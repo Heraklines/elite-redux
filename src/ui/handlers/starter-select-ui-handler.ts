@@ -173,6 +173,19 @@ export interface StarterRosterPickOptions {
   onRosterConfirm: (rootIds: number[]) => void;
 }
 
+/**
+ * Showdown Team Menu offline-build entry options, passed to `show()`'s THIRD arg by the flow wiring
+ * (title-phase). EDIT pre-seeds the grid with the preset's reconstructed mons; the cancel hook routes
+ * the grid top-level back-out to the Team Menu (restoring the borrowed gameMode) instead of the title.
+ * Showdown-only; every other caller omits it.
+ */
+export interface ShowdownPresetBuildEntry {
+  /** Reconstructed starters to pre-seed the grid party (EDIT in place); empty/omitted for CREATE. */
+  seedStarters?: Starter[];
+  /** Grid top-level back-out handler: returns to the Team Menu, restores the borrowed gameMode. */
+  onCancel?: () => void;
+}
+
 interface LanguageSetting {
   starterInfoTextSize: string;
   instructionTextSize: string;
@@ -602,6 +615,17 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * seconds off this. Null (unset) until the first editor open; reset on handler teardown.
    */
   private showdownPickDeadline: number | null = null;
+  /**
+   * Showdown Team Menu offline build (addendum): when the grid is opened to EDIT/CREATE a preset, this
+   * routes the grid top-level back-out to the Team Menu (restoring the borrowed gameMode + reopening the
+   * menu) INSTEAD of the title. Set from the show args; null in the live versus flow and every other mode.
+   */
+  private showdownBuildOnCancel: (() => void) | null = null;
+  /**
+   * Showdown EDIT: the in-flight seed asset load. `seedTeamFromStarters` adds the party mini-icons once
+   * the sprites resolve; exposed so the render harness can await a fully-seeded grid before snapshotting.
+   */
+  private showdownSeedInFlight: Promise<void> | null = null;
   private startCursorObj: Phaser.GameObjects.NineSlice;
   private randomCursorObj: Phaser.GameObjects.NineSlice;
   /** ER: cursor for the "Use Last Team" action (sits above the Random button). */
@@ -1702,6 +1726,21 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.filterBarCursor = 0;
       this.setCursor(0);
       this.tryUpdateValue(0);
+
+      // Showdown Team Menu offline build (addendum): the flow may pass a build-options bag as args[2].
+      //   - `onCancel`: route the grid top-level back-out to the Team Menu (not the title) - see tryExit.
+      //   - `seedStarters`: pre-seed the grid party when EDITING a preset, so the team strip shows the
+      //     preset's mons and each opens in the editor with its saved set (rules re-checked at Done).
+      // Reset every show so a stale build callback / seed never leaks into a later normal open.
+      this.showdownBuildOnCancel = null;
+      this.showdownSeedInFlight = null;
+      const showdownBuild = (args.length > 2 ? args[2] : null) as ShowdownPresetBuildEntry | null;
+      if (globalScene.gameMode.isShowdown && showdownBuild != null) {
+        this.showdownBuildOnCancel = showdownBuild.onCancel ?? null;
+        if (showdownBuild.seedStarters != null && showdownBuild.seedStarters.length > 0) {
+          this.seedTeamFromStarters(showdownBuild.seedStarters);
+        }
+      }
 
       // Roster-pick mode: hide the party point-budget label and paint the initial marks.
       this.valueLimitLabel.setVisible(!this.rosterPickMode);
@@ -6981,6 +7020,20 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       ui.setModeWithoutClear(
         UiMode.CONFIRM,
         () => {
+          // Showdown Team Menu offline build (addendum): the grid was opened to EDIT/CREATE a preset, so
+          // backing out returns to the Team Menu (restoring the borrowed gameMode + reopening the menu via
+          // onCancel -> onSettled), NOT the title. Pop the CONFIRM overlay, then hand back to the flow. This
+          // path never ends the TitlePhase (which is still the current phase driving the menu).
+          if (this.showdownBuildOnCancel != null) {
+            const onCancel = this.showdownBuildOnCancel;
+            this.showdownBuildOnCancel = null;
+            this.clearText();
+            void ui.revertMode().then(() => {
+              this.blockInput = false;
+              onCancel();
+            });
+            return;
+          }
           ui.setMode(UiMode.STARTER_SELECT);
           // Non-challenge modes go directly back to title, while challenge modes go to the selection screen.
           if (globalScene.gameMode.isChallenge) {
@@ -7012,11 +7065,24 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     if (!lastTeam || lastTeam.length === 0) {
       return false;
     }
+    return this.seedTeamFromStarters(lastTeam);
+  }
 
+  /**
+   * Seed the party grid from a provided list of saved {@linkcode Starter}s. Two callers:
+   *   - "Use Last Team" ({@linkcode restoreLastTeam}) with the persisted last run team.
+   *   - Showdown Team Menu EDIT (addendum): the preset's mons reconstructed via `manifestToStarter`,
+   *     each carrying its saved stage/shiny/item/moves/nature/ability, so editing starts pre-populated.
+   * Skips species not caught in this save + any the active challenge forbids, and stops adding once the
+   * point-value limit would be exceeded (effectively unlimited in showdown). Returns false when nothing
+   * could be added. Rules are NOT enforced here - Ready/Done re-validates as usual, so a now-illegal
+   * preset still loads with its mons.
+   */
+  seedTeamFromStarters(savedTeam: Starter[]): boolean {
     // Resolve which saved starters are usable (caught) and precompute their dex
     // attributes before mutating any selection state.
     const entries: { saved: Starter; species: PokemonSpecies; dexAttr: bigint }[] = [];
-    for (const saved of lastTeam.slice(0, 6)) {
+    for (const saved of savedTeam.slice(0, 6)) {
       const species = getPokemonSpecies(saved.speciesId);
       if (!species || !this.getSpeciesData(saved.speciesId).dexEntry.caughtAttr) {
         continue;
@@ -7057,7 +7123,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         true,
       );
     });
-    Promise.all(loads).then(() => {
+    this.showdownSeedInFlight = Promise.all(loads).then(() => {
       for (const e of entries) {
         const cost = globalScene.gameData.getSpeciesStarterValue(e.species.speciesId);
         if (!this.tryUpdateValue(cost, true)) {

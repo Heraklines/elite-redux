@@ -215,22 +215,31 @@ input:-internal-autofill-selected {
     [data-ui-mode="STARTER_SELECT"],
     [data-ui-mode="POKEDEX"],
     [data-ui-mode="POKEDEX_PAGE"],
-    [data-ui-mode="RUN_INFO"]
+    [data-ui-mode="RUN_INFO"],
+    [data-ui-mode="SHOWDOWN_SET_EDITOR"]
   )
   #apadCycleForm,
 #touchControls:not(.config-mode):not(
     [data-ui-mode="STARTER_SELECT"],
     [data-ui-mode="POKEDEX"],
     [data-ui-mode="POKEDEX_PAGE"],
-    [data-ui-mode="RUN_INFO"]
+    [data-ui-mode="RUN_INFO"],
+    [data-ui-mode="SHOWDOWN_TEAM_MENU"],
+    [data-ui-mode="SHOWDOWN_SET_EDITOR"]
   )
   #apadCycleShiny,
-#touchControls:not(.config-mode):not([data-ui-mode="STARTER_SELECT"])
+#touchControls:not(.config-mode):not(
+    [data-ui-mode="STARTER_SELECT"],
+    [data-ui-mode="SHOWDOWN_TEAM_MENU"],
+    [data-ui-mode="SHOWDOWN_SET_EDITOR"]
+  )
   #apadCycleNature,
 #touchControls:not(.config-mode):not(
     [data-ui-mode="STARTER_SELECT"],
     [data-ui-mode="POKEDEX_PAGE"],
-    [data-ui-mode="RUN_INFO"]
+    [data-ui-mode="RUN_INFO"],
+    [data-ui-mode="SHOWDOWN_TEAM_MENU"],
+    [data-ui-mode="SHOWDOWN_SET_EDITOR"]
   )
   #apadCycleAbility,
 #touchControls:not(.config-mode):not(

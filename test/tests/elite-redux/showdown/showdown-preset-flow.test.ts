@@ -140,6 +140,121 @@ describe.runIf(RUN)("showdown preset flow - build orchestrator + views + pending
     expect(list[0].mons[0].speciesId).toBe(SpeciesId.VENUSAUR);
   });
 
+  it("EDIT pre-seeds the grid with the preset's reconstructed mons, then saves the modified team in place", () => {
+    const gd = game.scene.gameData;
+    // A rich preset: a FIELDED evolution (Venusaur off the Bulbasaur line), a non-default nature, a
+    // shiny+variant, and a real moveset - every facet the edit-seed must carry into the grid pre-show.
+    const preset: ShowdownMonManifest[] = [
+      bulbasaur({
+        speciesId: SpeciesId.VENUSAUR,
+        formIndex: 0,
+        rootSpeciesId: SpeciesId.BULBASAUR,
+        nature: 5,
+        shiny: true,
+        variant: 1,
+        moveset: [MoveId.TACKLE, MoveId.GROWL],
+      }),
+      bulbasaur({ speciesId: SpeciesId.CHARMANDER, rootSpeciesId: SpeciesId.CHARMANDER, nature: 2 }),
+    ];
+    gd.saveShowdownTeamPreset("Grass+Fire", preset);
+    // Title-phase reconstructs the seed exactly this way (manifestToStarter over the preset's mons).
+    const seedStarters = preset.map(manifestToStarter);
+
+    let seenSeed: Starter[] | null = null;
+    runShowdownPresetBuild(
+      0,
+      "Grass+Fire",
+      {
+        // The grid handler receives `seed` as its show arg (args[2].seedStarters) - capture it and assert it
+        // reconstructs the preset. RED-PROOF: revert the seeding (drop the 4th arg / pass []) and `seenSeed`
+        // is EMPTY, so the length + per-field assertions below fail naming the empty party.
+        openStarterSelect: (onLockIn, _onCancel, seed) => {
+          seenSeed = seed;
+          // A modified confirm: the player swaps in a different final team; edit must save it in place.
+          onLockIn([
+            manifestToStarter(bulbasaur({ speciesId: SpeciesId.IVYSAUR, rootSpeciesId: SpeciesId.BULBASAUR })),
+          ]);
+        },
+        promptName: (_def, onName) => onName("Grass+Fire v2"),
+        toManifest: s => starterToManifest(s, gd),
+        save: (name, mons, index) => gd.saveShowdownTeamPreset(name, mons, index),
+        onSettled: () => {},
+      },
+      seedStarters,
+    );
+
+    // The seeded party pre-show matches the preset's manifests (species/form/shiny/nature/moves).
+    expect(seenSeed).not.toBeNull();
+    expect(seenSeed!).toHaveLength(preset.length);
+    seenSeed!.forEach((s, i) => {
+      const m = preset[i];
+      expect(s.speciesId).toBe(m.rootSpeciesId); // grid pick is the line ROOT
+      expect(s.showdownSpeciesId).toBe(m.speciesId); // fielded stage
+      expect(s.showdownFormIndex).toBe(m.formIndex);
+      expect(s.shiny).toBe(m.shiny);
+      expect(s.variant).toBe(m.variant);
+      expect(s.nature).toBe(m.nature);
+      expect(s.moveset).toEqual(m.moveset);
+    });
+    // ...and the reconstruction round-trips byte-identical to the stored manifests (baseCost normalized).
+    const norm = (x: ShowdownMonManifest) => ({ ...x, baseCost: 0 });
+    expect(seenSeed!.map(s => norm(starterToManifest(s, gd)))).toEqual(preset.map(norm));
+
+    // The modified confirm saved IN PLACE at index 0; index 1 untouched, no new slot appended.
+    const list = gd.listShowdownTeamPresets();
+    expect(list.map(p => p.name)).toEqual(["Grass+Fire v2"]);
+    expect(list[0].mons.map(m => m.speciesId)).toEqual([SpeciesId.IVYSAUR]);
+  });
+
+  it("CANCEL from the offline build (create + edit) returns to the Team Menu without saving", () => {
+    const gd = game.scene.gameData;
+    gd.saveShowdownTeamPreset("Keep", [bulbasaur()]);
+
+    // EDIT-cancel: the player backs out of the grid (onCancel fired). It must settle WITHOUT saving,
+    // restore the borrowed gameMode (modeled by `borrowed`), reopen the menu (`settled`), and never leak
+    // a pending lobby-preset stash. This is the fix: previously cancel exited to the title, not the menu.
+    let borrowed = true; // title-phase borrows SHOWDOWN for the build; onSettled restores it
+    let settled = 0;
+    const editSave = vi.fn();
+    runShowdownPresetBuild(
+      0,
+      "Keep",
+      {
+        openStarterSelect: (_onLockIn, onCancel) => onCancel(),
+        promptName: (_d, on) => on("won't happen"),
+        toManifest: s => starterToManifest(s, gd),
+        save: editSave,
+        onSettled: () => {
+          borrowed = false; // gameMode restored on the cancel path (clean, no next-launch self-heal)
+          settled++; // reopened the Team Menu
+        },
+      },
+      [manifestToStarter(bulbasaur())],
+    );
+    expect(editSave).not.toHaveBeenCalled();
+    expect(settled).toBe(1);
+    expect(borrowed).toBe(false);
+    expect(gd.listShowdownTeamPresets().map(p => p.name)).toEqual(["Keep"]); // preset unchanged
+    expect(consumePendingShowdownPresetStarters()).toBeNull(); // offline build never touched the lobby stash
+
+    // CREATE-cancel: same terminal (settle, no save) with no editIndex.
+    let createSettled = 0;
+    const createSave = vi.fn();
+    runShowdownPresetBuild(undefined, "Team", {
+      openStarterSelect: (_onLockIn, onCancel) => onCancel(),
+      promptName: (_d, on) => on("won't happen"),
+      toManifest: s => starterToManifest(s, gd),
+      save: createSave,
+      onSettled: () => {
+        createSettled++;
+      },
+    });
+    expect(createSave).not.toHaveBeenCalled();
+    expect(createSettled).toBe(1);
+    expect(gd.listShowdownTeamPresets().map(p => p.name)).toEqual(["Keep"]); // still just the one preset
+    expect(consumePendingShowdownPresetStarters()).toBeNull();
+  });
+
   it("CANCEL (no lock-in) returns without saving", () => {
     const gd = game.scene.gameData;
     const save = vi.fn();

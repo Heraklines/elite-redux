@@ -45,6 +45,7 @@ import {
   unlockErShinyLabNameFx,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
+import { manifestToStarter } from "#data/elite-redux/showdown/showdown-manifest";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { trainerConfigs } from "#data/trainers/trainer-config";
 import { AbilityId } from "#enums/ability-id";
@@ -820,6 +821,88 @@ const RECIPES: Record<string, Recipe> = {
       // Field the terminal evolution - re-stamps the in-party starter AND re-renders the detail
       // panel + party icon through the real item-15 display path.
       internals.setShowdownStage(SpeciesId.BULBASAUR, SpeciesId.VENUSAUR, 0);
+      ui.setActiveHandler?.(handler);
+      return handler;
+    },
+  },
+  // Showdown Team Menu EDIT entry (addendum): opening the grid to EDIT an existing preset PRE-SEEDS the
+  // party with the preset's reconstructed mons via the real show() seed path (args[2].seedStarters ->
+  // seedTeamFromStarters -> addToParty). The snapshot must show the team strip PRE-POPULATED (three party
+  // mini-icons: Venusaur/Charizard/Blastoise), not the empty grid the player used to rebuild from. The
+  // async seed asset-load is awaited (showdownSeedInFlight) before the golden capture.
+  "starter-select-showdown-edit": {
+    mode: UiMode.STARTER_SELECT,
+    prepare: game => {
+      game.scene.gameMode = getGameMode(GameModes.SHOWDOWN);
+      for (let id = 1; id <= 151; id++) {
+        caughtSpecies(game, id as SpeciesId);
+      }
+      return [() => {}];
+    },
+    render: async game => {
+      game.scene.gameMode = getGameMode(GameModes.SHOWDOWN);
+      const ui: any = game.scene.ui;
+      const registered: any = ui.handlers[UiMode.STARTER_SELECT];
+      let handler: any = registered;
+      try {
+        handler = new registered.constructor();
+      } catch {
+        handler = registered;
+      }
+      handler.setup();
+      // Reconstruct three preset mons (each FIELDED as its terminal evolution) exactly as title-phase
+      // does, and hand them to the grid via the real edit-seed show arg.
+      const seedStarters = [
+        manifestToStarter({
+          speciesId: SpeciesId.VENUSAUR,
+          formIndex: 0,
+          level: 100,
+          shiny: false,
+          variant: 0,
+          abilityIndex: 0,
+          nature: 5,
+          ivs: [31, 31, 31, 31, 31, 31],
+          moveset: [MoveId.TACKLE, MoveId.GROWL, MoveId.VINE_WHIP, MoveId.LEECH_SEED],
+          item: "LEFTOVERS",
+          rootSpeciesId: SpeciesId.BULBASAUR,
+          erBlackShiny: false,
+          baseCost: 4,
+        }),
+        manifestToStarter({
+          speciesId: SpeciesId.CHARIZARD,
+          formIndex: 0,
+          level: 100,
+          shiny: false,
+          variant: 0,
+          abilityIndex: 0,
+          nature: 2,
+          ivs: [31, 31, 31, 31, 31, 31],
+          moveset: [MoveId.EMBER, MoveId.GROWL, MoveId.SCRATCH, MoveId.LEER],
+          item: "FLAME_ORB",
+          rootSpeciesId: SpeciesId.CHARMANDER,
+          erBlackShiny: false,
+          baseCost: 4,
+        }),
+        manifestToStarter({
+          speciesId: SpeciesId.BLASTOISE,
+          formIndex: 0,
+          level: 100,
+          shiny: false,
+          variant: 0,
+          abilityIndex: 0,
+          nature: 0,
+          ivs: [31, 31, 31, 31, 31, 31],
+          moveset: [MoveId.TACKLE, MoveId.TAIL_WHIP, MoveId.BUBBLE, MoveId.WITHDRAW],
+          item: "LEFTOVERS",
+          rootSpeciesId: SpeciesId.SQUIRTLE,
+          erBlackShiny: false,
+          baseCost: 4,
+        }),
+      ];
+      handler.show([() => {}, undefined, { seedStarters, onCancel: () => {} }]);
+      // The seed loads sprites asynchronously and adds the party icons on resolution - await it so the
+      // golden captures the fully-seeded team strip (not a race with the empty grid).
+      await handler.showdownSeedInFlight;
       ui.setActiveHandler?.(handler);
       return handler;
     },

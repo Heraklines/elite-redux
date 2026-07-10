@@ -55,8 +55,13 @@ export function buildTeamMenuPresetViews(gameData: ShowdownTeamMenuGameData): Sh
  * the account-save CRUD; the flow test wires fakes.
  */
 export interface ShowdownPresetBuildDeps {
-  /** Open the teambuild (starter-select + editor). Calls `onLockIn` with the built team on confirm. */
-  openStarterSelect: (onLockIn: (starters: Starter[]) => void) => void;
+  /**
+   * Open the teambuild (starter-select + editor). Calls `onLockIn` with the built team on confirm, or
+   * `onCancel` when the player backs out of the grid at the top level (the offline build returns to the
+   * Team Menu, not the title). `seedStarters` pre-seeds the grid party when EDITING an existing preset
+   * (each reconstructed with its saved stage/shiny/item/moves/nature/ability); empty for CREATE.
+   */
+  openStarterSelect: (onLockIn: (starters: Starter[]) => void, onCancel: () => void, seedStarters: Starter[]) => void;
   /** Prompt for a team name. Calls `onName` with the entered name, or `null` when cancelled. */
   promptName: (defaultName: string, onName: (name: string | null) => void) => void;
   /** Map a built {@linkcode Starter} to its wire manifest (production: `starterToManifest`). */
@@ -70,25 +75,33 @@ export interface ShowdownPresetBuildDeps {
 /**
  * Offline create/edit orchestration. On a confirmed build: map to manifests, prompt for a name, and
  * SAVE (new when `editIndex` is undefined; IN PLACE at `editIndex` when editing). A cancelled name
- * prompt (or an empty build) settles WITHOUT saving. Every path ends in `onSettled` so the caller
- * always returns to the menu.
+ * prompt (or an empty build) settles WITHOUT saving; BACKING OUT of the grid (`onCancel`) likewise
+ * settles without saving. Every path ends in `onSettled` so the caller always returns to the menu
+ * (and restores the borrowed gameMode). `seedStarters` is forwarded to the teambuild for EDIT.
  */
 export function runShowdownPresetBuild(
   editIndex: number | undefined,
   defaultName: string,
   deps: ShowdownPresetBuildDeps,
+  seedStarters: Starter[] = [],
 ): void {
-  deps.openStarterSelect(starters => {
-    if (starters.length === 0) {
-      deps.onSettled();
-      return;
-    }
-    const mons = starters.map(deps.toManifest);
-    deps.promptName(defaultName, name => {
-      if (name != null && name.trim().length > 0) {
-        deps.save(name, mons, editIndex);
+  deps.openStarterSelect(
+    starters => {
+      if (starters.length === 0) {
+        deps.onSettled();
+        return;
       }
-      deps.onSettled();
-    });
-  });
+      const mons = starters.map(deps.toManifest);
+      deps.promptName(defaultName, name => {
+        if (name != null && name.trim().length > 0) {
+          deps.save(name, mons, editIndex);
+        }
+        deps.onSettled();
+      });
+    },
+    // Grid back-out: settle WITHOUT saving (returns to the menu, restores the gameMode) - same terminal
+    // as an empty/cancelled build, so create-cancel and edit-cancel both land cleanly on the Team Menu.
+    () => deps.onSettled(),
+    seedStarters,
+  );
 }

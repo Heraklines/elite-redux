@@ -436,38 +436,85 @@ export class TitlePhase extends Phase {
    */
   private openShowdownPresetBuild(editIndex: number | undefined, onSettled: () => void): void {
     const { gameData } = globalScene;
-    const prevGameMode = this.gameMode;
+    // Live fix #5 (2026-07-10, "naming my team doesn't advance"): capture the LIVE gameMode OBJECT.
+    // The previous capture used `this.gameMode` (a GameModes id the TitlePhase only carries when
+    // launching a real run - undefined while sitting in title menus), so settle() restored
+    // getGameMode(undefined) -> undefined and EVERY subsequent setMode crashed reading
+    // gameMode.isCoop (and the grid's shiny-lab timer crashed reading gameMode.challenges).
+    // The realpath test masked it by stamping phase.gameMode manually.
+    const prevGameMode = globalScene.gameMode;
     globalScene.gameMode = getGameMode(GameModes.SHOWDOWN);
-    const defaultName =
-      editIndex === undefined ? "Team" : (gameData.listShowdownTeamPresets()[editIndex]?.name ?? "Team");
-    runShowdownPresetBuild(editIndex, defaultName, {
-      openStarterSelect: onLockIn => {
-        void globalScene.ui.setMode(UiMode.STARTER_SELECT, (starters: Starter[]) => {
-          globalScene.ui.clearText();
-          onLockIn(starters);
-        });
+    const editing = editIndex === undefined ? undefined : gameData.listShowdownTeamPresets()[editIndex];
+    const defaultName = editing?.name ?? "Team";
+    // EDIT (addendum): pre-seed the grid with the preset's mons so the player edits IN PLACE, rather than
+    // rebuilding from an empty grid. Each mon is reconstructed with its saved stage/shiny/item/moves/
+    // nature/ability via `manifestToStarter` and fed into starter-select's show args (seedStarters), which
+    // seeds the party + team strip. CREATE seeds nothing. Rules stay enforced (Done re-validates as usual).
+    const seedStarters: Starter[] = editing == null ? [] : editing.mons.map(manifestToStarter);
+    // Both the SAVE path and every CANCEL path funnel through this settle: restore the borrowed gameMode
+    // (the offline build only borrowed SHOWDOWN to drive the teambuild UI) and reopen the Team Menu. This
+    // makes the cancel-to-menu path clean (no reliance on next-launch self-healing to restore the gameMode).
+    const settle = () => {
+      globalScene.gameMode = prevGameMode;
+      onSettled();
+    };
+    runShowdownPresetBuild(
+      editIndex,
+      defaultName,
+      {
+        openStarterSelect: (onLockIn, onCancel, seed) => {
+          // Live fix #3 (2026-07-10): NO showText hop. Fix #2's awaited-MESSAGE chain logged
+          // "MESSAGE settled" live and then went silent - `showText("", ...)` on the real
+          // MessageUiHandler never invoked its callback for empty text, so openGrid() never ran.
+          // (The Team Menu's identical-looking bounce works only because ITS showText runs on the
+          // title-context handler, which does fire.) The hop added nothing but that risk: open the
+          // grid DIRECTLY with awaited transitions and a breadcrumb at every step, so any residual
+          // live failure names its exact step in the console instead of a silent no-op.
+          void (async () => {
+            try {
+              await globalScene.ui.setMode(UiMode.MESSAGE);
+              globalScene.ui.resetModeChain();
+              console.log(`[showdown-build] MESSAGE settled -> opening starter-select (seed=${seed.length})`);
+              await globalScene.ui.setMode(
+                UiMode.STARTER_SELECT,
+                (starters: Starter[]) => {
+                  globalScene.ui.clearText();
+                  onLockIn(starters);
+                },
+                undefined,
+                {
+                  seedStarters: seed,
+                  // Grid top-level back-out routes here (not to the title): return to the Team Menu.
+                  onCancel: () => {
+                    globalScene.ui.clearText();
+                    onCancel();
+                  },
+                },
+              );
+              console.log("[showdown-build] starter-select OPEN");
+            } catch (err) {
+              console.error("[showdown-build] starter-select open failed", err);
+            }
+          })();
+        },
+        promptName: (def, onName) => {
+          globalScene.ui.setOverlayMode(
+            UiMode.COMMUNITY_CHALLENGE_TEXT,
+            {
+              buttonActions: [
+                (value: string) => globalScene.ui.revertMode().then(() => onName(value)),
+                () => globalScene.ui.revertMode().then(() => onName(null)),
+              ],
+            },
+            { title: "Name your team", fieldLabel: "Team name", initial: def },
+          );
+        },
+        toManifest: (starter: Starter) => starterToManifest(starter, gameData),
+        save: (name, mons, index) => gameData.saveShowdownTeamPreset(name, mons, index),
+        onSettled: settle,
       },
-      promptName: (def, onName) => {
-        globalScene.ui.setOverlayMode(
-          UiMode.COMMUNITY_CHALLENGE_TEXT,
-          {
-            buttonActions: [
-              (value: string) => globalScene.ui.revertMode().then(() => onName(value)),
-              () => globalScene.ui.revertMode().then(() => onName(null)),
-            ],
-          },
-          { title: "Name your team", fieldLabel: "Team name", initial: def },
-        );
-      },
-      toManifest: (starter: Starter) => starterToManifest(starter, gameData),
-      save: (name, mons, index) => gameData.saveShowdownTeamPreset(name, mons, index),
-      onSettled: () => {
-        // Restore the pre-build gameMode (the offline build only borrowed SHOWDOWN to drive the
-        // teambuild UI - no run was launched) and reopen the Team Menu with the saved team shown.
-        globalScene.gameMode = getGameMode(prevGameMode);
-        onSettled();
-      },
-    });
+      seedStarters,
+    );
   }
 
   /**

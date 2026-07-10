@@ -21,9 +21,13 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, setCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
+import {
+  beginShowdownBattle,
+  endShowdownBattle,
+  setPendingShowdownPresetStarters,
+} from "#data/elite-redux/showdown/showdown-battle-state";
 import { manifestToStarter, starterToManifest } from "#data/elite-redux/showdown/showdown-manifest";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { GameModes } from "#enums/game-modes";
@@ -128,4 +132,25 @@ describe.skipIf(!RUN)("Showdown Team Menu - pre-built preset -> two-engine battl
 
     logs.flush();
   }, 300_000);
+
+  it("RED-PROOF: reaching the versus flow with NO pending preset hard-fails to a message, never the grid", async () => {
+    // Stale-wiring guard (maintainer #3): teams are built BEFORE pairing now, so a client should ALWAYS
+    // carry a pending preset into startShowdownSelect. If it doesn't (a reconnect after the single-use
+    // stash was consumed, or any legacy direct-lobby path), the OLD code fell through to the interactive
+    // STARTER_SELECT grid - "sent to pick another team mid-pairing". It must hard-fail to a clear message
+    // instead. RED-PROOF: restore the grid fallthrough and this asserts STARTER_SELECT opened.
+    await game.runToTitle();
+    // Stand up a versus session so SelectStarterPhase takes the showdown branch (needs a coop controller
+    // + runtime; both come from the local versus session).
+    startLocalCoopSession({ username: "solo", kind: "versus" });
+    game.scene.gameMode = getGameMode(GameModes.SHOWDOWN);
+    setPendingShowdownPresetStarters(null); // the fault condition: no team carried in
+
+    new SelectStarterPhase().start();
+    await new Promise(r => setTimeout(r, 300));
+
+    expect(globalScene.ui.getMode(), "must NOT drop into the starter-select grid").not.toBe(UiMode.STARTER_SELECT);
+    expect(globalScene.ui.getMode(), "aborts to a clear message + back-out").toBe(UiMode.MESSAGE);
+    clearCoopRuntime();
+  }, 120_000);
 });
