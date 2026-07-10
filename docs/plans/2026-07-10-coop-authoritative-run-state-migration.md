@@ -993,6 +993,52 @@ that landed:
   strictly BELOW it (`<`, not `<=`) so a re-delivery is caught by the `operationId` dedupe instead. Reset
   the surface state at session assembly so reused seq addresses across runs/scenarios don't false-dedupe.
 
+### 8.2.1 Design deltas Wave-2d hit (reward shop + biome market, SURFACE 3 — multi-action stream)
+
+Wave-2d migrated the highest-traffic surface (`reward`* #1 + `biomeShop` #5, `coop-reward-operation.ts`).
+It is the first surface where ONE pinned interaction relays a STREAM of actions (buy, buy, lock, reroll,
+… leave) rather than a single pick, and that forced two amendments every later multi-action surface (ME,
+colosseum) copies:
+
+- **MULTI-ACTION OPERATION-ID (the single-pin id is not enough).** Wave-2a keyed the `operationId` on the
+  pinned counter alone (`${epoch}:${owner}:${pin}`) because biome travel is one-pick-per-pin. A shop relays
+  N actions on the SAME pin, so a pin-only id would make the guest applier dedupe every action after the
+  first. Wave-2d suffixes the pin with a **per-interaction monotonic ACTION ORDINAL** (`pin * ACTION_STRIDE
+  + ordinal`), tracked SEPARATELY for the owner (advanced on commit) and the watcher (advanced on adopt) so
+  the two roles never contaminate in the single-process duo harness (§8.2 pitfall). The ordinal resets when
+  the pin changes; a reroll/continuation KEEPS the pin, so the ordinal (and the operation identity) carries
+  across it. This generalizes cleanly: a single-pick surface is just the ordinal-always-0 case.
+- **TWO WATERMARKS, not one, for a stream.** Wave-2a's single `lastAppliedPinned` (`pick < it` → reject)
+  can't distinguish "a legit 2nd buy on the current interaction" (same pin, must ADOPT) from "a stale
+  leftover / a late-after-leave" (reject). Wave-2d splits it: `lastAdoptedStart` (the highest interaction
+  the watcher adopted ANY action at — `pin < it` rejects a strictly-earlier interaction's leftover, the
+  #861 cross-interaction shape) AND `lastLeftStart` (the highest interaction the watcher adopted a TERMINAL
+  skip/leave for — `pin <= it` rejects a late choice for an interaction already LEFT). Within a live
+  interaction (`pin > both`) every action passes, so a legitimate multi-buy stream is adopted verbatim. The
+  strict-`<` vs `<=` distinction is load-bearing: adopts use `<` (same-pin actions pass), the leave uses
+  `<=` (same-pin late choices reject).
+- **NESTED SUB-PICKS = MULTI-STEP OP PAYLOAD, not sub-operations.** The party-target / TM-move-slot /
+  ability-slot / fusion-pair sub-pick a reward can require is NOT a separate operation. The reward shop
+  already collapses the party-target menu into the ONE terminal relay (`coopFlushPending([slot, option])`
+  → one `coopRelaySend`), so the sub-pick rides in that single action's payload `data` (a "multi-step op
+  payload"). One human reward decision = one operation, regardless of how many sub-menus it walked through.
+  Separate sub-SURFACES that fire their OWN relay channel (the ability-capsule phase #4, learn-move-forward
+  #11) stay their own operations, migrated in their own wave — the boundary is "does it fire its own relay
+  send," not "is there a nested menu."
+- **CONTINUATION COPIES inherit the OPERATION, not a raw pin (#866, confirmed).** A move-learn continuation
+  copy (`BiomeShopPhase.copy()` / the base `SelectModifierPhase.copy()`) re-opens the shop on the
+  ALREADY-pinned interaction. Because the `operationId` derives from the inherited pin (+ the continuing
+  ordinal), the copy's actions keep the SAME operation identity and the SAME watermark tier — it is NOT the
+  unpinned orphan #866 described (whose terminal fired an asymmetric #837 unpinned advance and opened a
+  stray screen). The adapter needs NOTHING copy-specific: inheriting the pin is sufficient, which is the
+  general rule — a continuation is "same interaction, later action," structurally indistinguishable from a
+  second buy.
+- **SHARED STATE ACROSS SIBLING SURFACES is correct here.** The reward shop and the biome market pin on
+  DIFFERENT fields (`coopInteractionStart` vs `coopBiomeStart`) but the SAME monotonic interaction-counter
+  space, so `coop-reward-operation.ts` serves BOTH with ONE shared watermark/host/guest state — a
+  reward-then-market run gets cross-surface stale rejection for free. Sibling surfaces that share a counter
+  space should share adapter state; surfaces on disjoint counters should not.
+
 ### 8.3 Flag semantics (per surface)
 
 `is<Surface>OperationEnabled()`: default ON. Activation is HARD-gated by the `COOP_PROTOCOL_VERSION`
