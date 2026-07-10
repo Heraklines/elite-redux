@@ -6104,6 +6104,14 @@ export interface MoveAbilityBypassAbAttrParams extends AbAttrBaseParams {
   move: Move;
   /** Holds whether the move's ability should be ignored */
   cancelled: BooleanHolder;
+  /**
+   * Elite Redux — the move's target, when the bypass is being evaluated in a
+   * context where the defender is known (the accuracy / effect-application
+   * paths thread it through). Bypass variants that gate on the user↔target
+   * interaction (e.g. Deadly Precision's "super-effective attacks ignore the
+   * target's abilities") read it. `undefined` in target-less contexts.
+   */
+  target?: Pokemon | undefined;
 }
 
 export class MoveAbilityBypassAbAttr extends AbAttr {
@@ -6121,6 +6129,28 @@ export class MoveAbilityBypassAbAttr extends AbAttr {
 
   override apply({ cancelled }: MoveAbilityBypassAbAttrParams): void {
     cancelled.value = true;
+  }
+}
+
+/**
+ * Elite Redux — `MoveAbilityBypassAbAttr` gated to SUPER-EFFECTIVE moves only.
+ *
+ * Models the Deadly Precision (er 794) clause "Allows super effective attacks
+ * to ignore the target's abilities and innates that interfere with effects or
+ * reduce damage." Unlike the base class (which ignores the defender's ability
+ * for EVERY move), this only fires when the move is super-effective against the
+ * actual target. It therefore needs the target, which the IGNORE_ABILITIES
+ * consult threads through {@linkcode MoveAbilityBypassAbAttrParams.target}. In
+ * a target-less consult (e.g. the ally-accuracy path) the gate fails closed and
+ * the bypass does not fire.
+ */
+export class SuperEffectiveMoveAbilityBypassAbAttr extends MoveAbilityBypassAbAttr {
+  override canApply(params: MoveAbilityBypassAbAttrParams): boolean {
+    if (!super.canApply(params)) {
+      return false;
+    }
+    const { pokemon, move, target } = params;
+    return target != null && target.getMoveEffectiveness(pokemon, move) > 1;
   }
 }
 

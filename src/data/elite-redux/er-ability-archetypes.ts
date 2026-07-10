@@ -79,7 +79,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   276: { erAbilityId: 276, archetype: "bespoke", params: null },
   277: { erAbilityId: 277, archetype: "priority-modifier", params: {"condition":{"kind":"max-hp"},"priority":1,"filter":{"flag":"PUNCHING_MOVE"}} },
   278: { erAbilityId: 278, archetype: "bespoke", params: null },
-  279: { erAbilityId: 279, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"FIRE","multiplier":1.2} },
+  279: { erAbilityId: 279, archetype: "bespoke", params: null },
   280: { erAbilityId: 280, archetype: "type-conversion", params: {"sourceType":"ROCK","targetType":"ICE","multiplier":1.1} },
   281: { erAbilityId: 281, archetype: "type-damage-boost", params: {"type":"ELECTRIC","multiplier":1.25} },
   282: { erAbilityId: 282, archetype: "bespoke", params: null },
@@ -125,7 +125,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   322: { erAbilityId: 322, archetype: "type-damage-boost", params: {"type":"ELECTRIC","multiplier":1.2,"lowHpMultiplier":1.5,"lowHpThreshold":0.3333333333333333} },
   323: { erAbilityId: 323, archetype: "bespoke", params: null },
   324: { erAbilityId: 324, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"GHOST"}} },
-  325: { erAbilityId: 325, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"POISON","multiplier":1.2} },
+  325: { erAbilityId: 325, archetype: "bespoke", params: null },
   326: { erAbilityId: 326, archetype: "bespoke", params: null },
   327: { erAbilityId: 327, archetype: "bespoke", params: null },
   328: { erAbilityId: 328, archetype: "bespoke", params: null }, // Overwhelm: Dragon hits Fairy for neutral AND immune to Intimidate/Scare (composite — see dispatchBespoke)
@@ -256,7 +256,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   456: { erAbilityId: 456, archetype: "bespoke", params: null },
   457: { erAbilityId: 457, archetype: "bespoke", params: null },
   458: { erAbilityId: 458, archetype: "type-damage-boost", params: {"type":"GHOST","multiplier":1.3,"lowHpMultiplier":1.8,"lowHpThreshold":0.3333333333333333} },
-  459: { erAbilityId: 459, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"PSYCHIC","multiplier":1.2} },
+  459: { erAbilityId: 459, archetype: "bespoke", params: null },
   460: { erAbilityId: 460, archetype: "composite-vanilla-mashup", params: {"parts":["Technician","Skill Link"]} },
   461: { erAbilityId: 461, archetype: "bespoke", params: null },
   462: { erAbilityId: 462, archetype: "bespoke", params: null }, // Combat Specialist: punching AND kicking +30% — the flag-damage-boost row only covered PUNCHING; bespoke case wires both (see dispatchBespoke)

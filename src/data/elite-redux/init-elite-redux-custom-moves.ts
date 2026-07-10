@@ -862,7 +862,15 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       move.attr(MovePowerMultiplierAttr, (_u, t) => (t?.status?.effect === StatusEffect.SLEEP ? 2 : 1));
       break;
     // ---- Self-switch after damage ----
-    case 848: // Ghastly Echo
+    case 848: // Ghastly Echo (rom): "Deals damage and switches. Switch-in gets
+      // 50% boost for 1 turn. Sound-based." Damage + force-switch + SOUND_BASED
+      // are wired here. The "switch-in gets +50% move power for 1 turn" half is
+      // DEFERRED: it needs a new battler tag applied to the INCOMING replacement
+      // mon (chosen in a later SwitchSummonPhase that ForceSwitchOutAttr has no
+      // handle on) — genuinely new engine work with no existing primitive.
+      move.attr(ForceSwitchOutAttr, true);
+      move.soundBased();
+      break;
     case 976: // Take Flight
       move.attr(ForceSwitchOutAttr, true);
       break;

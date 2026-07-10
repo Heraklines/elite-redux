@@ -19,7 +19,16 @@ import { ForceSwitchOutHelper, PostStatStageChangeAbAttr } from "#abilities/ab-a
 import { SwitchType } from "#enums/switch-type";
 import type { PostStatStageChangeAbAttrParams } from "#types/ability-types";
 
-const USED_FLAG = Symbol("SelfSwitchOnStatLower.used");
+/**
+ * Once-per-BATTLE marker key. Stored in the holder's per-wave data
+ * ({@linkcode PokemonWaveData.entryEffectsFired}) — which is a fresh object each
+ * wave/battle (`resetWaveData` on every EncounterPhase) — so the "already fled"
+ * flag auto-resets between battles. A previous impl kept the flag on the Pokemon
+ * object itself; because party members persist across waves in this engine, that
+ * flag was never cleared and the ability fired only once per RUN instead of once
+ * per battle.
+ */
+const USED_KEY = "erTacticalRetreat.used";
 
 export class SelfSwitchOnStatLowerAbAttr extends PostStatStageChangeAbAttr {
   private readonly helper = new ForceSwitchOutHelper(SwitchType.SWITCH);
@@ -27,7 +36,7 @@ export class SelfSwitchOnStatLowerAbAttr extends PostStatStageChangeAbAttr {
   override canApply(params: PostStatStageChangeAbAttrParams): boolean {
     const { pokemon, stages } = params;
     // Any stat LOWERED (incl. self-drops, per the ROM). Once per battle.
-    if ((pokemon as unknown as Record<symbol, boolean>)[USED_FLAG]) {
+    if (pokemon.waveData.entryEffectsFired.has(USED_KEY)) {
       return false;
     }
     return stages < 0;
@@ -38,7 +47,7 @@ export class SelfSwitchOnStatLowerAbAttr extends PostStatStageChangeAbAttr {
     if (simulated) {
       return;
     }
-    (pokemon as unknown as Record<symbol, boolean>)[USED_FLAG] = true;
+    pokemon.waveData.entryEffectsFired.add(USED_KEY);
     this.helper.switchOutLogic(pokemon);
   }
 }

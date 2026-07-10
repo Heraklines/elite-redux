@@ -42,6 +42,16 @@ export interface PostSummonScriptedMoveOptions {
    * never trigger when the holder is sent out first (no opponent yet).
    */
   readonly targetsSelf?: boolean;
+  /**
+   * When `true` (and not {@linkcode targetsSelf}), the scripted move is cast at
+   * EVERY non-fainted opponent in a single MovePhase (spread), not just the
+   * leftmost foe. Required for on-entry moves the ER dex says hit ALL opponents
+   * — e.g. Web Spinner's String Shot ("harshly lowering the Speed of ALL
+   * opponents by 2 stages"), which in doubles must lower both foes. No effect in
+   * singles (there is only one opponent). Other users default to the historic
+   * single-foe behavior.
+   */
+  readonly allOpponents?: boolean;
   readonly oncePerBattleKey?: string;
   /**
    * Cap the number of casts this battle (per wave). Requires
@@ -63,6 +73,16 @@ export interface PostSummonScriptedMoveOptions {
 export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
   constructor(private readonly opts: PostSummonScriptedMoveOptions) {
     super(false);
+  }
+
+  /** The move this ability casts on switch-in. */
+  public getMoveId(): MoveId {
+    return this.opts.moveId;
+  }
+
+  /** Whether the on-entry cast targets EVERY opponent (Web Spinner) vs the leftmost foe. */
+  public targetsAllOpponents(): boolean {
+    return this.opts.allOpponents ?? false;
   }
 
   /** How many times this ability has cast (this wave), for the count-capped variant. */
@@ -106,18 +126,19 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
     if (simulated) {
       return;
     }
-    let targetIndex: number;
+    let targets: number[];
     if (this.opts.targetsSelf) {
       // Self-side move (e.g. Tailwind) — cast at the holder so it always lands,
       // even when the holder is sent out before any opponent.
-      targetIndex = pokemon.getBattlerIndex();
+      targets = [pokemon.getBattlerIndex()];
     } else {
       const opponents = pokemon.getOpponents().filter(o => !o.isFainted());
       if (opponents.length === 0) {
         return;
       }
-      // Pick the first available opponent (in doubles, prefer the leftmost).
-      targetIndex = opponents[0].getBattlerIndex();
+      // ALL-opponents variant (Web Spinner) hits every living foe in one spread
+      // cast; the default picks the first available opponent (leftmost in doubles).
+      targets = this.opts.allOpponents ? opponents.map(o => o.getBattlerIndex()) : [opponents[0].getBattlerIndex()];
     }
     if (this.opts.oncePerBattleKey !== undefined) {
       if (this.opts.maxUsesPerBattle === undefined) {
@@ -139,7 +160,7 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
     globalScene.phaseManager.unshiftNew(
       "MovePhase",
       pokemon,
-      [targetIndex],
+      targets,
       scriptedPokemonMove(this.opts.moveId, this.opts.power, { nonReflectable: this.opts.nonReflectable ?? false }),
       useMode,
     );

@@ -947,7 +947,14 @@ export abstract class Move implements Localizable {
       case MoveFlags.IGNORE_ABILITIES:
         if (user.hasAbilityWithAttr("MoveAbilityBypassAbAttr")) {
           const abilityEffectsIgnored = new BooleanHolder(false);
-          applyAbAttrs("MoveAbilityBypassAbAttr", { pokemon: user, cancelled: abilityEffectsIgnored, move: this });
+          applyAbAttrs("MoveAbilityBypassAbAttr", {
+            pokemon: user,
+            cancelled: abilityEffectsIgnored,
+            move: this,
+            // ER: super-effective-gated bypass variants (Deadly Precision) need
+            // the defender to compute effectiveness; thread it when known.
+            target,
+          });
           if (abilityEffectsIgnored.value) {
             return true;
           }

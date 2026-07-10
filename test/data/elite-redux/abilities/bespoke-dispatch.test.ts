@@ -1852,14 +1852,17 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.attrs.find(a => a.constructor.name === "FlagDamageBoostAbAttr")).toBeDefined();
   });
 
-  it("er id 655 (Smokey Maneuvers) wires WeatherStatMultiplier(EVA, 1.25, [FOG])", () => {
+  it("er id 655 (Smokey Maneuvers) wires WeatherStatMultiplier(EVA, 4/3, [FOG])", () => {
     const res = dispatchArchetype("bespoke", null, 655);
     expect(res.skipReason).toBeNull();
     expect(res.attrs).toHaveLength(1);
     const attr = res.attrs[0] as WeatherStatMultiplierAbAttr;
     expect(attr).toBeInstanceOf(WeatherStatMultiplierAbAttr);
     expect(attr.stat).toBe(Stat.EVA);
-    expect(attr.multiplier).toBeCloseTo(1.25);
+    // Dex: "-25% foe accuracy in fog" => the foe's hit chance is x0.75, i.e. the
+    // holder's evasion multiplier is 1/0.75 = 4/3 (audit tier-8 batch-1 fix; was
+    // an incorrect flat 1.25).
+    expect(attr.multiplier).toBeCloseTo(4 / 3);
     expect(attr.getWeathers()).toEqual([WeatherType.FOG]);
   });
 

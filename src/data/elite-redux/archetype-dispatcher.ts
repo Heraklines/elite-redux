@@ -130,6 +130,7 @@ import {
   SpreadTargetByFlagAbAttr,
   StatMultiplierAbAttr,
   StealthRockImmunityAbAttr,
+  SuperEffectiveMoveAbilityBypassAbAttr,
   SuppressFieldEffectsAbAttr,
   SuppressWeatherEffectAbAttr,
   SwitchWhileRampagingAbAttr,
@@ -148,6 +149,7 @@ import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-d
 import { AbsorbantAbAttr } from "#data/elite-redux/archetypes/absorbant";
 import { AddTypeToAttackerOnContactAbAttr } from "#data/elite-redux/archetypes/add-type-to-attacker-on-contact";
 import { AllyAttackPowerBoostAbAttr } from "#data/elite-redux/archetypes/ally-attack-power-boost";
+import { ateConditionalAttrs } from "#data/elite-redux/archetypes/ate-conditional";
 import { AttackStatSubstituteAbAttr } from "#data/elite-redux/archetypes/attack-stat-substitute";
 import { BoneMoveTypeChartAbAttr } from "#data/elite-redux/archetypes/bone-move-type-chart";
 import { ChanceDodgeAbAttr } from "#data/elite-redux/archetypes/chance-dodge";
@@ -3821,19 +3823,50 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new ConditionalAlwaysHitAbAttr({ flag: MoveFlags.SLICING_MOVE }),
         new IgnoreProtectByFlagAbAttr(MoveFlags.SLICING_MOVE),
       ]);
+    case 325:
+      // Intoxicate (rom): "Changes the user's Normal-type moves to Poison-type.
+      // If the user is Poison-type its Poison-type moves have a 10% chance to
+      // badly poison, otherwise it gains Poison STAB." (Was wrongly classified
+      // type-conversion with a flat ×1.2 boost — no flat boost, no STAB when
+      // Poison, no 10% toxic. Fixed via the -ate-conditional helper.)
+      return ok(
+        ateConditionalAttrs({ newType: PokemonType.POISON, outcome: { kind: "status", effect: StatusEffect.TOXIC } }),
+      );
+    case 459:
+      // Emanate (rom): "Changes the user's Normal-type moves to Psychic-type. If
+      // the user is Psychic-type its Psychic-type moves have a 10% confusion
+      // chance, otherwise it gains Psychic STAB."
+      return ok(
+        ateConditionalAttrs({ newType: PokemonType.PSYCHIC, outcome: { kind: "tag", tag: BattlerTagType.CONFUSED } }),
+      );
+    case 279:
+      // Immolate (rom): "Changes the user's Normal-type moves to Fire-type. If
+      // the user is Fire-type its Fire-type moves have a 10% chance to burn,
+      // otherwise it gains Fire STAB." Also the Immolate half of Solar Flare
+      // (er 366 = Chloroplast + Immolate); the composite resolves this case
+      // recursively, so fixing it here fixes Solar Flare too.
+      return ok(
+        ateConditionalAttrs({ newType: PokemonType.FIRE, outcome: { kind: "status", effect: StatusEffect.BURN } }),
+      );
     case 794:
-      // Deadly Precision — "Super-effective moves never miss and ignore abilities."
-      // No SE-detection primitive in pokerogue. Wire as full always-hit +
-      // ability bypass — broader than spec but the SE gate is engine work.
-      // ER C source doesn't implement this ability either (not in abilities.h).
-      return ok([new AlwaysHitAbAttr(), new MoveAbilityBypassAbAttr()]);
-    case 921:
-      // Flawless Precision — "Fatal + Deadly Precision." Deadly Precision = never
-      // miss + bypass the target's ability; Fatal adds "super-effective moves
-      // always land critical hits" (was missing — same shape as Deadly only).
+      // Deadly Precision (rom): "Always land super effective attacks on the
+      // opponent. Allows super effective attacks to ignore the target's
+      // abilities and innates that interfere with effects or reduce damage."
+      // BOTH halves are SUPER-EFFECTIVE-gated: the always-hit only applies to
+      // super-effective moves, and the ability-bypass only fires when the move
+      // is super-effective vs the actual target.
       return ok([
-        new AlwaysHitAbAttr(),
-        new MoveAbilityBypassAbAttr(),
+        new ConditionalAlwaysHitAbAttr({ superEffective: true }),
+        new SuperEffectiveMoveAbilityBypassAbAttr(),
+      ]);
+    case 921:
+      // Flawless Precision — "Fatal + Deadly Precision." Deadly Precision =
+      // super-effective moves never miss + super-effective moves bypass the
+      // target's ability; Fatal adds "super-effective moves always land a
+      // critical hit". All three halves are super-effective-gated.
+      return ok([
+        new ConditionalAlwaysHitAbAttr({ superEffective: true }),
+        new SuperEffectiveMoveAbilityBypassAbAttr(),
         new ConditionalCritAbAttr(
           (user, target, move) => target != null && user != null && target.getMoveEffectiveness(user, move) > 1,
         ),
@@ -4090,8 +4123,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 541:
-      // Web Spinner — "Uses String Shot on switch-in."
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.STRING_SHOT })]);
+      // Web Spinner (rom): "Uses String Shot on switch in, harshly lowering the
+      // Speed of ALL opponents by 2 stages." allOpponents makes the on-entry
+      // String Shot hit every foe (both in doubles), not just the leftmost.
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.STRING_SHOT, allOpponents: true })]);
     case 670:
       // Draco Morale — "Uses Dragon Cheer on switch-in."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.DRAGON_CHEER, targetsSelf: true })]);
