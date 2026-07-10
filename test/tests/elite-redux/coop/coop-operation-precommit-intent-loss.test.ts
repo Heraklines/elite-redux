@@ -36,6 +36,13 @@ import {
   type CoopIntentValidator,
   CoopOperationHost,
 } from "#data/elite-redux/coop/coop-operation-runtime";
+import {
+  commitMeOwnerIntent,
+  resetCoopMeOperationFlag,
+  resetCoopMeOperationState,
+  setCoopMeOperationEnabled,
+  setCoopMeOperationEpoch,
+} from "#data/elite-redux/coop/coop-me-operation";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it } from "vitest";
 
@@ -82,6 +89,32 @@ const GUEST_OWNER = 1; // an odd seat = guest-owned interaction (guest->host rel
 const PIN = 9_700_100;
 
 describe("W2e-R2 I5: pre-commit intent loss - owner re-send with the deterministic id is committed exactly once", () => {
+  it("I5 production seam: a guest owner receives the stable operationId needed to arm a resend", () => {
+    setCoopMeOperationEnabled(true);
+    resetCoopMeOperationState();
+    setCoopMeOperationEpoch(EPOCH);
+    try {
+      const params = {
+        kind: "ME_PICK" as const,
+        seq: 8_000_003,
+        pinned: 3,
+        payload: { optionIndex: 1 },
+        localRole: "guest" as const,
+        wave: 12,
+        turn: 0,
+      };
+      const first = commitMeOwnerIntent(params);
+      const repeated = commitMeOwnerIntent(params);
+      expect(first, "the owner seam must return the proposal identity used by the resend tracker").toBe(
+        makeCoopOperationId(EPOCH, GUEST_OWNER, params.seq * 8000 + 1000),
+      );
+      expect(repeated, "re-registering the same slot must reuse, never remint, the operationId").toBe(first);
+    } finally {
+      resetCoopMeOperationFlag();
+      resetCoopMeOperationState();
+    }
+  });
+
   // I5a - the core recovery: a lost intent, re-sent by the owner, commits exactly once; the late original reacks.
   it("I5a: a lost pre-commit intent recovered by owner re-send commits EXACTLY ONCE (the late original reacks)", () => {
     const host = new CoopOperationHost({ epoch: EPOCH });
