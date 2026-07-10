@@ -146,10 +146,17 @@ let watchGuest: CoopOperationGuest | null = null;
 
 /** Host presentation ordinal within the pinned ME (top-level, repeated rounds, then follow-up subprompts). */
 let ownerPresentationStep = 0;
+/** Authority-side ordinal for guest-owned ME_SUB proposals accepted on the host's FIFO. */
+let authoritySubPickStep = 0;
 
 /** Allocate the next durable ME_PRESENT address step in host emission order. */
 export function nextCoopMePresentationStep(): number {
   return ownerPresentationStep++;
+}
+
+/** Allocate the next authority commit address for a guest-owned ME_SUB proposal. */
+export function nextCoopMeAuthoritySubPickStep(): number {
+  return authoritySubPickStep++;
 }
 
 /** ME interactions whose terminal carrier switched from raw legacy to the durable journal. */
@@ -224,6 +231,7 @@ export function resetCoopMeOperationState(): void {
   journalLeadingTerminals.clear();
   pendingJournalMaterializations.clear();
   ownerPresentationStep = 0;
+  authoritySubPickStep = 0;
   lastAppliedPinned = -1;
   revisionFloor = 0;
 }

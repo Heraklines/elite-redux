@@ -85,7 +85,9 @@ import type {
   CoopAuthoritativeEnvelopeV1,
   CoopBiomePickPayload,
   CoopCrossroadsPickPayload,
+  CoopMePickPayload,
   CoopMePresentPayload,
+  CoopMeSubPayload,
   CoopMeTerminalPayload,
   CoopRewardActionPayload,
   CoopShopBuyPayload,
@@ -1949,6 +1951,14 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
     }
     runtime.interactionRelay.materializeCommittedInteractionOutcome(seq, payload.presentation);
     return true;
+  }
+  if (op.kind === "ME_PICK") {
+    const payload = op.payload as CoopMePickPayload;
+    return kindTag === 1 && Number.isInteger(payload?.optionIndex);
+  }
+  if (op.kind === "ME_SUB") {
+    const payload = op.payload as CoopMeSubPayload;
+    return kindTag === 2 && Number.isInteger(payload?.value);
   }
   if (op.kind !== "ME_TERMINAL") {
     return false;

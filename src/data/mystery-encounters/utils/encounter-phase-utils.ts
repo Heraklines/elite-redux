@@ -9,7 +9,11 @@ import type { IEggOptions } from "#data/egg";
 import { Egg } from "#data/egg";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
-import { commitMeOwnerIntent, nextCoopMePresentationStep } from "#data/elite-redux/coop/coop-me-operation";
+import {
+  commitMeOwnerIntent,
+  nextCoopMeAuthoritySubPickStep,
+  nextCoopMePresentationStep,
+} from "#data/elite-redux/coop/coop-me-operation";
 import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   coopGuestAwaitMeBattleParty,
@@ -81,6 +85,20 @@ import i18next from "i18next";
 // #840: COOP_ME_PUMP_SEQ_BASE imported from the seq registry (was re-declared locally in 4 files).
 /** Disconnect ceiling for every host<->guest ME await; steady state resolves on the relayed pick. */
 const COOP_ME_REPLAY_WAIT_MS = 1_200_000;
+
+/** Authority commit for one guest-owned ME sub-pick accepted from the host's real FIFO waiter. */
+function commitGuestMeSubPick(seq: number, value: number): void {
+  commitMeOwnerIntent({
+    kind: "ME_SUB",
+    seq,
+    pinned: coopMeInteractionStartValue(),
+    step: nextCoopMeAuthoritySubPickStep(),
+    payload: { value },
+    localRole: "host",
+    wave: globalScene?.currentBattle?.waveIndex ?? -1,
+    turn: 0,
+  });
+}
 /**
  * Co-op authoritative non-battle ME (#633, ADD-2c; #818/#827 mirrored): MEs whose selected-option chain
  * pushes a BESPOKE interactive sub-PHASE (ErQuizPhase) that does NOT route through the generic
@@ -168,6 +186,9 @@ export function coopHostStreamSecondaryAwaitIndex(labels: string[]): Promise<num
     relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS) ?? Promise.resolve(null);
   return awaited.then(pick => {
     const idx = pick?.choice ?? null;
+    if (idx != null) {
+      commitGuestMeSubPick(seqMe, idx);
+    }
     coopLog("me", "host received guest bespoke yes/no sub-pick (#827)", {
       seq: seqMe,
       idx,
@@ -216,6 +237,9 @@ export function coopHostStreamCatchFullAwaitSlot(pokemonName: string): Promise<n
     relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS) ?? Promise.resolve(null);
   return awaited.then(pick => {
     const slot = pick?.choice ?? null;
+    if (slot != null) {
+      commitGuestMeSubPick(seqMe, slot);
+    }
     const partySize = globalScene.getPlayerParty().length;
     if (slot == null || slot < 0 || slot >= partySize) {
       coopWarn("me", "host: catch-full guest declined/out-of-range/timeout; the granted mon is NOT added (#855)", {
@@ -840,6 +864,9 @@ export function selectPokemonForOption(
       void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(async pick => {
         // A null (disconnected guest) maps past the party tail => the not-selected branch.
         const slotIndex = pick?.choice ?? globalScene.getPlayerParty().length;
+        if (pick != null) {
+          commitGuestMeSubPick(seqMe, slotIndex);
+        }
         coopLog("me", "host received guest party sub-pick", {
           seq: seqMe,
           slotIndex,
@@ -890,6 +917,9 @@ export function selectPokemonForOption(
         void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(sec => {
           globalScene.currentBattle.mysteryEncounter!.setDialogueToken("selectedPokemon", pokemon.getNameToRender());
           const idx = sec?.choice ?? -1;
+          if (sec != null) {
+            commitGuestMeSubPick(seqMe, idx);
+          }
           coopLog("me", "host received guest secondary sub-pick", {
             seq: seqMe,
             idx,
