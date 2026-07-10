@@ -25,10 +25,11 @@ import { GameManager } from "#test/framework/game-manager";
 import {
   buildShowdownEditorDemoConfig,
   EditorField,
+  type ShowdownEditorTextInput,
   type ShowdownSetEditorUiHandler,
 } from "#ui/showdown-set-editor-ui-handler";
 import Phaser from "phaser";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -191,5 +192,81 @@ describe.skipIf(!RUN)("Showdown Set Editor type-to-search input model", () => {
     internals.processInput(Button.CANCEL);
     expect(internals.paneOpen, "back with nothing typed closes the dropdown").toBe(false);
     expect(cancels(), "and it does not leave the editor").toBe(0);
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // CAPTURE LIFECYCLE - the DOM text capture holds focus ONLY while a search dropdown is open, so the
+  // printable letter HOTKEYS (G / V team-cycle, F/R/E/N) stay live while browsing.
+  //
+  // Live bug (maintainer): "cycling between the mons in your team inside the custom menu doesnt work!"
+  // G (CYCLE_GENDER) / V (CYCLE_TERA) are printable, so while the DOM capture holds focus the input
+  // controller suppresses EVERY printable key as a game button - killing the team-cycle hotkeys. The
+  // round-4 build raised the capture whenever a searchable field was merely FOCUSED, so it lingered on
+  // the move/item fields and swallowed G/V. The fix gates the capture to `paneOpen`.
+  // ---------------------------------------------------------------------------------------------
+
+  /** Models the DOM/native text capture: tracks whether the editor is currently holding keyboard focus. */
+  class FakeTextInput implements ShowdownEditorTextInput {
+    isOpen = false;
+    open(_initial: string, _onChange: (v: string) => void): void {
+      this.isOpen = true;
+    }
+    close(): void {
+      this.isOpen = false;
+    }
+  }
+
+  function buildEditorWithCapture(
+    game: GameManager,
+    field: EditorField,
+  ): { internals: EditorInternals; input: FakeTextInput; cycles: ReturnType<typeof vi.fn> } {
+    const registered = game.scene.ui.handlers[UiMode.SHOWDOWN_SET_EDITOR] as ShowdownSetEditorUiHandler;
+    const handler = new (registered.constructor as new () => ShowdownSetEditorUiHandler)();
+    handler.setup();
+    const input = new FakeTextInput();
+    handler.setTextInput(input);
+    const cycles = vi.fn();
+    handler.show([buildShowdownEditorDemoConfig({ initialField: field, onCycleTeam: cycles })]);
+    return { internals: handler as unknown as EditorInternals, input, cycles };
+  }
+
+  it("a focused searchable field with the dropdown CLOSED does NOT hold the capture (hotkeys stay live)", () => {
+    const game = new GameManager(phaserGame);
+    const { internals, input } = buildEditorWithCapture(game, EditorField.MOVE0);
+    // RED-PROOF: on a freshly focused move field the dropdown is closed, so the capture must be RELEASED.
+    // Revert the fix (capture gated to `fieldIsSearchable` instead of `paneOpen`) and this is OPEN here -
+    // the capture lingers and the input controller eats every printable hotkey (G/V/F/R/E/N).
+    expect(internals.paneOpen, "the dropdown starts closed").toBe(false);
+    expect(input.isOpen, "no capture while merely browsing a searchable field").toBe(false);
+  });
+
+  it("the capture is raised ONLY while the dropdown is open, and released the instant it closes", () => {
+    const game = new GameManager(phaserGame);
+    const { internals, input } = buildEditorWithCapture(game, EditorField.MOVE0);
+    expect(input.isOpen).toBe(false);
+
+    internals.processInput(Button.ACTION); // open the search dropdown
+    expect(internals.paneOpen, "ACTION opens the dropdown").toBe(true);
+    expect(input.isOpen, "the capture is raised while the dropdown is open (so typing filters)").toBe(true);
+
+    internals.processInput(Button.MENU); // Esc closes the dropdown
+    expect(internals.paneOpen, "Esc closes the dropdown").toBe(false);
+    expect(input.isOpen, "the capture is released the instant the dropdown closes").toBe(false);
+  });
+
+  it("after closing a search (Esc), G and V cycle the team mon; while the search is OPEN the capture holds", () => {
+    const game = new GameManager(phaserGame);
+    const { internals, input, cycles } = buildEditorWithCapture(game, EditorField.MOVE0);
+
+    // Open then close a search - mirrors the live sequence the report came from.
+    internals.processInput(Button.ACTION);
+    expect(input.isOpen, "while the search IS open the capture holds - live, G/V type into the filter").toBe(true);
+    internals.processInput(Button.MENU); // Esc -> browsing, capture released
+    expect(input.isOpen).toBe(false);
+
+    // With the capture released, the printable team-cycle hotkeys reach the handler and fire onCycleTeam.
+    internals.processInput(Button.CYCLE_TERA); // V -> next
+    internals.processInput(Button.CYCLE_GENDER); // G -> prev
+    expect(cycles.mock.calls, "V cycles next (+1), G cycles prev (-1)").toEqual([[1], [-1]]);
   });
 });

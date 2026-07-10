@@ -122,3 +122,66 @@ export function buildShowdownRankCard(
 
   return card;
 }
+
+// =============================================================================
+// COMPACT rank CHIP - a one-line ball emblem + short tier label for a cramped host (the Team Menu
+// header band), where the full card above would cover the content beneath it (it overlapped the
+// preview column's moveset). Same tier vocabulary + guards as the card; the wager screen keeps the
+// big card.
+// =============================================================================
+
+/** The compact chip's fixed height (logical px). Width is label-dependent - see {@linkcode showdownRankChipWidth}. */
+export const SHOWDOWN_RANK_CHIP_HEIGHT = 11;
+
+/** The compact chip's one-line label ("Unranked" / "Ultra Ball 2" / "Champion"). Pure, so the host can measure it. */
+function chipLabel(state: ShowdownRankState | null): string {
+  return state == null
+    ? i18next.t("battle:showdownRankUnranked", { defaultValue: "Unranked" })
+    : rankLabel(state.tier, state.rank, localizedTierName(state.tier));
+}
+
+/** The compact chip's width for the given state, so a host can right-align it without measuring pixels. */
+export function showdownRankChipWidth(state: ShowdownRankState | null): number {
+  return 16 + chipLabel(state).length * 3.2 + 6;
+}
+
+/**
+ * Build a COMPACT one-line rank chip (ball emblem + short tier label) at (`x`, `y`) TOP-LEFT. For a
+ * cramped host like the Team Menu header where {@linkcode buildShowdownRankCard} would obstruct the
+ * content. `state == null` renders a neutral "Unranked" chip. Guarded so a missing ball atlas never
+ * throws into the host screen. The caller adds it to its own container and destroys it on teardown.
+ */
+export function buildShowdownRankChip(state: ShowdownRankState | null, x = 0, y = 0): Phaser.GameObjects.Container {
+  const chip = globalScene.add.container(x, y);
+  const h = SHOWDOWN_RANK_CHIP_HEIGHT;
+  const w = showdownRankChipWidth(state);
+  const isChampion = state?.tier === SHOWDOWN_RANK_TIER.champion;
+
+  // Pill background + subtle edge.
+  const bg = globalScene.add.rectangle(0, 0, w, h, 0x18233b, 1).setOrigin(0, 0);
+  bg.setStrokeStyle(1, state == null ? 0x33436a : 0x4a5a80, 1);
+  chip.add(bg);
+
+  // Ball emblem (unranked reuses the pokeball frame; the gray label reads as "no rank").
+  try {
+    const emblem = globalScene.add
+      .sprite(9, h / 2, "pb", tierBallFrame(state?.tier ?? SHOWDOWN_RANK_TIER.pokeball))
+      .setOrigin(0.5, 0.5)
+      .setScale(0.5);
+    chip.add(emblem);
+  } catch {
+    /* a missing ball atlas must never break the host screen */
+  }
+
+  const label = addTextObject(
+    17,
+    1,
+    chipLabel(state),
+    state == null ? TextStyle.SUMMARY_GRAY : isChampion ? TextStyle.SUMMARY_GOLD : TextStyle.SUMMARY_HEADER,
+    { fontSize: "22px" },
+  );
+  label.setOrigin(0, 0);
+  chip.add(label);
+
+  return chip;
+}

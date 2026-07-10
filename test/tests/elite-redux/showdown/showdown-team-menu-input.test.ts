@@ -19,6 +19,7 @@
 import { Button } from "#enums/buttons";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
+import type { ShowdownEditorTextInput } from "#ui/showdown-set-editor-ui-handler";
 import {
   buildShowdownTeamMenuDemoConfig,
   type ShowdownTeamMenuConfig,
@@ -33,11 +34,38 @@ type MenuInternals = {
   teamCursor: number;
   monCursor: number;
   renaming: boolean;
+  renameBuffer: string;
   notice: string | null;
   config: ShowdownTeamMenuConfig;
   processInput(button: Button): boolean;
   hoveredMon(): { speciesId: number } | null;
 };
+
+/**
+ * Models the real DOM text-capture the rename overlay uses live: the browser's focused hidden input
+ * natively edits the buffer (typing / Backspace) and fires the change back, WHILE the same physical
+ * Backspace ALSO reaches the game as Button.CANCEL. `backspace()` reproduces the native half; the test
+ * then sends the game half separately - exactly the two-path situation the fix has to survive.
+ */
+class FakeTextInput implements ShowdownEditorTextInput {
+  isOpen = false;
+  value = "";
+  private onChange: ((v: string) => void) | null = null;
+  open(initial: string, onChange: (v: string) => void): void {
+    this.isOpen = true;
+    this.value = initial;
+    this.onChange = onChange;
+  }
+  close(): void {
+    this.isOpen = false;
+    this.onChange = null;
+  }
+  /** The browser natively deleting a character from the focused input + firing its change event. */
+  backspace(): void {
+    this.value = this.value.slice(0, -1);
+    this.onChange?.(this.value);
+  }
+}
 
 /** Stub the shared ui so confirm prompts resolve synchronously to their YES branch. */
 function stubPrompts(game: GameManager): void {
@@ -158,5 +186,71 @@ describe.runIf(RUN)("showdown team menu - cursor model + routing", () => {
     await flush();
     expect(onDelete).toHaveBeenCalledWith(0);
     expect(config.presets.length).toBe(startCount - 1); // local view updated
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // RENAME OVERLAY - Backspace deletes a character, it NEVER yanks the player out to the title.
+  //
+  // Live bug (maintainer): "when you try to rename and press back it doesnt delete characters but
+  // instead completely yanks you out of the menu to the title screen." Backspace maps to the default
+  // CANCEL binding; the DOM input natively edits the buffer, but the SAME press ALSO reached the menu's
+  // CANCEL -> onExit -> title. The fix mirrors the Set Editor search: while renaming, CANCEL with text
+  // present is CONSUMED (the DOM input handles the delete) and never leaves; Esc closes just the overlay.
+  // ---------------------------------------------------------------------------------------------
+
+  /** Build the menu with a fake DOM capture injected + an onExit spy, focused on a real preset. */
+  function buildRenameMenu(g: GameManager): {
+    internals: MenuInternals;
+    input: FakeTextInput;
+    onExit: ReturnType<typeof vi.fn>;
+  } {
+    const registered = g.scene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU] as ShowdownTeamMenuUiHandler;
+    const handler = new (registered.constructor as new () => ShowdownTeamMenuUiHandler)();
+    handler.setup();
+    const input = new FakeTextInput();
+    handler.setTextInput(input);
+    const onExit = vi.fn();
+    handler.show([buildShowdownTeamMenuDemoConfig({ initialTeam: 0, onExit })]);
+    return { internals: handler as unknown as MenuInternals, input, onExit };
+  }
+
+  it("renaming + Backspace (CANCEL) deletes a character and stays in the menu - NEVER exits to the title", () => {
+    const { internals, input, onExit } = buildRenameMenu(game);
+    internals.processInput(Button.CYCLE_SHINY); // R -> open the rename overlay
+    expect(internals.renaming, "the rename overlay is up").toBe(true);
+    const before = internals.renameBuffer.length;
+    expect(before, "seeded with the team name").toBeGreaterThan(0);
+
+    // A single physical Backspace: the focused DOM input natively deletes a char (fires the change),
+    // and the SAME press also reaches the game as Button.CANCEL.
+    input.backspace();
+    internals.processInput(Button.CANCEL);
+
+    // RED-PROOF: the buffer shrank by exactly one AND we are STILL renaming (the menu never closed the
+    // overlay, never called onExit). Revert the fix (CANCEL -> cancelRename) and `renaming` flips false
+    // here - the overlay is torn down and the next Backspace bubbles to onExit -> title.
+    expect(internals.renameBuffer.length, "Backspace deleted one character").toBe(before - 1);
+    expect(internals.renaming, "still renaming - Backspace must not close the overlay").toBe(true);
+    expect(onExit, "Backspace must NEVER exit the menu to the title").not.toHaveBeenCalled();
+
+    // A second Backspace behaves identically - it can never accumulate into an exit.
+    input.backspace();
+    internals.processInput(Button.CANCEL);
+    expect(internals.renameBuffer.length).toBe(before - 2);
+    expect(internals.renaming).toBe(true);
+    expect(onExit).not.toHaveBeenCalled();
+  });
+
+  it("renaming + Esc (MENU) closes JUST the rename overlay, leaving the menu intact (never the title)", () => {
+    const { internals, onExit } = buildRenameMenu(game);
+    internals.processInput(Button.CYCLE_SHINY); // R
+    expect(internals.renaming).toBe(true);
+
+    const handled = internals.processInput(Button.MENU); // Esc
+    expect(handled, "Esc is consumed by the rename overlay").toBe(true);
+    expect(internals.renaming, "Esc closes just the overlay").toBe(false);
+    expect(onExit, "and it does NOT exit the menu to the title").not.toHaveBeenCalled();
+    // The menu itself is intact - the presets are untouched and still browsable.
+    expect(internals.config.presets.length).toBeGreaterThan(0);
   });
 });

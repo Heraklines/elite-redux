@@ -46,7 +46,11 @@ import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import type { Variant } from "#sprites/variant";
 import { SettingKeyboard } from "#system/settings-keyboard";
-import { buildShowdownRankCard, SHOWDOWN_RANK_CARD_HEIGHT } from "#ui/handlers/showdown-rank-card";
+import {
+  buildShowdownRankChip,
+  SHOWDOWN_RANK_CHIP_HEIGHT,
+  showdownRankChipWidth,
+} from "#ui/handlers/showdown-rank-card";
 import type { ShowdownEditorTextInput } from "#ui/showdown-set-editor-ui-handler";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
@@ -82,6 +86,13 @@ export interface ShowdownTeamMenuConfig {
   initialRenaming?: boolean;
   /** Deterministic initial confirm-question banner text (for the enter-lobby / delete prompt render recipe). */
   initialPromptText?: string;
+  /**
+   * Deterministic rank state for the header chip (render recipes). When DEFINED the live async fetch is
+   * skipped and this exact state (or null = unranked) is shown; when undefined the handler fetches live.
+   */
+  initialRankState?: ShowdownRankState | null;
+  /** Deterministic override for whether the rank chip is shown (recipes); live uses `isRankServerConfigured()`. */
+  rankAvailable?: boolean;
   /** CONFIRM on the create box: enter the offline team-build flow (Phase C). */
   onCreate?: () => void;
   /** Edit (E) a saved preset: re-enter the build flow seeded with it (Phase C). */
@@ -197,10 +208,11 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.renameBuffer = this.renaming ? (this.hoveredPreset()?.name ?? "") : "";
     this.notice = null;
     this.promptText = config.initialPromptText ?? null;
-    this.rankAvailable = isRankServerConfigured();
-    this.myRank = null;
-    if (this.rankAvailable) {
-      // Best-effort async fetch for the rank card; re-render when it lands.
+    this.rankAvailable = config.rankAvailable ?? isRankServerConfigured();
+    this.myRank = config.initialRankState ?? null;
+    // Live path only: fetch the rank when the recipe did NOT pin it (deterministic recipes pass a state).
+    if (this.rankAvailable && config.initialRankState === undefined) {
+      // Best-effort async fetch for the rank chip; re-render when it lands.
       void fetchMyShowdownRank().then(rank => {
         this.myRank = rank;
         if (this.config != null) {
@@ -425,11 +437,24 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     switch (button) {
       case Button.ACTION:
       case Button.SUBMIT:
+        // Enter commits the rename.
         this.commitRename();
         this.getUi().playSelect();
         return true;
       case Button.CANCEL:
+        // Backspace maps to CANCEL by default. INSIDE the rename overlay that is "delete a character",
+        // NEVER "leave the menu": while there is text AND the DOM input is driving the buffer, consume
+        // it and let the native input edit the buffer (mirrors the Set Editor search's back = delete).
+        // It must never bubble to the menu's own CANCEL -> onExit -> title (the maintainer's "back yanks
+        // me to the title" report). With an empty buffer (or no DOM bridge) there is nothing to delete,
+        // so close JUST the overlay back to the menu - the menu itself stays put.
+        if (this.renameBuffer.length > 0 && this.textInput != null) {
+          return true; // consumed; the DOM input handles the character delete
+        }
+        this.cancelRename();
+        return true;
       case Button.MENU:
+        // Esc closes JUST the rename overlay (back to the menu), never the menu itself.
         this.cancelRename();
         return true;
       default:
@@ -528,10 +553,6 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.renderHotkeyBar();
     this.renderList();
     this.renderPreview();
-    // Ranked rank card, pinned to the bottom-right corner of the preview column.
-    if (this.rankAvailable) {
-      this.add(buildShowdownRankCard(this.myRank, RIGHT_X, SCREEN_H - SHOWDOWN_RANK_CARD_HEIGHT - 2, RIGHT_W));
-    }
     if (this.notice != null) {
       this.renderNoticeBanner();
     }
@@ -560,15 +581,22 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.fill(0, 0, SCREEN_W, 1, 0x2a3a5c, 1);
     this.fill(0, HEADER_H - 1, SCREEN_W, 1, 0x1a2740, 1);
     this.text(MARGIN + 3, 3, "SHOWDOWN TEAMS", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+
+    // The ranked rank CHIP lives INSIDE the header band (right side) - a compact one-line ball + tier
+    // pill. The full rank card used to be pinned bottom-right of the preview column, where it covered the
+    // moveset (maintainer: "the unranked thing is blocking the movesets ... too big"). The header is the
+    // natural home for a per-player status chip and cannot collide with the preview content.
+    let countRightX = SCREEN_W - MARGIN - 3;
+    if (this.rankAvailable) {
+      const chipW = showdownRankChipWidth(this.myRank);
+      const chipX = SCREEN_W - MARGIN - 3 - chipW;
+      const chipY = Math.floor((HEADER_H - SHOWDOWN_RANK_CHIP_HEIGHT) / 2);
+      this.add(buildShowdownRankChip(this.myRank, chipX, chipY));
+      countRightX = chipX - 5; // the team count sits just left of the chip
+    }
+
     const count = this.config!.presets.length;
-    this.text(
-      SCREEN_W - MARGIN - 3,
-      4,
-      `${count} ${count === 1 ? "team" : "teams"}`,
-      TextStyle.SUMMARY_GRAY,
-      1,
-      FONT_TINY,
-    );
+    this.text(countRightX, 4, `${count} ${count === 1 ? "team" : "teams"}`, TextStyle.SUMMARY_GRAY, 1, FONT_TINY);
   }
 
   private renderHotkeyBar(): void {

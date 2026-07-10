@@ -724,20 +724,25 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   }
 
   /**
-   * Sync the text-input capture surface to the CURRENT state. The DOM/native input is focused whenever a
-   * SEARCHABLE field (item / moves) holds focus - pane open OR closed - so TYPE-TO-SEARCH actually works:
-   * on a freshly focused move/item field the very first keystroke reaches {@linkcode setFilter}, which
-   * opens the dropdown and filters. (The round-4 build gated this to `paneOpen`, which dead-locked
-   * desktop search: the pane only opens FROM a keystroke, but the capture that delivers keystrokes was
-   * only raised once the pane was already open - the maintainer's "type bl, no candidates" report.)
+   * Sync the text-input capture surface to the CURRENT state. The DOM/native input is focused ONLY while a
+   * search DROPDOWN is actually open (`paneOpen` on a searchable field) - never merely because a searchable
+   * field is FOCUSED. This is the fix for the "team-mon cycling (G/V) is dead in the editor" report:
+   * while the capture holds focus, the inputs-controller suppresses EVERY printable key as a game button
+   * (so typing a move name can't fire CYCLE_* mid-type) - which also kills the printable letter HOTKEYS
+   * F / R / E / N (stage/shiny/ability/nature) and G / V (prev/next team mon). Gating the capture to the
+   * open dropdown means those hotkeys stay live whenever the player is BROWSING (any field, pane closed),
+   * and the capture is raised only once the player opens a search (ACTION / A on a searchable field) - and
+   * released (blurred) the instant it closes (pick / Esc / field change), so it can never linger and
+   * swallow the next hotkey.
    *
    * Navigation is unaffected: the game's Button inputs (arrows cycle the stage / move field focus, Esc
-   * leaves, Enter commits) are delivered by Phaser and still route through {@linkcode processInput}; the
-   * off-screen capture surface only consumes printable characters into the typeahead. On a non-searchable
-   * field (ability) the capture is dropped so the F/R/E/N letter hotkeys stay live. Headless: inert no-op.
+   * leaves, Enter commits) are delivered by Phaser and route through {@linkcode processInput}; the
+   * off-screen capture surface only consumes printable characters into the typeahead WHILE the dropdown
+   * is open. On any closed/non-searchable state the capture is dropped so the letter hotkeys stay live.
+   * Headless: inert no-op (the rex factory is absent, so open/close do nothing).
    */
   private syncCapture(): void {
-    if (this.fieldIsSearchable(this.field)) {
+    if (this.paneOpen && this.fieldIsSearchable(this.field)) {
       this.textInput?.open(this.filter, value => this.setFilter(value));
     } else {
       this.textInput?.close();

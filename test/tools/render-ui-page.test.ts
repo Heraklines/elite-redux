@@ -1061,6 +1061,34 @@ const RECIPES: Record<string, Recipe> = {
     ],
     diffTolerance: 0,
   },
+  // Rank CHIP in the header (unranked): the compact ball+label pill replacing the old bottom-right rank
+  // card that covered the moveset (maintainer). rankAvailable forces the chip on; null state = Unranked.
+  "showdown-team-menu-rank-unranked": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => [buildShowdownTeamMenuDemoConfig({ initialTeam: 0, rankAvailable: true, initialRankState: null })],
+    diffTolerance: 0,
+  },
+  // Rank CHIP in the header (ranked): a concrete Ultra Ball 2 state so the ball frame + tier label render;
+  // the full preview (sprite / abilities / item / all 4 moves) must stay UNOBSTRUCTED beneath it.
+  "showdown-team-menu-rank-ranked": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => [
+      buildShowdownTeamMenuDemoConfig({
+        initialTeam: 0,
+        rankAvailable: true,
+        initialRankState: {
+          seasonId: "S1",
+          tier: 2,
+          rank: 2,
+          segments: 3,
+          streak: 0,
+          highestTierReached: 2,
+          careerBestTier: 2,
+        },
+      }),
+    ],
+    diffTolerance: 0,
+  },
   // interaction round-trips (the keystroke half is covered by showdown-editor-input.test.ts).
   "showdown-editor-nav": {
     mode: UiMode.SHOWDOWN_SET_EDITOR,

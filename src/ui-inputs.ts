@@ -226,6 +226,13 @@ export class UiInputs {
         // into the editor's own MENU handler instead.
         globalScene.ui.processInput(Button.MENU);
         break;
+      case UiMode.SHOWDOWN_TEAM_MENU:
+        // Showdown Team Menu: MENU (Escape) routes into the handler - it closes the rename overlay when
+        // one is up, otherwise backs out to the title. Without this the key hit the `default` return and
+        // was dead here, so the advertised "Esc Back" did nothing AND Esc could never close the rename
+        // overlay (only Backspace/X did, and that path is the "back yanks me to title" bug being fixed).
+        globalScene.ui.processInput(Button.MENU);
+        break;
       case UiMode.MENU:
         globalScene.ui.revertMode();
         globalScene.playSound("ui/select");
