@@ -93,7 +93,9 @@ describe("W2b durability convergence (§4.2/§4.4): a cut authoritative op is re
     const host = new CoopDurabilityManager(hostGate);
     const guest = new CoopDurabilityManager(guestGate, {
       extractKey: WAVE_KEY,
-      apply: e => applied.push((e.msg as { wave: number }).wave),
+      apply: e => {
+        applied.push((e.msg as { wave: number }).wave);
+      },
     });
 
     // Commit 1 and 2 cleanly.
@@ -134,7 +136,9 @@ describe("W2b durability convergence (§4.2/§4.4): a cut authoritative op is re
     const host = new CoopDurabilityManager(hostGate);
     const guest = new CoopDurabilityManager(guestGate, {
       extractKey: WAVE_KEY,
-      apply: e => applied.push((e.msg as { wave: number }).wave),
+      apply: e => {
+        applied.push((e.msg as { wave: number }).wave);
+      },
     });
 
     host.commit("wave", 1, waveOp(1));
@@ -174,7 +178,9 @@ describe("W2b durability convergence (§4.2/§4.4): a cut authoritative op is re
     const host = new CoopDurabilityManager(hostGate);
     const guest = new CoopDurabilityManager(guestGate, {
       extractKey: WAVE_KEY,
-      apply: e => applied.push((e.msg as { wave: number }).wave),
+      apply: e => {
+        applied.push((e.msg as { wave: number }).wave);
+      },
     });
 
     for (let w = 1; w <= 3; w++) {
@@ -204,7 +210,9 @@ describe("W2b durability convergence (§4.2/§4.4): a cut authoritative op is re
     const host = new CoopDurabilityManager(hostGate);
     const guest = new CoopDurabilityManager(guestGate, {
       extractKey: WAVE_KEY,
-      apply: e => applied.push((e.msg as { wave: number }).wave),
+      apply: e => {
+        applied.push((e.msg as { wave: number }).wave);
+      },
     });
 
     host.commit("wave", 1, waveOp(1));
@@ -238,7 +246,9 @@ describe("W2b durability convergence (§4.4): the FAULT TRANSPORT drops authorit
     const host = new CoopDurabilityManager(pair.host);
     const guest = new CoopDurabilityManager(pair.guest, {
       extractKey: WAVE_KEY,
-      apply: e => applied.push((e.msg as { wave: number }).wave),
+      apply: e => {
+        applied.push((e.msg as { wave: number }).wave);
+      },
     });
 
     const N = 12;

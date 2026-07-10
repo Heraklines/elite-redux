@@ -368,7 +368,9 @@ describe("durability §4/§1.8: control-plane PERSISTENCE for cold-resume conver
     const host = new CoopDurabilityManager(pair.host);
     const guest = new CoopDurabilityManager(pair.guest, {
       extractKey: m => (m.t === "waveResolved" ? { cls: "wave", seq: m.wave } : null),
-      apply: e => applied.push((e.msg as { wave: number }).wave),
+      apply: e => {
+        applied.push((e.msg as { wave: number }).wave);
+      },
     });
     host.commit("wave", 1, durableMsg(1));
     host.commit("wave", 2, durableMsg(2));
