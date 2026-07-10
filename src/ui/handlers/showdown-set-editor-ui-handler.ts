@@ -946,11 +946,11 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   private hotkey(x: number, setting: SettingKeyboard, defaultFrame: string, label: string): number {
     const frame = this.keyFrame(setting, defaultFrame);
     const glyph = globalScene.add
-      .sprite(x, HOTKEY_Y + 1, "keyboard", frame)
-      .setOrigin(0, 0)
+      .sprite(x, HOTKEY_Y + 6, "keyboard", frame)
+      .setOrigin(0, 0.5)
       .setScale(0.5);
     this.add(glyph);
-    this.text(x + 11, HOTKEY_Y + 2, label, TextStyle.INSTRUCTIONS_TEXT, 0, FONT_TINY);
+    this.text(x + 11, HOTKEY_Y + 3, label, TextStyle.INSTRUCTIONS_TEXT, 0, FONT_TINY);
     return x + 11 + label.length * 3.0 + 7;
   }
 
@@ -958,11 +958,11 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   private hotkeyRight(rightX: number, defaultFrame: string, label: string, width: number): void {
     const x = rightX - width;
     const glyph = globalScene.add
-      .sprite(x, HOTKEY_Y + 1, "keyboard", defaultFrame)
-      .setOrigin(0, 0)
+      .sprite(x, HOTKEY_Y + 6, "keyboard", defaultFrame)
+      .setOrigin(0, 0.5)
       .setScale(0.5);
     this.add(glyph);
-    this.text(x + 11, HOTKEY_Y + 2, label, TextStyle.INSTRUCTIONS_TEXT, 0, FONT_TINY);
+    this.text(x + 11, HOTKEY_Y + 3, label, TextStyle.INSTRUCTIONS_TEXT, 0, FONT_TINY);
   }
 
   /** Resolve the bound key glyph frame for a setting (falls back to the default in headless). */
@@ -992,19 +992,21 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.text(LEFT_X + LEFT_W - 4, BODY_Y + 4, `Cost ${rootCost}`, TextStyle.SUMMARY_GOLD, 1, FONT_HDR);
 
     // The FULL front battle sprite (item 2) - the game's full-scale art, sized around this column.
-    this.renderFullSprite(LEFT_X + LEFT_W / 2, BODY_Y + 40);
+    const spriteCx = LEFT_X + LEFT_W / 2;
+    const spriteCy = BODY_Y + 42;
+    this.renderFullSprite(spriteCx, spriteCy);
+    // Shinyness is shown ONLY by 4 cyclable shiny symbols tucked into the sprite's corner (item 3 /
+    // maintainer follow-up) - no separate shiny row.
+    this.renderSpriteShinyCorner(spriteCx, spriteCy);
 
     // Type chips under the sprite.
-    this.renderTypeChips(LEFT_X + LEFT_W / 2, BODY_Y + 64);
+    this.renderTypeChips(LEFT_X + LEFT_W / 2, BODY_Y + 68);
 
     // Stage strip (inline header).
-    this.renderStageStrip(BODY_Y + 70);
+    this.renderStageStrip(BODY_Y + 74);
 
-    // Compact shiny indicator (item 3).
-    this.renderShinySelector(BODY_Y + 94);
-
-    // Base stat bars with nature +/- coloring (item 4).
-    this.renderStatBars(BODY_Y + 108);
+    // Base stat bars with nature +/- coloring (item 4) - pulled up now the shiny row is gone.
+    this.renderStatBars(BODY_Y + 92);
   }
 
   /**
@@ -1115,36 +1117,43 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     }
   }
 
-  // -- compact SHINY indicator (starter-select style: one cyclable shiny-color star) -----------
-  // Small like starter select: a single shiny STAR in the currently-selected tier's colour (R cycles
-  // off -> owned tiers, defaulting to the highest owned rarity). No boxed grid, no tier labels.
+  // -- 4 cyclable shiny symbols in the sprite corner (starter-select style) ----------------------
+  // Shinyness is indicated ONLY here: 4 shiny-color stars (T1/T2/T3 + T4 black) stacked in the
+  // sprite's top-right corner. R cycles off -> owned tiers (default = highest owned); the SELECTED
+  // tier is boxed/bright, unowned tiers are dim, T4 (black shiny) is shown but unfieldable.
 
-  private renderShinySelector(y: number): void {
+  private renderSpriteShinyCorner(cx: number, cy: number): void {
     const cfg = this.config!;
-    this.text(LEFT_X + 4, y, "SHINY", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
-    const sx = LEFT_X + 34;
-    if (cfg.set.shiny) {
+    const owned = cfg.unlocks.ownedVariants;
+    const tiers: { variant: number; black: boolean }[] = [
+      { variant: 0, black: false },
+      { variant: 1, black: false },
+      { variant: 2, black: false },
+      { variant: 2, black: true },
+    ];
+    const bx = cx + 21; // just inside the sprite's right edge
+    const top = cy - 24; // top-right corner
+    const step = 11;
+    // A subtle dark backing so the stars read over the sprite art.
+    this.fill(bx - 6, top - 2, 13, tiers.length * step + 2, 0x0b1120, 0.55);
+    this.outline(bx - 6, top - 2, 13, tiers.length * step + 2, 0x2a3550);
+    tiers.forEach((t, i) => {
+      const sy = top + i * step;
+      const tierOwned = t.black ? cfg.unlocks.blackShinyOwned : owned.includes(t.variant);
+      const selected = !t.black && cfg.set.shiny && cfg.set.variant === t.variant;
+      if (selected) {
+        this.fill(bx - 5, sy - 1, 11, 10, ACCENT, 1);
+        this.outline(bx - 5, sy - 1, 11, 10, GOLD);
+      }
       const star = globalScene.add
-        .sprite(sx, y + 2, "shiny_icons")
-        .setOrigin(0.5, 0)
-        .setScale(0.6);
-      star.setFrame(getVariantIcon(cfg.set.variant as Variant));
-      star.setTint(getVariantTint(cfg.set.variant as Variant));
+        .sprite(bx, sy + 4, "shiny_icons")
+        .setOrigin(0.5, 0.5)
+        .setScale(0.5);
+      star.setFrame(getVariantIcon(t.variant as Variant));
+      star.setTint(t.black ? 0x0a0a0a : getVariantTint(t.variant as Variant));
+      star.setAlpha(tierOwned ? (selected ? 1 : 0.8) : 0.25);
       this.add(star);
-      this.text(sx + 8, y, `T${cfg.set.variant + 1}`, TextStyle.SUMMARY_GOLD, 0, FONT_TINY);
-    } else {
-      // Off: a dim hollow star so the control still reads as "shiny (off)".
-      const star = globalScene.add
-        .sprite(sx, y + 2, "shiny_icons")
-        .setOrigin(0.5, 0)
-        .setScale(0.6);
-      star.setFrame(getVariantIcon(0));
-      star.setTint(0x39404f);
-      this.add(star);
-      this.text(sx + 8, y, "off", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
-    }
-    // Cycle hint (mirrors the R hotkey in the legend).
-    this.text(LEFT_X + LEFT_W - 6, y, "R", TextStyle.INSTRUCTIONS_TEXT, 1, FONT_TINY);
+    });
   }
 
   // -- BASE stat bars (item 4) with nature +/- coloring -----------------------------------------
@@ -1156,20 +1165,20 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     const labels = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"];
     const barX = LEFT_X + 24;
     const barMaxW = 46;
-    const rowH = 5;
+    const rowH = 6; // roomier than before, but keeps Spe clear of the panel bottom
     const nature = cfg.set.nature as Nature;
     PERMANENT_STATS.forEach((stat, i) => {
-      const ry = y + 8 + i * rowH;
+      const ry = y + 9 + i * rowH;
       const base = sp.baseStats[i]; // BASE stat, not a computed L100 value.
       const mult = stat === Stat.HP ? 1 : getNatureStatMultiplier(nature, stat);
       const color = mult > 1 ? 0xf08aa0 : mult < 1 ? 0x8aa0f0 : 0x8ad08a;
       const labelStyle = mult > 1 ? TextStyle.SUMMARY_PINK : mult < 1 ? TextStyle.SUMMARY_BLUE : TextStyle.SUMMARY_GRAY;
-      this.text(LEFT_X + 4, ry - 1, labels[i], labelStyle, 0, 26);
+      this.text(LEFT_X + 4, ry - 1, labels[i], labelStyle, 0, 28);
       // Bar track + fill, scaled by the base value against a 200-ceiling.
-      this.fill(barX, ry, barMaxW, 3, 0x1b2436, 1);
+      this.fill(barX, ry, barMaxW, 4, 0x1b2436, 1);
       const w = Math.max(2, Math.min(1, base / 200) * barMaxW);
-      this.fill(barX, ry, w, 3, color, 1);
-      this.text(barX + barMaxW + 2, ry - 1, String(base), labelStyle, 0, 26);
+      this.fill(barX, ry, w, 4, color, 1);
+      this.text(barX + barMaxW + 2, ry - 1, String(base), labelStyle, 0, 28);
     });
   }
 
@@ -1223,7 +1232,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
       this.text(RIGHT_X + RIGHT_W - 8, ay + 3, ">", TextStyle.SUMMARY_GOLD, 0.5, FONT_HDR);
     }
     this.text(RIGHT_X + 36, ay + 1, active?.name ?? "-", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
-    this.text(RIGHT_X + 36, ay + 8, this.clip(active?.description ?? "", 60), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    this.text(RIGHT_X + 36, ay + 8, this.clip(active?.description ?? "", 78), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
 
     // The 3 INNATES - always-on for the LINE, but a locked slot is candy-gated (inactive on the
     // player's own party), so a locked one shows its candy unlock cost; an unlocked one reads active.
@@ -1241,7 +1250,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
       const nameStyle = unlocked ? TextStyle.SUMMARY_PINK : TextStyle.SHADOW_TEXT;
       this.text(RIGHT_X + 12, iy, this.clip(ability.name, 16), nameStyle, 0, FONT_TINY);
       if (unlocked) {
-        this.text(RIGHT_X + 78, iy, this.clip(ability.description ?? "", 44), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+        this.text(RIGHT_X + 78, iy, this.clip(ability.description ?? "", 56), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
       } else {
         // Locked: the candy icon + the slot's unlock cost, next to the innate (item 6).
         this.renderCandyCost(RIGHT_X + 78, iy, cfg.unlocks.innateSlotCandyCosts[i] ?? 0);
@@ -1273,7 +1282,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     const cfg = this.config!;
     this.add(addWindow(RIGHT_X, ITEM_Y, RIGHT_W, ITEM_H));
     // Item box takes the left ~2/3; the nature chip sits on the right (item 8: nature relocated, small).
-    const natureW = 62;
+    const natureW = 50;
     const itemW = RIGHT_W - 6 - natureW - 2;
     this.focusBox(RIGHT_X + 3, ITEM_Y + 3, itemW, ITEM_H - 6, EditorField.ITEM);
     this.text(RIGHT_X + 7, ITEM_Y + 5, "ITEM", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
@@ -1295,7 +1304,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
       this.text(
         vx + 8,
         ITEM_Y + 12,
-        this.clip(resolved?.getDescription() ?? "", 40),
+        this.clip(resolved?.getDescription() ?? "", 48),
         TextStyle.SUMMARY_GRAY,
         0,
         FONT_TINY,
@@ -1366,7 +1375,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.fill(RIGHT_X + 2, DESC_Y + 2, RIGHT_W - 4, DESC_H - 4, 0x0d1524, 1);
     const info = this.descBarContent();
     this.text(RIGHT_X + 5, DESC_Y + 2, info.title, TextStyle.SUMMARY_GOLD, 0, FONT_TINY);
-    this.text(RIGHT_X + 5, DESC_Y + 8, this.clip(info.desc, 74), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    this.text(RIGHT_X + 5, DESC_Y + 8, this.clip(info.desc, 92), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
   }
 
   /** The move (or field) whose description the bottom bar shows right now. */
