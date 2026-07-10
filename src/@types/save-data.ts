@@ -8,6 +8,7 @@ import type { ErRelicBattleStateData } from "#data/elite-redux/er-relic-battle-s
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import type { ErShinyLabSaveData } from "#data/elite-redux/er-shiny-lab-effects";
 import type { TrainerFxSaveData } from "#data/elite-redux/er-trainer-fx";
+import type { ShowdownTeamPreset } from "#data/elite-redux/showdown/showdown-team-preset";
 import type { BattleType } from "#enums/battle-type";
 import type { GameModes } from "#enums/game-modes";
 import type { MoveId } from "#enums/move-id";
@@ -56,6 +57,13 @@ export interface SystemSaveData {
    * never landed. Optional for back-compat (absent = empty).
    */
   showdownAppliedSettlements?: number[];
+  /**
+   * Showdown 1v1 (Team Menu): named team presets, serialized in the account save so they
+   * survive a device change / cloud round-trip. Each preset = { version, name, mons }, where
+   * mons are the canonical wire {@linkcode ShowdownMonManifest}s. Optional for back-compat
+   * (absent = empty); sanitized on load.
+   */
+  showdownTeamPresets?: ShowdownTeamPreset[];
   /**
    * One-time gift flag: `true` once the player has received the free 2 Legendary
    * eggs grant. Absent on saves predating the grant (treated as `false`, so the
