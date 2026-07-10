@@ -148,6 +148,41 @@ export interface CoopCrossroadsPickPayload {
   readonly optionIndex: number;
 }
 
+/**
+ * REWARD intent/outcome (Wave-2d, #1, REWARD_SELECT): one relayed reward-screen ACTION. Unlike biome
+ * travel (one pick per interaction), the reward shop relays a STREAM of actions on the same pinned
+ * interaction until a terminal (skip/leave, or a non-continuation reward grab). Each action - a reward
+ * pick, a shop buy, a reroll, a lock, a transfer, a Check-Team op - is ONE operation. A NESTED sub-pick
+ * (party target slot / TM move slot / ability slot / fusion pair) is folded into THIS payload's `data`
+ * (a "multi-step op payload", §8.2 Wave-2d) - it is NOT a separate sub-operation: the reward shop already
+ * collapses the party-target menu into the single terminal relay this operation carries.
+ */
+export interface CoopRewardActionPayload {
+  /** The wire `label` the legacy relay sent this action with (reward/shop/skip/reroll/check/transfer/lock). */
+  readonly label: string;
+  /** The picked option/cursor index, or a sentinel (COOP_INTERACTION_LEAVE = -1 / _REROLL = -2). */
+  readonly choice: number;
+  /** The relay `data` array (the act-code + any resolved sub-pick indices), verbatim; undefined when none. */
+  readonly data: number[] | undefined;
+  /** True iff this action LEAVES the interaction for good (skip / leave) - the late-after-leave watermark trigger. */
+  readonly terminal: boolean;
+}
+
+/**
+ * SHOP_BUY intent/outcome (Wave-2d, #5, SHOP): one relayed biome-market (BiomeShop / BlackMarket / Exotic /
+ * ImportBazaar) action - a buy (slot into the streamed stock + resolved party target + post-buy money) or
+ * the LEAVE terminal. Shares the reward shop's multi-action stream shape; the biome market pins on
+ * coopBiomeStart (the same monotonic interaction counter the reward shop pins coopInteractionStart on).
+ */
+export interface CoopShopBuyPayload {
+  /** The bought slot into the owner-streamed stock, or COOP_INTERACTION_LEAVE (-1) for the market terminal. */
+  readonly slot: number;
+  /** The relay `data` array ([targetPartySlot, moneyAfter] for a buy), verbatim; undefined when none. */
+  readonly data: number[] | undefined;
+  /** True iff this action LEAVES the market for good - the late-after-leave watermark trigger. */
+  readonly terminal: boolean;
+}
+
 // -----------------------------------------------------------------------------
 // Pure helpers: id mint/parse + closed-union guards. Zero engine dependency.
 // -----------------------------------------------------------------------------

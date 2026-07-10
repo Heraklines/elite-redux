@@ -1,0 +1,473 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Co-op REWARD-SHOP + biome-MARKET operation surface (Wave-2d authoritative run-state
+// migration; see docs/plans/2026-07-10-coop-authoritative-run-state-migration.md, §2.5
+// item 3 + §5.1). SURFACE 3 - the highest-traffic interaction (where #861 lived).
+//
+// This migrates the owner-alternated REWARD shop (SelectModifierPhase, #1 reward/shop/
+// skip/reroll/check/transfer/lock) AND its sibling biome MARKET (BiomeShopPhase +
+// Exotic/BlackMarket/ImportBazaar subclasses, #5) onto the authoritative operation model
+// (coop-operation-runtime.ts). It is the Wave-2a biome adapter (coop-biome-operation.ts)
+// cloned structurally, with the design deltas the multi-action nature of a shop forces.
+//
+// WHAT IT DOES (control plane only - the DATA plane is untouched, §1.2):
+//   - OWNER: every relayed reward/market action mints a TYPED intent (invariant 2) and, on
+//     the AUTHORITY (coop host), COMMITS it EXACTLY ONCE through CoopOperationHost
+//     (invariant 3), advancing a surface-local revision (§1.5).
+//   - WATCHER: gates its adoption of each relayed action through CoopOperationGuest -
+//     idempotent by operationId (invariant 5), and REJECTS a stale/late choice (invariant 6,
+//     the #861 shape) via the interaction-start watermarks below.
+//
+// DESIGN DELTAS vs Wave-2a (multi-action stream; recorded in §8.2 for later surfaces):
+//   - MULTI-ACTION STREAM. Biome travel relays ONE pick per pinned interaction; a shop relays
+//     a STREAM (buy, buy, lock, reroll, ... leave) on the SAME pinned counter. So each action is
+//     ONE operation, and the operationId cannot be the raw pin alone (that would dedupe every
+//     action after the first). We suffix the pin with a per-interaction monotonic ACTION ORDINAL
+//     (`pin * ACTION_STRIDE + ordinal`) so each action is a distinct op, tracked SEPARATELY for
+//     the owner (commit) and the watcher (adopt) so they never contaminate in the single-process
+//     duo harness (§8.2 pitfall).
+//   - TWO WATERMARKS for stale/late rejection (the biome adapter's single `lastAppliedPinned`
+//     generalized for a stream). `lastAdoptedStart` rejects a pick from a STRICTLY EARLIER
+//     interaction (`pin < lastAdoptedStart`, the #861 cross-interaction leftover). `lastLeftStart`
+//     rejects a pick for an interaction the watcher already LEFT (`pin <= lastLeftStart`, the
+//     late-choice-after-leave shape). Within a live interaction (`pin > both`) every action passes.
+//   - CONTINUATION IDENTITY (#866). A move-learn continuation copy (BiomeShopPhase.copy / the base
+//     SelectModifierPhase copy) inherits the pinned interaction counter, so its actions continue the
+//     SAME operationId space + the SAME watermark tier - the operation identity survives the copy
+//     rather than orphaning on a raw counter pin (which was exactly the #866 unpinned-orphan class).
+//
+// SUB-PICKER MODEL (party target / TM / ability / fusion): a nested sub-pick is folded into the
+// single terminal action's payload `data` (a multi-step op payload, §8.2), NOT a separate
+// sub-operation - the reward shop already collapses the party-target menu into the ONE relay this
+// operation carries (coopFlushPending([slot, option])). Separate sub-SURFACES that fire their own
+// relay channels (the ability-capsule phase #4, learn-move-forward #11) are migrated in later waves.
+//
+// DUAL-RUN (§1.8, §5.1): rides ALONGSIDE the legacy reward/biomeShop relay + the interaction counter,
+// which the phases keep firing unchanged (removing them is FORBIDDEN until every surface is migrated).
+// This layer is ADDITIVE control-plane bookkeeping + a watcher adoption GATE. When the flag is OFF the
+// surface behaves EXACTLY as before (pure legacy pass-through).
+//
+// FLAG (§5.4): `isCoopRewardOperationEnabled()`. Default ON, version-gated by the existing
+// COOP_PROTOCOL_VERSION (er-coop-12; NO new wire arms this wave - the control fields ride the existing
+// relay carrier, the Wave-2a "carrier" delta). `COOP_REWARD_OP=off` forces legacy for CI/soak/rollback.
+// State is per-session and reset on session boundaries (assembleCoopRuntime / clearCoopRuntime).
+// =============================================================================
+
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import {
+  type CoopOperationKind,
+  type CoopPendingOperation,
+  type CoopRewardActionPayload,
+  type CoopShopBuyPayload,
+  makeCoopOperationId,
+} from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  type CoopCommitContext,
+  type CoopIntentValidator,
+  CoopOperationGuest,
+  CoopOperationHost,
+} from "#data/elite-redux/coop/coop-operation-runtime";
+import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
+import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
+
+/** The two shop surfaces this adapter serves: the reward screen (#1) and the biome market (#5). */
+export type CoopShopSurface = "reward" | "market";
+
+/** The awaited relay action the watcher gates (a subset of CoopInteractionChoice - choice/data). */
+export interface CoopRewardRelayAction {
+  readonly choice: number;
+  readonly data?: number[] | undefined;
+}
+
+/** The watcher's adoption verdict for a relayed reward/market action. */
+export type CoopRewardAdoptDecision =
+  /** Adopt this action (apply it against the identical pool exactly as the legacy path would). */
+  | { readonly adopt: true }
+  /** Do NOT adopt (stale / late / duplicate / rejected / fail-closed): IGNORE it, keep awaiting the terminal. */
+  | { readonly adopt: false; readonly reason: string };
+
+// -----------------------------------------------------------------------------
+// Flag + per-session state (reset on session boundaries).
+// -----------------------------------------------------------------------------
+
+/**
+ * Default ON. Activation is HARD-GATED by the #806 protocol-version handshake (COOP_PROTOCOL_VERSION,
+ * er-coop-12): a mixed-build pair refuses to pair / banners, so a live session has both peers on the
+ * envelope build. The legacy path stays selectable (rollback = set false). CI/soak force legacy via
+ * the COOP_REWARD_OP=off env override.
+ */
+const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_REWARD_OP === "off");
+
+let enabled = DEFAULT_ENABLED;
+
+/**
+ * The session epoch (§1.4). Wave-2d keeps it constant (1) per session and resets the surface state on
+ * session boundaries; the full launch/resume epoch mint is a later, cross-surface piece (§2.4). An epoch
+ * change still bumps it here so a cross-epoch operationId is dropped structurally (invariant 6).
+ */
+let epoch = 1;
+
+/** The authority (coop host) commit log for shop ops. Lazily created; null until first use / on a non-host. */
+let authorityHost: CoopOperationHost | null = null;
+
+/** The watcher applier that gates adoption of a relayed action. Lazily created; null until first use. */
+let watchGuest: CoopOperationGuest | null = null;
+
+/**
+ * The highest pinned interaction start the local client has ADOPTED any action at AS A WATCHER. A pick
+ * pinned STRICTLY BELOW it is a leftover from a strictly-earlier interaction a later one superseded (the
+ * #861 cross-interaction stale shape). Advanced ONLY on a watcher adoption. -1 = none yet.
+ */
+let lastAdoptedStart = -1;
+
+/**
+ * The highest pinned interaction start the local client has adopted a TERMINAL (skip/leave) for AS A
+ * WATCHER. A pick pinned AT OR BELOW it is a late choice for an interaction already LEFT (the
+ * late-after-leave shape). -1 = none yet.
+ */
+let lastLeftStart = -1;
+
+/** ACTION ORDINAL stride: pin * STRIDE + ordinal must not overflow into the next pin's op-id space. */
+const ACTION_STRIDE = 100_000;
+
+/** The owner's per-interaction monotonic action ordinal (for the committed op-id). Reset when the pin changes. */
+let ownerOrdinal = 0;
+let ownerOrdinalStart = -1;
+
+/** The watcher's per-interaction monotonic action ordinal (for the applied op-id). Reset when the pin changes. */
+let watcherOrdinal = 0;
+let watcherOrdinalStart = -1;
+
+/** True iff the migrated (envelope-gated) shop path is active; else pure legacy fallback (§5.1). */
+export function isCoopRewardOperationEnabled(): boolean {
+  return enabled;
+}
+
+/** Select the migrated path (true) or the legacy relay fallback (false). The one-line per-surface rollback (§5.4). */
+export function setCoopRewardOperationEnabled(value: boolean): void {
+  enabled = value;
+}
+
+/** Restore the flag to its version-gated default (test hygiene). */
+export function resetCoopRewardOperationFlag(): void {
+  enabled = DEFAULT_ENABLED;
+}
+
+/** The current shop operation epoch (§1.4). */
+export function getCoopRewardOperationEpoch(): number {
+  return epoch;
+}
+
+/**
+ * Set the operation epoch (§1.4). A CHANGE resets the per-session op state so a leftover operationId from a
+ * prior epoch can never satisfy a live op (invariant 6). Idempotent for the same epoch.
+ */
+export function setCoopRewardOperationEpoch(next: number): void {
+  if (next === epoch) {
+    return;
+  }
+  epoch = next;
+  resetCoopRewardOperationState();
+}
+
+/** Tear down all per-session operation state (called from assembleCoopRuntime / clearCoopRuntime + tests). Keeps the flag. */
+export function resetCoopRewardOperationState(): void {
+  authorityHost = null;
+  watchGuest = null;
+  lastAdoptedStart = -1;
+  lastLeftStart = -1;
+  ownerOrdinal = 0;
+  ownerOrdinalStart = -1;
+  watcherOrdinal = 0;
+  watcherOrdinalStart = -1;
+}
+
+// -----------------------------------------------------------------------------
+// Internals.
+// -----------------------------------------------------------------------------
+
+function host(): CoopOperationHost {
+  if (authorityHost == null) {
+    authorityHost = new CoopOperationHost({ epoch });
+  }
+  return authorityHost;
+}
+
+function guest(): CoopOperationGuest {
+  if (watchGuest == null) {
+    watchGuest = new CoopOperationGuest({ epoch });
+  }
+  return watchGuest;
+}
+
+/** The operation kind for a surface (the §2 successor of the reward / biomeShop relay kinds). */
+function kindFor(surface: CoopShopSurface): Extract<CoopOperationKind, "REWARD" | "SHOP_BUY"> {
+  return surface === "reward" ? "REWARD" : "SHOP_BUY";
+}
+
+/**
+ * The owner-parity validator (§1.3): the intent's owner seat MUST be the seat the interaction counter
+ * assigns for this pinned slot. The typed successor of `isLocalOwnerAtCounter` - the host refuses an intent
+ * from the wrong seat instead of trusting the sender.
+ */
+function ownerParityValidator(pinned: number): CoopIntentValidator {
+  const expectedSeat = coopInteractionOwnerSeat(pinned);
+  return intent =>
+    intent.owner === expectedSeat
+      ? { ok: true }
+      : { ok: false, reason: `wrong-owner:${intent.owner}!=${expectedSeat}` };
+}
+
+/**
+ * A minimal control-plane commit context. The shop decision carries no NEW data-plane payload over the wire
+ * (the mon/field/money state travels on the existing checkpoint / waveEndState, dual-run), so the embedded
+ * authoritativeState is a lightweight placeholder the applier never reads (it classifies on the CONTROL
+ * fields only). The real adopt-by-id state apply is UNCHANGED (§1.2).
+ */
+function controlContext(surface: CoopShopSurface, wave: number, turn: number): CoopCommitContext {
+  const placeholder: CoopAuthoritativeBattleStateV1 = {
+    version: 1,
+    tick: 0,
+    wave,
+    turn,
+    playerParty: [],
+    enemyParty: [],
+    field: [],
+    weather: 0,
+    weatherTurnsLeft: 0,
+    terrain: 0,
+    terrainTurnsLeft: 0,
+    arenaTags: [],
+    money: 0,
+    pokeballCounts: [],
+    playerModifiers: [],
+    enemyModifiers: [],
+  };
+  return { wave, turn, logicalPhase: surface === "reward" ? "REWARD_SELECT" : "SHOP", authoritativeState: placeholder };
+}
+
+/** Next per-interaction owner action ordinal for `pinned` (resets when the pinned interaction changes). */
+function nextOwnerOrdinal(pinned: number): number {
+  if (ownerOrdinalStart !== pinned) {
+    ownerOrdinal = 0;
+    ownerOrdinalStart = pinned;
+  }
+  return ownerOrdinal++;
+}
+
+/** Peek the watcher's current per-interaction action ordinal for `pinned` (resets when the pin changes). */
+function peekWatcherOrdinal(pinned: number): number {
+  if (watcherOrdinalStart !== pinned) {
+    watcherOrdinal = 0;
+    watcherOrdinalStart = pinned;
+  }
+  return watcherOrdinal;
+}
+
+// -----------------------------------------------------------------------------
+// Owner seam (§1.3 propose -> commit). Dual-run: the phase still fires the legacy relay.
+// -----------------------------------------------------------------------------
+
+export interface CoopRewardOwnerCommitParams {
+  readonly surface: CoopShopSurface;
+  /** The pinned interaction counter this shop opened on (coopInteractionStart / coopBiomeStart). */
+  readonly pinned: number;
+  /** The relayed action's wire label (reward/shop/skip/reroll/check/transfer/lock, or biomeShop). */
+  readonly label: string;
+  /** The picked option/cursor index, or a sentinel (COOP_INTERACTION_LEAVE / _REROLL). */
+  readonly choice: number;
+  /** The relayed data array (act-code + any resolved sub-pick), verbatim; undefined when none. */
+  readonly data: number[] | undefined;
+  /** True iff this action LEAVES the interaction for good (skip / leave / market terminal). */
+  readonly terminal: boolean;
+  /** The local client's coop role - determines whether it is the authority that COMMITS. */
+  readonly localRole: CoopRole;
+  readonly wave: number;
+  readonly turn?: number;
+}
+
+/**
+ * OWNER: mint + (on the authority) COMMIT one typed reward/market action through the operation primitive
+ * (§1.3). ADDITIVE + dual-run: the phase still fires the legacy relay send; this records the authoritative
+ * operation. No-op when the flag is OFF. Never throws (the legacy relay is the fallback).
+ */
+export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): void {
+  if (!enabled || params.pinned < 0) {
+    return;
+  }
+  try {
+    const ownerSeat = coopInteractionOwnerSeat(params.pinned);
+    const ordinal = nextOwnerOrdinal(params.pinned);
+    const opId = makeCoopOperationId(epoch, ownerSeat, params.pinned * ACTION_STRIDE + ordinal);
+    const payload = buildPayload(params.surface, params.label, params.choice, params.data, params.terminal);
+    const intent: CoopPendingOperation = {
+      id: opId,
+      kind: kindFor(params.surface),
+      owner: ownerSeat,
+      status: "proposed",
+      payload,
+    };
+    // The AUTHORITY (coop host) is the sole committer (invariant 3). When the LOCAL owner is the host it
+    // commits its own intent here; when the owner is the guest, the host commits on adopt (watcher seam).
+    if (params.localRole === "host") {
+      const res = host().submit(
+        intent,
+        controlContext(params.surface, params.wave, params.turn ?? 0),
+        ownerParityValidator(params.pinned),
+      );
+      if (res.kind === "committed") {
+        coopLog(
+          "reward",
+          `${params.surface} op OWNER commit label=${params.label} rev=${res.envelope.revision} id=${opId} (Wave-2d)`,
+        );
+      } else {
+        coopWarn(
+          "reward",
+          `${params.surface} op OWNER commit non-committed (${res.kind}) id=${opId} - legacy relay carries it (Wave-2d)`,
+        );
+      }
+    }
+    // NOTE: the owner does NOT advance the watcher watermarks - those are a WATCHER-only order (§8.2). The
+    // owner knows its own picks; only an adopted RELAY needs the stale-ordering guard.
+  } catch (e) {
+    coopWarn("reward", `${params.surface} op OWNER commit threw (handled - legacy relay is the fallback) (Wave-2d)`, e);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Watcher seam (invariant 5 idempotent apply + invariant 6 late-rejection).
+// -----------------------------------------------------------------------------
+
+export interface CoopRewardWatcherAdoptParams {
+  readonly surface: CoopShopSurface;
+  readonly pinned: number;
+  /** The awaited relay action (null = owner timed out / disconnected). */
+  readonly action: CoopRewardRelayAction | null;
+  /** True iff this action LEAVES the interaction for good (skip / leave / market terminal). */
+  readonly terminal: boolean;
+  readonly localRole: CoopRole;
+  readonly wave: number;
+  readonly turn?: number;
+}
+
+/**
+ * WATCHER: gate the adoption of one relayed owner action through the operation primitive. When the flag is
+ * OFF this is a pass-through (adopt iff the action landed) - pure legacy behavior. When ON:
+ *   - on the AUTHORITY watching a guest-owned action, VALIDATE + COMMIT the guest's intent (invariant 3);
+ *   - REJECT a stale pick from a strictly-earlier interaction (`pin < lastAdoptedStart`, #861) or a late
+ *     pick for an interaction already LEFT (`pin <= lastLeftStart`), and de-dupe an exact re-delivery by
+ *     operationId (invariants 5, 6). On a reject the CALLER ignores the action and keeps awaiting the
+ *     authoritative terminal (exactly like the existing #854 out-of-range guard).
+ * Never throws (a throw returns `adopt:false` -> the caller skips the action, never crashing the watcher).
+ */
+export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): CoopRewardAdoptDecision {
+  // Legacy / fallback: adopt iff the action landed, no operation gating.
+  if (!enabled) {
+    return params.action == null ? { adopt: false, reason: "no-relay" } : { adopt: true };
+  }
+  if (params.action == null) {
+    return { adopt: false, reason: "no-relay" };
+  }
+  if (params.pinned < 0) {
+    // Unpinned interaction (should not happen in a live run): fall through to the legacy apply.
+    return { adopt: true };
+  }
+  try {
+    // Stale / late rejection (invariant 6, the #861 shape). The pinned interaction counter is monotonic, so:
+    //  - a pick STRICTLY BELOW the highest interaction we have adopted at is a leftover from an interaction a
+    //    later one already superseded (the cross-interaction stale buffer);
+    //  - a pick AT OR BELOW the highest interaction we have LEFT is a late choice for an interaction we
+    //    already terminated (the late-after-leave shape).
+    // Within a live interaction (pin > both) every action passes, so a legitimate stream of buys is adopted.
+    if (params.pinned < lastAdoptedStart || params.pinned <= lastLeftStart) {
+      coopWarn(
+        "reward",
+        `${params.surface} op WATCHER REJECT stale/late pin=${params.pinned} adoptedStart=${lastAdoptedStart} leftStart=${lastLeftStart} (Wave-2d)`,
+      );
+      return { adopt: false, reason: "stale-or-late" };
+    }
+
+    const ownerSeat = coopInteractionOwnerSeat(params.pinned);
+    const ordinal = peekWatcherOrdinal(params.pinned);
+    const opId = makeCoopOperationId(epoch, ownerSeat, params.pinned * ACTION_STRIDE + ordinal);
+    const payload = buildPayload(params.surface, "relay", params.action.choice, params.action.data, params.terminal);
+    const intent: CoopPendingOperation = {
+      id: opId,
+      kind: kindFor(params.surface),
+      owner: ownerSeat,
+      status: "proposed",
+      payload,
+    };
+
+    // The AUTHORITY (host) is the sole committer: if it is WATCHING a guest-owned action, commit it now
+    // (invariant 3). A rejection (wrong owner) -> do not adopt.
+    if (params.localRole === "host") {
+      const res = host().submit(
+        intent,
+        controlContext(params.surface, params.wave, params.turn ?? 0),
+        ownerParityValidator(params.pinned),
+      );
+      if (res.kind === "rejected" || res.kind === "rejected-late") {
+        coopWarn("reward", `${params.surface} op WATCHER(host) commit REJECTED (${res.kind}) id=${opId} (Wave-2d)`);
+        return { adopt: false, reason: `host-${res.kind}` };
+      }
+    }
+
+    // Exact re-delivery of an already-applied action is a no-op (invariant 5).
+    if (guest().hasApplied(opId)) {
+      coopWarn("reward", `${params.surface} op WATCHER REJECT duplicate id=${opId} (Wave-2d)`);
+      return { adopt: false, reason: "duplicate" };
+    }
+
+    // Apply through the guest applier (surface-local dense revision; classifies + records the op).
+    const appliedOp: CoopPendingOperation = { ...intent, status: "applied" };
+    const g = guest();
+    const applyRes = g.applyEnvelope({
+      version: 1,
+      sessionEpoch: epoch,
+      revision: g.getLastAppliedRevision() + 1,
+      wave: params.wave,
+      turn: params.turn ?? 0,
+      logicalPhase: params.surface === "reward" ? "REWARD_SELECT" : "SHOP",
+      pendingOperation: appliedOp,
+      authoritativeState: controlContext(params.surface, params.wave, params.turn ?? 0).authoritativeState,
+    });
+    if (applyRes.kind !== "applied") {
+      coopWarn("reward", `${params.surface} op WATCHER guest non-applied (${applyRes.kind}) id=${opId} (Wave-2d)`);
+      return { adopt: false, reason: `guest-${applyRes.kind}` };
+    }
+
+    // Advance the watcher order + ordinal ONLY on a successful adoption (§8.2: never on the owner's commit).
+    watcherOrdinal += 1;
+    lastAdoptedStart = Math.max(lastAdoptedStart, params.pinned);
+    if (params.terminal) {
+      lastLeftStart = Math.max(lastLeftStart, params.pinned);
+    }
+    coopLog(
+      "reward",
+      `${params.surface} op WATCHER adopt choice=${params.action.choice} terminal=${params.terminal} id=${opId} (Wave-2d)`,
+    );
+    return { adopt: true };
+  } catch (e) {
+    coopWarn("reward", `${params.surface} op WATCHER gate threw (handled - legacy apply is the fallback) (Wave-2d)`, e);
+    return { adopt: true };
+  }
+}
+
+/** Build the typed per-kind payload for a surface (a REWARD action or a SHOP_BUY action). */
+function buildPayload(
+  surface: CoopShopSurface,
+  label: string,
+  choice: number,
+  data: number[] | undefined,
+  terminal: boolean,
+): CoopRewardActionPayload | CoopShopBuyPayload {
+  return surface === "reward"
+    ? ({ label, choice, data, terminal } satisfies CoopRewardActionPayload)
+    : ({ slot: choice, data, terminal } satisfies CoopShopBuyPayload);
+}
