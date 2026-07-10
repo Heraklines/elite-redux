@@ -1,0 +1,58 @@
+===== COOP SOAK RESULT =====
+profile: level
+verdict: FAIL
+waves_requested: 55
+run: 29074943854 (main)
+timestamp: 2026-07-10T06-54-55Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260710 WAVES=55 - replay this run with:  SOAK_SEED=20260710 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=590 guest=480
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=870 guest=590
+[22m[39m[coop-soak] scalar-lag wave 13 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1060 guest=870
+[22m[39m[coop-soak] scalar-lag wave 14 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1260 guest=1060
+[22m[39m[coop-soak] scalar-lag wave 19 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1920 guest=1260
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=3410 guest=2580
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 26 (seed 20260710): wave driving threw (strand/stall): PhaseInterceptor.to("CommandPhase") did not reach its target (soft-lock / freeze?): stuck at phase "SelectModifierPhase", UI mode MESSAGE (=0), interceptor state "running".
+
+----- vitest result tail -----
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[coop:reward] WATCHER timed out waiting for partner -> leaving reward screen
+[38;2;0;60;189mUI mode changed from MODIFIER_SELECT (=6) to MESSAGE (=0)![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > plays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m54183[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:149:3[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[34mContinue to the next wave.[39m
+[34mContinue to the next wave.[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 26 (seed 20260710): wave driving threw (strand/stall): PhaseInterceptor.to("CommandPhase") did not reach its target (soft-lock / freeze?): stuck at phase "SelectModifierPhase", UI mode MESSAGE (=0), interceptor state "running".
+Original: Timed out in waitUntil!. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-10T06-54-55-567Z__seed-20260710__wave-26. Replay: SOAK_SEED=20260710[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1210:11[22m[39m
+    [90m1208|[39m       phaseState: phaseStateDump(rig),
+    [90m1209|[39m     });
+    [90m1210|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1211|[39m   };
+    [90m1212|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m2317:7[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m167:22[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 06:53:37
+[2m   Duration [22m 77.87s[2m (transform 17.96s, setup 22.16s, import 156ms, tests 54.65s, environment 737ms)[22m
+
