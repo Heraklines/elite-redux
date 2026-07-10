@@ -423,6 +423,22 @@ export class CoopJournal {
       }
     }
   }
+
+  /**
+   * Restore per-class peer-ACK marks on a COLD resume (§4). A converged control-plane save is taken with both
+   * peers at the high-water, so the peer applied (ACKed) through it: the committer's ACK view continues from
+   * there. Without this, the committer's `acked` restarts at 0, so the first un-ACKed post-resume op reads as
+   * a deep gap (its oldest retained is far past acked+1) and a reconnect resync SPURIOUSLY escalates to a full
+   * snapshot instead of serving the single tail op. Monotonic (a lower value than already recorded is ignored).
+   */
+  restoreAcked(marks: Record<string, number>): void {
+    for (const cls of Object.keys(marks)) {
+      const seq = marks[cls];
+      if (Number.isFinite(seq) && seq > (this.acked.get(cls) ?? 0)) {
+        this.acked.set(cls, seq);
+      }
+    }
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -785,6 +801,10 @@ export class CoopDurabilityManager {
   /** Restore persisted high-water + applied marks on a cold resume (§4), so revisions continue monotonically. */
   restore(highWater: Record<string, number>, applied: Record<string, number>): void {
     this.journal.restoreHighWater(highWater);
+    // Restore the committer's peer-ACK view too: a converged save has the peer applied through the high-water,
+    // so without this the committer's acked=0 makes a post-resume reconnect resync spuriously escalate to a
+    // full snapshot (the deep-gap check reads the first un-ACKed op's revision as far past acked+1).
+    this.journal.restoreAcked(highWater);
     this.ledger.restore(applied);
   }
 

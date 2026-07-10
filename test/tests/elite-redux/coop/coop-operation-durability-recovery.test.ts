@@ -301,7 +301,7 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
   // single revision behind and the ring holds exactly the op it needs.
   // EXPECTED RED (current code): CoopDurabilityManager.restore does not restore the journal's acked map.
   // ===========================================================================================
-  it.fails("I6b: [RED] a cold resume does not restore the committer's acked view -> a post-resume resend spuriously escalates to a full snapshot", async () => {
+  it("I6b: a cold resume restores the committer's acked view so a post-resume resend serves the tail, not a spurious full snapshot", async () => {
     const N = 5;
     const pair = createLoopbackPair();
     const hostGate = new ChannelGate(pair.host);
