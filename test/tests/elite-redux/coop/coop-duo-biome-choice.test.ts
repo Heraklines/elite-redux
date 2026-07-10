@@ -34,6 +34,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import { applyCoopFullSnapshot, captureCoopFullSnapshot } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   coopBiomeInteractionStartValue,
   resetCoopBiomePickerDrivenByTest,
@@ -50,8 +51,9 @@ import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
-import { type ErRouteNode, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
+import { type ErRouteNode, getErPendingNodes, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import { erBiomeOverstayAnchor, resetErBiomeStructure } from "#data/elite-redux/er-biome-structure";
+import { getRevealedMapNodes, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -185,6 +187,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     resetCoopBiomePickerDrivenByTest();
     resetErBiomeStructure();
     setErPendingNodes([]);
+    resetErMapNodes(); // #865: clear any revealed map nodes a test seeded so they don't leak
     logs.dispose();
     clearCoopRuntime();
     vi.restoreAllMocks();
@@ -699,6 +702,125 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       biomeArg(guestSwitch),
       "the watcher adopts the owner's biome verbatim (SAME biome, no divergence) (#864)",
     ).toBe(ownerBiome);
+    logs.flush();
+  }, 300_000);
+
+  // =====================================================================================
+  // SCENARIO 7 (#865): the NATURAL single-node biome-travel terminal (revealed.length===1,
+  // NON-chained). #864 closed the CHAINED single-node case (a crossroads Leave pinned the interaction, so
+  // setNextBiomeAndEnd relayed the biome). The RESIDUAL: a NATURAL single-node transition ticks NO
+  // interaction counter (coopAdvancePinned stays -1) and relays NO biomePick - both clients rely on
+  // computing the SAME revealed[0] from their OWN getErPendingNodes(). But the routing pending-node set is
+  // NOT part of the persisted erMapState and was NOT synced, so if the two clients' onward node sets diverge
+  // (a Map-Upgrade / mystery-event reveal that rolled differently), the host could see 1 node (auto-travels
+  // silently) while the guest sees 2 (opens a picker the host never had) -> different biomes.
+  //
+  // THE FIX (option b): erMapState + the routing pending-node set are host-authoritative, carried in the
+  // full-state resync snapshot and ADOPTED by the guest (restoreErMapState + setErPendingNodes). So when the
+  // guest heals from the host's snapshot it adopts the host's SINGLE onward node -> both clients take the
+  // deterministic single-node terminal to the SAME biome, coherent BY CONSTRUCTION (no relay, no picker).
+  //
+  // FAILS-BEFORE: the resync snapshot carried NO erPendingNodes, so applyCoopFullSnapshot left the guest's
+  // divergent 2-node set intact -> the guest opens a picker (revealed.length>1) instead of the single-node
+  // terminal, and never lands on the host's biome. PASSES-AFTER: the guest adopts the host's single node.
+  // =====================================================================================
+  it("SCENARIO 7 (#865): divergent map state -> guest adopts host's pending nodes via resync -> NATURAL single-node terminal converges", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+
+    // A mid-run wave, NOT a boundary/finale and NOT chained from a crossroads (the NATURAL terminal).
+    rig.hostScene.currentBattle.waveIndex = 13;
+    rig.guestScene.currentBattle.waveIndex = 13;
+
+    const hostBiome = BiomeId.VOLCANO;
+    const seedMap = (nodes: ErRouteNode[]): void => {
+      resetErMapNodes();
+      setErPendingNodes(nodes);
+      // A real string label (production uses getBiomeName) so the getErMapSaveData/restoreErMapState
+      // round-trip keeps the node (restoreErMapState drops nodes whose label is not a string).
+      revealMapNodes(
+        nodes.filter(n => n.revealed).map(n => ({ biome: n.biome, label: `biome-${n.biome}`, kind: "biome" })),
+      );
+    };
+
+    // HOST: a SINGLE revealed onward node -> the natural single-node terminal (no picker, no relay).
+    const hostSnapshot = withClientSync(rig.hostCtx, () => {
+      seedMap([{ biome: hostBiome, revealed: true }]);
+      return captureCoopFullSnapshot();
+    });
+    expect(
+      hostSnapshot?.erPendingNodes?.map(n => n.biome),
+      "host snapshot carries its single pending node",
+    ).toEqual([hostBiome]);
+
+    // GUEST: DIVERGENT map state - TWO revealed nodes (would open a picker the host never had).
+    withClientSync(rig.guestCtx, () => {
+      seedMap([
+        { biome: BiomeId.FOREST, revealed: true },
+        { biome: hostBiome, revealed: true },
+      ]);
+    });
+
+    // Apply the host's resync snapshot on the guest (the production stateSync heal path).
+    const guestAfter = withClientSync(rig.guestCtx, () => {
+      applyCoopFullSnapshot(hostSnapshot!, /* authoritativeGuest */ true, /* suppressResummon */ false);
+      return {
+        pending: getErPendingNodes(),
+        mapNodes: getRevealedMapNodes()
+          .filter(n => n.kind === "biome")
+          .map(n => n.biome),
+      };
+    });
+    // The guest ADOPTED the host's map state: a SINGLE revealed onward node (both the routing decision input
+    // AND the map overlay), so its SelectBiomePhase now takes the SAME single-node branch as the host.
+    expect(
+      guestAfter.pending.filter(n => n.revealed).length,
+      "the guest adopted the host's SINGLE revealed pending node (#865)",
+    ).toBe(1);
+    expect(guestAfter.pending[0]?.biome, "the guest's pending node IS the host's biome").toBe(hostBiome);
+    expect(guestAfter.mapNodes, "the guest's revealed MAP nodes match the host").toEqual([hostBiome]);
+
+    // Now the NATURAL single-node terminal runs on the guest -> travels to the host's biome, NO picker, NO
+    // biomePick relay (it is not an interaction), NO counter tick.
+    const guestSwitch = vi.spyOn(rig.guestScene.phaseManager, "unshiftNew");
+    const sendSpy = vi.spyOn(CoopInteractionRelay.prototype, "sendInteractionChoice");
+    const counterBefore = rig.guestRuntime.controller.interactionCounter();
+    const guestTracker = installUiModeTracker(rig.guestScene);
+    try {
+      await withClient(rig.guestCtx, async () => {
+        // NOT chained (no setCoopBiomeInteractionStart): the natural single-node deterministic terminal.
+        new SelectBiomePhase().start();
+        for (let i = 0; i < 80; i++) {
+          await drainLoopback();
+          if (
+            (guestSwitch.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1] as BiomeId | undefined) !== undefined
+          ) {
+            return;
+          }
+        }
+        throw new Error("SCENARIO 7 HANG: the guest single-node terminal never resolved (#865 fails-before)");
+      });
+    } finally {
+      guestTracker.restore();
+    }
+
+    const biomeArg = (spy: typeof guestSwitch): BiomeId | undefined =>
+      spy.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1] as BiomeId | undefined;
+    // THE CONVERGENCE: the guest travels to the host's single-node biome (coherent by construction).
+    expect(biomeArg(guestSwitch), "the guest travels to the host's single-node biome (coherent) (#865)").toBe(
+      hostBiome,
+    );
+    // The NATURAL single-node terminal is NOT an interaction: no biomePick relay, no counter advance, no map.
+    expect(
+      sendSpy.mock.calls.filter(c => c[1] === "biomePick").length,
+      "the natural single-node terminal sends NO biomePick relay (not an interaction)",
+    ).toBe(0);
+    expect(rig.guestRuntime.controller.interactionCounter(), "the natural single-node terminal ticks NO counter").toBe(
+      counterBefore,
+    );
+    expect(guestTracker.mode(), "the natural single-node terminal never opened the ER_MAP picker").not.toBe(
+      UiMode.ER_MAP,
+    );
     logs.flush();
   }, 300_000);
 });

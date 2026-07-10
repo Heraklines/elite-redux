@@ -24,7 +24,9 @@
 // plain-JSON `ErDataFingerprint` (#633 diagnostics), so the transport stays the lowest layer.
 import type { ErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import type { ErRouteNode } from "#data/elite-redux/er-biome-routing";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
+import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
 import type { ErRelicBattleStateData } from "#data/elite-redux/er-relic-battle-state";
 // TYPE-ONLY import (fully erased at runtime by `import type`, so this file stays the
 // zero-runtime-import lowest layer): the ghost-pool message carries plain-JSON
@@ -529,6 +531,25 @@ export interface CoopFullBattleSnapshot {
    */
   erBiomeStructure?: { biomeLength: number | null; biomeStartWave: number } | undefined;
   /**
+   * #865 ER WORLD-MAP STATE (revealed nodes / travel target / Treasure-Map fragments / journey history).
+   * The saveDataDigest now hashes the revealed-node set + travel target + fragments
+   * (`normalizeCoopErMapState`), so a host-vs-guest map drift is DETECTED - but no per-turn/resync heal
+   * carried the map state, so a divergence loop-detected with no heal path (audit #841 item 1). Carried
+   * here (the substrate's OWN save serializer, `getErMapSaveData`) + healed through `restoreErMapState` so
+   * the guest ADOPTS the host's map state. Optional + additive: an older host omits it and the guest leaves
+   * its map state alone.
+   */
+  erMapState?: ErMapSaveData | undefined;
+  /**
+   * #865 the ROUTING pending-node set (`er-biome-routing`). This is the ACTUAL input the biome-travel
+   * decision reads (`getErPendingNodes`), rolled at biome ENTRY (SwitchBiomePhase) and NOT part of the
+   * persisted `erMapState`. Carried + adopted (`setErPendingNodes`) alongside `erMapState` so the guest's
+   * SelectBiomePhase sees the SAME onward set as the host's - which makes the NATURAL single-node
+   * biome-travel terminal (revealed.length===1, non-chained, relays no biomePick) coherent BY
+   * CONSTRUCTION. Optional + additive.
+   */
+  erPendingNodes?: ErRouteNode[] | undefined;
+  /**
    * #838 UNIFY: the id-based authoritative full-state. When present the guest adopts THIS via the same
    * apply the live turns use (mutate-in-place by `Pokemon.id`, reconstruct/remove by id, adopt host party
    * order, instance-keyed modifiers) instead of the legacy species-order + benchParty reconcile the rest
@@ -588,6 +609,19 @@ export interface CoopAuthoritativeBattleStateV1 {
   erRelicBattleState?: ErRelicBattleStateData | undefined;
   /** #486 biome-structure EXTENT (rolled length + start wave); healed via restoreErBiomeStructure (audit #841 item 5). */
   erBiomeStructure?: { biomeLength: number | null; biomeStartWave: number } | undefined;
+  /**
+   * #865 ER world-map state (revealed nodes / travel target / fragments / journey) carried per-turn so the
+   * guest ADOPTS the host's map state (via restoreErMapState) BEFORE it hashes its saveDataDigest -
+   * adopt-then-hash convergence, so the widened erMapState digest never trips a per-turn assertion. Optional
+   * + additive.
+   */
+  erMapState?: ErMapSaveData | undefined;
+  /**
+   * #865 the routing pending-node set (getErPendingNodes) - the biome-travel decision's actual input,
+   * adopted per-turn (setErPendingNodes) so the guest's natural single-node terminal is coherent by
+   * construction. Optional + additive.
+   */
+  erPendingNodes?: ErRouteNode[] | undefined;
 }
 
 /**

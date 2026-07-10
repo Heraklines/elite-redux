@@ -43,7 +43,7 @@ import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { type ErRouteNode, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
+import { type ErRouteNode, getErPendingNodes, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import {
   erBiomeOverstayAnchor,
   getErBiomeLength,
@@ -52,6 +52,7 @@ import {
   restoreErBiomeStructure,
   setErBiomeOverstayAnchor,
 } from "#data/elite-redux/er-biome-structure";
+import { getRevealedMapNodes, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
 import { BattlerIndex } from "#enums/battler-index";
@@ -122,6 +123,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     resetCoopRendezvousWaitMs();
     setCoopHarnessModuleLetIsolation(false);
     setErPendingNodes([]);
+    resetErMapNodes(); // #865: clear any revealed map nodes a test seeded so they don't leak
     resetErBiomeStructure();
     resetCoopBiomePickerDrivenByTest();
     logs.dispose();
@@ -349,6 +351,87 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     expect(healed.length, "biome length healed through restoreErBiomeStructure").toBe(12);
     expect(healed.startWave, "biome start wave healed").toBe(11);
     expect(healed.digest, "the guest digest CONVERGED to the host after the biome-structure heal").toBe(hostDigest);
+    logs.flush();
+  }, 300_000);
+
+  it("DIVERGE + HEAL (#865 / #841 item 1): a diverged erMapState (revealed nodes) MISMATCHES the digest then heals via the resync", async () => {
+    // Audit #841 item 1: the ER world-map state (revealed onward nodes + travel target + Treasure-Map
+    // fragments) rides the saveDataDigest, so a host-vs-guest map drift is DETECTED - but before #865 NO
+    // per-turn/resync heal carried it, so a divergence loop-detected with NO heal path. Worse, the NATURAL
+    // single-node biome-travel terminal (revealed.length===1, non-chained) relays no biomePick and relies on
+    // both clients computing the SAME onward set from their OWN pending nodes (getErPendingNodes) - so a map
+    // drift could land the two clients in DIFFERENT biomes. This proves the map state now rides the
+    // full-snapshot resync (erMapState + the routing erPendingNodes) and heals to convergence.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+
+    // The revealed-node set + pending nodes are process-global (er-map-nodes / er-biome-routing module
+    // state), so - like the biome-structure test above - we set the divergent state INSIDE each
+    // digest-capture block (no per-client module-let isolation needed).
+    const hostBiome = BiomeId.VOLCANO;
+    const hostNode = (): ErRouteNode[] => [{ biome: hostBiome, revealed: true }];
+    const guestNodes = (): ErRouteNode[] => [
+      { biome: BiomeId.FOREST, revealed: true },
+      { biome: hostBiome, revealed: true },
+    ];
+    const seedMap = (nodes: ErRouteNode[]): void => {
+      resetErMapNodes();
+      setErPendingNodes(nodes);
+      // A real string label (production uses getBiomeName) so the getErMapSaveData/restoreErMapState
+      // round-trip keeps the node (restoreErMapState drops nodes whose label is not a string).
+      revealMapNodes(
+        nodes.filter(n => n.revealed).map(n => ({ biome: n.biome, label: `biome-${n.biome}`, kind: "biome" })),
+      );
+    };
+
+    // HOST: a SINGLE revealed onward node (the natural single-node terminal - no picker, no relay).
+    const hostDigest = await withClient(rig.hostCtx, () => {
+      seedMap(hostNode());
+      return captureCoopSaveDataDigest();
+    });
+    // GUEST: DIVERGENT map state - TWO revealed nodes (would open a picker the host never had).
+    const guestDiverged = await withClient(rig.guestCtx, () => {
+      seedMap(guestNodes());
+      return captureCoopSaveDataDigest();
+    });
+    expect(guestDiverged, "the diverged revealed-node set MISMATCHES the host digest (detected)").not.toBe(hostDigest);
+
+    // The host (re-asserting its single node - the guest's set clobbered the shared module) builds the
+    // authoritative full-snapshot; the guest APPLIES it (the production resync heal path).
+    const snapshot = await withClient(rig.hostCtx, () => {
+      seedMap(hostNode());
+      return captureCoopFullSnapshot();
+    });
+    expect(snapshot, "host built a full snapshot").not.toBeNull();
+    expect(
+      snapshot?.erPendingNodes?.map(n => n.biome),
+      "the snapshot carries the host routing pending-node set",
+    ).toEqual([hostBiome]);
+    expect(
+      snapshot?.erMapState?.nodes.map(n => n.biome),
+      "the snapshot carries the host revealed map nodes",
+    ).toEqual([hostBiome]);
+
+    const healed = await withClient(rig.guestCtx, () => {
+      seedMap(guestNodes()); // the guest's pre-heal divergent state
+      applyCoopFullSnapshot(snapshot!, /* authoritativeGuest */ true, /* suppressResummon */ false);
+      return {
+        digest: captureCoopSaveDataDigest(),
+        pending: getErPendingNodes().map(n => n.biome),
+        nodes: getRevealedMapNodes()
+          .filter(n => n.kind === "biome")
+          .map(n => n.biome),
+      };
+    });
+    // THE FIX: the guest ADOPTED the host's map state - a SINGLE onward node (both the routing pending set
+    // the decision reads AND the revealed map overlay), so the natural single-node terminal is now coherent.
+    expect(healed.pending, "the guest adopted the host's single routing pending node (#865)").toEqual([hostBiome]);
+    expect(healed.nodes, "the guest adopted the host's revealed map nodes (#865)").toEqual([hostBiome]);
+    expect(healed.digest, "the guest digest CONVERGED to the host after the erMapState heal (#841 item 1)").toBe(
+      hostDigest,
+    );
     logs.flush();
   }, 300_000);
 

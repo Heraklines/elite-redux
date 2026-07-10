@@ -56,6 +56,7 @@ import type {
   CoopSerializedArenaTag,
   CoopSerializedEnemy,
 } from "#data/elite-redux/coop/coop-transport";
+import { type ErRouteNode, getErPendingNodes, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import {
   erBiomeOverstayAnchor,
   getErBiomeLength,
@@ -63,6 +64,7 @@ import {
   setErBiomeOverstayAnchor,
   setErBiomeStructureExtent,
 } from "#data/elite-redux/er-biome-structure";
+import { getErMapSaveData, restoreErMapState } from "#data/elite-redux/er-map-nodes";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
 import {
@@ -1635,22 +1637,37 @@ const COOP_SAVEDATA_DIGEST_EXCLUDED_KEYS: ReadonlySet<string> = new Set<string>(
 ]);
 
 /**
- * Normalize the session save's `erMapState` (#837) to ONLY the biome-STRUCTURE trio that drives the
- * host-authoritative encounter generator (`biomeOverstayAnchor` is the confirmed blind spot, audit
- * Part 1 #2; biome length/start-wave are its inputs). The rest of `erMapState` - revealed nodes, the
- * pending travel target, Treasure-Map fragments, Fairy's-Boon luck, the journey history - is guest
- * RENDERER state the pure-renderer guest never rolls, so it legitimately diverges and must stay out of
- * the digest. Tolerant of an absent/malformed field (older save / no map yet).
+ * Normalize the session save's `erMapState` (#837, widened #865) to the host-AUTHORITATIVE fields the
+ * guest ADOPTS: the biome-STRUCTURE trio (`biomeOverstayAnchor` + biome length/start-wave - the confirmed
+ * encounter-generator blind spot, audit Part 1 #2) PLUS the REVEALED onward-node set, the pending travel
+ * target, and the Treasure-Map fragment count (#865). The revealed nodes drive the biome-travel decision
+ * (a natural single-node terminal picks `revealed[0]` with no relay), so hashing them makes a host-vs-guest
+ * map drift DETECTABLE and the resync heal ({@linkcode restoreCoopErMapState}) adopts them - closing the
+ * "erMapState heal path" gap (audit #841 item 1). Nodes are hashed by their `(biome, kind)` identity in
+ * ORDER (the single-node terminal reads `revealed[0]`, so order is load-bearing). The PURE-RENDERER-only
+ * fields that legitimately diverge and are never read at a biome terminal (Fairy's-Boon luck, carried
+ * weather, the cosmetic journey history) stay OUT of the digest. Tolerant of an absent/malformed field
+ * (older save / no map yet).
  */
 function normalizeCoopErMapState(value: unknown): Record<string, unknown> {
   if (value == null || typeof value !== "object") {
     return {};
   }
   const map = value as Record<string, unknown>;
+  const nodes = Array.isArray(map.nodes)
+    ? (map.nodes as Record<string, unknown>[]).map(n => ({
+        biome: typeof n?.biome === "number" ? n.biome : -1,
+        kind: typeof n?.kind === "string" ? n.kind : "",
+      }))
+    : [];
   return {
     biomeOverstayAnchor: typeof map.biomeOverstayAnchor === "number" ? map.biomeOverstayAnchor : null,
     biomeLength: typeof map.biomeLength === "number" ? map.biomeLength : null,
     biomeStartWave: typeof map.biomeStartWave === "number" ? map.biomeStartWave : null,
+    // #865: the revealed onward-node set + travel target + fragments are now host-authoritative + adopted.
+    nodes,
+    travelTarget: typeof map.travelTarget === "number" ? map.travelTarget : null,
+    fragments: typeof map.fragments === "number" ? map.fragments : 0,
   };
 }
 
@@ -2171,6 +2188,13 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
       // drift here (via erMapState) but no heal carried it; the gated guest heal restores it through
       // restoreErBiomeStructure. Captured unconditionally (additive); only READ in the gated heal.
       erBiomeStructure: { biomeLength: getErBiomeLength(), biomeStartWave: getErBiomeStartWave() },
+      // ER WORLD-MAP STATE (#865): the revealed onward nodes / travel target / fragments / journey (the
+      // substrate's OWN save serializer) + the routing PENDING-NODE set the biome-travel decision reads
+      // (getErPendingNodes, NOT part of erMapState). The gated guest heal adopts BOTH (restoreErMapState +
+      // setErPendingNodes) so a natural single-node biome-travel terminal is coherent by construction and the
+      // "erMapState heal path" (audit #841 item 1) is closed. Captured unconditionally (additive).
+      erMapState: getErMapSaveData(),
+      erPendingNodes: getErPendingNodes(),
       // #838 UNIFY: the id-based authoritative full-state (whole party as PokemonData, seating, arena,
       // modifiers, money, ER substrates). When present the guest heals via applyCoopAuthoritativeBattleState
       // (mutate-in-place by Pokemon.id) instead of the legacy species-order + benchParty reconcile above -
@@ -2282,6 +2306,11 @@ export function captureCoopAuthoritativeBattleState(turn: number): CoopAuthorita
       // drift here (via erMapState) but no heal carried it; the gated guest heal restores it through
       // restoreErBiomeStructure. Captured unconditionally (additive); only READ in the gated heal.
       erBiomeStructure: { biomeLength: getErBiomeLength(), biomeStartWave: getErBiomeStartWave() },
+      // ER WORLD-MAP STATE (#865): carried per-turn so the guest ADOPTS the host's map state (restoreErMapState
+      // + setErPendingNodes) BEFORE it hashes its saveDataDigest - adopt-then-hash convergence, so the widened
+      // erMapState digest never trips a per-turn assertion. Captured unconditionally (additive).
+      erMapState: getErMapSaveData(),
+      erPendingNodes: getErPendingNodes(),
     };
   } catch {
     return null;
@@ -3475,16 +3504,26 @@ export function adoptCoopHostPlayerPartyOrder(hostParty: number[] | undefined): 
 /**
  * GUEST (authoritative resync, #837): restore the ER MODULE-LET substrates the {@linkcode
  * CoopChecksumState.saveDataDigest} now detects as diverged but that no per-turn/resync heal carried:
- * the money-streak map (#348), the biome overstay anchor (#504), and the per-battle relic state
- * (Cursed Idol / Pharaoh's Ankh). Each goes through the substrate's OWN save-data restore function
- * (never a hand-rolled write), so the wire form is exactly the session-save form. Every field is
- * additive: an older host omits it (undefined) and that substrate is left untouched. Fully guarded so a
- * malformed substrate can never crash the guest's battle.
+ * the money-streak map (#348), the biome overstay anchor (#504), the per-battle relic state
+ * (Cursed Idol / Pharaoh's Ankh), and - #865 - the ER WORLD-MAP STATE (revealed onward nodes / travel
+ * target / fragments / journey) plus the routing PENDING-NODE set the biome-travel decision reads. Each
+ * goes through the substrate's OWN restore function (never a hand-rolled write), so the wire form is
+ * exactly the session-save form. Every field is additive: an older host omits it (undefined) and that
+ * substrate is left untouched. Fully guarded so a malformed substrate can never crash the guest's battle.
+ *
+ * Called BOTH per-turn (from {@linkcode applyCoopAuthoritativeBattleState}, before the checksum verify -
+ * so the guest adopts-then-hashes and the widened erMapState digest converges) AND on the full-snapshot
+ * resync (from {@linkcode applyCoopFullSnapshot}).
  */
 function restoreCoopModuleLetSubstrates(
   snapshot: Pick<
     CoopFullBattleSnapshot,
-    "erMoneyStreaks" | "biomeOverstayAnchor" | "erRelicBattleState" | "erBiomeStructure"
+    | "erMoneyStreaks"
+    | "biomeOverstayAnchor"
+    | "erRelicBattleState"
+    | "erBiomeStructure"
+    | "erMapState"
+    | "erPendingNodes"
   >,
 ): void {
   try {
@@ -3509,6 +3548,28 @@ function restoreCoopModuleLetSubstrates(
         `erRelicBattleState host wave=${(snapshot.erRelicBattleState as ErRelicBattleStateData).wave} -> restored (#837)`,
       );
       restoreErRelicBattleState(snapshot.erRelicBattleState);
+    }
+    // ER WORLD-MAP STATE (#865 / audit #841 item 1): adopt the host's map state (revealed nodes / travel
+    // target / fragments / journey / structure) THEN re-seat the routing PENDING-NODE set. Order matters:
+    // restoreErMapState RESETS the map subsystem (nodes/routing/structure/fairy) and re-applies the host's
+    // saved state - which WIPES the routing pending nodes (resetErRouting) - so setErPendingNodes must run
+    // AFTER, since the biome-travel decision (SelectBiomePhase) reads getErPendingNodes(), NOT the persisted
+    // erMapState nodes. Adopting the host's pending set makes a natural single-node biome-travel terminal
+    // coherent by construction. (biomeStartWave is always carried, so restoreErMapState's wave fallback is a
+    // no-op; pass the live wave defensively for an older save that omitted it.)
+    if (snapshot.erMapState !== undefined) {
+      coopLog(
+        "heal",
+        `erMapState host nodes=${snapshot.erMapState.nodes?.length ?? 0} travelTarget=${snapshot.erMapState.travelTarget ?? "-"} fragments=${snapshot.erMapState.fragments ?? 0} -> restored (#865/#841 item 1)`,
+      );
+      restoreErMapState(snapshot.erMapState, globalScene.currentBattle?.waveIndex ?? 1);
+    }
+    if (Array.isArray(snapshot.erPendingNodes)) {
+      coopLog(
+        "heal",
+        `erPendingNodes host count=${snapshot.erPendingNodes.length} revealed=${snapshot.erPendingNodes.filter(n => n.revealed).length} -> restored (#865)`,
+      );
+      setErPendingNodes((snapshot.erPendingNodes as ErRouteNode[]).map(n => ({ ...n })));
     }
   } catch {
     // A malformed module-let substrate must never crash the guest's battle.
