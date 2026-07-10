@@ -51,11 +51,13 @@ import { globalScene } from "#app/global-scene";
 import {
   beginReplayRecording,
   isReplayRecording,
+  recordReplayCheckpoint,
   recordReplayCommand,
   recordReplayInteraction,
 } from "#data/elite-redux/replay-recorder";
-import type { ReplayCommandKind, ReplayEndState } from "#data/elite-redux/replay-trace";
+import type { ReplayCheckpoint, ReplayCommandKind, ReplayEndState } from "#data/elite-redux/replay-trace";
 import { Command } from "#enums/command";
+import { ModifierData as PersistentModifierData } from "#system/modifier-data";
 import { PokemonData } from "#system/pokemon-data";
 
 /**
@@ -118,6 +120,44 @@ export function maybeBeginSinglePlayerReplayRecording(): void {
     });
   } catch {
     /* a header/roster serialize failure must never break the encounter (recording just stays off) */
+  }
+}
+
+/**
+ * Snapshot the run's CURRENT state as a session-save-grade {@linkcode ReplayCheckpoint} (#record-replay
+ * checkpoint). MODE-AGNOSTIC: it reads only `globalScene`, so it serves BOTH the co-op host and single-
+ * player recording (the recorder itself stays engine-free). Mirrors `game-data.ts` `getSessionSaveData`'s
+ * player-side fields (party + persistent modifiers + money + pokeballs + wave/seed cursor), so a loader can
+ * boot the run from this point. Cheap enough to call once per wave boundary (the perf guard: wave-boundary-
+ * only), which is where the window slides.
+ */
+export function captureReplayCheckpoint(): ReplayCheckpoint {
+  return {
+    wave: globalScene.currentBattle?.waveIndex ?? 0,
+    seed: globalScene.seed,
+    party: globalScene.getPlayerParty().map(p => new PokemonData(p)),
+    modifiers: globalScene.findModifiers(() => true).map(m => new PersistentModifierData(m, true)),
+    money: Math.floor(globalScene.money ?? 0),
+    pokeballCounts: { ...globalScene.pokeballCounts },
+  };
+}
+
+/**
+ * CAPTURE a window-start checkpoint at THIS wave boundary if a recording is live (#record-replay checkpoint).
+ * MODE-AGNOSTIC - called once from the {@linkcode EncounterPhase} for BOTH co-op (host-only, since only the
+ * host records) and single-player. No-op unless recording (a single boolean read), and the recorder ignores
+ * a re-capture for a wave it already has, so this only builds the snapshot once per new wave as the window
+ * slides. Fully guarded: a capture failure never breaks the encounter (the recording just keeps its prior
+ * checkpoint / boots from the header roster).
+ */
+export function maybeCaptureReplayCheckpoint(): void {
+  if (!isReplayRecording()) {
+    return;
+  }
+  try {
+    recordReplayCheckpoint(captureReplayCheckpoint());
+  } catch {
+    /* a checkpoint capture must never break the encounter (recording keeps its prior state) */
   }
 }
 

@@ -37,7 +37,10 @@ import {
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { buildTrainerEntranceTween, TRAINER_ENTRANCE_SLIDE_X } from "#data/elite-redux/er-trainer-fx";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
-import { maybeBeginSinglePlayerReplayRecording } from "#data/elite-redux/replay-single-recording";
+import {
+  maybeBeginSinglePlayerReplayRecording,
+  maybeCaptureReplayCheckpoint,
+} from "#data/elite-redux/replay-single-recording";
 import { getNatureName } from "#data/nature";
 import { BattleType } from "#enums/battle-type";
 import { BiomeId } from "#enums/biome-id";
@@ -139,6 +142,10 @@ export class EncounterPhase extends BattlePhase {
     // whichever recording is live. Both are behavior-preserving passive observers.
     maybeBeginReplayRecording();
     maybeBeginSinglePlayerReplayRecording();
+    // #record-replay (checkpoint): capture a session-save-grade CHECKPOINT at THIS wave boundary so a
+    // recorded trace can boot from the run's ACTUAL state at the ring-buffer window start (not the
+    // original header roster). Wave-boundary-only (the perf guard) + a no-op unless recording + guarded.
+    maybeCaptureReplayCheckpoint();
     // #801 run-scoped acquisition sharing: snapshot the dex/starter baseline at the CO-OP run's
     // first encounter so the shared blob only ever carries RUN acquisitions (catches, unlocks) -
     // never the host's whole account dex ("they get all of my pokemon" live report). Idempotent

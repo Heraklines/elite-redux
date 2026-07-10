@@ -521,12 +521,40 @@ export async function replaySingleTrace(
     throw new Error("replaySingleTrace: trace has no command events to replay");
   }
 
-  // ===== Rebuild the run from the header. =====
-  const starters = buildStartersFromRoster(trace.roster);
-  log(`launching solo run: seed=${trace.seed} roster=[${starters.map(s => s.speciesId).join(",")}]`);
-  await launchSoloRun(game, starters, trace.seed);
+  // ===== Rebuild the run. PREFER the window-start CHECKPOINT (the run's ACTUAL state at the oldest
+  // retained wave - post catches/releases/rewards/evolutions) over the ORIGINAL header roster, so a run
+  // that diverged from its starting party still boots correctly. Absent checkpoint -> boot from the header
+  // roster (backward compatible). The checkpoint's party + seed are the boot inputs; money + balls are
+  // restored after launch. (Mid-run modifier restore for a DEEP window start is the documented deep-wave
+  // gap - the closed-loop trace's window covers wave 1, where the checkpoint == the roster launch.) =====
+  const checkpoint = trace.checkpoint;
+  const bootRoster = checkpoint?.party ?? trace.roster;
+  const bootSeed = checkpoint?.seed ?? trace.seed;
+  const starters = buildStartersFromRoster(bootRoster);
+  log(
+    checkpoint == null
+      ? `launching solo run: seed=${trace.seed} roster=[${starters.map(s => s.speciesId).join(",")}]`
+      : `booting from checkpoint@wave${checkpoint.wave}: seed=${bootSeed} party=[${starters.map(s => s.speciesId).join(",")}]`,
+  );
+  await launchSoloRun(game, starters, bootSeed);
 
   const waves = [...new Set(commandEvents.map(c => c.wave))].sort((a, b) => a - b);
+  if (checkpoint != null) {
+    // Restore the session-save-grade cursor captured at the window start (money + ball inventory). At the
+    // window-start wave this reproduces the run from that point.
+    game.scene.money = checkpoint.money;
+    for (const [k, v] of Object.entries(checkpoint.pokeballCounts)) {
+      game.scene.pokeballCounts[Number(k) as PokeballType] = v;
+    }
+    // Guard the deep-wave boot gap loudly: the loader launches at wave 1, so a checkpoint whose window
+    // start is a LATER wave would need a mid-run fast-forward this loader does not do. Surface it as a
+    // divergence rather than silently replaying from the wrong wave.
+    if (waves.length > 0 && checkpoint.wave !== waves[0]) {
+      divergences.push(
+        `checkpoint boot gap: checkpoint is at wave ${checkpoint.wave} but the loader boots at wave ${waves[0]} (deep-wave mid-run restore is unimplemented)`,
+      );
+    }
+  }
   const maxWaves = opts.maxWaves ?? waves.length;
   let commandsFed = 0;
   let interactionsApplied = 0;
@@ -861,6 +889,15 @@ describe.skipIf(!RUN)("single-player replay: record -> replay closed loop (#reco
     expect(validateReplayTrace(trace).ok, "the captured trace validates").toBe(true);
     expect(trace.coop, "a single-player trace has NO coop layer").toBeUndefined();
     expect(trace.endState, "the single-player recorder stamped an end-state summary").toBeDefined();
+    // #record-replay (checkpoint): the recorder captured a window-start checkpoint at the first wave
+    // boundary. The 7-wave run fits the 10-wave window, so the window start (and thus the checkpoint) is
+    // wave 1 - and KILLER #2 boots the replay FROM it. Proves the checkpoint round-trips capture->replay.
+    expect(trace.checkpoint, "the recorder captured a window-start checkpoint").toBeDefined();
+    expect(
+      trace.checkpoint?.wave,
+      "the checkpoint is at the window-start wave (1: the whole run fits the window)",
+    ).toBe(1);
+    expect(trace.checkpoint?.party.length, "the checkpoint snapshotted the live party").toBeGreaterThanOrEqual(1);
 
     const commands = trace.events.filter(isReplayCommandEvent);
     const interactions = trace.events.filter(isReplayInteractionEvent);

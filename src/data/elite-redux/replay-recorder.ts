@@ -31,6 +31,7 @@
 import type { CoopRunConfig } from "#data/elite-redux/coop/coop-session-controller";
 import {
   makeReplayTrace,
+  type ReplayCheckpoint,
   type ReplayCommandEvent,
   type ReplayEndState,
   type ReplayInteractionEvent,
@@ -86,6 +87,13 @@ let header: ReplayRecorderHeader | null = null;
 let buffer: BufferedEvent[] = [];
 /** The highest wave seen, so pruning keeps the last REPLAY_RECORDER_WAVE_WINDOW waves. */
 let highestWave = 0;
+/**
+ * wave -> the session-save-grade CHECKPOINT captured at the START of that wave (#record-replay checkpoint).
+ * One entry per wave boundary; pruned to the same window as the event buffer so it never grows unbounded.
+ * At emit the checkpoint for the window-START wave is stamped onto the trace, so a loader can boot from the
+ * run's ACTUAL state at the oldest retained wave (not the original header roster) and replay events forward.
+ */
+let checkpoints = new Map<number, ReplayCheckpoint>();
 
 /** Whether a replay trace is currently being recorded (the hot-path gate every `record*` reads first). */
 export function isReplayRecording(): boolean {
@@ -106,6 +114,7 @@ export function beginReplayRecording(h: ReplayRecorderHeader): void {
   header = h;
   buffer = [];
   highestWave = 0;
+  checkpoints = new Map();
 }
 
 /** STOP recording + drop the buffered trace (call on run end / new run / title return). */
@@ -113,15 +122,63 @@ export function clearReplayRecording(): void {
   header = null;
   buffer = [];
   highestWave = 0;
+  checkpoints = new Map();
 }
 
-/** Drop buffered events older than the last {@linkcode REPLAY_RECORDER_WAVE_WINDOW} waves. */
+/** Drop buffered events + checkpoints older than the last {@linkcode REPLAY_RECORDER_WAVE_WINDOW} waves. */
 function pruneOldWaves(): void {
   const cutoff = highestWave - REPLAY_RECORDER_WAVE_WINDOW + 1;
   if (cutoff <= 0) {
     return;
   }
   buffer = buffer.filter(b => b.wave >= cutoff);
+  for (const wave of checkpoints.keys()) {
+    if (wave < cutoff) {
+      checkpoints.delete(wave);
+    }
+  }
+}
+
+/**
+ * RECORD a session-save-grade CHECKPOINT for the START of `cp.wave` (#record-replay checkpoint). No-op
+ * unless recording. Called ONCE per wave boundary (from the EncounterPhase tap); idempotent per wave (a
+ * re-call for a wave already captured is ignored, so it never overwrites the true window-start snapshot).
+ * The checkpoint is built by the caller (which reads globalScene) so the recorder stays engine-free; this
+ * only stores + prunes it to the ring-buffer window.
+ */
+export function recordReplayCheckpoint(cp: ReplayCheckpoint): void {
+  if (header == null) {
+    return;
+  }
+  if (cp.wave > highestWave) {
+    highestWave = cp.wave;
+  }
+  if (!checkpoints.has(cp.wave)) {
+    checkpoints.set(cp.wave, cp);
+  }
+  pruneOldWaves();
+}
+
+/**
+ * The checkpoint to boot a replay from: the one captured at the WINDOW-START wave (the oldest wave that
+ * still has retained events, or the highest wave when the buffer is empty). Picks the checkpoint whose
+ * wave is the greatest that is still <= the window start, so a boot restores the state that PRECEDES every
+ * retained event. Returns undefined when no checkpoint was captured (a mid-flow recording start).
+ */
+function windowStartCheckpoint(): ReplayCheckpoint | undefined {
+  if (checkpoints.size === 0) {
+    return;
+  }
+  const windowStart = buffer.length > 0 ? Math.min(...buffer.map(b => b.wave)) : highestWave;
+  let best: ReplayCheckpoint | undefined;
+  let bestWave = -1;
+  for (const [wave, cp] of checkpoints) {
+    if (wave <= windowStart && wave > bestWave) {
+      bestWave = wave;
+      best = cp;
+    }
+  }
+  return best;
 }
 
 /**
@@ -177,6 +234,7 @@ export function getReplayTrace(): ReplayTrace | null {
       endState = undefined;
     }
   }
+  const checkpoint = windowStartCheckpoint();
   return makeReplayTrace({
     seed: header.seed,
     gameModeId: header.gameModeId,
@@ -184,5 +242,6 @@ export function getReplayTrace(): ReplayTrace | null {
     events: buffer.map(b => b.event),
     ...(header.coopRunConfig == null ? {} : { coopRunConfig: header.coopRunConfig }),
     ...(endState == null ? {} : { endState }),
+    ...(checkpoint == null ? {} : { checkpoint }),
   });
 }

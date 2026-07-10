@@ -34,6 +34,7 @@
 
 import type { CoopRunConfig } from "#data/elite-redux/coop/coop-session-controller";
 import type { GameModes } from "#enums/game-modes";
+import type { ModifierData as PersistentModifierData } from "#system/modifier-data";
 import type { PokemonData } from "#system/pokemon-data";
 
 /**
@@ -140,6 +141,35 @@ export interface ReplayCoopLayer {
   runConfig: CoopRunConfig;
 }
 
+/**
+ * A compact SESSION-SAVE-GRADE state CHECKPOINT captured at the ring-buffer WINDOW START (#record-replay,
+ * checkpoint). The event ring only keeps the last {@linkcode REPLAY_RECORDER_WAVE_WINDOW} waves and the
+ * header's `roster` is the ORIGINAL starting party - so a run mutated by catches / releases / rewards /
+ * evolutions cannot be rebuilt from the header alone once the offending wave is older than the earliest
+ * retained event. This checkpoint fills that gap: it is the run's actual state at the START of the oldest
+ * retained wave (re-captured on wave boundaries as the window slides, so it is always cheap and always
+ * paired with the retained events), letting a loader BOOT from it and replay the retained events forward.
+ *
+ * Mirrors the fields a session save persists (see `game-data.ts` `getSessionSaveData`): the live party as
+ * serialized `PokemonData`, the player's persistent modifiers, money, the pokeball inventory, and the
+ * wave / seed cursor to boot at. Optional + additive: a trace without a checkpoint (e.g. a recording begun
+ * mid-flow) still replays from the header roster (backward compatible).
+ */
+export interface ReplayCheckpoint {
+  /** The wave whose START this checkpoint snapshots (the ring-buffer window start; the boot wave). */
+  wave: number;
+  /** The run RNG seed at capture (`globalScene.seed`) - pins RNG from the checkpoint wave onward. */
+  seed: string;
+  /** The player party at the window start as serialized `PokemonData` (post catch/release/evolution). */
+  party: PokemonData[];
+  /** The player's persistent modifiers at the window start (session-save-grade `ModifierData`). */
+  modifiers: PersistentModifierData[];
+  /** The player's money at the window start. */
+  money: number;
+  /** The pokeball inventory at the window start (keyed by `PokeballType`, as `globalScene.pokeballCounts`). */
+  pokeballCounts: Record<string, number>;
+}
+
 /** One party mon in a {@linkcode ReplayEndState} summary (the minimal state a replay asserts on). */
 export interface ReplayEndPartyMon {
   /** The {@linkcode SpeciesId} value (a number so it round-trips through JSON). */
@@ -203,6 +233,14 @@ export interface ReplayTrace {
    * single-engine loader can assert it reproduced the run deterministically. Absent for co-op / v1 traces.
    */
   endState?: ReplayEndState;
+  /**
+   * Optional window-start CHECKPOINT (v2+, additive; see {@linkcode ReplayCheckpoint}): the run's actual
+   * session-save-grade state at the START of the oldest retained wave, so a loader can BOOT from it and
+   * replay the retained events forward even when the run diverged from the header roster (catches /
+   * releases / rewards / evolutions). A loader PREFERS this over the header roster when present; a trace
+   * without it (recording begun mid-flow) still replays from the header roster (backward compatible).
+   */
+  checkpoint?: ReplayCheckpoint;
 }
 
 /** Narrowing guard: is this event a battle command? */
@@ -263,6 +301,17 @@ export function validateReplayTrace(trace: ReplayTrace): ReplayTraceValidation {
   if (trace.coop != null && trace.coop.runConfig == null) {
     errors.push("coop layer present but missing runConfig");
   }
+  // The checkpoint is OPTIONAL + additive; validate it only when present (a boot needs a wave, a seed,
+  // and a non-empty party). A structurally-broken checkpoint is rejected so a loader never boots from junk.
+  if (trace.checkpoint != null) {
+    const cp = trace.checkpoint;
+    if (!Number.isInteger(cp.wave) || typeof cp.seed !== "string" || cp.seed.length === 0) {
+      errors.push("checkpoint present but missing a valid wave/seed cursor");
+    }
+    if (!Array.isArray(cp.party) || cp.party.length === 0) {
+      errors.push("checkpoint present but has an empty party (a boot needs at least one mon)");
+    }
+  }
   return { ok: errors.length === 0, errors };
 }
 
@@ -296,6 +345,8 @@ export function makeReplayTrace(args: {
   challenges?: CoopRunConfig["challenges"];
   /** Optional v2+ end-state summary (single-player); omitted for a co-op trace. */
   endState?: ReplayEndState;
+  /** Optional v2+ window-start checkpoint (both modes); omitted when nothing was captured. */
+  checkpoint?: ReplayCheckpoint;
 }): ReplayTrace {
   const difficulty = args.difficulty ?? args.coopRunConfig?.difficulty ?? "youngster";
   const challenges = args.challenges ?? args.coopRunConfig?.challenges ?? [];
@@ -309,5 +360,6 @@ export function makeReplayTrace(args: {
     events: args.events,
     ...(args.coopRunConfig == null ? {} : { coop: { runConfig: args.coopRunConfig } }),
     ...(args.endState == null ? {} : { endState: args.endState }),
+    ...(args.checkpoint == null ? {} : { checkpoint: args.checkpoint }),
   };
 }
