@@ -101,8 +101,24 @@ parallel solo agent's work — out of scope here, exonerated by the #899 bisect.
 7. **Wave-3**: real-browser duo tests, model-based fuzz, forced-surface 200-wave campaign.
 8. Housekeeping: #892 quarantine mock fix, #893 stash purge/ban, #878 statStages transient.
 
-## 7. Final combined gate verdict
+## 7. Final combined gate verdict (2026-07-10 16:30)
 
-PENDING at time of writing — running on this fully integrated tree (started 15:47).
-The verdict will be appended below when it completes; individual lanes were already green
-on the keystone worktree (all four) and on the pre-keystone integrated tree (A/B/C; P = #899 flake).
+Full `node scripts/run-coop-gate.mjs` on the fully integrated tree (commit `427ee944e` + this doc):
+
+- **LANE A: PASS** (59 files, 72s) — includes all new engine-free suites.
+- **LANE B: 85/86 PASS**; the single failure (`coop-duo-mystery.test.ts`, host-owned
+  DEPARTMENT_STORE_SALE lockstep leg) **re-ran 6/6 GREEN solo** immediately after on a quiet
+  box. Failure shape: `PhaseInterceptor.to("PostMysteryEncounterPhase")` waitUntil timeout with
+  the run already AT that phase — the same load-sensitivity class as #899 (two-engine tests
+  under multi-worker contention), not a code regression. The same file was green in both the
+  W2e-R gate and the keystone worktree gate.
+- **LANE C: PASS** (8 files, 412s).
+- **LANE P: PASS** (112s) — the production-fidelity soak passes on the fully combined tree
+  in the same full-gate run (i.e. not only solo).
+- QUARANTINE: known pre-existing fail, non-gating (#892).
+
+Reviewer note: the two flake events observed today (lane P NO-PARK under load, lane B
+interceptor timeout under load) are both the #899 scheduling-race class in the TEST HARNESS,
+bisect-exonerated from all product commits. Re-run any suspicious lane solo before attributing
+a red to code. Fixing #899 (event-driven rendezvous release + possibly a load-aware
+interceptor budget) will remove this triage tax.
