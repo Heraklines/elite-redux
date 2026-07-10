@@ -53,10 +53,33 @@ function isEngineGated(absPath) {
   return /process\.env\.ER_SCENARIO/.test(src);
 }
 
-/** Categorize every coop test file into lane A (engine-free), B (heavy engine), or C (soak). */
+/**
+ * The set of git-TRACKED coop test files (basenames). A ship gate must run only COMMITTED code - an
+ * untracked WIP test another worktree/agent dropped into the dir (this is a shared repo) is not part of the
+ * shippable surface and must not red the gate. Falls back to "everything" if git is unavailable.
+ */
+function trackedTestBasenames() {
+  const res = spawnSync(process.platform === "win32" ? "git.exe" : "git", ["ls-files", `${COOP_DIR_REL}/*.test.ts`], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+  });
+  if (res.status !== 0 || typeof res.stdout !== "string") {
+    return null;
+  }
+  return new Set(
+    res.stdout
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map(p => p.slice(p.lastIndexOf("/") + 1)),
+  );
+}
+
+/** Categorize every TRACKED coop test file into lane A (engine-free), B (heavy engine), or C (soak). */
 function categorize() {
+  const tracked = trackedTestBasenames();
   const files = readdirSync(COOP_DIR)
     .filter(f => f.endsWith(".test.ts"))
+    .filter(f => tracked == null || tracked.has(f))
     .sort();
   const lanes = { A: [], B: [], C: [] };
   for (const f of files) {
