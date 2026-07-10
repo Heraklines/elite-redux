@@ -123,6 +123,25 @@ export interface ShowdownSetEditorConfig {
   initialFilter?: string;
   /** Deterministic initial pane cursor (for render recipes). */
   initialPaneCursor?: number;
+  /**
+   * Committed the set (Done / Start). Receives the edited {@linkcode ShowdownEditorStage} +
+   * {@linkcode ShowdownEditorSet} - the flow wiring writes them into the team manifest. Absent in
+   * the render recipes (the demo config never commits), so pressing Done there is an inert no-op.
+   */
+  onDone?: (result: { stage: ShowdownEditorStage; set: ShowdownEditorSet }) => void;
+  /** Backed out (B / Cancel) with no commit - the flow returns to the grid, discarding edits. */
+  onCancel?: () => void;
+  /**
+   * L/R team cycling (shoulders): switch the editor to the sibling already-picked team mon
+   * (`dir` = -1 previous / +1 next). Absent when there is no sibling to cycle to.
+   */
+  onCycleTeam?: (dir: number) => void;
+}
+
+/** The edited result the flow wiring writes back into the team (stage + set). */
+export interface ShowdownEditorResult {
+  stage: ShowdownEditorStage;
+  set: ShowdownEditorSet;
 }
 
 /**
@@ -221,6 +240,32 @@ function categoryLabel(cat: MoveCategory): string {
   return MoveCategory[cat]?.charAt(0) ?? "?";
 }
 
+/**
+ * Typeahead ranking (fuzzy PREFIX-first, substring fallback). A non-matching row is dropped; a match
+ * ranks by tier - (0) the whole name starts with the filter, (1) any word starts with it, (2) it is a
+ * plain substring - then alphabetically within a tier. So filtering "o" surfaces Outrage/Overheat before
+ * a mere substring hit like "Diamond Blade", instead of the old pure-substring-then-alphabetical order
+ * that buried the intuitive matches (the maintainer's render-review nit).
+ */
+function rankByFilter<T>(items: T[], nameOf: (item: T) => string, filter: string): T[] {
+  const f = filter.toLowerCase();
+  const tierOf = (name: string): number => {
+    const lower = name.toLowerCase();
+    if (lower.startsWith(f)) {
+      return 0;
+    }
+    if (lower.split(/[\s-]+/).some(word => word.startsWith(f))) {
+      return 1;
+    }
+    return lower.includes(f) ? 2 : 3;
+  };
+  return items
+    .map(item => ({ item, name: nameOf(item), tier: tierOf(nameOf(item)) }))
+    .filter(entry => entry.tier < 3)
+    .sort((a, b) => (a.tier === b.tier ? a.name.localeCompare(b.name) : a.tier - b.tier))
+    .map(entry => entry.item);
+}
+
 export class ShowdownSetEditorUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
   /** Transient children rebuilt on every render(). */
@@ -316,6 +361,30 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         break;
       case Button.ACTION:
         handled = this.openPane();
+        break;
+      case Button.SUBMIT:
+        // Start = Done: commit the edited stage + set back into the team (flow wiring).
+        this.config!.onDone?.({ stage: this.config!.stage, set: this.config!.set });
+        handled = true;
+        break;
+      case Button.CANCEL:
+        // B = Back: discard and return to the grid (flow wiring).
+        this.config!.onCancel?.();
+        handled = true;
+        break;
+      case Button.CYCLE_FORM:
+        // Left shoulder: cycle to the previous already-picked team mon.
+        if (this.config!.onCycleTeam != null) {
+          this.config!.onCycleTeam(-1);
+          handled = true;
+        }
+        break;
+      case Button.CYCLE_SHINY:
+        // Right shoulder: cycle to the next already-picked team mon.
+        if (this.config!.onCycleTeam != null) {
+          this.config!.onCycleTeam(1);
+          handled = true;
+        }
         break;
     }
     if (handled) {
@@ -449,21 +518,17 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         reason: locked ? i18next.t("battle:showdownEditorEggLocked", { defaultValue: "Egg move - not unlocked" }) : "",
       });
     }
-    let list = [...entries.values()];
-    if (this.filter) {
-      const f = this.filter.toLowerCase();
-      list = list.filter(e => e.name.toLowerCase().includes(f));
-    }
-    return list.sort((a, b) => a.name.localeCompare(b.name));
+    const list = [...entries.values()];
+    return this.filter
+      ? rankByFilter(list, e => e.name, this.filter)
+      : list.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   private itemKeys(): ShowdownItemKey[] {
-    let keys = [...SHOWDOWN_ITEM_POOL];
-    if (this.filter) {
-      const f = this.filter.toLowerCase();
-      keys = keys.filter(k => this.itemName(k).toLowerCase().includes(f));
-    }
-    return keys.sort((a, b) => this.itemName(a).localeCompare(this.itemName(b)));
+    const keys = [...SHOWDOWN_ITEM_POOL];
+    return this.filter
+      ? rankByFilter(keys, k => this.itemName(k), this.filter)
+      : keys.sort((a, b) => this.itemName(a).localeCompare(this.itemName(b)));
   }
 
   private itemName(key: ShowdownItemKey): string {
@@ -638,16 +703,20 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     cx = this.chip(cx, `Mega ${megaCount}/1`, megaCount <= 1);
     cx = this.chip(cx, `Cost8+ ${highCost}/1`, highCost <= 1);
 
-    // Countdown placeholder (right).
+    // Pick-window countdown (right) - LOAD-BEARING UX (the 10-minute clock). It sits on the light strip
+    // window, where faint gold read as unreadable (maintainer's render-review nit), so it gets a dark
+    // pill behind it and a bold high-contrast clock (gold, red under a minute).
     const mm = Math.floor(cfg.pickSecondsLeft / 60);
     const ss = cfg.pickSecondsLeft % 60;
     const clock = `${mm}:${String(ss).padStart(2, "0")}`;
-    this.text(280, 2, "PICK", TextStyle.SUMMARY_GRAY, 0, 26);
-    this.text(300, 2, clock, cfg.pickSecondsLeft <= 60 ? TextStyle.SUMMARY_RED : TextStyle.SUMMARY_GOLD, 1, FONT_CHIP);
+    const urgent = cfg.pickSecondsLeft <= 60;
+    this.fill(261, 1, 58, 20, 0x14213d, 1);
+    this.text(265, 3, "PICK", TextStyle.SUMMARY_GRAY, 0, 30);
+    this.text(315, 1, clock, urgent ? TextStyle.SUMMARY_RED : TextStyle.SUMMARY_GOLD, 1, 46);
 
-    // Partner-ready placeholder (right, below clock).
+    // Partner-ready state (right, below the clock) - on the same dark pill so it is legible too.
     const partner = cfg.partnerReady == null ? "Partner -" : cfg.partnerReady ? "Partner READY" : "Partner waiting";
-    this.text(300, 13, partner, cfg.partnerReady ? TextStyle.SUMMARY_GREEN : TextStyle.SUMMARY_GRAY, 1, 26);
+    this.text(315, 13, partner, cfg.partnerReady ? TextStyle.SUMMARY_GREEN : TextStyle.SUMMARY_GRAY, 1, 28);
   }
 
   private chip(x: number, label: string, ok: boolean): number {
@@ -685,10 +754,13 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
 
     const sp = this.fieldedSpecies;
     const spriteCX = LEFT_X + LEFT_W / 2;
-    // Name (left) + cost badge (right) on the header line.
+    // Name (left) + cost badge (right) on the header line. A dark header BAND sits behind them: the
+    // identity window is a light panel, so pale-gold name text on it read low-contrast (maintainer's
+    // render-review nit). Gold-on-dark-navy matches the right-column field-row headers and is legible.
+    this.fill(LEFT_X + 2, BODY_Y + 2, LEFT_W - 4, 12, 0x14213d, 1);
     this.text(LEFT_X + 5, BODY_Y + 3, sp.name, TextStyle.SUMMARY_GOLD, 0, FONT_TITLE);
     const rootCost = cfg.team[cfg.activeSlot]?.baseCost ?? 0;
-    this.text(LEFT_X + LEFT_W - 4, BODY_Y + 4, `Cost ${rootCost}`, TextStyle.SUMMARY_HEADER, 1, FONT_HDR);
+    this.text(LEFT_X + LEFT_W - 4, BODY_Y + 4, `Cost ${rootCost}`, TextStyle.SUMMARY_GOLD, 1, FONT_HDR);
 
     // Big (harness-static) sprite: the species icon enlarged as the identity portrait.
     this.renderIdentitySprite(spriteCX, BODY_Y + 34);
@@ -952,7 +1024,16 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
       this.text(PANE_X + 6, PANE_Y + 4, "SEARCH", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
       const label = FIELD_ORDER.indexOf(this.field) >= 0 ? this.fieldName(this.field) : "";
       this.text(PANE_X + 6, PANE_Y + 16, `Press A to browse ${label}.`, TextStyle.SUMMARY_GOLD, 0, FONT_DESC);
-      this.text(PANE_X + 6, PANE_Y + 28, "Type to filter, arrows to move, B to close.", TextStyle.SUMMARY_GRAY, 0, 26);
+      this.text(PANE_X + 6, PANE_Y + 27, "Type to filter, arrows to move, B to close.", TextStyle.SUMMARY_GRAY, 0, 26);
+      // Overview-level controls (the flow wiring binds these): Start commits, B backs, shoulders cycle.
+      this.text(
+        PANE_X + 6,
+        PANE_Y + 37,
+        "Start: Done   B: Back to grid   L/R: swap team mon",
+        TextStyle.SUMMARY_BLUE,
+        0,
+        26,
+      );
       return;
     }
     switch (this.field) {
