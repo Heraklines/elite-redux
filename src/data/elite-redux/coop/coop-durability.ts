@@ -653,11 +653,15 @@ export class CoopDurabilityManager {
   /** Committer: serve a peer's reconnect request - replay the journal tail after `from`, or a full snapshot. */
   private serveResync(cls: string, from: number): void {
     if (this.journal.needsFullSnapshot(cls, from)) {
+      // The gap is DEEPER than the ring can serve (§4.4): the retained tail after `from` starts past the
+      // first revision the peer still needs, so replaying it would only land as a gap on the receiver.
+      // Escalate to a full-state resync and do NOT send the unusable partial tail (the receiver adopts the
+      // snapshot at head, fast-forwards its ledger, and needs nothing more; the DATA-plane stateSync is the
+      // fallback when no snapshot hook is wired).
       const head = this.journal.highWaterMark(cls);
       coopLog("durability", `resync cls=${cls} from=${from} DEEPER than ring -> full snapshot at head=${head}`);
       this.hooks.sendFullSnapshot?.(cls, head);
-      // Still replay whatever the ring holds after the snapshot's head is caught up elsewhere; if no snapshot
-      // hook is wired, the ring replay below is the best-effort heal (the per-surface snapshot covers the rest).
+      return;
     }
     const tail = this.journal.tailFrom(cls, from);
     coopLog("durability", `resync cls=${cls} from=${from} -> replay ${tail.length} entries`);
@@ -703,9 +707,25 @@ export class CoopDurabilityManager {
     this.transport.send({ t: "coopAck", cls, seq: this.ledger.appliedThrough(cls) });
   }
 
-  /** Committer: resend the committed-but-unacked tail for EVERY class (§4.2/§4.4). Idempotent (receiver dedupes). */
+  /**
+   * Committer: resend the committed-but-unacked tail for EVERY class (§4.2/§4.4). Idempotent (receiver
+   * dedupes). OVERFLOW ESCALATION (§4.3/§4.4): if the bounded ring has EVICTED the ops the receiver is
+   * missing (its acked position is deeper than the ring can serve), the retained tail is UNUSABLE (it would
+   * land as a gap on the receiver), so escalate to a full-state resync instead of resending it - the exact
+   * "peer gone long enough that unacked ops are evicted" case.
+   */
   private resendUnackedTail(reason: string): void {
     for (const cls of this.journal.classes()) {
+      const acked = this.journal.ackedThrough(cls);
+      if (this.journal.needsFullSnapshot(cls, acked)) {
+        const head = this.journal.highWaterMark(cls);
+        coopWarn(
+          "durability",
+          `${reason} cls=${cls} OVERFLOW: ring evicted ops the peer needs (acked=${acked} deeper than ring) -> full snapshot at head=${head}`,
+        );
+        this.hooks.sendFullSnapshot?.(cls, head);
+        continue; // the retained tail is unusable (a gap at the evicted ops); the snapshot heals it
+      }
       const tail = this.journal.resendTail(cls);
       if (tail.length > 0) {
         coopLog("durability", `${reason} resend cls=${cls} unacked=${tail.length}`);

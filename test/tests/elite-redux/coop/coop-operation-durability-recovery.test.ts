@@ -183,7 +183,7 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
   // EXPECTED RED (current code): the coopResyncAll path (resendUnackedTail) blindly resends the retained
   // tail with NO deep-gap check, so an overflowed class gets an unusable partial tail and no escalation.
   // ===========================================================================================
-  it.fails("I3: [RED] coopResyncAll on an overflowed class resends an unusable partial tail instead of escalating to a full snapshot", async () => {
+  it("I3: coopResyncAll on an overflowed class escalates to a full snapshot instead of resending an unusable partial tail", async () => {
     const pair = createLoopbackPair();
     const hostGate = new ChannelGate(pair.host);
     const snapshots: number[] = [];
