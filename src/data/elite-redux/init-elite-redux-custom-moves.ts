@@ -943,6 +943,12 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     case 787: // Scatter Blast — scatters Stealth Rocks onto the foe's side
       move.attr(AddArenaTrapTagAttr, ArenaTagType.STEALTH_ROCK);
       break;
+    // ---- Sets Sticky Web on the foe's field + high crit ----
+    case 805: // Web Shot — "Sets up Sticky Web. +1 crit chance." (Archer boost is
+      // the ARROW flag from the archetype row; the hazard + crit were unwired.)
+      move.attr(HighCritAttr);
+      move.attr(AddArenaTrapTagAttr, ArenaTagType.STICKY_WEB);
+      break;
     // ---- Crash damage on miss (High Jump Kick-style) ----
     case 780: // Zephyr Rush — hurts the user on miss
       move.attr(MissEffectAttr, crashDamageFunc);

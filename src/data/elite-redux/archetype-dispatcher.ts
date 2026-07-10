@@ -3916,8 +3916,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Phantom Thief — "Attacks with 40BP Spectral Thief on switch-in."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.SPECTRAL_THIEF, power: 40 })]);
     case 717:
-      // Wildfire — "Attacks with Fire Spin on entry."
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.FIRE_SPIN })]);
+      // Wildfire — "Uses a 50 BP Fire Spin on switch-in (traps 4-5 turns, 1/8 HP
+      // per turn)." The port's Fire Spin is 35 BP, so pin the dex's 50 BP.
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.FIRE_SPIN, power: 50 })]);
     case 718:
       // Jumpscare — "Attacks with Astonish on first switch-in."
       // PostSummon only fires once per switch-in, so "first" is implicit.
@@ -4165,13 +4166,15 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 442:
-      // Fae Hunter — 1.5x to Fairy, 0.5x from Fairy.
+      // Fae Hunter — "1.5x damage TO Fairy-type Pokemon, 0.5x damage FROM
+      // Fairy-type Pokemon, based on the attacker/defender POKEMON types (not
+      // move types)." The shared buildTypeEffectivenessModAttrs gates the
+      // DEFENSIVE half on the incoming MOVE's type (wrong); wire it directly like
+      // Firefighter: offense gates on the defender's Pokemon type, defense on the
+      // ATTACKER's Pokemon type.
       return ok([
-        ...buildTypeEffectivenessModAttrs({
-          type: PokemonType.FAIRY,
-          offensiveMultiplier: 1.5,
-          defensiveMultiplier: 0.5,
-        }),
+        new OffensiveTypeMultiplierAbAttr(PokemonType.FAIRY, 1.5),
+        new ReceivedMoveDamageMultiplierAbAttr((_target, attacker) => attacker.isOfType(PokemonType.FAIRY), 0.5, false),
       ]);
     case 445:
       // Lumberjack — 1.5x to Grass, 0.5x from Grass.
@@ -5882,11 +5885,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     }
     case 506: {
-      // Determination — "Ups Special Attack by 50% if suffering."
-      // "Suffering" in ER context = statused.
-      const statusedGate = (pokemon: { status: { effect: StatusEffect } | null }) =>
-        pokemon.status !== null && pokemon.status?.effect !== StatusEffect.NONE;
-      return ok([new StatMultiplierAbAttr(Stat.SPATK, 1.5, statusedGate)]);
+      // Determination — "+50% Special Attack when the holder has ANY status
+      // condition. Also prevents frostbite from reducing Special Attack." ER
+      // frostbite is the ER_FROSTBITE battler tag (NOT this.status), so the gate
+      // must count it too; BypassBurnDamageReductionAbAttr waives the frostbite
+      // special-damage cut (the same mechanism Rage Point uses).
+      const sufferingGate = (p: Pokemon) =>
+        (p.status != null && p.status.effect !== StatusEffect.NONE) || !!p.getTag(BattlerTagType.ER_FROSTBITE);
+      return ok([new StatMultiplierAbAttr(Stat.SPATK, 1.5, sufferingGate), new BypassBurnDamageReductionAbAttr()]);
     }
     // -------------------------------------------------------------------------
     // Round 21 — on-KO stat triggers and remaining easy wires

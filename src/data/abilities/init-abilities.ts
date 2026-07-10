@@ -2036,6 +2036,9 @@ export function initAbilities() {
       .attr(CommanderAbAttr)
       .attr(DoubleBattleChanceAbAttr)
       .uncopiable()
+      // ER 2.65 dex: Commander "cannot be swapped, copied, or suppressed."
+      .unreplaceable()
+      .unsuppressable()
       .edgeCase() // Encore, Frenzy, and other non-`TURN_END` tags don't lapse correctly on the commanding Pokemon.
       .build(),
     new AbBuilder(AbilityId.ELECTROMORPHOSIS, 9) //
