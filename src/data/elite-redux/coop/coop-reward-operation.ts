@@ -58,6 +58,7 @@
 // State is per-session and reset on session boundaries (assembleCoopRuntime / clearCoopRuntime).
 // =============================================================================
 
+import { COOP_CAP_OP_REWARD, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   type CoopAuthoritativeEnvelopeV1,
@@ -156,9 +157,14 @@ let ownerOrdinalStart = -1;
 let watcherOrdinal = 0;
 let watcherOrdinalStart = -1;
 
-/** True iff the migrated (envelope-gated) shop path is active; else pure legacy fallback (§5.1). */
+/**
+ * True iff the migrated (envelope-gated) shop path is active; else pure legacy fallback (§5.1). The local
+ * rollback flag (`enabled`) is the OUTER gate; the NEGOTIATED capability set is the inner one (#896
+ * W2e-R2): if the peer did not advertise "opSurface.reward", it is not in the intersection and the surface
+ * stays OFF on BOTH peers (fail closed). Pre-handshake the capability gate is inert (local flag alone).
+ */
 export function isCoopRewardOperationEnabled(): boolean {
-  return enabled;
+  return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_REWARD);
 }
 
 /** Select the migrated path (true) or the legacy relay fallback (false). The one-line per-surface rollback (§5.4). */
@@ -319,7 +325,7 @@ export interface CoopRewardOwnerCommitParams {
  * operation. No-op when the flag is OFF. Never throws (the legacy relay is the fallback).
  */
 export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): void {
-  if (!enabled || params.pinned < 0) {
+  if (!isCoopRewardOperationEnabled() || params.pinned < 0) {
     return;
   }
   try {
@@ -392,7 +398,7 @@ export interface CoopRewardWatcherAdoptParams {
  */
 export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): CoopRewardAdoptDecision {
   // Legacy / fallback: adopt iff the action landed, no operation gating.
-  if (!enabled) {
+  if (!isCoopRewardOperationEnabled()) {
     return params.action == null ? { adopt: false, reason: "no-relay" } : { adopt: true };
   }
   if (params.action == null) {
@@ -502,7 +508,7 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
  * Both the reward screen and the biome market ride this one class ("op:reward"), sharing one applier.
  */
 function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): boolean {
-  if (!enabled) {
+  if (!isCoopRewardOperationEnabled()) {
     return false;
   }
   const op = envelope.pendingOperation;

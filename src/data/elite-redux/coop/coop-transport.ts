@@ -839,8 +839,16 @@ export type CoopMessage =
    * independently picks host = the lower tiebreak, so exactly one drives field slot 0
    * and the other slot 1 (without it, both await the other slot and the turn stalls).
    * Optional + additive (older clients omit it; reconciliation then falls back to name).
+   *
+   * `capabilities` (#896 W2e-R2, additive optional) is the sender's advertised co-op CAPABILITY set -
+   * the string-keyed feature bits (e.g. "opSurface.biome", "renderer.allowlistEnforce"). Each peer
+   * advertises what it supports; the effective session capabilities are the INTERSECTION of both sets,
+   * computed identically on both sides (see coop-capabilities.ts). A surface activates ONLY if its
+   * capability is negotiated, so a flag-flip / mixed build can never activate a surface on one peer
+   * only. ABSENT on an older client -> treated as the empty set (all negotiated features off, legacy
+   * paths engaged) - so this stays additive-optional and needs no COOP_PROTOCOL_VERSION bump.
    */
-  | { t: "hello"; version: string; username: string; role: CoopRole; tiebreak?: number }
+  | { t: "hello"; version: string; username: string; role: CoopRole; tiebreak?: number; capabilities?: string[] }
   /** Keepalive / latency probe. */
   | { t: "ping"; ts: number }
   | { t: "pong"; ts: number }
@@ -921,6 +929,12 @@ export type CoopMessage =
       role: CoopRole;
       entries: { speciesId: number; cost: number; starter?: CoopSerializedStarter }[];
       ready: boolean;
+      /**
+       * #896 W2e-R2 (additive optional): the sender's advertised co-op capability set, mirrored from
+       * `hello`. Carried here too so a `hello` lost on a channel flap still lets the peer negotiate off
+       * the self-healing roster re-broadcast (#868). Absent on an older client -> empty set (legacy).
+       */
+      capabilities?: string[];
     }
   /**
    * Host -> guest: the AUTHORITATIVE run configuration both players share (#633,

@@ -43,6 +43,7 @@
 // interaction counter, which the counter advances in lockstep (§1.8).
 // =============================================================================
 
+import { COOP_CAP_OP_BIOME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   type CoopAuthoritativeEnvelopeV1,
@@ -124,9 +125,15 @@ let journalWatchGuest: CoopOperationGuest | null = null;
  */
 let lastAppliedPinned = -1;
 
-/** True iff the migrated (envelope-gated) biome-travel path is active; else pure legacy fallback (§5.1). */
+/**
+ * True iff the migrated (envelope-gated) biome-travel path is active; else pure legacy fallback (§5.1).
+ * The local rollback flag (`enabled`) is the OUTER gate; the NEGOTIATED capability set is the inner one
+ * (#896 W2e-R2): if the peer did not advertise "opSurface.biome", it is not in the intersection and the
+ * surface stays OFF on BOTH peers - so a flag-flip / mixed build can never activate it one-sided. Pre-
+ * handshake (no negotiated set yet) the capability gate is inert, so the local flag stands alone.
+ */
 export function isCoopBiomeOperationEnabled(): boolean {
-  return enabled;
+  return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_BIOME);
 }
 
 /** Select the migrated path (true) or the legacy relay fallback (false). The one-line per-surface rollback (§5.4). */
@@ -257,7 +264,7 @@ export interface CoopBiomeOwnerCommitParams {
  * authoritative operation. No-op when the flag is OFF. Never throws (the legacy relay is the fallback).
  */
 export function commitBiomeOwnerIntent(params: CoopBiomeOwnerCommitParams): void {
-  if (!enabled) {
+  if (!isCoopBiomeOperationEnabled()) {
     return;
   }
   try {
@@ -322,7 +329,7 @@ export interface CoopBiomeWatcherAdoptParams {
  */
 export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): CoopBiomeAdoptDecision {
   // Legacy / fallback: adopt iff the relay landed, no operation gating.
-  if (!enabled) {
+  if (!isCoopBiomeOperationEnabled()) {
     return params.res == null
       ? { adopt: false, reason: "no-relay" }
       : { adopt: true, choice: params.res.choice, data: params.res.data };
@@ -404,7 +411,7 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
  * no-op. Returns true iff the op was NEWLY applied. No-op when the surface flag is OFF (pure legacy).
  */
 function applyJournaledBiomeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): boolean {
-  if (!enabled) {
+  if (!isCoopBiomeOperationEnabled()) {
     return false;
   }
   const op = envelope.pendingOperation;

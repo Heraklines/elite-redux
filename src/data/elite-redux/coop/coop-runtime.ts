@@ -37,7 +37,16 @@ import {
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
-import { resetCoopBiomeOperationState } from "#data/elite-redux/coop/coop-biome-operation";
+import { isCoopBiomeOperationEnabled, resetCoopBiomeOperationState } from "#data/elite-redux/coop/coop-biome-operation";
+import {
+  COOP_CAP_DURABILITY_JOURNAL,
+  COOP_CAP_OP_BIOME,
+  COOP_CAP_OP_ME,
+  COOP_CAP_OP_REWARD,
+  COOP_CAP_RENDERER_ALLOWLIST_ENFORCE,
+  type CoopCapabilityKey,
+  clearNegotiatedCoopCapabilities,
+} from "#data/elite-redux/coop/coop-capabilities";
 import { getCoopChecksumAssertionCount } from "#data/elite-redux/coop/coop-checksum-assert";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { CoopDurabilityManager, isCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
@@ -50,7 +59,11 @@ import {
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { COOP_DISCONNECT_GRACE_MS } from "#data/elite-redux/coop/coop-lifecycle";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
-import { commitMeOwnerIntent, resetCoopMeOperationState } from "#data/elite-redux/coop/coop-me-operation";
+import {
+  commitMeOwnerIntent,
+  isCoopMeOperationEnabled,
+  resetCoopMeOperationState,
+} from "#data/elite-redux/coop/coop-me-operation";
 import {
   coopMeHandoffBattleStarted,
   coopMeHandoffBattleWaveValue,
@@ -64,7 +77,10 @@ import {
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
-import { resetCoopRewardOperationState } from "#data/elite-redux/coop/coop-reward-operation";
+import {
+  isCoopRewardOperationEnabled,
+  resetCoopRewardOperationState,
+} from "#data/elite-redux/coop/coop-reward-operation";
 import { COOP_ME_TERM_SEQ_BASE, COOP_REJOIN_SYNC_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
@@ -2007,6 +2023,32 @@ export function connectCoopSession(
 }
 
 /**
+ * #896 W2e-R2: the co-op capability set THIS build ADVERTISES. A per-surface operation capability is
+ * advertised only when the surface is locally ENABLED (its rollback flag is on), so a locally-disabled
+ * surface is NOT advertised -> the peer's intersection drops it too and BOTH sides stay off (symmetric
+ * fail-closed). The durability + renderer-allowlist-enforce capabilities are static build features.
+ * Read at assembly time (pre-negotiation), so the getters return the raw local flag, not a negotiated
+ * value. Both peers advertise -> the enforce/journal features become negotiable (the enforce FLIP still
+ * gates separately on isCoopCapabilityNegotiated).
+ */
+function buildLocalCoopCapabilities(): CoopCapabilityKey[] {
+  const caps: CoopCapabilityKey[] = [];
+  if (isCoopBiomeOperationEnabled()) {
+    caps.push(COOP_CAP_OP_BIOME);
+  }
+  if (isCoopMeOperationEnabled()) {
+    caps.push(COOP_CAP_OP_ME);
+  }
+  if (isCoopRewardOperationEnabled()) {
+    caps.push(COOP_CAP_OP_REWARD);
+  }
+  // This build carries the durability journal + the renderer allowlist-enforce machinery.
+  caps.push(COOP_CAP_DURABILITY_JOURNAL);
+  caps.push(COOP_CAP_RENDERER_ALLOWLIST_ENFORCE);
+  return caps;
+}
+
+/**
  * Assemble + WIRE one co-op runtime over `transport` WITHOUT tearing down any prior session and
  * WITHOUT registering it as the active runtime or sending `hello`. This is the additive seam
  * {@linkcode connectCoopSession} delegates to (it adds the clear / setCoopRuntime / connect around
@@ -2037,7 +2079,17 @@ export function assembleCoopRuntime(
   // step 5) - drop any leftover ME op state so a new run's re-init-from-0 interaction counter can never
   // collide with a prior run's already-applied ME operationIds.
   resetCoopMeOperationState();
-  const controller = new CoopSessionController(transport, { username: opts.username, version: COOP_PROTOCOL_VERSION });
+  // #896 W2e-R2: a fresh assembly is a genuine RE-PAIR (new control plane), so drop any prior session's
+  // negotiated capability set - the first hello of this session renegotiates it. A HOT rejoin does NOT
+  // re-assemble (it pulls a snapshot in place), so this never clears a live negotiation on a flap.
+  clearNegotiatedCoopCapabilities();
+  const controller = new CoopSessionController(transport, {
+    username: opts.username,
+    version: COOP_PROTOCOL_VERSION,
+    // #896 W2e-R2: advertise what THIS build supports+enables; the controller negotiates the effective
+    // session set (intersection with the peer's) and stores it, and the surface adapters gate on it.
+    localCapabilities: buildLocalCoopCapabilities(),
+  });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
   // truth that rides along in broadcastRunConfig; on the GUEST it is only the pre-
   // runConfig default (the host's value overwrites it on receipt). Default lockstep.

@@ -21,6 +21,7 @@
 // a SpoofGuest standing in for player 2 during local dev).
 // =============================================================================
 
+import { setNegotiatedCoopCapabilities } from "#data/elite-redux/coop/coop-capabilities";
 import {
   computeErDataFingerprint,
   diffErDataFingerprint,
@@ -121,6 +122,20 @@ export interface CoopSessionOptions {
   version?: string | undefined;
   /** Injectable role-tiebreak nonce (tests); defaults to a random value per client. */
   tiebreak?: number | undefined;
+  /**
+   * #896 W2e-R2: this client's advertised co-op CAPABILITY set (string-keyed feature bits). Carried on
+   * `hello` + `rosterSync`; the effective session set is the INTERSECTION with the peer's (see
+   * coop-capabilities.ts). When UNDEFINED (the default, e.g. a bare controller test that does not opt
+   * into negotiation) the controller sends NO capability field and never negotiates, so the surface
+   * flags keep their standalone local meaning. The runtime passes the real advertised set.
+   */
+  localCapabilities?: readonly string[] | undefined;
+  /**
+   * #896 W2e-R2: invoked once the capability set is (re)negotiated (on the peer's first hello/rosterSync
+   * that carries capabilities, and again on a hot-rejoin re-handshake). Receives the frozen effective
+   * set. The runtime uses it to drive the per-surface activation from the negotiated intersection.
+   */
+  onCapabilitiesNegotiated?: ((negotiated: ReadonlySet<string>) => void) | undefined;
 }
 
 /**
@@ -151,6 +166,16 @@ export class CoopSessionController {
   private readonly version: string;
   /** #807 C: the partner's hello version (undefined until the handshake). */
   private partnerVersionValue: string | undefined;
+  /**
+   * #896 W2e-R2: this client's advertised capability set, or undefined when negotiation is not in use
+   * (a bare test controller). When defined, it is sent on hello/rosterSync and negotiated against the
+   * peer's on receipt.
+   */
+  private readonly localCapabilities: readonly string[] | undefined;
+  /** #896 W2e-R2: the partner's advertised capability set (undefined until a hello/rosterSync carries it). */
+  private partnerCapabilities: string[] | undefined;
+  /** #896 W2e-R2: the callback invoked with the frozen effective set each time it is (re)negotiated. */
+  private readonly onCapabilitiesNegotiated: ((negotiated: ReadonlySet<string>) => void) | undefined;
   /** #810 resume flow: guest-side offer handler + buffered offer, host-side reply waiter. */
   private resumeOfferHandler: ((wave: number) => void) | null = null;
   private pendingResumeOfferWave: number | null = null;
@@ -209,6 +234,8 @@ export class CoopSessionController {
     this.tiebreak = opts.tiebreak ?? Math.random();
     this.username = opts.username ?? (transport.role === "host" ? "Player 1" : "Player 2");
     this.version = opts.version ?? "1";
+    this.localCapabilities = opts.localCapabilities;
+    this.onCapabilitiesNegotiated = opts.onCapabilitiesNegotiated;
     this.offMessage = transport.onMessage(msg => this.handleMessage(msg));
     // #868: watch the transport lifecycle so a RECONNECT (channel flap -> #805 hot-rejoin)
     // re-establishes the lobby handshake. Every lobby frame sent while the channel was dark is
@@ -225,6 +252,25 @@ export class CoopSessionController {
   /** #807 C: the partner's reported version ("?" before the handshake). */
   get partnerVersion(): string {
     return this.partnerVersionValue ?? "?";
+  }
+
+  /**
+   * #896 W2e-R2: (re)negotiate the session capability set from OUR advertised set and the peer's, and
+   * publish it. Called on every hello/rosterSync that could carry the peer's capabilities. A no-op when
+   * this controller does not advertise a set (negotiation not in use). Idempotent: recomputing from the
+   * same two sets yields the same frozen result (so a hot-rejoin re-handshake preserves the negotiation).
+   * The peer's set is REMEMBERED, so a later frame that omits the field (e.g. a self-heal rosterSync from
+   * an older code path) does not erase a set the peer already advertised.
+   */
+  private negotiateCapabilities(peerCapabilities: string[] | undefined): void {
+    if (this.localCapabilities === undefined) {
+      return; // negotiation not in use (bare controller); surfaces keep their standalone local flags.
+    }
+    if (peerCapabilities !== undefined) {
+      this.partnerCapabilities = [...peerCapabilities];
+    }
+    const negotiated = setNegotiatedCoopCapabilities(this.localCapabilities, this.partnerCapabilities);
+    this.onCapabilitiesNegotiated?.(negotiated);
   }
 
   /** #817: watcher-side hook - the partner's ME option cursor moved. */
@@ -318,6 +364,8 @@ export class CoopSessionController {
       username: this.username,
       role: this.role,
       tiebreak: this.tiebreak,
+      // #896 W2e-R2: advertise our capability set (omit the field entirely when negotiation is not in use).
+      ...(this.localCapabilities === undefined ? {} : { capabilities: [...this.localCapabilities] }),
     });
     // ER data-table fingerprint exchange (#633, diagnostics): compute + log + send OUR
     // fingerprint once, and retain it so the peer's inbound `dataFingerprint` is diffed
@@ -664,13 +712,15 @@ export class CoopSessionController {
       `resyncLobbyState role=${this.role} localReady=${this._localReady} partnerReady=${this._partnerReady} `
         + `hasRunConfig=${this._runConfig != null} (#868 self-healing handshake)`,
     );
-    // Re-announce identity (same shape as connect()'s hello).
+    // Re-announce identity (same shape as connect()'s hello). #896 W2e-R2: re-advertise capabilities
+    // so a hot-rejoin re-runs the negotiation to the SAME frozen set (identical intersection inputs).
     this.transport.send({
       t: "hello",
       version: this.version,
       username: this.username,
       role: this.role,
       tiebreak: this.tiebreak,
+      ...(this.localCapabilities === undefined ? {} : { capabilities: [...this.localCapabilities] }),
     });
     // Re-broadcast our own roster + ready.
     this.broadcastLocal();
@@ -806,6 +856,9 @@ export class CoopSessionController {
         ...(e.starter === undefined ? {} : { starter: e.starter }),
       })),
       ready: this._localReady,
+      // #896 W2e-R2: also carry capabilities on rosterSync so a hello lost on a flap still lets the
+      // waiting peer negotiate (the roster/ready direction self-heals via #868 requestRoster).
+      ...(this.localCapabilities === undefined ? {} : { capabilities: [...this.localCapabilities] }),
     });
   }
 
@@ -894,6 +947,9 @@ export class CoopSessionController {
         }
         this._partnerConnected = true;
         this._partnerName = msg.username;
+        // #896 W2e-R2: (re)negotiate the capability set now the peer's advertised set is known. Runs on
+        // the initial hello AND on a hot-rejoin re-announce (resyncLobbyState) -> same frozen result.
+        this.negotiateCapabilities(msg.capabilities);
         this.emit();
         break;
       }
@@ -901,6 +957,9 @@ export class CoopSessionController {
         if (msg.role === this.partnerRoleId) {
           this.roster.replace(this.partnerRoleId, msg.entries);
           this._partnerReady = msg.ready;
+          // #896 W2e-R2: negotiate off rosterSync too, so a hello lost on a flap still lands the peer's
+          // capabilities via the self-healing roster re-broadcast (#868).
+          this.negotiateCapabilities(msg.capabilities);
           coopLog(
             "roster",
             `rosterSync RECV partner=${this.partnerRoleId} entries=${msg.entries.length} partnerReady=${msg.ready} `

@@ -52,6 +52,7 @@
 // cross-ME stale ordering still runs on the pinned counter (which advances once per whole ME).
 // =============================================================================
 
+import { COOP_CAP_OP_ME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   type CoopAuthoritativeEnvelopeV1,
@@ -156,9 +157,14 @@ let journalWatchGuest: CoopOperationGuest | null = null;
  */
 let lastAppliedPinned = -1;
 
-/** True iff the migrated (envelope-gated) ME path is active; else pure legacy fallback (§5.1). */
+/**
+ * True iff the migrated (envelope-gated) ME path is active; else pure legacy fallback (§5.1). The local
+ * rollback flag (`enabled`) is the OUTER gate; the NEGOTIATED capability set is the inner one (#896
+ * W2e-R2): if the peer did not advertise "opSurface.me", it is not in the intersection and the surface
+ * stays OFF on BOTH peers (fail closed). Pre-handshake the capability gate is inert (local flag alone).
+ */
 export function isCoopMeOperationEnabled(): boolean {
-  return enabled;
+  return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_ME);
 }
 
 /** Select the migrated path (true) or the legacy relay fallback (false). The one-line per-surface rollback (§5.4). */
@@ -327,7 +333,7 @@ export interface CoopMeOwnerCommitParams {
  * authoritative operation. No-op when the flag is OFF. Never throws (the legacy relay is the fallback).
  */
 export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): void {
-  if (!enabled) {
+  if (!isCoopMeOperationEnabled()) {
     return;
   }
   try {
@@ -395,7 +401,7 @@ export interface CoopMeWatcherAdoptParams {
  */
 export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAdoptDecision {
   // Legacy / fallback: adopt iff the relay landed, no operation gating.
-  if (!enabled) {
+  if (!isCoopMeOperationEnabled()) {
     return params.res == null
       ? { adopt: false, reason: "no-relay" }
       : { adopt: true, kind: params.kind, terminal: params.terminal, hostTurn: params.hostTurn };
@@ -485,7 +491,7 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
  * Returns true iff the step was NEWLY applied. No-op when the surface flag is OFF (pure legacy).
  */
 function applyJournaledMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): boolean {
-  if (!enabled) {
+  if (!isCoopMeOperationEnabled()) {
     return false;
   }
   const op = envelope.pendingOperation;
