@@ -54,6 +54,7 @@
 
 import { globalScene } from "#app/global-scene";
 import {
+  armCoopColosseumDecisionResend,
   commitColosseumBoard,
   commitColosseumDecision,
 } from "#data/elite-redux/coop/coop-colosseum-operation";
@@ -196,6 +197,14 @@ export function coopColosseumSendDecision(index: number): void {
   }
   coopLog("me", "colosseum: relay board decision (#829)", { seq, index });
   getCoopInteractionRelay()?.sendInteractionChoice(seq, COOP_COLOSSEUM_PICK_KIND, index);
+  if (controller?.role === "guest") {
+    const relay = getCoopInteractionRelay();
+    if (relay != null) {
+      armCoopColosseumDecisionResend(coopMeInteractionStartValue(), index, () => {
+        relay.sendInteractionChoice(seq, COOP_COLOSSEUM_PICK_KIND, index);
+      });
+    }
+  }
 }
 
 /**

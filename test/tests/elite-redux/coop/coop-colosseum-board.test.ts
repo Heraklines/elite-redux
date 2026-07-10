@@ -33,7 +33,9 @@ import {
   runColosseumGuestRoundLoop,
 } from "#data/elite-redux/coop/coop-colosseum";
 import {
+  resetCoopColosseumDecisionRetryMs,
   resetCoopColosseumOperationFlag,
+  setCoopColosseumDecisionRetryMs,
   setCoopColosseumOperationEnabled,
 } from "#data/elite-redux/coop/coop-colosseum-operation";
 import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -56,6 +58,7 @@ const BOARD_LABELS = ["CONTINUE (risk for S+)", "CASH OUT (claim S)"];
 
 describe("co-op Colosseum between-rounds board relay (#829)", () => {
   afterEach(() => {
+    resetCoopColosseumDecisionRetryMs();
     resetCoopColosseumOperationFlag();
     clearCoopRuntime();
     setCoopMeInteractionStart(-1); // drop the ME pin so the next file starts clean
@@ -158,10 +161,11 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
   });
 
   it("INTENT RECOVERY: a dropped guest-owned coloPick is resent until the host commits it", async () => {
+    setCoopColosseumDecisionRetryMs(10);
     const pair = wrapCoopFaultPair(
       createLoopbackPair(),
       {
-        drop: 1,
+        drop: 0,
         reorder: 0,
         delay: 0,
         faultable: msg => msg.t === "interactionChoice" && msg.kind === "coloPick",
@@ -171,6 +175,7 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
     const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
     const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
     setCoopMeInteractionStart(5);
+    pair.armNextDrop("interactionChoice", "guest");
     setCoopRuntime(hostRuntime);
     const hostDecision = coopColosseumAwaitDecision(100);
     setCoopRuntime(guestRuntime);

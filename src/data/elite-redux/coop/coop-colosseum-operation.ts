@@ -31,6 +31,54 @@ let authorityHost: CoopOperationHost | null = null;
 let receiverGuest: CoopOperationGuest | null = null;
 let ordinalPin = -1;
 let ordinal = 0;
+let decisionRetryMs = 1_000;
+const decisionRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function decisionKey(pinned: number, index: number): string {
+  return `${pinned}:${index}`;
+}
+
+function cancelDecisionRetry(pinned: number, index: number): void {
+  const key = decisionKey(pinned, index);
+  const timer = decisionRetryTimers.get(key);
+  if (timer != null) {
+    clearTimeout(timer);
+    decisionRetryTimers.delete(key);
+  }
+}
+
+export function setCoopColosseumDecisionRetryMs(ms: number): void {
+  decisionRetryMs = Math.max(1, Math.floor(ms));
+}
+
+export function resetCoopColosseumDecisionRetryMs(): void {
+  decisionRetryMs = 1_000;
+}
+
+/** Guest owner: resend the same deterministic legacy intent until its committed envelope returns. */
+export function armCoopColosseumDecisionResend(pinned: number, index: number, resend: () => void): void {
+  if (!isCoopColosseumOperationEnabled() || pinned < 0) {
+    return;
+  }
+  const key = decisionKey(pinned, index);
+  if (decisionRetryTimers.has(key)) {
+    return;
+  }
+  const tick = () => {
+    if (!decisionRetryTimers.has(key)) {
+      return;
+    }
+    try {
+      resend();
+    } catch {
+      /* the next bounded retry remains armed */
+    }
+    if (decisionRetryTimers.has(key)) {
+      decisionRetryTimers.set(key, setTimeout(tick, decisionRetryMs));
+    }
+  };
+  decisionRetryTimers.set(key, setTimeout(tick, decisionRetryMs));
+}
 
 export function isCoopColosseumOperationEnabled(): boolean {
   return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_COLOSSEUM);
@@ -45,6 +93,10 @@ export function resetCoopColosseumOperationFlag(): void {
 }
 
 export function resetCoopColosseumOperationState(): void {
+  for (const timer of decisionRetryTimers.values()) {
+    clearTimeout(timer);
+  }
+  decisionRetryTimers.clear();
   authorityHost = null;
   receiverGuest = null;
   revisionFloor = 0;
@@ -198,6 +250,14 @@ function applyJournaledColosseumEnvelope(envelope: CoopAuthoritativeEnvelopeV1):
   const result = g.applyEnvelope({ ...envelope, sessionEpoch: epoch, revision: g.getLastAppliedRevision() + 1 });
   if (result.kind !== "applied") {
     return "rejected";
+  }
+  const payload = op.payload as CoopColosseumPayload | undefined;
+  if (payload?.type === "decision") {
+    const parsed = /^\d+:\d+:(\d+)$/.exec(op.id);
+    if (parsed != null) {
+      const pinned = Math.floor(Number(parsed[1]) / COOP_COLOSSEUM_ACTION_STRIDE);
+      cancelDecisionRetry(pinned, payload.index);
+    }
   }
   routeCoopOperationToLiveSink("op:colosseum", envelope);
   return "applied";

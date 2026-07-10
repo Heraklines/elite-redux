@@ -2066,6 +2066,11 @@ function materializeCoopColosseumActionFromOp(runtime: CoopRuntime, envelope: Co
     return true;
   }
   if (payload.type === "decision" && Number.isSafeInteger(payload.index)) {
+    // A guest-owned decision was already applied locally by its capture UI; its committed envelope only
+    // confirms/cancels intent resend. Feeding it back into the same pinned FIFO would poison the next round.
+    if (op.owner === 1) {
+      return true;
+    }
     runtime.interactionRelay.materializeCommittedInteractionChoice(seq, "coloPick", payload.index, undefined, op.id);
     return true;
   }
