@@ -218,7 +218,11 @@ function wireCoopLiveEvents(controller: CoopSessionController, battleStream: Coo
  * HOST role so a guest/solo client never answers. Best-effort + guarded - a serialize
  * failure never breaks the host's turn.
  */
-function wireCoopResyncResponder(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
+function wireCoopResyncResponder(
+  controller: CoopSessionController,
+  battleStream: CoopBattleStreamer,
+  durability: CoopDurabilityManager | undefined,
+): void {
   battleStream.onStateSyncRequest((_turn, seq) => {
     coopLog("resync", `recv requestStateSync turn=${_turn} seq=${seq} role=${controller.role}`);
     if (controller.role !== "host") {
@@ -231,7 +235,12 @@ function wireCoopResyncResponder(controller: CoopSessionController, battleStream
         coopWarn("resync", `host has no live snapshot for requestStateSync seq=${seq} -> no reply`);
         return;
       }
-      const blob = compressToBase64(JSON.stringify(snapshot));
+      const blob = compressToBase64(
+        JSON.stringify({
+          ...snapshot,
+          journalHighWater: durability?.controlPlaneHighWater() ?? {},
+        } satisfies CoopFullBattleSnapshot),
+      );
       coopLog("resync", `send stateSync seq=${seq} blob=${blob.length}b`);
       battleStream.sendStateSync(blob, seq);
     } catch (e) {
@@ -239,6 +248,21 @@ function wireCoopResyncResponder(controller: CoopSessionController, battleStream
       coopWarn("resync", `host stateSync send failed seq=${seq}`, e);
     }
   });
+}
+
+/** Fast-forward the durability receiver through every operation revision a full DATA snapshot subsumes. */
+export function adoptCoopSnapshotHighWater(
+  durability: CoopDurabilityManager | undefined,
+  snapshot: Pick<CoopFullBattleSnapshot, "journalHighWater">,
+): void {
+  if (durability == null) {
+    return;
+  }
+  for (const [cls, revision] of Object.entries(snapshot.journalHighWater ?? {})) {
+    if (Number.isFinite(revision) && revision > 0) {
+      durability.adoptSnapshot(cls, revision);
+    }
+  }
 }
 
 /**
@@ -535,7 +559,10 @@ function wireCoopWaveEndState(controller: CoopSessionController, battleStream: C
  * turning the pump's silent "identical state" assumption into detect-and-heal (reusing the
  * Phase A machinery). Additive: on a match nothing changes, so the working pump is intact.
  */
-function wireCoopMeChecksumCheck(battleStream: CoopBattleStreamer): void {
+function wireCoopMeChecksumCheck(
+  battleStream: CoopBattleStreamer,
+  durability: CoopDurabilityManager | undefined,
+): void {
   battleStream.onMeChecksum((seq, ownerChecksum) => {
     const ours = captureCoopChecksum();
     if (ownerChecksum === COOP_CHECKSUM_SENTINEL || ours === COOP_CHECKSUM_SENTINEL || ownerChecksum === ours) {
@@ -566,11 +593,9 @@ function wireCoopMeChecksumCheck(battleStream: CoopBattleStreamer): void {
         // whether this early heal converges - the AUTHORITATIVE convergence is the ME terminal's
         // comprehensive meResync (applyCoopMeOutcome), which the guest still adopts. The still-diverged
         // path below is advisory by design (#839): it must never disrupt the encounter.
-        applyCoopFullSnapshot(
-          JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot,
-          isCoopAuthoritativeGuest(),
-          /* suppressResummon */ true,
-        );
+        const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
+        applyCoopFullSnapshot(snapshot, isCoopAuthoritativeGuest(), /* suppressResummon */ true);
+        adoptCoopSnapshotHighWater(durability, snapshot);
         const healed = captureCoopChecksum();
         if (healed === ownerChecksum) {
           coopLog("resync", `me-entry seq=${seq} ok (healed=${healed})`);
@@ -881,10 +906,9 @@ export function wireCoopStallWatchdog(
               return;
             }
             try {
-              applyCoopFullSnapshot(
-                JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot,
-                isCoopAuthoritativeGuest(),
-              );
+              const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
+              applyCoopFullSnapshot(snapshot, isCoopAuthoritativeGuest());
+              adoptCoopSnapshotHighWater(runtime.durability, snapshot);
               coopLog("resync", `stall-recovery snapshot applied seq=${seq} blob=${blob.length}b`);
             } catch {
               coopWarn("resync", `stall-recovery snapshot apply FAILED seq=${seq}`);
@@ -1078,10 +1102,9 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
                 return;
               }
               try {
-                applyCoopFullSnapshot(
-                  JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot,
-                  isCoopAuthoritativeGuest(),
-                );
+                const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
+                applyCoopFullSnapshot(snapshot, isCoopAuthoritativeGuest());
+                adoptCoopSnapshotHighWater(runtime.durability, snapshot);
                 coopLog("resync", `post-rejoin snapshot applied seq=${seq} blob=${blob.length}b`);
               } catch {
                 coopWarn("resync", `post-rejoin snapshot apply FAILED seq=${seq} (checksum backstop heals next turn)`);
@@ -2460,11 +2483,11 @@ export function assembleCoopRuntime(
   registerCoopOperationLiveSink("op:reward", envelope => materializeCoopRewardActionFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:me", envelope => materializeCoopMeOperationFromOp(runtime, envelope));
   wireCoopGhostPoolSync(controller, battleStream);
-  wireCoopResyncResponder(controller, battleStream);
+  wireCoopResyncResponder(controller, battleStream, durability);
   wireCoopEnemyPartyResponder(controller, battleStream);
   wireCoopWaveResolved(controller, battleStream);
   wireCoopWaveEndState(controller, battleStream);
-  wireCoopMeChecksumCheck(battleStream);
+  wireCoopMeChecksumCheck(battleStream, durability);
   wireCoopLiveEvents(controller, battleStream);
   wireCoopLearnMoveForward(transport);
   wireCoopLearnMoveBatchForward(transport);

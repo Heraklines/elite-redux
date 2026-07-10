@@ -466,6 +466,8 @@ export interface CoopFullMonSnapshot {
 export interface CoopFullBattleSnapshot {
   /** #807 monotonic state tick (Source-style snapshot sequencing); absent on legacy senders. */
   tick?: number;
+  /** Operation revisions whose effects this authoritative snapshot already subsumes (§4.4). */
+  journalHighWater?: Record<string, number> | undefined;
   /** Every occupied field mon's full state, by battler index. */
   field: CoopFullMonSnapshot[];
   /** `WeatherType` enum value (0 = none) + turns remaining. */
