@@ -12,7 +12,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopAttributeNewMon, setCoopCatchThrowerHint } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
-import { erRecordAchievementCatch } from "#data/elite-redux/er-achievement-tracker";
+import { erRecordAchievementCatch, erRecordAchievementRelease } from "#data/elite-redux/er-achievement-tracker";
 import { communitySpeciesAllowed } from "#data/elite-redux/er-community-run-state";
 import { erCollectorsAlbumRecordCatch } from "#data/elite-redux/er-relics";
 import { Gender } from "#data/gender";
@@ -406,12 +406,22 @@ export class AttemptCapturePhase extends PokemonPhase {
           ) {
             void coopHostAwaitWildCatchFullSlot(pokemon.getNameToRender(), pokemon.species.getRootSpeciesId(true)).then(
               slot => {
-                if (slot == null) {
+                const releaseParty = globalScene.getPlayerParty();
+                if (slot != null && slot >= 0 && slot < releaseParty.length) {
+                  // The catcher picked a slot to REPLACE. Free it exactly as PartyUiHandler.doRelease does
+                  // (strip its held-item modifiers, splice it out, record the release achievement, destroy),
+                  // then addToParty into the now-freed slot - the freed half lets coopAttributeNewMon
+                  // attribute the caught mon. This is the solo RELEASE flow's release-then-add, driven by
+                  // the relayed slot instead of the host's (undrivable-for-a-guest-catch) local UI.
+                  void globalScene.removePartyMemberModifiers(slot);
+                  const released = releaseParty.splice(slot, 1)[0];
+                  erRecordAchievementRelease(released.species.speciesId);
+                  released.destroy();
+                  addToParty(slot);
+                } else {
                   // The catcher cancelled / timed out / disconnected: the caught mon is NOT kept.
                   removePokemon();
                   end();
-                } else {
-                  addToParty(slot);
                 }
               },
             );
