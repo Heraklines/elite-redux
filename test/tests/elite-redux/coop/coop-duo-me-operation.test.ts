@@ -213,6 +213,50 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     logs.flush();
   }, 300_000);
 
+  it("DURABILITY: dropping the top-level mePresent still materializes the host presentation", async () => {
+    await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+    const hostScene = game.scene;
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 1,
+        reorder: 0,
+        delay: 0,
+        faultable: msg =>
+          msg.t === "interactionOutcome"
+          && msg.kind === "mePresent"
+          && msg.outcome.k === "mePresent"
+          && msg.outcome.subPrompt == null,
+      },
+      { seed: 0x6d3f },
+    );
+    const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+    const hostEncounter = hostScene.currentBattle.mysteryEncounter!;
+    const populateHostTokens = hostEncounter.populateDialogueTokensFromRequirements.bind(hostEncounter);
+    vi.spyOn(hostEncounter, "populateDialogueTokensFromRequirements").mockImplementation(() => {
+      populateHostTokens();
+      hostEncounter.dialogueTokens.durableProof = "host-authoritative";
+    });
+    rig.guestScene.currentBattle.mysteryEncounter!.dialogueTokens.durableProof = "guest-local";
+
+    await withClient(rig.hostCtx, async () => {
+      await runMysteryEncounterToEnd(game, 1);
+      await game.phaseInterceptor.to("SelectModifierPhase", false);
+      const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+      await driveHostRewardShopOwner(hostShop, { takeReward: false });
+      await game.phaseInterceptor.to("PostMysteryEncounterPhase");
+    });
+    expect(pair.faultsInjected(), "the legacy top-level mePresent must actually be dropped").toBeGreaterThan(0);
+
+    const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+    expect(guestReplay.settled, "the guest replay still reaches its terminal").toBe(true);
+    expect(
+      rig.guestScene.currentBattle.mysteryEncounter!.dialogueTokens.durableProof,
+      "the journal-delivered presentation must replace the guest-local token source",
+    ).toBe("host-authoritative");
+    logs.flush();
+  }, 300_000);
+
   // =====================================================================================
   // LEG 2 - GUEST-OWNED non-battle ME: the guest MINTS an ME_PICK intent; the HOST COMMITS it.
   // =====================================================================================
