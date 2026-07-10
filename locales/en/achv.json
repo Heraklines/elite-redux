@@ -574,19 +574,19 @@
     "name_female": "First Blood",
     "description": "Win your first Showdown match."
   },
-  "rivalRecord5": {
-    "name": "Regular Contender",
-    "name_female": "Regular Contender",
+  "duelist": {
+    "name": "Duelist",
+    "name_female": "Duelist",
     "description": "Win 5 Showdown matches."
   },
-  "rivalRecord25": {
-    "name": "Showdown Veteran",
-    "name_female": "Showdown Veteran",
+  "veteranDuelist": {
+    "name": "Veteran Duelist",
+    "name_female": "Veteran Duelist",
     "description": "Win 25 Showdown matches."
   },
-  "rivalRecord100": {
-    "name": "Showdown Legend",
-    "name_female": "Showdown Legend",
+  "legendaryDuelist": {
+    "name": "Legendary Duelist",
+    "name_female": "Legendary Duelist",
     "description": "Win 100 Showdown matches."
   },
   "highRoller": {
@@ -599,10 +599,25 @@
     "name_female": "All In",
     "description": "Win a Showdown match staked on a shiny Pokemon."
   },
-  "spoilsOfWar": {
-    "name": "Spoils of War",
-    "name_female": "Spoils of War",
-    "description": "Claim a Pokemon from a Showdown wager settlement."
+  "rawTalent": {
+    "name": "Raw Talent",
+    "name_female": "Raw Talent",
+    "description": "Win a Showdown match without Mega Evolving any of your Pokemon."
+  },
+  "budgetChampion": {
+    "name": "Budget Champion",
+    "name_female": "Budget Champion",
+    "description": "Win a Showdown match with a team where every Pokemon's base cost is 3 or less."
+  },
+  "ragsToRiches": {
+    "name": "Rags to Riches",
+    "name_female": "Rags to Riches",
+    "description": "Win a Showdown match with a team where every Pokemon's base cost is 2 or less."
+  },
+  "apexPredator": {
+    "name": "Apex Predator",
+    "name_female": "Apex Predator",
+    "description": "Win at least 80% of your Showdown matches, with 25 or more matches played."
   },
   "flawlessDuel": {
     "name": "Flawless Duel",
@@ -697,7 +712,7 @@
   "ghostTriad": {
     "name": "Ghost Triad",
     "name_female": "Ghost Triad",
-    "description": "Win a Triple Battle against a ghost trainer."
+    "description": "Win a Triple Battle against a ghost trainer's team."
   },
   "oneTurnClear": {
     "name": "One-Turn Clear",
@@ -743,5 +758,30 @@
     "name": "Signature Style",
     "name_female": "Signature Style",
     "description": "Win a boss wave with a Pokemon wearing a named preset and name effect."
+  },
+  "cocytus": {
+    "name": "Cocytus",
+    "name_female": "Cocytus",
+    "description": "On Hell difficulty, win a run with the NU usage tier, Triples Only, and Ghost Trainers challenges all active."
+  },
+  "giudecca": {
+    "name": "Giudecca",
+    "name_female": "Giudecca",
+    "description": "On Hell difficulty, win a run with the PU usage tier, Doubles Only, and Ghost Trainers challenges all active."
+  },
+  "theUpsideDown": {
+    "name": "The Upside Down",
+    "name_female": "The Upside Down",
+    "description": "Win a run with both the Nuzlocke and Inverse Battle challenges active."
+  },
+  "monochromeRequiem": {
+    "name": "Monochrome Requiem",
+    "name_female": "Monochrome Requiem",
+    "description": "Win a run with both the Monocolor and Nuzlocke challenges active."
+  },
+  "typecastTrio": {
+    "name": "Typecast Trio",
+    "name_female": "Typecast Trio",
+    "description": "Win a run with both the Mono-Type and Triples Only challenges active."
   }
 }

@@ -161,17 +161,20 @@ const ACHV_CATEGORY_OVERRIDES: Record<string, AchvCategory> = {
   PRIMAL_CASCOON: AchvCategory.EVENTS,
   RELIC_HUNTER: AchvCategory.EVENTS,
 
-  // --- Versus: the Showdown 1v1 PvP feats (#900) ---
+  // --- Versus: the Showdown 1v1 PvP feats (#900 + follow-up) ---
   FIRST_BLOOD: AchvCategory.VERSUS,
-  RIVAL_RECORD_5: AchvCategory.VERSUS,
-  RIVAL_RECORD_25: AchvCategory.VERSUS,
-  RIVAL_RECORD_100: AchvCategory.VERSUS,
+  DUELIST: AchvCategory.VERSUS,
+  VETERAN_DUELIST: AchvCategory.VERSUS,
+  LEGENDARY_DUELIST: AchvCategory.VERSUS,
   HIGH_ROLLER: AchvCategory.VERSUS,
   ALL_IN: AchvCategory.VERSUS,
-  SPOILS_OF_WAR: AchvCategory.VERSUS,
   FLAWLESS_DUEL: AchvCategory.VERSUS,
   DAVID_AND_GOLIATH: AchvCategory.VERSUS,
   GOOD_SPORT: AchvCategory.VERSUS,
+  RAW_TALENT: AchvCategory.VERSUS,
+  BUDGET_CHAMPION: AchvCategory.VERSUS,
+  RAGS_TO_RICHES: AchvCategory.VERSUS,
+  APEX_PREDATOR: AchvCategory.VERSUS,
 
   // --- Co-op: the shared-run feats (#900) ---
   BETTER_TOGETHER: AchvCategory.COOP,

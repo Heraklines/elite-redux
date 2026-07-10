@@ -32,7 +32,10 @@ const baseShowdown: ShowdownResultContext = {
   stakeShiny: false,
   ownTeamCost: 0,
   oppTeamCost: 0,
+  ownTeamMaxCost: 0,
   anyOwnFainted: false,
+  // Base wins are treated as mega-used so Raw Talent / budget feats only fire where a test opts in.
+  ownMegaUsed: true,
 };
 
 describe("#900 evaluateShowdownResult", () => {
@@ -63,10 +66,39 @@ describe("#900 evaluateShowdownResult", () => {
   });
 
   it("win-record thresholds are inclusive and cumulative", () => {
-    expect(evaluateShowdownResult(baseShowdown, { matchesPlayed: 5, wins: 5 })).toContain("RIVAL_RECORD_5");
-    expect(evaluateShowdownResult(baseShowdown, { matchesPlayed: 4, wins: 4 })).not.toContain("RIVAL_RECORD_5");
+    expect(evaluateShowdownResult(baseShowdown, { matchesPlayed: 5, wins: 5 })).toContain("DUELIST");
+    expect(evaluateShowdownResult(baseShowdown, { matchesPlayed: 4, wins: 4 })).not.toContain("DUELIST");
     const at100 = evaluateShowdownResult(baseShowdown, { matchesPlayed: 100, wins: 100 });
-    expect(at100).toEqual(expect.arrayContaining(["RIVAL_RECORD_5", "RIVAL_RECORD_25", "RIVAL_RECORD_100"]));
+    expect(at100).toEqual(expect.arrayContaining(["DUELIST", "VETERAN_DUELIST", "LEGENDARY_DUELIST"]));
+  });
+
+  it("Raw Talent needs a win with no mega evolution", () => {
+    expect(evaluateShowdownResult({ ...baseShowdown, ownMegaUsed: false }, { matchesPlayed: 1, wins: 1 })).toContain(
+      "RAW_TALENT",
+    );
+    expect(evaluateShowdownResult({ ...baseShowdown, ownMegaUsed: true }, { matchesPlayed: 1, wins: 1 })).not.toContain(
+      "RAW_TALENT",
+    );
+  });
+
+  it("budget feats gate on the highest team base cost (inclusive, escalating)", () => {
+    // maxCost 3: Budget Champion only. maxCost 2: both. maxCost 4 / unknown(0): neither.
+    const at3 = evaluateShowdownResult({ ...baseShowdown, ownTeamMaxCost: 3 }, { matchesPlayed: 1, wins: 1 });
+    expect(at3).toContain("BUDGET_CHAMPION");
+    expect(at3).not.toContain("RAGS_TO_RICHES");
+    const at2 = evaluateShowdownResult({ ...baseShowdown, ownTeamMaxCost: 2 }, { matchesPlayed: 1, wins: 1 });
+    expect(at2).toEqual(expect.arrayContaining(["BUDGET_CHAMPION", "RAGS_TO_RICHES"]));
+    const at4 = evaluateShowdownResult({ ...baseShowdown, ownTeamMaxCost: 4 }, { matchesPlayed: 1, wins: 1 });
+    expect(at4).not.toContain("BUDGET_CHAMPION");
+    // Unknown manifest (max 0) never qualifies.
+    expect(evaluateShowdownResult(baseShowdown, { matchesPlayed: 1, wins: 1 })).not.toContain("BUDGET_CHAMPION");
+  });
+
+  it("Apex Predator needs >= 80% win rate over >= 25 matches", () => {
+    expect(evaluateShowdownResult(baseShowdown, { matchesPlayed: 25, wins: 20 })).toContain("APEX_PREDATOR");
+    // Below the match floor, or below the 80% rate, does not qualify.
+    expect(evaluateShowdownResult(baseShowdown, { matchesPlayed: 24, wins: 24 })).not.toContain("APEX_PREDATOR");
+    expect(evaluateShowdownResult(baseShowdown, { matchesPlayed: 30, wins: 23 })).not.toContain("APEX_PREDATOR");
   });
 
   it("High Roller needs a staked win; All In needs a shiny stake win", () => {

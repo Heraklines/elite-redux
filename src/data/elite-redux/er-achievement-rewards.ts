@@ -26,15 +26,23 @@
 //    for very hard challenges only - shinies.
 //  - NEVER money, NEVER charms / rate boosts, NEVER run-start power. Rewards must
 //    not make a run easier or trivialize skill.
-//  - The black shiny is granted ONLY by the apex stacked challenge (Inferno:
-//    Hell + NU usage tier + Doubles-only + Ghost Trainers). Nothing else.
+//  - The black shiny is granted ONLY by the apex-tier stacked challenges. Maintainer
+//    house rule (extended #900 follow-up): the black shiny is earned by Inferno
+//    (Hell + NU usage tier + Doubles-only + Ghost Trainers) AND the two deeper apex
+//    rungs added in the follow-up - COCYTUS (Hell + NU + Triples-only + Ghost
+//    Trainers) and GIUDECCA (Hell + PU + Doubles-only + Ghost Trainers). Nothing
+//    outside these hell-tier apex stacks grants it.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
 import { speciesStarterCosts } from "#balance/starters";
 import { Egg } from "#data/egg";
 import { grantErShinyLabEffectAvailability } from "#data/elite-redux/er-shiny-lab-config";
-import { ER_SHINY_LAB_EFFECT_INDEX, getErShinyLabEffectsForAchv } from "#data/elite-redux/er-shiny-lab-effects";
+import {
+  ER_SHINY_LAB_EFFECT_INDEX,
+  ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
+  getErShinyLabEffectsForAchv,
+} from "#data/elite-redux/er-shiny-lab-effects";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { DexAttr } from "#enums/dex-attr";
@@ -87,7 +95,12 @@ export type RewardSpec =
   /** A specific Pokemon, caught (normal). */
   | { kind: "pokemon"; species: SpeciesId }
   /** Global Shiny Lab availability gates. Species still buy or catch ownership. */
-  | { kind: "shinyLabEffects"; effects: string[] };
+  | { kind: "shinyLabEffects"; effects: string[] }
+  /**
+   * Unlock availability of ONE randomly-chosen achievement-gated AROUND aura effect
+   * that isn't available yet (the apex COCYTUS reward). Cosmetic-only, unseeded roll.
+   */
+  | { kind: "randomAroundEffect" };
 
 /**
  * achv id (the key in `achvs`) -> reward(s). Only ids present here grant anything;
@@ -328,15 +341,20 @@ export const ER_ACHIEVEMENT_REWARDS: Record<string, RewardSpec | RewardSpec[]> =
 
   // --- Versus: Showdown 1v1 PvP -------------------------------------------
   FIRST_BLOOD: { kind: "candyTeam", perMon: 10 },
-  RIVAL_RECORD_5: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
-  RIVAL_RECORD_25: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
-  RIVAL_RECORD_100: { kind: "shiny", tier: 2, species: "random" },
+  DUELIST: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  VETERAN_DUELIST: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
+  LEGENDARY_DUELIST: { kind: "shiny", tier: 2, species: "random" },
   HIGH_ROLLER: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
-  ALL_IN: { kind: "shiny", tier: 1, species: "random" },
-  SPOILS_OF_WAR: { kind: "eggs", tier: EggTier.RARE, count: 1 },
+  // Bumped to tier-2 shiny per maintainer feedback (a shiny-staked win is a real risk).
+  ALL_IN: { kind: "shiny", tier: 2, species: "random" },
   FLAWLESS_DUEL: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
   DAVID_AND_GOLIATH: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
   GOOD_SPORT: { kind: "candyTeam", perMon: 10 },
+  // #900 follow-up skill/restriction feats (escalating, sibling to David and Goliath).
+  RAW_TALENT: { kind: "shiny", tier: 1, species: "random" },
+  BUDGET_CHAMPION: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  RAGS_TO_RICHES: { kind: "shiny", tier: 1, species: "random" },
+  APEX_PREDATOR: { kind: "shiny", tier: 2, species: "random" },
 
   // --- Co-op: shared-run feats --------------------------------------------
   CO_OP_INITIATE: { kind: "candyTeam", perMon: 10 },
@@ -372,6 +390,19 @@ export const ER_ACHIEVEMENT_REWARDS: Record<string, RewardSpec | RewardSpec[]> =
   LOOK_COLLECTOR_100: { kind: "shiny", tier: 1, species: "random" },
   PRESET_CURATOR: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
   SIGNATURE_STYLE: { kind: "shiny", tier: 1, species: "random" },
+
+  // --- #900 follow-up: challenge-stack apex + combo clears ----------------
+  // Apex rungs (hell): the black shiny, house-rule-extended to the two new apex tiers.
+  // COCYTUS also unlocks a random achievement-gated aura; GIUDECCA adds a Premium
+  // voucher to differentiate its reward from Inferno's.
+  COCYTUS: [{ kind: "blackShiny", species: "random" }, { kind: "randomAroundEffect" }],
+  GIUDECCA: [{ kind: "blackShiny", species: "random" }, { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 }],
+  // Mid-tier challenge combos (guaranteed shiny for the two hard permadeath combos;
+  // an egg + voucher for the mono-type triples run). Each also folds in the +2 Premium
+  // run-completion bonus via RUN_COMPLETION_ACHV_IDS.
+  THE_UPSIDE_DOWN: { kind: "shiny", tier: 2, species: "random" },
+  MONOCHROME_REQUIEM: { kind: "shiny", tier: 2, species: "random" },
+  TYPECAST_TRIO: [{ kind: "eggs", tier: EggTier.EPIC, count: 1 }, { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 }],
 };
 
 /**
@@ -428,6 +459,12 @@ const RUN_COMPLETION_ACHV_IDS = new Set<string>([
   "MONO_FAIRY",
   // #900: beating the final boss in co-op is a full-run completion.
   "DYNAMIC_DUO",
+  // #900 follow-up: the new apex + combo challenge clears are full-run completions.
+  "COCYTUS",
+  "GIUDECCA",
+  "THE_UPSIDE_DOWN",
+  "MONOCHROME_REQUIEM",
+  "TYPECAST_TRIO",
 ]);
 
 /** The +2 Premium-voucher bonus a full-run-completion achievement gets, else nothing. */
@@ -546,6 +583,8 @@ export function describeRewardSpec(spec: RewardSpec, ctx?: RewardDescribeContext
       return speciesName(spec.species);
     case "shinyLabEffects":
       return spec.effects.length ? `Shiny Lab effects: ${spec.effects.map(effectLabel).join(", ")}` : null;
+    case "randomAroundEffect":
+      return "a random Shiny Lab aura";
   }
 }
 
@@ -599,7 +638,32 @@ function applyRewardSpec(spec: RewardSpec): GrantedReward | null {
       const text = describeRewardSpec({ kind: "shinyLabEffects", effects: granted });
       return text ? { text } : null;
     }
+    case "randomAroundEffect": {
+      const granted = grantRandomAroundEffect();
+      return granted ? { text: `Shiny Lab aura: ${effectLabel(granted)}` } : null;
+    }
   }
+}
+
+/**
+ * Unlock availability of ONE randomly-chosen achievement-gated AROUND aura that isn't
+ * available yet. Only gated (lockHint) effects carry an availability bit, so a non-gated
+ * effect is skipped. Unseeded (cosmetic, needs no reproducibility). Returns the granted
+ * effect id, or null when every gated aura is already available.
+ */
+function grantRandomAroundEffect(): string | null {
+  const candidates = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.around.filter(def => def.lockHint);
+  // Fisher-Yates shuffle (unseeded) so each grant rolls a genuinely random aura.
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  for (const def of candidates) {
+    if (grantErShinyLabEffectAvailability(def.id, false)) {
+      return def.id;
+    }
+  }
+  return null;
 }
 
 /**

@@ -2,6 +2,7 @@ import type { Animation } from "#app/animations";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { erRecordAchievementFormChange } from "#data/elite-redux/er-achievement-tracker";
+import { erNoteShowdownPlayerMega } from "#data/elite-redux/er-social-achievement-tracker";
 import { getSpeciesFormChangeMessage } from "#data/form-change-triggers";
 import type { SpeciesFormChange } from "#data/pokemon-forms";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -77,6 +78,8 @@ export class FormChangePhase extends EvolutionPhase {
         if (this.formChange.formKey.indexOf(SpeciesFormKey.MEGA) > -1) {
           globalScene.validateAchv(achvs.MEGA_EVOLVE);
           erRecordAchievementFormChange(this.pokemon, `${this.formChange.formKey}`);
+          // #900 follow-up (Raw Talent): note a local player mega during an active Showdown match.
+          erNoteShowdownPlayerMega(this.pokemon);
           playEvolutionFanfare = true;
         } else if (
           this.formChange.formKey.indexOf(SpeciesFormKey.GIGANTAMAX) > -1

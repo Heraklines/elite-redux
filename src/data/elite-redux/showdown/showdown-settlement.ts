@@ -22,7 +22,6 @@
 // =============================================================================
 
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
-import { erRecordShowdownSettlementGrant } from "#data/elite-redux/er-social-achievement-tracker";
 import { DexAttr } from "#enums/dex-attr";
 import type { DexData, DexEntry } from "#types/dex-data";
 import type { StarterData, StarterDataEntry } from "#types/save-data";
@@ -167,15 +166,11 @@ function applyRemoveUnlock(gameData: SettlementGameData, mut: ShowdownSettlement
   }
 }
 
-/** @returns `true` when a NEW Pokemon was unlocked (not a candy conversion) - drives Spoils of War. */
-function applyGrantUnlock(
-  gameData: SettlementGameData,
-  mut: ShowdownSettlementMutation & { kind: "grantUnlock" },
-): boolean {
+function applyGrantUnlock(gameData: SettlementGameData, mut: ShowdownSettlementMutation & { kind: "grantUnlock" }) {
   const rootId = gameData.getRootStarterSpeciesId(mut.speciesId);
   const entry = gameData.dexData[rootId];
   if (!entry) {
-    return false;
+    return;
   }
   // I1: a black-shiny grant's already-owned check keys on the erBlackShiny FLAG (not the VARIANT_3
   // bit, which a regular v3 owner also sets) — so a winner who owns regular v3 but not the black is
@@ -191,7 +186,7 @@ function applyGrantUnlock(
   if (alreadyOwned) {
     // Already owned → candy conversion (the client decides this; the server can't read saves).
     gameData.addStarterCandy(rootId, settlementCandyAmount(mut));
-    return false;
+    return;
   }
   // Seed the starter entry if this line has none yet, then OR the unlock bits in.
   gameData.getStarterDataEntry(rootId);
@@ -208,7 +203,6 @@ function applyGrantUnlock(
   }
   entry.caughtAttr |= bits;
   entry.seenAttr |= bits;
-  return true;
 }
 
 /**
@@ -227,8 +221,6 @@ export function applySettlementMutations(
   }
   return coopAllowAccountWrite("showdown-settlement", () => {
     let n = 0;
-    // #900 Spoils of War: fire once if any grantUnlock genuinely added a NEW Pokemon.
-    let grantedNewMon = false;
     for (const mut of mutations) {
       switch (mut.kind) {
         case "removeUnlock":
@@ -236,7 +228,7 @@ export function applySettlementMutations(
           n++;
           break;
         case "grantUnlock":
-          grantedNewMon = applyGrantUnlock(gameData, mut) || grantedNewMon;
+          applyGrantUnlock(gameData, mut);
           n++;
           break;
         case "grantCandy":
@@ -256,11 +248,6 @@ export function applySettlementMutations(
         }
       }
       gameData.showdownAppliedSettlements = merged.slice(-SHOWDOWN_LEDGER_CAP);
-    }
-    // #900 Spoils of War (pure local observer; no wire traffic). Fired after the write so a
-    // detection error can never disturb the settlement apply / ledger.
-    if (grantedNewMon) {
-      erRecordShowdownSettlementGrant();
     }
     return n;
   });

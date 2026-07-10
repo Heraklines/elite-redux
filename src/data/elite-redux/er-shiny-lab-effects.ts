@@ -1036,7 +1036,7 @@ export const ER_SHINY_LAB_EFFECT_ACHV: Record<string, string> = {
   // Thematic matches: a spectral vortex for Ghost Triad, a gold palette for the High
   // Roller, a starfield for a shared legendary catch, hell-heat for the Hell feats.
   embers: "FIRST_BLOOD",
-  moonstone: "RIVAL_RECORD_100",
+  moonstone: "LEGENDARY_DUELIST",
   rosegold: "HIGH_ROLLER",
   sparkle: "ALL_IN",
   marble: "FLAWLESS_DUEL",

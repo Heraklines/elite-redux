@@ -37,22 +37,37 @@ interface NewAchvSpec {
 const NEW_ACHVS: NewAchvSpec[] = [
   // --- Versus ---
   { key: "FIRST_BLOOD", localizationKey: "firstBlood", icon: "brick", score: 25, category: AchvCategory.VERSUS },
-  { key: "RIVAL_RECORD_5", localizationKey: "rivalRecord5", icon: "rb", score: 50, category: AchvCategory.VERSUS },
-  { key: "RIVAL_RECORD_25", localizationKey: "rivalRecord25", icon: "mb", score: 75, category: AchvCategory.VERSUS },
+  { key: "DUELIST", localizationKey: "duelist", icon: "rb", score: 50, category: AchvCategory.VERSUS },
+  { key: "VETERAN_DUELIST", localizationKey: "veteranDuelist", icon: "mb", score: 75, category: AchvCategory.VERSUS },
   {
-    key: "RIVAL_RECORD_100",
-    localizationKey: "rivalRecord100",
+    key: "LEGENDARY_DUELIST",
+    localizationKey: "legendaryDuelist",
     icon: "relic_crown",
     score: 100,
     category: AchvCategory.VERSUS,
   },
   { key: "HIGH_ROLLER", localizationKey: "highRoller", icon: "coin_case", score: 50, category: AchvCategory.VERSUS },
   { key: "ALL_IN", localizationKey: "allIn", icon: "relic_gold", score: 75, category: AchvCategory.VERSUS },
+  { key: "RAW_TALENT", localizationKey: "rawTalent", icon: "eviolite", score: 50, category: AchvCategory.VERSUS },
   {
-    key: "SPOILS_OF_WAR",
-    localizationKey: "spoilsOfWar",
-    icon: "strange_ball",
+    key: "BUDGET_CHAMPION",
+    localizationKey: "budgetChampion",
+    icon: "nugget",
     score: 50,
+    category: AchvCategory.VERSUS,
+  },
+  {
+    key: "RAGS_TO_RICHES",
+    localizationKey: "ragsToRiches",
+    icon: "big_nugget",
+    score: 75,
+    category: AchvCategory.VERSUS,
+  },
+  {
+    key: "APEX_PREDATOR",
+    localizationKey: "apexPredator",
+    icon: "scope_lens",
+    score: 75,
     category: AchvCategory.VERSUS,
   },
   {
@@ -218,6 +233,30 @@ const NEW_ACHVS: NewAchvSpec[] = [
     score: 75,
     category: AchvCategory.COLLECTION,
   },
+  // --- #900 follow-up: challenge-stack apex + combos (CHALLENGE) ---
+  { key: "COCYTUS", localizationKey: "cocytus", icon: "icicle_plate", score: 175, category: AchvCategory.CHALLENGE },
+  { key: "GIUDECCA", localizationKey: "giudecca", icon: "pb_black", score: 160, category: AchvCategory.CHALLENGE },
+  {
+    key: "THE_UPSIDE_DOWN",
+    localizationKey: "theUpsideDown",
+    icon: "inverse",
+    score: 110,
+    category: AchvCategory.CHALLENGE,
+  },
+  {
+    key: "MONOCHROME_REQUIEM",
+    localizationKey: "monochromeRequiem",
+    icon: "dubious_disc",
+    score: 110,
+    category: AchvCategory.CHALLENGE,
+  },
+  {
+    key: "TYPECAST_TRIO",
+    localizationKey: "typecastTrio",
+    icon: "multi_lens",
+    score: 100,
+    category: AchvCategory.CHALLENGE,
+  },
 ];
 
 /** Tier is derived purely from score (see Achv.getTier). */
@@ -245,8 +284,8 @@ describe("ER achievement expansion wave (#900) - registry + locale + category", 
     { name: string; name_female: string; description: string }
   >;
 
-  it("adds 35 new achievements across Versus / Co-op / Triples / Shiny Lab", () => {
-    expect(NEW_ACHVS).toHaveLength(35);
+  it("adds 43 new/revised achievements across Versus / Co-op / Triples / Shiny Lab / Challenge", () => {
+    expect(NEW_ACHVS).toHaveLength(43);
   });
 
   it("registers each with the expected id, localizationKey, icon, score, and tier", () => {
@@ -300,7 +339,7 @@ describe("ER achievement expansion wave (#900) - Shiny Lab effect gates", () => 
   // Each of these marquee achvs unlocks exactly ONE new Shiny Lab effect (thematic).
   const EXPECTED_GATES: Record<string, string> = {
     FIRST_BLOOD: "embers",
-    RIVAL_RECORD_100: "moonstone",
+    LEGENDARY_DUELIST: "moonstone",
     HIGH_ROLLER: "rosegold",
     ALL_IN: "sparkle",
     FLAWLESS_DUEL: "marble",

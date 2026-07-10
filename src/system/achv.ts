@@ -527,12 +527,20 @@ export function getAchievementDescription(localizationKey: string): string {
     case "tempest":
     // Achievement expansion wave (#900): Versus / Co-op / Triples / Shiny Lab.
     case "firstBlood":
-    case "rivalRecord5":
-    case "rivalRecord25":
-    case "rivalRecord100":
+    case "duelist":
+    case "veteranDuelist":
+    case "legendaryDuelist":
+    case "rawTalent":
+    case "budgetChampion":
+    case "ragsToRiches":
+    case "apexPredator":
+    case "cocytus":
+    case "giudecca":
+    case "theUpsideDown":
+    case "monochromeRequiem":
+    case "typecastTrio":
     case "highRoller":
     case "allIn":
-    case "spoilsOfWar":
     case "flawlessDuel":
     case "davidAndGoliath":
     case "goodSport":
@@ -614,6 +622,42 @@ const monoTypeApexActive = (type: PokemonType) => {
     && ch.some(c => c.id === Challenges.GHOST_TRAINERS && c.value > 0)
   );
 };
+
+/**
+ * COCYTUS stack: the Inferno stack with TRIPLES_ONLY swapped in for Doubles Only
+ * (NU usage tier `value === 4` + Triples Only + Ghost Trainers). The triple format is
+ * a distinct, harder axis than doubles, so Cocytus sits deeper than Inferno. Difficulty
+ * (hell) is gated separately at the achievement.
+ */
+const tripleApexStackActive = () => {
+  const ch = globalScene.gameMode.challenges;
+  return (
+    ch.some(c => c.id === Challenges.USAGE_TIER && c.value === 4)
+    && ch.some(c => c.id === Challenges.TRIPLES_ONLY && c.value > 0)
+    && ch.some(c => c.id === Challenges.GHOST_TRAINERS && c.value > 0)
+  );
+};
+
+/**
+ * GIUDECCA stack: the Inferno stack on the PU usage tier (`value === 3`) instead of NU
+ * (PU + Doubles Only + Ghost Trainers). A sibling apex tier at the same reward class as
+ * Inferno (a parallel usage-tier flavour).
+ * NOTE (codebase tier semantics): usage-tier legality is `lineTier >= challengeValue`, so
+ * NU (value 4) is actually the SMALLEST legal pool and PU (value 3) admits PU+NU lines - i.e.
+ * PU is a marginally LARGER pool than NU here, not smaller. Giudecca is therefore treated as
+ * a SIBLING of Inferno (equal reward tier), not a strictly-harder rung.
+ */
+const puApexStackActive = () => {
+  const ch = globalScene.gameMode.challenges;
+  return (
+    ch.some(c => c.id === Challenges.USAGE_TIER && c.value === 3)
+    && ch.some(c => c.id === Challenges.DOUBLES_ONLY && c.value > 0)
+    && ch.some(c => c.id === Challenges.GHOST_TRAINERS && c.value > 0)
+  );
+};
+
+/** True when a given challenge id is active (value > 0) this run. */
+const challengeActive = (id: Challenges) => globalScene.gameMode.challenges.some(c => c.id === id && c.value > 0);
 
 /** The eighteen mono-TYPE ribbon flags (one per type), for the Master of All achv. */
 const MONO_TYPE_RIBBONS = [
@@ -1231,16 +1275,22 @@ export const achvs = {
   // Icons are existing item-atlas frames chosen thematically.
 
   // --- Versus: Showdown 1v1 PvP -------------------------------------------
+  // Win-count records: renamed from the opaque RIVAL_RECORD_N to self-explanatory
+  // Duelist ranks (they are lifetime showdown-WIN totals, not a rival streak).
   FIRST_BLOOD: new Achv("firstBlood", "firstBlood.description", "brick", 25),
-  RIVAL_RECORD_5: new Achv("rivalRecord5", "rivalRecord5.description", "rb", 50),
-  RIVAL_RECORD_25: new Achv("rivalRecord25", "rivalRecord25.description", "mb", 75),
-  RIVAL_RECORD_100: new Achv("rivalRecord100", "rivalRecord100.description", "relic_crown", 100),
+  DUELIST: new Achv("duelist", "duelist.description", "rb", 50),
+  VETERAN_DUELIST: new Achv("veteranDuelist", "veteranDuelist.description", "mb", 75),
+  LEGENDARY_DUELIST: new Achv("legendaryDuelist", "legendaryDuelist.description", "relic_crown", 100),
   HIGH_ROLLER: new Achv("highRoller", "highRoller.description", "coin_case", 50),
   ALL_IN: new Achv("allIn", "allIn.description", "relic_gold", 75),
-  SPOILS_OF_WAR: new Achv("spoilsOfWar", "spoilsOfWar.description", "strange_ball", 50),
   FLAWLESS_DUEL: new Achv("flawlessDuel", "flawlessDuel.description", "focus_sash", 75),
   DAVID_AND_GOLIATH: new Achv("davidAndGoliath", "davidAndGoliath.description", "focus_band", 75),
   GOOD_SPORT: new Achv("goodSport", "goodSport.description", "ribbon_friendship", 25),
+  // #900 follow-up: skill / restriction Showdown feats (detected in evaluateShowdownResult).
+  RAW_TALENT: new Achv("rawTalent", "rawTalent.description", "eviolite", 50),
+  BUDGET_CHAMPION: new Achv("budgetChampion", "budgetChampion.description", "nugget", 50),
+  RAGS_TO_RICHES: new Achv("ragsToRiches", "ragsToRiches.description", "big_nugget", 75),
+  APEX_PREDATOR: new Achv("apexPredator", "apexPredator.description", "scope_lens", 75),
 
   // --- Co-op: shared-run feats --------------------------------------------
   CO_OP_INITIATE: new Achv("coOpInitiate", "coOpInitiate.description", "linking_cord", 25),
@@ -1272,6 +1322,62 @@ export const achvs = {
   LOOK_COLLECTOR_100: new Achv("lookCollector100", "lookCollector100.description", "shiny_charm", 100),
   PRESET_CURATOR: new Achv("presetCurator", "presetCurator.description", "baton", 50),
   SIGNATURE_STYLE: new Achv("signatureStyle", "signatureStyle.description", "pb_gold", 75),
+
+  // === #900 follow-up: challenge-stack apex + combo clears ==================
+  // Auto-validated at game-over (ChallengeAchv) only on a challenge victory - each
+  // reads gameMode.challenges via a pure helper (ignoring the per-challenge arg), so
+  // it fires once regardless of which challenge triggers the sweep. CHALLENGE category
+  // is inferred from the subclass.
+
+  // Deeper apex rungs beyond Inferno (Divine-Comedy-adjacent). COCYTUS = the frozen
+  // ninth circle (NU + Triples Only + Ghost Trainers, hell). GIUDECCA = its innermost
+  // round (PU + Doubles Only + Ghost Trainers, hell), a sibling apex to Inferno.
+  COCYTUS: new ChallengeAchv(
+    "cocytus",
+    "cocytus.description",
+    "icicle_plate",
+    175,
+    () => tripleApexStackActive() && getErDifficulty() === "hell",
+  ),
+  GIUDECCA: new ChallengeAchv(
+    "giudecca",
+    "giudecca.description",
+    "pb_black",
+    160,
+    () => puApexStackActive() && getErDifficulty() === "hell",
+  ),
+  // Tasteful challenge-combination clears (mid-tier). Each requires BOTH named
+  // challenges active on a victory; the inverse/flip + passives-all blocks apply
+  // except where the combo itself requires inverse.
+  THE_UPSIDE_DOWN: new ChallengeAchv(
+    "theUpsideDown",
+    "theUpsideDown.description",
+    "inverse",
+    110,
+    () => isNuzlockeChallenge() && challengeActive(Challenges.INVERSE_BATTLE) && !passivesChallengeAchievementsBlock(),
+  ),
+  MONOCHROME_REQUIEM: new ChallengeAchv(
+    "monochromeRequiem",
+    "monochromeRequiem.description",
+    "dubious_disc",
+    110,
+    () =>
+      isNuzlockeChallenge()
+      && challengeActive(Challenges.MONO_COLOR)
+      && !inverseAndFlipStatAchievementsBlock()
+      && !passivesChallengeAchievementsBlock(),
+  ),
+  TYPECAST_TRIO: new ChallengeAchv(
+    "typecastTrio",
+    "typecastTrio.description",
+    "multi_lens",
+    100,
+    () =>
+      challengeActive(Challenges.SINGLE_TYPE)
+      && challengeActive(Challenges.TRIPLES_ONLY)
+      && !inverseAndFlipStatAchievementsBlock()
+      && !passivesChallengeAchievementsBlock(),
+  ),
 };
 
 export function initAchievements() {

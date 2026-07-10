@@ -38,6 +38,7 @@ import {
   getShowdownMatchId,
   getShowdownOpponentManifest,
   getShowdownOwnManifest,
+  isShowdownBattleActive,
 } from "#data/elite-redux/showdown/showdown-battle-state";
 import type { Pokemon } from "#field/pokemon";
 import { type Achv, achvs } from "#system/achv";
@@ -58,6 +59,24 @@ function fireAchvs(ids: readonly string[]): void {
 /** The negotiated stake of the most recently committed Showdown match (consumed at the result). */
 let pendingShowdownStakeShiny = false;
 let pendingShowdownStaked = false;
+/** Whether any LOCAL player Pokemon Mega Evolved during the active Showdown match (Raw Talent). */
+let pendingShowdownOwnMegaUsed = false;
+
+/**
+ * Observer for a Mega Evolution during a Showdown match. Called from the form-change phase's
+ * mega branch; records only the LOCAL player's megas while a Showdown battle is active. The
+ * flag is consumed + cleared at the terminal result. Guarded so it can never disturb the
+ * form change.
+ */
+export function erNoteShowdownPlayerMega(pokemon: Pokemon): void {
+  try {
+    if (isShowdownBattleActive() && pokemon.isPlayer()) {
+      pendingShowdownOwnMegaUsed = true;
+    }
+  } catch (e) {
+    console.warn("[er-social-achv] showdown mega note failed:", e);
+  }
+}
 
 /** Live match outcome facts read at the terminal Showdown result phase. */
 export interface ShowdownResultContext {
@@ -73,8 +92,12 @@ export interface ShowdownResultContext {
   ownTeamCost: number;
   /** Sum of the OPPONENT team's field-legality base costs. */
   oppTeamCost: number;
+  /** The HIGHEST base starter cost across the LOCAL team (0 when the manifest is unknown). */
+  ownTeamMaxCost: number;
   /** At least one of the local player's Pokemon fainted during the match. */
   anyOwnFainted: boolean;
+  /** At least one of the local player's Pokemon Mega Evolved during the match. */
+  ownMegaUsed: boolean;
 }
 
 /** Persistent Showdown tallies (mirrors `gameData.gameStats`), post-increment. */
@@ -99,14 +122,15 @@ export function evaluateShowdownResult(ctx: ShowdownResultContext, counters: Sho
   }
   if (ctx.won) {
     ids.push("FIRST_BLOOD");
+    // Lifetime win-count records (renamed from RIVAL_RECORD_N to the Duelist ranks).
     if (counters.wins >= 5) {
-      ids.push("RIVAL_RECORD_5");
+      ids.push("DUELIST");
     }
     if (counters.wins >= 25) {
-      ids.push("RIVAL_RECORD_25");
+      ids.push("VETERAN_DUELIST");
     }
     if (counters.wins >= 100) {
-      ids.push("RIVAL_RECORD_100");
+      ids.push("LEGENDARY_DUELIST");
     }
     if (ctx.staked) {
       ids.push("HIGH_ROLLER");
@@ -119,6 +143,21 @@ export function evaluateShowdownResult(ctx: ShowdownResultContext, counters: Sho
     }
     if (ctx.ownTeamCost > 0 && ctx.oppTeamCost > 0 && ctx.ownTeamCost < ctx.oppTeamCost) {
       ids.push("DAVID_AND_GOLIATH");
+    }
+    // Raw Talent: win without Mega Evolving any of your own Pokemon.
+    if (!ctx.ownMegaUsed) {
+      ids.push("RAW_TALENT");
+    }
+    // Budget feats: every LOCAL mon's base starter cost at or below the bracket (harder = lower).
+    if (ctx.ownTeamMaxCost > 0 && ctx.ownTeamMaxCost <= 3) {
+      ids.push("BUDGET_CHAMPION");
+    }
+    if (ctx.ownTeamMaxCost > 0 && ctx.ownTeamMaxCost <= 2) {
+      ids.push("RAGS_TO_RICHES");
+    }
+    // Apex Predator: >= 80% lifetime win rate over >= 25 matches (event-gated, no back-pay).
+    if (counters.matchesPlayed >= 25 && counters.wins / counters.matchesPlayed >= 0.8) {
+      ids.push("APEX_PREDATOR");
     }
   }
   return ids;
@@ -148,6 +187,18 @@ function manifestTeamCost(manifest: { baseCost: number }[] | null): number {
   return total;
 }
 
+/** Highest base starter cost across a manifest team (Budget feats; 0 when unknown/empty). */
+function manifestTeamMaxCost(manifest: { baseCost: number }[] | null): number {
+  if (!manifest || manifest.length === 0) {
+    return 0;
+  }
+  let max = 0;
+  for (const mon of manifest) {
+    max = Math.max(max, mon.baseCost ?? 0);
+  }
+  return max;
+}
+
 /**
  * Observer for the terminal Showdown result. MUST be called BEFORE `endShowdownBattle`
  * drops the match id + manifests (i.e. at the top of ShowdownResultPhase.start). Reads
@@ -159,8 +210,11 @@ export function erRecordShowdownResult(won: boolean, voided: boolean): void {
     // Consume the stashed stake (one match at a time; clear so it can't leak forward).
     const staked = pendingShowdownStaked || getShowdownMatchId() != null;
     const stakeShiny = pendingShowdownStakeShiny;
+    // Consume the per-match mega flag alongside the stake (cleared so it can't leak forward).
+    const ownMegaUsed = pendingShowdownOwnMegaUsed;
     pendingShowdownStaked = false;
     pendingShowdownStakeShiny = false;
+    pendingShowdownOwnMegaUsed = false;
 
     const stats = globalScene.gameData.gameStats;
     if (!voided) {
@@ -170,14 +224,17 @@ export function erRecordShowdownResult(won: boolean, voided: boolean): void {
       }
     }
 
+    const ownManifest = getShowdownOwnManifest();
     const ctx: ShowdownResultContext = {
       won,
       voided,
       staked,
       stakeShiny,
-      ownTeamCost: manifestTeamCost(getShowdownOwnManifest()),
+      ownTeamCost: manifestTeamCost(ownManifest),
       oppTeamCost: manifestTeamCost(getShowdownOpponentManifest()),
+      ownTeamMaxCost: manifestTeamMaxCost(ownManifest),
       anyOwnFainted: globalScene.getPlayerParty().some(mon => mon.isFainted()),
+      ownMegaUsed,
     };
     fireAchvs(
       evaluateShowdownResult(ctx, {
@@ -187,19 +244,6 @@ export function erRecordShowdownResult(won: boolean, voided: boolean): void {
     );
   } catch (e) {
     console.warn("[er-social-achv] showdown result detection failed:", e);
-  }
-}
-
-/**
- * Observer for a Showdown wager settlement that granted the player a Pokemon (Spoils
- * of War). Called from the settlement apply path after a `grantUnlock` mutation is
- * applied. Guarded so a detection error can't disturb the settlement write.
- */
-export function erRecordShowdownSettlementGrant(): void {
-  try {
-    fireAchvs(["SPOILS_OF_WAR"]);
-  } catch (e) {
-    console.warn("[er-social-achv] showdown settlement detection failed:", e);
   }
 }
 
