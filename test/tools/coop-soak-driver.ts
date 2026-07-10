@@ -310,6 +310,31 @@ export function resolveSoakLevel(): number | undefined {
   return;
 }
 
+/**
+ * The soak FIDELITY mode (#879 review item 5). Selects how faithfully the driver reproduces PRODUCTION's
+ * heal + command paths:
+ *   - "harness" (DEFAULT, unset = byte-identical to today): the driver heals the guest through convenient
+ *     harness seams the live client never takes - it re-mirrors the WHOLE guest (including its player party)
+ *     from the host every wave AND runs {@linkcode healGuestFromHost}, and the guest's command answerer reads
+ *     the HOST's authoritative guest-slot mon to choose the guest command. Fast + stable, but it MASKS any
+ *     guest-side replay drift (the between-wave reset re-syncs it away, and reading host state means a stale
+ *     guest still picks the host's move).
+ *   - "production": the driver takes ONLY production heal triggers. It does NOT re-mirror the guest player
+ *     party or run healGuestFromHost per wave (enemies / arena / run-config are still adopted - those ARE
+ *     host-authoritative in production); a heal happens ONLY when a checksum MISMATCH fires the resync
+ *     analogue (applyCoopFieldSnapshot / reconcileCoopPlayerField - the stateSync analogue). AND the guest's
+ *     command answerer chooses from the GUEST's OWN rendered scene state (its own party / moveset / PP), so a
+ *     guest too stale to construct a real player's command fails LOUDLY instead of silently borrowing the
+ *     host's. This surfaces the fidelity gaps the harness mode papers over as SoakFindings (Wave-2 evidence).
+ * DEFAULT-OFF: only SOAK_FIDELITY=production opts in.
+ */
+export type SoakFidelity = "harness" | "production";
+
+/** Resolve the soak fidelity mode from the SOAK_FIDELITY env (default "harness" = today's behavior). */
+export function resolveSoakFidelity(): SoakFidelity {
+  return process.env.SOAK_FIDELITY?.trim().toLowerCase() === "production" ? "production" : "harness";
+}
+
 // ---------------------------------------------------------------------------
 // Result + option shapes.
 // ---------------------------------------------------------------------------
@@ -424,6 +449,14 @@ export interface SoakOptions {
    * to today (no revive-take, no other level-only behavior).
    */
   profile?: SoakProfileName;
+  /**
+   * #879 review item 5 - the PRODUCTION-FIDELITY soak mode. Default "harness" (byte-identical to today).
+   * "production" disables the driver's convenient guest heals (no per-wave player re-mirror / healGuestFromHost -
+   * heals only via the checksum-mismatch resync analogue) AND selects the guest command from the GUEST's OWN
+   * rendered scene state, so a stale guest fails loudly. See {@linkcode SoakFidelity}. Expect FINDINGS in this
+   * mode (that is the point); it is gated default-off so the standing soak gate is unaffected.
+   */
+  fidelity?: SoakFidelity;
   /**
    * #633 MID-RUN MYSTERY-ENCOUNTER CONTINUATION (BUILD 1). A map of wave index -> the {@linkcode
    * MysteryEncounterType} to FORCE at that wave, driven INLINE through the real two-engine ME machinery
@@ -1050,6 +1083,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   const { seed, waves, logs } = opts;
   const rewardPolicy = opts.rewardPolicy ?? "seeded";
   const profile = opts.profile ?? "god";
+  // #879 review item 5: production-fidelity mode (default "harness" = byte-identical to today). Gates the
+  // guest-heal seams (no per-wave player re-mirror / healGuestFromHost) + the guest command SOURCE.
+  const fidelity: SoakFidelity = opts.fidelity ?? "harness";
   const rng = mulberry32(seed);
   const actionScript: string[] = [];
   const skips: Record<string, number> = {};
@@ -1148,6 +1184,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => {
     const wave = rig.hostScene.currentBattle.waveIndex;
     const turn = rig.hostScene.currentBattle.turn;
+    // #879 PRODUCTION-FIDELITY command SOURCE. In "harness" mode the guest answerer reads the HOST's
+    // authoritative guest-slot mon (byte-identical to today - a stale guest still borrows the host's move). In
+    // "production" mode it reads the GUEST's OWN rendered scene (its own field mon / moveset / PP / enemy
+    // field), exactly as a live guest client would: if the guest has DRIFTED (wrong mon on-field, spent PP,
+    // stale enemy), it now constructs a DIFFERENT command than the host - which either desyncs loudly at the
+    // per-turn checkpoint or picks an illegal/no-op move the framework rejects. That is the "a stale guest can
+    // no longer hide" evidence this mode exists to surface. Reading the guest scene is a plain field read; the
+    // guest mon-command still rides the REAL relay the host applies for the guest slot.
+    const commandScene = fidelity === "production" ? rig.guestScene : rig.hostScene;
     // #843 coverage #4: occasionally issue a VOLUNTARY SWITCH for the guest slot instead of a move, through
     // the REAL relay Command path (Command.POKEMON + party-slot cursor); the host summons the guest's pick
     // and the switch rides the per-turn checkpoint onto the guest's replay. Only when a legal guest-owned
@@ -1155,8 +1200,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // move / Fairy Lock / ER FEAR makes the switch ILLEGAL - the real command menu greys out the POKEMON
     // option, so issuing Command.POKEMON for a trapped mon soft-locks the command resolution; isTrapped is
     // the exact gate the menu uses). Else fall through to a move.
-    const guestSwitchMon = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
-    const benchSlot = firstLegalBenchSlot(rig.hostScene, "guest");
+    const guestSwitchMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+    const benchSlot = firstLegalBenchSlot(commandScene, "guest");
     if (
       switchesThisTurn(seed, wave, turn, GUEST_SWITCH_SALT)
       && benchSlot >= 0
@@ -1169,8 +1214,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       hitMode(UiMode.PARTY);
       return { command: Command.POKEMON, cursor: benchSlot };
     }
-    const guestMon = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
-    const { guestTarget, guestTargetMon } = pickTargets(rig.hostScene);
+    const guestMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+    const { guestTarget, guestTargetMon } = pickTargets(commandScene);
     const { slot, moveId } = resolveChosenMove(guestMon, guestTargetMon, seed, wave, GUEST_SLOT_SALT);
     // #849 COMMAND-issue tap: a guest FIGHT command drives COMMAND + FIGHT (+ TARGET_SELECT for the target).
     hitMode(UiMode.COMMAND);
@@ -1349,14 +1394,39 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   };
 
   /**
+   * The PRODUCTION RESYNC ANALOGUE (the stateSync heal): applyCoopFieldSnapshot + the field/party-order
+   * reconcile the guest's real CoopFullSnapshot resync runs on a checksum mismatch. This is the ONLY heal the
+   * production-fidelity mode permits (no full re-mirror / healGuestFromHost reset). Extracted so the wave-start
+   * boundary (production mode) + the post-turn detector share one faithful resync implementation.
+   */
+  const resyncHealAnalogue = async (): Promise<void> => {
+    const snap = await withClient(rig.hostCtx, () => captureCoopFieldSnapshot());
+    const checkpoint = await withClient(rig.hostCtx, () => captureCoopCheckpoint());
+    const hostParty = rig.hostScene.getPlayerParty().map(p => p.species.speciesId);
+    await withClient(rig.guestCtx, () => {
+      if (checkpoint != null) {
+        reconcileCoopPlayerField(checkpoint.field);
+      }
+      applyCoopFieldSnapshot(snap ?? undefined, true);
+      adoptCoopHostPlayerPartyOrder(hostParty);
+    });
+  };
+
+  /**
    * WAVE-START boundary: LOCKSTEP + record the boundary digest sample. The guest was just re-mirrored +
    * faithfully re-synced to the host ({@linkcode healGuestFromHost}), so this is the CLEAN-START parity
-   * check (the launch/resync fidelity). The one-heal here is a second re-mirror. The REAL replay-desync
-   * detection is the POST-TURN check below.
+   * check (the launch/resync fidelity). The one-heal here is a second re-mirror (HARNESS mode) or the
+   * production resync analogue (PRODUCTION-FIDELITY mode - no full reset). The REAL replay-desync detection is
+   * the POST-TURN check below.
    */
   const assertWaveBoundary = async (wave: number): Promise<void> => {
     assertLockstep(wave, "wave-start");
     const chk = await checkDigest(wave, "wave-start", async () => {
+      if (fidelity === "production") {
+        // Heals ONLY via the production trigger (checksum mismatch -> stateSync analogue); no full re-mirror.
+        await resyncHealAnalogue();
+        return;
+      }
       await remirrorWave(rig);
       await healGuestFromHost(rig);
     });
@@ -1386,26 +1456,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * cannot converge is recorded as a finding. A still-diverged state after this is a REAL desync -> a finding.
    */
   const assertPostTurnConverged = async (wave: number): Promise<void> => {
-    await checkDigest(wave, "post-turn", async () => {
-      const snap = await withClient(rig.hostCtx, () => captureCoopFieldSnapshot());
-      // #849 (World A): the post-turn one-heal is a LESSER mechanism than production's full resync. Neither
-      // applyCoopFieldSnapshot (writes per-BI data WITHOUT reordering) nor adoptCoopHostPlayerPartyOrder
-      // (reorders only the OFF-FIELD bench; on-field leads are PINNED) can reposition an ON-FIELD
-      // TRANSPOSITION - two on-field mons the host and guest hold in SWAPPED slots (a voluntary-switch party
-      // transposition production converges via reconcileCoopPlayerField, seed 20260706 wave 61). Without this
-      // the transposition stays diverged here and is mis-recorded as a REAL finding. Run production's actual
-      // field reconcile (reconcileCoopPlayerField over the host checkpoint's field) FIRST, so the one-heal is
-      // a faithful resync analogue - only a divergence production's resync ALSO cannot converge is a finding.
-      const checkpoint = await withClient(rig.hostCtx, () => captureCoopCheckpoint());
-      const hostParty = rig.hostScene.getPlayerParty().map(p => p.species.speciesId);
-      await withClient(rig.guestCtx, () => {
-        if (checkpoint != null) {
-          reconcileCoopPlayerField(checkpoint.field);
-        }
-        applyCoopFieldSnapshot(snap ?? undefined, true);
-        adoptCoopHostPlayerPartyOrder(hostParty);
-      });
-    });
+    // #849 (World A): the post-turn one-heal is a LESSER mechanism than production's full resync. Neither
+    // applyCoopFieldSnapshot (writes per-BI data WITHOUT reordering) nor adoptCoopHostPlayerPartyOrder
+    // (reorders only the OFF-FIELD bench; on-field leads are PINNED) can reposition an ON-FIELD TRANSPOSITION -
+    // two on-field mons the host and guest hold in SWAPPED slots (a voluntary-switch party transposition
+    // production converges via reconcileCoopPlayerField, seed 20260706 wave 61). Running production's actual
+    // field reconcile FIRST makes the one-heal a faithful resync analogue ({@linkcode resyncHealAnalogue}) -
+    // only a divergence production's resync ALSO cannot converge is a finding. Identical in both fidelity modes.
+    await checkDigest(wave, "post-turn", resyncHealAnalogue);
   };
 
   /**
@@ -2203,9 +2261,18 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const isMeWave = meType != null && rig.hostScene.currentBattle.battleType === BattleType.MYSTERY_ENCOUNTER;
     // Re-mirror the host's freshly-rolled battle onto the guest before each new wave (wave 1 was mirrored by
     // buildDuo), then faithfully re-sync the guest (held items / weather / modifiers / scalars).
+    // #879 PRODUCTION-FIDELITY: in "production" mode the per-wave mirror adopts ONLY the host-AUTHORITATIVE
+    // side (enemies / arena / run-config, exactly what a live guest adopts through its own EncounterPhase) but
+    // PRESERVES the guest's own replayed player party (no reset) AND does NOT run healGuestFromHost - so guest
+    // drift accumulates and surfaces (at the digest, or when the guest builds its own command) instead of
+    // being papered over every wave. In "harness" mode this is byte-identical to today (full re-mirror + heal).
     if (wave > 1 && !isMeWave) {
-      await remirrorWave(rig);
-      await healGuestFromHost(rig);
+      if (fidelity === "production") {
+        await remirrorWave(rig, { preserveGuestPlayerParty: true });
+      } else {
+        await remirrorWave(rig);
+        await healGuestFromHost(rig);
+      }
     }
 
     // Trainer-wave coverage tally (#846): count TRAINER waves (fixed rival/evil-team vs random rolled) so a

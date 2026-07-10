@@ -607,7 +607,11 @@ function adoptCoopHostRunConfig(hostScene: BattleScene, guestScene: BattleScene)
  *
  * Returns nothing; mutates the guest scene's party / currentBattle / arena / field.
  */
-export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: BattleScene): void {
+export function mirrorHostBattleToGuest(
+  hostScene: BattleScene,
+  guestScene: BattleScene,
+  opts?: { preserveGuestPlayerParty?: boolean },
+): void {
   // 0. Adopt the host's SEED + run-config-derived scene state (#658 seed-pin). See adoptCoopHostRunConfig:
   //    this is the launch-handshake step the plain mirror skipped, and WHY a benign per-wave checksum
   //    mismatch appeared + self-healed via a resync. After it the guest's wave-start checksum MATCHES the
@@ -661,10 +665,21 @@ export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: Batt
   // 2. Rebuild the player party under the guest scene from the host's PokemonData. We construct the
   //    mon DIRECTLY (not scene.addPlayerPokemon, whose init() builds the battle-info UI / sprites the
   //    headless guest scene can't fully back) - the ctor does the logical build; we skip init().
-  guestSceneInternal.party = [];
+  //
+  // PRODUCTION-FIDELITY (#879 review item 5, soak fidelity mode): when `preserveGuestPlayerParty` is set (and
+  // this is a real co-op run with an already-built guest party), SKIP the player rebuild entirely, so the
+  // guest carries its OWN replayed player party forward across the wave boundary instead of being reset to the
+  // host. This is what lets a guest that has DRIFTED stay drifted (and thus fail loudly at the next digest /
+  // when it constructs its own command) rather than being silently healed by the per-wave mirror. Enemies /
+  // arena / run-config are still adopted (they are host-AUTHORITATIVE in production too). Never used on the
+  // versus-flip path or when the guest party is empty (wave-1 launch adopt still rebuilds).
+  const preservePlayer = opts?.preserveGuestPlayerParty === true && !flip && guestSceneInternal.party.length > 0;
+  if (!preservePlayer) {
+    guestSceneInternal.party = [];
+  }
   // Versus flip: the guest's local PLAYER party is the host's ENEMY party (its own team). Co-op: the
   // host's own player party (the shared team).
-  for (const hostMon of flip ? hostScene.getEnemyParty() : hostScene.getPlayerParty()) {
+  for (const hostMon of preservePlayer ? [] : flip ? hostScene.getEnemyParty() : hostScene.getPlayerParty()) {
     const data = new PokemonData(hostMon);
     const mon = new PlayerPokemon(
       getPokemonSpecies(hostMon.species.speciesId),
@@ -942,9 +957,9 @@ export async function buildDuo(
  * each wave's host-authoritative field without driving the full launch handshake. Runs inside
  * withClient(guestCtx) so globalScene is the guest while the clone is built.
  */
-export async function remirrorWave(rig: DuoRig): Promise<void> {
+export async function remirrorWave(rig: DuoRig, opts?: { preserveGuestPlayerParty?: boolean }): Promise<void> {
   await withClient(rig.guestCtx, () => {
-    mirrorHostBattleToGuest(rig.hostScene, rig.guestScene);
+    mirrorHostBattleToGuest(rig.hostScene, rig.guestScene, opts);
     const gf = rig.guestScene.getPlayerField();
     gf[0].coopOwner = "host";
     gf[1].coopOwner = "guest";
