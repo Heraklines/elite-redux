@@ -44,7 +44,7 @@ import {
   setCoopMeOperationEpoch,
 } from "#data/elite-redux/coop/coop-me-operation";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 /** A minimal, complete authoritative DATA plane (§1.2) - the envelope embeds it unchanged. */
 function makeState(wave = 3, turn = 1): CoopAuthoritativeBattleStateV1 {
@@ -112,6 +112,37 @@ describe("W2e-R2 I5: pre-commit intent loss - owner re-send with the determinist
     } finally {
       resetCoopMeOperationFlag();
       resetCoopMeOperationState();
+    }
+  });
+
+  it("I5 production seam: a lost guest proposal is resent until the operation lifecycle resets", async () => {
+    vi.useFakeTimers();
+    setCoopMeOperationEnabled(true);
+    resetCoopMeOperationState();
+    setCoopMeOperationEpoch(EPOCH);
+    const resend = vi.fn();
+    try {
+      commitMeOwnerIntent({
+        kind: "ME_PICK",
+        seq: 8_000_003,
+        pinned: 3,
+        payload: { optionIndex: 1 },
+        localRole: "guest",
+        wave: 12,
+        turn: 0,
+        resend,
+      });
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(resend, "a dropped pre-commit proposal must be retried with the same relay payload").toHaveBeenCalledOnce();
+
+      resetCoopMeOperationState();
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(resend, "session teardown must bound the proposal resend lifecycle").toHaveBeenCalledOnce();
+    } finally {
+      resetCoopMeOperationFlag();
+      resetCoopMeOperationState();
+      vi.useRealTimers();
     }
   });
 
