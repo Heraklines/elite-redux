@@ -212,4 +212,51 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     hostMgr.dispose();
     guestMgr.dispose();
   });
+
+  // ===========================================================================================
+  // I4 - SEND RETRY: an op whose transport send() THROWS (the channel is DEAD at send time, not merely
+  // unACKed) must stay journaled + retriable and MUST NOT break the committer, then be resent on reconnect.
+  // EXPECTED RED (current code): commit() calls transport.send() unguarded, so a throwing send propagates
+  // the throw out of commit() (breaking any caller that does not wrap it - e.g. the keystone applier).
+  // ===========================================================================================
+  it.fails("I4: [RED] a commit whose send THROWS propagates the throw out of commit()", async () => {
+    let dead = true;
+    const applied: number[] = [];
+    const pair = createLoopbackPair();
+    // A transport that THROWS on send while dead (a real WebRTC dead-channel InvalidStateError), then heals.
+    const flaky: CoopTransport = {
+      get role() {
+        return pair.host.role;
+      },
+      get state() {
+        return pair.host.state;
+      },
+      send(msg: CoopMessage) {
+        if (dead) {
+          throw new Error("channel dead at send time");
+        }
+        pair.host.send(msg);
+      },
+      onMessage: h => pair.host.onMessage(h),
+      onStateChange: h => pair.host.onStateChange(h),
+      close: () => pair.host.close(),
+    };
+    const hostMgr = new CoopDurabilityManager(flaky);
+    const guestMgr = new CoopDurabilityManager(pair.guest, recordingWaveHooks(applied));
+
+    // The send THROWS. commit() must NOT propagate it - the op is journaled BEFORE the send, so it stays
+    // retriable; a throwing send must be caught, not break the committer.
+    expect(() => hostMgr.commit("wave", 1, waveMsg(1))).not.toThrow();
+    await flush();
+    expect(applied, "the throwing send never delivered").toEqual([]);
+    expect(hostMgr.unackedCount(), "the op stays journaled + retriable after a throwing send").toBe(1);
+
+    // The channel heals; a reconnect resends the journaled op - it was never dropped.
+    dead = false;
+    guestMgr.reconnect();
+    await flush();
+    expect(applied, "the throw-dropped op is resent on reconnect (never lost)").toEqual([1]);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
 });
