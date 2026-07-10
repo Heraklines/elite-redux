@@ -688,6 +688,21 @@ export class CoopDurabilityManager {
     this.transport.send({ t: "coopResyncAll" });
   }
 
+  /**
+   * Fast-forward the RECEIVER ledger to a full snapshot's head revision for a class (§4.4). The rejoin
+   * full-snapshot pull adopts the host's authoritative state INCLUDING the effects of every committed op
+   * through `headRevision` (a DATA-plane fact the durability receiver ledger does not otherwise learn).
+   * Without this, a subsequent journal tail replay of those already-subsumed ops would DOUBLE-APPLY them
+   * (re-running the applier for state the snapshot already materialized), and the guest's next reconnect
+   * would spuriously `coopResync` from a stale low mark - re-requesting ops the snapshot subsumed. This
+   * marks the class applied through `headRevision` and ACKs it (so the committer's resend tail shrinks to
+   * nothing). Idempotent + monotonic: a lower `headRevision` than already applied is ignored.
+   */
+  adoptSnapshot(cls: string, headRevision: number): void {
+    this.ledger.adoptSnapshot(cls, headRevision);
+    this.transport.send({ t: "coopAck", cls, seq: this.ledger.appliedThrough(cls) });
+  }
+
   /** Committer: resend the committed-but-unacked tail for EVERY class (§4.2/§4.4). Idempotent (receiver dedupes). */
   private resendUnackedTail(reason: string): void {
     for (const cls of this.journal.classes()) {
