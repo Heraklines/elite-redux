@@ -54,6 +54,7 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { PartyOption } from "#ui/party-ui-handler";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -912,13 +913,22 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
-  it("PROBE #795: Giratina's Bargain alternates - owner leaves, watcher adopts the outcome blob, counters lockstep", async () => {
+  it("DURABILITY #795: a dropped Giratina bargain outcome still materializes and keeps counters lockstep", async () => {
     // The Bargain is the 4th owner/watcher surface: at most ONE deal per visit, so the whole
     // relay is a single comprehensive outcome blob (the proven ME-terminal resync) + a uniform
     // terminal. This probe drives the LEAVE path end-to-end across two engines; the deal-commit
     // path reuses applyCoopMeOutcome verbatim (already proven by the duo ME tests).
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 1,
+        reorder: 0,
+        delay: 0,
+        faultable: msg => msg.t === "interactionOutcome" && msg.kind === "bargain",
+      },
+      { seed: 0xba26a1 },
+    );
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
     const turn = rig.hostScene.currentBattle.turn;
@@ -977,6 +987,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       }
     });
     expect(ownerDone, "HARNESS: the owner bargain chain fully completed before exit").toBe(true);
+    expect(pair.faultsInjected(), "the legacy bargain outcome was actually dropped").toBe(1);
     expect(rig.hostRuntime.controller.interactionCounter(), "owner advanced the bargain interaction").toBe(
       counterBefore + 1,
     );
