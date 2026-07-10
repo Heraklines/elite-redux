@@ -23,6 +23,7 @@
 import { globalScene } from "#app/global-scene";
 import { EntryHazardTag } from "#data/arena-tag";
 import { fieldPositionForSlot } from "#data/battle-format";
+import { SerializableBattlerTag } from "#data/battler-tags";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import {
   isCoopAuthoritativeGuestGated,
@@ -1403,10 +1404,29 @@ function readTransform(mon: Pokemon): CoopMonTransform | null {
   }
 }
 
-/** Read a live mon's battler-tag TYPE ids, sorted ascending (identity only, no counters). */
+/**
+ * Read a live mon's battler-tag TYPE ids, sorted ascending (identity only, no counters). ONLY
+ * {@linkcode SerializableBattlerTag} types are hashed (#876): a NON-serializable tag is a WITHIN-TURN
+ * transient (FLINCHED, PROTECTED, ENDURING, HELPING_HAND, CENTER_OF_ATTENTION, ROOSTED, ELECTRIFIED,
+ * BYPASS_SPEED, the charging-move tags, ...) that the save system deliberately DROPS on the
+ * `PokemonData` wire round-trip (pokemon-data.ts discards any tag not `instanceof SerializableBattlerTag`
+ * on load), AND that the pure-renderer guest never creates (it renders events, it does not run MovePhase /
+ * flinch / protect logic). So a host tag like FLINCHED - applied by an enemy's move on the WINNING turn -
+ * can NEVER reach the guest: the per-turn authoritative-state apply drops it, and the checksum-mismatch
+ * stateSync heal (also `PokemonData`) drops it too, so hashing it produced a permanent, UNHEALABLE
+ * false-desync that tripped the #838 per-turn assertion every time a flinch/protect landed at a wave-win
+ * crossing (soak seed 20260709: host F0.tags=[ER_ENRAGE,FLINCHED] vs guest [ER_ENRAGE] @ wave 90 turn 3).
+ * Restricting the hash to the SYNCABLE (serializable) subset makes both clients converge - the host filters
+ * FLINCHED out, the guest already lacks it - while a REAL serializable-tag divergence (ER_ENRAGE, Leech
+ * Seed, Encore, Taunt, ...) is STILL detected + healed. This mirrors the module's existing exclusion of
+ * turn COUNTERS for the same "legitimately transient, not identity" reason (see the file header).
+ */
 function readTagTypes(mon: Pokemon): number[] {
   try {
-    return mon.summonData.tags.map(t => t.tagType as unknown as number).sort((a, b) => a - b);
+    return mon.summonData.tags
+      .filter(t => t instanceof SerializableBattlerTag)
+      .map(t => t.tagType as unknown as number)
+      .sort((a, b) => a - b);
   } catch {
     return [];
   }
