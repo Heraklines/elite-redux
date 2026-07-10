@@ -258,6 +258,10 @@ export class CoopInteractionRelay {
   private readonly schedule: (cb: () => void, ms: number) => () => void;
   private readonly isVersus: () => boolean;
   private readonly offMessage: () => void;
+  /** Raw outcomes awaiting their matching journal carrier; keyed by seq + exact JSON payload. */
+  private readonly rawOutcomeCredits = new Map<string, number>();
+  /** Journal outcomes awaiting a later raw legacy echo, which must be dropped rather than double-applied. */
+  private readonly committedOutcomeCredits = new Map<string, number>();
 
   /** seq -> FIFO queue of choices that arrived before their waiter. */
   private readonly inbox = new Map<number, CoopInteractionChoice[]>();
@@ -450,6 +454,20 @@ export class CoopInteractionRelay {
       coopLog("relay", `SEND interactionOutcome seq=${seq} kind=${kind} ${summarizeOutcome(outcome)}`);
     }
     this.transport.send({ t: "interactionOutcome", seq, kind, outcome });
+  }
+
+  /**
+   * Deliver a host-COMMITTED outcome from the durable carrier into the real outcome FIFO. The matching
+   * legacy frame may arrive before or after the envelope; one credit on either side suppresses that echo,
+   * so the phase observes exactly one presentation without caring which carrier won the race.
+   */
+  materializeCommittedInteractionOutcome(seq: number, outcome: CoopInteractionOutcome): void {
+    const key = `${seq}:${JSON.stringify(outcome)}`;
+    if (this.consumeOutcomeCredit(this.rawOutcomeCredits, key)) {
+      return;
+    }
+    this.addOutcomeCredit(this.committedOutcomeCredits, key);
+    this.deliverInteractionOutcome(seq, outcome, "JOURNAL");
   }
 
   /**
@@ -728,6 +746,8 @@ export class CoopInteractionRelay {
     this.inbox.clear();
     this.outcomePending.clear();
     this.outcomeInbox.clear();
+    this.rawOutcomeCredits.clear();
+    this.committedOutcomeCredits.clear();
     this.rewardOptionsPending.clear();
     this.rewardOptionsInbox.clear();
     this.cancelledSeqs.clear();
@@ -757,6 +777,8 @@ export class CoopInteractionRelay {
     }
     this.inbox.clear();
     this.outcomeInbox.clear();
+    this.rawOutcomeCredits.clear();
+    this.committedOutcomeCredits.clear();
     this.rewardOptionsInbox.clear();
     // A seq sticky-cancelled in the PRIOR epoch must not keep resolving null in the NEW epoch (seqs reuse
     // low counters), so clear the cancel marks alongside the buffers.
@@ -854,27 +876,12 @@ export class CoopInteractionRelay {
       return;
     }
     if (msg.t === "interactionOutcome") {
-      const waiter = this.outcomePending.get(msg.seq);
-      if (waiter) {
-        if (isCoopDebug()) {
-          coopLog(
-            "relay",
-            `RECV interactionOutcome seq=${msg.seq} -> deliver-to-waiter ${summarizeOutcome(msg.outcome)}`,
-          );
-        }
-        waiter(msg.outcome);
+      const key = `${msg.seq}:${JSON.stringify(msg.outcome)}`;
+      if (this.consumeOutcomeCredit(this.committedOutcomeCredits, key)) {
         return;
       }
-      // No waiter yet - buffer FIFO for the next awaitInteractionOutcome(seq).
-      const queue = this.outcomeInbox.get(msg.seq) ?? [];
-      queue.push(msg.outcome);
-      this.outcomeInbox.set(msg.seq, queue);
-      if (isCoopDebug()) {
-        coopLog(
-          "relay",
-          `RECV interactionOutcome seq=${msg.seq} -> BUFFER outcomeInbox depth=${queue.length} ${summarizeOutcome(msg.outcome)}`,
-        );
-      }
+      this.addOutcomeCredit(this.rawOutcomeCredits, key);
+      this.deliverInteractionOutcome(msg.seq, msg.outcome, "RECV");
       return;
     }
     if (msg.t === "rewardOptions") {
@@ -926,6 +933,43 @@ export class CoopInteractionRelay {
     });
     // #861: carry the wire `kind` onto the choice so the KIND-VALIDATION can gate delivery + buffer-hits.
     this.deliverInteractionChoice(msg.seq, { choice: msg.choice, data: msg.data, kind: msg.kind });
+  }
+
+  private addOutcomeCredit(credits: Map<string, number>, key: string): void {
+    credits.set(key, (credits.get(key) ?? 0) + 1);
+  }
+
+  private consumeOutcomeCredit(credits: Map<string, number>, key: string): boolean {
+    const count = credits.get(key) ?? 0;
+    if (count <= 0) {
+      return false;
+    }
+    if (count === 1) {
+      credits.delete(key);
+    } else {
+      credits.set(key, count - 1);
+    }
+    return true;
+  }
+
+  private deliverInteractionOutcome(seq: number, outcome: CoopInteractionOutcome, source: "RECV" | "JOURNAL"): void {
+    const waiter = this.outcomePending.get(seq);
+    if (waiter) {
+      if (isCoopDebug()) {
+        coopLog("relay", `${source} interactionOutcome seq=${seq} -> deliver-to-waiter ${summarizeOutcome(outcome)}`);
+      }
+      waiter(outcome);
+      return;
+    }
+    const queue = this.outcomeInbox.get(seq) ?? [];
+    queue.push(outcome);
+    this.outcomeInbox.set(seq, queue);
+    if (isCoopDebug()) {
+      coopLog(
+        "relay",
+        `${source} interactionOutcome seq=${seq} -> BUFFER outcomeInbox depth=${queue.length} ${summarizeOutcome(outcome)}`,
+      );
+    }
   }
 }
 

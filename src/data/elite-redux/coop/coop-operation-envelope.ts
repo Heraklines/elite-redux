@@ -22,7 +22,7 @@
 // top and is individually flag-gated (§5).
 // =============================================================================
 
-import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
+import type { CoopAuthoritativeBattleStateV1, CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 
 /** A co-op player seat id (0..N-1). The host/authority is a specific id, conventionally 0. */
 export type CoopPlayerId = number;
@@ -225,6 +225,8 @@ export interface CoopMeButtonPayload {
 export interface CoopMePresentPayload {
   /** Whether the host has an ME this wave (the #862 host-authoritative presence verdict; false = the guest self-rolled a phantom). */
   readonly present: boolean;
+  /** Exact host-rendered presentation. Required when `present` is true so journal replay never re-derives from guest state. */
+  readonly presentation?: Extract<CoopInteractionOutcome, { k: "mePresent" }>;
 }
 
 /** ME_TERMINAL intent/outcome: the ME's terminal transition (#10). Carries the host-stated resolution (#859). */

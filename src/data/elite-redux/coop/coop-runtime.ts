@@ -85,6 +85,7 @@ import type {
   CoopAuthoritativeEnvelopeV1,
   CoopBiomePickPayload,
   CoopCrossroadsPickPayload,
+  CoopMePresentPayload,
   CoopMeTerminalPayload,
   CoopRewardActionPayload,
   CoopShopBuyPayload,
@@ -109,6 +110,7 @@ import {
   COOP_BIOME_PICK_SEQ_BASE,
   COOP_BIOME_SHOP_CHOICE_KINDS,
   COOP_CROSSROADS_SEQ_BASE,
+  COOP_ME_PUMP_SEQ_BASE,
   COOP_ME_TERM_SEQ_BASE,
   COOP_REJOIN_SYNC_SEQ_BASE,
   COOP_REWARD_CHOICE_KINDS,
@@ -1920,18 +1922,37 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
   return false;
 }
 
-/** Feed a journal-delivered, host-stated ME terminal into the receiver's existing 9M terminal waiter. */
-function materializeCoopMeTerminalFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+/** Feed journal-delivered ME presentation/terminal operations into the receiver's existing safe waiters. */
+function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
   if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
     return false;
   }
   const op = envelope.pendingOperation;
   const parsed = op == null ? null : parseCoopOperationId(op.id);
-  if (op == null || op.kind !== "ME_TERMINAL" || op.owner !== 0 || parsed == null) {
+  if (op == null || op.owner !== 0 || parsed == null) {
     return false;
   }
   const seq = Math.floor(parsed.pinnedSeq / 8000);
   const kindTag = Math.floor((parsed.pinnedSeq % 8000) / 1000);
+  if (op.kind === "ME_PRESENT") {
+    const pinned = seq - COOP_ME_PUMP_SEQ_BASE;
+    const payload = op.payload as CoopMePresentPayload;
+    if (
+      kindTag !== 0
+      || !Number.isSafeInteger(pinned)
+      || pinned < 0
+      || pinned >= 100_000
+      || payload?.present !== true
+      || payload.presentation?.k !== "mePresent"
+    ) {
+      return false;
+    }
+    runtime.interactionRelay.materializeCommittedInteractionOutcome(seq, payload.presentation);
+    return true;
+  }
+  if (op.kind !== "ME_TERMINAL") {
+    return false;
+  }
   const pinned = seq - COOP_ME_TERM_SEQ_BASE;
   const payload = op.payload as CoopMeTerminalPayload;
   if (
@@ -2427,7 +2448,7 @@ export function assembleCoopRuntime(
   // module-level sink, matching the sole receiver topology.
   registerCoopOperationLiveSink("op:biome", envelope => materializeCoopBiomeChoiceFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:reward", envelope => materializeCoopRewardActionFromOp(runtime, envelope));
-  registerCoopOperationLiveSink("op:me", envelope => materializeCoopMeTerminalFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:me", envelope => materializeCoopMeOperationFromOp(runtime, envelope));
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream);
   wireCoopEnemyPartyResponder(controller, battleStream);

@@ -405,7 +405,7 @@ export class MysteryEncounterPhase extends Phase {
         kind: "ME_PRESENT",
         seq: seqMe,
         pinned: coopMeInteractionStartValue(),
-        payload: { present: true },
+        payload: { present: true, presentation: present },
         localRole: getCoopController()?.role ?? "host",
         wave: globalScene.currentBattle?.waveIndex ?? -1,
         turn: 0,
