@@ -229,6 +229,48 @@ describe.skipIf(!RUN)(
       expect(result.resyncCount, `resyncs bounded (got ${result.resyncCount} over 2 waves)`).toBeLessThanOrEqual(2);
     }, 300_000);
 
+    it("boots a replay from the window checkpoint party instead of the original launch roster", async () => {
+      const checkpointParty = [
+        rosterMon(SpeciesId.RAICHU, 61, "host"),
+        rosterMon(SpeciesId.ALAKAZAM, 62, "guest"),
+      ];
+      const trace = makeReplayTrace({
+        seed: "original-launch-seed",
+        gameModeId: GameModes.COOP,
+        roster: [rosterMon(SpeciesId.PIKACHU, 5, "host"), rosterMon(SpeciesId.ABRA, 5, "guest")],
+        events: [
+          { type: "command", wave: 1, turn: 0, slotFieldIndex: 0, command: { kind: "move", moveIndex: 0, target: 2 } },
+          { type: "command", wave: 1, turn: 0, slotFieldIndex: 1, command: { kind: "move", moveIndex: 0, target: 3 } },
+          { type: "interaction", seq: 0, kind: "skip", choice: -1 },
+        ],
+        coopRunConfig: {
+          difficulty: "youngster",
+          challenges: [],
+          seed: "original-launch-seed",
+          netcodeMode: "authoritative",
+        },
+      });
+      trace.checkpoint = {
+        wave: 1,
+        seed: "checkpoint-window-seed",
+        party: checkpointParty,
+        modifiers: [],
+        money: 4_321,
+        pokeballCounts: { "0": 7 },
+      };
+
+      const result = await replayCoopTrace(game as unknown as ReplayGameManager, trace);
+
+      expect(result.divergences).toEqual([]);
+      expect(
+        game.scene.getPlayerParty().slice(0, 2).map(p => [p.species.speciesId, p.level]),
+        "the replay must begin from the evolved/leveled checkpoint party, not the stale header roster",
+      ).toEqual([
+        [SpeciesId.RAICHU, 61],
+        [SpeciesId.ALAKAZAM, 62],
+      ]);
+    }, 300_000);
+
     // =========================================================================================
     // THE KILLER TEST (closes the record->replay loop), split across TWO tests sharing `capturedTrace`
     // so each uses its OWN clean GameManager (one test can't safely construct two - the prompt-handler
