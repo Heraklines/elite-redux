@@ -1,4 +1,3 @@
-import { achvs } from "#system/achv";
 import {
   ER_SHINY_LAB_EFFECT_ACHV,
   ER_SHINY_LAB_EFFECT_INDEX,
@@ -6,6 +5,7 @@ import {
   getErShinyLabDiscountedEffects,
   getErShinyLabEffectsForAchv,
 } from "#data/elite-redux/er-shiny-lab-effects";
+import { achvs } from "#system/achv";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -59,14 +59,19 @@ describe("ER Shiny Lab achievement bindings", () => {
     }
   });
 
-  it("keeps coverage near the agreed ~50% of the 154-effect catalog", () => {
+  it("keeps a meaningful floor of achievement-gated effects", () => {
+    // The catalog grew to the full 369-effect design set (v7.2); the new v6/v7 effects
+    // unlock via the candy / wild-catch / completion-token paths, not all via achievements,
+    // so the old "~50% of the 154-effect catalog" ratio no longer applies. The ACHV map is
+    // owned separately; this guard just protects the gated DESIGN set from a silent drop
+    // (a typo'd binding removed, the map accidentally truncated) by asserting an absolute
+    // floor well under the current count, and that not everything is gated.
     const total =
       ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette.length
       + ER_SHINY_LAB_EFFECTS_BY_CATEGORY.surface.length
       + ER_SHINY_LAB_EFFECTS_BY_CATEGORY.around.length;
     const bound = Object.keys(ER_SHINY_LAB_EFFECT_ACHV).length;
-    const ratio = bound / total;
-    expect(ratio).toBeGreaterThan(0.4);
-    expect(ratio).toBeLessThan(0.6);
+    expect(bound).toBeGreaterThanOrEqual(40);
+    expect(bound).toBeLessThan(total);
   });
 });
