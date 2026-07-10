@@ -10,6 +10,8 @@
     "recent": "Recent",
     "victory": "Victory",
     "battle": "Battle",
+    "versus": "Versus",
+    "coop": "Co-op",
     "training": "Training",
     "collection": "Collection",
     "challenge": "Challenge",
@@ -566,5 +568,180 @@
     "name": "Squatter",
     "name_female": "Squatter",
     "description": "Stay in a single biome for at least 20 waves."
+  },
+  "firstBlood": {
+    "name": "First Blood",
+    "name_female": "First Blood",
+    "description": "Win your first Showdown match."
+  },
+  "rivalRecord5": {
+    "name": "Regular Contender",
+    "name_female": "Regular Contender",
+    "description": "Win 5 Showdown matches."
+  },
+  "rivalRecord25": {
+    "name": "Showdown Veteran",
+    "name_female": "Showdown Veteran",
+    "description": "Win 25 Showdown matches."
+  },
+  "rivalRecord100": {
+    "name": "Showdown Legend",
+    "name_female": "Showdown Legend",
+    "description": "Win 100 Showdown matches."
+  },
+  "highRoller": {
+    "name": "High Roller",
+    "name_female": "High Roller",
+    "description": "Win a staked Showdown match."
+  },
+  "allIn": {
+    "name": "All In",
+    "name_female": "All In",
+    "description": "Win a Showdown match staked on a shiny Pokemon."
+  },
+  "spoilsOfWar": {
+    "name": "Spoils of War",
+    "name_female": "Spoils of War",
+    "description": "Claim a Pokemon from a Showdown wager settlement."
+  },
+  "flawlessDuel": {
+    "name": "Flawless Duel",
+    "name_female": "Flawless Duel",
+    "description": "Win a Showdown match without any of your Pokemon fainting."
+  },
+  "davidAndGoliath": {
+    "name": "David and Goliath",
+    "name_female": "David and Goliath",
+    "description": "Win a Showdown match with a lower total team cost than your opponent."
+  },
+  "goodSport": {
+    "name": "Good Sport",
+    "name_female": "Good Sport",
+    "description": "Play 10 Showdown matches, win or lose."
+  },
+  "coOpInitiate": {
+    "name": "Co-op Initiate",
+    "name_female": "Co-op Initiate",
+    "description": "Win your first battle in a co-op run."
+  },
+  "betterTogether": {
+    "name": "Better Together",
+    "name_female": "Better Together",
+    "description": "Clear wave 10 in a co-op run."
+  },
+  "partnersInCrime": {
+    "name": "Partners in Crime",
+    "name_female": "Partners in Crime",
+    "description": "Clear wave 50 in a co-op run."
+  },
+  "longHaulDuo": {
+    "name": "Long Haul",
+    "name_female": "Long Haul",
+    "description": "Reach wave 100 in a co-op run."
+  },
+  "theLongRoad": {
+    "name": "The Long Road",
+    "name_female": "The Long Road",
+    "description": "Reach wave 150 in a co-op run."
+  },
+  "dynamicDuo": {
+    "name": "Dynamic Duo",
+    "name_female": "Dynamic Duo",
+    "description": "Defeat the final boss in a co-op run."
+  },
+  "generousSoul": {
+    "name": "Generous Soul",
+    "name_female": "Generous Soul",
+    "description": "Give one of your Pokemon to your co-op partner."
+  },
+  "guardianAngel": {
+    "name": "Guardian Angel",
+    "name_female": "Guardian Angel",
+    "description": "Revive one of your co-op partner's fainted Pokemon."
+  },
+  "sharedTriumph": {
+    "name": "Shared Triumph",
+    "name_female": "Shared Triumph",
+    "description": "Catch a legendary Pokemon during a co-op run."
+  },
+  "doubleTroubleHell": {
+    "name": "Double Trouble",
+    "name_female": "Double Trouble",
+    "description": "Clear wave 25 or beyond in a co-op run on Hell difficulty."
+  },
+  "threesCompany": {
+    "name": "Three's Company",
+    "name_female": "Three's Company",
+    "description": "Win your first Triple Battle."
+  },
+  "tripleThreat": {
+    "name": "Triple Threat",
+    "name_female": "Triple Threat",
+    "description": "Win 10 Triple Battles."
+  },
+  "tripleDown": {
+    "name": "Triple Down",
+    "name_female": "Triple Down",
+    "description": "Win 25 Triple Battles."
+  },
+  "centerStage": {
+    "name": "Center Stage",
+    "name_female": "Center Stage",
+    "description": "In a Triple Battle, have your center Pokemon personally knock out all three foes."
+  },
+  "holdTheLine": {
+    "name": "Hold the Line",
+    "name_female": "Hold the Line",
+    "description": "Win a Triple Battle without any of your Pokemon fainting."
+  },
+  "ghostTriad": {
+    "name": "Ghost Triad",
+    "name_female": "Ghost Triad",
+    "description": "Win a Triple Battle against a ghost trainer."
+  },
+  "oneTurnClear": {
+    "name": "One-Turn Clear",
+    "name_female": "One-Turn Clear",
+    "description": "Knock out all three foes in a Triple Battle in a single turn."
+  },
+  "triadOfHell": {
+    "name": "Triad of Hell",
+    "name_female": "Triad of Hell",
+    "description": "Win a Triple Battle on Hell difficulty."
+  },
+  "fashionista": {
+    "name": "Fashionista",
+    "name_female": "Fashionista",
+    "description": "Equip a full three-slot look (palette, surface, and aura) on one Pokemon in the Shiny Lab."
+  },
+  "lookCollector10": {
+    "name": "Trendsetter",
+    "name_female": "Trendsetter",
+    "description": "Own 10 Shiny Lab effects across your Pokemon."
+  },
+  "lookCollector25": {
+    "name": "Style Icon",
+    "name_female": "Style Icon",
+    "description": "Own 25 Shiny Lab effects across your Pokemon."
+  },
+  "lookCollector50": {
+    "name": "Haute Couture",
+    "name_female": "Haute Couture",
+    "description": "Own 50 Shiny Lab effects across your Pokemon."
+  },
+  "lookCollector100": {
+    "name": "Living Wardrobe",
+    "name_female": "Living Wardrobe",
+    "description": "Own 100 Shiny Lab effects across your Pokemon."
+  },
+  "presetCurator": {
+    "name": "Curator",
+    "name_female": "Curator",
+    "description": "Save five named looks in one Pokemon's Shiny Lab presets."
+  },
+  "signatureStyle": {
+    "name": "Signature Style",
+    "name_female": "Signature Style",
+    "description": "Win a boss wave with a Pokemon wearing a named preset and name effect."
   }
 }

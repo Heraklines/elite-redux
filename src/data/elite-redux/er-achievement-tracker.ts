@@ -4,6 +4,13 @@ import { wavesSinceEnteredBiome } from "#data/elite-redux/er-biome-structure";
 import { ER_COMPOSITE_PARTS } from "#data/elite-redux/er-composite-parts";
 import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import {
+  erRecordCoopLegendaryCatch,
+  erRecordCoopWaveWon,
+  erRecordSignatureStyleBossWin,
+  evaluateTripleWaveWon,
+} from "#data/elite-redux/er-social-achievement-tracker";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
@@ -22,7 +29,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { TrainerType } from "#enums/trainer-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
-import { achvs } from "#system/achv";
+import { type Achv, achvs } from "#system/achv";
 
 type HitCheckEntry = readonly [HitCheckResult, number];
 
@@ -47,6 +54,12 @@ interface ErAchievementBattleState {
   playerActedThisTurn?: boolean;
   playerEverActed?: boolean;
   flashFailed?: boolean;
+  /** Triple Battle feats (#900): any player mon fainted this battle (Hold the Line). */
+  playerFaintedThisBattle?: boolean;
+  /** Triple Battle feats (#900): enemy id -> the turn it was KO'd (One-Turn Clear). */
+  enemyKoTurns?: Map<number, number>;
+  /** Triple Battle feats (#900): enemy id -> the player mon that KO'd it + its field slot (Center Stage). */
+  enemyKoKillers?: Map<number, { userId: number; fieldIndex: number }>;
 }
 
 interface ErAchievementRunState {
@@ -215,6 +228,9 @@ function battleState(): ErAchievementBattleState {
       enemyFieldFaints: new Set<number>(),
       flashFailed: false,
       playerEverActed: false,
+      playerFaintedThisBattle: false,
+      enemyKoTurns: new Map<number, number>(),
+      enemyKoKillers: new Map<number, { userId: number; fieldIndex: number }>(),
     };
   }
   return battle.erAchievementState;
@@ -334,6 +350,10 @@ function recordFaintForLedger(pokemon: Pokemon): void {
     state.enemyFieldFaints = new Set<number>();
   }
   (pokemon.isPlayer() ? state.playerFieldFaints : state.enemyFieldFaints)!.add(pokemon.id);
+  // #900 (Hold the Line): remember that a player mon fainted at any point this battle.
+  if (pokemon.isPlayer()) {
+    state.playerFaintedThisBattle = true;
+  }
 }
 
 /**
@@ -464,6 +484,13 @@ export function erRecordAchievementMoveDamage(
     return;
   }
 
+  // #900 Center Stage: attribute an enemy KO to the player mon + field slot that dealt
+  // the lethal DIRECT hit. Indirect (hazard/status) KOs aren't "personal", so they are
+  // not attributed to a mon here (the faint turn itself is recorded in the faint hook).
+  if (target.isFainted() && useMode !== MoveUseMode.INDIRECT) {
+    battleState().enemyKoKillers?.set(target.id, { userId: user.id, fieldIndex: user.getFieldIndex() });
+  }
+
   if (target.isFainted() && useMode === MoveUseMode.INDIRECT) {
     globalScene.validateAchv(achvs.AUTO_COUNTER);
   }
@@ -512,6 +539,8 @@ export function erRecordAchievementDamageAndUpdate(
 export function erRecordAchievementEnemyFaint(fainted: Pokemon): void {
   recordFaintForLedger(fainted);
   checkEveryoneGetOut();
+  // #900 One-Turn Clear: note the turn each foe went down (direct + indirect).
+  battleState().enemyKoTurns?.set(fainted.id, globalScene.currentBattle.turn);
 
   const indirect = fainted.turnData.attacksReceived.length === 0;
   if (!indirect) {
@@ -558,10 +587,61 @@ export function erRecordAchievementTrainerVictory(): void {
   }
 }
 
+/**
+ * #900 Triple Battle feats, resolved at the win. A win on a triple-format wave bumps
+ * the persistent triple-win tally and unlocks the tally / faint / ghost / difficulty /
+ * center-sweep / one-turn feats. The KO maps are populated by the move-damage + faint
+ * hooks during the battle. No-op on any non-triple wave.
+ */
+function checkTripleWaveFeats(): void {
+  const battle = globalScene.currentBattle;
+  if (battle.arrangement.format.id !== "triple") {
+    return;
+  }
+  const state = battleState();
+  const stats = globalScene.gameData.gameStats;
+  stats.tripleBattleWins = (stats.tripleBattleWins ?? 0) + 1;
+
+  // One-Turn Clear: three (or more) foes down, all on the same turn.
+  const turns = [...(state.enemyKoTurns?.values() ?? [])];
+  const oneTurnClear = turns.length >= 3 && turns.every(t => t === turns[0]);
+
+  // Center Stage: three foes personally KO'd by the SAME player mon from the center slot (index 1).
+  const killers = [...(state.enemyKoKillers?.values() ?? [])];
+  const centerMonSweptAll =
+    killers.length >= 3 && killers.every(k => k.userId === killers[0].userId && k.fieldIndex === 1);
+
+  const trainer = battle.trainer;
+  const ghostTrainer = !!trainer && hasErGhostOverride(trainer);
+
+  const ids = evaluateTripleWaveWon({
+    isTriple: true,
+    tripleWins: stats.tripleBattleWins ?? 0,
+    playerFainted: !!state.playerFaintedThisBattle,
+    ghostTrainer,
+    difficultyHell: getErDifficulty() === "hell",
+    centerMonSweptAll,
+    oneTurnClear,
+  });
+  for (const id of ids) {
+    const achv = (achvs as Record<string, Achv>)[id];
+    if (achv) {
+      globalScene.validateAchv(achv);
+    }
+  }
+}
+
 export function erRecordAchievementWaveWon(): void {
   // Mutually Assured Destruction + Realistic Flash both resolve at the win.
   checkMutualDestruction();
   checkFlash();
+
+  // #900: Triple Battle feats, co-op wave milestones, and Signature Style all resolve
+  // at the win. Each is an independent, guarded observer (co-op + signature run on both
+  // clients via their own VictoryPhase; the triple check is a no-op off a triple wave).
+  checkTripleWaveFeats();
+  erRecordCoopWaveWon();
+  erRecordSignatureStyleBossWin();
 
   // Squatter: deliberately linger in one biome for >= 20 waves (only meaningful in
   // ER biome-routing runs, where the per-biome wave counter resets on each entry).
@@ -582,6 +662,8 @@ export function erRecordAchievementWaveWon(): void {
 }
 
 export function erRecordAchievementCatch(pokemon: Pokemon): void {
+  // #900 Shared Triumph: a legendary caught in a co-op run (fires on both clients).
+  erRecordCoopLegendaryCatch(pokemon);
   if (pokemon.species.speciesId === SpeciesId.ABSOL) {
     const state = runState();
     state.absolWarningWave = globalScene.currentBattle.waveIndex;

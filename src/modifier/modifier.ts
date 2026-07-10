@@ -2175,6 +2175,16 @@ export class PokemonHpRestoreModifier extends ConsumablePokemonModifier {
           ),
         pokemon.getMaxHp(),
       );
+      // #900 Guardian Angel: reviving a co-op partner's fainted mon (pure local observer).
+      // Lazily imported (fire-and-forget) so modifier.ts's module graph does NOT statically
+      // pull the co-op/showdown chain, which would cycle back here (er-resist-berries extends
+      // PokemonHeldItemModifier) and break class init order.
+      if (this.fainted) {
+        const revived = pokemon;
+        void import("#data/elite-redux/er-social-achievement-tracker")
+          .then(m => m.erRecordCoopRevivePartnerMon(revived))
+          .catch(() => {});
+      }
       return true;
     }
     return false;

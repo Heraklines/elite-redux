@@ -597,6 +597,27 @@ export const ER_SHINY_LAB_EFFECT_ACHV: Record<string, string> = {
   uprising: "I_JUST_GOT_HERE",
   topbeam: "BEAM_SPAM",
   sideaura: "YO",
+  // --- Achievement expansion wave (#900): the MARQUEE feats ---
+  // APPEND-ONLY. Each id below is an EXISTING registry effect that was previously
+  // unbound; binding it makes it buyable once its achievement is earned. Only the
+  // marquee feats are gated (the grind/threshold achvs stay reward-only) so the
+  // ~50% freely-buyable coverage band (see er-shiny-lab-achv-bindings.test) holds.
+  // Thematic matches: a spectral vortex for Ghost Triad, a gold palette for the High
+  // Roller, a starfield for a shared legendary catch, hell-heat for the Hell feats.
+  embers: "FIRST_BLOOD",
+  moonstone: "RIVAL_RECORD_100",
+  rosegold: "HIGH_ROLLER",
+  sparkle: "ALL_IN",
+  marble: "FLAWLESS_DUEL",
+  camo: "DAVID_AND_GOLIATH",
+  duosunset: "DYNAMIC_DUO",
+  starmap: "SHARED_TRIUMPH",
+  heatshimmer: "DOUBLE_TROUBLE_HELL",
+  vortex: "GHOST_TRIAD",
+  neonwire: "ONE_TURN_CLEAR",
+  lavacracks: "TRIAD_OF_HELL",
+  luminous: "CENTER_STAGE",
+  vaporwave: "FASHIONISTA",
 };
 
 /** Nicer display hints for achv keys that humanize badly; the rest are derived. */

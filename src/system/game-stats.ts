@@ -38,6 +38,13 @@ export class GameStats {
   public epicEggsPulled: number;
   public legendaryEggsPulled: number;
   public manaphyEggsPulled: number;
+  // ER achievement-expansion wave (#900): persistent counters for the count-threshold
+  // achievements (Showdown match/win records, Triple Battle win tally). New optional
+  // fields default to 0 for legacy saves (the `source?.X || 0` idiom), so an older save
+  // loads unchanged and simply starts counting from here.
+  public showdownMatchesPlayed: number;
+  public showdownWins: number;
+  public tripleBattleWins: number;
 
   constructor(source?: any) {
     this.playTime = source?.playTime || 0;
@@ -77,5 +84,8 @@ export class GameStats {
     this.epicEggsPulled = source?.epicEggsPulled || 0;
     this.legendaryEggsPulled = source?.legendaryEggsPulled || 0;
     this.manaphyEggsPulled = source?.manaphyEggsPulled || 0;
+    this.showdownMatchesPlayed = source?.showdownMatchesPlayed || 0;
+    this.showdownWins = source?.showdownWins || 0;
+    this.tripleBattleWins = source?.tripleBattleWins || 0;
   }
 }

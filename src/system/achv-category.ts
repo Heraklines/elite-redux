@@ -48,12 +48,18 @@ export enum AchvCategory {
   CHALLENGE,
   /** ER event + boss feats (Giratina's bargain, ghost exorcism, the Cascoon boss, relics). */
   EVENTS,
+  /** Showdown 1v1 PvP feats (first blood, win streaks, staked duels, the wager spoils). */
+  VERSUS,
+  /** Co-op run feats (shared wave milestones, the final-boss duo clear, partner acts of kindness). */
+  COOP,
 }
 
 /** Category nav order (the synthetic "All" filter is handled by the UI, not listed here). */
 export const ACHV_CATEGORY_ORDER: readonly AchvCategory[] = [
   AchvCategory.VICTORY,
   AchvCategory.BATTLE,
+  AchvCategory.VERSUS,
+  AchvCategory.COOP,
   AchvCategory.TRAINING,
   AchvCategory.COLLECTION,
   AchvCategory.CHALLENGE,
@@ -64,6 +70,8 @@ export const ACHV_CATEGORY_ORDER: readonly AchvCategory[] = [
 export const ACHV_CATEGORY_KEY: Record<AchvCategory, string> = {
   [AchvCategory.VICTORY]: "victory",
   [AchvCategory.BATTLE]: "battle",
+  [AchvCategory.VERSUS]: "versus",
+  [AchvCategory.COOP]: "coop",
   [AchvCategory.TRAINING]: "training",
   [AchvCategory.COLLECTION]: "collection",
   [AchvCategory.CHALLENGE]: "challenge",
@@ -152,6 +160,49 @@ const ACHV_CATEGORY_OVERRIDES: Record<string, AchvCategory> = {
   EXORCIST: AchvCategory.EVENTS,
   PRIMAL_CASCOON: AchvCategory.EVENTS,
   RELIC_HUNTER: AchvCategory.EVENTS,
+
+  // --- Versus: the Showdown 1v1 PvP feats (#900) ---
+  FIRST_BLOOD: AchvCategory.VERSUS,
+  RIVAL_RECORD_5: AchvCategory.VERSUS,
+  RIVAL_RECORD_25: AchvCategory.VERSUS,
+  RIVAL_RECORD_100: AchvCategory.VERSUS,
+  HIGH_ROLLER: AchvCategory.VERSUS,
+  ALL_IN: AchvCategory.VERSUS,
+  SPOILS_OF_WAR: AchvCategory.VERSUS,
+  FLAWLESS_DUEL: AchvCategory.VERSUS,
+  DAVID_AND_GOLIATH: AchvCategory.VERSUS,
+  GOOD_SPORT: AchvCategory.VERSUS,
+
+  // --- Co-op: the shared-run feats (#900) ---
+  BETTER_TOGETHER: AchvCategory.COOP,
+  PARTNERS_IN_CRIME: AchvCategory.COOP,
+  DYNAMIC_DUO: AchvCategory.COOP,
+  LONG_HAUL_DUO: AchvCategory.COOP,
+  THE_LONG_ROAD: AchvCategory.COOP,
+  CO_OP_INITIATE: AchvCategory.COOP,
+  GENEROUS_SOUL: AchvCategory.COOP,
+  GUARDIAN_ANGEL: AchvCategory.COOP,
+  SHARED_TRIUMPH: AchvCategory.COOP,
+  DOUBLE_TROUBLE_HELL: AchvCategory.COOP,
+
+  // --- Battle: the Triple Battle feats (#900) ---
+  THREES_COMPANY: AchvCategory.BATTLE,
+  TRIPLE_THREAT: AchvCategory.BATTLE,
+  TRIPLE_DOWN: AchvCategory.BATTLE,
+  CENTER_STAGE: AchvCategory.BATTLE,
+  HOLD_THE_LINE: AchvCategory.BATTLE,
+  GHOST_TRIAD: AchvCategory.BATTLE,
+  ONE_TURN_CLEAR: AchvCategory.BATTLE,
+  TRIAD_OF_HELL: AchvCategory.BATTLE,
+
+  // --- Collection: the Shiny Lab feats (#900) ---
+  FASHIONISTA: AchvCategory.COLLECTION,
+  LOOK_COLLECTOR_10: AchvCategory.COLLECTION,
+  LOOK_COLLECTOR_25: AchvCategory.COLLECTION,
+  LOOK_COLLECTOR_50: AchvCategory.COLLECTION,
+  LOOK_COLLECTOR_100: AchvCategory.COLLECTION,
+  PRESET_CURATOR: AchvCategory.COLLECTION,
+  SIGNATURE_STYLE: AchvCategory.COLLECTION,
 };
 
 /**

@@ -8,6 +8,7 @@ import { globalScene } from "#app/global-scene";
 import { clearCoopRuntime, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { resolveGhostDialogue } from "#data/elite-redux/er-ghost-profile";
 import { buildGhostDialogueCtx } from "#data/elite-redux/er-ghost-teams";
+import { erRecordShowdownResult } from "#data/elite-redux/er-social-achievement-tracker";
 import {
   endShowdownBattle,
   getShowdownMatchId,
@@ -66,6 +67,12 @@ export class ShowdownResultPhase extends BattlePhase {
 
   start(): void {
     super.start();
+
+    // #900: unlock the Versus achievements for this match BEFORE endShowdownBattle() (below)
+    // drops the match id + team manifests this reads. Pure local observer - it validates
+    // achievements on this client only and emits nothing over the wire, so it can't affect
+    // the escrow report / peer result message. Fired on both clients (each runs this phase).
+    erRecordShowdownResult(this.localWon, this.voided);
 
     // Task C7: the opponent's win/lose dialogue line, resolved BEFORE endShowdownBattle drops the
     // stashed profile. Ghost semantics: the WINNER hears the opponent's `defeated` line, the LOSER

@@ -525,6 +525,42 @@ export function getAchievementDescription(localizationKey: string): string {
     case "absoluteZero":
     case "endlessNight":
     case "tempest":
+    // Achievement expansion wave (#900): Versus / Co-op / Triples / Shiny Lab.
+    case "firstBlood":
+    case "rivalRecord5":
+    case "rivalRecord25":
+    case "rivalRecord100":
+    case "highRoller":
+    case "allIn":
+    case "spoilsOfWar":
+    case "flawlessDuel":
+    case "davidAndGoliath":
+    case "goodSport":
+    case "coOpInitiate":
+    case "betterTogether":
+    case "partnersInCrime":
+    case "longHaulDuo":
+    case "theLongRoad":
+    case "dynamicDuo":
+    case "generousSoul":
+    case "guardianAngel":
+    case "sharedTriumph":
+    case "doubleTroubleHell":
+    case "threesCompany":
+    case "tripleThreat":
+    case "tripleDown":
+    case "centerStage":
+    case "holdTheLine":
+    case "ghostTriad":
+    case "oneTurnClear":
+    case "triadOfHell":
+    case "fashionista":
+    case "lookCollector10":
+    case "lookCollector25":
+    case "lookCollector50":
+    case "lookCollector100":
+    case "presetCurator":
+    case "signatureStyle":
       return i18next.t(`achv:${localizationKey}.description`, { context: genderStr });
     case "relicHunter":
       return i18next.t("achv:relicHunter.description", { context: genderStr });
@@ -1186,6 +1222,56 @@ export const achvs = {
   END_THE_LEGEND: new Achv("endTheLegend", "endTheLegend.description", "brick", 50),
   // Stay in one biome for >= 20 waves (deliberate overstay through full notoriety).
   SQUATTER: new Achv("squatter", "squatter.description", "leftovers", 50),
+
+  // === Achievement expansion wave (#900) ===================================
+  // All event-gated plain Achvs validated from the ER social/versus/coop tracker
+  // (er-social-achievement-tracker) or the Shiny Lab callbacks - same observer
+  // pattern as the BEAM_SPAM..SQUATTER block above (the tracker gates the
+  // condition; these carry no conditionFunc so validate() is a pass-through).
+  // Icons are existing item-atlas frames chosen thematically.
+
+  // --- Versus: Showdown 1v1 PvP -------------------------------------------
+  FIRST_BLOOD: new Achv("firstBlood", "firstBlood.description", "brick", 25),
+  RIVAL_RECORD_5: new Achv("rivalRecord5", "rivalRecord5.description", "rb", 50),
+  RIVAL_RECORD_25: new Achv("rivalRecord25", "rivalRecord25.description", "mb", 75),
+  RIVAL_RECORD_100: new Achv("rivalRecord100", "rivalRecord100.description", "relic_crown", 100),
+  HIGH_ROLLER: new Achv("highRoller", "highRoller.description", "coin_case", 50),
+  ALL_IN: new Achv("allIn", "allIn.description", "relic_gold", 75),
+  SPOILS_OF_WAR: new Achv("spoilsOfWar", "spoilsOfWar.description", "strange_ball", 50),
+  FLAWLESS_DUEL: new Achv("flawlessDuel", "flawlessDuel.description", "focus_sash", 75),
+  DAVID_AND_GOLIATH: new Achv("davidAndGoliath", "davidAndGoliath.description", "focus_band", 75),
+  GOOD_SPORT: new Achv("goodSport", "goodSport.description", "ribbon_friendship", 25),
+
+  // --- Co-op: shared-run feats --------------------------------------------
+  CO_OP_INITIATE: new Achv("coOpInitiate", "coOpInitiate.description", "linking_cord", 25),
+  BETTER_TOGETHER: new Achv("betterTogether", "betterTogether.description", "linking_cord", 25),
+  PARTNERS_IN_CRIME: new Achv("partnersInCrime", "partnersInCrime.description", "linking_cord", 50),
+  LONG_HAUL_DUO: new Achv("longHaulDuo", "longHaulDuo.description", "leftovers", 75),
+  THE_LONG_ROAD: new Achv("theLongRoad", "theLongRoad.description", "dusk_stone", 100),
+  DYNAMIC_DUO: new Achv("dynamicDuo", "dynamicDuo.description", "classic_ribbon_default", 100),
+  GENEROUS_SOUL: new Achv("generousSoul", "generousSoul.description", "soul_dew", 25),
+  GUARDIAN_ANGEL: new Achv("guardianAngel", "guardianAngel.description", "focus_sash", 50),
+  SHARED_TRIUMPH: new Achv("sharedTriumph", "sharedTriumph.description", "legendary_egg", 100),
+  DOUBLE_TROUBLE_HELL: new Achv("doubleTroubleHell", "doubleTroubleHell.description", "dread_plate", 100),
+
+  // --- Battle: Triple Battle feats ----------------------------------------
+  THREES_COMPANY: new Achv("threesCompany", "threesCompany.description", "multi_lens", 25),
+  TRIPLE_THREAT: new Achv("tripleThreat", "tripleThreat.description", "multi_lens", 50),
+  TRIPLE_DOWN: new Achv("tripleDown", "tripleDown.description", "multi_lens", 75),
+  CENTER_STAGE: new Achv("centerStage", "centerStage.description", "scope_lens", 50),
+  HOLD_THE_LINE: new Achv("holdTheLine", "holdTheLine.description", "protective_pads", 50),
+  GHOST_TRIAD: new Achv("ghostTriad", "ghostTriad.description", "ghost_gem", 75),
+  ONE_TURN_CLEAR: new Achv("oneTurnClear", "oneTurnClear.description", "power_herb", 75),
+  TRIAD_OF_HELL: new Achv("triadOfHell", "triadOfHell.description", "dread_plate", 100),
+
+  // --- Collection: Shiny Lab feats ----------------------------------------
+  FASHIONISTA: new Achv("fashionista", "fashionista.description", "shiny_charm", 25),
+  LOOK_COLLECTOR_10: new Achv("lookCollector10", "lookCollector10.description", "shiny_charm", 25),
+  LOOK_COLLECTOR_25: new Achv("lookCollector25", "lookCollector25.description", "shiny_charm", 50),
+  LOOK_COLLECTOR_50: new Achv("lookCollector50", "lookCollector50.description", "shiny_charm", 75),
+  LOOK_COLLECTOR_100: new Achv("lookCollector100", "lookCollector100.description", "shiny_charm", 100),
+  PRESET_CURATOR: new Achv("presetCurator", "presetCurator.description", "baton", 50),
+  SIGNATURE_STYLE: new Achv("signatureStyle", "signatureStyle.description", "pb_gold", 75),
 };
 
 export function initAchievements() {

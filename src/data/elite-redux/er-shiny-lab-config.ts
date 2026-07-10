@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { erRecordShinyLabEffectPurchased, erRecordShinyLabLoadout } from "#data/elite-redux/er-social-achievement-tracker";
 import {
   bitsetToErShinyLabAvailableSet,
   decodeErShinyLabLoadout,
@@ -209,11 +210,15 @@ export function buildErShinyLabConfig(speciesId: number): ErShinyLabConfig {
     config.completion = getErShinyLabCompletion(save);
     applyPricedEffects(config);
     persistConfig(entry, config, config.equipped, config.params);
+    // #900 Look Collector: a fresh purchase may cross a "own N effects" threshold.
+    erRecordShinyLabEffectPurchased();
   };
   config.onChange = (loadout, nextParams) => {
     config.equipped = sanitizeErShinyLabLoadout(loadout, config.owned);
     config.params = sanitizeParams(nextParams, config.earnedTier, !!config.nameFxUnlocked);
     persistConfig(entry, config, config.equipped, config.params);
+    // #900 Fashionista (a full three-slot look) + Curator (five named presets on this mon).
+    erRecordShinyLabLoadout(config.equipped, config.presets.filter(p => !!p?.name).length);
   };
   config.onSetEquippedName = name => {
     config.equippedName = sanitizeErShinyLabPresetName(name);

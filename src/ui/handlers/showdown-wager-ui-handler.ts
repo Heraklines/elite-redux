@@ -39,6 +39,7 @@ import type {
   ShowdownStakeOfferWire,
 } from "#data/elite-redux/coop/coop-transport";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
+import { erRecordShowdownStakeCommit } from "#data/elite-redux/er-social-achievement-tracker";
 import { addShowdownRejoinResender } from "#data/elite-redux/showdown/showdown-battle-state";
 import { registerShowdownMatch } from "#data/elite-redux/showdown/showdown-escrow-client";
 import { isMegaStage } from "#data/elite-redux/showdown/showdown-evolutions";
@@ -479,6 +480,11 @@ export class ShowdownWagerUiHandler extends UiHandler {
       return;
     }
     this.committed = true;
+    // #900: stash this match's stake so the terminal result phase can award High Roller /
+    // All In (win/loss isn't known yet). A real escrow match id means it is staked; a shiny
+    // offer means the stake is a shiny. Pure local observer - records nothing over the wire.
+    const offer = this.selectedOffer();
+    erRecordShowdownStakeCommit(matchId != null, !!offer?.shiny);
     this.args?.onCommit(matchId);
   }
 

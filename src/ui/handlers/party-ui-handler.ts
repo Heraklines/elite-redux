@@ -20,6 +20,7 @@ import {
 } from "#data/elite-redux/coop/coop-shop-check-relay";
 import { erRecordAchievementRelease } from "#data/elite-redux/er-achievement-tracker";
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
+import { erRecordCoopGiveToPartner } from "#data/elite-redux/er-social-achievement-tracker";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { Button } from "#enums/buttons";
@@ -1117,6 +1118,8 @@ export class PartyUiHandler extends MessageUiHandler {
       if (given.ok) {
         this.populatePartySlots();
         ui.playSelect();
+        // #900 Generous Soul: unlock on the giver's client (pure local observer).
+        erRecordCoopGiveToPartner();
         this.coopReportCheckToPhase(COOP_CHECK_OP_GIVE, [givenSlot]);
       } else {
         ui.playError();

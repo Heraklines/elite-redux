@@ -318,6 +318,60 @@ export const ER_ACHIEVEMENT_REWARDS: Record<string, RewardSpec | RewardSpec[]> =
   ABSOLUTE_ZERO: { kind: "shiny", tier: 2, species: "random" },
   ENDLESS_NIGHT: { kind: "shiny", tier: 2, species: "random" },
   TEMPEST: { kind: "shiny", tier: 2, species: "random" },
+
+  // === Achievement expansion wave (#900) ===================================
+  // House rules hold: collection layer only (candy / eggs / vouchers / specific mon /
+  // tier 1-3 shiny), never money / charms / run-power, and no black shiny outside
+  // Inferno. First-win one-offs pay a little team candy; mid feats an egg-gacha
+  // voucher or an egg; hard / difficulty-gated feats a guaranteed shiny. Each achv's
+  // Shiny Lab effect gate (er-shiny-lab-effects) is folded in automatically on unlock.
+
+  // --- Versus: Showdown 1v1 PvP -------------------------------------------
+  FIRST_BLOOD: { kind: "candyTeam", perMon: 10 },
+  RIVAL_RECORD_5: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  RIVAL_RECORD_25: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
+  RIVAL_RECORD_100: { kind: "shiny", tier: 2, species: "random" },
+  HIGH_ROLLER: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  ALL_IN: { kind: "shiny", tier: 1, species: "random" },
+  SPOILS_OF_WAR: { kind: "eggs", tier: EggTier.RARE, count: 1 },
+  FLAWLESS_DUEL: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  DAVID_AND_GOLIATH: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  GOOD_SPORT: { kind: "candyTeam", perMon: 10 },
+
+  // --- Co-op: shared-run feats --------------------------------------------
+  CO_OP_INITIATE: { kind: "candyTeam", perMon: 10 },
+  BETTER_TOGETHER: { kind: "candyTeam", perMon: 10 },
+  PARTNERS_IN_CRIME: { kind: "eggs", tier: EggTier.RARE, count: 2 },
+  LONG_HAUL_DUO: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
+  THE_LONG_ROAD: { kind: "shiny", tier: 2, species: "random" },
+  // Beat the final boss in co-op: a run-completion feat (the +2 Premium bonus applies
+  // via RUN_COMPLETION_ACHV_IDS) plus a guaranteed shiny.
+  DYNAMIC_DUO: { kind: "shiny", tier: 2, species: "random" },
+  GENEROUS_SOUL: { kind: "candyTeam", perMon: 10 },
+  GUARDIAN_ANGEL: { kind: "candyTeam", perMon: 15 },
+  SHARED_TRIUMPH: { kind: "eggs", tier: EggTier.LEGENDARY, count: 1 },
+  // Difficulty-gated (Hell): a guaranteed shiny like the other Hell-tier feats.
+  DOUBLE_TROUBLE_HELL: { kind: "shiny", tier: 2, species: "random" },
+
+  // --- Battle: Triple Battle feats ----------------------------------------
+  THREES_COMPANY: { kind: "candyTeam", perMon: 10 },
+  TRIPLE_THREAT: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  TRIPLE_DOWN: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
+  CENTER_STAGE: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
+  HOLD_THE_LINE: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  GHOST_TRIAD: { kind: "candyTeam", perMon: 15 },
+  ONE_TURN_CLEAR: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  // Difficulty-gated (Hell): a guaranteed shiny.
+  TRIAD_OF_HELL: { kind: "shiny", tier: 2, species: "random" },
+
+  // --- Collection: Shiny Lab feats ----------------------------------------
+  FASHIONISTA: { kind: "candyTeam", perMon: 10 },
+  LOOK_COLLECTOR_10: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  LOOK_COLLECTOR_25: { kind: "eggs", tier: EggTier.RARE, count: 2 },
+  LOOK_COLLECTOR_50: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
+  LOOK_COLLECTOR_100: { kind: "shiny", tier: 1, species: "random" },
+  PRESET_CURATOR: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  SIGNATURE_STYLE: { kind: "shiny", tier: 1, species: "random" },
 };
 
 /**
@@ -372,6 +426,8 @@ const RUN_COMPLETION_ACHV_IDS = new Set<string>([
   "MONO_DRAGON",
   "MONO_DARK",
   "MONO_FAIRY",
+  // #900: beating the final boss in co-op is a full-run completion.
+  "DYNAMIC_DUO",
 ]);
 
 /** The +2 Premium-voucher bonus a full-run-completion achievement gets, else nothing. */
