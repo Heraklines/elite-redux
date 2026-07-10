@@ -23,6 +23,11 @@
 // =============================================================================
 
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import {
+  CoopOutboundQueue,
+  classifyCoopMessage,
+  isCoopDurabilityEnabled,
+} from "#data/elite-redux/coop/coop-durability";
 import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 /**
@@ -87,6 +92,13 @@ export class WebRtcTransport implements CoopTransport {
   private keepaliveCancel: (() => void) | null = null;
   /** #diagnostics: epoch-ms the last inbound frame arrived (0 = none yet). Includes keepalive ping/pong. */
   private lastRxAt = 0;
+  /**
+   * W2b durability (§4.3): the bounded outbound queue that holds DURABLE frames sent while the channel is
+   * dark, flushed FIFO on the next `open`. Lazily created on the first dark send while the flag is ON; when
+   * the flag is OFF the transport keeps its legacy drop-on-not-open behavior (null queue). Cosmetic/internal
+   * frames are shed, never queued (§4.1). Survives {@linkcode replaceChannel} (it lives on the instance).
+   */
+  private outboundQueue: CoopOutboundQueue | null = null;
 
   constructor(role: CoopRole, wire: CoopWireChannel) {
     this.role = role;
@@ -105,6 +117,7 @@ export class WebRtcTransport implements CoopTransport {
       }
       coopLog("webrtc", `channel OPEN role=${this.role} gen=${gen}`);
       this.setState("connected");
+      this.flushOutboundQueue();
     });
     wire.onClose(() => {
       if (gen !== this.wireGeneration) {
@@ -139,6 +152,9 @@ export class WebRtcTransport implements CoopTransport {
     this.attach(wire);
     if (wire.readyState === "open") {
       this.setState("connected");
+      // The fresh channel came up already open (no `open` event to wait for): flush the frames that
+      // queued while it was dark (§4.3) so a #805 hot rejoin loses nothing sent during the blip.
+      this.flushOutboundQueue();
     }
   }
 
@@ -185,6 +201,21 @@ export class WebRtcTransport implements CoopTransport {
 
   send(msg: CoopMessage): void {
     if (this._state !== "connected" || this.wire.readyState !== "open") {
+      // W2b durability (§4.3): instead of dropping a DURABLE frame silently (the review-finding-3 hazard),
+      // ENQUEUE it and flush FIFO on the next `open`. Cosmetic/internal frames are shed (§4.1). Keepalive
+      // pings (internal) are never queued - they are time-sensitive. With the flag OFF this is the legacy
+      // drop-on-not-open path unchanged.
+      if (isCoopDurabilityEnabled() && classifyCoopMessage(msg) === "durable") {
+        const queue = this.outboundQueue ?? (this.outboundQueue = new CoopOutboundQueue());
+        const outcome = queue.offer(msg, JSON.stringify(msg).length);
+        if (isCoopDebug()) {
+          coopWarn(
+            "webrtc",
+            `send DARK role=${this.role} t=${msg.t} -> ${outcome} (depth=${queue.size()} state=${this._state} readyState=${this.wire.readyState})`,
+          );
+        }
+        return;
+      }
       if (isCoopDebug()) {
         coopWarn(
           "webrtc",
@@ -193,11 +224,54 @@ export class WebRtcTransport implements CoopTransport {
       }
       return;
     }
+    this.transmit(msg);
+  }
+
+  /**
+   * W2b (§4.3): stringify + send one frame on the CURRENT open channel, with the send ERROR CAUGHT (the
+   * channel can die between the state check and the send; before this a throw from `wire.send` propagated
+   * uncaught out of every caller). A failed send is logged; the channel's close event drives the rejoin.
+   */
+  private transmit(msg: CoopMessage): void {
     const frame = JSON.stringify(msg);
     if (isCoopDebug()) {
       coopLog("webrtc", `raw tx role=${this.role} t=${msg.t} bytes=${frame.length}`);
     }
-    this.wire.send(frame);
+    try {
+      this.wire.send(frame);
+    } catch (e) {
+      coopWarn(
+        "webrtc",
+        `raw send THREW role=${this.role} t=${msg.t} err=${(e as Error)?.message ?? "?"} (close event drives the rejoin)`,
+      );
+    }
+  }
+
+  /** W2b (§4.3): flush any frames queued while the channel was dark, FIFO, on (re)connect. */
+  private flushOutboundQueue(): void {
+    const queue = this.outboundQueue;
+    if (queue == null || queue.size() === 0) {
+      return;
+    }
+    if (isCoopDebug()) {
+      coopLog("webrtc", `flush outbound queue role=${this.role} depth=${queue.size()} bytes=${queue.byteSize()}`);
+    }
+    queue.drain(m => this.transmit(m));
+  }
+
+  /** W2b diagnostics: number of DURABLE frames queued while the channel is dark (health-line backpressure). */
+  outboundQueueDepth(): number {
+    return this.outboundQueue?.size() ?? 0;
+  }
+
+  /** W2b (§4.3): whether the outbound queue overflowed + dropped its backlog (a reconnect resync is owed). */
+  outboundQueueNeedsResync(): boolean {
+    return this.outboundQueue?.needsResync() ?? false;
+  }
+
+  /** W2b (§4.3): clear the resync-owed flag once the caller has issued the reconnect-from-revision request. */
+  clearOutboundQueueResync(): void {
+    this.outboundQueue?.clearResync();
   }
 
   onMessage(handler: (msg: CoopMessage) => void): () => void {

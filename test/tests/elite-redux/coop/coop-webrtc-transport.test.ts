@@ -8,6 +8,7 @@
 // verified headlessly against a mock data channel (no live ICE). Also proves the
 // CoopSessionController runs unchanged over WebRtcTransport (transport-agnostic).
 
+import { setCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import type { CoopConnectionState, CoopMessage } from "#data/elite-redux/coop/coop-transport";
@@ -18,7 +19,7 @@ import {
   WebRtcTransport,
   wireFromRtcChannel,
 } from "#data/elite-redux/coop/coop-webrtc-transport";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 /** In-process mock of a data channel implementing {@linkcode CoopWireChannel}.
  *  Two are cross-wired (`link`) to simulate the two ends of an open channel. */
@@ -144,6 +145,83 @@ describe("co-op WebRTC transport (#633, P6) - framing", () => {
     const t = new WebRtcTransport("host", wire);
     t.send({ t: "ping", ts: 3 });
     expect(wire.sent).toHaveLength(0); // state is "connecting", not "connected"
+  });
+});
+
+describe("W2b durability (§4.3): the outbound queue replaces drop-on-not-open for durable frames", () => {
+  afterEach(() => setCoopDurabilityEnabled(true));
+
+  it("QUEUES a durable frame sent while the channel is dark, then flushes it FIFO on open (no silent drop)", () => {
+    setCoopDurabilityEnabled(true);
+    const wire = new MockWire();
+    wire.readyState = "connecting"; // transport starts "connecting", not "connected"
+    const t = new WebRtcTransport("host", wire);
+
+    // A durable frame sent while dark is NOT dropped - it is held in the queue.
+    t.send({ t: "waveResolved", wave: 7, outcome: "win" });
+    t.send({ t: "waveResolved", wave: 8, outcome: "win" });
+    expect(wire.sent).toHaveLength(0); // nothing on the wire yet
+    expect(t.outboundQueueDepth()).toBe(2);
+
+    // The channel comes up: the queued frames flush FIFO.
+    wire.fireOpen();
+    expect(t.outboundQueueDepth()).toBe(0);
+    expect(wire.sent.map(f => JSON.parse(f).wave)).toEqual([7, 8]);
+  });
+
+  it("SHEDS cosmetic + internal frames while dark (fire-and-forget, never queued)", () => {
+    setCoopDurabilityEnabled(true);
+    const wire = new MockWire();
+    wire.readyState = "connecting";
+    const t = new WebRtcTransport("host", wire);
+
+    t.send({ t: "battleEvent", turn: 1, seq: 0, event: { k: "msg", text: "x" } as never }); // cosmetic
+    t.send({ t: "ping", ts: 1 }); // internal
+    expect(t.outboundQueueDepth()).toBe(0);
+    wire.fireOpen();
+    expect(wire.sent).toHaveLength(0); // nothing queued, nothing replayed
+  });
+
+  it("with the flag OFF, a durable dark send is DROPPED (legacy behavior, no queue)", () => {
+    setCoopDurabilityEnabled(false);
+    const wire = new MockWire();
+    wire.readyState = "connecting";
+    const t = new WebRtcTransport("host", wire);
+    t.send({ t: "waveResolved", wave: 9, outcome: "win" });
+    expect(t.outboundQueueDepth()).toBe(0);
+    wire.fireOpen();
+    expect(wire.sent).toHaveLength(0); // dropped, never queued (pre-W2b behavior)
+  });
+
+  it("hot rejoin (#805): frames queued while dark flush over the FRESH wire on replaceChannel", () => {
+    setCoopDurabilityEnabled(true);
+    const wireA = new MockWire();
+    const t = new WebRtcTransport("host", wireA);
+    expect(t.state).toBe("connected");
+
+    // Channel dies; a durable frame is committed while dark and must survive the rejoin.
+    wireA.close();
+    expect(t.state).toBe("disconnected");
+    t.send({ t: "waveResolved", wave: 11, outcome: "win" });
+    expect(t.outboundQueueDepth()).toBe(1);
+
+    // Re-dial: a fresh already-open wire swaps in -> the queued frame flushes over it.
+    const wireB = new MockWire(); // readyState "open"
+    t.replaceChannel(wireB);
+    expect(t.state).toBe("connected");
+    expect(t.outboundQueueDepth()).toBe(0);
+    expect(wireB.sent.map(f => JSON.parse(f).wave)).toEqual([11]);
+  });
+
+  it("error-caught send: a wire whose send() throws does not propagate out of transmit", () => {
+    setCoopDurabilityEnabled(true);
+    const wire = new MockWire();
+    wire.send = () => {
+      throw new Error("SCTP abort mid-send");
+    };
+    const t = new WebRtcTransport("host", wire);
+    // Before W2b this threw out of send() into the caller; now it is caught (the close event drives rejoin).
+    expect(() => t.send({ t: "waveResolved", wave: 12, outcome: "win" })).not.toThrow();
   });
 });
 
