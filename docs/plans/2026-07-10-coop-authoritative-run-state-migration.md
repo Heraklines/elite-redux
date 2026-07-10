@@ -715,3 +715,131 @@ The renderer gate's own harness proof mechanism (the neutralized-log,
 neutralized every mutating/host-only/unknown phase and ran only §3.1 ∪ §3.2.
 
 ---
+
+## 5. Rollout strategy (phased on a LIVE system)
+
+The system is live; PROD is FROZEN and ships only on explicit maintainer clearance
+(`handoff.md:54-56`); staging is the test surface. The migration must never require a big-bang cutover.
+
+### 5.1 Per-surface migration with the old path as fallback
+
+Every surface in §2.5 migrates INDIVIDUALLY, and the legacy relay for that surface stays as a
+fallback until the envelope path is soaked for it. Concretely per surface:
+1. Wire the surface through `runCoopInteraction` (`coop-interaction.ts:91`) — which is already
+   built, tested headlessly, and "wired to nothing yet" (`:28`). The `CoopInteractionContext`
+   (`:56-75`) adapters (`sendOutcome`/`awaitOutcome`/`applyOutcome`/`replicateState`) become thin
+   shims over the envelope commit + broadcast.
+2. Keep the surface's legacy relay send/await active in DUAL-RUN (§1.8): the envelope carries the
+   authoritative outcome AND the legacy relay still fires, so a client on the pre-migration build (or
+   the fallback path) still converges. The legacy path is the fallback if the envelope apply throws.
+3. The interaction counter keeps advancing in lockstep with `revision` (§1.8) so still-legacy
+   surfaces downstream see the counter they expect. Removing the counter is FORBIDDEN until every
+   surface is migrated (the final step).
+
+### 5.2 Version gating (the #806/#807 build-version handshake)
+
+The protocol-version handshake already exists: `COOP_PROTOCOL_VERSION = "er-coop-11"`
+(`coop-transport.ts:46`), exchanged in `hello` (`:839`), mismatch detected + bannered
+(`coop-session-controller.ts:843-852`, `coop-runtime.ts:717-719,881-882`). Use it:
+- Each migration phase that changes the WIRE (adds `envelope`, `envelopeAck`, `reconnectSync`) BUMPS
+  `COOP_PROTOCOL_VERSION`. Because paired clients share the version (the additive-optional discipline,
+  `coop-transport.ts:855-857`), a field is "present on both or neither" — so a mixed-build pair either
+  both speak envelope or both fall back to the legacy relay, never half-and-half.
+- New wire fields stay ADDITIVE + OPTIONAL (the established pattern, e.g. `coop-transport.ts:552-559,
+  928-934`) so an in-flight save or an un-updated client degrades gracefully rather than desyncing.
+- A hard-incompatible step (retiring the counter) is gated behind a MAJOR version bump that refuses to
+  pair mixed builds (the banner path), scheduled only after every surface migrated.
+
+### 5.3 Soak / duo proof obligations per phase
+
+Every phase carries a MANDATORY proof, matching the existing regime (`handoff.md:117-127`):
+- **A `coop-duo-*` repro** in the two-engine harness (`test/tools/coop-duo-harness.ts`) that
+  exercises the migrated surface end-to-end (host commit → guest adopt → idempotent re-apply →
+  reconnect-with-pending-op). "Every co-op fix gets a `coop-duo-*` repro here first" is the standing
+  rule (`handoff.md:118-120`).
+- **The P5 checksum assertion** (`handoff.md:126-127`) must stay green — the migrated surface must not
+  introduce a hashed-state divergence. Adopt-then-hash convergence (the existing discipline,
+  `coop-transport.ts:612-617`) applies: the guest adopts the envelope BEFORE it hashes.
+- **The renderer-allowlist harness** (§4.5) asserts the guest ran nothing outside §3.1 ∪ §3.2 for the
+  migrated surface.
+- **Nightly 3-leg soak** (`.github/workflows/nightly-coop-soak.yml`, god / level-55 / me-asymmetric,
+  `handoff.md:125-127`) must pass a full night on the migrated tree before the next phase starts.
+- Gate on a QUIET box (never under load — disjoint flakies are contention, `handoff.md:50-53`).
+
+### 5.4 Rollback story (explicit)
+
+- **Per-surface rollback = flip the dual-run flag.** Because each migrated surface keeps its legacy
+  relay live (§5.1), rollback is a one-line gate flip back to the legacy path for that surface — no
+  revert of the envelope infrastructure, no wire-version churn. The envelope keeps broadcasting
+  (harmless, additive); only the surface's DRIVE reverts to the counter+relay path.
+- **Infrastructure rollback.** The `envelope`/`envelopeAck`/`reconnectSync` messages are additive; a
+  full revert to the pre-migration commit leaves older clients unaffected (they ignore unknown `t`).
+  Because the interaction counter is never removed until the final step, a rollback at any earlier
+  phase leaves the live control plane (counter + relays) fully intact.
+- **The point of no return** is the counter-retirement step (final). It is the ONLY step that is not
+  a flag-flip rollback; it ships alone, behind a major version bump, after a full soak of the
+  envelope path carrying the whole run with the counter already provably redundant (revision totally
+  orders the run in soak logs). Until that step, every phase is reversible without a revert.
+
+---
+
+## 6. Non-goals + risks
+
+### 6.1 Non-goals (deliberately NOT changed)
+
+- **The authoritative DATA plane.** `CoopAuthoritativeBattleStateV1` / `CoopFullBattleSnapshot` and
+  the adopt-by-`Pokemon.id` apply (`coop-battle-engine.ts:2898`) are UNCHANGED. The envelope embeds
+  the existing state object (§1.2); this migration touches the CONTROL plane only.
+- **The per-turn checksum + resync self-heal.** `turnResolution.checksum` (`coop-transport.ts:1047`)
+  → `requestStateSync` → `stateSync` stays as the divergence backstop. The envelope adds ordering and
+  idempotency; it does not replace checksum-detect-and-heal.
+- **Host-authoritative resolution.** The host remains the sole engine; this is not a move to lockstep
+  or client-side prediction. Guests stay pure renderers (`handoff.md:12-14`).
+- **The 5s keepalive + rejoin PC-reaping** (#857, `coop-webrtc-transport.ts:162-182`,
+  `coop-runtime.ts`) — orthogonal connection-liveness, untouched.
+- **Showdown / versus** (`coop-ui-registry.ts:200-205`, the `showdown*` messages
+  `coop-transport.ts:1207-1237`) — owned by the parallel showdown agent; out of scope (`handoff.md:80`).
+- **Egg / evolution determinism** (`coop-ui-registry.ts:160-162`) — left per-client deterministic
+  unless the §3.3 RENDER-DUAL review finds a divergence; not proactively rewritten.
+- **The open residuals #865 (biome map derivation), #856 (catch-full release)** are addressed AS the
+  biome/catch surfaces migrate (§2.5 items 1 and 6), not as separate pre-work. #865's durable close
+  (make `erMapState` host-authoritative + adopted, `handoff.md:156-162`) is subsumed by the
+  BIOME_SELECT operation carrying the committed map state.
+
+### 6.2 Risks (where the migration could regress LIVE play)
+
+| Risk | Mechanism | Mitigation |
+|------|-----------|------------|
+| **Dual-run desync** | The counter and `revision` drift apart mid-migration; a surface commits via envelope but the counter advance is missed, so a still-legacy surface downstream sees the wrong owner | §1.8 makes them advance in ONE code path (apply = revision++ = counter-advance); a duo test asserts they stay locked per surface |
+| **Fail-closed over-blocks** | A phase mis-classified mutating/unknown (§3) neutralizes on the guest and the run HANGS instead of desyncing — arguably worse for a live player | Ship §3's allowlist in WARN-only first (like today's tripwire, `ui.ts:800`) — log what WOULD be blocked across a full soak, reconcile with the parallel agent's list, only THEN flip to enforce |
+| **Journal ring too small** | A reconnect gap deeper than the ring forces a full snapshot every rejoin — heavy, and if the snapshot also drops, a loop | Size the ring ≥ deepest soak-observed gap; the full-snapshot fallback (§4.4) is the existing tested path, so worst case is today's behavior |
+| **Epoch bump loses an in-flight op** | A cold resume (new epoch) mid-interaction restarts it; if the host had already applied a partial, the guest could double-drive | Cold resume restarts from the TOP (unchanged today, `coop-session-controller.ts:497-500`); only HOT rejoin (same epoch) resumes mid-op (§4.4). The distinction is the load-bearing invariant — a duo test must cover resume-mid-ME |
+| **Outbound queue reorders vs. presentation** | Enqueuing envelopes while shedding `battleEvent`s could land a checkpoint before its animation | Presentation is already declared reconcile-safe (`coop-transport.ts:1037-1039`); the checkpoint is authoritative regardless of anim order — this is by design, not a regression |
+| **Backpressure collapse hides a real stall** | Replacing a full queue with a resync-request could mask a genuinely dead partner | Keep the #806 stall watchdog + `peerBeat` health line (`handoff.md:99-101`) — collapse handles transient darkness, the watchdog still catches a truly dead client |
+| **Version-mismatch during a phased rollout** | A player on a stale cached bundle pairs mid-migration | The existing handshake refuses/banners the pair (`coop-session-controller.ts:847-852`); additive-optional fields keep an un-bumped pair on the legacy path |
+| **Counter retirement (final step)** | The one non-reversible step; a latent counter dependency surfaces after removal | Precede it with a soak where `revision` provably orders the whole run WITH the counter still present but unread by any migrated surface; remove only when it is demonstrably dead (the same "production-dead" bar that removed `restoreInteractionCounter`, `coop-session-controller.ts:498-500`) |
+
+### 6.3 The single biggest live-regression hazard
+
+Flipping §3's default from ALLOW (denylist) to DENY (allowlist) is the highest-stakes change: a
+false-negative today produces a silent DESYNC (bad but self-healing via checksum); a false-negative
+under fail-closed produces a HANG (a neutralized phase the guest needed). The migration therefore
+runs the allowlist in WARN-only across a full soak (§6.2 row 2) and only enforces after the parallel
+agent's independently-derived list and this one agree row-for-row (§3.5). Do not flip the default on a
+single agent's classification.
+
+---
+
+## 7. Implementation-readiness checklist (for the Wave-2 agent)
+
+A Wave-2 agent building from this doc alone can:
+- Build the envelope (`§1.1`) as an additive `CoopMessage` arm embedding the existing
+  `CoopAuthoritativeBattleStateV1` — no data-plane changes.
+- Build the journal (`§4.1`) as a revision-keyed bounded ring of committed envelopes, with ACK/resend
+  (`§4.2`) and the reconnect-from-revision protocol (`§4.4`) replacing the per-surface re-request loops.
+- Migrate one surface (`§2.5` order, `§5.1` procedure) by wiring it through the already-built
+  `runCoopInteraction` (`coop-interaction.ts:91`), keeping the legacy relay as dual-run fallback, and
+  proving it with a `coop-duo-*` repro + the P5 checksum + the allowlist harness (`§5.3`).
+- Keep the interaction counter live and lock-stepped to `revision` (`§1.8`) until the final step.
+- Never flip the renderer allowlist default without cross-checking `§3` against the parallel agent.
+
