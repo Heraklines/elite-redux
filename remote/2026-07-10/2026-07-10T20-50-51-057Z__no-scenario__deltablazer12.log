@@ -1,0 +1,83 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrfd6tw5-6nf6
+mode:     7  wave:?
+seed:     DJ75xFQ6sGPwzwDc9KLXGp8c
+party:    
+enemy:    
+
+----- COMMENT -----
+screen bug. backing out of custimization menu
+
+----- CONSOLE -----
+[20:38:43.391] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[20:38:43.803] LOG: [ER] build mrfd6tw5-6nf6
+[20:38:43.831] LOG: [dev-tools] loaded — 508 scenarios + Send Logs button
+[20:38:54.206] DEBUG: Destroying loading scene
+[20:38:54.206] DEBUG: Destroyed loading scene
+[20:38:54.249] LOG: Seed: DJ75xFQ6sGPwzwDc9KLXGp8c
+[20:38:54.249] LOG: Wave Seed: DJ75xFQ6sGPwzwDc9KLXGp8c 0
+[20:38:56.048] LOG: %cStart Phase LoginPhase color:green;
+[20:38:56.375] LOG: Client Session: j0R2P1NflNzoR8Di439H7sA6UyZhqaXC
+[20:38:57.396] DEBUG: Using cached system data
+[20:38:57.748] LOG: %cStart Phase TitlePhase color:green;
+[20:38:57.749] LOG: Getting Session Slot id: %d 3
+[20:38:57.763] LOG: use seasonal splash messages true
+[20:39:49.457] LOG: [showdown-build] MESSAGE settled -> opening starter-select (seed=0)
+[20:39:50.313] LOG: [showdown-build] starter-select OPEN
+[20:39:51.869] LOG: Charmander's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[20:40:07.012] LOG: Spinda's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[20:40:11.843] WARN: cry/384 not found
+[20:40:11.857] WARN: cry/10771 not found
+[20:40:11.867] ERROR: [unhandledrejection] TypeError: Cannot read properties of undefined (reading 'setTexture')
+TypeError: Cannot read properties of undefined (reading 'setTexture')
+    at StarterSelectUiHandler.renderShowdownAwarePartyIcon (https://elite-redux-staging.pages.dev/assets/battle-scene-CzAdTnhy.js:1001:35794)
+    at StarterSelectUiHandler.addToParty (https://elite-redux-staging.pages.dev/assets/battle-scene-CzAdTnhy.js:1001:27159)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-CzAdTnhy.js:1001:78785
+[20:40:17.040] LOG: Mawile's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[20:40:17.924] LOG: Mawile's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[20:40:29.344] LOG: Mawile's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[20:40:30.523] LOG: Mawile's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[20:40:32.107] LOG: Mawile's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[20:40:34.690] LOG: Munchlax's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[20:41:47.614] WARN: cry/359 not found
+[20:42:12.567] LOG: [coop:lobby] start announce name=gigatest
+[20:42:14.112] LOG: [coop:lobby] announced id=1a6d33f5-66b0-491a-a4b2-de9c129be232 -> begin polling
+[20:42:15.094] LOG: [coop:lobby] poll players=0
+[20:42:17.490] LOG: [coop:lobby] cancel (id=1a6d33f5-66b0-491a-a4b2-de9c129be232 connecting=false)
+[20:42:17.491] LOG: %cStart Phase TitlePhase color:green;
+[20:42:17.491] LOG: Getting Session Slot id: %d 3
+[20:42:17.504] LOG: use seasonal splash messages true
+[20:46:07.558] LOG: [showdown-build] MESSAGE settled -> opening starter-select (seed=0)
+[20:46:08.408] LOG: [showdown-build] starter-select OPEN
+[20:46:09.845] LOG: Charmander's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[20:46:46.091] LOG: Mawile's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[20:46:50.857] LOG: Durant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[20:47:10.572] WARN: cry/746 not found
+[20:47:11.161] WARN: cry/13 not found
+[20:47:11.824] WARN: cry/123 not found
+[20:47:12.886] WARN: cry/504 not found
+[20:47:13.987] WARN: cry/10438 not found
+[20:47:16.317] WARN: cry/973 not found
+[20:47:28.368] WARN: Texture "%s" has no frame "%s" items er_fairy_gem
+[20:47:28.368] WARN: Texture "%s" has no frame "%s" items er_fighting_gem
+[20:47:28.369] WARN: Texture "%s" has no frame "%s" items er_fire_gem
+[20:47:28.370] WARN: Texture "%s" has no frame "%s" items er_flying_gem
+[20:47:29.722] WARN: Texture "%s" has no frame "%s" items er_fairy_gem
+[20:47:29.723] WARN: Texture "%s" has no frame "%s" items er_fighting_gem
+[20:47:29.723] WARN: Texture "%s" has no frame "%s" items er_fire_gem
+[20:47:29.724] WARN: Texture "%s" has no frame "%s" items er_flying_gem
+[20:47:29.969] WARN: Texture "%s" has no frame "%s" items er_fairy_gem
+[20:47:29.969] WARN: Texture "%s" has no frame "%s" items er_fighting_gem
+[20:47:29.970] WARN: Texture "%s" has no frame "%s" items er_fire_gem
+[20:47:29.971] WARN: Texture "%s" has no frame "%s" items er_flying_gem
+[20:47:31.583] WARN: Texture "%s" has no frame "%s" items er_fairy_gem
+[20:47:31.584] WARN: Texture "%s" has no frame "%s" items er_fighting_gem
+[20:47:31.585] WARN: Texture "%s" has no frame "%s" items er_fire_gem
+[20:47:31.586] WARN: Texture "%s" has no frame "%s" items er_flying_gem
+[20:47:31.755] WARN: Texture "%s" has no frame "%s" items er_absorb_bulb
+[20:47:31.755] WARN: Texture "%s" has no frame "%s" items er_assault_vest
+[20:47:31.756] WARN: Texture "%s" has no frame "%s" items er_bug_gem
+[20:47:31.757] WARN: Texture "%s" has no frame "%s" items er_cell_battery
+
+----- REPLAY TRACE (JSON) -----
+(none)
