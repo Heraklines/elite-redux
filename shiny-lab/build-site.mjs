@@ -76,8 +76,22 @@ for (const [f, e] of Object.entries(evo)) {
   }
 }
 
-const data = { cdn: CDN, species, def: present.has(144) ? 144 : species[0].i, evo };
-console.log(`species ${species.length} | evo ${Object.keys(evo).length} | sha ${sha.slice(0, 8)}`);
+// species typing (for the type-derived exotic effects)
+const speciesSrc = fs.readFileSync("src/data/balance/pokemon-species.ts", "utf8");
+const types = {};
+for (const m of speciesSrc.matchAll(
+  /new PokemonSpecies\(\s*SpeciesId\.([A-Z0-9_]+),[^,]*,[^,]*,[^,]*,[^,]*,\s*"[^"]*",\s*PokemonType\.([A-Z]+),\s*(?:PokemonType\.([A-Z]+)|null)/g,
+)) {
+  const id = nameToId[m[1]];
+  if (id && id <= 1025 && present.has(id) && !types[id]) {
+    types[id] = m[3] ? [m[2], m[3]] : [m[2]];
+  }
+}
+
+const data = { cdn: CDN, species, def: present.has(144) ? 144 : species[0].i, evo, types };
+console.log(
+  `species ${species.length} | evo ${Object.keys(evo).length} | types ${Object.keys(types).length} | sha ${sha.slice(0, 8)}`,
+);
 
 const html = `<!doctype html>
 <html lang="en">

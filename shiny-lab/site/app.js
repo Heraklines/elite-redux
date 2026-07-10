@@ -562,6 +562,17 @@ const stageEl = document.getElementById("stage");
 let fxOx = 0;
 let fxOy = 0;
 let fxShown = false;
+// live cursor over the stage (Cursor Bait & friends) - converted to overlay logical px
+const cursorCss = { x: 0, y: 0, active: false };
+stageEl.addEventListener("mousemove", e => {
+  const r = stageEl.getBoundingClientRect();
+  cursorCss.x = e.clientX - r.left;
+  cursorCss.y = e.clientY - r.top;
+  cursorCss.active = true;
+});
+stageEl.addEventListener("mouseleave", () => {
+  cursorCss.active = false;
+});
 function syncFxOverlay() {
   const scale = heroCv.offsetWidth / PW;
   if (!(scale > 0)) {
@@ -751,6 +762,7 @@ function buildPicker() {
 // ---- loop --------------------------------------------------------------------
 let lastThumb = 0;
 let rr = 0;
+let fxRr = 0;
 function lookSig() {
   return `${curSpecies}|${slots.palette}|${slots.surface}|${slots.around}|${clusterAlgo}`;
 }
@@ -777,6 +789,17 @@ function exoEnv(t, EW, EH, ox, oy, dist, compact) {
     sig: lookSig(),
     evo: evoInfoFor(curSpecies),
     aux: auxLook,
+    types: (LAB.types && LAB.types[curSpecies]) || [],
+    name: (SPECIES.find(s => s.i === curSpecies) || {}).n || "POKEMON",
+    bg: compact ? "void" : (stageEl.className.match(/stage (\w+)/) || [])[1] || "void",
+    cursor:
+      !compact && cursorCss.active && heroCv.offsetWidth > 0
+        ? {
+            x: cursorCss.x / (heroCv.offsetWidth / PW),
+            y: cursorCss.y / (heroCv.offsetWidth / PW),
+            active: true,
+          }
+        : null,
   };
 }
 // exotic + rig + moment sandwich around the composited look
@@ -857,13 +880,16 @@ function loop(now) {
     }
     rr = vis.length > 0 ? (rr + N) % vis.length : 0;
     // fx tiles preview their effect applied to the CURRENT hero look (cheap 2D ops);
-    // moments run slightly time-compressed so the tile shows action sooner
-    for (const tl of tiles) {
-      if (tl.fx && tl.vis) {
-        const tt = tl.fx.moment ? t * 1.7 : t;
-        drawFxScene(tl.ctx, { exotic: "", rig: "", moment: "", ...tl.fx }, exoEnv(tt, PW, PH, 0, 0, dist, true));
-      }
+    // round-robin a bounded batch per tick (the registry is large now); moments run
+    // slightly time-compressed so the tile shows action sooner
+    const fxVis = tiles.filter(tl => tl.fx && tl.vis);
+    const FN = Math.min(fxVis.length, 12);
+    for (let j = 0; j < FN; j++) {
+      const tl = fxVis[(fxRr + j) % fxVis.length];
+      const tt = tl.fx.moment ? t * 1.7 : t;
+      drawFxScene(tl.ctx, { exotic: "", rig: "", moment: "", ...tl.fx }, exoEnv(tt, PW, PH, 0, 0, dist, true));
     }
+    fxRr = fxVis.length > 0 ? (fxRr + FN) % fxVis.length : 0;
   }
 }
 
