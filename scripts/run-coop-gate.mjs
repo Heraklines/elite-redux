@@ -26,15 +26,22 @@
 //   - Lane B (heavy duo / engine): every ER_SCENARIO-gated two-engine + engine coop test EXCEPT the soaks -
 //     each boots a real BattleScene (or two). The bulk of the runtime; sequential single-fork = no contention.
 //   - Lane C (soak-style): the coop-soak* driver runs - the heaviest per file (a full randomized run) - kept
-//     in their own sequential lane so a slow soak never shares a worker with anything else.
+//     in their own sequential lane so a slow soak never shares a worker with anything else. These run in the
+//     driver's DEFAULT "harness" fidelity (the driver heals the guest through convenient seams to stay green).
+//   - Lane P (PRODUCTION-FIDELITY soak, #897): a SINGLE bounded soak run (coop-soak-fidelity-gate.test.ts)
+//     with SOAK_FIDELITY=production - NO harness heals, guest commands sourced from the guest's OWN scene - so
+//     it catches the "guest replay drifted" divergence class lane C structurally cannot. It is GATING: the
+//     gate test does NOT swallow a hard LOCKSTEP/NO-PARK/TEARDOWN breach (unlike the non-gating evidence test
+//     coop-soak-fidelity.test.ts), so any hard-invariant failure = nonzero exit = GATE RED. Bounded to
+//     PROD_FIDELITY_GATE_WAVES waves so the gate stays wall-clock-bounded (the long god soak stays nightly).
 //
 // USAGE:
 //   node scripts/run-coop-gate.mjs                 # run all lanes, aggregate (exit 0 = all green)
-//   node scripts/run-coop-gate.mjs --lane A        # run one lane (A|B|C)
+//   node scripts/run-coop-gate.mjs --lane A        # run one lane (A|B|C|P)
 //   node scripts/run-coop-gate.mjs --list          # print the calibrated lane composition + counts, run nothing
 //   pnpm coop:gate                                 # the package.json alias
 //
-// EXIT: 0 iff EVERY lane passed. Per-lane summaries (file count / pass-fail / duration) print at the end.
+// EXIT: 0 iff EVERY gating lane (A,B,C,P) passed. Per-lane summaries (file count / pass-fail / duration) print at the end.
 // =============================================================================
 
 import { spawnSync } from "node:child_process";
@@ -46,6 +53,20 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
 const COOP_DIR = join(REPO_ROOT, "test", "tests", "elite-redux", "coop");
 const COOP_DIR_REL = "test/tests/elite-redux/coop";
+
+/**
+ * LANE P (#897): the GATING production-fidelity soak. The nightly soak (lane C) heals the guest through
+ * harness-only seams a live client never takes, so it CANNOT catch the "guest replay drifted" class the
+ * prod path still hits; and the standing prod-fidelity *evidence* test (coop-soak-fidelity.test.ts) is
+ * DELIBERATELY non-gating - it swallows a hard LOCKSTEP/NO-PARK/TEARDOWN breach into a green pass as long as
+ * wave 1 ran (the reviewer's finding: "a hard invariant failure after wave 1 still passes"). LANE P closes
+ * that hole: it runs a SEPARATE, BOUNDED prod-fidelity test (coop-soak-fidelity-gate.test.ts) that does NOT
+ * catch SoakInvariantError, so any hard-invariant breach = a failed test = nonzero exit = GATE RED. It runs
+ * only the ONE gate file (routed here, NOT into lane C) with SOAK_FIDELITY=production + a bounded wave count
+ * so the gate stays wall-clock-bounded (the long nightly god soak stays in the evidence test / nightly job).
+ */
+const PROD_FIDELITY_GATE_FILE = "coop-soak-fidelity-gate.test.ts";
+const PROD_FIDELITY_GATE_WAVES = 12;
 
 /**
  * QUARANTINE (#879): files that fail PRE-EXISTINGLY - they exit non-zero even run SOLO on a clean parent
@@ -95,19 +116,26 @@ function trackedTestBasenames() {
   );
 }
 
-/** Categorize every TRACKED coop test file into lane A (engine-free), B (heavy engine), C (soak), or Q (quarantine). */
+/**
+ * Categorize every TRACKED coop test file into lane A (engine-free), B (heavy engine), C (soak),
+ * P (gating production-fidelity soak, #897), or Q (quarantine).
+ */
 function categorize() {
   const tracked = trackedTestBasenames();
   const files = readdirSync(COOP_DIR)
     .filter(f => f.endsWith(".test.ts"))
     .filter(f => tracked == null || tracked.has(f))
     .sort();
-  const lanes = { A: [], B: [], C: [], Q: [] };
+  const lanes = { A: [], B: [], C: [], P: [], Q: [] };
   for (const f of files) {
     const rel = `${COOP_DIR_REL}/${f}`;
     if (QUARANTINE.has(f)) {
       // Pre-existing solo failure - run non-gating (see QUARANTINE).
       lanes.Q.push(rel);
+    } else if (f === PROD_FIDELITY_GATE_FILE) {
+      // #897: the GATING prod-fidelity soak - its OWN lane with SOAK_FIDELITY=production (see PROD_FIDELITY_GATE_FILE).
+      // Routed here BEFORE the /soak/ match so it never lands in lane C (which runs harness-fidelity, no env).
+      lanes.P.push(rel);
     } else if (/(^|[-_])soak/.test(f)) {
       // coop-soak.test.ts + coop-soak-*.test.ts - the heaviest per-file runs.
       lanes.C.push(rel);
@@ -132,7 +160,20 @@ function categorize() {
  * those files intentionally CHAIN a real `globalScene` across the dir (capture prevGlobalScene -> restore),
  * so isolating them would strand a stub with no real scene to chain; Lane A is already reliably green as-is.
  */
-const LANE_ISOLATE = { A: false, B: true, C: true, Q: false };
+const LANE_ISOLATE = { A: false, B: true, C: true, P: true, Q: false };
+
+/**
+ * Per-lane EXTRA env (merged over ER_SCENARIO=1). Only LANE P (#897) needs any: it forces the soak driver
+ * into production-fidelity mode (no harness heals) and bounds the wave count so the gate stays wall-clock
+ * -bounded. Every other lane runs with the plain ER_SCENARIO=1 env (empty here).
+ */
+const LANE_ENV = {
+  A: {},
+  B: {},
+  C: {},
+  P: { SOAK_FIDELITY: "production", SOAK_WAVES: String(PROD_FIDELITY_GATE_WAVES) },
+  Q: {},
+};
 
 /**
  * Run one lane: a single `vitest run` over the lane's file list with `--no-file-parallelism` (one worker,
@@ -144,8 +185,13 @@ function runLane(name, files) {
     return { name, files: 0, ok: true, ms: 0, summary: "(no files)" };
   }
   const isolate = LANE_ISOLATE[name] ? "--isolate" : "--no-isolate";
+  const extraEnv = Object.entries(LANE_ENV[name] ?? {})
+    .map(([k, v]) => `${k}=${v}`)
+    .join(" ");
   // eslint-disable-next-line no-console
-  console.log(`\n=== LANE ${name}: ${files.length} files (sequential, single worker, ${isolate}) ===`);
+  console.log(
+    `\n=== LANE ${name}: ${files.length} files (sequential, single worker, ${isolate}${extraEnv ? `, ${extraEnv}` : ""}) ===`,
+  );
   const started = Date.now();
   // shell:true + a single command STRING so Windows resolves `npx` (-> npx.cmd) via PATHEXT reliably (a bare
   // spawnSync("npx.cmd", argv) returns exit=null on this box). Coop test paths never contain spaces, so no
@@ -153,7 +199,7 @@ function runLane(name, files) {
   const cmd = `npx vitest run ${files.join(" ")} --no-file-parallelism ${isolate}`;
   const res = spawnSync(cmd, {
     cwd: REPO_ROOT,
-    env: { ...process.env, ER_SCENARIO: "1" },
+    env: { ...process.env, ER_SCENARIO: "1", ...(LANE_ENV[name] ?? {}) },
     stdio: ["ignore", "inherit", "inherit"],
     encoding: "utf8",
     shell: true,
@@ -167,6 +213,17 @@ function fmtMs(ms) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+/** The `--list` header suffix for a lane (marks the two non-standard lanes). */
+function laneListSuffix(name) {
+  if (name === "Q") {
+    return " (quarantine, NON-GATING)";
+  }
+  if (name === "P") {
+    return " (production-fidelity, GATING)";
+  }
+  return "";
+}
+
 function main() {
   const args = process.argv.slice(2);
   const lanes = categorize();
@@ -174,7 +231,7 @@ function main() {
   if (args.includes("--list")) {
     for (const [name, files] of Object.entries(lanes)) {
       // eslint-disable-next-line no-console
-      console.log(`\n=== LANE ${name}${name === "Q" ? " (quarantine, NON-GATING)" : ""} (${files.length} files) ===`);
+      console.log(`\n=== LANE ${name}${laneListSuffix(name)} (${files.length} files) ===`);
       for (const f of files) {
         // eslint-disable-next-line no-console
         console.log(`  ${f}`);
@@ -187,15 +244,15 @@ function main() {
 
   const laneArgIdx = args.indexOf("--lane");
   const only = laneArgIdx >= 0 ? args[laneArgIdx + 1]?.toUpperCase() : undefined;
-  // Gating lanes = A, B, C. Q (quarantine) is run non-gating (its result never changes the exit code).
-  const gatingOrder = only ? [only] : ["A", "B", "C"];
+  // Gating lanes = A, B, C, P (#897). Q (quarantine) is run non-gating (its result never changes the exit code).
+  const gatingOrder = only ? [only] : ["A", "B", "C", "P"];
   const runQuarantine = !only || only === "Q";
 
   const results = [];
   for (const name of gatingOrder) {
     if (!lanes[name]) {
       // eslint-disable-next-line no-console
-      console.error(`unknown lane "${name}" (expected A, B, C, or Q)`);
+      console.error(`unknown lane "${name}" (expected A, B, C, P, or Q)`);
       process.exit(2);
     }
     results.push(runLane(name, lanes[name]));
@@ -204,7 +261,7 @@ function main() {
   // NON-GATING quarantine pass (pre-existing solo failures - see QUARANTINE). Reported LOUDLY but never
   // affects the gate exit code, so the gate reflects the SHIPPABLE surface, not a defect that predates it.
   let quarantine;
-  if (runQuarantine && lanes.Q.length > 0 && only !== "A" && only !== "B" && only !== "C") {
+  if (runQuarantine && lanes.Q.length > 0 && only !== "A" && only !== "B" && only !== "C" && only !== "P") {
     // eslint-disable-next-line no-console
     console.log(`\n=== QUARANTINE (${lanes.Q.length} files, NON-GATING - pre-existing solo failures) ===`);
     for (const [name, reason] of QUARANTINE) {
