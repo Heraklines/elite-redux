@@ -5067,6 +5067,23 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     const variableCategory = new NumberHolder(move.category);
     applyMoveAttrs("VariableMoveCategoryAttr", source, this, move, variableCategory);
+    // ER ability-side category override (Mystic Blades: slicing moves become
+    // SPECIAL). Scanned by name — registration-free, same pattern as the
+    // AttackStatSubstituteAbAttr scan in getBaseDamage. Flipping the category
+    // here makes the move fully special downstream (Sp.Atk offense, Sp.Def
+    // defense, no burn halving, Light-Screen-blocked).
+    if (!ignoreSourceAbility) {
+      for (const attr of source.getAllActiveAbilityAttrs()) {
+        if (attr?.constructor?.name === "MoveCategoryOverrideAbAttr") {
+          const overridden = (attr as unknown as { resolveCategory: (m: Move) => MoveCategory | null }).resolveCategory(
+            move,
+          );
+          if (overridden != null) {
+            variableCategory.value = overridden;
+          }
+        }
+      }
+    }
     const moveCategory = variableCategory.value as MoveCategory;
 
     /** The move's type after type-changing effects are applied */

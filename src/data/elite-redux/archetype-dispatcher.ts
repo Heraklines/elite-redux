@@ -207,6 +207,7 @@ import {
 } from "#data/elite-redux/archetypes/immunity-with-absorb";
 import { IncomingAccuracyMultiplierAbAttr } from "#data/elite-redux/archetypes/incoming-accuracy-multiplier";
 import { LifestealOnHitAbAttr, LifestealOnKoAbAttr, ScavengerLootAbAttr } from "#data/elite-redux/archetypes/lifesteal";
+import { MoveCategoryOverrideAbAttr } from "#data/elite-redux/archetypes/move-category-override";
 import { MoveFlagInjectionAbAttr } from "#data/elite-redux/archetypes/move-flag-injection";
 import { MovingFirstTrapFlinchAbAttr } from "#data/elite-redux/archetypes/moving-first-trap-flinch";
 import { ErMultiHeadedAbAttr } from "#data/elite-redux/archetypes/multi-headed";
@@ -5447,12 +5448,15 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // the holder's moves.
       return ok([new FieldMoveTypePowerBoostAbAttr(PokemonType.FAIRY, 4 / 3), new StatMultiplierAbAttr(Stat.ACC, 1.2)]);
     case 505:
-      // Mystic Blades — "Keen edge moves become special and deal 30% more
-      // damage." 1.3x on SLICING_MOVE + the "become special" piece via
-      // flag-gated AttackStatSubstitute (slicing moves use SpAtk offensively).
+      // Mystic Blades — "Keen Edge [slicing] moves become SPECIAL (deal Special
+      // damage AND use the Special Attack stat) and deal 30% more damage." The
+      // category flip makes the move FULLY special: Sp.Atk offense, the target's
+      // Sp.Def defense, no burn halving, Light-Screen-blocked. (Contrast Mind
+      // Crunch 568 / Magical Fists 742, whose dex keep hitting the enemy's
+      // Defense — those retain the offense-only AttackStatSubstitute.)
       return ok([
         new FlagDamageBoostAbAttr({ flag: MoveFlags.SLICING_MOVE, multiplier: 1.3 }),
-        new AttackStatSubstituteAbAttr({ physicalStat: Stat.SPATK, flag: MoveFlags.SLICING_MOVE }),
+        new MoveCategoryOverrideAbAttr({ flag: MoveFlags.SLICING_MOVE, category: MoveCategory.SPECIAL }),
       ]);
     case 568:
       // Mind Crunch — "Biting moves use SpAtk and deal 30% more damage."
