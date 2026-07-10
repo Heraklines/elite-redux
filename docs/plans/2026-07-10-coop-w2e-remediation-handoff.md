@@ -174,3 +174,24 @@ The next implementation item is the checkpoint replay loader: `test/tools/coop-d
 restore `trace.checkpoint` (mutated party, inventory, wave, money, and RNG state) instead of rebuilding
 every replay from the original launch roster. Journal coverage sweep and the remaining operation surfaces
 also remain open; no final “no gaps” claim is made.
+
+## 10. Continuation evidence (authoritative checkpoint replay)
+
+The checkpoint replay-loader residual is closed. `c4490fd4d` is the failure-first RED: a deep-window
+co-op trace booted from its original Pikachu/Abra launch roster instead of the caught, leveled, and
+move-modified Snorlax/Gengar party captured at wave 7. `910c3d528` makes the checkpoint the replay boot
+authority: it pins the checkpoint seed immediately before `EncounterPhase` generates the battle, starts
+at the captured wave, reconstructs the full `PokemonData` party and moves, restores persistent modifiers,
+money, and ball inventory, and mirrors that exact state into the guest before replaying any event. It also
+disables the test launcher's global moveset override before restoration; otherwise every
+`Pokemon.getMoveset()` read silently mutated the checkpoint party back to the fixture moves.
+
+Proof: `coop-duo-replay.test.ts` 5/5, including the production capture-to-replay round trip and the new
+deep-window checkpoint case; touched-file TypeScript diagnostics are zero and Biome reports no errors
+(two pre-existing harness complexity notices remain). The full four-lane gate and final long soak have
+still not been rerun, so they remain unclaimed.
+
+Next: perform the non-cosmetic journal coverage sweep, then migrate the remaining contract section 2
+surfaces in order (Giratina bargain, colosseum, ability picker; per-mon operations; lobby/resume last).
+Renderer allowlist enforcement, quarantine closure, expanded soak coverage, and the final drop-every-class
+campaign remain open. There is still no justified “no gaps” claim.
