@@ -26,6 +26,7 @@ import {
   type CoopJournalEntry,
   setCoopDurabilityEnabled,
 } from "#data/elite-redux/coop/coop-durability";
+import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { adoptCoopSnapshotHighWater } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -231,6 +232,42 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     ).toEqual([]);
     hostMgr.dispose();
     guestMgr.dispose();
+  });
+
+  it("I3b production carrier: a deep-gap snapshot crosses the live stream and fast-forwards the guest", async () => {
+    const pair = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(pair.host);
+    const guestStream = new CoopBattleStreamer(pair.guest);
+    const guestMgr = new CoopDurabilityManager(pair.guest);
+    let liveSnapshotHead = 0;
+    const hostMgr = new CoopDurabilityManager(
+      pair.host,
+      {
+        sendFullSnapshot: (cls, head) => {
+          hostStream.sendDurabilitySnapshot(JSON.stringify({ journalHighWater: { [cls]: head } }));
+        },
+      },
+      3,
+    );
+    guestStream.onDurabilitySnapshot(blob => {
+      const snapshot = JSON.parse(blob) as { journalHighWater: Record<string, number> };
+      liveSnapshotHead = snapshot.journalHighWater.wave ?? 0;
+      adoptCoopSnapshotHighWater(guestMgr, snapshot);
+    });
+
+    for (let revision = 1; revision <= 6; revision++) {
+      hostMgr.commit("wave", revision, waveMsg(revision));
+    }
+    await flush();
+    pair.guest.send({ t: "coopResyncAll" });
+    await flush();
+
+    expect(liveSnapshotHead, "the deep-gap full snapshot must reach the guest's live apply callback").toBe(6);
+    expect(hostMgr.unackedCount(), "snapshot adoption must ACK the evicted operation range").toBe(0);
+    hostMgr.dispose();
+    guestMgr.dispose();
+    hostStream.dispose();
+    guestStream.dispose();
   });
 
   // ===========================================================================================
