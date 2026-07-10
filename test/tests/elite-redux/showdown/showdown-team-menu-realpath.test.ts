@@ -86,7 +86,7 @@ describe.runIf(RUN)("showdown team menu - real-path acceptance", () => {
 
   it("Issue 2: backing out of the build returns to the Team Menu and restores the gameMode", async () => {
     const phase = new TitlePhase();
-    (phase as any).gameMode = GameModes.CLASSIC;
+    // NO phase.gameMode stamp: at the live title it is undefined - the exact fix-#5 condition.
     (phase as any).openShowdownTeamMenu(() => {});
     await wait(400);
     press(Button.ACTION);
@@ -100,7 +100,11 @@ describe.runIf(RUN)("showdown team menu - real-path acceptance", () => {
     await confirmYesIfPrompted(); // Yes -> showdownBuildOnCancel -> settle -> reopen the menu
 
     expect(mode()).toBe(UiMode.SHOWDOWN_TEAM_MENU); // returned to the menu, NOT the title
-    expect(game.scene.gameMode.isShowdown).toBeFalsy(); // borrowed gameMode cleanly restored (undefined for CLASSIC)
+    // Live fix #5 net: settle must restore the LIVE gameMode OBJECT (the old code restored
+    // getGameMode(phase.gameMode) where phase.gameMode is undefined at the title -> every
+    // subsequent setMode crashed on gameMode.isCoop, live "naming doesn't advance").
+    expect(game.scene.gameMode, "gameMode restored to a real object after settle").toBeDefined();
+    expect(game.scene.gameMode.isShowdown).toBeFalsy(); // borrowed gameMode cleanly restored
     expect(game.scene.gameData.showdownTeamPresets.length).toBe(0); // nothing saved on cancel
   });
 });

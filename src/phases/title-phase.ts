@@ -436,7 +436,13 @@ export class TitlePhase extends Phase {
    */
   private openShowdownPresetBuild(editIndex: number | undefined, onSettled: () => void): void {
     const { gameData } = globalScene;
-    const prevGameMode = this.gameMode;
+    // Live fix #5 (2026-07-10, "naming my team doesn't advance"): capture the LIVE gameMode OBJECT.
+    // The previous capture used `this.gameMode` (a GameModes id the TitlePhase only carries when
+    // launching a real run - undefined while sitting in title menus), so settle() restored
+    // getGameMode(undefined) -> undefined and EVERY subsequent setMode crashed reading
+    // gameMode.isCoop (and the grid's shiny-lab timer crashed reading gameMode.challenges).
+    // The realpath test masked it by stamping phase.gameMode manually.
+    const prevGameMode = globalScene.gameMode;
     globalScene.gameMode = getGameMode(GameModes.SHOWDOWN);
     const editing = editIndex === undefined ? undefined : gameData.listShowdownTeamPresets()[editIndex];
     const defaultName = editing?.name ?? "Team";
@@ -449,7 +455,7 @@ export class TitlePhase extends Phase {
     // (the offline build only borrowed SHOWDOWN to drive the teambuild UI) and reopen the Team Menu. This
     // makes the cancel-to-menu path clean (no reliance on next-launch self-healing to restore the gameMode).
     const settle = () => {
-      globalScene.gameMode = getGameMode(prevGameMode);
+      globalScene.gameMode = prevGameMode;
       onSettled();
     };
     runShowdownPresetBuild(
