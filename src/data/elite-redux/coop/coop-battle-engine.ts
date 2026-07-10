@@ -1704,6 +1704,16 @@ const COOP_SAVEDATA_DIGEST_EXCLUDED_KEYS: ReadonlySet<string> = new Set<string>(
   // now host-authoritative + adopted by the guest (the enemyPartySync battleType verdict + the newBattle
   // adopt in this fix), so the guest never re-derives a divergent value in the first place.
   "battleType",
+  // Wave-2e: `coopControlPlane` carries the durability journal high-water marks (journalHighWater) +
+  // the persisted interaction counter. The watermarks are FLOW-CONTROL transients: the RECEIVER always
+  // lags the COMMITTER between an op's commit and its cumulative ack, so the two clients legitimately
+  // read different values at any given capture point - the same read-skew class as the excluded raw
+  // `waveIndex`/`battleType`, NOT a state desync (exposed by the lane-isolated gate: the #835
+  // dropped-revive repro's post-heal convergence tripped on watermark skew alone). The field stays in
+  // the SESSION SAVE (cold-resume parity needs it, #887) - it is only excluded from the convergence
+  // digest. A REAL lost operation still surfaces through the journal's own gap-detection + resend
+  // (coop-durability), which is the layer that owns watermark correctness.
+  "coopControlPlane",
 ]);
 
 /**
