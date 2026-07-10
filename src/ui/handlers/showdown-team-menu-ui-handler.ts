@@ -80,6 +80,8 @@ export interface ShowdownTeamMenuConfig {
   initialMon?: number;
   /** Deterministic initial rename-overlay state (for the rename-prompt render recipe). */
   initialRenaming?: boolean;
+  /** Deterministic initial confirm-question banner text (for the enter-lobby / delete prompt render recipe). */
+  initialPromptText?: string;
   /** CONFIRM on the create box: enter the offline team-build flow (Phase C). */
   onCreate?: () => void;
   /** Edit (E) a saved preset: re-enter the build flow seeded with it (Phase C). */
@@ -148,6 +150,14 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
   private renameBuffer = "";
   /** A transient explain/notice banner (e.g. confirming an invalid team) - cleared on next input. */
   private notice: string | null = null;
+  /**
+   * The QUESTION shown while a Yes/No CONFIRM overlay is up (enter-lobby / delete). The CONFIRM handler
+   * only draws the bare Yes/No buttons; a plain `ui.showText` routes to the battle message box that this
+   * full-screen menu paints OVER, so the question was invisible ("it just says yes or no" - maintainer).
+   * We render it as our OWN banner BEFORE opening the overlay (the menu container stays visible beneath a
+   * setOverlayMode), so the player reads what they are agreeing to.
+   */
+  private promptText: string | null = null;
   private textInput: ShowdownEditorTextInput | null = null;
   private requestedSpriteKeys = new Set<string>();
   /** Ranked ladder: this player's rank for the card (fetched at show; null = offline/unranked). */
@@ -186,6 +196,7 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.renaming = config.initialRenaming ?? false;
     this.renameBuffer = this.renaming ? (this.hoveredPreset()?.name ?? "") : "";
     this.notice = null;
+    this.promptText = config.initialPromptText ?? null;
     this.rankAvailable = isRankServerConfigured();
     this.myRank = null;
     if (this.rankAvailable) {
@@ -370,18 +381,26 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.render();
   }
 
-  /** A Yes/No CONFIRM overlay. Live-only (headless render recipes never press into it). */
+  /** A Yes/No CONFIRM overlay, with the QUESTION painted into the menu so it is visible over the strip. */
   private prompt(_message: string, onYes: () => void): void {
     const ui = globalScene.ui;
     if (typeof ui?.setOverlayMode !== "function") {
       onYes();
       return;
     }
+    // Paint the question as our own banner FIRST (it stays visible beneath the non-clearing CONFIRM
+    // overlay), then clear it on either resolution.
+    this.promptText = _message;
+    this.render();
+    const clearPrompt = () => {
+      this.promptText = null;
+      this.render();
+    };
     ui.showText(_message, null, () => {
       ui.setOverlayMode(
         UiMode.CONFIRM,
-        () => ui.revertMode().then(() => onYes()),
-        () => ui.revertMode(),
+        () => ui.revertMode().then(() => (clearPrompt(), onYes())),
+        () => ui.revertMode().then(clearPrompt),
       );
     });
   }
@@ -516,9 +535,24 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     if (this.notice != null) {
       this.renderNoticeBanner();
     }
+    if (this.promptText != null) {
+      this.renderPromptBanner();
+    }
     if (this.renaming) {
       this.renderRenameOverlay();
     }
+  }
+
+  /** The question banner shown beneath the Yes/No CONFIRM overlay (enter-lobby / delete), so the player
+   *  sees WHAT they are confirming. Neutral gold-accented styling (the notice banner is red for errors). */
+  private renderPromptBanner(): void {
+    const bh = 20;
+    const by = BODY_Y + 10;
+    this.fill(0, by - 3, SCREEN_W, bh + 6, 0x000000, 0.55);
+    this.fill(MARGIN, by, SCREEN_W - 2 * MARGIN, bh, 0x102038, 0.98);
+    this.outline(MARGIN, by, SCREEN_W - 2 * MARGIN, bh, GOLD);
+    this.text(SCREEN_W / 2, by + 4, this.clip(this.promptText ?? "", 60), TextStyle.SUMMARY_GOLD, 0.5, FONT_NAME);
+    this.text(SCREEN_W / 2, by + 13, "Yes / No", TextStyle.SUMMARY_GRAY, 0.5, FONT_TINY);
   }
 
   private renderHeader(): void {
@@ -714,6 +748,21 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
       }
     }
     this.add(icon);
+
+    // Held-item mini-icon at the icon's bottom-right, mirroring the wager screen's per-mon overlay (same
+    // "items" atlas + small-scale language). A mega slot's stone is implied by the form, so it carries no
+    // item chip (matching the wager). Scale/offset are tuned to the box's 18x15 icon seat + 0.42 sprite.
+    if (mon.item !== MEGA_STONE_ITEM && !isMegaStage(mon.speciesId, mon.formIndex)) {
+      const modType = modifierTypes[mon.item as ShowdownItemKey];
+      const iconImage = modType == null ? undefined : getModifierType(modType).iconImage;
+      if (iconImage) {
+        const itemIcon = globalScene.add
+          .sprite(cx + 7, y + 11, "items", iconImage)
+          .setOrigin(0.5, 0.5)
+          .setScale(0.28);
+        this.add(itemIcon);
+      }
+    }
   }
 
   // -- right preview panel ----------------------------------------------------------------------
