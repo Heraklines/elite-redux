@@ -19,6 +19,8 @@
 import { getGameMode } from "#app/game-mode";
 import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
+import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { TitlePhase } from "#phases/title-phase";
 import { GameManager } from "#test/framework/game-manager";
@@ -82,6 +84,66 @@ describe.runIf(RUN)("showdown team menu - real-path acceptance", () => {
     // exactly what the player saw ("still the same issue" with both open-breadcrumbs logged).
     const menuHandler = game.scene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU] as any;
     expect(menuHandler?.container?.visible, "the Team Menu container is hidden once the grid opens").toBe(false);
+  });
+
+  // ---- hotkey bar: R (rename) / N (delete) / E (edit) --------------------------------------------
+  // These keys are CYCLE_SHINY / CYCLE_NATURE / CYCLE_ABILITY, which route through ui-inputs'
+  // `buttonCycleOption` - a HANDLER WHITELIST that SWALLOWED them for the Team Menu (not whitelisted),
+  // so the keys did nothing live even though the handler's processInput handles them (why the existing
+  // menu-input test, which feeds processInput DIRECTLY, was green). Driving through the REAL dispatch
+  // (game.scene.uiInputs.buttonCycleOption) is the red-proof: revert the whitelist entry and each
+  // assertion fails (the action never fires). Keyboard AND controller share this dispatch; mobile's
+  // on-screen apad cycle buttons emit the same Button.CYCLE_*, so this one gate covers all three.
+  const cycle = (b: Button) => game.scene.uiInputs.buttonCycleOption(b);
+  const openMenuWithPreset = async () => {
+    game.scene.gameData.saveShowdownTeamPreset("Sand", [
+      {
+        speciesId: SpeciesId.GARCHOMP,
+        formIndex: 0,
+        level: 100,
+        shiny: false,
+        variant: 0,
+        abilityIndex: 0,
+        nature: 0,
+        ivs: [31, 31, 31, 31, 31, 31],
+        moveset: [MoveId.EARTHQUAKE],
+        item: "LEFTOVERS",
+        rootSpeciesId: SpeciesId.GIBLE,
+        erBlackShiny: false,
+        baseCost: 4,
+      },
+    ]);
+    const phase = new TitlePhase();
+    (phase as any).openShowdownTeamMenu(() => {});
+    await wait(400);
+    expect(mode()).toBe(UiMode.SHOWDOWN_TEAM_MENU);
+    return game.scene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU] as any;
+  };
+
+  it("hotkey R (CYCLE_SHINY) opens the RENAME overlay through the real input dispatch", async () => {
+    const menuHandler = await openMenuWithPreset();
+    // Drop the DOM keyboard bridge: the real rex InputText's setFocus() has no headless mock (a browser-
+    // only concern, orthogonal to the whitelist fix under test). beginRename still flips `renaming`.
+    menuHandler.setTextInput(null);
+    expect(menuHandler.renaming).toBe(false);
+    cycle(Button.CYCLE_SHINY);
+    await wait(50);
+    expect(menuHandler.renaming, "R must open the rename overlay (whitelist reached the handler)").toBe(true);
+  });
+
+  it("hotkey N (CYCLE_NATURE) opens the DELETE confirm through the real input dispatch", async () => {
+    await openMenuWithPreset();
+    cycle(Button.CYCLE_NATURE);
+    await wait(400);
+    expect(mode(), "N must open the delete Yes/No confirm").toBe(UiMode.CONFIRM);
+  });
+
+  it("hotkey E (CYCLE_ABILITY) enters the seeded EDIT build through the real input dispatch", async () => {
+    await openMenuWithPreset();
+    cycle(Button.CYCLE_ABILITY);
+    await wait(600);
+    expect(mode(), "E must enter the edit build (starter-select opens)").toBe(UiMode.STARTER_SELECT);
+    expect(game.scene.gameMode.isShowdown).toBe(true);
   });
 
   it("Issue 2: backing out of the build returns to the Team Menu and restores the gameMode", async () => {

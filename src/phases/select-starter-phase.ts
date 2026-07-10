@@ -385,21 +385,23 @@ export class SelectStarterPhase extends Phase {
     const relay = new ShowdownCommandRelay(runtime.localTransport);
     setPendingShowdownSession(session);
     setPendingShowdownRelay(relay);
-    // Team Menu (Phase D): teams are now built + selected BEFORE pairing. When the player entered the
-    // lobby carrying a preset, its reconstructed starters are pending here - SKIP the interactive
-    // grid+editor teambuild entirely and feed the pre-built team straight into the negotiate/wager
-    // pipeline (both clients do this, so pairing leads near-immediately to the wager, no 10-minute pick
-    // wait). The legacy in-lobby STARTER_SELECT path below stays code-tolerant but is unreachable from
-    // the new entry flow (no pending preset -> it still opens, so a direct/legacy launch never breaks).
+    // Team Menu (Phase D): teams are now built + selected BEFORE pairing. Entering the lobby ALWAYS
+    // stashes the chosen preset's reconstructed starters (title-phase `onEnterLobby` is the sole versus
+    // lobby entry - the announcer AND the accepter both go through it), so BOTH clients arrive with a
+    // pending team and pairing leads near-immediately to the wager (no 10-minute in-lobby pick wait).
     const presetStarters = consumePendingShowdownPresetStarters();
     if (presetStarters != null) {
       void this.runShowdownFlow(presetStarters, controller.role, session, relay);
       return;
     }
-    globalScene.ui.setMode(UiMode.STARTER_SELECT, (starters: Starter[]) => {
-      globalScene.ui.clearText();
-      void this.runShowdownFlow(starters, controller.role, session, relay);
-    });
+    // No pending preset = a client reached the versus flow WITHOUT a team (a stale/legacy path: a
+    // reconnect after the single-use stash was consumed, or any old direct-lobby wiring). The old code
+    // fell through to the interactive STARTER_SELECT grid here - exactly the "sent to pick another team"
+    // the maintainer flagged. HARD-FAIL instead with a clear message + clean back-out (abortShowdown
+    // disposes the just-built session/relay so nothing strands), never the grid. Both clients build
+    // their team in the Team Menu now, so this branch is only ever a fault condition.
+    console.warn("[showdown] startShowdownSelect: no pending preset - aborting (team must be picked in the Team Menu)");
+    this.abortShowdown("No team was carried into this match. Pick a team in the Showdown menu, then enter the lobby.");
   }
 
   /**

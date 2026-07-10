@@ -16,6 +16,8 @@ import { SettingsDisplayUiHandler } from "#ui/settings-display-ui-handler";
 import { SettingsGamepadUiHandler } from "#ui/settings-gamepad-ui-handler";
 import { SettingsKeyboardUiHandler } from "#ui/settings-keyboard-ui-handler";
 import { SettingsUiHandler } from "#ui/settings-ui-handler";
+import { ShowdownSetEditorUiHandler } from "#ui/showdown-set-editor-ui-handler";
+import { ShowdownTeamMenuUiHandler } from "#ui/showdown-team-menu-ui-handler";
 import { StarterSelectUiHandler } from "#ui/starter-select-ui-handler";
 import { SummaryUiHandler } from "#ui/summary-ui-handler";
 import Phaser from "phaser";
@@ -248,6 +250,17 @@ export class UiInputs {
       // gift-cycle handler in SummaryUiHandler.processInput was unreachable dead code.
       SummaryUiHandler,
       StarterSelectUiHandler,
+      // Showdown (Team Menu): the hotkey bar's R (rename) / N (delete) / E (edit) are CYCLE_SHINY /
+      // CYCLE_NATURE / CYCLE_ABILITY. Without this entry buttonCycleOption swallowed them here and the
+      // keys did nothing live (the handler's processInput already routes them) - the maintainer's
+      // "shortcuts don't work" report. This fixes keyboard AND controller at once (pad RB/RC_W/RT map
+      // to the same Button.CYCLE_*), and the mobile apad cycle buttons (CSS-shown for this mode) reach
+      // it through the same dispatch.
+      ShowdownTeamMenuUiHandler,
+      // Showdown (Set Editor): its F / R / E / N glyph bar (CYCLE_FORM/SHINY/ABILITY/NATURE) cycles
+      // stage / shiny / ability / nature - the same latent swallow. Whitelist it so the advertised
+      // shortcuts work on every input method too.
+      ShowdownSetEditorUiHandler,
       PokedexUiHandler,
       PokedexPageUiHandler,
       SettingsUiHandler,
