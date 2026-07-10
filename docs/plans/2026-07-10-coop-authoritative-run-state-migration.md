@@ -790,6 +790,67 @@ file) per the coordination rule.
   `rendezvous`) provably NEVER on the wire — the journal is the mechanism (review finding 3 closed
   generically). The bespoke self-heals remain as backstops but are no longer the repair path.
 
+### 4.7 W2e implementation notes — the operation↔durability seam is CLOSED (final carrier architecture)
+
+Wave-2e plugged the operation ENVELOPE (W2a) into the durability JOURNAL (W2b) — the deliberate,
+documented parallel-lane seam ("the durability manager is a wired but passive scaffold UNTIL the
+envelope commit path calls `runtime.durability.commit(...)`"). The final carrier architecture:
+
+- **The `envelope` arm is the journaled op carrier; `coopAck`/`coopResync` are its ack/reconnect.**
+  A committed op now rides the additive `envelope` wire arm (§1.1) through the durability journal:
+  the bridge `coop-operation-journal.ts` (`journalCoopCommittedEnvelope`) calls
+  `CoopDurabilityManager.commit(cls, revision, { t:"envelope", envelope })` the moment a surface
+  adapter's `CoopOperationHost` commits (owner seam, OR the host's watcher seam for a guest-owned op —
+  the host is the sole committer, invariant 3). The manager journals + broadcasts it, ACKs it
+  cumulatively (`coopAck`), and resends / reconnect-tails it (`coopResync`). So a committed op is a
+  journaled, ACK'd, resendable wire frame end-to-end.
+- **WIRE CONSOLIDATION (the parallel-lane merge cleanup).** The doc's envelope-specialized
+  `envelopeAck` / `reconnectSync` (§4.2/§4.4) are **RETIRED** — they never shipped a sender or a
+  receiver. The generic, class-parameterized W2b `coopAck { cls, seq }` / `coopResync { cls, from }`
+  ARE the envelope's ack + reconnect (the envelope is class `op:<surface>`, seq = revision). One
+  ack/reconnect family serves every journaled class. The `#820` sender-only guard's
+  `DECLARED_AHEAD_OF_RECEIVER` allowlist is emptied: `envelope` now has a receiver
+  (`extractKey`/`apply` in the bridge), and the retired arms no longer exist in the union.
+- **JOURNALED CLASS = one per surface, keyed by the SURFACE-LOCAL revision.** The class is DERIVED
+  from the envelope's `logicalPhase` (no new wire field): `BIOME_SELECT → op:biome`,
+  `REWARD_SELECT`/`SHOP → op:reward` (the reward shop + biome market share ONE host + ONE revision,
+  §8.2.1, so both map to the same dense class), `MYSTERY_ENCOUNTER → op:me`. The surface-local dense
+  revision (§8.2) is the journal seq until the global dense revision lands (all-surfaces-migrated).
+- **DUAL-RUN carrier, unchanged (§5.1).** The migrated surfaces STILL ride the legacy relay carrier;
+  W2e is ADDITIVE. The legacy relay-adopt path drives the phase's actual adoption (biome switch, shop
+  buy, ME control-flow); the journal is the DURABILITY ledger that converges the op history over a cut.
+  Crucially the journal replay routes into a **DEDICATED** guest applier (`journalGuest`) per surface,
+  SEPARATE from the relay-adopt `watchGuest`: routing it into the SAME applier let the journal steal
+  the operationId the live adopt dedupes on, making the live path see its own op as a duplicate and
+  fall back (caught by the duo suites). Two idempotent appliers, one op — no conflict; the DATA plane
+  still travels on the checkpoint/`waveEndState` (§1.2).
+- **SESSION-SAVE DIGEST parity.** `coopControlPlane.journalHighWater` is now the UNION of the
+  committer's journal high-water AND the receiver's applied-through marks
+  (`CoopDurabilityManager.controlPlaneHighWater`), so the host (committer, value in its journal) and
+  the guest (receiver, same converged value in its ledger) serialize the IDENTICAL value — a plain
+  `highWaterMarks()` is populated only on the committer, so the `saveDataDigest` diverged the moment
+  the host committed its first op (the 35-wave soak caught exactly this). Cold-resume restore seeds
+  both marks so a resumed guest neither re-applies nor diverges. No change to the digest formula or
+  the hashed key set.
+- **FLAG discipline (§5).** The plug respects EVERY flag: the manager exists only under
+  `isCoopDurabilityEnabled`; the bridge's active-manager reference is installed in `setCoopRuntime`
+  (so the duo harness's per-`withClient` swap journals into the ACTIVE client's manager, not a stale
+  global) and cleared in `clearCoopRuntime`; and each adapter's commit / apply seam is itself gated by
+  its per-surface flag. Flag OFF anywhere = today's pure legacy dual-run (no journaling).
+- **NO `COOP_PROTOCOL_VERSION` bump.** All wire changes are additive: `envelope` was already declared
+  (W2a) and is merely now SENT; `coopAck`/`coopResync` were already the generic durability arms
+  (W2b); the retired `envelopeAck`/`reconnectSync` never flowed. No EXISTING arm's shape or semantics
+  changed, so no peer misparses (an unknown-receiver peer ignores `envelope` via the default arm and
+  still converges via the legacy relay dual-run). This matches the additive-only precedent of W2c/W2d.
+- **Proof.** `coop-operation-durability-convergence.test.ts` (engine-free, the W2b convergence pattern +
+  fault transport) drives the REAL biome adapter commit/apply path through two managers over a
+  ChannelGate / seeded fault transport, CUTS the channel between the owner's committed op and the
+  watcher's adoption, rejoins, and proves the op arrives via the JOURNAL resend / reconnect-tail replay
+  — one test per direction (host-owned → guest; guest-minted → host), with the bespoke self-heals
+  provably absent from the wire and a flag-OFF-anywhere case. The three surface `coop-duo-*-operation`
+  suites stay green under BOTH flag states; the 35-wave soak (`SOAK_SEED=20260709`) + `coop-soak-me` +
+  `coop-soak-resume` are green ON and OFF.
+
 ---
 
 ## 5. Rollout strategy (phased on a LIVE system)
@@ -1098,4 +1159,24 @@ cross-ctx control), so the guest-side MINT isn't exercised by the harness — as
 before the await is resolved, leaking a pending promise that later fires `handleOptionSelect` under a
 LATER test's scene (an `encounteredEvents` under-read). Drive every guest-owned handshake to full settle
 BEFORE asserting.
+
+### 8.5 Design delta Wave-2e (the durability journal is now LIVE under every migrated surface)
+
+Wave-2e is not a new surface — it CLOSED the operation↔durability seam (§4.7). The template gains one
+step every surface already satisfies for free, and one it must NOT skip:
+
+- **A committed op now journals automatically.** A surface's `CoopOperationHost` commit already runs
+  through the adapter's owner + host-watcher seams; those seams now call
+  `journalCoopCommittedEnvelope(res.envelope)` after a `committed` result, so the op rides the journaled
+  `envelope` arm with zero per-surface wiring beyond the one call. The class is derived from the
+  envelope's `logicalPhase` (`coopOperationClassForPhase`); a NEW surface only needs its phase added to
+  that map (and a `registerCoopOperationApplier` at import) — see §4.7.
+- **Route the journal replay into a DEDICATED applier, never the relay-adopt `guest()`.** The dual-run
+  legacy relay still drives the phase; the journal is the durability ledger. Sharing one applier lets
+  the journal steal the operationId the live adopt dedupes on (the live path then falls back). Each
+  adapter keeps a separate `journalGuest` for the replay path (§4.7).
+- **`journalHighWater` in the save must be the committer∪receiver union** (`controlPlaneHighWater`), or
+  the `saveDataDigest` diverges the moment the host commits (only the committer holds a journal
+  high-water; the receiver holds the same value in its ledger). This is a surface-agnostic fix in the
+  save path, not per-surface, but a new surface's class must be a dense committed-op stream for it to hold.
 
