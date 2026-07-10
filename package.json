@@ -64,7 +64,8 @@
     "er:audit-archetype-coverage": "node scripts/elite-redux/audit-archetype-coverage.mjs",
     "er:verify-assets": "node scripts/elite-redux/verify-assets.mjs",
     "er:test": "vitest run test/data/elite-redux",
-    "er:scenario": "node scripts/run-scenario.mjs"
+    "er:scenario": "node scripts/run-scenario.mjs",
+    "coop:gate": "node scripts/run-coop-gate.mjs"
   },
   "dependencies": {
     "@material/material-color-utilities": "^0.4.0",
