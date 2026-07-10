@@ -195,3 +195,21 @@ Next: perform the non-cosmetic journal coverage sweep, then migrate the remainin
 surfaces in order (Giratina bargain, colosseum, ability picker; per-mon operations; lobby/resume last).
 Renderer allowlist enforcement, quarantine closure, expanded soak coverage, and the final drop-every-class
 campaign remain open. There is still no justified “no gaps” claim.
+
+## 11. Continuation evidence (journal coverage sweep: Giratina bargain)
+
+The non-cosmetic wire audit found the first post-keystone hole in Giratina's bargain: its one terminal
+`interactionOutcome` was classified and queued as durable transport traffic, but no committed operation
+journal retained it. `e3f51b41b` is the failure-first RED: drop only that legacy outcome and the real guest
+watcher remains parked in `TheBargainPhase`. `0021292d5` adds the negotiated `opSurface.bargain`
+capability, typed `BARGAIN` outcome, `op:bargain` journal class, cold-resume revision floor, one guest
+operation ledger, and a production live sink that feeds the committed outcome into the existing safe
+outcome waiter. The legacy relay remains the flag-off fallback.
+
+Proof: the two-engine exploration probe passes with the operation enabled while the legacy bargain frame
+is actually dropped, and passes with the operation disabled on the pure legacy carrier (2/2). Capability,
+handshake, durability, and recovery suites pass 54/54; touched-file TypeScript diagnostics are zero and
+Biome reports no errors (only pre-existing warnings/notices in the large runtime and exploration files).
+
+The journal sweep is not complete. Colosseum and ability-picker are next in the contract's order, followed
+by the per-mon in-battle classes. The full gate and long soak remain unclaimed.
