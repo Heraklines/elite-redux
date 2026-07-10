@@ -120,6 +120,29 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
     }
   });
 
+  it("DURABILITY: dropping only coloPick still materializes the committed decision for the guest", async () => {
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 1,
+        reorder: 0,
+        delay: 0,
+        faultable: msg => msg.t === "interactionChoice" && msg.kind === "coloPick",
+      },
+      { seed: 0xc011 },
+    );
+    const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
+    setCoopRuntime(hostRuntime);
+    setCoopMeInteractionStart(4);
+
+    coopColosseumSendDecision(COLOSSEUM_CONTINUE);
+    const decision = await guestRuntime.interactionRelay.awaitInteractionChoice(coopColosseumSeq(4), 25);
+
+    expect(pair.faultsInjected(), "the raw coloPick carrier was actually dropped").toBe(1);
+    expect(decision?.choice, "the committed decision reached the real guest choice FIFO").toBe(COLOSSEUM_CONTINUE);
+  });
+
   it("awaits the guest owner's relayed decision index (guest-owned)", async () => {
     // Guest-owned board (odd counter): the guest DRIVES its board and relays its picked index; the host
     // (sole engine) awaits it on the SAME board seq and resolves to exactly that index, then applies it.
