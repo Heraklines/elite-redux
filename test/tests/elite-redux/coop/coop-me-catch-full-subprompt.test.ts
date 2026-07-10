@@ -131,6 +131,20 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
     );
   });
 
+  it("HOST commits the guest-owned catch-full slot as a durable ME_SUB step", async () => {
+    const commitSpy = vi.spyOn(meOp, "commitMeOwnerIntent");
+    const { seqMe, guestRelay } = hostRig(3);
+
+    const hostAwait = coopHostStreamCatchFullAwaitSlot("Rattata");
+    await guestRelay.awaitInteractionOutcome(seqMe);
+    guestRelay.sendInteractionChoice(seqMe, "meSub", 2);
+    expect(await hostAwait).toBe(2);
+
+    const subCommits = commitSpy.mock.calls.filter(call => call[0].kind === "ME_SUB");
+    expect(subCommits, "the authority must commit the guest proposal after accepting its slot").toHaveLength(1);
+    expect(subCommits[0][0]).toMatchObject({ seq: seqMe, payload: { value: 2 }, localRole: "host" });
+  });
+
   it("HOST LOUDLY declines (resolves null) when the guest cancels / relays an out-of-range slot (skip the grant)", async () => {
     // A full party is 6 mons; the guest's SELECT cancel relays an out-of-range slot (== party length, 6).
     // The helper must surface that as `null` so the caller runs the "skip" branch (the granted mon is NOT
