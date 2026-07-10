@@ -1,0 +1,331 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Co-op AUTHORITATIVE OPERATION RUNTIME (Wave-2 authoritative run-state migration;
+// see docs/plans/2026-07-10-coop-authoritative-run-state-migration.md, §1.3-§1.6).
+//
+// Two small, ENGINE-FREE state machines that drive an operation through the lifecycle
+// (proposed -> committed -> applied/rejected/superseded, §1.3):
+//
+//   - CoopOperationHost  : the sole-authority COMMIT LOG. Validates + commits each op
+//                          EXACTLY ONCE (invariant 3), increments `revision` on apply
+//                          (§1.5), rejects wrong-owner / illegal / cross-epoch intents,
+//                          and supersedes an in-flight op when a newer op takes its slot.
+//   - CoopOperationGuest : the idempotent APPLIER. Applies envelopes keyed on the triple
+//                          (sessionEpoch, revision, operationId) (invariant 5, §1.6),
+//                          DROPS cross-epoch + duplicate/late traffic, detects a revision
+//                          GAP, FAILS CLOSED on an unknown phase/kind (invariant 8, §1.7),
+//                          and re-enters an in-flight op on reconnect (invariant 7).
+//
+// Both are pure w.r.t. the engine: the DATA-plane adoption (applyCoopAuthoritativeBattleState)
+// and the wire send/receive are the CALLER's job. These machines only own the CONTROL fields.
+// That keeps the lifecycle exhaustively unit-testable headlessly (the tests in
+// coop-operation-runtime.test.ts are the model's spec) and is the template every later
+// surface copies.
+// =============================================================================
+
+import type {
+  CoopAuthoritativeEnvelopeV1,
+  CoopLogicalPhase,
+  CoopOperationId,
+  CoopOperationStatus,
+  CoopPendingOperation,
+  CoopRevision,
+  CoopSessionEpoch,
+} from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  isKnownCoopLogicalPhase,
+  isKnownCoopOperationKind,
+  parseCoopOperationId,
+} from "#data/elite-redux/coop/coop-operation-envelope";
+import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
+
+// -----------------------------------------------------------------------------
+// HOST commit log (§1.3-§1.5).
+// -----------------------------------------------------------------------------
+
+/** The current authoritative snapshot the host embeds in the envelope it broadcasts on commit (§1.1, §1.2). */
+export interface CoopCommitContext {
+  readonly wave: number;
+  readonly turn: number;
+  readonly logicalPhase: CoopLogicalPhase;
+  /** The existing authoritative DATA plane, embedded UNCHANGED (§1.2). */
+  readonly authoritativeState: CoopAuthoritativeBattleStateV1;
+}
+
+/** The host's validation verdict for one proposed intent (owner correct, choice legal, epoch matches). */
+export type CoopIntentValidation = { readonly ok: true } | { readonly ok: false; readonly reason: string };
+
+/** A validator the host runs at the single COMMIT point (§1.3). Wrong-owner / illegal-choice -> reject. */
+export type CoopIntentValidator = (intent: CoopPendingOperation) => CoopIntentValidation;
+
+/** Outcome of submitting one proposed intent to the host commit log (§1.3). */
+export type CoopHostSubmitResult =
+  /** Validated + committed + applied: revision++, broadcast this envelope (invariant 4). */
+  | { readonly kind: "committed"; readonly envelope: CoopAuthoritativeEnvelopeV1 }
+  /** Validation REFUSED (wrong owner / illegal / cross-epoch): broadcast so the proposer surfaces a default. No revision change. */
+  | { readonly kind: "rejected"; readonly envelope: CoopAuthoritativeEnvelopeV1; readonly reason: string }
+  /** Duplicate of an ALREADY-APPLIED id (invariant 3): a no-op re-ACK, never a second commit. */
+  | { readonly kind: "reack"; readonly op: CoopPendingOperation }
+  /** Late intent for an id that is already TERMINAL rejected/superseded (invariant 6, §1.6): dropped. */
+  | { readonly kind: "rejected-late"; readonly reason: string };
+
+export interface CoopOperationHostConfig {
+  readonly epoch: CoopSessionEpoch;
+  /** Revision the log starts at; the first committed op lands at initialRevision + 1. Default 0. */
+  readonly initialRevision?: CoopRevision;
+  /**
+   * §1.8 dual-run: advance the legacy interaction counter in LOCKSTEP with `revision` on every applied
+   * commit, so any still-legacy surface downstream sees the counter it expects. Removing the counter is
+   * FORBIDDEN until every surface is migrated. Optional (a headless lifecycle test passes nothing).
+   */
+  readonly onApplied?: (op: CoopPendingOperation, revision: CoopRevision) => void;
+}
+
+/**
+ * The sole-authority commit log. The host receives proposed intents (its own or the guest's relayed one),
+ * validates + commits each EXACTLY ONCE, applies (revision++), and produces the envelope to broadcast.
+ */
+export class CoopOperationHost {
+  private readonly epoch: CoopSessionEpoch;
+  private revision: CoopRevision;
+  private readonly onApplied: ((op: CoopPendingOperation, revision: CoopRevision) => void) | undefined;
+  /** The ONE in-flight op the host is driving/awaiting (status proposed/committed), or null when quiescent. */
+  private pending: CoopPendingOperation | null = null;
+  /** Terminal (and applied) status per id, so a repeated/late message for a completed op is caught (§1.6). */
+  private readonly statusById = new Map<CoopOperationId, CoopOperationStatus>();
+  /** The last applied op per id, returned on an idempotent re-ACK (§1.3). */
+  private readonly appliedById = new Map<CoopOperationId, CoopPendingOperation>();
+
+  public constructor(config: CoopOperationHostConfig) {
+    this.epoch = config.epoch;
+    this.revision = config.initialRevision ?? 0;
+    this.onApplied = config.onApplied;
+  }
+
+  public getEpoch(): CoopSessionEpoch {
+    return this.epoch;
+  }
+
+  public getRevision(): CoopRevision {
+    return this.revision;
+  }
+
+  public getPendingOperation(): CoopPendingOperation | null {
+    return this.pending;
+  }
+
+  public statusOf(id: CoopOperationId): CoopOperationStatus | undefined {
+    return this.statusById.get(id);
+  }
+
+  /**
+   * Register an in-flight op the host is AWAITING (e.g. a guest-owned intent relayed later, or the host's
+   * own op mid-drive). Sets it as the pending slot in status "committed" so a NEWER op that takes the slot
+   * before it lands SUPERSEDES it (§1.3), and its late arrival is then late-rejected (§1.6). Idempotent.
+   */
+  public expect(intent: CoopPendingOperation): void {
+    if (this.statusById.has(intent.id)) {
+      return; // already terminal / applied - do not re-open an in-flight slot for it.
+    }
+    this.pending = { ...intent, status: "committed" };
+  }
+
+  /**
+   * Submit ONE proposed intent to the commit log. This is the single point where invariant 3 (exactly
+   * once) is enforced (§1.3). Runs, in order: cross-epoch rejection (§1.4), duplicate/late detection
+   * (§1.6), slot supersession (§1.3), validation, then commit+apply (revision++, §1.5).
+   */
+  public submit(
+    intent: CoopPendingOperation,
+    ctx: CoopCommitContext,
+    validate: CoopIntentValidator,
+  ): CoopHostSubmitResult {
+    // 1. Epoch guard (§1.4): an id from another epoch can never satisfy a live op. Rejected as cross-epoch.
+    const parsed = parseCoopOperationId(intent.id);
+    if (parsed == null || parsed.epoch !== this.epoch) {
+      return { kind: "rejected-late", reason: "epoch-mismatch" };
+    }
+
+    // 2. Dedupe / late-rejection (§1.6): a message for an id that already reached a terminal state.
+    const prior = this.statusById.get(intent.id);
+    if (prior === "applied") {
+      // Idempotent re-ACK (invariant 3): never a second commit, no revision change.
+      const applied = this.appliedById.get(intent.id);
+      return { kind: "reack", op: applied ?? { ...intent, status: "applied" } };
+    }
+    if (prior === "rejected" || prior === "superseded") {
+      return { kind: "rejected-late", reason: `already-${prior}` };
+    }
+
+    // 3. Supersession (§1.3): a newer op takes the slot while the previous in-flight op is still open.
+    if (this.pending != null && this.pending.id !== intent.id) {
+      this.statusById.set(this.pending.id, "superseded");
+      this.pending = null;
+    }
+
+    // 4. Validation at the single commit point (owner correct for phase / choice legal / etc.).
+    const verdict = validate(intent);
+    if (!verdict.ok) {
+      // Rejected: broadcast so the proposer surfaces a safe default. NO revision change (§1.3).
+      this.statusById.set(intent.id, "rejected");
+      this.pending = null;
+      const rejectedOp: CoopPendingOperation = { ...intent, status: "rejected", rejectReason: verdict.reason };
+      return { kind: "rejected", reason: verdict.reason, envelope: this.buildEnvelope(ctx, rejectedOp, this.revision) };
+    }
+
+    // 5. Commit + apply (committed -> applied, §1.5): revision++, broadcast, mark terminal-applied.
+    this.revision += 1;
+    const appliedOp: CoopPendingOperation = { ...intent, status: "applied" };
+    this.statusById.set(intent.id, "applied");
+    this.appliedById.set(intent.id, appliedOp);
+    this.pending = null;
+    this.onApplied?.(appliedOp, this.revision); // §1.8 dual-run: advance the legacy counter in lockstep.
+    return { kind: "committed", envelope: this.buildEnvelope(ctx, appliedOp, this.revision) };
+  }
+
+  private buildEnvelope(
+    ctx: CoopCommitContext,
+    op: CoopPendingOperation,
+    revision: CoopRevision,
+  ): CoopAuthoritativeEnvelopeV1 {
+    return {
+      version: 1,
+      sessionEpoch: this.epoch,
+      revision,
+      wave: ctx.wave,
+      turn: ctx.turn,
+      logicalPhase: ctx.logicalPhase,
+      pendingOperation: op,
+      authoritativeState: ctx.authoritativeState,
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// GUEST applier (§1.6, §1.7).
+// -----------------------------------------------------------------------------
+
+/** Outcome of applying one envelope on the guest (§1.6). The caller adopts the DATA plane iff `kind === "applied"`. */
+export type CoopGuestApplyResult =
+  /** Applied at revision `env.revision`: the caller now adopts the embedded authoritativeState + marks the op applied. */
+  | {
+      readonly kind: "applied";
+      readonly envelope: CoopAuthoritativeEnvelopeV1;
+      readonly op: CoopPendingOperation | null;
+    }
+  /** An in-flight (proposed/committed) op arrived (reconnect tail, §4.4): re-enter the interaction; no state advance. */
+  | { readonly kind: "pending"; readonly op: CoopPendingOperation }
+  /** The host REJECTED the proposer's intent (§1.3): surface a safe default. No state advance. */
+  | { readonly kind: "rejected"; readonly op: CoopPendingOperation }
+  /** The op was SUPERSEDED by a newer op for the slot (§1.3). No state advance. */
+  | { readonly kind: "superseded"; readonly op: CoopPendingOperation }
+  /** Cross-epoch (§1.4) - dropped. */
+  | { readonly kind: "dropped-epoch" }
+  /** Duplicate / late applied envelope (revision <= last, or id already applied) - idempotent no-op (§1.6). */
+  | { readonly kind: "duplicate" }
+  /** Revision GAP (> last + 1): the guest missed a commit; request the journal tail (§4.4) rather than apply out of order. */
+  | { readonly kind: "gap"; readonly missingFrom: CoopRevision }
+  /** Unknown logicalPhase / operation kind (§1.7): FAIL CLOSED - render nothing, hold at last good, request resync. */
+  | { readonly kind: "fail-closed"; readonly reason: "unknown-phase" | "unknown-kind" };
+
+export interface CoopOperationGuestConfig {
+  readonly epoch: CoopSessionEpoch;
+  /** The revision the guest has already applied through (0 = nothing yet; on reconnect, the resync's lastAppliedRevision). Default 0. */
+  readonly initialRevision?: CoopRevision;
+  /** Recognizer for the closed logical-phase union; default the envelope module's guard. Injectable for tests. */
+  readonly isKnownPhase?: (phase: string) => boolean;
+  /** Recognizer for the closed operation-kind union; default the envelope module's guard. Injectable for tests. */
+  readonly isKnownKind?: (kind: string) => boolean;
+}
+
+/**
+ * The idempotent guest applier. Never mutates shared state itself (invariant 1); it CLASSIFIES each
+ * inbound envelope (§1.6) and tells the caller whether to adopt it. Application is a pure function of
+ * (sessionEpoch, revision, operationId) (invariant 5).
+ */
+export class CoopOperationGuest {
+  private readonly epoch: CoopSessionEpoch;
+  private lastAppliedRevision: CoopRevision;
+  private readonly isKnownPhase: (phase: string) => boolean;
+  private readonly isKnownKind: (kind: string) => boolean;
+  /** Ids the guest has already applied, so a re-delivered applied envelope is a no-op (invariant 5, §1.6). */
+  private readonly appliedIds = new Set<CoopOperationId>();
+  /** The last envelope whose phase + kind the guest recognized (the fail-closed "hold at last known-good", §1.7). */
+  private lastGoodEnvelope: CoopAuthoritativeEnvelopeV1 | null = null;
+
+  public constructor(config: CoopOperationGuestConfig) {
+    this.epoch = config.epoch;
+    this.lastAppliedRevision = config.initialRevision ?? 0;
+    this.isKnownPhase = config.isKnownPhase ?? isKnownCoopLogicalPhase;
+    this.isKnownKind = config.isKnownKind ?? isKnownCoopOperationKind;
+  }
+
+  public getEpoch(): CoopSessionEpoch {
+    return this.epoch;
+  }
+
+  public getLastAppliedRevision(): CoopRevision {
+    return this.lastAppliedRevision;
+  }
+
+  public hasApplied(id: CoopOperationId): boolean {
+    return this.appliedIds.has(id);
+  }
+
+  public getLastGoodEnvelope(): CoopAuthoritativeEnvelopeV1 | null {
+    return this.lastGoodEnvelope;
+  }
+
+  public applyEnvelope(env: CoopAuthoritativeEnvelopeV1): CoopGuestApplyResult {
+    // 1. Epoch guard (§1.6 rule 1): an envelope from another epoch is DROPPED.
+    if (env.sessionEpoch !== this.epoch) {
+      return { kind: "dropped-epoch" };
+    }
+
+    // 2. Fail closed on an unknown phase/kind (§1.7, invariant 8): hold at last good, request resync - never run local.
+    if (!this.isKnownPhase(env.logicalPhase)) {
+      return { kind: "fail-closed", reason: "unknown-phase" };
+    }
+    const op = env.pendingOperation;
+    if (op != null && !this.isKnownKind(op.kind)) {
+      return { kind: "fail-closed", reason: "unknown-kind" };
+    }
+
+    // 3. Control signals that do NOT advance revision (§1.3): rejection / supersession / an in-flight (reconnect) op.
+    if (op != null) {
+      if (op.status === "rejected") {
+        return { kind: "rejected", op };
+      }
+      if (op.status === "superseded") {
+        return { kind: "superseded", op };
+      }
+      if (op.status === "proposed" || op.status === "committed") {
+        return { kind: "pending", op }; // reconnect tail: re-enter the interaction, no state advance (§4.4).
+      }
+    }
+
+    // 4. Revision handling for an APPLIED (or quiescent) envelope (§1.6 rules 2-3).
+    if (op != null && op.status === "applied" && this.appliedIds.has(op.id)) {
+      return { kind: "duplicate" }; // id-dedupe (§1.6 rule 3): applied at most once per id.
+    }
+    if (env.revision <= this.lastAppliedRevision) {
+      return { kind: "duplicate" }; // revision monotonicity (§1.6 rule 2): a late/duplicate broadcast is a no-op.
+    }
+    if (env.revision > this.lastAppliedRevision + 1) {
+      return { kind: "gap", missingFrom: this.lastAppliedRevision + 1 }; // a hole: request the tail (§4.4).
+    }
+
+    // 5. Apply (revision === last + 1). The caller adopts the embedded authoritativeState now.
+    this.lastAppliedRevision = env.revision;
+    if (op != null) {
+      this.appliedIds.add(op.id);
+    }
+    this.lastGoodEnvelope = env;
+    return { kind: "applied", envelope: env, op };
+  }
+}
