@@ -108,6 +108,56 @@ import { EnemyBattleInfo } from "#ui/enemy-battle-info";
 import { getPokemonSpecies, getPokemonSpeciesForm } from "#utils/pokemon-utils";
 import { compressToBase64, decompressFromBase64 } from "lz-string";
 
+// =============================================================================
+// STRUCTURED APPLY FAILURE (accepted-review item 4). Every per-mon / per-section
+// authoritative-state apply path below guards its OWN failure so one bad mon never
+// aborts the rest of the turn's apply. Historically those catches were SILENT ("the
+// checksum catches residual drift") - but the checksum can only see the HASHED
+// fields, so a failure that corrupts an UNHASHED sub-field (a summonData internal, a
+// modifier arg, a module-let substrate) left the guest silently diverged AND the
+// outer apply still returned `true`. This accumulator turns each swallowed failure
+// into a structured `{ section, monId?, error }` record; a non-empty drain at the
+// finalize call site forces the LOUD heal-once/resync path even when the checksum
+// happened to match (it is blind to the failed field). Empty on the happy path, so
+// behavior is byte-identical when every mon/section applies cleanly.
+// =============================================================================
+
+/** One swallowed authoritative-apply failure: which section, which mon (if per-mon), and the error text. */
+export interface CoopApplyFailure {
+  /** The apply stage that failed (e.g. "monData", "modifiers", "substrates", "apply"). */
+  section: string;
+  /** The host-stable `Pokemon.id` for a per-mon failure; absent for a whole-section failure. */
+  monId?: number;
+  /** The error's message (or its stringification), for the loud diagnostic + coop log. */
+  error: string;
+}
+
+/** Failures accumulated during the CURRENT authoritative-state apply; drained by the finalize caller. */
+let coopApplyFailures: CoopApplyFailure[] = [];
+
+/** Reset the apply-failure accumulator at the START of an authoritative-state apply (no cross-apply bleed). */
+function beginCoopApplyFailureCapture(): void {
+  coopApplyFailures = [];
+}
+
+/** Record ONE swallowed apply failure. Never throws (the caller's own catch already fired). */
+function recordCoopApplyFailure(section: string, error: unknown, monId?: number): void {
+  const text = error instanceof Error ? error.message : String(error);
+  coopApplyFailures.push(monId === undefined ? { section, error: text } : { section, monId, error: text });
+}
+
+/**
+ * Drain (return + clear) the structured failures accumulated by the most recent
+ * {@linkcode applyCoopAuthoritativeBattleState}. A NON-EMPTY result means a per-mon / per-section apply
+ * silently failed on a field the checksum cannot see - the caller MUST trigger the loud heal/resync
+ * anyway. Empty on the happy path.
+ */
+export function drainCoopApplyFailures(): CoopApplyFailure[] {
+  const out = coopApplyFailures;
+  coopApplyFailures = [];
+  return out;
+}
+
 /**
  * ER BattlerTags carried in the co-op checkpoint (#633 Fix #4h). These are BattlerTags, not
  * StatusEffects, so the checkpoint's `status` field can't repair them - without this the three
@@ -2505,8 +2555,11 @@ function applyAuthoritativeMonData(mon: Pokemon, data: PokemonData, authoritativ
     }
     // NOTE: no render here. The Phase-3 differ (runCoopRenderDiffer) refreshes battle-info + re-summons
     // on a sprite-key change AFTER the whole state apply, over every on-field mon.
-  } catch {
-    /* one mon's authoritative data failed; checksum catches residual drift */
+  } catch (e) {
+    // One mon's authoritative data failed. The checksum catches HASHED residual drift, but NOT a corrupted
+    // UNHASHED sub-field (a summonData internal, an ability/form the hash reads only on-field) - so record
+    // it structurally: a non-empty drain forces the loud heal even when the checksum matched (item 4).
+    recordCoopApplyFailure("monData", e, data.id);
   }
 }
 
@@ -2800,8 +2853,11 @@ function reconcileAuthoritativeModifiers(rawBlobs: Record<string, unknown>[] | u
     if (changed) {
       globalScene.updateModifiers(player, true);
     }
-  } catch {
-    /* malformed modifier payload must not crash the turn */
+  } catch (e) {
+    // A malformed modifier payload must not crash the turn, but it CAN leave a modifier arg (an unhashed
+    // internal the [typeId, stackCount] digest cannot see) diverged - record it so the finalize caller
+    // forces the loud heal (item 4).
+    recordCoopApplyFailure(player ? "playerModifiers" : "enemyModifiers", e);
   }
 }
 
@@ -2902,6 +2958,9 @@ export function applyCoopAuthoritativeBattleState(
   state: CoopAuthoritativeBattleStateV1 | undefined,
   authoritativeGuest = false,
 ): boolean {
+  // Reset the structured-failure accumulator FIRST (item 4): a prior apply's failures must never leak into
+  // this one's drain, and an early reject below leaves it empty (no apply attempted -> nothing to heal).
+  beginCoopApplyFailureCapture();
   if (state === undefined) {
     return false;
   }
@@ -2974,7 +3033,10 @@ export function applyCoopAuthoritativeBattleState(
       `guest apply authoritativeState tick=${state.tick} wave=${state.wave} turn=${state.turn} party=${state.playerParty.length}/${state.enemyParty.length} field=${state.field.length}`,
     );
     return true;
-  } catch {
+  } catch (e) {
+    // A whole-apply throw (past the early structural rejects) is the loudest failure class: record it so the
+    // caller heals even if it somehow returned a stale-but-matching checksum. Return false as before.
+    recordCoopApplyFailure("apply", e);
     return false;
   }
 }
@@ -3657,8 +3719,11 @@ function restoreCoopModuleLetSubstrates(
       );
       setErPendingNodes((snapshot.erPendingNodes as ErRouteNode[]).map(n => ({ ...n })));
     }
-  } catch {
-    // A malformed module-let substrate must never crash the guest's battle.
+  } catch (e) {
+    // A malformed module-let substrate must never crash the guest's battle, but these substrates ride the
+    // saveDataDigest (an OPAQUE hash) - a failed restore leaves the guest diverged with no per-field signal,
+    // so record it structurally for the loud heal (item 4).
+    recordCoopApplyFailure("substrates", e);
   }
 }
 

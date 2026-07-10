@@ -39,8 +39,10 @@ import {
   applyCoopCheckpoint,
   applyCoopFieldSnapshot,
   applyCoopFullSnapshot,
+  type CoopApplyFailure,
   captureCoopChecksum,
   captureCoopChecksumState,
+  drainCoopApplyFailures,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { recordCoopChecksumAssertion } from "#data/elite-redux/coop/coop-checksum-assert";
 import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
@@ -879,6 +881,11 @@ export class CoopFinalizeTurnPhase extends Phase {
           this.authoritativeState,
           isCoopAuthoritativeGuest(),
         );
+        // Structured apply failures (item 4): per-mon / per-section catches that USED to be silent now push a
+        // `{ section, monId?, error }` record. Drain them here so a NON-EMPTY set forces the loud heal even
+        // when the checksum matched (it is blind to the unhashed field the failure corrupted). Empty on the
+        // happy path -> byte-identical behavior.
+        const applyFailures = drainCoopApplyFailures();
         if (!authoritativeApplied) {
           // Heal the COMPLETE on-field per-mon state the numeric checkpoint OMITS (#633 M2): moveset+PP /
           // tera / boss / held items / ability / form, applied IN-LINE this turn via the proven applyFullMon
@@ -886,7 +893,7 @@ export class CoopFinalizeTurnPhase extends Phase {
           // on-field mons; ABSENT (older host) -> no-op, and the checksum-detect + resync heal still covers it.
           applyCoopFieldSnapshot(this.fullField, isCoopAuthoritativeGuest());
         }
-        this.verifyChecksum(this.checksum, this.preimage);
+        this.verifyChecksum(this.checksum, this.preimage, applyFailures);
       } else {
         coopWarn(
           "checksum",
@@ -908,7 +915,7 @@ export class CoopFinalizeTurnPhase extends Phase {
    * `hostPreimage` (#633, diagnostics) we deep-DIFF it against ours to log the exact field(s)
    * that diverged - both at the initial mismatch and again if the snapshot fails to heal it.
    */
-  private verifyChecksum(hostChecksum: string, hostPreimage?: string): void {
+  private verifyChecksum(hostChecksum: string, hostPreimage?: string, applyFailures: CoopApplyFailure[] = []): void {
     const streamer = getCoopBattleStreamer();
     if (streamer == null) {
       coopWarn("checksum", `guest verify turn=${this.turn}: no streamer -> verification skipped`);
@@ -919,7 +926,20 @@ export class CoopFinalizeTurnPhase extends Phase {
       coopLog("checksum", `guest verify turn=${this.turn}: sentinel (read failure) -> comparison skipped`);
       return;
     }
-    if (hostChecksum === guestChecksum) {
+    // Item 4: a STRUCTURED APPLY FAILURE (a per-mon / per-section apply silently threw) means the guest may
+    // be diverged on a field the checksum CANNOT SEE (an unhashed summonData internal / modifier arg /
+    // opaque save-data substrate). So we must trigger the loud heal even when the two hashes MATCHED - the
+    // hash matching is not proof of convergence when the apply itself failed.
+    const structuralFailure = applyFailures.length > 0;
+    if (structuralFailure) {
+      coopWarn(
+        "checksum",
+        `turn=${this.turn} STRUCTURED APPLY FAILURE (${applyFailures.length} section(s)): `
+          + applyFailures.map(f => `${f.section}${f.monId === undefined ? "" : `#${f.monId}`}: ${f.error}`).join("; ")
+          + ` -> forcing heal-once/resync (checksum ${hostChecksum === guestChecksum ? "MATCHED but is blind to the failed field" : "also mismatched"})`,
+      );
+    }
+    if (hostChecksum === guestChecksum && !structuralFailure) {
       coopLog("checksum", `guest verify turn=${this.turn}: MATCH host=guest=${hostChecksum}`);
       return;
     }
