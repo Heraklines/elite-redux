@@ -121,4 +121,49 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     hostMgr.dispose();
     guestMgr.dispose();
   });
+
+  // ===========================================================================================
+  // I2 - SNAPSHOT FAST-FORWARD: a rejoining guest that adopts a full-state snapshot subsuming journaled
+  // ops must NOT double-apply those ops when the journal tail later replays, and its receiver ledger must
+  // fast-forward to the snapshot's head (no spurious resync of ops the snapshot subsumed).
+  // EXPECTED RED (current code): the DATA-plane full-snapshot adoption does not touch the durability
+  // receiver ledger; there was NO way to fast-forward it. So the ledger stays at its pre-snapshot mark and
+  // a subsequent journal tail replay (a committer resend) re-runs the applier for the subsumed ops.
+  // ===========================================================================================
+  it.fails("I2: [RED] a journal tail replay after a snapshot double-applies subsumed ops (no ledger fast-forward)", async () => {
+    const pair = createLoopbackPair();
+    const hostGate = new ChannelGate(pair.host);
+    const applied: number[] = [];
+    const hostMgr = new CoopDurabilityManager(hostGate);
+    const guestMgr = new CoopDurabilityManager(pair.guest, recordingWaveHooks(applied));
+
+    hostMgr.commit("wave", 1, { t: "waveResolved", wave: 1, outcome: "win" });
+    hostMgr.commit("wave", 2, { t: "waveResolved", wave: 2, outcome: "win" });
+    await flush();
+    expect(applied).toEqual([1, 2]);
+
+    // Host commits 3,4,5 while the channel is dark: the guest misses them.
+    hostGate.cut = true;
+    for (const w of [3, 4, 5]) {
+      hostMgr.commit("wave", w, { t: "waveResolved", wave: w, outcome: "win" });
+    }
+    await flush();
+    expect(applied).toEqual([1, 2]);
+
+    // The rejoin FULL-SNAPSHOT pull adopts the host's authoritative state at head=5: the guest's LIVE
+    // state now already includes 3,4,5. In production this is the DATA-plane snapshot, which does NOT
+    // update the durability receiver ledger - so it stays at 2. (No manager.adoptSnapshot is called here.)
+
+    // Channel recovers; the committer resends its committed-but-unacked tail (3,4,5) on reconnect.
+    hostGate.cut = false;
+    guestMgr.reconnect();
+    await flush();
+
+    // The snapshot already materialized 3,4,5; the durability applier must NOT re-run them. But the stale
+    // ledger (still at 2) treats the resent tail as new -> DOUBLE APPLY. (Post-fix: adoptSnapshot fast-
+    // forwards the ledger to 5, so the resent tail is deduped and `applied` stays [1,2].)
+    expect(applied, "ops the snapshot subsumed must not re-run through the durability applier").toEqual([1, 2]);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
 });
