@@ -80,4 +80,6 @@ export enum UiMode {
   SHOWDOWN_WAGER,
   /** Showdown 1v1: the full-screen Set Editor (identity column + field rows + shared search pane). */
   SHOWDOWN_SET_EDITOR,
+  /** Showdown 1v1: the TEAM PRESET MENU - the new pre-pairing entry screen (build/select before lobby). */
+  SHOWDOWN_TEAM_MENU,
 }

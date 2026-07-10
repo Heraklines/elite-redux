@@ -85,6 +85,7 @@ import { buildDemoConfig } from "#ui/er-shiny-lab-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
 import { buildShowdownEditorDemoConfig, EditorField } from "#ui/showdown-set-editor-ui-handler";
+import { buildShowdownTeamMenuDemoConfig } from "#ui/showdown-team-menu-ui-handler";
 import type { ShowdownWagerArgs } from "#ui/showdown-wager-ui-handler";
 import { getModifierType } from "#utils/modifier-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -932,6 +933,36 @@ const RECIPES: Record<string, Recipe> = {
         initialField: EditorField.ABILITY,
       }),
     ],
+    diffTolerance: 0,
+  },
+  // Showdown TEAM PRESET MENU (addendum): the pre-pairing entry screen. Left = stylish preset boxes
+  // (name + validity marker + 6 mini icons) with a trailing create box; right = the hovered mon's
+  // full sprite + ability/innates + item + moveset (live preview). Multi-team with hover preview on
+  // the first team's first mon. Data-driven demo config (two valid teams + one invalid).
+  "showdown-team-menu": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => [buildShowdownTeamMenuDemoConfig()],
+    diffTolerance: 0,
+  },
+  // Empty state: no saved presets -> the large "create your first team" affordance, cursor on it,
+  // the right panel inviting a build.
+  "showdown-team-menu-empty": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => [buildShowdownTeamMenuDemoConfig({ presets: [], initialTeam: 0 })],
+    diffTolerance: 0,
+  },
+  // Invalid-team marker: hover the third (invalid) preset - its box shows the INVALID marker + red
+  // edge, and its preview still renders (confirm on it would explain, not enter the lobby).
+  "showdown-team-menu-invalid": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => [buildShowdownTeamMenuDemoConfig({ initialTeam: 2, initialMon: 0 })],
+    diffTolerance: 0,
+  },
+  // Rename prompt: the in-handler rename overlay (same DOM-input infra as the editor search) composited
+  // over the menu, seeded with the hovered team's current name.
+  "showdown-team-menu-rename": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => [buildShowdownTeamMenuDemoConfig({ initialTeam: 0, initialRenaming: true })],
     diffTolerance: 0,
   },
   // interaction round-trips (the keystroke half is covered by showdown-editor-input.test.ts).

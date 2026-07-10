@@ -1,0 +1,162 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Showdown TEAM PRESET MENU - the cursor model + confirm routing (addendum).
+//
+// Contract asserted here:
+//   - Cursor defaults to the FIRST mon of the FIRST team box.
+//   - LEFT/RIGHT cycle mons WITHIN the hovered team (wrapping among its real mons).
+//   - UP/DOWN switch teams, INCLUDING onto the trailing create box, resetting the mon cursor.
+//   - CONFIRM: create box -> onCreate; valid team -> onEnterLobby; INVALID team -> explains
+//     (notice set) and NEVER enters the lobby.
+//   - E -> onEdit; N -> onDelete (updates the local view); R -> opens the rename overlay.
+// Gated ER_SCENARIO (needs the real GameManager for the registered handler + balance tables).
+// =============================================================================
+
+import { Button } from "#enums/buttons";
+import { UiMode } from "#enums/ui-mode";
+import { GameManager } from "#test/framework/game-manager";
+import {
+  buildShowdownTeamMenuDemoConfig,
+  type ShowdownTeamMenuConfig,
+  type ShowdownTeamMenuUiHandler,
+} from "#ui/showdown-team-menu-ui-handler";
+import Phaser from "phaser";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+const RUN = process.env.ER_SCENARIO === "1";
+
+type MenuInternals = {
+  teamCursor: number;
+  monCursor: number;
+  renaming: boolean;
+  notice: string | null;
+  config: ShowdownTeamMenuConfig;
+  processInput(button: Button): boolean;
+  hoveredMon(): { speciesId: number } | null;
+};
+
+/** Stub the shared ui so confirm prompts resolve synchronously to their YES branch. */
+function stubPrompts(game: GameManager): void {
+  const ui = game.scene.ui as unknown as Record<string, unknown>;
+  ui.showText = (_t: string, _d: unknown, cb?: () => void) => cb?.();
+  ui.setOverlayMode = (_m: unknown, yes?: () => void) => {
+    yes?.();
+    return Promise.resolve(true);
+  };
+  ui.revertMode = () => Promise.resolve(true);
+  ui.playSelect = () => {};
+  ui.playError = () => {};
+}
+
+function buildMenu(
+  game: GameManager,
+  overrides: Partial<ShowdownTeamMenuConfig> = {},
+): { handler: ShowdownTeamMenuUiHandler; internals: MenuInternals; config: ShowdownTeamMenuConfig } {
+  const registered = game.scene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU] as ShowdownTeamMenuUiHandler;
+  const handler = new (registered.constructor as new () => ShowdownTeamMenuUiHandler)();
+  handler.setup();
+  const config = buildShowdownTeamMenuDemoConfig(overrides);
+  handler.show([config]);
+  return { handler, internals: handler as unknown as MenuInternals, config };
+}
+
+describe.runIf(RUN)("showdown team menu - cursor model + routing", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+
+  beforeAll(async () => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    game = new GameManager(phaserGame);
+    await game.importData("./test/utils/saves/everything.prsv");
+    stubPrompts(game);
+  });
+
+  afterAll(() => {
+    phaserGame?.destroy(true);
+  });
+
+  it("defaults to the first mon of the first team box", () => {
+    const { internals, config } = buildMenu(game);
+    expect(internals.teamCursor).toBe(0);
+    expect(internals.monCursor).toBe(0);
+    expect(internals.hoveredMon()?.speciesId).toBe(config.presets[0].mons[0].speciesId);
+  });
+
+  it("LEFT/RIGHT cycle mons WITHIN the hovered team (wrapping among real mons)", () => {
+    const { internals, config } = buildMenu(game);
+    const teamSize = config.presets[0].mons.length; // Sand Rush = 4
+    internals.processInput(Button.RIGHT);
+    expect(internals.monCursor).toBe(1);
+    internals.processInput(Button.LEFT);
+    internals.processInput(Button.LEFT);
+    expect(internals.monCursor).toBe(teamSize - 1); // wrapped past 0
+  });
+
+  it("UP/DOWN switch teams and reset the mon cursor, incl. onto the create box", () => {
+    const { internals, config } = buildMenu(game);
+    internals.processInput(Button.RIGHT); // monCursor = 1 on team 0
+    internals.processInput(Button.DOWN); // team 1
+    expect(internals.teamCursor).toBe(1);
+    expect(internals.monCursor).toBe(0); // reset on team switch
+    // Walk down to the trailing create box (presets.length rows in, index === presets.length).
+    internals.processInput(Button.DOWN); // team 2
+    internals.processInput(Button.DOWN); // create box
+    expect(internals.teamCursor).toBe(config.presets.length);
+    expect(internals.hoveredMon()).toBeNull();
+  });
+
+  /** Flush the prompt's revertMode().then(onYes) microtask chain. */
+  const flush = () => new Promise(r => setTimeout(r, 0));
+
+  it("CONFIRM on the create box calls onCreate", async () => {
+    const onCreate = vi.fn();
+    const { internals, config } = buildMenu(game, { onCreate });
+    for (const _ of config.presets) {
+      internals.processInput(Button.DOWN);
+    }
+    internals.processInput(Button.ACTION);
+    await flush();
+    expect(onCreate).toHaveBeenCalledOnce();
+  });
+
+  it("CONFIRM on a valid team calls onEnterLobby with its index", async () => {
+    const onEnterLobby = vi.fn();
+    const { internals } = buildMenu(game, { onEnterLobby });
+    internals.processInput(Button.ACTION); // team 0 is valid
+    await flush();
+    expect(onEnterLobby).toHaveBeenCalledWith(0);
+  });
+
+  it("CONFIRM on an INVALID team explains and never enters the lobby", () => {
+    const onEnterLobby = vi.fn();
+    const { internals } = buildMenu(game, { initialTeam: 2, onEnterLobby }); // Legacy Squad = invalid
+    internals.processInput(Button.ACTION);
+    expect(onEnterLobby).not.toHaveBeenCalled();
+    expect(internals.notice).not.toBeNull();
+  });
+
+  it("E edits, N deletes (updating the local view), R opens the rename overlay", async () => {
+    const onEdit = vi.fn();
+    const onDelete = vi.fn();
+    const onRename = vi.fn();
+    const { internals, config } = buildMenu(game, { onEdit, onDelete, onRename });
+    const startCount = config.presets.length;
+
+    internals.processInput(Button.CYCLE_ABILITY); // E
+    expect(onEdit).toHaveBeenCalledWith(0);
+
+    internals.processInput(Button.CYCLE_SHINY); // R
+    expect(internals.renaming).toBe(true);
+    internals.processInput(Button.MENU); // Esc cancels rename
+    expect(internals.renaming).toBe(false);
+
+    internals.processInput(Button.CYCLE_NATURE); // N -> delete (prompt YES)
+    await flush();
+    expect(onDelete).toHaveBeenCalledWith(0);
+    expect(config.presets.length).toBe(startCount - 1); // local view updated
+  });
+});
