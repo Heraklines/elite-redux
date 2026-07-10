@@ -26,6 +26,7 @@ import {
   type CoopJournalEntry,
   setCoopDurabilityEnabled,
 } from "#data/elite-redux/coop/coop-durability";
+import { adoptCoopSnapshotHighWater } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -171,6 +172,25 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     expect(hostMgr.unackedCount(), "the snapshot ACK caught the committer up to head -> nothing left to resend").toBe(
       0,
     );
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
+  it("I2b production seam: a stateSync snapshot fast-forwards every stamped operation class", async () => {
+    const pair = createLoopbackPair();
+    const hostMgr = new CoopDurabilityManager(pair.host);
+    const guestMgr = new CoopDurabilityManager(pair.guest);
+
+    for (let revision = 1; revision <= 3; revision++) {
+      hostMgr.commit("op:wave", revision, waveMsg(revision));
+    }
+    await flush();
+    expect(hostMgr.unackedCount()).toBe(3);
+
+    adoptCoopSnapshotHighWater(guestMgr, { journalHighWater: { "op:wave": 3 } });
+    await flush();
+
+    expect(hostMgr.unackedCount(), "snapshot adoption must ACK every operation revision it subsumed").toBe(0);
     hostMgr.dispose();
     guestMgr.dispose();
   });
