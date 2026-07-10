@@ -1048,6 +1048,19 @@ const RECIPES: Record<string, Recipe> = {
     prepare: () => [buildShowdownTeamMenuDemoConfig({ initialTeam: 0, initialRenaming: true })],
     diffTolerance: 0,
   },
+  // Enter-lobby / delete CONFIRM question banner: the menu paints the QUESTION over the strip (the bare
+  // CONFIRM overlay only draws Yes/No), so the player reads what they are agreeing to (maintainer: "it
+  // just says yes or no"). Also shows the per-mon held-item mini-icons on the box icons.
+  "showdown-team-menu-prompt": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => [
+      buildShowdownTeamMenuDemoConfig({
+        initialTeam: 0,
+        initialPromptText: "Enter the lobby with this team?",
+      }),
+    ],
+    diffTolerance: 0,
+  },
   // interaction round-trips (the keystroke half is covered by showdown-editor-input.test.ts).
   "showdown-editor-nav": {
     mode: UiMode.SHOWDOWN_SET_EDITOR,

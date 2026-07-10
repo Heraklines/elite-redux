@@ -24,6 +24,7 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { TitlePhase } from "#phases/title-phase";
 import { GameManager } from "#test/framework/game-manager";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -144,6 +145,39 @@ describe.runIf(RUN)("showdown team menu - real-path acceptance", () => {
     await wait(600);
     expect(mode(), "E must enter the edit build (starter-select opens)").toBe(UiMode.STARTER_SELECT);
     expect(game.scene.gameMode.isShowdown).toBe(true);
+  });
+
+  it("FREEZE BUG: cancel from a mon's Set Editor visibly returns to the grid (offline build)", async () => {
+    const phase = new TitlePhase();
+    (phase as any).openShowdownTeamMenu(() => {});
+    await wait(400);
+    press(Button.ACTION); // create -> straight into the build grid
+    await wait(500);
+    await confirmYesIfPrompted();
+    expect(mode()).toBe(UiMode.STARTER_SELECT);
+
+    const grid: any = game.scene.ui.handlers[UiMode.STARTER_SELECT];
+    // Highlight a caught species + populate the detail cursors (mirrors the render recipe), then open the
+    // Set Editor for a NEW slot - the exact "creating a mon's set" path the tester backed out of.
+    const bulbasaur = getPokemonSpecies(SpeciesId.BULBASAUR);
+    grid.lastSpecies = bulbasaur;
+    grid.speciesStarterDexEntry = game.scene.gameData.dexData[SpeciesId.BULBASAUR];
+    grid.setSpeciesDetails(bulbasaur, {}, false);
+    grid.openShowdownEditor(-1);
+    await wait(300);
+    expect(mode(), "the Set Editor opened").toBe(UiMode.SHOWDOWN_SET_EDITOR);
+    const editor: any = game.scene.ui.handlers[UiMode.SHOWDOWN_SET_EDITOR];
+    expect(editor.container.visible, "editor container is up").toBe(true);
+
+    // Back out of the set (CANCEL / B).
+    game.scene.ui.getHandler().processInput(Button.CANCEL);
+    await wait(600);
+
+    // fix-#4 lesson: assert VISIBILITY, not just mode - the freeze is the grid active (input) under a
+    // container that never repaints.
+    expect(mode(), "returns to the grid mode").toBe(UiMode.STARTER_SELECT);
+    expect(editor.container.visible, "the editor container is HIDDEN after cancel").toBe(false);
+    expect(grid.starterSelectContainer.visible, "the grid container is VISIBLE after cancel").toBe(true);
   });
 
   it("Issue 2: backing out of the build returns to the Team Menu and restores the gameMode", async () => {

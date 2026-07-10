@@ -147,6 +147,13 @@ const noTransitionModes = [
   UiMode.CHANGE_PASSWORD_FORM,
   UiMode.BUG_REPORT_FORM,
   UiMode.COMMUNITY_CHALLENGE_TEXT,
+  // Showdown Set Editor opens as an OVERLAY over the (transition-mode) STARTER_SELECT grid, so without
+  // this its open + its Cancel revert both run the fade path. In the OFFLINE build flow (reset mode-chain
+  // + MESSAGE hop before the grid) that fade could leave the black overlay stuck OPAQUE over the grid on
+  // the live client: mode was STARTER_SELECT (the grid took input - the tester heard cursor sounds) but
+  // the screen never repainted ("frozen at starter select"). An INSTANT editor swap (no fade) removes the
+  // race entirely - snappy is also the right feel for a teambuilder set editor.
+  UiMode.SHOWDOWN_SET_EDITOR,
 ];
 
 // biome-ignore lint/style/useNamingConvention: a unique case (only 2 letters)

@@ -276,23 +276,54 @@ function categoryLabel(cat: MoveCategory): string {
 }
 
 /**
- * Typeahead ranking (fuzzy PREFIX-first, substring fallback). A non-matching row is dropped; a match
- * ranks by tier - (0) the whole name starts with the filter, (1) any word starts with it, (2) it is a
- * plain substring - then alphabetically within a tier. So filtering "o" surfaces Outrage/Overheat before
- * a mere substring hit like "Diamond Blade", instead of the old pure-substring-then-alphabetical order
- * that buried the intuitive matches (the maintainer's render-review nit).
+ * Lowercase + strip apostrophes (straight AND curly) so a query and a name compare equal across the
+ * punctuation a player never types: "kings" == "king's", "farfetchd" == "farfetch'd".
  */
-function rankByFilter<T>(items: T[], nameOf: (item: T) => string, filter: string): T[] {
-  const f = filter.toLowerCase();
+function stripSoftPunct(s: string): string {
+  return s.toLowerCase().replace(/['’‘]/g, "");
+}
+
+/**
+ * Collapse ALL word separators (spaces + hyphens) after {@linkcode stripSoftPunct}, so a query typed with
+ * no separators still prefix-matches the real name: "uturn" -> "U-turn", "stonee" -> "Stone Edge",
+ * "kingsshield" -> "King's Shield". This is the separator-insensitive comparison key.
+ */
+function collapseSearchKey(s: string): string {
+  return stripSoftPunct(s).replace(/[\s-]+/g, "");
+}
+
+/** The word tokens of a name (apostrophe-stripped, split on spaces + hyphens) for word-prefix ranking. */
+function searchWords(s: string): string[] {
+  return stripSoftPunct(s)
+    .split(/[\s-]+/)
+    .filter(Boolean);
+}
+
+/**
+ * Typeahead ranking - Showdown-standard "autocomplete" order. Case-insensitive and separator-insensitive
+ * (apostrophes/hyphens/spaces normalized on BOTH sides). A non-matching row is dropped; a match ranks by
+ * tier, then alphabetically within a tier:
+ *   (0) EXACT PREFIX  - the whole name starts with the query ("ea" -> Earthquake; "sto" -> Stone Edge;
+ *       "kings" -> King's Shield; "uturn" -> U-turn).
+ *   (1) WORD PREFIX   - a later word starts with the query ("sto" -> Bleakwind Storm's "Storm").
+ *   (2) SUBSTRING     - the query appears anywhere else.
+ * So a one-char "e" surfaces every Earthquake-class prefix match above a mere substring hit like "Blaze".
+ * Exported for the ranking-matrix unit tests.
+ */
+export function rankByFilter<T>(items: T[], nameOf: (item: T) => string, filter: string): T[] {
+  const fKey = collapseSearchKey(filter);
+  if (fKey.length === 0) {
+    return [...items].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  }
   const tierOf = (name: string): number => {
-    const lower = name.toLowerCase();
-    if (lower.startsWith(f)) {
+    const nameKey = collapseSearchKey(name);
+    if (nameKey.startsWith(fKey)) {
       return 0;
     }
-    if (lower.split(/[\s-]+/).some(word => word.startsWith(f))) {
+    if (searchWords(name).some(word => word.startsWith(fKey))) {
       return 1;
     }
-    return lower.includes(f) ? 2 : 3;
+    return nameKey.includes(fKey) ? 2 : 3;
   };
   return items
     .map(item => ({ item, name: nameOf(item), tier: tierOf(nameOf(item)) }))
@@ -456,17 +487,32 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         handled = this.cycleNature(1);
         break;
       case Button.STATS:
-        // Shoulder: page between already-picked team mons.
-        if (this.config!.onCycleTeam != null) {
-          this.config!.onCycleTeam(-1);
-          handled = true;
-        }
+        // Shoulder: page to the PREVIOUS already-picked team mon.
+        handled = this.cycleTeam(-1);
+        break;
+      case Button.CYCLE_GENDER:
+        // G hotkey: PREVIOUS team mon (a keyboard-reachable partner to the shoulder; free key, no
+        // collision with the F/R/E/N field hotkeys or the arrows, and printable-suppressed while typing).
+        handled = this.cycleTeam(-1);
+        break;
+      case Button.CYCLE_TERA:
+        // V hotkey: NEXT team mon.
+        handled = this.cycleTeam(1);
         break;
     }
     if (handled) {
       this.getUi().playSelect();
     }
     return handled;
+  }
+
+  /** Switch which already-picked team mon the editor is shaping (shoulder / G / V). No-op if unwired. */
+  private cycleTeam(dir: number): boolean {
+    if (this.config?.onCycleTeam == null) {
+      return false;
+    }
+    this.config.onCycleTeam(dir);
+    return true;
   }
 
   private processPaneInput(button: Button): boolean {
@@ -1034,7 +1080,13 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_FORM, "F.png", "Stage");
     x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_SHINY, "R.png", "Shiny");
     x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_ABILITY, "E.png", "Ability");
-    this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_NATURE, "N.png", "Nature");
+    x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_NATURE, "N.png", "Nature");
+    // Switch which already-picked team mon is being shaped (G = prev, V = next) - only when the flow
+    // wired team cycling (a live build with >1 slot). Discoverable keyboard partners to the shoulders.
+    if (this.config?.onCycleTeam != null) {
+      x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_GENDER, "G.png", "Prev");
+      this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_TERA, "V.png", "Next Mon");
+    }
     // Leave + commit hints on the right (Esc = back out to the grid; Enter = commit). These use WIDE
     // glyphs (ESC / ENTER), so their labels sit further right than the narrow-letter hotkeys.
     const doneW = "Done".length * 3.0 + 22;
@@ -1695,6 +1747,9 @@ export function buildShowdownEditorDemoConfig(
     activeSlot: 2,
     pickSecondsLeft: 583,
     partnerReady: false,
+    // The real editor (opened from the grid) always wires team cycling, so the demo shows the G/V
+    // "Prev / Next Mon" hotkeys in the legend bar too (a no-op here; overridden by the switch test).
+    onCycleTeam: () => {},
     ...overrides,
   };
 }

@@ -29,6 +29,32 @@ import Phaser from "phaser";
 const repeatInputDelayMillis = 250;
 
 /**
+ * True when a DOM text field currently holds focus - the Showdown Set Editor's search typeahead capture
+ * (a hidden rex `InputText`), or the login / nickname form inputs. While one does, a PRINTABLE keystroke
+ * belongs to that field's TEXT and must NOT also drive a game {@linkcode Button}: otherwise typing a move
+ * name like "earthquake" fires CYCLE_ABILITY (e) / CYCLE_SHINY (r) / CYCLE_NATURE (n) / CYCLE_FORM (f)
+ * mid-type (the Set Editor's handler whitelist made those live game buttons on that screen). Non-printable
+ * keys (arrows / Enter / Escape / Backspace, whose `event.key` is a multi-char name) still map through, so
+ * pane navigation, pick, and close keep working.
+ */
+function isDomTextInputFocused(): boolean {
+  if (typeof document === "undefined") {
+    return false;
+  }
+  const el = document.activeElement as HTMLElement | null;
+  if (el == null) {
+    return false;
+  }
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable === true;
+}
+
+/** A keydown that produced a single character (a printable key) - the standard "typed text" signal. */
+function isPrintableKeyEvent(event: KeyboardEvent): boolean {
+  return typeof event.key === "string" && event.key.length === 1;
+}
+
+/**
  * Manages and handles all input controls for the game, including keyboard and gamepad interactions.
  *
  * @remarks
@@ -325,6 +351,10 @@ export class InputsController {
   keyboardKeyDown(event: KeyboardEvent): void {
     this.lastSource = "keyboard";
     this.ensureKeyboardIsInit();
+    // Printable keys belong to a focused DOM text field's text, not to game buttons (see isDomTextInputFocused).
+    if (isPrintableKeyEvent(event) && isDomTextInputFocused()) {
+      return;
+    }
     const buttonDown = getButtonWithKeycode(this.getActiveConfig(Device.KEYBOARD)!, event.keyCode);
     if (buttonDown != null) {
       if (this.buttonLock.includes(buttonDown)) {
@@ -352,6 +382,11 @@ export class InputsController {
    */
   keyboardKeyUp(event: KeyboardEvent): void {
     this.lastSource = "keyboard";
+    // Symmetric with keyboardKeyDown: a printable key suppressed on the way down must not emit a stray
+    // input_up (which would also mis-splice buttonLock, since its down was never locked).
+    if (isPrintableKeyEvent(event) && isDomTextInputFocused()) {
+      return;
+    }
     // Bang is safe here; can't receive keyboard input if no active keyboard
     const buttonUp = getButtonWithKeycode(this.getActiveConfig(Device.KEYBOARD)!, event.keyCode);
     if (buttonUp != null) {
