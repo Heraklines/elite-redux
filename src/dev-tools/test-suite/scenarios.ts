@@ -13864,4 +13864,257 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  // ===========================================================================
+  // TIER-4 audit fixes
+  // ===========================================================================
+  {
+    label: "Ability: Impulse (Speed replaces Attack)",
+    description:
+      "Impulse (2.65 dex): 'Non-contact moves use the Speed stat for damage INSTEAD OF\n"
+      + "Attack/Special Attack.' It was adding Speed to Attack (~2x); now it replaces.\n"
+      + "DO: as fast, low-Attack Ninjask, use the non-contact move Swift on the foe.\n"
+      + "EXPECT: Swift hits for damage based on your (high) Speed, not your (low) Attack.\n"
+      + "A CONTACT move (e.g. Fury Cutter) still uses Attack normally.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5274), // Impulse
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.NINJASK, { moveset: [MoveId.SWIFT, MoveId.FURY_CUTTER, MoveId.REST, MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Super Hot Goo (contact-gated)",
+    description:
+      "Super Hot Goo (2.65 dex): '30% burn AND -1 Speed to the attacker when hit by a\n"
+      + "CONTACT move.' The -1 Speed used to fire on ANY move; now it is contact-gated.\n"
+      + "DO: let the foe hit you with a NON-contact move (Water Gun) - nothing happens to\n"
+      + "its Speed. Then a CONTACT move (Tackle) - now it can lose Speed / be burned.\n"
+      + "EXPECT: no Speed drop from the non-contact hit; the contact hit drops its Speed.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5199), // Super Hot Goo
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.WATER_GUN, MoveId.TACKLE],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.PROTECT, MoveId.REST, MoveId.SPLASH, MoveId.BODY_SLAM] }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Rite Of Spring (sun boosts)",
+    description:
+      "Rite Of Spring (2.65 dex): 'In sun, boosts Speed AND the highest attacking stat by\n"
+      + "50%.' The old composite gave Speed x2, SpAtk-only, plus an unwanted HP drain.\n"
+      + "DO: in harsh sun, attack over a couple of turns.\n"
+      + "EXPECT: you outspeed/hit ~50% harder in sun (Speed +50% and your higher of\n"
+      + "Atk/SpAtk +50%), and you take NO per-turn HP loss from the ability.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        WEATHER_OVERRIDE: WeatherType.SUNNY,
+        ABILITY_OVERRIDE: erAbility(5503), // Rite Of Spring
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.REST, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Crispy Cream (burn OR frostbite)",
+    description:
+      "Crispy Cream (2.65 dex): '30% to inflict burn OR frostbite when hit by contact.'\n"
+      + "It used to roll two independent 15% chances (could land both); now it is ONE\n"
+      + "30% roll that picks a single outcome.\n"
+      + "DO: let the foe repeatedly hit you with a CONTACT move (Tackle).\n"
+      + "EXPECT: roughly 30% of contact hits inflict EITHER burn OR frostbite on the foe -\n"
+      + "never both at once on one hit.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5593), // Crispy Cream
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.PROTECT, MoveId.REST, MoveId.SPLASH, MoveId.BODY_SLAM] }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Volcano Rage (50 BP Eruption follow-up)",
+    description:
+      "Volcano Rage (2.65 dex): 'After any Fire move, a followup Eruption at 50 base power\n"
+      + "that scales with the user's HP.' It was firing Eruption at its full 150 BP (3x).\n"
+      + "DO: use a Fire move (Ember) on the foe at full HP.\n"
+      + "EXPECT: a followup Eruption lands, but at ~50 BP (a THIRD of a real Eruption).\n"
+      + "As your HP drops, the followup scales down.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5119), // Volcano Rage
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.CHARIZARD, { moveset: [MoveId.EMBER, MoveId.FLAMETHROWER, MoveId.REST, MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Relic Stone (suppresses foe STAB)",
+    description:
+      "Relic Stone (2.65 dex): 'While on field, every OTHER Pokemon gets no STAB bonus.'\n"
+      + "It was a no-op; now it is a real field aura.\n"
+      + "DO: attack the foe with a STAB move (Snorlax's Normal Body Slam) while the foe has\n"
+      + "Relic Stone.\n"
+      + "EXPECT: your Body Slam deals ~1.5x LESS than normal (no STAB bonus) because the\n"
+      + "foe's Relic Stone suppresses your STAB. (Your foe's own STAB still works.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: erAbility(5567), // Relic Stone
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT, MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Toxic Spill (field-wide + Poison Heal)",
+    description:
+      "Toxic Spill (2.65 dex): 'Damages all non-Poison Pokemon 1/8 HP each turn; Poison\n"
+      + "Heal holders recover instead.' It was foes-only with no Poison Heal branch.\n"
+      + "DO: hold Toxic Spill; every turn watch the non-Poison foe lose 1/8 HP. (In\n"
+      + "doubles a non-Poison ally would also take it.)\n"
+      + "EXPECT: the non-Poison foe chips 1/8 each turn; a Poison Heal foe would HEAL 1/8\n"
+      + "instead; a Poison-type foe is unaffected.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5147), // Toxic Spill
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.PROTECT, MoveId.REST, MoveId.SPLASH, MoveId.BODY_SLAM] }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Toxic Boost (Toxic-Terrain self-poison)",
+    description:
+      "Toxic Boost (2.65 dex): '+50% Attack when poisoned; immediately self-poisons in\n"
+      + "Toxic Terrain (any grounding); nullifies poison damage.' The self-poison in Toxic\n"
+      + "Terrain was missing.\n"
+      + "DO: start in Toxic Terrain holding Toxic Boost, then attack.\n"
+      + "EXPECT: you become POISONED on entry (from the terrain), take NO poison damage,\n"
+      + "and hit ~50% harder physically from the Toxic Boost Attack bonus.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        STARTING_TERRAIN_OVERRIDE: TerrainType.TOXIC,
+        ABILITY_OVERRIDE: AbilityId.TOXIC_BOOST,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT, MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Salt Circle (traps all foes)",
+    description:
+      "Salt Circle (2.65 dex): 'When the user enters, all opposing Pokemon cannot flee or\n"
+      + "switch until it leaves. Forced switches / pivot moves still work.' It used to trap\n"
+      + "only one foe via Mean Look; now it is a continuous field trap.\n"
+      + "DO: with a wild foe, open the menu and try to switch out is fine (you're not\n"
+      + "trapped); the FOE cannot switch. (Best observed vs a trainer, but wild works too.)\n"
+      + "EXPECT: the opposing Pokemon is trapped for as long as your Salt Circle mon is out;\n"
+      + "Ghost-types and Run Away foes are still free.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5273), // Salt Circle
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT, MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Electromorphosis (charge on any move)",
+    description:
+      "Electromorphosis (2.65 dex): 'When hit by ANY move, becomes Charged (next Electric\n"
+      + "move doubled).' Vanilla only charged on a DAMAGING hit; ER charges on any move.\n"
+      + "DO: let the foe hit you with a STATUS move (Growl), then fire an Electric move.\n"
+      + "EXPECT: the Growl still makes you Charged ('became charged!'), so your next\n"
+      + "Electric move is doubled. Before the fix a status move did not charge you.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.ELECTROMORPHOSIS,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.GROWL],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, { moveset: [MoveId.THUNDERBOLT, MoveId.PROTECT, MoveId.REST, MoveId.SPLASH] }),
+      ];
+    },
+  },
 ];
