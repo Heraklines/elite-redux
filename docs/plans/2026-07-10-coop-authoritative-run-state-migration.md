@@ -843,3 +843,86 @@ A Wave-2 agent building from this doc alone can:
 - Keep the interaction counter live and lock-stepped to `revision` (`§1.8`) until the final step.
 - Never flip the renderer allowlist default without cross-checking `§3` against the parallel agent.
 
+---
+
+## 8. TEMPLATE — how to migrate a surface (distilled from Wave-2a: biome travel)
+
+Wave-2a migrated the FIRST surface (biome travel: `biomePick` #15 + `crossroads` #14) onto the
+operation model. This is the recipe every later surface copies. It is grounded in the actual files
+that landed:
+- `src/data/elite-redux/coop/coop-operation-envelope.ts` — the envelope types + id mint/parse + closed-union guards (§1.1).
+- `src/data/elite-redux/coop/coop-operation-runtime.ts` — `CoopOperationHost` (commit log) + `CoopOperationGuest` (idempotent applier), engine-free (§1.3-§1.7).
+- `src/data/elite-redux/coop/coop-biome-operation.ts` — the per-surface ADAPTER (flag + owner-commit seam + watcher-adopt gate).
+- `test/tests/elite-redux/coop/coop-operation-runtime.test.ts` — the lifecycle SPEC (exhaustive, engine-free).
+- `test/tests/elite-redux/coop/coop-duo-biome-operation.test.ts` — the two-engine end-to-end + adversarial repro.
+
+### 8.1 The steps
+
+1. **Declare the operation kind + payload** in `coop-operation-envelope.ts`: add the `CoopOperationKind`
+   member(s) (they are already declared for every §2 surface) and a typed per-kind payload interface. Add
+   the kind to `KNOWN_OPERATION_KINDS` (it is the fail-closed allowlist, §1.7).
+2. **Write a per-surface adapter** `coop-<surface>-operation.ts`, modeled on `coop-biome-operation.ts`:
+   - a FLAG (`is<Surface>OperationEnabled()` / `set…Enabled()` / `reset…Flag()`), default ON, gated by the
+     `COOP_PROTOCOL_VERSION` bump (§5.2). An env override (`process.env.<SURFACE>_OP === "off"`) lets CI +
+     rollback force legacy;
+   - per-session state (`CoopOperationHost` on the authority, `CoopOperationGuest` for watching, a
+     `lastAppliedPinned` watcher order), created lazily and RESET on session boundaries (step 5);
+   - an OWNER-parity validator (`intent.owner === coopInteractionOwnerSeat(pinned)`) — the typed successor
+     of `isLocalOwnerAtCounter`;
+   - an OWNER-commit seam (`commit…OwnerIntent`) — mints the typed intent, and on the authority COMMITS it
+     through `CoopOperationHost.submit` (revision++);
+   - a WATCHER-adopt gate (`adopt…WatcherChoice`) — wraps the awaited relay result, (on the authority)
+     commits the guest's intent, then gates adoption idempotently by `operationId` + the monotonic pinned
+     order (invariants 5, 6). Returns `{ adopt } | { adopt:false, reason }`. When the flag is OFF it is a
+     pass-through (pure legacy).
+3. **Wire the phases at exactly two seams**, ADDITIVELY (never delete the legacy relay send/await):
+   - OWNER terminal (the single relay-send funnel, e.g. `coopRelayOwnerBiome` / `coopOwnerCommit`): keep
+     the legacy `sendInteractionChoice`, then ALSO call `commit…OwnerIntent` (dual-run, §1.8);
+   - WATCHER adopt (right after `awaitCoopChoiceWithOrphanBackstop`): route the awaited `res` through
+     `adopt…WatcherChoice`; on `adopt:false` fall to the SAME deterministic backstop the timeout path uses.
+4. **Bump `COOP_PROTOCOL_VERSION`** (paired clients share it, so a session is both-envelope or both-legacy,
+   never half — §5.2) and add the `envelope`/`envelopeAck`/`reconnectSync` arms if not already present
+   (additive, forward-safe).
+5. **Reset the operation state on session boundaries**: call `reset…OperationState()` from BOTH
+   `assembleCoopRuntime` (session start — a fresh control plane, §1.4) and `clearCoopRuntime` (teardown),
+   so a new run's counter (re-init from base 0, reusing seq addresses) can never collide with a prior run's
+   applied `operationId`s. Do NOT reset on hot rejoin (it pulls a snapshot without re-assembling).
+6. **Prove it** (§5.3): the surface's existing `coop-duo-*` suites green under BOTH flag states (env
+   `<SURFACE>_OP=off` forces legacy); a NEW `coop-duo-<surface>-operation` test driving the migrated path
+   end-to-end PLUS one adversarial case (a stale buffered pick from a previous op is rejected — the #861
+   shape); the 35-wave soak green under both flag states. `tsc` zero new vs parent.
+
+### 8.2 Design deltas Wave-2a hit (amendments to the doc's model, honored by every later surface)
+
+- **Carrier (dual-run rides the relay, not a new wire message).** §1.1 adds an `envelope` message; §5.1.2
+  keeps the legacy relay firing. Wave-2a rides the envelope's CONTROL fields over the EXISTING relay
+  carrier and sends NO new wire message — the biome decision's DATA still travels on the existing
+  per-turn checkpoint / `waveEndState` (§1.2 keeps the data apply as-is). The `envelope`/`envelopeAck`/
+  `reconnectSync` arms are therefore DECLARED but not yet sent/received (both ends land in the journal
+  wave, Wave-2b). Consequence: the `#820` sender-only-channel guard allowlists them until Wave-2b.
+- **Surface-local revision, not the global dense revision.** §1.5's `revision` is dense across ALL
+  surfaces + turns. With only ONE surface migrated, the biome ops are sparse in the global order (the
+  counter advances for still-legacy reward/ME interactions in between), which would false-trip the guest
+  applier's gap check. Wave-2a feeds the guest a SURFACE-LOCAL dense revision (+1 per biome/crossroads op)
+  and enforces cross-op stale ordering on the pinned interaction counter (which advances in lockstep,
+  §1.8). The global dense revision replaces the surface-local one when every surface is migrated.
+- **`authoritativeState` placeholder for control-only classification.** The guest applier reads only the
+  CONTROL fields; the watcher-gate builds an envelope with a minimal placeholder `authoritativeState` it
+  never adopts (the real adopt-by-id apply is untouched, adjudication (a)). Later waves that broadcast a
+  real `envelope` embed the live state object by reference (§1.2).
+- **Single-process harness state-sharing pitfall (important for every duo test).** In the two-engine
+  harness both clients share module-level state (production has separate processes). The owner-commit and
+  watcher-adopt of the SAME interaction must not contaminate each other: advance the monotonic
+  `lastAppliedPinned` order ONLY on a watcher adoption, never on the owner's own commit, and reject a pick
+  strictly BELOW it (`<`, not `<=`) so a re-delivery is caught by the `operationId` dedupe instead. Reset
+  the surface state at session assembly so reused seq addresses across runs/scenarios don't false-dedupe.
+
+### 8.3 Flag semantics (per surface)
+
+`is<Surface>OperationEnabled()`: default ON. Activation is HARD-gated by the `COOP_PROTOCOL_VERSION`
+handshake — a mixed-build pair refuses to pair / banners (`coop-session-controller.ts:843-852`), so a live
+session has both peers on the envelope build. The legacy path stays selectable: `set…Enabled(false)` is the
+one-line per-surface rollback (§5.4) — it reverts only the surface's DRIVE to the counter+relay path; the
+envelope infrastructure keeps running harmlessly. CI/soak force legacy via the `<SURFACE>_OP=off` env
+override. The counter and the legacy relay are NEVER removed until every surface is migrated (§1.8, §5.4).
+
