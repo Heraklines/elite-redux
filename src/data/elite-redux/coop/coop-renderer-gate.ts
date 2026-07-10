@@ -165,12 +165,53 @@ export const COOP_RENDERER_DENIED_PHASES: ReadonlySet<string> = new Set<string>(
 ]);
 
 /**
+ * Read the INITIAL enforcement mode without a rebuild, so the nightly/soak (env) or a staging
+ * tester (localStorage / URL) can flip fail-closed for a run. Precedence: URL `?coopgateenforce=1`
+ * > localStorage `coopGateEnforce` > env `COOP_RENDERER_GATE_ENFORCE` > default OFF (observe). All
+ * reads are guarded (no DOM / no `process` reads as OFF), so solo / host / a normal browser build
+ * is unaffected. Kept OFF by default: fail-closed on a mis-classification is a prod hang, so the
+ * flip to ENFORCE is a deliberate ops action after clean staging + soaks (see the module header).
+ */
+function readInitialEnforced(): boolean {
+  try {
+    const loc = (globalThis as { location?: { search?: string } }).location;
+    if (loc?.search) {
+      const q = new URLSearchParams(loc.search).get("coopgateenforce");
+      if (q === "1" || q === "true") {
+        return true;
+      }
+      if (q === "0" || q === "false") {
+        return false;
+      }
+    }
+    const ls = (globalThis as { localStorage?: Storage }).localStorage?.getItem("coopGateEnforce");
+    if (ls === "1") {
+      return true;
+    }
+    if (ls === "0") {
+      return false;
+    }
+  } catch {
+    // headless / SSR / no DOM: fall through to the env / compile default.
+  }
+  try {
+    const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+    if (env?.COOP_RENDERER_GATE_ENFORCE === "1" || env?.COOP_RENDERER_GATE_ENFORCE === "true") {
+      return true;
+    }
+  } catch {
+    // no `process` (browser): env is not a source here.
+  }
+  return false;
+}
+
+/**
  * Enforcement flag. `false` (default) = OBSERVE / warn-first: a non-allowlisted phase RUNS (or,
  * if in the legacy denylist, neutralizes as today) and is logged WOULD-BLOCK. `true` = ENFORCE:
  * a non-allowlisted phase fails closed (neutralized + logged BLOCK). Flipped by the migration
  * follow-up after clean staging + soaks; the unit test flips it on to prove fail-closed.
  */
-let enforced = false;
+let enforced = readInitialEnforced();
 
 /** Whether the renderer allowlist is ENFORCED (fail-closed) vs OBSERVE (warn-first, the default). */
 export function isCoopRendererGateEnforced(): boolean {
