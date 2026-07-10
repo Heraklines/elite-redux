@@ -329,6 +329,17 @@ export class CoopInteractionRelay {
   }
 
   /**
+   * Deliver a host-COMMITTED interaction choice from the durable operation carrier into the same local
+   * FIFO/waiter seam as a live legacy `interactionChoice` frame. This is deliberately local-only: the
+   * journal already transported and authenticated the committed envelope, so re-sending it would create a
+   * second network carrier. A waiting phase wakes immediately; otherwise the choice is buffered until that
+   * phase opens. The surface adapter still performs its normal operation-ledger adopt before mutating.
+   */
+  materializeCommittedInteractionChoice(seq: number, kind: string, choice: number, data?: number[]): void {
+    this.deliverInteractionChoice(seq, { choice, data, kind });
+  }
+
+  /**
    * WATCHER: take the next owner choice for interaction `seq` (FIFO). Resolves
    * immediately if one is already buffered, else waits for the next to arrive, or
    * resolves `null` on timeout (the watcher then leaves the screen, never hangs).
@@ -795,6 +806,34 @@ export class CoopInteractionRelay {
     return true;
   }
 
+  /** Route a trusted local/wire choice to an accepting waiter or the per-seq FIFO. */
+  private deliverInteractionChoice(seq: number, choice: CoopInteractionChoice): void {
+    const waiter = this.pending.get(seq);
+    if (waiter && kindAccepted(choice.kind, waiter.expectedKinds)) {
+      if (isCoopDebug()) {
+        coopLog("relay", `DELIVER interactionChoice seq=${seq} -> waiter ${summarizeChoice(choice)}`);
+      }
+      waiter.finish(choice);
+      return;
+    }
+    if (waiter) {
+      coopWarn(
+        "relay",
+        `DELIVER interactionChoice seq=${seq} kind=${choice.kind ?? "?"} MISMATCH parked waiter `
+          + `(expected [${(waiter.expectedKinds ?? []).join(",")}]) -> BUFFER, waiter stays parked (#861)`,
+      );
+    }
+    const queue = this.inbox.get(seq) ?? [];
+    queue.push(choice);
+    this.inbox.set(seq, queue);
+    if (isCoopDebug()) {
+      coopLog(
+        "relay",
+        `DELIVER interactionChoice seq=${seq} -> BUFFER inbox depth=${queue.length} ${summarizeChoice(choice)}`,
+      );
+    }
+  }
+
   private handle(msg: CoopMessage): void {
     if (msg.t === "revivalPrompt") {
       coopLog("relay", `RECV revivalPrompt fieldIndex=${msg.fieldIndex} (#809)`);
@@ -868,8 +907,6 @@ export class CoopInteractionRelay {
     if (this.isForgedCrossOwnerSwitch(msg.seq, msg.choice)) {
       return;
     }
-    // #861: carry the wire `kind` onto the choice so the KIND-VALIDATION can gate delivery + buffer-hits.
-    const choice: CoopInteractionChoice = { choice: msg.choice, data: msg.data, kind: msg.kind };
     // #record-replay: capture this RECEIVED (partner-owned) interaction pick so the host's single trace
     // captures EVERY committed interaction, not just its own (no-op unless recording on the host).
     recordReplayInteraction({
@@ -879,34 +916,8 @@ export class CoopInteractionRelay {
       choice: msg.choice,
       ...(msg.data === undefined ? {} : { data: [...msg.data] }),
     });
-    const waiter = this.pending.get(msg.seq);
-    // #861: only deliver straight to a parked waiter when the incoming kind is one that waiter declared it
-    // consumes. A mismatch (a stale/cross-family arrival at this reused seq) is NOT delivered - it falls
-    // through to the buffer + is loudly logged, and the waiter stays parked for its genuine pick.
-    if (waiter && kindAccepted(msg.kind, waiter.expectedKinds)) {
-      if (isCoopDebug()) {
-        coopLog("relay", `RECV interactionChoice seq=${msg.seq} -> deliver-to-waiter ${summarizeChoice(choice)}`);
-      }
-      waiter.finish(choice);
-      return;
-    }
-    if (waiter) {
-      coopWarn(
-        "relay",
-        `RECV interactionChoice seq=${msg.seq} kind=${msg.kind} MISMATCH parked waiter `
-          + `(expected [${(waiter.expectedKinds ?? []).join(",")}]) -> BUFFER, waiter stays parked (#861)`,
-      );
-    }
-    // No (accepting) waiter yet - buffer FIFO for the next awaitInteractionChoice(seq).
-    const queue = this.inbox.get(msg.seq) ?? [];
-    queue.push(choice);
-    this.inbox.set(msg.seq, queue);
-    if (isCoopDebug()) {
-      coopLog(
-        "relay",
-        `RECV interactionChoice seq=${msg.seq} -> BUFFER inbox depth=${queue.length} ${summarizeChoice(choice)}`,
-      );
-    }
+    // #861: carry the wire `kind` onto the choice so the KIND-VALIDATION can gate delivery + buffer-hits.
+    this.deliverInteractionChoice(msg.seq, { choice: msg.choice, data: msg.data, kind: msg.kind });
   }
 }
 

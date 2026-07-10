@@ -38,6 +38,7 @@ import {
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import {
+  armCoopBiomeJournalMaterialization,
   isCoopBiomeOperationEnabled,
   resetCoopBiomeOperationState,
   setCoopBiomeOperationRevisionFloor,
@@ -79,8 +80,11 @@ import {
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import type {
   CoopAuthoritativeEnvelopeV1,
+  CoopBiomePickPayload,
+  CoopCrossroadsPickPayload,
   CoopWaveAdvancePayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
+import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   coopOperationDurabilityHooks,
   registerCoopOperationLiveSink,
@@ -93,7 +97,13 @@ import {
   resetCoopRewardOperationState,
   setCoopRewardOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-reward-operation";
-import { COOP_ME_TERM_SEQ_BASE, COOP_REJOIN_SYNC_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import {
+  COOP_BIOME_PICK_SEQ_BASE,
+  COOP_CROSSROADS_SEQ_BASE,
+  COOP_ME_TERM_SEQ_BASE,
+  COOP_REJOIN_SYNC_SEQ_BASE,
+  COOP_STORMGLASS_SEQ,
+} from "#data/elite-redux/coop/coop-seq-registry";
 import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
@@ -1796,6 +1806,53 @@ registerCoopOperationLiveSink("op:wave", (envelope: CoopAuthoritativeEnvelopeV1)
 });
 
 /**
+ * Production biome live-materializer. Captures the RECEIVING runtime rather than consulting the ambient
+ * singleton: transport delivery is asynchronous, and the two-engine harness may be driving the partner's
+ * scene when this receiver callback runs. Real clients have one runtime, but keeping the dependency explicit
+ * makes the production wiring correct under both topologies.
+ */
+function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const op = envelope.pendingOperation;
+  const parsed = op == null ? null : parseCoopOperationId(op.id);
+  if (op == null || parsed == null) {
+    return false;
+  }
+  if (op.kind === "BIOME_PICK") {
+    const payload = op.payload as CoopBiomePickPayload;
+    if (
+      parsed.pinnedSeq < COOP_BIOME_PICK_SEQ_BASE
+      || parsed.pinnedSeq >= COOP_STORMGLASS_SEQ
+      || typeof payload?.biomeId !== "number"
+      || typeof payload.nodeIndex !== "number"
+    ) {
+      return false;
+    }
+    runtime.interactionRelay.materializeCommittedInteractionChoice(parsed.pinnedSeq, "biomePick", payload.nodeIndex, [
+      payload.biomeId,
+    ]);
+    armCoopBiomeJournalMaterialization(op.id);
+    return true;
+  }
+  if (op.kind === "CROSSROADS_PICK") {
+    const payload = op.payload as CoopCrossroadsPickPayload;
+    if (
+      parsed.pinnedSeq < COOP_CROSSROADS_SEQ_BASE
+      || parsed.pinnedSeq >= COOP_BIOME_PICK_SEQ_BASE
+      || typeof payload?.optionIndex !== "number"
+    ) {
+      return false;
+    }
+    runtime.interactionRelay.materializeCommittedInteractionChoice(parsed.pinnedSeq, "crossroads", payload.optionIndex);
+    armCoopBiomeJournalMaterialization(op.id);
+    return true;
+  }
+  return false;
+}
+
+/**
  * Co-op WAVE-END authoritative capture (#838): the HOST streams the COMPLETE post-exp authoritative
  * battle state (whole player + enemy party as serialized PokemonData, seating, arena, modifiers, money,
  * ER substrates), captured HERE in the host's `BattleEndPhase` AFTER the wave's exp/level/evolution
@@ -2262,6 +2319,10 @@ export function assembleCoopRuntime(
     localTransport: transport,
     durability,
   };
+  // Per-runtime production sink: a journal-delivered biome op feeds this receiver's own relay. In a real
+  // process there is one runtime; in the duo harness the final (guest) assembly intentionally owns the one
+  // module-level sink, matching the sole receiver topology.
+  registerCoopOperationLiveSink("op:biome", envelope => materializeCoopBiomeChoiceFromOp(runtime, envelope));
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream);
   wireCoopEnemyPartyResponder(controller, battleStream);
