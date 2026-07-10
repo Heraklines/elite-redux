@@ -162,3 +162,40 @@ Nature: Jolly
 - In-game dev test-suite `(note)` entries for the two-client flows; solo-
   expressible pieces (editor rendering) get scenarios where drivable.
 - Gates: tsc 301, showdown suite green, coop dir unchanged, biome.
+
+## ADDENDUM (maintainer, 2026-07-11): the Team Preset Menu — new showdown entry flow
+
+The showdown ENTRY flow is inverted: teams are built/selected BEFORE pairing.
+Clicking Showdown no longer goes to the lobby/team-pick; it opens the TEAM MENU.
+
+### The Team Menu (new UiMode + handler)
+- A list of saved TEAM PRESETS (empty state if none). Presets are SERIALIZED IN
+  THE SAVE (system/account data — NOT just localStorage; they must survive
+  device changes and never be lost). This supersedes the earlier local-only v1
+  decision for TEAM presets.
+- Each preset renders as a stylish box/encapsulation (not necessarily literal
+  boxes) containing the team's mini icons + the team NAME (nameable via text
+  input at save time or from the menu).
+- Cursor model: defaults to the FIRST pokemon of the FIRST team box.
+  LEFT/RIGHT cycles pokemon WITHIN the hovered team; UP/DOWN switches teams.
+- RIGHT SIDE panel: whatever pokemon is hovered shows its FULL SPRITE +
+  abilities + item + moveset (live preview, same data language as the editor).
+- CONFIRM on an EMPTY box (or with no teams at all): prompt to CREATE a team →
+  enters the existing starter-select + Set Editor flow; when a full team is
+  confirmed there, return to the Team Menu with the team saved (and nameable).
+- CONFIRM on a saved team: prompt to ENTER THE LOBBY with this team.
+
+### Lobby consequence
+Both players arrive with pre-built teams, so pairing leads (near-)immediately
+to battle: match -> the existing negotiate/anti-tamper/wager pipeline runs on
+the PRE-BUILT manifests (the wager/ante step is PRESERVED unless the maintainer
+says otherwise - "immediately taken to battle" = no 10-minute team-pick wait,
+which this flow eliminates). The 10-minute pick window / rendezvous barriers
+around in-lobby teambuilding become legacy for this path.
+
+### Notes
+- Preset validation on load: collection may have changed since save (mon
+  released, unlock state changed) - re-validate at menu render + at lobby entry
+  with precise reasons, same language as the editor's rules.
+- Editing an existing preset: enter the same starter-select/editor flow seeded
+  with the preset.
