@@ -372,9 +372,9 @@ export interface CoopMeOwnerCommitParams {
  * ADDITIVE + dual-run: the phase / pump / quiz-mirror still fires the legacy relay send; this records the
  * authoritative operation. No-op when the flag is OFF. Never throws (the legacy relay is the fallback).
  */
-export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): void {
+export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | null {
   if (!isCoopMeOperationEnabled()) {
-    return;
+    return null;
   }
   try {
     const ownerSeat = ownerSeatFor(params.kind, params.pinned);
@@ -404,8 +404,10 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): void {
     }
     // NOTE: the owner does NOT advance lastAppliedPinned - that is a WATCHER-only order (see its field
     // doc). The owner knows its own decision; only an adopted RELAY needs the stale-ordering guard.
+    return intent.id;
   } catch (e) {
     coopWarn("me", "ME op OWNER commit threw (handled - legacy relay is the fallback) (Wave-2c)", e);
+    return null;
   }
 }
 
