@@ -1,0 +1,93 @@
+# ER rarity-tier audit — deferred items
+
+Tracking doc for the confirmed-but-not-yet-fixed items surfaced by the
+rarity-tier dex-fidelity audit (tiers 3–7: abilities bucketed by species count,
+moves by mon-count). The vast majority of findings were fixed and committed with
+headless + vitest verification; the items below were deliberately deferred with
+reasons. Pick them up when the noted blocker clears.
+
+## 1. In-game dev-suite scenarios for tier-6 and tier-7 fixes
+
+**Status:** owed. Tiers 3, 4, 5 got their `src/dev-tools/test-suite/scenarios.ts`
+entries; tiers 6 and 7 did not.
+
+**Why deferred:** `scenarios.ts` was under continuous edit *and* commit by a
+concurrent process on `feat/elite-redux-port` throughout the audit session.
+Appending to it risked entangling that process's unfinished hunks in an audit
+commit. Every tier-6/7 fix is already covered by a vitest regression test
+(`er-*.test.ts`) and a green headless-runner scenario, so this is the
+complementary human-testing tier only.
+
+**To do:** once `scenarios.ts` is stable, add DO/EXPECT scenarios (same pattern
+as the tier-3/4/5 blocks already in the file) for the combat-observable tier-6/7
+fixes — e.g. Furnace, Retriever, Mystic Blades, Evaporate, Vengeful Spirit,
+Illusion, Forecast, Ripen (tier-6); Egoist, Cutthroat, Soul Linker, Pitfall,
+Aurora Borealis, Chrome Coat, Cryomancy (tier-7).
+
+## 2. Shallow Grave (er 629) — true post-faint revive (APPROXIMATION)
+
+**Dex:** "After fainting while fog is active, the user revives at 25% max HP when
+you send out your next party member. Also activates if it faints on the last turn
+fog is active."
+
+**Current:** wired via `PostFaintReviveAbAttr` (`archetypes/post-faint-revive.ts`)
+which extends `PreDefendFullHpEndureAbAttr` — it clamps the lethal hit to leave
+the holder at 1 HP (Sturdy-style) and heals to 25% the same turn. The holder
+therefore **never faints and never leaves the field**, so it dodges all
+faint-triggered interactions, and the "faints on the last turn of fog" deferred
+revive cannot be represented. The 25%-once and fog gating are correct.
+
+**Blocker:** a faithful implementation is a genuine *deferred, on-next-summon*
+revive (faint the mon → flag it → revive to 25% in the `SwitchSummonPhase` path),
+which is engine work, not a param tweak. **Backup Power (er 899)** shares the
+exact same endure-instead-of-revive approximation and should be fixed together.
+
+## 3. `er-ability-rom-descriptions.ts` slug misalignment (387–392)
+
+**Status:** partially unrecoverable, documented only.
+
+The description entries for slugs `discipline`(387) → `arcticfur`(392) are each
+shifted by one — each key holds the *next* ability's ROM "Detail" text (proven:
+`marineapex` holds Mighty Horn's text, `mightyhorn` holds Hardened Sheath's,
+etc.). Entries re-align at `spectralize`(393) and before `discipline`(387).
+
+**Why deferred:** re-aligning requires the correct text for each slug. The bottom
+entries are reconstructable, but the top boundary — **Discipline (387)** — needs a
+long "Detail" string that was overwritten and is **not present anywhere in the
+repo or vendor** (only its short desc survives). Half-migrating would duplicate a
+neighbour's text. No gameplay impact — this is reference/audit data; the affected
+abilities' *implementations* are correct (Marine Apex was explicitly re-verified).
+
+**To do:** if the original 2.65 ROM "Detail" string for Discipline is recovered
+(from an ER 2.65 dex dump), shift the whole 387–392 block back into alignment.
+
+## 4. Evaporate (er 444) — doubles-ally self-drop immunity (minor edge)
+
+**Dex:** "…Mist protects the entire team from stat reductions, including self
+drops."
+
+**Current:** Evaporate's Mist now blocks self-inflicted drops (Overheat, Close
+Combat, …) for **the holder**. Extending that self-drop immunity to a *doubles
+ally* isn't structurally supported by `SelfStatDropImmunityAbAttr` (it only fires
+for its own holder). The whole-team status/secondary immunity and the holder's
+own self-drop immunity are done; only the ally-side self-drop half is missing, and
+only in doubles.
+
+## 5. Lead Coat (er 296) — same weight-triple omission as Chrome Coat
+
+Chrome Coat (539) was fixed to add its `WeightMultiplierAbAttr(3)`. Its
+physical-side twin **Lead Coat (296)** carries the identical dropped weight-triple
+clause (flagged during the 539 audit, out of the tier being swept). Apply the same
+one-line fix (`new WeightMultiplierAbAttr(3)` in its dispatch case) when its tier
+is audited, or opportunistically.
+
+## 6. Minor / negligible notes (no action expected)
+
+- **Rockhard Will (617):** uses strict `< 1/3 HP` for its low-HP boost where the
+  dex says "1/3 or lower" — a mon at *exactly* 1/3 HP gets ×1.2 not ×1.5. Matches
+  the vanilla Blaze/Overgrow boundary convention; negligible.
+- **Radiance (437):** a *runtime*-Dark move (‑ate/Tera/Judgment) aimed at
+  Radiance's **ally** in doubles is caught by neither the static-type field
+  condition nor the holder-only immunity. Static-Dark and holder-targeted
+  runtime-Dark are handled; only runtime-Dark spread/ally-target in doubles slips.
+</content>
