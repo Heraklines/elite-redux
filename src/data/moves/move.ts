@@ -3393,7 +3393,9 @@ export class StatusEffectAttr extends MoveEffectAttr {
 
     const quiet = move.category !== MoveCategory.STATUS;
 
-    return target.trySetStatus(this.effect, user, undefined, null, false, quiet);
+    // Pass the move's category so a status-move-only immunity bypass (ER Mycelium
+    // Might) fires only for STATUS moves, not a damaging move's secondary status.
+    return target.trySetStatus(this.effect, user, undefined, null, false, quiet, undefined, false, move.category);
   }
 
   getTargetBenefitScore(user: Pokemon, target: Pokemon, move: Move): number {

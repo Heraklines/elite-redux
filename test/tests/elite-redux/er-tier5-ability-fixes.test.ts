@@ -29,6 +29,7 @@ import type { AbilityId } from "#enums/ability-id";
 import { AbilityId as Ability } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { ErAbilityId } from "#enums/er-ability-id";
+import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
@@ -208,20 +209,28 @@ describe.skipIf(!RUN)("ER tier-5 ability fixes", () => {
       expect(enemy.getMoveEffectiveness(player, allMoves[MoveId.SPORE])).toBeGreaterThan(0);
     });
 
-    it("Toxic can poison a Steel type (status-application immunity bypass)", async () => {
+    it("a STATUS Toxic can poison a Steel type (status-application immunity bypass)", async () => {
       game.override.ability(Ability.MYCELIUM_MIGHT).enemySpecies(SpeciesId.MAGNEMITE); // Steel
       await game.classicMode.startBattle(SpeciesId.RATTATA);
       const player = game.scene.getPlayerField()[0];
       const enemy = game.scene.getEnemyField()[0];
-      expect(enemy.canSetStatus(StatusEffect.TOXIC, true, false, player)).toBe(true);
+      // Toxic is a STATUS move — the bypass fires (7th arg = the move's category).
+      expect(enemy.canSetStatus(StatusEffect.TOXIC, true, false, player, false, false, MoveCategory.STATUS)).toBe(true);
+      // A DAMAGING poison move's secondary poison does NOT pierce the Steel immunity.
+      expect(enemy.canSetStatus(StatusEffect.TOXIC, true, false, player, false, false, MoveCategory.PHYSICAL)).toBe(
+        false,
+      );
     });
 
-    it("Will-O-Wisp can burn a Fire type", async () => {
+    it("a STATUS Will-O-Wisp can burn a Fire type (but a damaging burn does not)", async () => {
       game.override.ability(Ability.MYCELIUM_MIGHT).enemySpecies(SpeciesId.VULPIX); // Fire
       await game.classicMode.startBattle(SpeciesId.RATTATA);
       const player = game.scene.getPlayerField()[0];
       const enemy = game.scene.getEnemyField()[0];
-      expect(enemy.canSetStatus(StatusEffect.BURN, true, false, player)).toBe(true);
+      expect(enemy.canSetStatus(StatusEffect.BURN, true, false, player, false, false, MoveCategory.STATUS)).toBe(true);
+      expect(enemy.canSetStatus(StatusEffect.BURN, true, false, player, false, false, MoveCategory.SPECIAL)).toBe(
+        false,
+      );
     });
 
     it("a DAMAGING move does NOT bypass a type immunity (status-category gate)", async () => {

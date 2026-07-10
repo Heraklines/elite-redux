@@ -6249,6 +6249,13 @@ export interface IgnoreTypeStatusEffectImmunityAbAttrParams extends AbAttrParams
   readonly statusEffect: StatusEffect;
   /** Holds whether the type immunity should be bypassed */
   readonly defenderType: PokemonType;
+  /**
+   * Category of the move applying the status, when it originates from a move
+   * (undefined for non-move sources like Toxic Spikes / abilities). Consulted by
+   * the `statusMoveOnly` variant (ER Mycelium Might) so only STATUS moves pierce
+   * the type immunity.
+   */
+  readonly moveCategory?: MoveCategory | undefined;
 }
 
 /**
@@ -6258,15 +6265,26 @@ export interface IgnoreTypeStatusEffectImmunityAbAttrParams extends AbAttrParams
 export class IgnoreTypeStatusEffectImmunityAbAttr extends AbAttr {
   private readonly statusEffect: readonly StatusEffect[];
   private readonly defenderType: readonly PokemonType[];
+  /** When true, only pierce the immunity for STATUS-category moves (Mycelium Might). */
+  private readonly statusMoveOnly: boolean;
 
-  constructor(statusEffect: readonly StatusEffect[], defenderType: readonly PokemonType[]) {
+  constructor(statusEffect: readonly StatusEffect[], defenderType: readonly PokemonType[], statusMoveOnly = false) {
     super(false);
 
     this.statusEffect = statusEffect;
     this.defenderType = defenderType;
+    this.statusMoveOnly = statusMoveOnly;
   }
 
-  override canApply({ statusEffect, defenderType, cancelled }: IgnoreTypeStatusEffectImmunityAbAttrParams): boolean {
+  override canApply({
+    statusEffect,
+    defenderType,
+    cancelled,
+    moveCategory,
+  }: IgnoreTypeStatusEffectImmunityAbAttrParams): boolean {
+    if (this.statusMoveOnly && moveCategory !== MoveCategory.STATUS) {
+      return false;
+    }
     return !cancelled.value && this.statusEffect.includes(statusEffect) && this.defenderType.includes(defenderType);
   }
 

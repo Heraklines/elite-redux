@@ -6572,6 +6572,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     sourcePokemon: Pokemon | null = null,
     ignoreField = false,
     ignoreTypeImmunity = false,
+    // Category of the move applying the status (null for non-move sources). Lets
+    // a status-move-only immunity bypass (ER Mycelium Might) gate on it.
+    sourceMoveCategory: MoveCategory | null = null,
   ): boolean {
     if (effect !== StatusEffect.FAINT) {
       // Status-overriding moves (i.e. Rest) fail if their respective status already exists;
@@ -6624,6 +6627,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
             cancelled: cancelImmunity,
             statusEffect: effect,
             defenderType: defType,
+            moveCategory: sourceMoveCategory ?? undefined,
           });
           return !cancelImmunity.value;
         });
@@ -6657,6 +6661,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
             cancelled: cancelImmunity,
             statusEffect: effect,
             defenderType: PokemonType.FIRE,
+            moveCategory: sourceMoveCategory ?? undefined,
           });
           if (cancelImmunity.value) {
             isImmune = false;
@@ -6729,6 +6734,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     quiet = true,
     overrideMessage?: string,
     ignoreTypeImmunity = false,
+    // Category of the move applying the status (null for non-move sources).
+    sourceMoveCategory: MoveCategory | null = null,
   ): boolean {
     // TODO: This needs to propagate failure status for status moves
     if (!effect) {
@@ -6744,7 +6751,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return this.addTag(BattlerTagType.ER_FROSTBITE, 0, undefined, sourcePokemon?.id);
     }
 
-    if (!this.canSetStatus(effect, quiet, overrideStatus, sourcePokemon, false, ignoreTypeImmunity)) {
+    if (
+      !this.canSetStatus(effect, quiet, overrideStatus, sourcePokemon, false, ignoreTypeImmunity, sourceMoveCategory)
+    ) {
       return false;
     }
     if (this.isFainted() && effect !== StatusEffect.FAINT) {

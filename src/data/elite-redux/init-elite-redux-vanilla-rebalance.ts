@@ -299,9 +299,13 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       }
       if (!ab.attrs.some(a => a instanceof IgnoreTypeStatusEffectImmunityAbAttr)) {
         ab.attrs.push(
+          // statusMoveOnly=true: only a STATUS move (Toxic vs Steel, Will-O-Wisp
+          // vs Fire) pierces the type immunity — a damaging move's secondary
+          // poison/burn does not (unlike Corrosion, which is any-move).
           new IgnoreTypeStatusEffectImmunityAbAttr(
             [StatusEffect.POISON, StatusEffect.TOXIC, StatusEffect.BURN],
             [PokemonType.STEEL, PokemonType.POISON, PokemonType.FIRE],
+            true,
           ),
         );
       }
