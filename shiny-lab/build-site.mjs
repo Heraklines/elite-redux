@@ -21,13 +21,22 @@ const present = new Set(
     .map(f => +f.slice(0, -4)),
 );
 
-// dex -> name from the species enum
+// dex -> name from the species enum (auto-incrementing: only anchors carry "= N")
 const enumSrc = fs.readFileSync("src/enums/species-id.ts", "utf8");
 const names = {};
-for (const m of enumSrc.matchAll(/^\s*([A-Z0-9_]+)\s*=\s*(\d+),/gm)) {
-  const id = +m[2];
-  if (id <= 1025 && !names[id]) {
-    names[id] = m[1]
+const nameToId = {};
+let enumVal = 0;
+for (const line of enumSrc.split("\n")) {
+  const m = line.match(/^\s*([A-Z][A-Z0-9_]*)\s*(?:=\s*(\d+)\s*)?,/);
+  if (!m) {
+    continue;
+  }
+  enumVal = m[2] !== undefined ? +m[2] : enumVal + 1;
+  if (!(m[1] in nameToId)) {
+    nameToId[m[1]] = enumVal;
+  }
+  if (enumVal <= 1025 && !names[enumVal]) {
+    names[enumVal] = m[1]
       .toLowerCase()
       .split("_")
       .map(w => (w ? w[0].toUpperCase() + w.slice(1) : w))
@@ -41,8 +50,34 @@ for (let id = 1; id <= 1025; id++) {
   }
 }
 
-const data = { cdn: CDN, species, def: present.has(144) ? 144 : species[0].i };
-console.log(`species ${species.length} | sha ${sha.slice(0, 8)}`);
+// evolution-line map (for the lineage exotic effects): { id: { p: prevId, n: [nextIds] } }
+const evoSrc = fs.readFileSync("src/data/balance/pokemon-evolutions.ts", "utf8");
+const evoBody = evoSrc.slice(evoSrc.indexOf("export const pokemonEvolutions"));
+const evo = {};
+for (const m of evoBody.matchAll(/\[SpeciesId\.([A-Z0-9_]+)\]:\s*\[([^]*?)\n  \]/g)) {
+  const from = nameToId[m[1]];
+  if (!from || from > 1025 || !present.has(from)) {
+    continue;
+  }
+  const tos = [];
+  for (const em of m[2].matchAll(/new Species(?:Form)?Evolution\(\s*SpeciesId\.([A-Z0-9_]+)/g)) {
+    const to = nameToId[em[1]];
+    if (to && to <= 1025 && to !== from && present.has(to) && !tos.includes(to)) {
+      tos.push(to);
+    }
+  }
+  if (tos.length > 0) {
+    evo[from] = { ...(evo[from] || {}), n: tos };
+  }
+}
+for (const [f, e] of Object.entries(evo)) {
+  for (const t of e.n || []) {
+    evo[t] = { ...(evo[t] || {}), p: +f };
+  }
+}
+
+const data = { cdn: CDN, species, def: present.has(144) ? 144 : species[0].i, evo };
+console.log(`species ${species.length} | evo ${Object.keys(evo).length} | sha ${sha.slice(0, 8)}`);
 
 const html = `<!doctype html>
 <html lang="en">
@@ -70,7 +105,9 @@ ${css}
     <span><span class="dot pal"></span><b>Palette</b> - crossplay-safe recolor</span>
     <span><span class="dot aura"></span><b>Surface FX</b> - on-sprite aura</span>
     <span><span class="dot aro"></span><b>Around FX</b> - aura around the mon (some partial)</span>
-    <span><span class="dot exo"></span><b>Exotic</b> - multi-sprite: copies, echoes, distortions</span>
+    <span><span class="dot exo"></span><b>Exotic</b> - multi-sprite layers around the mon</span>
+    <span><span class="dot rig"></span><b>Rig</b> - the body itself transforms</span>
+    <span><span class="dot mom"></span><b>Moment</b> - auto-looping event sequences</span>
     <span class="hint">mix one of each - click tiles or use the dropdowns</span>
   </div>
 </header>
@@ -79,6 +116,7 @@ ${css}
   <div id="stage" class="stage void">
     <div class="glow"></div>
     <canvas id="heroCanvas"></canvas>
+    <canvas id="fxCanvas"></canvas>
     <div id="status" class="status"></div>
   </div>
   <div class="panel">
@@ -87,7 +125,9 @@ ${css}
       <div class="row"><label class="lp">Palette</label><select id="sel_palette" class="sel"></select></div>
       <div class="row"><label class="ls">Surface FX</label><select id="sel_surface" class="sel"></select></div>
       <div class="row"><label class="la">Around FX</label><select id="sel_around" class="sel"></select></div>
-      <div class="row"><label class="lx">Exotic</label><select id="sel_exotic" class="sel"></select><button id="pulse" class="mini" title="Trigger event effects (Shatter)">&#9889;</button></div>
+      <div class="row"><label class="lx">Exotic</label><select id="sel_exotic" class="sel"></select></div>
+      <div class="row"><label class="lr">Rig</label><select id="sel_rig" class="sel"></select></div>
+      <div class="row"><label class="lm">Moment</label><select id="sel_moment" class="sel"></select></div>
       <div class="row"><label class="lp">Clustering</label><select id="sel_cluster" class="sel" title="How the cluster palettes segment the sprite's colors"></select></div>
       <div class="row"><label>Speed (master)</label><input id="speed" type="range" min="0.1" max="3" step="0.05" value="1"></div>
       <div class="row"><label class="lp">Pal amount</label><input id="int_palette" type="range" min="0" max="1" step="0.02" value="1"></div>
@@ -133,8 +173,12 @@ ${css}
 <div class="grid" id="surfGrid"></div>
 <div class="section-title"><h3>Around FX</h3><span class="cnt"><span id="aroCount"></span></span><span>auras around the mon - glow, flames, orbits, backdrops (some partial)</span></div>
 <div class="grid" id="aroGrid"></div>
-<div class="section-title"><h3>Exotic (multi-sprite)</h3><span class="cnt"><span id="exoCount"></span></span><span>layered copies of the full look - depth orbits, time echoes, distortions, one-shots (&#9889; = press Pulse)</span></div>
+<div class="section-title"><h3>Exotic (multi-sprite)</h3><span class="cnt"><span id="exoCount"></span></span><span>layered copies of the full look around the mon - depth orbits, time echoes, companions</span></div>
 <div class="grid" id="exoGrid"></div>
+<div class="section-title"><h3>Body Rig</h3><span class="cnt"><span id="rigCount"></span></span><span>the body itself transforms - fake 3D, materials, lineage recolors (one at a time, stacks with everything else)</span></div>
+<div class="grid" id="rigGrid"></div>
+<div class="section-title"><h3>Moments</h3><span class="cnt"><span id="momCount"></span></span><span>finite event sequences that loop automatically - watch a few seconds</span></div>
+<div class="grid" id="momGrid"></div>
 
 <footer>
   Prototype for the Elite Redux special-form shiny system. Sprites stream from the er-assets CDN (jsDelivr, pinned sha) like the game.

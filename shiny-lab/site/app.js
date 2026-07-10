@@ -24,7 +24,14 @@ function recomputeCL() {
 }
 
 const PALS = ["base", ...ALL_PALETTE];
-const SLOTKIND = { palette: PALS, surface: ALL_AURA, around: ALL_AROUND, exotic: ALL_EXOTIC };
+const SLOTKIND = {
+  palette: PALS,
+  surface: ALL_AURA,
+  around: ALL_AROUND,
+  exotic: ALL_EXOTIC,
+  rig: ALL_RIG,
+  moment: ALL_MOMENT,
+};
 // exotic effects carry their labels on the registry - fold them into the shared LABELS map
 for (const [exoId, exoDef] of Object.entries(EXOTIC)) {
   LABELS[exoId] = exoDef.label;
@@ -37,12 +44,11 @@ let lookCtx = null;
 let ringCv = [];
 let ringHead = -1;
 let lastRingCap = 0;
-let pulseAt = Number.NEGATIVE_INFINITY;
 function ensureExoticCanvases() {
   lookCv = document.createElement("canvas");
   lookCv.width = PW;
   lookCv.height = PH;
-  lookCtx = lookCv.getContext("2d");
+  lookCtx = lookCv.getContext("2d", { willReadFrequently: true });
   ringCv = [];
   ringHead = -1;
   for (let i = 0; i < RING_N; i++) {
@@ -59,18 +65,104 @@ const ringGet = n => {
   const lag = Math.max(0, Math.min(RING_N - 1, Math.round(n)));
   return ringCv[(ringHead - lag + RING_N * 4) % RING_N];
 };
-// the hero canvas grows while an exotic effect is equipped so copies have room to roam
-function heroDims() {
-  return slots.exotic ? { EW: Math.round(PW * 2), EH: Math.round(PH * 1.7) } : { EW: PW, EH: PH };
-}
 function resizeHero() {
   if (PW <= 0 || PH <= 0) {
     return; // no species loaded yet
   }
-  const { EW, EH } = heroDims();
-  heroCv.width = EW;
-  heroCv.height = EH;
+  heroCv.width = PW;
+  heroCv.height = PH;
   heroImg = heroCtx.createImageData(PW, PH);
+}
+// raw sprite silhouette (no aura bleed) - exotic effects derive contours/masks from it
+let baseAlphaArr = null;
+let baseAlphaFor = -1;
+function getBaseAlpha() {
+  if (baseAlphaFor === curSpecies && baseAlphaArr && baseAlphaArr.length === PW * PH) {
+    return baseAlphaArr;
+  }
+  const A = new Uint8Array(PW * PH);
+  for (let y = 0; y < FH; y++) {
+    for (let x = 0; x < FW; x++) {
+      if (denseBuf[(y * FW + x) * 4 + 3] > 0.4) {
+        A[(y + PAD) * PW + (x + PAD)] = 1;
+      }
+    }
+  }
+  baseAlphaArr = A;
+  baseAlphaFor = curSpecies;
+  return A;
+}
+// evolution-line info (baked into LAB.evo by build-site) for lineage effects
+const evoInfoCache = new Map();
+function evoInfoFor(id) {
+  if (evoInfoCache.has(id)) {
+    return evoInfoCache.get(id);
+  }
+  const E = LAB.evo || {};
+  const up = [id];
+  let cur = id;
+  while (E[cur] && E[cur].p != null && up.length < 4 && !up.includes(E[cur].p)) {
+    cur = E[cur].p;
+    up.unshift(cur);
+  }
+  const chain = [...up];
+  cur = id;
+  while (E[cur] && E[cur].n && E[cur].n.length > 0 && chain.length < 4) {
+    const nx = E[cur].n[0];
+    if (chain.includes(nx)) {
+      break;
+    }
+    chain.push(nx);
+    cur = nx;
+  }
+  const info = { prev: E[id] && E[id].p != null ? E[id].p : 0, next: (E[id] && E[id].n) || [], chain };
+  evoInfoCache.set(id, info);
+  return info;
+}
+// aux sprite loader: frame-0 canvas of ANOTHER species (async; null until loaded)
+const auxCache = new Map();
+function auxLook(id) {
+  if (!id) {
+    return null;
+  }
+  let e = auxCache.get(id);
+  if (e === undefined) {
+    e = { cv: null };
+    auxCache.set(id, e);
+    (async () => {
+      try {
+        const atlas = await fetch(`${CDN}/${id}.json`).then(r => {
+          if (!r.ok) {
+            throw new Error("no atlas");
+          }
+          return r.json();
+        });
+        const fr = parseFrames(atlas)[0];
+        const img = await loadImg(`${CDN}/${id}.png`);
+        const w = (fr.sourceSize && fr.sourceSize.w) || fr.frame.w;
+        const h = (fr.sourceSize && fr.sourceSize.h) || fr.frame.h;
+        const cv = document.createElement("canvas");
+        cv.width = w;
+        cv.height = h;
+        const sss = fr.spriteSourceSize || { x: 0, y: 0 };
+        cv.getContext("2d", { willReadFrequently: true }).drawImage(
+          img,
+          fr.frame.x,
+          fr.frame.y,
+          fr.frame.w,
+          fr.frame.h,
+          sss.x,
+          sss.y,
+          fr.frame.w,
+          fr.frame.h,
+        );
+        e.cv = cv;
+      } catch {
+        /* leave null - effects fall back gracefully */
+      }
+    })();
+  }
+  return e.cv;
 }
 
 // ---- sprite loading (CDN) ----------------------------------------------------
@@ -404,19 +496,32 @@ const io = new IntersectionObserver(
     }),
   { rootMargin: "150px" },
 );
+const FX_KINDS = ["exotic", "rig", "moment"];
 function mkTile(kind, name) {
   const el = document.createElement("div");
   el.className = `tile ${kind}`;
   const pill = PARTIAL.has(name) ? '<span class="pill">partial</span>' : "";
-  const dotc = kind === "around" ? "aro" : kind === "surface" ? "aura" : kind === "exotic" ? "exo" : "pal";
+  const dotc =
+    kind === "around"
+      ? "aro"
+      : kind === "surface"
+        ? "aura"
+        : kind === "exotic"
+          ? "exo"
+          : kind === "rig"
+            ? "rig"
+            : kind === "moment"
+              ? "mom"
+              : "pal";
   el.innerHTML = `<div class="frame"><canvas></canvas></div>
     <div class="name"><span class="dot ${dotc}"></span>${name === "base" ? "Base" : LABELS[name]}${pill}</div>`;
   const cv = el.querySelector("canvas");
   const ctx = cv.getContext("2d");
+  const isFx = FX_KINDS.includes(kind);
   const slots =
     kind === "palette" ? { palette: name } : kind === "surface" ? { palette: "base", surface: name } : { around: name };
   el.addEventListener("click", () => setSlot(kind, name));
-  const tile = { kind, name, slots, cv, ctx, img: null, el, vis: true, exo: kind === "exotic" ? name : null };
+  const tile = { kind, name, slots, cv, ctx, img: null, el, vis: true, fx: isFx ? { [kind]: name } : null };
   tiles.push(tile);
   io.observe(el);
   return el;
@@ -426,10 +531,14 @@ function buildGallery() {
   ALL_AURA.forEach(n => document.getElementById("surfGrid").appendChild(mkTile("surface", n)));
   ALL_AROUND.forEach(n => document.getElementById("aroGrid").appendChild(mkTile("around", n)));
   ALL_EXOTIC.forEach(n => document.getElementById("exoGrid").appendChild(mkTile("exotic", n)));
+  ALL_RIG.forEach(n => document.getElementById("rigGrid").appendChild(mkTile("rig", n)));
+  ALL_MOMENT.forEach(n => document.getElementById("momGrid").appendChild(mkTile("moment", n)));
   document.getElementById("palCount").textContent = ALL_PALETTE.length + 1;
   document.getElementById("surfCount").textContent = ALL_AURA.length;
   document.getElementById("aroCount").textContent = ALL_AROUND.length;
   document.getElementById("exoCount").textContent = ALL_EXOTIC.length;
+  document.getElementById("rigCount").textContent = ALL_RIG.length;
+  document.getElementById("momCount").textContent = ALL_MOMENT.length;
 }
 function resizeCanvases() {
   resizeHero();
@@ -437,15 +546,39 @@ function resizeCanvases() {
   for (const t of tiles) {
     t.cv.width = PW;
     t.cv.height = PH;
-    t.img = t.exo ? null : t.ctx.createImageData(PW, PH);
+    t.img = t.fx ? null : t.ctx.createImageData(PW, PH);
   }
 }
 
 // ---- state / hero ------------------------------------------------------------
 const heroCv = document.getElementById("heroCanvas");
 const heroCtx = heroCv.getContext("2d");
+// full-stage overlay: exotic/rig/moment scenes render here at the SAME on-screen
+// pixel scale as the hero canvas, so the mon never shrinks - copies get the whole
+// stage to roam instead of a bigger (CSS-downscaled) canvas
+const fxCv = document.getElementById("fxCanvas");
+const fxCtx = fxCv.getContext("2d");
+const stageEl = document.getElementById("stage");
+let fxOx = 0;
+let fxOy = 0;
+let fxShown = false;
+function syncFxOverlay() {
+  const scale = heroCv.offsetWidth / PW;
+  if (!(scale > 0)) {
+    return false;
+  }
+  const w = Math.max(1, Math.round(stageEl.clientWidth / scale));
+  const h = Math.max(1, Math.round(stageEl.clientHeight / scale));
+  if (fxCv.width !== w || fxCv.height !== h) {
+    fxCv.width = w;
+    fxCv.height = h;
+  }
+  fxOx = Math.round(heroCv.offsetLeft / scale);
+  fxOy = Math.round(heroCv.offsetTop / scale);
+  return true;
+}
 let heroImg = null;
-const slots = { palette: "glacier", surface: "", around: "auroraveil", exotic: "" };
+const slots = { palette: "glacier", surface: "", around: "auroraveil", exotic: "", rig: "", moment: "" };
 let speed = 1; // master speed (multiplies both layers)
 let palIntensity = 1;
 let surfIntensity = 1;
@@ -468,17 +601,31 @@ const nameOf = kind => {
   return !v || v === "base" ? "" : LABELS[v];
 };
 function refreshHero() {
-  const parts = [nameOf("palette"), nameOf("surface"), nameOf("around"), nameOf("exotic")].filter(Boolean);
+  const parts = [
+    nameOf("palette"),
+    nameOf("surface"),
+    nameOf("around"),
+    nameOf("exotic"),
+    nameOf("rig"),
+    nameOf("moment"),
+  ].filter(Boolean);
   document.getElementById("heroName").textContent = parts.length > 0 ? parts.join("  +  ") : "Base";
-  document.querySelector(".stage .glow").style.background =
-    `radial-gradient(circle, ${slots.exotic ? "#b78aff" : slots.around ? "#ffd27a" : slots.surface ? "#ff7ad9" : "#5ad1ff"}33, transparent 70%)`;
-  for (const k of ["palette", "surface", "around", "exotic"]) {
+  const glowCol = slots.moment
+    ? "#ffb45a"
+    : slots.rig
+      ? "#6ee7c8"
+      : slots.exotic
+        ? "#b78aff"
+        : slots.around
+          ? "#ffd27a"
+          : slots.surface
+            ? "#ff7ad9"
+            : "#5ad1ff";
+  document.querySelector(".stage .glow").style.background = `radial-gradient(circle, ${glowCol}33, transparent 70%)`;
+  for (const k of ["palette", "surface", "around", "exotic", "rig", "moment"]) {
     document.getElementById("sel_" + k).value = slots[k];
   }
   tiles.forEach(t => t.el.classList.toggle("active", slots[t.kind] === t.name));
-  if (heroCv.width !== heroDims().EW) {
-    resizeHero();
-  }
 }
 function setSlot(kind, name) {
   slots[kind] = name === slots[kind] && kind !== "palette" ? "" : name;
@@ -486,7 +633,7 @@ function setSlot(kind, name) {
 }
 
 function wireControls() {
-  for (const k of ["palette", "surface", "around", "exotic"]) {
+  for (const k of ["palette", "surface", "around", "exotic", "rig", "moment"]) {
     const sel = document.getElementById("sel_" + k);
     if (k !== "palette") {
       sel.appendChild(new Option("None", ""));
@@ -497,9 +644,6 @@ function wireControls() {
       refreshHero();
     });
   }
-  document.getElementById("pulse").addEventListener("click", () => {
-    pulseAt = performance.now();
-  });
   const cs = document.getElementById("sel_cluster");
   if (cs) {
     for (const [key, alg] of Object.entries(CLUSTERING)) {
@@ -558,6 +702,8 @@ function wireControls() {
     slots.surface = "";
     slots.around = "";
     slots.exotic = "";
+    slots.rig = "";
+    slots.moment = "";
     refreshHero();
   });
   document.getElementById("surprise").addEventListener("click", () => {
@@ -565,7 +711,9 @@ function wireControls() {
     slots.palette = pick(ALL_PALETTE);
     slots.surface = Math.random() < 0.5 ? "" : pick(ALL_AURA);
     slots.around = Math.random() < 0.4 ? "" : pick(ALL_AROUND);
-    slots.exotic = Math.random() < 0.35 ? pick(ALL_EXOTIC) : "";
+    slots.exotic = Math.random() < 0.3 ? pick(ALL_EXOTIC) : "";
+    slots.rig = Math.random() < 0.22 ? pick(ALL_RIG) : "";
+    slots.moment = Math.random() < 0.18 ? pick(ALL_MOMENT) : "";
     refreshHero();
   });
 }
@@ -603,11 +751,17 @@ function buildPicker() {
 // ---- loop --------------------------------------------------------------------
 let lastThumb = 0;
 let rr = 0;
-function exoEnv(t, EW, EH, ox, oy, dist, now, compact) {
+function lookSig() {
+  return `${curSpecies}|${slots.palette}|${slots.surface}|${slots.around}|${clusterAlgo}`;
+}
+function exoEnv(t, EW, EH, ox, oy, dist, compact) {
+  let ld = null;
   return {
     t,
     look: lookCv,
     ring: ringGet,
+    lookData: () => ld || (ld = lookCtx.getImageData(0, 0, PW, PH)),
+    baseAlpha: getBaseAlpha,
     PW,
     PH,
     EW,
@@ -619,21 +773,37 @@ function exoEnv(t, EW, EH, ox, oy, dist, now, compact) {
     fy: dist.fy * PH,
     seed: layerFx.aro.seed + curSpecies,
     compact,
-    pulse: (now - pulseAt) / 1000,
+    species: curSpecies,
+    sig: lookSig(),
+    evo: evoInfoFor(curSpecies),
+    aux: auxLook,
   };
 }
-function drawExoticScene(ctx2, exId, env) {
-  const ex = EXOTIC[exId];
+// exotic + rig + moment sandwich around the composited look
+function drawFxScene(ctx2, sl, env) {
+  const ex = EXOTIC[sl.exotic];
+  const rg = EXOTIC[sl.rig];
+  const mo = EXOTIC[sl.moment];
   ctx2.clearRect(0, 0, env.EW, env.EH);
   ctx2.imageSmoothingEnabled = false;
   if (ex && ex.behind) {
     ex.behind(ctx2, env);
   }
-  if (!(ex && ex.replacesBase)) {
-    ctx2.drawImage(lookCv, env.ox, env.oy);
+  if (mo && mo.behind) {
+    mo.behind(ctx2, env);
+  }
+  if (!(mo && mo.hidesBase && mo.hidesBase(env))) {
+    if (rg) {
+      rg.draw(ctx2, env);
+    } else {
+      ctx2.drawImage(lookCv, env.ox, env.oy);
+    }
   }
   if (ex && ex.front) {
     ex.front(ctx2, env);
+  }
+  if (mo && mo.front) {
+    mo.front(ctx2, env);
   }
 }
 function loop(now) {
@@ -658,15 +828,27 @@ function loop(now) {
     rc.clearRect(0, 0, PW, PH);
     rc.drawImage(lookCv, 0, 0);
   }
-  // 3) hero = exotic layers sandwiching the look (or a plain stamp when none equipped)
-  const EW = heroCv.width;
-  const EH = heroCv.height;
-  const ox = (EW - PW) >> 1;
-  const oy = Math.round((EH - PH) * 0.7);
-  drawExoticScene(heroCtx, slots.exotic, exoEnv(t * speed, EW, EH, ox, oy, dist, now, false));
+  // 3) hero: plain look on the hero canvas, OR the full fx scene on the stage
+  // overlay (same on-screen pixel scale - the mon NEVER changes size)
+  const anyFx = slots.exotic || slots.rig || slots.moment;
+  if (anyFx && syncFxOverlay()) {
+    if (!fxShown) {
+      fxShown = true;
+      heroCv.style.visibility = "hidden";
+      fxCv.style.display = "block";
+    }
+    drawFxScene(fxCtx, slots, exoEnv(t * speed, fxCv.width, fxCv.height, fxOx, fxOy, dist, false));
+  } else {
+    if (fxShown) {
+      fxShown = false;
+      heroCv.style.visibility = "";
+      fxCv.style.display = "none";
+    }
+    heroCtx.putImageData(heroImg, 0, 0);
+  }
   if (now - lastThumb > 60) {
     lastThumb = now;
-    const vis = tiles.filter(tl => tl.vis && !tl.exo);
+    const vis = tiles.filter(tl => tl.vis && !tl.fx);
     const N = Math.min(vis.length, 16);
     for (let j = 0; j < N; j++) {
       const tl = vis[(rr + j) % vis.length];
@@ -674,10 +856,12 @@ function loop(now) {
       tl.ctx.putImageData(tl.img, 0, 0);
     }
     rr = vis.length > 0 ? (rr + N) % vis.length : 0;
-    // exotic tiles preview their effect applied to the CURRENT hero look (cheap 2D ops)
+    // fx tiles preview their effect applied to the CURRENT hero look (cheap 2D ops);
+    // moments run slightly time-compressed so the tile shows action sooner
     for (const tl of tiles) {
-      if (tl.exo && tl.vis) {
-        drawExoticScene(tl.ctx, tl.exo, exoEnv(t, PW, PH, 0, 0, dist, now, true));
+      if (tl.fx && tl.vis) {
+        const tt = tl.fx.moment ? t * 1.7 : t;
+        drawFxScene(tl.ctx, { exotic: "", rig: "", moment: "", ...tl.fx }, exoEnv(tt, PW, PH, 0, 0, dist, true));
       }
     }
   }
