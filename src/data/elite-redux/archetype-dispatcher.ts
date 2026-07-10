@@ -260,7 +260,10 @@ import {
   AllyFaintPowerBoostTriggerAbAttr,
 } from "#data/elite-redux/archetypes/power-boost-on-ally-faint";
 import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
-import { PreSwitchOutItemRestoreAbAttr } from "#data/elite-redux/archetypes/pre-switch-out-item-restore";
+import {
+  PostSummonRetrieverSnapshotAbAttr,
+  PreSwitchOutItemRestoreAbAttr,
+} from "#data/elite-redux/archetypes/pre-switch-out-item-restore";
 import { PreemptivePriorityCounterAbAttr } from "#data/elite-redux/archetypes/preemptive-priority-counter";
 import {
   type PriorityCondition,
@@ -6958,8 +6961,11 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // skipped the charge turn.
       return ok([new SkipChargeTurnAbAttr()]);
     case 515:
-      // Retriever — "Retrieves item on switch-out."
-      return ok([new PreSwitchOutItemRestoreAbAttr()]);
+      // Retriever — "Retrieves its original held item on switch-out if it is
+      // not currently holding one." The snapshot attr records the entry item on
+      // switch-in; the restore attr re-grants it on switch-out (also un-marks
+      // eaten berries so they reconstitute).
+      return ok([new PostSummonRetrieverSnapshotAbAttr(), new PreSwitchOutItemRestoreAbAttr()]);
     case 523:
       // Grappler — "Trapping moves last 6 turns. Trapping deals 1/6 HP."
       return ok([new TrapDurationModifierAbAttr({ turns: 6, damageFraction: 1 / 6 })]);
