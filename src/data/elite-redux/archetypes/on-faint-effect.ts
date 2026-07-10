@@ -64,6 +64,7 @@ import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { ArenaTagType } from "#enums/arena-tag-type";
 import type { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
+import type { PokemonType } from "#enums/pokemon-type";
 import type { BattleStat } from "#enums/stat";
 import { WeatherType } from "#enums/weather-type";
 import { BooleanHolder, toDmgValue } from "#utils/common";
@@ -131,6 +132,13 @@ export interface OnFaintEffectAttackerBattlerTag {
    * @defaultValue `0`
    */
   readonly turns?: number;
+  /**
+   * Attacker types that are IMMUNE to the tag — the effect is a no-op when the
+   * attacker is of any of these types. Models Vengeful Spirit (565), whose
+   * curse-on-faint does not apply to GHOST-type attackers.
+   * @defaultValue `[]` (applies to any attacker)
+   */
+  readonly excludeAttackerTypes?: readonly PokemonType[];
 }
 
 /**
@@ -225,7 +233,11 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
       case "set-hazard":
         return true;
       case "attacker-battler-tag":
-        return params.attacker !== undefined && !params.attacker.isFainted();
+        return (
+          params.attacker !== undefined
+          && !params.attacker.isFainted()
+          && !OnFaintEffectAbAttr.attackerTypeExcluded(this.effect, params)
+        );
       case "attacker-stat-change":
         return params.attacker !== undefined && !params.attacker.isFainted();
     }
@@ -392,6 +404,22 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
     }
     const turns = effect.turns ?? 0;
     attacker.addTag(effect.tagType, turns, undefined, pokemon.id);
+  }
+
+  /**
+   * Whether the fainting attacker is of a type that is immune to the tag (e.g.
+   * a GHOST-type attacker is immune to Vengeful Spirit's curse). Returns false
+   * when no exclusions are configured or there is no attacker.
+   */
+  private static attackerTypeExcluded(
+    effect: OnFaintEffectAttackerBattlerTag,
+    { attacker }: PostFaintAbAttrParams,
+  ): boolean {
+    const excluded = effect.excludeAttackerTypes ?? [];
+    if (excluded.length === 0 || attacker === undefined) {
+      return false;
+    }
+    return excluded.some(type => attacker.isOfType(type));
   }
 
   /**

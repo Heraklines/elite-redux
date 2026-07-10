@@ -29,7 +29,7 @@
 // (i18next would otherwise return the missing-key placeholder).
 // =============================================================================
 
-import { type AbAttr, ConditionalCritAbAttr } from "#abilities/ab-attrs";
+import { type AbAttr, ConditionalCritAbAttr, PostFaintAbAttr } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { ER_SILKEN_DECREE_ABILITY_ID, SilkenDecreeAbAttr } from "#data/elite-redux/abilities/silken-decree";
@@ -458,6 +458,14 @@ function wireArchetypeAttrs(
   // mutable; `Ability` snapshots it at construction time.
   for (const attr of dispatched.attrs) {
     builder.attrs.push(attr);
+  }
+  // A PostFaint attr (Haunted Spirit / Vengeful Spirit curse, on-faint weather /
+  // hazard, Guilt Trip) only fires if the ability BYPASSES the faint gate in
+  // canApplyAbility (hp>0 || bypassFaint). Vanilla Aftermath sets this via
+  // `.bypassFaint()`; ER's archetype wiring must do the same or the effect
+  // silently never runs on the holder's KO.
+  if (dispatched.attrs.some(attr => attr instanceof PostFaintAbAttr)) {
+    builder.bypassFaint();
   }
   result.attrsWiredByArchetype[archetype] = (result.attrsWiredByArchetype[archetype] ?? 0) + 1;
   result.totalAttrsAttached += dispatched.attrs.length;

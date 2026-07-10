@@ -2500,6 +2500,28 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           effect: { kind: "attacker-battler-tag", tagType: BattlerTagType.CURSED },
         }),
       ]);
+    case 565:
+      // Vengeful Spirit — "Curses the attacker when KO'd by a direct hit (25%
+      // max HP/turn; GHOST-type attackers are IMMUNE to the curse). Boosts Ghost
+      // moves by 30%, or by 50% at <=1/3 HP." Bespoke (was Haunted Spirit +
+      // Vengeance composite): Vengeance's base is 1.2x, but the dex wants 1.3x,
+      // and the composite curse cursed even GHOST attackers. Ghost base 1.3x +
+      // a stacked low-HP factor tuned to net 1.5x (1.3 × 1.1538 ≈ 1.5), and the
+      // curse excludes GHOST-type attackers.
+      return ok([
+        new OnFaintEffectAbAttr({
+          effect: {
+            kind: "attacker-battler-tag",
+            tagType: BattlerTagType.CURSED,
+            excludeAttackerTypes: [PokemonType.GHOST],
+          },
+        }),
+        new MoveTypePowerBoostAbAttr(PokemonType.GHOST, 1.3),
+        new MovePowerBoostAbAttr(
+          (user, _t, move) => !!move && move.type === PokemonType.GHOST && !!user && user.getHpRatio() < 1 / 3,
+          1.5 / 1.3,
+        ),
+      ]);
     case 391:
       // Hardened Sheath — Atk +1 after a horn move resolves.
       return ok([

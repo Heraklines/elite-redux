@@ -349,7 +349,11 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   559: { erAbilityId: 559, archetype: "bespoke", params: null },
   560: { erAbilityId: 560, archetype: "priority-modifier", params: {"condition":{"kind":"max-hp"},"priority":1,"filter":{"type":"WATER"}} },
   564: { erAbilityId: 564, archetype: "bespoke", params: null },
-  565: { erAbilityId: 565, archetype: "composite-vanilla-mashup", params: {"parts":["Haunted Spirit","Vengeance"]} },
+  // Vengeful Spirit — reclassified to bespoke: its Ghost boost is 1.3x (not
+  // Vengeance's 1.2x) and its curse excludes GHOST-type attackers, neither of
+  // which the auto-resolved Haunted-Spirit+Vengeance parts express. Its
+  // vestigial composite-parts entry was removed (see er-composite-parts.ts).
+  565: { erAbilityId: 565, archetype: "bespoke", params: null },
   568: { erAbilityId: 568, archetype: "bespoke", params: null },
   570: { erAbilityId: 570, archetype: "bespoke", params: null },
   571: { erAbilityId: 571, archetype: "damage-reduction-generic", params: {"filter":{"kind":"special"},"reduction":0.5} },

@@ -85,7 +85,6 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   528: { erAbilityId: 528, parts: [{ kind: "pokerogue", abilityId: 235 }, { kind: "pokerogue", abilityId: 192 }], hasRider: false },
   530: { erAbilityId: 530, parts: [{ kind: "pokerogue", abilityId: 127 }, { kind: "pokerogue", abilityId: 265 }, { kind: "pokerogue", abilityId: 264 }], hasRider: false },
   542: { erAbilityId: 542, parts: [{ kind: "er", erAbilityId: 435 }, { kind: "er", erAbilityId: 350 }], hasRider: false },
-  565: { erAbilityId: 565, parts: [{ kind: "er", erAbilityId: 335 }, { kind: "er", erAbilityId: 276 }], hasRider: false },
   590: { erAbilityId: 590, parts: [{ kind: "er", erAbilityId: 421 }, { kind: "er", erAbilityId: 271 }], hasRider: false },
   600: { erAbilityId: 600, parts: [{ kind: "pokerogue", abilityId: 99 }], unresolvedParts: ["Dragon type moves become punching moves"], hasRider: true },
   605: { erAbilityId: 605, parts: [{ kind: "pokerogue", abilityId: 109 }, { kind: "pokerogue", abilityId: 128 }], hasRider: false },
