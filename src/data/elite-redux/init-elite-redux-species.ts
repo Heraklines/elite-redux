@@ -447,9 +447,13 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
  * combos). Total ~250 forms across all suffixes.
  */
 const ER_FORM_SUFFIXES: readonly { suffix: string; formKey: string; formName: string }[] = [
-  // Split megas (must precede plain _MEGA)
+  // Split megas (must precede plain _MEGA). ER ships a SECOND mega ("Mega Z") for a few lines
+  // (Absol / Charizard / Garchomp / Lucario) as its own SPECIES_*_MEGA_Z record - injecting it here
+  // makes it a real fieldable form so the showdown stage strip enumerates BOTH megas (the maintainer's
+  // "Garchomp has two megas" fix). Reached only by direct-field (showdown); no form-change trigger.
   { suffix: "_MEGA_X", formKey: "mega-x", formName: "Mega X" },
   { suffix: "_MEGA_Y", formKey: "mega-y", formName: "Mega Y" },
+  { suffix: "_MEGA_Z", formKey: "mega-z", formName: "Mega Z" },
   // Regional + mega combos (must precede plain regional suffixes)
   { suffix: "_HISUIAN_MEGA", formKey: "hisui-mega", formName: "Hisuian Mega" },
   { suffix: "_MEGA_GALARIAN", formKey: "galar-mega", formName: "Galarian Mega" },

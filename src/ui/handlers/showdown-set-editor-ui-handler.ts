@@ -12,24 +12,25 @@
 // mega), the ability, held item, four moves, nature and shiny tier - every choice
 // gated by the live collection, every choice showing its inline description.
 //
-// Layout (logical 320x180, x6 to screen):
+// Layout (logical 320x180, x6 to screen) - round-3 redesign, game-native nine-slice chrome:
 //   - TOP micro TEAM STRIP: 6 slot icons + validity chips (size / mega / cost) + a
-//     pick-window countdown placeholder + a partner-ready placeholder. (No wager
-//     preview - cut from v1.)
+//     pick-window countdown + a partner-ready line. (No wager preview - cut from v1.)
 //   - LEFT IDENTITY COLUMN (~1/3): the (harness-static) sprite, the evolution STAGE
-//     STRIP with the mega slot + its team-budget state, shiny/variant chips
-//     (owned / locked / black-unfieldable), live STAT BARS with nature +/- coloring,
-//     and a cost badge.
-//   - RIGHT FIELD ROWS (~2/3): Ability, Item, Moves x4, Nature - each row shows its
-//     current value AND a one-line description, with distinct focused/unfocused states.
-//   - BOTTOM SHARED SEARCH PANE: one pane whose contents follow the focused field -
-//     collapsed hint, the move table (typeahead), the ability pane (actives + innates),
-//     the item pane, or the nature pane. A footer shows the highlighted entry's description.
+//     STRIP - enumerating EVERY owned fielded form incl. multiple megas per line
+//     (e.g. Garchomp's two megas) - shiny/variant chips, live STAT BARS, a cost badge.
+//   - RIGHT COLUMN (~2/3): four stacked WINDOWED section panels so the whole set reads at
+//     a glance without expanding anything:
+//       ABILITIES - the flagship ER feature: all FOUR abilities on the main screen (1 ACTIVE,
+//         focusable/changeable + marked, and the 3 always-on INNATES with compact descriptions),
+//       ITEM, MOVES (a compact 2x2 cell grid), NATURE.
+//   - SEARCH DROPDOWN: drawn ON TOP, only while a field is actively being searched. TYPE-TO-SEARCH:
+//     focusing a field is search-ready; alphanumeric input opens + filters the dropdown directly
+//     (no "press A to browse" ceremony), prefix-first ranked; A opens it unfiltered (controller);
+//     arrows navigate, Enter/A picks, B dismisses. Mobile/desktop keystrokes ride the
+//     {@linkcode ShowdownEditorTextInput} bridge into {@linkcode ShowdownSetEditorUiHandler.setFilter}.
 //
-// P1 SCOPE: this is the standalone LAYOUT + basic focus/input plumbing. Flow wiring
-// (opening it from the grid, committing back into the negotiate/wager flow) and the
-// mobile hidden-input bridge (see {@linkcode ShowdownEditorTextInput}) land in the NEXT
-// task. The handler consumes a plain {@linkcode ShowdownSetEditorConfig} so wiring is trivial.
+// The handler consumes a plain {@linkcode ShowdownSetEditorConfig}; the flow wiring lives in
+// StarterSelect (grid confirm -> editor -> Done writes the manifest). See showdown-editor-flow.test.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
@@ -184,33 +185,48 @@ const MOVE_FIELDS: EditorField[] = [EditorField.MOVE0, EditorField.MOVE1, Editor
 
 const SCREEN_W = 320;
 const SCREEN_H = 180;
+const MARGIN = 3;
 
 const STRIP_H = 22;
-const BODY_Y = STRIP_H + 2;
+const BODY_Y = STRIP_H + 2; // 24
 
-const LEFT_X = 3;
+const LEFT_X = MARGIN; // 3
 const LEFT_W = 100;
-const RIGHT_X = LEFT_X + LEFT_W + 3; // 106
-const RIGHT_W = SCREEN_W - RIGHT_X - 3; // 211
+const RIGHT_X = LEFT_X + LEFT_W + MARGIN; // 106
+const RIGHT_W = SCREEN_W - RIGHT_X - MARGIN; // 211
 
-// The shared search pane occupies the RIGHT column BELOW the field rows, so the left identity
-// column stays full-height and always visible (a deliberate improvement over the Showdown layout,
-// where opening the search hides the set). The description footer spans the pane width.
-const FIELD_TOP = BODY_Y + 2;
-const FIELD_ROW_H = 13;
-const PANE_X = RIGHT_X;
-const PANE_W = SCREEN_W - RIGHT_X - 3; // 211
-const PANE_Y = FIELD_TOP + 7 * FIELD_ROW_H + 1; // just under the 7 field rows
-const PANE_H = SCREEN_H - PANE_Y - 3;
+// The RIGHT column is four stacked, windowed section panels (game-native nine-slice chrome, not flat
+// fills) so the whole set reads at a glance without expanding anything:
+//   ABILITIES (the 1 active + 3 always-on innates - half of an ER mon's identity),
+//   ITEM, MOVES (a 2x2 grid of cells), NATURE.
+// The search DROPDOWN is drawn LAST, ON TOP, only while a field is actively being searched - there is
+// no idle "press A to browse" region. The left identity column stays full-height + always visible.
+const ABIL_Y = BODY_Y; // 24
+const ABIL_H = 60; // 24..84 - the 1 active + 3 innates block
+const ITEM_Y = ABIL_Y + ABIL_H + 2; // 86
+const ITEM_H = 20; // 86..106
+const MOVES_Y = ITEM_Y + ITEM_H + 2; // 108
+const MOVES_H = 46; // 108..154 - header + a 2x2 cell grid
+const NAT_Y = MOVES_Y + MOVES_H + 2; // 156
+const NAT_H = SCREEN_H - NAT_Y - MARGIN; // 21 -> ends at 177
 
-const ACCENT = 0x3d5a80; // focused-row fill
-const ACCENT_PANE = 0x2a3f5c; // pane focused-row fill
-const PANEL_DIM = 0x0b1220;
+// The floating search dropdown (over the right column, drawn last). Anchored in a consistent band so
+// it always reads as the same control regardless of which field is focused.
+const DROP_X = RIGHT_X;
+const DROP_W = RIGHT_W;
+const DROP_Y = ABIL_Y + 40; // drops from just under the ABILITIES header band, over the set
+const DROP_H = SCREEN_H - DROP_Y - MARGIN;
 
-// Font sizes (the addTextObject default is a huge 96; dense screens run ~34-52).
-const FONT_HDR = 40; // small section/row labels
-const FONT_VAL = 48; // the chosen value on a field row
-const FONT_DESC = 32; // inline descriptions / dense table cells
+const ACCENT = 0x3d5a80; // focused-element fill
+const ACCENT_SOFT = 0x24344f; // focused-in-search (a field is open in the dropdown)
+const HEADER_BAND = 0x18233b; // dark navy band behind section headers (legible gold-on-dark)
+const CELL_DIM = 0x16223d; // solid dark inset for field boxes / move cells (contrast on light windows)
+
+// Font sizes (the addTextObject default is a huge 96; dense screens run ~22-52).
+const FONT_HDR = 34; // small section headers
+const FONT_NAME = 40; // ability / move names
+const FONT_DESC = 26; // inline descriptions
+const FONT_TINY = 22; // dense innate / cell metadata
 const FONT_CHIP = 34; // strip chips + shiny chips
 const FONT_TITLE = 52; // species name
 
@@ -310,6 +326,12 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.paneCursor = config.initialPaneCursor ?? 0;
     this.paneScroll = 0;
     this.container.setVisible(true);
+    // Raise the type-to-search capture immediately: a focused field is search-ready with no ceremony
+    // (desktop keystrokes / mobile native keyboard both feed the typeahead). Headless: inert no-op.
+    if (this.paneOpen) {
+      this.ensurePaneCursorVisible();
+    }
+    this.openCapture();
     this.render();
     return true;
   }
@@ -431,6 +453,10 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     const idx = FIELD_ORDER.indexOf(this.field);
     const next = (idx + dir + FIELD_ORDER.length) % FIELD_ORDER.length;
     this.field = FIELD_ORDER[next];
+    // Every field is search-ready: reset the capture buffer for the newly focused field so the first
+    // keystroke here filters THIS field's pool (no stale filter, no "browse" action).
+    this.filter = "";
+    this.openCapture();
     this.render();
     return true;
   }
@@ -454,15 +480,28 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     return true;
   }
 
+  /**
+   * Raise the type-to-search capture surface for the CURRENT field (desktop physical-keyboard capture /
+   * mobile native keyboard). Every keystroke routes to {@linkcode setFilter}, which auto-opens the
+   * dropdown on the first character - so on keyboard/touch you simply START TYPING, no button first.
+   * Headless (tests / render harness): the factory is absent, so this is an inert no-op.
+   */
+  private openCapture(): void {
+    this.textInput?.open(this.filter, value => this.setFilter(value));
+  }
+
+  /**
+   * CONTROLLER path (A on a focused field): open the dropdown UNFILTERED with the current value
+   * pre-highlighted. Keyboard/touch users never need this - they just type - but it also re-raises the
+   * capture so they can immediately narrow.
+   */
   private openPane(): boolean {
     this.paneOpen = true;
+    this.filter = "";
     this.paneCursor = this.currentPaneSelectionIndex();
     this.paneScroll = 0;
     this.ensurePaneCursorVisible();
-    // Mobile: raise the native keyboard for typeahead fields (stubbed until the NEXT task).
-    if (this.field === EditorField.ITEM || MOVE_FIELDS.includes(this.field)) {
-      this.textInput?.open(this.filter, value => this.setFilter(value));
-    }
+    this.openCapture();
     this.render();
     return true;
   }
@@ -470,14 +509,23 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   private closePane(): void {
     this.paneOpen = false;
     this.filter = "";
-    this.textInput?.close();
+    // Reopen the capture at field level so the NEXT keystroke starts a fresh search with no ceremony.
+    this.openCapture();
     this.render();
   }
 
-  /** Keyboard / mobile typeahead entry point (the NEXT task drives this from real input). */
+  /**
+   * The single typeahead entry point - fed by the capture surface (desktop keyboard / mobile native
+   * keyboard) AND the interaction tests. Typing on a focused field IS the search: the first character
+   * opens the dropdown with NO prior "browse"/A action, and each edit re-ranks (prefix-first) to the
+   * top match. This is the round-3 input model: no separate search button, no mode-switch.
+   */
   setFilter(value: string): void {
     this.filter = value;
-    this.paneCursor = 0;
+    if (value.length > 0 && !this.paneOpen) {
+      this.paneOpen = true; // typing opens the dropdown directly
+    }
+    this.paneCursor = 0; // the closest (prefix-first) match sits at the top, ready to Enter/click
     this.paneScroll = 0;
     this.render();
   }
@@ -537,7 +585,10 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   }
 
   private natureList(): number[] {
-    return (Object.values(Nature).filter(n => typeof n === "number") as number[]).sort((a, b) => a - b);
+    const all = Object.values(Nature).filter(n => typeof n === "number") as number[];
+    return this.filter
+      ? rankByFilter(all, n => getNatureName(n as Nature, false, false, true), this.filter)
+      : all.sort((a, b) => a - b);
   }
 
   private paneRowCount(): number {
@@ -668,8 +719,14 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
 
     this.renderStrip();
     this.renderIdentityColumn();
-    this.renderFieldRows();
-    this.renderPane();
+    this.renderAbilitiesPanel();
+    this.renderItemPanel();
+    this.renderMovesPanel();
+    this.renderNaturePanel();
+    // The search dropdown is drawn LAST so it floats ON TOP of the set (only while actively searching).
+    if (this.paneOpen) {
+      this.renderDropdown();
+    }
   }
 
   // -- top micro team strip ---------------------------------------------------------------------
@@ -903,151 +960,201 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     });
   }
 
-  // -- right field rows -------------------------------------------------------------------------
-
-  private renderFieldRows(): void {
-    let y = FIELD_TOP;
-    y = this.renderAbilityRow(y);
-    y = this.renderItemRow(y);
-    for (let i = 0; i < 4; i++) {
-      y = this.renderMoveRow(y, i);
-    }
-    this.renderNatureRow(y);
-  }
-
-  private rowFrame(y: number, field: EditorField): void {
-    const focused = this.field === field && !this.paneOpen;
-    const focusedInPane = this.field === field && this.paneOpen;
-    // Focus accent bar on the left edge + a row fill that brightens on focus.
-    this.fill(
-      RIGHT_X,
-      y,
-      RIGHT_W,
-      FIELD_ROW_H - 1,
-      focused ? ACCENT : focusedInPane ? ACCENT_PANE : PANEL_DIM,
-      focused ? 1 : 0.5,
-    );
-    if (focused) {
-      this.fill(RIGHT_X, y, 2, FIELD_ROW_H - 1, 0xffd447, 1);
-    }
-  }
-
-  private readonly LABEL_X = RIGHT_X + 5;
-  private readonly VAL_X = RIGHT_X + 44;
-
-  private renderAbilityRow(y: number): number {
-    this.rowFrame(y, EditorField.ABILITY);
-    const id = this.activeAbilityIds()[this.config!.set.abilityIndex] ?? this.activeAbilityIds()[0];
-    const ability = allAbilities[id];
-    this.text(this.LABEL_X, y + 2, "Ability", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
-    this.text(this.VAL_X, y + 1, ability?.name ?? "-", TextStyle.SUMMARY_GOLD, 0, FONT_VAL);
-    this.text(this.VAL_X, y + 8, this.clip(ability?.description ?? "", 66), TextStyle.SUMMARY_GRAY, 0, 26);
-    return y + FIELD_ROW_H;
-  }
-
-  private renderItemRow(y: number): number {
-    this.rowFrame(y, EditorField.ITEM);
-    this.text(this.LABEL_X, y + 2, "Item", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
-    if (this.isMega) {
-      this.text(this.VAL_X, y + 1, "Mega Stone", TextStyle.SUMMARY_PINK, 0, FONT_VAL);
-      this.text(this.VAL_X, y + 8, "Auto-forced by the mega stage (slot locked).", TextStyle.SUMMARY_GRAY, 0, 26);
-      return y + FIELD_ROW_H;
-    }
-    const key = this.config!.set.item as ShowdownItemKey;
-    const modType = modifierTypes[key];
-    const resolved = modType == null ? null : getModifierType(modType);
-    if (resolved?.iconImage) {
-      const icon = globalScene.add
-        .sprite(this.VAL_X + 4, y + 4, "items", resolved.iconImage)
-        .setOrigin(0.5, 0.5)
-        .setScale(0.45);
-      this.add(icon);
-    }
-    this.text(this.VAL_X + 11, y + 1, resolved?.name ?? String(key), TextStyle.SUMMARY_GOLD, 0, FONT_VAL);
-    this.text(this.VAL_X, y + 8, this.clip(resolved?.getDescription() ?? "", 66), TextStyle.SUMMARY_GRAY, 0, 26);
-    return y + FIELD_ROW_H;
-  }
-
-  private renderMoveRow(y: number, slot: number): number {
-    const field = MOVE_FIELDS[slot];
-    this.rowFrame(y, field);
-    const moveId = this.config!.set.moves[slot];
-    this.text(this.LABEL_X, y + 2, `Move ${slot + 1}`, TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
-    if (moveId == null) {
-      this.text(this.VAL_X, y + 3, "-- empty --", TextStyle.SUMMARY_GRAY, 0, FONT_DESC);
-      return y + FIELD_ROW_H;
-    }
-    const move = allMoves[moveId];
-    this.text(this.VAL_X, y + 3, move?.name ?? "-", TextStyle.SUMMARY_GOLD, 0, FONT_VAL);
-    if (move) {
-      // Type + category icons + BP/Acc/PP, right-aligned block.
-      const catX = RIGHT_X + RIGHT_W - 88;
-      const typeX = RIGHT_X + RIGHT_W - 104;
-      const tSpr = globalScene.add
-        .sprite(typeX, y + 6, getLocalizedSpriteKey("types"), PokemonType[move.type].toLowerCase())
-        .setOrigin(0.5, 0.5)
-        .setScale(0.42);
-      this.add(tSpr);
-      const cSpr = globalScene.add
-        .sprite(catX, y + 6, "categories", MoveCategory[move.category].toLowerCase())
-        .setOrigin(0.5, 0.5)
-        .setScale(0.6);
-      this.add(cSpr);
-      const bp = move.power > 0 ? `${move.power}` : "-";
-      const acc = move.accuracy > 0 ? `${move.accuracy}` : "-";
-      this.text(RIGHT_X + RIGHT_W - 70, y + 2, `BP ${bp}`, TextStyle.SUMMARY_GRAY, 0, 28);
-      this.text(RIGHT_X + RIGHT_W - 70, y + 8, `Acc ${acc}`, TextStyle.SUMMARY_GRAY, 0, 28);
-      this.text(RIGHT_X + RIGHT_W - 30, y + 2, `PP ${move.pp}`, TextStyle.SUMMARY_GRAY, 0, 28);
-    }
-    return y + FIELD_ROW_H;
-  }
-
-  private renderNatureRow(y: number): number {
-    this.rowFrame(y, EditorField.NATURE);
-    this.text(this.LABEL_X, y + 2, "Nature", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
-    const name = getNatureName(this.config!.set.nature as Nature, false, false, true);
-    const summary = getNatureName(this.config!.set.nature as Nature, true, false, true).replace(/\n/g, " ");
-    this.text(this.VAL_X, y + 1, summary || name, TextStyle.SUMMARY_GOLD, 0, FONT_VAL);
-    this.text(this.VAL_X, y + 8, "Free pick - recolors the stat bars live.", TextStyle.SUMMARY_GRAY, 0, 26);
-    return y + FIELD_ROW_H;
-  }
-
   private clip(s: string, max: number): string {
     return s.length > max ? `${s.slice(0, max - 2)}..` : s;
   }
 
-  // -- bottom shared search pane ----------------------------------------------------------------
+  // -- right column: four windowed section panels -----------------------------------------------
 
-  private renderPane(): void {
-    this.add(addWindow(PANE_X, PANE_Y, PANE_W, PANE_H));
-    if (!this.paneOpen) {
-      this.text(PANE_X + 6, PANE_Y + 4, "SEARCH", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
-      const label = FIELD_ORDER.indexOf(this.field) >= 0 ? this.fieldName(this.field) : "";
-      this.text(PANE_X + 6, PANE_Y + 16, `Press A to browse ${label}.`, TextStyle.SUMMARY_GOLD, 0, FONT_DESC);
-      this.text(PANE_X + 6, PANE_Y + 27, "Type to filter, arrows to move, B to close.", TextStyle.SUMMARY_GRAY, 0, 26);
-      // Overview-level controls (the flow wiring binds these): Start commits, B backs, shoulders cycle.
-      this.text(
-        PANE_X + 6,
-        PANE_Y + 37,
-        "Start: Done   B: Back to grid   L/R: swap team mon",
-        TextStyle.SUMMARY_BLUE,
-        0,
-        26,
-      );
+  /** A game-native section header band (dark navy strip + gold title) at the top of a right panel. */
+  private sectionHeader(panelY: number, title: string, rightNote?: string): void {
+    this.fill(RIGHT_X + 3, panelY + 3, RIGHT_W - 6, 9, HEADER_BAND, 1);
+    this.text(RIGHT_X + 6, panelY + 3, title, TextStyle.SUMMARY_GOLD, 0, FONT_HDR);
+    if (rightNote != null) {
+      this.text(RIGHT_X + RIGHT_W - 7, panelY + 3, rightNote, TextStyle.SUMMARY_GRAY, 1, FONT_TINY);
+    }
+  }
+
+  /**
+   * Focus treatment for a focusable field's interior box: a bright ACCENT fill + gold left edge when
+   * this field holds focus (pane closed), a soft fill when it is the field currently open in the
+   * dropdown. One rule used identically on every field, so "focused" reads the same everywhere.
+   */
+  private focusBox(x: number, y: number, w: number, h: number, field: EditorField): void {
+    const focused = this.field === field && !this.paneOpen;
+    const openHere = this.field === field && this.paneOpen;
+    this.fill(x, y, w, h, focused ? ACCENT : openHere ? ACCENT_SOFT : CELL_DIM, 1);
+    if (focused) {
+      this.fill(x, y, 2, h, 0xffd447, 1);
+    }
+  }
+
+  // -- ABILITIES panel: the flagship ER feature - all FOUR abilities on the main screen ----------
+  // 1 ACTIVE (focusable / changeable, marked) + 3 always-on INNATES (names + one-line descriptions,
+  // informational). This is half of an ER mon's identity and must read without expanding anything.
+
+  private renderAbilitiesPanel(): void {
+    const cfg = this.config!;
+    this.add(addWindow(RIGHT_X, ABIL_Y, RIGHT_W, ABIL_H));
+    this.sectionHeader(ABIL_Y, "ABILITIES", "1 active + 3 innate");
+
+    // The ACTIVE ability - the ONE selectable slot. Focus box + "ACTIVE" tag so it reads as editable.
+    const actives = this.activeAbilityIds();
+    const activeId = actives[cfg.set.abilityIndex] ?? actives[0];
+    const active = allAbilities[activeId];
+    const ay = ABIL_Y + 14;
+    this.focusBox(RIGHT_X + 3, ay, RIGHT_W - 6, 15, EditorField.ABILITY);
+    this.tag(RIGHT_X + 6, ay + 2, "ACTIVE", 0x2f6d4a);
+    this.text(RIGHT_X + 34, ay + 1, active?.name ?? "-", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+    this.text(RIGHT_X + 34, ay + 8, this.clip(active?.description ?? "", 62), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+
+    // The 3 INNATES - always on, not editable. Name (bold) + compact description on one line each.
+    const innates = this.innateAbilityIds();
+    const iy0 = ay + 17;
+    innates.forEach((id, i) => {
+      const ability = allAbilities[id];
+      const iy = iy0 + i * 8;
+      this.fill(RIGHT_X + 7, iy + 2, 2, 2, 0xc78ce0, 1); // innate marker dot
+      this.text(RIGHT_X + 12, iy, this.clip(ability?.name ?? "-", 18), TextStyle.SUMMARY_PINK, 0, FONT_TINY);
+      this.text(RIGHT_X + 78, iy, this.clip(ability?.description ?? "", 44), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    });
+  }
+
+  // -- ITEM panel -------------------------------------------------------------------------------
+
+  private renderItemPanel(): void {
+    this.add(addWindow(RIGHT_X, ITEM_Y, RIGHT_W, ITEM_H));
+    this.focusBox(RIGHT_X + 3, ITEM_Y + 3, RIGHT_W - 6, ITEM_H - 6, EditorField.ITEM);
+    this.text(RIGHT_X + 7, ITEM_Y + 5, "ITEM", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
+    const vx = RIGHT_X + 40;
+    if (this.isMega) {
+      this.text(vx + 12, ITEM_Y + 4, "Mega Stone", TextStyle.SUMMARY_PINK, 0, FONT_NAME);
+      this.text(vx + 12, ITEM_Y + 12, "Auto-forced by the mega stage (locked).", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
       return;
     }
+    const key = this.config!.set.item as ShowdownItemKey;
+    const resolved = this.resolvedItem(key);
+    if (resolved?.iconImage) {
+      const icon = globalScene.add
+        .sprite(vx + 4, ITEM_Y + 8, "items", resolved.iconImage)
+        .setOrigin(0.5, 0.5)
+        .setScale(0.42);
+      this.add(icon);
+    }
+    this.text(vx + 12, ITEM_Y + 4, resolved?.name ?? String(key), TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+    this.text(
+      vx + 12,
+      ITEM_Y + 12,
+      this.clip(resolved?.getDescription() ?? "", 58),
+      TextStyle.SUMMARY_GRAY,
+      0,
+      FONT_TINY,
+    );
+  }
+
+  // -- MOVES panel: a 2x2 grid of cells (compact, fits with the abilities block) -----------------
+
+  private renderMovesPanel(): void {
+    this.add(addWindow(RIGHT_X, MOVES_Y, RIGHT_W, MOVES_H));
+    this.sectionHeader(MOVES_Y, "MOVES");
+    const cellW = (RIGHT_W - 9) / 2; // two columns with a small central gutter
+    const cellH = 16;
+    const gridY = MOVES_Y + 13;
+    for (let slot = 0; slot < 4; slot++) {
+      const col = slot % 2;
+      const row = Math.floor(slot / 2);
+      const cx = RIGHT_X + 3 + col * (cellW + 3);
+      const cy = gridY + row * (cellH + 1);
+      this.renderMoveCell(cx, cy, cellW, cellH, slot);
+    }
+  }
+
+  private renderMoveCell(cx: number, cy: number, w: number, h: number, slot: number): void {
+    this.focusBox(cx, cy, w, h, MOVE_FIELDS[slot]);
+    const moveId = this.config!.set.moves[slot];
+    if (moveId == null) {
+      this.text(cx + 5, cy + 5, `-- empty --  (${slot + 1})`, TextStyle.SUMMARY_GRAY, 0, FONT_DESC);
+      return;
+    }
+    const move = allMoves[moveId];
+    this.text(cx + 5, cy + 1, this.clip(move?.name ?? "-", 16), TextStyle.SUMMARY_GOLD, 0, FONT_DESC);
+    if (!move) {
+      return;
+    }
+    const tSpr = globalScene.add
+      .sprite(cx + 11, cy + 11, getLocalizedSpriteKey("types"), PokemonType[move.type].toLowerCase())
+      .setOrigin(0.5, 0.5)
+      .setScale(0.34);
+    this.add(tSpr);
+    const cSpr = globalScene.add
+      .sprite(cx + 27, cy + 11, "categories", MoveCategory[move.category].toLowerCase())
+      .setOrigin(0.5, 0.5)
+      .setScale(0.5);
+    this.add(cSpr);
+    const bp = move.power > 0 ? String(move.power) : "-";
+    const acc = move.accuracy > 0 ? String(move.accuracy) : "-";
+    this.text(cx + 38, cy + 9, `BP ${bp}`, TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    this.text(cx + w - 4, cy + 9, `${acc}%`, TextStyle.SUMMARY_GRAY, 1, FONT_TINY);
+  }
+
+  // -- NATURE panel -----------------------------------------------------------------------------
+
+  private renderNaturePanel(): void {
+    this.add(addWindow(RIGHT_X, NAT_Y, RIGHT_W, NAT_H));
+    this.focusBox(RIGHT_X + 3, NAT_Y + 3, RIGHT_W - 6, NAT_H - 6, EditorField.NATURE);
+    this.text(RIGHT_X + 7, NAT_Y + 4, "NATURE", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
+    const name = getNatureName(this.config!.set.nature as Nature, false, false, true);
+    const summary = getNatureName(this.config!.set.nature as Nature, true, false, true).replace(/\n/g, " ");
+    this.text(RIGHT_X + 44, NAT_Y + 3, summary || name, TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+    this.text(
+      RIGHT_X + 44,
+      NAT_Y + 11,
+      "Free pick - recolors the stat bars live.",
+      TextStyle.SUMMARY_GRAY,
+      0,
+      FONT_TINY,
+    );
+  }
+
+  /** A small solid label pill (e.g. the "ACTIVE" tag on the ability row). */
+  private tag(x: number, y: number, label: string, color: number): void {
+    const w = label.length * 3.1 + 5;
+    this.fill(x, y, w, 8, color, 1);
+    this.text(x + 2, y + 1, label, TextStyle.WINDOW, 0, FONT_TINY);
+  }
+
+  private resolvedItem(key: ShowdownItemKey) {
+    const modType = modifierTypes[key];
+    return modType == null ? null : getModifierType(modType);
+  }
+
+  // -- floating search DROPDOWN (drawn on top, only while actively searching) --------------------
+
+  private renderDropdown(): void {
+    this.add(addWindow(DROP_X, DROP_Y, DROP_W, DROP_H));
+    // Search bar: the focused field's pool name + the live typed query with a caret. Typing filled it
+    // directly (no "browse" button) - an empty query means the controller opened it unfiltered.
+    const barY = DROP_Y + 3;
+    this.fill(DROP_X + 3, barY, DROP_W - 6, 11, HEADER_BAND, 1);
+    this.text(DROP_X + 6, barY + 2, this.fieldName(this.field), TextStyle.SUMMARY_GOLD, 0, FONT_HDR);
+    if (this.filter) {
+      this.text(DROP_X + 70, barY + 2, `${this.filter}_`, TextStyle.WINDOW, 0, FONT_HDR);
+    } else {
+      this.text(DROP_X + 70, barY + 2, "type to search", TextStyle.SHADOW_TEXT, 0, FONT_HDR);
+    }
+    const top = DROP_Y + 17;
     switch (this.field) {
       case EditorField.ABILITY:
-        this.renderAbilityPane();
+        this.renderAbilityDropdown(top);
         break;
       case EditorField.ITEM:
-        this.renderItemPane();
+        this.renderItemDropdown(top);
         break;
       case EditorField.NATURE:
-        this.renderNaturePane();
+        this.renderNatureDropdown(top);
         break;
       default:
-        this.renderMovePane();
+        this.renderMoveDropdown(top);
         break;
     }
   }
@@ -1055,190 +1162,157 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   private fieldName(field: EditorField): string {
     switch (field) {
       case EditorField.ABILITY:
-        return "abilities";
+        return "ABILITY";
       case EditorField.ITEM:
-        return "items";
+        return "ITEM";
       case EditorField.NATURE:
-        return "natures";
+        return "NATURE";
       default:
-        return `Move ${MOVE_FIELDS.indexOf(field) + 1}`;
+        return `MOVE ${MOVE_FIELDS.indexOf(field) + 1}`;
     }
   }
 
-  private static readonly FOOTER_Y = SCREEN_H - 11;
+  private static readonly DROP_FOOTER_Y = SCREEN_H - 12;
+  private static readonly DROP_ROW_H = 11;
 
-  private paneHeader(title: string): void {
-    this.text(PANE_X + 6, PANE_Y + 3, title, TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
-    if (this.filter) {
-      this.text(PANE_X + 54, PANE_Y + 3, `filter: ${this.filter}_`, TextStyle.SUMMARY_GOLD, 0, FONT_HDR);
+  private dropFooter(desc: string): void {
+    const y = ShowdownSetEditorUiHandler.DROP_FOOTER_Y;
+    this.fill(DROP_X + 3, y, DROP_W - 6, 10, 0x0d1524, 1);
+    this.text(DROP_X + 6, y + 1, this.clip(desc, 68), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+  }
+
+  /** Highlight fill + return the row's baseline y for the i-th visible dropdown row. */
+  private dropRow(index: number, top: number): number {
+    const rowH = ShowdownSetEditorUiHandler.DROP_ROW_H;
+    const ry = top + (index - this.paneScroll) * rowH;
+    if (index === this.paneCursor) {
+      this.fill(DROP_X + 3, ry - 1, DROP_W - 6, rowH, ACCENT, 1);
     }
+    return ry;
   }
 
-  private paneFooter(desc: string): void {
-    const y = ShowdownSetEditorUiHandler.FOOTER_Y;
-    this.fill(PANE_X + 3, y, PANE_W - 6, 9, 0x101827, 1);
-    this.text(PANE_X + 6, y + 1, this.clip(desc, 62), TextStyle.SUMMARY_GRAY, 0, 26);
-  }
-
-  private renderMovePane(): void {
-    this.paneHeader("MOVES");
+  private renderMoveDropdown(top: number): void {
     const entries = this.moveEntries();
-    // Column headers. Effect snippet lives in the footer (the highlighted move's full text).
-    const hy = PANE_Y + 11;
-    const cName = PANE_X + 7;
-    const cType = PANE_X + 96;
-    const cCat = PANE_X + 122;
-    const cBp = PANE_X + 142;
-    const cAcc = PANE_X + 168;
-    const cPp = PANE_X + 192;
-    const HF = 22;
-    this.text(cName, hy, "Name", TextStyle.SUMMARY_BLUE, 0, HF);
-    this.text(cType, hy, "Type", TextStyle.SUMMARY_BLUE, 0, HF);
-    this.text(cCat, hy, "Cat", TextStyle.SUMMARY_BLUE, 0, HF);
-    this.text(cBp, hy, "BP", TextStyle.SUMMARY_BLUE, 0, HF);
-    this.text(cAcc, hy, "Acc", TextStyle.SUMMARY_BLUE, 0, HF);
-    this.text(cPp, hy, "PP", TextStyle.SUMMARY_BLUE, 0, HF);
-
     const visible = ShowdownSetEditorUiHandler.PANE_VISIBLE_ROWS;
-    const rowH = 6;
-    const start = this.paneScroll;
-    const end = Math.min(start + visible, entries.length);
-    for (let i = start; i < end; i++) {
-      const e = entries[i];
-      const move = allMoves[e.moveId];
-      const ry = PANE_Y + 17 + (i - start) * rowH;
-      if (i === this.paneCursor) {
-        this.fill(PANE_X + 3, ry - 1, PANE_W - 6, rowH, ACCENT, 1);
-      }
-      const nameStyle = e.locked
-        ? TextStyle.SHADOW_TEXT
-        : i === this.paneCursor
-          ? TextStyle.WINDOW
-          : TextStyle.SUMMARY_GRAY;
-      const lockTag = e.locked ? " (egg)" : "";
-      this.text(cName, ry, this.clip(`${e.name}${lockTag}`, 20), nameStyle, 0, 24);
-      if (move) {
-        const tSpr = globalScene.add
-          .sprite(cType + 9, ry + 2, getLocalizedSpriteKey("types"), PokemonType[move.type].toLowerCase())
-          .setOrigin(0.5, 0.5)
-          .setScale(0.34);
-        tSpr.setAlpha(e.locked ? 0.4 : 1);
-        this.add(tSpr);
-        this.text(cCat, ry, categoryLabel(move.category), nameStyle, 0, 24);
-        this.text(cBp, ry, move.power > 0 ? String(move.power) : "-", nameStyle, 0, 24);
-        this.text(cAcc, ry, move.accuracy > 0 ? String(move.accuracy) : "-", nameStyle, 0, 24);
-        this.text(cPp, ry, String(move.pp), nameStyle, 0, 24);
-      }
+    const end = Math.min(this.paneScroll + visible, entries.length);
+    for (let i = this.paneScroll; i < end; i++) {
+      this.renderMoveDropRow(entries[i], i, top);
     }
-    const highlighted = entries[this.paneCursor];
-    const footerMove = highlighted ? allMoves[highlighted.moveId] : null;
-    this.paneFooter(highlighted?.locked ? highlighted.reason : (footerMove?.effect ?? ""));
+    const hi = entries[this.paneCursor];
+    const hiMove = hi ? allMoves[hi.moveId] : null;
+    this.dropFooter(hi?.locked ? hi.reason : (hiMove?.effect ?? ""));
   }
 
-  private renderAbilityPane(): void {
-    this.paneHeader("ABILITY");
-    const actives = this.activeAbilityIds();
-    const cfg = this.config!;
-    // Actives (selectable; locked slots grayed with reason). Left half of the pane.
-    const actX = PANE_X + 6;
-    this.text(actX, PANE_Y + 11, "ACTIVES (pick one)", TextStyle.SUMMARY_BLUE, 0, 24);
-    actives.forEach((id, i) => {
-      const ry = PANE_Y + 17 + i * 11;
-      const unlocked = cfg.unlocks.unlockedAbilityIndices.includes(i);
-      if (i === this.paneCursor) {
-        this.fill(actX - 2, ry - 1, 100, 10, ACCENT, 1);
+  private renderMoveDropRow(e: MovePaneEntry, i: number, top: number): void {
+    const move = allMoves[e.moveId];
+    const ry = this.dropRow(i, top);
+    const style = e.locked ? TextStyle.SHADOW_TEXT : i === this.paneCursor ? TextStyle.WINDOW : TextStyle.SUMMARY_GRAY;
+    this.text(DROP_X + 8, ry + 1, this.clip(`${e.name}${e.locked ? " (egg)" : ""}`, 22), style, 0, FONT_DESC);
+    if (!move) {
+      return;
+    }
+    const tSpr = globalScene.add
+      .sprite(DROP_X + 120, ry + 4, getLocalizedSpriteKey("types"), PokemonType[move.type].toLowerCase())
+      .setOrigin(0.5, 0.5)
+      .setScale(0.34);
+    tSpr.setAlpha(e.locked ? 0.4 : 1);
+    this.add(tSpr);
+    this.text(DROP_X + 140, ry + 1, categoryLabel(move.category), style, 0, FONT_TINY);
+    this.text(DROP_X + 156, ry + 1, move.power > 0 ? `BP ${move.power}` : "BP -", style, 0, FONT_TINY);
+    this.text(DROP_X + 184, ry + 1, move.accuracy > 0 ? `${move.accuracy}%` : "-", style, 0, FONT_TINY);
+  }
+
+  private renderItemDropdown(top: number): void {
+    const keys = this.itemKeys();
+    const visible = ShowdownSetEditorUiHandler.PANE_VISIBLE_ROWS;
+    const start = this.paneScroll;
+    const end = Math.min(start + visible, keys.length);
+    for (let i = start; i < end; i++) {
+      const resolved = this.resolvedItem(keys[i]);
+      const ry = this.dropRow(i, top);
+      const style = i === this.paneCursor ? TextStyle.WINDOW : TextStyle.SUMMARY_GRAY;
+      if (resolved?.iconImage) {
+        const icon = globalScene.add
+          .sprite(DROP_X + 13, ry + 4, "items", resolved.iconImage)
+          .setOrigin(0.5, 0.5)
+          .setScale(0.42);
+        this.add(icon);
       }
+      this.text(DROP_X + 24, ry + 1, this.clip(resolved?.name ?? String(keys[i]), 26), style, 0, FONT_DESC);
+      this.text(DROP_X + 122, ry + 2, this.clip(resolved?.getDescription() ?? "", 30), style, 0, FONT_TINY);
+    }
+    const hi = this.resolvedItem(keys[this.paneCursor]);
+    this.dropFooter(hi?.getDescription() ?? "");
+  }
+
+  private renderAbilityDropdown(top: number): void {
+    // Only the 3 ACTIVES are selectable (the innates live on the main screen, always-on). Locked slots
+    // are grayed WITH the unlock reason, never hidden.
+    const cfg = this.config!;
+    const actives = this.activeAbilityIds();
+    actives.forEach((id, i) => {
+      const ry = this.dropRow(i, top + i * 2); // extra breathing room - only 3 rows
+      const unlocked = cfg.unlocks.unlockedAbilityIndices.includes(i);
       const ability = allAbilities[id];
       const style = unlocked
         ? i === this.paneCursor
           ? TextStyle.WINDOW
           : TextStyle.SUMMARY_GOLD
         : TextStyle.SHADOW_TEXT;
-      const mark = cfg.set.abilityIndex === i ? "[*] " : "[ ] ";
-      this.text(actX, ry, `${mark}${ability?.name ?? "-"}${unlocked ? "" : " LOCK"}`, style, 0, 26);
+      const mark = cfg.set.abilityIndex === i ? "(*) " : "( ) ";
       this.text(
-        actX + 4,
-        ry + 5,
-        this.clip(unlocked ? (ability?.description ?? "") : "Unlock this ability slot in the collection.", 28),
+        DROP_X + 8,
+        ry + 1,
+        `${mark}${ability?.name ?? "-"}${unlocked ? "" : "  [LOCKED]"}`,
+        style,
+        0,
+        FONT_NAME,
+      );
+      this.text(
+        DROP_X + 12,
+        ry + 8,
+        this.clip(unlocked ? (ability?.description ?? "") : "Unlock this ability slot in the collection.", 60),
         TextStyle.SUMMARY_GRAY,
         0,
-        22,
+        FONT_TINY,
       );
     });
-    // Innates (informational - always active, never picked). Right half of the pane.
-    const innates = this.innateAbilityIds();
-    const innX = PANE_X + 108;
-    this.text(innX, PANE_Y + 11, "INNATES (always on)", TextStyle.SUMMARY_PINK, 0, 24);
-    innates.forEach((id, i) => {
-      const ry = PANE_Y + 17 + i * 11;
-      const ability = allAbilities[id];
-      this.text(innX, ry, ability?.name ?? "-", TextStyle.SUMMARY_GOLD, 0, 26);
-      this.text(innX + 4, ry + 5, this.clip(ability?.description ?? "", 30), TextStyle.SUMMARY_GRAY, 0, 22);
-    });
-    const highlighted = allAbilities[actives[this.paneCursor]];
+    const hi = allAbilities[actives[this.paneCursor]];
     const unlocked = cfg.unlocks.unlockedAbilityIndices.includes(this.paneCursor);
-    this.paneFooter(unlocked ? (highlighted?.description ?? "") : "Locked ability slot - unlock it in the collection.");
+    this.dropFooter(unlocked ? (hi?.description ?? "") : "Locked ability slot - unlock it in the collection.");
   }
 
-  private renderItemPane(): void {
-    this.paneHeader("ITEM");
-    const keys = this.itemKeys();
-    const visible = ShowdownSetEditorUiHandler.PANE_VISIBLE_ROWS;
-    const rowH = 6;
-    const start = this.paneScroll;
-    const end = Math.min(start + visible, keys.length);
-    for (let i = start; i < end; i++) {
-      const key = keys[i];
-      const modType = modifierTypes[key];
-      const resolved = modType == null ? null : getModifierType(modType);
-      const ry = PANE_Y + 12 + (i - start) * rowH;
-      if (i === this.paneCursor) {
-        this.fill(PANE_X + 3, ry - 1, PANE_W - 6, rowH, ACCENT, 1);
-      }
-      if (resolved?.iconImage) {
-        const icon = globalScene.add
-          .sprite(PANE_X + 11, ry + 2, "items", resolved.iconImage)
-          .setOrigin(0.5, 0.5)
-          .setScale(0.4);
-        this.add(icon);
-      }
-      const style = i === this.paneCursor ? TextStyle.WINDOW : TextStyle.SUMMARY_GRAY;
-      this.text(PANE_X + 20, ry, this.clip(resolved?.name ?? String(key), 24), style, 0, 24);
-      this.text(PANE_X + 112, ry, this.clip(resolved?.getDescription() ?? "", 30), style, 0, 22);
-    }
-    const hi = keys[this.paneCursor];
-    const hiType = hi == null ? null : modifierTypes[hi];
-    this.paneFooter(hiType == null ? "" : (getModifierType(hiType).getDescription() ?? ""));
-  }
-
-  private renderNaturePane(): void {
-    this.paneHeader("NATURE");
+  private renderNatureDropdown(top: number): void {
     const natures = this.natureList();
-    // A compact 5x5 name grid (the +/- summary + live stat-bar recolor is in the footer/bars).
-    const cols = 5;
-    const colW = 40;
-    const rowH = 8;
-    natures.forEach((nat, i) => {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const x = PANE_X + 8 + col * colW;
-      const ry = PANE_Y + 12 + row * rowH;
-      if (i === this.paneCursor) {
-        this.fill(x - 3, ry - 1, colW - 2, rowH, ACCENT, 1);
-      }
+    const visible = ShowdownSetEditorUiHandler.PANE_VISIBLE_ROWS;
+    const start = this.paneScroll;
+    const end = Math.min(start + visible, natures.length);
+    for (let i = start; i < end; i++) {
+      const nat = natures[i];
+      const ry = this.dropRow(i, top);
       const style =
         i === this.paneCursor
           ? TextStyle.WINDOW
           : nat === this.config!.set.nature
             ? TextStyle.SUMMARY_GOLD
             : TextStyle.SUMMARY_GRAY;
-      this.text(x, ry, getNatureName(nat as Nature, false, false, true), style, 0, 24);
-    });
+      this.text(DROP_X + 8, ry + 1, getNatureName(nat as Nature, false, false, true), style, 0, FONT_DESC);
+      this.text(
+        DROP_X + 70,
+        ry + 2,
+        getNatureName(nat as Nature, true, false, true)
+          .replace(/\n/g, " ")
+          .replace(/[()]/g, ""),
+        style,
+        0,
+        FONT_TINY,
+      );
+    }
     const picked = natures[this.paneCursor];
-    this.paneFooter(
+    this.dropFooter(
       picked == null
         ? ""
-        : `${getNatureName(picked as Nature, true, false, true).replace(/\n/g, " ")} - preview updates the stat bars.`,
+        : `${getNatureName(picked as Nature, true, false, true).replace(/\n/g, " ")} - live stat-bar preview.`,
     );
   }
 

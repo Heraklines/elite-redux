@@ -884,12 +884,15 @@ const RECIPES: Record<string, Recipe> = {
     prepare: () => [buildShowdownEditorDemoConfig({ initialField: EditorField.ITEM, initialPaneOpen: true })],
     diffTolerance: 0,
   },
-  // Input-plumbing proof (not the golden set): drive focus down to Move 1 and open its pane via
-  // processInput, so the harness exercises the real keyboard focus graph.
+  // Input-plumbing proof (not the golden set): drive the round-3 focus -> open -> navigate -> PICK
+  // path through processInput. DOWN,DOWN focuses Move 1; ACTION opens its search dropdown (the
+  // controller/A path, no ceremony); DOWN moves the result cursor; ACTION commits the highlighted
+  // move and closes the dropdown. The final PNG is the set with Move 1 changed - proof the type/pick
+  // interaction round-trips (the keystroke half is covered by showdown-editor-input.test.ts).
   "showdown-editor-nav": {
     mode: UiMode.SHOWDOWN_SET_EDITOR,
     prepare: () => [buildShowdownEditorDemoConfig()],
-    steps: [Button.DOWN, Button.DOWN, Button.ACTION],
+    steps: [Button.DOWN, Button.DOWN, Button.ACTION, Button.DOWN, Button.ACTION],
     diffTolerance: 0,
   },
   // Demo of universal input driving: drives the real starter-select grid cursor. Each
