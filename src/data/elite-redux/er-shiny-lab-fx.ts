@@ -365,6 +365,16 @@ export const SURFACE_BLEND = {
   marble: "softlight",
   halftone: "hardlight",
   rainbowedge: "screen",
+  softshade: "softlight",
+  discoball: "screen",
+  lensflare: "screen",
+  starfall: "add",
+  soapswirl: "screen",
+  moire: "softlight",
+  staticcharge: "add",
+  spiritflame: "screen",
+  lavalamp: "normal",
+  shockwave: "normal",
 };
 
 // "Tint FX to palette": recolor a single-hue effect to the palette's hue while
@@ -396,6 +406,29 @@ export const NO_TINT = new Set([
   "prismburst",
   "rainbowoutline",
   "rainbowglitter",
+  "neonsign",
+  "echoes",
+  "triecho",
+  "soapswirl",
+  "discoball",
+  "tiedye",
+  "cmykprint",
+  "tvbars",
+  "gemplate",
+  "checkerflip",
+  "coderain",
+  "rainbowarc",
+  "confetti",
+  "lasershow",
+  "fireworks",
+  "butterflies",
+  "cardstorm",
+  "ribbonloop",
+  "planets",
+  "equalizer",
+  "fairydust",
+  "glitterstorm",
+  "prismrain",
 ]);
 
 const G = {
@@ -1510,6 +1543,1083 @@ AURA.tron = (r, g, b, x, y, t, ctx) => {
     Math.min(1, base[2] + glow + rim * 0.35),
     1,
   ];
+};
+
+AURA.neonsign = (r, g, b, x, y, t, ctx) => {
+  const e = ctx?.e ?? 0;
+  const ink = Math.max(smooth(0.35, 0.9, e), luma(r, g, b) < 0.17 ? 1 : 0);
+  if (ink < 0.05) {
+    return [r * 0.5, g * 0.5, b * 0.6, 0.07];
+  }
+  let bh = 0;
+  let bs = 0.9;
+  let bw = -1;
+  for (const [ox, oy] of [
+    [0.05, 0],
+    [-0.05, 0],
+    [0, 0.05],
+    [0, -0.05],
+    [0.035, 0.035],
+    [-0.035, -0.035],
+  ]) {
+    const s2 = ctx.sa(x + ox, y + oy);
+    if (s2[3] < 0.5) {
+      continue;
+    }
+    const hsv = rgb2hsv(s2[0], s2[1], s2[2]);
+    const w = hsv[1] * hsv[2];
+    if (w > bw) {
+      bw = w;
+      bh = hsv[0];
+      bs = hsv[1];
+    }
+  }
+  const col = bw > 0.04 ? hsv2rgb(bh, clamp(bs * 1.2 + 0.25), 1) : hsv2rgb(fract((x + y) * 0.5 + t * 0.08), 0.9, 1);
+  const buzz = 0.8 + 0.2 * Math.sin(t * 2.4 + (x + y) * 4) * (h2(Math.floor(t * 14), 2) > 0.08 ? 1 : 0.3);
+  return [col[0] * buzz, col[1] * buzz, col[2] * buzz, ink];
+};
+// Mist Veil: the whole silhouette frays into drifting mist (edge alpha erosion).
+AURA.mistveil = (r, g, b, x, y, t, ctx) => {
+  const e = ctx?.e ?? 0;
+  const n = fbm(x * 6 + t * 0.35, y * 6 - t * 0.22);
+  const erode = smooth(0.25, 1.0, e) * smooth(0.32, 0.75, n);
+  const whiten = clamp(erode * 1.3) * 0.55;
+  return [mix(r, 0.9, whiten), mix(g, 0.94, whiten), mix(b, 1.0, whiten), clamp(1 - erode * 1.7)];
+};
+// Rising Mist: only the lower body dissolves, like the mountain-in-fog photo.
+AURA.mistfeet = (r, g, b, x, y, t, ctx) => {
+  const e = ctx?.e ?? 0;
+  const reg = smooth(0.45, 0.95, y);
+  const n = fbm(x * 5 + t * 0.3, y * 6 - t * 0.15);
+  const erode = clamp(reg * (0.35 + smooth(0.3, 0.8, n)) * (0.45 + 0.55 * e) * 1.5);
+  const whiten = clamp(erode * 1.2) * 0.6;
+  return [mix(r, 0.9, whiten), mix(g, 0.93, whiten), mix(b, 0.99, whiten), clamp(1 - erode * 1.45)];
+};
+// Bloom: HD soft glow - bright regions bleed light outward (smooth, not pixelated).
+AURA.bloom = (r, g, b, x, y, t, ctx) => {
+  const acc = [0, 0, 0];
+  let n = 0;
+  for (let ring = 1; ring <= 2; ring++) {
+    const R = 0.028 * ring;
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + ring;
+      const s2 = ctx.sa(x + Math.cos(a) * R, y + Math.sin(a) * R);
+      if (s2[3] < 0.5) {
+        continue;
+      }
+      const w = smooth(0.52, 1.0, luma(s2[0], s2[1], s2[2])) / ring;
+      acc[0] += s2[0] * w;
+      acc[1] += s2[1] * w;
+      acc[2] += s2[2] * w;
+      n++;
+    }
+  }
+  const k = n ? 1.0 / n : 0;
+  const pulse = 0.82 + 0.18 * Math.sin(t * 1.7);
+  return [clamp(r + acc[0] * k * pulse), clamp(g + acc[1] * k * pulse), clamp(b + acc[2] * k * pulse), 1];
+};
+// HD Lighting: blur the sprite's own lights/darks into a smooth low-opacity
+// shading layer (softlight blend) so the lighting reads high-def.
+AURA.softshade = (r, g, b, x, y, t, ctx) => {
+  let acc = 0;
+  let n = 0;
+  for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      const s2 = ctx.sa(x + dx * 0.022, y + dy * 0.022);
+      if (s2[3] < 0.5) {
+        continue;
+      }
+      acc += luma(s2[0], s2[1], s2[2]);
+      n++;
+    }
+  }
+  const soft = n ? acc / n : luma(r, g, b);
+  const tv = smooth(0.12, 0.88, soft);
+  return [tv, tv, tv, 1];
+};
+// Glass Warp: refraction through uneven voronoi glass panes + bright pane seams.
+AURA.glasswarp = (r, g, b, x, y, t, ctx) => {
+  const v = voro(x + Math.sin(t * 0.4) * 0.012, y, 5);
+  const ang = v.cell * Math.PI * 2;
+  const s2 = ctx.sa(x + Math.cos(ang) * 0.035, y + Math.sin(ang) * 0.035);
+  const c = s2[3] > 0.02 ? [s2[0], s2[1], s2[2]] : [r, g, b];
+  const streak = Math.pow(Math.max(0, Math.sin((x + y) * 9 + v.cell * 8 + t * 0.5)), 22) * 0.45;
+  const seam = smooth(0.045, 0.0, v.border) * 0.3;
+  return [clamp(c[0] * 0.94 + streak + seam), clamp(c[1] * 0.97 + streak + seam), clamp(c[2] + streak + seam), 1];
+};
+// No Outline: delete the dark linework entirely - the fill floats disjointed.
+AURA.unlined = (r, g, b) => [r, g, b, smooth(0.1, 0.2, luma(r, g, b))];
+// Pulled Apart: the sprite shatters into voronoi shards, each shifted its own way,
+// with the outline gaps left transparent (the "sprite pulled apart" idea).
+AURA.sundered = (r, g, b, x, y, t, ctx) => {
+  const v = voro(x, y, 4);
+  const ang = v.cell * Math.PI * 2;
+  const push = 0.045 + 0.025 * Math.sin(t * 1.4 + v.cell * 19);
+  const s2 = ctx.sa(x - Math.cos(ang) * push, y - Math.sin(ang) * push);
+  if (s2[3] < 0.02) {
+    return [0, 0, 0, 0];
+  }
+  return [...mix3([s2[0], s2[1], s2[2]], [0.03, 0.03, 0.05], smooth(0.035, 0.0, v.border) * 0.75), 1];
+};
+// Living Shadow: the mon becomes a breathing flat shadow with a violet rim.
+AURA.livingshadow = (r, g, b, x, y, t, ctx) => {
+  const e = ctx?.e ?? 0;
+  const rim = smooth(0.3, 1.0, e) * (0.7 + 0.3 * Math.sin(t * 1.3));
+  return [0.03 + rim * 0.22, 0.015 + rim * 0.05, 0.07 + rim * 0.5, 0.94];
+};
+
+// ============== v7 surface FX ==============
+// Waterline: the mon stands half-sunk - a bright surface line, and below it a
+// wavy, deep-blue mirror of its upper half.
+AURA.waterline = (r, g, b, x, y, t, ctx) => {
+  const WL = 0.58;
+  if (y < WL - 0.012) {
+    return [r, g, b, 1];
+  }
+  if (y < WL + 0.018) {
+    const gl = 0.5 + 0.5 * Math.sin(x * 26 + t * 2.2);
+    return [clamp(r * 0.45 + 0.35 + gl * 0.3), clamp(g * 0.5 + 0.42 + gl * 0.35), clamp(b * 0.55 + 0.5 + gl * 0.4), 1];
+  }
+  const depth = (y - WL) / (1 - WL);
+  const wob = (0.015 + depth * 0.045) * Math.sin(y * 38 - t * 2.6);
+  const s2 = ctx.sa(x + wob, 2 * WL - y);
+  const c = s2[3] > 0.02 ? [s2[0], s2[1], s2[2]] : [r * 0.45, g * 0.55, b * 0.75];
+  const shimmer = Math.pow(Math.max(0, Math.sin(y * 52 + x * 8 - t * 3)), 6) * (1 - depth) * 0.35;
+  return [
+    clamp(mix(c[0], 0.08, 0.4 + depth * 0.3) + shimmer * 0.7),
+    clamp(mix(c[1], 0.28, 0.32 + depth * 0.26) + shimmer * 0.85),
+    clamp(mix(c[2], 0.5, 0.24 + depth * 0.2) + shimmer),
+    1,
+  ];
+};
+// Fire Creep: flames crawling up the body from the feet.
+AURA.firecreep = (r, g, b, x, y, t) => {
+  const n = fbm(x * 6, y * 5 - t * 1.2);
+  const reg = smooth(0.35, 0.95, y + (n - 0.5) * 0.4);
+  const fire = ramp(G.inferno, clamp(n * 1.4 * reg));
+  return [...mix3([r, g, b], fire, clamp(reg * 1.4) * 0.9), 1];
+};
+// Snowcap: thick snow settles on every upward-facing surface, with glints.
+AURA.snowcap = (r, g, b, x, y, t, ctx) => {
+  const open1 = ctx.sa(x, y - 0.03)[3] < 0.4 ? 1 : 0;
+  const open2 = ctx.sa(x, y - 0.07)[3] < 0.4 ? 0.7 : 0;
+  const open = Math.max(open1, open2);
+  const n = 0.75 + 0.25 * vnoise(x * 22, y * 22);
+  const cap = clamp(open * n * 1.6);
+  let c = mix3([r, g, b], [0.96, 0.98, 1.0], cap);
+  c = mix3(c, [0.62, 0.74, 0.95], cap > 0.1 && cap < 0.55 ? 0.3 : 0);
+  const glint =
+    cap > 0.6 && h2(Math.floor(x * 40), Math.floor(y * 40)) > 0.9
+      ? Math.pow(0.5 + 0.5 * Math.sin(t * 3 + x * 30), 4) * 0.55
+      : 0;
+  return [clamp(c[0] + glint), clamp(c[1] + glint), clamp(c[2] + glint), 1];
+};
+// Disco Glints: mirror facets flashing hard, under sweeping colored club light.
+AURA.discoball = (r, g, b, x, y, t) => {
+  const gx = Math.floor(x * 9);
+  const gy = Math.floor(y * 9);
+  const ph = h2(gx, gy);
+  const fl = Math.pow(Math.max(0, Math.sin(t * 2.4 + ph * 20)), 8);
+  const facet = 0.9 + (h2(gx + 3, gy) - 0.5) * 0.2;
+  const beam = Math.pow(Math.max(0, Math.sin((x + y) * 4.5 - t * 1.7)), 4) * 0.45;
+  const bc = hsv2rgb(fract(t * 0.11), 0.65, 1);
+  const col = hsv2rgb(fract(ph + t * 0.08), 0.5, 1);
+  return [
+    clamp(r * 0.8 * facet + col[0] * fl + bc[0] * beam),
+    clamp(g * 0.8 * facet + col[1] * fl + bc[1] * beam),
+    clamp(b * 0.8 * facet + col[2] * fl + bc[2] * beam),
+    1,
+  ];
+};
+// Lens Flare: a hot anamorphic flare drifting over the body, spikes and ghosts included.
+AURA.lensflare = (r, g, b, x, y, t) => {
+  const fx0 = 0.5 + 0.22 * Math.sin(t * 0.5);
+  const fy0 = 0.32 + 0.14 * Math.cos(t * 0.35);
+  const d = Math.hypot(x - fx0, y - fy0);
+  const core = Math.pow(clamp(1 - d * 3), 5) * 1.1;
+  const ana = Math.pow(clamp(1 - Math.abs(y - fy0) * 9), 4) * 0.55;
+  const spikes = Math.pow(Math.max(0, Math.cos(Math.atan2(y - fy0, x - fx0) * 3)), 30) * Math.pow(clamp(1 - d * 1.8), 2) * 0.7;
+  let ghost = 0;
+  for (let i = 1; i <= 3; i++) {
+    const k = i / 3;
+    ghost += smooth(0.05, 0.02, Math.abs(Math.hypot(x - mix(fx0, 1 - fx0, k), y - mix(fy0, 1 - fy0, k)) - 0.04)) * 0.3;
+  }
+  const k = core + ana + spikes + ghost;
+  return [clamp(r + k), clamp(g + k * 0.92), clamp(b + k * 0.75), 1];
+};
+// Old Film: sepia, grain, gate weave, scratches, vignette, flicker.
+AURA.oldfilm = (r, g, b, x, y, t) => {
+  const L = luma(r, g, b);
+  let c = [clamp(L * 1.05 + 0.06), clamp(L * 0.88 + 0.04), clamp(L * 0.62)];
+  const grain = (h2(Math.floor(x * 90) + Math.floor(t * 18) * 13, Math.floor(y * 90)) - 0.5) * 0.22;
+  const scratch = h2(Math.floor(t * 7), 3) > 0.7 && Math.abs(x - h2(Math.floor(t * 7), 9)) < 0.004 ? 0.35 : 0;
+  const vig = 1 - Math.pow(Math.hypot(x - 0.5, y - 0.5) * 1.2, 2) * 0.5;
+  const flick = 0.92 + 0.08 * Math.sin(t * 19 + Math.sin(t * 7));
+  c = c.map(v => clamp((v + grain + scratch) * vig * flick));
+  return [c[0], c[1], c[2], 1];
+};
+// VHS: tracking-band displacement + chroma bleed + row noise (worn tape).
+AURA.vhs = (r, g, b, x, y, t, ctx) => {
+  const band = Math.floor(y * 24 + t * 2);
+  const bad = h2(band, Math.floor(t * 5)) > 0.82;
+  const dx = bad ? (h2(band + 3, Math.floor(t * 9)) - 0.5) * 0.1 : 0;
+  const sR = ctx.sa(x + dx + 0.014, y);
+  const sB = ctx.sa(x + dx - 0.014, y);
+  const sG = ctx.sa(x + dx, y);
+  const noise = bad ? (h2(Math.floor(x * 70), band * 7 + Math.floor(t * 30)) - 0.5) * 0.5 : 0;
+  return [clamp(sR[0] + noise), clamp(sG[1] + noise), clamp(sB[2] + noise), sG[3] > 0.02 ? 1 : 0.15];
+};
+// Pixel Sort: whole columns smear their brightest color downward, hard.
+AURA.pixelsort = (r, g, b, x, y, t, ctx) => {
+  const col = Math.floor(x * 36);
+  if (h2(col, 11) < 0.42) {
+    return [r, g, b, 1];
+  }
+  let best = [r, g, b];
+  let bl = luma(r, g, b);
+  for (let i = 1; i <= 9; i++) {
+    const s2 = ctx.sa(x, y - i * 0.03);
+    if (s2[3] < 0.5) {
+      continue;
+    }
+    const L2 = luma(s2[0], s2[1], s2[2]);
+    if (L2 > bl) {
+      bl = L2;
+      best = [s2[0], s2[1], s2[2]];
+    }
+  }
+  const drift = 0.5 + 0.5 * Math.sin(t * 0.9 + col);
+  return [...mix3([r, g, b], best, clamp(smooth(0.3, 0.7, bl) * (0.55 + drift * 0.45))), 1];
+};
+// Hypno Rings: bold two-tone rings pulsing out from the heart, slightly spiraled.
+AURA.moire = (r, g, b, x, y, t) => {
+  const d = Math.hypot(x - 0.5, y - 0.48);
+  const ang = Math.atan2(y - 0.48, x - 0.5);
+  const ring = Math.sin(d * 44 - t * 3.1 + Math.sin(ang * 2 + t) * 0.9);
+  const band = smooth(-0.25, 0.65, ring);
+  const c1 = hsv2rgb(fract(0.86 + t * 0.02), 0.75, 0.98);
+  const c2 = hsv2rgb(fract(0.53 + t * 0.02), 0.7, 0.3);
+  const L = 0.4 + luma(r, g, b) * 0.7;
+  const c = mix3(c2, c1, band);
+  return [clamp(c[0] * L), clamp(c[1] * L), clamp(c[2] * L), 1];
+};
+// Contours: animated topographic iso-lines drawn on the body's brightness.
+AURA.contours = (r, g, b, x, y, t) => {
+  const L = luma(r, g, b);
+  const band = fract(L * 6 - t * 0.12);
+  const line = smooth(0.1, 0.02, Math.abs(band - 0.5)) * 0.9;
+  const flat = mix3([r, g, b], [r * 0.7 + 0.08, g * 0.75 + 0.09, b * 0.8 + 0.12], 0.4);
+  return [...mix3(flat, [0.1, 0.9, 0.7], line), 1];
+};
+// Code Rain: green glyph streams falling through the body (the matrix look).
+AURA.coderain = (r, g, b, x, y, t) => {
+  const gx = Math.floor(x * 14);
+  const ph = fract(y * 1.6 - t * (0.35 + h2(gx, 1) * 0.4) + h2(gx, 3));
+  const bit = h2(gx, Math.floor(y * 30) + Math.floor(t * 7)) > 0.5 ? 1 : 0.25;
+  const head = smooth(0.12, 0.0, ph);
+  const trail = smooth(0.55, 0.05, ph) * 0.7;
+  const k = (head + trail) * bit;
+  const base = [r * 0.1, g * 0.2 + 0.03, b * 0.12];
+  return [clamp(base[0] + head * 0.7), clamp(base[1] + k), clamp(base[2] + k * 0.4), 1];
+};
+// Honeycomb Plate: hexagonal armor plating with glowing seams.
+AURA.honeyplate = (r, g, b, x, y, t) => {
+  const s = 8 * FXSCALE;
+  const qx = (x * s) / 1.5;
+  const qy = y * s * 0.866 - qx * 0.5;
+  const cx0 = Math.round(qx);
+  const cy0 = Math.round(qy);
+  const lx = (qx - cx0) * 1.5;
+  const ly = (qy - cy0 + (qx - cx0) * 0.5) * 1.155;
+  const d = Math.max(Math.abs(lx) * 0.866 + Math.abs(ly) * 0.5, Math.abs(ly));
+  const seam = smooth(0.32, 0.42, d);
+  const cellL = 0.85 + 0.3 * (h2(cx0, cy0) - 0.5);
+  const glowP = 0.5 + 0.5 * Math.sin(t * 2 + h2(cx0, cy0) * 12);
+  const body = [r * cellL, g * cellL, b * cellL];
+  return [...mix3(body, [0.3 + glowP * 0.4, 0.9, 1.0], seam * 0.8), 1];
+};
+// Carbon Weave: the body's own colors over a fine fiber weave, with a moving sheen.
+AURA.carbonweave = (r, g, b, x, y, t) => {
+  const w = Math.sin(x * 80) * Math.sin(y * 80);
+  const [h, s, v] = rgb2hsv(r, g, b);
+  const base = hsv2rgb(h, clamp(s * 0.6), clamp(v * (0.55 + 0.22 * w) + 0.05));
+  const sheen = Math.pow(Math.max(0, Math.sin((x + y) * 4 - t * 0.8)), 8) * 0.3;
+  return [clamp(base[0] + sheen * 0.7), clamp(base[1] + sheen * 0.85), clamp(base[2] + sheen), 1];
+};
+// Brushed Metal: anisotropic horizontal grain + a sweeping specular band.
+AURA.brushedmetal = (r, g, b, x, y, t) => {
+  const grain = 0.85 + 0.3 * vnoise(x * 4, y * 60);
+  const L = smooth(0.05, 0.95, luma(r, g, b));
+  const spec = Math.pow(Math.max(0, Math.sin((x - y) * 3 - t * 0.7)), 14) * 0.5;
+  const m = ramp(G.chrome, L);
+  return [clamp(m[0] * grain + spec), clamp(m[1] * grain + spec), clamp(m[2] * grain + spec), 1];
+};
+// Lava Lamp: huge slow blobs drifting through the body in warm two-tone.
+AURA.lavalamp = (r, g, b, x, y, t) => {
+  const v = fbm(x * 2 + Math.sin(t * 0.2), y * 2 - t * 0.14);
+  const blob = smooth(0.5, 0.62, v);
+  const base = mix3([r, g, b], hx("2a0a3a"), 0.7);
+  const goo = ramp(["ff3a6a", "ff8a2a", "ffd23a"].map(hx), fract(v * 2 + t * 0.05));
+  return [...mix3(base, goo, blob * 0.9), 1];
+};
+// Soap Swirl: swirling thin-film pastels over a bright base.
+AURA.soapswirl = (r, g, b, x, y, t) => {
+  const w = fbm(x * 3 + Math.sin(t * 0.3) * 0.5, y * 3 + Math.cos(t * 0.25) * 0.5);
+  const hue = fract(w * 1.6 + (x - y) * 0.25 + t * 0.04);
+  const film = hsv2rgb(hue, 0.45, 1);
+  const L = luma(r, g, b);
+  return [...mix3([clamp(L + 0.35), clamp(L + 0.38), clamp(L + 0.42)], film, 0.55), 1];
+};
+// X-Ray: inverted translucent blues with hot rims and a faint scan (radiograph).
+AURA.xray = (r, g, b, x, y, t, ctx) => {
+  const inv = 1 - luma(r, g, b);
+  const e = ctx?.e ?? 0;
+  const rim = smooth(0.2, 0.85, e);
+  const scan = 0.88 + 0.12 * Math.sin(y * 70 + t * 2);
+  return [
+    clamp((inv * 0.55 + rim * 0.6) * scan + 0.03),
+    clamp((inv * 0.9 + rim * 0.72) * scan + 0.05),
+    clamp((inv * 1.3 + rim * 0.85) * scan + 0.12),
+    0.95,
+  ];
+};
+// Blueprint Scan: the mon as a live technical drawing - flat drafting blue,
+// white edge linework, a grid, and a bright scanline sweeping through.
+AURA.blueprintscan = (r, g, b, x, y, t, ctx) => {
+  const grid = (fract(x * 10) < 0.06 || fract(y * 10) < 0.06 ? 1 : 0) * 0.3;
+  const sweep = Math.pow(Math.max(0, 1 - Math.abs(y - fract(t * 0.22)) * 9), 3) * 0.85;
+  const e = ctx?.e ?? 0;
+  const L = luma(r, g, b);
+  const base = mix3(hx("143f85"), hx("2f6fc9"), L);
+  const k = grid + sweep + smooth(0.3, 0.95, e) * 0.95;
+  return [clamp(base[0] + k * 0.72), clamp(base[1] + k * 0.85), clamp(base[2] + k), 1];
+};
+// Knitted: the sprite re-knitted in chunky yarn - fat V stitches, row shadows.
+AURA.stitchwork = (r, g, b, x, y) => {
+  const s = 9;
+  const ry = Math.floor(y * s);
+  const phase = fract(x * s + (ry % 2) * 0.5);
+  const fy2 = fract(y * s);
+  const vshape = Math.abs(phase - 0.5) * 1.5 + Math.abs(fy2 - 0.5) * 0.5;
+  const shade = 0.5 + 0.65 * Math.sin(clamp(1 - vshape) * Math.PI * 0.55 + fy2 * 0.9);
+  const gap = smooth(0.5, 0.42, Math.abs(fy2 - 0.5));
+  const [h, sat, v] = rgb2hsv(r, g, b);
+  const c = hsv2rgb(h, clamp(sat * 1.15 + 0.08), Math.round(clamp(v) * 3) / 3);
+  return [clamp(c[0] * shade * gap + 0.02), clamp(c[1] * shade * gap + 0.02), clamp(c[2] * shade * gap + 0.02), 1];
+};
+// Mosaic Tile: little ceramic tiles with grout and per-tile color jitter.
+AURA.mosaictile = (r, g, b, x, y, t, ctx) => {
+  const s = 11 * FXSCALE;
+  const tx = Math.floor(x * s);
+  const ty = Math.floor(y * s);
+  const cs = ctx.sa((tx + 0.5) / s, (ty + 0.5) / s);
+  const base = cs[3] > 0.02 ? [cs[0], cs[1], cs[2]] : [r, g, b];
+  const jit = (h2(tx, ty) - 0.5) * 0.14;
+  const gx = fract(x * s);
+  const gy = fract(y * s);
+  const grout = Math.min(gx, 1 - gx, gy, 1 - gy) < 0.07 ? 1 : 0;
+  const c = grout ? [0.16, 0.15, 0.14] : base.map(v => clamp(v + jit));
+  return [c[0], c[1], c[2], 1];
+};
+// Papercut: flat poster layers with an inner drop-shadow between them.
+AURA.papercut = (r, g, b, x, y, t, ctx) => {
+  const lvl = c2 => Math.round(smooth(0.05, 0.95, luma(c2[0], c2[1], c2[2])) * 3);
+  const L0 = lvl([r, g, b]);
+  const s2 = ctx.sa(x - 0.03, y - 0.03);
+  const shadow = s2[3] > 0.5 && lvl(s2) > L0 ? 0.5 : 0;
+  const [h, s] = rgb2hsv(r, g, b);
+  const c = hsv2rgb(h, clamp(s * 0.9 + 0.08), 0.3 + (L0 / 3) * 0.68);
+  return [clamp(c[0] * (1 - shadow)), clamp(c[1] * (1 - shadow)), clamp(c[2] * (1 - shadow)), 1];
+};
+// Ink Wash: sumi-e - soft gray washes, pigment pooling dark at the edges.
+AURA.inkwash = (r, g, b, x, y, t, ctx) => {
+  const L = luma(r, g, b);
+  const wash = 0.25 + smooth(0.1, 0.9, L) * 0.7 + (fbm(x * 5, y * 5) - 0.5) * 0.12;
+  const e = ctx?.e ?? 0;
+  const pool = smooth(0.35, 1, e) * 0.4;
+  const v = clamp(wash * (1 - pool) + 0.06);
+  return [clamp(v * 1.02), clamp(v), clamp(v * 0.94), 1];
+};
+// Gold Leaf: patches of gold foil pressed over dark lacquer.
+AURA.goldleaf = (r, g, b, x, y, t) => {
+  const v = voro(x, y, 6);
+  const L = luma(r, g, b);
+  if (v.cell > 0.45) {
+    const sheen = 0.5 + 0.5 * Math.sin((x + y) * 18 + v.cell * 30 + t * 0.6);
+    return [...ramp(G.gold, clamp(L * 0.7 + sheen * 0.35)), 1];
+  }
+  return [...ramp(["120a08", "2a1a14", "4a3020"].map(hx), L), 1];
+};
+// Rust Creep: corrosion crusting upward from below.
+AURA.rustcreep = (r, g, b, x, y, t) => {
+  const n = fbm(x * 7, y * 7);
+  const rust = smooth(0.45, 0.8, n * 0.6 + y * 0.7 - 0.15);
+  const crust = ramp(["3a1a0a", "7a3a12", "b05a1e", "d88a3a"].map(hx), clamp(luma(r, g, b) * 0.6 + n * 0.5));
+  const pit = vnoise(x * 40, y * 40) < 0.12 && rust > 0.5 ? 0 : 1;
+  return [...mix3([r, g, b], crust, rust * 0.92), pit];
+};
+// Petrified: turned to granite - matte gray, speckle, hairline cracks.
+AURA.petrified = (r, g, b, x, y) => {
+  const L = luma(r, g, b);
+  const speck = (vnoise(x * 50, y * 50) - 0.5) * 0.12;
+  const n = fbm(x * 6, y * 6);
+  const crack = smooth(0.9, 0.98, 1 - Math.abs(n - 0.5) * 2) * 0.4;
+  const v = clamp(0.2 + L * 0.6 + speck - crack);
+  return [v, clamp(v * 0.98), clamp(v * 0.94), 1];
+};
+// Slime Coat: translucent green goo oozing down with glossy highlights.
+AURA.slimecoat = (r, g, b, x, y, t) => {
+  const front = 0.28 + 0.45 * fbm(x * 6, 2.0) + 0.05 * Math.sin(t * 0.6 + x * 9);
+  const cover = smooth(0.06, 0.0, y - front);
+  const goo = mix3([r * 0.3, g * 0.8 + 0.15, b * 0.2], [0.5, 0.95, 0.25], 0.4);
+  const gloss = Math.pow(Math.max(0, Math.sin(x * 30 + y * 14 + t)), 30) * cover;
+  let c = mix3([r, g, b], goo, cover * 0.75);
+  c = mix3(c, [0.95, 1, 0.85], smooth(0.04, 0.0, Math.abs(front - y)) * 0.8 + gloss);
+  return [c[0], c[1], c[2], 1];
+};
+// Soul Siphon: glowing motes peel off the body and stream toward a point above.
+AURA.bubblewrap = (r, g, b, x, y, t) => {
+  const tx = 0.5;
+  const ty = 0.04;
+  const dx = tx - x;
+  const dy = ty - y;
+  const dist = Math.hypot(dx, dy) + 1e-4;
+  const lane = Math.floor((Math.atan2(dy, dx) + Math.PI) * 15);
+  if (h2(lane, 3) < 0.3) {
+    const drain0 = 0.5 + 0.5 * Math.sin(dist * 8 - t * 2);
+    return [clamp(r * 0.5), clamp(g * 0.55 + 0.02), clamp(b * 0.7 + 0.08 + drain0 * 0.04), 1];
+  }
+  const ph = fract(dist * 2.4 + t * (0.45 + h2(lane, 1) * 0.35));
+  const dot = Math.pow(smooth(0.16, 0.0, Math.abs(ph - 0.5)), 2.2);
+  const pinch = clamp(0.4 + dist * 1.4);
+  const k = dot * pinch * (0.7 + 0.3 * Math.sin(t * 3 + lane));
+  return [clamp(r * 0.5 + k * 0.5), clamp(g * 0.55 + 0.02 + k * 0.95), clamp(b * 0.7 + 0.08 + k * 1.35), 1];
+};
+// Candy Cane: bold diagonal red/white swirl stripes shaded by the sprite.
+AURA.candycane = (r, g, b, x, y, t) => {
+  const L = 0.35 + luma(r, g, b) * 0.75;
+  const band = fract((x + y) * 3.5 + t * 0.08);
+  const c = band < 0.5 ? [1.0, 0.16, 0.22] : [1.0, 0.97, 0.95];
+  const soft = smooth(0.0, 0.06, Math.abs(band - 0.5)) * 0.15;
+  return [clamp(c[0] * L + soft), clamp(c[1] * L + soft), clamp(c[2] * L + soft), 1];
+};
+// Ember Motes: the body cools to charcoal while burning motes drift up off it.
+AURA.embermotes = (r, g, b, x, y, t) => {
+  const L = luma(r, g, b);
+  const body = [0.13 + L * 0.27, 0.1 + L * 0.19, 0.1 + L * 0.16];
+  let k = 0;
+  for (let layer = 0; layer < 2; layer++) {
+    const cellN = 15 + layer * 9;
+    const fy = y + t * (0.16 + layer * 0.09);
+    const cx0 = Math.floor(x * cellN);
+    const cy0 = Math.floor(fy * cellN);
+    if (h2(cx0 * 1.3 + layer * 5, cy0 * 1.7) < 0.68) {
+      continue;
+    }
+    const jx = h2(cx0 + 7, cy0) * 0.6 + 0.2;
+    const jy = h2(cx0, cy0 + 3) * 0.6 + 0.2;
+    const lx = fract(x * cellN) - jx + Math.sin(t * 3 + cy0) * 0.07;
+    const ly = fract(fy * cellN) - jy;
+    const dot = Math.pow(clamp(1 - Math.hypot(lx, ly) * (2.3 - layer * 0.5)), 2.2);
+    const tw = 0.7 + 0.3 * Math.sin(t * 4 + h2(cy0, cx0) * 20);
+    k = Math.max(k, dot * tw);
+  }
+  return [clamp(body[0] + k * 1.9), clamp(body[1] + k * 0.9), clamp(body[2] + k * 0.2), 1];
+};
+// Fairy Dust: fine multicolor sparkle dust drifting across a softly-lit body.
+AURA.fairydust = (r, g, b, x, y, t) => {
+  let k = 0;
+  let hue = 0;
+  for (let layer = 0; layer < 2; layer++) {
+    const cellN = 18 + layer * 8;
+    const fx0 = x - t * (0.09 + layer * 0.05);
+    const fy = y + t * (0.06 + layer * 0.045) + Math.sin(x * 6 + t) * 0.02;
+    const cx0 = Math.floor(fx0 * cellN);
+    const cy0 = Math.floor(fy * cellN);
+    if (h2(cx0 * 2.1 + layer * 3, cy0 * 1.3) < 0.52) {
+      continue;
+    }
+    const jx = h2(cx0 + 5, cy0) * 0.6 + 0.2;
+    const jy = h2(cx0, cy0 + 9) * 0.6 + 0.2;
+    const lx = fract(fx0 * cellN) - jx;
+    const ly = fract(fy * cellN) - jy;
+    const tw = Math.pow(0.5 + 0.5 * Math.sin(t * 5 + h2(cy0, cx0) * 25), 2);
+    const cross =
+      (smooth(0.05, 0.01, Math.abs(lx)) + smooth(0.05, 0.01, Math.abs(ly))) * smooth(0.4, 0.08, Math.hypot(lx, ly)) * 0.6;
+    const dot = (Math.pow(clamp(1 - Math.hypot(lx, ly) * 2.5), 2) + cross) * tw;
+    if (dot > k) {
+      k = dot;
+      hue = fract(h2(cx0, cy0) + t * 0.05);
+    }
+  }
+  const sp = hsv2rgb(hue, 0.6, 1);
+  return [clamp(r + 0.05 + sp[0] * k * 1.7), clamp(g + 0.04 + sp[1] * k * 1.7), clamp(b + 0.09 + sp[2] * k * 1.7), 1];
+};
+// Glitter Storm: dense wind-driven glitter, every fleck its own color and twinkle.
+AURA.glitterstorm = (r, g, b, x, y, t) => {
+  let k = 0;
+  let gate = 0;
+  for (let layer = 0; layer < 2; layer++) {
+    const cellN = 22 + layer * 9;
+    const fx0 = x + Math.sin(y * 8 + t * 1.5 + layer) * 0.02;
+    const fy = y + t * (0.1 + layer * 0.06);
+    const cx0 = Math.floor(fx0 * cellN);
+    const cy0 = Math.floor(fy * cellN);
+    const g0 = h2(cx0 * 1.3 + layer * 11, cy0 * 2.1);
+    if (g0 < 0.38) {
+      continue;
+    }
+    const tw = Math.pow(0.5 + 0.5 * Math.sin(t * 6 + g0 * 30), 3);
+    const lx = fract(fx0 * cellN) - 0.5;
+    const ly = fract(fy * cellN) - 0.5;
+    const fleck = Math.pow(clamp(1 - (Math.abs(lx) + Math.abs(ly)) * 1.9), 2) * tw;
+    if (fleck > k) {
+      k = fleck;
+      gate = g0;
+    }
+  }
+  const col = hsv2rgb(fract(gate * 7), 0.75, 1);
+  const deep = [r * 0.55, g * 0.55, b * 0.7];
+  return [clamp(deep[0] + col[0] * k * 1.8), clamp(deep[1] + col[1] * k * 1.8), clamp(deep[2] + col[2] * k * 1.8), 1];
+};
+// Firefly Glade: a dusk-dark body where green motes wander and pulse.
+AURA.fireflyglade = (r, g, b, x, y, t) => {
+  const body = [r * 0.22, g * 0.28 + 0.02, b * 0.32 + 0.05];
+  let k = 0;
+  for (let i = 0; i < 2; i++) {
+    const cellN = 8 + i * 5;
+    const fx0 = x + Math.sin(t * (0.5 + i * 0.2) + y * 5 + i * 3) * 0.06;
+    const fy = y + Math.cos(t * (0.4 + i * 0.15) + x * 4) * 0.05;
+    const cx0 = Math.floor(fx0 * cellN);
+    const cy0 = Math.floor(fy * cellN);
+    if (h2(cx0 * 1.9 + i, cy0 * 1.3) < 0.76) {
+      continue;
+    }
+    const lx = fract(fx0 * cellN) - 0.5;
+    const ly = fract(fy * cellN) - 0.5;
+    const pulse = Math.pow(0.5 + 0.5 * Math.sin(t * 2.5 + h2(cy0, cx0) * 20), 6);
+    k = Math.max(k, Math.pow(clamp(1 - Math.hypot(lx, ly) * 2.4), 3) * pulse);
+  }
+  return [clamp(body[0] + k * 0.6), clamp(body[1] + k * 1.3), clamp(body[2] + k * 0.35), 1];
+};
+// Starfall: bright shooting stars raking diagonally across a dimmed body.
+// ph must ADVANCE with t (+t): head at ph=0 slides down-left, trail (ph>0) sits
+// up-right BEHIND it. With -t the head climbed and the trail led the motion.
+AURA.starfall = (r, g, b, x, y, t) => {
+  const lane = Math.floor((x + y) * 6);
+  const across = Math.abs(fract((x + y) * 6) - 0.5);
+  const w = smooth(0.38, 0.06, across);
+  const ph = fract((x - y) * 1.1 + t * (0.45 + h2(lane, 1) * 0.3) + h2(lane, 2));
+  const head = Math.pow(smooth(0.1, 0.0, ph), 2) * 1.5;
+  const trail = smooth(0.45, 0.02, ph) * 0.75;
+  const gate = h2(lane, 5) > 0.25 ? 1 : 0;
+  const k = (head + trail) * gate * w;
+  return [clamp(r * 0.55 + k), clamp(g * 0.6 + k * 0.95), clamp(b * 0.75 + k * 0.8), 1];
+};
+// shared by the Astral forms: linework strength via local luma contrast - a pixel
+// darker than its 4 neighbors is line art, whatever the sprite's overall brightness.
+// Also returns the "next to a line" signal (pixel brighter than its neighbors) used
+// for the glow halo. One neighbor loop serves both.
+const _lineContrast = (x, y, L, ctx) => {
+  if (!ctx?.sa) {
+    return { line: smooth(0.3, 0.16, L), near: 0 };
+  }
+  const stx = 1 / (ctx.W || 96);
+  const sty = 1 / (ctx.H || 96);
+  let nsum = 0;
+  let nc = 0;
+  for (const [ox, oy] of [[stx, 0], [-stx, 0], [0, sty], [0, -sty]]) {
+    const s = ctx.sa(x + ox, y + oy);
+    if (s[3] > 0.02) {
+      nsum += luma(s[0], s[1], s[2]);
+      nc++;
+    }
+  }
+  if (nc === 0) {
+    return { line: 0, near: 0 };
+  }
+  const d = nsum / nc - L;
+  return { line: smooth(0.02, 0.07, d), near: smooth(0.03, 0.1, -d) };
+};
+// Astral Form: the living-constellation star chart. Flat, deep night-sky body;
+// the sprite's OWN linework stays fully lit as pale connecting lines (local-contrast
+// detection, so it follows any sprite's shape), and BIG glowing constellation stars
+// - solid core, soft halo, 4-point flare - sit anchored on those lines, joined to
+// each other by the linework. A shimmer travels along the lines.
+AURA.astral = (r, g, b, x, y, t, ctx) => {
+  const L = luma(r, g, b);
+  const e = ctx?.e ?? 0;
+  // flat deep body with big soft nebula patches
+  const neb = fbm(x * 2.6 + 7 + t * 0.03, y * 2.6 - t * 0.02);
+  const body = mix3(hx("090f22"), hx("1d2b4d"), clamp(L * 0.4 + smooth(0.35, 0.85, neb) * 0.45));
+  // scattered body stars: small soft glowing dots (bigger than single pixels).
+  // FXSEED reshuffles the star map, FXSCALE (texture-noise slider) sets density.
+  let tw = 0;
+  const SCELL = 26 * FXSCALE;
+  const bx = Math.floor(x * SCELL);
+  const by = Math.floor(y * SCELL);
+  if (h2(bx + FXSEED, by - FXSEED * 1.7) > 0.975) {
+    const axs = (bx + 0.25 + h2(bx + 7 + FXSEED, by) * 0.5) / SCELL;
+    const ays = (by + 0.25 + h2(by + 9, bx + FXSEED) * 0.5) / SCELL;
+    const ds = Math.hypot(x - axs, y - ays);
+    tw = smooth(0.013, 0.003, ds) * Math.pow(0.5 + 0.5 * Math.sin(t * 1.8 + h2(by, bx) * 25), 2);
+  }
+  // connecting lines: full linework, always lit but DIMMER than the stars, with a
+  // shimmer sliding along it - these are the strands joining the stars together
+  const { line, near } = _lineContrast(x, y, L, ctx);
+  const shim = 0.75 + 0.25 * Math.sin((x + y) * 30 - t * 2.5);
+  const constel = line * shim * 0.6;
+  const halo = near * 0.12;
+  // BIG constellation stars anchored ON the linework: solid round core + soft glow
+  // + a 4-point flare, pulsing slowly. Two anchor candidates per cell; every
+  // candidate that lands on a line becomes a star, so the constellation actually
+  // populates. The star is round and overflows the thin line it decorates.
+  let node = 0;
+  const NCELL = 13 * FXSCALE;
+  const gx = Math.floor(x * NCELL);
+  const gy = Math.floor(y * NCELL);
+  if (ctx?.sa && h2(gx * 1.7 + 2 + FXSEED, gy * 1.3 + 5 - FXSEED) > 0.35) {
+    const R = 0.028;
+    for (let k = 0; k < 2; k++) {
+      const ax = (gx + 0.2 + h2(gx + k * 11 + FXSEED, gy) * 0.6) / NCELL;
+      const ay = (gy + 0.2 + h2(gy + 3, gx + k * 17 + FXSEED) * 0.6) / NCELL;
+      const d = Math.hypot(x - ax, y - ay);
+      if (d >= R * 2.8) {
+        continue;
+      }
+      const sA = ctx.sa(ax, ay);
+      if (sA[3] <= 0.02 || _lineContrast(ax, ay, luma(sA[0], sA[1], sA[2]), ctx).line <= 0.25) {
+        continue;
+      }
+      const pulse = 0.8 + 0.2 * Math.sin(t * 2 + h2(gy + k, gx) * 20);
+      const core = smooth(R * 0.65, R * 0.15, d);
+      const glow = smooth(R * 2.6, R * 0.4, d) * 0.42;
+      const flare =
+        Math.max(smooth(0.007, 0.0015, Math.abs(x - ax)), smooth(0.007, 0.0015, Math.abs(y - ay))) *
+        smooth(R * 2.8, R * 0.5, d) *
+        0.6;
+      node = Math.max(node, (core + glow + flare) * pulse);
+    }
+  }
+  const rim = smooth(0.35, 1, e) * 0.12;
+  let c = mix3(body, hx("b6c8ec"), clamp(constel));
+  const boost = constel * 0.15 + halo + tw + rim;
+  c = [clamp(c[0] + boost * 0.72), clamp(c[1] + boost * 0.84), clamp(c[2] + boost)];
+  // stars snap toward pure starlight on top of everything
+  c = mix3(c, [0.96, 0.99, 1], clamp(node));
+  return [c[0], c[1], c[2], 1];
+};
+// Smolder: charcoal body, embers gnawing hot at the silhouette, sparks rising.
+AURA.smolder = (r, g, b, x, y, t, ctx) => {
+  const e = ctx?.e ?? 0;
+  const L = luma(r, g, b);
+  const ash = [0.1 + L * 0.22, 0.09 + L * 0.2, 0.1 + L * 0.2];
+  const gnaw = smooth(0.3, 1, e) * (0.45 + 0.55 * fbm(x * 9, y * 9 + t * 0.8));
+  const ember = ramp(["3a0a00", "a02a06", "ff7a1a", "ffd23a"].map(hx), clamp(gnaw * 1.3));
+  const spark = h2(Math.floor(x * 36), Math.floor((y + t * 0.12) * 36)) > 0.96 && e > 0.25 ? 0.85 : 0;
+  const c = mix3(ash, ember, clamp(gnaw * 1.6));
+  return [clamp(c[0] + spark), clamp(c[1] + spark * 0.55), clamp(c[2] + spark * 0.15), 1];
+};
+// Frost Core: ice crystallizing outward from the heart of the body.
+AURA.frostcore = (r, g, b, x, y, t) => {
+  const rr = Math.hypot(x - 0.5, y - 0.52);
+  const core = smooth(0.5, 0.12, rr + (fbm(x * 8, y * 8) - 0.5) * 0.2);
+  const ice = mix3([r * 0.75, g * 0.88, b], [0.9, 0.97, 1.0], clamp(core * 0.8 + vnoise(x * 24, y * 24) * 0.25 * core));
+  const gl = Math.pow(Math.max(0, Math.sin(rr * 30 - t * 1.5)), 8) * core * 0.3;
+  return [clamp(ice[0] + gl), clamp(ice[1] + gl), clamp(ice[2] + gl), 1];
+};
+// Shockwave: a hot refraction ring punches outward from the center.
+AURA.shockwave = (r, g, b, x, y, t, ctx) => {
+  const rr = Math.hypot(x - 0.5, y - 0.5) + 1e-4;
+  const front = fract(t * 0.45) * 0.75;
+  const d = rr - front;
+  const k = Math.exp(-Math.abs(d) * 20) * 0.09;
+  const s2 = ctx.sa(x + ((x - 0.5) / rr) * k, y + ((y - 0.5) / rr) * k);
+  const ring = Math.exp(-Math.abs(d) * 22) * (1 - front) * 1.1;
+  const c = s2[3] > 0.02 ? [s2[0], s2[1], s2[2]] : [r, g, b];
+  return [clamp(c[0] + ring * 1.1), clamp(c[1] + ring * 0.85), clamp(c[2] + ring * 0.55), 1];
+};
+// Runic Etch: a few LARGE glowing sigils carved into the body, breathing light.
+AURA.runes = (r, g, b, x, y, t) => {
+  const s = 3.2 * FXSCALE;
+  const gx = Math.floor(x * s + FXSEED);
+  const gy = Math.floor(y * s + FXSEED * 1.3);
+  const lx = (fract(x * s + FXSEED) - 0.5) * 2;
+  const ly = (fract(y * s + FXSEED * 1.3) - 0.5) * 2;
+  const id = h2(gx * 1.7, gy * 2.3);
+  const base = [r * 0.5, g * 0.5, b * 0.6];
+  if (id < 0.35) {
+    return [base[0], base[1], base[2], 1];
+  }
+  const inBox = smooth(0.8, 0.6, Math.abs(lx)) * smooth(0.8, 0.6, Math.abs(ly));
+  let st = smooth(0.16, 0.05, Math.abs(lx));
+  st = Math.max(st, smooth(0.14, 0.04, Math.abs(ly - (id - 0.5) * 0.8)));
+  if (id > 0.6) {
+    st = Math.max(st, smooth(0.14, 0.04, Math.abs(ly - lx * (id > 0.8 ? 0.8 : -0.8))));
+  }
+  const glyph = st * inBox;
+  const pulse = 0.55 + 0.45 * Math.sin(t * 2.2 + id * 19);
+  return [
+    clamp(base[0] + glyph * 0.45 * pulse),
+    clamp(base[1] + glyph * 1.15 * pulse),
+    clamp(base[2] + glyph * 1.05 * pulse),
+    1,
+  ];
+};
+// Static Charge: hard crackling arcs racing along the silhouette, with surges.
+AURA.staticcharge = (r, g, b, x, y, t, ctx) => {
+  const e = ctx?.e ?? 0;
+  const rim = smooth(0.18, 0.8, e);
+  const s = Math.pow(Math.max(0, Math.sin(x * 30 + y * 26 + t * 22 + h2(Math.floor(t * 16), 2) * 25)), 12);
+  const gate = h2(Math.floor(t * 10), Math.floor(x * 12) + Math.floor(y * 9)) > 0.3 ? 1 : 0.1;
+  const surge = h2(Math.floor(t * 4), 7) > 0.86 ? rim * 0.7 : 0;
+  const k = clamp(rim * s * gate * 1.7 + surge);
+  return [clamp(r + k * 0.75), clamp(g + k * 0.95), clamp(b + k * 1.4), 1];
+};
+// CMYK Print: misregistered process-ink halftone (subtractive print look).
+AURA.cmykprint = (r, g, b, x, y, t, ctx) => {
+  const inks = [
+    [0.012, 0.0, [0, 1, 1]],
+    [-0.008, 0.008, [1, 0, 1]],
+    [0.0, -0.012, [1, 1, 0]],
+  ];
+  let out = [0.96, 0.95, 0.92];
+  for (let i = 0; i < 3; i++) {
+    const s2 = ctx.sa(x + inks[i][0], y + inks[i][1]);
+    const src = s2[3] > 0.02 ? s2 : [r, g, b, 1];
+    const amt = 1 - src[i];
+    const sscale = 9 + i;
+    const dx = fract(x * sscale + i * 0.33) - 0.5;
+    const dy = fract(y * sscale + i * 0.21) - 0.5;
+    const dot = Math.hypot(dx, dy) < amt * 0.58 ? 1 : 0;
+    if (dot) {
+      out = [out[0] * (0.15 + inks[i][2][0] * 0.85), out[1] * (0.15 + inks[i][2][1] * 0.85), out[2] * (0.15 + inks[i][2][2] * 0.85)];
+    }
+  }
+  return [out[0], out[1], out[2], 1];
+};
+// Binary Body: the mon rendered as scrolling 0s and 1s.
+AURA.binarybody = (r, g, b, x, y, t) => {
+  const gx = Math.floor(x * 13);
+  const gy = Math.floor(y * 18 + t * (0.5 + h2(gx, 7)));
+  const one = h2(gx, gy) > 0.5;
+  const lx = fract(x * 13) - 0.5;
+  const ly = fract(y * 18 + t * (0.5 + h2(gx, 7))) - 0.5;
+  const glyph = one ? (Math.abs(lx) < 0.12 && Math.abs(ly) < 0.32 ? 1 : 0) : Math.abs(Math.hypot(lx * 1.4, ly) - 0.26) < 0.09 ? 1 : 0;
+  const L = luma(r, g, b);
+  const k = glyph * (0.35 + L * 0.75);
+  return [0.02 + k * 0.3, 0.05 + k, 0.1 + k * 0.5, 1];
+};
+// Origami: folded-paper facets, each triangle flat-shaded.
+AURA.origami = (r, g, b, x, y, t, ctx) => {
+  const s = 5;
+  const gx = Math.floor(x * s);
+  const gy = Math.floor(y * s);
+  const upper = fract(x * s) + fract(y * s) < 1 ? 0 : 1;
+  const cs = ctx.sa((gx + (upper ? 0.7 : 0.3)) / s, (gy + (upper ? 0.7 : 0.3)) / s);
+  const base = cs[3] > 0.02 ? [cs[0], cs[1], cs[2]] : [r, g, b];
+  const shade = 0.8 + 0.35 * h2(gx * 2 + upper, gy * 3);
+  const foldd = Math.min(fract(x * s), 1 - fract(x * s), fract(y * s), 1 - fract(y * s), Math.abs(fract(x * s) + fract(y * s) - 1) * 0.7);
+  const line = smooth(0.05, 0.0, foldd) * 0.25;
+  return [clamp(base[0] * shade - line), clamp(base[1] * shade - line), clamp(base[2] * shade - line), 1];
+};
+// Crackle Glaze: fired-ceramic hairline crackle + a soft glaze sheen.
+AURA.crackleglaze = (r, g, b, x, y, t) => {
+  const v = voro(x, y, 15);
+  const line = smooth(0.02, 0.0, v.border) * 0.35;
+  const sheen = Math.pow(Math.max(0, Math.sin((x - y) * 5 + t * 0.5)), 6) * 0.15;
+  const c = mix3([r, g, b], [0.94, 0.96, 0.97], 0.22);
+  return [clamp(c[0] - line + sheen), clamp(c[1] - line + sheen), clamp(c[2] - line + sheen), 1];
+};
+// Kintsugi: thick molten-gold seams repair the body's fractures, glowing softly.
+AURA.kintsugi = (r, g, b, x, y, t) => {
+  const v = voro(x, y, 5.5);
+  const seam = smooth(0.06, 0.0, v.border);
+  const halo = smooth(0.16, 0.03, v.border) * 0.3;
+  const gold = ramp(G.gold, 0.62 + 0.32 * Math.sin(t * 1.5 + v.cell * 10 + (x + y) * 6));
+  const c = mix3([r, g, b], gold, clamp(seam * 1.2));
+  return [clamp(c[0] + halo * gold[0]), clamp(c[1] + halo * gold[1]), clamp(c[2] + halo * gold[2] * 0.5), 1];
+};
+// Active Camo: bold drifting camouflage blotches that never sit still.
+AURA.activecamo = (r, g, b, x, y, t) => {
+  const v = fbm(x * 2.4 + t * 0.09, y * 2.4 - t * 0.06);
+  const tone = ramp(["161c0c", "3a521c", "7a8a2e", "d8d29a"].map(hx), Math.floor(clamp(v * 1.15) * 3.99) / 3);
+  const L = 0.45 + luma(r, g, b) * 0.85;
+  return [clamp(tone[0] * L), clamp(tone[1] * L), clamp(tone[2] * L), 1];
+};
+// Watercolor: wet pigment mottling, colors pooling darker at the edges.
+AURA.watercolor = (r, g, b, x, y, t, ctx) => {
+  const pig = fbm(x * 5 + 7, y * 5);
+  const [h, s, v] = rgb2hsv(r, g, b);
+  let c = hsv2rgb(h, clamp(s * 0.8), clamp(v * (0.85 + (pig - 0.5) * 0.5) + 0.12));
+  const e = ctx?.e ?? 0;
+  c = c.map(vv => clamp(vv * (1 - smooth(0.35, 1, e) * 0.3)));
+  return [...mix3(c, [0.98, 0.96, 0.9], 0.12), 1];
+};
+// Spirit Flame: cold blue fire licking hard off the top of the silhouette.
+AURA.spiritflame = (r, g, b, x, y, t, ctx) => {
+  const open1 = ctx.sa(x, y - 0.05)[3] < 0.4 ? 1 : 0;
+  const open2 = ctx.sa(x, y - 0.11)[3] < 0.4 ? 0.55 : 0;
+  const open = Math.max(open1, open2);
+  const n = fbm(x * 8, y * 6 - t * 2.2);
+  const lick = open * smooth(0.22, 0.68, n) * 1.4;
+  return [clamp(r * (1 - lick * 0.3) + lick * 0.18), clamp(g + lick * 0.75), clamp(b + lick * 1.5), 1];
+};
+// Data Corruption: whole blocks of the sprite swap and solarize.
+AURA.datacorrupt = (r, g, b, x, y, t, ctx) => {
+  const bx = Math.floor(x * 7);
+  const by = Math.floor(y * 7);
+  const slot = Math.floor(t * 1.6);
+  if (h2(bx * 1.3 + slot, by * 1.7) > 0.78) {
+    const s2 = ctx.sa(fract(x + h2(bx, by + slot) * 0.6), fract(y + h2(by, bx + slot) * 0.6));
+    const c = s2[3] > 0.02 ? [s2[0], s2[1], s2[2]] : [1 - r, 1 - g, 1 - b];
+    return [c[0], c[1], c[2], 1];
+  }
+  return [r, g, b, 1];
+};
+// Double Exposure: a hue-shifted luminous ghost of the mon orbits over itself.
+AURA.doubleexposure = (r, g, b, x, y, t, ctx) => {
+  const s2 = ctx.sa(x + 0.07 * Math.sin(t * 0.6), y + 0.05 * Math.cos(t * 0.45));
+  if (s2[3] < 0.4) {
+    return [r, g, b, 1];
+  }
+  const [h, s, v] = rgb2hsv(s2[0], s2[1], s2[2]);
+  const gc = hsv2rgb(fract(h + 0.45), clamp(s + 0.2), v);
+  return [
+    1 - (1 - r) * (1 - gc[0] * 0.75),
+    1 - (1 - g) * (1 - gc[1] * 0.75),
+    1 - (1 - b) * (1 - gc[2] * 0.75),
+    1,
+  ];
+};
+// Paper Burn: a smoldering char front eats across the sprite and resets.
+AURA.paperburn = (r, g, b, x, y, t) => {
+  const prog = (x + y) * 0.5 + (fbm(x * 5, y * 5) - 0.5) * 0.25;
+  const front = fract(t * 0.14) * 1.5 - 0.2;
+  const d = prog - front;
+  if (d > 0.04) {
+    return [r, g, b, 1];
+  }
+  if (d > -0.04) {
+    const gl = smooth(0.04, 0.0, Math.abs(d));
+    return [clamp(r + gl), clamp(g + gl * 0.5 - 0.1), clamp(b - 0.2), 1];
+  }
+  const holes = vnoise(x * 30, y * 30) < 0.2 ? 0 : 1;
+  return [0.09, 0.08, 0.08, holes * 0.95];
+};
+// Overgrowth: moss creeping up the body, dotted with tiny blossoms.
+AURA.mossgrow = (r, g, b, x, y, t) => {
+  const n = fbm(x * 8, y * 8);
+  const reg = smooth(0.35, 0.85, y + (n - 0.5) * 0.4);
+  const moss = ramp(["1a2e10", "2e5a1c", "4a8a2e"].map(hx), clamp(luma(r, g, b) * 0.8 + n * 0.3));
+  const flower = vnoise(x * 34, y * 34) > 0.93 && reg > 0.5 ? 1 : 0;
+  let c = mix3([r, g, b], moss, reg * 0.85);
+  c = mix3(c, [1, 0.8, 0.9], flower * 0.9);
+  return [c[0], c[1], c[2], 1];
+};
+// Gem Plate: large faceted jewels armor the body - deep tones, hard facet glints.
+AURA.gemplate = (r, g, b, x, y, t) => {
+  const v = voro(x, y, 4.5);
+  const hue = fract(v.cell * 5.3);
+  const depth = smooth(0.0, 0.55, v.d1);
+  const jewel = hsv2rgb(hue, 0.85, clamp(0.92 - depth * 0.55) * (0.4 + luma(r, g, b) * 0.8));
+  const facet = Math.pow(Math.max(0, Math.sin((x * 0.7 - y) * 30 + v.cell * 40)), 16) * smooth(0.45, 0.1, v.d1) * 0.55;
+  const border = smooth(0.05, 0.015, v.border);
+  const spark = Math.pow(Math.max(0, Math.sin(t * 2.5 + v.cell * 30)), 30) * smooth(0.28, 0.03, v.d1) * 0.9;
+  const c = mix3(jewel, [0.05, 0.045, 0.09], border);
+  return [clamp(c[0] + facet + spark), clamp(c[1] + facet + spark), clamp(c[2] + facet * 0.9 + spark), 1];
+};
+// Tie-Dye: a psychedelic hue spiral twisting out from the center.
+AURA.tiedye = (r, g, b, x, y, t) => {
+  const dx = x - 0.5;
+  const dy = y - 0.5;
+  const ang = Math.atan2(dy, dx) + Math.hypot(dx, dy) * 7 - t * 0.15;
+  const hue = fract((Math.floor((ang / (Math.PI * 2)) * 6 + 6) % 6) / 6);
+  const c = hsv2rgb(hue, 0.7, clamp(0.5 + luma(r, g, b) * 0.6));
+  return [...mix3([r, g, b], c, 0.8), 1];
+};
+// Checker Flip: checkerboard tiles flip to the complement in traveling waves.
+AURA.checkerflip = (r, g, b, x, y, t) => {
+  const cx0 = Math.floor(x * 9);
+  const cy0 = Math.floor(y * 9);
+  const flip = Math.sin(t * 2.5 - (cx0 + cy0) * 0.55) > 0 !== ((cx0 + cy0) % 2 === 0);
+  if (!flip) {
+    return [r, g, b, 1];
+  }
+  const [h, s, v] = rgb2hsv(r, g, b);
+  return [...hsv2rgb(fract(h + 0.5), clamp(s + 0.15), v), 1];
+};
+// Polka Dot: bold complementary dots stamped over the body.
+AURA.polkadot = (r, g, b, x, y) => {
+  const s = 8;
+  const lx = fract(x * s + (Math.floor(y * s) % 2) * 0.5) - 0.5;
+  const ly = fract(y * s) - 0.5;
+  const dot = smooth(0.3, 0.24, Math.hypot(lx, ly));
+  const [h, sa2, v] = rgb2hsv(r, g, b);
+  const dc = hsv2rgb(fract(h + 0.5), clamp(sa2 * 0.8 + 0.3), clamp(v * 0.9 + 0.2));
+  return [...mix3([r, g, b], dc, dot), 1];
+};
+// Graffiti: hard stencil colors, dark overspray at the edges, neon paint runs.
+AURA.graffiti = (r, g, b, x, y, t, ctx) => {
+  const [h, s, v] = rgb2hsv(r, g, b);
+  let c = hsv2rgb(h, clamp(s * 1.5 + 0.15), 0.22 + (Math.round(smooth(0.05, 0.95, v) * 2) / 2) * 0.75);
+  const col = Math.floor(x * 16);
+  const start = h2(col, 6) * 0.45;
+  const len = 0.18 + h2(col, 9) * 0.35 * (0.7 + 0.3 * Math.sin(t * 0.7 + col));
+  const inDrip = h2(col, 4) > 0.6 && y > start && y < start + len && Math.abs(fract(x * 16) - 0.5) < 0.22;
+  if (inDrip) {
+    const accent = hsv2rgb(fract(0.3 + h2(col, 2) * 0.25), 0.95, 1);
+    const tip = y > start + len - 0.06 ? 1 : 0.8;
+    c = mix3(c, accent, tip);
+  }
+  const e = ctx?.e ?? 0;
+  const spray = smooth(0.3, 0.85, e) * (vnoise(x * 50, y * 50) > 0.55 ? 0.6 : 0);
+  c = mix3(c, [0.04, 0.04, 0.07], spray);
+  return [c[0], c[1], c[2], 1];
+};
+// Inner Storm: thunderclouds churn inside the silhouette, lightning included.
+AURA.innerstorm = (r, g, b, x, y, t) => {
+  const cloud = fbm(x * 4 + t * 0.1, y * 4 - t * 0.05);
+  let c = mix3([r * 0.25, g * 0.28, b * 0.38], [0.5, 0.55, 0.68], smooth(0.35, 0.75, cloud));
+  const flash = h2(Math.floor(t * 2.6), 5) > 0.82 ? smooth(0.5, 0.85, fbm(x * 3 + 9, y * 3)) : 0;
+  c = mix3(c, [0.95, 0.97, 1.0], flash * 0.9);
+  return [c[0], c[1], c[2], 1];
+};
+// Meltdown: the sprite visibly sags and runs like heated wax, with a glossy sheen.
+AURA.meltdown = (r, g, b, x, y, t, ctx) => {
+  const wave = fbm(x * 5.5, 2.4);
+  const sag = smooth(0.08, 1, y) * (0.55 + 0.35 * Math.sin(t * 0.55)) * 0.55 * wave;
+  const s2 = ctx.sa(x + Math.sin(y * 14 + t) * 0.012 * sag * 10, y - sag);
+  if (s2[3] < 0.02) {
+    return [r, g, b, 0];
+  }
+  const gloss = Math.pow(Math.max(0, Math.sin(x * 24 + y * 10 - t * 1.2)), 18) * clamp(sag * 8) * 0.5;
+  return [clamp(s2[0] * 1.04 + gloss), clamp(s2[1] + gloss), clamp(s2[2] * 0.94 + gloss), 1];
+};
+// Sequins: flip-disc shimmer waving across the body in two tones.
+AURA.sequins = (r, g, b, x, y, t) => {
+  const s = 13;
+  const gx = Math.floor(x * s);
+  const gy = Math.floor(y * s);
+  const lx = fract(x * s) - 0.5;
+  const ly = fract(y * s) - 0.5;
+  if (Math.hypot(lx, ly) > 0.44) {
+    return [r * 0.5, g * 0.5, b * 0.55, 1];
+  }
+  const wave = Math.sin(t * 3 - (gx + gy) * 0.55);
+  const [h, sat, v] = rgb2hsv(r, g, b);
+  const c = wave > 0 ? hsv2rgb(h, clamp(sat + 0.2), clamp(v * 1.25 + 0.12)) : hsv2rgb(fract(h + 0.12), clamp(sat + 0.1), clamp(v * 0.7));
+  const spec = smooth(0.2, 0.02, Math.hypot(lx + 0.1, ly + 0.1)) * Math.max(0, wave) * 0.5;
+  return [clamp(c[0] + spec), clamp(c[1] + spec), clamp(c[2] + spec), 1];
+};
+// TV Bars: SMPTE color bars scrolling through the body.
+AURA.tvbars = (r, g, b, x, y, t) => {
+  const bars = [
+    [0.75, 0.75, 0.75],
+    [0.75, 0.75, 0.0],
+    [0.0, 0.75, 0.75],
+    [0.0, 0.75, 0.0],
+    [0.75, 0.0, 0.75],
+    [0.75, 0.0, 0.0],
+    [0.0, 0.0, 0.75],
+  ];
+  const bar = bars[Math.floor(fract(x + t * 0.05) * 7)];
+  const L = 0.35 + luma(r, g, b) * 0.8;
+  return [clamp(bar[0] * L + 0.08), clamp(bar[1] * L + 0.08), clamp(bar[2] * L + 0.08), 1];
+};
+// Reveal Scan: the mon hides as a dark silhouette; a scanline unveils it.
+AURA.revealscan = (r, g, b, x, y, t) => {
+  const band = fract(t * 0.28);
+  const d = x - band;
+  const inband = smooth(0.09, 0.0, Math.abs(d));
+  const wake = d < 0 ? smooth(0.4, 0.0, -d) * 0.6 : 0;
+  const darkc = [r * 0.08 + 0.02, g * 0.1 + 0.03, b * 0.16 + 0.07];
+  const k = clamp(inband * 1.2 + wake);
+  return [
+    clamp(mix(darkc[0], r * 1.15, k) + inband * 0.2),
+    clamp(mix(darkc[1], g * 1.15, k) + inband * 0.3),
+    clamp(mix(darkc[2], b * 1.15, k) + inband * 0.4),
+    1,
+  ];
+};
+// Spotlight: a roving stage light picks out part of the mon.
+AURA.spotlight = (r, g, b, x, y, t) => {
+  const cx0 = 0.5 + 0.32 * Math.sin(t * 0.7);
+  const cy0 = 0.42 + 0.25 * Math.cos(t * 0.55);
+  const lit = smooth(0.4, 0.12, Math.hypot(x - cx0, y - cy0));
+  return [clamp(r * (0.12 + 1.15 * lit) + lit * 0.08), clamp(g * (0.12 + 1.12 * lit) + lit * 0.07), clamp(b * (0.12 + 1.05 * lit) + lit * 0.04), 1];
+};
+// Demake: chunky low-res pixels quantized to a tiny console palette.
+AURA.demake = (r, g, b, x, y, t, ctx) => {
+  const s = 22;
+  const s2 = ctx.sa((Math.floor(x * s) + 0.5) / s, (Math.floor(y * s) + 0.5) / s);
+  const src = s2[3] > 0.02 ? s2 : [r, g, b, 1];
+  const pal = ["000000", "5a5a8a", "3a7a3a", "b04a3a", "d8a038", "6a9ad8", "e8e0d0", "ffffff"].map(hx);
+  let bi = 0;
+  let bd = 9;
+  for (let i = 0; i < pal.length; i++) {
+    const d = (src[0] - pal[i][0]) ** 2 + (src[1] - pal[i][1]) ** 2 + (src[2] - pal[i][2]) ** 2;
+    if (d < bd) {
+      bd = d;
+      bi = i;
+    }
+  }
+  return [pal[bi][0], pal[bi][1], pal[bi][2], s2[3] > 0.02 ? 1 : 0];
+};
+// Gen 1: the mon as a Red/Blue sprite - chunky half-res pixels with hard alpha,
+// GREYSCALE 4-tone biased bright (Gen 1 bodies are mostly white/light grey),
+// heavy BLACK linework (silhouette outline + the sprite's own internal line art,
+// found by local contrast), and selective checkerboard dithering on midtones.
+// Texture-noise slider = chunk size; FX color modes re-tint the ramp (Super Game
+// Boy / DMG-green style).
+AURA.genone = (r, g, b, x, y, t, ctx) => {
+  const s = Math.max(16, Math.round(44 / (FXSCALE || 1)));
+  const cxq = Math.floor(x * s);
+  const cyq = Math.floor(y * s);
+  const px2 = (cxq + 0.5) / s;
+  const py2 = (cyq + 0.5) / s;
+  const s2 = ctx?.sa ? ctx.sa(px2, py2) : [r, g, b, 1];
+  if (s2[3] <= 0.4) {
+    return [0, 0, 0, 0]; // hard pixel alpha - no soft edges on a Game Boy
+  }
+  const GB = ["101010", "5a5a5a", "aaaaaa", "f8f8f8"].map(hx);
+  const Lc = luma(s2[0], s2[1], s2[2]);
+  if (ctx?.sa) {
+    // silhouette outline: any chunk bordering transparency goes black
+    for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (ctx.sa((cxq + ox + 0.5) / s, (cyq + oy + 0.5) / s)[3] <= 0.4) {
+        return [GB[0][0], GB[0][1], GB[0][2], 1];
+      }
+    }
+    // internal line art: the sprite's own linework (darker than its surroundings)
+    // re-inks in black - this is what makes it read as a drawn Gen 1 sprite
+    if (_lineContrast(px2, py2, Lc, ctx).line > 0.35) {
+      return [GB[0][0], GB[0][1], GB[0][2], 1];
+    }
+  }
+  // bright-biased 4 tones (Gen 1 bodies are mostly the two light shades);
+  // genuine midtones get the classic 50% checkerboard dither, flats stay flat
+  const v = clamp(Math.pow(Lc, 0.62) * 3.6 - 0.25, 0, 3);
+  const base = Math.floor(v);
+  const frac = v - base;
+  let lvl = frac > 0.35 && frac < 0.65 ? base + ((cxq + cyq) & 1) : Math.round(v);
+  lvl = Math.max(0, Math.min(3, lvl));
+  return [GB[lvl][0], GB[lvl][1], GB[lvl][2], 1];
+};
+// Marching Ants: an animated dashed selection crawling along the outline.
+AURA.marchingants = (r, g, b, x, y, t, ctx) => {
+  const e = ctx?.e ?? 0;
+  const rim = smooth(0.5, 0.95, e);
+  const dash = fract((x + y) * 22 - t * 1.6) < 0.5 ? 1 : 0;
+  const k = rim * dash;
+  return [clamp(r * 0.92 + k), clamp(g * 0.92 + k), clamp(b * 0.92 + k * 0.4), 1];
+};
+// Phosphor: glow-in-the-dark - the bright parts breathe radioactive green.
+AURA.phosphor = (r, g, b, x, y, t) => {
+  const L = luma(r, g, b);
+  const glow = smooth(0.45, 0.9, L) * (0.55 + 0.45 * Math.sin(t * 1.1 + L * 6));
+  const base = [r * 0.16, g * 0.2, b * 0.3];
+  return [clamp(base[0] + glow * 0.25), clamp(base[1] + glow), clamp(base[2] + glow * 0.45), 1];
 };
 
 // --- v5 around: PokeMMO-style colored auras ---

@@ -31,16 +31,39 @@ describe("ER Shiny Lab registry completeness", () => {
 // it is padded enough that an "around" aura has off-sprite space to draw into. The
 // colour must vary across the sprite so displacement / neighbour-sampling surfaces
 // (ripple, pixelpulse) actually move pixels instead of resampling one flat colour.
+// A small filled DISC with a dark outline ring inside a 16x16 frame: this gives a
+// non-rectangular silhouette (top-facing surfaces for snowcap), transparent corners
+// (off-sprite space + edges for aura / rim FX), near-black outline pixels (so
+// alpha-only FX like No Outline actually change something) and a varied interior
+// (so displacement / neighbour-sampling FX move real colour). A flat rectangle no-ops
+// a whole class of region/edge/silhouette effects even though they render fine on a
+// real Pokemon sprite.
 function source() {
-  const w = 12;
-  const h = 12;
+  const w = 24;
+  const h = 24;
   const data = new Uint8ClampedArray(w * h * 4);
+  const cx = 11.5;
+  const cy = 11.5;
+  const rad = 9.5;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
-      data[i] = 40 + x * 16;
-      data[i + 1] = 60 + y * 14;
-      data[i + 2] = 200 - x * 10;
+      const d = Math.hypot(x - cx, y - cy);
+      if (d > rad) {
+        data[i + 3] = 0;
+        continue;
+      }
+      if (d > rad - 1.6) {
+        // dark outline ring
+        data[i] = 20;
+        data[i + 1] = 18;
+        data[i + 2] = 30;
+      } else {
+        // varied, wide-luma body (near-black shadow bottom-left -> bright top-right)
+        data[i] = 20 + x * 9;
+        data[i + 1] = 30 + y * 8;
+        data[i + 2] = 220 - x * 7;
+      }
       data[i + 3] = 255;
     }
   }
