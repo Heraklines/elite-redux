@@ -31,6 +31,7 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import {
   COOP_BARGAIN_SEQ_BASE,
   COOP_BIOME_SHOP_SEQ_BASE,
+  COOP_CATCH_FULL_SEQ,
   COOP_DEX_SYNC_SEQ,
   COOP_FAINT_SWITCH_SEQ_BASE,
   COOP_REVIVAL_SEQ_BASE,
@@ -50,6 +51,7 @@ import { recordReplayInteraction } from "#data/elite-redux/replay-recorder";
 export {
   COOP_BARGAIN_SEQ_BASE,
   COOP_BIOME_SHOP_SEQ_BASE,
+  COOP_CATCH_FULL_SEQ,
   COOP_DEX_SYNC_SEQ,
   COOP_FAINT_SWITCH_SEQ_BASE,
   COOP_REVIVAL_SEQ_BASE,
@@ -296,6 +298,12 @@ export class CoopInteractionRelay {
   promptRevival(fieldIndex: number): void {
     coopLog("relay", `SEND revivalPrompt fieldIndex=${fieldIndex} (#809)`);
     this.transport.send({ t: "revivalPrompt", fieldIndex });
+  }
+
+  /** #856: ask the CATCHER partner to open its full-party keep/release picker for a wild catch. */
+  promptCatchFull(pokemonName: string, speciesId: number): void {
+    coopLog("relay", `SEND catchFullPrompt sp=${speciesId} name=${pokemonName} (#856)`);
+    this.transport.send({ t: "catchFullPrompt", pokemonName, speciesId });
   }
 
   /** OWNER: send one pick for interaction `seq` (`kind` is routing/logging only). */
@@ -727,6 +735,13 @@ export class CoopInteractionRelay {
   onRevivalPrompt: ((fieldIndex: number) => void) | null = null;
 
   /**
+   * #856: fired when the partner (the sole-engine host) asks THIS client - the CATCHER - to drive the
+   * full-party keep/release picker for a wild catch it threw. Wired by the runtime (queues
+   * CoopGuestCatchFullPhase on the guest); null in engine-free tests.
+   */
+  onCatchFullPrompt: ((pokemonName: string, speciesId: number) => void) | null = null;
+
+  /**
    * #829 malicious-peer hardening: whether a received `interactionChoice` at `seq` is a FORGED
    * cross-owner faint-replacement switch. A faint-replacement pick (COOP_FAINT_SWITCH_SEQ_BASE +
    * fieldIndex) is a CROSS-OWNER relay - the sending peer relays the replacement for ITS OWN field
@@ -768,6 +783,11 @@ export class CoopInteractionRelay {
     if (msg.t === "revivalPrompt") {
       coopLog("relay", `RECV revivalPrompt fieldIndex=${msg.fieldIndex} (#809)`);
       this.onRevivalPrompt?.(msg.fieldIndex);
+      return;
+    }
+    if (msg.t === "catchFullPrompt") {
+      coopLog("relay", `RECV catchFullPrompt sp=${msg.speciesId} name=${msg.pokemonName} (#856)`);
+      this.onCatchFullPrompt?.(msg.pokemonName, msg.speciesId);
       return;
     }
     if (msg.t === "interactionOutcome") {

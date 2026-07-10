@@ -96,6 +96,16 @@ export const COOP_BIOME_PICK_SEQ_BASE = 9_700_000;
  * the prompt is one-time it needs no interaction-counter offset - a fixed singleton above every other band.
  */
 export const COOP_STORMGLASS_SEQ = 9_800_000;
+/**
+ * The wild-catch FULL-PARTY keep/release owner-driven relay: a FIXED singleton seq (#856). On a successful
+ * WILD catch with a full party the keep/release (box/release) picker belongs to the CATCHER (the ball
+ * thrower), not the sole-engine host. For a GUEST-thrown catch the HOST streams a `catchFullPrompt`, the
+ * GUEST opens the real replace-or-skip picker + relays the chosen party slot, and the host applies the
+ * authoritative release+add. Only one live-battle catch resolves at a time, so it needs no interaction-
+ * counter offset - a fixed singleton above every other band (a HOST-thrown catch drives the picker locally
+ * and never touches this band). The recipient-drives twin of the #855 ME catch-full sub-prompt.
+ */
+export const COOP_CATCH_FULL_SEQ = 9_900_000;
 /** Host->guest dex/starter sync broadcasts: a fixed disjoint seq (#794). */
 export const COOP_DEX_SYNC_SEQ = 9_200_000;
 /** Rejoin full-resync request: `BASE + (Date.now() % 100_000)`. */
@@ -274,6 +284,13 @@ export const COOP_SEQ_BANDS: readonly CoopSeqBand[] = [
     offset: "fixed singleton (one-time weather pick)",
     owner: "er-stormglass-picker-phase.ts",
   },
+  {
+    key: "catchFull",
+    base: COOP_CATCH_FULL_SEQ,
+    maxOffset: 0,
+    offset: "fixed singleton (one live catch resolves at a time)",
+    owner: "attempt-capture-phase.ts / coop-guest-catch-full-phase.ts",
+  },
 ];
 
 /** The inclusive numeric range `[lo, hi]` a band occupies at realistic magnitudes. */
@@ -371,6 +388,8 @@ export const COOP_RELAY_KINDS: readonly CoopRelayKind[] = [
   { kind: "biomePick", transport: "choice", band: "biomePick", sender: "select-biome-phase.ts" },
   // ER Stormglass one-time weather pick (#130 co-op wiring): host drives, relays the chosen weather index.
   { kind: "stormglass", transport: "choice", band: "stormglass", sender: "er-stormglass-picker-phase.ts" },
+  // Wild-catch FULL-party keep/release owner pick (#856): the GUEST catcher drives the picker + relays the slot.
+  { kind: "catchFull", transport: "choice", band: "catchFull", sender: "coop-guest-catch-full-phase.ts" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -404,6 +423,8 @@ export const COOP_BIOME_PICK_CHOICE_KINDS = ["biomePick"] as const;
 export const COOP_CROSSROADS_CHOICE_KINDS = ["crossroads"] as const;
 /** One-time Stormglass weather pick (er-stormglass-picker-phase.ts). */
 export const COOP_STORMGLASS_CHOICE_KINDS = ["stormglass"] as const;
+/** Wild-catch full-party keep/release owner pick (attempt-capture-phase.ts / coop-guest-catch-full-phase.ts). */
+export const COOP_CATCH_FULL_CHOICE_KINDS = ["catchFull"] as const;
 /** Lockstep + per-slot-forward "which move to forget" pick (learn-move-phase.ts). */
 export const COOP_LEARN_MOVE_CHOICE_KINDS = ["learnMove"] as const;
 /** Shared batch level-up Move Learn panel terminal (learn-move-batch-phase.ts). */

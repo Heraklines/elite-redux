@@ -1985,6 +1985,19 @@ export function assembleCoopRuntime(
       coopWarn("replay", `revivalPrompt fieldIndex=${fieldIndex} could not queue the picker (${e}) - host auto-picks`);
     }
   };
+  // #856: the host asked THIS client - the CATCHER - to drive the full-party keep/release picker for a
+  // wild catch it threw. Queue the guest picker (the host awaits its relayed slot); the guest never runs
+  // AttemptCapturePhase, so this is the only place the recipient's picker opens.
+  interactionRelay.onCatchFullPrompt = (pokemonName, speciesId) => {
+    if (getCoopRuntime() !== runtime || runtime.controller.role === "host") {
+      return;
+    }
+    try {
+      globalScene.phaseManager.unshiftNew("CoopGuestCatchFullPhase", pokemonName, speciesId);
+    } catch (e) {
+      coopWarn("replay", `catchFullPrompt sp=${speciesId} could not queue the picker (${e}) - host declines the grant`);
+    }
+  };
   // #807: a fresh SESSION starts a fresh tick line (assembly-scoped, NOT setCoopRuntime -
   // the duo harness re-registers runtimes per context swap and must not reset mid-session).
   resetCoopStateTicks();

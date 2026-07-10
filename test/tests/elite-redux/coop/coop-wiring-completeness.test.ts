@@ -41,6 +41,10 @@ const CRITICAL_HOOKS: { name: string; installed: (r: CoopRuntime) => boolean }[]
     installed: r => r.interactionRelay.onRevivalPrompt != null,
   },
   {
+    name: "interactionRelay.onCatchFullPrompt (#856 wild-catch full-party owner-pick)",
+    installed: r => r.interactionRelay.onCatchFullPrompt != null,
+  },
+  {
     name: "battleSync slotOwnershipProbe (#812 pre-responder ownership)",
     installed: r => r.battleSync.hasSlotOwnershipProbe(),
   },

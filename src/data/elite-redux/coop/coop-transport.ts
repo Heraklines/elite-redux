@@ -843,6 +843,13 @@ export type CoopMessage =
   | { t: "rendezvous"; point: string }
   /** #809: host asks the partner to pick a Revival Blessing target for its own mon. */
   | { t: "revivalPrompt"; fieldIndex: number }
+  /**
+   * #856: host asks the CATCHER (the partner who threw the ball) to drive the FULL-party keep/release
+   * picker for a successful wild catch. The recipient opens the real replace-or-skip picker and relays the
+   * chosen party slot on {@linkcode COOP_CATCH_FULL_SEQ}; the host applies the authoritative release+add.
+   * `speciesId` is the caught mon's root species (for a locally-localized picker header on the recipient).
+   */
+  | { t: "catchFullPrompt"; pokemonName: string; speciesId: number }
   /** #810 resume flow: host offers to resume the saved run with this partner at `wave`. */
   | { t: "meCursor"; index: number }
   | { t: "resumeOffer"; wave: number }

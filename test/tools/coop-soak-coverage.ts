@@ -239,8 +239,22 @@ const STORMGLASS_LEG =
 const CATCH_LEG =
   "#843/#849 BUILD 1 landed the inline catch leg (coop-soak-driver catchWaves + coop-soak-catch.test.ts drives "
   + "BALL + the `catch` situation + dexSync, asserting BOTH dex credits + ball convergence); the default "
-  + "wave/shop soak configures no catch leg, so the default partition is unchanged; follow-up: full-party "
-  + "box/release + a guest-owned (relayed) throw";
+  + "wave/shop soak configures no catch leg, so the default partition is unchanged; the full-party box/release "
+  + "+ guest-owned (relayed) throw is now driven by the dedicated coop-duo-catch-full.test.ts (see catchFull)";
+/**
+ * Follow-up shorthand for the wild-catch FULL-PARTY keep/release owner-pick surfaces (#856). The
+ * recipient-drives relay (a GUEST-thrown wild catch on a FULL merged party: the HOST streams a
+ * `catchFullPrompt`, the GUEST catcher opens the real replace-or-skip picker + relays the slot, the host
+ * applies the authoritative release+add) is proven over two real engines by the dedicated
+ * coop-duo-catch-full.test.ts. The DEFAULT wave/shop soak (and the coop-soak-catch leg) uses a NON-full
+ * party host-thrown catch, so the `catchFull` kind/band never fires there - undrivable in the default run
+ * until a soak leg stages a full-party guest-thrown throw.
+ */
+const CATCH_FULL_LEG =
+  "#856 the wild-catch full-party keep/release owner pick is driven over two real engines by "
+  + "coop-duo-catch-full.test.ts (host streams catchFullPrompt, guest catcher relays the slot, host applies "
+  + "the release+add); the default soak's catch leg uses a NON-full host-thrown party, so catchFull never "
+  + "fires there - follow-up: stage a full-party GUEST-thrown catch in the soak driver (catchFullWaves knob)";
 /**
  * Follow-up shorthand for the level-up move-learn BATCH surfaces. #848/#849 BUILD 2 LANDED the inline
  * learn-move leg (the coop-soak-driver `learnMoveWaves` knob, proven green by coop-soak-learn-move.test.ts):
@@ -395,6 +409,15 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
       followupTask: STORMGLASS_LEG,
     },
   ],
+  [
+    kindKey("catchFull"),
+    {
+      reason:
+        "the wild-catch full-party keep/release owner pick needs a GUEST-thrown catch on a FULL merged party; "
+        + "the default soak's catch leg uses a NON-full host-thrown party, so the catchFull relay never fires there",
+      followupTask: CATCH_FULL_LEG,
+    },
+  ],
   [kindKey("bargain"), { reason: "the Bargain outcome relay is ME-gated", followupTask: ME_CONTINUATION }],
   [kindKey("coloBoard"), { reason: "the Colosseum board relay is ME-gated", followupTask: ME_CONTINUATION }],
   [kindKey("coloPick"), { reason: "the Colosseum pick relay is ME-gated", followupTask: ME_CONTINUATION }],
@@ -497,6 +520,15 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
     {
       reason: "the Stormglass seq band needs the Stormglass relic, which the soak never grants (see kind:stormglass)",
       followupTask: STORMGLASS_LEG,
+    },
+  ],
+  [
+    bandKey("catchFull"),
+    {
+      reason:
+        "the wild-catch full-party keep/release seq band needs a GUEST-thrown catch on a FULL merged party; "
+        + "the default soak's catch leg uses a NON-full host-thrown party (see kind:catchFull)",
+      followupTask: CATCH_FULL_LEG,
     },
   ],
   [bandKey("bargain"), { reason: "the Bargain seq band is ME-gated", followupTask: ME_CONTINUATION }],

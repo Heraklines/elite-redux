@@ -4,7 +4,12 @@ import { globalScene } from "#app/global-scene";
 import { IS_TEST, isBeta, isDev } from "#constants/app-constants";
 import { SubstituteTag } from "#data/battler-tags";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
-import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
+import { coopHostAwaitWildCatchFullSlot } from "#data/elite-redux/coop/coop-catch-full";
+import {
+  broadcastCoopWaveResolved,
+  getCoopController,
+  getCoopInteractionRelay,
+} from "#data/elite-redux/coop/coop-runtime";
 import { coopAttributeNewMon, setCoopCatchThrowerHint } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { erRecordAchievementCatch } from "#data/elite-redux/er-achievement-tracker";
@@ -384,22 +389,34 @@ export class AttemptCapturePhase extends PokemonPhase {
           const partyFull = globalScene.gameMode.isCoop
             ? coopAttributeNewMon(party) === null
             : party.length === PLAYER_PARTY_MAX_SIZE;
-          // Co-op wiring-audit REVIEW (finding #3, docs/plans/2026-07-07-coop-screen-wiring-audit.md):
-          // this full-party RELEASE picker runs HOST-ONLY (AttemptCapturePhase is in the renderer
-          // DENIED set, coop-renderer-gate.ts), so it CANNOT hang - but for a GUEST-thrown catch
-          // (`this.throwerRole === "guest"`) it lets the HOST decide releases from the MERGED party,
-          // which can release the host's OWN mons and mis-attribute the guest's catch to the host
-          // (the #800 class). The correct fix is the #855 catchFull relay applied to the wild path:
-          // the RECIPIENT (the catching player, `this.throwerRole`) drives a non-mutating PARTY/SELECT
-          // picker and the authoritative host applies the release+add from the relayed slot, scoped to
-          // the recipient's own `coopOwner` half - reusing `coopHostStreamCatchFullAwaitSlot` /
-          // `CoopReplayMePhase.openSubPickCapture` (ME path) via the live-battle precedent of
-          // `CoopGuestFaintSwitchPhase` (host `awaitInteractionChoice` on a new `catchFull` seq band +
-          // a guest picker dispatched off a live catch-full presentation at coop-replay-turn-phase.ts,
-          // timeout => DECLINE the grant, never hangs). DEFERRED from the closeout batch: it is an
-          // all-or-nothing landing (the seq/kind registry guards require band+kind+consumer together)
-          // and needs a new two-engine harness scenario (the guest never runs this phase today), which
-          // is disproportionate to a benign, non-blocking case. Tracked here + in the audit doc.
+          // Co-op (#856): on a full merged party the keep/release picker belongs to the CATCHER (the ball
+          // thrower), not the sole-engine host. A HOST-thrown catch drives the local picker below (the host
+          // IS the catcher). A GUEST-thrown catch must NOT let the host decide releases from the MERGED
+          // party (that can release the host's OWN mons + mis-attribute the guest's catch - the #800 class):
+          // the RECIPIENT (the guest) drives a non-mutating picker on its own client and relays the chosen
+          // slot, and the host applies the authoritative release+add here. The caught mon then materializes
+          // on the guest via the normal capture handshake (applyCoopCaptureParty). This is the wild-path
+          // twin of the #855 ME catch-full sub-prompt, via the CoopGuestRevivalPhase live-battle precedent.
+          if (
+            partyFull
+            && globalScene.gameMode.isCoop
+            && this.throwerRole === "guest"
+            && getCoopController()?.role === "host"
+            && getCoopInteractionRelay() != null
+          ) {
+            void coopHostAwaitWildCatchFullSlot(pokemon.getNameToRender(), pokemon.species.getRootSpeciesId(true)).then(
+              slot => {
+                if (slot == null) {
+                  // The catcher cancelled / timed out / disconnected: the caught mon is NOT kept.
+                  removePokemon();
+                  end();
+                } else {
+                  addToParty(slot);
+                }
+              },
+            );
+            return;
+          }
           if (partyFull) {
             const promptRelease = () => {
               globalScene.ui.showText(
