@@ -42,6 +42,7 @@ import {
   type ReplayTrace,
   validateReplayTrace,
 } from "#data/elite-redux/replay-trace";
+import { PokemonMove } from "#data/moves/pokemon-move";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -92,6 +93,7 @@ function rosterMon(species: SpeciesId, level: number, coopOwner: "host" | "guest
     variant: 0,
   });
   data.coopOwner = coopOwner;
+  data.moveset = [new PokemonMove(MoveId.TACKLE), new PokemonMove(MoveId.SPLASH)];
   return data;
 }
 
@@ -231,18 +233,16 @@ describe.skipIf(!RUN)(
 
     it("boots a replay from the window checkpoint party instead of the original launch roster", async () => {
       const checkpointParty = [
-        rosterMon(SpeciesId.RAICHU, 61, "host"),
-        rosterMon(SpeciesId.ALAKAZAM, 62, "guest"),
+        rosterMon(SpeciesId.SNORLAX, 61, "host"),
+        rosterMon(SpeciesId.GENGAR, 62, "guest"),
       ];
+      checkpointParty[0].moveset = [new PokemonMove(MoveId.THUNDER_PUNCH)];
+      checkpointParty[1].moveset = [new PokemonMove(MoveId.SHADOW_BALL)];
       const trace = makeReplayTrace({
         seed: "original-launch-seed",
         gameModeId: GameModes.COOP,
         roster: [rosterMon(SpeciesId.PIKACHU, 5, "host"), rosterMon(SpeciesId.ABRA, 5, "guest")],
-        events: [
-          { type: "command", wave: 1, turn: 0, slotFieldIndex: 0, command: { kind: "move", moveIndex: 0, target: 2 } },
-          { type: "command", wave: 1, turn: 0, slotFieldIndex: 1, command: { kind: "move", moveIndex: 0, target: 3 } },
-          { type: "interaction", seq: 0, kind: "skip", choice: -1 },
-        ],
+        events: [],
         coopRunConfig: {
           difficulty: "youngster",
           challenges: [],
@@ -251,7 +251,7 @@ describe.skipIf(!RUN)(
         },
       });
       trace.checkpoint = {
-        wave: 1,
+        wave: 7,
         seed: "checkpoint-window-seed",
         party: checkpointParty,
         modifiers: [],
@@ -264,11 +264,19 @@ describe.skipIf(!RUN)(
       expect(result.divergences).toEqual([]);
       expect(
         game.scene.getPlayerParty().slice(0, 2).map(p => [p.species.speciesId, p.level]),
-        "the replay must begin from the evolved/leveled checkpoint party, not the stale header roster",
+        "the replay must begin from the caught/leveled checkpoint party, not the stale header roster",
       ).toEqual([
-        [SpeciesId.RAICHU, 61],
-        [SpeciesId.ALAKAZAM, 62],
+        [SpeciesId.SNORLAX, 61],
+        [SpeciesId.GENGAR, 62],
       ]);
+      expect(game.scene.getPlayerParty().slice(0, 2).map(p => p.getMoveset()[0]?.moveId)).toEqual([
+        MoveId.THUNDER_PUNCH,
+        MoveId.SHADOW_BALL,
+      ]);
+      expect(game.scene.currentBattle.waveIndex).toBe(7);
+      expect(game.scene.seed).toBe("checkpoint-window-seed");
+      expect(game.scene.money).toBe(4_321);
+      expect(game.scene.pokeballCounts[0]).toBe(7);
     }, 300_000);
 
     // =========================================================================================
