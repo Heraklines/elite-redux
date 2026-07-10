@@ -143,7 +143,10 @@ export function getBerryEffectFunc(berryType: BerryType): BerryEffectFunc {
             consumer.getMoveset().find(m => m.ppUsed === m.getMovePp())
             ?? consumer.getMoveset().find(m => m.ppUsed < m.getMovePp());
           if (ppRestoreMove) {
-            ppRestoreMove.ppUsed = Math.max(ppRestoreMove.ppUsed - 10, 0);
+            // Ripen doubles a berry's beneficial effect — a Leppa restores 20 PP.
+            const ppRestored = new NumberHolder(10);
+            applyAbAttrs("DoubleBerryEffectAbAttr", { pokemon: consumer, effectValue: ppRestored });
+            ppRestoreMove.ppUsed = Math.max(ppRestoreMove.ppUsed - ppRestored.value, 0);
             globalScene.phaseManager.queueMessage(
               i18next.t("battle:ppHealBerry", {
                 pokemonNameWithAffix: getPokemonNameWithAffix(consumer),

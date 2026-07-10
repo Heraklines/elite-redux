@@ -20,13 +20,15 @@
 // This test drives the REAL resolution + REAL redirected loadAssets:
 //   - the battle SPRITE key/atlas resolve to the mega SLUG (not the base Garchomp),
 //   - loadAssets() QUEUES the vanilla mega cry `cry/445-mega`,
-//   - the ENGINE name is "Mega Garchomp" while the battle-info panel deliberately
-//     shows the base species name (upstream #6942, not a bug).
+//   - the ENGINE name is "Mega Garchomp", and Showdown's battle-info panel also
+//     exposes that selected permanent form instead of disguising it as the base set.
 //
 // Red-proof: revert the redirect cry re-queue -> the `cry/445-mega` load
 // assertion fails (the cry is never queued). Gated behind ER_SCENARIO=1.
 // =============================================================================
 
+import { getGameMode } from "#app/game-mode";
+import { GameModes } from "#enums/game-modes";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -103,7 +105,7 @@ describe.skipIf(!RUN)("Showdown construction-time vanilla mega (sprite + cry)", 
     mon.destroy();
   });
 
-  it("engine name is 'Mega Garchomp'; the battle-info panel shows the base species name (upstream #6942)", async () => {
+  it("engine and Showdown battle-info names both identify Mega Garchomp", async () => {
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
 
     const mon = game.scene.addPlayerPokemon(
@@ -117,10 +119,14 @@ describe.skipIf(!RUN)("Showdown construction-time vanilla mega (sprite + cry)", 
     expect(mon.name).toBe("Mega Garchomp");
     expect(mon.species.getName(GARCHOMP_MEGA_FORM_INDEX)).toBe("Mega Garchomp");
 
-    // The battle-info HP panel deliberately renders the BASE species name for ALL forms
-    // (pokerogue #6942 "don't display form name in battle info UI") - so "Garchomp" there
-    // is intended, not a showdown bug.
+    // Solo retains upstream's compact base-species panel label.
     expect(mon.getNameToRender({ prependFormName: false })).toBe("Garchomp");
+
+    // Showdown is different: the permanent form is part of the negotiated set identity.
+    // Refresh after selecting the mode, as the mon was built in the classic headless shell.
+    game.scene.gameMode = getGameMode(GameModes.SHOWDOWN);
+    await mon.updateInfo(true);
+    expect((mon as unknown as { battleInfo: { name: string } }).battleInfo.name).toBe("Mega Garchomp");
 
     mon.destroy();
   });

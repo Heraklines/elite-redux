@@ -23,6 +23,7 @@ import {
   HitHealAttr,
   type Move,
   MultiHitAttr,
+  OneHitKOAccuracyAttr,
   OneHitKOAttr,
   PhotonGeyserCategoryAttr,
   RecoilAttr,
@@ -38,8 +39,9 @@ import { StatusEffect } from "#enums/status-effect";
 import { describe, expect, it } from "vitest";
 
 function getMove(id: MoveId): Move {
-  const move = allMoves.find(m => m?.id === id);
+  const move = allMoves[id];
   expect(move, `move ${MoveId[id]} not found`).toBeDefined();
+  expect(move!.id).toBe(id);
   return move!;
 }
 
@@ -58,7 +60,11 @@ describe("ER vanilla move rebalance — TOTAL OHKO nerfs", () => {
 
   it("HORN_DRILL drops OHKO and gains high crit + ignore-abilities + horn flag", () => {
     const move = getMove(MoveId.HORN_DRILL);
+    expect(move.power).toBe(95);
+    expect(move.accuracy).toBe(100);
+    expect(move.pp).toBe(5);
     expect(hasAttrCtor(move, OneHitKOAttr)).toBe(false);
+    expect(hasAttrCtor(move, OneHitKOAccuracyAttr)).toBe(false);
     expect(hasAttrCtor(move, HighCritAttr)).toBe(true);
     expect(move.hasFlag(MoveFlags.IGNORE_ABILITIES)).toBe(true);
     expect(move.hasFlag(MoveFlags.HORN_BASED)).toBe(true);
@@ -242,6 +248,22 @@ describe("ER vanilla move rebalance — MAJOR status/stat-on-hit additions", () 
   it("WILD_CHARGE gains paralysis status", () => {
     expect(hasAttrCtor(getMove(MoveId.WILD_CHARGE), StatusEffectAttr)).toBe(true);
   });
+
+  it("CONFUSION uses the dex's guaranteed confusion chance", () => {
+    const move = getMove(MoveId.CONFUSION);
+    expect(move.pp).toBe(20);
+    expect(move.chance).toBe(100);
+    expect(hasAttrCtor(move, ConfuseAttr)).toBe(true);
+  });
+
+  it("DRAGON_BREATH uses the dex's 20 BP guaranteed burn", () => {
+    const move = getMove(MoveId.DRAGON_BREATH);
+    expect(move.power).toBe(20);
+    expect(move.pp).toBe(20);
+    expect(move.chance).toBe(100);
+    const statusAttrs = move.attrs.filter((attr): attr is StatusEffectAttr => attr instanceof StatusEffectAttr);
+    expect(statusAttrs.some(attr => attr.effect === StatusEffect.BURN)).toBe(true);
+  });
 });
 
 describe("ER vanilla move rebalance — MAJOR spread / category swaps", () => {
@@ -251,6 +273,12 @@ describe("ER vanilla move rebalance — MAJOR spread / category swaps", () => {
 
   it("BUBBLE widens to ALL_NEAR_ENEMIES", () => {
     expect(getMove(MoveId.BUBBLE).moveTarget).toBe(MoveTarget.ALL_NEAR_ENEMIES);
+  });
+
+  it("OMINOUS_WIND uses the dex's 55 BP spread targeting", () => {
+    const move = getMove(MoveId.OMINOUS_WIND);
+    expect(move.power).toBe(55);
+    expect(move.moveTarget).toBe(MoveTarget.ALL_NEAR_ENEMIES);
   });
 
   it("BIND swaps to SPECIAL category", () => {

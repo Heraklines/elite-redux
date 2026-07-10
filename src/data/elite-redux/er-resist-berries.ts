@@ -22,6 +22,7 @@
 // the weakness pick.
 // =============================================================================
 
+import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { erBalanceMap } from "#data/elite-redux/er-balance-tuning";
 import { erNotorietyItemRateMult } from "#data/elite-redux/er-biome-notoriety";
@@ -32,7 +33,7 @@ import { PokemonType } from "#enums/pokemon-type";
 import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import { type Modifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import { PokemonHeldItemModifierType } from "#modifiers/modifier-type";
-import { type NumberHolder, toDmgValue } from "#utils/common";
+import { NumberHolder, toDmgValue } from "#utils/common";
 
 /** Berry name + items-atlas icon per covered attack type (Roseli/Fairy: no icon → excluded). */
 export const ER_RESIST_BERRY_BY_TYPE: ReadonlyMap<PokemonType, { name: string; icon: string }> = new Map([
@@ -88,9 +89,16 @@ export class ErResistBerryModifier extends PokemonHeldItemModifier {
     return [...super.getArgs(), this.resistType];
   }
 
-  /** `apply(pokemon, damage)` — halve the incoming hit. */
-  override apply(_pokemon: Pokemon, damage: NumberHolder): boolean {
-    damage.value = toDmgValue(damage.value / 2);
+  /**
+   * `apply(pokemon, damage)` — halve the incoming hit. A Ripen holder DOUBLES
+   * the beneficial berry effect, so the reduction becomes a quarter (75% off)
+   * instead of a half. Consult DoubleBerryEffectAbAttr on the holder to scale
+   * the divisor (2 → 4).
+   */
+  override apply(pokemon: Pokemon, damage: NumberHolder): boolean {
+    const divisor = new NumberHolder(2);
+    applyAbAttrs("DoubleBerryEffectAbAttr", { pokemon, effectValue: divisor });
+    damage.value = toDmgValue(damage.value / divisor.value);
     return true;
   }
 

@@ -2887,6 +2887,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Showdown/co-op: closing Settings never destroys the live match",
+    description:
+      "NETWORK SETTINGS regression - verify with TWO clients in either a live Showdown duel or co-op run.\n"
+      + "Live report: opening Settings, changing a reload-required option, then backing out reset the whole\n"
+      + "scene. Showdown is ephemeral and cannot resume; in co-op the unilateral reset strands the peer.\n"
+      + "DO: during a live match open Settings, change an option marked as requiring reload, then Back.\n"
+      + "EXPECT: the battle remains on the same turn and both peers stay connected. The preference is saved\n"
+      + "and takes effect on the next ordinary page reload. Solo play retains its immediate settings reload.\n"
+      + "Unit policy: showdown-settings-reload-policy.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          formIndex: 1,
+          moveset: [MoveId.DRAGON_CLAW, MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "QoL: reward-shop long-desc auto-scroll (#557)",
     description:
       "#557 - long ER item descriptions auto-scroll in the REWARD screen instead of\n"

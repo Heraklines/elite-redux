@@ -80,8 +80,8 @@ describe("ER Eerie Fog — per-turn stat-buff decay", () => {
     game.move.select(MoveId.OMINOUS_WIND);
     await game.phaseInterceptor.to("MoveEffectPhase");
 
-    // Base power 60 → doubled to 120 by Eerie Fog.
-    expect(ominousWind.calculateBattlePower).toHaveReturnedWith(120);
+    // Base power 55 -> doubled to 110 by Eerie Fog.
+    expect(ominousWind.calculateBattlePower).toHaveReturnedWith(110);
   });
 
   it("Ominous Wind deals normal power without fog", async () => {
@@ -93,6 +93,6 @@ describe("ER Eerie Fog — per-turn stat-buff decay", () => {
     game.move.select(MoveId.OMINOUS_WIND);
     await game.phaseInterceptor.to("MoveEffectPhase");
 
-    expect(ominousWind.calculateBattlePower).toHaveReturnedWith(60);
+    expect(ominousWind.calculateBattlePower).toHaveReturnedWith(55);
   });
 });

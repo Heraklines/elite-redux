@@ -912,6 +912,11 @@ const RECIPES: Record<string, Recipe> = {
     prepare: async game => {
       game.override.starterForms({ [SpeciesId.GARCHOMP]: 1 });
       await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+      // ClassicModeHelper necessarily launches in CLASSIC; switch to the actual Showdown
+      // presentation policy and refresh the panel before capture. This makes the golden cover
+      // both the redirected Mega sprite AND the Showdown-only form-qualified name.
+      game.scene.gameMode = getGameMode(GameModes.SHOWDOWN);
+      await game.scene.getPlayerField()[0].updateInfo(true);
       return [];
     },
   },

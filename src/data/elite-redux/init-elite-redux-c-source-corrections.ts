@@ -82,7 +82,8 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_ROLLING_KICK", { power: 60, accuracy: 85 }],
   ["MOVE_HEADBUTT", { power: 70 }],
   ["MOVE_HORN_ATTACK", { power: 80, pp: 25, chance: 0 }],
-  ["MOVE_HORN_DRILL", { power: 120, accuracy: 90, chance: 0 }],
+  // ER 2.65 dex authority: regular 95 BP / 100 acc damaging move, not an OHKO.
+  ["MOVE_HORN_DRILL", { power: 95, accuracy: 100, pp: 5, chance: 0 }],
   ["MOVE_TACKLE", { pp: 35 }],
   ["MOVE_WRAP", { accuracy: 90 }],
   ["MOVE_TAKE_DOWN", { power: 95, chance: 0 }],
@@ -138,7 +139,8 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_THUNDER_WAVE", { pp: 20 }],
   ["MOVE_THUNDER", { accuracy: 75, pp: 10 }],
   ["MOVE_ROCK_THROW", { power: 50, pp: 15 }],
-  ["MOVE_CONFUSION", { pp: 25, chance: 10 }],
+  // ER 2.65 dex authority: "causes confusion" / 100% effect chance.
+  ["MOVE_CONFUSION", { pp: 20, chance: 100 }],
   ["MOVE_PSYCHIC", { chance: 10 }],
   ["MOVE_MEDITATE", { pp: 40 }],
   ["MOVE_AGILITY", { pp: 30 }],
@@ -207,7 +209,8 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_MAGNITUDE", { pp: 30 }],
   ["MOVE_DYNAMIC_PUNCH", { power: 100 }],
   ["MOVE_MEGAHORN", { chance: 0 }],
-  ["MOVE_DRAGON_BREATH", { power: 70, chance: 30 }],
+  // ER 2.65 dex authority: 20 BP, guaranteed burn.
+  ["MOVE_DRAGON_BREATH", { power: 20, pp: 20, chance: 100 }],
   ["MOVE_BATON_PASS", { pp: 40 }],
   ["MOVE_RAPID_SPIN", { pp: 40, chance: 0 }],
   ["MOVE_IRON_TAIL", { accuracy: 90, pp: 15, chance: 30 }],
@@ -327,7 +330,8 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_HEAL_ORDER", { pp: 10 }],
   ["MOVE_DOUBLE_HIT", { power: 35 }],
   ["MOVE_CRUSH_GRIP", { power: 1 }],
-  ["MOVE_OMINOUS_WIND", { power: 60 }],
+  // ER 2.65 dex authority: 55 BP, doubled by fog through the mechanic patch.
+  ["MOVE_OMINOUS_WIND", { power: 55 }],
   ["MOVE_SHADOW_FORCE", { chance: 0 }],
   ["MOVE_QUIVER_DANCE", { pp: 20 }],
   ["MOVE_SYNCHRONOISE", { power: 95, pp: 10 }],
@@ -754,7 +758,7 @@ export function initEliteReduxCSourceCorrections(): CSourceCorrectionResult {
       result.movesMissing++;
       continue;
     }
-    const move = byId.get(pkrgId);
+    const move = allMoves[pkrgId] ?? byId.get(pkrgId);
     if (!move) {
       result.movesMissing++;
       continue;
@@ -798,7 +802,7 @@ export function initEliteReduxCSourceCorrections(): CSourceCorrectionResult {
     if (pkrgId === undefined) {
       continue;
     }
-    const move = byId.get(pkrgId);
+    const move = allMoves[pkrgId] ?? byId.get(pkrgId);
     if (!move) {
       continue;
     }

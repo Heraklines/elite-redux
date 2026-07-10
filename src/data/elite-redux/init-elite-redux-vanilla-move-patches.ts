@@ -161,6 +161,7 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     move => {
       retypeMove(move, PokemonType.BUG);
       removeAttrsByCtor(move, [OneHitKOAttr, OneHitKOAccuracyAttr]);
+      clearMoveFailureConditions(move);
       orFlag(move, MoveFlags.SLICING_MOVE);
       addAttrUnique(move, new HighCritAttr());
     },
@@ -170,6 +171,8 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     MoveId.HORN_DRILL,
     move => {
       removeAttrsByCtor(move, [OneHitKOAttr, OneHitKOAccuracyAttr]);
+      removeAttrsByName(move, ["OneHitKOAttr", "OneHitKOAccuracyAttr"]);
+      clearMoveFailureConditions(move);
       orFlag(move, MoveFlags.IGNORE_ABILITIES);
       orFlag(move, MoveFlags.HORN_BASED);
       addAttrUnique(move, new HighCritAttr());
@@ -181,6 +184,7 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     MoveId.FISSURE,
     move => {
       removeAttrsByCtor(move, [OneHitKOAttr, OneHitKOAccuracyAttr]);
+      clearMoveFailureConditions(move);
       move.moveTarget = MoveTarget.ALL_NEAR_ENEMIES;
     },
   ],
@@ -189,6 +193,7 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     MoveId.SHEER_COLD,
     move => {
       removeAttrsByCtor(move, [OneHitKOAttr, OneHitKOAccuracyAttr, SheerColdAccuracyAttr]);
+      clearMoveFailureConditions(move);
       // ER's frostbite is wired via the ER FREEZE-status remap in B2 (status-effect
       // pathway). We add the StatusEffectAttr; the chance is the existing
       // `move.chance` patched by the numeric pass.
@@ -863,6 +868,16 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       }
     },
   ],
+  [
+    MoveId.DRAGON_BREATH,
+    move => {
+      // ER 2.65 dex: "100% burn chance" at 20 BP. Vanilla Dragon Breath
+      // carries a paralysis attr, so the chance correction alone is not enough.
+      removeAttrsByName(move, ["StatusEffectAttr"]);
+      addAttrUnique(move, new StatusEffectAttr(StatusEffect.BURN));
+      move.chance = 100;
+    },
+  ],
   // FLAME_WHEEL: ER Rollout clone - "rolls into a wheel to strike with
   // rising intensity". 40 BP ramp, NO burn rider (numeric pass pins
   // 40 BP / 10 PP / chance 0). Community batch 2026-06-11.
@@ -1023,11 +1038,12 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       addAttrUnique(move, new MovePowerMultiplierAttr((_u, target) => (target.isMega() ? 2 : 1)));
     },
   ],
-  // Ominous Wind — ER "Deals double damage in fog." (keeps its vanilla 60 BP
+  // Ominous Wind - ER 55 BP, spread, "Deals double damage in fog."
   // Ghost-special + 10% all-stats raise.)
   [
     MoveId.OMINOUS_WIND,
     move => {
+      move.moveTarget = MoveTarget.ALL_NEAR_ENEMIES;
       addAttrUnique(
         move,
         new MovePowerMultiplierAttr(() => {
@@ -1203,6 +1219,9 @@ interface MutableMove {
   accuracy: number;
   chance: number;
   attrs: MoveAttr[];
+  conditions?: unknown[];
+  conditionsSeq2?: unknown[];
+  conditionsSeq3?: unknown[];
   /** Present only on charge moves (ChargingAttackMove); attrs applied on the charge turn. */
   chargeAttrs?: MoveAttr[];
   moveTarget: MoveTarget;
@@ -1303,6 +1322,14 @@ function removeAttrsByName(move: MutableMove, names: readonly string[]): void {
   move.attrs = move.attrs.filter(a => !names.includes(a.constructor.name));
 }
 
+function clearMoveFailureConditions(move: MutableMove): void {
+  // Move.attr() copies attr-provided conditions into private arrays. ER OHKO
+  // rewrites strip OneHitKOAttr, so the stale level-gate condition must go too.
+  move.conditions?.splice(0);
+  move.conditionsSeq2?.splice(0);
+  move.conditionsSeq3?.splice(0);
+}
+
 /**
  * Apply ER's mechanic deltas to every vanilla pokerogue move with an entry
  * in {@linkcode MOVE_PATCHERS}. Idempotent via {@linkcode MOVE_PATCHED_MARKER}.
@@ -1366,7 +1393,7 @@ export function initEliteReduxVanillaMovePatches(): VanillaMovePatchResult {
   };
 
   for (const [moveId, patcher] of MOVE_PATCHERS) {
-    const move = moveById.get(moveId);
+    const move = allMoves[moveId] ?? moveById.get(moveId);
     if (!move) {
       result.moveMissing++;
       continue;
@@ -1406,7 +1433,7 @@ export function initEliteReduxVanillaMovePatches(): VanillaMovePatchResult {
     if (pokerogueId === undefined || pokerogueId >= VANILLA_ID_CUTOFF || draft.archetype !== "vanilla") {
       continue;
     }
-    const move = moveById.get(pokerogueId);
+    const move = allMoves[pokerogueId] ?? moveById.get(pokerogueId);
     if (!move) {
       continue;
     }
@@ -1446,7 +1473,7 @@ export function initEliteReduxVanillaMovePatches(): VanillaMovePatchResult {
     if (!Array.isArray(flags)) {
       continue;
     }
-    const move = moveById.get(pokerogueId);
+    const move = allMoves[pokerogueId] ?? moveById.get(pokerogueId);
     if (!move) {
       continue;
     }
@@ -1478,7 +1505,7 @@ export function initEliteReduxVanillaMovePatches(): VanillaMovePatchResult {
     if (pokerogueId === undefined || pokerogueId >= VANILLA_ID_CUTOFF) {
       continue;
     }
-    const move = moveById.get(pokerogueId);
+    const move = allMoves[pokerogueId] ?? moveById.get(pokerogueId);
     if (!move) {
       result.moveMissing++;
       continue;
@@ -1517,7 +1544,7 @@ export function initEliteReduxVanillaMovePatches(): VanillaMovePatchResult {
     if (pokerogueId === undefined || pokerogueId >= VANILLA_ID_CUTOFF) {
       continue;
     }
-    const move = moveById.get(pokerogueId);
+    const move = allMoves[pokerogueId] ?? moveById.get(pokerogueId);
     if (!move) {
       result.moveMissing++;
       continue;

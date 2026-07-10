@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
@@ -9,6 +10,7 @@ import type { InputsIcons } from "#ui/abstract-control-settings-ui-handler";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { NavigationManager, NavigationMenu } from "#ui/navigation-menu";
 import { ScrollBar } from "#ui/scroll-bar";
+import { shouldReloadSceneOnSettingsExit } from "#ui/settings/settings-reload-policy";
 import { addTextObject, getTextColor } from "#ui/text";
 import type { TitleUiHandler } from "#ui/title-ui-handler";
 import { addWindow } from "#ui/ui-theme";
@@ -502,7 +504,15 @@ export class AbstractSettingsUiHandler extends MessageUiHandler {
     (this.getUi().handlers[UiMode.TITLE] as TitleUiHandler)?.updateUsername();
     if (this.reloadRequired) {
       this.reloadRequired = false;
-      globalScene.reset(true, false, true);
+      // A scene reset tears down the in-memory WebRTC/runtime state. Showdown has no
+      // resumable save at all, and unilateral co-op reloads strand the peer, so defer
+      // reload-required settings until the next normal page load while a network session
+      // is alive. Solo retains the existing immediate-reload behaviour.
+      if (shouldReloadSceneOnSettingsExit(true, getCoopRuntime() != null)) {
+        globalScene.reset(true, false, true);
+      } else {
+        console.info("[settings] deferred reload-required change until after the network match");
+      }
     }
   }
 

@@ -19,6 +19,16 @@ import { toCamelCase } from "#utils/strings";
 import i18next from "i18next";
 
 /**
+ * Battle-info panels normally follow upstream's compact base-species label, but Showdown's
+ * fielded form is part of the player's chosen competitive set. Keep that identity visible
+ * there so a permanent Mega/Primal cannot look like the wrong set even when its sprite is
+ * visually similar to the base form.
+ */
+function getBattleInfoDisplayName(pokemon: Pokemon): string {
+  return pokemon.getNameToRender({ prependFormName: globalScene.gameMode.isShowdown });
+}
+
+/**
  * Parameters influencing the position of elements within the battle info container
  */
 export type BattleInfoParamList = {
@@ -402,8 +412,8 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
     this.updateShinyLabNameplate(pokemon);
     const nameTextWidth = this.nameText.displayWidth;
 
-    this.name = pokemon.getNameToRender({ prependFormName: false });
-    this.box.name = pokemon.getNameToRender({ prependFormName: false });
+    this.name = getBattleInfoDisplayName(pokemon);
+    this.box.name = getBattleInfoDisplayName(pokemon);
 
     this.genderText
       .setText(getGenderSymbol(pokemon.gender))
@@ -569,7 +579,7 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
 
   /** Update the pokemon name inside the container */
   protected updateName(pokemon: Pokemon): boolean {
-    const name = pokemon.getNameToRender({ prependFormName: false });
+    const name = getBattleInfoDisplayName(pokemon);
     if (this.lastName === name) {
       this.updateShinyLabNameplate(pokemon);
       return false;
@@ -774,7 +784,7 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   //#endregion
 
   updateNameText(pokemon: Pokemon): void {
-    let displayName = pokemon.getNameToRender({ prependFormName: false }).replace(/[♂♀]/g, "");
+    let displayName = getBattleInfoDisplayName(pokemon).replace(/[♂♀]/g, "");
     let nameTextWidth: number;
 
     const nameSizeTest = addTextObject(0, 0, displayName, TextStyle.BATTLE_INFO);
@@ -797,7 +807,7 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
     nameSizeTest.destroy();
 
     this.nameText.setText(displayName);
-    this.lastName = pokemon.getNameToRender({ prependFormName: false });
+    this.lastName = getBattleInfoDisplayName(pokemon);
 
     if (this.nameText.visible) {
       this.nameText.setInteractive(
