@@ -47,13 +47,21 @@
 // duplicate rejection is a legitimate skip (the wave already advanced), not a fail-loud.
 // =============================================================================
 
+import { COOP_CAP_OP_WAVE, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
 import {
+  type CoopAuthoritativeEnvelopeV1,
   type CoopOperationKind,
   type CoopPendingOperation,
   type CoopWaveAdvancePayload,
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  journalCoopCommittedEnvelope,
+  registerCoopOperationApplier,
+  routeCoopOperationToLiveSink,
+} from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
   type CoopIntentValidator,
@@ -117,9 +125,25 @@ let watchGuest: CoopOperationGuest | null = null;
  */
 let lastAppliedWave = -1;
 
-/** True iff the migrated (envelope-gated) wave-advance path is active; else pure legacy derivation (§5.1). */
+/**
+ * The surface-local revision FLOOR (W2e-R P0-3). On a COLD resume the durability receiver ledger is restored
+ * to the persisted per-class high-water N (coop-runtime.ts applyCoopControlPlaneSaveData), but this surface's
+ * CoopOperationHost + guest applier are recreated at revision 0 - so the producer would emit revision 1 and
+ * the restored receiver would drop it as a stale duplicate. Flooring the host + guest to N makes the producer
+ * continue at N+1 and the guest accept it, keeping the committed-op revision stream MONOTONIC across the save
+ * boundary (§4.6; the epoch is unchanged, so the restored receiver marks stay valid). 0 = fresh session.
+ */
+let revisionFloor = 0;
+
+/**
+ * True iff the migrated (envelope-gated) wave-advance path is active; else pure legacy derivation (§5.1).
+ * The local rollback flag (`enabled`) is the OUTER gate; the NEGOTIATED capability set is the inner one
+ * (#896 W2e-R2): if the peer did not advertise "opSurface.wave" it is not in the intersection and the surface
+ * stays OFF on BOTH peers - a flag-flip / mixed build can never activate it one-sided. Pre-handshake (no
+ * negotiated set yet) the capability gate is inert, so the local flag stands alone.
+ */
 export function isCoopWaveAdvanceOperationEnabled(): boolean {
-  return enabled;
+  return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_WAVE);
 }
 
 /** Select the migrated path (true) or the legacy derivation fallback (false). The one-line per-surface rollback (§5.4). */
@@ -154,6 +178,23 @@ export function resetCoopWaveAdvanceOperationState(): void {
   authorityHost = null;
   watchGuest = null;
   lastAppliedWave = -1;
+  revisionFloor = 0;
+}
+
+/**
+ * Seed the surface-local revision FLOOR from the persisted per-class high-water on a COLD resume (W2e-R
+ * P0-3). Called from `applyCoopControlPlaneSaveData` with `journalHighWater["op:wave"]`. Recreates the host
+ * + guest so the producer continues at floor+1 and the guest accepts it (see {@linkcode revisionFloor}). A
+ * no-op for a fresh session (floor 0). Idempotent for the same value.
+ */
+export function setCoopWaveAdvanceOperationRevisionFloor(hw: number): void {
+  if (!Number.isFinite(hw) || hw <= 0 || hw === revisionFloor) {
+    return;
+  }
+  revisionFloor = hw;
+  // Recreate the host + guest so the new floor takes effect on next use (they were created at the old floor).
+  authorityHost = null;
+  watchGuest = null;
 }
 
 // -----------------------------------------------------------------------------
@@ -162,14 +203,24 @@ export function resetCoopWaveAdvanceOperationState(): void {
 
 function host(): CoopOperationHost {
   if (authorityHost == null) {
-    authorityHost = new CoopOperationHost({ epoch });
+    authorityHost = new CoopOperationHost({ epoch, initialRevision: revisionFloor });
   }
   return authorityHost;
 }
 
+/**
+ * The ONE guest applier (W2e-R P0-2, coordinator directive): unlike the parked-era biome/ME/reward adapters -
+ * which keep a SEPARATE journalGuest because they have no live sink and unifying would make the relay-adopt
+ * path see the journal's operationId as already-applied and fall to the wrong fallback - the wave surface has
+ * a LIVE MATERIALIZER (registerCoopOperationLiveSink), so the journal path can drive the real mutation. Both
+ * the relay-adopt seam (adoptWaveAdvanceWatcherChoice) AND the journal-replay seam (applyJournaledWaveEnvelope)
+ * feed THIS one applier, deduped by operationId (invariant 5). The materialization (the tail build) is deduped
+ * SEPARATELY by lastResolvedWave (coop-runtime), so the tail is built exactly once regardless of which carrier
+ * consumes the op first. See §8.6 addendum.
+ */
 function guest(): CoopOperationGuest {
   if (watchGuest == null) {
-    watchGuest = new CoopOperationGuest({ epoch });
+    watchGuest = new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
   }
   return watchGuest;
 }
@@ -284,7 +335,7 @@ export interface CoopWaveAdvanceOwnerCommitParams {
  * Never throws (the legacy derivation is the fallback).
  */
 export function commitWaveAdvanceOwnerIntent(params: CoopWaveAdvanceOwnerCommitParams): void {
-  if (!enabled || params.localRole !== "host") {
+  if (!isCoopWaveAdvanceOperationEnabled() || params.localRole !== "host") {
     return;
   }
   try {
@@ -298,6 +349,11 @@ export function commitWaveAdvanceOwnerIntent(params: CoopWaveAdvanceOwnerCommitP
     };
     const res = host().submit(intent, controlContext(params.payload, params.wave, params.turn), hostSeatValidator());
     if (res.kind === "committed") {
+      // COMMIT -> JOURNAL (Wave-2e/W2e-R): register the committed op with the durability journal so a lost
+      // waveResolved is healed by the journal resend / reconnect tail -> the guest's live-sink materializer
+      // (the FIRST production sink) rebuilds the tail. Rides ALONGSIDE the legacy waveResolved (dual-run);
+      // no-op when durability is OFF. The DATA still travels on waveResolved/waveEndState (§1.2).
+      journalCoopCommittedEnvelope(res.envelope);
       coopLog(
         "runtime",
         `wave-advance op HOST commit wave=${params.payload.wave} outcome=${params.payload.outcome} next=${params.payload.nextLogicalPhase} rev=${res.envelope.revision} id=${intent.id} (Wave-2f)`,
@@ -346,7 +402,7 @@ export function adoptWaveAdvanceWatcherChoice(params: CoopWaveAdvanceWatcherAdop
   }
   // Legacy / fallback: adopt the reconstructed payload verbatim, no operation gating (the caller then uses
   // the payload's outcome exactly as the legacy derivation used pending.outcome).
-  if (!enabled) {
+  if (!isCoopWaveAdvanceOperationEnabled()) {
     return { adopt: true, payload: params.payload, sanctionedTails: coopWaveAdvanceSanctionedTails(params.payload) };
   }
   try {
@@ -404,3 +460,67 @@ export function adoptWaveAdvanceWatcherChoice(params: CoopWaveAdvanceWatcherAdop
     return { adopt: false, reason: "threw", stale: false };
   }
 }
+
+// -----------------------------------------------------------------------------
+// Journal replay seam (Wave-2e/W2e-R, §4.2/§4.4 + §8.6): route a resent / reconnect-tail committed
+// WAVE_ADVANCE envelope INTO the ONE guest applier (invariant 5) AND the LIVE-MUTATION sink. This is the
+// FIRST surface whose journal applier drives a REAL live materialization (the reviewer's central demand):
+// the sink (registered from coop-runtime) rebuilds the guest's wave-advance tail from the host-stated op.
+// -----------------------------------------------------------------------------
+
+/**
+ * Apply a committed WAVE_ADVANCE envelope delivered by the durability journal (a resend or reconnect tail).
+ * ONE LEDGER (W2e-R P0-2, coordinator directive): routes into the SAME {@linkcode CoopOperationGuest} the
+ * relay-adopt path (adoptWaveAdvanceWatcherChoice) uses, deduped by operationId - so a dual-run duplicate
+ * (the live waveResolved already adopted it) is a no-op. Re-keyed to the guest-local dense revision (not the
+ * envelope's host revision) so the one shared applier stays on a single monotonic stream. When it NEWLY
+ * consumes an op it routes into the live-mutation sink (materialize the tail on the guest). Returns a
+ * {@linkcode CoopApplyOutcome} that GATES the durability ACK (W2e-R P0-1): `applied` (newly consumed - ACK +
+ * advance), `duplicate` (already consumed / non-applicable / flag-off - ACK so a resend cannot spin), or
+ * `rejected` (transient - do NOT ACK, retriable). Never throws.
+ */
+function applyJournaledWaveEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
+  // Flag OFF / capability-blocked / a non-op frame is ACK'd + dropped (spin-safe): returning "rejected"
+  // would spin the committer's resend loop forever (W2e-R P0-1). The capability gate keeps this symmetric
+  // with activation (#896 W2e-R2).
+  if (!isCoopWaveAdvanceOperationEnabled()) {
+    return "duplicate";
+  }
+  const op = envelope.pendingOperation;
+  if (op == null || op.status !== "applied" || op.kind !== "WAVE_ADVANCE") {
+    return "duplicate";
+  }
+  const g = guest();
+  if (g.hasApplied(op.id)) {
+    return "duplicate"; // the relay-adopt path or a prior journal delivery already consumed it - ACK, no re-apply.
+  }
+  // Re-key to the guest-local dense revision (the ONE-ledger stream) so the shared applier never spuriously
+  // gaps/duplicates on the host's revision; the op is deduped by operationId (invariant 5).
+  const rekeyed: CoopAuthoritativeEnvelopeV1 = {
+    ...envelope,
+    sessionEpoch: epoch,
+    revision: g.getLastAppliedRevision() + 1,
+  };
+  const res = g.applyEnvelope(rekeyed);
+  if (res.kind !== "applied") {
+    // A transient non-applicable result (fail-closed / gap): leave it retriable (do NOT ACK). Never a
+    // permanent condition (a permanent one is the duplicate above).
+    return "rejected";
+  }
+  const payload = op.payload as CoopWaveAdvancePayload;
+  if (typeof payload?.wave === "number" && payload.wave > lastAppliedWave) {
+    lastAppliedWave = payload.wave;
+  }
+  // W2e-R P0-1: route the newly-consumed op INTO the ONE live-mutation seam. UNLIKE the parked-era biome/ME/
+  // reward adapters, the wave surface REGISTERS a real production sink (coop-runtime materializeCoopWave-
+  // AdvanceFromOp), so a journal-delivered wave-advance rebuilds the guest's tail (the keystone). When no sink
+  // is registered (durability-only headless test) the op is still recorded + ACK'd (durable delivery is a
+  // receiver-ledger fact, not a live-mutation fact).
+  routeCoopOperationToLiveSink("op:wave", envelope);
+  coopLog("runtime", `wave-advance op JOURNAL apply id=${op.id} rev=${envelope.revision} (Wave-2f/W2e-R)`);
+  return "applied";
+}
+
+// Register the wave-advance guest applier so the durability manager can route a resent / reconnect-tail
+// `op:wave` envelope into it (one-way dep: adapter -> journal bridge; runs at import).
+registerCoopOperationApplier("op:wave", applyJournaledWaveEnvelope);

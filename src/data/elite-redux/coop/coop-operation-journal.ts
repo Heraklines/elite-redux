@@ -67,6 +67,13 @@ export function coopOperationClassForPhase(phase: CoopLogicalPhase): string | nu
       return "op:reward";
     case "MYSTERY_ENCOUNTER":
       return "op:me";
+    case "WAVE_VICTORY":
+    case "WAVE_FLEE":
+    case "GAME_OVER":
+      // Wave-2f KEYSTONE (§2.5 item 4): the post-battle wave-advance op. Its envelope's logicalPhase is
+      // the NEXT phase the transition enters (WAVE_VICTORY / WAVE_FLEE / GAME_OVER), all one class - the
+      // FIRST surface whose journal applier drives a LIVE materialization (registerCoopOperationLiveSink).
+      return "op:wave";
     default:
       return null; // control-plane phases that are not (yet) a migrated operation surface
   }

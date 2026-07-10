@@ -75,6 +75,7 @@ import type {
 } from "#data/elite-redux/coop/coop-transport";
 import {
   adoptWaveAdvanceWatcherChoice,
+  coopWaveAdvanceSanctionedTails,
   isCoopWaveAdvanceOperationEnabled,
 } from "#data/elite-redux/coop/coop-wave-operation";
 import { doPokeballBounceAnim, getPokeballAtlasKey } from "#data/pokeball";
@@ -1155,31 +1156,34 @@ export class CoopFinalizeTurnPhase extends Phase {
     // construct the tail FROM the adopted op's transition instead of DERIVING it from the one-bit outcome.
     // Dual-run: with the flag OFF this is a pass-through (adopt the reconstructed payload verbatim), so the
     // legacy derivation runs unchanged; with it ON the SELECTION is op-gated (idempotent, stale-rejected).
+    //
+    // ONE-LEDGER (W2e-R P0-2): the MATERIALIZATION is deduped by `consumeCoopPendingWaveAdvance` above
+    // (lastResolvedWave), NOT by the op ledger. So even when the JOURNAL carrier already pre-applied this
+    // op to the shared applier (adopt then returns stale:true), the tail must STILL build here - the op
+    // ledger is bookkeeping/convergence, the wave-guarded consume is the single build gate. Only a FAIL-LOUD
+    // (unknown-kind / applier gap under the flag) suppresses the build.
+    const reconstructed = buildCoopWaveAdvancePayload(pending.outcome, pending.wave);
     const decision = adoptWaveAdvanceWatcherChoice({
-      payload: buildCoopWaveAdvancePayload(pending.outcome, pending.wave),
+      payload: reconstructed,
       localRole: getCoopController()?.role ?? "guest",
       wave: globalScene.currentBattle.waveIndex,
       turn: globalScene.currentBattle.turn,
     });
-    if (!decision.adopt) {
-      if (isCoopWaveAdvanceOperationEnabled() && !decision.stale) {
-        // FAIL LOUD (§2.5 item 4): a flag-ON guest with an unadoptable op must NOT silently derive the
-        // tail. The #859 phantom-dissolve + resync backstops remain the recovery path.
-        coopWarn(
-          "replay",
-          `guest wave-advance FAIL-LOUD (op ${decision.reason}) wave=${pending.wave} - NOT deriving (Wave-2f)`,
-        );
-        return;
-      }
-      // stale/dup (the wave already advanced): a legitimate skip, nothing to build.
-      coopLog("replay", `guest wave-advance op skip (${decision.reason}) wave=${pending.wave} (Wave-2f)`);
+    if (isCoopWaveAdvanceOperationEnabled() && !decision.adopt && !decision.stale) {
+      // FAIL LOUD (§2.5 item 4): a flag-ON guest with an unadoptable op (fail-closed unknown kind / applier
+      // gap) must NOT silently derive the tail. The #859 phantom-dissolve + resync backstops recover.
+      coopWarn(
+        "replay",
+        `guest wave-advance FAIL-LOUD (op ${decision.reason}) wave=${pending.wave} - NOT deriving (Wave-2f)`,
+      );
       return;
     }
-    // The transition to build FROM: the adopted op's host-stated payload (op-selected). op.outcome ==
-    // pending.outcome; the SELECTION is now op-gated. §3 strict-tails: sanction the boundary tails this op
-    // legitimately builds (observe-mode evidence - a tail outside the sanction logs TAIL WOULD-BLOCK).
-    const tail = decision.payload;
-    setCoopWaveTailSanction(decision.sanctionedTails);
+    // The transition to build FROM: the adopted op's host-stated payload when the op adopted fresh (op-
+    // selected), else the reconstructed payload (flag-off pass-through, OR the journal pre-applied it). Either
+    // way op.outcome == pending.outcome. §3 strict-tails: sanction the boundary tails this op legitimately
+    // builds (observe-mode evidence - a tail outside the sanction logs TAIL WOULD-BLOCK).
+    const tail = decision.adopt ? decision.payload : reconstructed;
+    setCoopWaveTailSanction(coopWaveAdvanceSanctionedTails(tail));
     // DIAGNOSTIC (#633 trainer-victory deadlock): log the outcome + the guest's battleType so a live
     // capture confirms the guest queues the right tail. For a "win" on a TRAINER wave the VictoryPhase
     // it queues MUST go on to push TrainerVictoryPhase + SelectModifierPhase (the guest becomes the

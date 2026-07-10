@@ -47,6 +47,7 @@ import {
   COOP_CAP_OP_BIOME,
   COOP_CAP_OP_ME,
   COOP_CAP_OP_REWARD,
+  COOP_CAP_OP_WAVE,
   COOP_CAP_RENDERER_ALLOWLIST_ENFORCE,
   type CoopCapabilityKey,
   clearNegotiatedCoopCapabilities,
@@ -76,9 +77,13 @@ import {
   setCoopMeInteractionStart,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
-import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import type {
+  CoopAuthoritativeEnvelopeV1,
+  CoopWaveAdvancePayload,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   coopOperationDurabilityHooks,
+  registerCoopOperationLiveSink,
   resetCoopOperationJournalLog,
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
@@ -112,7 +117,9 @@ import { setCoopLiveEmitter } from "#data/elite-redux/coop/coop-turn-recorder";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import {
   commitWaveAdvanceOwnerIntent,
+  isCoopWaveAdvanceOperationEnabled,
   resetCoopWaveAdvanceOperationState,
+  setCoopWaveAdvanceOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-wave-operation";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
 import {
@@ -1349,6 +1356,9 @@ export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | u
     setCoopBiomeOperationRevisionFloor(marks["op:biome"] ?? 0);
     setCoopRewardOperationRevisionFloor(marks["op:reward"] ?? 0);
     setCoopMeOperationRevisionFloor(marks["op:me"] ?? 0);
+    // Wave-2f KEYSTONE (W2e-R P0-3): floor the wave-advance producer + guest so a resumed run continues the
+    // committed-op revision stream at N+1 and the restored receiver ledger accepts it.
+    setCoopWaveAdvanceOperationRevisionFloor(marks["op:wave"] ?? 0);
   } catch {
     /* control-plane restore is best-effort; a resume must never hard-fail on it */
   }
@@ -1738,6 +1748,51 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
 }
 
 /**
+ * GUEST live-materialization sink for a JOURNAL-delivered WAVE_ADVANCE op (Wave-2f KEYSTONE, W2e-R P0-1).
+ * This is the FIRST production live-mutation sink (the reviewer's central demand): when the legacy
+ * `waveResolved` was LOST but the committed op arrived via the durability journal resend / reconnect tail,
+ * the journal applier routes here and this feeds the SAME `pendingWaveAdvance` queue the relay path feeds -
+ * so the guest's wave-advance tail (VictoryPhase / BattleEnd / NewBattle / GameOver) rebuilds at the next
+ * SAFE turn boundary via `maybeRunCoopWaveAdvance`, not mid-message. Idempotent: the materialization is
+ * deduped by `lastResolvedWave` (a wave already resolved is skipped), so a normal (relay-present) run never
+ * double-builds. Guest-only + authoritative-only; a host / solo / lockstep client no-ops. Returns true iff
+ * it enqueued the materialization. Best-effort - never throws into the durability handler.
+ */
+function materializeCoopWaveAdvanceFromOp(payload: CoopWaveAdvancePayload): boolean {
+  try {
+    if (getCoopNetcodeMode() !== "authoritative" || getCoopController()?.role !== "guest") {
+      return false; // only the authoritative GUEST renders the tail; the host resolves it directly.
+    }
+    if (typeof payload.wave !== "number" || payload.wave <= lastResolvedWave) {
+      return false; // already materialized this wave (the relay path built it, or a prior journal delivery).
+    }
+    // Feed the SAME pending queue the legacy waveResolved feeds; the safe-boundary maybeRunCoopWaveAdvance
+    // consumes it (one materialization site). Carry no capture blob - the DATA plane (waveEndState) reconciles
+    // the party; the tail phases (VictoryPhase etc.) are the control materialization the journal recovers.
+    const merged = mergeCoopPendingWaveAdvance(pendingWaveAdvance, payload.wave, payload.outcome, undefined, undefined);
+    if (merged != null) {
+      pendingWaveAdvance = merged;
+      coopLog("runtime", `wave-advance JOURNAL materialize wave=${payload.wave} outcome=${payload.outcome} (Wave-2f)`);
+    }
+    return merged != null;
+  } catch (e) {
+    coopWarn("runtime", "wave-advance JOURNAL materialize threw (handled)", e);
+    return false;
+  }
+}
+
+// Register the FIRST production live-mutation sink (Wave-2f KEYSTONE): a journal-delivered `op:wave` envelope
+// routes here to rebuild the guest's wave-advance tail. Runs once at import; the sink is role/wave-gated, so
+// it no-ops off-session / on the host / for an already-resolved wave.
+registerCoopOperationLiveSink("op:wave", (envelope: CoopAuthoritativeEnvelopeV1) => {
+  const op = envelope.pendingOperation;
+  if (op == null || op.kind !== "WAVE_ADVANCE") {
+    return false;
+  }
+  return materializeCoopWaveAdvanceFromOp(op.payload as CoopWaveAdvancePayload);
+});
+
+/**
  * Co-op WAVE-END authoritative capture (#838): the HOST streams the COMPLETE post-exp authoritative
  * battle state (whole player + enemy party as serialized PokemonData, seating, arena, modifiers, money,
  * ER substrates), captured HERE in the host's `BattleEndPhase` AFTER the wave's exp/level/evolution
@@ -2107,6 +2162,12 @@ function buildLocalCoopCapabilities(): CoopCapabilityKey[] {
   }
   if (isCoopRewardOperationEnabled()) {
     caps.push(COOP_CAP_OP_REWARD);
+  }
+  // Wave-2f KEYSTONE: advertise the post-battle wave-advance surface (§2.5 item 4). Read at assembly time
+  // (pre-negotiation), so the capability gate is inert and this returns the raw local flag, exactly like the
+  // other surfaces - so a mixed build never one-sided-activates it (the negotiated intersection gates it).
+  if (isCoopWaveAdvanceOperationEnabled()) {
+    caps.push(COOP_CAP_OP_WAVE);
   }
   // This build carries the durability journal + the renderer allowlist-enforce machinery.
   caps.push(COOP_CAP_DURABILITY_JOURNAL);

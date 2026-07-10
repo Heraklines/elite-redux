@@ -55,6 +55,8 @@ export const COOP_CAP_OP_BIOME: CoopCapabilityKey = "opSurface.biome";
 export const COOP_CAP_OP_ME: CoopCapabilityKey = "opSurface.me";
 /** The migrated reward-shop operation surface (coop-reward-operation.ts, §2.5 item 3). */
 export const COOP_CAP_OP_REWARD: CoopCapabilityKey = "opSurface.reward";
+/** The migrated post-battle wave-advance operation surface - THE KEYSTONE (coop-wave-operation.ts, §2.5 item 4). */
+export const COOP_CAP_OP_WAVE: CoopCapabilityKey = "opSurface.wave";
 /** The application-level durability journal (§4, coop-durability.ts / coop-operation-journal.ts). */
 export const COOP_CAP_DURABILITY_JOURNAL: CoopCapabilityKey = "durability.journal";
 /**
