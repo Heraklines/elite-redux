@@ -1281,6 +1281,12 @@ export type CoopMessage =
   /** Either player -> peer: the stake is locked in for `matchId` at the agreed `tier` (escrow-coupled: post-registration). */
   | { t: "showdownStakeLock"; matchId: string; tier: number }
   /**
+   * Either player -> peer: this player's RANKED opt-in state at the wager screen. Ranked counts only
+   * when BOTH opt in (rides the existing both-locked commit barrier). `rankedMatchId` is the HOST's
+   * generated ranked-match id (echoed empty by the guest, who adopts the host's). Connection-scoped.
+   */
+  | { t: "showdownRankedOptIn"; optIn: boolean; rankedMatchId: string }
+  /**
    * Either player -> peer: this player's full built team (see {@linkcode ShowdownMonManifestWire}),
    * plus this player's authored GHOST-TRAINER `presentation` (C7; sprite/class/name/title/dialogue/FX).
    * `presentation` is absent/null when the player authored no profile. The receiver ALWAYS re-sanitizes
@@ -1427,6 +1433,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `offer=sp${msg.offer.speciesId} shiny=${msg.offer.shiny} v=${msg.offer.variant} cost=${msg.offer.cost}`;
     case "showdownStakeLock":
       return `match=${msg.matchId} tier=${msg.tier}`;
+    case "showdownRankedOptIn":
+      return `optIn=${msg.optIn} rankedMatch=${msg.rankedMatchId}`;
     case "showdownTeam":
       return `mons=${msg.manifest.length} pres=${msg.presentation == null ? "-" : "y"}`;
     case "showdownReady":

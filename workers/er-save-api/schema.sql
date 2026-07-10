@@ -248,3 +248,60 @@ CREATE TABLE IF NOT EXISTS showdown_settlements (
   applied_at    INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_showdown_settle_uid ON showdown_settlements (uid, applied_at);
+
+-- Showdown ranked ladder (Pokemon-Champions-style). The PURE progression + dual-attestation
+-- logic lives in src/showdown-rank.ts (unit-tested, no CF deps); the worker persists rows here.
+-- All four tables are auto-created by the worker on first /showdown/rank* hit
+-- (ensureShowdownRankTables), so an already-deployed DB needs no migration; listed here so a
+-- fresh DB matches.
+
+-- One ladder-position row per player. tier 0..4 (pokeball..champion); rank 4..1 (champion=1);
+-- segments 0..3; career_best persists across seasons (the only field a season reset keeps).
+CREATE TABLE IF NOT EXISTS showdown_ranks (
+  uid          TEXT    PRIMARY KEY,
+  season_id    TEXT    NOT NULL,          -- "YYYY-MM"
+  tier         INTEGER NOT NULL DEFAULT 0,
+  rank         INTEGER NOT NULL DEFAULT 4,
+  segments     INTEGER NOT NULL DEFAULT 0,
+  streak       INTEGER NOT NULL DEFAULT 0,
+  highest_tier INTEGER NOT NULL DEFAULT 0,   -- best tier this season (resets per season)
+  career_best  INTEGER NOT NULL DEFAULT 0,   -- best tier ever (persists)
+  updated_at   INTEGER NOT NULL
+);
+
+-- Per (player, opponent) season win counter for anti-win-trading diminishing returns.
+CREATE TABLE IF NOT EXISTS showdown_rank_opponents (
+  uid          TEXT    NOT NULL,
+  opponent_uid TEXT    NOT NULL,
+  season_id    TEXT    NOT NULL,
+  wins         INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (uid, opponent_uid)
+);
+
+-- Dual-attestation reconciliation ledger for ranked results (mirrors showdown_matches). A result
+-- applies to both rank rows only when both clients report the SAME winner (state 'settled');
+-- a conflict is 'void' (no rank change).
+CREATE TABLE IF NOT EXISTS showdown_rank_matches (
+  id                TEXT    PRIMARY KEY,
+  host_uid          TEXT    NOT NULL,
+  guest_uid         TEXT    NOT NULL,
+  state             TEXT    NOT NULL DEFAULT 'open',   -- 'open' | 'settled' | 'void'
+  host_report_json  TEXT,
+  guest_report_json TEXT,
+  winner            TEXT,                              -- 'host' | 'guest' once settled
+  created_at        INTEGER NOT NULL,
+  resolved_at       INTEGER
+);
+
+-- Per-uid settled-match reward events queued for the OTHER participant (the first reporter, which
+-- got 'pending' at report time) to drain on its next GET /showdown/rank. The settler receives its
+-- events inline in the POST response. events_json is a RankResultEvents blob.
+CREATE TABLE IF NOT EXISTS showdown_rank_events (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  uid         TEXT    NOT NULL,
+  match_id    TEXT    NOT NULL,
+  events_json TEXT    NOT NULL,
+  created_at  INTEGER NOT NULL,
+  consumed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_showdown_rank_events_uid ON showdown_rank_events (uid, consumed_at);

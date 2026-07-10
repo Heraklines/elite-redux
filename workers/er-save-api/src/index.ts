@@ -44,6 +44,22 @@ import {
   type StakeRecord,
   voidMatch,
 } from "./showdown-escrow";
+import {
+  applyRankedResult,
+  applyRankReport,
+  initialRankState,
+  MIN_TIER,
+  newRankMatch,
+  type OpponentWinCount,
+  type RankMatchRecord,
+  type RankResultEvents,
+  type RankRole,
+  type RankState,
+  type RankTier,
+  rankRoleOf,
+  reconcileSeason,
+  seasonIdFromTime,
+} from "./showdown-rank";
 
 interface Env {
   DB: D1Database;
@@ -3202,6 +3218,331 @@ async function handleShowdownPendingAck(request: Request, auth: TokenPayload, en
 }
 
 // #endregion
+// #region showdown ranked ladder
+// -----------------------------------------------------------------------------
+// Showdown ranked ladder (Pokemon-Champions-style). The PURE progression + dual-attestation
+// logic lives in ./showdown-rank.ts (unit-tested, no CF deps); this layer only persists rows
+// to D1 and shuttles the pure decisions. A ranked result is applied to BOTH players' rows only
+// when both clients report the SAME winner (settled), reusing the escrow's double-report/void
+// reconciliation, so a single lying client can never self-promote.
+//
+// Routes (all authed via authUser):
+//   GET  /showdown/rank         this player's own ranked state (lazy season reconcile)
+//   POST /showdown/rank/result  dual-attestation ranked report -> apply to both rows | void
+// -----------------------------------------------------------------------------
+
+let showdownRankTablesReady = false;
+async function ensureShowdownRankTables(env: Env): Promise<void> {
+  if (showdownRankTablesReady) {
+    return;
+  }
+  // One ranked-state row per player (the ladder position). All self-created on first hit
+  // (mirrors ensureShowdownTables), so an already-deployed DB needs no migration.
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS showdown_ranks (
+       uid          TEXT    PRIMARY KEY,
+       season_id    TEXT    NOT NULL,
+       tier         INTEGER NOT NULL DEFAULT 0,
+       rank         INTEGER NOT NULL DEFAULT 4,
+       segments     INTEGER NOT NULL DEFAULT 0,
+       streak       INTEGER NOT NULL DEFAULT 0,
+       highest_tier INTEGER NOT NULL DEFAULT 0,
+       career_best  INTEGER NOT NULL DEFAULT 0,
+       updated_at   INTEGER NOT NULL
+     )`,
+  ).run();
+  // Per (player, opponent) season win counter for anti-win-trading diminishing returns.
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS showdown_rank_opponents (
+       uid          TEXT    NOT NULL,
+       opponent_uid TEXT    NOT NULL,
+       season_id    TEXT    NOT NULL,
+       wins         INTEGER NOT NULL DEFAULT 0,
+       PRIMARY KEY (uid, opponent_uid)
+     )`,
+  ).run();
+  // Dual-attestation reconciliation ledger for ranked results (mirrors showdown_matches).
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS showdown_rank_matches (
+       id                TEXT    PRIMARY KEY,
+       host_uid          TEXT    NOT NULL,
+       guest_uid         TEXT    NOT NULL,
+       state             TEXT    NOT NULL DEFAULT 'open',
+       host_report_json  TEXT,
+       guest_report_json TEXT,
+       winner            TEXT,
+       created_at        INTEGER NOT NULL,
+       resolved_at       INTEGER
+     )`,
+  ).run();
+  // Per-uid settled-match events queued for the OTHER participant (the first reporter, who got
+  // 'pending' at report time) to drain on its next GET /showdown/rank — so both sides' reward
+  // hooks fire. The settler receives its events inline in the POST response.
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS showdown_rank_events (
+       id          INTEGER PRIMARY KEY AUTOINCREMENT,
+       uid         TEXT    NOT NULL,
+       match_id    TEXT    NOT NULL,
+       events_json TEXT    NOT NULL,
+       created_at  INTEGER NOT NULL,
+       consumed_at INTEGER
+     )`,
+  ).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_showdown_rank_events_uid ON showdown_rank_events (uid, consumed_at)",
+  ).run();
+  showdownRankTablesReady = true;
+}
+
+/** Deserialize a persisted rank row into the pure `RankState` (defaulting to the season floor). */
+function rowToRankState(row: Record<string, unknown> | null, seasonId: string): RankState {
+  if (row == null) {
+    return initialRankState(seasonId, MIN_TIER);
+  }
+  return {
+    seasonId: String(row.season_id),
+    tier: Number(row.tier) as RankTier,
+    rank: Number(row.rank),
+    segments: Number(row.segments),
+    streak: Number(row.streak),
+    highestTierReached: Number(row.highest_tier) as RankTier,
+    careerBestTier: Number(row.career_best) as RankTier,
+  };
+}
+
+/** Upsert statement for a player's rank row. */
+function writeRankStateStmt(env: Env, uid: string, s: RankState, now: number) {
+  return env.DB.prepare(
+    `INSERT INTO showdown_ranks (uid, season_id, tier, rank, segments, streak, highest_tier, career_best, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+       ON CONFLICT(uid) DO UPDATE SET season_id=?2, tier=?3, rank=?4, segments=?5, streak=?6, highest_tier=?7, career_best=?8, updated_at=?9`,
+  ).bind(uid, s.seasonId, s.tier, s.rank, s.segments, s.streak, s.highestTierReached, s.careerBestTier, now);
+}
+
+/** Load a player's per-opponent season win counter (defaulting to 0 for the current season). */
+async function loadOpponentWins(
+  env: Env,
+  uid: string,
+  opponentUid: string,
+  seasonId: string,
+): Promise<OpponentWinCount> {
+  const row = await env.DB.prepare(
+    "SELECT season_id, wins FROM showdown_rank_opponents WHERE uid = ?1 AND opponent_uid = ?2",
+  )
+    .bind(uid, opponentUid)
+    .first<{ season_id: string; wins: number }>();
+  if (!row) {
+    return { seasonId, wins: 0 };
+  }
+  return { seasonId: String(row.season_id), wins: Number(row.wins) };
+}
+
+/** Upsert statement for a per-opponent season win counter. */
+function writeOpponentWinsStmt(env: Env, uid: string, opponentUid: string, c: OpponentWinCount) {
+  return env.DB.prepare(
+    `INSERT INTO showdown_rank_opponents (uid, opponent_uid, season_id, wins)
+       VALUES (?1, ?2, ?3, ?4)
+       ON CONFLICT(uid, opponent_uid) DO UPDATE SET season_id=?3, wins=?4`,
+  ).bind(uid, opponentUid, c.seasonId, c.wins);
+}
+
+/** Deserialize a rank-match row into the pure `RankMatchRecord`. */
+function rowToRankMatch(row: Record<string, unknown>): RankMatchRecord | null {
+  try {
+    const parse = (s: unknown) => (typeof s === "string" && s.length > 0 ? JSON.parse(s) : null);
+    return {
+      id: String(row.id),
+      hostUid: String(row.host_uid),
+      guestUid: String(row.guest_uid),
+      state: row.state as RankMatchRecord["state"],
+      hostReport: parse(row.host_report_json),
+      guestReport: parse(row.guest_report_json),
+      winner: (row.winner as RankRole | null) ?? null,
+      createdAt: Number(row.created_at),
+      resolvedAt: row.resolved_at == null ? null : Number(row.resolved_at),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Persist a rank-match record's mutable state. */
+function persistRankMatchStmt(env: Env, m: RankMatchRecord) {
+  return env.DB.prepare(
+    `INSERT INTO showdown_rank_matches (id, host_uid, guest_uid, state, host_report_json, guest_report_json, winner, created_at, resolved_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+       ON CONFLICT(id) DO UPDATE SET state=?4, host_report_json=?5, guest_report_json=?6, winner=?7, resolved_at=?9`,
+  ).bind(
+    m.id,
+    m.hostUid,
+    m.guestUid,
+    m.state,
+    m.hostReport ? JSON.stringify(m.hostReport) : null,
+    m.guestReport ? JSON.stringify(m.guestReport) : null,
+    m.winner,
+    m.createdAt,
+    m.resolvedAt,
+  );
+}
+
+/**
+ * Apply a SETTLED ranked match to both players' rows: the winner gains, the loser loses, each
+ * counting the other as the opponent (anti-win-trading). Idempotent by match id (the settlement
+ * rows are written once; a re-settle is a no-op because the match is already 'settled'). Returns
+ * the CALLER's result events (for the inline POST response); the OTHER participant's events are
+ * queued for it to drain on GET /showdown/rank.
+ */
+async function applyRankSettlement(
+  env: Env,
+  m: RankMatchRecord,
+  callerUid: string,
+  now: number,
+): Promise<RankResultEvents> {
+  const seasonId = seasonIdFromTime(now);
+  const winnerRole = m.winner;
+  const winnerUid = winnerRole === "host" ? m.hostUid : m.guestUid;
+  const loserUid = winnerRole === "host" ? m.guestUid : m.hostUid;
+
+  const [winnerRow, loserRow] = await Promise.all([
+    env.DB.prepare("SELECT * FROM showdown_ranks WHERE uid = ?1").bind(winnerUid).first(),
+    env.DB.prepare("SELECT * FROM showdown_ranks WHERE uid = ?1").bind(loserUid).first(),
+  ]);
+  const winnerCounter = await loadOpponentWins(env, winnerUid, loserUid, seasonId);
+  const loserCounter = await loadOpponentWins(env, loserUid, winnerUid, seasonId);
+
+  const winnerRes = applyRankedResult(
+    rowToRankState(winnerRow as Record<string, unknown> | null, seasonId),
+    winnerCounter,
+    {
+      won: true,
+      now,
+    },
+  );
+  const loserRes = applyRankedResult(
+    rowToRankState(loserRow as Record<string, unknown> | null, seasonId),
+    loserCounter,
+    {
+      won: false,
+      now,
+    },
+  );
+
+  const callerEvents = callerUid === winnerUid ? winnerRes.events : loserRes.events;
+  const otherUid = callerUid === winnerUid ? loserUid : winnerUid;
+  const otherEvents = callerUid === winnerUid ? loserRes.events : winnerRes.events;
+
+  await env.DB.batch([
+    writeRankStateStmt(env, winnerUid, winnerRes.state, now),
+    writeRankStateStmt(env, loserUid, loserRes.state, now),
+    writeOpponentWinsStmt(env, winnerUid, loserUid, winnerRes.opponentWins),
+    writeOpponentWinsStmt(env, loserUid, winnerUid, loserRes.opponentWins),
+    // Queue the OTHER participant's events for it to drain on its next GET (it got 'pending' earlier).
+    env.DB.prepare(
+      "INSERT INTO showdown_rank_events (uid, match_id, events_json, created_at, consumed_at) VALUES (?1, ?2, ?3, ?4, NULL)",
+    ).bind(otherUid, m.id, JSON.stringify(otherEvents), now),
+  ]);
+  return callerEvents;
+}
+
+async function handleShowdownRank(auth: TokenPayload, env: Env, cors: Record<string, string>): Promise<Response> {
+  const now = Date.now();
+  await ensureShowdownRankTables(env);
+  const seasonId = seasonIdFromTime(now);
+  const row = await env.DB.prepare("SELECT * FROM showdown_ranks WHERE uid = ?1").bind(auth.u).first();
+  const stored = rowToRankState(row as Record<string, unknown> | null, seasonId);
+  // Lazy season reconcile: a stale-season row resets to the pokeball floor and surfaces the prior
+  // final tier ONCE for the season-end reward hook (fires on first login of a new season, not only
+  // on the first match).
+  const { state, seasonEndedFinalTier } = reconcileSeason(stored, now);
+  if (row != null && state !== stored) {
+    await writeRankStateStmt(env, auth.u, state, now).run();
+  }
+  // Drain any queued settled-match events for this uid (the first-reporter delivery path).
+  const pending = await env.DB.prepare(
+    "SELECT id, events_json FROM showdown_rank_events WHERE uid = ?1 AND consumed_at IS NULL ORDER BY id ASC LIMIT 50",
+  )
+    .bind(auth.u)
+    .all<{ id: number; events_json: string }>();
+  const pendingEvents: RankResultEvents[] = [];
+  const drainedIds: number[] = [];
+  for (const r of pending.results ?? []) {
+    try {
+      pendingEvents.push(JSON.parse(r.events_json) as RankResultEvents);
+      drainedIds.push(r.id);
+    } catch {
+      drainedIds.push(r.id); // drop a corrupt row so it doesn't wedge the queue
+    }
+  }
+  if (drainedIds.length > 0) {
+    const ph = drainedIds.map((_, i) => `?${i + 2}`).join(",");
+    await env.DB.prepare(`UPDATE showdown_rank_events SET consumed_at = ?1 WHERE id IN (${ph})`)
+      .bind(now, ...drainedIds)
+      .run();
+  }
+  return json({ ok: true, state, seasonEndedFinalTier, pendingEvents }, 200, cors);
+}
+
+async function handleShowdownRankResult(
+  request: Request,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const now = Date.now();
+  if (showdownRateLimited(auth.u, now)) {
+    return text("Too many requests.", 429, cors);
+  }
+  const body = await readShowdownBody(request);
+  if (body == null) {
+    return json({ error: "invalid body" }, 400, cors);
+  }
+  await ensureShowdownRankTables(env);
+  const id = typeof body.matchId === "string" ? body.matchId : "";
+  const hostUid = typeof body.hostUid === "string" ? body.hostUid : "";
+  const guestUid = typeof body.guestUid === "string" ? body.guestUid : "";
+  const winner = body.winner;
+  if (!id || !hostUid || !guestUid || hostUid === guestUid) {
+    return json({ error: "invalid match" }, 400, cors);
+  }
+  if (winner !== "host" && winner !== "guest") {
+    return json({ error: "invalid winner" }, 400, cors);
+  }
+  // The reporter MUST be one of the two named participants (anti-spoof: you can't report someone
+  // else's ranked match). Identity = the token username.
+  if (auth.u !== hostUid && auth.u !== guestUid) {
+    return json({ error: "not a participant" }, 403, cors);
+  }
+  const existingRow = await env.DB.prepare("SELECT * FROM showdown_rank_matches WHERE id = ?1").bind(id).first();
+  const match = existingRow
+    ? rowToRankMatch(existingRow as Record<string, unknown>)
+    : newRankMatch(id, hostUid, guestUid, now);
+  if (match == null) {
+    return json({ error: "corrupt match" }, 500, cors);
+  }
+  if (rankRoleOf(match, auth.u) === null) {
+    return json({ error: "not a participant" }, 403, cors);
+  }
+  const applied = applyRankReport(match, auth.u, winner as RankRole, now);
+  await persistRankMatchStmt(env, applied.match).run();
+  if (applied.resolution === "settled") {
+    const events = await applyRankSettlement(env, applied.match, auth.u, now);
+    const seasonId = seasonIdFromTime(now);
+    const row = await env.DB.prepare("SELECT * FROM showdown_ranks WHERE uid = ?1").bind(auth.u).first();
+    return json(
+      {
+        ok: true,
+        resolution: "settled",
+        state: rowToRankState(row as Record<string, unknown> | null, seasonId),
+        events,
+      },
+      200,
+      cors,
+    );
+  }
+  return json({ ok: true, resolution: applied.resolution, state: null }, 200, cors);
+}
+
+// #endregion
 
 export default {
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
@@ -3356,6 +3697,13 @@ export default {
       }
       if (pathname === "/showdown/pending/ack" && method === "POST") {
         return await handleShowdownPendingAck(request, auth, env, cors);
+      }
+      // Showdown ranked ladder (Pokemon-Champions-style). Pure logic in ./showdown-rank.ts.
+      if (pathname === "/showdown/rank" && method === "GET") {
+        return await handleShowdownRank(auth, env, cors);
+      }
+      if (pathname === "/showdown/rank/result" && method === "POST") {
+        return await handleShowdownRankResult(request, auth, env, cors);
       }
 
       return text("Not found.", 404, cors);

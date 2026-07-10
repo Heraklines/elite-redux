@@ -39,6 +39,22 @@ interface ShowdownBattleState {
    * the `showdownResult` / `showdownVoid` wire messages carry it verbatim.
    */
   matchId: string | null;
+  /**
+   * Ranked ladder: set when BOTH players opted into ranked at the wager screen, else null (casual).
+   * The result phase reports the decisive outcome to /showdown/rank/result (dual attestation) when
+   * this is present and the match is NOT voided. Orthogonal to `matchId` (ranked works for a friendly).
+   */
+  ranked: ShowdownRankedContext | null;
+}
+
+/** The identity a ranked result is reported against (shared, agreed by both clients at wager commit). */
+export interface ShowdownRankedContext {
+  /** The ranked-match id both clients report against (the escrow id when staked, else a host-minted id). */
+  rankedMatchId: string;
+  /** The HOST-role player's account username. */
+  hostUid: string;
+  /** The GUEST-role player's account username. */
+  guestUid: string;
 }
 
 let state: ShowdownBattleState | null = null;
@@ -159,6 +175,7 @@ export function beginShowdownBattle(
   relay: ShowdownCommandRelay | null = null,
   opponentProfile: GhostTrainerProfile | null = null,
   matchId: string | null = null,
+  ranked: ShowdownRankedContext | null = null,
 ): void {
   // Adopt the pre-battle relay into the live state: clear the pending slot WITHOUT disposing the
   // adopted relay (endShowdownBattle owns its teardown now). Dispose a stale, non-adopted pending relay.
@@ -166,7 +183,7 @@ export function beginShowdownBattle(
     pendingRelay.dispose();
   }
   pendingRelay = null;
-  state = { ownManifest, opponentManifest, relay, opponentProfile, matchId };
+  state = { ownManifest, opponentManifest, relay, opponentProfile, matchId, ranked };
 }
 
 /** The live match state, or null when no showdown match is active. */
@@ -201,6 +218,11 @@ export function getShowdownRelay(): ShowdownCommandRelay | null {
 /** Task D1/D2: the escrow match id for a STAKED match, or null for a friendly (no escrow). */
 export function getShowdownMatchId(): string | null {
   return state?.matchId ?? null;
+}
+
+/** Ranked ladder: the ranked reporting context when both players opted in, else null (casual). */
+export function getShowdownRankedContext(): ShowdownRankedContext | null {
+  return state?.ranked ?? null;
 }
 
 /** Whether a showdown match is active (both teams stashed). */

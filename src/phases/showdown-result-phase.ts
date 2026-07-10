@@ -13,6 +13,7 @@ import {
   endShowdownBattle,
   getShowdownMatchId,
   getShowdownOpponentProfile,
+  getShowdownRankedContext,
 } from "#data/elite-redux/showdown/showdown-battle-state";
 import {
   reportShowdownResult,
@@ -25,6 +26,7 @@ import {
   selectShowdownResultLine,
   winnerFromLocalResult,
 } from "#data/elite-redux/showdown/showdown-outcome";
+import { reportShowdownRankResult } from "#data/elite-redux/showdown/showdown-rank-client";
 import { sealShowdownTelemetry } from "#data/elite-redux/showdown/showdown-telemetry";
 import { UiMode } from "#enums/ui-mode";
 import { BattlePhase } from "#phases/battle-phase";
@@ -83,6 +85,8 @@ export class ShowdownResultPhase extends BattlePhase {
 
     // The escrow match id (null for a FRIENDLY match). Read BEFORE endShowdownBattle drops it.
     const matchId = getShowdownMatchId();
+    // Ranked reporting context (null when either player declined ranked). Read BEFORE endShowdownBattle.
+    const ranked = getShowdownRankedContext();
     const localRole = getCoopRuntime()?.controller.role ?? "host";
 
     // Emit the outcome to the peer so both clients show the same result (matchId carried verbatim:
@@ -121,6 +125,20 @@ export class ShowdownResultPhase extends BattlePhase {
     } else if (matchId != null && this.voided) {
       // I4: a VOIDED staked match releases both escrow holds server-side (no winner to attest).
       void reportShowdownVoid(matchId).catch(() => {});
+    }
+
+    // RANKED (dual attestation): report the decisive outcome to /showdown/rank/result so the server
+    // applies the ladder progression to BOTH players once both clients agree. A VOID never counts (no
+    // winner to attest). Fire-and-forget + fully guarded - a ranked round trip must NEVER block or
+    // strand the return to title; an unreachable server simply leaves the match uncounted (casual-safe).
+    if (ranked != null && !this.voided) {
+      const winner = winnerFromLocalResult(localRole, this.localWon);
+      void reportShowdownRankResult({
+        matchId: ranked.rankedMatchId,
+        hostUid: ranked.hostUid,
+        guestUid: ranked.guestUid,
+        winner,
+      }).catch(() => {});
     }
 
     // D5: seal + fire-and-forget the HOST's battle telemetry (no-op for the guest / no active record).

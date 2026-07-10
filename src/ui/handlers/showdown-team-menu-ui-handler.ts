@@ -35,6 +35,8 @@ import { globalScene } from "#app/global-scene";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { isMegaStage } from "#data/elite-redux/showdown/showdown-evolutions";
 import type { ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
+import { fetchMyShowdownRank, isRankServerConfigured } from "#data/elite-redux/showdown/showdown-rank-client";
+import type { ShowdownRankState } from "#data/elite-redux/showdown/showdown-rank-types";
 import { MEGA_STONE_ITEM, type ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { Button } from "#enums/buttons";
 import { MoveCategory } from "#enums/move-category";
@@ -44,6 +46,7 @@ import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import type { Variant } from "#sprites/variant";
 import { SettingKeyboard } from "#system/settings-keyboard";
+import { buildShowdownRankCard, SHOWDOWN_RANK_CARD_HEIGHT } from "#ui/handlers/showdown-rank-card";
 import type { ShowdownEditorTextInput } from "#ui/showdown-set-editor-ui-handler";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
@@ -147,6 +150,10 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
   private notice: string | null = null;
   private textInput: ShowdownEditorTextInput | null = null;
   private requestedSpriteKeys = new Set<string>();
+  /** Ranked ladder: this player's rank for the card (fetched at show; null = offline/unranked). */
+  private myRank: ShowdownRankState | null = null;
+  /** Whether the ranked server is configured (the rank card is shown only then). */
+  private rankAvailable = false;
 
   constructor() {
     super(UiMode.SHOWDOWN_TEAM_MENU);
@@ -179,6 +186,17 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.renaming = config.initialRenaming ?? false;
     this.renameBuffer = this.renaming ? (this.hoveredPreset()?.name ?? "") : "";
     this.notice = null;
+    this.rankAvailable = isRankServerConfigured();
+    this.myRank = null;
+    if (this.rankAvailable) {
+      // Best-effort async fetch for the rank card; re-render when it lands.
+      void fetchMyShowdownRank().then(rank => {
+        this.myRank = rank;
+        if (this.config != null) {
+          this.render();
+        }
+      });
+    }
     this.container.setVisible(true);
     this.render();
     return true;
@@ -473,6 +491,10 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.renderHotkeyBar();
     this.renderList();
     this.renderPreview();
+    // Ranked rank card, pinned to the bottom-right corner of the preview column.
+    if (this.rankAvailable) {
+      this.add(buildShowdownRankCard(this.myRank, RIGHT_X, SCREEN_H - SHOWDOWN_RANK_CARD_HEIGHT - 2, RIGHT_W));
+    }
     if (this.notice != null) {
       this.renderNoticeBanner();
     }

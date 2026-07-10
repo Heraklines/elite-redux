@@ -40,16 +40,22 @@ import type {
 } from "#data/elite-redux/coop/coop-transport";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import { erRecordShowdownStakeCommit } from "#data/elite-redux/er-social-achievement-tracker";
-import { addShowdownRejoinResender } from "#data/elite-redux/showdown/showdown-battle-state";
+import {
+  addShowdownRejoinResender,
+  type ShowdownRankedContext,
+} from "#data/elite-redux/showdown/showdown-battle-state";
 import { registerShowdownMatch } from "#data/elite-redux/showdown/showdown-escrow-client";
 import { isMegaStage } from "#data/elite-redux/showdown/showdown-evolutions";
 import type { ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
+import { fetchMyShowdownRank, isRankServerConfigured } from "#data/elite-redux/showdown/showdown-rank-client";
+import type { ShowdownRankState } from "#data/elite-redux/showdown/showdown-rank-types";
 import { getShowdownPickWaitMs, SHOWDOWN_WAGER_COMMIT_POINT } from "#data/elite-redux/showdown/showdown-session";
 import { type StakeOffer, type StakeVariant, stakesMatch, stakeTier } from "#data/elite-redux/showdown/showdown-stakes";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
+import { buildShowdownRankCard } from "#ui/handlers/showdown-rank-card";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
@@ -83,9 +89,10 @@ export interface ShowdownWagerArgs {
   opponentUsername?: string;
   /**
    * Called ONCE both players have committed. `matchId` is the escrow server's id for a STAKED
-   * match, or null for a FRIENDLY (no-escrow) match. Proceeds to battle.
+   * match, or null for a FRIENDLY (no-escrow) match. `ranked` is the ranked reporting context when
+   * BOTH players opted into ranked (else null — casual). Proceeds to battle.
    */
-  onCommit: (matchId: string | null) => void;
+  onCommit: (matchId: string | null, ranked: ShowdownRankedContext | null) => void;
 }
 
 /** A row in the stake picker: an offer plus its display label. `offer === null` is Friendly. */
@@ -162,6 +169,17 @@ export class ShowdownWagerUiHandler extends UiHandler {
   private escrowBusy = false;
   /** First visible picker row (scroll window offset) — the pool can be hundreds of entries. */
   private scrollTop = 0;
+  // ---- ranked ladder opt-in ----------------------------------------------------------------------
+  /** Whether the ranked server is reachable/configured (the toggle is disabled + hinted when not). */
+  private rankAvailable = false;
+  /** THIS player's ranked opt-in (toggled with R). Ranked counts only when BOTH opt in. */
+  private ownRankedOptIn = false;
+  /** The opponent's ranked opt-in (synced via `showdownRankedOptIn`). */
+  private opponentRankedOptIn = false;
+  /** The ranked-match id: the HOST mints one on opt-in and broadcasts it; the guest adopts it. */
+  private rankedMatchId: string | null = null;
+  /** THIS player's current ranked state for the rank card, fetched at show (null = offline/unranked). */
+  private myRank: ShowdownRankState | null = null;
 
   constructor() {
     super(UiMode.SHOWDOWN_WAGER);
@@ -192,7 +210,23 @@ export class ShowdownWagerUiHandler extends UiHandler {
     this.escrowBusy = false;
     this.scrollTop = 0;
     this.cursor = 0;
+    this.ownRankedOptIn = false;
+    this.opponentRankedOptIn = false;
+    this.rankedMatchId = null;
+    this.myRank = null;
+    // Ranked is only offered when the server is configured; a real match also needs both usernames
+    // (the render-harness preview has neither). Disabled -> the toggle shows a hint, casual is unaffected.
+    this.rankAvailable = isRankServerConfigured() && !!params.ownUsername && !!params.opponentUsername;
     this.choices = this.buildChoices(params);
+    // Fetch this player's rank for the card (best-effort, async). Re-render when it lands.
+    if (this.rankAvailable) {
+      void fetchMyShowdownRank().then(rank => {
+        this.myRank = rank;
+        if (this.args != null) {
+          this.render();
+        }
+      });
+    }
 
     // Wire: listen for the opponent's offer (tier-match display) + their commit arrival (lock lamp).
     this.offMessage?.();
@@ -264,11 +298,52 @@ export class ShowdownWagerUiHandler extends UiHandler {
       }
       this.render();
       this.tryStakedCommit();
+    } else if (msg.t === "showdownRankedOptIn") {
+      // The opponent toggled ranked. Adopt the HOST-minted ranked-match id when present.
+      this.opponentRankedOptIn = msg.optIn;
+      if (msg.rankedMatchId) {
+        this.rankedMatchId = msg.rankedMatchId;
+      }
+      this.render();
     } else if (msg.t === "rendezvous" && msg.point === SHOWDOWN_WAGER_COMMIT_POINT) {
       // The opponent committed the FRIENDLY match: light their lock lamp (their rendezvous arrival).
       this.opponentLocked = true;
       this.render();
     }
+  }
+
+  /** Whether ranked is in effect for this match (BOTH players opted in AND the server is available). */
+  private isRanked(): boolean {
+    return this.rankAvailable && this.ownRankedOptIn && this.opponentRankedOptIn;
+  }
+
+  /** Toggle THIS player's ranked opt-in (R). The HOST mints the shared ranked-match id on opt-in. */
+  private toggleRanked(): boolean {
+    if (!this.rankAvailable) {
+      globalScene.ui.playError();
+      this.flash(i18next.t("battle:showdownRankedUnavailable", { defaultValue: "Ranked unavailable - casual only" }));
+      return false;
+    }
+    if (this.ownLocked) {
+      return false; // the opt-in is frozen once locked in
+    }
+    this.ownRankedOptIn = !this.ownRankedOptIn;
+    // The HOST mints the shared ranked-match id the first time it opts in (the guest adopts it).
+    if (this.ownRankedOptIn && this.args?.role === "host" && this.rankedMatchId == null) {
+      this.rankedMatchId = `rk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+    this.broadcastRankedOptIn();
+    this.render();
+    return true;
+  }
+
+  /** Send THIS player's ranked opt-in (carrying the host-minted id when we are the host). */
+  private broadcastRankedOptIn(): void {
+    this.args?.transport?.send({
+      t: "showdownRankedOptIn",
+      optIn: this.ownRankedOptIn,
+      rankedMatchId: this.args.role === "host" ? (this.rankedMatchId ?? "") : "",
+    });
   }
 
   /**
@@ -279,6 +354,7 @@ export class ShowdownWagerUiHandler extends UiHandler {
    */
   private resendState(): void {
     this.broadcastOffer();
+    this.broadcastRankedOptIn();
     const offer = this.selectedOffer();
     if (this.ownLocked && offer != null) {
       this.args?.transport?.send({ t: "showdownStakeLock", matchId: this.serverMatchId ?? "", tier: stakeTier(offer) });
@@ -317,6 +393,9 @@ export class ShowdownWagerUiHandler extends UiHandler {
         break;
       case Button.ACTION:
         success = this.confirmLock();
+        break;
+      case Button.CYCLE_SHINY:
+        success = this.toggleRanked();
         break;
     }
     if (success) {
@@ -485,7 +564,30 @@ export class ShowdownWagerUiHandler extends UiHandler {
     // offer means the stake is a shiny. Pure local observer - records nothing over the wire.
     const offer = this.selectedOffer();
     erRecordShowdownStakeCommit(matchId != null, !!offer?.shiny);
-    this.args?.onCommit(matchId);
+    this.args?.onCommit(matchId, this.buildRankedContext(matchId));
+  }
+
+  /**
+   * Build the ranked reporting context when BOTH players opted in, else null (casual). The reported
+   * id prefers the escrow match id (staked matches share it already), falling back to the host-minted
+   * ranked id (friendly-ranked). host/guest usernames are mapped from THIS client's role so both
+   * clients agree on the same identity. Null when either side declined or the id never synced.
+   */
+  private buildRankedContext(matchId: string | null): ShowdownRankedContext | null {
+    if (!this.isRanked()) {
+      return null;
+    }
+    const args = this.args;
+    if (args == null) {
+      return null;
+    }
+    const rankedMatchId = matchId ?? this.rankedMatchId;
+    if (!rankedMatchId || !args.ownUsername || !args.opponentUsername) {
+      return null; // no shared id / missing identity — fall back to casual (never blocks the match)
+    }
+    const hostUid = args.role === "host" ? args.ownUsername : args.opponentUsername;
+    const guestUid = args.role === "host" ? args.opponentUsername : args.ownUsername;
+    return { rankedMatchId, hostUid, guestUid };
   }
 
   // ---- rendering ---------------------------------------------------------------------------------
@@ -532,6 +634,12 @@ export class ShowdownWagerUiHandler extends UiHandler {
       TextStyle.SUMMARY_GREEN,
     );
     this.renderTeamRow(this.opponentHeader(), this.args.opponentTeam, 49, TextStyle.SUMMARY_RED);
+
+    // Ranked rank card (top-right, narrow to clear the team-icon strip).
+    if (this.rankAvailable) {
+      const card = buildShowdownRankCard(this.myRank, 210, 15, 106);
+      this.add(card);
+    }
 
     // Stake panel + instructions.
     this.renderStakePanel();
@@ -742,15 +850,45 @@ export class ShowdownWagerUiHandler extends UiHandler {
       ),
     );
 
+    // Ranked opt-in status (both must opt in for the match to count; R toggles).
+    ry += 13;
+    this.add(addTextObject(rightX, ry, this.rankedStatusText(), this.rankedStatusStyle()));
+
     // Instructions on the backdrop strip BELOW the panel window (clear of both columns).
     const help = addTextObject(
       160,
       panelY + panelH + 2,
-      i18next.t("battle:showdownWagerHelp", { defaultValue: "UP / DOWN: choose stake      ACTION: lock in" }),
+      i18next.t("battle:showdownWagerHelp", {
+        defaultValue: "UP / DOWN: choose stake   ACTION: lock in   R: ranked",
+      }),
       TextStyle.INSTRUCTIONS_TEXT,
     );
     help.setOrigin(0.5, 0);
     this.add(help);
+  }
+
+  /** One-line ranked status: unavailable / off / you-only / both-in (counts). */
+  private rankedStatusText(): string {
+    if (!this.rankAvailable) {
+      return i18next.t("battle:showdownRankedOff", { defaultValue: "Ranked: unavailable" });
+    }
+    if (this.isRanked()) {
+      return i18next.t("battle:showdownRankedBoth", { defaultValue: "Ranked: ON (both)" });
+    }
+    if (this.ownRankedOptIn) {
+      return i18next.t("battle:showdownRankedYouOnly", { defaultValue: "Ranked: you (awaiting them)" });
+    }
+    if (this.opponentRankedOptIn) {
+      return i18next.t("battle:showdownRankedThemOnly", { defaultValue: "Ranked: them (press R)" });
+    }
+    return i18next.t("battle:showdownRankedNone", { defaultValue: "Ranked: off" });
+  }
+
+  private rankedStatusStyle(): TextStyle {
+    if (!this.rankAvailable) {
+      return TextStyle.SHADOW_TEXT;
+    }
+    return this.isRanked() ? TextStyle.SUMMARY_GREEN : TextStyle.SUMMARY_GRAY;
   }
 
   private lampText(who: string, on: boolean): string {
