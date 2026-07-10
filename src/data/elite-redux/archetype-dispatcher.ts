@@ -2481,11 +2481,16 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 411:
-      // Toxic Spill — non-Poison-types take 1/8 dmg every turn.
+      // Toxic Spill — "Damages ALL non-Poison-type Pokemon by 1/8 HP each turn.
+      // Pokemon with Poison Heal recover instead." Field-wide (every active mon
+      // except the holder, so the ally is hit too in doubles) with the Poison
+      // Heal recover branch (was foes-only, no Poison Heal handling).
       return ok([
         new PostTurnHurtNonTypedAbAttr({
           safeTypes: [PokemonType.POISON],
           damageFraction: 1 / 8,
+          fieldWide: true,
+          poisonHealRecovers: true,
         }),
       ]);
     case 447:

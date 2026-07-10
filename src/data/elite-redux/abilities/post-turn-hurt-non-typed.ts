@@ -35,6 +35,8 @@ import { PostTurnAbAttr } from "#abilities/ab-attrs";
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { allAbilities } from "#data/data-lists";
+import { AbilityId } from "#enums/ability-id";
 import { HitResult } from "#enums/hit-result";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { WeatherType } from "#enums/weather-type";
@@ -65,6 +67,20 @@ export interface PostTurnHurtNonTypedOptions {
    * weather-agnostic procs (Toxic Spill / Flame Coat / Funeral Pyre).
    */
   readonly requiredWeathers?: readonly WeatherType[];
+  /**
+   * When true, target the WHOLE field (every active Pokemon except the holder),
+   * not just the holder's opponents. Toxic Spill's dex reads "damages ALL
+   * non-Poison-type Pokemon" — in doubles that includes the holder's ally.
+   * @defaultValue `false`
+   */
+  readonly fieldWide?: boolean;
+  /**
+   * When true, a target with {@linkcode AbilityId.POISON_HEAL} RECOVERS the
+   * configured fraction instead of taking damage (Toxic Spill: "Pokemon with
+   * Poison Heal recover instead").
+   * @defaultValue `false`
+   */
+  readonly poisonHealRecovers?: boolean;
 }
 
 /**
@@ -82,6 +98,8 @@ export class PostTurnHurtNonTypedAbAttr extends PostTurnAbAttr {
   private readonly safeTypes: readonly PokemonType[];
   private readonly damageFraction: number;
   private readonly requiredWeathers: readonly WeatherType[] | null;
+  private readonly fieldWide: boolean;
+  private readonly poisonHealRecovers: boolean;
 
   constructor(opts: PostTurnHurtNonTypedOptions) {
     if (!(opts.damageFraction > 0 && opts.damageFraction <= 1)) {
@@ -91,6 +109,16 @@ export class PostTurnHurtNonTypedAbAttr extends PostTurnAbAttr {
     this.safeTypes = opts.safeTypes;
     this.damageFraction = opts.damageFraction;
     this.requiredWeathers = opts.requiredWeathers && opts.requiredWeathers.length > 0 ? opts.requiredWeathers : null;
+    this.fieldWide = opts.fieldWide ?? false;
+    this.poisonHealRecovers = opts.poisonHealRecovers ?? false;
+  }
+
+  /** Targets of the proc: the whole field (minus the holder) or just its foes. */
+  private getTargets(pokemon: AbAttrBaseParams["pokemon"]): AbAttrBaseParams["pokemon"][] {
+    if (this.fieldWide) {
+      return globalScene.getField(true).filter(p => p !== pokemon);
+    }
+    return pokemon.getOpponents();
   }
 
   /** Read-only accessor: the configured safe-types list. */
@@ -122,7 +150,7 @@ export class PostTurnHurtNonTypedAbAttr extends PostTurnAbAttr {
     if (!this.isWeatherActive()) {
       return false;
     }
-    for (const opp of pokemon.getOpponents()) {
+    for (const opp of this.getTargets(pokemon)) {
       if (this.isValidTarget(opp)) {
         return true;
       }
@@ -154,8 +182,25 @@ export class PostTurnHurtNonTypedAbAttr extends PostTurnAbAttr {
       return;
     }
     const { pokemon } = params;
-    for (const opp of pokemon.getOpponents()) {
+    for (const opp of this.getTargets(pokemon)) {
       if (!this.isValidTarget(opp)) {
+        continue;
+      }
+      const amount = toDmgValue(opp.getMaxHp() * this.damageFraction);
+      // Poison Heal holders RECOVER the fraction instead of taking it.
+      if (this.poisonHealRecovers && opp.hasAbility(AbilityId.POISON_HEAL)) {
+        if (!opp.isFullHp()) {
+          globalScene.phaseManager.unshiftNew(
+            "PokemonHealPhase",
+            opp.getBattlerIndex(),
+            amount,
+            i18next.t("abilityTriggers:poisonHeal", {
+              pokemonName: getPokemonNameWithAffix(opp),
+              abilityName: allAbilities[AbilityId.POISON_HEAL].name,
+            }),
+            true,
+          );
+        }
         continue;
       }
       const cancelled = new BooleanHolder(false);
@@ -163,8 +208,7 @@ export class PostTurnHurtNonTypedAbAttr extends PostTurnAbAttr {
       if (cancelled.value) {
         continue;
       }
-      const damage = toDmgValue(opp.getMaxHp() * this.damageFraction);
-      opp.damageAndUpdate(damage, { result: HitResult.INDIRECT });
+      opp.damageAndUpdate(amount, { result: HitResult.INDIRECT });
       globalScene.phaseManager.queueMessage(
         i18next.t("battle:hurtByItem", { pokemonNameWithAffix: getPokemonNameWithAffix(opp) }),
       );
