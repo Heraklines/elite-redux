@@ -1,0 +1,329 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Wave-2e OPERATION <-> DURABILITY end-to-end CHANNEL-CUT PROOF (contract doc §4.2/§4.4/§4.6).
+//
+// Wave-2a/b built the operation envelope + the durability journal in parallel behind a documented
+// plug-in point; Wave-2e closed it (coop-operation-journal.ts). This is the direct proof that a
+// committed operation on a MIGRATED surface (biome travel) now rides a journaled, ACK'd, resendable
+// wire frame end-to-end: it CUTS the channel between the owner's committed op and the watcher's
+// adoption, RECONNECTS, and proves the op arrives via the JOURNAL resend / reconnect-tail replay -
+// with the bespoke self-heals PROVABLY NOT the mechanism (the only wire traffic is the `envelope`
+// op stream + the generic coopAck / coopResync durability arms).
+//
+// It reuses the W2b convergence-test pattern (coop-durability-convergence.test.ts): two
+// CoopDurabilityManagers over a ChannelGate / seeded fault transport. The difference is the op stream
+// is the REAL one the migrated adapter produces (commitBiomeOwnerIntent / adoptBiomeWatcherChoice ->
+// journalCoopCommittedEnvelope) and applies (the registered applyJournaledBiomeEnvelope guest applier),
+// not a synthetic wave op. Engine-free (no GameManager / ER_SCENARIO): the operation + durability
+// layers are pure.
+//
+// ONE TEST PER DIRECTION (the deliverable): the journal ALWAYS flows from the sole committer (the
+// host, invariant 3) to the receiver, so both directions are a host-committed envelope healed by the
+// journal - they differ by op OWNERSHIP:
+//   1. HOST-OWNED op -> guest watcher (committed on the host's OWNER seam, commitBiomeOwnerIntent).
+//   2. GUEST-MINTED intent -> host, committed on the host's WATCHER seam (adoptBiomeWatcherChoice) and
+//      journaled back to the guest. The single-process guest-applier is reset AFTER the host commit to
+//      model the separate guest process (the §8.2 single-process state-sharing pitfall), so the journal
+//      replay lands on a fresh applier exactly as it would across two real processes.
+// =============================================================================
+
+import {
+  adoptBiomeWatcherChoice,
+  commitBiomeOwnerIntent,
+  resetCoopBiomeOperationFlag,
+  resetCoopBiomeOperationState,
+  setCoopBiomeOperationEnabled,
+} from "#data/elite-redux/coop/coop-biome-operation";
+import { CoopDurabilityManager, setCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
+import type { CoopBiomePickPayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  coopOperationDurabilityHooks,
+  getCoopOperationJournalApplied,
+  resetCoopOperationJournalLog,
+  setCoopOperationDurability,
+} from "#data/elite-redux/coop/coop-operation-journal";
+import { COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+/** Await several microtask turns so the loopback (queueMicrotask) delivery + ACK round-trips settle. */
+async function flush(): Promise<void> {
+  for (let i = 0; i < 12; i++) {
+    await Promise.resolve();
+  }
+}
+
+/**
+ * A thin gate over a {@linkcode CoopTransport} endpoint that can CUT the channel (drop outbound frames -
+ * exactly a dark channel: the frame is "sent" but never reaches the peer) and RESTORE it. Delegates
+ * everything else verbatim so the framing the peer sees is byte-identical. (Same shape as the W2b proof.)
+ */
+class ChannelGate implements CoopTransport {
+  cut = false;
+  readonly sentTypes: string[] = [];
+  constructor(private readonly inner: CoopTransport) {}
+  get role(): CoopRole {
+    return this.inner.role;
+  }
+  get state(): CoopConnectionState {
+    return this.inner.state;
+  }
+  send(msg: CoopMessage): void {
+    this.sentTypes.push(msg.t);
+    if (this.cut) {
+      return;
+    }
+    this.inner.send(msg);
+  }
+  onMessage(handler: (msg: CoopMessage) => void): () => void {
+    return this.inner.onMessage(handler);
+  }
+  onStateChange(handler: (state: CoopConnectionState) => void): () => void {
+    return this.inner.onStateChange(handler);
+  }
+  close(): void {
+    this.inner.close();
+  }
+}
+
+/** The bespoke self-heal message classes that must NOT be the mechanism (review finding 3, §4.6). */
+const BESPOKE_SELFHEAL_TYPES = new Set([
+  "requestStateSync",
+  "stateSync",
+  "requestRunConfig",
+  "requestRoster",
+  "requestEnemyParty",
+  "rendezvous",
+]);
+
+/** The biomeIds NEWLY applied via the journal on this client (proof observability), in order. */
+function appliedBiomes(): number[] {
+  return getCoopOperationJournalApplied().map(e => (e.pendingOperation?.payload as CoopBiomePickPayload).biomeId);
+}
+
+/** Assert the whole run's wire traffic never used a bespoke self-heal (the journal was the mechanism). */
+function assertNoSelfHeal(...gates: ChannelGate[]): void {
+  for (const g of gates) {
+    for (const t of g.sentTypes) {
+      expect(BESPOKE_SELFHEAL_TYPES.has(t), `unexpected self-heal on the wire: ${t}`).toBe(false);
+    }
+  }
+}
+
+describe("Wave-2e operation<->durability convergence: a cut committed op is repaired by the journal, not a self-heal", () => {
+  beforeEach(() => {
+    setCoopDurabilityEnabled(true);
+    setCoopBiomeOperationEnabled(true);
+    resetCoopBiomeOperationState();
+    resetCoopOperationJournalLog();
+    setCoopOperationDurability(null);
+  });
+
+  afterEach(() => {
+    setCoopOperationDurability(null);
+    resetCoopOperationJournalLog();
+    resetCoopBiomeOperationState();
+    resetCoopBiomeOperationFlag();
+    setCoopDurabilityEnabled(true);
+  });
+
+  /** Commit a HOST-OWNED biome pick (even pin -> host seat) through the real owner seam; it journals. */
+  function commitHostOwnedBiome(pinned: number, biomeId: number): void {
+    commitBiomeOwnerIntent({
+      kind: "BIOME_PICK",
+      seq: COOP_BIOME_PICK_SEQ_BASE + pinned,
+      pinned,
+      choice: 0,
+      payload: { biomeId, nodeIndex: 0 } satisfies CoopBiomePickPayload,
+      localRole: "host",
+      wave: 11,
+      turn: 0,
+    });
+  }
+
+  // ===========================================================================================
+  // DIRECTION 1: host-committed op -> guest watcher.
+  // ===========================================================================================
+  it("DIRECTION 1 (host-owned -> guest) MID-STREAM cut: a dropped committed biome op is healed by the gap-triggered tail", async () => {
+    const pair = createLoopbackPair();
+    const hostGate = new ChannelGate(pair.host);
+    const guestGate = new ChannelGate(pair.guest);
+    const hostMgr = new CoopDurabilityManager(hostGate); // committer: no receiver hooks (the host never applies)
+    const guestMgr = new CoopDurabilityManager(guestGate, coopOperationDurabilityHooks());
+    setCoopOperationDurability(hostMgr);
+
+    // Commit two host-owned biome ops cleanly (distinct interactions -> distinct ops -> revisions 1, 2).
+    commitHostOwnedBiome(2, 10);
+    commitHostOwnedBiome(4, 11);
+    await flush();
+    expect(appliedBiomes()).toEqual([10, 11]);
+
+    // CUT the channel and commit a THIRD op - it is journaled + "sent" but never reaches the guest.
+    hostGate.cut = true;
+    commitHostOwnedBiome(6, 12);
+    await flush();
+    expect(appliedBiomes()).toEqual([10, 11]); // op 3 lost between commit and apply (the review-finding-3 hole)
+
+    // Channel recovers; a FOURTH op commits. The guest sees revision 4 out of order -> requests the tail
+    // after 2, and the host replays 3 then 4. Convergence, with NO bespoke self-heal involved.
+    hostGate.cut = false;
+    commitHostOwnedBiome(8, 13);
+    await flush();
+    expect(appliedBiomes()).toEqual([10, 11, 12, 13]);
+
+    assertNoSelfHeal(hostGate, guestGate);
+    expect(guestGate.sentTypes).toContain("coopResync"); // the generic tail request WAS the mechanism
+    expect(hostGate.sentTypes).toContain("envelope"); // the op rode the journaled envelope arm
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
+  it("DIRECTION 1 (host-owned -> guest) TAIL cut + REJOIN: a committed-but-unacked op is recovered by reconnect()", async () => {
+    const pair = createLoopbackPair();
+    const hostGate = new ChannelGate(pair.host);
+    const guestGate = new ChannelGate(pair.guest);
+    const hostMgr = new CoopDurabilityManager(hostGate);
+    const guestMgr = new CoopDurabilityManager(guestGate, coopOperationDurabilityHooks());
+    setCoopOperationDurability(hostMgr);
+
+    commitHostOwnedBiome(2, 20);
+    await flush();
+    expect(appliedBiomes()).toEqual([20]);
+
+    // CUT, then commit the FINAL op. Nothing follows it, so the guest never sees a gap -> without the
+    // journal this committed-but-unacked op is unrecoverable short of a full snapshot.
+    hostGate.cut = true;
+    commitHostOwnedBiome(4, 21);
+    await flush();
+    expect(appliedBiomes()).toEqual([20]);
+
+    // #805 hot rejoin: the channel recovers and both sides run reconnect(). The host resends its
+    // committed-but-unacked tail; the guest converges - precisely the message the buffer purge dropped pre-W2b.
+    hostGate.cut = false;
+    hostMgr.reconnect();
+    guestMgr.reconnect();
+    await flush();
+    expect(appliedBiomes()).toEqual([20, 21]);
+
+    assertNoSelfHeal(hostGate, guestGate);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
+  // ===========================================================================================
+  // DIRECTION 2: guest-minted intent -> host, journaled back to the guest.
+  // ===========================================================================================
+  it("DIRECTION 2 (guest-minted -> host) cut + REJOIN: the host-committed envelope reaches the guest via the journal", async () => {
+    const pair = createLoopbackPair();
+    const hostGate = new ChannelGate(pair.host);
+    const guestGate = new ChannelGate(pair.guest);
+    const hostMgr = new CoopDurabilityManager(hostGate);
+    const guestMgr = new CoopDurabilityManager(guestGate, coopOperationDurabilityHooks());
+    setCoopOperationDurability(hostMgr);
+
+    // CUT first: the host is about to commit a GUEST-owned pick (odd pin -> guest seat) on its watcher seam
+    // (the guest relayed the minted intent). The committed envelope is journaled but the guest never sees it.
+    hostGate.cut = true;
+    const decision = adoptBiomeWatcherChoice({
+      kind: "BIOME_PICK",
+      seq: COOP_BIOME_PICK_SEQ_BASE + 3,
+      pinned: 3, // odd -> guest owns; the host is the sole committer of the guest's relayed intent (invariant 3)
+      res: { choice: 0, data: [30] },
+      localRole: "host",
+      wave: 11,
+      turn: 0,
+    });
+    expect(decision.adopt, "the host committed + adopted the guest's relayed pick").toBe(true);
+    await flush();
+    expect(appliedBiomes()).toEqual([]); // the guest has not received the committed envelope (channel dark)
+
+    // Model the separate guest process: the host's single-process watcher-adopt touched the shared guest
+    // applier, so reset it - the real guest process never applied this op (its channel was cut). The journal
+    // (held in the host MANAGER, independent of the adapter) still holds the committed envelope.
+    resetCoopBiomeOperationState();
+
+    // Hot rejoin: the host resends its committed-but-unacked tail; the guest applies it via the journal.
+    hostGate.cut = false;
+    hostMgr.reconnect();
+    guestMgr.reconnect();
+    await flush();
+    expect(appliedBiomes(), "the guest-minted op's committed envelope arrived via the journal").toEqual([30]);
+
+    assertNoSelfHeal(hostGate, guestGate);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
+  // ===========================================================================================
+  // FAULT TRANSPORT + FLAG interplay.
+  // ===========================================================================================
+  it("a seeded fault profile that DROPS the envelope op stream still converges after reconnect", async () => {
+    const faultable = (msg: CoopMessage) => msg.t === "envelope";
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      { drop: 0.6, reorder: 0, delay: 0, faultable },
+      { seed: 0xe11e },
+    );
+    const hostMgr = new CoopDurabilityManager(pair.host);
+    const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
+    setCoopOperationDurability(hostMgr);
+
+    const N = 10;
+    for (let i = 0; i < N; i++) {
+      commitHostOwnedBiome(2 * (i + 1), 100 + i);
+      await flush();
+    }
+    expect(pair.faultsInjected(), "the run must actually inject faults (not vacuous)").toBeGreaterThan(0);
+
+    // Recover + rejoin repeatedly: each round the guest re-requests the next missing revision; the tail
+    // replay is idempotent, so it converges to the full, in-order op history despite the drops.
+    pair.setProfile(COOP_NO_FAULT_PROFILE);
+    for (let round = 0; round < N + 2; round++) {
+      hostMgr.reconnect();
+      guestMgr.reconnect();
+      await flush();
+      if (appliedBiomes().length === N) {
+        break;
+      }
+    }
+    expect(appliedBiomes()).toEqual(Array.from({ length: N }, (_, i) => 100 + i));
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
+  it("FLAG OFF anywhere = today's behavior: no envelope is journaled or sent", async () => {
+    // (a) durability manager NOT installed (isCoopDurabilityEnabled OFF at assembly): the commit still runs
+    // its host log, but journalCoopCommittedEnvelope is a no-op - nothing rides the wire.
+    const pair = createLoopbackPair();
+    const hostGate = new ChannelGate(pair.host);
+    const guestGate = new ChannelGate(pair.guest);
+    const guestMgr = new CoopDurabilityManager(guestGate, coopOperationDurabilityHooks());
+    setCoopOperationDurability(null); // durability OFF -> no active manager
+    commitHostOwnedBiome(2, 40);
+    await flush();
+    expect(hostGate.sentTypes).not.toContain("envelope");
+    expect(appliedBiomes()).toEqual([]);
+    guestMgr.dispose();
+
+    // (b) per-surface flag OFF: commit early-returns, so no op is minted, committed, or journaled.
+    const pair2 = createLoopbackPair();
+    const hostGate2 = new ChannelGate(pair2.host);
+    const guestGate2 = new ChannelGate(pair2.guest);
+    const hostMgr2 = new CoopDurabilityManager(hostGate2);
+    const guestMgr2 = new CoopDurabilityManager(guestGate2, coopOperationDurabilityHooks());
+    setCoopOperationDurability(hostMgr2);
+    setCoopBiomeOperationEnabled(false);
+    commitHostOwnedBiome(2, 41);
+    await flush();
+    expect(hostGate2.sentTypes).not.toContain("envelope");
+    expect(appliedBiomes()).toEqual([]);
+    hostMgr2.dispose();
+    guestMgr2.dispose();
+  });
+});
