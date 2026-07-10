@@ -416,10 +416,11 @@ export class TitlePhase extends Phase {
           this.openCoopLobby(setModeAndEnd, "authoritative", "versus", GameModes.SHOWDOWN);
         },
       };
-      void globalScene.ui.setMode(UiMode.SHOWDOWN_TEAM_MENU, config).then(() => {
-        const handler = globalScene.ui.getHandler();
-        (handler as ShowdownTeamMenuUiHandler).setTextInput?.(new DomShowdownEditorTextInput());
-      });
+      // Inject the mobile/desktop native-keyboard bridge for the rename overlay (the same DOM-input
+      // infra the editor search uses), on the registered handler BEFORE show - mirrors the editor.
+      const handler = globalScene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU] as ShowdownTeamMenuUiHandler | undefined;
+      handler?.setTextInput(new DomShowdownEditorTextInput());
+      void globalScene.ui.setMode(UiMode.SHOWDOWN_TEAM_MENU, config);
     };
     globalScene.ui.setMode(UiMode.MESSAGE);
     globalScene.ui.resetModeChain();
