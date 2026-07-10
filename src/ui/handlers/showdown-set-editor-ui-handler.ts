@@ -39,11 +39,10 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import { speciesEggMoves } from "#balance/moves/egg-moves";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { isMegaStage, listEvolutionStages, listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
 import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
-import { collectShowdownFreeMoves, collectUnlockedEggMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
+import { collectShowdownLegalMoves, collectUnlockedEggMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
 import { MEGA_STONE_ITEM, type ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { Button } from "#enums/buttons";
@@ -63,7 +62,6 @@ import { addWindow } from "#ui/ui-theme";
 import { getLocalizedSpriteKey } from "#utils/common";
 import { getModifierType } from "#utils/modifier-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
-import i18next from "i18next";
 
 // ---- public config (what the handler consumes) -----------------------------------------------
 
@@ -150,6 +148,14 @@ export interface ShowdownSetEditorConfig {
    * the render recipes (the demo config never commits), so pressing Done there is an inert no-op.
    */
   onDone?: (result: { stage: ShowdownEditorStage; set: ShowdownEditorSet }) => void;
+  /**
+   * Done-time re-validation. Given the edited stage + set, the flow builds the PROVISIONAL team (this
+   * slot's edit applied) and runs the shared `validateShowdownTeam` rule engine, returning the FIRST
+   * violation's message (mega budget, cost caps, black-shiny fieldability, item legality, ...) or null
+   * when the whole set is legal. The editor REFUSES to commit while this returns a message, surfacing it
+   * inline - so an invalid team can never be built SILENTLY (the ready-time validator stays the final net).
+   */
+  validate?: (result: { stage: ShowdownEditorStage; set: ShowdownEditorSet }) => string | null;
   /** Backed out (B / Cancel) with no commit - the flow returns to the grid, discarding edits. */
   onCancel?: () => void;
   /**
@@ -306,6 +312,8 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   private paneCursor = 0;
   private paneScroll = 0;
   private filter = "";
+  /** A pending Done-time rule violation (mega budget / cost cap / ...), shown inline until the set is fixed. */
+  private validationError: string | null = null;
   private textInput: ShowdownEditorTextInput | null = null;
   /** Full-sprite atlas keys already requested this session (avoid re-queuing the same async load). */
   private requestedSpriteKeys = new Set<string>();
@@ -347,6 +355,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.filter = config.initialFilter ?? "";
     this.paneCursor = config.initialPaneCursor ?? 0;
     this.paneScroll = 0;
+    this.validationError = null;
     this.container.setVisible(true);
     if (this.paneOpen) {
       this.ensurePaneCursorVisible();
@@ -414,9 +423,10 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         handled = this.field === EditorField.ABILITY ? this.cycleActiveAbility(1) : this.openPane();
         break;
       case Button.SUBMIT:
-        // Start = Done: commit the edited stage + set back into the team (flow wiring).
-        this.config!.onDone?.({ stage: this.config!.stage, set: this.config!.set });
-        handled = true;
+        // Start = Done: re-validate the WHOLE set first (mega budget, cost caps, black-shiny
+        // fieldability, item legality) and commit ONLY when it is legal - otherwise refuse with the
+        // specific message inline, so the player can never SILENTLY build an invalid team.
+        handled = this.tryCommit();
         break;
       case Button.CANCEL:
         // B = Back: discard and return to the grid (flow wiring).
@@ -518,14 +528,72 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     return true;
   }
 
-  /** LEFT/RIGHT cycles the fielded STAGE - sprite, abilities, movepool all follow. */
+  /**
+   * Done: re-validate the WHOLE set and commit only when it is legal. A local mega-budget guard (the
+   * editor already knows the team's spent budget) plus the flow's full {@linkcode
+   * ShowdownSetEditorConfig.validate} rule-engine callback (cost caps, black-shiny fieldability, item
+   * legality, duplicate/level/... across the provisional team) must BOTH pass; otherwise the first
+   * violation is shown inline and NOTHING is committed. Consumes the input either way.
+   */
+  private tryCommit(): boolean {
+    const cfg = this.config!;
+    const result = { stage: cfg.stage, set: cfg.set };
+    // Local, always-available guard first: never commit a second mega (matches the greyed stage strip).
+    let error: string | null = this.stageLocked(cfg.stage) ? this.megaBudgetMessage() : null;
+    // Full shared rule-engine re-validation over the provisional team, when the flow supplies it.
+    error ??= cfg.validate?.(result) ?? null;
+    if (error != null) {
+      this.validationError = error;
+      this.getUi().playError();
+      this.render();
+      return true;
+    }
+    this.validationError = null;
+    cfg.onDone?.(result);
+    return true;
+  }
+
+  /** The specific "second mega" refusal message (names the line that already spent the budget when known). */
+  private megaBudgetMessage(): string {
+    const by = this.config!.unlocks.megaBudgetSpentBy;
+    return by
+      ? `Team already fields a Mega (${by}) - only one Mega per team.`
+      : "A team may include at most one Mega/Primal Pokemon.";
+  }
+
+  /** A stage the player cannot field: a mega/primal while the team's one mega budget is already spent. */
+  private stageLocked(stage: ShowdownEditorStage): boolean {
+    return isMegaStage(stage.speciesId, stage.formIndex) && this.config!.unlocks.megaBudgetSpent;
+  }
+
+  /**
+   * LEFT/RIGHT cycles the fielded STAGE - sprite, abilities, movepool all follow. LOCKED stages (a second
+   * mega when the team already fields one) are SKIPPED, so cycling can never LAND on a stage the set
+   * validator would reject - closing the "cycle onto a second mega and confirm" bypass at the source.
+   */
   private cycleStage(dir: number): boolean {
     const stages = this.allStages();
     const cur = stages.findIndex(
       s => s.speciesId === this.config!.stage.speciesId && s.formIndex === this.config!.stage.formIndex,
     );
-    const next = ((cur < 0 ? 0 : cur) + dir + stages.length) % stages.length;
-    const target = stages[next];
+    // Step in `dir`, skipping locked stages; stop after a full loop if every other stage is locked.
+    let next = cur < 0 ? 0 : cur;
+    let target = stages[next];
+    let steps = 0;
+    while (steps < stages.length) {
+      next = (next + dir + stages.length) % stages.length;
+      const candidate = stages[next];
+      if (!this.stageLocked(candidate)) {
+        target = candidate;
+        break;
+      }
+      steps += 1;
+    }
+    if (target.speciesId === this.config!.stage.speciesId && target.formIndex === this.config!.stage.formIndex) {
+      return false; // no other selectable stage to move to
+    }
+    // Cycling off the offending stage clears any pending "second mega" refusal banner.
+    this.validationError = null;
     this.config!.stage = { speciesId: target.speciesId, formIndex: target.formIndex };
     // Mega auto-forces the item slot to the sentinel; leaving mega restores a real item.
     if (isMegaStage(target.speciesId, target.formIndex)) {
@@ -610,14 +678,20 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   }
 
   /**
-   * Sync the text-input capture surface to the CURRENT state. The DOM/native input is focused ONLY while
-   * a search dropdown is actively OPEN on a searchable field (item / moves) - so on a bare focused field
-   * the game keeps the keyboard and every game button works normally: the F/R/E/N hotkeys, X/Cancel,
-   * arrows and Escape are NOT swallowed as typed characters (the round-4 navigation fix). Opening the
-   * pane (A / tap) raises the capture; leaving it drops the native keyboard. Headless: inert no-op.
+   * Sync the text-input capture surface to the CURRENT state. The DOM/native input is focused whenever a
+   * SEARCHABLE field (item / moves) holds focus - pane open OR closed - so TYPE-TO-SEARCH actually works:
+   * on a freshly focused move/item field the very first keystroke reaches {@linkcode setFilter}, which
+   * opens the dropdown and filters. (The round-4 build gated this to `paneOpen`, which dead-locked
+   * desktop search: the pane only opens FROM a keystroke, but the capture that delivers keystrokes was
+   * only raised once the pane was already open - the maintainer's "type bl, no candidates" report.)
+   *
+   * Navigation is unaffected: the game's Button inputs (arrows cycle the stage / move field focus, Esc
+   * leaves, Enter commits) are delivered by Phaser and still route through {@linkcode processInput}; the
+   * off-screen capture surface only consumes printable characters into the typeahead. On a non-searchable
+   * field (ability) the capture is dropped so the F/R/E/N letter hotkeys stay live. Headless: inert no-op.
    */
   private syncCapture(): void {
-    if (this.paneOpen && this.fieldIsSearchable(this.field)) {
+    if (this.fieldIsSearchable(this.field)) {
       this.textInput?.open(this.filter, value => this.setFilter(value));
     } else {
       this.textInput?.close();
@@ -683,30 +757,23 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
 
   private moveEntries(): MovePaneEntry[] {
     const cfg = this.config!;
-    const free = collectShowdownFreeMoves(cfg.rootSpeciesId, cfg.stage.speciesId);
-    const unlockedEgg = new Set(collectUnlockedEggMoves(cfg.rootSpeciesId, cfg.unlocks.unlockedEggMoveBits));
-    const eggAll = speciesEggMoves[cfg.rootSpeciesId] ?? [];
-    const entries = new Map<number, MovePaneEntry>();
-    for (const moveId of free) {
+    // The EXACT canonical legal pool for the CURRENT fielded stage (the same `collectShowdownLegalMoves`
+    // the validator accepts): every level-up / TM / tutor move of the fielded species + its pre-evolutions
+    // (+ the ER-mega base), PLUS only the UNLOCKED egg moves. LOCKED egg moves are not offered at all
+    // (maintainer: "the moves it can learn ... with the exception of egg moves i havent unlocked yet").
+    // Derived from `cfg.stage.speciesId` on EVERY call, so cycling the stage re-pools the dropdown live.
+    const legal = collectShowdownLegalMoves(
+      cfg.rootSpeciesId,
+      cfg.stage.speciesId,
+      collectUnlockedEggMoves(cfg.rootSpeciesId, cfg.unlocks.unlockedEggMoveBits),
+    );
+    const list: MovePaneEntry[] = [];
+    for (const moveId of legal) {
       const move = allMoves[moveId];
       if (move) {
-        entries.set(moveId, { moveId, name: move.name, locked: false, reason: "" });
+        list.push({ moveId, name: move.name, locked: false, reason: "" });
       }
     }
-    for (const moveId of eggAll) {
-      const move = allMoves[moveId];
-      if (!move || entries.has(moveId)) {
-        continue;
-      }
-      const locked = !unlockedEgg.has(moveId);
-      entries.set(moveId, {
-        moveId,
-        name: move.name,
-        locked,
-        reason: locked ? i18next.t("battle:showdownEditorEggLocked", { defaultValue: "Egg move - not unlocked" }) : "",
-      });
-    }
-    const list = [...entries.values()];
     return this.filter
       ? rankByFilter(list, e => e.name, this.filter)
       : list.sort((a, b) => a.name.localeCompare(b.name));
@@ -855,6 +922,27 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     if (this.paneOpen) {
       this.renderDropdown();
     }
+    // A Done-time rule refusal (second mega, cost cap, ...) floats above everything until the set is fixed.
+    if (this.validationError != null) {
+      this.renderValidationBanner();
+    }
+  }
+
+  /** A centered red refusal banner shown when Done is rejected - the specific rule message. */
+  private renderValidationBanner(): void {
+    const bh = 16;
+    const by = (SCREEN_H - bh) / 2;
+    this.fill(0, by - 2, SCREEN_W, bh + 4, 0x000000, 0.55);
+    this.fill(MARGIN, by, SCREEN_W - 2 * MARGIN, bh, 0x3a0d12, 0.98);
+    this.outline(MARGIN, by, SCREEN_W - 2 * MARGIN, bh, 0xe86464);
+    this.text(
+      SCREEN_W / 2,
+      by + 4,
+      this.clip(`Cannot save - ${this.validationError ?? ""}`, 100),
+      TextStyle.SUMMARY_RED,
+      0.5,
+      FONT_TINY,
+    );
   }
 
   // -- top team strip (redesigned: one cohesive dark bar) ---------------------------------------
@@ -1012,9 +1100,11 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
 
     // Identity column vertical rhythm (clean, non-overlapping at 1080p): sprite -> type chips ->
     // STAGE strip -> BASE STATS, each with its own band and a few px of breathing room.
-    // The FULL front battle sprite (item 2) - the game's full-scale art, sized around this column.
+    // The FULL front battle sprite (item 2) - the game's full-scale art, sized around this column. It is
+    // seated a little lower + slightly smaller than before so tall sprites (raised-claw mons, spread
+    // wings) clear the NAME band above and the type chips below instead of bleeding into them.
     const spriteCx = LEFT_X + LEFT_W / 2;
-    const spriteCy = BODY_Y + 38;
+    const spriteCy = BODY_Y + 40;
     this.renderFullSprite(spriteCx, spriteCy);
     // Shinyness is shown ONLY by 4 cyclable shiny symbols tucked into the sprite's corner (item 3 /
     // maintainer follow-up) - no separate shiny row.
@@ -1061,7 +1151,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         });
     }
     if (globalScene.textures.exists(key)) {
-      const spr = globalScene.add.sprite(cx, cy, key).setOrigin(0.5, 0.5).setScale(0.44);
+      const spr = globalScene.add.sprite(cx, cy, key).setOrigin(0.5, 0.5).setScale(0.4);
       const frames = globalScene.textures.get(key).getFrameNames();
       if (frames.length > 0) {
         spr.setFrame(frames.slice().sort()[0]);
@@ -1149,7 +1239,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
       return;
     }
     const star = globalScene.add
-      .sprite(cx + 20, cy - 18, "shiny_icons")
+      .sprite(cx + 22, cy - 14, "shiny_icons")
       .setOrigin(0.5, 0.5)
       .setScale(0.55);
     star.setFrame(getVariantIcon(cfg.set.variant as Variant));
@@ -1232,12 +1322,16 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     const activeId = actives[cfg.set.abilityIndex] ?? actives[0];
     const active = allAbilities[activeId];
     const ay = ABIL_Y + 14;
-    this.focusBox(RIGHT_X + 3, ay, RIGHT_W - 6, 15, EditorField.ABILITY);
-    this.tag(RIGHT_X + 6, ay + 2, "ACTIVE", 0x2f6d4a);
+    // Inset the ACTIVE bar a full frame-width (6px) so its bright fill + gold focus edge sit INSIDE the
+    // panel's nine-slice frame instead of kissing/overrunning it (the reported "ability bar overlaps the
+    // frames"). The E glyph is pulled in to match; the description clips clear of it.
+    const abilBarW = RIGHT_W - 12;
+    this.focusBox(RIGHT_X + 6, ay, abilBarW, 15, EditorField.ABILITY);
+    this.tag(RIGHT_X + 9, ay + 2, "ACTIVE", 0x2f6d4a);
     if (selectable.length > 1) {
       const eGlyph = globalScene.add
         .sprite(
-          RIGHT_X + RIGHT_W - 10,
+          RIGHT_X + RIGHT_W - 16,
           ay + 7,
           "keyboard",
           this.keyFrame(SettingKeyboard.BUTTON_CYCLE_ABILITY, "E.png"),
@@ -1246,8 +1340,8 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         .setScale(0.45);
       this.add(eGlyph);
     }
-    this.text(RIGHT_X + 36, ay + 1, active?.name ?? "-", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
-    this.text(RIGHT_X + 36, ay + 8, this.clip(active?.description ?? "", 78), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    this.text(RIGHT_X + 39, ay + 1, active?.name ?? "-", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+    this.text(RIGHT_X + 39, ay + 8, this.clip(active?.description ?? "", 72), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
 
     // The 3 INNATES - always-on for the LINE, but a locked slot is candy-gated (inactive on the
     // player's own party), so a locked one shows its candy unlock cost; an unlocked one reads active.
@@ -1533,6 +1627,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.textInput?.close();
     this.container.setVisible(false);
     this.config = null;
+    this.validationError = null;
     this.requestedSpriteKeys.clear();
   }
 }

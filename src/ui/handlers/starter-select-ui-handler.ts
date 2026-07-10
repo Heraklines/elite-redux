@@ -4068,11 +4068,38 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       // Versus "partner" = the opponent; the coop controller's readied flag is the best pre-Ready signal.
       partnerReady: getCoopController()?.partnerReady ?? null,
       onDone: result => this.commitShowdownEditor(species, root, editIndex, result),
+      // Done-time re-validation: build the PROVISIONAL team with this slot's edit applied and run the
+      // shared rule engine, returning the first violation (mega budget, cost caps, black-shiny, item
+      // legality, ...) so the editor refuses to commit an invalid set instead of silently building one.
+      validate: result => this.validateShowdownEditorSet(root, editIndex, props, result),
       // Revert the overlay back to the (still-alive) grid - never setMode(STARTER_SELECT), which re-shows
       // it empty (init gated on the callback arg).
       onCancel: () => void this.getUi().revertMode(),
       onCycleTeam: dir => this.cycleShowdownEditorTeam(editIndex, dir),
     };
+  }
+
+  /**
+   * Showdown editor Done-time re-validation. Rebuilds the whole team as manifests with THIS slot's edited
+   * stage + set applied (create => appended, edit => replaced in place) and runs the shared
+   * {@linkcode validateShowdownTeam} rule engine. Returns the FIRST violation's message (the same wording
+   * the ready-time net uses) or null when the set is fully legal - so the editor refuses to commit an
+   * invalid team rather than letting the player build one silently.
+   */
+  private validateShowdownEditorSet(
+    root: number,
+    editIndex: number,
+    props: { female: boolean; formIndex: number; shiny: boolean; variant: number },
+    result: { stage: ShowdownEditorStage; set: ShowdownEditorSet },
+  ): string | null {
+    const { gameData } = globalScene;
+    const edited = this.buildProvisionalShowdownManifest(root, result.stage, result.set, props, gameData);
+    const manifests = this.starters.map((s, i) => (i === editIndex ? edited : starterToManifest(s, gameData)));
+    if (editIndex < 0) {
+      manifests.push(edited);
+    }
+    const violations = validateShowdownTeam(manifests, buildUnlockSnapshot(gameData), isMegaStage);
+    return violations.length > 0 ? violations[0].message : null;
   }
 
   /** Showdown: a provisional manifest for the not-yet-added mon (drives the strip's live slot). */

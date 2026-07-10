@@ -901,6 +901,39 @@ const RECIPES: Record<string, Recipe> = {
   // path through processInput. DOWN,DOWN focuses Move 1; ACTION opens its search dropdown (the
   // controller/A path, no ceremony); DOWN moves the result cursor; ACTION commits the highlighted
   // move and closes the dropdown. The final PNG is the set with Move 1 changed - proof the type/pick
+  // Bug 2 refusal banner: fielding a MEGA while the team's one mega budget is already spent, then
+  // pressing Done (SUBMIT) - the editor REFUSES with the specific "second mega" message instead of
+  // committing. The final step PNG shows the red banner over the greyed mega stage strip.
+  "showdown-editor-mega-blocked": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => {
+      const base = buildShowdownEditorDemoConfig();
+      const mega = listMegaStages(SpeciesId.GIBLE)[0];
+      return [
+        {
+          ...base,
+          stage: { speciesId: mega.speciesId, formIndex: mega.formIndex },
+          unlocks: { ...base.unlocks, megaBudgetSpent: true, megaBudgetSpentBy: "Blastoise" },
+        },
+      ];
+    },
+    steps: [Button.SUBMIT],
+    diffTolerance: 0,
+  },
+  // LONG species name (Crabominable) + focused ABILITY row: the overlap golden gate (Bug 3). The identity
+  // NAME bar must clip clear of the cost badge, and the focused ACTIVE ability bar + its E glyph must sit
+  // INSIDE the abilities panel frame (not kiss/overrun it). Regenerating this pins the fixed geometry.
+  "showdown-editor-longname": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [
+      buildShowdownEditorDemoConfig({
+        rootSpeciesId: SpeciesId.CRABRAWLER,
+        stage: { speciesId: SpeciesId.CRABOMINABLE, formIndex: 0 },
+        initialField: EditorField.ABILITY,
+      }),
+    ],
+    diffTolerance: 0,
+  },
   // interaction round-trips (the keystroke half is covered by showdown-editor-input.test.ts).
   "showdown-editor-nav": {
     mode: UiMode.SHOWDOWN_SET_EDITOR,
