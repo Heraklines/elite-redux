@@ -3985,7 +3985,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // The registered handler instance is reused across opens, so re-injecting each open is harmless.
     const editor = ui.handlers[UiMode.SHOWDOWN_SET_EDITOR] as ShowdownSetEditorUiHandler | undefined;
     editor?.setTextInput(new DomShowdownEditorTextInput());
-    ui.setMode(UiMode.SHOWDOWN_SET_EDITOR, config);
+    // Open as an OVERLAY (chains onto the mode stack) rather than setMode: setMode would CLEAR this
+    // StarterSelect (hide its grid, reset its cursor), and returning via setMode(STARTER_SELECT) with no
+    // callback arg re-runs show() into an EMPTY screen (its init is gated on `args[0] instanceof
+    // Function`). As an overlay the grid stays alive underneath the editor's opaque backdrop, and the
+    // editor's Done/Cancel revertMode() back to it intact - no empty-screen softlock.
+    ui.setOverlayMode(UiMode.SHOWDOWN_SET_EDITOR, config);
   }
 
   /** Showdown (flow wiring): assemble the {@linkcode ShowdownSetEditorConfig} snapshot for one slot. */
@@ -4063,7 +4068,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       // Versus "partner" = the opponent; the coop controller's readied flag is the best pre-Ready signal.
       partnerReady: getCoopController()?.partnerReady ?? null,
       onDone: result => this.commitShowdownEditor(species, root, editIndex, result),
-      onCancel: () => this.getUi().setMode(UiMode.STARTER_SELECT),
+      // Revert the overlay back to the (still-alive) grid - never setMode(STARTER_SELECT), which re-shows
+      // it empty (init gated on the callback arg).
+      onCancel: () => void this.getUi().revertMode(),
       onCycleTeam: dir => this.cycleShowdownEditorTeam(editIndex, dir),
     };
   }
@@ -4135,11 +4142,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       if (this.lastSpecies?.speciesId === root) {
         this.setSpeciesDetails(this.lastSpecies);
       }
-      ui.setMode(UiMode.STARTER_SELECT);
+      // Revert the overlay to the (still-alive) grid; setMode would re-show it empty (see openShowdownEditor).
+      void ui.revertMode();
       return;
     }
     // CREATE: addToParty stamps the stage+item from showdownSelections (set above) and builds the icon.
-    ui.setMode(UiMode.STARTER_SELECT);
+    // Revert the overlay back to the live grid first, then add to the party against its restored state.
+    void ui.revertMode();
     const added = this.addToParty(
       species,
       this.getCurrentDexProps(root),

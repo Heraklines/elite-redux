@@ -171,13 +171,25 @@ describe.skipIf(!RUN)("Showdown Set Editor type-to-search input model", () => {
     expect(cancels(), "MENU leaves the editor via onCancel").toBe(1);
   });
 
-  it("Escape (MENU) from an OPEN move dropdown leaves the WHOLE editor", () => {
+  it("Escape (MENU) from an OPEN move dropdown only CLOSES the dropdown (browse), it does NOT leave", () => {
     const game = new GameManager(phaserGame);
     const { internals, cancels } = buildEditorWithCancel(game, EditorField.MOVE0);
     internals.setFilter("o"); // opens the search dropdown
     expect(internals.paneOpen, "the dropdown is open").toBe(true);
     const handled = internals.processInput(Button.MENU);
-    expect(handled, "MENU is consumed from the open dropdown").toBe(true);
-    expect(cancels(), "MENU from the open dropdown leaves the whole editor").toBe(1);
+    expect(handled, "MENU is consumed").toBe(true);
+    expect(internals.paneOpen, "Esc closes the dropdown back to browsing the moves").toBe(false);
+    expect(cancels(), "Esc from the dropdown must NOT leave the editor").toBe(0);
+  });
+
+  it("Back (CANCEL) with an empty query closes the dropdown to browsing (controller path)", () => {
+    const game = new GameManager(phaserGame);
+    const { internals, cancels } = buildEditorWithCancel(game, EditorField.MOVE0);
+    (internals as unknown as { openPane(): boolean }).openPane(); // opens with an EMPTY query
+    expect(internals.paneOpen).toBe(true);
+    expect(internals.filter).toBe("");
+    internals.processInput(Button.CANCEL);
+    expect(internals.paneOpen, "back with nothing typed closes the dropdown").toBe(false);
+    expect(cancels(), "and it does not leave the editor").toBe(0);
   });
 });

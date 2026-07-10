@@ -483,14 +483,20 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         handled = this.selectPaneRow();
         break;
       case Button.CANCEL:
-        // B = step back: close the dropdown but stay in the editor.
-        this.closePane();
-        handled = true;
+        // Back button INSIDE a search: while there is typed text this is "delete a character", so leave
+        // it to the native/DOM input (which edits the filter) and do NOT close - matching the user's
+        // "back should remove words, not take me out". With the query already empty (or on a controller
+        // that never typed) there is nothing to delete, so it closes the dropdown back to browsing.
+        if (this.filter.length > 0 && this.textInput != null) {
+          handled = true; // consumed; the DOM input handles the character delete
+        } else {
+          this.closePane();
+          handled = true;
+        }
         break;
       case Button.MENU:
-        // Escape from an open dropdown leaves the WHOLE editor to the grid (not just the pane), so the
-        // user is never trapped and the exposed StarterSelect can't turn a stray Escape into Start.
-        this.config!.onCancel?.();
+        // Escape ONLY exits the dropdown back to browsing the moves/items - it does NOT leave the editor.
+        this.closePane();
         handled = true;
         break;
     }
@@ -888,25 +894,15 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     cx = this.chip(cx, `Mega ${megaCount}/1`, megaCount <= 1);
     this.chip(cx, `Cost8+ ${highCost}/1`, highCost <= 1);
 
-    // Integrated countdown + partner status (right), in the same pill language.
-    const mm = Math.floor(cfg.pickSecondsLeft / 60);
-    const ss = cfg.pickSecondsLeft % 60;
-    const clock = `${mm}:${String(ss).padStart(2, "0")}`;
-    const urgent = cfg.pickSecondsLeft <= 60;
-    const clockX = SCREEN_W - 3;
-    this.fill(SCREEN_W - 62, 2, 59, slotH, HEADER_BAND, 1);
-    this.outline(SCREEN_W - 62, 2, 59, slotH, 0x33436a);
-    this.text(SCREEN_W - 58, 3, "PICK", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
-    this.text(clockX - 3, 2, clock, urgent ? TextStyle.SUMMARY_RED : TextStyle.SUMMARY_GOLD, 1, FONT_NAME);
-    const partner = cfg.partnerReady == null ? "Foe -" : cfg.partnerReady ? "Foe READY" : "Foe waiting";
-    this.text(
-      clockX - 3,
-      11,
-      partner,
-      cfg.partnerReady ? TextStyle.SUMMARY_GREEN : TextStyle.SUMMARY_GRAY,
-      1,
-      FONT_TINY,
-    );
+    // Opponent-ready status (right), in the same pill language. The pick countdown/timer was removed
+    // per maintainer request.
+    const foe = cfg.partnerReady == null ? "Foe -" : cfg.partnerReady ? "Foe READY" : "Foe waiting";
+    const foeW = foe.length * 3.0 + 10;
+    const foeX = SCREEN_W - 3 - foeW;
+    this.fill(foeX, 4, foeW, 12, HEADER_BAND, 1);
+    this.outline(foeX, 4, foeW, 12, cfg.partnerReady ? 0x2f6d4a : 0x33436a);
+    this.fill(foeX + 3, 8, 3, 3, cfg.partnerReady ? 0x4bd08a : 0x8a94a6, 1);
+    this.text(foeX + 8, 6, foe, cfg.partnerReady ? TextStyle.SUMMARY_GREEN : TextStyle.SUMMARY_GRAY, 0, FONT_CHIP);
   }
 
   private chip(x: number, label: string, ok: boolean): number {
@@ -1001,11 +997,18 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.add(addWindow(LEFT_X, BODY_Y, LEFT_W, SCREEN_H - BODY_Y - 2));
 
     const sp = this.fieldedSpecies;
-    // Name (left) + cost badge (right) on a dark header BAND (gold-on-dark, legible on the light panel).
-    this.fill(LEFT_X + 2, BODY_Y + 2, LEFT_W - 4, 12, HEADER_BAND, 1);
-    this.text(LEFT_X + 5, BODY_Y + 3, sp.name, TextStyle.SUMMARY_GOLD, 0, FONT_TITLE);
+    // Header band: species NAME (left, clipped so it never runs into the cost) + a distinct COST badge
+    // (right) - a bordered pill so the cost reads as its own tag, on a dark band with a thin gold underline.
     const rootCost = cfg.team[cfg.activeSlot]?.baseCost ?? 0;
-    this.text(LEFT_X + LEFT_W - 4, BODY_Y + 4, `Cost ${rootCost}`, TextStyle.SUMMARY_GOLD, 1, FONT_HDR);
+    this.fill(LEFT_X + 2, BODY_Y + 2, LEFT_W - 4, 15, HEADER_BAND, 1);
+    this.fill(LEFT_X + 2, BODY_Y + 16, LEFT_W - 4, 1, 0x4a5a80, 1);
+    const costText = `Cost ${rootCost}`;
+    const costW = costText.length * 3.0 + 6;
+    const costX = LEFT_X + LEFT_W - 4 - costW;
+    this.fill(costX, BODY_Y + 4, costW, 10, CELL_DIM, 1);
+    this.outline(costX, BODY_Y + 4, costW, 10, 0x4a5a80);
+    this.text(costX + 3, BODY_Y + 5, costText, TextStyle.SUMMARY_GOLD, 0, FONT_TINY);
+    this.text(LEFT_X + 6, BODY_Y + 3, this.clip(sp.name, 11), TextStyle.SUMMARY_GOLD, 0, FONT_TITLE);
 
     // Identity column vertical rhythm (clean, non-overlapping at 1080p): sprite -> type chips ->
     // STAGE strip -> BASE STATS, each with its own band and a few px of breathing room.

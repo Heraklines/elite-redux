@@ -96,15 +96,16 @@ describe.skipIf(!RUN)("Showdown teambuilder editor flow (grid -> editor -> Done)
     internals.speciesStarterDexEntry = game.scene.gameData.dexData[SpeciesId.CHARMANDER];
     internals.setSpeciesDetails(species, {}, false);
 
-    // Stub setMode: record the call but skip the real UI transition (a full mode transition awaits the
-    // game clock, which a pure unit test never pumps). We only assert WHICH mode was opened.
-    const setModeSpy = vi.spyOn(game.scene.ui, "setMode").mockResolvedValue(undefined as never);
+    // Stub setOverlayMode: record the call but skip the real UI transition (a full mode transition awaits
+    // the game clock, which a pure unit test never pumps). The editor opens as an OVERLAY (so the grid
+    // stays alive underneath and Cancel/Done revertMode back to it), not setMode. We assert WHICH mode.
+    const setOverlaySpy = vi.spyOn(game.scene.ui, "setOverlayMode").mockResolvedValue(undefined as never);
     // A brand-new, field-legal pick (not a dupe, valid for challenge).
     internals.handleShowdownGridConfirm(false, -1, true);
 
     expect(
-      setModeSpy.mock.calls.some(call => call[0] === UiMode.SHOWDOWN_SET_EDITOR),
-      "grid confirm should setMode(SHOWDOWN_SET_EDITOR)",
+      setOverlaySpy.mock.calls.some(call => call[0] === UiMode.SHOWDOWN_SET_EDITOR),
+      "grid confirm should open the editor as an overlay (setOverlayMode)",
     ).toBe(true);
     // Nothing is committed to the team until the editor's Done fires.
     expect(internals.starterSpecies.length).toBe(0);
