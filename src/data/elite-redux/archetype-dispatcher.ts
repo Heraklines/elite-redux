@@ -196,6 +196,7 @@ import { FirstTurnStatMultiplierAbAttr } from "#data/elite-redux/archetypes/firs
 import { FlagDamageBoostAbAttr } from "#data/elite-redux/archetypes/flag-damage-boost";
 import { FoeStrongestStatSelfBoostAbAttr } from "#data/elite-redux/archetypes/foe-strongest-stat-self-boost";
 import { ForceFoeOutOnInactivityAbAttr } from "#data/elite-redux/archetypes/force-foe-out-on-inactivity";
+import { GroundEntryHazardImmunityAbAttr } from "#data/elite-redux/archetypes/ground-entry-hazard-immunity";
 import { HitMultiplierAbAttr, HitMultiplierPowerAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
 import { HpScalingStatMultiplierAbAttr } from "#data/elite-redux/archetypes/hp-scaling-stat-multiplier";
 import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-threshold-form-change";
@@ -2017,6 +2018,27 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
       }
     }
   }
+  // Big Leaves 374 (Chloroplast + Chlorophyll + Leaf Guard + Harvest + Solar
+  // Power) — clause 5 is "Raises the HIGHEST attacking stat by 50% in sun", but
+  // the Solar Power part only contributes a Sp.Atk×1.5 (StatMultiplierAbAttr on
+  // SPATK), so a physical attacker got nothing. Swap that SPATK-only multiplier
+  // for a highest-of-{ATK,SPATK}×1.5 gated on sun. (Do NOT touch patchSolarPower —
+  // the standalone Solar Power ability is legitimately Sp.Atk-only.)
+  if (erAbilityId === 374) {
+    for (let i = out.length - 1; i >= 0; i--) {
+      const a = out[i];
+      if (a.constructor.name === "StatMultiplierAbAttr" && (a as unknown as { stat: number }).stat === Stat.SPATK) {
+        out.splice(i, 1);
+      }
+    }
+    out.push(
+      new SelfHighestStatMultiplierAbAttr({
+        candidates: [Stat.ATK, Stat.SPATK],
+        multiplier: 1.5,
+        weathers: [WeatherType.SUNNY, WeatherType.HARSH_SUN],
+      }),
+    );
+  }
   // Draconic Might 841 (Draconize + Half Drake) — the Normal→Dragon conversion +
   // Dragon STAB + entry Dragon-type-add are wired, but Draconize's "if the user
   // is Dragon-type, its Dragon moves deal neutral damage vs Fairy" override was
@@ -2354,6 +2376,47 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           stages: 1,
         }),
       ]);
+    case 308:
+      // Tectonize — "Changes the holder's Normal moves to Ground-type. If the
+      // holder is Ground-type it is IMMUNE to Stealth Rock and Spikes; otherwise
+      // it gains Ground STAB." (Was classified type-conversion with a flat 1.2x
+      // that dropped the conditional STAB and the Ground-type hazard immunity;
+      // hand-wired here to the dex.)
+      return ok([
+        // Normal moves become Ground.
+        new TypeConversionAbAttr({ source: { kind: "type", type: PokemonType.NORMAL }, newType: PokemonType.GROUND }),
+        // Non-Ground holder gains Ground STAB. StabAddAbAttr self-gates: it only
+        // boosts a Ground move that is NOT already one of the holder's types, so
+        // a Ground-type holder (with natural Ground STAB) gets nothing here —
+        // exactly the dex's "otherwise" branch.
+        new StabAddAbAttr({ targetType: PokemonType.GROUND }),
+        // Ground-type holder: immune to Stealth Rock and Spikes switch-in damage.
+        // The marker is consumed in DamagingTrapTag.activateTrap, gated there on
+        // the holder being Ground-type (so a non-Ground holder is unaffected).
+        new GroundEntryHazardImmunityAbAttr(),
+      ]);
+    case 413: // Draconize — "Changes Normal moves to Dragon-type. If the holder is
+      // Dragon-type its Dragon moves deal NEUTRAL damage vs Fairy; otherwise it
+      // gains Dragon STAB." (Was classified type-conversion with a flat 1.2x that
+      // dropped the conditional STAB and the Dragon-vs-Fairy override; hand-wired
+      // here to the dex — mirrors Draconic Might 841.)
+      {
+        const dragonVsFairy = new OffensiveTypeChartOverrideAbAttr({
+          rules: [{ attackType: PokemonType.DRAGON, defenderType: PokemonType.FAIRY, newMultiplier: 1 }],
+        });
+        // Only a Dragon-type holder pierces the Fairy immunity (the scan in
+        // getAttackTypeEffectiveness respects this condition against the holder).
+        dragonVsFairy.addCondition(holder => holder.isOfType(PokemonType.DRAGON));
+        return ok([
+          new TypeConversionAbAttr({
+            source: { kind: "type", type: PokemonType.NORMAL },
+            newType: PokemonType.DRAGON,
+          }),
+          // Non-Dragon holder gains Dragon STAB (StabAddAbAttr self-gates as above).
+          new StabAddAbAttr({ targetType: PokemonType.DRAGON }),
+          dragonVsFairy,
+        ]);
+      }
     case 315:
       // Hydrate — "Changes the user's Normal-type moves to Water-type. If the
       // user is Water-type its Water-type moves have a 10% chance to drench,

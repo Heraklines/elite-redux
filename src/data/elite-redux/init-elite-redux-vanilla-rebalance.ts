@@ -63,6 +63,7 @@ import {
   FullHpResistTypeAbAttr,
   getWeatherCondition,
   HealFromBerryUseAbAttr,
+  IgnoreTypeStatusEffectImmunityAbAttr,
   MovePowerBoostAbAttr,
   MoveTypeChangeAbAttr,
   MoveTypePowerBoostAbAttr,
@@ -122,6 +123,7 @@ import {
   StatTriggerOnHitAbAttr,
   StatTriggerOnStatLoweredAbAttr,
 } from "#data/elite-redux/archetypes/stat-trigger-on-event";
+import { StatusMoveTypeImmunityBypassAbAttr } from "#data/elite-redux/archetypes/status-move-type-bypass";
 import {
   ToxicTerrainSelfPoisonOnSummonAbAttr,
   ToxicTerrainSelfPoisonOnTerrainChangeAbAttr,
@@ -278,6 +280,30 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     ab => {
       if (!ab.attrs.some(a => a instanceof FullHpResistTypeAbAttr)) {
         ab.attrs.push(new FullHpResistTypeAbAttr());
+      }
+    },
+  ],
+
+  // Mycelium Might (510): ER spec adds "Status moves bypass all immunities and
+  // type resistances" on top of vanilla's move-last + ignore-abilities. Two
+  // riders: (1) a marker consumed in getMoveEffectiveness making the holder's
+  // STATUS-category moves ignore TYPE-based immunity (Thunder Wave vs Ground,
+  // powder vs Grass); (2) an IgnoreTypeStatusEffectImmunityAbAttr covering the
+  // status-application type immunities (Toxic vs Steel, Will-O-Wisp vs Fire) —
+  // the same primitive Corrosion uses.
+  [
+    AbilityId.MYCELIUM_MIGHT,
+    ab => {
+      if (!ab.attrs.some(a => a instanceof StatusMoveTypeImmunityBypassAbAttr)) {
+        ab.attrs.push(new StatusMoveTypeImmunityBypassAbAttr());
+      }
+      if (!ab.attrs.some(a => a instanceof IgnoreTypeStatusEffectImmunityAbAttr)) {
+        ab.attrs.push(
+          new IgnoreTypeStatusEffectImmunityAbAttr(
+            [StatusEffect.POISON, StatusEffect.TOXIC, StatusEffect.BURN],
+            [PokemonType.STEEL, PokemonType.POISON, PokemonType.FIRE],
+          ),
+        );
       }
     },
   ],

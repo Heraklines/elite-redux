@@ -924,6 +924,17 @@ abstract class DamagingTrapTag extends EntryHazardTag {
    * @sealed
    */
   override activateTrap(simulated: boolean, pokemon: Pokemon): boolean {
+    // ER Tectonize (308): a Ground-type holder is IMMUNE (no damage, no heal) to
+    // Stealth Rock and Spikes. Gated on the specific hazards named by the dex so
+    // ER-custom spikes-style tags (Creeping Thorns) are unaffected.
+    if (
+      (this.tagType === ArenaTagType.SPIKES || this.tagType === ArenaTagType.STEALTH_ROCK)
+      && pokemon.isOfType(PokemonType.GROUND)
+      && pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "GroundEntryHazardImmunityAbAttr")
+    ) {
+      return false;
+    }
+
     // Check for magic guard immunity
     const cancelled = new BooleanHolder(false);
     applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });

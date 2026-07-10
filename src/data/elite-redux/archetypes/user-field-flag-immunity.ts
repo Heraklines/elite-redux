@@ -30,7 +30,11 @@ export class UserFieldFlagImmunityAbAttr extends PreDefendAbAttr {
 
   override canApply(params: TypeMultiplierAbAttrParams): boolean {
     const { move, opponent, pokemon } = params;
-    if (opponent === pokemon || !move.is("AttackMove")) {
+    // NB: no AttackMove gate — Noise Cancel blocks ALL sound moves, including
+    // status ones (Growl, Metal Sound), matching Soundproof. The dispatcher in
+    // getMoveEffectiveness only invokes this on the target's own side, so the
+    // opponent (attacker) is always the other side.
+    if (opponent === pokemon) {
       return false;
     }
     if (!move.doesFlagEffectApply({ flag: this.opts.flag, user: opponent, target: pokemon })) {
@@ -46,7 +50,9 @@ export class UserFieldFlagImmunityAbAttr extends PreDefendAbAttr {
   }
 
   override apply(params: TypeMultiplierAbAttrParams): void {
+    // Zero the type multiplier (not `cancelled`) so the move reads as a plain
+    // type-immunity — the engine shows "It doesn't affect ..." rather than a
+    // MISS. The getMoveEffectiveness dispatcher returns this 0 for the target.
     params.typeMultiplier.value = 0;
-    params.cancelled.value = true;
   }
 }

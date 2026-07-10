@@ -108,7 +108,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   305: { erAbilityId: 305, archetype: "conditional-damage", params: {"condition":{"kind":"any-active-asleep"},"multiplier":2} }, // Dreamcatcher: 2x when ANY active mon asleep (user/ally/opponent), not just target
   306: { erAbilityId: 306, archetype: "bespoke", params: null }, // Nocturnal: Dark moves +1.25x AND -25% dmg from Dark/Fairy (composite — see dispatchBespoke)
   307: { erAbilityId: 307, archetype: "passive-recovery", params: {"healFraction":0.0625} },
-  308: { erAbilityId: 308, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"GROUND","multiplier":1.2} },
+  308: { erAbilityId: 308, archetype: "bespoke", params: null }, // Tectonize: Normal->Ground + conditional Ground STAB / Ground-type SR+Spikes immunity (see dispatchBespoke)
   309: { erAbilityId: 309, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"ICE"}} },
   310: { erAbilityId: 310, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"DRAGON"}} },
   311: { erAbilityId: 311, archetype: "bespoke", params: null }, // Liquified: 1/2 contact dmg AND takes 2x from Water moves (composite — see dispatchBespoke)
@@ -215,7 +215,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   410: { erAbilityId: 410, archetype: "stat-trigger-on-event", params: {"trigger":"on-stat-lowered","scope":"side","stats":[{"stat":"SPATK","stages":1},{"stat":"SPDEF","stages":1}]} }, // Queen's Mourning: "Lowering any stats on its side raises SpAtk and SpDef" (holder + ally, once per stat)
   411: { erAbilityId: 411, archetype: "bespoke", params: null },
   412: { erAbilityId: 412, archetype: "bespoke", params: null },
-  413: { erAbilityId: 413, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"DRAGON","multiplier":1.2} },
+  413: { erAbilityId: 413, archetype: "bespoke", params: null }, // Draconize: Normal->Dragon + conditional Dragon STAB / Dragon-type-holder Dragon-vs-Fairy neutral (see dispatchBespoke)
   414: { erAbilityId: 414, archetype: "conditional-damage", params: {"condition":{"kind":"target-has-lowered-stat"},"multiplier":1.5} },
   415: { erAbilityId: 415, archetype: "composite-vanilla-mashup", params: {"parts":["Self Sufficient","Natural Cure"]} },
   416: { erAbilityId: 416, archetype: "composite-vanilla-mashup", params: {"parts":["Electromorphosis","Galvanize"]} },

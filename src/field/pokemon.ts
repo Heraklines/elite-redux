@@ -1648,7 +1648,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // a 3-wide side spreads + staggers so all three sprites stay separated). See battle-format.
     const arr = globalScene.currentBattle?.arrangement;
     const capacity = arr ? (this.isPlayer() ? arr.playerCapacity : arr.enemyCapacity) : 1;
-    return fieldSpriteOffset(this.fieldPosition, capacity);
+    return fieldSpriteOffset(this.fieldPosition, capacity, this.isPlayer());
   }
 
   /**
@@ -3537,6 +3537,21 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       typeMultiplier.value = 0;
     }
 
+    // ER Mycelium Might (510): the holder's STATUS-category moves bypass TYPE-based
+    // immunities/resistances — the type-chart 0x (Thunder Wave vs Ground) and the
+    // isTypeImmune 0x (powder vs Grass). Only the type-based zeroing computed above
+    // is undone here; ability-based immunities (Soundproof, Levitate) and tag/
+    // substitute immunities run later and still hold. Status-application immunities
+    // (Toxic vs Steel, Will-O-Wisp vs Fire) live in canSetStatus, handled separately.
+    if (
+      move.category === MoveCategory.STATUS
+      && typeMultiplier.value === 0
+      && !ignoreSourceAbility
+      && source.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "StatusMoveTypeImmunityBypassAbAttr")
+    ) {
+      typeMultiplier.value = 1;
+    }
+
     // TODO: Rework to use an apply method specific to Tar Shot
     if (this.getTag(TarShotTag) && moveType === PokemonType.FIRE) {
       typeMultiplier.value *= 2;
@@ -3570,6 +3585,33 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
             cancelled: cancelledHolder,
             simulated,
           });
+        }
+      }
+
+      // ER Noise Cancel (595): protects the holder AND its ally from being
+      // targeted by sound-based moves. The attr rides no standard PreDefend path,
+      // so dispatch it explicitly over the target's whole side (holder-inclusive
+      // via getAlliesGenerator). NON-simulated on purpose — a hard immunity that
+      // must also hold in the real hit phase. Any side member carrying the attr
+      // cancels the move against the actual target (SOUND_BASED is a static flag).
+      if (!cancelledHolder.value) {
+        for (const p of this.getAlliesGenerator()) {
+          const ncParams: TypeMultiplierAbAttrParams = { ...commonAbAttrParams, pokemon: p };
+          for (const attr of p.getAllActiveAbilityAttrs()) {
+            if (attr?.constructor?.name !== "UserFieldFlagImmunityAbAttr") {
+              continue;
+            }
+            const nc = attr as unknown as {
+              canApply: (params: TypeMultiplierAbAttrParams) => boolean;
+              apply: (params: TypeMultiplierAbAttrParams) => void;
+            };
+            if (nc.canApply(ncParams)) {
+              nc.apply(ncParams);
+            }
+          }
+          if (typeMultiplier.value === 0) {
+            break;
+          }
         }
       }
     }
@@ -3657,11 +3699,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       const sourceAttrs = source.getAllActiveAbilityAttrs();
       for (const attr of sourceAttrs) {
         if (attr?.constructor?.name === "OffensiveTypeChartOverrideAbAttr") {
-          (attr as unknown as { fire: (mt: PokemonType, dts: PokemonType[], h: NumberHolder) => void }).fire(
-            moveType,
-            types,
-            multi,
-          );
+          // Respect an optional holder-side condition (e.g. Draconize 413 /
+          // Draconic Might 841 only pierce Fairy immunity when the HOLDER is
+          // Dragon-type). No condition => always fires (Ground Shock, Molten
+          // Down, Trash Heap, ...).
+          const cond = attr.getCondition?.();
+          if (!cond || cond(source)) {
+            (attr as unknown as { fire: (mt: PokemonType, dts: PokemonType[], h: NumberHolder) => void }).fire(
+              moveType,
+              types,
+              multi,
+            );
+          }
         }
         // ER Bone Zone: bone-flagged moves bypass type immunities (0x → 1x) and
         // double resisted damage (<1x → ×2). Needs the move, so gate on it.
@@ -6598,6 +6647,21 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         // status attr sets `ignoreTypeImmunity`, bypassing the Fire immunity
         // for this move ONLY. Every other burn source keeps the immunity.
         isImmune = !ignoreTypeImmunity && this.isOfType(PokemonType.FIRE);
+        // ER Mycelium Might (510): a source ability can pierce the Fire-type burn
+        // immunity (Will-O-Wisp vs Fire), mirroring the Poison/Toxic Corrosion
+        // hook above. Only fires if the applier carries the matching bypass.
+        if (isImmune && sourcePokemon) {
+          const cancelImmunity = new BooleanHolder(false);
+          applyAbAttrs("IgnoreTypeStatusEffectImmunityAbAttr", {
+            pokemon: sourcePokemon,
+            cancelled: cancelImmunity,
+            statusEffect: effect,
+            defenderType: PokemonType.FIRE,
+          });
+          if (cancelImmunity.value) {
+            isImmune = false;
+          }
+        }
         break;
     }
 
