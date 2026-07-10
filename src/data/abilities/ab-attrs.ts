@@ -6494,7 +6494,12 @@ export class IllusionPreSummonAbAttr extends PreSummonAbAttr {
         return false;
       }
     }
-    return pokemon.summonData.illusion != null;
+    // A fresh illusion is created in `apply` (which calls `setIllusion`), so we
+    // must NOT gate on it already being set here — the trainer branch above has
+    // rejected the invalid cases, and a wild holder can always disguise as a
+    // random species. (The prior `summonData.illusion != null` check deadlocked:
+    // the illusion is never set before `apply` runs, so it never activated.)
+    return true;
   }
 }
 
