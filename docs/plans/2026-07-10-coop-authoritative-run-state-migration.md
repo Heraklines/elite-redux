@@ -324,3 +324,134 @@ This guarantees the counter never breaks mid-migration: it keeps doing its exact
 the envelope is layered on top deriving from it, until it is provably redundant.
 
 ---
+
+## 2. Complete inventory of bespoke relay / decision surfaces
+
+Grep-derived from `coop-seq-registry.ts` (the TOTAL band+kind table, `:160-294` and `:324-393`),
+the message union (`coop-transport.ts:839-1237`), and the rendezvous points (`coop-rendezvous.ts`,
+`coop-transport.ts:868-877`). Each surface is a control plane the migration collapses onto the ONE
+operation model. For each: the current owner rule, the current failure modes (with fix-ledger #s),
+and its target mapping onto `CoopOperationKind` + `CoopLogicalPhase`.
+
+### 2.1 The relay `kind`s (interactionChoice / interactionOutcome)
+
+All ride `coop-transport.ts:1097` (`interactionChoice`) or `:1105` (`interactionOutcome`), routed by
+numeric `seq` band (`coop-seq-registry.ts:139-153`), kind-validated per #861
+(`coop-seq-registry.ts:396-435`). `owner` = which seat drives, resolved from interaction-counter
+parity unless noted. Migration target kind names are proposed `CoopOperationKind` members.
+
+| # | kind(s) | band / addressing | owner rule | current failure modes (ledger) | -> operation kind / logicalPhase |
+|---|---------|-------------------|-----------|--------------------------------|-------------------------------|
+| 1 | `reward` `shop` `skip` `reroll` `check` `transfer` `lock` | `reward` base 0 `+ interactionCounter` (`:45,162-167`) | counter parity | #861 seq-blind await matched a stale cross-session reward pick; precursor reward matched by seq not kind (`handoff.md:19,192`) | `REWARD_*` under `REWARD_SELECT` |
+| 2 | `switch` | `faintSwitch` base 90_000 `+ fieldIndex` (`:47,169-174`) | the FAINTED mon's owner (`coopOwner`) | #786 faint-replacement; #851 post-half-wipe index skew -> owner-keyed match added (`coop-transport.ts:849-857`) | `FAINT_SWITCH` under `COMMAND`/`TURN_RESOLVE` |
+| 3 | `revival` | `revival` base 95_000 `+ fieldIndex` (`:48,176-181`) | Revival Blessing target mon owner | #809 revival prompt (`coop-transport.ts:878-879`) | `REVIVAL` under `TURN_RESOLVE` |
+| 4 | `abilityPicker` | `abilityPicker` base 6_000_000 `+ counter` (`:51,182-188`) | counter parity | ability-capsule owner/watcher relay | `ABILITY_PICK` under `INTERACTION` |
+| 5 | `biomeShop` | `biomeShop` base 7_000_000 `+ pinnedStart` (`:53,189-195`) | counter parity | #858 biome-shop vs map ordering race, one-sided fallback -> reciprocal `biomepick` barrier (`handoff.md:186-187`) | `SHOP_BUY` under `SHOP` |
+| 6 | `bargain` | `bargain` base 7_500_000 `+ coopBargainStart` (`:54,196-202`) | counter parity | #795 Giratina bargain; watcher adopts outcome blob | `BARGAIN` under `INTERACTION` |
+| 7 | `coloBoard` `coloPick` | `colosseum` base 7_600_000 `+ pinnedCounter` (`:56,203-209`) | counter parity | #829/#818 colosseum board; guest round-loop | `COLO_PICK` under `INTERACTION` |
+| 8 | `mePresent` `meResync` `me` `meSub` `meBtn` | `mePump` base 8_000_000 `+ counter` (`:59,210-216`) | counter parity | #859/#860 phantom ME turn (leftover battle chain parks guest); #862 wave-TYPE divergence; #855 ME catch-full sub-prompt (`handoff.md:188-194`) | `ME_PRESENT`/`ME_PICK`/`ME_SUB`/`ME_BUTTON` under `MYSTERY_ENCOUNTER` |
+| 9 | `quizAns` | `meQuiz` base 8_500_000 `+ (counter%2048)*16+(idx%16)` (`:60,217-223`) | counter parity | #818 quiz mirror; both run ErQuizPhase | `QUIZ_ANSWER` under `MYSTERY_ENCOUNTER` |
+| 10 | (ME terminal LEAVE/handoff) | `meTerm` base 9_000_000 `+ counter` (`:62,224-230`) | counter parity | #840 near-collision: `learnMove` was 9_000_001 INSIDE this band (`:29-36`); #859/#860 phantom turn | terminal transition of `MYSTERY_ENCOUNTER` |
+| 11 | `learnMoveForward` `learnMove` | `learnMoveFwd` 9_100_000 `+ partySlot`; `learnMove` singleton 9_500_000 (`:68,118,231-237,258-265`) | mon owner | #633 BUG3+5 per-slot forward; #840 relocation | `LEARN_MOVE` under `TURN_RESOLVE` |
+| 12 | `learnMoveBatchForward` `learnMoveBatch` | `learnMoveBatchFwd` 9_150_000 `+ partySlot` (`:75,238-244`) | mon owner | #848 shared level-up panel; panel error falls back to per-move relay (`coop-ui-registry.ts:97-103`) | `LEARN_MOVE_BATCH` under `TURN_RESOLVE` |
+| 13 | `dexSync` | `dexSync` singleton 9_200_000 (`:110,245-251`) | host broadcast | #794 dex/starter sync | host-broadcast side-effect of any commit (not owner-driven) |
+| 14 | `crossroads` | `crossroads` base 9_600_000 `+ pinnedStart` (`:81,266-272`) | counter parity (alternated) | #848 co-op biome choice; watcher mirrors owner cursor | `CROSSROADS_PICK` under `BIOME_SELECT` |
+| 15 | `biomePick` | `biomePick` base 9_700_000 `+ pinnedStart` (`:89,273-279`) | counter parity (alternated) | #863/#864 owner biome-travel only relayed on multi-node picker onSelect; every other terminal traveled silently (`handoff.md:198-200`) | `BIOME_PICK` under `BIOME_SELECT` |
+| 16 | `stormglass` | `stormglass` singleton 9_800_000 (`:98,280-286`) | HOST drives (one-time) | #130 one-time weather pick; unmirrored per-client prompt would diverge checksum | `STORMGLASS` under `INTERACTION` |
+| 17 | `catchFull` | `catchFull` singleton 9_900_000 (`:108,287-293`) | the CATCHER (ball-thrower) | #856 wild-catch full-party release is host-only; guest-thrown catch OPEN (`handoff.md:164-166`) | `CATCH_FULL` under `TURN_RESOLVE` |
+
+Registered choice-kind validation sets: `coop-seq-registry.ts:408-435` (17 named sets). These are the
+exact `expected-kind` allowlists each await declares today; each becomes one `CoopOperationKind` guard
+after migration (invariant 6 by `id` instead of by kind-set).
+
+### 2.2 Sentinel / pin fields (interaction-counter anchors)
+
+Not seq bands but the PIN values a surface captures once so its owner/relay stay stable for the whole
+interaction (`coop-session-controller.ts:472-478` explains why pinning exists — an inbound reconcile
+can bump the live counter mid-interaction):
+- `coopInteractionStart` / the pinned counter (`isLocalOwnerAtCounter(pinnedCounter)`,
+  `coop-session-controller.ts:480-491`; read in the tripwire `ui.ts:796-797`).
+- `coopBiomeStart` / `pinnedStart` — the crossroads + biomePick anchor (`coop-seq-registry.ts:270,277`).
+- `coopBargainStart` (`:200`), `coopMe*` ME counter pins (`ui.ts:796`, `coopMeInteractionStartValue`).
+
+**Migration mapping:** every pin becomes the `operationId` suffix. `operationId =
+${epoch}:${owner}:${pinnedStart}` makes the pin a structural component of idempotency (§1.6) rather
+than a per-surface convention — the "capture once, resolve owner from the pinned value" discipline
+(`coop-session-controller.ts:473-478`) becomes the id-minting rule.
+
+### 2.3 Rendezvous points (the SECOND control plane)
+
+`rendezvous` message (`coop-transport.ts:868-877`), `CoopRendezvous` (`coop-rendezvous.ts`). Named
+two-sided barriers, EXPLICITLY separate from the interaction counter (`coop-transport.ts:870-871`:
+"the counter says WHO picks; this says WHEN both may proceed"). Points today:
+- `cmd:<wave>:<turn>` — next-command-open barrier (`coop-transport.ts:874`).
+- `shop:<wave>:<counter>` — shop-pick-commit barrier (`coop-transport.ts:874`).
+- `biomepick:<wave>` — #858 reciprocal biome-shop-vs-map barrier (`handoff.md:186-187`).
+
+Failure modes: #858 (one-sided fallback race), the "berry-bush freeze" ordering trace
+(`coop-rendezvous.ts:181-182` — a `shop:3:2` arrival buffered before the `cmd:3:2` await opened);
+divergent-branch parks (`coop-rendezvous.ts:374` — the partner reached a point we never will).
+
+**Migration mapping:** rendezvous barriers are subsumed by `logicalPhase` + `revision`. A barrier
+exists today only because the two control planes advance independently and must be re-synchronized;
+once `logicalPhase` is host-stated and `revision` totally orders commits, "both may proceed" is
+"both have applied through `revision = R`." The reciprocal barrier becomes an ACK of the committing
+envelope (§4.2). Rendezvous is retired PER POINT as the surface that raised it migrates (e.g.
+`shop:` retires when REWARD_SELECT migrates), NOT wholesale — see the order in §2.5.
+
+### 2.4 The lobby handshake (pre-run control plane)
+
+Separate from in-run operations but part of the control surface:
+- `hello` (`coop-transport.ts:839`) — version + role + tiebreak. Protocol-version mismatch -> refuse
+  (`coop-session-controller.ts:843-852`). This is where `epoch` is negotiated (§1.4).
+- `runConfig` / `requestRunConfig` (`coop-transport.ts:935-955`) — host states difficulty +
+  challenges + seed + `netcodeMode` (`"lockstep"|"authoritative"`); guest adopts. Self-healing
+  (re-request until it lands).
+- `rosterSync` / `requestRoster` (`coop-transport.ts:915-966`) — each player's starter picks + ready.
+  #868 self-healing lobby handshake: one-shot `rosterSync` lost on a flap left `partnerReady` false
+  forever -> symmetric re-request added (`coop-transport.ts:956-965`).
+- `launchSnapshot` (`coop-transport.ts:1008`) / `resumeOffer`/`resumeReply`/`resumeStartNew`
+  (`:889-898`) — the launch/resume boundary that mints the epoch.
+
+**Migration mapping:** the lobby handshake is the epoch-0 -> epoch-1 transition. `runConfig` and
+`rosterSync` become the first committed operations of a new epoch (`logicalPhase: "IDLE"` -> first
+`COMMAND`), so #868's self-heal is subsumed by the reconnect tail (§4.4): a lost `rosterSync` is a
+missing revision the joining client requests. Migrate the lobby LAST (§2.5) — least frequent P0
+source and highest blast radius (a lobby regression blocks every run from starting).
+
+### 2.5 Recommended migration ORDER (risk-ordered)
+
+Ordered by live-P0 frequency (migrate the biggest bleeders first, each behind its old path as
+fallback per §5) then by blast radius (defer the surfaces whose regression blocks a whole run):
+
+1. **Biome travel (`biomePick` + `crossroads`, #14/#15).** The #863/#864 cluster — un-relayed owner
+   travel — was the most recent and most reproducible live P0 (`handoff.md:198-200`), and #865
+   remains OPEN in this exact path (`handoff.md:156-162`). Highest live-bug density; the operation
+   model (host commits the chosen biome, guest adopts, never derives) is the textbook cure for the
+   whole "watcher adopts / silent travel" class. `BIOME_SELECT` phase + `BIOME_PICK`/`CROSSROADS_PICK`.
+2. **Mystery encounter (`mePump`/`meTerm`/`meQuiz`, #8/#9/#10).** #859/#860/#862 phantom-turn +
+   wave-type divergence (`handoff.md:188-194`) — the second-densest cluster, with the nastiest
+   parked-await failure mode. `MYSTERY_ENCOUNTER` phase; the phantom-turn softlock
+   (`coop-replay-phases.ts:1042-1058`) is exactly what a host-stated `logicalPhase` eliminates (the
+   guest stops inferring "there is a battle turn" from a leftover chain).
+3. **Reward shop (`reward`* channel, #1).** #861 seq/kind blindness lived here
+   (`handoff.md:192-193`); highest-traffic interaction so idempotency+late-rejection (§1.6) pays off
+   most. `REWARD_SELECT` phase.
+4. **Post-battle wave-advance tail (guest-constructed tail, `coop-replay-phases.ts:1119-1192`).**
+   Not a relay `kind` but THE canonical control-plane leak: the guest builds VictoryPhase/BattleEnd/
+   NewBattle/GameOver itself. Migrating this makes `logicalPhase` host-authoritative for the
+   between-wave transition — the keystone that lets §3's allowlist stop denying and start allowing.
+5. **Biome/black-market/exotic shops + bargain + colosseum + ability picker (#4/#5/#6/#7).** Lower
+   frequency, well-contained; batch onto `SHOP`/`INTERACTION` once the primitive is proven on 1-3.
+6. **Faint-switch / revival / learn-move / catch-full / stormglass (#2/#3/#11/#12/#16/#17).**
+   Per-mon, in-battle, already the most heavily-guarded (#851 owner-key, #786, #856-open). Migrate
+   after the between-wave surfaces so a regression is contained to one turn, not a whole wave loop.
+7. **Lobby handshake + resume (§2.4).** LAST. Highest blast radius (blocks run start), lowest live-P0
+   rate. Migrate only once the in-run model is soaked, so the epoch-mint path is exercised by every
+   prior phase before it becomes load-bearing.
+
+Rationale in one line: **start where the P0s are (biome, ME, reward), install the keystone
+(host-stated phase for the wave tail) fourth so the renderer allowlist can flip, then sweep the
+low-frequency in-battle and lobby surfaces last where a regression is most contained or most rare.**
+
+---
