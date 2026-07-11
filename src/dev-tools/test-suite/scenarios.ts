@@ -14564,4 +14564,436 @@ export const DEV_SCENARIOS: DevScenario[] = [
       }
     },
   },
+  // ===========================================================================
+  // WEATHER — Eerie Fog (distinct), Snowy Wrath, Delta Stream weather-block
+  // ===========================================================================
+  {
+    label: "Eerie Fog: Fog Machine sets it",
+    description:
+      "Fog Machine (er 905) summons the DISTINCT Eerie Fog weather (NOT vanilla fog).\n"
+      + "DO: let the foe TACKLE you once, then use Curse.\n"
+      + "EXPECT: after the hit the banner shows 'An eerie fog crept in!'; Curse then acts\n"
+      + "as the GHOST-type Curse (Mightyena sacrifices ~half its HP and curses the foe)\n"
+      + "even though it's not a Ghost-type — proof the fog synergies fire under Eerie Fog.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.FOG_MACHINE),
+        MOVESET_OVERRIDE: [MoveId.SPLASH, MoveId.CURSE],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [makeStarter(SpeciesId.MIGHTYENA, { moveset: [MoveId.SPLASH, MoveId.CURSE] })];
+    },
+  },
+  {
+    label: "Snowy Wrath: chip + Ice Def",
+    description:
+      "Snowy Wrath (er 666) summons a wrathful blizzard for 8 turns.\n"
+      + "DO: keep using Splash.\n"
+      + "EXPECT: the non-Ice foe (Chansey) is chipped 1/16 max HP each turn; the Ice\n"
+      + "holder (Walrein) takes NO chip and its Defense is buffed +50% (open Summary).\n"
+      + "This is a DISTINCT weather — vanilla hail/snow (Abomasnow) is unaffected.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.SNOWY_WRATH),
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.WALREIN, { moveset: [MoveId.SPLASH, MoveId.SURF, MoveId.ICE_BEAM, MoveId.REST] })];
+    },
+  },
+  {
+    label: "Delta Stream: weather-move block",
+    description:
+      "Delta Stream (er 191) makes weather-based moves unusable (like Desolate Land vs Fire).\n"
+      + "DO: use Weather Ball, then use Thunderbolt.\n"
+      + "EXPECT: Weather Ball fizzles ('The mysterious strong winds dissipated the attack!')\n"
+      + "and deals no damage; Thunderbolt lands normally the next turn.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 80,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.WEATHER_BALL, MoveId.THUNDERBOLT],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.DELTA_STREAM,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.WEATHER_BALL, MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.THUNDER_WAVE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // MOVE — Ghastly Echo (848): the switch-in gets +50% move power for 1 turn
+  // ===========================================================================
+  {
+    label: "Move: Ghastly Echo empowers the switch-in",
+    description:
+      "Ghastly Echo (2.65 dex 848): 'Deals damage and switches. Switch-in gets 50%\n"
+      + "boost for 1 turn. Sound-based.' The damage + self force-switch + sound flag were\n"
+      + "already in; this is the previously-missing 'empower the switch-in' half.\n"
+      + "DO: with Gengar, use GHASTLY ECHO (it hits the foe and forces Gengar to switch\n"
+      + "out). Send out Pikachu when prompted. Turn 2, use THUNDERBOLT and note the\n"
+      + "damage; turn 3, use THUNDERBOLT again.\n"
+      + "EXPECT: after the switch, the banner reads 'Pikachu was empowered by the ghastly\n"
+      + "echo!'. Its FIRST move (turn 2 Thunderbolt) deals ~1.5x; its SECOND move (turn 3)\n"
+      + "is back to normal — the boost lasts a single acting turn. Compare the two damage\n"
+      + "numbers: the first is ~50% higher. (Enemy Harden only raises its Defense, which\n"
+      + "does not touch the special Thunderbolt, so the two hits differ only by the boost.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        // Bronzong (Steel/Psychic) is NOT Normal-typed, so it takes the Ghost-type
+        // Ghastly Echo (a Normal-type foe would be immune and never switch); its
+        // huge special bulk survives both Thunderbolts, and it has no trapping
+        // ability to block the forced switch.
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BRONZONG,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [erMove(ErMoveId.GHASTLY_ECHO), MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.THUNDER, MoveId.QUICK_ATTACK, MoveId.SWIFT],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // ABILITY — Soothsayer (773): 3-turn "not very effective" FLOOR (#52)
+  // ===========================================================================
+  {
+    label: "Ability: Soothsayer NVE-floors hits for 3 turns",
+    description:
+      "Soothsayer (2.65 dex 773): 'On entry, all attacks received are considered NOT\n"
+      + "very effective for 3 turns.' Fixed: it now CLAMPS the type-effectiveness to 0.5x\n"
+      + "(Tera-Shell-style), instead of the old flat x0.5 damage cut that mis-scaled\n"
+      + "super-effective and resisted hits.\n"
+      + "DO: with Machamp, use MACH PUNCH (Fighting, 4x vs the Aggron) on turns 1, 2, 3\n"
+      + "and 4.\n"
+      + "EXPECT: turns 1-3 read 'It's not very effective…' (the 4x is floored to 0.5x —\n"
+      + "small damage). On turn 4 the window has closed and it reads 'It's super\n"
+      + "effective!' with a big damage spike.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        MOVESET_OVERRIDE: [MoveId.MACH_PUNCH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.AGGRON,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: erAbility(5474), // Soothsayer
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.MACHAMP, {
+          moveset: [MoveId.MACH_PUNCH, MoveId.BULLET_PUNCH, MoveId.BULK_UP, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => boostEnemy([[Stat.DEF, 6]]), // survive four Mach Punches
+  },
+  // ===========================================================================
+  // ABILITY — Drakelp Head (932): consume-on-first-defend (#56)
+  // ===========================================================================
+  {
+    label: "Ability: Drakelp Head weakens only the FIRST hit",
+    description:
+      "Drakelp Head (2.65 dex 932): 'Weakens the FIRST move taken and drops that\n"
+      + "attacker's Attack.' Fixed: it is now a one-shot — only the first damaging hit is\n"
+      + "halved and the attacker's Attack drops once, then it is spent (was: blanket\n"
+      + "turn-1 halving + an Attack drop on EVERY hit).\n"
+      + "DO: with Alakazam, use PSYCHIC (special — so the -1 Attack it suffers does not\n"
+      + "muddy the damage) on turn 1, then PSYCHIC again on turn 2.\n"
+      + "EXPECT: turn 1 Psychic does roughly HALF the damage of turn 2 (the first hit is\n"
+      + "weakened), and Alakazam's Attack falls to -1 after turn 1. On turn 2 the damage\n"
+      + "is full and Alakazam's Attack stays at -1 (no second drop).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        MOVESET_OVERRIDE: [MoveId.PSYCHIC],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: erAbility(5690), // Drakelp Head
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.ALAKAZAM, {
+          moveset: [MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.CALM_MIND, MoveId.RECOVER],
+        }),
+      ];
+    },
+    onBattleStart: () => boostEnemy([[Stat.SPDEF, 6]]), // survive two Psychics
+  },
+  // ===========================================================================
+  // ABILITY — Gleam Eyes (707): foe held items suppressed (#54)
+  // ===========================================================================
+  {
+    label: "Ability: Gleam Eyes suppresses the foe's items",
+    description:
+      "Gleam Eyes (2.65 dex 707): on entry it reveals the foe's items (Frisk), drops\n"
+      + "their Sp. Atk (Scare), AND prevents their items from working (Embargo-style).\n"
+      + "The item-suppression clause was missing; it is now wired.\n"
+      + "NOTE: a faithful 2-turn window needs a dedicated Embargo battler tag (owned by a\n"
+      + "concurrent batch); this delivers the suppression while Gleam Eyes is on the field.\n"
+      + "DO: the Snorlax is pre-set to ~55% HP and holds a Sitrus Berry (heals at 50%).\n"
+      + "With Slowbro (Gleam Eyes forced active), use WATER GUN once to chip it below 50%.\n"
+      + "EXPECT: the Sitrus Berry does NOT trigger — Snorlax stays below half HP (normally\n"
+      + "it would eat the berry and heal back up).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5410), // Gleam Eyes (force active on the player)
+        MOVESET_OVERRIDE: [MoveId.WATER_GUN],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_HELD_ITEMS_OVERRIDE: [{ name: "BERRY", type: BerryType.SITRUS }],
+      });
+      return [
+        makeStarter(SpeciesId.SLOWBRO, {
+          moveset: [MoveId.WATER_GUN, MoveId.PSYCHIC, MoveId.SLACK_OFF, MoveId.CALM_MIND],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const e = globalScene.getEnemyPokemon();
+      if (e) {
+        e.hp = Math.floor(e.getMaxHp() * 0.55);
+        e.updateInfo();
+      }
+    },
+  },
+  // ===========================================================================
+  // ABILITY — Lead Coat (296): TRIPLES the holder's weight (#60)
+  // ===========================================================================
+  {
+    label: "Ability: Lead Coat triples the holder's weight",
+    description:
+      "Lead Coat (2.65 dex 296): '-40% physical damage, x0.9 Speed, TRIPLES the holder's\n"
+      + "weight' — mirroring its special-side twin Chrome Coat (539). The weight-triple\n"
+      + "clause was dropped in the port and is now restored.\n"
+      + "DO: the foe is a lightweight Meowth (~4 kg → 12 kg with Lead Coat). With Machamp,\n"
+      + "use LOW KICK (its power scales with the target's weight).\n"
+      + "EXPECT: Low Kick hits noticeably HARDER than the foe's real weight would suggest —\n"
+      + "the tripled weight bumps it into a higher power tier (40 BP instead of 20 BP).\n"
+      + "(Lead Coat's own -40% physical reduction is also in effect, so it is not a full\n"
+      + "doubling of damage, but the power tier jump is clear.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        MOVESET_OVERRIDE: [MoveId.LOW_KICK],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MEOWTH,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: erAbility(5034), // Lead Coat
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.MACHAMP, {
+          moveset: [MoveId.LOW_KICK, MoveId.BULLET_PUNCH, MoveId.BULK_UP, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // ABILITY — Evaporate (444): Mist shields the DOUBLES ALLY's self-drops (#60)
+  // ===========================================================================
+  {
+    label: "Ability: Evaporate Mist protects the ally too",
+    description:
+      "Evaporate (2.65 dex 444): 'Negates Water damage and sets Mist when hit by Water.\n"
+      + "Mist protects the ENTIRE TEAM from stat reductions, including self-drops.' The\n"
+      + "holder's own self-drop immunity was already in; this adds the DOUBLES ALLY.\n"
+      + "DO (double battle): turn 1, have Blastoise (Evaporate) use PROTECT while the foe\n"
+      + "Water Guns it (this sets Mist on your side); have Charizard use OVERHEAT. Repeat\n"
+      + "Overheat on turn 2 if needed.\n"
+      + "EXPECT: while your side's Mist is up, Charizard's OVERHEAT does NOT drop its own\n"
+      + "Sp. Atk — the ally is shielded by the holder's Mist (without Evaporate the ally's\n"
+      + "Sp. Atk would fall by 2 each Overheat).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        BATTLE_STYLE_OVERRIDE: "double",
+        ABILITY_OVERRIDE: erAbility(5180), // Evaporate (player side)
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.QUAGSIRE,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.WATER_GUN],
+      });
+      return [
+        makeStarter(SpeciesId.BLASTOISE, {
+          moveset: [MoveId.PROTECT, MoveId.SURF, MoveId.ICE_BEAM, MoveId.RAPID_SPIN],
+        }),
+        makeStarter(SpeciesId.CHARIZARD, {
+          moveset: [MoveId.OVERHEAT, MoveId.AIR_SLASH, MoveId.DRAGON_PULSE, MoveId.ROOST],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // ABILITY — Tera Shell / Teraform Zero: resist EVERY hit of a multi-hit (#46)
+  // ===========================================================================
+  {
+    label: "Ability: Tera Shell resists every multi-hit strike",
+    description:
+      "Tera Shell (607) / Teraform Zero (739): 'Activates on EACH hit of a multi-hit\n"
+      + "attack, unlike other similar abilities.' Regression check — a full-HP holder must\n"
+      + "resist EVERY sub-hit, not just the first (the effectiveness latch handles this).\n"
+      + "DO: with Breloom, use BULLET SEED (2-5 hits) against the full-HP Snorlax (Tera\n"
+      + "Shell forced active).\n"
+      + "EXPECT: 'It's not very effective…' shows and EVERY hit lands for the same reduced\n"
+      + "damage (all strikes floored to 0.5x), even though Snorlax is Normal-typed and\n"
+      + "Bullet Seed is Grass (naturally neutral) — the resist holds across all hits.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        MOVESET_OVERRIDE: [MoveId.BULLET_SEED],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.TERA_SHELL,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.BRELOOM, {
+          moveset: [MoveId.BULLET_SEED, MoveId.MACH_PUNCH, MoveId.SPORE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+    onBattleStart: () => boostEnemy([[Stat.DEF, 6]]), // survive all strikes to observe each resist
+  },
+  // ===========================================================================
+  // ABILITY — Mental Pollution (816): on-enrage FIELD ability suppression (#53)
+  // ===========================================================================
+  {
+    label: "Ability: Mental Pollution suppresses foes when the holder enrages",
+    description:
+      "Mental Pollution (816): 'Applies ability suppression to OTHER Pokemon when the\n"
+      + "user becomes enraged. Suppression lasts while those Pokemon remain on the field.'\n"
+      + "The foe here NEVER attacks you (it only Swaggers) — the old wire missed exactly\n"
+      + "this case. The foe holds Levitate (Ground-immune).\n"
+      + "DO: turn 1, use EARTHQUAKE — it does NOTHING (foe's Levitate blocks it). The foe\n"
+      + "Swaggers you, so you become ENRAGED ('Garchomp became enraged!'). Turn 2, use\n"
+      + "EARTHQUAKE again.\n"
+      + "EXPECT: turn 2 Earthquake now CONNECTS and damages the foe — its Levitate is\n"
+      + "suppressed because you are enraged, even though it never attacked you.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 80,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.MENTAL_POLLUTION),
+        MOVESET_OVERRIDE: [MoveId.EARTHQUAKE],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.ROTOM,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.LEVITATE,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SWAGGER],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.SWORDS_DANCE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // ABILITY — Gleam Eyes (707): real 2-turn Embargo on entry (#54)
+  // ===========================================================================
+  {
+    label: "Ability: Gleam Eyes disables foe items for exactly 2 turns",
+    description:
+      "Gleam Eyes (707): on entry it REVEALS the foe's items, drops all foes' Sp. Atk by\n"
+      + "one stage, and PREVENTS their items from working for exactly 2 TURNS (Embargo-\n"
+      + "style; Mega Stones are exempt). The foe holds Leftovers.\n"
+      + "DO: on entry you'll see 'frisked … found: Leftovers!' and 'Sp. Atk fell!'. Use\n"
+      + "TACKLE each turn to chip the tanky foe and watch its END-OF-TURN Leftovers heal.\n"
+      + "EXPECT: turns 1 and 2 — NO Leftovers heal (items disabled). Turn 3 — Leftovers\n"
+      + "heals again (the 2-turn window has lapsed).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.GLEAM_EYES),
+        MOVESET_OVERRIDE: [MoveId.TACKLE],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_HELD_ITEMS_OVERRIDE: [{ name: "LEFTOVERS" }],
+      });
+      return [
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.TACKLE, MoveId.WATERFALL, MoveId.CRUNCH, MoveId.DRAGON_DANCE],
+        }),
+      ];
+    },
+    onBattleStart: () => boostEnemy([[Stat.DEF, 6]]), // stay alive across 3 turns to observe the heal gap
+  },
+  // ===========================================================================
+  // MOVE — Fetch (969): retrieves a lost NON-BERRY item, then switches (#55)
+  // ===========================================================================
+  {
+    label: "Move: Fetch retrieves a knocked-off item, then switches",
+    description:
+      "Fetch (969): 'The user retrieves its lost item and switches to an ally.' The\n"
+      + "consumed-item ledger now records NON-BERRY losses (knocked-off items, consumed\n"
+      + "one-time items, shattered Gems), not just berries. Your lead holds Leftovers and\n"
+      + "the foe spams KNOCK OFF.\n"
+      + "DO: turn 1, let the foe KNOCK OFF your Leftovers (its icon disappears). Turn 2,\n"
+      + "use FETCH.\n"
+      + "EXPECT: Fetch RETRIEVES the Leftovers (a 'created … Leftovers' message) and your\n"
+      + "lead SWITCHES OUT to the ally — check the bench mon: the Leftovers is back on it.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 50,
+        MOVESET_OVERRIDE: [erMove(ErMoveId.FETCH)],
+        STARTING_HELD_ITEMS_OVERRIDE: [{ name: "LEFTOVERS" }],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 20,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.KNOCK_OFF],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [erMove(ErMoveId.FETCH), MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.MUNCHLAX, {
+          moveset: [MoveId.TACKLE, MoveId.DEFENSE_CURL, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
 ];
