@@ -1086,7 +1086,7 @@ export class CoopFinalizeTurnPhase extends Phase {
         // waveIndex may not tick before the next wave's first replay phase starts, so clear the
         // mark NOW (the wave boundary) or the new wave's turn 1 is killed as a "stale duplicate".
         getCoopBattleStreamer()?.clearFinalizedMark();
-        this.maybeRunCoopWaveAdvance();
+        CoopFinalizeTurnPhase.runPendingWaveAdvanceTail();
       } else if (meBattleWon) {
         // #847: TERMINAL final turn of an ME-spawned battle. Run the ME victory tail (VictoryPhase ->
         // handleMysteryEncounterVictory -> reward shop) and DO NOT queue turn-end - opening a phantom
@@ -1117,7 +1117,7 @@ export class CoopFinalizeTurnPhase extends Phase {
         }
         // The turn-end phases were pushed to the back of the queue above; pushing the victory tail
         // here runs it AFTER they drain (the in-flight turn finishes first, per the Oracle ordering).
-        this.maybeRunCoopWaveAdvance();
+        CoopFinalizeTurnPhase.runPendingWaveAdvanceTail();
       }
     } catch {
       // The turn-end queue / wave-advance is best-effort; a failure here must never hang the turn.
@@ -1148,7 +1148,12 @@ export class CoopFinalizeTurnPhase extends Phase {
    * One-shot + wave-guarded by {@linkcode consumeCoopPendingWaveAdvance}; a duplicate `waveResolved`
    * is a no-op. Fully guarded so a missing-pokemon edge can never hang the guest.
    */
-  private maybeRunCoopWaveAdvance(): void {
+  /**
+   * Consume and materialize the host-stated wave tail. Public/static so a host phaseRoute can recover a
+   * guest that already escaped finalization into a phantom CommandPhase after the terminal signal raced in.
+   * The underlying consume is one-shot, so normal finalize and routed recovery cannot double-queue it.
+   */
+  public static runPendingWaveAdvanceTail(): void {
     const pending = consumeCoopPendingWaveAdvance();
     if (pending == null) {
       return;

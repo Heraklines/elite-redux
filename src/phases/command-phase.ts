@@ -21,6 +21,7 @@ import {
   coopOwnerOfPlayerFieldSlot,
   getCoopBattleStreamer,
   getCoopBattleSync,
+  coopHasPendingWaveAdvance,
   getCoopController,
   getCoopNetcodeMode,
   getCoopRendezvous,
@@ -55,6 +56,7 @@ import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { getMoveTargets } from "#moves/move-utils";
 import { FieldPhase } from "#phases/field-phase";
+import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
 import type { MoveTargetSet } from "#types/move-target-set";
 import type { TurnMove } from "#types/turn-move";
 import i18next from "i18next";
@@ -634,6 +636,13 @@ export class CommandPhase extends FieldPhase {
               "rendezvous",
               `next-command barrier ${point} ROUTED AWAY to host-authoritative ${result.authoritativePoint}; closing phantom command phase`,
             );
+            // The live ME softlock can race waveResolved in AFTER finalize already queued a phantom turn.
+            // A host route to the reward shop sanctions discarding that locally-derived turn queue and
+            // materializing the same one-shot host WAVE_ADVANCE tail normal finalization would have queued.
+            if (result.authoritativePoint.startsWith("shop:") && coopHasPendingWaveAdvance()) {
+              globalScene.phaseManager.clearPhaseQueue();
+              CoopFinalizeTurnPhase.runPendingWaveAdvanceTail();
+            }
             this.end();
             return false;
           } else if (result.crossPoint !== undefined) {
