@@ -77,6 +77,28 @@ function makeStubScene(): BattleScene {
       setMode(): Promise<boolean> {
         return Promise.resolve(true);
       },
+      showText(
+        _text: string,
+        _delay: unknown,
+        callback?: (() => void) | null,
+      ): void {
+        callback?.();
+      },
+      showTextPromise(): Promise<void> {
+        return Promise.resolve();
+      },
+    },
+    money: 10_000,
+    updateMoneyText() {},
+    animateMoneyChanged() {},
+    playSound() {},
+    triggerPokemonFormChange() {},
+    load: {
+      once(_event: string, callback: () => void): void {
+        callback();
+      },
+      isLoading: () => false,
+      start() {},
     },
   } as unknown as BattleScene;
 }
@@ -99,8 +121,20 @@ function makeLearnMovePhase(learnMoveType: LearnMoveType, cost: number): LearnMo
 
 /** Drive the private guest dispatch (its guest branch ignores the 3 args). */
 function driveGuestLearnMove(phase: LearnMovePhase): void {
+  const pokemon = {
+    coopOwner: "host",
+    moveset: [] as { getName(): string }[],
+    usedTMs: [] as number[],
+    getMaxMoveCount: () => 4,
+    setMove(index: number): void {
+      this.moveset[index] = { getName: () => "Move" };
+    },
+    getNameToRender: () => "Stubmon",
+    species: { getName: () => "Stubmon" },
+    isEnemy: () => false,
+  };
   const fn = (phase as unknown as Record<string, (...args: unknown[]) => void>).coopAuthoritativeLearnMove;
-  fn.call(phase, [], {}, {});
+  fn.call(phase, pokemon.moveset, { id: MoveId.TACKLE, name: "Tackle" }, pokemon);
 }
 
 describe("#698 stale-reward-shop softlock - continuation-copy orphan + resync rescue", () => {

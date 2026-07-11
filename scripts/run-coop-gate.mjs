@@ -78,16 +78,7 @@ const PROD_FIDELITY_GATE_WAVES = 12;
  * fix behind a defect that predates it. Keep this list EMPTY-by-default discipline: only a file proven to
  * fail solo belongs here, each with its reason.
  */
-const QUARANTINE = new Map([
-  [
-    "coop-shop-continuation-orphan.test.ts",
-    "PRE-EXISTING (fails solo on parent HEAD): all 11 tests PASS but the guest CoopAuthoritative "
-      + "LearnMovePhase path leaks 4 Unhandled Rejections (pokemon.setMove / globalScene.updateMoneyText "
-      + "are absent on the engine-free stub scene), so the PROCESS exits 1. Not a scheduling issue - a test "
-      + "mock-completeness defect. Verify: ER_SCENARIO=1 npx vitest run "
-      + "test/tests/elite-redux/coop/coop-shop-continuation-orphan.test.ts",
-  ],
-]);
+const QUARANTINE = new Map();
 
 /** Read a test file and report whether it gates on ER_SCENARIO (i.e. it boots the real engine). */
 function isEngineGated(absPath) {
