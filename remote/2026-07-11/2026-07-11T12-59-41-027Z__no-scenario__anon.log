@@ -1,0 +1,54 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrgclqae-8t5n
+mode:     ?  wave:?
+seed:     m3ZViCBoN02AIdBwMQ6JLFZF
+party:    
+enemy:    
+
+----- COMMENT -----
+couldnt reload
+
+----- CONSOLE -----
+[12:57:52.021] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[12:57:52.620] LOG: [ER] build mrgclqae-8t5n
+[12:57:52.731] LOG: [dev-tools] loaded — 513 scenarios + Send Logs button
+[12:58:00.741] DEBUG: Destroying loading scene
+[12:58:00.741] DEBUG: Destroyed loading scene
+[12:58:00.942] LOG: Seed: m3ZViCBoN02AIdBwMQ6JLFZF
+[12:58:00.942] LOG: Wave Seed: m3ZViCBoN02AIdBwMQ6JLFZF 0
+[12:58:03.402] LOG: %cStart Phase LoginPhase color:green;
+[12:58:03.593] LOG: Client Session: 3qb00OefFmVjaQrM3d80Qw7c5ISx24ZG
+[12:58:03.808] DEBUG: Using cached system data
+[12:58:03.885] LOG: %cStart Phase TitlePhase color:green;
+[12:58:03.889] LOG: use seasonal splash messages true
+[12:58:12.233] LOG: Getting Session Slot id: %d 0
+[12:58:12.237] LOG: Getting Session Slot id: %d 1
+[12:58:12.238] LOG: Getting Session Slot id: %d 2
+[12:58:12.239] LOG: Getting Session Slot id: %d 3
+[12:58:12.240] LOG: Getting Session Slot id: %d 4
+[12:58:12.241] LOG: Getting Session Slot id: %d 0
+[12:58:12.356] ERROR: Invalid save data JSON detected! Session not found.
+[12:58:12.357] ERROR: Invalid save data JSON detected! Session not found.
+[12:58:12.360] ERROR: Invalid save data JSON detected! Session not found.
+[12:58:12.362] ERROR: Invalid save data JSON detected! Session not found.
+[12:58:13.949] LOG: Getting Session Slot id: %d 0
+[12:58:13.951] WARN: [coop:launch] loadSession slot=0 REFUSED: co-op save without a live partner connection (#807)
+[12:58:13.952] ERROR: TypeError: can't access property "getStartingBiome", (intermediate value).gameMode is undefined
+end@https://elite-redux-staging.pages.dev/assets/battle-scene-2n4Exjea.js:462:846
+loadSaveSlot@https://elite-redux-staging.pages.dev/assets/battle-scene-2n4Exjea.js:461:1362
+
+[12:58:13.954] ERROR: [unhandledrejection] TypeError: can't access property "isCoop", (intermediate value).gameMode is undefined
+showText@https://elite-redux-staging.pages.dev/assets/battle-scene-2n4Exjea.js:1052:16689
+loadSaveSlot@https://elite-redux-staging.pages.dev/assets/battle-scene-2n4Exjea.js:461:1399
+
+[12:58:15.485] ERROR: [uncaught] TypeError: can't access property "isCoop", (intermediate value).gameMode is undefined @ https://elite-redux-staging.pages.dev/assets/battle-scene-2n4Exjea.js:1052:14515
+[12:58:51.407] ERROR: [uncaught] TypeError: can't access property "isCoop", (intermediate value).gameMode is undefined @ https://elite-redux-staging.pages.dev/assets/battle-scene-2n4Exjea.js:1052:14515
+[12:58:51.718] ERROR: [uncaught] TypeError: can't access property "isCoop", (intermediate value).gameMode is undefined @ https://elite-redux-staging.pages.dev/assets/battle-scene-2n4Exjea.js:1052:14515
+[12:58:51.910] ERROR: [uncaught] TypeError: can't access property "isCoop", (intermediate value).gameMode is undefined @ https://elite-redux-staging.pages.dev/assets/battle-scene-2n4Exjea.js:1052:14515
+[12:58:52.102] ERROR: [uncaught] TypeError: can't access property "isCoop", (intermediate value).gameMode is undefined @ https://elite-redux-staging.pages.dev/assets/battle-scene-2n4Exjea.js:1052:14515
+[12:58:52.302] ERROR: [uncaught] TypeError: can't access property "isCoop", (intermediate value).gameMode is undefined @ https://elite-redux-staging.pages.dev/assets/battle-scene-2n4Exjea.js:1052:14515
+[12:58:52.478] ERROR: [uncaught] TypeError: can't access property "isCoop", (intermediate value).gameMode is undefined @ https://elite-redux-staging.pages.dev/assets/battle-scene-2n4Exjea.js:1052:14515
+[12:58:52.670] ERROR: [uncaught] TypeError: can't access property "isCoop", (intermediate value).gameMode is undefined @ https://elite-redux-staging.pages.dev/assets/battle-scene-2n4Exjea.js:1052:14515
+
+----- REPLAY TRACE (JSON) -----
+(none)
