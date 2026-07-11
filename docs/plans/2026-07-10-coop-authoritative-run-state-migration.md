@@ -1323,3 +1323,18 @@ suites are 46/46 green; operation-runtime plus lobby/role and the real duo cold-
 The duo proof asserts both peers share the pre-resume epoch, the host bumps on acceptance, and the guest adopts
 the new epoch before applying the authoritative snapshot. Cross-epoch rejection remains pinned by the generic
 operation-runtime lifecycle suite.
+
+### 8.9 Renderer allowlist enforcement flip
+
+`81dac3137` (failure-first `a88d76d0e`) flips §3 from warn-first observation to shipped default-deny.
+On an authoritative guest, any phase outside the presentation/input-intent allowlist is now replaced by
+`CoopInertPhase` and logged `ALLOWLIST BLOCK`; solo, host, and non-authoritative sessions still bypass the gate.
+Observe mode remains available immediately through `?coopgateenforce=0`, localStorage, the environment flag,
+or the test setter. The pure allowlist + wave tests are 36/36 green. Twelve real two-engine suites spanning
+wave 10/biome boundary, biome operation, ME, reward, catch-full, faint-switch, revival, learn-move,
+stormglass, cold resume, and trainer transitions all passed with enforcement forced on.
+
+Strict-tail sanctioning remains observe-only: the matrix exposed expected ME/egg tail warnings because those
+tails are governed by `ME_TERMINAL`/local egg continuation rather than a standard `WAVE_ADVANCE`. They remain
+explicitly allowlisted until their operation-specific sanction is wired; this does not reopen arbitrary phases,
+because every non-allowlisted phase is already denied by default.
