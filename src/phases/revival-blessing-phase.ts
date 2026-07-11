@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { COOP_REVIVAL_SEQ_BASE, getCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { commitRevivalAuthorityDecision, sendCoopRevivalPrompt } from "#data/elite-redux/coop/coop-revival-operation";
 import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REVIVAL_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { SwitchType } from "#enums/switch-type";
@@ -45,6 +46,21 @@ export class RevivalBlessingPhase extends BattlePhase {
           if (!pokemon || !pokemon.isFainted()) {
             return this.end();
           }
+          const controller = getCoopController();
+          if (controller?.role === "host") {
+            commitRevivalAuthorityDecision({
+              payload: {
+                type: "decision",
+                fieldIndex: this.user.getFieldIndex(),
+                partySlot: slotIndex,
+                speciesId: pokemon.species?.speciesId ?? 0,
+              },
+              ownerRole: "host",
+              localRole: "host",
+              wave: globalScene.currentBattle?.waveIndex ?? 0,
+              turn: globalScene.currentBattle?.turn ?? 0,
+            });
+          }
           this.applyRevive(slotIndex, pokemon);
         }
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
@@ -68,7 +84,9 @@ export class RevivalBlessingPhase extends BattlePhase {
     const fieldIndex = this.user.getFieldIndex();
     const seq = COOP_REVIVAL_SEQ_BASE + fieldIndex;
     coopLog("replay", `revival owner-pick: awaiting partner pick seq=${seq} (user slot=${fieldIndex})`);
-    relay.promptRevival(fieldIndex);
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    const turn = globalScene.currentBattle?.turn ?? 0;
+    sendCoopRevivalPrompt(relay, fieldIndex, { localRole: "host", wave, turn });
     void relay.awaitInteractionChoice(seq, getCoopFaintSwitchWaitMs(), COOP_REVIVAL_CHOICE_KINDS).then(res => {
       const party = globalScene.getPlayerParty();
       let slotIndex = res?.choice ?? -1;
@@ -92,6 +110,18 @@ export class RevivalBlessingPhase extends BattlePhase {
         coopLog("replay", `revival owner-pick: fallback -> party[${slotIndex}]`);
       }
       if (slotIndex >= 0) {
+        commitRevivalAuthorityDecision({
+          payload: {
+            type: "decision",
+            fieldIndex,
+            partySlot: slotIndex,
+            speciesId: party[slotIndex].species?.speciesId ?? 0,
+          },
+          ownerRole: this.user.coopOwner ?? "guest",
+          localRole: "host",
+          wave,
+          turn,
+        });
         this.applyRevive(slotIndex, party[slotIndex]);
       }
       this.end();

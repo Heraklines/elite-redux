@@ -69,6 +69,7 @@ import {
   COOP_CAP_OP_COLOSSEUM,
   COOP_CAP_OP_FAINT_SWITCH,
   COOP_CAP_OP_ME,
+  COOP_CAP_OP_REVIVAL,
   COOP_CAP_OP_REWARD,
   COOP_CAP_OP_WAVE,
   COOP_CAP_RENDERER_ALLOWLIST_ENFORCE,
@@ -125,6 +126,7 @@ import type {
   CoopMePresentPayload,
   CoopMeSubPayload,
   CoopMeTerminalPayload,
+  CoopRevivalPayload,
   CoopRewardActionPayload,
   CoopShopBuyPayload,
   CoopWaveAdvancePayload,
@@ -137,6 +139,11 @@ import {
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
+import {
+  isCoopRevivalOperationEnabled,
+  resetCoopRevivalOperationState,
+  setCoopRevivalOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-revival-operation";
 import {
   armCoopRewardJournalMaterialization,
   COOP_REWARD_ACTION_STRIDE,
@@ -1490,6 +1497,7 @@ export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | u
     setCoopBargainOperationRevisionFloor(marks["op:bargain"] ?? 0);
     setCoopColosseumOperationRevisionFloor(marks["op:colosseum"] ?? 0);
     setCoopFaintSwitchOperationRevisionFloor(marks["op:faintSwitch"] ?? 0);
+    setCoopRevivalOperationRevisionFloor(marks["op:revival"] ?? 0);
     setCoopRewardOperationRevisionFloor(marks["op:reward"] ?? 0);
     setCoopMeOperationRevisionFloor(marks["op:me"] ?? 0);
     // Wave-2f KEYSTONE (W2e-R P0-3): floor the wave-advance producer + guest so a resumed run continues the
@@ -2096,6 +2104,20 @@ function materializeCoopAbilityOutcomeFromOp(runtime: CoopRuntime, envelope: Coo
   return true;
 }
 
+/** Feed a journal-delivered Revival Blessing prompt into the guest's existing picker seam. */
+function materializeCoopRevivalPromptFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const operation = envelope.pendingOperation;
+  const payload = operation?.payload as CoopRevivalPayload | undefined;
+  if (operation?.kind !== "REVIVAL" || payload?.type !== "prompt") {
+    return false;
+  }
+  runtime.interactionRelay.materializeCommittedRevivalPrompt(payload.fieldIndex, operation.id);
+  return true;
+}
+
 /** Feed one journal-delivered colosseum board/pick into the receiver's existing safe FIFOs. */
 function materializeCoopColosseumActionFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
   if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
@@ -2573,6 +2595,9 @@ function buildLocalCoopCapabilities(): CoopCapabilityKey[] {
   if (isCoopFaintSwitchOperationEnabled()) {
     caps.push(COOP_CAP_OP_FAINT_SWITCH);
   }
+  if (isCoopRevivalOperationEnabled()) {
+    caps.push(COOP_CAP_OP_REVIVAL);
+  }
   if (isCoopMeOperationEnabled()) {
     caps.push(COOP_CAP_OP_ME);
   }
@@ -2620,6 +2645,7 @@ export function assembleCoopRuntime(
   resetCoopBargainOperationState();
   resetCoopColosseumOperationState();
   resetCoopFaintSwitchOperationState();
+  resetCoopRevivalOperationState();
   // Wave-2d: same fresh-control-plane reset for the reward-shop + biome-market operation state (SURFACE 3).
   resetCoopRewardOperationState();
   // Wave-2c: the mystery-encounter operation surface shares the same fresh-control-plane discipline (§8
@@ -2693,6 +2719,7 @@ export function assembleCoopRuntime(
   registerCoopOperationLiveSink("op:colosseum", envelope => materializeCoopColosseumActionFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:reward", envelope => materializeCoopRewardActionFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:me", envelope => materializeCoopMeOperationFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:revival", envelope => materializeCoopRevivalPromptFromOp(runtime, envelope));
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream, durability);
   wireCoopDurabilitySnapshotReceiver(controller, battleStream, durability);
@@ -2860,6 +2887,7 @@ export function clearCoopRuntime(): void {
   resetCoopBargainOperationState();
   resetCoopColosseumOperationState();
   resetCoopFaintSwitchOperationState();
+  resetCoopRevivalOperationState();
   // Wave-2d: drop the reward-shop + biome-market operation state too (SURFACE 3).
   resetCoopRewardOperationState();
   // Wave-2c: same teardown for the mystery-encounter operation surface.

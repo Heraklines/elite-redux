@@ -91,6 +91,16 @@ export function sendCoopFaintSwitchChoice(
   relay?.sendInteractionChoice(COOP_FAINT_SWITCH_SEQ_BASE + fieldIndex, "switch", partySlot, [...data]);
 }
 
+/** Production carrier seam for a Revival Blessing owner's target decision. */
+export function sendCoopRevivalChoice(
+  relay: CoopInteractionRelay | null,
+  fieldIndex: number,
+  partySlot: number,
+  data: number[],
+): void {
+  relay?.sendInteractionChoice(COOP_REVIVAL_SEQ_BASE + fieldIndex, "revival", partySlot, [...data]);
+}
+
 /**
  * #806 STALL-WATCHDOG SUPPRESSION (faint-replacement window). While a faint-replacement pick is pending -
  * the host AWAITING the partner's relayed choice ({@linkcode ShowdownEnemyFaintSwitchPhase} / the co-op
@@ -278,6 +288,9 @@ export class CoopInteractionRelay {
   private readonly rawChoiceCredits = new Map<string, number>();
   /** Journal choices awaiting a later raw legacy echo, which must be dropped rather than double-applied. */
   private readonly committedChoiceCredits = new Map<string, number>();
+  /** Raw/journal prompt echo credits, keyed by the prompt operation id. */
+  private readonly rawRevivalPromptCredits = new Map<string, number>();
+  private readonly committedRevivalPromptCredits = new Map<string, number>();
 
   /** seq -> FIFO queue of choices that arrived before their waiter. */
   private readonly inbox = new Map<number, CoopInteractionChoice[]>();
@@ -317,9 +330,18 @@ export class CoopInteractionRelay {
   }
 
   /** #809: ask the partner to open its Revival Blessing picker for `fieldIndex`. */
-  promptRevival(fieldIndex: number): void {
+  promptRevival(fieldIndex: number, operationId?: string): void {
     coopLog("relay", `SEND revivalPrompt fieldIndex=${fieldIndex} (#809)`);
-    this.transport.send({ t: "revivalPrompt", fieldIndex });
+    this.transport.send({ t: "revivalPrompt", fieldIndex, ...(operationId === undefined ? {} : { operationId }) });
+  }
+
+  /** Deliver a committed prompt through the same picker seam, suppressing its raw legacy echo. */
+  materializeCommittedRevivalPrompt(fieldIndex: number, operationId: string): void {
+    if (this.consumeEchoCredit(this.rawRevivalPromptCredits, operationId)) {
+      return;
+    }
+    this.addEchoCredit(this.committedRevivalPromptCredits, operationId);
+    this.onRevivalPrompt?.(fieldIndex);
   }
 
   /** #856: ask the CATCHER partner to open its full-party keep/release picker for a wild catch. */
@@ -775,6 +797,8 @@ export class CoopInteractionRelay {
     this.committedOutcomeCredits.clear();
     this.rawChoiceCredits.clear();
     this.committedChoiceCredits.clear();
+    this.rawRevivalPromptCredits.clear();
+    this.committedRevivalPromptCredits.clear();
     this.rewardOptionsPending.clear();
     this.rewardOptionsInbox.clear();
     this.cancelledSeqs.clear();
@@ -808,6 +832,8 @@ export class CoopInteractionRelay {
     this.committedOutcomeCredits.clear();
     this.rawChoiceCredits.clear();
     this.committedChoiceCredits.clear();
+    this.rawRevivalPromptCredits.clear();
+    this.committedRevivalPromptCredits.clear();
     this.rewardOptionsInbox.clear();
     // A seq sticky-cancelled in the PRIOR epoch must not keep resolving null in the NEW epoch (seqs reuse
     // low counters), so clear the cancel marks alongside the buffers.
@@ -896,6 +922,12 @@ export class CoopInteractionRelay {
   private handle(msg: CoopMessage): void {
     if (msg.t === "revivalPrompt") {
       coopLog("relay", `RECV revivalPrompt fieldIndex=${msg.fieldIndex} (#809)`);
+      if (msg.operationId !== undefined) {
+        if (this.consumeEchoCredit(this.committedRevivalPromptCredits, msg.operationId)) {
+          return;
+        }
+        this.addEchoCredit(this.rawRevivalPromptCredits, msg.operationId);
+      }
       this.onRevivalPrompt?.(msg.fieldIndex);
       return;
     }

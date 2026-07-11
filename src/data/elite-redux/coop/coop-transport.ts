@@ -895,7 +895,7 @@ export type CoopMessage =
    */
   | { t: "rendezvous"; point: string }
   /** #809: host asks the partner to pick a Revival Blessing target for its own mon. */
-  | { t: "revivalPrompt"; fieldIndex: number }
+  | { t: "revivalPrompt"; fieldIndex: number; operationId?: string | undefined }
   /**
    * #856: host asks the CATCHER (the partner who threw the ball) to drive the FULL-party keep/release
    * picker for a successful wild catch. The recipient opens the real replace-or-skip picker and relays the

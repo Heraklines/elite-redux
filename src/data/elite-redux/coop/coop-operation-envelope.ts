@@ -207,6 +207,16 @@ export interface CoopFaintSwitchPayload {
   readonly data: number[];
 }
 
+/** REVIVAL control stream: host prompt followed by the host-resolved owner decision. */
+export type CoopRevivalPayload =
+  | { readonly type: "prompt"; readonly fieldIndex: number }
+  | {
+      readonly type: "decision";
+      readonly fieldIndex: number;
+      readonly partySlot: number;
+      readonly speciesId: number;
+    };
+
 // -----------------------------------------------------------------------------
 // Wave-2c: mystery-encounter payloads (§2.1 #8/#9/#10, MYSTERY_ENCOUNTER phase). The ME surface is
 // owner-alternated with the choice-forwarding model (#693: the guest never runs the encounter

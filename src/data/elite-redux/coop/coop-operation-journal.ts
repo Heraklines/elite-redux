@@ -84,6 +84,9 @@ function coopOperationClassForEnvelope(envelope: CoopAuthoritativeEnvelopeV1): s
   if (envelope.pendingOperation?.kind === "FAINT_SWITCH" && envelope.logicalPhase === "TURN_RESOLVE") {
     return "op:faintSwitch";
   }
+  if (envelope.pendingOperation?.kind === "REVIVAL" && envelope.logicalPhase === "TURN_RESOLVE") {
+    return "op:revival";
+  }
   if (envelope.logicalPhase === "INTERACTION") {
     switch (envelope.pendingOperation?.kind) {
       case "BARGAIN":

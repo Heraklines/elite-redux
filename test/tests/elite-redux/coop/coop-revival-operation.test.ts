@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { COOP_REVIVAL_SEQ_BASE, sendCoopRevivalChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   armCoopRevivalIntentResend,
   commitRevivalAuthorityDecision,
@@ -12,8 +13,7 @@ import {
   setCoopRevivalOperationEnabled,
   setCoopRevivalRetryMs,
 } from "#data/elite-redux/coop/coop-revival-operation";
-import { COOP_REVIVAL_SEQ_BASE, sendCoopRevivalChoice } from "#data/elite-redux/coop/coop-interaction-relay";
-import { assembleCoopRuntime, clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
@@ -45,8 +45,8 @@ describe("co-op Revival Blessing operation migration", () => {
     });
     sendCoopRevivalChoice(guestRuntime.interactionRelay, COOP_GUEST_FIELD_INDEX, 3, [0, 9]);
 
-    expect(prompts).toBe(1);
     expect(await awaited).toMatchObject({ choice: 3, data: [0, 9], kind: "revival" });
+    expect(prompts).toBe(1);
   });
 
   it("DURABILITY + EXACTLY ONCE: a dropped raw prompt is materialized once from the journal", async () => {
@@ -67,15 +67,35 @@ describe("co-op Revival Blessing operation migration", () => {
       expect(fieldIndex).toBe(COOP_GUEST_FIELD_INDEX);
       prompts++;
     };
+    setCoopRuntime(hostRuntime);
 
     sendCoopRevivalPrompt(hostRuntime.interactionRelay, COOP_GUEST_FIELD_INDEX, {
       localRole: "host",
       wave: 4,
       turn: 2,
     });
+    await new Promise(resolve => setTimeout(resolve, 0));
 
     expect(pair.faultsInjected(), "the raw revivalPrompt was actually dropped").toBe(1);
     expect(prompts, "the committed prompt opened exactly one guest picker").toBe(1);
+  });
+
+  it("EXACTLY ONCE: the journal prompt and its raw legacy echo open only one picker", async () => {
+    const pair = createLoopbackPair();
+    const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
+    let prompts = 0;
+    guestRuntime.interactionRelay.onRevivalPrompt = () => prompts++;
+    setCoopRuntime(hostRuntime);
+
+    sendCoopRevivalPrompt(hostRuntime.interactionRelay, COOP_GUEST_FIELD_INDEX, {
+      localRole: "host",
+      wave: 4,
+      turn: 3,
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(prompts, "raw + journal are two carriers for one prompt").toBe(1);
   });
 
   it("INTENT RECOVERY: a dropped owner choice is resent until the host commits the resolved decision", async () => {
