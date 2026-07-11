@@ -1,0 +1,65 @@
+===== COOP SOAK RESULT =====
+profile: level
+verdict: FAIL
+waves_requested: 55
+run: 29141729306 (main)
+timestamp: 2026-07-11T05-53-28Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260711 WAVES=55 - replay this run with:  SOAK_SEED=20260711 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=330 guest=220
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=610 guest=330
+[22m[39m[coop-soak] scalar-lag wave 13 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=800 guest=610
+[22m[39m[coop-soak] scalar-lag wave 14 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1000 guest=800
+[coop-soak] scalar-lag wave 20 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=2310 guest=1000
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=3800 guest=2970
+[22m[39m[coop-soak] scalar-lag wave 27 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=4890 guest=3800
+[22m[39m[coop-soak] scalar-lag wave 28 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=5850 guest=4890
+[22m[39m[coop-soak] scalar-lag wave 35 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=6770 guest=5850
+[22m[39m[coop-soak] scalar-lag wave 43 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=8220 guest=6770
+[22m[39m[coop-soak] scalar-lag wave 44 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=9050 guest=8220
+[coop-soak] scalar-lag wave 50 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=12120 guest=9050
+[22m[39m[coop-soak] scalar-lag wave 55 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=15490 guest=13440
+[22m[39m[coop-soak] DONE seed=20260711 waves=55/55 resyncHeals=0 assertions=0 findings=0 trainerWaves=13 (fixed=5 random=8) skips={"mysteryEncounterDisabledV1":1} elapsedMs=86140
+
+----- vitest result tail -----
+[coop-soak-coverage]   SKIP situation:revivalBlessing - no Revival Blessing reward is taken, so the owner-pick relay never fires => FOLLOW-UP: drive a Revival Blessing reward in the soak
+[coop-soak-coverage]   SKIP situation:saveResume - the DEFAULT soak is a single continuous process (no save/resume); the resume leg (coop-soak-resume.test.ts) serializes the host session mid-run + reboots the guest from the snapshot => FOLLOW-UP: #807/#810/#849 BUILD 3 landed the inline save-resume leg (coop-soak-driver resumeWaves + coop-soak-resume.test.ts serializes the host session, reboots the GUEST via applyCoopLaunchSession, and asserts byte-equal convergence + a green continuation); the default run does no save/resume, so the default partition is unchanged
+[coop-soak-coverage]   SKIP situation:single - the soak forces battleStyle 'double', so a single (1v1) wild wave never rolls => FOLLOW-UP: run a single-battle-style soak variant to cover the 1-slot command path
+[coop-soak-coverage]   SKIP situation:tera - the soak never terastallizes => FOLLOW-UP: drive a seeded terastallize (move.select tera flag)
+[coop-soak-coverage]   SKIP situation:transportFault - transport fault injection is covered by the dedicated fault test (coop-transport-fault), not the soak => FOLLOW-UP: none - covered by the Layer-A transport-fault test
+[coop-soak-coverage]   SKIP situation:trio - 3-player co-op (trio seating) is not stood up by the two-engine harness => FOLLOW-UP: extend the harness to a three-engine trio rig
+[coop-soak-coverage]   SKIP situation:triple - triple battles are not forced by the soak => FOLLOW-UP: run a triple-battle-style soak variant
+[coop-soak-coverage]   SKIP situation:willYouSwitch - the 'will you switch?' post-KO prompt is not driven => FOLLOW-UP: drive the will-you-switch prompt in the soak
+[coop-soak-coverage] ===========================================
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > plays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m87206[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:149:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mError[22m: [coop-soak-coverage] COMPLETENESS BACKSTOP FAILED (profile=level, seed 20260711, 55 waves):
+  - LEVEL FAINT CHANNEL COLD: the level party is built to FAINT reliably, but 2 faint surface(s) went unexercised - the profile's whole point is to GUARANTEE the faint/switch/replace machinery (#845-#848). RED, not a narrowing (replay SOAK_SEED=20260711 SOAK_PROFILE=level): [kind:switch, situation:singleFaint][39m
+[36m [2m❯[22m assertSoakCompleteness test/tools/coop-soak-coverage.ts:[2m1034:13[22m[39m
+    [90m1032|[39m     const faintCold = sorted(FAINT_PROMOTABLE).filter(s => expected.ha…
+    [90m1033|[39m     [35mif[39m (faintCold[33m.[39mlength [33m>[39m [34m0[39m) {
+    [90m1034|[39m       [35mthrow[39m [35mnew[39m [33mError[39m(
+    [90m   |[39m             [31m^[39m
+    [90m1035|[39m         `[coop-soak-coverage] COMPLETENESS BACKSTOP FAILED (profile=le…
+    [90m1036|[39m           + `  - LEVEL FAINT CHANNEL COLD: the level party is built to…
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m248:7[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 05:51:37
+[2m   Duration [22m 110.87s[2m (transform 17.97s, setup 22.07s, import 149ms, tests 87.67s, environment 768ms)[22m
+
