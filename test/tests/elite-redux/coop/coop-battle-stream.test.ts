@@ -458,6 +458,40 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("replays the complete encounter authority after first-envelope loss", async () => {
+      const pair = wrapCoopFaultPair(createLoopbackPair(), COOP_NO_FAULT_PROFILE, { seed: 0x454e4354 });
+      const hostStream = new CoopBattleStreamer(pair.host);
+      const guestStream = new CoopBattleStreamer(pair.guest);
+      const party = [{ fieldIndex: 0, data: { speciesId: 307, level: 40 } }];
+      const encounter = {
+        battleType: 1,
+        mysteryEncounterType: -1,
+        formatId: "double",
+        enemyLevels: [40, 41],
+        trainer: {
+          trainerType: 12,
+          variant: 2,
+          partyTemplateIndex: 1,
+          name: "Authority",
+          partnerName: "Replay",
+        },
+      };
+
+      pair.armNextDrop("enemyPartySync", "host");
+      hostStream.sendEnemyParty(9, party, -1, 1, undefined, encounter);
+      await guestStream.awaitEnemyPartyWithRetry(9, wave => guestStream.requestEnemyParty(wave), {
+        timeoutMs: 1_000,
+        retryIntervalMs: 100,
+        maxRetries: 1,
+      });
+
+      expect(guestStream.consumeEnemyPartyEncounter(9)).toEqual(encounter);
+      expect(guestStream.consumeEnemyPartyEncounter(9), "encounter authority is consumed atomically").toBeUndefined();
+
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
     it("awaitEnemyPartyWithRetry resolves immediately from a party buffered BEFORE the await (no retry needed)", async () => {
       const { host, guest } = createLoopbackPair();
       const hostStream = new CoopBattleStreamer(host);
