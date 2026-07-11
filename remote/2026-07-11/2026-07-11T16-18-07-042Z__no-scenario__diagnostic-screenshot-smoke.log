@@ -1,0 +1,343 @@
+url:      http://127.0.0.1:5173/
+build:    ?
+mode:     ?  wave:?
+seed:     ?
+party:    
+enemy:    
+
+----- COMMENT -----
+diagnostic screenshot smoke
+
+----- SCREENSHOT -----
+paired attachment: 960x540 image/webp
+
+----- CONSOLE -----
+[16:17:51.193] LOG: Manifest not found: SyntaxError: Failed to execute 'json' on 'Response': Unexpected end of JSON input
+SyntaxError: Unexpected end of JSON input
+    at http://127.0.0.1:5173/src/init/init-manifest.ts:3:63
+    at async http://127.0.0.1:5173/src/init/init-manifest.ts:3:19
+[16:17:51.706] ERROR: Error loading fonts: NetworkError: A network error occurred.
+[16:17:51.712] ERROR: NetworkError: A network error occurred.
+[16:17:51.713] ERROR: NetworkError: A network error occurred.
+[16:17:51.713] ERROR: NetworkError: A network error occurred.
+[16:17:51.713] ERROR: NetworkError: A network error occurred.
+[16:17:51.713] ERROR: NetworkError: A network error occurred.
+[16:17:51.713] ERROR: NetworkError: A network error occurred.
+[16:18:00.743] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[16:18:01.532] LOG: Sending GET request to:  http://localhost:8001/game/titlestats {"method":"GET","headers":{"Authorization":"","Content-Type":"application/json"}}
+[16:18:02.921] ERROR: [unhandledrejection] SyntaxError: Failed to execute 'json' on 'Response': Unexpected end of JSON input
+SyntaxError: Unexpected end of JSON input
+    at http://127.0.0.1:5173/src/init/init-biome-bgm-loop-points.ts:4:64
+[16:18:02.966] WARN: [asset-retry] load error key=loading_bg - retry 1/2 with cache-buster
+[16:18:02.996] WARN: [asset-retry] load error key=logo - retry 1/2 with cache-buster
+[16:18:02.999] WARN: [asset-retry] load error key=logo_fake - retry 1/2 with cache-buster
+[16:18:03.001] WARN: [asset-retry] load error key=snow - retry 1/2 with cache-buster
+[16:18:03.002] WARN: [asset-retry] load error key=fog_horizontal - retry 1/2 with cache-buster
+[16:18:03.010] WARN: [asset-retry] load error key=er_life_orb - retry 1/2 with cache-buster
+[16:18:03.012] WARN: [asset-retry] load error key=er_assault_vest - retry 1/2 with cache-buster
+[16:18:03.013] WARN: [asset-retry] load error key=er_rocky_helmet - retry 1/2 with cache-buster
+[16:18:03.014] WARN: [asset-retry] load error key=er_field_medic - retry 1/2 with cache-buster
+[16:18:03.015] WARN: [asset-retry] load error key=er_warm_incubator - retry 1/2 with cache-buster
+[16:18:03.016] WARN: [asset-retry] load error key=er_blood_pact - retry 1/2 with cache-buster
+[16:18:03.016] WARN: [asset-retry] load error key=er_momentum_engine - retry 1/2 with cache-buster
+[16:18:03.017] WARN: [asset-retry] load error key=er_stormglass - retry 1/2 with cache-buster
+[16:18:03.018] WARN: [asset-retry] load error key=er_cartographers_lens - retry 1/2 with cache-buster
+[16:18:03.020] WARN: [asset-retry] load error key=er_trailblazers_mark - retry 1/2 with cache-buster
+[16:18:03.021] WARN: [asset-retry] load error key=er_merchants_seal - retry 1/2 with cache-buster
+[16:18:03.021] WARN: [asset-retry] load error key=er_gamblers_coin - retry 1/2 with cache-buster
+[16:18:03.022] WARN: [asset-retry] load error key=er_bargain_giratina - retry 1/2 with cache-buster
+[16:18:03.023] WARN: [asset-retry] load error key=er_cell_battery - retry 1/2 with cache-buster
+[16:18:03.030] WARN: [asset-retry] load error key=er_absorb_bulb - retry 1/2 with cache-buster
+[16:18:03.033] WARN: [asset-retry] load error key=er_snowball - retry 1/2 with cache-buster
+[16:18:03.034] WARN: [asset-retry] load error key=er_luminous_moss - retry 1/2 with cache-buster
+[16:18:03.034] WARN: [asset-retry] load error key=er_weakness_policy - retry 1/2 with cache-buster
+[16:18:03.035] WARN: [asset-retry] load error key=er_electric_seed - retry 1/2 with cache-buster
+[16:18:03.036] WARN: [asset-retry] load error key=er_grassy_seed - retry 1/2 with cache-buster
+[16:18:03.036] WARN: [asset-retry] load error key=er_misty_seed - retry 1/2 with cache-buster
+[16:18:03.038] WARN: [asset-retry] load error key=er_psychic_seed - retry 1/2 with cache-buster
+[16:18:03.042] WARN: [asset-retry] load error key=er_normal_gem - retry 1/2 with cache-buster
+[16:18:03.050] WARN: [asset-retry] load error key=er_fire_gem - retry 1/2 with cache-buster
+[16:18:03.052] WARN: [asset-retry] load error key=er_water_gem - retry 1/2 with cache-buster
+[16:18:03.054] WARN: [asset-retry] load error key=er_electric_gem - retry 1/2 with cache-buster
+[16:18:03.054] WARN: [asset-retry] load error key=er_grass_gem - retry 1/2 with cache-buster
+[16:18:03.148] WARN: [asset-retry] load error key=er_ice_gem - retry 1/2 with cache-buster
+[16:18:03.244] LOG: [dev-tools] window.dev ready — try dev.summary('BOUFFALANT')
+[16:18:03.244] WARN: [asset-retry] load error key=er_fighting_gem - retry 1/2 with cache-buster
+[16:18:03.247] WARN: [asset-retry] load error key=baker - retry 1/2 with cache-buster
+[16:18:03.291] WARN: [asset-retry] load error key=er_poison_gem - retry 1/2 with cache-buster
+[16:18:03.292] WARN: [asset-retry] load error key=er_bug_gem - retry 1/2 with cache-buster
+[16:18:03.293] WARN: [asset-retry] load error key=er_psychic_gem - retry 1/2 with cache-buster
+[16:18:03.293] WARN: [asset-retry] load error key=er_flying_gem - retry 1/2 with cache-buster
+[16:18:03.294] WARN: [asset-retry] load error key=er_ground_gem - retry 1/2 with cache-buster
+[16:18:03.294] WARN: [asset-retry] load error key=er_rock_gem - retry 1/2 with cache-buster
+[16:18:03.295] WARN: [asset-retry] load error key=er_ghost_gem - retry 1/2 with cache-buster
+[16:18:03.296] WARN: [asset-retry] load error key=er_dragon_gem - retry 1/2 with cache-buster
+[16:18:03.298] WARN: [asset-retry] load error key=er_dark_gem - retry 1/2 with cache-buster
+[16:18:03.299] WARN: [asset-retry] load error key=er_steel_gem - retry 1/2 with cache-buster
+[16:18:03.300] WARN: [asset-retry] load error key=er_fairy_gem - retry 1/2 with cache-buster
+[16:18:03.300] WARN: [asset-retry] load error key=er_binfo_side_player - retry 1/2 with cache-buster
+[16:18:03.307] WARN: [asset-retry] load error key=er_binfo_side_enemy - retry 1/2 with cache-buster
+[16:18:03.309] WARN: [asset-retry] load error key=er_binfo_field - retry 1/2 with cache-buster
+[16:18:03.310] WARN: [asset-retry] load error key=er_binfo_stats - retry 1/2 with cache-buster
+[16:18:03.311] WARN: [asset-retry] load error key=er_binfo_abilities - retry 1/2 with cache-buster
+[16:18:03.312] WARN: [asset-retry] load error key=er_binfo_moves - retry 1/2 with cache-buster
+[16:18:03.313] WARN: [asset-retry] load error key=er_binfo_speed - retry 1/2 with cache-buster
+[16:18:03.314] WARN: [asset-retry] load error key=er_binfo_selector - retry 1/2 with cache-buster
+[16:18:03.315] WARN: [asset-retry] load error key=er_binfo_field_tile - retry 1/2 with cache-buster
+[16:18:03.317] WARN: [asset-retry] load error key=er_binfo_stat_up - retry 1/2 with cache-buster
+[16:18:03.318] WARN: [asset-retry] load error key=er_binfo_stat_down - retry 1/2 with cache-buster
+[16:18:03.319] WARN: [asset-retry] load error key=er_binfo_check - retry 1/2 with cache-buster
+[16:18:03.320] WARN: [asset-retry] load error key=er_colosseum_bg - retry 1/2 with cache-buster
+[16:18:03.320] WARN: [asset-retry] load error key=er_pwt_crest - retry 1/2 with cache-buster
+[16:18:03.321] WARN: [asset-retry] load error key=er_pwt_trophy - retry 1/2 with cache-buster
+[16:18:03.328] WARN: [asset-retry] load error key=er_pwt_panel - retry 1/2 with cache-buster
+[16:18:03.330] WARN: [asset-retry] load error key=er_pwt_button - retry 1/2 with cache-buster
+[16:18:03.331] WARN: [asset-retry] load error key=clerk_m - retry 1/2 with cache-buster
+[16:18:03.367] WARN: [asset-retry] load error key=clerk_f - retry 1/2 with cache-buster
+[16:18:03.466] WARN: [asset-retry] load error key=clerk_m_2 - retry 1/2 with cache-buster
+[16:18:03.516] WARN: [asset-retry] load error key=aroma_lady - retry 1/2 with cache-buster
+[16:18:03.561] WARN: [asset-retry] load error key=ranger_m - retry 1/2 with cache-buster
+[16:18:03.590] WARN: [asset-retry] load error key=ranger_f - retry 1/2 with cache-buster
+[16:18:03.621] WARN: [asset-retry] load error key=fisherman - retry 1/2 with cache-buster
+[16:18:03.622] WARN: [asset-retry] load error key=sailor - retry 1/2 with cache-buster
+[16:18:03.670] WARN: [asset-retry] load error key=scuba_diver_m - retry 1/2 with cache-buster
+[16:18:03.678] WARN: [asset-retry] load error key=hiker - retry 1/2 with cache-buster
+[16:18:03.680] WARN: [asset-retry] load error key=worker_m - retry 1/2 with cache-buster
+[16:18:03.681] WARN: [asset-retry] load error key=worker_f - retry 1/2 with cache-buster
+[16:18:03.682] WARN: [asset-retry] load error key=backpacker_m - retry 1/2 with cache-buster
+[16:18:03.683] WARN: [asset-retry] load error key=veteran_m - retry 1/2 with cache-buster
+[16:18:03.683] WARN: [asset-retry] load error key=parasol_lady - retry 1/2 with cache-buster
+[16:18:03.684] WARN: [asset-retry] load error key=snow_worker_m - retry 1/2 with cache-buster
+[16:18:03.684] WARN: [asset-retry] load error key=scientist_m - retry 1/2 with cache-buster
+[16:18:03.699] WARN: [asset-retry] load error key=scientist_f - retry 1/2 with cache-buster
+[16:18:03.702] WARN: [asset-retry] load error key=firebreather - retry 1/2 with cache-buster
+[16:18:03.703] WARN: [asset-retry] load error key=black_belt_m - retry 1/2 with cache-buster
+[16:18:03.704] WARN: [asset-retry] load error key=hex_maniac - retry 1/2 with cache-buster
+[16:18:03.705] WARN: [asset-retry] load error key=ruin_maniac - retry 1/2 with cache-buster
+[16:18:03.706] WARN: [asset-retry] load error key=fairy_tale_girl - retry 1/2 with cache-buster
+[16:18:03.773] WARN: [asset-retry] load error key=roughneck - retry 1/2 with cache-buster
+[16:18:03.774] WARN: [asset-retry] load error key=bg - retry 1/2 with cache-buster
+[16:18:03.774] WARN: [asset-retry] load error key=bg_legacy - retry 1/2 with cache-buster
+[16:18:03.776] WARN: [asset-retry] load error key=prompt - retry 1/2 with cache-buster
+[16:18:03.822] WARN: [asset-retry] load error key=prompt_legacy - retry 1/2 with cache-buster
+[16:18:03.872] WARN: [asset-retry] load error key=candy - retry 1/2 with cache-buster
+[16:18:03.917] WARN: [asset-retry] load error key=candy_legacy - retry 1/2 with cache-buster
+[16:18:03.917] WARN: [asset-retry] load error key=candy_overlay - retry 1/2 with cache-buster
+[16:18:03.918] WARN: [asset-retry] load error key=candy_overlay_legacy - retry 1/2 with cache-buster
+[16:18:03.919] WARN: [asset-retry] load error key=friendship - retry 1/2 with cache-buster
+[16:18:03.919] WARN: [asset-retry] load error key=friendship_legacy - retry 1/2 with cache-buster
+[16:18:03.920] WARN: [asset-retry] load error key=friendship_overlay - retry 1/2 with cache-buster
+[16:18:03.920] WARN: [asset-retry] load error key=friendship_overlay_legacy - retry 1/2 with cache-buster
+[16:18:03.924] WARN: [asset-retry] load error key=cursor - retry 1/2 with cache-buster
+[16:18:03.925] WARN: [asset-retry] load error key=cursor_legacy - retry 1/2 with cache-buster
+[16:18:03.933] WARN: [asset-retry] load error key=cursor_reverse - retry 1/2 with cache-buster
+[16:18:03.934] WARN: [asset-retry] load error key=cursor_reverse_legacy - retry 1/2 with cache-buster
+[16:18:03.936] WARN: [asset-retry] load error key=window_1 - retry 1/2 with cache-buster
+[16:18:03.937] WARN: [asset-retry] load error key=window_1_legacy - retry 1/2 with cache-buster
+[16:18:03.938] WARN: [asset-retry] load error key=window_2 - retry 1/2 with cache-buster
+[16:18:03.939] WARN: [asset-retry] load error key=window_2_legacy - retry 1/2 with cache-buster
+[16:18:03.940] WARN: [asset-retry] load error key=window_3 - retry 1/2 with cache-buster
+[16:18:03.941] WARN: [asset-retry] load error key=window_3_legacy - retry 1/2 with cache-buster
+[16:18:03.943] WARN: [asset-retry] load error key=window_4 - retry 1/2 with cache-buster
+[16:18:03.945] WARN: [asset-retry] load error key=window_4_legacy - retry 1/2 with cache-buster
+[16:18:03.946] WARN: [asset-retry] load error key=window_5 - retry 1/2 with cache-buster
+[16:18:03.947] WARN: [asset-retry] load error key=window_5_legacy - retry 1/2 with cache-buster
+[16:18:03.954] WARN: [asset-retry] load error key=window_1_thin - retry 1/2 with cache-buster
+[16:18:03.956] WARN: [asset-retry] load error key=window_1_thin_legacy - retry 1/2 with cache-buster
+[16:18:03.957] WARN: [asset-retry] load error key=window_2_thin - retry 1/2 with cache-buster
+[16:18:03.958] WARN: [asset-retry] load error key=window_2_thin_legacy - retry 1/2 with cache-buster
+[16:18:03.959] WARN: [asset-retry] load error key=window_3_thin - retry 1/2 with cache-buster
+[16:18:03.959] WARN: [asset-retry] load error key=window_3_thin_legacy - retry 1/2 with cache-buster
+[16:18:03.960] WARN: [asset-retry] load error key=window_4_thin - retry 1/2 with cache-buster
+[16:18:03.961] WARN: [asset-retry] load error key=window_4_thin_legacy - retry 1/2 with cache-buster
+[16:18:03.961] WARN: [asset-retry] load error key=window_5_thin - retry 1/2 with cache-buster
+[16:18:04.010] WARN: [asset-retry] load error key=window_5_thin_legacy - retry 1/2 with cache-buster
+[16:18:04.011] WARN: Could not get game title stats! TypeError: Failed to fetch
+TypeError: Failed to fetch
+    at PokerogueApi.doFetch (http://127.0.0.1:5173/src/api/api-base.ts:79:17)
+    at PokerogueApi.doGet (http://127.0.0.1:5173/src/api/api-base.ts:25:15)
+    at PokerogueApi.getGameTitleStats (http://127.0.0.1:5173/src/api/api.ts:22:32)
+    at localPing (http://127.0.0.1:5173/src/utils/common.ts:255:41)
+    at LoadingScene.preload (http://127.0.0.1:5173/src/loading-scene.ts:23:3)
+    at SceneManager.bootScene (http://127.0.0.1:5173/node_modules/.vite/deps/phaser.js?v=9f484251:140502:23)
+    at SceneManager.start (http://127.0.0.1:5173/node_modules/.vite/deps/phaser.js?v=9f484251:140974:13)
+    at SceneManager.bootQueue (http://127.0.0.1:5173/node_modules/.vite/deps/phaser.js?v=9f484251:140358:14)
+    at EventEmitter.emit (http://127.0.0.1:5173/node_modules/.vite/deps/phaser.js?v=9f484251:152:27)
+    at Game.texturesReady (http://127.0.0.1:5173/node_modules/.vite/deps/phaser.js?v=9f484251:12388:20)
+[16:18:04.013] LOG: isLocalServerConnected: false
+[16:18:04.054] LOG: [dev-tools] loaded — 513 scenarios + Send Logs button
+[16:18:04.056] WARN: [asset-retry] load error key=window_1_xthin - retry 1/2 with cache-buster
+[16:18:04.056] WARN: [asset-retry] load error key=window_1_xthin_legacy - retry 1/2 with cache-buster
+[16:18:04.122] WARN: [asset-retry] load error key=window_2_xthin - retry 1/2 with cache-buster
+[16:18:04.124] WARN: [asset-retry] load error key=window_2_xthin_legacy - retry 1/2 with cache-buster
+[16:18:04.125] WARN: [asset-retry] load error key=window_3_xthin - retry 1/2 with cache-buster
+[16:18:04.126] WARN: [asset-retry] load error key=window_3_xthin_legacy - retry 1/2 with cache-buster
+[16:18:04.128] WARN: [asset-retry] load error key=window_4_xthin - retry 1/2 with cache-buster
+[16:18:04.129] WARN: [asset-retry] load error key=window_4_xthin_legacy - retry 1/2 with cache-buster
+[16:18:04.129] WARN: [asset-retry] load error key=window_5_xthin - retry 1/2 with cache-buster
+[16:18:04.130] WARN: [asset-retry] load error key=window_5_xthin_legacy - retry 1/2 with cache-buster
+[16:18:04.138] WARN: [asset-retry] load error key=namebox - retry 1/2 with cache-buster
+[16:18:04.174] WARN: [asset-retry] load error key=namebox_legacy - retry 1/2 with cache-buster
+[16:18:04.188] WARN: [asset-retry] load error key=pbinfo_player_type - retry 1/2 with cache-buster
+[16:18:04.189] WARN: [asset-retry] load error key=pbinfo_player_type_legacy - retry 1/2 with cache-buster
+[16:18:04.190] WARN: [asset-retry] load error key=pbinfo_player_type1 - retry 1/2 with cache-buster
+[16:18:04.192] WARN: [asset-retry] load error key=pbinfo_player_type1_legacy - retry 1/2 with cache-buster
+[16:18:04.195] WARN: [asset-retry] load error key=pbinfo_player_type2 - retry 1/2 with cache-buster
+[16:18:04.205] WARN: [asset-retry] load error key=pbinfo_player_type2_legacy - retry 1/2 with cache-buster
+[16:18:04.244] WARN: [asset-retry] load error key=pbinfo_enemy_type - retry 1/2 with cache-buster
+[16:18:04.287] WARN: [asset-retry] load error key=pbinfo_enemy_type_legacy - retry 1/2 with cache-buster
+[16:18:04.288] WARN: [asset-retry] load error key=pbinfo_player - retry 1/2 with cache-buster
+[16:18:04.289] WARN: [asset-retry] load error key=pbinfo_player_legacy - retry 1/2 with cache-buster
+[16:18:04.292] WARN: [asset-retry] load error key=pbinfo_player_stats - retry 1/2 with cache-buster
+[16:18:04.294] WARN: [asset-retry] load error key=pbinfo_player_stats_legacy - retry 1/2 with cache-buster
+[16:18:04.302] WARN: [asset-retry] load error key=pbinfo_player_mini - retry 1/2 with cache-buster
+[16:18:04.304] WARN: [asset-retry] load error key=pbinfo_player_mini_legacy - retry 1/2 with cache-buster
+[16:18:04.306] WARN: [asset-retry] load error key=pbinfo_player_mini_stats - retry 1/2 with cache-buster
+[16:18:04.306] WARN: [asset-retry] load error key=pbinfo_player_mini_stats_legacy - retry 1/2 with cache-buster
+[16:18:04.308] WARN: [asset-retry] load error key=pbinfo_enemy_mini - retry 1/2 with cache-buster
+[16:18:04.309] WARN: [asset-retry] load error key=pbinfo_enemy_mini_legacy - retry 1/2 with cache-buster
+[16:18:04.309] WARN: [asset-retry] load error key=pbinfo_enemy_mini_stats - retry 1/2 with cache-buster
+[16:18:04.312] WARN: [asset-retry] load error key=pbinfo_enemy_mini_stats_legacy - retry 1/2 with cache-buster
+[16:18:04.313] WARN: [asset-retry] load error key=pbinfo_enemy_boss_legacy - retry 1/2 with cache-buster
+[16:18:04.315] WARN: [asset-retry] load error key=pbinfo_enemy_boss - retry 1/2 with cache-buster
+[16:18:04.325] WARN: [asset-retry] load error key=pbinfo_enemy_boss_stats - retry 1/2 with cache-buster
+[16:18:04.326] WARN: [asset-retry] load error key=pbinfo_enemy_boss_stats_legacy - retry 1/2 with cache-buster
+[16:18:04.328] WARN: [asset-retry] load error key=pbinfo_enemy_type1 - retry 1/2 with cache-buster
+[16:18:04.329] WARN: [asset-retry] load error key=pbinfo_enemy_type1_legacy - retry 1/2 with cache-buster
+[16:18:04.329] WARN: [asset-retry] load error key=pbinfo_enemy_type2 - retry 1/2 with cache-buster
+[16:18:04.402] WARN: [asset-retry] load error key=pbinfo_enemy_type2_legacy - retry 1/2 with cache-buster
+[16:18:04.406] WARN: [asset-retry] load error key=pbinfo_stat_numbers - retry 1/2 with cache-buster
+[16:18:04.408] WARN: [asset-retry] load error key=pbinfo_stat_numbers_legacy - retry 1/2 with cache-buster
+[16:18:04.417] WARN: [asset-retry] load error key=numbers - retry 1/2 with cache-buster
+[16:18:04.419] WARN: [asset-retry] load error key=numbers_legacy - retry 1/2 with cache-buster
+[16:18:04.449] WARN: [asset-retry] load error key=numbers_red - retry 1/2 with cache-buster
+[16:18:04.452] WARN: [asset-retry] load error key=numbers_red_legacy - retry 1/2 with cache-buster
+[16:18:04.454] WARN: [asset-retry] load error key=overlay_hp - retry 1/2 with cache-buster
+[16:18:04.462] WARN: [asset-retry] load error key=overlay_hp_legacy - retry 1/2 with cache-buster
+[16:18:04.464] WARN: [asset-retry] load error key=overlay_hp_boss - retry 1/2 with cache-buster
+[16:18:04.465] WARN: [asset-retry] load error key=overlay_hp_boss_legacy - retry 1/2 with cache-buster
+[16:18:04.502] WARN: [asset-retry] load error key=overlay_exp - retry 1/2 with cache-buster
+[16:18:04.504] WARN: [asset-retry] load error key=overlay_exp_legacy - retry 1/2 with cache-buster
+[16:18:04.512] WARN: [asset-retry] load error key=icon_owned - retry 1/2 with cache-buster
+[16:18:04.514] WARN: [asset-retry] load error key=icon_owned_legacy - retry 1/2 with cache-buster
+[16:18:04.515] WARN: [asset-retry] load error key=icon_egg_move - retry 1/2 with cache-buster
+[16:18:04.545] WARN: [asset-retry] load error key=icon_egg_move_legacy - retry 1/2 with cache-buster
+[16:18:04.571] WARN: [asset-retry] load error key=ability_bar_left - retry 1/2 with cache-buster
+[16:18:04.572] WARN: [asset-retry] load error key=ability_bar_left_legacy - retry 1/2 with cache-buster
+[16:18:04.574] WARN: [asset-retry] load error key=ability_bar_right - retry 1/2 with cache-buster
+[16:18:04.576] WARN: [asset-retry] load error key=ability_bar_right_legacy - retry 1/2 with cache-buster
+[16:18:04.577] WARN: [asset-retry] load error key=bgm_bar - retry 1/2 with cache-buster
+[16:18:04.577] WARN: [asset-retry] load error key=bgm_bar_legacy - retry 1/2 with cache-buster
+[16:18:04.578] WARN: [asset-retry] load error key=party_exp_bar - retry 1/2 with cache-buster
+[16:18:04.587] WARN: [asset-retry] load error key=party_exp_bar_legacy - retry 1/2 with cache-buster
+[16:18:04.588] WARN: [asset-retry] load error key=achv_bar - retry 1/2 with cache-buster
+[16:18:04.638] WARN: [asset-retry] load error key=achv_bar_legacy - retry 1/2 with cache-buster
+[16:18:04.668] WARN: [asset-retry] load error key=achv_bar_2 - retry 1/2 with cache-buster
+[16:18:04.668] WARN: [asset-retry] load error key=achv_bar_2_legacy - retry 1/2 with cache-buster
+[16:18:04.669] WARN: [asset-retry] load error key=achv_bar_3 - retry 1/2 with cache-buster
+[16:18:04.671] WARN: [asset-retry] load error key=achv_bar_3_legacy - retry 1/2 with cache-buster
+[16:18:04.674] WARN: [asset-retry] load error key=achv_bar_4 - retry 1/2 with cache-buster
+[16:18:04.716] WARN: [asset-retry] load error key=achv_bar_4_legacy - retry 1/2 with cache-buster
+[16:18:04.742] WARN: [asset-retry] load error key=achv_bar_5 - retry 1/2 with cache-buster
+[16:18:04.744] WARN: [asset-retry] load error key=achv_bar_5_legacy - retry 1/2 with cache-buster
+[16:18:04.747] WARN: [asset-retry] load error key=shiny_star - retry 1/2 with cache-buster
+[16:18:04.758] WARN: [asset-retry] load error key=shiny_star_legacy - retry 1/2 with cache-buster
+[16:18:04.759] WARN: [asset-retry] load error key=shiny_star_1 - retry 1/2 with cache-buster
+[16:18:04.761] WARN: [asset-retry] load error key=shiny_star_small_1 - retry 1/2 with cache-buster
+[16:18:04.762] WARN: [asset-retry] load error key=shiny_star_1_legacy - retry 1/2 with cache-buster
+[16:18:04.762] WARN: [asset-retry] load error key=shiny_star_2 - retry 1/2 with cache-buster
+[16:18:04.763] WARN: [asset-retry] load error key=shiny_star_2_legacy - retry 1/2 with cache-buster
+[16:18:04.764] WARN: [asset-retry] load error key=shiny_star_small - retry 1/2 with cache-buster
+[16:18:04.767] WARN: [asset-retry] load error key=shiny_star_small_legacy - retry 1/2 with cache-buster
+[16:18:04.919] WARN: [asset-retry] load error key=shiny_star_small_1_legacy - retry 1/2 with cache-buster
+[16:18:04.922] WARN: [asset-retry] load error key=shiny_icons - retry 1/2 with cache-buster
+[16:18:04.960] WARN: [asset-retry] load error key=shiny_star_small_2 - retry 1/2 with cache-buster
+[16:18:04.961] WARN: [asset-retry] load error key=shiny_star_small_2_legacy - retry 1/2 with cache-buster
+[16:18:04.962] WARN: [asset-retry] load error key=favorite - retry 1/2 with cache-buster
+[16:18:04.963] WARN: [asset-retry] load error key=favorite_legacy - retry 1/2 with cache-buster
+[16:18:04.964] WARN: [asset-retry] load error key=passive_bg - retry 1/2 with cache-buster
+[16:18:04.964] WARN: [asset-retry] load error key=passive_bg_legacy - retry 1/2 with cache-buster
+[16:18:05.007] WARN: [asset-retry] load error key=shiny_icons_legacy - retry 1/2 with cache-buster
+[16:18:05.051] WARN: [asset-retry] load error key=ha_capsule - retry 1/2 with cache-buster
+[16:18:05.054] WARN: [asset-retry] load error key=ha_capsule_legacy - retry 1/2 with cache-buster
+[16:18:05.054] WARN: [asset-retry] load error key=champion_ribbon - retry 1/2 with cache-buster
+[16:18:05.055] WARN: [asset-retry] load error key=champion_ribbon_legacy - retry 1/2 with cache-buster
+[16:18:05.056] WARN: [asset-retry] load error key=champion_ribbon_emerald - retry 1/2 with cache-buster
+[16:18:05.057] WARN: [asset-retry] load error key=champion_ribbon_emerald_legacy - retry 1/2 with cache-buster
+[16:18:05.057] WARN: [asset-retry] load error key=icon_spliced - retry 1/2 with cache-buster
+[16:18:05.058] WARN: [asset-retry] load error key=icon_spliced_legacy - retry 1/2 with cache-buster
+[16:18:05.058] WARN: [asset-retry] load error key=icon_lock - retry 1/2 with cache-buster
+[16:18:05.059] WARN: [asset-retry] load error key=icon_lock_legacy - retry 1/2 with cache-buster
+[16:18:05.059] WARN: [asset-retry] load error key=icon_stop - retry 1/2 with cache-buster
+[16:18:05.107] WARN: [asset-retry] load error key=type_bgs - retry 1/2 with cache-buster
+[16:18:05.110] WARN: [asset-retry] load error key=type_bgs_legacy - retry 1/2 with cache-buster
+[16:18:05.113] WARN: [asset-retry] load error key=button_tera - retry 1/2 with cache-buster
+[16:18:05.122] WARN: [asset-retry] load error key=icon_stop_legacy - retry 1/2 with cache-buster
+[16:18:05.124] WARN: [asset-retry] load error key=button_tera_legacy - retry 1/2 with cache-buster
+[16:18:05.155] WARN: [asset-retry] load error key=icon_tera_legacy - retry 1/2 with cache-buster
+[16:18:05.157] WARN: [asset-retry] load error key=icon_tera - retry 1/2 with cache-buster
+[16:18:05.158] WARN: [asset-retry] load error key=cursor_tera - retry 1/2 with cache-buster
+[16:18:05.159] WARN: [asset-retry] load error key=cursor_tera_legacy - retry 1/2 with cache-buster
+[16:18:05.160] WARN: [asset-retry] load error key=type_tera - retry 1/2 with cache-buster
+[16:18:05.167] WARN: [asset-retry] load error key=type_tera_legacy - retry 1/2 with cache-buster
+[16:18:05.171] WARN: [asset-retry] load error key=common_egg - retry 1/2 with cache-buster
+[16:18:05.172] WARN: [asset-retry] load error key=common_egg_legacy - retry 1/2 with cache-buster
+[16:18:05.202] WARN: [asset-retry] load error key=dawn_icon_mg_legacy - retry 1/2 with cache-buster
+[16:18:05.249] WARN: [asset-retry] load error key=normal_memory - retry 1/2 with cache-buster
+[16:18:05.250] WARN: [asset-retry] load error key=normal_memory_legacy - retry 1/2 with cache-buster
+[16:18:05.251] WARN: [asset-retry] load error key=dawn_icon_fg - retry 1/2 with cache-buster
+[16:18:05.252] WARN: [asset-retry] load error key=dawn_icon_fg_legacy - retry 1/2 with cache-buster
+[16:18:05.254] WARN: [asset-retry] load error key=dawn_icon_mg - retry 1/2 with cache-buster
+[16:18:05.579] WARN: [asset-retry] load error key=pb_tray_ball_legacy - retry 1/2 with cache-buster
+[16:18:05.581] WARN: [asset-retry] load error key=pb_tray_ball - retry 1/2 with cache-buster
+[16:18:05.610] WARN: [asset-retry] load error key=dawn_icon_bg - retry 1/2 with cache-buster
+[16:18:05.643] WARN: [asset-retry] load error key=dawn_icon_bg_legacy - retry 1/2 with cache-buster
+[16:18:05.653] WARN: [asset-retry] load error key=day_icon_fg - retry 1/2 with cache-buster
+[16:18:05.655] WARN: [asset-retry] load error key=day_icon_fg_legacy - retry 1/2 with cache-buster
+[16:18:05.656] WARN: [asset-retry] load error key=day_icon_mg - retry 1/2 with cache-buster
+[16:18:05.657] WARN: [asset-retry] load error key=day_icon_mg_legacy - retry 1/2 with cache-buster
+[16:18:05.658] WARN: [asset-retry] load error key=day_icon_bg - retry 1/2 with cache-buster
+[16:18:05.658] WARN: [asset-retry] load error key=day_icon_bg_legacy - retry 1/2 with cache-buster
+[16:18:05.659] WARN: [asset-retry] load error key=dusk_icon_fg_legacy - retry 1/2 with cache-buster
+[16:18:05.660] WARN: [asset-retry] load error key=night_icon_mg - retry 1/2 with cache-buster
+[16:18:05.663] WARN: [asset-retry] load error key=party_bg_double_legacy - retry 1/2 with cache-buster
+[16:18:05.666] WARN: [asset-retry] load error key=night_icon_fg_legacy - retry 1/2 with cache-buster
+[16:18:05.666] WARN: [asset-retry] load error key=dusk_icon_bg - retry 1/2 with cache-buster
+[16:18:05.676] WARN: [asset-retry] load error key=dusk_icon_mg - retry 1/2 with cache-buster
+[16:18:05.677] WARN: [asset-retry] load error key=night_icon_bg - retry 1/2 with cache-buster
+[16:18:05.678] WARN: [asset-retry] load error key=party_bg - retry 1/2 with cache-buster
+[16:18:05.679] WARN: [asset-retry] load error key=night_icon_mg_legacy - retry 1/2 with cache-buster
+[16:18:05.680] WARN: [asset-retry] load error key=party_bg_double - retry 1/2 with cache-buster
+[16:18:05.680] WARN: [asset-retry] load error key=pb_tray_overlay_enemy_legacy - retry 1/2 with cache-buster
+[16:18:05.681] WARN: [asset-retry] load error key=dusk_icon_bg_legacy - retry 1/2 with cache-buster
+[16:18:05.682] WARN: [asset-retry] load error key=dusk_icon_fg - retry 1/2 with cache-buster
+[16:18:05.683] WARN: [asset-retry] load error key=party_bg_legacy - retry 1/2 with cache-buster
+[16:18:05.685] WARN: [asset-retry] load error key=pb_tray_overlay_player_legacy - retry 1/2 with cache-buster
+[16:18:05.686] WARN: [asset-retry] load error key=pb_tray_overlay_player - retry 1/2 with cache-buster
+[16:18:05.687] WARN: [asset-retry] load error key=night_icon_bg_legacy - retry 1/2 with cache-buster
+[16:18:05.687] WARN: [asset-retry] load error key=pb_tray_overlay_enemy - retry 1/2 with cache-buster
+[16:18:05.688] WARN: [asset-retry] load error key=night_icon_fg - retry 1/2 with cache-buster
+[16:18:05.696] WARN: [asset-retry] load error key=dusk_icon_mg_legacy - retry 1/2 with cache-buster
+[16:18:05.747] WARN: [asset-retry] load error key=party_slot_main - retry 1/2 with cache-buster
+[16:18:05.748] WARN: [asset-retry] load error key=party_slot_main_legacy - retry 1/2 with cache-buster
+[16:18:05.749] WARN: [asset-retry] load error key=party_slot_main_short - retry 1/2 with cache-buster
+[16:18:05.750] WARN: [asset-retry] load error key=party_slot_main_short_legacy - retry 1/2 with cache-buster
+[16:18:05.751] WARN: [asset-retry] load error key=party_slot - retry 1/2 with cache-buster
+[16:18:05.795] WARN: [asset-retry] load error key=party_bg_double_manage - retry 1/2 with cache-buster
+[16:18:05.796] WARN: [asset-retry] load error key=party_slot_legacy - retry 1/2 with cache-buster
+[16:18:05.797] WARN: [asset-retry] load error key=party_slot_hp_overlay - retry 1/2 with cache-buster
+[16:18:05.798] WARN: [asset-retry] load error key=party_slot_hp_overlay_legacy - retry 1/2 with cache-buster
+[16:18:05.799] WARN: [asset-retry] load error key=party_pb - retry 1/2 with cache-buster
+[16:18:05.803] WARN: [asset-retry] load error key=party_pb_legacy - retry 1/2 with cache-buster
+[16:18:05.848] WARN: [asset-retry] load error key=party_bg_double_manage_legacy - retry 1/2 with cache-buster
+[16:18:05.853] WARN: [asset-retry] load error key=party_slot_hp_bar - retry 1/2 with cache-buster
+[16:18:05.854] WARN: [asset-retry] load error key=party_slot_hp_bar_legacy - retry 1/2 with cache-buster
+
+----- REPLAY CAPTURE STATUS -----
+not recording on this client
+
+----- REPLAY TRACE (JSON) -----
+(none)
+
+----- CURRENT CO-OP SNAPSHOT (LZ-BASE64) -----
+(none)
