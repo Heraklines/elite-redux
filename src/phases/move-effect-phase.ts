@@ -623,7 +623,12 @@ export class MoveEffectPhase extends PokemonPhase {
       ![MoveTarget.ENEMY_SIDE, MoveTarget.BOTH_SIDES].includes(this.move.moveTarget)
       && (bypassIgnoreProtect.value || !this.move.doesFlagEffectApply({ flag: MoveFlags.IGNORE_PROTECT, user, target }))
       && (hasConditionalProtectApplied.value
-        || protectionTags.some(t => (!isStatusMove || t.blockStatus) && target.lapseTag(t.tagType)))
+        || protectionTags.some(
+          t =>
+            (!isStatusMove || t.blockStatus)
+            && t.protectsAgainstMove(this.move, user, target)
+            && target.lapseTag(t.tagType),
+        ))
     );
   }
 

@@ -780,11 +780,13 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
         }),
       ]);
     case 955:
-      // Tangling Husk — protect that slows attackers on contact. SILK_TRAP =
-      // protect + -1 Speed to a contact attacker (the slow-on-contact clause).
-      // The "non-Fire moves only" filter is genuinely bespoke (no type-specific
-      // protect primitive) and remains deferred.
-      return ok(0, [new ProtectAttr(BattlerTagType.SILK_TRAP)]);
+      // Tangling Husk — "Protects against non-Fire-type moves." A protect that,
+      // like SILK_TRAP, drops a contact attacker's Speed by 1 — but Fire-type
+      // moves are EXEMPT (they bypass the protection and hit normally, and do NOT
+      // trigger the -1 Speed on-contact reaction). ER_TANGLING_HUSK is the
+      // Fire-exempt protect tag (ContactStatStageChangeProtectedTag whose block
+      // predicate returns false for Fire moves; see ErTanglingHuskProtectedTag).
+      return ok(0, [new ProtectAttr(BattlerTagType.ER_TANGLING_HUSK)]);
     case 962:
       // Sparkling Barrage — hits 3 times.
       return ok(0, [new MultiHitAttr(MultiHitType.THREE)]);

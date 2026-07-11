@@ -35,6 +35,8 @@ export enum BattlerTagType {
   BURNING_BULWARK = "BURNING_BULWARK",
   /** ER (Merculight): a full protect that paralyzes contact attackers. */
   ER_PARALYZING_SHIELD = "ER_PARALYZING_SHIELD",
+  /** ER (Tangling Husk, dex 955): a protect that lets Fire-type moves through and drops -1 Speed on non-Fire contact. */
+  ER_TANGLING_HUSK = "ER_TANGLING_HUSK",
   ENDURING = "ENDURING",
   STURDY = "STURDY",
   PERISH_SONG = "PERISH_SONG",

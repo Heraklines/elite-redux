@@ -1932,6 +1932,22 @@ export class ProtectedTag extends BattlerTag {
     return true;
   }
 
+  /**
+   * Whether this protection effect blocks a specific incoming move. Defaults to
+   * `true` (block everything, the vanilla behavior). Type-conditional protects
+   * (e.g. Elite Redux's Tangling Husk, which lets Fire-type moves through)
+   * override this so the move-effect phase's protect check bypasses the block —
+   * and, crucially, does NOT lapse the tag (no "protected itself" message, no
+   * on-contact reaction) for a move that is allowed through.
+   * @param _move - The incoming move being resolved against the protected pokemon
+   * @param _user - The pokemon using the incoming move
+   * @param _target - The protected pokemon holding this tag
+   * @returns Whether the incoming move is blocked by this protection effect
+   */
+  public protectsAgainstMove(_move: Move, _user: Pokemon, _target: Pokemon): boolean {
+    return true;
+  }
+
   constructor(sourceMove: MoveId, tagType: ProtectionBattlerTagType = BattlerTagType.PROTECTED) {
     super(tagType, BattlerTagLapseType.TURN_END, 0, sourceMove);
   }
@@ -2149,6 +2165,40 @@ export class ContactStatStageChangeProtectedTag extends ContactProtectedTag {
       [this.#stat],
       this.#levels,
     );
+  }
+}
+
+/**
+ * Elite Redux `BattlerTag` for Tangling Husk (2.65 dex id 955): "Protects against
+ * non-Fire-type moves." A protect that behaves like {@linkcode BattlerTagType.SILK_TRAP}
+ * (blocks the move AND drops a contact attacker's Speed by 1) EXCEPT that Fire-type
+ * moves are exempt — they bypass the protection entirely (hit normally, and do NOT
+ * trigger the -1 Speed on-contact reaction, since a Fire move is never blocked here).
+ *
+ * Implemented as a {@linkcode ContactStatStageChangeProtectedTag} (Speed -1 on
+ * contact, same as Silk Trap) with {@linkcode protectsAgainstMove} overridden to
+ * return `false` for Fire-type moves, so the move-effect phase's protect check lets
+ * a Fire move through without lapsing this tag.
+ *
+ * @sealed
+ */
+export class ErTanglingHuskProtectedTag extends ContactStatStageChangeProtectedTag {
+  public override readonly tagType = BattlerTagType.ER_TANGLING_HUSK;
+
+  constructor(sourceMove: MoveId) {
+    super(sourceMove, BattlerTagType.ER_TANGLING_HUSK, Stat.SPD, -1);
+  }
+
+  /**
+   * Fire-type moves bypass Tangling Husk (they are not blocked); every other type
+   * is blocked exactly like Silk Trap.
+   * @param move - The incoming move being resolved against the protected pokemon
+   * @param user - The pokemon using the incoming move
+   * @param _target - The protected pokemon holding this tag
+   * @returns `false` for Fire-type moves (not blocked), `true` otherwise
+   */
+  public override protectsAgainstMove(move: Move, user: Pokemon, _target: Pokemon): boolean {
+    return user.getMoveType(move) !== PokemonType.FIRE;
   }
 }
 
@@ -4419,6 +4469,8 @@ export function getBattlerTag(
       return new ContactSetStatusProtectedTag(sourceMove, tagType, StatusEffect.BURN, false);
     case BattlerTagType.ER_PARALYZING_SHIELD:
       return new ContactSetStatusProtectedTag(sourceMove, tagType, StatusEffect.PARALYSIS);
+    case BattlerTagType.ER_TANGLING_HUSK:
+      return new ErTanglingHuskProtectedTag(sourceMove);
     case BattlerTagType.ENDURING:
       return new EnduringTag(tagType, BattlerTagLapseType.TURN_END, sourceMove);
     case BattlerTagType.ENDURE_TOKEN:
@@ -4631,6 +4683,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.BANEFUL_BUNKER]: ContactSetStatusProtectedTag;
   [BattlerTagType.BURNING_BULWARK]: ContactSetStatusProtectedTag;
   [BattlerTagType.ER_PARALYZING_SHIELD]: ContactSetStatusProtectedTag;
+  [BattlerTagType.ER_TANGLING_HUSK]: ErTanglingHuskProtectedTag;
   [BattlerTagType.ENDURING]: EnduringTag;
   [BattlerTagType.ENDURE_TOKEN]: EnduringTag;
   [BattlerTagType.STURDY]: SturdyTag;
