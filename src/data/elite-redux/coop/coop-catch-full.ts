@@ -22,6 +22,10 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import {
+  commitCoopCatchFullAuthorityDecision,
+  sendCoopCatchFullPrompt,
+} from "#data/elite-redux/coop/coop-catch-full-operation";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_CATCH_FULL_SEQ, getCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
@@ -43,13 +47,22 @@ export function coopHostAwaitWildCatchFullSlot(pokemonName: string, speciesId: n
     seq: COOP_CATCH_FULL_SEQ,
     speciesId,
   });
-  relay.promptCatchFull(pokemonName, speciesId);
+  const wave = globalScene.currentBattle?.waveIndex ?? 0;
+  const turn = globalScene.currentBattle?.turn ?? 0;
+  sendCoopCatchFullPrompt(relay, pokemonName, speciesId, { localRole: "host", wave, turn });
   return relay
     .awaitInteractionChoice(COOP_CATCH_FULL_SEQ, getCoopFaintSwitchWaitMs(), COOP_CATCH_FULL_CHOICE_KINDS)
     .then(pick => {
       const slot = pick?.choice ?? null;
       const partySize = globalScene.getPlayerParty().length;
       if (slot == null || slot < 0 || slot >= partySize) {
+        commitCoopCatchFullAuthorityDecision({
+          payload: { type: "decision", speciesId, partySlot: -1 },
+          ownerRole: "guest",
+          localRole: "host",
+          wave,
+          turn,
+        });
         coopWarn(
           "replay",
           "host: catch-full catcher declined/out-of-range/timeout; the caught mon is NOT kept (#856)",
@@ -62,6 +75,13 @@ export function coopHostAwaitWildCatchFullSlot(pokemonName: string, speciesId: n
         );
         return null;
       }
+      commitCoopCatchFullAuthorityDecision({
+        payload: { type: "decision", speciesId, partySlot: slot },
+        ownerRole: "guest",
+        localRole: "host",
+        wave,
+        turn,
+      });
       coopLog("replay", "host received catcher catch-full replace slot (#856)", { seq: COOP_CATCH_FULL_SEQ, slot });
       return slot;
     });

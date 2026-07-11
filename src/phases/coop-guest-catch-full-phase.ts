@@ -6,6 +6,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { armCoopCatchFullIntentResend } from "#data/elite-redux/coop/coop-catch-full-operation";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_CATCH_FULL_SEQ } from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
@@ -63,7 +64,17 @@ export class CoopGuestCatchFullPhase extends Phase {
         // the release+add); the callback relays the chosen slot, or an out-of-range slot on cancel (skip).
         void globalScene.ui.setMode(UiMode.PARTY, PartyUiMode.SELECT, -1, (slotIndex: number) => {
           coopLog("replay", `guest catch-full picker PICK slot=${slotIndex} seq=${seq}`);
-          relay.sendInteractionChoice(seq, "catchFull", slotIndex);
+          const partySlot = slotIndex >= 0 && slotIndex < 6 ? slotIndex : -1;
+          const wave = globalScene.currentBattle?.waveIndex ?? 0;
+          const turn = globalScene.currentBattle?.turn ?? 0;
+          const resend = () => relay.sendInteractionChoice(seq, "catchFull", partySlot);
+          resend();
+          armCoopCatchFullIntentResend({
+            payload: { type: "decision", speciesId: this.speciesId, partySlot },
+            wave,
+            turn,
+            resend,
+          });
           void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => this.end());
         });
       });

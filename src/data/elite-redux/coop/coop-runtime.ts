@@ -66,6 +66,7 @@ import {
   COOP_CAP_OP_ABILITY,
   COOP_CAP_OP_BARGAIN,
   COOP_CAP_OP_BIOME,
+  COOP_CAP_OP_CATCH_FULL,
   COOP_CAP_OP_COLOSSEUM,
   COOP_CAP_OP_FAINT_SWITCH,
   COOP_CAP_OP_LEARN_MOVE,
@@ -77,6 +78,11 @@ import {
   type CoopCapabilityKey,
   clearNegotiatedCoopCapabilities,
 } from "#data/elite-redux/coop/coop-capabilities";
+import {
+  isCoopCatchFullOperationEnabled,
+  resetCoopCatchFullOperationState,
+  setCoopCatchFullOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-catch-full-operation";
 import { getCoopChecksumAssertionCount } from "#data/elite-redux/coop/coop-checksum-assert";
 import {
   COOP_COLOSSEUM_ACTION_STRIDE,
@@ -126,6 +132,7 @@ import type {
   CoopAuthoritativeEnvelopeV1,
   CoopBargainPayload,
   CoopBiomePickPayload,
+  CoopCatchFullPayload,
   CoopColosseumPayload,
   CoopCrossroadsPickPayload,
   CoopLearnMoveBatchPayload,
@@ -1505,6 +1512,7 @@ export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | u
     setCoopBiomeOperationRevisionFloor(marks["op:biome"] ?? 0);
     setCoopAbilityOperationRevisionFloor(marks["op:ability"] ?? 0);
     setCoopBargainOperationRevisionFloor(marks["op:bargain"] ?? 0);
+    setCoopCatchFullOperationRevisionFloor(marks["op:catchFull"] ?? 0);
     setCoopColosseumOperationRevisionFloor(marks["op:colosseum"] ?? 0);
     setCoopFaintSwitchOperationRevisionFloor(marks["op:faintSwitch"] ?? 0);
     setCoopLearnMoveOperationRevisionFloor(marks["op:learnMove"] ?? 0);
@@ -2129,6 +2137,20 @@ function materializeCoopRevivalPromptFromOp(runtime: CoopRuntime, envelope: Coop
   return true;
 }
 
+/** Feed a journal-delivered wild catch-full prompt into the guest's existing picker seam. */
+function materializeCoopCatchFullPromptFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const operation = envelope.pendingOperation;
+  const payload = operation?.payload as CoopCatchFullPayload | undefined;
+  if (operation?.kind !== "CATCH_FULL" || payload?.type !== "prompt") {
+    return false;
+  }
+  runtime.interactionRelay.materializeCommittedCatchFullPrompt(payload.pokemonName, payload.speciesId, operation.id);
+  return true;
+}
+
 /** Route journaled learn presentations/host terminals into the same relay seams as their raw carriers. */
 function materializeCoopLearnMoveFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
   if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
@@ -2653,6 +2675,9 @@ function buildLocalCoopCapabilities(): CoopCapabilityKey[] {
   if (isCoopBargainOperationEnabled()) {
     caps.push(COOP_CAP_OP_BARGAIN);
   }
+  if (isCoopCatchFullOperationEnabled()) {
+    caps.push(COOP_CAP_OP_CATCH_FULL);
+  }
   if (isCoopColosseumOperationEnabled()) {
     caps.push(COOP_CAP_OP_COLOSSEUM);
   }
@@ -2710,6 +2735,7 @@ export function assembleCoopRuntime(
   resetCoopBiomeOperationState();
   resetCoopAbilityOperationState();
   resetCoopBargainOperationState();
+  resetCoopCatchFullOperationState();
   resetCoopColosseumOperationState();
   resetCoopFaintSwitchOperationState();
   resetCoopLearnMoveOperationState();
@@ -2788,6 +2814,7 @@ export function assembleCoopRuntime(
   registerCoopOperationLiveSink("op:reward", envelope => materializeCoopRewardActionFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:me", envelope => materializeCoopMeOperationFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:revival", envelope => materializeCoopRevivalPromptFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:catchFull", envelope => materializeCoopCatchFullPromptFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:learnMove", envelope => materializeCoopLearnMoveFromOp(runtime, envelope));
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream, durability);
@@ -2954,6 +2981,7 @@ export function clearCoopRuntime(): void {
   resetCoopBiomeOperationState();
   resetCoopAbilityOperationState();
   resetCoopBargainOperationState();
+  resetCoopCatchFullOperationState();
   resetCoopColosseumOperationState();
   resetCoopFaintSwitchOperationState();
   resetCoopLearnMoveOperationState();

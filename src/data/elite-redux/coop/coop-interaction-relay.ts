@@ -291,6 +291,9 @@ export class CoopInteractionRelay {
   /** Raw/journal prompt echo credits, keyed by the prompt operation id. */
   private readonly rawRevivalPromptCredits = new Map<string, number>();
   private readonly committedRevivalPromptCredits = new Map<string, number>();
+  /** Raw/journal wild catch-full prompt echo credits, keyed by the prompt operation id. */
+  private readonly rawCatchFullPromptCredits = new Map<string, number>();
+  private readonly committedCatchFullPromptCredits = new Map<string, number>();
 
   /** seq -> FIFO queue of choices that arrived before their waiter. */
   private readonly inbox = new Map<number, CoopInteractionChoice[]>();
@@ -345,9 +348,23 @@ export class CoopInteractionRelay {
   }
 
   /** #856: ask the CATCHER partner to open its full-party keep/release picker for a wild catch. */
-  promptCatchFull(pokemonName: string, speciesId: number): void {
+  promptCatchFull(pokemonName: string, speciesId: number, operationId?: string): void {
     coopLog("relay", `SEND catchFullPrompt sp=${speciesId} name=${pokemonName} (#856)`);
-    this.transport.send({ t: "catchFullPrompt", pokemonName, speciesId });
+    this.transport.send({
+      t: "catchFullPrompt",
+      pokemonName,
+      speciesId,
+      ...(operationId === undefined ? {} : { operationId }),
+    });
+  }
+
+  /** Deliver a committed catch-full prompt through the picker seam, suppressing its raw legacy echo. */
+  materializeCommittedCatchFullPrompt(pokemonName: string, speciesId: number, operationId: string): void {
+    if (this.consumeEchoCredit(this.rawCatchFullPromptCredits, operationId)) {
+      return;
+    }
+    this.addEchoCredit(this.committedCatchFullPromptCredits, operationId);
+    this.onCatchFullPrompt?.(pokemonName, speciesId);
   }
 
   /** OWNER: send one pick for interaction `seq` (`kind` is routing/logging only). */
@@ -799,6 +816,8 @@ export class CoopInteractionRelay {
     this.committedChoiceCredits.clear();
     this.rawRevivalPromptCredits.clear();
     this.committedRevivalPromptCredits.clear();
+    this.rawCatchFullPromptCredits.clear();
+    this.committedCatchFullPromptCredits.clear();
     this.rewardOptionsPending.clear();
     this.rewardOptionsInbox.clear();
     this.cancelledSeqs.clear();
@@ -834,6 +853,8 @@ export class CoopInteractionRelay {
     this.committedChoiceCredits.clear();
     this.rawRevivalPromptCredits.clear();
     this.committedRevivalPromptCredits.clear();
+    this.rawCatchFullPromptCredits.clear();
+    this.committedCatchFullPromptCredits.clear();
     this.rewardOptionsInbox.clear();
     // A seq sticky-cancelled in the PRIOR epoch must not keep resolving null in the NEW epoch (seqs reuse
     // low counters), so clear the cancel marks alongside the buffers.
@@ -940,6 +961,12 @@ export class CoopInteractionRelay {
     }
     if (msg.t === "catchFullPrompt") {
       coopLog("relay", `RECV catchFullPrompt sp=${msg.speciesId} name=${msg.pokemonName} (#856)`);
+      if (msg.operationId !== undefined) {
+        if (this.consumeEchoCredit(this.committedCatchFullPromptCredits, msg.operationId)) {
+          return;
+        }
+        this.addEchoCredit(this.rawCatchFullPromptCredits, msg.operationId);
+      }
       this.onCatchFullPrompt?.(msg.pokemonName, msg.speciesId);
       return;
     }

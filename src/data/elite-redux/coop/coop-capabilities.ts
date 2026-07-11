@@ -69,6 +69,8 @@ export const COOP_CAP_OP_FAINT_SWITCH: CoopCapabilityKey = "opSurface.faintSwitc
 export const COOP_CAP_OP_REVIVAL: CoopCapabilityKey = "opSurface.revival";
 /** The migrated per-move and batch move-learning control stream. */
 export const COOP_CAP_OP_LEARN_MOVE: CoopCapabilityKey = "opSurface.learnMove";
+/** The migrated wild-catch full-party keep/release control stream. */
+export const COOP_CAP_OP_CATCH_FULL: CoopCapabilityKey = "opSurface.catchFull";
 /** The application-level durability journal (§4, coop-durability.ts / coop-operation-journal.ts). */
 export const COOP_CAP_DURABILITY_JOURNAL: CoopCapabilityKey = "durability.journal";
 /**

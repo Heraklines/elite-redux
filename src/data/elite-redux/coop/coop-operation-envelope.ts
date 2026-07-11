@@ -217,6 +217,11 @@ export type CoopRevivalPayload =
       readonly speciesId: number;
     };
 
+/** Wild-catch full-party presentation followed by the host-resolved owner decision. */
+export type CoopCatchFullPayload =
+  | { readonly type: "prompt"; readonly pokemonName: string; readonly speciesId: number }
+  | { readonly type: "decision"; readonly speciesId: number; readonly partySlot: number };
+
 export type CoopLearnMovePayload =
   | { readonly type: "prompt"; readonly partySlot: number; readonly moveId: number; readonly maxMoveCount: number }
   | {

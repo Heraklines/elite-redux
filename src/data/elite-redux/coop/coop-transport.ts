@@ -902,7 +902,7 @@ export type CoopMessage =
    * chosen party slot on {@linkcode COOP_CATCH_FULL_SEQ}; the host applies the authoritative release+add.
    * `speciesId` is the caught mon's root species (for a locally-localized picker header on the recipient).
    */
-  | { t: "catchFullPrompt"; pokemonName: string; speciesId: number }
+  | { t: "catchFullPrompt"; pokemonName: string; speciesId: number; operationId?: string | undefined }
   /** #810 resume flow: host offers to resume the saved run with this partner at `wave`. */
   | { t: "meCursor"; index: number }
   | { t: "resumeOffer"; wave: number }

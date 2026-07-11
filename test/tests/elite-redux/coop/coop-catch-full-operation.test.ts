@@ -13,6 +13,7 @@ import {
   setCoopCatchFullRetryMs,
 } from "#data/elite-redux/coop/coop-catch-full-operation";
 import { COOP_CATCH_FULL_SEQ } from "#data/elite-redux/coop/coop-interaction-relay";
+import { getCoopOperationJournalApplied } from "#data/elite-redux/coop/coop-operation-journal";
 import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
@@ -116,8 +117,10 @@ describe("co-op wild catch-full operation migration", () => {
     resend();
     armCoopCatchFullIntentResend({
       payload: { type: "decision", speciesId: 3, partySlot: 4 },
-      wave: 7,
-      turn: 4,
+      // A renderer may be behind the authority here. Cancellation is keyed by the exact resolved
+      // decision, not these presentation-local coordinates.
+      wave: 6,
+      turn: 99,
       resend,
     });
 
@@ -131,6 +134,12 @@ describe("co-op wild catch-full operation migration", () => {
       turn: 4,
     });
     await new Promise(resolve => setTimeout(resolve, 30));
+    const traced = getCoopOperationJournalApplied().find(envelope => envelope.pendingOperation?.kind === "CATCH_FULL");
+    expect(traced?.pendingOperation?.payload, "the host-resolved owner decision is trace-replayable").toEqual({
+      type: "decision",
+      speciesId: 3,
+      partySlot: 4,
+    });
     expect(delivered, "the committed decision cancels all later owner retries").toBe(1);
     offCount();
   });
