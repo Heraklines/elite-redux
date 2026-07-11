@@ -172,6 +172,10 @@ const VANILLA_ID_CUTOFF = 5000;
  */
 const ER_VANILLA_TARGET_OVERRIDES: ReadonlyMap<number, MoveTarget> = new Map([
   [MoveId.FLASH as number, MoveTarget.ALL_NEAR_ENEMIES],
+  // Tera Starstorm — ER dex #961 "Strikes both foes." Vanilla keeps a native
+  // VariableTargetAttr that only widens to ALL_NEAR_ENEMIES when the user is a
+  // terastallized Terapagos; ER always hits both foes. Force the spread target.
+  [MoveId.TERA_STARSTORM as number, MoveTarget.ALL_NEAR_ENEMIES],
 ]);
 
 /** Aggregated result of a single `initEliteReduxVanillaRebalance()` run. */

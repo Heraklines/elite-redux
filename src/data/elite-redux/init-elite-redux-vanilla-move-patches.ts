@@ -43,6 +43,10 @@ import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { type ErPledgeRule, ErPledgeWeatherEffectAttr } from "#data/elite-redux/er-pledge-weather-effect";
 import {
+  BestEffectivenessChartOverrideAttr,
+  RaiseHighestOffenseDefenseStatAttr,
+} from "#data/elite-redux/move-archetype-dispatcher";
+import {
   AddArenaTagAttr,
   AddBattlerTagAttr,
   CompareWeightPowerAttr,
@@ -289,6 +293,9 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     MoveId.OCTOLOCK,
     move => {
       setCategory(move, MoveCategory.PHYSICAL);
+      // ER dex #699: 20-BP physical. Vanilla Octolock is a 0-BP status move, so
+      // without setting power the damaging category deals 0 damage.
+      move.power = 20;
     },
   ],
   // DECORATE: vanilla status (ally Atk/SpAtk +2, ally-targeted, no power) → ER
@@ -563,7 +570,17 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       move.chance = -1;
     },
   ],
-  [MoveId.MYSTICAL_POWER, move => addAttrUnique(move, new PhotonGeyserCategoryAttr())],
+  // Mystical Power - ER dex #985 "Raises the user's highest of Attack, Defense,
+  // Sp. Atk, or Sp. Def by 1." Vanilla hard-wires a self SpAtk+1
+  // (StatStageChangeAttr [SPATK]); drop it and add the ER highest-stat raiser.
+  [
+    MoveId.MYSTICAL_POWER,
+    move => {
+      addAttrUnique(move, new PhotonGeyserCategoryAttr());
+      removeAttrsByName(move, ["StatStageChangeAttr"]);
+      addAttrUnique(move, new RaiseHighestOffenseDefenseStatAttr());
+    },
+  ],
   [
     MoveId.BLEAKWIND_STORM,
     move => {
@@ -685,8 +702,17 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
   [MoveId.BOOMBURST, move => addAttrUnique(move, new RecoilAttr(false, 0.5))],
   // WILD_CHARGE: 10% paralyze chance.
   [MoveId.WILD_CHARGE, move => addAttrUnique(move, new StatusEffectAttr(StatusEffect.PARALYSIS))],
-  // BEAK_BLAST: direct burn proc (not just the header).
-  [MoveId.BEAK_BLAST, move => addAttrUnique(move, new StatusEffectAttr(StatusEffect.BURN))],
+  // BEAK_BLAST: ER dex #653 is ONLY "30% burn chance" on the move's own hit. Strip
+  // the vanilla BeakBlastHeaderAttr (which primes the beak and 100%-burns any
+  // contact attacker that turn — not in the ER dex) and wire the 30% on-hit burn
+  // (chance gated by the numeric-patched move.chance).
+  [
+    MoveId.BEAK_BLAST,
+    move => {
+      removeAttrsByName(move, ["BeakBlastHeaderAttr"]);
+      addAttrUnique(move, new StatusEffectAttr(StatusEffect.BURN));
+    },
+  ],
   // CHILLING_WATER: ER re-specs this to "Fires ice-cold water at the foe. 30%
   // chance to inflict Frostbite." (75 power Water — power set by rebalance). The
   // ER move (id 847) shares the vanilla name, so the c-source name-remap pins it
@@ -1027,22 +1053,76 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       move.accuracy = -1;
     },
   ],
-  // Gigaton Hammer — ER ABBR "Super effective vs Steel." Same #151 collision
-  // zone as Tachyon Cutter, so key by the MoveId enum here (the ER-id SE pass
-  // below targets the diverging static id). x2 power vs Steel.
-  [
-    MoveId.GIGATON_HAMMER,
-    move => {
-      addAttrUnique(move, new MovePowerMultiplierAttr((_u, target) => (target.isOfType(PokemonType.STEEL) ? 2 : 1)));
-    },
-  ],
+  // Gigaton Hammer — ER ABBR "Super effective vs Steel." The 2× vs Steel is wired
+  // by the ER-id super-effective pass (ER_ID_SUPER_EFFECTIVE_VS_TYPE, id 859 →
+  // STEEL) as a type-chart override, which correctly shows "super effective" and
+  // colours the hit. A separate MovePowerMultiplierAttr here would STACK on top of
+  // that override (addAttrUnique only dedups by constructor, not intent) for ~4×
+  // vs Steel, so it is intentionally NOT patched here — the chart override alone
+  // gives the correct single 2×.
   // Dynamax Cannon - ER dex #690 "Deals 2x damage to Mega foes." (No Dynamax in
-  // ER; the clause lands on Mega-evolved targets.) Vanilla ships it as a plain
-  // 100 BP Dragon special with no such multiplier.
+  // ER; the clause lands on Mega-evolved targets.) Vanilla Dynamax Cannon ALREADY
+  // ships a MovePowerMultiplierAttr (the overleveled-target boost), so an
+  // addAttrUnique of a second MovePowerMultiplierAttr would be dropped (dedup by
+  // constructor). Fold BOTH the overleveled boost and the ER mega ×2 into ONE
+  // closure and add it directly (bypassing addAttrUnique) after stripping the
+  // vanilla one, so both clauses apply.
   [
     MoveId.DYNAMAX_CANNON,
     move => {
+      removeAttrsByName(move, ["MovePowerMultiplierAttr"]);
+      move.addAttr(
+        new MovePowerMultiplierAttr((_user, target) => {
+          // Vanilla overleveled boost (verbatim from move.ts DYNAMAX_CANNON).
+          let overleveled = 1;
+          if (target.level > globalScene.getMaxExpLevel()) {
+            const dynamaxCannonPercentMarginBeforeFullDamage = 0.05;
+            const overLevel = target.level - globalScene.getMaxExpLevel();
+            const damageFactor = globalScene.getMaxExpLevel() * dynamaxCannonPercentMarginBeforeFullDamage;
+            overleveled = 1 + Math.min(1, overLevel / damageFactor);
+          }
+          const mega = target.isMega() ? 2 : 1;
+          return overleveled * mega;
+        }),
+      );
+    },
+  ],
+  // Behemoth Blade - ER dex #709 "Deals double damage to Mega Pokemon." Vanilla
+  // ships it as a plain 100 BP Steel slicing physical with no multiplier, so the
+  // mega ×2 is a fresh addAttrUnique (no existing MovePowerMultiplierAttr to dedup
+  // against). Mirrors the Dynamax Cannon mega clause.
+  [
+    MoveId.BEHEMOTH_BLADE,
+    move => {
       addAttrUnique(move, new MovePowerMultiplierAttr((_u, target) => (target.isMega() ? 2 : 1)));
+    },
+  ],
+  // Aura Wheel - ER dex #711 "Electric or Dark, whichever is more effective."
+  // Vanilla derives the type from Morpeko's FORM (AuraWheelTypeAttr), so it stays
+  // Electric for non-Morpeko users. Strip that and make the move deal the more
+  // effective of Electric/Dark vs the target. NB: a VariableMoveTypeAttr chooser
+  // (BestEffectivenessTypeAttr) cannot do this — getMoveType is called with a null
+  // target, so it always resolves to the first candidate in real combat.
+  // BestEffectivenessChartOverrideAttr overrides the type-effectiveness multiplier
+  // at damage time (where the real target IS available) and picks the better of the
+  // two, so the hit lands "super effective" for the stronger type. Self SPD+1 stays.
+  [
+    MoveId.AURA_WHEEL,
+    move => {
+      removeAttrsByName(move, ["AuraWheelTypeAttr"]);
+      addAttrUnique(move, new BestEffectivenessChartOverrideAttr([PokemonType.ELECTRIC, PokemonType.DARK]));
+    },
+  ],
+  // Tera Starstorm - ER dex #961 "Strikes both foes." The base target is forced to
+  // ALL_NEAR_ENEMIES by ER_VANILLA_TARGET_OVERRIDES, but vanilla also carries a
+  // VariableTargetAttr that re-derives the target at cast time (only widening to
+  // ALL_NEAR_ENEMIES for a terastallized Terapagos, else NEAR_OTHER), which would
+  // clobber the static override. Strip it so the spread target always holds. The
+  // "uses higher offense" TeraMoveCategoryAttr and the type attr stay untouched.
+  [
+    MoveId.TERA_STARSTORM,
+    move => {
+      removeAttrsByName(move, ["VariableTargetAttr"]);
     },
   ],
   // Ominous Wind - ER 55 BP, spread, "Deals double damage in fog."

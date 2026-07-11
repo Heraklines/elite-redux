@@ -708,6 +708,12 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     case 1017: // Shot Put — dex 30% Speed drop (ER effectChance ships 0 -> was guaranteed)
       move.chance = 30;
       break;
+    case 1021: // Pocket Sand — dex "10% acc drop, +1 priority". ER data ships
+      // priority 0 and effectChance 0 (so the dispatcher's ACC drop was unconditional).
+      // Force +1 priority and gate the ACC drop at 10%.
+      move.priority = 1;
+      move.chance = 10;
+      break;
     // (Saber Slashes / 1019's 20% flinch chance lives in its multi-hit case below.)
     // ---- Drench-chance corrections (DRENCH now resolves to ER_DRENCHED; the
     // archetype auto-added a generic applier gated on the buggy move.chance -1
@@ -785,7 +791,8 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     case 997: // Insect Impact — 30% lower foe Def
       move.attr(StatStageChangeAttr, [Stat.DEF], -1);
       break;
-    case 1031: // Rumble Kick — 20% lower foe Atk
+    case 1031: // Rumble Kick — 20% lower foe Atk (ER effectChance ships 30)
+      move.chance = 20;
       move.attr(StatStageChangeAttr, [Stat.ATK], -1);
       break;
     // ---- Status / tag chances (gated by Move.chance) ----

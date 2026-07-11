@@ -83,6 +83,7 @@ import {
 } from "#data/moves/move";
 import { failIfTargetNotAttackingCondition, type MoveCondition } from "#data/moves/move-condition";
 import { TerrainType } from "#data/terrain";
+import { getTypeDamageMultiplier } from "#data/type";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
@@ -407,6 +408,59 @@ export class BestEffectivenessTypeAttr extends VariableMoveTypeAttr {
 
   override getTypeForMovegen(_user: Pokemon, move: Move): PokemonType {
     return this.candidates[0] ?? move.type;
+  }
+}
+
+/**
+ * The WORKING "type morphs to the more effective of N candidates" attribute.
+ *
+ * {@linkcode BestEffectivenessTypeAttr} (a {@link VariableMoveTypeAttr}) can only
+ * change a move's type through `Pokemon.getMoveType`, which pokerogue always calls
+ * with a NULL target — so with a real defender it can never see it and falls back
+ * to the first candidate. That makes the whole "best-effectiveness" family pick
+ * candidate[0] in actual combat (verified: it never shows "super effective").
+ *
+ * This attr instead overrides the type-effectiveness MULTIPLIER at damage time.
+ * `MoveTypeChartOverrideAttr` is applied inside `getAttackTypeEffectiveness` WITH
+ * the real defender (see `Pokemon.getAttackTypeEffectiveness`), so we can compute
+ * the effectiveness of each candidate attack type vs the defender and set the
+ * multiplier to the BEST one. The move then deals — and displays "super effective"
+ * for — the more effective type, which is the observable ER-dex behavior.
+ *
+ * It extends the value-exported {@link ErSuperEffectiveVsTypeAttr} purely to
+ * inherit the (type-only-exported, hence un-extendable directly)
+ * `MoveTypeChartOverrideAttr` base; the parent's own fields are unused.
+ */
+export class BestEffectivenessChartOverrideAttr extends ErSuperEffectiveVsTypeAttr {
+  private readonly attackTypes: readonly PokemonType[];
+
+  constructor(attackTypes: readonly PokemonType[]) {
+    super(PokemonType.NORMAL);
+    this.attackTypes = attackTypes;
+  }
+
+  public override apply(
+    _user: Pokemon,
+    _target: Pokemon,
+    _move: Move,
+    args: [multiplier: NumberHolder, types: readonly PokemonType[], moveType: PokemonType],
+  ): boolean {
+    const [multiplier, types] = args;
+    if (this.attackTypes.length === 0) {
+      return false;
+    }
+    let best = Number.NEGATIVE_INFINITY;
+    for (const attackType of this.attackTypes) {
+      let combined = 1;
+      for (const defenderType of types) {
+        combined *= getTypeDamageMultiplier(attackType, defenderType);
+      }
+      if (combined > best) {
+        best = combined;
+      }
+    }
+    multiplier.value = best;
+    return true;
   }
 }
 
@@ -884,10 +938,10 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // crit boost, so the +1 priority (draft.priority) is the whole move.
       return ok(0, []);
     case 1021:
-      // Pocket Sand — 10% to lower foe's accuracy by 1, +1 priority (already
-      // in draft.priority). Pokerogue doesn't expose an effect-chance gate at
-      // the attr level; we keep the stat-stage drop unconditional and rely on
-      // the +1 priority + the description making the trade-off clear.
+      // Pocket Sand — 10% to lower foe's accuracy by 1, +1 priority. The ER draft
+      // ships priority 0 and effectChance 0, so `applyErMoveBespokeRiders` (case
+      // 1021) forces `move.priority = 1` and `move.chance = 10`; this ACC-drop attr
+      // then gates on that 10% Move.chance.
       return ok(0, [new StatStageChangeAttr([Stat.ACC], -1)]);
     case 1022:
       // Concoction — "Attacks and uses a random berry effect." Applies a RANDOM
