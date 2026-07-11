@@ -1556,6 +1556,32 @@ export class FieldMultiplyStatAbAttr extends AbAttr {
   }
 }
 
+/**
+ * Elite Redux — Eternal Flower (er 979): "Reduces the stats of OTHER Megas by
+ * 20%." A cross-side variant of the Ruin mechanism ({@linkcode
+ * FieldMultiplyStatAbAttr}): the base class multiplies the stat of every OTHER
+ * field battler, but this override narrows the target set to OPPOSING Mega /
+ * Primal forms only — detected with the canonical {@linkcode Pokemon.isMega}
+ * predicate rather than a loose `formIndex > 0` check, so ordinary alternate
+ * forms are left untouched. The old wire used a same-side {@linkcode
+ * PersistentFieldAuraAbAttr}, which could only ever debuff the holder's OWN
+ * allied Megas (inert in singles) — the opposite of the dex intent.
+ *
+ * Matched via the base-class name in `getEffectiveStat`'s
+ * `applyAbAttrs("FieldMultiplyStatAbAttr")` loop (instanceof), so no separate
+ * registration is required.
+ */
+export class OpposingMegaStatSuppressAbAttr extends FieldMultiplyStatAbAttr {
+  override canApply(params: FieldMultiplyStatAbAttrParams): boolean {
+    const { pokemon, target } = params;
+    // Only OPPOSING Megas: never the holder, never same-side allies, never non-Megas.
+    if (target === pokemon || target.isPlayer() === pokemon.isPlayer() || !target.isMega()) {
+      return false;
+    }
+    return super.canApply(params);
+  }
+}
+
 export interface MoveTypeChangeAbAttrParams extends AugmentMoveInteractionAbAttrParams {
   // TODO: Replace the number holder with a holder for the type.
   /** Holds the type of the move, which may change after ability application */

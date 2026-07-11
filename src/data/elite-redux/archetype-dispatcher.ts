@@ -96,6 +96,7 @@ import {
   MovePowerBoostAbAttr,
   MoveTypeChangeAbAttr,
   MoveTypePowerBoostAbAttr,
+  OpposingMegaStatSuppressAbAttr,
   OverruleCritAbAttr,
   PokemonTypeChangeAbAttr,
   PostAttackAbilityGiveAbAttr,
@@ -1748,10 +1749,18 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
           return user?.getMoveType(move) === PokemonType.WATER;
         }, 2.0),
       ];
-    case 870: // Molten Core: "Absorbs Rock-moves/Stealth Rocks" — Rock-move
+    case 873: // Ice Plumes: "Absorbs Rock-moves/Stealth Rocks" — Rock-move
       // absorb (immune + heal 1/4, like Water Absorb) PLUS Stealth Rock immunity
       // (no switch-in damage, heal 1/4 instead) via the hazard-immunity marker.
+      // The +2-Speed-on-Rock-hit and +2-Speed-on-SR-present-switch-in halves come
+      // from the er447 Furnace composite part (both triggers already wired there).
       return [new TypeAbsorbHealAbAttr({ type: PokemonType.ROCK }), new StealthRockImmunityAbAttr()];
+    case 871: // Fire Aspect: "Doubles all allies' Speed" — persistent same-side
+      // Speed aura (x2) over the holder's teammates (the Desolate Land weather +
+      // 3-turn Tailwind halves come from the pokerogue-190 + er320 composite parts).
+      // Same-side only (PersistentFieldAura skips cross-side); inert in singles,
+      // as an ally aura should be.
+      return [new PersistentFieldAuraAbAttr({ stats: [Stat.SPD], multiplier: 2 })];
     case 848: // Superheavy: "blocks phasing moves" — immune to forced switch-out
       // (Roar/Whirlwind/Dragon Tail), exactly Suction Cups' effect.
       return [new ForceSwitchOutImmunityAbAttr()];
@@ -5797,12 +5806,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Musical Notes — "Status moves become sound-based." Move-flag
       // injection primitive missing. Defer.
       return SKIP_BESPOKE;
-    case 871:
-      // Blistering Sun — "Desolate Land + Air Blower." Compose vanilla
-      // DESOLATE_LAND (236) attrs + a partial Air Blower stand-in.
-      // Wire just the vanilla Desolate Land piece for now; Air Blower
-      // (terrain-clear) needs a new primitive.
-      return ok([...(allAbilities[236]?.attrs ?? [])]);
+    // (er 871 Fire Aspect is now the DESOLATE_LAND(190)+Air Blower(er320)
+    // composite — see ER_COMPOSITE_PARTS[871] + compositeRiderAttrs case 871.
+    // Its old bespoke stub here was removed in the 869-873 cross-wiring fix.)
     // -------------------------------------------------------------------------
     // Round 18 — more flag-boost siblings + composites
     // -------------------------------------------------------------------------
@@ -6539,10 +6545,11 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // Logical id 392 is Arctic Fur — "Weakens incoming physical and
       // special moves by 35%." Simple damage reduction (all moves, 0.35).
       return ok([new DamageReductionAbAttr({ reduction: 0.35, filter: { kind: "all" } })]);
-    case 871:
-      // Logical id 871 is Fire Aspect — "Absorbs fire moves and always burns
-      // with fire." Fire immunity (heal) + the holder's damaging attacks always
-      // inflict BURN (100%, any damaging move — not just contact).
+    case 869:
+      // Blistering Sun (er 869) — "Absorbs Fire moves (heal 25%) and always burns
+      // with Fire." Fire immunity (heal 1/4) + the holder's damaging attacks always
+      // inflict BURN (100%, any damaging move — not just contact). (Formerly
+      // mis-keyed to 871/Fire Aspect during the cross-wired era; corrected here.)
       return ok([
         new TypeAbsorbHealAbAttr({ type: PokemonType.FIRE, healFraction: 0.25 }),
         new ChanceStatusOnAttackAbAttr({ chance: 100, effects: [StatusEffect.BURN], contactRequired: false }),
@@ -6640,23 +6647,18 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         }),
       ]);
     case 979:
-      // Eternal Flower — "Reduces the stats of other Megas by 20%."
-      // Uses PersistentFieldAura with a predicate that checks the ally's
-      // form name for "mega" / formIndex > 0. Multiplier 0.8 (-20%).
+      // Eternal Flower — "Reduces the stats of OTHER Megas by 20%." Cross-side
+      // Ruin-style aura (OpposingMegaStatSuppressAbAttr, multiplier 0.8) applied
+      // to every effective stat of OPPOSING Mega/Primal forms only. Replaces the
+      // old same-side PersistentFieldAura (which only ever debuffed the holder's
+      // OWN allied Megas and was inert in singles) and tightens the Mega test from
+      // the loose formIndex>0 to the canonical Pokemon.isMega() predicate.
       return ok([
-        new PersistentFieldAuraAbAttr({
-          stats: [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD],
-          multiplier: 0.8,
-          predicate: (ally, holder) => {
-            if (ally === holder) {
-              return false;
-            }
-            // Match if the ally's species form is a Mega — formIndex > 0
-            // typically indicates a non-base form (mega/primal/etc).
-            return ally.formIndex > 0;
-          },
-          includeSelf: false,
-        }),
+        new OpposingMegaStatSuppressAbAttr(Stat.ATK, 0.8),
+        new OpposingMegaStatSuppressAbAttr(Stat.DEF, 0.8),
+        new OpposingMegaStatSuppressAbAttr(Stat.SPATK, 0.8),
+        new OpposingMegaStatSuppressAbAttr(Stat.SPDEF, 0.8),
+        new OpposingMegaStatSuppressAbAttr(Stat.SPD, 0.8),
       ]);
 
     // -------------------------------------------------------------------------

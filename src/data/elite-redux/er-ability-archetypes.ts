@@ -545,7 +545,10 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   758: { erAbilityId: 758, archetype: "composite-vanilla-mashup", params: {"parts":["Rock Head","Reckless"]} },
   759: { erAbilityId: 759, archetype: "composite-vanilla-mashup", params: {"parts":["Shell Armor","50BP Thunder Cage when hit by contact"]} },
   760: { erAbilityId: 760, archetype: "composite-vanilla-mashup", params: {"parts":["Corrosion","Poison STAB"]} },
-  761: { erAbilityId: 761, archetype: "entry-effect", params: {"effect":{"kind":"set-hazard","hazard":"TOXIC_SPIKES","layers":2}} },
+  // 761 Rose Garden — lays TWO layers of Toxic Spikes on the FOE's side (dex).
+  // Without side:"foe" the hazard defaulted to "both" and badly-poisoned the
+  // holder's own grounded switch-ins.
+  761: { erAbilityId: 761, archetype: "entry-effect", params: {"effect":{"kind":"set-hazard","hazard":"TOXIC_SPIKES","layers":2,"side":"foe"}} },
   762: { erAbilityId: 762, archetype: "composite-vanilla-mashup", params: {"parts":["Always hits","Rampage"]} },
   763: { erAbilityId: 763, archetype: "composite-vanilla-mashup", params: {"parts":["Magic Guard","Magic Bounce"]} },
   764: { erAbilityId: 764, archetype: "bespoke", params: null },
@@ -654,11 +657,24 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   866: { erAbilityId: 866, archetype: "bespoke", params: null },
   867: { erAbilityId: 867, archetype: "composite-vanilla-mashup", params: {"parts":["Drizzle","Electro Surge"]} },
   868: { erAbilityId: 868, archetype: "bespoke", params: null },
-  871: { erAbilityId: 871, archetype: "bespoke", params: null },
-  873: { erAbilityId: 873, archetype: "damage-reduction-generic", params: {"filter":{"kind":"special"},"reduction":0.5} },
-  869: { erAbilityId: 869, archetype: "composite-vanilla-mashup", params: {"parts":["Desolate Land","Air Blower"]} },
-  870: { erAbilityId: 870, archetype: "composite-vanilla-mashup", params: {"parts":["Furnace","Absorbs Rock-moves/Stealth Rocks"]} },
-  872: { erAbilityId: 872, archetype: "composite-vanilla-mashup", params: {"parts":["Majestic Bird","North Wind"]} },
+  // --- 869-873 cluster (Legendary weather/aspect quintet) ---------------------
+  // These five were CROSS-WIRED: each row implemented a NEIGHBOUR's dex effect.
+  // Re-keyed so every ability implements ITS OWN ER 2.65 dex entry. Do not
+  // shuffle without re-reading the dex — the effects deliberately do not overlap.
+  // 869 Blistering Sun — Fire immunity + heal 25% on Fire hit + always burn on
+  //   attack. Hand-wired: dispatchBespokeR48 case 869.
+  869: { erAbilityId: 869, archetype: "bespoke", params: null },
+  // 870 Molten Core — SpAtk x1.5 + Aurora Veil on entry + Hail immunity =
+  //   er323 Majestic Bird + er348 North Wind.
+  870: { erAbilityId: 870, archetype: "composite-vanilla-mashup", params: {"parts":["Majestic Bird","North Wind"]} },
+  // 871 Fire Aspect — primal Desolate Land + 3-turn Tailwind on entry + doubles
+  //   all allies' Speed = Desolate Land (190) + er320 Air Blower (+ double-speed rider).
+  871: { erAbilityId: 871, archetype: "composite-vanilla-mashup", params: {"parts":["Desolate Land","Air Blower"]} },
+  // 872 Aurora's Gale — halves all incoming Special-attack damage (x0.5).
+  872: { erAbilityId: 872, archetype: "damage-reduction-generic", params: {"filter":{"kind":"special"},"reduction":0.5} },
+  // 873 Ice Plumes — +2 Speed on Rock hit / SR-present switch-in + absorb Rock &
+  //   Stealth Rock (heal 25%) = er447 Furnace + Rock/SR-absorb rider.
+  873: { erAbilityId: 873, archetype: "composite-vanilla-mashup", params: {"parts":["Furnace","Absorbs Rock-moves/Stealth Rocks"]} },
   874: { erAbilityId: 874, archetype: "bespoke", params: null },
   875: { erAbilityId: 875, archetype: "lifesteal", params: {"trigger":"on-hit-deal","healFraction":0.125} },
   876: { erAbilityId: 876, archetype: "bespoke", params: null },

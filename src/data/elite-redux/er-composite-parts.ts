@@ -181,9 +181,15 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   861: { erAbilityId: 861, parts: [{ kind: "pokerogue", abilityId: 173 }], unresolvedParts: ["Jaws of Carnage"], hasRider: true },
   863: { erAbilityId: 863, parts: [{ kind: "er", erAbilityId: 270 }, { kind: "er", erAbilityId: 456 }], hasRider: false },
   867: { erAbilityId: 867, parts: [{ kind: "pokerogue", abilityId: 2 }, { kind: "er", erAbilityId: 226 }], hasRider: false },
-  869: { erAbilityId: 869, parts: [{ kind: "pokerogue", abilityId: 190 }, { kind: "er", erAbilityId: 320 }], hasRider: false },
-  870: { erAbilityId: 870, parts: [{ kind: "er", erAbilityId: 447 }], unresolvedParts: ["Absorbs Rock-moves/Stealth Rocks"], hasRider: true },
-  872: { erAbilityId: 872, parts: [{ kind: "er", erAbilityId: 323 }, { kind: "er", erAbilityId: 348 }], hasRider: false },
+  // 869-873 cluster re-key (was cross-wired — see er-ability-archetypes.ts).
+  // 869 Blistering Sun is now bespoke (no composite entry). 872 Aurora's Gale is
+  // now damage-reduction-generic (no composite entry).
+  // 870 Molten Core = er323 Majestic Bird (SpAtk x1.5) + er348 North Wind (Aurora Veil + Hail immunity).
+  870: { erAbilityId: 870, parts: [{ kind: "er", erAbilityId: 323 }, { kind: "er", erAbilityId: 348 }], hasRider: false },
+  // 871 Fire Aspect = Desolate Land (190) + er320 Air Blower (3-turn Tailwind) + "double allies' Speed" rider.
+  871: { erAbilityId: 871, parts: [{ kind: "pokerogue", abilityId: 190 }, { kind: "er", erAbilityId: 320 }], unresolvedParts: ["Doubles all allies' Speed"], hasRider: true },
+  // 873 Ice Plumes = er447 Furnace (+2 Speed on Rock hit / SR-present entry) + Rock/SR-absorb+heal rider.
+  873: { erAbilityId: 873, parts: [{ kind: "er", erAbilityId: 447 }], unresolvedParts: ["Absorbs Rock-moves/Stealth Rocks"], hasRider: true },
   881: { erAbilityId: 881, parts: [{ kind: "er", erAbilityId: 303 }], unresolvedParts: ["Rock moves ignore abilities"], hasRider: true },
   894: { erAbilityId: 894, parts: [{ kind: "pokerogue", abilityId: 301 }, { kind: "pokerogue", abilityId: 132 }], hasRider: false },
   900: { erAbilityId: 900, parts: [{ kind: "pokerogue", abilityId: 159 }, { kind: "er", erAbilityId: 482 }], hasRider: false },
