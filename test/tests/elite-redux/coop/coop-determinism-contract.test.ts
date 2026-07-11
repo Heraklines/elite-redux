@@ -48,8 +48,6 @@ const RUN = process.env.ER_SCENARIO === "1";
 
 /** A handful of waves is enough to prove the contract; keep each run fast. */
 const CONTRACT_WAVES = 4;
-/** Both pairs pin the SAME run seed so the seed-bearing save-data digest compares apples-to-apples. */
-const PIN_SEED = "coop-determinism-contract";
 /** The single script seed both pairs are driven by. */
 const SCRIPT_SEED = 987654321;
 
@@ -115,14 +113,13 @@ describe.skipIf(!RUN)("DETERMINISM CONTRACT: identical seeded script => identica
     // rewardPolicy "seeded": rewards are TAKEN (across the full pool - non-party AND party-target) by the
     // seed, EXACTLY as the soak drives them. This is the STRONG form of the contract: a taken reward that
     // embedded a client-local id (a granted mon's pokemonId in a held-item arg) would diverge the two
-    // independent runs' digests - the #839 class this guard exists to catch (now normalized). pinSeed
-    // aligns the seed-bearing digest; the SAME SCRIPT_SEED drives identical moves + take decisions.
+    // independent runs' digests - the #839 class this guard exists to catch (now normalized). The driver's
+    // DEFAULT content seed derives from the SAME SCRIPT_SEED, so this also prevents replay-key regression.
     const result = await runCoopSoak(game, {
       seed: SCRIPT_SEED,
       waves: CONTRACT_WAVES,
       logs,
       rewardPolicy: "seeded",
-      pinSeed: PIN_SEED,
     });
     return result.boundaryDigests;
   }
