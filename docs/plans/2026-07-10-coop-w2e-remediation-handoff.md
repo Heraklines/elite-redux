@@ -538,6 +538,25 @@ pairing protocol advances to `er-coop-19`, preventing a stale cached renderer fr
 old fallback.
 
 Focused proof: the ME handoff, battle-stream, durability, WebRTC, and capability batch passes 103/103;
-the production-shaped two-engine mystery and ME-battle-reward suites pass 8/8. The full sharded checkpoint
-and staging promotion remain pending. The remaining architecture work is still open: deliberately undriven forced soak legs, browser-
-level transport scenarios, canonical causal tracing, and the lobby/resume operation-model migration.
+the production-shaped two-engine mystery and ME-battle-reward suites pass 8/8. The 13-shard external gate
+passed at `ed8560292`, and staging deployment run `29166638586` completed successfully. The remaining
+architecture work is still open: deliberately undriven forced soak legs, browser-level transport scenarios,
+canonical causal tracing, and the lobby/resume operation-model migration.
+
+## 27. Ordinary-wave enemy authority recovery
+
+The same audit then found the general wave boundary still bypassed its already-built recovery primitive.
+`EncounterPhase.adoptCoopHostEnemyParty` called the one-shot `awaitEnemyParty`; timeout or any malformed
+entry left empty slots for the normal generation loop, explicitly permitting a different guest battle.
+`961173886` is the failure-first wiring proof.
+
+`f09ad820c` routes the live phase through `awaitEnemyPartyWithRetry`, sends an immediate keyed request,
+retries on its bounded schedule and reconnect, and makes the host retain the exact last four complete
+`enemyPartySync` carriers. Replay therefore preserves not only species but the host's battle-type verdict,
+mystery-event verdict, and complete authoritative wave-boundary state. Party reconstruction is atomic;
+missing, empty, duplicate-index, or unbuildable authority shows an explicit reconnect/retry prompt and
+never falls into local generation.
+
+Proof: battle-stream plus production-wiring suites pass 38/38, including a deterministic first-carrier
+drop whose replay retains all control fields; production-shaped multiwave and launch suites pass 6/6.
+The next full sharded checkpoint and staging promotion remain pending.
