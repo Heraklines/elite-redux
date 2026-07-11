@@ -629,13 +629,20 @@ export class CommandPhase extends FieldPhase {
               `next-command barrier ${point} ABORTED during teardown/recovery - command UI remains closed`,
             );
             return false;
+          } else if (result.authoritativePoint !== undefined && result.authoritativePoint !== point) {
+            coopWarn(
+              "rendezvous",
+              `next-command barrier ${point} ROUTED AWAY to host-authoritative ${result.authoritativePoint}; closing phantom command phase`,
+            );
+            this.end();
+            return false;
           } else if (result.crossPoint !== undefined) {
             // #847 CROSS-POINT: the partner is already at another sync point (e.g. the reward shop) and
             // will never reach this command point. Open the UI immediately - the downstream catch-up
             // machinery reconciles. INFO, not the anti-hang WARN (no dead partner, no 60s wait).
             coopLog(
               "rendezvous",
-              `next-command barrier ${point} CROSS-POINT release (partner at ${result.crossPoint}); opening UI`,
+              `next-command barrier ${point} host-authoritative route ACKED (partner had ${result.crossPoint}); opening UI`,
             );
           }
           return true;

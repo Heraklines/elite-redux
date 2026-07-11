@@ -1361,13 +1361,20 @@ export class SelectModifierPhase extends BattlePhase {
           `shop-pick-commit barrier ${point} ABORTED during teardown/recovery - pick screen remains closed`,
         );
         return false;
+      } else if (result.authoritativePoint !== undefined && result.authoritativePoint !== point) {
+        coopWarn(
+          "rendezvous",
+          `shop-pick-commit barrier ${point} ROUTED AWAY to host-authoritative ${result.authoritativePoint}; closing stale shop phase`,
+        );
+        this.end();
+        return false;
       } else if (result.crossPoint !== undefined) {
         // #847 CROSS-POINT: the partner is parked at another sync point (e.g. a phantom next command) and
         // will never reach this shop barrier. Open the pick screen now - the catch-up machinery reconciles.
         // INFO, not the anti-hang WARN (no dead partner, no 60s wait).
         coopLog(
           "rendezvous",
-          `shop-pick-commit barrier ${point} CROSS-POINT release (partner at ${result.crossPoint}); opening pick screen`,
+          `shop-pick-commit barrier ${point} host-authoritative route ACKED (partner had ${result.crossPoint}); opening pick screen`,
         );
       }
       return true;
