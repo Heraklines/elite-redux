@@ -559,4 +559,22 @@ never falls into local generation.
 
 Proof: battle-stream plus production-wiring suites pass 38/38, including a deterministic first-carrier
 drop whose replay retains all control fields; production-shaped multiwave and launch suites pass 6/6.
-The next full sharded checkpoint and staging promotion remain pending.
+The 13-shard gate passed at `eb4449ac0`; staging deployment run `29166936424` completed successfully.
+
+## 28. Interaction barriers no longer timeout open
+
+The remaining interaction-counter barriers still treated their 60-second production timeout as permission
+to proceed. That affected both `CoopPartnerSyncPhase` after a shared menu and the host's next-wave enemy
+publication barrier. A suspended tab or one lost completion frame could therefore put one player in the
+next wave while the other was still in the prior reward/ME flow. `7ab1a963e` deterministically drops the
+host's completion counter and proves the guest returned `false` after the test timeout.
+
+`06d074c20` adds the durable `requestInteractionCounter` replay handshake. A timeout now requests the
+peer's current counter snapshot and waits again; reconnect also re-announces the counter. The response is
+idempotent and cannot increment either side. Shared phase and wave-start barriers remain visibly closed
+until the required counter arrives; there is no proceed-and-heal branch. The incompatible safety behavior
+bumps pairing to `er-coop-20` so cached older clients cannot silently ignore the replay request.
+
+Proof: controller/capability/wiring suites pass 29/29, including actual first-frame loss and recovery;
+production-shaped pacing, biome-boundary, and multiwave suites pass 13/13. The next external checkpoint
+and staging promotion remain pending.
