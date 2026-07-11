@@ -62,6 +62,13 @@ import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-autho
  * Wave-1 boundary-tail allowance the guest still builds locally today.
  */
 export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>([
+  // ── SESSION/ACCOUNT SHELL - outside an active shared-run mutation context ──
+  // A paired guest can legitimately revisit these during initial boot, teardown, or reconnect. Blocking
+  // them strands the scene before currentBattle exists and turns the next TurnInitPhase into a null-battle
+  // crash. They own account/session navigation only; no shared battle state is resolved here.
+  "LoginPhase",
+  "TitlePhase",
+
   // ── PRESENTATION (§3.1) - pure render / animation / narration; mutates no hashed state ──
   "MessagePhase", // narration box; guest shows host-localized log lines
   "CommonAnimPhase", // shared VFX; no state (empirically constructed on the guest)

@@ -49,7 +49,7 @@ import {
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -84,6 +84,9 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
   afterAll(() => {
     setCoopWaveBarrierMs(60_000);
     resetCoopRendezvousWaitMs();
+  });
+
+  afterEach(() => {
     logs?.dispose();
     clearCoopRuntime();
     initGlobalScene(game.scene);

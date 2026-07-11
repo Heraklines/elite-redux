@@ -166,6 +166,13 @@ describe("co-op renderer ALLOWLIST gate (#633, accepted-review item 2)", () => {
       expect(getCoopRendererNeutralizedLog()).not.toContain("SelectStarterPhase");
     });
 
+    it("RUNS the account/session shell while a guest session is paired but no battle exists", () => {
+      for (const phase of ["LoginPhase", "TitlePhase"]) {
+        expect(isCoopRendererBlockedPhase(phase), `${phase} is outside shared-run mutation`).toBe(false);
+        expect(coopRendererGateNeutralizes(phase), `${phase} must not strand boot/reconnect`).toBe(false);
+      }
+    });
+
     it("RUNS the guest turn dispatcher so it can divert into CoopReplayTurnPhase", () => {
       expect(isCoopRendererBlockedPhase("TurnStartPhase")).toBe(false);
       expect(coopRendererGateNeutralizes("TurnStartPhase")).toBe(false);

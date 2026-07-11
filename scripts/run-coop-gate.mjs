@@ -16,11 +16,11 @@
 // heavy duo file times out under the CPU contention of ~11 forks. Which files land in which fork - and in
 // what order - varies run to run, so 2-17 files fail NONDETERMINISTICALLY, every one passing solo (#879).
 //
-// THE FIX IS SCHEDULING ONLY (no assertion is weakened). Each LANE runs its files in a SINGLE worker with
-// `--no-file-parallelism`, so the files execute sequentially in the sequencer's deterministic order and the
-// shared-scene chain is never fragmented; and the lanes run one-at-a-time, so the box is never under the
-// ~11-fork load that caused the hook/waitUntil timeouts. The dir is split into three lanes calibrated on this
-// box so each is individually reliable:
+// THE FIX IS SCHEDULING ONLY (no assertion is weakened). Engine-heavy files run sequentially in independent
+// Vitest processes. This preserves deterministic order and one-process-at-a-time resource use while also
+// reclaiming Phaser/module heaps and cancelling leaked timers between files. Engine-free Lane A remains one
+// sequential process because its stub-scene tests intentionally share a scene chain. The dir is split into
+// calibrated lanes:
 //   - Lane A (engine-free / light): the coop repros that do NOT boot a real engine (no ER_SCENARIO gate) -
 //     stub-scene handler/relay unit tests. Fast; sequential keeps their globalScene citizenship intact.
 //   - Lane B (heavy duo / engine): every ER_SCENARIO-gated two-engine + engine coop test EXCEPT the soaks -
@@ -143,16 +143,16 @@ function categorize() {
 }
 
 /**
- * Per-lane vitest ISOLATION. The heavy engine/soak lanes (B, C) run with `--isolate` so EACH file gets a
- * FRESH module registry (its own `globalScene`) - this is what actually kills #879: with the default
- * `isolate: false`, a single duo file that fails to fully restore `globalScene` in afterEach leaves it
- * broken for EVERY later file in the worker (a deterministic `undefined.play` cascade under single-fork, a
- * nondeterministic one under multi-fork). `--isolate` removes the shared-state coupling entirely, so no file
- * can poison another. Lane A (engine-free stub repros) is DELIBERATELY left on the default `--no-isolate`:
+ * Per-lane vitest MODULE isolation. Heavy lanes also get PROCESS isolation in {@linkcode runLane}; `--isolate`
+ * alone resets module contexts but Vitest still reuses the worker process, so Phaser heaps and asynchronous
+ * scene work can survive between files. Lane A (engine-free stub repros) is deliberately `--no-isolate`:
  * those files intentionally CHAIN a real `globalScene` across the dir (capture prevGlobalScene -> restore),
  * so isolating them would strand a stub with no real scene to chain; Lane A is already reliably green as-is.
  */
 const LANE_ISOLATE = { A: false, B: true, C: true, P: true, Q: false };
+
+/** Lanes whose files each run in a fresh, sequential Vitest process (heap + timer isolation). */
+const LANE_PROCESS_ISOLATE = { A: false, B: true, C: true, P: true, Q: false };
 
 /**
  * Per-lane EXTRA env (merged over ER_SCENARIO=1). Only LANE P (#897) needs any: it forces the soak driver
@@ -168,9 +168,10 @@ const LANE_ENV = {
 };
 
 /**
- * Run one lane: a single `vitest run` over the lane's file list with `--no-file-parallelism` (one worker,
- * sequential, no ~11-fork load) + the lane's isolation ({@linkcode LANE_ISOLATE}) and ER_SCENARIO=1 (so the
- * engine-gated files actually run). Returns the lane result (pass/fail + duration + the parsed summary line).
+ * Run one lane sequentially. Heavy lanes execute one file per Vitest child process; this is still one worker
+ * at a time on the runner, but releases the entire heap and kills leaked async scene work between files.
+ * Lane A keeps one grouped process for its intentional shared-scene chain. Every file runs even after a red
+ * so one checkpoint returns the complete failure batch.
  */
 function runLane(name, files) {
   if (files.length === 0) {
@@ -182,23 +183,32 @@ function runLane(name, files) {
     .join(" ");
   // eslint-disable-next-line no-console
   console.log(
-    `\n=== LANE ${name}: ${files.length} files (sequential, single worker, ${isolate}${extraEnv ? `, ${extraEnv}` : ""}) ===`,
+    `\n=== LANE ${name}: ${files.length} files (sequential, ${LANE_PROCESS_ISOLATE[name] ? "fresh process/file" : "single process"}, ${isolate}${extraEnv ? `, ${extraEnv}` : ""}) ===`,
   );
   const started = Date.now();
-  // shell:true + a single command STRING so Windows resolves `npx` (-> npx.cmd) via PATHEXT reliably (a bare
-  // spawnSync("npx.cmd", argv) returns exit=null on this box). Coop test paths never contain spaces, so no
-  // quoting is needed; the arg list stays well under the Windows command-line length limit.
-  const cmd = `npx vitest run ${files.join(" ")} --no-file-parallelism ${isolate}`;
-  const res = spawnSync(cmd, {
-    cwd: REPO_ROOT,
-    env: { ...process.env, ER_SCENARIO: "1", ...(LANE_ENV[name] ?? {}) },
-    stdio: ["ignore", "inherit", "inherit"],
-    encoding: "utf8",
-    shell: true,
-  });
+  const groups = LANE_PROCESS_ISOLATE[name] ? files.map(file => [file]) : [files];
+  let failures = 0;
+  for (const [index, group] of groups.entries()) {
+    if (groups.length > 1) {
+      console.log(`\n--- LANE ${name} FILE ${index + 1}/${groups.length}: ${group[0]} ---`);
+    }
+    // shell:true + a single command string lets Windows resolve npx.cmd through PATHEXT. Paths are repo-relative
+    // and contain no spaces. Only one child exists at a time, so external sharding supplies all concurrency.
+    const cmd = `npx vitest run ${group.join(" ")} --no-file-parallelism ${isolate}`;
+    const res = spawnSync(cmd, {
+      cwd: REPO_ROOT,
+      env: { ...process.env, ER_SCENARIO: "1", ...(LANE_ENV[name] ?? {}) },
+      stdio: ["ignore", "inherit", "inherit"],
+      encoding: "utf8",
+      shell: true,
+    });
+    if (res.status !== 0) {
+      failures++;
+    }
+  }
   const ms = Date.now() - started;
-  const ok = res.status === 0;
-  return { name, files: files.length, ok, ms, summary: ok ? "PASS" : `FAIL (exit ${res.status})` };
+  const ok = failures === 0;
+  return { name, files: files.length, ok, ms, summary: ok ? "PASS" : `FAIL (${failures} file process(es))` };
 }
 
 function fmtMs(ms) {
