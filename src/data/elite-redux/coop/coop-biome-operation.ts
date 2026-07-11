@@ -455,19 +455,21 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
  * no-op. Returns true iff the op was NEWLY applied. No-op when the surface flag is OFF (pure legacy).
  */
 function applyJournaledBiomeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
-  // Flag OFF / capability-blocked / a non-op frame is ACK'd + dropped (spin-safe): the committer would
-  // not send it in a consistent session, and returning "rejected" would spin its resend loop forever
-  // (W2e-R P0-1). The capability-gated predicate (#896 W2e-R2) keeps this symmetric with activation.
+  // A consistent peer cannot send this while the surface is disabled. Refuse an incompatible/corrupt
+  // frame without ACKing rather than permanently discarding an authoritative mutation.
   if (!isCoopBiomeOperationEnabled()) {
-    return "duplicate";
+    return "rejected";
   }
   const op = envelope.pendingOperation;
   if (op == null || op.status !== "applied") {
-    return "duplicate";
+    return "rejected";
   }
   const g = guest();
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
+  }
+  if (!routeCoopOperationToLiveSink("op:biome", envelope)) {
+    return "rejected";
   }
   // Re-key to the guest-local dense revision so the live relay and journal carriers share ONE applier
   // without creating artificial gaps when either carrier wins the race.
@@ -485,7 +487,6 @@ function applyJournaledBiomeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coo
   // receiver's local interaction relay, so the existing SelectBiomePhase / ErCrossroadsPhase safe apply path
   // performs the real mutation. That production sink arms the one-shot phase handoff itself; headless
   // recording sinks can still prove routing without changing live adoption semantics.
-  routeCoopOperationToLiveSink("op:biome", envelope);
   coopLog("reward", `biome op JOURNAL apply id=${op.id} rev=${envelope.revision} (Wave-2e/W2e-R)`);
   return "applied";
 }

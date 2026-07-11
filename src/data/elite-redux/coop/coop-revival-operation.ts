@@ -248,11 +248,11 @@ function validPayload(value: unknown): value is CoopRevivalPayload {
 
 function applyJournaledRevivalEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
   if (!isCoopRevivalOperationEnabled()) {
-    return "duplicate";
+    return "rejected";
   }
   const operation = envelope.pendingOperation;
   if (operation?.kind !== "REVIVAL" || operation.status !== "applied") {
-    return "duplicate";
+    return "rejected";
   }
   if (!validPayload(operation.payload)) {
     return "rejected";
@@ -261,13 +261,14 @@ function applyJournaledRevivalEnvelope(envelope: CoopAuthoritativeEnvelopeV1): C
   if (g.hasApplied(operation.id)) {
     return "duplicate";
   }
+  if (!routeCoopOperationToLiveSink("op:revival", envelope)) {
+    return "rejected";
+  }
   const result = g.applyEnvelope({ ...envelope, sessionEpoch: epoch, revision: g.getLastAppliedRevision() + 1 });
   if (result.kind !== "applied") {
     return "rejected";
   }
-  if (operation.payload.type === "prompt") {
-    routeCoopOperationToLiveSink("op:revival", envelope);
-  } else {
+  if (operation.payload.type !== "prompt") {
     cancelRetry(operation.payload, envelope.wave, envelope.turn);
   }
   return "applied";

@@ -84,7 +84,10 @@ function bargainOperationId(pinned: number): string {
   return makeCoopOperationId(epoch, coopInteractionOwnerSeat(pinned), pinned);
 }
 
-function controlContext(wave: number, turn: number): Omit<CoopAuthoritativeEnvelopeV1, "version" | "sessionEpoch" | "revision" | "pendingOperation"> {
+function controlContext(
+  wave: number,
+  turn: number,
+): Omit<CoopAuthoritativeEnvelopeV1, "version" | "sessionEpoch" | "revision" | "pendingOperation"> {
   const authoritativeState: CoopAuthoritativeBattleStateV1 = {
     version: 1,
     tick: 0,
@@ -119,9 +122,7 @@ function intentFor(pinned: number, outcome: CoopInteractionOutcome): CoopPending
 function commit(pinned: number, outcome: CoopInteractionOutcome, wave: number, turn: number): void {
   const intent = intentFor(pinned, outcome);
   const result = host().submit(intent, controlContext(wave, turn), proposed =>
-    proposed.owner === coopInteractionOwnerSeat(pinned)
-      ? { ok: true }
-      : { ok: false, reason: "wrong-owner" },
+    proposed.owner === coopInteractionOwnerSeat(pinned) ? { ok: true } : { ok: false, reason: "wrong-owner" },
   );
   if (result.kind === "committed") {
     journalCoopCommittedEnvelope(result.envelope);
@@ -193,21 +194,23 @@ export function armCoopBargainJournalMaterialization(operationId: string): void 
 
 function applyJournaledBargainEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
   if (!isCoopBargainOperationEnabled()) {
-    return "duplicate";
+    return "rejected";
   }
   const op = envelope.pendingOperation;
   if (op?.kind !== "BARGAIN" || op.status !== "applied") {
-    return "duplicate";
+    return "rejected";
   }
   const g = guest();
   if (g.hasApplied(op.id)) {
     return "duplicate";
   }
+  if (!routeCoopOperationToLiveSink("op:bargain", envelope)) {
+    return "rejected";
+  }
   const result = g.applyEnvelope({ ...envelope, sessionEpoch: epoch, revision: g.getLastAppliedRevision() + 1 });
   if (result.kind !== "applied") {
     return "rejected";
   }
-  routeCoopOperationToLiveSink("op:bargain", envelope);
   return "applied";
 }
 

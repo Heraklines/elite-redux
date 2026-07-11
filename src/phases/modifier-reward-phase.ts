@@ -1,5 +1,7 @@
 import { globalScene } from "#app/global-scene";
-import type { ModifierType } from "#modifiers/modifier-type";
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import { isCoopAuthoritativeGuest } from "#data/elite-redux/coop/coop-runtime";
+import { AddVoucherModifierType, type ModifierType } from "#modifiers/modifier-type";
 import { BattlePhase } from "#phases/battle-phase";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import { getModifierType } from "#utils/modifier-utils";
@@ -21,6 +23,15 @@ export class ModifierRewardPhase extends BattlePhase {
   start() {
     super.start();
 
+    // The authoritative renderer may apply only account-local voucher credit. Shared run modifiers are
+    // host mutations and arrive through the authoritative state carrier; running their generator here
+    // would create a second source of truth. Keeping this decision inside the phase makes its renderer
+    // allowlist classification context-safe for every caller.
+    if (isCoopAuthoritativeGuest() && !(this.modifierType instanceof AddVoucherModifierType)) {
+      coopLog("reward", `renderer SKIP shared ModifierRewardPhase type=${this.modifierType.name}`);
+      this.end();
+      return;
+    }
     this.doReward().then(() => this.end());
   }
 

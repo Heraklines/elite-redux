@@ -266,11 +266,11 @@ export function armCoopAbilityJournalMaterialization(id: string): void {
 
 function applyJournaledAbilityEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
   if (!isCoopAbilityOperationEnabled()) {
-    return "duplicate";
+    return "rejected";
   }
   const operation = envelope.pendingOperation;
   if (operation?.kind !== "ABILITY_PICK" || operation.status !== "applied") {
-    return "duplicate";
+    return "rejected";
   }
   const payload = operation.payload as CoopAbilityPickPayload | undefined;
   if (payload == null || !Array.isArray(payload.data) || !payload.data.every(Number.isFinite)) {
@@ -279,6 +279,9 @@ function applyJournaledAbilityEnvelope(envelope: CoopAuthoritativeEnvelopeV1): C
   const g = guest();
   if (g.hasApplied(operation.id)) {
     return "duplicate";
+  }
+  if (!routeCoopOperationToLiveSink("op:ability", envelope)) {
+    return "rejected";
   }
   const result = g.applyEnvelope({ ...envelope, sessionEpoch: epoch, revision: g.getLastAppliedRevision() + 1 });
   if (result.kind !== "applied") {
@@ -289,7 +292,6 @@ function applyJournaledAbilityEnvelope(envelope: CoopAuthoritativeEnvelopeV1): C
     const pinned = Math.floor(Number(parsed[1]) / COOP_ABILITY_ACTION_STRIDE);
     cancelRetry(pinned, payload.data);
   }
-  routeCoopOperationToLiveSink("op:ability", envelope);
   return "applied";
 }
 

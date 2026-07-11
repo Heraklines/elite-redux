@@ -9,9 +9,10 @@
 //   - host CoopSessionController <-> guest CoopSessionController (symmetry).
 // Pure logic over LoopbackTransport - no game engine.
 
+import { computeErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { CoopSessionController, type CoopSessionSnapshot } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { COOP_PROTOCOL_VERSION, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { describe, expect, it } from "vitest";
 
@@ -19,6 +20,53 @@ import { describe, expect, it } from "vitest";
 const flush = () => new Promise<void>(resolve => queueMicrotask(resolve));
 
 describe("co-op session controller (#633, P1)", () => {
+  describe("functional compatibility launch barrier", () => {
+    async function readyAgainstFingerprint(kind: "functional" | "presentation"): Promise<CoopSessionController> {
+      const { host, guest } = createLoopbackPair();
+      const controller = new CoopSessionController(host, {
+        username: "Host",
+        version: COOP_PROTOCOL_VERSION,
+        requireFunctionalFingerprint: true,
+      });
+      controller.connect();
+      guest.send({
+        t: "hello",
+        version: COOP_PROTOCOL_VERSION,
+        username: "Guest",
+        role: "guest",
+        epoch: 0,
+      });
+      const fp = computeErDataFingerprint();
+      const peer = structuredClone(fp);
+      if (kind === "functional") {
+        peer.movesData.hash = "ffffffffffffffff";
+      } else {
+        peer.movesName.hash = "eeeeeeeeeeeeeeee";
+      }
+      guest.send({ t: "dataFingerprint", fp: peer });
+      guest.send({ t: "rosterSync", role: "guest", entries: [{ speciesId: 2, cost: 1 }], ready: true });
+      controller.setLocalRoster([{ speciesId: 1, cost: 1 }]);
+      controller.setLocalReady(true);
+      await flush();
+      return controller;
+    }
+
+    it("refuses launch when a simulation-affecting data fingerprint differs", async () => {
+      const controller = await readyAgainstFingerprint("functional");
+      expect(controller.functionalFingerprintMismatch).toBe(true);
+      expect(controller.compatibilityAccepted).toBe(false);
+      expect(controller.bothReady()).toBe(false);
+    });
+
+    it("separates localization-only drift from functional compatibility", async () => {
+      const controller = await readyAgainstFingerprint("presentation");
+      expect(controller.presentationFingerprintMismatch).toBe(true);
+      expect(controller.functionalFingerprintMismatch).toBe(false);
+      expect(controller.compatibilityAccepted).toBe(true);
+      expect(controller.bothReady()).toBe(true);
+    });
+  });
+
   describe("host controller <-> spoofed guest (local-dev path)", () => {
     it("runs the full handshake: connect -> partner picks -> both ready -> merged party", async () => {
       const { host, guest } = createLoopbackPair();

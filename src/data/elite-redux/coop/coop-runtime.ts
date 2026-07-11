@@ -101,6 +101,7 @@ import {
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import {
   COOP_DEX_SYNC_SEQ,
+  COOP_FAINT_SWITCH_SEQ_BASE,
   COOP_INTERACTION_LEAVE,
   CoopInteractionRelay,
   coopBiomeShopSeq,
@@ -137,6 +138,7 @@ import type {
   CoopCatchFullPayload,
   CoopColosseumPayload,
   CoopCrossroadsPickPayload,
+  CoopFaintSwitchPayload,
   CoopLearnMoveBatchPayload,
   CoopLearnMovePayload,
   CoopMePickPayload,
@@ -990,7 +992,7 @@ export function wireCoopStallWatchdog(
 ): void {
   let peerBeat: { ms: number; at: number } | null = null;
   let lastRecoveryAt = 0;
-  let versionWarned = false;
+  let compatibilityWarned = false;
   let lastHealthAt = 0;
   const offMsg = transport.onMessage(msg => {
     if (msg.t === "stallBeat") {
@@ -1001,11 +1003,17 @@ export function wireCoopStallWatchdog(
     try {
       // #807 C one-shot: a protocol-version mismatch means a stale cached bundle - tell BOTH
       // players plainly (the top source of unreproducible ghost bugs in live sessions).
-      if (!versionWarned && runtime.controller.versionMismatch && getCoopRuntime() === runtime) {
-        versionWarned = true;
+      if (
+        !compatibilityWarned
+        && (runtime.controller.versionMismatch || runtime.controller.functionalFingerprintMismatch)
+        && getCoopRuntime() === runtime
+      ) {
+        compatibilityWarned = true;
         try {
           globalScene.ui.showText(
-            "Version mismatch with your partner. Both players should hard refresh (Ctrl+F5) and reconnect.",
+            runtime.controller.versionMismatch
+              ? "Version mismatch with your partner. Both players should hard refresh (Ctrl+F5) and reconnect."
+              : "Game data mismatch with your partner. Shared play was blocked; both players should update and hard refresh.",
             null,
             undefined,
             6000,
@@ -1162,12 +1170,12 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
     // #857: a PROTOCOL-VERSION mismatch (one player on a stale cached build) can never be healed by
     // re-dialing - the fresh channel would just drop again on the same incompatibility, producing the
     // endless redial FLAP. Surface a clear, persistent instruction instead and do NOT enter the loop.
-    if (runtime.controller.versionMismatch) {
-      coopWarn("runtime", "channel dropped with a protocol-version mismatch -> NOT redial-looping (stale build)");
+    if (runtime.controller.versionMismatch || runtime.controller.functionalFingerprintMismatch) {
+      coopWarn("runtime", "channel dropped with an incompatible peer -> NOT redial-looping");
       if (isActiveRuntime) {
         try {
           globalScene.ui.showText(
-            "Version mismatch with your partner - both players update your client (hard refresh, Ctrl+F5) and reconnect.",
+            "Incompatible game build with your partner - both players update your client (hard refresh, Ctrl+F5) and reconnect.",
             null,
             undefined,
             10000,
@@ -1994,8 +2002,11 @@ function materializeCoopWaveAdvanceFromOp(payload: CoopWaveAdvancePayload): bool
     if (getCoopNetcodeMode() !== "authoritative" || getCoopController()?.role !== "guest") {
       return false; // only the authoritative GUEST renders the tail; the host resolves it directly.
     }
-    if (typeof payload.wave !== "number" || payload.wave <= lastResolvedWave) {
-      return false; // already materialized this wave (the relay path built it, or a prior journal delivery).
+    if (typeof payload.wave !== "number") {
+      return false;
+    }
+    if (payload.wave <= lastResolvedWave) {
+      return true; // the relay path already materialized this exact wave; it is safe to acknowledge.
     }
     // Feed the SAME pending queue the legacy waveResolved feeds; the safe-boundary maybeRunCoopWaveAdvance
     // consumes it (one materialization site). Carry no capture blob - the DATA plane (waveEndState) reconciles
@@ -2205,10 +2216,14 @@ function materializeCoopRevivalPromptFromOp(runtime: CoopRuntime, envelope: Coop
   }
   const operation = envelope.pendingOperation;
   const payload = operation?.payload as CoopRevivalPayload | undefined;
-  if (operation?.kind !== "REVIVAL" || payload?.type !== "prompt") {
+  if (operation?.kind !== "REVIVAL" || payload == null) {
     return false;
   }
-  runtime.interactionRelay.materializeCommittedRevivalPrompt(payload.fieldIndex, operation.id);
+  if (payload.type === "prompt") {
+    runtime.interactionRelay.materializeCommittedRevivalPrompt(payload.fieldIndex, operation.id);
+  }
+  // A decision was already made by its owning picker and is materialized by the host's authoritative
+  // result/state stream; the committed envelope is its durable confirmation.
   return true;
 }
 
@@ -2219,10 +2234,46 @@ function materializeCoopCatchFullPromptFromOp(runtime: CoopRuntime, envelope: Co
   }
   const operation = envelope.pendingOperation;
   const payload = operation?.payload as CoopCatchFullPayload | undefined;
-  if (operation?.kind !== "CATCH_FULL" || payload?.type !== "prompt") {
+  if (operation?.kind !== "CATCH_FULL" || payload == null) {
     return false;
   }
-  runtime.interactionRelay.materializeCommittedCatchFullPrompt(payload.pokemonName, payload.speciesId, operation.id);
+  if (payload.type === "prompt") {
+    runtime.interactionRelay.materializeCommittedCatchFullPrompt(payload.pokemonName, payload.speciesId, operation.id);
+  }
+  // Decisions are owner-local and converge through the host's authoritative capture state.
+  return true;
+}
+
+/** Materialize/confirm a committed faint replacement before its durability ACK is allowed. */
+function materializeCoopFaintSwitchFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const operation = envelope.pendingOperation;
+  const payload = operation?.payload as CoopFaintSwitchPayload | undefined;
+  if (
+    operation?.kind !== "FAINT_SWITCH"
+    || payload == null
+    || !Number.isSafeInteger(payload.fieldIndex)
+    || payload.fieldIndex < 0
+    || payload.fieldIndex > 3
+    || !Number.isSafeInteger(payload.partySlot)
+    || !Array.isArray(payload.data)
+    || !payload.data.every(Number.isFinite)
+  ) {
+    return false;
+  }
+  // Guest-owned picks were already materialized by the local picker. Host-owned replacements are fed into
+  // the same committed-choice FIFO used by the replacement phase, with the operation id for dedupe.
+  if (operation.owner === 0) {
+    runtime.interactionRelay.materializeCommittedInteractionChoice(
+      COOP_FAINT_SWITCH_SEQ_BASE + payload.fieldIndex,
+      "switch",
+      payload.partySlot,
+      [...payload.data],
+      operation.id,
+    );
+  }
   return true;
 }
 
@@ -2857,6 +2908,7 @@ export function assembleCoopRuntime(
     // #896 W2e-R2: advertise what THIS build supports+enables; the controller negotiates the effective
     // session set (intersection with the peer's) and stores it, and the surface adapters gate on it.
     localCapabilities: buildLocalCoopCapabilities(),
+    requireFunctionalFingerprint: true,
     onEpochNegotiated: applyCoopOperationEpoch,
   });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
@@ -2916,6 +2968,7 @@ export function assembleCoopRuntime(
   registerCoopOperationLiveSink("op:catchFull", envelope => materializeCoopCatchFullPromptFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:stormglass", envelope => materializeCoopStormglassFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:learnMove", envelope => materializeCoopLearnMoveFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:faintSwitch", envelope => materializeCoopFaintSwitchFromOp(runtime, envelope));
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream, durability);
   wireCoopDurabilitySnapshotReceiver(controller, battleStream, durability);

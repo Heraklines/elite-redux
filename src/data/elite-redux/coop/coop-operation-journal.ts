@@ -130,11 +130,9 @@ export type CoopOperationEnvelopeApplier = (envelope: CoopAuthoritativeEnvelopeV
  * A surface's LIVE-MUTATION SINK (W2e-R P0-1): the ONE seam a journal-delivered committed op routes INTO to
  * perform the REAL shared-run mutation on the receiver (biome switch / reward apply / ME control-flow),
  * instead of only recording sidecar history. Invoked by the surface applier when it NEWLY consumes a
- * journal-delivered op. Returns true iff the live mutation was materialized. When NO sink is registered (or
- * it returns false) the op is still RECORDED + ACK'd (durable delivery is a receiver-ledger fact, not a
- * live-mutation fact - see {@linkcode CoopApplyOutcome}); the live materialization is then the DATA-plane's
- * job (a rejoin snapshot / the keystone wave-advance work). The sink lets a test PROVE the carrier routes
- * into the mutation seam, and lets production wire a real materializer once the keystone lands.
+ * journal-delivered op. Returns true iff the live mutation was materialized. A missing, false, or throwing
+ * sink MUST leave the envelope unconsumed and unacknowledged so the committer retains it for retry. Delivery
+ * is not complete until the receiver's production mutation seam has accepted the operation.
  */
 export type CoopOperationLiveSink = (envelope: CoopAuthoritativeEnvelopeV1) => boolean;
 
@@ -146,6 +144,13 @@ const appliers = new Map<string, CoopOperationEnvelopeApplier>();
 
 /** Per-class LIVE-MUTATION sinks (the runtime/engine layer registers at session assembly; keyed by class). */
 const liveSinks = new Map<string, CoopOperationLiveSink>();
+
+/** Operations whose production sink already succeeded but whose sidecar ledger may still be retrying. */
+const liveMaterialized = new Set<string>();
+
+function materializationKey(cls: string, envelope: CoopAuthoritativeEnvelopeV1): string {
+  return `${cls}:${envelope.pendingOperation?.id ?? `${envelope.sessionEpoch}:${envelope.revision}`}`;
+}
 
 /**
  * Observability for the failure-first proof (W2e-R T1/T3): the committed envelopes for which the
@@ -223,9 +228,9 @@ export function registerCoopOperationApplier(cls: string, applier: CoopOperation
 
 /**
  * Register (or clear, with `null`) the LIVE-MUTATION sink for a journaled class (W2e-R P0-1). The runtime
- * installs a real materializer here at session assembly; a test installs a recording mock; clearing it
- * leaves the journal path as a pure durable-delivery ledger (the op is still recorded + ACK'd, the live
- * materialization deferred to the DATA plane). Keyed by {@linkcode coopOperationClassForPhase}.
+ * installs a real materializer here at session assembly; a test installs a recording mock. Clearing it
+ * makes delivery fail closed: the op stays unacknowledged and retriable until a materializer is installed.
+ * Keyed by {@linkcode coopOperationClassForPhase}.
  */
 export function registerCoopOperationLiveSink(cls: string, sink: CoopOperationLiveSink | null): void {
   if (sink == null) {
@@ -239,18 +244,27 @@ export function registerCoopOperationLiveSink(cls: string, sink: CoopOperationLi
  * Route a NEWLY-consumed journal-delivered committed op INTO its class's live-mutation sink (W2e-R P0-1).
  * Called by a surface applier the moment it newly consumes a journal op. Records the routing for the proof
  * observability and returns whether the live mutation was materialized (false when no sink is registered).
- * Never throws (a sink failure must not withhold the ACK - durable delivery is a receiver-ledger fact).
+ * Successful routing is remembered so a retry after a later sidecar-ledger failure cannot mutate twice.
+ * Never throws: a sink failure is converted to `false`, which makes the adapter reject without ACKing.
  */
 export function routeCoopOperationToLiveSink(cls: string, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  const key = materializationKey(cls, envelope);
+  if (liveMaterialized.has(key)) {
+    return true;
+  }
   liveSinkInvoked.push(envelope);
   const sink = liveSinks.get(cls);
   if (sink == null) {
     return false;
   }
   try {
-    return sink(envelope);
+    const materialized = sink(envelope);
+    if (materialized) {
+      liveMaterialized.add(key);
+    }
+    return materialized;
   } catch {
-    // A live-mutation failure is a DATA-plane concern; it must never withhold the durable-delivery ACK.
+    // The operation remains unacknowledged and retriable.
     return false;
   }
 }
@@ -279,8 +293,8 @@ export function coopOperationDurabilityHooks(): CoopDurabilityHooks {
       const envelope = entry.msg.envelope;
       const applier = appliers.get(entry.cls);
       if (applier == null) {
-        // No receiver for this class: ACK + drop (spin-safe) rather than reject-and-resend forever.
-        return "duplicate";
+        // Unknown classes fail closed. ACK-dropping would permanently discard a committed mutation.
+        return "rejected";
       }
       const outcome = applier(envelope);
       if (outcome === "applied") {
@@ -310,5 +324,6 @@ export function getCoopOperationJournalCommittedClasses(): readonly CoopOperatio
 export function resetCoopOperationJournalLog(): void {
   journalApplied.length = 0;
   liveSinkInvoked.length = 0;
+  liveMaterialized.clear();
   journalCommittedClasses.clear();
 }

@@ -624,12 +624,11 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
  */
 function applyJournaledMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
   if (!isCoopMeOperationEnabled()) {
-    // Flag OFF / capability-blocked: ACK + drop (spin-safe) - the committer would not send it in a consistent session.
-    return "duplicate";
+    return "rejected";
   }
   const op = envelope.pendingOperation;
   if (op == null || op.status !== "applied") {
-    return "duplicate";
+    return "rejected";
   }
   // The committed envelope is the authority's receipt. Stop the pre-commit retry even if the live
   // dual-run path already applied this operation and this journal delivery is therefore a duplicate.
@@ -637,6 +636,9 @@ function applyJournaledMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopAp
   const g = guest();
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
+  }
+  if (!routeCoopOperationToLiveSink("op:me", envelope)) {
+    return "rejected";
   }
   const res = g.applyEnvelope({
     ...envelope,
@@ -648,7 +650,6 @@ function applyJournaledMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopAp
   }
   // Route newly-consumed ME operations into the production live sink. Supported terminal operations feed
   // the tagged host-stated sentinel into the existing 9M safe terminal handler.
-  routeCoopOperationToLiveSink("op:me", envelope);
   coopLog("me", `ME op JOURNAL apply kind=${op.kind} id=${op.id} rev=${envelope.revision} (Wave-2e/W2e-R)`);
   return "applied";
 }

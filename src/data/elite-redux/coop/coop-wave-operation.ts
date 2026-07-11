@@ -548,15 +548,14 @@ export function adoptWaveAdvanceWatcherChoice(params: CoopWaveAdvanceWatcherAdop
  * `rejected` (transient - do NOT ACK, retriable). Never throws.
  */
 function applyJournaledWaveEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
-  // Flag OFF / capability-blocked / a non-op frame is ACK'd + dropped (spin-safe): returning "rejected"
-  // would spin the committer's resend loop forever (W2e-R P0-1). The capability gate keeps this symmetric
-  // with activation (#896 W2e-R2).
+  // A consistent peer cannot send this while the surface is disabled. Refuse without ACKing instead of
+  // permanently discarding an authoritative mutation.
   if (!isCoopWaveAdvanceOperationEnabled()) {
-    return "duplicate";
+    return "rejected";
   }
   const op = envelope.pendingOperation;
   if (op == null || op.status !== "applied" || op.kind !== "WAVE_ADVANCE") {
-    return "duplicate";
+    return "rejected";
   }
   if (!isValidCoopWaveAdvancePayload(op.payload)) {
     return "rejected";
@@ -564,6 +563,9 @@ function applyJournaledWaveEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coop
   const g = guest();
   if (g.hasApplied(op.id)) {
     return "duplicate"; // the relay-adopt path or a prior journal delivery already consumed it - ACK, no re-apply.
+  }
+  if (!routeCoopOperationToLiveSink("op:wave", envelope)) {
+    return "rejected";
   }
   // Re-key to the guest-local dense revision (the ONE-ledger stream) so the shared applier never spuriously
   // gaps/duplicates on the host's revision; the op is deduped by operationId (invariant 5).
@@ -582,12 +584,7 @@ function applyJournaledWaveEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coop
   if (typeof payload?.wave === "number" && payload.wave > lastAppliedWave) {
     lastAppliedWave = payload.wave;
   }
-  // W2e-R P0-1: route the newly-consumed op INTO the ONE live-mutation seam. UNLIKE the parked-era biome/ME/
-  // reward adapters, the wave surface REGISTERS a real production sink (coop-runtime materializeCoopWave-
-  // AdvanceFromOp), so a journal-delivered wave-advance rebuilds the guest's tail (the keystone). When no sink
-  // is registered (durability-only headless test) the op is still recorded + ACK'd (durable delivery is a
-  // receiver-ledger fact, not a live-mutation fact).
-  routeCoopOperationToLiveSink("op:wave", envelope);
+  // W2e-R P0-1: the production sink already accepted this operation above, before the sidecar ledger moved.
   coopLog("runtime", `wave-advance op JOURNAL apply id=${op.id} rev=${envelope.revision} (Wave-2f/W2e-R)`);
   return "applied";
 }

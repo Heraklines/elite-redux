@@ -15,6 +15,7 @@ import {
 import {
   journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
+  routeCoopOperationToLiveSink,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import { CoopOperationGuest, CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopSeatOfRole } from "#data/elite-redux/coop/coop-session";
@@ -233,11 +234,11 @@ function validPayload(value: unknown): value is CoopFaintSwitchPayload {
 
 function applyJournaledFaintSwitchEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
   if (!isCoopFaintSwitchOperationEnabled()) {
-    return "duplicate";
+    return "rejected";
   }
   const operation = envelope.pendingOperation;
   if (operation?.kind !== "FAINT_SWITCH" || operation.status !== "applied") {
-    return "duplicate";
+    return "rejected";
   }
   if (!validPayload(operation.payload)) {
     return "rejected";
@@ -245,6 +246,9 @@ function applyJournaledFaintSwitchEnvelope(envelope: CoopAuthoritativeEnvelopeV1
   const g = guest();
   if (g.hasApplied(operation.id)) {
     return "duplicate";
+  }
+  if (!routeCoopOperationToLiveSink("op:faintSwitch", envelope)) {
+    return "rejected";
   }
   const result = g.applyEnvelope({ ...envelope, sessionEpoch: epoch, revision: g.getLastAppliedRevision() + 1 });
   if (result.kind !== "applied") {

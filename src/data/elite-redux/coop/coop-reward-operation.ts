@@ -553,16 +553,18 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
  */
 function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
   if (!isCoopRewardOperationEnabled()) {
-    // Flag OFF / capability-blocked: ACK + drop (spin-safe) - the committer would not send it in a consistent session.
-    return "duplicate";
+    return "rejected";
   }
   const op = envelope.pendingOperation;
   if (op == null || op.status !== "applied") {
-    return "duplicate";
+    return "rejected";
   }
   const g = guest();
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
+  }
+  if (!routeCoopOperationToLiveSink("op:reward", envelope)) {
+    return "rejected";
   }
   const res = g.applyEnvelope({
     ...envelope,
@@ -574,7 +576,6 @@ function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Co
   }
   // Route the newly-consumed action into the production sink. It feeds the tagged committed choice into the
   // receiver's existing reward/market FIFO; the phase remains the sole safe mutation site.
-  routeCoopOperationToLiveSink("op:reward", envelope);
   coopLog("reward", `shop op JOURNAL apply kind=${op.kind} id=${op.id} rev=${envelope.revision} (Wave-2e/W2e-R)`);
   return "applied";
 }

@@ -28,7 +28,7 @@ import {
 } from "#data/elite-redux/coop/coop-capabilities";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 /** Loopback / flap transports deliver on a microtask; flush before asserting. */
 const flush = () => new Promise<void>(resolve => queueMicrotask(resolve));
@@ -117,6 +117,10 @@ function makeFlapPair(): { host: FlapTransport; guest: FlapTransport } {
 }
 
 describe("co-op capability handshake wiring (#896 W2e-R2)", () => {
+  beforeEach(() => {
+    clearNegotiatedCoopCapabilities();
+  });
+
   afterEach(() => {
     // Session-scoped module state is process-global; reset so nothing leaks into another file.
     clearNegotiatedCoopCapabilities();
@@ -218,10 +222,7 @@ describe("co-op capability handshake wiring (#896 W2e-R2)", () => {
     setNegotiatedCoopCapabilities([COOP_CAP_OP_BIOME, COOP_CAP_OP_ME], [COOP_CAP_OP_BIOME, COOP_CAP_OP_ME]);
     expect([...(getNegotiatedCoopCapabilities() ?? [])]).toEqual([COOP_CAP_OP_BIOME, COOP_CAP_OP_ME]);
 
-    setNegotiatedCoopCapabilities(
-      [COOP_CAP_OP_BIOME, COOP_CAP_OP_ME],
-      [COOP_CAP_OP_ME, COOP_CAP_OP_REWARD],
-    );
+    setNegotiatedCoopCapabilities([COOP_CAP_OP_BIOME, COOP_CAP_OP_ME], [COOP_CAP_OP_ME, COOP_CAP_OP_REWARD]);
     expect(
       [...(getNegotiatedCoopCapabilities() ?? [])],
       "a later hello/roster frame cannot change live session behavior",

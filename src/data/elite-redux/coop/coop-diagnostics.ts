@@ -58,7 +58,7 @@ export function formatCoopControlPlane(): string {
 
     // --- Session identifiers ---
     lines.push(
-      `session:  role=${controller.role} seat=${safe(() => String(controller.seat))} gen=${coopSessionGeneration()}g netcode=${getCoopNetcodeMode()}${controller.versionMismatch ? " VERSION-MISMATCH" : ""}`,
+      `session:  role=${controller.role} seat=${safe(() => String(controller.seat))} gen=${coopSessionGeneration()}g netcode=${getCoopNetcodeMode()}${controller.versionMismatch ? " VERSION-MISMATCH" : ""}${controller.functionalFingerprintMismatch ? " FUNCTIONAL-FINGERPRINT-MISMATCH" : ""}${controller.presentationFingerprintMismatch ? " PRESENTATION-FINGERPRINT-MISMATCH" : ""}`,
     );
 
     // --- Phase manager (running + queued, in run order) ---

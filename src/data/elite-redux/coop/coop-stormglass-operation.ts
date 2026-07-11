@@ -145,11 +145,11 @@ function validPayload(value: unknown): value is CoopStormglassPayload {
 
 function applyJournaledStormglassEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
   if (!isCoopStormglassOperationEnabled()) {
-    return "duplicate";
+    return "rejected";
   }
   const operation = envelope.pendingOperation;
   if (operation?.kind !== "STORMGLASS" || operation.status !== "applied") {
-    return "duplicate";
+    return "rejected";
   }
   if (!validPayload(operation.payload)) {
     return "rejected";
@@ -158,11 +158,13 @@ function applyJournaledStormglassEnvelope(envelope: CoopAuthoritativeEnvelopeV1)
   if (g.hasApplied(operation.id)) {
     return "duplicate";
   }
+  if (!routeCoopOperationToLiveSink("op:stormglass", envelope)) {
+    return "rejected";
+  }
   const result = g.applyEnvelope({ ...envelope, sessionEpoch: epoch, revision: g.getLastAppliedRevision() + 1 });
   if (result.kind !== "applied") {
     return "rejected";
   }
-  routeCoopOperationToLiveSink("op:stormglass", envelope);
   return "applied";
 }
 

@@ -27,7 +27,11 @@ import { modifierTypes } from "#data/data-lists";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { adoptCoopEnemiesStructural, buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { CoopInteractionRelay, setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { isCoopRendererGateEnforced, setCoopRendererGateEnforced } from "#data/elite-redux/coop/coop-renderer-gate";
+import {
+  isCoopRendererGateEnforced,
+  setCoopRendererGateEnforced,
+  setCoopWaveTailSanction,
+} from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   clearCoopRuntime,
   getCoopController,
@@ -77,6 +81,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   });
 
   afterEach(() => {
+    setCoopWaveTailSanction(null);
     clearCoopRuntime();
   });
 
@@ -1010,6 +1015,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // enemy party member by id so getPokemon() resolves a real mon).
     const lastEnemy = globalScene.getEnemyParty().at(-1)!;
     const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
+    setCoopWaveTailSanction(["VictoryPhase", "BattleEndPhase", "TrainerVictoryPhase"]);
     const victory = game.scene.phaseManager.create("VictoryPhase", lastEnemy.id);
     victory.start();
 
@@ -1043,6 +1049,16 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       globalScene.gameData.voucherCounts[VoucherType.REGULAR],
       "the guest's own account is credited the egg voucher (per-account, full amount)",
     ).toBe(before + 1);
+  });
+
+  it("shared ModifierRewardPhase mutations are skipped on the renderer", async () => {
+    await startCoopGuest();
+    const before = globalScene.modifiers.length;
+    const rewardPhase = game.scene.phaseManager.create("ModifierRewardPhase", modifierTypes.EXP_CHARM);
+    rewardPhase.start();
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(globalScene.modifiers.length, "host authority is the only source of shared modifiers").toBe(before);
   });
 
   // (G) SELF-SWITCH MIRROR (#633, coop-me-authoritative): the headline regression. The guest's

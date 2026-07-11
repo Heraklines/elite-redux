@@ -606,3 +606,31 @@ later frames; renderer default-deny remains observe-only; unknown operation clas
 or throwing materializers do not withhold `applied`; and `op:faintSwitch` has no production live sink. Focused
 runs also emit renderer `WOULD-BLOCK`/unsanctioned-tail evidence and recovery warnings that the current gate
 does not fail. These are the next containment checkpoint, ahead of lobby migration or any player-count work.
+
+## 30. Compatibility, renderer, and honest materialization containment
+
+The independent audit's first containment group is now implemented. Protocol mismatch retains only enough
+peer identity for an actionable lobby banner; it cannot negotiate role/epoch/capabilities, publish or adopt
+a run configuration, report both-ready, or assemble a launch party. Production sessions also require the
+functional data fingerprint: simulation-table drift closes launch, while name-only presentation drift stays
+diagnostic. The first accepted capability intersection is frozen for the live session and later mutation is
+refused; only a genuine re-pair clears it.
+
+Authoritative guests now run renderer default-deny by default. The modifier reward boundary explicitly
+separates account-local voucher credit from shared modifier mutation, and the clean three-wave production
+harness asserts that no renderer phase or unsanctioned shared tail was neutralized. The observe mode remains
+only as an emergency staging rollback.
+
+Durability ACKs now mean materialization, not receipt. Every operation adapter invokes its production sink
+before advancing its receiver sidecar; a missing, false, or throwing sink leaves the operation unacknowledged
+and retriable. Successful sink work is remembered across a later sidecar retry, preventing double mutation.
+Unknown/unregistered classes and disabled or malformed operation frames fail closed instead of ACK-dropping.
+All registered classes have a production sink, including `op:faintSwitch`; already-materialized legacy
+carrier effects are accepted explicitly rather than silently bypassing the contract.
+
+Focused evidence: compatibility/session/WebRTC suites pass 57/57; renderer plus clean multiwave pass 33/33;
+materialization/faint/all-class fault suites pass 13/13; wave and operation recovery/convergence pass 20/20.
+The aggregate 13-shard checkpoint and staging promotion are still required. The larger audit remains open:
+control-atomic snapshots, stop-play divergence policy, membership-aware reconnect, full battle-command
+validation, a single global commit sequence, lobby/resume operations, causal traces, and undriven/browser
+fault campaigns have not been claimed complete.

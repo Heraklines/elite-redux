@@ -165,6 +165,36 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     guestMgr.dispose();
   });
 
+  it.each([
+    "missing",
+    "throwing",
+  ] as const)("T1b: a %s production sink leaves the committed op unacked and retriable", async failure => {
+    if (failure === "throwing") {
+      registerCoopOperationLiveSink("op:biome", () => {
+        throw new Error("materializer failed");
+      });
+    }
+    const pair = createLoopbackPair();
+    const hostMgr = new CoopDurabilityManager(pair.host);
+    const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
+    setCoopOperationDurability(hostMgr);
+
+    commitHostOwnedBiome(2, 43);
+    await flush();
+
+    expect(hostMgr.unackedCount(), "no materialization means no ACK").toBe(1);
+    expect(guestMgr.appliedMarks(), "the receiver ledger must not claim the op").toEqual({});
+    expect(getCoopOperationJournalApplied(), "the sidecar ledger must not advance first").toEqual([]);
+
+    registerCoopOperationLiveSink("op:biome", () => true);
+    hostMgr.reconnect();
+    await flush();
+    expect(hostMgr.unackedCount(), "the retained op ACKs once materialization recovers").toBe(0);
+    expect(guestMgr.appliedMarks()).toEqual({ "op:biome": 1 });
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
   // ===========================================================================================
   // T2 - the receiver GATES its ACK + ledger advance on a successful apply (P0-1).
   // EXPECTED RED (pre-remediation): receiveOp called a VOID apply then UNCONDITIONALLY markApplied + ACKed,
@@ -269,6 +299,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     const hostMgr = new CoopDurabilityManager(pair.host);
     const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
     setCoopOperationDurability(hostMgr);
+    registerCoopOperationLiveSink("op:biome", () => true);
 
     // Simulate a COLD resume at high-water N for op:biome: restore BOTH managers' marks and floor the surface.
     hostMgr.restore({ "op:biome": N }, { "op:biome": N });

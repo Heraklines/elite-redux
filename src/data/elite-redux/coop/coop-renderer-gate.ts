@@ -79,6 +79,11 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   "ShowTrainerPhase", // trainer-sprite intro
   "ScanIvsPhase", // per-client IV scanner readout
   "EndCardPhase", // run end card
+  // Context-safe account reward: the phase itself permits only AddVoucherModifierType on the renderer
+  // and skips shared run modifiers, which arrive from host authority.
+  "ModifierRewardPhase",
+  "RibbonModifierRewardPhase",
+  "GameOverModifierRewardPhase",
 
   // ── COOP REPLAY / RENDER FAMILY (§3.1) - the guest's OWN render + adopt pipeline ──
   "CoopReplayTurnPhase", // the guest's per-turn render driver
@@ -194,7 +199,7 @@ export const COOP_RENDERER_DENIED_PHASES: ReadonlySet<string> = new Set<string>(
 /**
  * Read the INITIAL enforcement mode without a rebuild, so the nightly/soak (env) or a staging
  * tester (localStorage / URL) can override it for a run. Precedence: URL `?coopgateenforce=0|1`
- * > localStorage `coopGateEnforce` > env `COOP_RENDERER_GATE_ENFORCE` > default OFF (observe). All
+ * > localStorage `coopGateEnforce` > env `COOP_RENDERER_GATE_ENFORCE` > default ON (enforce). All
  * reads are guarded, so solo / host / lockstep remain unaffected regardless of this flag. `0` remains an
  * emergency observe-mode rollback without a rebuild.
  */
@@ -231,22 +236,22 @@ function readInitialEnforced(): boolean {
   } catch {
     // no `process` (browser): env is not a source here.
   }
-  return false;
+  return true;
 }
 
 /**
- * Enforcement flag. `false` = OBSERVE rollback: a non-allowlisted phase RUNS (or, if in the legacy
- * denylist, neutralizes as before) and is logged WOULD-BLOCK. `true` (explicit opt-in) = ENFORCE:
+ * Enforcement flag. `false` = emergency OBSERVE rollback: a non-allowlisted phase RUNS (or, if in the legacy
+ * denylist, neutralizes as before) and is logged WOULD-BLOCK. `true` (production default) = ENFORCE:
  * a non-allowlisted phase fails closed (neutralized + logged BLOCK).
  */
 let enforced = readInitialEnforced();
 
-/** Whether the renderer allowlist is ENFORCED (fail-closed opt-in) vs OBSERVE (safe default). */
+/** Whether the renderer allowlist is ENFORCED (production default) vs emergency OBSERVE rollback. */
 export function isCoopRendererGateEnforced(): boolean {
   return enforced;
 }
 
-/** Set the enforcement mode. Default is OBSERVE (`false`); true opts into fail-closed enforcement. */
+/** Set the enforcement mode. Default is ENFORCE (`true`); false is an explicit diagnostic rollback. */
 export function setCoopRendererGateEnforced(on: boolean): void {
   enforced = on;
 }
@@ -398,7 +403,7 @@ export function isCoopRendererBlockedPhase(phaseName: string, constructorArgs: r
  * phase in the observed-set, and LOUDLY log a WOULD-BLOCK (observe) or BLOCK (enforce) when the
  * phase is not allowlisted. Pure + cheap for solo / host / lockstep (a single boolean short-circuit).
  *
- * OBSERVE (default): preserve today's behavior - the legacy denylist neutralizes its 6 phases; any
+ * OBSERVE (emergency rollback): the legacy denylist neutralizes its 6 phases; any
  * other non-allowlisted phase RUNS but is logged WOULD-BLOCK so staging can see the allowlist gap.
  * ENFORCE: any non-allowlisted phase neutralizes (fail closed) and is logged BLOCK.
  */

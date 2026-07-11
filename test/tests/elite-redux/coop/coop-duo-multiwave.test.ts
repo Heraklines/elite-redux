@@ -33,6 +33,12 @@ import { initGlobalScene } from "#app/global-scene";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  getCoopRendererNeutralizedLog,
+  getCoopTailWouldBlockLog,
+  resetCoopRendererNeutralizedLog,
+  resetCoopTailWouldBlockLog,
+} from "#data/elite-redux/coop/coop-renderer-gate";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
@@ -92,6 +98,8 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     // #839 next-command barrier: fast-pass via the anti-hang timeout (the harness never drives concurrent
     // command points, so the host's barrier never sees the guest's arrival) - same pattern as the wave barrier.
     setCoopRendezvousWaitMs(50);
+    resetCoopRendererNeutralizedLog();
+    resetCoopTailWouldBlockLog();
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`multiwave-${Date.now()}`);
     game.override
@@ -247,6 +255,8 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
       resyncSpy.mock.calls.length,
       `a converged run forces ZERO resyncs (got ${resyncSpy.mock.calls.length} over ${WAVES} waves)`,
     ).toBe(0);
+    expect(getCoopRendererNeutralizedLog(), "clean multiwave run has no renderer phase leaks").toEqual([]);
+    expect(getCoopTailWouldBlockLog(), "clean multiwave run has no unsanctioned boundary tails").toEqual([]);
     logs.flush();
   }, 300_000);
 

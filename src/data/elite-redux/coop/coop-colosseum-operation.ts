@@ -170,11 +170,7 @@ function commit(params: {
 }): void {
   const actionOrdinal = nextOrdinal(params.pinned);
   const op: CoopPendingOperation = {
-    id: makeCoopOperationId(
-      epoch,
-      params.owner,
-      params.pinned * COOP_COLOSSEUM_ACTION_STRIDE + actionOrdinal,
-    ),
+    id: makeCoopOperationId(epoch, params.owner, params.pinned * COOP_COLOSSEUM_ACTION_STRIDE + actionOrdinal),
     kind: "COLO_PICK",
     owner: params.owner,
     status: "proposed",
@@ -237,15 +233,18 @@ export function commitColosseumDecision(params: {
 
 function applyJournaledColosseumEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
   if (!isCoopColosseumOperationEnabled()) {
-    return "duplicate";
+    return "rejected";
   }
   const op = envelope.pendingOperation;
   if (op?.kind !== "COLO_PICK" || op.status !== "applied") {
-    return "duplicate";
+    return "rejected";
   }
   const g = guest();
   if (g.hasApplied(op.id)) {
     return "duplicate";
+  }
+  if (!routeCoopOperationToLiveSink("op:colosseum", envelope)) {
+    return "rejected";
   }
   const result = g.applyEnvelope({ ...envelope, sessionEpoch: epoch, revision: g.getLastAppliedRevision() + 1 });
   if (result.kind !== "applied") {
@@ -259,7 +258,6 @@ function applyJournaledColosseumEnvelope(envelope: CoopAuthoritativeEnvelopeV1):
       cancelDecisionRetry(pinned, payload.index);
     }
   }
-  routeCoopOperationToLiveSink("op:colosseum", envelope);
   return "applied";
 }
 

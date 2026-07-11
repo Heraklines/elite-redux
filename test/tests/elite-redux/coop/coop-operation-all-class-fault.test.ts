@@ -96,6 +96,16 @@ afterEach(() => {
 });
 
 describe("authoritative operation fault campaign: every registered class", () => {
+  it("fails closed when a committed envelope has no registered operation applier", () => {
+    const envelope = envelopeFor("op:biome", 1);
+    const outcome = coopOperationDurabilityHooks().apply?.({
+      cls: "op:future-unregistered",
+      seq: 1,
+      msg: { t: "envelope", envelope },
+    });
+    expect(outcome, "an unknown class must remain unacknowledged and retriable").toBe("rejected");
+  });
+
   it("maps, drops, replays, ACKs, and live-materializes every class after reconnect", async () => {
     const liveState = new Map<CoopOperationSurfaceClass, string>();
     const pair = wrapCoopFaultPair(

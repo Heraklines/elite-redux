@@ -261,11 +261,11 @@ function valid(value: unknown, kind: CoopOperationKind): value is LearnPayload {
 }
 function applyEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
   if (!isCoopLearnMoveOperationEnabled()) {
-    return "duplicate";
+    return "rejected";
   }
   const op = envelope.pendingOperation;
   if ((op?.kind !== "LEARN_MOVE" && op?.kind !== "LEARN_MOVE_BATCH") || op.status !== "applied") {
-    return "duplicate";
+    return "rejected";
   }
   if (!valid(op.payload, op.kind)) {
     return "rejected";
@@ -274,13 +274,13 @@ function applyEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome 
   if (g.hasApplied(op.id)) {
     return "duplicate";
   }
+  if (!routeCoopOperationToLiveSink("op:learnMove", envelope)) {
+    return "rejected";
+  }
   if (
     g.applyEnvelope({ ...envelope, sessionEpoch: epoch, revision: g.getLastAppliedRevision() + 1 }).kind !== "applied"
   ) {
     return "rejected";
-  }
-  if (op.payload.type === "prompt" || op.owner === 0) {
-    routeCoopOperationToLiveSink("op:learnMove", envelope);
   }
   if (op.payload.type === "decision") {
     cancel(op.payload, envelope.wave, envelope.turn);

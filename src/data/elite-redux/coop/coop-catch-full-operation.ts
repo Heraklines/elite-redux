@@ -231,11 +231,11 @@ function validPayload(value: unknown): value is CoopCatchFullPayload {
 
 function applyJournaledCatchFullEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
   if (!isCoopCatchFullOperationEnabled()) {
-    return "duplicate";
+    return "rejected";
   }
   const operation = envelope.pendingOperation;
   if (operation?.kind !== "CATCH_FULL" || operation.status !== "applied") {
-    return "duplicate";
+    return "rejected";
   }
   if (!validPayload(operation.payload)) {
     return "rejected";
@@ -244,13 +244,14 @@ function applyJournaledCatchFullEnvelope(envelope: CoopAuthoritativeEnvelopeV1):
   if (g.hasApplied(operation.id)) {
     return "duplicate";
   }
+  if (!routeCoopOperationToLiveSink("op:catchFull", envelope)) {
+    return "rejected";
+  }
   const result = g.applyEnvelope({ ...envelope, sessionEpoch: epoch, revision: g.getLastAppliedRevision() + 1 });
   if (result.kind !== "applied") {
     return "rejected";
   }
-  if (operation.payload.type === "prompt") {
-    routeCoopOperationToLiveSink("op:catchFull", envelope);
-  } else {
+  if (operation.payload.type !== "prompt") {
     cancelRetry(operation.payload);
   }
   return "applied";

@@ -138,6 +138,8 @@ export interface CoopSessionOptions {
   onCapabilitiesNegotiated?: ((negotiated: ReadonlySet<string>) => void) | undefined;
   /** Publishes the host-negotiated operation epoch into every surface adapter. */
   onEpochNegotiated?: ((epoch: number) => void) | undefined;
+  /** Production launch requires a matching functional data fingerprint before `bothReady` can open. */
+  requireFunctionalFingerprint?: boolean | undefined;
 }
 
 /**
@@ -179,6 +181,7 @@ export class CoopSessionController {
   /** #896 W2e-R2: the callback invoked with the frozen effective set each time it is (re)negotiated. */
   private readonly onCapabilitiesNegotiated: ((negotiated: ReadonlySet<string>) => void) | undefined;
   private readonly onEpochNegotiated: ((epoch: number) => void) | undefined;
+  private readonly requireFunctionalFingerprint: boolean;
   /** Candidate belongs to this controller; it becomes authoritative iff this side is host. */
   private readonly epochCandidate: number;
   private sessionEpochValue: number;
@@ -230,6 +233,8 @@ export class CoopSessionController {
    * against it. Null until computed (computed lazily on receipt if the peer's arrives first).
    */
   private _localDataFingerprint: ErDataFingerprint | null = null;
+  private _functionalFingerprintStatus: "pending" | "match" | "mismatch" = "pending";
+  private _presentationFingerprintMismatch = false;
 
   private readonly changeHandlers = new Set<(snap: CoopSessionSnapshot) => void>();
   private readonly offMessage: () => void;
@@ -253,6 +258,7 @@ export class CoopSessionController {
     this.localCapabilities = opts.localCapabilities;
     this.onCapabilitiesNegotiated = opts.onCapabilitiesNegotiated;
     this.onEpochNegotiated = opts.onEpochNegotiated;
+    this.requireFunctionalFingerprint = opts.requireFunctionalFingerprint ?? false;
     this.epochCandidate = this.mintEpoch(0);
     this.sessionEpochValue = this.role === "host" ? this.epochCandidate : 0;
     this.offMessage = transport.onMessage(msg => this.handleMessage(msg));
@@ -271,6 +277,25 @@ export class CoopSessionController {
   /** #807 C: the partner's reported version ("?" before the handshake). */
   get partnerVersion(): string {
     return this.partnerVersionValue ?? "?";
+  }
+
+  /** True when simulation-affecting registries differ; localized name-only drift is tracked separately. */
+  get functionalFingerprintMismatch(): boolean {
+    return this._functionalFingerprintStatus === "mismatch";
+  }
+
+  /** Presentation/localization drift never authorizes different simulation behavior. */
+  get presentationFingerprintMismatch(): boolean {
+    return this._presentationFingerprintMismatch;
+  }
+
+  /** The single launch predicate for protocol + functional-build compatibility. */
+  get compatibilityAccepted(): boolean {
+    return (
+      !this.versionMismatch
+      && !this.functionalFingerprintMismatch
+      && (!this.requireFunctionalFingerprint || this._functionalFingerprintStatus === "match")
+    );
   }
 
   /** The agreed host-authored control-plane epoch (0 only before a guest receives hello). */
@@ -521,7 +546,7 @@ export class CoopSessionController {
 
   /** Both players locked in and each brought at least one Pokemon. */
   bothReady(): boolean {
-    return this._localReady && this._partnerReady && this.roster.bothReady();
+    return this.compatibilityAccepted && this._localReady && this._partnerReady && this.roster.bothReady();
   }
 
   /**
@@ -530,6 +555,9 @@ export class CoopSessionController {
    * authoritative state. Only meaningful once {@linkcode bothReady} is true.
    */
   mergedLaunchParty(): (CoopRosterEntry | null)[] {
+    if (!this.compatibilityAccepted) {
+      throw new Error("Cannot build a co-op launch party before compatibility is accepted");
+    }
     // Showdown 1v1 PvP (C1): versus does NOT merge. Each client launches with ITS OWN
     // picks as the player party (slots 0..n, pick order); the OPPONENT's team crosses via
     // the showdown manifest (C2) and becomes the ENEMY side (C3), never a merged half. The
@@ -707,6 +735,10 @@ export class CoopSessionController {
    * too. No-op shape-wise on the guest (the guest receives it via the transport).
    */
   broadcastRunConfig(config: CoopRunConfig): void {
+    if (!this.compatibilityAccepted) {
+      coopWarn("launch", "REFUSE runConfig publication before compatibility is accepted");
+      return;
+    }
     // Pin the active netcode (#633, selectable A/B) into the retained config so the
     // self-healing `requestRunConfig` re-broadcast (and any later read) carries it.
     const netcodeMode = config.netcodeMode ?? this._netcodeMode;
@@ -1047,6 +1079,14 @@ export class CoopSessionController {
             "launch",
             `PROTOCOL VERSION MISMATCH: ours=${this.version} partner=${msg.version} - one client is on a stale build`,
           );
+          // Hard launch barrier: retain just enough identity for the UI's refresh banner, but do not
+          // reconcile roles/epochs/capabilities with an incompatible peer. Roster frames may already be
+          // in flight; `bothReady()` also checks versionMismatch, so no ordering can cross into a run.
+          this._partnerConnected = true;
+          this._partnerName = msg.username;
+          this._partnerReady = false;
+          this.emit();
+          break;
         }
         // Deterministic role reconciliation (#633): if the peer claims the SAME role
         // as us (the lobby race assigned both clients the same role - the live "both
@@ -1175,7 +1215,7 @@ export class CoopSessionController {
         // The HOST decides difficulty + challenges + seed; the guest mirrors them
         // so the run is coherent and both engines stay in lockstep (#633, LIVE-A/C).
         // Only honour it FROM the host.
-        if (this.role === "guest") {
+        if (this.role === "guest" && this.compatibilityAccepted) {
           // The guest adopts the host's chosen netcode (#633 M3: authoritative-only); an
           // absent value (an in-flight save from before this field) means "authoritative".
           const netcodeMode = msg.netcodeMode ?? "authoritative";
@@ -1221,6 +1261,11 @@ export class CoopSessionController {
         const local = this._localDataFingerprint;
         const peer = msg.fp;
         const diff = diffErDataFingerprint(local, peer);
+        const presentationSections = new Set(["movesName", "abilitiesName"]);
+        const functionalDiff = diff.filter(name => !presentationSections.has(name));
+        const presentationDiff = diff.filter(name => presentationSections.has(name));
+        this._functionalFingerprintStatus = functionalDiff.length === 0 ? "match" : "mismatch";
+        this._presentationFingerprintMismatch = presentationDiff.length > 0;
         if (diff.length === 0) {
           coopLog("checksum", "MATCH - data tables identical across clients");
         } else {
@@ -1231,8 +1276,19 @@ export class CoopSessionController {
                 + ` peer=${peer[name as keyof ErDataFingerprint].hash}(${peer[name as keyof ErDataFingerprint].n})`,
             )
             .join(" ");
-          coopWarn("checksum", `MISMATCH sections=${diff.join(",")} - ${detail}`);
+          if (functionalDiff.length > 0) {
+            coopWarn(
+              "checksum",
+              `FUNCTIONAL MISMATCH sections=${functionalDiff.join(",")} - launch remains closed - ${detail}`,
+            );
+          } else {
+            coopWarn(
+              "checksum",
+              `PRESENTATION MISMATCH sections=${presentationDiff.join(",")} - simulation compatible - ${detail}`,
+            );
+          }
         }
+        this.emit();
         break;
       }
       default:

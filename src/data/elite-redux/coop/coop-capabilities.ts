@@ -135,6 +135,18 @@ export function setNegotiatedCoopCapabilities(
 ): ReadonlySet<CoopCapabilityKey> {
   const localSet = new Set(local);
   const effective = negotiateCoopCapabilities(localSet, peer);
+  if (negotiated !== null) {
+    const frozenCurrent = negotiated;
+    const unchanged = effective.length === frozenCurrent.size && effective.every(key => frozenCurrent.has(key));
+    if (!unchanged) {
+      coopWarn(
+        "session",
+        `capabilities MUTATION REFUSED frozen=[${[...frozenCurrent].sort().join(",")}] `
+          + `later=[${effective.join(",")}] - a live session cannot change feature semantics`,
+      );
+    }
+    return frozenCurrent;
+  }
   const frozen: ReadonlySet<CoopCapabilityKey> = new Set(effective);
   negotiated = frozen;
   coopLog(
