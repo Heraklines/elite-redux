@@ -89,6 +89,13 @@ export type CoopMeOperationKind = Extract<
   "ME_PRESENT" | "ME_PICK" | "ME_SUB" | "ME_BUTTON" | "ME_TERMINAL" | "QUIZ_ANSWER"
 >;
 
+/** Boundary tails sanctioned by the host-stated ME terminal (strict-tail renderer contract). */
+export function coopMeTerminalSanctionedTails(terminal: CoopMeTerminalKind): string[] {
+  return terminal === "battle"
+    ? ["MysteryEncounterBattlePhase", "MysteryEncounterBattleStartCleanupPhase"]
+    : ["MysteryEncounterRewardsPhase", "PostMysteryEncounterPhase"];
+}
+
 /** The typed per-kind payload the owner mints (invariant 2) / the host commits (invariant 4). */
 export type CoopMeOperationPayload =
   | CoopMePresentPayload

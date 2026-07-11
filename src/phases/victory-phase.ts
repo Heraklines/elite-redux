@@ -4,9 +4,11 @@ import { modifierTypes } from "#data/data-lists";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import {
   broadcastCoopWaveResolved,
+  getCoopActiveWaveTransition,
   getCoopController,
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
+import { resolveCoopVictoryTailControl } from "#data/elite-redux/coop/coop-wave-operation";
 import { erRecordAchievementWaveWon } from "#data/elite-redux/er-achievement-tracker";
 import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
@@ -101,7 +103,15 @@ export class VictoryPhase extends PokemonPhase {
       erRecordAchievementWaveWon();
       broadcastCoopWaveResolved("win");
 
-      const isTrainerWin = globalScene.currentBattle.battleType === BattleType.TRAINER;
+      const gameMode = globalScene.gameMode;
+      const currentWaveIndex = globalScene.currentBattle.waveIndex;
+      const authoritativeTransition = isCoopAuthoritativeGuest() ? getCoopActiveWaveTransition(currentWaveIndex) : null;
+      const tailControl = resolveCoopVictoryTailControl(authoritativeTransition, {
+        trainerWin: () => globalScene.currentBattle.battleType === BattleType.TRAINER,
+        runContinues: () => gameMode.isEndless || !gameMode.isWaveFinal(currentWaveIndex),
+        biomeChange: () => globalScene.isNewBiome(),
+      });
+      const isTrainerWin = tailControl.trainerWin;
       // DIAGNOSTIC (#633 trainer-victory deadlock): log the win-branch entry on a co-op run so a live
       // capture shows the battleType and whether the trainer reward chain is queued. On the GUEST this
       // MUST read TRAINER + queue=TrainerVictoryPhase for a trainer wave - if the guest's KOd enemy was
@@ -121,9 +131,6 @@ export class VictoryPhase extends PokemonPhase {
         globalScene.phaseManager.pushNew("TrainerVictoryPhase");
       }
 
-      const gameMode = globalScene.gameMode;
-      const currentWaveIndex = globalScene.currentBattle.waveIndex;
-
       // LLM Director post-victory hook: queue the LLM-authored postWinText +
       // victoryEffects narration + victoryRewards BEFORE the vanilla
       // egg/modifier rewards. Applies only in Director mode and only if the
@@ -132,8 +139,10 @@ export class VictoryPhase extends PokemonPhase {
         applyPostVictoryHook(currentWaveIndex);
       }
 
-      if (gameMode.isEndless || !gameMode.isWaveFinal(currentWaveIndex)) {
-        globalScene.phaseManager.pushNew("EggLapsePhase");
+      if (tailControl.runContinues) {
+        if (tailControl.eggLapse) {
+          globalScene.phaseManager.pushNew("EggLapsePhase");
+        }
         if (gameMode.isClassic) {
           switch (currentWaveIndex) {
             case ClassicFixedBossWaves.RIVAL_1:
@@ -210,8 +219,20 @@ export class VictoryPhase extends PokemonPhase {
         // market always fires every 10 global waves regardless of variable biome
         // length / notoriety. Daily runs (shared seed) are still skipped.
         const erRouting = erBiomeRoutingActive();
-        const biomeEnding = globalScene.isNewBiome();
+        // The authoritative guest must NEVER derive this boundary locally. A one-bit disagreement here is
+        // the wave-10 split: one queue opens SelectBiomePhase while the other advances without the map.
+        const biomeEnding = tailControl.biomeChange;
         const fireBiomeShop = !(currentWaveIndex % 10) && !gameMode.isDaily;
+        const raiseCrossroads =
+          !biomeEnding
+          && erRouting
+          && erShouldRaiseCrossroads(currentWaveIndex)
+          && !gameMode.isFixedBattle(currentWaveIndex + 1);
+        if (globalScene.gameMode.isCoop) {
+          console.info(
+            `[coop-diag] VictoryTail role=${getCoopController()?.role ?? "none"} wave=${currentWaveIndex} source=${authoritativeTransition == null ? "legacy-local" : "host-stated"} trainer=${isTrainerWin} egg=${tailControl.eggLapse} biomeShop=${fireBiomeShop} biomeChange=${biomeEnding} crossroads=${raiseCrossroads} nextWave=${authoritativeTransition?.nextWave ?? currentWaveIndex + 1}`,
+          );
+        }
         if (fireBiomeShop) {
           // ER Abyss: the Abyss has no market - its every-10-waves "shop" slot is
           // Giratina's Bargain (a dialogue event, see TheBargainPhase). Everywhere
@@ -242,11 +263,7 @@ export class VictoryPhase extends PokemonPhase {
 
         if (gameMode.hasRandomBiomes || biomeEnding) {
           globalScene.phaseManager.pushNew("SelectBiomePhase");
-        } else if (
-          erRouting
-          && erShouldRaiseCrossroads(currentWaveIndex)
-          && !gameMode.isFixedBattle(currentWaveIndex + 1)
-        ) {
+        } else if (raiseCrossroads) {
           // ER (#486): not a biome end, but a 5-wave Crossroads tick - raise the
           // "Stay / Move on" choice AFTER the reward and BEFORE the next battle.
           globalScene.phaseManager.pushNew("ErCrossroadsPhase");

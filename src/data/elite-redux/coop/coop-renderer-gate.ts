@@ -24,19 +24,16 @@
 // overlooked mutating phase can never silently run on the guest: it fails closed (neutralized
 // to CoopInertPhase) and is LOUDLY logged.
 //
-// ── WARN-FIRST ROLLOUT (default OBSERVE mode) ────────────────────────────────
-// A mis-classified allowlist entry, under fail-closed enforcement, is a PRODUCTION HANG (the
-// guest never gets the phase it needs). Under the old denylist the same mistake self-heals as
-// a recoverable desync. So the allowlist ships in OBSERVE mode by default:
-//   • OBSERVE (default): today's behavior is preserved byte-for-byte - the legacy resolution
+// ── DEFAULT-DENY AVAILABLE; OBSERVE IS THE SAFE STAGING DEFAULT ─────────────
+// The warn-first soak phase is complete. The shipped behavior is now:
+//   • OBSERVE (explicit rollback): legacy behavior is preserved - the legacy resolution
 //     DENYLIST still neutralizes its 6 phases, and any OTHER non-allowlisted phase RUNS (as it
 //     does today) but is logged `[coop:gate] ALLOWLIST WOULD-BLOCK phase=X`. Staging + the full
 //     soaks watch that log: ZERO WOULD-BLOCK lines across a clean run == the allowlist is
 //     complete and it is safe to flip enforcement.
-//   • ENFORCE (behind the flag): fail closed - ANY non-allowlisted phase on the live guest is
+//   • ENFORCE (explicit opt-in): fail closed - ANY non-allowlisted phase on the live guest is
 //     neutralized to CoopInertPhase and logged `[coop:gate] ALLOWLIST BLOCK phase=X`.
-// The flip to ENFORCE is a follow-up after clean staging sessions + soaks. The unit test
-// exercises ENFORCE; the soak evidence is gathered in OBSERVE.
+// URL/localStorage/env can still force OBSERVE immediately if staging finds a missing legitimate phase.
 //
 // This is a CYCLE-FREE leaf (like coop-authoritative-gate): it imports only that gate (which
 // imports nothing heavy) and the cycle-free debug logger, so phase-manager can import it with
@@ -120,10 +117,17 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   "LearnMovePhase", // per-move learn intent
   "LearnMoveBatchPhase", // ER batch level-up learn intent
   "SwitchPhase", // own faint-switch / voluntary-switch intent
+  // Guest-side dispatcher: its authoritative-role branch queues CoopReplayTurnPhase and returns
+  // before any move/capture/enemy resolution is constructed.
+  "TurnStartPhase",
   "RevivalBlessingPhase", // revival PICK intent (the APPLY half is host-authoritative)
   "CoopGuestCatchFullPhase", // guest-catcher CATCH_FULL intent driver
   "CoopGuestFaintSwitchPhase", // guest faint-switch intent driver
   "CoopGuestRevivalPhase", // guest revival intent driver
+  // Pre-run roster input after the host's Resume/New Game decision. This is local input whose
+  // rosterSync intent is merged host-authoritatively; blocking it skips the guest straight into
+  // battle phases before a launch snapshot/currentBattle exists.
+  "SelectStarterPhase",
   "ErDexNavPhase", // per-client dex-nav selection (REVIEW row: acquisitions are host-shared, so this is intent-only)
   "SelectGenderPhase", // account-local one-time gender pick (REVIEW row: per-account, not shared state)
 
@@ -169,7 +173,6 @@ export const COOP_WAVE_TAIL_PHASES: ReadonlySet<string> = new Set<string>([
   "MysteryEncounterBattleStartCleanupPhase",
   "MysteryEncounterRewardsPhase",
   "PostMysteryEncounterPhase",
-  "EggLapsePhase",
 ]);
 
 /**
@@ -190,11 +193,10 @@ export const COOP_RENDERER_DENIED_PHASES: ReadonlySet<string> = new Set<string>(
 
 /**
  * Read the INITIAL enforcement mode without a rebuild, so the nightly/soak (env) or a staging
- * tester (localStorage / URL) can flip fail-closed for a run. Precedence: URL `?coopgateenforce=1`
+ * tester (localStorage / URL) can override it for a run. Precedence: URL `?coopgateenforce=0|1`
  * > localStorage `coopGateEnforce` > env `COOP_RENDERER_GATE_ENFORCE` > default OFF (observe). All
- * reads are guarded (no DOM / no `process` reads as OFF), so solo / host / a normal browser build
- * is unaffected. Kept OFF by default: fail-closed on a mis-classification is a prod hang, so the
- * flip to ENFORCE is a deliberate ops action after clean staging + soaks (see the module header).
+ * reads are guarded, so solo / host / lockstep remain unaffected regardless of this flag. `0` remains an
+ * emergency observe-mode rollback without a rebuild.
  */
 function readInitialEnforced(): boolean {
   try {
@@ -223,6 +225,9 @@ function readInitialEnforced(): boolean {
     if (env?.COOP_RENDERER_GATE_ENFORCE === "1" || env?.COOP_RENDERER_GATE_ENFORCE === "true") {
       return true;
     }
+    if (env?.COOP_RENDERER_GATE_ENFORCE === "0" || env?.COOP_RENDERER_GATE_ENFORCE === "false") {
+      return false;
+    }
   } catch {
     // no `process` (browser): env is not a source here.
   }
@@ -230,35 +235,34 @@ function readInitialEnforced(): boolean {
 }
 
 /**
- * Enforcement flag. `false` (default) = OBSERVE / warn-first: a non-allowlisted phase RUNS (or,
- * if in the legacy denylist, neutralizes as today) and is logged WOULD-BLOCK. `true` = ENFORCE:
- * a non-allowlisted phase fails closed (neutralized + logged BLOCK). Flipped by the migration
- * follow-up after clean staging + soaks; the unit test flips it on to prove fail-closed.
+ * Enforcement flag. `false` = OBSERVE rollback: a non-allowlisted phase RUNS (or, if in the legacy
+ * denylist, neutralizes as before) and is logged WOULD-BLOCK. `true` (explicit opt-in) = ENFORCE:
+ * a non-allowlisted phase fails closed (neutralized + logged BLOCK).
  */
 let enforced = readInitialEnforced();
 
-/** Whether the renderer allowlist is ENFORCED (fail-closed) vs OBSERVE (warn-first, the default). */
+/** Whether the renderer allowlist is ENFORCED (fail-closed opt-in) vs OBSERVE (safe default). */
 export function isCoopRendererGateEnforced(): boolean {
   return enforced;
 }
 
-/** Set the enforcement mode. Default is OBSERVE (`false`); the follow-up flips to ENFORCE (`true`). */
+/** Set the enforcement mode. Default is OBSERVE (`false`); true opts into fail-closed enforcement. */
 export function setCoopRendererGateEnforced(on: boolean): void {
   enforced = on;
 }
 
 // ── Wave-2f STRICT-TAILS mode (§3.3 KEYSTONE, §6.3) ──────────────────────────
-// A SEPARATE sub-flag, default OFF, mirroring the allowlist's warn-first rollout. When ON (OBSERVE
-// only - it NEVER blocks, evidence-gathering per §6.3), a WAVE-1 boundary-tail phase the guest
+// A SEPARATE sub-flag, default ON. Under renderer ENFORCE an unsanctioned shared boundary tail is
+// neutralized; under the emergency renderer OBSERVE rollback it logs and runs. A boundary-tail phase
 // constructs is checked against the CURRENT adopted WAVE_ADVANCE op's sanctioned set: an UNSANCTIONED
 // tail logs `[coop:gate] TAIL WOULD-BLOCK` (the signal that the guest built a tail the host's stated
 // transition did not sanction). The op adapter (coop-wave-operation.ts) PUSHES the sanction on adopt
-// (keeping this gate a cycle-free leaf - nothing is pulled from the operation runtime). Default OFF, so
-// a run with strict-tails off behaves EXACTLY as today (no sanction check, no logging).
+// (keeping this gate a cycle-free leaf - nothing is pulled from the operation runtime). The main renderer
+// observe rollback remains available for emergency diagnosis.
 
 /**
  * Read the INITIAL strict-tails mode without a rebuild (env `COOP_RENDERER_GATE_STRICT_TAILS` /
- * localStorage `coopGateStrictTails` / URL `?coopgatestricttails=1`), default OFF (observe-off). Guarded
+ * localStorage `coopGateStrictTails` / URL `?coopgatestricttails=1`), default ON (observe). Guarded
  * exactly like {@linkcode readInitialEnforced}. OFF by default: strict-tails is evidence-gathering the
  * migration follow-up turns ON after the op surface soaks; it NEVER enforces (§6.3).
  */
@@ -289,13 +293,16 @@ function readInitialStrictTails(): boolean {
     if (env?.COOP_RENDERER_GATE_STRICT_TAILS === "1" || env?.COOP_RENDERER_GATE_STRICT_TAILS === "true") {
       return true;
     }
+    if (env?.COOP_RENDERER_GATE_STRICT_TAILS === "0" || env?.COOP_RENDERER_GATE_STRICT_TAILS === "false") {
+      return false;
+    }
   } catch {
     // no `process` (browser): env is not a source here.
   }
-  return false;
+  return true;
 }
 
-/** Strict-tails OBSERVE flag (default OFF). ON = check boundary tails against the adopted op's sanction. */
+/** Strict-tail sanction flag (default ON). Enforcement follows the main renderer gate mode. */
 let strictTails = readInitialStrictTails();
 
 /** The tail phases the CURRENT adopted WAVE_ADVANCE op sanctions, or null when no op is adopted (all tails would-block). */
@@ -306,7 +313,7 @@ export function isCoopStrictTailsMode(): boolean {
   return strictTails;
 }
 
-/** Set strict-tails OBSERVE mode. Default OFF; the migration follow-up turns it ON to gather evidence (§6.3). */
+/** Set strict-tail sanction mode. Default ON; false disables sanction checks for emergency diagnosis. */
 export function setCoopStrictTailsMode(on: boolean): void {
   strictTails = on;
 }
@@ -344,6 +351,16 @@ function logTailWouldBlock(phaseName: string): void {
   }
 }
 
+function logTailBlock(phaseName: string): void {
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[coop:gate] TAIL BLOCK phase=${phaseName} (no authoritative operation sanctioned this boundary tail; neutralized to CoopInertPhase)`,
+  );
+  if (tailWouldBlockLog.length < LOG_CAP) {
+    tailWouldBlockLog.push(phaseName);
+  }
+}
+
 /** Bounded so a runaway leak can never grow a diagnostic log without limit. */
 const LOG_CAP = 256;
 /** Phases actually NEUTRALIZED on the guest (ENFORCE block + OBSERVE legacy-denylist neutralize). */
@@ -360,8 +377,19 @@ let observedGuestPhases = new Set<string>();
  * Hard `false` for solo / host / lockstep (the gate predicate is false), so those paths never
  * even reach the allowlist lookup.
  */
-export function isCoopRendererBlockedPhase(phaseName: string): boolean {
-  return isCoopAuthoritativeGuestGated() && !COOP_RENDERER_ALLOWED_PHASES.has(phaseName);
+function isContextuallyAllowedRendererPhase(phaseName: string, constructorArgs: readonly unknown[]): boolean {
+  // The host snapshot has already populated the complete run. `loaded=true` makes EncounterPhase
+  // render/re-enter that adopted encounter; an ordinary EncounterPhase can generate shared state
+  // and therefore remains default-denied.
+  return phaseName === "EncounterPhase" && constructorArgs[0] === true;
+}
+
+export function isCoopRendererBlockedPhase(phaseName: string, constructorArgs: readonly unknown[] = []): boolean {
+  return (
+    isCoopAuthoritativeGuestGated()
+    && !COOP_RENDERER_ALLOWED_PHASES.has(phaseName)
+    && !isContextuallyAllowedRendererPhase(phaseName, constructorArgs)
+  );
 }
 
 /**
@@ -374,18 +402,27 @@ export function isCoopRendererBlockedPhase(phaseName: string): boolean {
  * other non-allowlisted phase RUNS but is logged WOULD-BLOCK so staging can see the allowlist gap.
  * ENFORCE: any non-allowlisted phase neutralizes (fail closed) and is logged BLOCK.
  */
-export function coopRendererGateNeutralizes(phaseName: string): boolean {
+export function coopRendererGateNeutralizes(phaseName: string, constructorArgs: readonly unknown[] = []): boolean {
   // Fast path: solo / host / lockstep never touch the allowlist.
   if (!isCoopAuthoritativeGuestGated()) {
     return false;
   }
   observedGuestPhases.add(phaseName);
 
+  if (isContextuallyAllowedRendererPhase(phaseName, constructorArgs)) {
+    return false;
+  }
+
   if (COOP_RENDERER_ALLOWED_PHASES.has(phaseName)) {
-    // Wave-2f STRICT-TAILS (§3.3 KEYSTONE, observe-only): a boundary tail the guest builds that the current
-    // adopted WAVE_ADVANCE op did NOT sanction is surfaced LOUDLY (never blocked). Only the boundary-tail
+    // Wave-2f STRICT-TAILS: a tail the current authoritative operation did NOT sanction fails closed under
+    // renderer enforcement, or is surfaced loudly and allowed under observe rollback. Only the boundary-tail
     // group is checked; presentation / input-intent allowlist entries are always fine.
     if (strictTails && COOP_WAVE_TAIL_PHASES.has(phaseName) && !(sanctionedTailPhases?.has(phaseName) ?? false)) {
+      if (enforced) {
+        logTailBlock(phaseName);
+        recordNeutralized(phaseName);
+        return true;
+      }
       logTailWouldBlock(phaseName);
     }
     return false; // presentation / input-intent / allowed boundary tail: the guest runs it

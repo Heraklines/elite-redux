@@ -21,7 +21,7 @@ describe("co-op role reconciliation (#633)", () => {
     // a LOWER tiebreak, so it wins host and we must become guest.
     const me = new CoopSessionController(host, { username: "A", tiebreak: 0.9 });
     expect(me.role).toBe("host");
-    guest.send({ t: "hello", version: "1", username: "B", role: "host", tiebreak: 0.1 });
+    guest.send({ t: "hello", version: "1", username: "B", role: "host", tiebreak: 0.1, epoch: 101 });
     await new Promise(r => setTimeout(r, 0));
     expect(me.role).toBe("guest");
     expect(me.partnerRoleId).toBe("host");
@@ -30,7 +30,7 @@ describe("co-op role reconciliation (#633)", () => {
   it("a peer claiming the SAME role leaves us host when we have the lower tiebreak", async () => {
     const { host, guest } = createLoopbackPair();
     const me = new CoopSessionController(host, { username: "A", tiebreak: 0.1 });
-    guest.send({ t: "hello", version: "1", username: "B", role: "host", tiebreak: 0.9 });
+    guest.send({ t: "hello", version: "1", username: "B", role: "host", tiebreak: 0.9, epoch: 102 });
     await new Promise(r => setTimeout(r, 0));
     expect(me.role).toBe("host");
     expect(me.partnerRoleId).toBe("guest");
@@ -45,19 +45,34 @@ describe("co-op role reconciliation (#633)", () => {
     const clientA = new CoopSessionController(a.host, { username: "A", tiebreak: 0.2 });
     const clientB = new CoopSessionController(b.host, { username: "B", tiebreak: 0.8 });
     // Cross-deliver each other's hello (what the live channel does).
-    a.guest.send({ t: "hello", version: "1", username: "B", role: "host", tiebreak: 0.8 });
-    b.guest.send({ t: "hello", version: "1", username: "A", role: "host", tiebreak: 0.2 });
+    a.guest.send({
+      t: "hello",
+      version: "1",
+      username: "B",
+      role: "host",
+      tiebreak: 0.8,
+      epoch: clientB.sessionEpoch,
+    });
+    b.guest.send({
+      t: "hello",
+      version: "1",
+      username: "A",
+      role: "host",
+      tiebreak: 0.2,
+      epoch: clientA.sessionEpoch,
+    });
     await new Promise(r => setTimeout(r, 0));
     // Lower tiebreak (A, 0.2) is host; B is guest. They are OPPOSITE.
     expect(clientA.role).toBe("host");
     expect(clientB.role).toBe("guest");
     expect(clientA.role).not.toBe(clientB.role);
+    expect(clientB.sessionEpoch, "the losing host adopts the winner's epoch").toBe(clientA.sessionEpoch);
   });
 
   it("no conflict: a peer with the OPPOSITE role leaves our role unchanged", async () => {
     const { host, guest } = createLoopbackPair();
     const me = new CoopSessionController(host, { username: "A", tiebreak: 0.5 });
-    guest.send({ t: "hello", version: "1", username: "B", role: "guest", tiebreak: 0.1 });
+    guest.send({ t: "hello", version: "1", username: "B", role: "guest", tiebreak: 0.1, epoch: 0 });
     await new Promise(r => setTimeout(r, 0));
     expect(me.role).toBe("host"); // unchanged - roles already distinct
   });

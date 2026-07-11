@@ -100,6 +100,8 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     const host = rig.hostRuntime.controller;
     const guest = rig.guestRuntime.controller;
+    const preResumeEpoch = host.sessionEpoch;
+    expect(guest.sessionEpoch).toBe(preResumeEpoch);
 
     // The handshake exchanged account identities: each side knows the other's name.
     expect(host.partnerName, "host knows the guest identity").toBe(guest.localName());
@@ -134,6 +136,8 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     guest.replyResume(true);
     await flush();
     await expect(offer, "host sees the guest ACCEPT").resolves.toBe(true);
+    expect(host.sessionEpoch, "cold resume minted a fresh host epoch").toBeGreaterThan(preResumeEpoch);
+    expect(guest.sessionEpoch, "guest adopted the cold-resume epoch before snapshot boot").toBe(host.sessionEpoch);
 
     // RESUME BOOT: the guest boots from the host's saved snapshot (the coopGuestResumeBoot core)...
     const booted = await withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(hostJson));

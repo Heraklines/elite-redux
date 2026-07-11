@@ -74,6 +74,7 @@ import {
   resetCoopChecksumAssertionCount,
   setCoopChecksumAssertSeverity,
 } from "#data/elite-redux/coop/coop-checksum-assert";
+import { getCoopOperationJournalCommittedClasses } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   clearCoopRuntime,
   getCoopInteractionRelay,
@@ -438,9 +439,9 @@ export interface SoakOptions {
    */
   rewardPolicy?: "seeded" | "leave";
   /**
-   * Pin the run seed to this string on the host BEFORE the duo mirror (setSeed writes the seed field with
-   * no RND re-sow), so two INDEPENDENT runs compare their (seed-bearing) save-data digests apples-to-apples
-   * for the determinism contract (#842). Undefined for the soak = the framework's own run seed.
+   * Override the deterministic content seed used from the first post-bootstrap crossing onward. When absent,
+   * the driver derives `coop-soak-<SOAK_SEED>`; the printed replay seed must reproduce game content as well as
+   * action choices. Explicit values remain useful for the independent-run determinism contract (#842).
    */
   pinSeed?: string;
   /**
@@ -950,6 +951,19 @@ function writeSoakArtifact(
 
 /** Snapshot both clients' current phase names + interaction counters (the NO-PARK strand dump). */
 function phaseStateDump(rig: DuoRig): Record<string, unknown> {
+  const monDump = (mon: Pokemon) => ({
+    id: mon.id,
+    battlerIndex: mon.getBattlerIndex(),
+    speciesId: mon.species.speciesId,
+    speciesName: mon.species.name,
+    hp: mon.hp,
+    maxHp: mon.getMaxHp(),
+    fainted: mon.isFainted(),
+    status: mon.status?.effect ?? 0,
+    statStages: [...mon.getStatStages()],
+    moves: mon.getMoveset().map(move => move == null ? null : { id: move.moveId, ppUsed: move.ppUsed }),
+    coopOwner: mon.coopOwner,
+  });
   return {
     hostPhase: rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? "none",
     guestPhase: rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none",
@@ -957,7 +971,18 @@ function phaseStateDump(rig: DuoRig): Record<string, unknown> {
     guestInteractionCounter: rig.guestRuntime.controller.interactionCounter(),
     hostWave: rig.hostScene.currentBattle?.waveIndex,
     hostBattleType: rig.hostScene.currentBattle?.battleType,
+    hostPlayerField: rig.hostScene.getPlayerField().map(monDump),
+    hostEnemyField: rig.hostScene.getEnemyField().map(monDump),
+    guestPlayerField: rig.guestScene.getPlayerField().map(monDump),
+    guestEnemyField: rig.guestScene.getEnemyField().map(monDump),
   };
+}
+
+/** Pin the content RNG before `startBattle`; callers use the same replay key as the action policy. */
+export function prepareCoopSoakContent(game: GameManager, seed: number, pinSeed?: string): string {
+  const contentSeed = pinSeed ?? `coop-soak-${seed}`;
+  game.scene.setSeed(contentSeed);
+  return contentSeed;
 }
 
 // ---------------------------------------------------------------------------
@@ -1129,10 +1154,17 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     bumpSkip("mysteryEncounterDisabledV1");
   }
 
-  // Optionally PIN the run seed BEFORE the mirror (determinism contract) so two runs are seed-aligned.
-  if (opts.pinSeed != null) {
-    game.scene.setSeed(opts.pinSeed);
+  // #899 REPLAY COMPLETENESS: SOAK_SEED used to seed only the driver's action PRNG while game content used
+  // the framework's unrelated run seed. The same printed replay could therefore pass or strand on different
+  // enemies (observed twice at seed 20260710 wave 2), making its artifact non-reproducible. Pin content too.
+  const contentSeed = opts.pinSeed ?? `coop-soak-${seed}`;
+  const preseeded = game.scene.seed === contentSeed;
+  if (!preseeded) {
+    // Backward-compatible fallback for specialized callers not yet migrated; critical gate/nightly callers
+    // pre-seed before startBattle so wave 1 is covered too.
+    prepareCoopSoakContent(game, seed, opts.pinSeed);
   }
+  actionScript.push(`content seed=${contentSeed} preseeded=${preseeded}`);
 
   // #843 CATCH LEG (BUILD 1): when a catch leg is configured, shorten the dexSync broadcast delay so the
   // host's post-catch dexSync timer fires DURING the guest-ctx reconcile drain (not during the host throw),
@@ -1574,6 +1606,16 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         armHostFaintAutoPick();
       });
       await withClient(rig.guestCtx, () => driveGuestReplayTurnWithFaint(rig, turn));
+
+      if (t === 0 || (t + 1) % 10 === 0) {
+        actionScript.push(
+          `wave ${wave} turn ${turn}: progress enemyHp=[${rig.hostScene.getEnemyField()
+            .map(mon => `${mon.species.speciesId}:${mon.hp}/${mon.getMaxHp()}`)
+            .join(",")}] playerHp=[${rig.hostScene.getPlayerField()
+            .map(mon => `${mon.species.speciesId}:${mon.hp}/${mon.getMaxHp()}`)
+            .join(",")}]`,
+        );
+      }
 
       if (rig.hostScene.currentBattle.enemyParty.every(e => e.isFainted())) {
         return;
@@ -2474,6 +2516,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   // #828 ASYMMETRIC CONTINUATION (BUILD 2): host-half exhaustion is NO LONGER a terminal - it is now DRIVEN
   // (the guest plays on solo, {@linkcode hostHalfExhausted} recorded per wave in the loop above). Any
   // run-end here is a TRUE terminal (full wipe / GameOver / Title), so nothing extra to record.
+
+  for (const cls of getCoopOperationJournalCommittedClasses()) {
+    hits.operations.add(cls);
+  }
 
   assertTeardown();
   return {

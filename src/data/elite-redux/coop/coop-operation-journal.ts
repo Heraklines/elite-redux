@@ -56,6 +56,10 @@ import type {
   CoopDurabilityManager,
 } from "#data/elite-redux/coop/coop-durability";
 import type { CoopAuthoritativeEnvelopeV1, CoopLogicalPhase } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  type CoopOperationSurfaceClass,
+  isCoopOperationSurfaceClass,
+} from "#data/elite-redux/coop/coop-operation-surface-registry";
 
 /** The journaled durability class for a committed op, DERIVED from its logical phase (§4.1). */
 export function coopOperationClassForPhase(phase: CoopLogicalPhase): string | null {
@@ -158,6 +162,9 @@ const liveSinkInvoked: CoopAuthoritativeEnvelopeV1[] = [];
  */
 const journalApplied: CoopAuthoritativeEnvelopeV1[] = [];
 
+/** Operation classes committed during this session (coverage/diagnostic ledger, canonical-registry checked). */
+const journalCommittedClasses = new Set<CoopOperationSurfaceClass>();
+
 /**
  * Install (or clear) the active session's durability manager. Called from `assembleCoopRuntime` with the
  * flag-gated manager (null when durability is OFF), and cleared on `clearCoopRuntime`. When null,
@@ -187,6 +194,9 @@ export function journalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelope
   if (cls == null) {
     return;
   }
+  if (isCoopOperationSurfaceClass(cls)) {
+    journalCommittedClasses.add(cls);
+  }
   try {
     manager.commit(cls, envelope.revision, { t: "envelope", envelope });
   } catch {
@@ -199,8 +209,16 @@ export function journalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelope
  * Register a surface's guest applier (adapters call this at import; one-way dep). Keyed by the journaled
  * class ({@linkcode coopOperationClassForPhase}). Idempotent for the same class (last registration wins).
  */
-export function registerCoopOperationApplier(cls: string, applier: CoopOperationEnvelopeApplier): void {
+export function registerCoopOperationApplier(cls: string, applier: CoopOperationEnvelopeApplier): () => void {
+  const previous = appliers.get(cls);
   appliers.set(cls, applier);
+  return () => {
+    if (previous == null) {
+      appliers.delete(cls);
+    } else {
+      appliers.set(cls, previous);
+    }
+  };
 }
 
 /**
@@ -283,8 +301,14 @@ export function getCoopOperationLiveSinkInvoked(): readonly CoopAuthoritativeEnv
   return liveSinkInvoked;
 }
 
+/** Migrated authoritative operation classes committed in this session, sorted for stable diagnostics. */
+export function getCoopOperationJournalCommittedClasses(): readonly CoopOperationSurfaceClass[] {
+  return [...journalCommittedClasses].sort();
+}
+
 /** Drop the journal-applied + live-sink logs (session boundary / test hygiene). Keeps the applier registry. */
 export function resetCoopOperationJournalLog(): void {
   journalApplied.length = 0;
   liveSinkInvoked.length = 0;
+  journalCommittedClasses.clear();
 }

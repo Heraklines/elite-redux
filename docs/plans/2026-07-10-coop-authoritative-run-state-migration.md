@@ -1294,3 +1294,100 @@ can drive real guest mutation (the reviewer's central demand). What it establish
 boundary companions) are now gated by the strict-tails observe mode above when it is ON — a tail is
 op-sanctioned by the adopted `WAVE_ADVANCE` op or it logs `TAIL WOULD-BLOCK`. They remain in the allowlist
 (the guest still constructs them); strict-tails is the evidence path toward op-sanctioned enforcement.
+
+### 8.8 Lobby/resume boundary hardening (tester-ready checkpoint)
+
+The first half of §2.5 item 7 is live in `6e89d400a` and `5952d491d` (failure-first commits
+`955bcbe87` and `440703f22`):
+
+- `resumeOffer`, `resumeReply`, and `resumeStartNew` are keyed by a host-authored `decisionId`. The host
+  retains the latest decision and re-announces it after hot rejoin; the guest de-duplicates a repeated offer;
+  and a delayed reply is accepted only by the exact active offer. This closes both the lost start-new barrier
+  softlock and the stale-reply/new-offer alias.
+- The host retains the latest wave-keyed `launchSnapshot`. A guest parks its waiter and sends
+  `requestLaunchSnapshot`; the host replays the exact cached snapshot. A reconnect reissues every outstanding
+  request, and already-consumed snapshots are ignored exactly once so a resend cannot poison a later await.
+- An authoritative guest no longer falls back to generating its own launch when the snapshot is unavailable or
+  invalid. It fails closed at an explicit recovery screen. Local generation made the UI appear to recover while
+  creating a structurally different run, guaranteeing a later desync.
+- The incompatible wire is gated by `er-coop-15`. Controller/transport suites are 32/32 green, battle-stream is
+  32/32 green, and the real two-engine resume + launch snapshot + launch-sync suites are 4/4 green.
+
+The remaining half of item 7 landed in `419a84cd0` (failure-first `a2c3e1724`). `hello` now carries a
+host-minted safe-integer epoch; the guest adopts and echoes it, deterministic role reconciliation transfers
+epoch authority to the winning host, and stale/lower host epochs are rejected. `coop-operation-epoch.ts` is
+the single fan-out into all twelve migrated surface adapters, preventing a newly negotiated run from leaving
+one adapter on the old epoch. A new-game or accepted cold resume mints a strictly newer epoch before its
+release/snapshot; hot rejoin only re-announces the existing epoch. The controller/role/capability/transport
+suites are 46/46 green; operation-runtime plus lobby/role and the real duo cold-resume suite are 40/40 green.
+The duo proof asserts both peers share the pre-resume epoch, the host bumps on acceptance, and the guest adopts
+the new epoch before applying the authoritative snapshot. Cross-epoch rejection remains pinned by the generic
+operation-runtime lifecycle suite.
+
+### 8.9 Renderer allowlist enforcement flip
+
+`81dac3137` (failure-first `a88d76d0e`) flips §3 from warn-first observation to shipped default-deny.
+On an authoritative guest, any phase outside the presentation/input-intent allowlist is now replaced by
+`CoopInertPhase` and logged `ALLOWLIST BLOCK`; solo, host, and non-authoritative sessions still bypass the gate.
+Observe mode remains available immediately through `?coopgateenforce=0`, localStorage, the environment flag,
+or the test setter. The pure allowlist + wave tests are 36/36 green. Twelve real two-engine suites spanning
+wave 10/biome boundary, biome operation, ME, reward, catch-full, faint-switch, revival, learn-move,
+stormglass, cold resume, and trainer transitions all passed with enforcement forced on.
+
+Strict-tail sanctioning remains observe-only: the matrix exposed expected ME/egg tail warnings because those
+tails are governed by `ME_TERMINAL`/local egg continuation rather than a standard `WAVE_ADVANCE`. They remain
+explicitly allowlisted until their operation-specific sanction is wired; this does not reopen arbitrary phases,
+because every non-allowlisted phase is already denied by default.
+
+### 8.10 Test-gate and checksum-view closure
+
+`999e4adb9` removes the final quarantine after repairing the learn-move continuation harness's incomplete
+production stubs; all eleven assertions now complete without asynchronous errors. `dbd45b0b6` (red proof
+`756adf9e2`) also aligns checksum capture with the authoritative data plane's slot-present battler view. A
+just-fainted enemy therefore remains hash-visible through the wave-win boundary, including its `statStages`.
+Normal and versus-egress capture use the same representation, and the real two-engine serialization round trip
+proves the stronger checksum is healable. Evidence: 18/18 gated live-engine assertions and 47/47 pure
+checksum/checkpoint assertions.
+
+### 8.11 Authoritative-operation completeness registry
+
+`2542e7db9` (red proof `ded5d0e3e`) adds the missing operation dimension to the #849 soak completeness
+backstop. `COOP_OPERATION_SURFACES` canonically inventories all twelve migrated journal classes. The host
+journal records committed classes, the soak publishes them as hit surfaces, and the profile partitions must
+totally and disjointly classify the registry. A real two-wave duo run observed both default-path classes
+(`op:wave`, `op:reward`) with zero desync findings. New operation adapters now auto-red coverage until they
+are classified and actually driven or carry an explicit forced-leg follow-up.
+
+### 8.12 All-class first-envelope loss recovery
+
+`5baab1484` runs the canonical twelve-class registry through the durability never-seen-class failure mode.
+Every first envelope is actually dropped; no live sink mutates before recovery; guest-only reconnect replays
+all twelve via `coopResyncAll`; all live seams converge; and every cumulative ACK drains from the host.
+The matrix validates generic carrier recovery, while concrete adapter mutation remains the responsibility of
+the existing per-surface real-engine duo tests and the pending forced-surface/browser campaign.
+
+### 8.13 Production-fidelity replay closure (#899)
+
+`68f960483` makes `SOAK_SEED` seed both the action policy and game content (default
+`coop-soak-<SOAK_SEED>`). This removes the old partial-replay behavior that let the same wave-2 key pass or
+strand in separate processes. Failure artifacts now carry full host/guest field causality plus periodic HP
+progress. Evidence: two identical 3-wave production runs, the full 12-wave production gate, and the
+independent-pair determinism contract are green; the latter no longer relies on an explicit `pinSeed`.
+`3ca47791c` pre-seeds the critical soak entrypoints before `startBattle`, extending the replay guarantee to
+the bootstrap wave as well as every subsequent crossing.
+
+### 8.14 Strict-tail enforcement closure
+
+`b01faa56f` makes shared boundary sanctions fail closed under the default renderer enforcement. Wave tails
+must be sanctioned by `WAVE_ADVANCE`; mystery-encounter leave/battle tails are sanctioned by the adopted
+`ME_TERMINAL`. Renderer observe mode remains the emergency log-and-run rollback. Account-local deterministic
+`EggLapsePhase` is allowlisted but is not incorrectly modeled as shared operation control. Protocol
+`er-coop-16` prevents mixed enforcement builds from pairing. Evidence: 26/26 pure tail assertions, 17/17
+real wave/biome/ME/egg tests, and 38/38 session/capability tests.
+
+### 8.15 Full-gate specialized-seed closure
+
+The first all-lane gate found a mixed-seed save/resume failure (`seed=606060`, wave 2). `9b2cab7e5`
+pre-seeds all specialized soak entrypoints before bootstrap and gives the ME campaign its explicit legal
+content stream. The exact resume replay is green, all three ME continuations are green, and lane C passes
+13/13 executed tests across eight files (one evidence-only skip). A fresh complete aggregate remains pending.

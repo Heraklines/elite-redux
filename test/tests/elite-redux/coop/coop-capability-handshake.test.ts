@@ -293,6 +293,7 @@ describe("co-op capability handshake wiring (#896 W2e-R2)", () => {
         username: "Host",
         role: "host",
         tiebreak: 1,
+        epoch: 1,
         capabilities: [COOP_CAP_OP_BIOME, COOP_CAP_OP_ME],
       };
       const round = JSON.parse(JSON.stringify(hello)) as CoopMessage;
@@ -318,7 +319,7 @@ describe("co-op capability handshake wiring (#896 W2e-R2)", () => {
     });
 
     it("an omitted capabilities field round-trips as undefined (older peer)", () => {
-      const hello: CoopMessage = { t: "hello", version: "er-coop-12", username: "Old", role: "guest" };
+      const hello: CoopMessage = { t: "hello", version: "er-coop-12", username: "Old", role: "guest", epoch: 0 };
       const round = JSON.parse(JSON.stringify(hello)) as CoopMessage;
       if (round.t === "hello") {
         expect(round.capabilities).toBeUndefined();

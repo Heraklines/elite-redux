@@ -85,7 +85,7 @@ describe("co-op WebRTC transport (#633, P6) - framing", () => {
     const received: CoopMessage[] = [];
     guest.onMessage(m => received.push(m));
 
-    const msg: CoopMessage = { t: "hello", version: "1", username: "Ash", role: "host" };
+    const msg: CoopMessage = { t: "hello", version: "1", username: "Ash", role: "host", epoch: 1 };
     host.send(msg);
 
     // Sent as a JSON string on the wire...

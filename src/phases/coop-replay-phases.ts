@@ -48,10 +48,7 @@ import { recordCoopChecksumAssertion } from "#data/elite-redux/coop/coop-checksu
 import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { armCoopFaintSwitchIntentResend } from "#data/elite-redux/coop/coop-faint-switch-operation";
-import {
-  isCoopFaintSwitchSeq,
-  sendCoopFaintSwitchChoice,
-} from "#data/elite-redux/coop/coop-interaction-relay";
+import { isCoopFaintSwitchSeq, sendCoopFaintSwitchChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   buildCoopWaveAdvancePayload,
@@ -68,6 +65,7 @@ import {
   isShowdownGuestFlip,
   isVersusSession,
   queueCoopMeBattleVictoryTail,
+  resolveCoopPendingWaveTransition,
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
 import type {
@@ -1169,7 +1167,11 @@ export class CoopFinalizeTurnPhase extends Phase {
     // op to the shared applier (adopt then returns stale:true), the tail must STILL build here - the op
     // ledger is bookkeeping/convergence, the wave-guarded consume is the single build gate. Only a FAIL-LOUD
     // (unknown-kind / applier gap under the flag) suppresses the build.
-    const reconstructed = buildCoopWaveAdvancePayload(pending.outcome, pending.wave);
+    // Current peers carry the authority's COMPLETE transition on waveResolved and the journal sink preserves
+    // the same payload. Only an older/flag-off carrier can omit it; that compatibility path may derive.
+    const reconstructed = resolveCoopPendingWaveTransition(pending, () =>
+      buildCoopWaveAdvancePayload(pending.outcome, pending.wave),
+    );
     const decision = adoptWaveAdvanceWatcherChoice({
       payload: reconstructed,
       localRole: getCoopController()?.role ?? "guest",
@@ -1197,7 +1199,7 @@ export class CoopFinalizeTurnPhase extends Phase {
     // reward-shop OWNER so the host's WATCHER wait resolves).
     coopLog(
       "replay",
-      `guest wave-advance outcome=${tail.outcome} wave=${pending.wave} next=${tail.nextLogicalPhase} battleType=${BattleType[globalScene.currentBattle.battleType]} queues=${tail.outcome === "win" || tail.outcome === "capture" ? "VictoryPhase" : tail.outcome === "flee" ? "BattleEnd+NewBattle" : "GameOverPhase"} (op-selected)`,
+      `guest wave-advance outcome=${tail.outcome} wave=${pending.wave} next=${tail.nextLogicalPhase}/wave${tail.nextWave} biomeChange=${tail.biomeChange} eggLapse=${tail.eggLapse} victoryKind=${tail.victoryKind ?? "-"} battleType=${BattleType[globalScene.currentBattle.battleType]} queues=${tail.outcome === "win" || tail.outcome === "capture" ? "VictoryPhase" : tail.outcome === "flee" ? "BattleEnd+NewBattle" : "GameOverPhase"} (host-stated)`,
     );
     try {
       switch (tail.outcome) {

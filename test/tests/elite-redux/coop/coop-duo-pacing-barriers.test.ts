@@ -140,7 +140,7 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
   // (no block), then the host's real turn opens its command as usual.
   // ===========================================================================================
   it("a real host CommandPhase invokes the next-command barrier at its cmd point", async () => {
-    setCoopRendezvousWaitMs(50); // fast anti-hang fallback (the harness never drives the guest's own command)
+    setCoopRendezvousWaitMs(50);
     forceItemRewards(game.override, [{ name: "LURE" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
@@ -148,6 +148,7 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
 
     // Spy the HOST runtime's rendezvous to capture the barrier point CommandPhase awaits.
     const rzSpy = vi.spyOn(rig.hostRuntime.rendezvous, "rendezvous");
+    const arriveSpy = vi.spyOn(rig.hostRuntime.rendezvous, "arrive");
 
     // Play wave 1 to a win + guest replays + drive the (host-owned) reward shop, so the host crosses
     // into wave 2 and opens a co-op-gated CommandPhase (the wave-1 turn-1 command ran during
@@ -169,13 +170,18 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
     await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
 
     await remirrorWave(rig);
+    // This focused wiring probe drives only the host's real CommandPhase. Materialize the guest's exact
+    // wave-2 command arrival explicitly; production gets this from the guest's own CommandPhase. The old
+    // test depended on a unilateral timeout, which is no longer a legal shared-boundary continuation.
+    withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.arrive("cmd:2:1"));
+    await drainLoopback();
     // Cross into wave 2's first CommandPhase - its start() invokes coopNextCommandBarrier(cmd:2:1).
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("CommandPhase");
     });
     expect(rig.hostScene.currentBattle.waveIndex, "host reached wave 2").toBe(2);
 
-    const barrierPoints = rzSpy.mock.calls.map(c => String(c[0]));
+    const barrierPoints = [...rzSpy.mock.calls, ...arriveSpy.mock.calls].map(c => String(c[0]));
     expect(
       barrierPoints.some(p => /^cmd:\d+:\d+$/.test(p)),
       `a real CommandPhase invoked the next-command barrier at a cmd point (saw: ${barrierPoints.join(", ")})`,

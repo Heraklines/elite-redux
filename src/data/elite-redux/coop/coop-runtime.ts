@@ -78,6 +78,7 @@ import {
   COOP_CAP_RENDERER_ALLOWLIST_ENFORCE,
   type CoopCapabilityKey,
   clearNegotiatedCoopCapabilities,
+  isCoopCapabilityNegotiated,
 } from "#data/elite-redux/coop/coop-capabilities";
 import {
   isCoopCatchFullOperationEnabled,
@@ -149,6 +150,7 @@ import type {
   CoopWaveAdvancePayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import { applyCoopOperationEpoch } from "#data/elite-redux/coop/coop-operation-epoch";
 import {
   coopOperationDurabilityHooks,
   registerCoopOperationLiveSink,
@@ -211,6 +213,7 @@ import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import {
   commitWaveAdvanceOwnerIntent,
   isCoopWaveAdvanceOperationEnabled,
+  isValidCoopWaveAdvancePayload,
   resetCoopWaveAdvanceOperationState,
   setCoopWaveAdvanceOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-wave-operation";
@@ -431,12 +434,18 @@ function wireCoopEnemyPartyResponder(controller: CoopSessionController, battleSt
  * on receipt; {@linkcode consumeCoopPendingWaveAdvance} hands it to the guest's
  * `CoopReplayTurnPhase` at the next SAFE turn boundary (NEVER mid-replay) so it runs the tail.
  */
-let pendingWaveAdvance: {
+interface CoopPendingWaveAdvance {
   wave: number;
   outcome: CoopWaveOutcome;
   captureParty?: string[] | undefined;
   capturePresentation?: CoopCapturePresentation | undefined;
-} | null = null;
+  /** The host's complete control statement. Present on current peers and journal recovery. */
+  transition?: CoopWaveAdvancePayload | undefined;
+}
+
+let pendingWaveAdvance: CoopPendingWaveAdvance | null = null;
+/** Complete host statement currently driving the guest's VictoryPhase tail, wave-keyed against stale reuse. */
+let activeGuestWaveTransition: CoopWaveAdvancePayload | null = null;
 /** The last wave the guest already ran the victory tail for (guards a duplicate `waveResolved`). */
 let lastResolvedWave = -1;
 
@@ -491,6 +500,7 @@ export function consumeCoopPendingWaveAdvance(): {
   outcome: CoopWaveOutcome;
   captureParty?: string[] | undefined;
   capturePresentation?: CoopCapturePresentation | undefined;
+  transition?: CoopWaveAdvancePayload | undefined;
 } | null {
   const pending = pendingWaveAdvance;
   pendingWaveAdvance = null;
@@ -502,10 +512,24 @@ export function consumeCoopPendingWaveAdvance(): {
   }
   coopLog(
     "runtime",
-    `consume wave-advance wave=${pending.wave} outcome=${pending.outcome} (lastResolved ${lastResolvedWave} -> ${pending.wave})`,
+    `consume wave-advance wave=${pending.wave} outcome=${pending.outcome} transition=${pending.transition == null ? "legacy" : `${pending.transition.nextLogicalPhase}/next${pending.transition.nextWave}/biome${Number(pending.transition.biomeChange)}/egg${Number(pending.transition.eggLapse)}/${pending.transition.victoryKind ?? "-"}`} (lastResolved ${lastResolvedWave} -> ${pending.wave})`,
   );
+  activeGuestWaveTransition = pending.transition ?? null;
   lastResolvedWave = pending.wave;
   return pending;
+}
+
+/** The host statement that must control this guest wave's concrete VictoryPhase queue. */
+export function getCoopActiveWaveTransition(wave: number): CoopWaveAdvancePayload | null {
+  return activeGuestWaveTransition?.wave === wave ? activeGuestWaveTransition : null;
+}
+
+/** Choose the authority's preserved transition; derive only for an additive-legacy carrier that omitted it. */
+export function resolveCoopPendingWaveTransition(
+  pending: Pick<CoopPendingWaveAdvance, "transition">,
+  legacyDerive: () => CoopWaveAdvancePayload,
+): CoopWaveAdvancePayload {
+  return pending.transition ?? legacyDerive();
 }
 
 /**
@@ -542,22 +566,13 @@ export function coopWaveAdvanceSignaledFor(wave: number): boolean {
  * pending unchanged (a stale earlier-wave signal). Pure - exported for unit testing.
  */
 export function mergeCoopPendingWaveAdvance(
-  prev: {
-    wave: number;
-    outcome: CoopWaveOutcome;
-    captureParty?: string[] | undefined;
-    capturePresentation?: CoopCapturePresentation | undefined;
-  } | null,
+  prev: CoopPendingWaveAdvance | null,
   wave: number,
   outcome: CoopWaveOutcome,
   captureParty: string[] | undefined,
   capturePresentation?: CoopCapturePresentation | undefined,
-): {
-  wave: number;
-  outcome: CoopWaveOutcome;
-  captureParty?: string[] | undefined;
-  capturePresentation?: CoopCapturePresentation | undefined;
-} | null {
+  transition?: CoopWaveAdvancePayload | undefined,
+): CoopPendingWaveAdvance | null {
   if (prev != null && wave < prev.wave) {
     return null; // a stale earlier-wave signal: keep the existing later-wave pending.
   }
@@ -567,7 +582,23 @@ export function mergeCoopPendingWaveAdvance(
   // so a "win" arriving after the "capture" in a double battle does not drop the ball animation (#689).
   const carriedPresentation =
     capturePresentation ?? (prev != null && prev.wave === wave ? prev.capturePresentation : undefined);
-  return { wave, outcome, captureParty: carriedCapture, capturePresentation: carriedPresentation };
+  // A same-wave retransmission of the SAME terminal may omit the additive statement and safely inherit it.
+  // Never carry a statement across a changed outcome (capture -> win in doubles): that would pair a stale
+  // control statement with a newer terminal. Current peers include a fresh statement on every signal.
+  const receivedTransition =
+    isValidCoopWaveAdvancePayload(transition) && transition.wave === wave && transition.outcome === outcome
+      ? transition
+      : undefined;
+  const carriedTransition =
+    receivedTransition
+    ?? (prev != null && prev.wave === wave && prev.outcome === outcome ? prev.transition : undefined);
+  return {
+    wave,
+    outcome,
+    captureParty: carriedCapture,
+    capturePresentation: carriedPresentation,
+    ...(carriedTransition === undefined ? {} : { transition: carriedTransition }),
+  };
 }
 
 /**
@@ -578,13 +609,24 @@ export function mergeCoopPendingWaveAdvance(
  * live GUEST role in the AUTHORITATIVE netcode; a host / solo / lockstep client ignores it.
  */
 function wireCoopWaveResolved(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
-  battleStream.onWaveResolved((wave, outcome, captureParty, capturePresentation) => {
+  battleStream.onWaveResolved((wave, outcome, captureParty, capturePresentation, transition) => {
     coopLog(
       "runtime",
       `recv waveResolved wave=${wave} outcome=${outcome} role=${controller.role} netcode=${getCoopNetcodeMode()}`,
     );
     if (controller.role !== "guest" || getCoopNetcodeMode() !== "authoritative") {
       coopLog("runtime", `ignore waveResolved wave=${wave} (not authoritative guest)`);
+      return;
+    }
+    if (
+      isCoopWaveAdvanceOperationEnabled()
+      && isCoopCapabilityNegotiated(COOP_CAP_OP_WAVE)
+      && !isValidCoopWaveAdvancePayload(transition)
+    ) {
+      coopWarn(
+        "runtime",
+        `reject waveResolved wave=${wave} outcome=${outcome}: missing/malformed host transition; awaiting durable op`,
+      );
       return;
     }
     // Already advanced past this wave (a duplicate signal) -> ignore.
@@ -594,13 +636,20 @@ function wireCoopWaveResolved(controller: CoopSessionController, battleStream: C
     }
     // Latest signal wins (a later wave supersedes an unconsumed earlier one), but a captureParty is
     // PRESERVED across a same-wave supersession (see mergeCoopPendingWaveAdvance).
-    const merged = mergeCoopPendingWaveAdvance(pendingWaveAdvance, wave, outcome, captureParty, capturePresentation);
+    const merged = mergeCoopPendingWaveAdvance(
+      pendingWaveAdvance,
+      wave,
+      outcome,
+      captureParty,
+      capturePresentation,
+      transition,
+    );
     if (merged == null) {
       coopWarn("runtime", `waveResolved wave=${wave} stale vs pending=${pendingWaveAdvance?.wave} -> kept pending`);
     } else {
       coopLog(
         "runtime",
-        `pend waveResolved wave=${wave} outcome=${outcome}${merged.captureParty == null ? "" : ` captureParty=${merged.captureParty.length}`} (prevPending=${pendingWaveAdvance?.wave ?? "none"})`,
+        `pend waveResolved wave=${wave} outcome=${outcome} transition=${merged.transition == null ? "legacy" : `${merged.transition.nextLogicalPhase}/next${merged.transition.nextWave}/biome${Number(merged.transition.biomeChange)}/egg${Number(merged.transition.eggLapse)}/${merged.transition.victoryKind ?? "-"}`}${merged.captureParty == null ? "" : ` captureParty=${merged.captureParty.length}`} (prevPending=${pendingWaveAdvance?.wave ?? "none"})`,
       );
       pendingWaveAdvance = merged;
     }
@@ -1904,13 +1953,14 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
       "runtime",
       `send waveResolved wave=${wave} outcome=${outcome}${captureParty == null ? "" : ` captureParty=${captureParty.length}`}${presentation == null ? "" : ` cap=sp${presentation.speciesId}`} (host)`,
     );
-    active.battleStream.sendWaveResolved(wave, outcome, captureParty, presentation);
+    const transition = buildCoopWaveAdvancePayload(outcome, wave);
+    active.battleStream.sendWaveResolved(wave, outcome, captureParty, presentation, transition);
     // Wave-2f KEYSTONE (§2.5 item 4): ALSO commit the host-stated WAVE_ADVANCE operation (dual-run - the
     // legacy waveResolved above still carries the DATA the guest adopts; this op is the CONTROL statement
     // that makes logicalPhase host-authoritative). Owner is the host seat; pinned on the wave. No-op when
     // the flag is OFF. The host is the sole engine that resolves a wave, so it commits its own intent here.
     commitWaveAdvanceOwnerIntent({
-      payload: buildCoopWaveAdvancePayload(outcome, wave),
+      payload: transition,
       localRole: active.controller.role,
       wave,
       turn: globalScene.currentBattle.turn,
@@ -1943,10 +1993,20 @@ function materializeCoopWaveAdvanceFromOp(payload: CoopWaveAdvancePayload): bool
     // Feed the SAME pending queue the legacy waveResolved feeds; the safe-boundary maybeRunCoopWaveAdvance
     // consumes it (one materialization site). Carry no capture blob - the DATA plane (waveEndState) reconciles
     // the party; the tail phases (VictoryPhase etc.) are the control materialization the journal recovers.
-    const merged = mergeCoopPendingWaveAdvance(pendingWaveAdvance, payload.wave, payload.outcome, undefined, undefined);
+    const merged = mergeCoopPendingWaveAdvance(
+      pendingWaveAdvance,
+      payload.wave,
+      payload.outcome,
+      undefined,
+      undefined,
+      payload,
+    );
     if (merged != null) {
       pendingWaveAdvance = merged;
-      coopLog("runtime", `wave-advance JOURNAL materialize wave=${payload.wave} outcome=${payload.outcome} (Wave-2f)`);
+      coopLog(
+        "runtime",
+        `wave-advance JOURNAL materialize wave=${payload.wave} outcome=${payload.outcome} transition=${payload.nextLogicalPhase}/next${payload.nextWave}/biome${Number(payload.biomeChange)}/egg${Number(payload.eggLapse)}/${payload.victoryKind ?? "-"} (Wave-2f)`,
+      );
     }
     return merged != null;
   } catch (e) {
@@ -2791,6 +2851,7 @@ export function assembleCoopRuntime(
     // #896 W2e-R2: advertise what THIS build supports+enables; the controller negotiates the effective
     // session set (intersection with the peer's) and stores it, and the surface adapters gate on it.
     localCapabilities: buildLocalCoopCapabilities(),
+    onEpochNegotiated: applyCoopOperationEpoch,
   });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
   // truth that rides along in broadcastRunConfig; on the GUEST it is only the pre-
@@ -3042,6 +3103,7 @@ export function clearCoopRuntime(): void {
   setCoopMeInteractionStart(-1);
   // Reset the authoritative wave-advance state so a subsequent run starts clean (#633).
   pendingWaveAdvance = null;
+  activeGuestWaveTransition = null;
   lastResolvedWave = -1;
   // Reset the wave-end authoritative snapshot state so a subsequent run starts clean (#838).
   pendingWaveEndState = null;

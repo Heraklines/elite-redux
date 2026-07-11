@@ -405,3 +405,119 @@ The in-run operation-surface migration list is now complete. Next is the archite
 lobby handshake + resume migration, followed by renderer allowlist enforcement, quarantine/stat-stage
 cleanup, expanded soak/model coverage, the final drop-every-class campaign, and the full four-lane/final
 long-soak gate. No final “no gaps” claim is made yet.
+
+## 19. Live wave-10 incident: host statement was discarded before queue construction
+
+Tester reports of repeated wave-10 map desyncs/softlocks exposed a violation inside the already-migrated
+`WAVE_ADVANCE` keystone. `ebe05657c` is the failure-first proof: the host committed a complete transition
+with `biomeChange=true`, but the guest pending queue retained only `{wave,outcome}`. The guest then called
+its own `isNewBiome()` twice—once while reconstructing the operation and again in `VictoryPhase` while
+building the concrete queue. A one-bit disagreement therefore made one client enqueue `SelectBiomePhase`
+while the other advanced directly, exactly matching the reported nondeterministic map/screen-jump lock.
+
+`27c04cc73` makes the complete host transition part of `waveResolved`, preserves it through same-wave
+merge and journal recovery, validates it strictly, keeps it active through the guest's `VictoryPhase`, and
+uses it for trainer-victory, run-continuation, egg-lapse, and biome-boundary queue decisions. Current peers
+never evaluate the corresponding guest-local predicates. Protocol version is now `er-coop-14`, so an older
+`er-coop-13` guest that still discards the statement cannot silently pair. Transition summaries and the
+final concrete Victory tail are logged on both clients for future incident correlation.
+
+Proof: failure-first focused test 1/1 red before the fix; wave primitive/durability, capture merge/wire, and
+battle-stream regressions pass together. The real two-engine wave-operation, wave-10 shop/map boundary,
+and biome-operation suites pass together under an adversarial host-boundary/guest-no-boundary setup. The
+guest retains the host payload, never calls its contradictory `isNewBiome`, and keeps that exact payload
+active for the concrete Victory queue. Touched-file TypeScript diagnostics are zero; repository-wide
+pre-existing failures remain.
+
+## 20. Quarantine closure and fainted-slot checksum closure
+
+The last gate quarantine is closed in `999e4adb9`. The learn-move continuation test's eleven assertions were
+already correct; its four unhandled asynchronous errors came from incomplete scene/Pokemon loader stubs. The
+stub now implements the production continuation's move, money-text, sound, form, and loader seams, the file
+passes 11/11 with no unhandled errors, and `scripts/run-coop-gate.mjs` has no quarantined files left.
+
+The #878 checksum blind spot is closed in `dbd45b0b6` (failure-first `756adf9e2`). Checksum capture previously
+used `getField(true)`, which drops a just-fainted enemy at the exact wave-win boundary, while authoritative
+snapshots and checkpoints retain slot-present battlers. A change to that enemy's `statStages` was consequently
+invisible. Normal and versus-egress checksums now use the same `getCoopSerializableField()` view as the data
+plane. The real-engine reproduction proves the digest changes; the live capture -> JSON wire -> guest apply ->
+recapture suite passes 18/18, and pure checksum/checkpoint coverage passes 47/47. This makes the added state both
+detectable and reproducible instead of creating an unhealable checksum mismatch.
+
+Next: make soak completeness mechanically assert every registered operation surface is exercised, then expand
+the production-fidelity and drop-every-authoritative-class fault campaigns. Strict-tail ME/egg sanctioning,
+real-browser duo coverage, model-based fuzzing, and the final long multi-lane campaign remain open; no final
+"no gaps" claim is made yet.
+
+## 21. Authoritative-operation soak completeness
+
+`2542e7db9` (failure-first `ded5d0e3e`) closes a test-architecture hole in the #849 completeness
+backstop. The old runtime-derived inventory covered mirrored UI modes, relay kinds, sequence bands, and
+battle situations, but not the twelve migrated authoritative operation classes. A surface could therefore
+go completely cold without appearing in the completeness partition.
+
+`COOP_OPERATION_SURFACES` is now the canonical twelve-class inventory. Host journal commits feed an
+operation hit ledger into every soak result; expected surfaces derive from the canonical registry; and every
+class is classified as guaranteed, profile-dependent, or explicitly undrivable in the default continuous
+run with a named forced-leg follow-up. A total-and-disjoint partition test runs for both soak profiles. The
+real two-engine probe completed 2/2 waves with zero heals/assertions/findings and reported
+`HIT operations=[op:reward, op:wave]`, proving runtime accounting rather than static-list-only coverage.
+
+Next: derive the fault-injection matrix from this same registry and require every authoritative class to
+survive carrier loss with live-state convergence. The known-undrivable continuous-soak legs remain explicit
+work, not silently treated as covered.
+
+## 22. Drop-every-operation-class durability campaign
+
+`5baab1484` derives an authoritative carrier-loss matrix from the canonical surface registry. For each of
+the twelve operation classes it drops the class's first envelope (the never-seen-class case), proves no
+receiver live mutation occurred, then performs the production-topology guest-only reconnect. Generic
+`coopResyncAll` replay must route every class through its live-mutation seam, cumulatively ACK it, and drain
+the host's unacked journal to zero. The campaign asserts exactly twelve faults were injected, preventing a
+vacuous green. The surrounding biome/wave/remediation durability suites pass 19/19.
+
+This proves the shared durability carrier for every class; it does not replace the dedicated real-engine
+duo suites that prove each adapter's concrete scene/party/UI mutation. The remaining final campaign must
+combine forced real-engine surface legs with authoritative backbone frame drops and browser-level clients.
+
+## 23. #899 production-fidelity replay determinism and liveness tracing
+
+`68f960483` closes the source of the apparently nondeterministic wave-2 no-progress result. `SOAK_SEED`
+previously drove only action choices; the game's content RNG retained an unrelated framework seed. Two
+processes using the same printed replay key could therefore encounter different content and produce one
+pass plus one 60-turn strand. The driver now pins content to `coop-soak-<SOAK_SEED>` by default, while
+retaining an explicit `pinSeed` override for specialized contracts. `3ca47791c` adds the pre-bootstrap
+seeding helper to the nightly, production-fidelity, and independent-pair entrypoints, so wave 1 is included
+rather than only post-bootstrap crossings.
+
+No-progress artifacts now include host and guest field species/ids, HP/max HP, faint/status/stages,
+moves/PP, co-op ownership, and periodic player/enemy HP progress. The same production-fidelity seed passed
+3 waves twice, the exact 12-wave lane-P depth passed with zero hard failures, and the independent-pair
+determinism contract passes 3/3 without a test-only content seed. A printed soak seed is now a complete
+content-plus-action replay key for the complete critical run.
+
+## 24. Operation-sanctioned boundary-tail enforcement
+
+`b01faa56f` closes the strict-tail residual. Strict sanction checks now default on and follow the main
+renderer mode: staging/default enforcement neutralizes an unsanctioned shared boundary tail, while the
+emergency renderer-observe rollback logs `TAIL WOULD-BLOCK` and lets it run. `ME_TERMINAL` publishes the
+exact leave/battle tail sanction before construction, alongside the existing `WAVE_ADVANCE` sanction.
+`EggLapsePhase` remains allowlisted but is correctly excluded from shared-operation sanctioning because egg
+state is deterministic and account-local, not shared-run control.
+
+The incompatible behavior bumps the pairing protocol to `er-coop-16`. Pure strict-tail coverage passes
+26/26; real wave-10/biome/ME/egg coverage passes 17/17 with enforcement active; capability/session
+handshake coverage passes 38/38. An older renderer cannot silently pair and run a locally derived tail.
+
+## 25. Full-gate seed audit and lane-C closure
+
+The first complete four-lane run exposed one test-architecture red: the specialized save/resume soak
+serialized a mixed-seed run (`preseeded=false`) and failed full-state convergence at wave 2. `9b2cab7e5`
+pre-seeds every remaining catch, learn-move, ME, and resume campaign before `startBattle`. The ME fixtures
+also declare their stable `test` content stream explicitly because the default `828633` content makes wave
+12 a trainer battle, where forcing an ME is illegal; the same seed is passed through the driver and traced.
+
+The exact resume artifact now passes its 5-wave boot/convergence/continuation proof. All three continuous ME
+campaigns pass, including both ownership parities and post-ME continuation. Lane C reran green: eight files
+passed, one evidence-only file skipped, 13 tests passed, zero failed. This fixes the sole red artifact found
+by the aggregate run; a fresh all-lane aggregate rerun remains the final acceptance step.

@@ -36,7 +36,7 @@
 // behaves EXACTLY as before (pure legacy derivation). The #859/#860 phantom-dissolve + abort
 // backstops REMAIN (this op supersedes their trigger but they stay as belt-and-suspenders).
 //
-// FLAG (§5.4): `isCoopWaveAdvanceOperationEnabled()`. Default ON, gated by the SAME er-coop-13
+// FLAG (§5.4): `isCoopWaveAdvanceOperationEnabled()`. Default ON, gated by the protocol-version
 // protocol-version handshake as biome/ME/reward (COOP_PROTOCOL_VERSION; no new bump - no new wire
 // arm, the wave decision's DATA still rides the existing waveResolved/waveEndState). CI/soak force
 // legacy via COOP_WAVE_OP=off. State is per-session and reset on assembleCoopRuntime / clearCoopRuntime.
@@ -92,7 +92,7 @@ export type CoopWaveAdvanceAdoptDecision =
 // -----------------------------------------------------------------------------
 
 /**
- * Default ON. Activation is HARD-GATED by the SAME er-coop-13 protocol-version handshake as biome/ME/reward
+ * Default ON. Activation is HARD-GATED by the protocol-version handshake shared with biome/ME/reward
  * (the COOP_PROTOCOL_VERSION check): a mixed-build pair refuses to pair / banners, so a live session has both
  * peers on the envelope build. The legacy derivation path remains selectable (rollback = set false). No new
  * wire arm is added, so no version bump is needed (the wave decision's DATA rides the existing waveResolved).
@@ -315,6 +315,58 @@ export function coopWaveAdvanceSanctionedTails(payload: CoopWaveAdvancePayload):
   return tails;
 }
 
+/** Strict wire/journal validation for the complete host-stated transition. */
+export function isValidCoopWaveAdvancePayload(value: unknown): value is CoopWaveAdvancePayload {
+  const payload = value as CoopWaveAdvancePayload | undefined;
+  if (
+    payload == null
+    || !Number.isSafeInteger(payload.wave)
+    || payload.wave < 0
+    || !Number.isSafeInteger(payload.nextWave)
+    || typeof payload.biomeChange !== "boolean"
+    || typeof payload.eggLapse !== "boolean"
+    || (payload.meBoundary !== "none" && payload.meBoundary !== "battle-victory")
+  ) {
+    return false;
+  }
+  if (payload.outcome === "win" || payload.outcome === "capture") {
+    return (
+      payload.nextLogicalPhase === "WAVE_VICTORY"
+      && payload.nextWave === payload.wave + 1
+      && (payload.victoryKind === "wild" || payload.victoryKind === "trainer")
+    );
+  }
+  if (payload.outcome === "flee") {
+    return payload.nextLogicalPhase === "WAVE_FLEE" && payload.nextWave === payload.wave + 1;
+  }
+  if (payload.outcome === "gameOver") {
+    return payload.nextLogicalPhase === "GAME_OVER" && payload.nextWave === payload.wave;
+  }
+  return false;
+}
+
+/** Resolve concrete victory-tail control from the authority statement, with local values only for legacy. */
+export function resolveCoopVictoryTailControl(
+  transition: CoopWaveAdvancePayload | null,
+  local: { trainerWin: () => boolean; runContinues: () => boolean; biomeChange: () => boolean },
+): { trainerWin: boolean; runContinues: boolean; eggLapse: boolean; biomeChange: boolean } {
+  if (transition == null) {
+    const runContinues = local.runContinues();
+    return {
+      trainerWin: local.trainerWin(),
+      runContinues,
+      eggLapse: runContinues,
+      biomeChange: local.biomeChange(),
+    };
+  }
+  return {
+    trainerWin: transition.victoryKind === "trainer",
+    runContinues: transition.nextWave === transition.wave + 1,
+    eggLapse: transition.eggLapse,
+    biomeChange: transition.biomeChange,
+  };
+}
+
 // -----------------------------------------------------------------------------
 // Owner (HOST) seam (§1.3 propose -> commit). Called at the host's wave-end.
 // -----------------------------------------------------------------------------
@@ -336,6 +388,10 @@ export interface CoopWaveAdvanceOwnerCommitParams {
  */
 export function commitWaveAdvanceOwnerIntent(params: CoopWaveAdvanceOwnerCommitParams): void {
   if (!isCoopWaveAdvanceOperationEnabled() || params.localRole !== "host") {
+    return;
+  }
+  if (!isValidCoopWaveAdvancePayload(params.payload)) {
+    coopWarn("runtime", "wave-advance op HOST rejected malformed transition before commit", params.payload);
     return;
   }
   try {
@@ -404,6 +460,9 @@ export function adoptWaveAdvanceWatcherChoice(params: CoopWaveAdvanceWatcherAdop
   // the payload's outcome exactly as the legacy derivation used pending.outcome).
   if (!isCoopWaveAdvanceOperationEnabled()) {
     return { adopt: true, payload: params.payload, sanctionedTails: coopWaveAdvanceSanctionedTails(params.payload) };
+  }
+  if (!isValidCoopWaveAdvancePayload(params.payload)) {
+    return { adopt: false, reason: "malformed-transition", stale: false };
   }
   try {
     const opId = makeCoopOperationId(epoch, HOST_SEAT, params.payload.wave);
@@ -489,6 +548,9 @@ function applyJournaledWaveEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coop
   const op = envelope.pendingOperation;
   if (op == null || op.status !== "applied" || op.kind !== "WAVE_ADVANCE") {
     return "duplicate";
+  }
+  if (!isValidCoopWaveAdvancePayload(op.payload)) {
+    return "rejected";
   }
   const g = guest();
   if (g.hasApplied(op.id)) {

@@ -36,7 +36,13 @@ import {
   registerCoopOperationLiveSink,
   resetCoopOperationJournalLog,
 } from "#data/elite-redux/coop/coop-operation-journal";
-import { broadcastCoopWaveResolved, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  broadcastCoopWaveResolved,
+  clearCoopRuntime,
+  consumeCoopPendingWaveAdvance,
+  getCoopActiveWaveTransition,
+  setCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import * as waveOp from "#data/elite-redux/coop/coop-wave-operation";
 import {
@@ -187,6 +193,8 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   // ===========================================================================================
   it("BIOME boundary @10: the committed WAVE_ADVANCE states biomeChange faithfully, and the guest receives the SAME verdict", async () => {
     const rig = await bootDuo();
+    vi.spyOn(rig.hostScene, "isNewBiome").mockReturnValue(true);
+    const guestDerive = vi.spyOn(rig.guestScene, "isNewBiome").mockReturnValue(false);
     const payload = await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 10 });
 
     // The host states its OWN biome verdict; assert the payload carries exactly what the host computed
@@ -196,6 +204,17 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     expect(routed.at(-1)!.biomeChange, "the guest received the SAME host-stated biome verdict").toBe(
       payload!.biomeChange,
     );
+    const pending = await withClient(rig.guestCtx, () => consumeCoopPendingWaveAdvance());
+    expect(pending?.transition, "the live guest pending queue retained the full host statement").toEqual(payload);
+    expect(pending?.transition?.biomeChange, "host says map boundary even while the guest locally says no").toBe(true);
+    expect(
+      guestDerive,
+      "the pending queue never consulted the contradictory guest biome verdict",
+    ).not.toHaveBeenCalled();
+    expect(
+      await withClient(rig.guestCtx, () => getCoopActiveWaveTransition(10)),
+      "the exact statement remains active for the guest VictoryPhase queue",
+    ).toEqual(payload);
     if (payload!.biomeChange) {
       const tails = waveOp.coopWaveAdvanceSanctionedTails(payload!);
       expect(tails, "a biome boundary sanctions the biome-transition tail").toEqual(

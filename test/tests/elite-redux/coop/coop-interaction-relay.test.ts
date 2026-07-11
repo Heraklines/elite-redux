@@ -11,6 +11,7 @@
 
 import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { describe, expect, it } from "vitest";
 
 describe("co-op alternating-interaction relay (#633)", () => {
@@ -153,6 +154,27 @@ describe("co-op alternating-interaction relay (#633)", () => {
       expect(res).toEqual(options);
     });
 
+    it("re-requests and recovers the exact cached owner options when the first stream frame is lost", async () => {
+      const pair = wrapCoopFaultPair(createLoopbackPair(), COOP_NO_FAULT_PROFILE, { seed: 81017 });
+      const owner = new CoopInteractionRelay(pair.host);
+      const timer: { fire?: () => void } = {};
+      const watcher = new CoopInteractionRelay(pair.guest, {
+        schedule: cb => {
+          timer.fire = cb;
+          return () => {};
+        },
+      });
+
+      pair.armNextDrop("rewardOptions", "host");
+      owner.sendRewardOptions(8, 0, options);
+      const awaited = watcher.awaitRewardOptions(8, 0, 1000);
+      await new Promise(r => setTimeout(r, 0));
+      timer.fire?.();
+
+      expect(await awaited).toEqual(options);
+      expect(pair.counters.host.oneShotDropped).toBe(1);
+    });
+
     it("keys options by (seq, reroll) - a different reroll round does not satisfy the wait", async () => {
       const { host, guest } = createLoopbackPair();
       const owner = new CoopInteractionRelay(host);
@@ -172,7 +194,7 @@ describe("co-op alternating-interaction relay (#633)", () => {
       expect(await awaited).toBeNull();
     });
 
-    it("times out to null so the watcher falls back to its own roll (never hangs)", async () => {
+    it("times out to null so the caller can fail closed without using a local roll", async () => {
       const { guest } = createLoopbackPair();
       const timer: { fire?: () => void } = {};
       const watcher = new CoopInteractionRelay(guest, {

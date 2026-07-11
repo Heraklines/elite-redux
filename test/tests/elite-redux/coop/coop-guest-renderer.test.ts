@@ -226,6 +226,16 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(field.length).toBe(2);
   });
 
+  it("the phase factory admits only the loaded authoritative EncounterPhase context", async () => {
+    await startCoopGuest();
+
+    const ordinary = game.scene.phaseManager.create("EncounterPhase", false);
+    const loaded = game.scene.phaseManager.create("EncounterPhase", true);
+
+    expect(ordinary.is("EncounterPhase"), "ordinary guest encounter generation stays denied").toBe(false);
+    expect(loaded.is("EncounterPhase"), "snapshot-adopted loaded encounter is admitted").toBe(true);
+  });
+
   it("CoopReplayTurnPhase renders the host's outcome: applies the streamed checkpoint to the field", async () => {
     const field = await startCoopGuest();
     const turn = globalScene.currentBattle.turn;

@@ -30,6 +30,7 @@ import { installDuoLogCapture } from "#test/tools/coop-duo-harness";
 import { assertSoakCompleteness, logSoakCoverage } from "#test/tools/coop-soak-coverage";
 import {
   announceSoakSeed,
+  prepareCoopSoakContent,
   resolveSoakLevel,
   resolveSoakProfile,
   resolveSoakSeed,
@@ -153,6 +154,7 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
       const waves = resolveSoakWaves();
       // PRINT the seed FIRST THING so any failure is replayable with SOAK_SEED=<seed>.
       announceSoakSeed(seed, waves);
+      prepareCoopSoakContent(game, seed);
 
       const started = Date.now();
       // #832/#843/#849: a full SIX-mon party (like real co-op's 3-mon-per-player cap) so a player faint has a

@@ -40,6 +40,7 @@ const flush = () => new Promise<void>(resolve => queueMicrotask(resolve));
  */
 class FlapTransport implements CoopTransport {
   readonly role: CoopRole;
+  readonly sent: CoopMessage[] = [];
   private peer: FlapTransport | null = null;
   private _state: CoopConnectionState = "connected";
   private readonly msgHandlers = new Set<(msg: CoopMessage) => void>();
@@ -70,6 +71,7 @@ class FlapTransport implements CoopTransport {
   }
 
   send(msg: CoopMessage): void {
+    this.sent.push(msg);
     if (this._state !== "connected") {
       return; // dark: dropped at the source (like the real transport bailing on a closed channel)
     }
@@ -85,6 +87,13 @@ class FlapTransport implements CoopTransport {
         h(msg);
       }
     });
+  }
+
+  /** Test-only delivery of a delayed frame that was retained by an old wire. */
+  deliver(msg: CoopMessage): void {
+    for (const h of [...this.msgHandlers]) {
+      h(msg);
+    }
   }
 
   onMessage(handler: (msg: CoopMessage) => void): () => void {
@@ -117,6 +126,109 @@ function makeFlapPair(): { host: FlapTransport; guest: FlapTransport } {
 }
 
 describe("co-op lobby self-healing handshake (#868)", () => {
+  it("the host mints a nonzero operation epoch and the guest echoes the same epoch", async () => {
+    const { host, guest } = makeFlapPair();
+    const h = new CoopSessionController(host, { username: "Host", tiebreak: 1 });
+    const g = new CoopSessionController(guest, { username: "Guest", tiebreak: 2 });
+    h.connect();
+    g.connect();
+    await flush();
+    await flush();
+
+    const hostHello = host.sent.find((msg): msg is Extract<CoopMessage, { t: "hello" }> => msg.t === "hello");
+    const guestHellos = guest.sent.filter(
+      (msg): msg is Extract<CoopMessage, { t: "hello" }> => msg.t === "hello",
+    );
+    const epoch = (hostHello as unknown as { epoch?: number } | undefined)?.epoch;
+    expect(epoch, "host-authored epoch is carried in hello").toBeTypeOf("number");
+    expect(epoch).toBeGreaterThan(0);
+    expect(
+      guestHellos.some(msg => (msg as unknown as { epoch?: number }).epoch === epoch),
+      "guest echoes the adopted host epoch",
+    ).toBe(true);
+    expect(h.sessionEpoch).toBe(epoch);
+    expect(g.sessionEpoch).toBe(epoch);
+
+    // A wire-only hot rejoin keeps the control-plane identity intact.
+    host.setConnected(false);
+    guest.setConnected(false);
+    guest.setConnected(true);
+    host.setConnected(true);
+    await flush();
+    await flush();
+    expect(h.sessionEpoch, "hot rejoin does not mint").toBe(epoch);
+    expect(g.sessionEpoch, "hot rejoin does not mint").toBe(epoch);
+
+    // A hard run boundary mints on the host and is adopted by the guest.
+    const next = h.beginNewOperationEpoch("test-cold-resume");
+    await flush();
+    expect(next).toBeGreaterThan(epoch!);
+    expect(g.sessionEpoch, "cold resume adopts the new host epoch").toBe(next);
+  });
+
+  it("a delayed reply from an older resume offer cannot resolve the current offer", async () => {
+    const { host, guest } = makeFlapPair();
+    const h = new CoopSessionController(host, { username: "Host", tiebreak: 1 });
+    const g = new CoopSessionController(guest, { username: "Guest", tiebreak: 2 });
+    h.connect();
+    g.connect();
+    await flush();
+
+    g.armResumeOfferHandler(() => {});
+    const first = h.offerResume(10);
+    await flush();
+    const firstFrame = host.sent.find(
+      (msg): msg is Extract<CoopMessage, { t: "resumeOffer" }> => msg.t === "resumeOffer" && msg.wave === 10,
+    );
+    expect(firstFrame).toBeDefined();
+    g.replyResume(false);
+    await expect(first).resolves.toBe(false);
+
+    const second = h.offerResume(20);
+    await flush();
+    let secondSettled = false;
+    void second.then(() => {
+      secondSettled = true;
+    });
+
+    host.deliver({ t: "resumeReply", decisionId: firstFrame!.decisionId, accept: true });
+    await flush();
+    expect(secondSettled, "stale reply was rejected by transaction id").toBe(false);
+
+    g.replyResume(true);
+    await expect(second).resolves.toBe(true);
+  });
+
+  it("a resumeStartNew release lost during a flap is re-sent on reconnect", async () => {
+    const { host, guest } = makeFlapPair();
+    const h = new CoopSessionController(host, { username: "Host", tiebreak: 1 });
+    const g = new CoopSessionController(guest, { username: "Guest", tiebreak: 2 });
+    h.connect();
+    g.connect();
+    await flush();
+
+    let released = 0;
+    g.armResumeStartNewHandler(() => {
+      released++;
+    });
+
+    // The host decides while the wire is dark. This is a durable lobby decision: after
+    // reconnect the guest must observe it instead of waiting for the anti-hang timeout.
+    host.setConnected(false);
+    guest.setConnected(false);
+    h.sendResumeStartNew();
+    await flush();
+    expect(released).toBe(0);
+
+    guest.setConnected(true);
+    host.setConnected(true);
+    await flush();
+    await flush();
+    await flush();
+
+    expect(released, "the durable start-new decision healed immediately on reconnect").toBe(1);
+  });
+
   // -------------------------------------------------------------------------
   // REPRO (ii): a guest lock-in LOST during a channel flap must heal on reconnect,
   // so the HOST's proceedIfReady converges to bothReady (case b: "partner got kicked").

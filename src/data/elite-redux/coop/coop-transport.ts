@@ -27,7 +27,10 @@ import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 // TYPE-ONLY (erased at runtime, so this stays the lowest layer): the authoritative control-plane
 // envelope (Wave-2 run-state migration, §1.1). The envelope module in turn imports only the
 // CoopAuthoritativeBattleStateV1 TYPE from here, so the cycle is fully type-level (no runtime cycle).
-import type { CoopAuthoritativeEnvelopeV1 } from "#data/elite-redux/coop/coop-operation-envelope";
+import type {
+  CoopAuthoritativeEnvelopeV1,
+  CoopWaveAdvancePayload,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import type { ErRouteNode } from "#data/elite-redux/er-biome-routing";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
@@ -47,7 +50,12 @@ export type CoopRole = "host" | "guest";
  * changes shape. Carried in the hello; a mismatch means one player runs a stale cached bundle -
  * the top source of unreproducible ghost bugs - and both get told to hard-refresh.
  */
-export const COOP_PROTOCOL_VERSION = "er-coop-13";
+// er-coop-15: resume decisions are transaction-keyed/durable, launch snapshots are re-answerable, and hello
+// carries the host-minted operation epoch. Older builds can lose/alias a boundary or accept prior-run ops.
+// er-coop-16: shared boundary tails fail closed unless WAVE_ADVANCE or ME_TERMINAL sanctions them.
+// er-coop-17: shared reward/market option payloads are cached and explicitly re-requestable; watchers
+// never continue against a local roll when the authoritative stream is lost.
+export const COOP_PROTOCOL_VERSION = "er-coop-17";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -855,7 +863,16 @@ export type CoopMessage =
    * only. ABSENT on an older client -> treated as the empty set (all negotiated features off, legacy
    * paths engaged) - so this stays additive-optional and needs no COOP_PROTOCOL_VERSION bump.
    */
-  | { t: "hello"; version: string; username: string; role: CoopRole; tiebreak?: number; capabilities?: string[] }
+  | {
+      t: "hello";
+      version: string;
+      username: string;
+      role: CoopRole;
+      tiebreak?: number;
+      capabilities?: string[];
+      /** Host-minted control-plane epoch; the guest adopts and echoes it before operations begin. */
+      epoch: number;
+    }
   /** Keepalive / latency probe. */
   | { t: "ping"; ts: number }
   | { t: "pong"; ts: number }
@@ -905,16 +922,16 @@ export type CoopMessage =
   | { t: "catchFullPrompt"; pokemonName: string; speciesId: number; operationId?: string | undefined }
   /** #810 resume flow: host offers to resume the saved run with this partner at `wave`. */
   | { t: "meCursor"; index: number }
-  | { t: "resumeOffer"; wave: number }
+  | { t: "resumeOffer"; decisionId: string; wave: number }
   /** #810 resume flow: guest's answer to the offer. */
-  | { t: "resumeReply"; accept: boolean }
+  | { t: "resumeReply"; decisionId: string; accept: boolean }
   /**
    * #810 resume flow (barrier): host tells the guest "no resume - proceed to a NEW game".
    * Sent whenever the host will NOT resume (no matching save, host picked New Game, guest
    * declined, or the offer timed out), so the guest never sits blocked waiting for an offer
    * that will never come. The guest treats it as the release signal for its wait barrier.
    */
-  | { t: "resumeStartNew" }
+  | { t: "resumeStartNew"; decisionId: string }
   /** A forced/voluntary switch replacement: bring in party `partySlot` to `fieldIndex` (P2). */
   | { t: "switchChoice"; fieldIndex: number; partySlot: number }
   /**
@@ -1031,6 +1048,8 @@ export type CoopMessage =
    * (its EncounterPhase), replacing the narrow `enemyPartySync` + the `requestEnemyParty` poll.
    */
   | { t: "launchSnapshot"; wave: number; session: string }
+  /** Guest -> host: re-send the cached authoritative launch/resume snapshot for this exact wave. */
+  | { t: "requestLaunchSnapshot"; wave: number }
   /**
    * Host -> guest (#633, authoritative ME battle handoff): the EXACT enemy party the host
    * generated for a mystery-encounter-SPAWNED battle. Unlike `enemyPartySync` (keyed by the
@@ -1152,6 +1171,8 @@ export type CoopMessage =
    * `reroll` is the reroll round these options belong to (a fresh roll per reroll).
    */
   | { t: "rewardOptions"; seq: number; reroll: number; options: CoopSerializedRewardOption[] }
+  /** Watcher -> option owner: replay the exact cached reward/market option payload for this key. */
+  | { t: "requestRewardOptions"; seq: number; reroll: number }
   /**
    * Owner -> watcher (#633): a COSMETIC live-cursor button on a shared interaction
    * screen. The watcher replays `button` into its identical screen so the partner
@@ -1205,6 +1226,8 @@ export type CoopMessage =
       outcome: CoopWaveOutcome;
       captureParty?: string[] | undefined;
       capturePresentation?: CoopCapturePresentation | undefined;
+      /** Complete host-stated post-wave control transition; never re-derived by the authoritative guest. */
+      transition?: CoopWaveAdvancePayload | undefined;
     }
   /**
    * Host -> guest (#838 WAVE-END authoritative capture): the COMPLETE post-exp authoritative battle
@@ -1388,6 +1411,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `wave=${msg.wave}`;
     case "launchSnapshot":
       return `wave=${msg.wave} session=${msg.session.length}b`;
+    case "requestLaunchSnapshot":
+      return `wave=${msg.wave}`;
     case "meBattleEnemyPartySync":
       return `key=${msg.key} enemies=${msg.enemies.length}`;
     case "ghostPool":
@@ -1408,12 +1433,14 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `len=${msg.text.length}`;
     case "rewardOptions":
       return `seq=${msg.seq} reroll=${msg.reroll} options=${msg.options.length}`;
+    case "requestRewardOptions":
+      return `seq=${msg.seq} reroll=${msg.reroll}`;
     case "uiInput":
       return `seq=${msg.seq} n=${msg.n} button=${msg.button} mode=${msg.mode}`;
     case "lifecycle":
       return `event=${msg.event}`;
     case "hello":
-      return `role=${msg.role} v=${msg.version} tiebreak=${msg.tiebreak ?? "(none)"}`;
+      return `role=${msg.role} v=${msg.version} epoch=${msg.epoch} tiebreak=${msg.tiebreak ?? "(none)"}`;
     case "ping":
     case "pong":
       return `ts=${msg.ts}`;
