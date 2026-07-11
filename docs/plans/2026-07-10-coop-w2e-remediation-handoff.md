@@ -235,3 +235,34 @@ complexity/no-void notices remain). The full gate and long soak remain unclaimed
 
 Next journal surface: ability picker. Per-mon in-battle operations, lobby/resume, enforcement, quarantine,
 expanded soak coverage, and the final drop-every-class campaign remain open.
+
+## 13. Continuation evidence (journal coverage sweep: ability picker)
+
+All three ER ability-consumable picker phases now share one durable `ABILITY_PICK` operation path.
+`dfc49559c` is the first failure-first RED: dropping the host-owned legacy `abilityPicker` frame left the
+guest FIFO empty. `31578436e` is the second RED: with both normal carriers present, the journal materialized
+one choice and the later raw echo buffered a phantom second purchase. The behavior-neutral carrier seam was
+introduced in `1ad54d7b7`; `438876b4e` adds the negotiated `opSurface.abilityPicker` capability,
+ordinal-addressed `op:ability` journal, resume revision floor, one watcher ledger, production materializer,
+guest-owned intent retry/cancellation, and ability-scoped raw/journal echo suppression in both delivery
+orders. The flag-off path remains the byte-compatible legacy relay.
+
+The watcher gate is wired into Ability Capsule, Greater Ability Capsule, and Greater Ability Randomizer,
+including journal-first materialization markers so a committed envelope wakes the real phase without a
+second mutation. Malformed payloads reject without ACK; lifecycle reset clears operation state and retry
+timers. Echo suppression is intentionally enabled only for `abilityPicker`: a broader payload-only rollout
+briefly regressed repeated reward/ME sequence semantics, and was removed. Other surfaces must opt in only
+with their own identity-aware ordering regressions.
+
+Proof: ability-picker + interaction-relay suites pass 31/31, including host-carrier loss, guest-intent loss,
+normal dual-carrier exactly-once, raw-first/journal-first order, all literal payloads, and flag-off fallback.
+The combined ability/relay/capability/handshake/recovery batch passes 81/81. The real two-engine #789 probe
+passes (Ability Capsule applied to the partner's mon converges on both engines); colosseum remains 13/13;
+the gated reward end-to-end and ME battle-handoff regressions pass after the ability-only echo scope.
+Touched-file TypeScript diagnostics are zero. Biome reports no errors (only pre-existing complexity/no-void
+notices in large legacy files).
+
+Next: contract section 2.5 item 6, beginning with faint-switch, then revival, learn-move/batch, catch-full,
+and stormglass. Lobby/resume remains last. Renderer enforcement, quarantine/stat-stage cleanup, expanded
+model/soak coverage, the final drop-every-class campaign, and the full four-lane/final-long-soak gate all
+remain open; there is still no justified “no gaps” claim.
