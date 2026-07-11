@@ -27,6 +27,7 @@ import { modifierTypes } from "#data/data-lists";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { adoptCoopEnemiesStructural, buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { CoopInteractionRelay, setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { isCoopRendererGateEnforced, setCoopRendererGateEnforced } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   clearCoopRuntime,
   getCoopController,
@@ -45,6 +46,7 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { SpeciesId } from "#enums/species-id";
+import { StatusEffect } from "#enums/status-effect";
 import { SwitchType } from "#enums/switch-type";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { UiMode } from "#enums/ui-mode";
@@ -226,14 +228,19 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(field.length).toBe(2);
   });
 
-  it("the phase factory admits only the loaded authoritative EncounterPhase context", async () => {
+  it("the enforced phase factory admits only the loaded authoritative EncounterPhase context", async () => {
     await startCoopGuest();
+    const wasEnforced = isCoopRendererGateEnforced();
+    try {
+      setCoopRendererGateEnforced(true);
+      const ordinary = game.scene.phaseManager.create("EncounterPhase", false);
+      const loaded = game.scene.phaseManager.create("EncounterPhase", true);
 
-    const ordinary = game.scene.phaseManager.create("EncounterPhase", false);
-    const loaded = game.scene.phaseManager.create("EncounterPhase", true);
-
-    expect(ordinary.is("EncounterPhase"), "ordinary guest encounter generation stays denied").toBe(false);
-    expect(loaded.is("EncounterPhase"), "snapshot-adopted loaded encounter is admitted").toBe(true);
+      expect(ordinary.is("EncounterPhase"), "ordinary guest encounter generation stays denied").toBe(false);
+      expect(loaded.is("EncounterPhase"), "snapshot-adopted loaded encounter is admitted").toBe(true);
+    } finally {
+      setCoopRendererGateEnforced(wasEnforced);
+    }
   });
 
   it("CoopReplayTurnPhase renders the host's outcome: applies the streamed checkpoint to the field", async () => {
@@ -322,7 +329,13 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // isFainted -> not isActive, so getField(true)/getEnemyField(true) drop it exactly as a real KO
     // does. The Part-1 capture serializes player-active + enemy-SLOT-PRESENT mons, so the host
     // checkpoint still CARRIES bi2 (with fainted:true), which is what drives the guest's removal.
+    const originalSummonData = enemy0.summonData;
+    const originalTempSummonData = enemy0.tempSummonData;
     enemy0.hp = 0;
+    enemy0.doSetStatus(StatusEffect.FAINT);
+    enemy0.resetSummonData();
+    enemy0.switchOutStatus = true;
+    globalScene.field.remove(enemy0);
     const hostCheckpoint = coopEngine.captureCoopCheckpoint();
     const hostChecksum = coopEngine.captureCoopChecksum();
     expect(hostCheckpoint).not.toBeNull();
@@ -335,7 +348,12 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
 
     // --- GUEST divergence: the guest never saw the KO, so on its field bi2 is still ALIVE. Restore
     // its hp to model exactly the real 2-client log (host enemy field = {bi3}; guest = {bi2 alive, bi3}).
+    enemy0.summonData = originalSummonData;
+    enemy0.tempSummonData = originalTempSummonData;
+    enemy0.switchOutStatus = false;
+    globalScene.field.add(enemy0);
     enemy0.hp = enemy0.getMaxHp();
+    enemy0.status = null;
     expect(enemy0.isActive(), "guest still has the host-KOd enemy alive (the desync)").toBe(true);
     const guestEnemyBefore = globalScene.getEnemyField(true).map(e => e.getBattlerIndex());
     expect(guestEnemyBefore).toContain(BattlerIndex.ENEMY);
@@ -399,7 +417,13 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // --- HOST authoritative truth: model the host's partner (bi1) fainting this turn. Zeroing hp makes
     // it isFainted -> not isActive, so getField(true) drops it; but getPlayerField(false) (the new
     // slot-present player capture) still CARRIES bi1 with fainted:true, which drives the removal.
+    const originalSummonData = partnerMon.summonData;
+    const originalTempSummonData = partnerMon.tempSummonData;
     partnerMon.hp = 0;
+    partnerMon.doSetStatus(StatusEffect.FAINT);
+    partnerMon.resetSummonData();
+    partnerMon.switchOutStatus = true;
+    globalScene.field.remove(partnerMon);
     const hostCheckpoint = coopEngine.captureCoopCheckpoint();
     const hostChecksum = coopEngine.captureCoopChecksum();
     expect(hostCheckpoint).not.toBeNull();
@@ -414,7 +438,12 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
 
     // --- GUEST divergence: the guest never resolved the faint, so on its field bi1 is still ALIVE.
     // Restore its hp to model exactly the desync (host player field = {bi0}; guest = {bi0, bi1 alive}).
+    partnerMon.summonData = originalSummonData;
+    partnerMon.tempSummonData = originalTempSummonData;
+    partnerMon.switchOutStatus = false;
+    globalScene.field.add(partnerMon);
     partnerMon.hp = partnerMon.getMaxHp();
+    partnerMon.status = null;
     expect(partnerMon.isActive(), "guest still has the host-KOd partner alive (the desync)").toBe(true);
     const guestPlayerBefore = globalScene.getPlayerField(true).map(p => p.getBattlerIndex());
     expect(guestPlayerBefore).toContain(BattlerIndex.PLAYER_2);

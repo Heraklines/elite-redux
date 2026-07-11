@@ -32,7 +32,11 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  captureCoopChecksum,
+  captureCoopChecksumState,
+  captureCoopSaveDataNormalized,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, getCoopBattleStreamer, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { coopRoleOfSeat, coopSeatIsAuthority } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -122,6 +126,7 @@ describe.skipIf(!RUN)("co-op TRIO M5: 1 authority + 2 renderers converge from on
       runtime: guest2Runtime,
       rndState: Phaser.Math.RND.state(),
       ghost: emptyGhostSnapshot(),
+      moduleLets: structuredClone(rig.hostCtx.moduleLets!),
       mePins: undefined,
     };
     await withClient(guest2Ctx, () => {
@@ -136,6 +141,8 @@ describe.skipIf(!RUN)("co-op TRIO M5: 1 authority + 2 renderers converge from on
     const wave = rig.hostScene.currentBattle.waveIndex;
     const hostJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
     const hostChecksum = await withClient(rig.hostCtx, () => captureCoopChecksum());
+    const hostState = await withClient(rig.hostCtx, () => structuredClone(captureCoopChecksumState()));
+    const hostSaveState = await withClient(rig.hostCtx, () => structuredClone(captureCoopSaveDataNormalized()));
 
     // PERTURB both renderers DIFFERENTLY so all three states diverge pairwise - the 3-way
     // convergence below is then meaningful (each renderer provably reconstructed, not matched).
@@ -175,7 +182,11 @@ describe.skipIf(!RUN)("co-op TRIO M5: 1 authority + 2 renderers converge from on
     // THE M5 N-CLIENT GUARANTEE: all three full-state checksums are byte-equal (PP included).
     const g1After = await withClient(rig.guestCtx, () => captureCoopChecksum());
     const g2After = await withClient(guest2Ctx, () => captureCoopChecksum());
+    const g2State = await withClient(guest2Ctx, () => structuredClone(captureCoopChecksumState()));
+    const g2SaveState = await withClient(guest2Ctx, () => structuredClone(captureCoopSaveDataNormalized()));
     expect(g1After, "renderer 1 == authority after boot").toBe(hostChecksum);
+    expect(g2SaveState, "renderer 2 exact normalized save state == authority after boot").toEqual(hostSaveState);
+    expect(g2State, "renderer 2 exact checksum preimage == authority after boot").toEqual(hostState);
     expect(g2After, "renderer 2 == authority after boot").toBe(hostChecksum);
     expect(g1After, "renderer 1 == renderer 2 (the pairwise N-client convergence)").toBe(g2After);
 

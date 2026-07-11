@@ -45,6 +45,7 @@ import { SpeciesId } from "#enums/species-id";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
   driveGuestReplayTurn,
@@ -266,6 +267,7 @@ describe.skipIf(!RUN)(
         await leaveRewardShop(rig, w);
 
         if (w < WAVES) {
+          await arriveGuestCommandBoundary(rig, w + 1);
           await withClient(rig.hostCtx, async () => {
             await game.phaseInterceptor.to("CommandPhase");
           });
@@ -396,6 +398,7 @@ describe.skipIf(!RUN)(
 
         await leaveRewardShop(rig, w);
         if (w < WAVES) {
+          await arriveGuestCommandBoundary(rig, w + 1);
           await withClient(rig.hostCtx, async () => {
             await game.phaseInterceptor.to("CommandPhase");
           });
@@ -515,6 +518,7 @@ describe.skipIf(!RUN)(
       // drop-after: play wave 1 clean + advance to wave 2 (re-mirror) so the drop lands mid-session.
       if (targetWave === 2) {
         await playConvergedWave(1);
+        await arriveGuestCommandBoundary(rig, 2);
         await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase"));
         await remirrorWave(rig);
       }

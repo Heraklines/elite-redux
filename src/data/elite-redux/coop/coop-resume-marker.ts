@@ -28,6 +28,7 @@
 // =============================================================================
 
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { GameModes } from "#enums/game-modes";
 
 const COOP_RESUME_MARKER_KEY = "er-coop-resume";
 
@@ -42,6 +43,90 @@ export interface CoopResumeMarker {
   wave: number;
   /** Save timestamp (freshness display / future expiry). */
   ts: number;
+}
+
+interface CoopResumeSessionSummary {
+  gameMode: number;
+  waveIndex: number;
+  timestamp: number;
+  coopParticipants?: { players: [string, string] } | undefined;
+}
+
+function sameIdentity(a: string, b: string): boolean {
+  return a.localeCompare(b, undefined, { sensitivity: "accent" }) === 0;
+}
+
+/** Canonical pair ordering keeps host and guest save snapshots byte-representative. */
+export function canonicalCoopParticipantPair(self: string, partner: string): [string, string] {
+  return [self, partner].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "accent" })) as [string, string];
+}
+
+function sessionMatchesPair(
+  session: CoopResumeSessionSummary | undefined,
+  self: string,
+  partner: string,
+  allowLegacy: boolean,
+): session is CoopResumeSessionSummary {
+  if (session == null || session.gameMode !== GameModes.COOP) {
+    return false;
+  }
+  const participants = session.coopParticipants;
+  if (participants == null) {
+    return allowLegacy;
+  }
+  const expected = canonicalCoopParticipantPair(self, partner);
+  return sameIdentity(participants.players[0], expected[0]) && sameIdentity(participants.players[1], expected[1]);
+}
+
+/**
+ * Resolve a pair-matched resume from the actual saved session. The local marker remains the
+ * backwards-compatible fast path, but it is validated before use. New saves carry participant
+ * identities, allowing all five slots (including cloud-restored slots) to reconstruct a missing
+ * marker and preventing an unrelated/stale slot from ever being offered.
+ */
+export async function findCoopResumeCandidate(
+  self: string,
+  partner: string,
+  loadSession: (slot: number) => Promise<CoopResumeSessionSummary | undefined>,
+): Promise<CoopResumeMarker | null> {
+  const marker = readCoopResumeMarker(self, partner);
+  if (marker != null) {
+    const saved = await loadSession(marker.slot).catch(error => {
+      coopWarn("launch", `resume marker slot=${marker.slot} load failed -> scanning saves`, error);
+      return;
+    });
+    if (sessionMatchesPair(saved, self, partner, true)) {
+      return { ...marker, wave: saved.waveIndex, ts: saved.timestamp };
+    }
+    coopWarn("launch", `resume marker slot=${marker.slot} is missing/non-coop/wrong-pair -> scanning saves`);
+  }
+
+  const sessions = await Promise.all(
+    [0, 1, 2, 3, 4].map(async slot => ({
+      slot,
+      session: await loadSession(slot).catch(error => {
+        coopWarn("launch", `resume scan slot=${slot} load failed (ignored)`, error);
+        return;
+      }),
+    })),
+  );
+  const candidates = sessions
+    .filter(({ session }) => sessionMatchesPair(session, self, partner, false))
+    .sort((a, b) => (b.session?.timestamp ?? 0) - (a.session?.timestamp ?? 0));
+  const best = candidates[0];
+  if (best?.session == null) {
+    return null;
+  }
+  const recovered: CoopResumeMarker = {
+    slot: best.slot,
+    self,
+    partner,
+    wave: best.session.waveIndex,
+    ts: best.session.timestamp,
+  };
+  recordCoopResumeMarker(recovered.slot, self, partner, recovered.wave);
+  coopLog("launch", `resume candidate recovered from save slot=${recovered.slot} wave=${recovered.wave}`);
+  return recovered;
 }
 
 /**

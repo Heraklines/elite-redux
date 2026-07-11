@@ -38,6 +38,7 @@
 // USAGE:
 //   node scripts/run-coop-gate.mjs                 # run all lanes, aggregate (exit 0 = all green)
 //   node scripts/run-coop-gate.mjs --lane A        # run one lane (A|B|C|P)
+//   node scripts/run-coop-gate.mjs --lane B --shard 1/8  # one deterministic external-compute shard
 //   node scripts/run-coop-gate.mjs --list          # print the calibrated lane composition + counts, run nothing
 //   pnpm coop:gate                                 # the package.json alias
 //
@@ -215,38 +216,82 @@ function laneListSuffix(name) {
   return "";
 }
 
+/** Parse a Vitest-style one-based shard token (`i/n`). */
+function parseShard(args) {
+  const idx = args.indexOf("--shard");
+  if (idx < 0) {
+    return null;
+  }
+  const raw = args[idx + 1] ?? "";
+  const match = /^(\d+)\/(\d+)$/.exec(raw);
+  if (match == null) {
+    throw new Error(`invalid --shard "${raw}" (expected one-based i/n, e.g. 1/8)`);
+  }
+  const index = Number(match[1]);
+  const total = Number(match[2]);
+  if (!Number.isSafeInteger(index) || !Number.isSafeInteger(total) || total < 1 || index < 1 || index > total) {
+    throw new Error(`invalid --shard "${raw}" (require 1 <= i <= n)`);
+  }
+  return { index, total, label: `${index}/${total}` };
+}
+
+/** Deterministic round-robin file partition. Every file appears in exactly one shard. */
+function selectShard(files, shard) {
+  if (shard == null) {
+    return files;
+  }
+  return files.filter((_file, index) => index % shard.total === shard.index - 1);
+}
+
 function main() {
   const args = process.argv.slice(2);
   const lanes = categorize();
+  const laneArgIdx = args.indexOf("--lane");
+  const only = laneArgIdx >= 0 ? args[laneArgIdx + 1]?.toUpperCase() : undefined;
+  if (only != null && !lanes[only]) {
+    // eslint-disable-next-line no-console
+    console.error(`unknown lane "${only}" (expected A, B, C, P, or Q)`);
+    process.exit(2);
+  }
+  let shard;
+  try {
+    shard = parseShard(args);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(2);
+  }
 
   if (args.includes("--list")) {
-    for (const [name, files] of Object.entries(lanes)) {
+    const listedLanes = only == null ? Object.entries(lanes) : [[only, lanes[only]]];
+    let listedTotal = 0;
+    for (const [name, allFiles] of listedLanes) {
+      const files = selectShard(allFiles, shard);
+      listedTotal += files.length;
       // eslint-disable-next-line no-console
-      console.log(`\n=== LANE ${name}${laneListSuffix(name)} (${files.length} files) ===`);
+      console.log(
+        `\n=== LANE ${name}${laneListSuffix(name)}${shard ? ` SHARD ${shard.label}` : ""} (${files.length} files) ===`,
+      );
       for (const f of files) {
         // eslint-disable-next-line no-console
         console.log(`  ${f}`);
       }
     }
     // eslint-disable-next-line no-console
-    console.log(`\nTOTAL: ${Object.values(lanes).reduce((n, l) => n + l.length, 0)} files`);
+    console.log(`\nTOTAL${shard ? ` SHARD ${shard.label}` : ""}: ${listedTotal} files`);
     return;
   }
 
-  const laneArgIdx = args.indexOf("--lane");
-  const only = laneArgIdx >= 0 ? args[laneArgIdx + 1]?.toUpperCase() : undefined;
   // Gating lanes = A, B, C, P (#897). Q (quarantine) is run non-gating (its result never changes the exit code).
   const gatingOrder = only ? [only] : ["A", "B", "C", "P"];
   const runQuarantine = !only || only === "Q";
 
   const results = [];
   for (const name of gatingOrder) {
-    if (!lanes[name]) {
-      // eslint-disable-next-line no-console
-      console.error(`unknown lane "${name}" (expected A, B, C, P, or Q)`);
-      process.exit(2);
+    const files = selectShard(lanes[name], shard);
+    if (shard != null) {
+      console.log(`lane ${name} external-compute shard ${shard.label}: ${files.length}/${lanes[name].length} files`);
     }
-    results.push(runLane(name, lanes[name]));
+    results.push(runLane(name, files));
   }
 
   // NON-GATING quarantine pass (pre-existing solo failures - see QUARANTINE). Reported LOUDLY but never

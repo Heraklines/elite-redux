@@ -418,10 +418,21 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     // leaveField'd the foe - capture the checksum, then RESTORE enemy0 alive (still on-field) so the
     // guest starts the turn with the foe present and must animate the faint itself.
     const koOrigHp = enemy0.hp;
+    const koOrigSummonData = enemy0.summonData;
+    const koOrigTempSummonData = enemy0.tempSummonData;
     enemy0.hp = 0;
     enemy0.doSetStatus(StatusEffect.FAINT);
+    // A real host FaintPhase has already run leaveField(clearEffects=true) before the
+    // end-of-turn checksum: volatile summon/temp state is reset and the mon is off-field.
+    enemy0.resetSummonData();
+    enemy0.switchOutStatus = true;
+    globalScene.field.remove(enemy0);
     const hostChecksum = coopEngine.captureCoopChecksum();
     const hostCheckpoint = checkpointKO(koBi);
+    enemy0.summonData = koOrigSummonData;
+    enemy0.tempSummonData = koOrigTempSummonData;
+    enemy0.switchOutStatus = false;
+    globalScene.field.add(enemy0);
     enemy0.hp = koOrigHp;
     enemy0.status = null;
     expect(enemy0.isOnField(), "enemy0 is alive on the guest's pre-turn field").toBe(true);

@@ -69,6 +69,7 @@ import { SelectBiomePhase } from "#phases/select-biome-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
   drainLoopback,
@@ -231,6 +232,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
 
       await leaveRewardShop(rig);
       if (w < WAVES) {
+        await arriveGuestCommandBoundary(rig, w + 1);
         await withClient(rig.hostCtx, async () => {
           await game.phaseInterceptor.to("CommandPhase");
         });
@@ -505,9 +507,12 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     const ownerMock = mockErMap(ownerCtx.scene);
     const watcherMock = mockErMap(watcherCtx.scene);
     try {
+      // The harness drives the two clients sequentially. Materialize the watcher's production boundary
+      // arrival first; a timeout is recovery telemetry and must never authorize the owner unilaterally.
+      await withClient(watcherCtx, () => watcherCtx.runtime.rendezvous.arrive(`biomepick:${WAVE}`));
+      await drainLoopback();
       // OWNER drives the real picker + relays its chosen biome (buffered for the watcher). #858: the picker
-      // opens AFTER the reciprocal boundary barrier; driven alone here it resolves via the anti-hang timeout,
-      // so poll for the ER_MAP config across it before committing the pick.
+      // opens AFTER the reciprocal boundary barrier, which buffer-hits the watcher arrival above.
       await withClient(ownerCtx, async () => {
         const phase = new SelectBiomePhase();
         phase.start();
@@ -568,7 +573,15 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
 
     const counter = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counter % 2 === 0;
+    const ownerCtx = hostOwns ? rig.hostCtx : rig.guestCtx;
     const watcherCtx = hostOwns ? rig.guestCtx : rig.hostCtx;
+
+    // The owner reached the shared boundary, then disappeared before sending its choice. This is the
+    // legitimate fallback window: the watcher may cross the already-reciprocal boundary, then its mocked
+    // choice await returns null and it derives the shared-seed fallback. An owner that never reaches the
+    // boundary remains fail-closed (covered by the pacing-barrier tests).
+    await withClient(ownerCtx, () => ownerCtx.runtime.rendezvous.arrive(`biomepick:${WAVE}`));
+    await drainLoopback();
 
     // The deterministic roll BOTH engines compute off the shared, just-reset wave seed (identical by #658
     // seed pin) - so if both fell back they would match; the fallback cannot desync.

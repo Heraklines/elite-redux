@@ -49,6 +49,7 @@ import { LearnMovePhase } from "#phases/learn-move-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
   drainLoopback,
@@ -225,6 +226,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
 
       // ===== Host crosses into the NEXT wave's battle (real EncounterPhase rolls wave w+1). =====
       if (w < WAVES) {
+        await arriveGuestCommandBoundary(rig, w + 1);
         await withClient(rig.hostCtx, async () => {
           await game.phaseInterceptor.to("CommandPhase");
         });

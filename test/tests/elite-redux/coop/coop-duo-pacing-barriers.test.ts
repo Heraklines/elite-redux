@@ -34,6 +34,7 @@ import { SpeciesId } from "#enums/species-id";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
   drainLoopback,
@@ -169,17 +170,13 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
     const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
     await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
 
-    await remirrorWave(rig);
-    // This focused wiring probe drives only the host's real CommandPhase. Materialize the guest's exact
-    // wave-2 command arrival explicitly; production gets this from the guest's own CommandPhase. The old
-    // test depended on a unilateral timeout, which is no longer a legal shared-boundary continuation.
-    withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.arrive("cmd:2:1"));
-    await drainLoopback();
+    await arriveGuestCommandBoundary(rig, 2);
     // Cross into wave 2's first CommandPhase - its start() invokes coopNextCommandBarrier(cmd:2:1).
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("CommandPhase");
     });
     expect(rig.hostScene.currentBattle.waveIndex, "host reached wave 2").toBe(2);
+    await remirrorWave(rig);
 
     const barrierPoints = [...rzSpy.mock.calls, ...arriveSpy.mock.calls].map(c => String(c[0]));
     expect(

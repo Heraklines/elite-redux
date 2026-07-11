@@ -376,10 +376,17 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     // getField(true) excludes it, capture the checksum + checkpoint, then RESTORE enemy0 alive so the
     // guest must animate + regenerate the line itself and re-converge.
     const koOrigHp = enemy0.hp;
+    // Build while the target is still field-visible. checkpointKO writes its authoritative hp/status as
+    // fainted itself; building after doSetStatus(FAINT) made getField(true) omit the KO entry entirely,
+    // so the guest lost its host-side stat stages even though checksum capture intentionally retains a
+    // just-fainted battler through this boundary.
+    const hostCheckpoint = checkpointKO(koBi);
     enemy0.hp = 0;
     enemy0.doSetStatus(StatusEffect.FAINT);
     const hostChecksum = coopEngine.captureCoopChecksum();
-    const hostCheckpoint = checkpointKO(koBi);
+    const hostChecksumState = structuredClone(coopEngine.captureCoopChecksumState());
+    const hostFullField = coopEngine.captureCoopFieldSnapshot();
+    expect(hostFullField, "production companion full-field snapshot captured the just-fainted mon").not.toBeNull();
     enemy0.hp = koOrigHp;
     enemy0.status = null;
     expect(enemy0.isOnField(), "enemy0 is alive on the guest's pre-turn field").toBe(true);
@@ -394,6 +401,7 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
         { k: "faint", bi: koBi, narrate: true },
       ],
       checkpoint: hostCheckpoint,
+      fullField: hostFullField!,
       checksum: hostChecksum,
     });
     await new Promise(r => setTimeout(r, 0));
@@ -402,6 +410,9 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
 
     // The regenerated lines are PURELY COSMETIC (text is not in the checksum), so the post-turn checksum
     // re-converges to the host's exactly - no desync.
+    expect(coopEngine.captureCoopChecksumState(), "the post-turn checksum state converges to the host's").toEqual(
+      hostChecksumState,
+    );
     expect(coopEngine.captureCoopChecksum(), "the post-turn checksum converges to the host's").toBe(hostChecksum);
     expect(enemy0.isOnField(), "the KOd enemy left the field by turn end").toBe(false);
     expect(field[COOP_HOST_FIELD_INDEX].isOnField(), "the host's mon survives").toBe(true);

@@ -192,6 +192,12 @@ export interface SessionSaveData {
    * saves (restore fresh, empty state). See er-achievement-run-state.ts.
    */
   erAchievementRunState?: import("#data/elite-redux/er-achievement-run-state").ErAchievementRunSaveData;
+  /**
+   * Stable account pair for co-op resume discovery. The separate local marker is only a fast
+   * pointer; keeping the pair in the save lets the lobby recover the option when that marker is
+   * missing/stale or the save was restored from cloud on another browser. Optional for legacy saves.
+   */
+  coopParticipants?: { players: [string, string] } | undefined;
 }
 
 export interface Unlocks {

@@ -107,6 +107,19 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     expect(host.partnerName, "host knows the guest identity").toBe(guest.localName());
     expect(guest.partnerName, "guest knows the host identity").toBe(host.localName());
 
+    // Save-backed discovery metadata is canonical, so host and guest persist the same pair
+    // representation even though each sees self/partner from the opposite perspective.
+    const hostParticipants = await withClient(
+      rig.hostCtx,
+      () => rig.hostScene.gameData.getSessionSaveData().coopParticipants,
+    );
+    const guestParticipants = await withClient(
+      rig.guestCtx,
+      () => rig.guestScene.gameData.getSessionSaveData().coopParticipants,
+    );
+    expect(hostParticipants, "host save embeds the connected account pair").toBeDefined();
+    expect(guestParticipants, "guest save embeds the connected account pair").toEqual(hostParticipants);
+
     // IDENTITY GATE (test 3): a marker recorded for THIS pair is found for the exact pair, but
     // NOT for a different partner - so a saved run is never offered/loaded with the wrong player.
     recordCoopResumeMarker(2, host.localName(), host.partnerName!, 7);

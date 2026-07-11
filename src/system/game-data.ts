@@ -18,7 +18,7 @@ import { Egg } from "#data/egg";
 import { coopGateAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { recordCoopResumeMarker } from "#data/elite-redux/coop/coop-resume-marker";
+import { canonicalCoopParticipantPair, recordCoopResumeMarker } from "#data/elite-redux/coop/coop-resume-marker";
 import {
   applyCoopControlPlaneSaveData,
   clearCoopRuntime,
@@ -1439,6 +1439,11 @@ export class GameData {
   }
 
   public getSessionSaveData(): SessionSaveData {
+    const coopController = globalScene.gameMode?.isCoop === true ? getCoopRuntime()?.controller : undefined;
+    const coopParticipants =
+      coopController?.partnerName == null
+        ? undefined
+        : { players: canonicalCoopParticipantPair(coopController.localName(), coopController.partnerName) };
     return {
       seed: globalScene.seed,
       playTime: globalScene.sessionPlayTime,
@@ -1499,6 +1504,9 @@ export class GameData {
       // high-water) so a cold resume keeps alternating-owner parity + revision ordering. undefined for
       // every solo save (no live co-op runtime), so non-co-op saves are byte-identical.
       coopControlPlane: getCoopControlPlaneSaveData(),
+      // Pair identity lives in the save itself so resume discovery survives a missing browser-local
+      // pointer or a cloud restore. Old saves remain supported through the legacy marker fallback.
+      coopParticipants,
     } as SessionSaveData;
   }
 

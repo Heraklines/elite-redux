@@ -51,7 +51,7 @@ export class SwitchBiomePhase extends BattlePhase {
 
       // ER (#486): roll THIS biome's variable length + record its start wave. The
       // new biome's first battle is the wave AFTER the boundary we just cleared.
-      erRollBiomeLength(this.nextBiome, (globalScene.currentBattle?.waveIndex ?? 0) + 1);
+      erRollBiomeLength(this.nextBiome, (globalScene.currentBattle?.waveIndex ?? 0) + 1, globalScene.seed);
     }
 
     // Before switching biomes, make sure to set the last encounter for other phases that need it too.

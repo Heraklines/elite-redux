@@ -889,6 +889,49 @@ export class CoopSessionController {
     };
   }
 
+  /**
+   * Wait until the peer's opening `hello` has established its stable account identity and
+   * reconciled the local host/guest role. A connected WebRTC data channel is not sufficient:
+   * {@linkcode connectCoopSession} returns immediately after sending our hello, so lobby UI
+   * code that reads `partnerName` synchronously can race the peer frame and incorrectly decide
+   * that no pair-matched resume exists.
+   *
+   * Returns `null` instead of guessing when the identity handshake does not arrive. Callers
+   * must remain at the lobby recovery screen; starting a new run unilaterally would split the
+   * two clients across different pre-run states.
+   */
+  awaitPartnerIdentity(timeoutMs = 15_000): Promise<CoopSessionSnapshot | null> {
+    const current = this.snapshot();
+    if (current.partnerConnected && current.partnerName != null) {
+      return Promise.resolve(current);
+    }
+    return new Promise(resolve => {
+      let settled = false;
+      let off = (): void => {};
+      const finish = (snap: CoopSessionSnapshot | null): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        off();
+        resolve(snap);
+      };
+      const timer = setTimeout(() => finish(null), Math.max(0, timeoutMs));
+      off = this.onChange(snap => {
+        if (snap.partnerConnected && snap.partnerName != null) {
+          finish(snap);
+        }
+      });
+      // Close the subscribe-after-check race: a hello can land between the first snapshot and
+      // onChange registration. Re-read after subscribing so that frame cannot be missed.
+      const afterSubscribe = this.snapshot();
+      if (afterSubscribe.partnerConnected && afterSubscribe.partnerName != null) {
+        finish(afterSubscribe);
+      }
+    });
+  }
+
   /** Tear down: stop listening to the transport (does not close the transport). */
   dispose(): void {
     this.offMessage();

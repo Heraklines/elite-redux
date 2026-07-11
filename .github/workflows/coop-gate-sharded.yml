@@ -1,0 +1,59 @@
+name: Co-op Gate (Sharded)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: coop-gate-sharded-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Lane ${{ matrix.lane }} shard ${{ matrix.shard }}/${{ matrix.total }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { lane: A, shard: 1, total: 1 }
+          - { lane: B, shard: 1, total: 8 }
+          - { lane: B, shard: 2, total: 8 }
+          - { lane: B, shard: 3, total: 8 }
+          - { lane: B, shard: 4, total: 8 }
+          - { lane: B, shard: 5, total: 8 }
+          - { lane: B, shard: 6, total: 8 }
+          - { lane: B, shard: 7, total: 8 }
+          - { lane: B, shard: 8, total: 8 }
+          - { lane: C, shard: 1, total: 3 }
+          - { lane: C, shard: 2, total: 3 }
+          - { lane: C, shard: 3, total: 3 }
+          - { lane: P, shard: 1, total: 1 }
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Run isolated co-op gate shard
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/run-coop-gate.mjs \
+            --lane "${{ matrix.lane }}" \
+            --shard "${{ matrix.shard }}/${{ matrix.total }}" \
+            2>&1 | tee "coop-gate-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log"
+
+      - name: Upload shard log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-gate-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}
+          path: coop-gate-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log
+          retention-days: 7
+          if-no-files-found: warn

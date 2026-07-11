@@ -112,7 +112,7 @@ export function erInLateGameZone(waveIndex: number): boolean {
  * The `biome` arg is retained for API/signature stability (callers pass it) even
  * though #504 dropped the per-biome bands - lengths are now uniform-ish per entry.
  */
-export function erRollBiomeLength(_biome: BiomeId, startWave: number): void {
+export function erRollBiomeLength(_biome: BiomeId, startWave: number, runSeed?: string): void {
   leaveBiomeNow = false;
   currentStartWave = startWave;
   // A fresh biome starts with a clean slate: no deliberate overstay yet, so the
@@ -130,8 +130,17 @@ export function erRollBiomeLength(_biome: BiomeId, startWave: number): void {
   // Mild bias toward the longer end: take the higher of two rolls so the median
   // sits above 10 (most biomes will tip into notoriety territory) while short
   // biomes (down to 7) still happen. No snap-to-5 - the cap is exact (#504).
-  const a = randSeedIntRange(BIOME_LENGTH_MIN, BIOME_LENGTH_MAX);
-  const b = randSeedIntRange(BIOME_LENGTH_MIN, BIOME_LENGTH_MAX);
+  // Run-seeded callers use a LOCAL, addressable stream so the structural boundary cannot depend on
+  // unrelated RNG consumption before newArena (starter ability rolls, rendering, test process history).
+  // Legacy/unit callers without a seed preserve the existing shared-RNG behavior.
+  const localRng = runSeed
+    ? new Phaser.Math.RandomDataGenerator([`${runSeed}:er-biome-length:${startWave}`])
+    : null;
+  const roll = (): number =>
+    localRng?.integerInRange(BIOME_LENGTH_MIN, BIOME_LENGTH_MAX)
+    ?? randSeedIntRange(BIOME_LENGTH_MIN, BIOME_LENGTH_MAX);
+  const a = roll();
+  const b = roll();
   currentLength = Math.max(a, b);
 }
 

@@ -42,6 +42,7 @@ import { TrainerVariant } from "#enums/trainer-variant";
 import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  arriveGuestCommandBoundary,
   buildDuo,
   type CoopResyncProbe,
   type DuoRig,
@@ -127,6 +128,7 @@ describe.skipIf(!RUN)(
     /** Play ONE host turn: the HOST slot KOs the ENEMY-slot lead; the GUEST slot rides the relay (HOLD, ENEMY_2). */
     async function playTurn(rig: DuoRig): Promise<void> {
       const turn = rig.hostScene.currentBattle.turn;
+      await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, turn);
       await withClient(rig.hostCtx, async () => {
         game.move.select(KO_MOVE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
         await game.phaseInterceptor.to("TurnEndPhase");

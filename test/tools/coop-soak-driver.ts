@@ -86,6 +86,7 @@ import {
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { COOP_UI_MIRRORED_MODES } from "#data/elite-redux/coop/coop-ui-registry";
+import { erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
 import { TerrainType } from "#data/terrain";
 import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -351,6 +352,9 @@ export interface SoakBoundaryDigest {
   guestChecksum: string;
   hostSaveDigest: string;
   guestSaveDigest: string;
+  /** Optional normalized hash preimages for focused cross-run diagnostics (default off for long soaks). */
+  hostSaveState?: Record<string, unknown>;
+  guestSaveState?: Record<string, unknown>;
 }
 
 /**
@@ -453,6 +457,8 @@ export interface SoakOptions {
    * leave (the determinism contract, so no reward grant perturbs the cross-run digest compare).
    */
   rewardPolicy?: "seeded" | "leave";
+  /** Retain normalized save-digest preimages at each boundary; bounded diagnostic/contract runs only. */
+  captureBoundaryPreimages?: boolean;
   /**
    * Override the deterministic content seed used from the first post-bootstrap crossing onward. When absent,
    * the driver derives `coop-soak-<SOAK_SEED>`; the printed replay seed must reproduce game content as well as
@@ -993,10 +999,18 @@ function phaseStateDump(rig: DuoRig): Record<string, unknown> {
   };
 }
 
-/** Pin the content RNG before `startBattle`; callers use the same replay key as the action policy. */
+/** Pin + sow the content RNG before `startBattle`; mirrors TitlePhase's setSeed -> resetSeed launch order. */
 export function prepareCoopSoakContent(game: GameManager, seed: number, pinSeed?: string): string {
   const contentSeed = pinSeed ?? `coop-soak-${seed}`;
   game.scene.setSeed(contentSeed);
+  // setSeed updates the master seed and derived offsets but deliberately does NOT sow Phaser.RND.
+  // newArena rolls the first biome structure before newBattle's later resetSeed, so omitting this made
+  // identical soak seeds inherit different process RNG cursors (biomeLength 25 vs 23 at wave 1).
+  game.scene.resetSeed();
+  // GameManager's scene reset created the starting arena BEFORE this test helper applied its custom
+  // content seed. Re-address that already-created run-start structure to the new seed as a real fresh
+  // launch would; later biome entries are handled by SwitchBiomePhase's seeded roll.
+  erRollBiomeLength(game.scene.arena.biomeId, 1, contentSeed);
   return contentSeed;
 }
 
@@ -1248,7 +1262,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       const guestMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
       const explosionSlot = guestMon?.getMoveset().findIndex(move => move?.moveId === MoveId.EXPLOSION) ?? -1;
       if (explosionSlot >= 0 && moveSlots.includes(explosionSlot)) {
-        const target = commandScene.getEnemyField().find(mon => !mon.isFainted())?.getBattlerIndex();
+        const target = commandScene
+          .getEnemyField()
+          .find(mon => !mon.isFainted())
+          ?.getBattlerIndex();
         if (target == null) {
           fail("no-park", wave, "level forced-faint leg could not find a live Explosion target");
         }
@@ -1312,6 +1329,16 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const host = await withClient(rig.hostCtx, () => captureCoopSaveDataDigest());
     const guest = await withClient(rig.guestCtx, () => captureCoopSaveDataDigest());
     return { host, guest };
+  };
+
+  /** Optional exact normalized preimages for cross-run determinism failures (never retained by default). */
+  const captureSavePreimages = async (): Promise<{
+    hostSaveState: Record<string, unknown>;
+    guestSaveState: Record<string, unknown>;
+  }> => {
+    const hostSaveState = await withClient(rig.hostCtx, () => structuredClone(captureCoopSaveDataNormalized()));
+    const guestSaveState = await withClient(rig.guestCtx, () => structuredClone(captureCoopSaveDataNormalized()));
+    return { hostSaveState, guestSaveState };
   };
 
   const fail = (invariant: "lockstep" | "no-park" | "teardown", wave: number, detail: string): never => {
@@ -1526,12 +1553,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       await healGuestFromHost(rig);
     });
     const save = await captureSaveDigests();
+    const preimages = opts.captureBoundaryPreimages ? await captureSavePreimages() : undefined;
     boundaryDigests.push({
       wave,
       hostChecksum: chk.host,
       guestChecksum: chk.guest,
       hostSaveDigest: save.host,
       guestSaveDigest: save.guest,
+      ...preimages,
     });
   };
 

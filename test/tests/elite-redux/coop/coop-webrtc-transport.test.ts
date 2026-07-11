@@ -19,6 +19,7 @@ import {
   WebRtcTransport,
   wireFromRtcChannel,
 } from "#data/elite-redux/coop/coop-webrtc-transport";
+import { GameModes } from "#enums/game-modes";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /** In-process mock of a data channel implementing {@linkcode CoopWireChannel}.
@@ -505,6 +506,53 @@ describe("#807 C: protocol version negotiation", () => {
 });
 
 describe("#810: resume offer/reply protocol + marker", () => {
+  it("identity barrier waits for the peer hello before pair-keyed resume discovery", async () => {
+    const a = new MockWire();
+    const b = new MockWire();
+    // Delay host -> guest delivery to model the real data-channel scheduling gap between
+    // connectCoopSession returning and the peer hello arriving.
+    a.peer = null;
+    b.peer = a;
+    const host = new CoopSessionController(new WebRtcTransport("host", a), { username: "Alice" });
+    const guest = new CoopSessionController(new WebRtcTransport("guest", b), { username: "Bob" });
+
+    // This is the live ordering: connectCoopSession sends OUR hello and returns before the
+    // peer has necessarily sent theirs. The title callback must not read partnerName yet.
+    host.connect();
+    expect(host.partnerName, "peer identity is genuinely not known at the old decision seam").toBeNull();
+    let settled = false;
+    const identity = host.awaitPartnerIdentity(1_000).then(snapshot => {
+      settled = true;
+      return snapshot;
+    });
+    await Promise.resolve();
+    expect(settled, "resume discovery remains behind the hello barrier").toBe(false);
+
+    a.peer = b;
+    guest.connect();
+    await expect(identity).resolves.toMatchObject({
+      localRole: "host",
+      partnerConnected: true,
+      partnerName: "Bob",
+    });
+  });
+
+  it("identity barrier fails closed when no peer hello arrives", async () => {
+    vi.useFakeTimers();
+    try {
+      const a = new MockWire();
+      const b = new MockWire();
+      a.peer = b;
+      b.peer = a;
+      const host = new CoopSessionController(new WebRtcTransport("host", a), { username: "Alice" });
+      const identity = host.awaitPartnerIdentity(250);
+      await vi.advanceTimersByTimeAsync(250);
+      await expect(identity, "a missing identity never authorizes a unilateral new run").resolves.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("offer -> guest handler fires (buffered if armed late) -> reply resolves the host promise", async () => {
     const a = new MockWire();
     const b = new MockWire();
@@ -608,5 +656,59 @@ describe("#810: resume offer/reply protocol + marker", () => {
     expect(readCoopResumeMarker("Alice", null)).toBeNull();
     clearCoopResumeMarker();
     expect(readCoopResumeMarker("Alice", "Bob"), "cleared").toBeNull();
+  });
+
+  it("resume discovery recovers a missing marker from the newest exact-pair co-op save", async () => {
+    const { clearCoopResumeMarker, findCoopResumeCandidate, readCoopResumeMarker } = await import(
+      "#data/elite-redux/coop/coop-resume-marker"
+    );
+    clearCoopResumeMarker();
+    const saves = new Map([
+      [
+        1,
+        {
+          gameMode: GameModes.COOP,
+          waveIndex: 20,
+          timestamp: 200,
+          coopParticipants: { players: ["Alice", "Carol"] as [string, string] },
+        },
+      ],
+      [
+        3,
+        {
+          gameMode: GameModes.COOP,
+          waveIndex: 17,
+          timestamp: 170,
+          coopParticipants: { players: ["alice", "bob"] as [string, string] },
+        },
+      ],
+    ]);
+
+    const candidate = await findCoopResumeCandidate("Alice", "Bob", async slot => saves.get(slot));
+    expect(candidate).toMatchObject({ slot: 3, wave: 17, self: "Alice", partner: "Bob" });
+    expect(readCoopResumeMarker("Alice", "Bob")?.slot, "recovered pointer is repaired for the next lobby").toBe(3);
+    clearCoopResumeMarker();
+  });
+
+  it("resume discovery validates stale pointers and never offers another pair's save", async () => {
+    const { clearCoopResumeMarker, findCoopResumeCandidate, recordCoopResumeMarker } = await import(
+      "#data/elite-redux/coop/coop-resume-marker"
+    );
+    clearCoopResumeMarker();
+    recordCoopResumeMarker(2, "Alice", "Bob", 99);
+    const saves = new Map([
+      [
+        2,
+        {
+          gameMode: GameModes.COOP,
+          waveIndex: 30,
+          timestamp: 300,
+          coopParticipants: { players: ["Alice", "Carol"] as [string, string] },
+        },
+      ],
+    ]);
+
+    await expect(findCoopResumeCandidate("Alice", "Bob", async slot => saves.get(slot))).resolves.toBeNull();
+    clearCoopResumeMarker();
   });
 });

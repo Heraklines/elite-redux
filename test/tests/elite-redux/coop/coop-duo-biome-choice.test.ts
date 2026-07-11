@@ -211,6 +211,12 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       : { ownerCtx: rig.guestCtx, watcherCtx: rig.hostCtx, hostOwns };
   }
 
+  /** Materialize the other engine's real reciprocal-boundary arrival before driving one side. */
+  async function arriveBoundary(ctx: ClientCtx, point: string): Promise<void> {
+    await withClient(ctx, () => ctx.runtime.rendezvous.arrive(point));
+    await drainLoopback();
+  }
+
   interface CrossroadsSeam {
     phaseName: string;
     start(): void;
@@ -265,6 +271,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     const ownerCap = installUiCapture(ownerCtx.scene);
     const watcherCap = installUiCapture(watcherCtx.scene);
     try {
+      await arriveBoundary(watcherCtx, "xroads:26");
       // OWNER first (buffers its relay), THEN watcher (drains it) - sequential, per-ctx.
       await withClient(ownerCtx, () => driveCrossroadsOwner(ownerCap, /* moveOn */ false));
       await withClient(watcherCtx, () => driveCrossroadsWatch());
@@ -324,6 +331,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     let ownerCap = installUiCapture(ownerCtx.scene);
     let watcherCap = installUiCapture(watcherCtx.scene);
     try {
+      await arriveBoundary(watcherCtx, "xroads:11");
       await withClient(ownerCtx, () => driveCrossroadsOwner(ownerCap, /* moveOn */ true));
       await withClient(watcherCtx, () => driveCrossroadsWatch());
     } finally {
@@ -350,6 +358,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     ownerCap = installUiCapture(ownerCtx.scene);
     watcherCap = installUiCapture(watcherCtx.scene);
     try {
+      await arriveBoundary(watcherCtx, "biomepick:11");
       setCoopBiomeInteractionStart(pinAfterLeave); // the owner engine's chained pin
       await withClient(ownerCtx, async () => {
         const phase = new SelectBiomePhase();
@@ -419,19 +428,20 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     vi.spyOn(CoopInteractionRelay.prototype, "awaitInteractionChoice").mockResolvedValue(null);
 
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
-    const { watcherCtx } = ownerCtxFor(rig, counterBefore);
+    const { ownerCtx, watcherCtx } = ownerCtxFor(rig, counterBefore);
     const watcherCounterBefore = watcherCtx.runtime.controller.interactionCounter();
     const switchSpy = vi.spyOn(watcherCtx.scene.phaseManager, "unshiftNew");
 
-    // The watcher runs the biome pick alone; the owner never sends -> deterministic fallback.
+    // The owner reached the shared boundary, then disappeared before sending a choice. This lets the
+    // watcher cross the reciprocal barrier while still exercising the deterministic relay fallback.
+    await arriveBoundary(ownerCtx, "biomepick:11");
     const cap = installUiCapture(watcherCtx.scene);
     let fallbackBiome: BiomeId | undefined;
     try {
       await withClient(watcherCtx, async () => {
         const phase = new SelectBiomePhase();
         phase.start();
-        // #858: the watcher first crosses its natural-pick boundary barrier (owner absent -> anti-hang
-        // timeout at setCoopRendezvousWaitMs(50)), THEN falls back on the mocked relay timeout - poll across.
+        // #858: the watcher crosses the already-paired boundary, THEN falls back on the mocked relay timeout.
         for (let i = 0; i < 80; i++) {
           await drainLoopback();
           fallbackBiome = switchSpy.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1] as BiomeId | undefined;
@@ -567,15 +577,15 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     ]);
 
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
-    const { ownerCtx } = ownerCtxFor(rig, counterBefore);
+    const { ownerCtx, watcherCtx } = ownerCtxFor(rig, counterBefore);
 
     const sendSpy = vi.spyOn(CoopInteractionRelay.prototype, "sendInteractionChoice");
 
+    await arriveBoundary(watcherCtx, "biomepick:11");
     await withClient(ownerCtx, async () => {
       const phase = new SelectBiomePhase();
       phase.start();
-      // Poll across the #858 boundary barrier (owner alone -> times out at setCoopRendezvousWaitMs(50)),
-      // then the REAL ER_MAP handler opens.
+      // Poll across the #858 boundary barrier after the watcher has genuinely arrived; then the real handler opens.
       let opened = false;
       for (let i = 0; i < 120 && !opened; i++) {
         await drainLoopback();

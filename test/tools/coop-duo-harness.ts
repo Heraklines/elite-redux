@@ -90,7 +90,13 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
-import { erBiomeOverstayAnchor, setErBiomeOverstayAnchor } from "#data/elite-redux/er-biome-structure";
+import {
+  erBiomeOverstayAnchor,
+  getErBiomeLength,
+  getErBiomeStartWave,
+  setErBiomeOverstayAnchor,
+  setErBiomeStructureExtent,
+} from "#data/elite-redux/er-biome-structure";
 import {
   type ErGhostRunStateSnapshot,
   emptyErGhostRunStateSnapshot,
@@ -239,6 +245,8 @@ export interface ClientCtx {
 interface CoopModuleLetSnapshot {
   moneyStreaks: [number, number][];
   overstayAnchor: number | null;
+  biomeLength: number | null;
+  biomeStartWave: number;
   relic: ErRelicBattleStateData;
 }
 
@@ -246,6 +254,8 @@ function snapshotModuleLets(): CoopModuleLetSnapshot {
   return {
     moneyStreaks: getErMoneyStreakEntries(),
     overstayAnchor: erBiomeOverstayAnchor(),
+    biomeLength: getErBiomeLength(),
+    biomeStartWave: getErBiomeStartWave(),
     relic: getErRelicBattleState(),
   };
 }
@@ -253,6 +263,7 @@ function snapshotModuleLets(): CoopModuleLetSnapshot {
 function restoreModuleLets(s: CoopModuleLetSnapshot): void {
   restoreErMoneyStreaks(s.moneyStreaks);
   setErBiomeOverstayAnchor(s.overstayAnchor);
+  setErBiomeStructureExtent(s.biomeLength, s.biomeStartWave);
   restoreErRelicBattleState(s.relic);
 }
 
@@ -935,13 +946,16 @@ export async function buildDuo(
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
   const guestScene = buildGuestScene(hostGame);
+  // BattleScene construction resets process-global ER module state. Production clients are separate
+  // processes, so creating the guest must not clobber the already-running host's authoritative state.
+  restoreModuleLets(hostCtx.moduleLets!);
   const guestCtx: ClientCtx = {
     label: "guest",
     scene: guestScene,
     runtime: guestRuntime,
     rndState: Phaser.Math.RND.state(),
     ghost: emptyGhostSnapshot(),
-    moduleLets: snapshotModuleLets(),
+    moduleLets: structuredClone(hostCtx.moduleLets!),
     mePins: { ...IDLE_ME_PINS },
   };
   await withClient(guestCtx, () => {
@@ -977,6 +991,19 @@ export async function remirrorWave(rig: DuoRig, opts?: { preserveGuestPlayerPart
     gf[0].coopOwner = "host";
     gf[1].coopOwner = "guest";
   });
+}
+
+/**
+ * Materialize the command-boundary arrival omitted by {@linkcode remirrorWave}'s abbreviated guest
+ * transition. Call this AFTER both reward terminals and BEFORE awaiting the host's next CommandPhase:
+ * the host phase is fail-closed and therefore cannot finish first so a later remirror can rescue it.
+ * This sends a real rendezvous frame and drains the loopback; it never authorizes a unilateral cross.
+ */
+export async function arriveGuestCommandBoundary(rig: DuoRig, wave: number, turn = 1): Promise<void> {
+  await withClient(rig.guestCtx, () => {
+    rig.guestRuntime.rendezvous.arrive(`cmd:${wave}:${turn}`);
+  });
+  await drainLoopback();
 }
 
 // ---------------------------------------------------------------------------
@@ -2107,9 +2134,10 @@ export async function replayCoopTrace(
   // launch header; absent checkpoint preserves the v1/header behavior. =====
   // Detach from the trace object: constructors/test overrides must never mutate the forensic evidence
   // that a second host/guest rebuild still needs later in this loader.
-  const checkpoint = trace.checkpoint == null
-    ? undefined
-    : (structuredClone(trace.checkpoint) as NonNullable<ReplayTrace["checkpoint"]>);
+  const checkpoint =
+    trace.checkpoint == null
+      ? undefined
+      : (structuredClone(trace.checkpoint) as NonNullable<ReplayTrace["checkpoint"]>);
   const bootRoster = checkpoint?.party ?? trace.roster;
   const bootSeed = checkpoint?.seed ?? trace.seed;
   game.override.battleStyle("double");
@@ -2231,6 +2259,7 @@ export async function replayCoopTrace(
 
     // ===== Host crosses into the next wave's battle (real EncounterPhase rolls wave w+1). =====
     if (wavesReplayed < waves.length) {
+      await arriveGuestCommandBoundary(rig, wave + 1);
       await withClient(rig.hostCtx, async () => {
         await game.phaseInterceptor.to("CommandPhase");
       });

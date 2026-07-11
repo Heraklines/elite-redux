@@ -48,6 +48,7 @@ import { SpeciesId } from "#enums/species-id";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
   driveGuestReplayTurn,
@@ -215,6 +216,7 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
       await leaveRewardShop(rig);
 
       if (w < WAVES) {
+        await arriveGuestCommandBoundary(rig, w + 1);
         await withClient(rig.hostCtx, async () => {
           await game.phaseInterceptor.to("CommandPhase");
         });

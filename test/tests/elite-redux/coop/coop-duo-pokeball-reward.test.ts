@@ -26,6 +26,7 @@ import { SpeciesId } from "#enums/species-id";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
   driveGuestReplayTurn,
@@ -144,6 +145,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
 
     // ===== Cross to wave 2 (force another ball reward). =====
     forceItemRewards(game.override, [{ name: "GREAT_BALL" }]);
+    await arriveGuestCommandBoundary(rig, 2);
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("CommandPhase");
     });

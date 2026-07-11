@@ -121,6 +121,7 @@ describe.skipIf(!RUN)("DETERMINISM CONTRACT: identical seeded script => identica
       waves: CONTRACT_WAVES,
       logs,
       rewardPolicy: "seeded",
+      captureBoundaryPreimages: true,
     });
     return result.boundaryDigests;
   }
@@ -163,6 +164,10 @@ describe.skipIf(!RUN)("DETERMINISM CONTRACT: identical seeded script => identica
       const a = digestsA[i];
       const b = digestsB[i];
       expect(a.wave, `boundary ${i} aligns on the same wave`).toBe(b.wave);
+      expect(
+        b.hostSaveState,
+        `wave ${a.wave}: exact normalized HOST save preimages identify any cross-run identity leak`,
+      ).toEqual(a.hostSaveState);
       expect(
         b.hostSaveDigest,
         `wave ${a.wave}: independent runs' HOST save-data digests are identical (#842 - no identity leak)`,

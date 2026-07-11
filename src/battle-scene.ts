@@ -2302,7 +2302,7 @@ export class BattleScene extends SceneBase {
     // biome NOTORIETY over-level pin to its max forever (enemies +25 levels for the
     // rest of the run). The `restoring` flag suppresses the roll on the load path.
     if (erBiomeRoutingActive() && !this.currentBattle && !restoring) {
-      erRollBiomeLength(biome, 1);
+      erRollBiomeLength(biome, 1, this.seed);
       // ER (#486): also roll this STARTING biome's onward routes now, so the World
       // Map can show "where you can go next" from the very first biome (biome-to-
       // biome transitions roll theirs in SwitchBiomePhase). SelectBiomePhase reuses

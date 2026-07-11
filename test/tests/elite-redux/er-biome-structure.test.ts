@@ -40,6 +40,15 @@ describe("ER #486 - variable biome length / structure", () => {
     expect(getErBiomeStartWave()).toBe(1);
   });
 
+  it("pins a biome entry's structural length to the run seed, independent of the ambient RNG cursor", () => {
+    erRollBiomeLength(BiomeId.PLAINS, 1, "replayable-run");
+    const first = getErBiomeLength();
+    Phaser.Math.RND.integerInRange(0, 1_000_000);
+    Phaser.Math.RND.integerInRange(0, 1_000_000);
+    erRollBiomeLength(BiomeId.PLAINS, 1, "replayable-run");
+    expect(getErBiomeLength()).toBe(first);
+  });
+
   it("all biomes roll the same [7, 25] range (#504 dropped per-biome bands)", () => {
     for (const biome of [BiomeId.PLAINS, BiomeId.CAVE, BiomeId.GRASS, BiomeId.TOWN]) {
       erRollBiomeLength(biome, 1);

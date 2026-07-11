@@ -52,6 +52,7 @@ import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { PokemonData } from "#system/pokemon-data";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
   driveGuestReplayTurn,
@@ -232,10 +233,7 @@ describe.skipIf(!RUN)(
     }, 300_000);
 
     it("boots a replay from the window checkpoint party instead of the original launch roster", async () => {
-      const checkpointParty = [
-        rosterMon(SpeciesId.SNORLAX, 61, "host"),
-        rosterMon(SpeciesId.GENGAR, 62, "guest"),
-      ];
+      const checkpointParty = [rosterMon(SpeciesId.SNORLAX, 61, "host"), rosterMon(SpeciesId.GENGAR, 62, "guest")];
       checkpointParty[0].moveset = [new PokemonMove(MoveId.THUNDER_PUNCH)];
       checkpointParty[1].moveset = [new PokemonMove(MoveId.SHADOW_BALL)];
       const trace = makeReplayTrace({
@@ -263,16 +261,21 @@ describe.skipIf(!RUN)(
 
       expect(result.divergences).toEqual([]);
       expect(
-        game.scene.getPlayerParty().slice(0, 2).map(p => [p.species.speciesId, p.level]),
+        game.scene
+          .getPlayerParty()
+          .slice(0, 2)
+          .map(p => [p.species.speciesId, p.level]),
         "the replay must begin from the caught/leveled checkpoint party, not the stale header roster",
       ).toEqual([
         [SpeciesId.SNORLAX, 61],
         [SpeciesId.GENGAR, 62],
       ]);
-      expect(game.scene.getPlayerParty().slice(0, 2).map(p => p.getMoveset()[0]?.moveId)).toEqual([
-        MoveId.THUNDER_PUNCH,
-        MoveId.SHADOW_BALL,
-      ]);
+      expect(
+        game.scene
+          .getPlayerParty()
+          .slice(0, 2)
+          .map(p => p.getMoveset()[0]?.moveId),
+      ).toEqual([MoveId.THUNDER_PUNCH, MoveId.SHADOW_BALL]);
       expect(game.scene.currentBattle.waveIndex).toBe(7);
       expect(game.scene.seed).toBe("checkpoint-window-seed");
       expect(game.scene.money).toBe(4_321);
@@ -363,6 +366,7 @@ describe.skipIf(!RUN)(
           await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
         }
         if (w < RECORD_WAVES) {
+          await arriveGuestCommandBoundary(rig, w + 1);
           await withClient(rig.hostCtx, async () => {
             await game.phaseInterceptor.to("CommandPhase");
           });

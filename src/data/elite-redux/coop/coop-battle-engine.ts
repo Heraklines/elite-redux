@@ -967,7 +967,11 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
     // BEFORE-the-numeric-apply ordering as the enemy reconcile so the freshly-summoned replacement
     // RECEIVES the host's hp/status/stages for that bi. Strictly player slots; side-effect-free; idempotent.
     reconcileCoopPlayerField(checkpoint.field);
-    for (const mon of globalScene.getField(true)) {
+    // Reconciliation above can remove a just-fainted battler from the ACTIVE field and reset its
+    // summonData (including stat stages). Apply onto the same SLOT-PRESENT view the host serialized,
+    // so that removed object still receives the authoritative terminal state used by the checksum.
+    // This also keeps freshly reconciled replacements addressable by battler index.
+    for (const mon of getCoopSerializableField()) {
       if (mon == null) {
         continue;
       }
@@ -1656,6 +1660,11 @@ const COOP_SAVEDATA_DIGEST_EXCLUDED_KEYS: ReadonlySet<string> = new Set<string>(
   "timestamp",
   // Player-chosen run name: cosmetic; the guest may not carry it and it is never a sync concern.
   "name",
+  // Lobby/account discovery metadata, not battle simulation state. It can be absent on a renderer
+  // booted directly from authoritative bytes before its peer-identity handshake (and N-client
+  // renderers do not all share one self/partner orientation). Never manufacture a battle resync
+  // from this local resume-index field; the lobby validates it against the saved session separately.
+  "coopParticipants",
   // Arena weather/terrain TURN COUNTERS (`turnsLeft`) decrement per tick and legitimately differ by
   // one between two correct engines - the base field checksum EXCLUDES them for exactly this reason.
   // Arena IDENTITY (weather/terrain type, tags, biome) is already hashed by the base checksum, so
@@ -3811,12 +3820,10 @@ export function applyCoopFullSnapshot(
       // snapshot's per-bi state lands on. Side-effect-free, idempotent, player slots only.
       reconcileCoopPlayerField(snapshot.field);
     }
-    const byIndex = new Map(
-      globalScene
-        .getField(true)
-        .filter((m): m is Pokemon => m != null)
-        .map(m => [m.getBattlerIndex(), m]),
-    );
+    // The checkpoint reconcile immediately before this may have removed a just-fainted mon from the
+    // ACTIVE field (and reset its summonData). Match against the SLOT-PRESENT view instead: it is the
+    // exact capture coordinate space and retains that party object through the wave-win boundary.
+    const byIndex = new Map(getCoopSerializableField().map(m => [m.getBattlerIndex(), m]));
     for (const snap of snapshot.field) {
       const mon = byIndex.get(snap.bi);
       if (mon != null) {
@@ -3962,12 +3969,10 @@ export function applyCoopFieldSnapshot(field: CoopFullMonSnapshot[] | undefined,
     return;
   }
   try {
-    const byIndex = new Map(
-      globalScene
-        .getField(true)
-        .filter((m): m is Pokemon => m != null)
-        .map(m => [m.getBattlerIndex(), m]),
-    );
+    // The numeric checkpoint immediately before this can remove a just-fainted mon from the ACTIVE
+    // field and reset its summonData. Retain the slot-present object so the rich companion restores
+    // every authoritative terminal field (notably ability/form/tags/held items) at the same boundary.
+    const byIndex = new Map(getCoopSerializableField().map(m => [m.getBattlerIndex(), m]));
     for (const snap of field) {
       const mon = byIndex.get(snap.bi);
       if (mon != null) {

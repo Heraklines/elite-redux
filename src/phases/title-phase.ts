@@ -10,7 +10,7 @@ import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-seed/daily-run";
 import { modifierTypes } from "#data/data-lists";
 import { CoopLobbyController, type LobbyPlayer } from "#data/elite-redux/coop/coop-lobby";
-import { readCoopResumeMarker } from "#data/elite-redux/coop/coop-resume-marker";
+import { findCoopResumeCandidate } from "#data/elite-redux/coop/coop-resume-marker";
 import {
   getCoopBattleStreamer,
   getCoopController,
@@ -755,9 +755,15 @@ export class TitlePhase extends Phase {
         // renderer divert): the guest then ran a full live engine on the host's snapshot.
         runtime.controller.setSessionKind(sessionKind);
         const controller = runtime.controller;
-        const partner = controller.partnerName ?? "Partner";
-        stage.setSeat(1, { name: partner, detail: "Connected", dot: "green" });
-        stage.setStatus("Connected! Starting co-op...");
+        // The data channel is open, but the peer hello (identity + final role reconciliation)
+        // may still be in flight. Resume discovery is pair-keyed, so reading partnerName here
+        // used to race as null and silently skip a perfectly valid save. Hold both clients at
+        // the lobby until the identity handshake is complete.
+        stage.setSeat(1, { name: null, detail: "Verifying...", dot: "amber" });
+        stage.setStatus("Connected! Verifying your partner...");
+        globalScene.ui.setMode(UiMode.MESSAGE);
+        globalScene.ui.resetModeChain();
+        globalScene.ui.showText("Connected! Verifying your partner and co-op saves...", null);
         const startNewRun = () => {
           stage.destroy();
           setModeAndEnd(launchMode);
@@ -774,124 +780,180 @@ export class TitlePhase extends Phase {
           return;
         }
 
-        // #810 RESUME FLOW (maintainer directive): after the ACCEPT handshake, decide RESUME
-        // vs NEW GAME BEFORE anyone advances into starter-select. The HOST owns the decision
-        // (it holds the authoritative save + its own resume marker, which BOTH clients now
-        // record); the GUEST mirrors a waiting state. BARRIER: neither side calls startNewRun
-        // until the choice resolves. Identity is gated by the marker's exact (self, partner)
-        // account pair, so a save is never offered/loaded with a different partner.
-        if (controller.role === "guest") {
-          // GUEST: block on the host's decision. Show a mirrored "waiting" state - NO "press to
-          // start" (that was the barrier hole: the guest could start a new run while the host
-          // was still deciding to resume). Release on EITHER the resume OFFER or the START-NEW
-          // signal; an anti-hang timeout falls back to NEW GAME with a loud warn if the host
-          // goes silent (dropped signal / dead peer).
-          stage.setStatus(`Connected! Waiting for ${partner}...`);
-          globalScene.ui.setMode(UiMode.MESSAGE);
-          globalScene.ui.resetModeChain();
-          globalScene.ui.showText(`Connected! Waiting for ${partner} to choose Resume or New Game...`, null);
-
-          let settled = false;
-          /** Claim the single decision; returns true only for the first caller. */
-          const claim = (): boolean => {
-            if (settled) {
-              return false;
-            }
-            settled = true;
-            return true;
-          };
-          const guestWaitTimer = setTimeout(() => {
-            if (claim()) {
+        void controller
+          .awaitPartnerIdentity()
+          .then(async identity => {
+            if (identity == null || identity.partnerName == null) {
               console.warn(
-                `[coop-resume] guest: no Resume/New Game from ${partner} in ${COOP_RESUME_GUEST_WAIT_MS}ms -> NEW GAME (anti-hang)`,
+                "[coop-resume] peer identity handshake timed out; keeping lobby closed (no unilateral start)",
               );
-              startNewRun();
-            }
-          }, COOP_RESUME_GUEST_WAIT_MS);
-
-          // Host chose New Game (or had no save / we declined / the offer timed out): release.
-          controller.armResumeStartNewHandler(() => {
-            clearTimeout(guestWaitTimer);
-            if (claim()) {
-              startNewRun();
-            }
-          });
-          // Host offers to resume: surface accept/decline. Keep the start-new handler live (the
-          // host can still time out and release us); only a user answer here claims the decision.
-          controller.armResumeOfferHandler(wave => {
-            clearTimeout(guestWaitTimer);
-            if (settled) {
+              stage.setSeat(1, { name: null, detail: "Reconnect needed", dot: "red" });
+              stage.setStatus("Could not verify your partner. Reconnect and try again.");
+              globalScene.ui.showText(
+                "Could not verify your co-op partner. Please reconnect and try again.",
+                null,
+                backToTitle,
+                null,
+                true,
+              );
               return;
             }
+            const partner = identity.partnerName;
+            stage.setSeat(1, { name: partner, detail: "Connected", dot: "green" });
+            stage.setStatus("Connected! Checking for a co-op save...");
+
+            // #810 RESUME FLOW (maintainer directive): after the ACCEPT handshake, decide RESUME
+            // vs NEW GAME BEFORE anyone advances into starter-select. The HOST owns the decision
+            // (it holds the authoritative save + its own resume marker, which BOTH clients now
+            // record); the GUEST mirrors a waiting state. BARRIER: neither side calls startNewRun
+            // until the choice resolves. Identity is gated by the marker's exact (self, partner)
+            // account pair, so a save is never offered/loaded with a different partner.
+            if (identity.localRole === "guest") {
+              // GUEST: block on the host's decision. Show a mirrored "waiting" state - NO "press to
+              // start" (that was the barrier hole: the guest could start a new run while the host
+              // was still deciding to resume). Release on EITHER the resume OFFER or the START-NEW
+              // signal. If the host goes silent, fail closed to reconnect instead of authorizing a
+              // unilateral new run that would split the clients across different states.
+              stage.setStatus(`Connected! Waiting for ${partner}...`);
+              globalScene.ui.setMode(UiMode.MESSAGE);
+              globalScene.ui.resetModeChain();
+              globalScene.ui.showText(`Connected! Waiting for ${partner} to choose Resume or New Game...`, null);
+
+              let settled = false;
+              /** Claim the single decision; returns true only for the first caller. */
+              const claim = (): boolean => {
+                if (settled) {
+                  return false;
+                }
+                settled = true;
+                return true;
+              };
+              const guestWaitTimer = setTimeout(() => {
+                if (claim()) {
+                  console.warn(
+                    `[coop-resume] guest: no Resume/New Game from ${partner} in ${COOP_RESUME_GUEST_WAIT_MS}ms -> reconnect (fail-closed)`,
+                  );
+                  stage.setStatus("Partner decision timed out. Reconnect and try again.");
+                  globalScene.ui.showText(
+                    "Your partner did not finish the co-op save decision. Please reconnect and try again.",
+                    null,
+                    backToTitle,
+                    null,
+                    true,
+                  );
+                }
+              }, COOP_RESUME_GUEST_WAIT_MS);
+
+              // Host chose New Game (or had no save / we declined / the offer timed out): release.
+              controller.armResumeStartNewHandler(() => {
+                clearTimeout(guestWaitTimer);
+                if (claim()) {
+                  startNewRun();
+                }
+              });
+              // Host offers to resume: surface accept/decline. Keep the start-new handler live (the
+              // host can still time out and release us). Accept claims Resume; Decline remains behind
+              // the barrier until the host durably commits New Game.
+              controller.armResumeOfferHandler(wave => {
+                clearTimeout(guestWaitTimer);
+                if (settled) {
+                  return;
+                }
+                globalScene.ui.showText(
+                  `${partner} wants to resume your saved co-op run (wave ${wave}). Accept?`,
+                  null,
+                  () => {
+                    globalScene.ui.setMode(
+                      UiMode.CONFIRM,
+                      () => {
+                        if (claim()) {
+                          controller.replyResume(true);
+                          stage.destroy();
+                          void this.coopGuestResumeBoot(wave);
+                        }
+                      },
+                      () => {
+                        if (!settled) {
+                          controller.replyResume(false);
+                          // Stay behind the barrier until the host commits and durably broadcasts
+                          // resumeStartNew. Advancing here put the guest in team select while the
+                          // host was still showing a message/confirmation screen.
+                          globalScene.ui.setMode(UiMode.MESSAGE);
+                          globalScene.ui.showText(`Waiting for ${partner} to start a new run...`, null);
+                        }
+                      },
+                    );
+                  },
+                  null,
+                  true,
+                );
+              });
+              return;
+            }
+
+            // HOST: is there a saved run with EXACTLY this partner (self+partner account pair)?
+            const marker = await findCoopResumeCandidate(controller.localName(), partner, slot =>
+              globalScene.gameData.getSession(slot),
+            );
+            // Every host non-resume path relays the release so the waiting guest never hangs.
+            const hostStartNew = () => {
+              controller.sendResumeStartNew();
+              startNewRun();
+            };
+            if (marker == null) {
+              // Release the guest only when the host actually presses Start. Sending this before
+              // the prompt caused the live split: guest in team select, host still in the lobby.
+              globalScene.ui.showText(
+                "Connected to your partner!\nPress to start co-op.",
+                null,
+                hostStartNew,
+                null,
+                true,
+              );
+              return;
+            }
+            // Offer the HOST a real RESUME / NEW GAME choice.
             globalScene.ui.showText(
-              `${partner} wants to resume your saved co-op run (wave ${wave}). Accept?`,
+              `Found a saved co-op run with ${partner} (wave ${marker.wave}). Resume it?`,
               null,
               () => {
                 globalScene.ui.setMode(
                   UiMode.CONFIRM,
                   () => {
-                    if (claim()) {
-                      controller.replyResume(true);
-                      stage.destroy();
-                      void this.coopGuestResumeBoot(wave);
-                    }
+                    // RESUME: relay the offer; both proceed identically on accept. offerResume has
+                    // its own 60s no-reply timeout -> resolves false -> we fall to NEW GAME (and
+                    // release the guest), so the barrier can never hang on an unresponsive guest.
+                    globalScene.ui.setMode(UiMode.MESSAGE);
+                    globalScene.ui.showText(`Waiting for ${partner} to accept...`, null);
+                    void controller.offerResume(marker.wave).then(accepted => {
+                      if (accepted) {
+                        stage.destroy();
+                        void this.loadSaveSlot(marker.slot);
+                      } else {
+                        // The guest remains behind the barrier after declining; this single durable
+                        // release moves both clients into team select together.
+                        hostStartNew();
+                      }
+                    });
                   },
-                  () => {
-                    if (claim()) {
-                      controller.replyResume(false);
-                      startNewRun();
-                    }
-                  },
+                  // NEW GAME: release the guest and start fresh.
+                  hostStartNew,
                 );
               },
               null,
               true,
             );
-          });
-          return;
-        }
-
-        // HOST: is there a saved run with EXACTLY this partner (self+partner account pair)?
-        const marker = readCoopResumeMarker(controller.localName(), controller.partnerName);
-        // Every host non-resume path relays the release so the waiting guest never hangs.
-        const hostStartNew = () => {
-          controller.sendResumeStartNew();
-          startNewRun();
-        };
-        if (marker == null) {
-          controller.sendResumeStartNew();
-          globalScene.ui.showText("Connected to your partner!\nPress to start co-op.", null, startNewRun, null, true);
-          return;
-        }
-        // Offer the HOST a real RESUME / NEW GAME choice.
-        globalScene.ui.showText(
-          `Found a saved co-op run with ${partner} (wave ${marker.wave}). Resume it?`,
-          null,
-          () => {
-            globalScene.ui.setMode(
-              UiMode.CONFIRM,
-              () => {
-                // RESUME: relay the offer; both proceed identically on accept. offerResume has
-                // its own 60s no-reply timeout -> resolves false -> we fall to NEW GAME (and
-                // release the guest), so the barrier can never hang on an unresponsive guest.
-                globalScene.ui.setMode(UiMode.MESSAGE);
-                globalScene.ui.showText(`Waiting for ${partner} to accept...`, null);
-                void controller.offerResume(marker.wave).then(accepted => {
-                  if (accepted) {
-                    stage.destroy();
-                    void this.loadSaveSlot(marker.slot);
-                  } else {
-                    globalScene.ui.showText(`${partner} declined. Starting a new run.`, null, hostStartNew, null, true);
-                  }
-                });
-              },
-              // NEW GAME: release the guest and start fresh.
-              hostStartNew,
+          })
+          .catch(error => {
+            console.error("[coop-resume] identity/resume decision failed", error);
+            globalScene.ui.showText(
+              "Could not check co-op saves. Please reconnect and try again.",
+              null,
+              backToTitle,
+              null,
+              true,
             );
-          },
-          null,
-          true,
-        );
+          });
       },
       onError: e => {
         globalScene.ui.showText(`Co-op error:\n${e}`, null, backToTitle, null, true);

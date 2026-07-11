@@ -38,6 +38,7 @@ import { SpeciesId } from "#enums/species-id";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
   driveGuestReplayTurn,
@@ -178,6 +179,7 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     );
 
     // ===== The NEXT battle resolves turns 1-2 with NO stall (the wedge the counter drift caused). =====
+    await arriveGuestCommandBoundary(rig, 2);
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("CommandPhase");
     });

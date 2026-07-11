@@ -34,6 +34,7 @@ import { BerryModifier } from "#modifiers/modifier";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
   driveGuestReplayTurn,
@@ -174,6 +175,7 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
 
     // ===== Cross to wave 2 (LEFTOVERS triggers no level-up -> no LearnMovePhase -> clean cross). =====
     forceItemRewards(game.override, [{ name: "RARE_CANDY" }]);
+    await arriveGuestCommandBoundary(rig, 2);
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("CommandPhase");
     });
