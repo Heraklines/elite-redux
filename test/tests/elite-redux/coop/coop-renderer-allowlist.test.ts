@@ -90,7 +90,7 @@ describe("co-op renderer ALLOWLIST gate (#633, accepted-review item 2)", () => {
     resetCoopRendererNeutralizedLog();
     resetCoopRendererWouldBlockLog();
     resetObservedCoopGuestPhases();
-    setCoopRendererGateEnforced(false); // OBSERVE is the default; restore it explicitly
+    setCoopRendererGateEnforced(false);
   });
   afterEach(() => {
     // Never leak the predicate / enforcement / logs into the next test file (solo / host read false).
@@ -101,8 +101,8 @@ describe("co-op renderer ALLOWLIST gate (#633, accepted-review item 2)", () => {
     resetObservedCoopGuestPhases();
   });
 
-  it("defaults to OBSERVE (warn-first), not ENFORCE", () => {
-    expect(isCoopRendererGateEnforced()).toBe(false);
+  it("defaults to ENFORCE (fail closed)", () => {
+    expect(isCoopRendererGateEnforced()).toBe(true);
   });
 
   it("neutralizes NOTHING when there is no live session (solo / host / lockstep read false)", () => {
