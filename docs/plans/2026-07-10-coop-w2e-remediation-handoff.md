@@ -409,13 +409,13 @@ long-soak gate. No final “no gaps” claim is made yet.
 ## 19. Live wave-10 incident: host statement was discarded before queue construction
 
 Tester reports of repeated wave-10 map desyncs/softlocks exposed a violation inside the already-migrated
-`WAVE_ADVANCE` keystone. `de65dc9cf` is the failure-first proof: the host committed a complete transition
+`WAVE_ADVANCE` keystone. `ebe05657c` is the failure-first proof: the host committed a complete transition
 with `biomeChange=true`, but the guest pending queue retained only `{wave,outcome}`. The guest then called
 its own `isNewBiome()` twice—once while reconstructing the operation and again in `VictoryPhase` while
 building the concrete queue. A one-bit disagreement therefore made one client enqueue `SelectBiomePhase`
 while the other advanced directly, exactly matching the reported nondeterministic map/screen-jump lock.
 
-`6ce742e08` makes the complete host transition part of `waveResolved`, preserves it through same-wave
+`27c04cc73` makes the complete host transition part of `waveResolved`, preserves it through same-wave
 merge and journal recovery, validates it strictly, keeps it active through the guest's `VictoryPhase`, and
 uses it for trainer-victory, run-continuation, egg-lapse, and biome-boundary queue decisions. Current peers
 never evaluate the corresponding guest-local predicates. Protocol version is now `er-coop-14`, so an older
