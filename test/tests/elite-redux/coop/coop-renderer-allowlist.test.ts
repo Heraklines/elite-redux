@@ -32,6 +32,7 @@ import {
   resetCoopRendererWouldBlockLog,
   resetObservedCoopGuestPhases,
   setCoopRendererGateEnforced,
+  setCoopStrictTailsMode,
 } from "#data/elite-redux/coop/coop-renderer-gate";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -68,6 +69,10 @@ const COOP_GUEST_OBSERVED_PHASES: readonly string[] = [
   "SelectBiomePhase",
   "SelectGenderPhase",
   "SelectModifierPhase",
+  // Real title/lobby path: after resumeStartNew the authoritative guest must remain on its
+  // local roster picker. Blocking this phase skips directly into battle construction with no
+  // launch snapshot/currentBattle and strands the two peers on different screens.
+  "SelectStarterPhase",
   "SwitchBiomePhase",
   "VictoryPhase",
 ];
@@ -91,11 +96,15 @@ describe("co-op renderer ALLOWLIST gate (#633, accepted-review item 2)", () => {
     resetCoopRendererWouldBlockLog();
     resetObservedCoopGuestPhases();
     setCoopRendererGateEnforced(true);
+    // This file verifies the phase allowlist. Tail-sanction enforcement has its own focused suite;
+    // disabling it here prevents an unsanctioned boundary tail from masquerading as an allowlist block.
+    setCoopStrictTailsMode(false);
   });
   afterEach(() => {
     // Never leak the predicate / enforcement / logs into the next test file (solo / host read false).
     setCoopAuthoritativeGuestPredicate(null);
     setCoopRendererGateEnforced(true);
+    setCoopStrictTailsMode(true);
     resetCoopRendererNeutralizedLog();
     resetCoopRendererWouldBlockLog();
     resetObservedCoopGuestPhases();
@@ -148,6 +157,12 @@ describe("co-op renderer ALLOWLIST gate (#633, accepted-review item 2)", () => {
         expect(isCoopRendererBlockedPhase(phase), `${phase} must NOT be blocked`).toBe(false);
         expect(coopRendererGateNeutralizes(phase), `${phase} must NOT be neutralized`).toBe(false);
       }
+    });
+
+    it("RUNS the guest's pre-run starter picker after the Resume/New Game barrier releases", () => {
+      expect(isCoopRendererBlockedPhase("SelectStarterPhase")).toBe(false);
+      expect(coopRendererGateNeutralizes("SelectStarterPhase")).toBe(false);
+      expect(getCoopRendererNeutralizedLog()).not.toContain("SelectStarterPhase");
     });
   });
 

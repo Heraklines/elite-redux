@@ -121,6 +121,10 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   "CoopGuestCatchFullPhase", // guest-catcher CATCH_FULL intent driver
   "CoopGuestFaintSwitchPhase", // guest faint-switch intent driver
   "CoopGuestRevivalPhase", // guest revival intent driver
+  // Pre-run roster input after the host's Resume/New Game decision. This is local input whose
+  // rosterSync intent is merged host-authoritatively; blocking it skips the guest straight into
+  // battle phases before a launch snapshot/currentBattle exists.
+  "SelectStarterPhase",
   "ErDexNavPhase", // per-client dex-nav selection (REVIEW row: acquisitions are host-shared, so this is intent-only)
   "SelectGenderPhase", // account-local one-time gender pick (REVIEW row: per-account, not shared state)
 
