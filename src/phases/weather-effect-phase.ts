@@ -2,7 +2,7 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { erWeathervaneBlocksWeatherDamage } from "#data/elite-redux/er-relics";
 import type { Weather } from "#data/weather";
-import { getWeatherDamageMessage, getWeatherLapseMessage } from "#data/weather";
+import { getWeatherDamageMessage, getWeatherLapseMessage, isFogWeather } from "#data/weather";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
 import { CommonAnim } from "#enums/move-anims-common";
@@ -13,6 +13,21 @@ import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
 import { BooleanHolder, toDmgValue } from "#utils/common";
+
+/**
+ * Map a weather type to the {@linkcode CommonAnim} used for its per-turn effect
+ * visual. FOG has its own anim; ER's Snowy Wrath reuses the hail visual. Every
+ * other (contiguous) weather uses the `SUNNY + (w-1)` index math.
+ */
+function weatherEffectAnim(w: WeatherType): CommonAnim {
+  if (isFogWeather(w)) {
+    return CommonAnim.FOG;
+  }
+  if (w === WeatherType.SNOWY_WRATH) {
+    return CommonAnim.HAIL;
+  }
+  return CommonAnim.SUNNY + (w - 1);
+}
 
 /** Stat stages Eerie Fog decays toward +0 each turn. */
 const ER_FOG_DECAY_STATS: readonly BattleStat[] = [
@@ -31,8 +46,9 @@ export class WeatherEffectPhase extends CommonAnimPhase {
 
   constructor() {
     const w = globalScene?.arena?.weather?.weatherType || WeatherType.NONE;
-    // ER: special-case FOG so it picks CommonAnim.FOG instead of CommonAnim.WIND.
-    const anim = w === WeatherType.FOG ? CommonAnim.FOG : CommonAnim.SUNNY + (w - 1);
+    // ER: special-case FOG (CommonAnim.FOG) and Snowy Wrath (reuse the hail visual)
+    // so the default `SUNNY + (w-1)` index math doesn't run off the enum.
+    const anim = weatherEffectAnim(w);
     super(undefined, undefined, anim);
     this.weather = globalScene?.arena?.weather;
   }
@@ -46,13 +62,14 @@ export class WeatherEffectPhase extends CommonAnimPhase {
     }
 
     const w = this.weather.weatherType;
-    const anim = w === WeatherType.FOG ? CommonAnim.FOG : CommonAnim.SUNNY + (w - 1);
+    const anim = weatherEffectAnim(w);
     this.setAnimation(anim);
 
     // ER Eerie Fog: each turn, every active Pokémon that is NOT Ghost- or
     // Psychic-type loses one stage off each POSITIVE stat boost (decays to +0).
-    // Debuffs (negative stages) are left alone.
-    if (w === WeatherType.FOG) {
+    // Debuffs (negative stages) are left alone. Fires under vanilla FOG and ER's
+    // distinct EERIE_FOG (Fog Machine now summons the latter).
+    if (isFogWeather(w)) {
       this.executeForAll((pokemon: Pokemon) => {
         if (!pokemon || pokemon.switchOutStatus || pokemon.isFainted()) {
           return;

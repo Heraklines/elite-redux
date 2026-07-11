@@ -810,7 +810,10 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.skipReason).toBeNull();
     const attr = res.attrs[0] as PassiveRecoveryAbAttr;
     expect(attr.getHealFraction()).toBeCloseTo(1 / 8);
-    expect(attr.getRecoveryCondition()).toEqual({ kind: "weather", weathers: [WeatherType.FOG] });
+    expect(attr.getRecoveryCondition()).toEqual({
+      kind: "weather",
+      weathers: [WeatherType.FOG, WeatherType.EERIE_FOG],
+    });
   });
 
   it("er id 787 (Cryo Architect) wires StatTriggerOnHit (WATER+ICE filter, +1 ATK/DEF)", () => {
@@ -1838,7 +1841,7 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr).toBeInstanceOf(WeatherStatMultiplierAbAttr);
     expect(attr.stat).toBe(Stat.SPD);
     expect(attr.multiplier).toBeCloseTo(1.5);
-    expect(attr.getWeathers()).toEqual([WeatherType.FOG]);
+    expect(attr.getWeathers()).toEqual([WeatherType.FOG, WeatherType.EERIE_FOG]);
   });
 
   it("er id 645 (Soul Crusher) wires DefenseStatSwapOnFlag(HAMMER→SpDef) + FlagDamageBoost(1.1)", () => {
@@ -1863,7 +1866,7 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     // holder's evasion multiplier is 1/0.75 = 4/3 (audit tier-8 batch-1 fix; was
     // an incorrect flat 1.25).
     expect(attr.multiplier).toBeCloseTo(4 / 3);
-    expect(attr.getWeathers()).toEqual([WeatherType.FOG]);
+    expect(attr.getWeathers()).toEqual([WeatherType.FOG, WeatherType.EERIE_FOG]);
   });
 
   it("er id 819 (Serpent Bind) wires an offensive 50% damaging trap + per-turn trapped speed drop", () => {

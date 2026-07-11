@@ -88,6 +88,7 @@ import {
 } from "#data/moves/move";
 import { consecutiveUseRestriction, FirstMoveCondition } from "#data/moves/move-condition";
 import { TerrainType } from "#data/terrain";
+import { isFogWeather } from "#data/weather";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -1135,7 +1136,7 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
         move,
         new MovePowerMultiplierAttr(() => {
           const w = globalScene.arena.weather;
-          return w?.weatherType === WeatherType.FOG && !w.isEffectSuppressed() ? 2 : 1;
+          return isFogWeather(w?.weatherType) && !w?.isEffectSuppressed() ? 2 : 1;
         }),
       );
     },

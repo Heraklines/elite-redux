@@ -117,11 +117,16 @@ const ER_CUSTOM_ID_FLOOR = 10000;
  * as a storm visual (it has no dedicated asset).
  */
 function weatherCommonAnim(weather: WeatherType): CommonAnim {
-  if (weather === WeatherType.FOG) {
+  if (weather === WeatherType.FOG || weather === WeatherType.EERIE_FOG) {
+    // ER Eerie Fog reuses the vanilla fog visual.
     return CommonAnim.FOG;
   }
   if (weather === WeatherType.TEMPEST_STORM) {
     return CommonAnim.RAIN;
+  }
+  if (weather === WeatherType.SNOWY_WRATH) {
+    // ER Snowy Wrath reuses the hail visual (a damaging blizzard).
+    return CommonAnim.HAIL;
   }
   return CommonAnim.SUNNY + (weather - 1);
 }
@@ -394,7 +399,7 @@ export class Arena {
   private overrideWeather(): void {
     const weather = Overrides.WEATHER_OVERRIDE;
     this.weather = new Weather(weather, 0);
-    globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, CommonAnim.SUNNY + (weather - 1));
+    globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, weatherCommonAnim(weather));
     globalScene.phaseManager.queueMessage(getWeatherStartMessage(weather)!); // TODO: is this bang correct?
   }
 

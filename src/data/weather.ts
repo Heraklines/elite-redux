@@ -1,11 +1,49 @@
 import type { SuppressWeatherEffectAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
 import i18next from "i18next";
+
+/**
+ * Elite Redux — the set of "weather-based" moves that {@linkcode WeatherType.STRONG_WINDS}
+ * (Delta Stream, er 191) makes unusable, per the 2.65 dex ("Weather-based moves not usable").
+ * Mirrors how Desolate Land / Primordial Sea make Water / Fire moves fizzle. Covers Weather
+ * Ball (type + power derive from weather), the weather-setting moves, and the Solar charge
+ * moves (their behaviour depends on weather).
+ */
+const ER_WEATHER_BASED_MOVES: ReadonlySet<MoveId> = new Set<MoveId>([
+  MoveId.WEATHER_BALL,
+  MoveId.RAIN_DANCE,
+  MoveId.SUNNY_DAY,
+  MoveId.SANDSTORM,
+  MoveId.HAIL,
+  MoveId.SNOWSCAPE,
+  MoveId.CHILLY_RECEPTION,
+  MoveId.SOLAR_BEAM,
+  MoveId.SOLAR_BLADE,
+]);
+
+/** Whether the given move is a "weather-based" move blocked by Delta Stream's Strong Winds. */
+export function isErWeatherBasedMove(move: Move): boolean {
+  return ER_WEATHER_BASED_MOVES.has(move.id);
+}
+
+/**
+ * Elite Redux — treat vanilla {@linkcode WeatherType.FOG} and ER's distinct
+ * {@linkcode WeatherType.EERIE_FOG} as "fog" for every fog-gated synergy (Eerie
+ * Spell/Vexing Void always-hit, Ominous Wind / Echolocation / Foggy Eye boosts,
+ * Shallow Grave's deferred revive, Madness Enhancement's fog-enrage, the Curse
+ * Ghost-variant, the per-turn buff decay, the Ghost/Psychic damage reduction,
+ * etc.). Fog Machine now summons EERIE_FOG, so these checks must fire under BOTH
+ * — while the graveyard biome's vanilla FOG keeps its existing behavior.
+ */
+export function isFogWeather(weatherType: WeatherType | undefined): boolean {
+  return weatherType === WeatherType.FOG || weatherType === WeatherType.EERIE_FOG;
+}
 
 export interface SerializedWeather {
   weatherType: WeatherType;
@@ -56,6 +94,8 @@ export class Weather {
       case WeatherType.SANDSTORM:
       case WeatherType.HAIL:
       case WeatherType.TEMPEST_STORM:
+      // ER Snowy Wrath: a damaging snow — chips non-Ice types 1/16 HP each turn like hail.
+      case WeatherType.SNOWY_WRATH:
         return true;
     }
 
@@ -67,6 +107,8 @@ export class Weather {
       case WeatherType.SANDSTORM:
         return type === PokemonType.GROUND || type === PokemonType.ROCK || type === PokemonType.STEEL;
       case WeatherType.HAIL:
+      // ER Snowy Wrath chips like hail — Ice-types are immune to the chip.
+      case WeatherType.SNOWY_WRATH:
         return type === PokemonType.ICE;
       case WeatherType.TEMPEST_STORM:
         // Electric-types are at home in a thundershock storm.
@@ -109,6 +151,13 @@ export class Weather {
         return move.is("AttackMove") && moveType === PokemonType.WATER;
       case WeatherType.HEAVY_RAIN:
         return move.is("AttackMove") && moveType === PokemonType.FIRE;
+      case WeatherType.STRONG_WINDS:
+        // ER Delta Stream (er 191): "Weather-based moves not usable." The strong
+        // winds disrupt any weather-manipulating move (Weather Ball, the weather
+        // setters, Solar moves), mirroring how Desolate Land / Primordial Sea make
+        // Water / Fire moves fizzle. STRONG_WINDS is only ever set by Delta Stream,
+        // so this cleanly gates the effect to that ability.
+        return isErWeatherBasedMove(move);
     }
 
     return false;
@@ -161,6 +210,11 @@ export function getWeatherStartMessage(weatherType: WeatherType): string | null 
       // ER custom weather — hardcoded English (the shared locales submodule has
       // no key for it; ER's custom content is English-only).
       return "A thundershock storm brewed!";
+    case WeatherType.SNOWY_WRATH:
+      return "A wrathful blizzard kicked up!";
+    case WeatherType.EERIE_FOG:
+      // ER custom weather — English-only (the shared locales submodule has no key).
+      return "An eerie fog crept in!";
   }
 
   return null;
@@ -188,6 +242,10 @@ export function getWeatherLapseMessage(weatherType: WeatherType): string | null 
       return i18next.t("weather:strongWindsLapseMessage");
     case WeatherType.TEMPEST_STORM:
       return "The thundershock storm rages.";
+    case WeatherType.SNOWY_WRATH:
+      return "The wrathful blizzard rages.";
+    case WeatherType.EERIE_FOG:
+      return "The eerie fog is deep.";
   }
 
   return null;
@@ -205,6 +263,8 @@ export function getWeatherDamageMessage(weatherType: WeatherType, pokemon: Pokem
       });
     case WeatherType.TEMPEST_STORM:
       return `${getPokemonNameWithAffix(pokemon)} is struck\nby the thundershock storm!`;
+    case WeatherType.SNOWY_WRATH:
+      return `${getPokemonNameWithAffix(pokemon)} is buffeted\nby the wrathful blizzard!`;
   }
 
   return null;
@@ -232,6 +292,10 @@ export function getWeatherClearMessage(weatherType: WeatherType): string | null 
       return i18next.t("weather:strongWindsClearMessage");
     case WeatherType.TEMPEST_STORM:
       return i18next.t("weather:tempestStormClearMessage");
+    case WeatherType.SNOWY_WRATH:
+      return "The wrathful blizzard subsided.";
+    case WeatherType.EERIE_FOG:
+      return "The eerie fog lifted.";
   }
 
   return null;
@@ -255,6 +319,9 @@ export function getWeatherBlockMessage(weatherType: WeatherType): string {
       return i18next.t("weather:harshSunEffectMessage");
     case WeatherType.HEAVY_RAIN:
       return i18next.t("weather:heavyRainEffectMessage");
+    case WeatherType.STRONG_WINDS:
+      // ER Delta Stream — a weather-based move fizzled in the strong winds.
+      return "The mysterious strong winds\ndissipated the attack!";
   }
   return i18next.t("weather:defaultEffectMessage");
 }

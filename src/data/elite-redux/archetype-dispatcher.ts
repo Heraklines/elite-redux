@@ -355,6 +355,7 @@ import { ER_COMPOSITE_PARTS, type ErCompositePartRef } from "#data/elite-redux/e
 import { ER_CLASSIFIER_FLAG_TO_MOVE_FLAG } from "#data/elite-redux/er-flag-mapping";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { TerrainType } from "#data/terrain";
+import { isFogWeather } from "#data/weather";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -2775,7 +2776,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new PassiveRecoveryAbAttr({
           healFraction: 1 / 8,
-          condition: { kind: "weather", weathers: [WeatherType.FOG] },
+          condition: { kind: "weather", weathers: [WeatherType.FOG, WeatherType.EERIE_FOG] },
         }),
       ]);
     case 663:
@@ -3539,7 +3540,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new SelfHighestStatMultiplierAbAttr({
           candidates: [Stat.ATK, Stat.SPATK],
           multiplier: 1.5,
-          weathers: [WeatherType.FOG],
+          weathers: [WeatherType.FOG, WeatherType.EERIE_FOG],
         }),
       ]);
     case 935:
@@ -3560,7 +3561,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new WeatherStatMultiplierAbAttr({
           stat: Stat.SPD,
           multiplier: 1.5,
-          weathers: [WeatherType.FOG],
+          weathers: [WeatherType.FOG, WeatherType.EERIE_FOG],
         }),
       ]);
     case 380:
@@ -3587,7 +3588,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new SelfHighestStatBoostOnSummonAbAttr({
           candidates: [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD],
           stages: 1,
-          weathers: [WeatherType.FOG],
+          weathers: [WeatherType.FOG, WeatherType.EERIE_FOG],
         }),
       ]);
     case 330:
@@ -3857,14 +3858,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new PostSummonRemoveArenaTagAbAttr([ArenaTagType.REFLECT, ArenaTagType.LIGHT_SCREEN, ArenaTagType.AURORA_VEIL]),
       ]);
     case 619:
-      // Low Visibility — "Summons Eerie Fog on entry."
-      // Eerie Fog = FOG weather in pokerogue (WeatherType.FOG = 6).
-      return ok([new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.FOG, turns: 8 })]);
+      // Low Visibility — "Summons Eerie Fog on entry." Sets ER's distinct
+      // EERIE_FOG weather (a Ghost/Psychic weather, NOT vanilla FOG).
+      return ok([new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.EERIE_FOG, turns: 8 })]);
     case 983:
       // Overcast — "Low Visibility + Sets Mist on entry."
-      // Composite: FOG weather + Mist arena tag (Mist blocks stat drops).
+      // Composite: EERIE_FOG weather + Mist arena tag (Mist blocks stat drops).
       return ok([
-        new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.FOG, turns: 8 }),
+        new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.EERIE_FOG, turns: 8 }),
         new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MIST, targetsSelf: true }),
       ]);
     case 477:
@@ -3910,8 +3911,8 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Echolocation — "In fog, deal 20% more damage and never miss." +20%
       // power in fog and all moves always hit while fog is active.
       return ok([
-        new MovePowerBoostAbAttr((_u, _t, _move) => globalScene.arena.weather?.weatherType === WeatherType.FOG, 1.2),
-        new ConditionalAlwaysHitAbAttr({ weather: [WeatherType.FOG] }),
+        new MovePowerBoostAbAttr((_u, _t, _move) => isFogWeather(globalScene.arena.weather?.weatherType), 1.2),
+        new ConditionalAlwaysHitAbAttr({ weather: [WeatherType.FOG, WeatherType.EERIE_FOG] }),
       ]);
     case 916:
       // Narcissist — "When a stat is lowered, sharply raise both offenses."
@@ -4645,7 +4646,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new WeatherStatMultiplierAbAttr({
           stat: Stat.EVA,
           multiplier: 4 / 3,
-          weathers: [WeatherType.FOG],
+          weathers: [WeatherType.FOG, WeatherType.EERIE_FOG],
         }),
       ]);
     case 819:
@@ -5085,7 +5086,7 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 820:
       // Soul Tap — "Drain 10% HP from foes at the end of each turn in fog."
       // Same as Life Steal but only while fog is active.
-      return ok([new PostTurnDrainAbAttr({ fraction: 0.1, weather: [WeatherType.FOG] })]);
+      return ok([new PostTurnDrainAbAttr({ fraction: 0.1, weather: [WeatherType.FOG, WeatherType.EERIE_FOG] })]);
     // -------------------------------------------------------------------------
     // Round 33 — more wires + StabAdd / TypeDamageBoost compositions
     // -------------------------------------------------------------------------
@@ -5626,6 +5627,17 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Cryomancy — "Moves inflict frostbite 5x as often." Same shape as
       // Pyromancy (270): flat 30% ER_FROSTBITE on hit.
       return ok([
+        new ChanceBattlerTagOnHitAbAttr({ chance: 30, tags: [BattlerTagType.ER_FROSTBITE], contactRequired: false }),
+      ]);
+    case 666:
+      // Snowy Wrath = Snow Warning + Cryomancy. Snow Warning's plain HAIL chips
+      // non-Ice types but DOESN'T carry the +50% Ice Defense the 2.65 dex wants, so
+      // summon the bespoke SNOWY_WRATH weather (8 turns) — a damaging snow that BOTH
+      // chips 1/16 non-Ice per turn AND boosts Ice-type Defense — and keep Cryomancy's
+      // flat 30% ER_FROSTBITE-on-hit rider. Distinct weather type so vanilla hail/snow
+      // (Abomasnow's Snow Warning) is unaffected.
+      return ok([
+        new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.SNOWY_WRATH, turns: 8 }),
         new ChanceBattlerTagOnHitAbAttr({ chance: 30, tags: [BattlerTagType.ER_FROSTBITE], contactRequired: false }),
       ]);
     case 444:
@@ -6814,7 +6826,7 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       return ok([
         new MovePowerBoostAbAttr((user, _t, move) => {
           const w = globalScene.arena.weather?.weatherType;
-          return w === WeatherType.FOG && user.getMoveType(move) === PokemonType.GHOST;
+          return isFogWeather(w) && user.getMoveType(move) === PokemonType.GHOST;
         }, 1.5),
         new DamageReductionAbAttr({
           reduction: 0.5,
@@ -7345,7 +7357,9 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // Surprise! — "Astonishes enemy priority users in fog." Now uses the
       // real WeatherType.FOG (pokerogue ships FOG in the WeatherType enum).
       // Flinch chance gated on fog being active.
-      return ok([new PreemptivePriorityCounterAbAttr().addCondition(getWeatherCondition(WeatherType.FOG))]);
+      return ok([
+        new PreemptivePriorityCounterAbAttr().addCondition(getWeatherCondition(WeatherType.FOG, WeatherType.EERIE_FOG)),
+      ]);
     case 629:
       // Shallow Grave — "After fainting while fog is active, the user revives at
       // 25% max HP when sending out your next party member. This still activates
@@ -7354,7 +7368,12 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // HP as a living bench reserve when its side next sends out a party member
       // (see PostFaintDeferredReviveAbAttr). Gated on fog at faint time (so the
       // last-fog-turn faint still arms).
-      return ok([new PostFaintDeferredReviveAbAttr({ hpFraction: 0.25, requireWeather: [WeatherType.FOG] })]);
+      return ok([
+        new PostFaintDeferredReviveAbAttr({
+          hpFraction: 0.25,
+          requireWeather: [WeatherType.FOG, WeatherType.EERIE_FOG],
+        }),
+      ]);
     case 634:
       // Last Stand — covered in R20; kept here as no-op (return null to fall through).
       return null;
@@ -7437,13 +7456,12 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       return ok([
         new ReceivedMoveDamageMultiplierAbAttr(
           target =>
-            target.getTag(BattlerTagType.ER_ENRAGE) != null
-            || globalScene.arena.weather?.weatherType === WeatherType.FOG,
+            target.getTag(BattlerTagType.ER_ENRAGE) != null || isFogWeather(globalScene.arena.weather?.weatherType),
           0.5,
         ),
         new BlockRecoilDamageAttr(),
-        new PostSummonAddBattlerTagAbAttr(BattlerTagType.ER_ENRAGE, 1).addCondition(
-          () => globalScene.arena.weather?.weatherType === WeatherType.FOG,
+        new PostSummonAddBattlerTagAbAttr(BattlerTagType.ER_ENRAGE, 1).addCondition(() =>
+          isFogWeather(globalScene.arena.weather?.weatherType),
         ),
       ]);
     case 828:

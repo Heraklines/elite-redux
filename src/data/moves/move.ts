@@ -44,6 +44,7 @@ import { SpeciesFormChangeRevertWeatherFormTrigger } from "#data/form-change-tri
 import { getNonVolatileStatusEffects, getStatusEffectHealText, isNonVolatileStatusEffect } from "#data/status-effect";
 import { TerrainType } from "#data/terrain";
 import { getTypeDamageMultiplier } from "#data/type";
+import { isFogWeather } from "#data/weather";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -1312,6 +1313,14 @@ export abstract class Move implements Localizable {
     // real Reckless ability on a real recoil move isn't double-counted.
     if (source.getTag(BattlerTagType.ER_ENRAGE) && !this.hasFlag(MoveFlags.RECKLESS_MOVE)) {
       power.value *= 1.2;
+    }
+
+    // ER Ghastly Echo (848) "empower the switch-in": the mon sent out after
+    // Ghastly Echo's self-switch gets +50% move power for its first move (see
+    // ErEmpoweredSwitchInTag; the tag lapses AFTER_MOVE so only that move is
+    // boosted).
+    if (source.getTag(BattlerTagType.ER_EMPOWERED_SWITCH_IN)) {
+      power.value *= 1.5;
     }
 
     if (!ignoreSourceAbility) {
@@ -3002,6 +3011,8 @@ export class PlantHealAttr extends WeatherHealAttr {
       case WeatherType.HAIL:
       case WeatherType.SNOW:
       case WeatherType.FOG:
+      // ER Eerie Fog halves weather-based recovery like other non-Sun weathers.
+      case WeatherType.EERIE_FOG:
       case WeatherType.HEAVY_RAIN:
         return 0.25;
       default:
@@ -3015,6 +3026,9 @@ export class SandHealAttr extends WeatherHealAttr {
     switch (weatherType) {
       case WeatherType.SANDSTORM:
         return 2 / 3;
+      // ER Eerie Fog halves Shore Up too (weather-based recovery in fog).
+      case WeatherType.EERIE_FOG:
+        return 0.25;
       default:
         return 0.5;
     }
@@ -5464,6 +5478,8 @@ export class AntiSunlightPowerDecreaseAttr extends VariablePowerAttr {
         case WeatherType.HAIL:
         case WeatherType.SNOW:
         case WeatherType.FOG:
+        // ER Eerie Fog is a non-Sun weather — Solar moves are weakened in it too.
+        case WeatherType.EERIE_FOG:
         case WeatherType.HEAVY_RAIN:
           power.value *= 0.5;
           return true;
@@ -7319,7 +7335,7 @@ export class CurseAttr extends MoveEffectAttr {
     // ER Eerie Fog: in fog, ALL Curses act as the Ghost-type Curse (sacrifice HP
     // to curse the target) regardless of the user's typing.
     const erFogActive =
-      globalScene.arena.weather?.weatherType === WeatherType.FOG && !globalScene.arena.weather.isEffectSuppressed();
+      isFogWeather(globalScene.arena.weather?.weatherType) && !globalScene.arena.weather?.isEffectSuppressed();
     if (user.getTypes(true).includes(PokemonType.GHOST) || erFogActive) {
       if (target.getTag(BattlerTagType.CURSED)) {
         globalScene.phaseManager.queueMessage(i18next.t("battle:attackFailed"));
@@ -9543,7 +9559,7 @@ export class SuppressAbilitiesAttr extends MoveEffectAttr {
  */
 export class ErSuppressAbilitiesInFogAttr extends SuppressAbilitiesAttr {
   override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
-    if (globalScene.arena.weather?.weatherType !== WeatherType.FOG) {
+    if (!isFogWeather(globalScene.arena.weather?.weatherType)) {
       return false;
     }
     // Mirror the base getCondition guard: only suppress a suppressable ability.
@@ -11366,6 +11382,7 @@ export function initMoves() {
           WeatherType.HAIL,
           WeatherType.SNOW,
           WeatherType.FOG,
+          WeatherType.EERIE_FOG,
           WeatherType.HEAVY_RAIN,
           WeatherType.HARSH_SUN,
         ];
@@ -11757,6 +11774,9 @@ export function initMoves() {
     new StatusMove(MoveId.DEFOG, PokemonType.FLYING, -1, 15, -1, 0, 4)
       .attr(StatStageChangeAttr, [Stat.EVA], -1)
       .attr(ClearWeatherAttr, WeatherType.FOG)
+      // ER: Defog also lifts the distinct Eerie Fog weather (ClearWeatherAttr
+      // no-ops unless that weather is the active one).
+      .attr(ClearWeatherAttr, WeatherType.EERIE_FOG)
       .attr(ClearTerrainAttr)
       .attr(RemoveScreensAttr, (_user, target) => (target.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY))
       .attr(RemoveArenaTrapAttr, () => ArenaTagSide.BOTH)

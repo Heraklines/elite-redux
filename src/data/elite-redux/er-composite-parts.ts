@@ -102,7 +102,10 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   661: { erAbilityId: 661, parts: [{ kind: "pokerogue", abilityId: 39 }, { kind: "pokerogue", abilityId: 201 }], hasRider: false },
   664: { erAbilityId: 664, parts: [{ kind: "pokerogue", abilityId: 199 }, { kind: "er", erAbilityId: 351 }], hasRider: false },
   665: { erAbilityId: 665, parts: [{ kind: "pokerogue", abilityId: 18 }, { kind: "pokerogue", abilityId: 11 }], hasRider: false },
-  666: { erAbilityId: 666, parts: [{ kind: "pokerogue", abilityId: 117 }, { kind: "er", erAbilityId: 456 }], hasRider: false },
+  // 666 Snowy Wrath reclassified composite -> bespoke (Snow Warning's plain HAIL
+  // lacks the +50% Ice Defense the 2.65 dex requires). Its vestigial parts entry is
+  // removed so the side-table count stays in lockstep with the archetype config; the
+  // live wire (SNOWY_WRATH weather summon + Cryomancy frostbite) is in dispatchBespoke.
   667: { erAbilityId: 667, parts: [{ kind: "pokerogue", abilityId: 168 }, { kind: "pokerogue", abilityId: 61 }], hasRider: false },
   675: { erAbilityId: 675, parts: [{ kind: "pokerogue", abilityId: 3 }, { kind: "er", erAbilityId: 695 }], hasRider: false },
   679: { erAbilityId: 679, parts: [{ kind: "pokerogue", abilityId: 39 }, { kind: "er", erAbilityId: 375 }], hasRider: false },

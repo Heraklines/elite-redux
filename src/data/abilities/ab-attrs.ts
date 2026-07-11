@@ -14,6 +14,7 @@ import { getStatusEffectDescriptor, getStatusEffectHealText } from "#data/status
 import { TerrainType } from "#data/terrain";
 import { getTypeDamageMultiplier } from "#data/type";
 import type { Weather } from "#data/weather";
+import { isFogWeather } from "#data/weather";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -4801,7 +4802,7 @@ export class FogRestoreDisguiseFormChangeAbAttr extends PostWeatherChangeAbAttr 
   }
 
   override canApply({ pokemon, weather }: PostWeatherChangeAbAttrParams): boolean {
-    return pokemon.formIndex === this.bustedFormIndex && weather === WeatherType.FOG;
+    return pokemon.formIndex === this.bustedFormIndex && isFogWeather(weather);
   }
 
   override apply({ simulated, pokemon }: PostWeatherChangeAbAttrParams): void {
@@ -4829,7 +4830,7 @@ export class PostSummonFogRestoreDisguiseAbAttr extends PostSummonAbAttr {
   }
 
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
-    return pokemon.formIndex === this.bustedFormIndex && globalScene.arena.weatherType === WeatherType.FOG;
+    return pokemon.formIndex === this.bustedFormIndex && isFogWeather(globalScene.arena.weatherType);
   }
 
   override apply({ simulated, pokemon }: AbAttrBaseParams): void {

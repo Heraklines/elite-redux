@@ -146,6 +146,7 @@ import { getRandomStatus, getStatusEffectHealText, getStatusEffectOverlapText, S
 import { getTerrainBlockMessage, TerrainType } from "#data/terrain";
 import type { TypeDamageMultiplier } from "#data/type";
 import { getTypeDamageMultiplier, getTypeRgb } from "#data/type";
+import { isFogWeather } from "#data/weather";
 import { AbilityId } from "#enums/ability-id";
 import { AiType } from "#enums/ai-type";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -1985,7 +1986,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         }
         break;
       case Stat.DEF:
-        if (this.isOfType(PokemonType.ICE) && globalScene.arena.weather?.weatherType === WeatherType.SNOW) {
+        // Ice-types gain +50% Def in snow — and in ER's Snowy Wrath (er 666), a
+        // damaging snow that carries the same Ice Defense boost.
+        if (
+          this.isOfType(PokemonType.ICE)
+          && (globalScene.arena.weather?.weatherType === WeatherType.SNOW
+            || globalScene.arena.weather?.weatherType === WeatherType.SNOWY_WRATH)
+        ) {
           ret *= 1.5;
         }
         break;
@@ -5123,8 +5130,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // ER Eerie Fog: Ghost- and Psychic-type defenders take 20% less move damage.
     const erFog = globalScene.arena.weather;
     if (
-      erFog?.weatherType === WeatherType.FOG
-      && !erFog.isEffectSuppressed()
+      isFogWeather(erFog?.weatherType)
+      && !erFog?.isEffectSuppressed()
       && (this.isOfType(PokemonType.GHOST) || this.isOfType(PokemonType.PSYCHIC))
     ) {
       arenaAttackTypeMultiplier.value *= 0.8;

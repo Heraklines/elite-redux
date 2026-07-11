@@ -146,11 +146,12 @@ export const ER_WEATHER_ALWAYS_HIT: ReadonlyMap<number, readonly WeatherType[]> 
   number,
   readonly WeatherType[]
 >([
-  [MoveId.EERIE_SPELL, [WeatherType.FOG]], // er 754 — "Never misses in fog"
+  // er 754 — "Never misses in fog" (vanilla FOG or ER's distinct EERIE_FOG).
+  [MoveId.EERIE_SPELL, [WeatherType.FOG, WeatherType.EERIE_FOG]],
   // Vexing Void (er 974) is an ER custom — resolve its runtime id.
   ...(ER_ID_MAP.moves[974] === undefined
     ? []
-    : ([[ER_ID_MAP.moves[974], [WeatherType.FOG]]] as [number, readonly WeatherType[]][])),
+    : ([[ER_ID_MAP.moves[974], [WeatherType.FOG, WeatherType.EERIE_FOG]]] as [number, readonly WeatherType[]][])),
 ]);
 
 /**

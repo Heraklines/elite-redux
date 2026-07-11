@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import type { BattlerId } from "#data/battle-format";
 import { allMoves } from "#data/data-lists";
+import { isFogWeather } from "#data/weather";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory, type MoveDamageCategory } from "#enums/move-category";
@@ -100,13 +101,19 @@ export function getMoveTargets(user: Pokemon, move: MoveId, replaceTarget?: Move
       break;
 
     // biome-ignore lint/suspicious/noFallthroughSwitchClause: intentional
-    case MoveTarget.CURSE:
-      // Non ghost-type Curse targets exclusively the user; ghost-type Curse targets any enemy
+    case MoveTarget.CURSE: {
+      // Non ghost-type Curse targets exclusively the user; ghost-type Curse targets any enemy.
+      // ER Eerie Fog (docs/er-custom-mechanics.md): in Eerie Fog ALL Curses become the
+      // Ghost-type Curse, so a non-Ghost user's Curse also targets an enemy (matching
+      // CurseAttr's fog branch, which sacrifices HP + applies the CURSED tag).
       // TODO: check if the user is about to Terastallize to/from Ghost type
-      if (!user.isOfType(PokemonType.GHOST, true, true)) {
+      const w = globalScene.arena.weather;
+      const fogCurse = isFogWeather(w?.weatherType) && !w?.isEffectSuppressed();
+      if (!user.isOfType(PokemonType.GHOST, true, true) && !fogCurse) {
         set = [user];
         break;
       }
+    }
     case MoveTarget.NEAR_OTHER:
     case MoveTarget.OTHER:
     case MoveTarget.ALL_NEAR_OTHERS:

@@ -440,7 +440,12 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   663: { erAbilityId: 663, archetype: "bespoke", params: null },
   664: { erAbilityId: 664, archetype: "composite-vanilla-mashup", params: {"parts":["Water Bubble","Flaming Soul"]} },
   665: { erAbilityId: 665, archetype: "composite-vanilla-mashup", params: {"parts":["Flash Fire","Water Absorb"]} },
-  666: { erAbilityId: 666, archetype: "composite-vanilla-mashup", params: {"parts":["Snow Warning","Cryomancy"]} },
+  // 666 Snowy Wrath reclassified composite -> bespoke: Snow Warning's HAIL doesn't
+  // carry the +50% Ice Defense the 2.65 dex wants, so the dispatcher summons the
+  // bespoke SNOWY_WRATH weather (damaging snow + Ice-Def boost) plus Cryomancy's
+  // frostbite rider. Composite parts entry removed (see er-composite-parts.ts).
+  666: { erAbilityId: 666, archetype: "bespoke", params: null }, // Snowy Wrath — see dispatchBespoke
+
   667: { erAbilityId: 667, archetype: "composite-vanilla-mashup", params: {"parts":["Protean","Shed Skin"]} },
   668: { erAbilityId: 668, archetype: "bespoke", params: null },
   669: { erAbilityId: 669, archetype: "bespoke", params: null },
