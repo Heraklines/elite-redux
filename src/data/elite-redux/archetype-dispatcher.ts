@@ -354,6 +354,7 @@ import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { BerryType } from "#enums/berry-type";
 import { ErMoveId } from "#enums/er-move-id";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
@@ -1695,8 +1696,15 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       return [new StabAddAbAttr({ targetType: PokemonType.WATER }), new DrenchImmunityAbAttr()];
     case 969: // Hand Barnacles: "Water STAB"
       return [new StabAddAbAttr({ targetType: PokemonType.WATER })];
-    case 760: // Acidic Slime: "Poison STAB"
-      return [new StabAddAbAttr({ targetType: PokemonType.POISON })];
+    case 760: // Acidic Slime: "Poison STAB" + "Poison moves are super-effective
+      // vs Steel" (the offensive type-chart override the dex grants, mirroring
+      // Trash Heap 725 / Pyroclastic Flow 635).
+      return [
+        new StabAddAbAttr({ targetType: PokemonType.POISON }),
+        new OffensiveTypeChartOverrideAbAttr({
+          rules: [{ attackType: PokemonType.POISON, defenderType: PokemonType.STEEL, newMultiplier: 2 }],
+        }),
+      ];
     case 826: // Tender Affection: "Fairy STAB"
       return [new StabAddAbAttr({ targetType: PokemonType.FAIRY })];
     case 681: // Atomic Punch: "Iron Fist + 30% Steel type damage" — Steel moves x1.3
@@ -1713,6 +1721,19 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       ];
     case 986: // Mucus Membrane: "Takes 30% less damage from attacks" (reduction = fraction removed)
       return [new DamageReductionAbAttr({ reduction: 0.3, filter: { kind: "all" } })];
+    case 530: // Crowned King: "Prevents all opposing Pokemon from consuming held
+      // items." The composite parts wire Unnerve (berry-only block) + the Grim/
+      // Chilling Neigh KO boosts; add the PreventItemUse marker so NON-berry
+      // consumables are blocked too (mirrors As One 266/267).
+      return [new PreventItemUseAbAttr()];
+    case 779: // Blight Scale: "30% chance to inflict poison on contact moves, BOTH
+      // when attacking and being attacked." The composite parts wire Multiscale +
+      // Poison Point (the DEFENSIVE half); add the OFFENSIVE 30%-poison-on-contact.
+      return [new ChanceStatusOnAttackAbAttr({ chance: 30, effects: [StatusEffect.POISON], contactRequired: true })];
+    case 962: // Angelic Wings: "Prism Scales + Huge Wings." The Prism Scales part
+      // (-30% special damage) resolves; add the dropped Huge Wings component —
+      // wing/wind/air-based (AIR_BASED) moves at 1.3x, mirroring Giant Wings er371.
+      return [new FlagDamageBoostAbAttr({ flag: MoveFlags.AIR_BASED, multiplier: 1.3 })];
     // (er 909 Lightsaber relocated to dispatchBespokeR48 — it's a pure
     // hand-wired ability with no vanilla-ability parts, so it's classified
     // `bespoke` rather than `composite-vanilla-mashup`.)
@@ -1785,9 +1806,12 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       // contact" — retaliate with Thunder Cage when struck by a contact move
       // (Shell Armor is the auto-resolved part). The ROM dex specifies the
       // counter is cast at 50 BP (Thunder Cage's natural power is 80), so the
-      // power override is required to match the dex.
+      // power override is required to match the dex. Dex also grants "Incoming
+      // damage is reduced by 20%, multiplicative" — add the 0.8x DamageReduction
+      // (same form Dream State/709 uses).
       return [
         new CounterAttackOnHitAbAttr({ moveId: MoveId.THUNDER_CAGE, power: 50, filter: { contactRequired: true } }),
+        new DamageReductionAbAttr({ reduction: 0.2, filter: { kind: "all" } }),
       ];
     case 1019: // Wind Chimes: "Amplifier + attacks with 30 BP Hyper Voice when
       // hit" — retaliate with a 30BP Hyper Voice on any hit (power overridden
@@ -2004,6 +2028,16 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
   // status-immunity bypass (poison Steel/Poison) but NOT the "Poison-type moves
   // become super-effective against Steel" damage clause; append it.
   if (erAbilityId === 725) {
+    out.push(
+      new OffensiveTypeChartOverrideAbAttr({
+        rules: [{ attackType: PokemonType.POISON, defenderType: PokemonType.STEEL, newMultiplier: 2 }],
+      }),
+    );
+  }
+  // Pyroclastic Flow 635 (Molten Down + Corrosion) — the parts wire Fire-SE-vs-Rock
+  // and poison-any-type, but NOT the dex's "Poison-type moves become super-effective
+  // against Steel"; append the same offensive override 725/760 carry.
+  if (erAbilityId === 635) {
     out.push(
       new OffensiveTypeChartOverrideAbAttr({
         rules: [{ attackType: PokemonType.POISON, defenderType: PokemonType.STEEL, newMultiplier: 2 }],
@@ -3643,10 +3677,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([new PostSummonClearAllyStatStagesAbAttr()]);
     case 989:
       // Storm Cloud — "Summon rain on entry for 8 turns. Gain Electric-type STAB."
-      // Use EntryEffect set-weather + add-self-type for Electric (so STAB applies).
+      // The dex grants Electric STAB ONLY (STAB-add phrasing, cf. Old Mariner 620),
+      // NOT defensive Electric typing — so use StabAddAbAttr, not add-self-type
+      // (which would graft a Ground weakness the dex never grants). Keep RAIN(8).
       return ok([
         new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.RAIN, turns: 8 }),
-        new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.ELECTRIC }),
+        new StabAddAbAttr({ targetType: PokemonType.ELECTRIC }),
       ]);
     case 604:
       // Desert Spirit — "Summons sand on entry. Ground moves hit airborne in
@@ -4209,8 +4245,27 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Monster Mash — "Casts Trick-or-Treat on entry."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TRICK_OR_TREAT })]);
     case 784:
-      // Poseidon's Dominion — "Attacks with Whirlpool on entry."
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.WHIRLPOOL })]);
+      // Poseidon's Dominion — "Attacks with a 50 BP Whirlpool on entry." Vanilla
+      // Whirlpool is 35 BP; the dex specifies 50, so override the power.
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.WHIRLPOOL, power: 50 })]);
+    case 849:
+      // World Serpent — "Physical non-contact moves deal 20% more damage. Contact
+      // moves have a 50% chance to trap for 4-5 turns." Bespoke: the old composite
+      // (Long Reach + Grip Pincer) was wrong — Long Reach stripped contact from
+      // ALL moves (so the trap could never proc) and gave no boost, and Grip
+      // Pincer dragged in Def-ignore/always-hit riders the dex never grants.
+      return ok([
+        new MovePowerBoostAbAttr(
+          (_user, _target, move) => move.category === MoveCategory.PHYSICAL && !move.hasFlag(MoveFlags.MAKES_CONTACT),
+          1.2,
+        ),
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 50,
+          tags: [BattlerTagType.WRAP],
+          contactRequired: true,
+          turnRange: [4, 5],
+        }),
+      ]);
     case 788:
       // Glacial Rage — "Triggers 50 BP Blizzard after using a Ice-type move."
       return ok([
@@ -5352,8 +5407,21 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 890:
       // Craving — "Triggers a random berry effect at the end of every turn."
       // Fires a random berry's effect unconditionally (was Harvest, which only
-      // restored a berry already eaten this battle — the wrong mechanic).
-      return ok([new PostTurnRandomBerryEffectAbAttr()]);
+      // restored a berry already eaten this battle — the wrong mechanic). The dex
+      // curates the pool to stat/pinch berries (Sitrus is the pinch-healing berry),
+      // so restrict the pick and keep off-list berries (Lum/Enigma/Leppa) out.
+      return ok([
+        new PostTurnRandomBerryEffectAbAttr([
+          BerryType.SITRUS,
+          BerryType.LIECHI,
+          BerryType.GANLON,
+          BerryType.SALAC,
+          BerryType.PETAYA,
+          BerryType.APICOT,
+          BerryType.LANSAT,
+          BerryType.STARF,
+        ]),
+      ]);
     case 899:
       // Backup Power — "Revives at 25% HP once after fainting in Electric
       // Terrain." Terrain-gated revive. Defer.
@@ -5959,9 +6027,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 594:
       // Haunting Frenzy — "20% chance to flinch + gains +1 Speed on KO." The
-      // prior wire had only the flinch; the on-KO Speed boost was missing.
+      // dex/ROM flinch has NO contact qualifier ("Attacks have a 20% chance to
+      // flinch"), so contactRequired:false makes non-contact attacks roll it too.
       return ok([
-        new ChanceBattlerTagOnAttackAbAttr({ chance: 20, tags: [BattlerTagType.FLINCHED], contactRequired: true }),
+        new ChanceBattlerTagOnAttackAbAttr({ chance: 20, tags: [BattlerTagType.FLINCHED], contactRequired: false }),
         new StatTriggerOnKoAbAttr({ stats: [{ stat: Stat.SPD, stages: 1 }] }),
       ]);
     case 618:

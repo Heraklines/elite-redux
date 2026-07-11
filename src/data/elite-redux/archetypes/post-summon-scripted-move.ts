@@ -80,6 +80,11 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
     return this.opts.moveId;
   }
 
+  /** The base-power override for the cast move, or `undefined` for the move's full power. */
+  public getPower(): number | undefined {
+    return this.opts.power;
+  }
+
   /** Whether the on-entry cast targets EVERY opponent (Web Spinner) vs the leftmost foe. */
   public targetsAllOpponents(): boolean {
     return this.opts.allOpponents ?? false;

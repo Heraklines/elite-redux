@@ -259,6 +259,14 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   [AbilityId.MISTY_SURGE, ab => patchTerrainSummoner(ab, 8)],
   [AbilityId.GRASSY_SURGE, ab => patchTerrainSummoner(ab, 8)],
 
+  // Orichalcum Pulse (584) / Hadron Engine (587): ER dex sets sun / electric
+  // terrain on entry for 8 turns (12 with Heat Rock / Terrain Extender, via the
+  // FieldEffectModifier extension the ER summoner helpers re-apply). Vanilla
+  // defaults to 5. The +33% ATK/SpAtk-in-field StatMultiplier attrs are left
+  // untouched (already correct); only the summon duration is patched.
+  [AbilityId.ORICHALCUM_PULSE, ab => patchWeatherSummoner(ab, WeatherType.SUNNY, 8)],
+  [AbilityId.HADRON_ENGINE, ab => patchTerrainSummoner(ab, 8)],
+
   // ===== MINOR — Speed-in-weather multiplier (2.0 → 1.5) =====
   [AbilityId.SWIFT_SWIM, ab => mutateStatMultiplier(ab, Stat.SPD, 1.5)],
   [AbilityId.CHLOROPHYLL, ab => mutateStatMultiplier(ab, Stat.SPD, 1.5)],

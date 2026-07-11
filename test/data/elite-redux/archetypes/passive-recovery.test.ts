@@ -19,17 +19,24 @@ import type { BattleScene } from "#app/battle-scene";
 import { initGlobalScene } from "#app/global-scene";
 import { PassiveRecoveryAbAttr } from "#data/elite-redux/archetypes/passive-recovery";
 import { TerrainType } from "#data/terrain";
+import { AbilityId } from "#enums/ability-id";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { beforeEach, describe, expect, it } from "vitest";
 
-function makeStubPokemon(opts: { fullHp?: boolean; status?: StatusEffect; hp?: number; maxHp?: number } = {}): Pokemon {
+function makeStubPokemon(
+  opts: { fullHp?: boolean; status?: StatusEffect; hp?: number; maxHp?: number; comatose?: boolean } = {},
+): Pokemon {
   return {
     isFullHp: () => opts.fullHp ?? false,
     status: opts.status === undefined ? null : { effect: opts.status },
     hp: opts.hp ?? 50,
     getMaxHp: () => opts.maxHp ?? 100,
+    // The SLEEP-gated condition (Sweet Dreams) also fires for Comatose holders,
+    // so matchesCondition consults hasAbility(COMATOSE) — the stub must provide it.
+    hasAbility: (id: AbilityId) => (opts.comatose ?? false) && id === AbilityId.COMATOSE,
+    getTypes: () => [],
   } as unknown as Pokemon;
 }
 
@@ -97,6 +104,14 @@ describe("PassiveRecoveryAbAttr archetype (C1e)", () => {
         condition: { kind: "status", status: StatusEffect.SLEEP },
       });
       expect(runCanApply({ attr, pokemon: makeStubPokemon() })).toBe(false);
+    });
+
+    it("SLEEP gate ALSO fires for a Comatose holder with no real status (Peaceful Slumber #490)", () => {
+      const attr = new PassiveRecoveryAbAttr({
+        healFraction: 1 / 8,
+        condition: { kind: "status", status: StatusEffect.SLEEP },
+      });
+      expect(runCanApply({ attr, pokemon: makeStubPokemon({ comatose: true }) })).toBe(true);
     });
   });
 

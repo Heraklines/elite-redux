@@ -692,6 +692,11 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
     return this.filter;
   }
 
+  /** Whether the proc requires the holder's move to make contact (read-only). */
+  public requiresContact(): boolean {
+    return this.contactRequired;
+  }
+
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     const { simulated, pokemon, move, opponent: target } = params;
     if (!super.canApply(params)) {

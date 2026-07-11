@@ -261,7 +261,14 @@ export class TypeRecoilAbAttr extends PostAttackAbAttr {
     if (!recoil) {
       return;
     }
-    pokemon.damageAndUpdate(recoil, { result: HitResult.INDIRECT, ignoreSegments: true });
-    pokemon.turnData.damageTaken += recoil;
+    // ER dex: every TypeRecoilAbAttr consumer (Electric Burst, Infernal Rage,
+    // Doom Blast, Two-Faced) states "The recoil damage will not knock out the
+    // user." Clamp so the holder is always left with >=1 HP.
+    const survivableRecoil = Math.min(recoil, pokemon.hp - 1);
+    if (survivableRecoil <= 0) {
+      return;
+    }
+    pokemon.damageAndUpdate(survivableRecoil, { result: HitResult.INDIRECT, ignoreSegments: true });
+    pokemon.turnData.damageTaken += survivableRecoil;
   }
 }

@@ -637,7 +637,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   846: { erAbilityId: 846, archetype: "composite-vanilla-mashup", params: {"parts":["Dual Wield","Best Offense"]} },
   847: { erAbilityId: 847, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"ELECTRIC"}} },
   848: { erAbilityId: 848, archetype: "composite-vanilla-mashup", params: {"parts":["Steadfast","blocks phasing moves"]} },
-  849: { erAbilityId: 849, archetype: "composite-vanilla-mashup", params: {"parts":["Long Reach","Grip Pincer"]} },
+  849: { erAbilityId: 849, archetype: "bespoke", params: null }, // World Serpent: physical non-contact +20% + 50% contact-trap (bespoke — see dispatchBespoke; Long Reach/Grip Pincer composite was wrong)
   850: { erAbilityId: 850, archetype: "composite-vanilla-mashup", params: {"parts":["Serene Grace","Giant Wings"]} },
   851: { erAbilityId: 851, archetype: "bespoke", params: null },
   852: { erAbilityId: 852, archetype: "chance-status-on-hit", params: {"chance":30,"status":"POISON","direction":"offense","onContactOnly":false} }, // Envenom: holder's move poisons the target after landing ANY move (not contact-only)

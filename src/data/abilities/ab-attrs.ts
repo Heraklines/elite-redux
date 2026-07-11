@@ -4972,11 +4972,31 @@ export class PostTurnAbAttr extends AbAttr {
 export class PostTurnRandomBerryEffectAbAttr extends PostTurnAbAttr {
   private static readonly BERRY_COUNT = Object.values(BerryType).filter(v => typeof v === "number").length;
 
+  /**
+   * Optional curated pool the random pick is restricted to. When omitted the
+   * pick is uniform across ALL {@linkcode BerryType} (legacy behavior). Craving
+   * (er890) passes its dex pool so off-list berries (Lum/Enigma/Leppa) can't fire.
+   */
+  private readonly berryPool: readonly BerryType[] | undefined;
+
+  constructor(berryPool?: readonly BerryType[]) {
+    super();
+    this.berryPool = berryPool && berryPool.length > 0 ? berryPool : undefined;
+  }
+
+  /** Read-only accessor for the configured curated pool (tests); `undefined` = all berries. */
+  public getBerryPool(): readonly BerryType[] | undefined {
+    return this.berryPool;
+  }
+
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (simulated) {
       return;
     }
-    const berry = pokemon.randBattleSeedInt(PostTurnRandomBerryEffectAbAttr.BERRY_COUNT) as BerryType;
+    const berry =
+      this.berryPool === undefined
+        ? (pokemon.randBattleSeedInt(PostTurnRandomBerryEffectAbAttr.BERRY_COUNT) as BerryType)
+        : this.berryPool[pokemon.randBattleSeedInt(this.berryPool.length)];
     globalScene.phaseManager.unshiftNew(
       "CommonAnimPhase",
       pokemon.getBattlerIndex(),

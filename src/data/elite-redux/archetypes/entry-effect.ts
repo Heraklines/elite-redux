@@ -50,7 +50,7 @@ import { ER_SEED_CONFIG, ErSeedModifier } from "#data/elite-redux/er-terrain-see
 import { PokemonMove } from "#data/moves/pokemon-move";
 import type { TerrainType } from "#data/terrain";
 import { ArenaTagSide } from "#enums/arena-tag-side";
-import type { ArenaTagType } from "#enums/arena-tag-type";
+import { ArenaTagType } from "#enums/arena-tag-type";
 import type { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
@@ -303,6 +303,15 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
         const playerSide = pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
         const foeSide = pokemon.isPlayer() ? ArenaTagSide.ENEMY : ArenaTagSide.PLAYER;
         const side = sideOpt === "both" ? ArenaTagSide.BOTH : sideOpt === "self" ? playerSide : foeSide;
+        // Foamy Web (er951): "Cannot activate if Sticky Web is already present on
+        // the opponent's field." FOAMY_WEB is a distinct hazard type, so it would
+        // otherwise stack with a real Sticky Web — no-op when one is already there.
+        if (
+          this.effect.hazard === ArenaTagType.FOAMY_WEB
+          && globalScene.arena.getTagOnSide(ArenaTagType.STICKY_WEB, side)
+        ) {
+          return;
+        }
         for (let i = 0; i < layers; i++) {
           globalScene.arena.addTag(this.effect.hazard, 0, undefined, pokemon.id, side);
         }

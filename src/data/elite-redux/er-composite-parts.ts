@@ -171,7 +171,9 @@ export const ER_COMPOSITE_PARTS: Readonly<Record<number, ErCompositeEntry>> = {
   845: { erAbilityId: 845, parts: [{ kind: "er", erAbilityId: 390 }], unresolvedParts: ["30% Bleed chance on horn moves"], hasRider: true },
   846: { erAbilityId: 846, parts: [{ kind: "er", erAbilityId: 433 }, { kind: "er", erAbilityId: 844 }], hasRider: false },
   848: { erAbilityId: 848, parts: [{ kind: "pokerogue", abilityId: 80 }], unresolvedParts: ["blocks phasing moves"], hasRider: true },
-  849: { erAbilityId: 849, parts: [{ kind: "pokerogue", abilityId: 203 }, { kind: "er", erAbilityId: 373 }], hasRider: false },
+  // 849 World Serpent reclassified composite -> bespoke (the Long Reach + Grip
+  // Pincer resolution was WRONG per the 2.65 dex); its vestigial parts entry is
+  // removed so the side-table count stays in lockstep with the archetype config.
   850: { erAbilityId: 850, parts: [{ kind: "pokerogue", abilityId: 32 }, { kind: "er", erAbilityId: 371 }], hasRider: false },
   854: { erAbilityId: 854, parts: [{ kind: "pokerogue", abilityId: 178 }, { kind: "er", erAbilityId: 568 }], hasRider: false },
   856: { erAbilityId: 856, parts: [{ kind: "er", erAbilityId: 404 }], unresolvedParts: ["Rock moves have 50% burn chance"], hasRider: true },
