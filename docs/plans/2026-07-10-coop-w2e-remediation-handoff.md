@@ -578,3 +578,31 @@ bumps pairing to `er-coop-20` so cached older clients cannot silently ignore the
 Proof: controller/capability/wiring suites pass 29/29, including actual first-frame loss and recovery;
 production-shaped pacing, biome-boundary, and multiwave suites pass 13/13. The next external checkpoint
 and staging promotion remain pending.
+
+## 29. Late encounter authority and independent stop-ship audit
+
+The next current-state audit found that ordinary-wave party recovery still arrived too late to control the
+whole encounter. `BattleScene.newBattle()` could provisionally choose WILD versus TRAINER, the mystery-event
+type, battle format, enemy levels, and trainer locally; `EncounterPhase` later replaced only the enemy party.
+A late/replayed carrier could therefore leave a trainer party attached to a wild battle shell, the wrong
+trainer sprite/dialogue, or single/double/triple command maps built for the wrong format.
+
+`740a307de` is the failure-first carrier proof. Protocol `er-coop-21` pairs the replayable enemy party with a
+complete encounter descriptor: battle/ME type, format, levels, and serialized trainer identity plus resolved
+names/dialogue/FX. The guest consumes it once, validates contradictions, constructs the replacement trainer
+before mutating the scene, resets the format's turn-command maps, clears every provisional enemy slot, then
+rebuilds the exact host party. Non-ME waves require a non-empty contiguous party; ME waves require the exact
+host ME type and an empty ordinary party. Missing/malformed metadata keeps the boundary closed.
+
+Focused party-carrier and real-scene tests pass 38/38, including first-frame loss/replay and converting an
+already-wrong wild single shell into the host's double trainer encounter. Production-shaped multiwave and
+mystery suites pass. The repository-wide TypeScript command still has extensive unrelated baseline errors;
+the filtered check found only a test control-flow narrowing error in the touched files, which was fixed.
+
+An independent audit of pushed SHA `dfe203b1c` was also incorporated into the completion audit. Current
+source confirms several stop-ship defects, so prior broad assurance language is withdrawn: protocol and
+functional-fingerprint mismatches warn but do not refuse pairing; negotiated capabilities can be replaced by
+later frames; renderer default-deny remains observe-only; unknown operation classes are ACK-dropped; missing
+or throwing materializers do not withhold `applied`; and `op:faintSwitch` has no production live sink. Focused
+runs also emit renderer `WOULD-BLOCK`/unsanctioned-tail evidence and recovery warnings that the current gate
+does not fail. These are the next containment checkpoint, ahead of lobby migration or any player-count work.
