@@ -596,6 +596,43 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Move: Tangling Husk (2.65 dex 955) — Fire-exempt protect
+  // ===========================================================================
+  {
+    label: "Move: Tangling Husk lets Fire through",
+    description:
+      "Tangling Husk (2.65 dex 955): 'Protects against non-Fire-type moves. Slows\n"
+      + "attackers on contact.' i.e. a Silk-Trap-style protect (blocks + drops a CONTACT\n"
+      + "attacker's Speed -1) EXCEPT Fire-type moves bypass it and hit normally. It was\n"
+      + "wired as a plain Silk Trap, which wrongly blocked Fire too.\n"
+      + "The foe (Snorlax) uses Tangling Husk every turn (it announces 'protected itself'\n"
+      + "when the husk goes up — that's the shield forming, not a block).\n"
+      + "DO, over three turns, hit the foe with: (1) Flamethrower (Fire), (2) Surf\n"
+      + "(non-Fire, non-contact), (3) Tackle (non-Fire, CONTACT).\n"
+      + "EXPECT: (1) Flamethrower HITS — the foe takes damage despite the husk being up.\n"
+      + "(2) Surf is BLOCKED — no damage. (3) Tackle is BLOCKED — no damage — AND your\n"
+      + "Snorlax's Speed falls -1 (the slow-on-contact clause still fires on the moves it\n"
+      + "does block). Vanilla Silk Trap is unchanged (it still blocks Fire).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        // Neutral enemy ability + passive so no ER innate adds a second protect.
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_PASSIVE_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [erMove(ErMoveId.TANGLING_HUSK)],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.FLAMETHROWER, MoveId.SURF, MoveId.TACKLE, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Dev tool — in-battle "Reset wave" command (dev/staging only)
   // ===========================================================================
   {
@@ -14406,6 +14443,125 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.GARDEVOIR, { moveset: [MoveId.PSYCHIC, MoveId.REST, MoveId.PROTECT, MoveId.SPLASH] }),
       ];
+    },
+  },
+  // ===========================================================================
+  // Ability: Victory Bomb (729) — TRUE any-KO detonation
+  // ===========================================================================
+  {
+    label: "Ability: Victory Bomb explodes on ANY KO",
+    description:
+      "Victory Bomb (2.65 dex 729): 'When fainting, retaliate with a 100 BP Fire-type\n"
+      + "Explosion targeting all adjacent Pokemon. Cannot miss. Works regardless of how\n"
+      + "the user was KOed.' Before the fix it only fired on a lethal DAMAGING hit - a\n"
+      + "status/weather/recoil/hazard KO never detonated.\n"
+      + "DO: the foe (Victory Bomb) starts poisoned and at 1 HP. Use Splash and let it\n"
+      + "faint to its own poison at end of turn (do NOT attack it).\n"
+      + "EXPECT: when the foe faints to POISON (a non-damaging cause), it STILL detonates\n"
+      + "a 100 BP Fire Explosion that damages your Snorlax.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: erAbility(5431), // Victory Bomb
+        ENEMY_STATUS_OVERRIDE: StatusEffect.POISON,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.SPLASH, MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const e = globalScene.getEnemyPokemon();
+      if (e) {
+        e.hp = 1; // faints to the poison chip at end of the first turn (a non-damaging KO)
+      }
+    },
+  },
+  // ===========================================================================
+  // Ability: Berserker Rage (480, incl. Rampage) — recharge clears on KO
+  // ===========================================================================
+  {
+    label: "Ability: Berserker Rage clears recharge on KO",
+    description:
+      "Berserker Rage (2.65 dex 480, includes Rampage): 'When the user knocks out an\n"
+      + "opponent, it instantly recovers from recharge status, allowing immediate use of\n"
+      + "moves like Hyper Beam without waiting.' Double battle so the fight continues past\n"
+      + "the KO.\n"
+      + "DO: with your LEFT Snorlax use Hyper Beam and KO a frail foe (right Snorlax can\n"
+      + "Splash).\n"
+      + "EXPECT: next turn the LEFT Snorlax is NOT locked recharging - its command menu\n"
+      + "opens and it can act immediately. (Hyper Beam WITHOUT a KO still forces a normal\n"
+      + "recharge turn.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        BATTLE_STYLE_OVERRIDE: "double",
+        ABILITY_OVERRIDE: erAbility(5211), // Berserker Rage
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.HYPER_BEAM, MoveId.BODY_SLAM, MoveId.SPLASH, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.SPLASH, MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Ability: Shallow Grave (629) — TRUE deferred revive at next send-out
+  // ===========================================================================
+  {
+    label: "Ability: Shallow Grave revives at next send-out",
+    description:
+      "Shallow Grave (2.65 dex 629): 'After fainting while fog is active, the user\n"
+      + "revives at 25% max HP when sending out your next party member.' Before the fix\n"
+      + "the mon never actually fainted (it clung to 1 HP and stayed on the field).\n"
+      + "DO: FOG is active; your lead Snorlax starts poisoned and at 1 HP. Use Splash and\n"
+      + "let it FAINT to the poison. Send out Magikarp when prompted.\n"
+      + "EXPECT: Snorlax truly FAINTS and leaves the field; when you send out Magikarp,\n"
+      + "Snorlax is REVIVED to ~25% max HP as a usable reserve (switch back to it to see\n"
+      + "it alive).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        WEATHER_OVERRIDE: WeatherType.FOG,
+        ABILITY_OVERRIDE: erAbility(5333), // Shallow Grave
+        STATUS_OVERRIDE: StatusEffect.POISON,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.SPLASH, MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.MAGIKARP, {
+          moveset: [MoveId.SPLASH, MoveId.TACKLE, MoveId.FLAIL, MoveId.BOUNCE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const p = globalScene.getPlayerPokemon();
+      if (p) {
+        p.hp = 1; // faints to the poison chip at end of the first turn
+      }
     },
   },
 ];
