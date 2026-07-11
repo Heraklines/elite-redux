@@ -1313,5 +1313,13 @@ The first half of §2.5 item 7 is live in `6e89d400a` and `5952d491d` (failure-f
 - The incompatible wire is gated by `er-coop-15`. Controller/transport suites are 32/32 green, battle-stream is
   32/32 green, and the real two-engine resume + launch snapshot + launch-sync suites are 4/4 green.
 
-Remaining in item 7: mint and negotiate the control-plane epoch at the launch/cold-resume boundary, then prove
-same-epoch hot rejoin and cross-epoch stale-op rejection end-to-end.
+The remaining half of item 7 landed in `419a84cd0` (failure-first `a2c3e1724`). `hello` now carries a
+host-minted safe-integer epoch; the guest adopts and echoes it, deterministic role reconciliation transfers
+epoch authority to the winning host, and stale/lower host epochs are rejected. `coop-operation-epoch.ts` is
+the single fan-out into all twelve migrated surface adapters, preventing a newly negotiated run from leaving
+one adapter on the old epoch. A new-game or accepted cold resume mints a strictly newer epoch before its
+release/snapshot; hot rejoin only re-announces the existing epoch. The controller/role/capability/transport
+suites are 46/46 green; operation-runtime plus lobby/role and the real duo cold-resume suite are 40/40 green.
+The duo proof asserts both peers share the pre-resume epoch, the host bumps on acceptance, and the guest adopts
+the new epoch before applying the authoritative snapshot. Cross-epoch rejection remains pinned by the generic
+operation-runtime lifecycle suite.
