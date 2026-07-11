@@ -12,7 +12,12 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import type { CoopInteractionChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
-import { adoptMeWatcherChoice, commitMeOwnerIntent } from "#data/elite-redux/coop/coop-me-operation";
+import {
+  adoptMeWatcherChoice,
+  commitMeOwnerIntent,
+  coopMeTerminalSanctionedTails,
+} from "#data/elite-redux/coop/coop-me-operation";
+import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   coopMeHandoffBattleStarted,
   coopMeInteractionStartValue,
@@ -801,6 +806,9 @@ export class CoopReplayMePhase extends Phase {
       }
     }
     const isBattleTerminal = terminalDecision.adopt ? terminalDecision.terminal === "battle" : legacyIsBattle;
+    if (terminalDecision.adopt && terminalDecision.terminal != null) {
+      setCoopWaveTailSanction(coopMeTerminalSanctionedTails(terminalDecision.terminal));
+    }
     coopLog("me", "host terminal resolved", {
       seqTerm: this.seqTerm,
       action: action == null ? "null" : action.choice,

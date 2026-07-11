@@ -52,7 +52,8 @@ export type CoopRole = "host" | "guest";
  */
 // er-coop-15: resume decisions are transaction-keyed/durable, launch snapshots are re-answerable, and hello
 // carries the host-minted operation epoch. Older builds can lose/alias a boundary or accept prior-run ops.
-export const COOP_PROTOCOL_VERSION = "er-coop-15";
+// er-coop-16: shared boundary tails fail closed unless WAVE_ADVANCE or ME_TERMINAL sanctions them.
+export const COOP_PROTOCOL_VERSION = "er-coop-16";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete

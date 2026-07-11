@@ -166,7 +166,6 @@ export const COOP_WAVE_TAIL_PHASES: ReadonlySet<string> = new Set<string>([
   "MysteryEncounterBattleStartCleanupPhase",
   "MysteryEncounterRewardsPhase",
   "PostMysteryEncounterPhase",
-  "EggLapsePhase",
 ]);
 
 /**
@@ -246,17 +245,17 @@ export function setCoopRendererGateEnforced(on: boolean): void {
 }
 
 // ── Wave-2f STRICT-TAILS mode (§3.3 KEYSTONE, §6.3) ──────────────────────────
-// A SEPARATE sub-flag, default OFF, mirroring the allowlist's warn-first rollout. When ON (OBSERVE
-// only - it NEVER blocks, evidence-gathering per §6.3), a WAVE-1 boundary-tail phase the guest
+// A SEPARATE sub-flag, default ON. Under renderer ENFORCE an unsanctioned shared boundary tail is
+// neutralized; under the emergency renderer OBSERVE rollback it logs and runs. A boundary-tail phase
 // constructs is checked against the CURRENT adopted WAVE_ADVANCE op's sanctioned set: an UNSANCTIONED
 // tail logs `[coop:gate] TAIL WOULD-BLOCK` (the signal that the guest built a tail the host's stated
 // transition did not sanction). The op adapter (coop-wave-operation.ts) PUSHES the sanction on adopt
-// (keeping this gate a cycle-free leaf - nothing is pulled from the operation runtime). Default OFF, so
-// a run with strict-tails off behaves EXACTLY as today (no sanction check, no logging).
+// (keeping this gate a cycle-free leaf - nothing is pulled from the operation runtime). The main renderer
+// observe rollback remains available for emergency diagnosis.
 
 /**
  * Read the INITIAL strict-tails mode without a rebuild (env `COOP_RENDERER_GATE_STRICT_TAILS` /
- * localStorage `coopGateStrictTails` / URL `?coopgatestricttails=1`), default OFF (observe-off). Guarded
+ * localStorage `coopGateStrictTails` / URL `?coopgatestricttails=1`), default ON (observe). Guarded
  * exactly like {@linkcode readInitialEnforced}. OFF by default: strict-tails is evidence-gathering the
  * migration follow-up turns ON after the op surface soaks; it NEVER enforces (§6.3).
  */
@@ -287,13 +286,16 @@ function readInitialStrictTails(): boolean {
     if (env?.COOP_RENDERER_GATE_STRICT_TAILS === "1" || env?.COOP_RENDERER_GATE_STRICT_TAILS === "true") {
       return true;
     }
+    if (env?.COOP_RENDERER_GATE_STRICT_TAILS === "0" || env?.COOP_RENDERER_GATE_STRICT_TAILS === "false") {
+      return false;
+    }
   } catch {
     // no `process` (browser): env is not a source here.
   }
-  return false;
+  return true;
 }
 
-/** Strict-tails OBSERVE flag (default OFF). ON = check boundary tails against the adopted op's sanction. */
+/** Strict-tail sanction flag (default ON). Enforcement follows the main renderer gate mode. */
 let strictTails = readInitialStrictTails();
 
 /** The tail phases the CURRENT adopted WAVE_ADVANCE op sanctions, or null when no op is adopted (all tails would-block). */
@@ -304,7 +306,7 @@ export function isCoopStrictTailsMode(): boolean {
   return strictTails;
 }
 
-/** Set strict-tails OBSERVE mode. Default OFF; the migration follow-up turns it ON to gather evidence (§6.3). */
+/** Set strict-tail sanction mode. Default ON; false disables sanction checks for emergency diagnosis. */
 export function setCoopStrictTailsMode(on: boolean): void {
   strictTails = on;
 }
@@ -336,6 +338,16 @@ function logTailWouldBlock(phaseName: string): void {
   // eslint-disable-next-line no-console
   console.warn(
     `[coop:gate] TAIL WOULD-BLOCK phase=${phaseName} (the adopted WAVE_ADVANCE op did not sanction this boundary tail; allowed under strict-tails observe - op-sanctioned construction is the enforce target)`,
+  );
+  if (tailWouldBlockLog.length < LOG_CAP) {
+    tailWouldBlockLog.push(phaseName);
+  }
+}
+
+function logTailBlock(phaseName: string): void {
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[coop:gate] TAIL BLOCK phase=${phaseName} (no authoritative operation sanctioned this boundary tail; neutralized to CoopInertPhase)`,
   );
   if (tailWouldBlockLog.length < LOG_CAP) {
     tailWouldBlockLog.push(phaseName);
@@ -380,10 +392,15 @@ export function coopRendererGateNeutralizes(phaseName: string): boolean {
   observedGuestPhases.add(phaseName);
 
   if (COOP_RENDERER_ALLOWED_PHASES.has(phaseName)) {
-    // Wave-2f STRICT-TAILS (§3.3 KEYSTONE, observe-only): a boundary tail the guest builds that the current
-    // adopted WAVE_ADVANCE op did NOT sanction is surfaced LOUDLY (never blocked). Only the boundary-tail
+    // Wave-2f STRICT-TAILS: a tail the current authoritative operation did NOT sanction fails closed under
+    // renderer enforcement, or is surfaced loudly and allowed under observe rollback. Only the boundary-tail
     // group is checked; presentation / input-intent allowlist entries are always fine.
     if (strictTails && COOP_WAVE_TAIL_PHASES.has(phaseName) && !(sanctionedTailPhases?.has(phaseName) ?? false)) {
+      if (enforced) {
+        logTailBlock(phaseName);
+        recordNeutralized(phaseName);
+        return true;
+      }
       logTailWouldBlock(phaseName);
     }
     return false; // presentation / input-intent / allowed boundary tail: the guest runs it

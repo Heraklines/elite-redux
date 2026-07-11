@@ -16,8 +16,7 @@
 //      flag-OFF pass-through adopts verbatim (legacy derivation). Only flag-OFF derives.
 //   3. Per-transition SANCTIONED TAILS: the boundary tails the op sanctions vary by outcome (wild win
 //      vs trainer victory vs biome boundary vs game-over vs egg-lapse) - the §3 strict-tails instrument.
-//   4. STRICT-TAILS gate (observe-only): a boundary tail the adopted op did NOT sanction logs
-//      `[coop:gate] TAIL WOULD-BLOCK` and still RUNS (never blocks); default OFF is a byte-for-byte no-op.
+//   4. STRICT-TAILS gate: an unsanctioned shared tail fails closed under enforcement; observe rollback logs.
 //
 // The two-engine end-to-end + full-convergence proof (one per transition class) lives in
 // coop-duo-wave-operation.test.ts (ER_SCENARIO). This is the fast deterministic lifecycle spec.
@@ -25,6 +24,7 @@
 
 import { setCoopAuthoritativeGuestPredicate } from "#data/elite-redux/coop/coop-authoritative-gate";
 import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import { coopMeTerminalSanctionedTails } from "#data/elite-redux/coop/coop-me-operation";
 import {
   COOP_RENDERER_ALLOWED_PHASES,
   COOP_WAVE_TAIL_PHASES,
@@ -32,6 +32,7 @@ import {
   getCoopTailWouldBlockLog,
   isCoopStrictTailsMode,
   resetCoopTailWouldBlockLog,
+  setCoopRendererGateEnforced,
   setCoopStrictTailsMode,
   setCoopWaveTailSanction,
 } from "#data/elite-redux/coop/coop-renderer-gate";
@@ -267,12 +268,12 @@ describe("co-op WAVE-ADVANCE operation - the keystone (Wave-2f)", () => {
 });
 
 // =====================================================================================
-// STRICT-TAILS gate (observe-only): a boundary tail the current adopted op did NOT sanction logs
-// TAIL WOULD-BLOCK and still RUNS. Default OFF is a byte-for-byte no-op. Never blocks (§6.3).
+// STRICT-TAILS gate: shared boundary tails require an authoritative wave/ME sanction under enforcement.
 // =====================================================================================
-describe("co-op STRICT-TAILS renderer gate mode (Wave-2f, §3.3 observe-only)", () => {
+describe("co-op STRICT-TAILS renderer gate mode (Wave-2f, §3.3)", () => {
   beforeEach(() => {
-    setCoopStrictTailsMode(false);
+    setCoopRendererGateEnforced(true);
+    setCoopStrictTailsMode(true);
     setCoopWaveTailSanction(null);
     resetCoopTailWouldBlockLog();
     setCoopAuthoritativeGuestPredicate(() => true); // the authoritative guest (else the gate short-circuits)
@@ -284,8 +285,8 @@ describe("co-op STRICT-TAILS renderer gate mode (Wave-2f, §3.3 observe-only)", 
     resetCoopTailWouldBlockLog();
   });
 
-  it("defaults to OFF (strict-tails is not enabled by default)", () => {
-    expect(isCoopStrictTailsMode()).toBe(false);
+  it("defaults to ON (strict-tail mismatches are always observable)", () => {
+    expect(isCoopStrictTailsMode()).toBe(true);
   });
 
   it("OFF: never logs TAIL WOULD-BLOCK, never neutralizes a boundary tail (byte-for-byte today)", () => {
@@ -296,15 +297,23 @@ describe("co-op STRICT-TAILS renderer gate mode (Wave-2f, §3.3 observe-only)", 
     expect(getCoopTailWouldBlockLog()).toHaveLength(0);
   });
 
-  it("ON, unsanctioned: logs TAIL WOULD-BLOCK but still RUNS (never blocks - evidence-gathering)", () => {
+  it("ON, unsanctioned: blocks the tail under renderer enforcement", () => {
     setCoopStrictTailsMode(true);
     setCoopWaveTailSanction(["VictoryPhase"]); // only VictoryPhase is op-sanctioned this advance
     // VictoryPhase is sanctioned -> no would-block.
     expect(coopRendererGateNeutralizes("VictoryPhase")).toBe(false);
-    // BattleEndPhase is NOT sanctioned this advance -> would-block logged, but STILL RUNS.
-    expect(coopRendererGateNeutralizes("BattleEndPhase"), "strict-tails never blocks (observe)").toBe(false);
+    // BattleEndPhase is NOT sanctioned this advance -> fail closed.
+    expect(coopRendererGateNeutralizes("BattleEndPhase"), "unsanctioned tail is neutralized").toBe(true);
     expect(getCoopTailWouldBlockLog()).toContain("BattleEndPhase");
     expect(getCoopTailWouldBlockLog()).not.toContain("VictoryPhase");
+  });
+
+  it("renderer observe rollback logs an unsanctioned tail but lets it run", () => {
+    setCoopRendererGateEnforced(false);
+    setCoopStrictTailsMode(true);
+    setCoopWaveTailSanction([]);
+    expect(coopRendererGateNeutralizes("BattleEndPhase")).toBe(false);
+    expect(getCoopTailWouldBlockLog()).toContain("BattleEndPhase");
   });
 
   it("ON with a matching sanction set: a fully-sanctioned tail produces ZERO would-block (the clean-run target)", () => {
@@ -328,10 +337,20 @@ describe("co-op STRICT-TAILS renderer gate mode (Wave-2f, §3.3 observe-only)", 
     );
   });
 
-  it("ON with NO adopted op (null sanction): every boundary tail would-block (a tail built without an op)", () => {
+  it.each(["leave", "battle"] as const)("ON with a host-stated ME %s terminal sanctions its exact tail", terminal => {
+    setCoopStrictTailsMode(true);
+    const sanction = coopMeTerminalSanctionedTails(terminal);
+    setCoopWaveTailSanction(sanction);
+    for (const tail of sanction) {
+      expect(coopRendererGateNeutralizes(tail)).toBe(false);
+    }
+    expect(getCoopTailWouldBlockLog()).toHaveLength(0);
+  });
+
+  it("ON with NO adopted op (null sanction): every boundary tail blocks (a tail built without an op)", () => {
     setCoopStrictTailsMode(true);
     setCoopWaveTailSanction(null);
-    expect(coopRendererGateNeutralizes("VictoryPhase")).toBe(false); // still runs
+    expect(coopRendererGateNeutralizes("VictoryPhase")).toBe(true);
     expect(getCoopTailWouldBlockLog()).toContain("VictoryPhase");
   });
 
@@ -340,5 +359,12 @@ describe("co-op STRICT-TAILS renderer gate mode (Wave-2f, §3.3 observe-only)", 
     setCoopWaveTailSanction([]); // nothing sanctioned
     expect(coopRendererGateNeutralizes("CommandPhase")).toBe(false); // input-intent, not a boundary tail
     expect(getCoopTailWouldBlockLog()).not.toContain("CommandPhase");
+  });
+
+  it("ON: account-local deterministic EggLapsePhase is allowlisted but not operation-sanction checked", () => {
+    setCoopStrictTailsMode(true);
+    setCoopWaveTailSanction([]);
+    expect(coopRendererGateNeutralizes("EggLapsePhase")).toBe(false);
+    expect(getCoopTailWouldBlockLog()).not.toContain("EggLapsePhase");
   });
 });
