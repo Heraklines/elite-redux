@@ -1294,3 +1294,24 @@ can drive real guest mutation (the reviewer's central demand). What it establish
 boundary companions) are now gated by the strict-tails observe mode above when it is ON — a tail is
 op-sanctioned by the adopted `WAVE_ADVANCE` op or it logs `TAIL WOULD-BLOCK`. They remain in the allowlist
 (the guest still constructs them); strict-tails is the evidence path toward op-sanctioned enforcement.
+
+### 8.8 Lobby/resume boundary hardening (tester-ready checkpoint)
+
+The first half of §2.5 item 7 is live in `6e89d400a` and `5952d491d` (failure-first commits
+`955bcbe87` and `440703f22`):
+
+- `resumeOffer`, `resumeReply`, and `resumeStartNew` are keyed by a host-authored `decisionId`. The host
+  retains the latest decision and re-announces it after hot rejoin; the guest de-duplicates a repeated offer;
+  and a delayed reply is accepted only by the exact active offer. This closes both the lost start-new barrier
+  softlock and the stale-reply/new-offer alias.
+- The host retains the latest wave-keyed `launchSnapshot`. A guest parks its waiter and sends
+  `requestLaunchSnapshot`; the host replays the exact cached snapshot. A reconnect reissues every outstanding
+  request, and already-consumed snapshots are ignored exactly once so a resend cannot poison a later await.
+- An authoritative guest no longer falls back to generating its own launch when the snapshot is unavailable or
+  invalid. It fails closed at an explicit recovery screen. Local generation made the UI appear to recover while
+  creating a structurally different run, guaranteeing a later desync.
+- The incompatible wire is gated by `er-coop-15`. Controller/transport suites are 32/32 green, battle-stream is
+  32/32 green, and the real two-engine resume + launch snapshot + launch-sync suites are 4/4 green.
+
+Remaining in item 7: mint and negotiate the control-plane epoch at the launch/cold-resume boundary, then prove
+same-epoch hot rejoin and cross-epoch stale-op rejection end-to-end.
