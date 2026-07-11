@@ -20,6 +20,14 @@ prior assumption.
   array is empty — see #449).
 - When a tester reports a divergence, confirm it against the 2.65 dex text
   FIRST, then fix the port to match. Do not guess from vanilla behavior.
+- 🔴 **ER has its own custom weathers / terrains / statuses that are NOT vanilla**
+  (Eerie Fog, Toxic Terrain, Bleed, Fear, Enrage, Drench, reworked Infatuation).
+  Their authoritative maintainer-written definitions are in
+  **`docs/er-custom-mechanics.md`** — READ IT before implementing or auditing
+  anything that sets or reacts to them. Setting a *vanilla* weather/terrain/status
+  where ER defines its own is a bug (e.g. Fog Machine must set ER **Eerie Fog**, a
+  distinct Ghost/Psychic weather with no accuracy debuff — NOT vanilla
+  `WeatherType.FOG`).
 
 ## 🔴 STANDING RULE — every bug fix gets an in-game test scenario
 
