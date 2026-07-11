@@ -1,5 +1,12 @@
 # ER rarity-tier audit — deferred items
 
+> 🔴 **The remaining-dex sweep (all abilities on 10+ species + moves on 37+ mons,
+> 938 items) has its own FIX QUEUE:** `docs/audits/er-remaining-dex-fix-plan.md`
+> — 287 findings (173 numeric dex-vs-c-source conflicts where the **dex wins**, +
+> 114 genuine implementation gaps), with per-row dex-vs-code + suggested fix.
+> Another agent can pick that up directly.
+
+
 Tracking doc for the confirmed-but-not-yet-fixed items surfaced by the
 rarity-tier dex-fidelity audit (tiers 3–7: abilities bucketed by species count,
 moves by mon-count). The vast majority of findings were fixed and committed with
