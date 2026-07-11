@@ -484,6 +484,12 @@ describe("#807 C: protocol version negotiation", () => {
     expect(hostCtl.versionMismatch).toBe(true);
     expect(hostCtl.partnerVersion).toBe("er-coop-STALE");
     expect(guestCtl.versionMismatch).toBe(true);
+    hostCtl.setLocalRoster([{ speciesId: 1, cost: 1 }]);
+    guestCtl.setLocalRoster([{ speciesId: 2, cost: 1 }]);
+    hostCtl.setLocalReady(true);
+    guestCtl.setLocalReady(true);
+    expect(hostCtl.bothReady(), "incompatible peers can never cross the launch barrier").toBe(false);
+    expect(guestCtl.bothReady(), "incompatible peers can never cross the launch barrier").toBe(false);
 
     // Same version on both sides: no mismatch.
     const c = new MockWire();

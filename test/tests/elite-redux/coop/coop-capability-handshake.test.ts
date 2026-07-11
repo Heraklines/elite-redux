@@ -24,6 +24,7 @@ import {
   clearNegotiatedCoopCapabilities,
   getNegotiatedCoopCapabilities,
   isCoopCapabilityNegotiated,
+  setNegotiatedCoopCapabilities,
 } from "#data/elite-redux/coop/coop-capabilities";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
@@ -213,6 +214,20 @@ describe("co-op capability handshake wiring (#896 W2e-R2)", () => {
   // ---------------------------------------------------------------------------
   // Hot rejoin PRESERVES the negotiated set (re-handshake -> same intersection).
   // ---------------------------------------------------------------------------
+  it("freezes the first accepted capability intersection against later mutation", () => {
+    setNegotiatedCoopCapabilities([COOP_CAP_OP_BIOME, COOP_CAP_OP_ME], [COOP_CAP_OP_BIOME, COOP_CAP_OP_ME]);
+    expect([...(getNegotiatedCoopCapabilities() ?? [])]).toEqual([COOP_CAP_OP_BIOME, COOP_CAP_OP_ME]);
+
+    setNegotiatedCoopCapabilities(
+      [COOP_CAP_OP_BIOME, COOP_CAP_OP_ME],
+      [COOP_CAP_OP_ME, COOP_CAP_OP_REWARD],
+    );
+    expect(
+      [...(getNegotiatedCoopCapabilities() ?? [])],
+      "a later hello/roster frame cannot change live session behavior",
+    ).toEqual([COOP_CAP_OP_BIOME, COOP_CAP_OP_ME]);
+  });
+
   it("a HOT REJOIN (flap -> reconnect re-handshake) preserves the negotiated set", async () => {
     const { host, guest } = makeFlapPair();
     const caps = [COOP_CAP_OP_BIOME, COOP_CAP_OP_ME];
