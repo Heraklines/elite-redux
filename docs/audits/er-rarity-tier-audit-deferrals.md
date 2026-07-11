@@ -6,17 +6,28 @@ moves by mon-count). The vast majority of findings were fixed and committed with
 headless + vitest verification; the items below were deliberately deferred with
 reasons. Pick them up when the noted blocker clears.
 
-## 1. In-game dev-suite scenarios for tier-6, tier-7 and tier-8 fixes
+## 1. In-game dev-suite scenarios for tier-6, tier-7, tier-8 and tier-9 fixes
 
 **Status:** owed. Tiers 3, 4, 5 got their `src/dev-tools/test-suite/scenarios.ts`
-entries; tiers 6, 7 and 8 did not.
+entries; tiers 6, 7, 8 and 9 did not.
 
 **Why deferred:** `scenarios.ts` was under continuous edit *and* commit by a
 concurrent process on `feat/elite-redux-port` throughout the audit session.
 Appending to it risked entangling that process's unfinished hunks in an audit
-commit. Every tier-6/7/8 fix is already covered by a vitest regression test
+commit. Every tier-6/7/8/9 fix is already covered by a vitest regression test
 (`er-*.test.ts`) and a green headless-runner scenario, so this is the
-complementary human-testing tier only.
+complementary human-testing tier only. Tier-9 combat-observable fixes owed a
+scenario: Trace (no Wonder Guard copy), Thundercall (1.5x vs Water + screen
+bypass), Mineralize / Fertilize (-ate conditional branches), Seed Sower (party
+status heal), Primal Maw (flinch-once), Nightmare (damage + chip), Speed Swap
+(stage swap).
+
+**Note — vanilla `test/tests/moves/nightmare.test.ts` fails at baseline** (not a
+regression): ER intentionally makes Nightmare a 120-BP damaging move (dex: "Deals
+heavy damage to a sleeping foe and makes them lose 1/4 HP each turn"), so the
+vanilla-only exact-HP assertion (expects status-move-only chip) can't pass. The
+ER behavior is covered by `er-dex-tier9-batch.test.ts`. Leave the vanilla test or
+re-point it at the ER expectation if the suite ever gates on it.
 
 **To do:** once `scenarios.ts` is stable, add DO/EXPECT scenarios (same pattern
 as the tier-3/4/5 blocks already in the file) for the combat-observable fixes —
