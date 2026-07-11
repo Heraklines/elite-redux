@@ -191,6 +191,8 @@ export class CoopBattleStreamer {
   private lastCheckpoint: CoopCheckpointEnvelope | null = null;
   /** Latest enemy party the guest has not yet adopted (consumed at the wave's first turn). */
   private lastEnemyParty: { wave: number; enemies: CoopSerializedEnemy[] } | null = null;
+  /** HOST: exact wave-boundary carriers retained for loss/reconnect replay. */
+  private readonly sentEnemyParties = new Map<number, Extract<CoopMessage, { t: "enemyPartySync" }>>();
   /** New-wave state paired with enemyPartySync; consumed after the guest has built the streamed enemies. */
   private readonly enemyPartyStateByWave = new Map<number, CoopAuthoritativeBattleStateV1>();
   /** wave -> resolver for an in-flight {@linkcode awaitLaunchSnapshot} (#633 M4 push-snapshot launch). */
@@ -280,6 +282,10 @@ export class CoopBattleStreamer {
         coopLog("stream", `guest RE-SEND requestLaunchSnapshot wave=${wave} after reconnect`);
         this.transport.send({ t: "requestLaunchSnapshot", wave });
       }
+      for (const wave of this.enemyPartyWaiters.keys()) {
+        coopLog("stream", `guest RE-SEND requestEnemyParty wave=${wave} after reconnect`);
+        this.transport.send({ t: "requestEnemyParty", wave });
+      }
       for (const key of this.meBattlePartyWaiters.keys()) {
         coopLog("stream", `guest RE-SEND requestMeBattleEnemyParty key=${key} after reconnect`);
         this.transport.send({ t: "requestMeBattleEnemyParty", key });
@@ -298,18 +304,28 @@ export class CoopBattleStreamer {
     battleType?: number,
     authoritativeState?: CoopAuthoritativeBattleStateV1,
   ): void {
-    coopLog(
-      "replay",
-      `host SEND enemyPartySync wave=${wave} count=${enemies.length} meType=${meType ?? "-"} battleType=${battleType ?? "-"}`,
-    );
-    this.transport.send({
+    const message: Extract<CoopMessage, { t: "enemyPartySync" }> = {
       t: "enemyPartySync",
       wave,
       enemies,
       ...(meType === undefined ? {} : { meType }),
       ...(battleType === undefined ? {} : { battleType }),
       ...(authoritativeState === undefined ? {} : { authoritativeState }),
-    });
+    };
+    this.sentEnemyParties.delete(wave);
+    this.sentEnemyParties.set(wave, message);
+    while (this.sentEnemyParties.size > 4) {
+      const oldest = this.sentEnemyParties.keys().next().value;
+      if (oldest === undefined) {
+        break;
+      }
+      this.sentEnemyParties.delete(oldest);
+    }
+    coopLog(
+      "replay",
+      `host SEND enemyPartySync wave=${wave} count=${enemies.length} meType=${meType ?? "-"} battleType=${battleType ?? "-"}`,
+    );
+    this.transport.send(message);
   }
 
   /** GUEST: consume the complete state paired with this wave's enemy-party handoff, if supplied. */
@@ -660,8 +676,8 @@ export class CoopBattleStreamer {
   /**
    * GUEST: await the host's authoritative enemy party for `wave` (#633, LIVE-D6).
    * Resolves immediately with the buffered party if the host already sent it, else
-   * waits for it to arrive, or resolves `null` on timeout (the guest then falls back
-   * to generating its own enemies - divergent but never a hang). The guest calls this
+   * waits for it to arrive, or resolves `null` on timeout (the authoritative caller fails closed).
+   * The guest calls this
    * at encounter time, BEFORE building its own party, so it adopts the host's enemies
    * verbatim and the two clients fight identical mons (species included). The host
    * only knows its enemies AFTER it clears its own save-slot screen, so a real wait
@@ -696,7 +712,7 @@ export class CoopBattleStreamer {
         if (res == null) {
           coopWarn(
             "stream",
-            `guest awaitEnemyParty wave=${wave} -> null (timeout/superseded), guest will self-generate enemies`,
+            `guest awaitEnemyParty wave=${wave} -> null (timeout/superseded), authoritative caller fails closed`,
           );
         } else {
           coopLog("stream", `guest awaitEnemyParty wave=${wave} RESOLVE count=${res.length}`);
@@ -711,9 +727,9 @@ export class CoopBattleStreamer {
   /**
    * GUEST (#633 M4 push-snapshot launch): await the host's authoritative full session snapshot
    * for `wave`. Resolves immediately with the buffered snapshot if the host raced ahead, else
-   * waits for the host's PUSH (event-driven - NO re-request poll; the ordered/reliable channel
-   * guarantees delivery), or resolves `null` on timeout (the caller then falls back to its own
-   * launch so it can never hard-hang). Mirrors {@linkcode awaitEnemyParty} exactly. The guest calls
+   * waits for the host's PUSH or requests the retained snapshot again, and resolves `null` on timeout
+   * so the caller can show explicit recovery. It never falls back to a locally generated launch.
+   * Mirrors {@linkcode awaitEnemyParty} exactly. The guest calls
    * this at launch BEFORE building anything, then boots from the snapshot (computing nothing).
    */
   awaitLaunchSnapshot(wave: number, timeoutMs = this.timeoutMs): Promise<string | null> {
@@ -777,8 +793,8 @@ export class CoopBattleStreamer {
    * the guest re-requests the party via `sendRequest` (the host re-broadcasts if it has it),
    * emitting a `coopWarn` each attempt so a future capture shows the retry path. The first
    * re-arrival - from the original broadcast, a retry response, or a pre-await buffered party -
-   * resolves immediately; only the full ceiling with no arrival resolves null (then the caller
-   * self-generates, exactly as before). A pre-await arrival is already BUFFERED by wave
+   * resolves immediately; only the full ceiling with no arrival resolves null (then the authoritative
+   * caller fails closed). A pre-await arrival is already BUFFERED by wave
    * (`lastEnemyParty` / the parked-waiter path), so it is consumed here, never lost.
    *
    * Engine-free + timer-injected like {@linkcode awaitEnemyParty}, so it is unit-testable; the
@@ -793,9 +809,19 @@ export class CoopBattleStreamer {
     const retryIntervalMs = opts.retryIntervalMs ?? 5_000;
     const maxRetries = opts.maxRetries ?? 6;
 
+    const buffered = this.consumeEnemyParty(wave);
+    if (buffered != null) {
+      return Promise.resolve(buffered);
+    }
+
     // The single long-lived await is the source of truth + the 120s backstop. We never
     // supersede it on a retry (that would resolve it null); we only re-poke the host.
     const awaited = this.awaitEnemyParty(wave, timeoutMs);
+    try {
+      sendRequest(wave);
+    } catch {
+      /* the timed retry remains armed */
+    }
     if (maxRetries <= 0 || retryIntervalMs <= 0) {
       return awaited;
     }
@@ -1237,6 +1263,7 @@ export class CoopBattleStreamer {
     this.liveWaiter = null;
     this.lastCheckpoint = null;
     this.lastEnemyParty = null;
+    this.sentEnemyParties.clear();
     this.enemyPartyStateByWave.clear();
     this.lastLaunchSnapshot = null;
     this.lastSentLaunchSnapshot = null;
@@ -1407,16 +1434,23 @@ export class CoopBattleStreamer {
         this.checkpointWaiter?.();
         this.checkpointHandler?.(msg.reason, msg.checkpoint);
         return;
-      case "requestEnemyParty":
+      case "requestEnemyParty": {
         // HOST: the guest re-requested its enemy party (its original sync was lost, or it
         // reached the await before the host generated). Hand it to the host's re-broadcaster
         // (a no-op before the host has the party for that wave).
         coopLog("stream", `host RECV requestEnemyParty wave=${msg.wave}`);
+        const retained = this.sentEnemyParties.get(msg.wave);
+        if (retained != null) {
+          coopLog("stream", `host REPLAY retained enemyPartySync wave=${msg.wave} count=${retained.enemies.length}`);
+          this.transport.send(retained);
+          return;
+        }
         if (this.enemyPartyRequestHandler == null) {
           coopWarn("stream", `host RECV requestEnemyParty wave=${msg.wave} DROPPED (no handler registered)`);
         }
         this.enemyPartyRequestHandler?.(msg.wave);
         return;
+      }
       case "requestStateSync":
         // HOST: the guest detected a desync - hand the request to the host's builder.
         coopLog("resync", `host RECV requestStateSync turn=${msg.turn} seq=${msg.seq}`);

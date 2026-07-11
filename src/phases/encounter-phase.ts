@@ -26,7 +26,6 @@ import {
   isVersusSession,
   maybeBeginReplayRecording,
 } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopSerializedEnemy } from "#data/elite-redux/coop/coop-transport";
 import { erRecordAchievementShinyEncounter } from "#data/elite-redux/er-achievement-tracker";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
@@ -162,8 +161,8 @@ export class EncounterPhase extends BattlePhase {
     // Co-op GUEST (#633, LIVE-D6): adopt the host's authoritative enemy party BEFORE
     // generating our own, so both clients fight byte-identical enemies (species
     // included). The host only knows its enemies after it clears its own save-slot
-    // screen, so the guest waits (bounded; falls back to normal generation on
-    // timeout, never hangs). Solo / host / loaded runs go straight to runEncounter()
+    // screen, so the guest waits behind a replaying authority boundary. A timeout fails
+    // closed; it never permits normal generation. Solo / host / loaded runs go straight to runEncounter()
     // synchronously below - byte-for-byte unchanged from before.
     if (this.shouldAdoptCoopEnemyParty()) {
       void this.runEncounterAfterCoopAdopt();
@@ -211,16 +210,27 @@ export class EncounterPhase extends BattlePhase {
 
   /** Co-op guest: wait for + adopt the host's enemy party, then run the encounter. */
   private async runEncounterAfterCoopAdopt(): Promise<void> {
-    await this.adoptCoopHostEnemyParty();
-    this.runEncounter();
+    try {
+      await this.adoptCoopHostEnemyParty();
+      this.runEncounter();
+    } catch (error) {
+      coopWarn("stream", "ordinary-wave authoritative enemy adoption failed closed", error);
+      globalScene.ui.showText(
+        "Could not recover your partner's battle state. Reconnect, then confirm to retry.",
+        null,
+        () => void this.runEncounterAfterCoopAdopt(),
+        null,
+        true,
+      );
+    }
   }
 
   /**
    * Co-op GUEST (#633, LIVE-D6): pull the host's authoritative enemy party off the
    * stream and pre-populate `battle.enemyParty` from it, so {@linkcode runEncounter}'s
    * generation loop SKIPS rolling our own (its `!battle.enemyParty[e]` guard) and we
-   * fight the host's exact mons. Fully guarded: a timeout / bad entry simply leaves
-   * the slot empty so the guest generates normally (divergent but never broken).
+   * fight the host's exact mons. The whole party is adopted atomically; missing or malformed
+   * authority fails the transition closed instead of letting the guest generate a different battle.
    */
   private async adoptCoopHostEnemyParty(): Promise<void> {
     const streamer = getCoopBattleStreamer();
@@ -228,42 +238,42 @@ export class EncounterPhase extends BattlePhase {
     if (streamer == null || battle == null) {
       return;
     }
-    let enemies: CoopSerializedEnemy[] | null = null;
-    try {
-      // #633 M4: DELETE THE POLL. The guest awaits the host's one-shot `enemyPartySync` PUSH
-      // event-driven - NO `requestEnemyParty` re-request. The co-op data channel is ordered +
-      // reliable ({ ordered: true }, no maxRetransmits), so the host's push is guaranteed
-      // delivered in order; a pre-await or eventual arrival is consumed via the wave-keyed buffer /
-      // parked waiter. The 120s ceiling remains as a last-resort backstop (then the guest
-      // self-generates - divergent but never a hang). The launch (first EncounterPhase) does not
-      // reach here at all: the guest boots from the full launch snapshot (tryCoopGuestSnapshotBoot).
-      enemies = await streamer.awaitEnemyParty(battle.waveIndex, COOP_ENEMY_PARTY_WAIT_MS);
-    } catch {
-      enemies = null;
-    }
-    if (enemies == null) {
-      return;
+    // Ordered WebRTC cannot guarantee a one-shot frame sent across an SCTP abort, suspended tab, or
+    // reconnect generation. Keep the boundary closed and re-request the exact wave until the ceiling.
+    const enemies = await streamer.awaitEnemyPartyWithRetry(
+      battle.waveIndex,
+      wave => streamer.requestEnemyParty(wave),
+      { timeoutMs: COOP_ENEMY_PARTY_WAIT_MS },
+    );
+    if (enemies == null || enemies.length === 0) {
+      throw new Error(`Authoritative enemy party unavailable for wave ${battle.waveIndex}; refusing local derivation`);
     }
     const levels = battle.enemyLevels ?? [];
     // Trainer enemies belong in TrainerSlot.TRAINER; wild enemies in NONE.
     const trainerSlot = battle.battleType === BattleType.TRAINER ? TrainerSlot.TRAINER : TrainerSlot.NONE;
+    const rebuilt: EnemyPokemon[] = [];
     for (const entry of enemies) {
-      if (battle.enemyParty[entry.fieldIndex] != null) {
-        continue;
+      if (!Number.isInteger(entry.fieldIndex) || entry.fieldIndex < 0 || rebuilt[entry.fieldIndex] != null) {
+        throw new Error(`Invalid authoritative enemy field index ${entry.fieldIndex} at wave ${battle.waveIndex}`);
       }
-      try {
-        const built = buildCoopEnemy(entry.data, levels[entry.fieldIndex] ?? 1, trainerSlot);
-        if (built != null) {
-          battle.enemyParty[entry.fieldIndex] = built;
-          // We adopted at least one enemy verbatim (incl. its host-streamed held items),
-          // so the generation loop must NOT roll its own modifiers for this party (#633):
-          // that would double / diverge the held items. Suppressed in runEncounter.
-          this.coopAdoptedEnemyParty = true;
-        }
-      } catch {
-        /* one enemy failed to reconstruct; leave the slot for normal generation */
+      const built = buildCoopEnemy(entry.data, levels[entry.fieldIndex] ?? 1, trainerSlot);
+      if (built == null) {
+        throw new Error(
+          `Could not reconstruct authoritative enemy slot ${entry.fieldIndex} at wave ${battle.waveIndex}`,
+        );
+      }
+      rebuilt[entry.fieldIndex] = built;
+    }
+    if (rebuilt[0] == null || rebuilt.filter(Boolean).length !== enemies.length) {
+      throw new Error(`Authoritative enemy party was incomplete at wave ${battle.waveIndex}`);
+    }
+    for (let fieldIndex = 0; fieldIndex < rebuilt.length; fieldIndex++) {
+      if (rebuilt[fieldIndex] != null) {
+        battle.enemyParty[fieldIndex] = rebuilt[fieldIndex];
       }
     }
+    // The generation loop must not roll modifiers over the verbatim party; that would double held items.
+    this.coopAdoptedEnemyParty = true;
     // The enemy handoff is also the first coherent boundary of the new wave. Apply the host's complete
     // state here so between-wave HP/modifier/party mutations are visible before the first command, rather
     // than relying on a later checksum mismatch to repair them after the player has already seen stale UI.
@@ -349,7 +359,7 @@ export class EncounterPhase extends BattlePhase {
       const json = JSON.stringify(session, (_k, v: unknown) => (typeof v === "bigint" ? v.toString() : v));
       streamer.sendLaunchSnapshot(globalScene.currentBattle.waveIndex, json);
     } catch {
-      /* a serialize/send failure must never break the host's encounter (the guest falls back) */
+      /* a serialize/send failure must never break the host; the guest remains at its recovery boundary */
     }
   }
 
