@@ -170,4 +170,15 @@ export enum BattlerTagType {
    * contact attacks (5 turns). No HP effect; independent of the ER status tags.
    */
   ER_QUASHED = "ER_QUASHED",
+  /**
+   * Elite Redux "empower the switch-in" (Ghastly Echo, dex 848). Applied to the
+   * Pokemon sent out after Ghastly Echo's user force-switches itself out; grants
+   * the holder x1.5 MOVE POWER (read in {@linkcode Move.getPower}, the same hook
+   * as ER_ENRAGE) for its FIRST move, then lapses (BattlerTagLapseType.TURN_END,
+   * turnCount 2 — it is summoned mid-turn, so it survives the summon turn's
+   * turn-end and expires at the end of its first acting turn). Armed + consumed
+   * via the per-side pending latch in `empower-switch-in.ts`. Not serialized
+   * (transient effect).
+   */
+  ER_EMPOWERED_SWITCH_IN = "ER_EMPOWERED_SWITCH_IN",
 }

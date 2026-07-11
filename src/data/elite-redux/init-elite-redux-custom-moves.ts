@@ -43,6 +43,7 @@
 import { globalScene } from "#app/global-scene";
 import { ChargeAnim } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
+import { erArmSwitchInBoost } from "#data/elite-redux/empower-switch-in";
 import { ER_FLAG_NAMES_LIST } from "#data/elite-redux/er-flag-mapping";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVE_ARCHETYPES, type ErMoveArchetypeKind } from "#data/elite-redux/er-move-archetypes";
@@ -101,6 +102,7 @@ import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
+import type { Pokemon } from "#field/pokemon";
 import i18next from "i18next";
 
 /**
@@ -143,6 +145,32 @@ export interface InitEliteReduxCustomMovesResult {
    * contributes 2.
    */
   totalFlagBitsApplied: number;
+}
+
+/**
+ * Ghastly Echo (dex 848) self-switch rider. A plain {@linkcode
+ * ForceSwitchOutAttr} that, when its self-switch actually fires, ARMS the
+ * per-side "empower the switch-in" latch so the replacement Pokemon gets a
+ * one-turn +50% move-power tag on send-out (see `empower-switch-in.ts` and
+ * {@linkcode BattlerTagType.ER_EMPOWERED_SWITCH_IN}). Subclassing keeps this
+ * behaviour on 848 ONLY — Take Flight (976) stays on the plain attr.
+ */
+class ErGhastlyEchoSwitchAttr extends ForceSwitchOutAttr {
+  constructor() {
+    // selfSwitch=true — Ghastly Echo switches its OWN user out (matches the old
+    // `move.attr(ForceSwitchOutAttr, true)` wiring).
+    super(true);
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    const switched = super.apply(user, target, move, args);
+    // Only arm when the forced self-switch is actually queued (super returns
+    // true) — an aborted switch (no eligible bench mon) leaves no dangling flag.
+    if (switched) {
+      erArmSwitchInBoost(user.isPlayer());
+    }
+    return switched;
+  }
 }
 
 /**
@@ -872,10 +900,12 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     case 848: // Ghastly Echo (rom): "Deals damage and switches. Switch-in gets
       // 50% boost for 1 turn. Sound-based." Damage + force-switch + SOUND_BASED
       // are wired here. The "switch-in gets +50% move power for 1 turn" half is
-      // DEFERRED: it needs a new battler tag applied to the INCOMING replacement
-      // mon (chosen in a later SwitchSummonPhase that ForceSwitchOutAttr has no
-      // handle on) — genuinely new engine work with no existing primitive.
-      move.attr(ForceSwitchOutAttr, true);
+      // the ErGhastlyEchoSwitchAttr rider: its self-switch arms a per-side latch
+      // (empower-switch-in.ts) that SummonPhase.onEnd consumes, tagging the
+      // incoming replacement with the one-turn +50% ER_EMPOWERED_SWITCH_IN
+      // battler tag (read in Move.getPower). Take Flight (976) keeps the plain
+      // ForceSwitchOutAttr — only 848 empowers its switch-in.
+      move.attr(ErGhastlyEchoSwitchAttr);
       move.soundBased();
       break;
     case 976: // Take Flight

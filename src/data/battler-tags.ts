@@ -4380,6 +4380,42 @@ export class ErQuashedTag extends SerializableBattlerTag {
 }
 
 /**
+ * ER Ghastly Echo (dex 848) "empower the switch-in": granted to the Pokemon sent
+ * out after Ghastly Echo's user force-switches itself out. While present the
+ * holder's move power is x1.5 (applied in {@linkcode Move.getPower}, the same
+ * hook as {@linkcode ErEnrageTag}). Non-serializable (a transient effect); armed
+ * + applied by the per-side latch in `empower-switch-in.ts`.
+ *
+ * Lapse: {@linkcode BattlerTagLapseType.TURN_END} with turnCount 2. The switch-in
+ * is summoned MID-TURN (during Ghastly Echo's resolution), so:
+ *   - end of the summon turn: 2 → 1 (survives — the mon hasn't moved yet);
+ *   - the mon's FIRST move (next turn) sees the tag ⇒ x1.5;
+ *   - end of that turn: 1 → 0 ⇒ removed, so the SECOND move is unboosted.
+ *
+ * NB: {@linkcode BattlerTagLapseType.AFTER_MOVE} is WRONG here — Ghastly Echo's
+ * own trailing {@linkcode MoveEndPhase} resolves to the switch-in's field slot
+ * and fires an AFTER_MOVE lapse the instant the tag is added, consuming it before
+ * the mon ever moves. TURN_END never fires mid-move, so it is immune to that.
+ * turnCount 1 would likewise be stripped by the summon turn's own turn-end.
+ */
+export class ErEmpoweredSwitchInTag extends BattlerTag {
+  public override readonly tagType = BattlerTagType.ER_EMPOWERED_SWITCH_IN;
+  constructor() {
+    super(BattlerTagType.ER_EMPOWERED_SWITCH_IN, BattlerTagLapseType.TURN_END, 2);
+  }
+
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    globalScene.phaseManager.queueMessage(
+      i18next.t("battlerTags:erEmpoweredSwitchInOnAdd", {
+        pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+        defaultValue: `${getPokemonNameWithAffix(pokemon)} was empowered by the ghastly echo!`,
+      }),
+    );
+  }
+}
+
+/**
  * Retrieves a {@linkcode BattlerTag} based on the provided tag type, turn count, source move, and source ID.
  * @param sourceId - The ID of the pokemon adding the tag
  * @returns The corresponding {@linkcode BattlerTag} object.
@@ -4607,6 +4643,8 @@ export function getBattlerTag(
       return new ErEnrageTag();
     case BattlerTagType.ER_QUASHED:
       return new ErQuashedTag(turnCount || 5);
+    case BattlerTagType.ER_EMPOWERED_SWITCH_IN:
+      return new ErEmpoweredSwitchInTag();
   }
 }
 
@@ -4754,6 +4792,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.ER_DRENCHED]: ErDrenchedTag;
   [BattlerTagType.ER_ENRAGE]: ErEnrageTag;
   [BattlerTagType.ER_QUASHED]: ErQuashedTag;
+  [BattlerTagType.ER_EMPOWERED_SWITCH_IN]: ErEmpoweredSwitchInTag;
 };
 
 /**

@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { erApplyPendingRevives } from "#data/elite-redux/archetypes/post-faint-deferred-revive";
+import { erApplyPendingSwitchInBoost } from "#data/elite-redux/empower-switch-in";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { getPokeballAtlasKey, getPokeballTintColor } from "#data/pokeball";
 import { BattleType } from "#enums/battle-type";
@@ -281,6 +282,11 @@ export class SummonPhase extends PartyMemberPokemonPhase {
     // reserve when its side next sends out a party member. No-op unless a
     // flagged, fainted member is waiting on this side.
     erApplyPendingRevives(this.player);
+
+    // ER (848 Ghastly Echo): if this side armed the "empower the switch-in"
+    // latch (its user force-switched itself out via Ghastly Echo), the mon just
+    // sent out gets a one-turn +50% move-power tag. No-op unless armed.
+    erApplyPendingSwitchInBoost(pokemon);
 
     if (pokemon.isShiny(true)) {
       globalScene.phaseManager.unshiftNew("ShinySparklePhase", pokemon.getBattlerIndex());

@@ -1316,9 +1316,9 @@ export abstract class Move implements Localizable {
     }
 
     // ER Ghastly Echo (848) "empower the switch-in": the mon sent out after
-    // Ghastly Echo's self-switch gets +50% move power for its first move (see
-    // ErEmpoweredSwitchInTag; the tag lapses AFTER_MOVE so only that move is
-    // boosted).
+    // Ghastly Echo's self-switch gets +50% move power for its first acting turn
+    // (see ErEmpoweredSwitchInTag; the tag lapses at TURN_END so only that turn's
+    // move is boosted).
     if (source.getTag(BattlerTagType.ER_EMPOWERED_SWITCH_IN)) {
       power.value *= 1.5;
     }
