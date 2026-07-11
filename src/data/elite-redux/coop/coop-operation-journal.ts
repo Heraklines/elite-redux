@@ -209,8 +209,16 @@ export function journalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelope
  * Register a surface's guest applier (adapters call this at import; one-way dep). Keyed by the journaled
  * class ({@linkcode coopOperationClassForPhase}). Idempotent for the same class (last registration wins).
  */
-export function registerCoopOperationApplier(cls: string, applier: CoopOperationEnvelopeApplier): void {
+export function registerCoopOperationApplier(cls: string, applier: CoopOperationEnvelopeApplier): () => void {
+  const previous = appliers.get(cls);
   appliers.set(cls, applier);
+  return () => {
+    if (previous == null) {
+      appliers.delete(cls);
+    } else {
+      appliers.set(cls, previous);
+    }
+  };
 }
 
 /**
