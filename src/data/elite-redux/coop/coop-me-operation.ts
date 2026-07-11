@@ -422,6 +422,18 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
   }
   try {
     const ownerSeat = ownerSeatFor(params.kind, params.pinned);
+    // Fail closed at the operation boundary: a guest may only propose an interaction that the pinned
+    // ownership schedule assigns to the guest seat. The host is deliberately exempt because it is the
+    // sole authority and commits both its own intents and relayed guest intents. Without this guard a
+    // watcher-side UI leak could arm a durable resend for a HOST-owned ME and retransmit the stale pick
+    // forever after the host had already advanced to the reward/shop boundary.
+    if (params.localRole === "guest" && ownerSeat !== 1) {
+      coopWarn(
+        "me",
+        `ME op OWNER reject wrong local owner kind=${params.kind} pinned=${params.pinned} expectedSeat=${ownerSeat} role=guest`,
+      );
+      return null;
+    }
     const addr = meOpAddr(params.kind, params.seq, params.step ?? 0);
     const intent: CoopPendingOperation = {
       id: makeCoopOperationId(epoch, ownerSeat, addr),

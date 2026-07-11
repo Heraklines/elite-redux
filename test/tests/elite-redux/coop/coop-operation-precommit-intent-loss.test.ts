@@ -90,6 +90,34 @@ const GUEST_OWNER = 1; // an odd seat = guest-owned interaction (guest->host rel
 const PIN = 9_700_100;
 
 describe("W2e-R2 I5: pre-commit intent loss - owner re-send with the deterministic id is committed exactly once", () => {
+  it("rejects a guest watcher proposal for a host-owned pinned ME without arming a retry", async () => {
+    vi.useFakeTimers();
+    setCoopMeOperationEnabled(true);
+    resetCoopMeOperationState();
+    setCoopMeOperationEpoch(EPOCH);
+    const resend = vi.fn();
+    try {
+      const id = commitMeOwnerIntent({
+        kind: "ME_PICK",
+        seq: 8_000_006,
+        pinned: 6,
+        payload: { optionIndex: 1 },
+        localRole: "guest",
+        wave: 7,
+        turn: 0,
+        resend,
+      });
+
+      expect(id, "the watcher cannot mint an operation for the host-owned even counter").toBeNull();
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(resend, "a rejected watcher pick must never become a one-second retry storm").not.toHaveBeenCalled();
+    } finally {
+      resetCoopMeOperationFlag();
+      resetCoopMeOperationState();
+      vi.useRealTimers();
+    }
+  });
+
   it("I5 production seam: a guest owner receives the stable operationId needed to arm a resend", () => {
     setCoopMeOperationEnabled(true);
     resetCoopMeOperationState();

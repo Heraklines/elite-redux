@@ -135,6 +135,15 @@ export class MysteryEncounterUiHandler extends UiHandler {
   override processInput(button: Button): boolean {
     const ui = this.getUi();
 
+    // An authoritative guest always renders the host-streamed ME screen, but only the pinned owner may
+    // drive it. `show()` releases its short animation lock after one second, so ownership must be a
+    // separate permanent gate; otherwise a watcher can originate a stale `me` choice and durable retry
+    // while the host has already moved on to the reward/shop boundary.
+    const activePhase = globalScene.phaseManager.getCurrentPhase();
+    if (activePhase?.phaseName === "CoopReplayMePhase" && !(activePhase as CoopReplayMePhase).canLocalPlayerSelect()) {
+      return false;
+    }
+
     let success = false;
 
     const cursor = this.getCursor();
@@ -164,7 +173,7 @@ export class MysteryEncounterUiHandler extends UiHandler {
         ) {
           success = false;
         } else {
-          const phase = globalScene.phaseManager.getCurrentPhase();
+          const phase = activePhase;
           if (phase?.phaseName === "CoopReplayMePhase") {
             // Co-op guest-owned ME (#633 BLOCK-3): forward the chosen index to the replay phase (which
             // relays it to the host, the sole engine). No local engine resolution on the guest; the

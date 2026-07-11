@@ -365,6 +365,15 @@ export class CoopReplayMePhase extends Phase {
   private pickSent = false;
 
   /**
+   * Whether this replay client owns the pinned ME and may originate option input. This is intentionally
+   * public so the UI handler can fail closed before accepting cursor/action input; the owner check is
+   * repeated in handleGuestOptionSelect as a second boundary against stale callbacks or future UI leaks.
+   */
+  public canLocalPlayerSelect(): boolean {
+    return getCoopController()?.isLocalOwnerAtCounter(this.interactionCounter) ?? false;
+  }
+
+  /**
    * #821/#818: settled via a DETACHED handoff (the embedded reward SHOP or the embedded QUIZ) - the
    * phase ended but the ME is still live on the owner, so the terminal must still run the leave +
    * advance duties. Generalizes the former `settledForShop`: the three shop-aware race guards + the
@@ -398,6 +407,13 @@ export class CoopReplayMePhase extends Phase {
   private newRoundsRendered = 0;
 
   public handleGuestOptionSelect(index: number): void {
+    if (!this.canLocalPlayerSelect()) {
+      coopWarn("me", "watcher option select IGNORED (pinned ME belongs to partner)", {
+        counter: this.interactionCounter,
+        index,
+      });
+      return;
+    }
     if (this.pickSent) {
       coopWarn("me", "DUPLICATE guest option select IGNORED (#815 re-entry guard)", {
         counter: this.interactionCounter,
