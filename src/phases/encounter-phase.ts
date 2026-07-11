@@ -1,4 +1,5 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
+import type { Battle } from "#app/battle";
 import { PLAYER_PARTY_MAX_SIZE, WEIGHT_INCREMENT_ON_SPAWN_MISS } from "#app/constants";
 import { consumePendingDevEnemyParty, type DevEnemyMonSpec } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
@@ -6,7 +7,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims";
-import { fieldPositionForSlot } from "#data/battle-format";
+import { fieldPositionForSlot, formatById } from "#data/battle-format";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import {
   applyCoopAuthoritativeBattleState,
@@ -26,6 +27,7 @@ import {
   isVersusSession,
   maybeBeginReplayRecording,
 } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopEncounterAuthority, CoopSerializedTrainer } from "#data/elite-redux/coop/coop-transport";
 import { erRecordAchievementShinyEncounter } from "#data/elite-redux/er-achievement-tracker";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
@@ -50,13 +52,17 @@ import { BattleType } from "#enums/battle-type";
 import { BiomeId } from "#enums/biome-id";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
+import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { PlayerGender } from "#enums/player-gender";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerSlot } from "#enums/trainer-slot";
+import type { TrainerType } from "#enums/trainer-type";
+import type { TrainerVariant } from "#enums/trainer-variant";
 import { UiMode } from "#enums/ui-mode";
 import type { WeatherType } from "#enums/weather-type";
 import { EncounterPhaseEvent } from "#events/battle-scene";
 import type { EnemyPokemon, Pokemon } from "#field/pokemon";
+import { Trainer } from "#field/trainer";
 import {
   BoostBugSpawnModifier,
   IvScannerModifier,
@@ -71,6 +77,7 @@ import { doTrainerExclamation } from "#mystery-encounters/encounter-phase-utils"
 import { getGoldenBugNetSpecies } from "#mystery-encounters/encounter-pokemon-utils";
 import { BattlePhase } from "#phases/battle-phase";
 import { achvs } from "#system/achv";
+import { trainerConfigs } from "#trainers/trainer-config";
 import { randSeedInt, randSeedItem } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
@@ -117,6 +124,148 @@ function buildDevEnemy(spec: DevEnemyMonSpec, fallbackLevel: number, trainerBatt
  * after a human clears its save-slot screen, which can take a while.
  */
 const COOP_ENEMY_PARTY_WAIT_MS = 120_000;
+
+function captureCoopTrainer(trainer: Trainer): CoopSerializedTrainer {
+  return {
+    trainerType: trainer.config.trainerType,
+    variant: trainer.variant,
+    partyTemplateIndex: trainer.partyTemplateIndex,
+    ...(trainer.nameKey ? { nameKey: trainer.nameKey } : {}),
+    ...(trainer.partnerNameKey ? { partnerNameKey: trainer.partnerNameKey } : {}),
+    ...(trainer.name ? { name: trainer.name } : {}),
+    ...(trainer.partnerName ? { partnerName: trainer.partnerName } : {}),
+    nameWithTitle: trainer.getName(TrainerSlot.NONE, true),
+    renderNames: {
+      none: trainer.getName(TrainerSlot.NONE, false),
+      noneWithTitle: trainer.getName(TrainerSlot.NONE, true),
+      trainer: trainer.getName(TrainerSlot.TRAINER, false),
+      trainerWithTitle: trainer.getName(TrainerSlot.TRAINER, true),
+      partner: trainer.getName(TrainerSlot.TRAINER_PARTNER, false),
+      partnerWithTitle: trainer.getName(TrainerSlot.TRAINER_PARTNER, true),
+    },
+    encounterMessages: [...trainer.getEncounterMessages()],
+    victoryMessages: [...trainer.getVictoryMessages()],
+    defeatMessages: [...trainer.getDefeatMessages()],
+    ...(trainer.erGhostApproach ? { erGhostApproach: trainer.erGhostApproach } : {}),
+    ...(trainer.erGhostAura ? { erGhostAura: trainer.erGhostAura } : {}),
+    ...(trainer.erGhostFxSpeed === undefined ? {} : { erGhostFxSpeed: trainer.erGhostFxSpeed }),
+    ...(trainer.erGhostFxIntensity === undefined ? {} : { erGhostFxIntensity: trainer.erGhostFxIntensity }),
+  };
+}
+
+/** Host: capture every encounter branch the guest must adopt before rendering this wave. */
+export function captureCoopEncounterAuthority(battle: Battle): CoopEncounterAuthority {
+  return {
+    battleType: battle.battleType,
+    mysteryEncounterType: battle.mysteryEncounter?.encounterType ?? COOP_WAVE_NO_ME,
+    formatId: battle.format.id,
+    enemyLevels: [...(battle.enemyLevels ?? [])],
+    ...(battle.trainer == null ? {} : { trainer: captureCoopTrainer(battle.trainer) }),
+  };
+}
+
+function buildAuthoritativeTrainer(data: CoopSerializedTrainer): Trainer {
+  if (
+    !Number.isInteger(data.trainerType)
+    || !Object.hasOwn(trainerConfigs, data.trainerType)
+    || !Number.isInteger(data.variant)
+    || !Number.isInteger(data.partyTemplateIndex)
+    || data.partyTemplateIndex < 0
+  ) {
+    throw new Error("Malformed authoritative trainer descriptor");
+  }
+  const trainer = new Trainer(
+    data.trainerType as TrainerType,
+    data.variant as TrainerVariant,
+    data.partyTemplateIndex,
+    data.nameKey,
+    data.partnerNameKey,
+  );
+  if (data.name !== undefined) {
+    trainer.name = data.name;
+  }
+  if (data.partnerName !== undefined) {
+    trainer.partnerName = data.partnerName;
+  }
+  if (data.renderNames !== undefined) {
+    const names = { ...data.renderNames };
+    trainer.getName = (slot: TrainerSlot = TrainerSlot.NONE, includeTitle = false): string => {
+      if (slot === TrainerSlot.TRAINER_PARTNER) {
+        return includeTitle ? names.partnerWithTitle : names.partner;
+      }
+      if (slot === TrainerSlot.TRAINER) {
+        return includeTitle ? names.trainerWithTitle : names.trainer;
+      }
+      return includeTitle ? names.noneWithTitle : names.none;
+    };
+  } else if (data.nameWithTitle !== undefined) {
+    const plainName = data.name ?? trainer.name;
+    const titledName = data.nameWithTitle;
+    trainer.getName = (_slot: TrainerSlot = TrainerSlot.NONE, includeTitle = false): string =>
+      includeTitle ? titledName : plainName;
+  }
+  if (data.encounterMessages !== undefined) {
+    const messages = [...data.encounterMessages];
+    trainer.getEncounterMessages = () => [...messages];
+  }
+  if (data.victoryMessages !== undefined) {
+    const messages = [...data.victoryMessages];
+    trainer.getVictoryMessages = () => [...messages];
+  }
+  if (data.defeatMessages !== undefined) {
+    const messages = [...data.defeatMessages];
+    trainer.getDefeatMessages = () => [...messages];
+  }
+  trainer.erGhostApproach = data.erGhostApproach as Trainer["erGhostApproach"];
+  trainer.erGhostAura = data.erGhostAura;
+  trainer.erGhostFxSpeed = data.erGhostFxSpeed;
+  trainer.erGhostFxIntensity = data.erGhostFxIntensity;
+  return trainer;
+}
+
+/** Guest: atomically replace every locally-derived encounter branch with the host descriptor. */
+export function applyCoopEncounterAuthority(battle: Battle, authority: CoopEncounterAuthority): void {
+  const format = formatById(authority.formatId);
+  const validBattleType =
+    authority.battleType === BattleType.WILD
+    || authority.battleType === BattleType.TRAINER
+    || authority.battleType === BattleType.MYSTERY_ENCOUNTER;
+  const levelsValid =
+    Array.isArray(authority.enemyLevels) && authority.enemyLevels.every(level => Number.isFinite(level) && level >= 1);
+  if (!validBattleType || format == null || !levelsValid) {
+    throw new Error("Malformed authoritative encounter descriptor");
+  }
+  const isMystery = authority.battleType === BattleType.MYSTERY_ENCOUNTER;
+  if (isMystery === (authority.mysteryEncounterType === COOP_WAVE_NO_ME)) {
+    throw new Error("Authoritative encounter mystery verdict contradicts battle type");
+  }
+  if ((authority.battleType === BattleType.TRAINER) !== (authority.trainer != null)) {
+    throw new Error("Authoritative encounter trainer descriptor contradicts battle type");
+  }
+
+  // Construct first so an invalid trainer cannot partially mutate the live battle.
+  const replacementTrainer = authority.trainer == null ? null : buildAuthoritativeTrainer(authority.trainer);
+  const oldTrainer = battle.trainer;
+  battle.battleType = authority.battleType as BattleType;
+  battle.mysteryEncounterType = isMystery ? (authority.mysteryEncounterType as MysteryEncounterType) : undefined;
+  battle.mysteryEncounter = undefined;
+  battle.setFormat(format);
+  const commandSlots = battle.arrangement.activeIndices();
+  battle.turnCommands = Object.fromEntries(commandSlots.map(index => [index, null]));
+  battle.preTurnCommands = Object.fromEntries(commandSlots.map(index => [index, null]));
+  battle.enemyLevels = [...authority.enemyLevels];
+  // Never preserve a locally pre-populated encounter override or an extra slot from the wrong format.
+  // The caller installs the carrier's complete party immediately after this descriptor is accepted.
+  battle.enemyParty = [];
+  battle.trainer = replacementTrainer;
+  if (oldTrainer != null && oldTrainer !== replacementTrainer) {
+    globalScene.field.remove(oldTrainer, false);
+    oldTrainer.destroy();
+  }
+  if (replacementTrainer != null) {
+    globalScene.field.add(replacementTrainer);
+  }
+}
 
 export class EncounterPhase extends BattlePhase {
   // Union type is necessary as this is subclassed, and typescript will otherwise complain
@@ -245,8 +394,19 @@ export class EncounterPhase extends BattlePhase {
       wave => streamer.requestEnemyParty(wave),
       { timeoutMs: COOP_ENEMY_PARTY_WAIT_MS },
     );
-    if (enemies == null || enemies.length === 0) {
+    if (enemies == null) {
       throw new Error(`Authoritative enemy party unavailable for wave ${battle.waveIndex}; refusing local derivation`);
+    }
+    const encounter = streamer.consumeEnemyPartyEncounter(battle.waveIndex);
+    if (encounter == null) {
+      throw new Error(`Authoritative encounter descriptor unavailable for wave ${battle.waveIndex}`);
+    }
+    applyCoopEncounterAuthority(battle, encounter);
+    if (battle.battleType !== BattleType.MYSTERY_ENCOUNTER && enemies.length === 0) {
+      throw new Error(`Authoritative enemy party was empty at wave ${battle.waveIndex}`);
+    }
+    if (battle.battleType === BattleType.MYSTERY_ENCOUNTER && enemies.length > 0) {
+      throw new Error(`Mystery encounter carried an unexpected ordinary enemy party at wave ${battle.waveIndex}`);
     }
     const levels = battle.enemyLevels ?? [];
     // Trainer enemies belong in TrainerSlot.TRAINER; wild enemies in NONE.
@@ -264,14 +424,10 @@ export class EncounterPhase extends BattlePhase {
       }
       rebuilt[entry.fieldIndex] = built;
     }
-    if (rebuilt[0] == null || rebuilt.filter(Boolean).length !== enemies.length) {
+    if (rebuilt.length !== enemies.length || rebuilt[0] == null || rebuilt.some(enemy => enemy == null)) {
       throw new Error(`Authoritative enemy party was incomplete at wave ${battle.waveIndex}`);
     }
-    for (let fieldIndex = 0; fieldIndex < rebuilt.length; fieldIndex++) {
-      if (rebuilt[fieldIndex] != null) {
-        battle.enemyParty[fieldIndex] = rebuilt[fieldIndex];
-      }
-    }
+    battle.enemyParty = rebuilt;
     // The generation loop must not roll modifiers over the verbatim party; that would double held items.
     this.coopAdoptedEnemyParty = true;
     // The enemy handoff is also the first coherent boundary of the new wave. Apply the host's complete
@@ -300,6 +456,7 @@ export class EncounterPhase extends BattlePhase {
       const wave = globalScene.currentBattle.waveIndex;
       const enemies = captureCoopEnemies();
       const authoritativeState = captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
+      const encounter = captureCoopEncounterAuthority(globalScene.currentBattle);
       // #788 (live "I could pick a reward and continue without my partner"): the HOST reaches
       // the next wave SECONDS before the guest finishes replaying the between-wave menu, and
       // handing the guest the NEXT wave's party mid-menu is the desync window. BARRIER: defer
@@ -322,10 +479,13 @@ export class EncounterPhase extends BattlePhase {
           // newBattle instead of re-deriving via isWaveTrainer (the wave-42 saveDataDigest split).
           globalScene.currentBattle?.battleType,
           authoritativeState ?? undefined,
+          encounter,
         );
       });
-    } catch {
-      /* a serialize/send failure must never break the host's encounter */
+    } catch (error) {
+      // Keep the host playable, but make the failed authoritative boundary explicit in diagnostics; the
+      // guest stays closed and re-requests rather than constructing a different encounter.
+      coopWarn("stream", "host failed to publish complete ordinary-wave authority", error);
     }
   }
 

@@ -25,6 +25,11 @@ import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
 import { SpeciesId } from "#enums/species-id";
+import { TrainerSlot } from "#enums/trainer-slot";
+import { TrainerType } from "#enums/trainer-type";
+import { TrainerVariant } from "#enums/trainer-variant";
+import type { Trainer } from "#field/trainer";
+import { applyCoopEncounterAuthority } from "#phases/encounter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
@@ -98,6 +103,65 @@ describe.skipIf(!RUN)("co-op GUEST newBattle adopts the host's battleType verdic
   it("adopts WILD when the host verdict is WILD even though the local isWaveTrainer rolls TRAINER", async () => {
     const battleType = await guestNewBattleType(BattleType.WILD, /* localRoll (TRAINER) */ true);
     expect(battleType, "guest adopted the host's WILD verdict over its TRAINER local roll").toBe(BattleType.WILD);
+    logs.flush();
+  }, 240_000);
+
+  it("late authority atomically replaces a locally-built wild wave with the host trainer encounter", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.DRAGONITE, SpeciesId.TYRANITAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+
+    await withClient(rig.guestCtx, () => {
+      const battle = rig.guestScene.currentBattle;
+      battle.battleType = BattleType.WILD;
+      battle.trainer = null;
+      battle.setDouble(false);
+      battle.enemyLevels = [3];
+      expect(battle.enemyParty.length).toBeGreaterThan(0);
+
+      applyCoopEncounterAuthority(battle, {
+        battleType: BattleType.TRAINER,
+        mysteryEncounterType: COOP_WAVE_NO_ME,
+        formatId: "double",
+        enemyLevels: [44, 45],
+        trainer: {
+          trainerType: TrainerType.BACKPACKER,
+          variant: TrainerVariant.DOUBLE,
+          partyTemplateIndex: 0,
+          name: "Host Atlas",
+          partnerName: "Host Echo",
+          nameWithTitle: "Backpackers Host Atlas & Host Echo",
+          renderNames: {
+            none: "Host Atlas & Host Echo",
+            noneWithTitle: "Backpackers Host Atlas & Host Echo",
+            trainer: "Host Atlas",
+            trainerWithTitle: "Backpacker Host Atlas",
+            partner: "Host Echo",
+            partnerWithTitle: "Backpacker Host Echo",
+          },
+          encounterMessages: ["The host-authored challenge."],
+          victoryMessages: ["The host-authored defeat."],
+          defeatMessages: ["The host-authored victory."],
+        },
+      });
+
+      expect(battle.battleType).toBe(BattleType.TRAINER);
+      expect(battle.format.id).toBe("double");
+      expect(battle.enemyLevels).toEqual([44, 45]);
+      expect(battle.enemyParty, "late descriptor drops every locally-derived enemy before carrier rebuild").toEqual([]);
+      expect(Object.keys(battle.turnCommands).map(Number)).toEqual([0, 1, 2, 3]);
+      expect(Object.keys(battle.preTurnCommands).map(Number)).toEqual([0, 1, 2, 3]);
+      const adoptedTrainer = battle.trainer as Trainer | null;
+      expect(adoptedTrainer?.config.trainerType).toBe(TrainerType.BACKPACKER);
+      expect(adoptedTrainer?.name).toBe("Host Atlas");
+      expect(adoptedTrainer?.partnerName).toBe("Host Echo");
+      expect(adoptedTrainer?.getName(TrainerSlot.NONE, true)).toBe("Backpackers Host Atlas & Host Echo");
+      expect(adoptedTrainer?.getName(TrainerSlot.TRAINER, false)).toBe("Host Atlas");
+      expect(adoptedTrainer?.getName(TrainerSlot.TRAINER_PARTNER, false)).toBe("Host Echo");
+      expect(adoptedTrainer?.getEncounterMessages()).toEqual(["The host-authored challenge."]);
+      expect(adoptedTrainer?.getVictoryMessages()).toEqual(["The host-authored defeat."]);
+      expect(adoptedTrainer?.getDefeatMessages()).toEqual(["The host-authored victory."]);
+    });
     logs.flush();
   }, 240_000);
 });

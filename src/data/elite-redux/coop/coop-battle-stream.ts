@@ -30,6 +30,7 @@ import type {
   CoopBattleEvent,
   CoopCapturePresentation,
   CoopConnectionState,
+  CoopEncounterAuthority,
   CoopFullMonSnapshot,
   CoopMessage,
   CoopSerializedEnemy,
@@ -195,6 +196,8 @@ export class CoopBattleStreamer {
   private readonly sentEnemyParties = new Map<number, Extract<CoopMessage, { t: "enemyPartySync" }>>();
   /** New-wave state paired with enemyPartySync; consumed after the guest has built the streamed enemies. */
   private readonly enemyPartyStateByWave = new Map<number, CoopAuthoritativeBattleStateV1>();
+  /** Complete encounter identity paired with the replayable wave carrier; consumed atomically at adopt. */
+  private readonly enemyPartyEncounterByWave = new Map<number, CoopEncounterAuthority>();
   /** wave -> resolver for an in-flight {@linkcode awaitLaunchSnapshot} (#633 M4 push-snapshot launch). */
   private readonly launchSnapshotWaiters = new Map<number, (res: string | null) => void>();
   /** Latest launch snapshot that arrived before its waiter (race buffer, keyed by wave). */
@@ -249,8 +252,8 @@ export class CoopBattleStreamer {
    * wave-42 `saveDataDigest` `battleType` split (host TRAINER, guest WILD), a checksum mismatch every
    * turn until a resync heals it, and the "wild"-thinking guest mishandling the trainer's mid-battle
    * send-outs. So the wave TYPE is HOST-AUTHORITATIVE: the guest adopts this verdict instead of rolling.
-   * `undefined` = no wave-start sync received yet (fall back to the local roll; the resync backstop
-   * still heals a late-arriving divergence).
+   * `undefined` = no wave-start sync received yet. `newBattle` may build a provisional local shell,
+   * but EncounterPhase remains closed until the replayable carrier arrives and atomically overwrites it.
    */
   battleTypeForWave(wave: number): number | undefined {
     return this.battleTypeByWave.get(wave);
@@ -262,8 +265,8 @@ export class CoopBattleStreamer {
    * host explicitly rolled NO ME (#862: the guest's own presence roll depends on per-client
    * pity state that diverges after any one-sided ME anomaly - same seed, different verdict -
    * so the guest must adopt the host's verdict in BOTH directions); `undefined` = no
-   * wave-start sync received yet (fall back to the local roll; the MysteryEncounterPhase
-   * divert guard catches a late-arriving negative verdict).
+   * wave-start sync received yet. A provisional local shell is never allowed past EncounterPhase;
+   * the replayable encounter descriptor overwrites the final verdict before rendering.
    */
   meTypeForWave(wave: number): number | undefined {
     return this.meTypeByWave.get(wave);
@@ -303,13 +306,24 @@ export class CoopBattleStreamer {
     meType?: number,
     battleType?: number,
     authoritativeState?: CoopAuthoritativeBattleStateV1,
+    encounter?: CoopEncounterAuthority,
   ): void {
+    if (
+      encounter !== undefined
+      && ((meType !== undefined && encounter.mysteryEncounterType !== meType)
+        || (battleType !== undefined && encounter.battleType !== battleType))
+    ) {
+      throw new Error(`Contradictory authoritative encounter metadata for wave ${wave}`);
+    }
+    const resolvedMeType = encounter?.mysteryEncounterType ?? meType;
+    const resolvedBattleType = encounter?.battleType ?? battleType;
     const message: Extract<CoopMessage, { t: "enemyPartySync" }> = {
       t: "enemyPartySync",
       wave,
       enemies,
-      ...(meType === undefined ? {} : { meType }),
-      ...(battleType === undefined ? {} : { battleType }),
+      ...(resolvedMeType === undefined ? {} : { meType: resolvedMeType }),
+      ...(resolvedBattleType === undefined ? {} : { battleType: resolvedBattleType }),
+      ...(encounter === undefined ? {} : { encounter }),
       ...(authoritativeState === undefined ? {} : { authoritativeState }),
     };
     this.sentEnemyParties.delete(wave);
@@ -323,7 +337,7 @@ export class CoopBattleStreamer {
     }
     coopLog(
       "replay",
-      `host SEND enemyPartySync wave=${wave} count=${enemies.length} meType=${meType ?? "-"} battleType=${battleType ?? "-"}`,
+      `host SEND enemyPartySync wave=${wave} count=${enemies.length} meType=${resolvedMeType ?? "-"} battleType=${resolvedBattleType ?? "-"}`,
     );
     this.transport.send(message);
   }
@@ -333,6 +347,13 @@ export class CoopBattleStreamer {
     const state = this.enemyPartyStateByWave.get(wave);
     this.enemyPartyStateByWave.delete(wave);
     return state;
+  }
+
+  /** GUEST: atomically consume the exact encounter identity paired with this wave's party. */
+  consumeEnemyPartyEncounter(wave: number): CoopEncounterAuthority | undefined {
+    const encounter = this.enemyPartyEncounterByWave.get(wave);
+    this.enemyPartyEncounterByWave.delete(wave);
+    return encounter;
   }
 
   /**
@@ -1265,6 +1286,9 @@ export class CoopBattleStreamer {
     this.lastEnemyParty = null;
     this.sentEnemyParties.clear();
     this.enemyPartyStateByWave.clear();
+    this.enemyPartyEncounterByWave.clear();
+    this.meTypeByWave.clear();
+    this.battleTypeByWave.clear();
     this.lastLaunchSnapshot = null;
     this.lastSentLaunchSnapshot = null;
     this.consumedLaunchSnapshotWaves.clear();
@@ -1287,16 +1311,19 @@ export class CoopBattleStreamer {
         if (msg.authoritativeState !== undefined) {
           this.enemyPartyStateByWave.set(msg.wave, msg.authoritativeState);
         }
-        // #825: remember the host's rolled ME type for this wave so a guest that
-        // generates its encounter AFTER the sync arrives adopts the host's roll.
-        if (msg.meType !== undefined) {
-          this.meTypeByWave.set(msg.wave, msg.meType);
-        }
-        // #867: remember the host's authoritative WILD-vs-TRAINER verdict so the guest's newBattle
-        // ADOPTS it instead of re-deriving the wave type via isWaveTrainer (which diverges once the
-        // guest's arena/overstay/RNG state drifts from the host - the wave-42 battleType desync).
-        if (msg.battleType !== undefined) {
-          this.battleTypeByWave.set(msg.wave, msg.battleType);
+        if (msg.encounter === undefined) {
+          // Legacy/unit carriers without the complete descriptor still populate the early hints. The
+          // er-coop-21 production adopt refuses to cross the encounter boundary without the descriptor.
+          if (msg.meType !== undefined) {
+            this.meTypeByWave.set(msg.wave, msg.meType);
+          }
+          if (msg.battleType !== undefined) {
+            this.battleTypeByWave.set(msg.wave, msg.battleType);
+          }
+        } else {
+          this.enemyPartyEncounterByWave.set(msg.wave, msg.encounter);
+          this.meTypeByWave.set(msg.wave, msg.encounter.mysteryEncounterType);
+          this.battleTypeByWave.set(msg.wave, msg.encounter.battleType);
         }
         // Hand it straight to a parked awaitEnemyParty (consumed), else buffer for the
         // next consume/await. Either way fire any live handler.

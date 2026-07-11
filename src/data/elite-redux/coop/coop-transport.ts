@@ -60,7 +60,9 @@ export type CoopRole = "host" | "guest";
 // er-coop-19: mystery-battle enemy parties are retained and re-requestable by interaction key; a guest
 // refuses local enemy derivation when the authoritative carrier is lost or malformed.
 // er-coop-20: interaction-counter barriers request an idempotent counter replay and never timeout open.
-export const COOP_PROTOCOL_VERSION = "er-coop-20";
+// er-coop-21: wave-party carriers include the complete encounter descriptor so a late/replayed carrier
+// atomically replaces locally-derived battle type, format, mystery type, levels, and trainer presentation.
+export const COOP_PROTOCOL_VERSION = "er-coop-21";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -257,6 +259,48 @@ export interface CoopSerializedEnemy {
   fieldIndex: number;
   /** The host's serialized enemy Pokemon. */
   data: CoopSerializedPokemon;
+}
+
+/** Plain-JSON trainer identity/presentation carried by a wave's authoritative encounter descriptor. */
+export interface CoopSerializedTrainer {
+  trainerType: number;
+  variant: number;
+  partyTemplateIndex: number;
+  nameKey?: string | undefined;
+  partnerNameKey?: string | undefined;
+  name?: string | undefined;
+  partnerName?: string | undefined;
+  nameWithTitle?: string | undefined;
+  renderNames?: {
+    none: string;
+    noneWithTitle: string;
+    trainer: string;
+    trainerWithTitle: string;
+    partner: string;
+    partnerWithTitle: string;
+  } | undefined;
+  encounterMessages?: string[] | undefined;
+  victoryMessages?: string[] | undefined;
+  defeatMessages?: string[] | undefined;
+  erGhostApproach?: string | undefined;
+  erGhostAura?: string | undefined;
+  erGhostFxSpeed?: number | undefined;
+  erGhostFxIntensity?: number | undefined;
+}
+
+/**
+ * Complete host-authored encounter identity paired atomically with `enemyPartySync`.
+ * The guest applies this before reconstructing enemies or rendering the encounter, so a carrier that
+ * arrives after `newBattle()` repairs every locally-derived branch rather than only replacing species.
+ */
+export interface CoopEncounterAuthority {
+  battleType: number;
+  /** `COOP_WAVE_NO_ME` for a non-ME wave, otherwise the exact host encounter type. */
+  mysteryEncounterType: number;
+  /** Registry id from `BattleFormat.id` (`single`, `double`, `triple`, ...). */
+  formatId: string;
+  enemyLevels: number[];
+  trainer?: CoopSerializedTrainer | undefined;
 }
 
 /**
@@ -1043,6 +1087,8 @@ export type CoopMessage =
       enemies: CoopSerializedEnemy[];
       meType?: number;
       battleType?: number;
+      /** Complete encounter identity; required by the er-coop-21 production sender. */
+      encounter?: CoopEncounterAuthority;
       /** Complete host state at the new-wave encounter boundary; additive for older peers. */
       authoritativeState?: CoopAuthoritativeBattleStateV1;
     }
