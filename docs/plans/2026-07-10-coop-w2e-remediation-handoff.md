@@ -351,3 +351,31 @@ approval.
 Next per-mon surfaces: catch-full and stormglass. Lobby/resume, renderer enforcement,
 quarantine/stat-stage cleanup, expanded model/soak coverage, the final drop-every-class campaign, and the
 full four-lane/final-long-soak gate remain open.
+
+## 17. Continuation evidence (per-mon operations: wild catch-full)
+
+The guest-catcher wild full-party keep/release path is now migrated. `af9625330` is the failure-first
+carrier-loss suite; `6015216c3` adds negotiated `opSurface.catchFull`, typed prompt/decision
+`CATCH_FULL` operations, the `op:catchFull` journal class under `TURN_RESOLVE`, cold-resume revision
+floor, journal-first presentation, identity-tagged raw-prompt echo suppression, and lifecycle-bounded
+guest decision retry. The flag-off path remains the original prompt/choice relay.
+
+The authority journals the validated replacement slot it actually applies, or the explicit `-1` decline
+when the guest cancels, disconnects, sends an invalid slot, or times out. The committed decision therefore
+both stops owner retries and leaves a replayable explanation of whether the captured mon was kept. Retry
+cancellation keys on the exact species/slot decision rather than local wave/turn coordinates, so a renderer
+that is already behind cannot keep retransmitting after the authority has resolved the catch. The existing
+capture-party checkpoint remains the sole mutation/materialization plane; the operation does not splice a
+second party copy on the renderer.
+
+Proof: `coop-catch-full-operation.test.ts` passes 4/4 (flag-off fallback, dropped raw prompt recovery,
+dual-carrier exactly-once, dropped owner choice with mismatched local coordinates, committed trace, and
+retry cancellation). The catch-full seam plus capability/handshake batch passes 24/24, with the gated duo
+file intentionally skipped in that batch. With `ER_SCENARIO=1`, the real two-engine catch-full suite passes
+2/2: guest-thrown replacement converges across both engines and host-thrown behavior remains unchanged.
+Biome reports no new errors; the repository-wide TypeScript check retains unrelated failures and reports
+zero diagnostics in touched files.
+
+Next per-mon surface: stormglass. Lobby/resume, renderer enforcement, quarantine/stat-stage cleanup,
+expanded model/soak coverage, the final drop-every-class campaign, and the full four-lane/final-long-soak
+gate remain open. The slice is ready for the staging sync/deploy checkpoint before stormglass begins.
