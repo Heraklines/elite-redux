@@ -34,6 +34,7 @@ import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import { COOP_ME_BATTLE_HANDOFF, CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { type CoopSerializedEnemy, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { describe, expect, it } from "vitest";
 
 /** Flush the loopback (delivers on a macrotask via setTimeout(0), like the live transport). */
@@ -232,6 +233,26 @@ describe("co-op authoritative ME battle handoff (#633)", () => {
     await flush();
     const got = await guestStream.awaitMeBattleEnemyParty(key, 1_000);
     expect(got, "an early ME party is buffered and consumed by the next await").toEqual(BOSS_PARTY);
+
+    hostStream.dispose();
+    guestStream.dispose();
+  });
+
+  it("FAILURE-FIRST: a dropped authoritative ME party is requested again instead of locally rerolled", async () => {
+    const pair = wrapCoopFaultPair(createLoopbackPair(), COOP_NO_FAULT_PROFILE, { seed: 0x4d454241 });
+    const hostStream = new CoopBattleStreamer(pair.host);
+    const guestStream = new CoopBattleStreamer(pair.guest);
+    const key = meBattleHandoffKey(27, 5);
+
+    pair.armNextDrop("meBattleEnemyPartySync", "host");
+    hostStream.sendMeBattleEnemyParty(key, BOSS_PARTY);
+    await flush();
+
+    const got = await guestStream.awaitMeBattleEnemyParty(key, 100);
+    expect(pair.counters.host.oneShotDropped, "the original authoritative carrier was actually lost").toBe(1);
+    expect(got, "the guest re-requests and adopts the retained host party; it never keeps a local roll").toEqual(
+      BOSS_PARTY,
+    );
 
     hostStream.dispose();
     guestStream.dispose();
