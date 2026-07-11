@@ -521,3 +521,23 @@ The exact resume artifact now passes its 5-wave boot/convergence/continuation pr
 campaigns pass, including both ownership parities and post-ME continuation. Lane C reran green: eight files
 passed, one evidence-only file skipped, 13 tests passed, zero failed. This fixes the sole red artifact found
 by the aggregate run; a fresh all-lane aggregate rerun remains the final acceptance step.
+
+## 26. Mystery-battle authority carrier recovery
+
+The current-state audit found one remaining fail-open branch at the highest-risk live surface. A mystery
+encounter battle's `meBattleEnemyPartySync` crossed once; if that frame was lost, the guest timed out and
+kept its locally generated enemy party. That directly violated host authority and could produce a different
+battle/phase branch immediately after an ME.
+
+`4e163a283` records the failure-first proof: the first authoritative party carrier is deterministically
+dropped and the guest receives `null`. `6044d5b48` retains the host's last eight keyed ME
+parties, adds `requestMeBattleEnemyParty`, requests immediately after parking the guest waiter, re-requests
+after reconnect, and validates complete reconstruction before replacing local enemies. Timeout, teardown,
+an empty payload, or a malformed payload now fails closed instead of authorizing local derivation. The
+pairing protocol advances to `er-coop-19`, preventing a stale cached renderer from silently retaining the
+old fallback.
+
+Focused proof: the ME handoff, battle-stream, durability, WebRTC, and capability batch passes 103/103;
+the production-shaped two-engine mystery and ME-battle-reward suites pass 8/8. The full sharded checkpoint
+and staging promotion remain pending. The remaining architecture work is still open: deliberately undriven forced soak legs, browser-
+level transport scenarios, canonical causal tracing, and the lobby/resume operation-model migration.
