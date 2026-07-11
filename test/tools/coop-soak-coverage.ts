@@ -38,6 +38,7 @@
 // NOT import the coop runtime, so it stays a pure test-side classifier.
 // =============================================================================
 
+import { COOP_OPERATION_SURFACES } from "#data/elite-redux/coop/coop-operation-surface-registry";
 import { COOP_RELAY_KINDS, COOP_SEQ_BANDS, coopSeqBandRange } from "#data/elite-redux/coop/coop-seq-registry";
 import { COOP_UI_MIRRORED_MODES } from "#data/elite-redux/coop/coop-ui-registry";
 import { UiMode } from "#enums/ui-mode";
@@ -115,11 +116,13 @@ export interface SoakHitSet {
   bands: Set<string>;
   /** Battle-flow situation values the run reached (the wave-start + per-turn situation taps). */
   situations: Set<string>;
+  /** Authoritative operation classes committed by the host during the run. */
+  operations: Set<string>;
 }
 
 /** A fresh, empty hit-set. */
 export function createSoakHitSet(): SoakHitSet {
-  return { modes: new Set(), kinds: new Set(), bands: new Set(), situations: new Set() };
+  return { modes: new Set(), kinds: new Set(), bands: new Set(), situations: new Set(), operations: new Set() };
 }
 
 // ---------------------------------------------------------------------------
@@ -130,6 +133,7 @@ const modeKey = (m: UiMode): string => `mode:${UiMode[m]}`;
 const kindKey = (k: string): string => `kind:${k}`;
 const bandKey = (b: string): string => `band:${b}`;
 const sitKey = (s: string): string => `situation:${s}`;
+const operationKey = (cls: string): string => `operation:${cls}`;
 
 /**
  * The EXPECTED surface set, derived AT RUNTIME from the registries (never hardcoded): every mirrored
@@ -150,6 +154,9 @@ export function expectedSurfaces(): Set<string> {
   for (const s of Object.values(COOP_SOAK_SITUATIONS)) {
     out.add(sitKey(s));
   }
+  for (const cls of COOP_OPERATION_SURFACES) {
+    out.add(operationKey(cls));
+  }
   return out;
 }
 
@@ -167,6 +174,9 @@ export function hitSurfaces(hits: SoakHitSet): Set<string> {
   }
   for (const s of hits.situations) {
     out.add(sitKey(s));
+  }
+  for (const cls of hits.operations) {
+    out.add(operationKey(cls));
   }
   return out;
 }
@@ -713,6 +723,26 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
   // terminating at it. It is PROBABILISTIC (fires only when one player's whole half dies before the other's
   // and before an every-10-wave heal), so it lives in {@linkcode PROBABILISTIC_BASE}, covered by the
   // cross-run union ledger. See coop-soak-driver.ts's guest-solo continuation + hostHalfExhausted predicate.
+  // ---- AUTHORITATIVE OPERATIONS ----
+  // These classes have dedicated real-engine operation suites, but the default wave/shop soak cannot stage
+  // their content yet. Keeping them in the SAME partition makes every omission loud and task-linked.
+  ...[
+    "op:ability",
+    "op:bargain",
+    "op:biome",
+    "op:catchFull",
+    "op:colosseum",
+    "op:learnMove",
+    "op:me",
+    "op:revival",
+    "op:stormglass",
+  ].map(cls => [
+    operationKey(cls),
+    {
+      reason: `the default wave/shop soak does not stage ${cls}; its dedicated two-engine operation suite does`,
+      followupTask: `add a forced ${cls} leg to the continuous soak/fault campaign`,
+    },
+  ] as [string, UndrivableEntry]),
 ]);
 
 // ---------------------------------------------------------------------------
@@ -731,7 +761,11 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
  * (#832): PROBABILISTIC under "god" (the level-300 party rarely faints), PROMOTED to GUARANTEED under
  * "level". Verified GUARANTEED-hit across level seeds.
  */
-const FAINT_PROMOTABLE: readonly string[] = [sitKey(COOP_SOAK_SITUATIONS.singleFaint), kindKey("switch")];
+const FAINT_PROMOTABLE: readonly string[] = [
+  sitKey(COOP_SOAK_SITUATIONS.singleFaint),
+  kindKey("switch"),
+  operationKey("op:faintSwitch"),
+];
 
 /**
  * Faint-channel surfaces that fire only under HEAVIER / more specific conditions, so they stay PROBABILISTIC
@@ -768,6 +802,9 @@ const GUARANTEED_BASE: readonly string[] = [
   sitKey(COOP_SOAK_SITUATIONS.wildDouble),
   sitKey(COOP_SOAK_SITUATIONS.trainerFixed),
   sitKey(COOP_SOAK_SITUATIONS.boss),
+  // Every continuous run commits wave advancement and reward-shop choices through the operation journal.
+  operationKey("op:wave"),
+  operationKey("op:reward"),
 ];
 
 /** PROBABILISTIC base: seed/content-dependent surfaces that are probabilistic under EVERY profile. */
@@ -905,6 +942,7 @@ export function logSoakCoverage(hits: SoakHitSet, profile: SoakProfileName = "go
   log(`[coop-soak-coverage] HIT kinds=[${sorted(hits.kinds).join(", ")}]`);
   log(`[coop-soak-coverage] HIT bands=[${sorted(hits.bands).join(", ")}]`);
   log(`[coop-soak-coverage] HIT situations=[${sorted(hits.situations).join(", ")}]`);
+  log(`[coop-soak-coverage] HIT operations=[${sorted(hits.operations).join(", ")}]`);
 
   // GUARANTEED status.
   const guaranteedCold = sorted(guaranteed).filter(s => !hit.has(s));

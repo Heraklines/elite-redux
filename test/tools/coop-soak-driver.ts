@@ -74,6 +74,7 @@ import {
   resetCoopChecksumAssertionCount,
   setCoopChecksumAssertSeverity,
 } from "#data/elite-redux/coop/coop-checksum-assert";
+import { getCoopOperationJournalCommittedClasses } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   clearCoopRuntime,
   getCoopInteractionRelay,
@@ -2474,6 +2475,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   // #828 ASYMMETRIC CONTINUATION (BUILD 2): host-half exhaustion is NO LONGER a terminal - it is now DRIVEN
   // (the guest plays on solo, {@linkcode hostHalfExhausted} recorded per wave in the loop above). Any
   // run-end here is a TRUE terminal (full wipe / GameOver / Title), so nothing extra to record.
+
+  for (const cls of getCoopOperationJournalCommittedClasses()) {
+    hits.operations.add(cls);
+  }
 
   assertTeardown();
   return {
