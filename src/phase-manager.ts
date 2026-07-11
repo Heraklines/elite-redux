@@ -612,7 +612,7 @@ export class PhaseManager {
     // roll RNG, apply damage, or read per-account state. Hard-gated on the live authoritative GUEST, so
     // solo / host / lockstep are byte-for-byte unaffected (the predicate is false and this returns
     // early). See coop-renderer-gate.ts + docs/plans/2026-07-10-coop-authoritative-run-state-migration.md.
-    if (coopRendererGateNeutralizes(phase)) {
+    if (coopRendererGateNeutralizes(phase, args)) {
       // The inert phase legitimately substitutes for ANY neutralized phase; every consumer of create()
       // only ENQUEUES the result as a base `Phase` (verified: no caller reads a neutralized phase's
       // methods), so this is a sound deliberate substitution, not an error suppression.

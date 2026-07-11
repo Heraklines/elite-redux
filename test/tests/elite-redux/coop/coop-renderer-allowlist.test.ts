@@ -74,6 +74,7 @@ const COOP_GUEST_OBSERVED_PHASES: readonly string[] = [
   // launch snapshot/currentBattle and strands the two peers on different screens.
   "SelectStarterPhase",
   "SwitchBiomePhase",
+  "TurnStartPhase",
   "VictoryPhase",
 ];
 
@@ -163,6 +164,17 @@ describe("co-op renderer ALLOWLIST gate (#633, accepted-review item 2)", () => {
       expect(isCoopRendererBlockedPhase("SelectStarterPhase")).toBe(false);
       expect(coopRendererGateNeutralizes("SelectStarterPhase")).toBe(false);
       expect(getCoopRendererNeutralizedLog()).not.toContain("SelectStarterPhase");
+    });
+
+    it("RUNS the guest turn dispatcher so it can divert into CoopReplayTurnPhase", () => {
+      expect(isCoopRendererBlockedPhase("TurnStartPhase")).toBe(false);
+      expect(coopRendererGateNeutralizes("TurnStartPhase")).toBe(false);
+    });
+
+    it("permits only a loaded EncounterPhase after authoritative launch/resume adoption", () => {
+      expect(coopRendererGateNeutralizes("EncounterPhase")).toBe(true);
+      expect(coopRendererGateNeutralizes("EncounterPhase", [false])).toBe(true);
+      expect(coopRendererGateNeutralizes("EncounterPhase", [true])).toBe(false);
     });
   });
 

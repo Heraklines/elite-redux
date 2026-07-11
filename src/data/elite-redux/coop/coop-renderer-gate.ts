@@ -117,6 +117,9 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   "LearnMovePhase", // per-move learn intent
   "LearnMoveBatchPhase", // ER batch level-up learn intent
   "SwitchPhase", // own faint-switch / voluntary-switch intent
+  // Guest-side dispatcher: its authoritative-role branch queues CoopReplayTurnPhase and returns
+  // before any move/capture/enemy resolution is constructed.
+  "TurnStartPhase",
   "RevivalBlessingPhase", // revival PICK intent (the APPLY half is host-authoritative)
   "CoopGuestCatchFullPhase", // guest-catcher CATCH_FULL intent driver
   "CoopGuestFaintSwitchPhase", // guest faint-switch intent driver
@@ -374,8 +377,19 @@ let observedGuestPhases = new Set<string>();
  * Hard `false` for solo / host / lockstep (the gate predicate is false), so those paths never
  * even reach the allowlist lookup.
  */
-export function isCoopRendererBlockedPhase(phaseName: string): boolean {
-  return isCoopAuthoritativeGuestGated() && !COOP_RENDERER_ALLOWED_PHASES.has(phaseName);
+function isContextuallyAllowedRendererPhase(phaseName: string, constructorArgs: readonly unknown[]): boolean {
+  // The host snapshot has already populated the complete run. `loaded=true` makes EncounterPhase
+  // render/re-enter that adopted encounter; an ordinary EncounterPhase can generate shared state
+  // and therefore remains default-denied.
+  return phaseName === "EncounterPhase" && constructorArgs[0] === true;
+}
+
+export function isCoopRendererBlockedPhase(phaseName: string, constructorArgs: readonly unknown[] = []): boolean {
+  return (
+    isCoopAuthoritativeGuestGated()
+    && !COOP_RENDERER_ALLOWED_PHASES.has(phaseName)
+    && !isContextuallyAllowedRendererPhase(phaseName, constructorArgs)
+  );
 }
 
 /**
@@ -388,12 +402,16 @@ export function isCoopRendererBlockedPhase(phaseName: string): boolean {
  * other non-allowlisted phase RUNS but is logged WOULD-BLOCK so staging can see the allowlist gap.
  * ENFORCE: any non-allowlisted phase neutralizes (fail closed) and is logged BLOCK.
  */
-export function coopRendererGateNeutralizes(phaseName: string): boolean {
+export function coopRendererGateNeutralizes(phaseName: string, constructorArgs: readonly unknown[] = []): boolean {
   // Fast path: solo / host / lockstep never touch the allowlist.
   if (!isCoopAuthoritativeGuestGated()) {
     return false;
   }
   observedGuestPhases.add(phaseName);
+
+  if (isContextuallyAllowedRendererPhase(phaseName, constructorArgs)) {
+    return false;
+  }
 
   if (COOP_RENDERER_ALLOWED_PHASES.has(phaseName)) {
     // Wave-2f STRICT-TAILS: a tail the current authoritative operation did NOT sanction fails closed under
