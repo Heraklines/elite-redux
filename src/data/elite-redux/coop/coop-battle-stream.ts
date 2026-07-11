@@ -23,6 +23,7 @@
 // =============================================================================
 
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopBattleCheckpoint,
@@ -217,6 +218,7 @@ export class CoopBattleStreamer {
         outcome: CoopWaveOutcome,
         captureParty?: string[],
         capturePresentation?: CoopCapturePresentation,
+        transition?: CoopWaveAdvancePayload,
       ) => void)
     | null = null;
   /** GUEST: handler for the host's WAVE-END authoritative full-state snapshot (#838). */
@@ -412,12 +414,13 @@ export class CoopBattleStreamer {
     outcome: CoopWaveOutcome,
     captureParty?: string[],
     capturePresentation?: CoopCapturePresentation,
+    transition?: CoopWaveAdvancePayload,
   ): void {
     coopLog(
       "replay",
-      `host SEND waveResolved wave=${wave} outcome=${outcome}${captureParty == null ? "" : ` captureParty=${captureParty.length}`}${capturePresentation == null ? "" : ` cap=sp${capturePresentation.speciesId}`}`,
+      `host SEND waveResolved wave=${wave} outcome=${outcome} transition=${transition == null ? "legacy" : `${transition.nextLogicalPhase}/next${transition.nextWave}/biome${Number(transition.biomeChange)}/egg${Number(transition.eggLapse)}/${transition.victoryKind ?? "-"}`}${captureParty == null ? "" : ` captureParty=${captureParty.length}`}${capturePresentation == null ? "" : ` cap=sp${capturePresentation.speciesId}`}`,
     );
-    this.transport.send({ t: "waveResolved", wave, outcome, captureParty, capturePresentation });
+    this.transport.send({ t: "waveResolved", wave, outcome, captureParty, capturePresentation, transition });
   }
 
   /**
@@ -851,6 +854,7 @@ export class CoopBattleStreamer {
       outcome: CoopWaveOutcome,
       captureParty?: string[],
       capturePresentation?: CoopCapturePresentation,
+      transition?: CoopWaveAdvancePayload,
     ) => void,
   ): void {
     coopLog("stream", `guest REGISTER onWaveResolved handler (was=${this.waveResolvedHandler != null})`);
@@ -1374,12 +1378,12 @@ export class CoopBattleStreamer {
         // GUEST: the host cleared/ended this wave - run the normal post-battle tail.
         coopLog(
           "replay",
-          `guest RECV waveResolved wave=${msg.wave} outcome=${msg.outcome}${msg.captureParty == null ? "" : ` captureParty=${msg.captureParty.length}`}${msg.capturePresentation == null ? "" : ` cap=sp${msg.capturePresentation.speciesId}`}`,
+          `guest RECV waveResolved wave=${msg.wave} outcome=${msg.outcome} transition=${msg.transition == null ? "legacy" : `${msg.transition.nextLogicalPhase}/next${msg.transition.nextWave}/biome${Number(msg.transition.biomeChange)}/egg${Number(msg.transition.eggLapse)}/${msg.transition.victoryKind ?? "-"}`}${msg.captureParty == null ? "" : ` captureParty=${msg.captureParty.length}`}${msg.capturePresentation == null ? "" : ` cap=sp${msg.capturePresentation.speciesId}`}`,
         );
         if (this.waveResolvedHandler == null) {
           coopWarn("replay", `guest RECV waveResolved wave=${msg.wave} DROPPED (no handler registered)`);
         }
-        this.waveResolvedHandler?.(msg.wave, msg.outcome, msg.captureParty, msg.capturePresentation);
+        this.waveResolvedHandler?.(msg.wave, msg.outcome, msg.captureParty, msg.capturePresentation, msg.transition);
         return;
       case "waveEndState":
         // GUEST (#838): the host's WAVE-END authoritative full-state snapshot - the guest adopts it in

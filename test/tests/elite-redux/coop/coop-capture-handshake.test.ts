@@ -14,13 +14,14 @@
 
 import { getGameMode } from "#app/game-mode";
 import { applyCoopCaptureParty } from "#data/elite-redux/coop/coop-battle-engine";
+import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   clearCoopRuntime,
   mergeCoopPendingWaveAdvance,
+  resolveCoopPendingWaveTransition,
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
-import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import { GameModes } from "#enums/game-modes";
 import { SpeciesId } from "#enums/species-id";
 import { PokemonData } from "#system/pokemon-data";
@@ -45,6 +46,21 @@ describe("co-op capture handshake (#633 B1/B2/B3) - wire round-trip", () => {
     const round = JSON.parse(JSON.stringify(msg)) as Extract<CoopMessage, { t: "waveResolved" }>;
     expect(round.outcome).toBe("win");
     expect(round.captureParty).toBeUndefined();
+  });
+
+  it("a waveResolved carries the complete host-stated map-boundary transition byte-identically", () => {
+    const transition: CoopWaveAdvancePayload = {
+      wave: 10,
+      outcome: "win",
+      nextLogicalPhase: "WAVE_VICTORY",
+      nextWave: 11,
+      biomeChange: true,
+      eggLapse: true,
+      meBoundary: "none",
+      victoryKind: "wild",
+    };
+    const msg: CoopMessage = { t: "waveResolved", wave: 10, outcome: "win", transition };
+    expect(JSON.parse(JSON.stringify(msg))).toEqual(msg);
   });
 });
 
@@ -95,6 +111,15 @@ describe("co-op wave-advance preserves the host-stated transition at the wave-10
   it("never discards biomeChange and re-derives it from the guest scene", () => {
     const pending = mergeCoopPendingWaveAdvance(null, 10, "win", undefined, undefined, transition);
     expect(pending?.transition, "the pending tail retains the host's complete wave-10 statement").toEqual(transition);
+    let derived = false;
+    expect(
+      resolveCoopPendingWaveTransition(pending!, () => {
+        derived = true;
+        return { ...transition, biomeChange: false };
+      }),
+      "a contradictory guest-local biome verdict cannot replace the host statement",
+    ).toEqual(transition);
+    expect(derived, "the guest-local derivation was never evaluated").toBe(false);
   });
 });
 

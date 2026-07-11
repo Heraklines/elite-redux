@@ -42,6 +42,7 @@ import {
   isCoopWaveAdvanceOperationEnabled,
   resetCoopWaveAdvanceOperationFlag,
   resetCoopWaveAdvanceOperationState,
+  resolveCoopVictoryTailControl,
   setCoopWaveAdvanceOperationEnabled,
 } from "#data/elite-redux/coop/coop-wave-operation";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -56,6 +57,7 @@ function payload(over: Partial<CoopWaveAdvancePayload> & { wave: number }): Coop
     biomeChange: false,
     eggLapse: false,
     meBoundary: "none",
+    ...(isVictory ? { victoryKind: "wild" as const } : {}),
     ...over,
   };
 }
@@ -68,6 +70,22 @@ describe("co-op WAVE-ADVANCE operation - the keystone (Wave-2f)", () => {
   afterEach(() => {
     resetCoopWaveAdvanceOperationFlag();
     resetCoopWaveAdvanceOperationState();
+  });
+
+  it("concrete VictoryPhase control uses the host boundary statement and never evaluates guest derivations", () => {
+    const host = payload({ wave: 10, victoryKind: "wild", biomeChange: true, eggLapse: true });
+    let localReads = 0;
+    const local = (value: boolean) => () => {
+      localReads++;
+      return value;
+    };
+    const control = resolveCoopVictoryTailControl(host, {
+      trainerWin: local(true),
+      runContinues: local(false),
+      biomeChange: local(false),
+    });
+    expect(control).toEqual({ trainerWin: false, runContinues: true, eggLapse: true, biomeChange: true });
+    expect(localReads, "no contradictory guest-local tail predicate was evaluated").toBe(0);
   });
 
   // ── WATCHER adoption + stale/dup gating ──────────────────────────────────
