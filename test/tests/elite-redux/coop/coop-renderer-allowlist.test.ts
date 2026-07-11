@@ -111,7 +111,7 @@ describe("co-op renderer ALLOWLIST gate (#633, accepted-review item 2)", () => {
     resetObservedCoopGuestPhases();
   });
 
-  it("defaults to ENFORCE (fail closed)", () => {
+  it("can explicitly enable ENFORCE (fail closed)", () => {
     expect(isCoopRendererGateEnforced()).toBe(true);
   });
 
