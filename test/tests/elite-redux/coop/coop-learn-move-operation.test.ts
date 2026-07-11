@@ -14,7 +14,6 @@ import {
   sendCoopLearnMovePrompt,
   setCoopLearnMoveRetryMs,
 } from "#data/elite-redux/coop/coop-learn-move-operation";
-import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import {
   COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE,
@@ -73,20 +72,29 @@ describe("co-op learn-move operation migration", () => {
       },
       { seed: 0x1ea212 },
     );
-    const hostRelay = new CoopInteractionRelay(pair.host);
-    const guestRelay = new CoopInteractionRelay(pair.guest);
+    const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
     const payload = { type: "decision" as const, partySlot: SLOT, moveId: 57, forgetSlot: 1, maxMoveCount: 4 };
-    const send = () => guestRelay.sendInteractionChoice(COOP_LEARN_MOVE_FWD_SEQ_BASE + SLOT, "learnMove", 1);
+    const send = () =>
+      guestRuntime.interactionRelay.sendInteractionChoice(COOP_LEARN_MOVE_FWD_SEQ_BASE + SLOT, "learnMove", 1);
+    let delivered = 0;
+    const offCount = pair.host.onMessage(msg => {
+      if (msg.t === "interactionChoice" && msg.kind === "learnMove") {
+        delivered++;
+      }
+    });
     pair.armNextDrop("interactionChoice", "guest");
-    const awaited = hostRelay.awaitInteractionChoice(COOP_LEARN_MOVE_FWD_SEQ_BASE + SLOT, 100);
+    const awaited = hostRuntime.interactionRelay.awaitInteractionChoice(COOP_LEARN_MOVE_FWD_SEQ_BASE + SLOT, 100);
 
     send();
     armCoopLearnMoveIntentResend({ payload, wave: WAVE, turn: TURN, resend: send });
     expect(pair.faultsInjected()).toBe(1);
     expect((await awaited)?.choice).toBe(1);
+    setCoopRuntime(hostRuntime);
     commitCoopLearnMoveDecision({ payload, ownerRole: "guest", localRole: "host", wave: WAVE, turn: TURN });
-    hostRelay.dispose();
-    guestRelay.dispose();
+    await new Promise(resolve => setTimeout(resolve, 30));
+    expect(delivered).toBe(1);
+    offCount();
   });
 
   it("DURABILITY: dropping a batch forward still opens exactly one guest panel", async () => {
@@ -158,8 +166,8 @@ describe("co-op learn-move operation migration", () => {
       },
       { seed: 0x1ea215 },
     );
-    const hostRelay = new CoopInteractionRelay(pair.host);
-    const guestRelay = new CoopInteractionRelay(pair.guest);
+    const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
     const seq = COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE + SLOT;
     const payload = {
       type: "decision" as const,
@@ -167,16 +175,24 @@ describe("co-op learn-move operation migration", () => {
       assignments: [[57, 1]] as [number, number][],
       fallback: false,
     };
-    const send = () => guestRelay.sendInteractionChoice(seq, "learnMoveBatch", 1, [57, 1]);
+    const send = () => guestRuntime.interactionRelay.sendInteractionChoice(seq, "learnMoveBatch", 1, [57, 1]);
+    let delivered = 0;
+    const offCount = pair.host.onMessage(msg => {
+      if (msg.t === "interactionChoice" && msg.kind === "learnMoveBatch") {
+        delivered++;
+      }
+    });
     pair.armNextDrop("interactionChoice", "guest");
-    const awaited = hostRelay.awaitInteractionChoice(seq, 100);
+    const awaited = hostRuntime.interactionRelay.awaitInteractionChoice(seq, 100);
 
     send();
     armCoopLearnMoveBatchIntentResend({ payload, wave: WAVE, turn: TURN, resend: send });
     expect(pair.faultsInjected()).toBe(1);
     expect(await awaited).toMatchObject({ choice: 1, data: [57, 1] });
+    setCoopRuntime(hostRuntime);
     commitCoopLearnMoveBatchDecision({ payload, ownerRole: "guest", localRole: "host", wave: WAVE, turn: TURN });
-    hostRelay.dispose();
-    guestRelay.dispose();
+    await new Promise(resolve => setTimeout(resolve, 30));
+    expect(delivered).toBe(1);
+    offCount();
   });
 });

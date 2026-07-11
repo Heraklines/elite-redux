@@ -68,6 +68,7 @@ import {
   COOP_CAP_OP_BIOME,
   COOP_CAP_OP_COLOSSEUM,
   COOP_CAP_OP_FAINT_SWITCH,
+  COOP_CAP_OP_LEARN_MOVE,
   COOP_CAP_OP_ME,
   COOP_CAP_OP_REVIVAL,
   COOP_CAP_OP_REWARD,
@@ -99,6 +100,11 @@ import {
   isCoopFaintSwitchWindowOpen,
   resetCoopFaintSwitchWindows,
 } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  isCoopLearnMoveOperationEnabled,
+  resetCoopLearnMoveOperationState,
+  setCoopLearnMoveOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-learn-move-operation";
 import { COOP_DISCONNECT_GRACE_MS } from "#data/elite-redux/coop/coop-lifecycle";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import {
@@ -122,6 +128,8 @@ import type {
   CoopBiomePickPayload,
   CoopColosseumPayload,
   CoopCrossroadsPickPayload,
+  CoopLearnMoveBatchPayload,
+  CoopLearnMovePayload,
   CoopMePickPayload,
   CoopMePresentPayload,
   CoopMeSubPayload,
@@ -157,6 +165,8 @@ import {
   COOP_BIOME_SHOP_CHOICE_KINDS,
   COOP_COLOSSEUM_SEQ_BASE,
   COOP_CROSSROADS_SEQ_BASE,
+  COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE,
+  COOP_LEARN_MOVE_FWD_SEQ_BASE,
   COOP_ME_PUMP_SEQ_BASE,
   COOP_ME_TERM_SEQ_BASE,
   COOP_REJOIN_SYNC_SEQ_BASE,
@@ -1497,6 +1507,7 @@ export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | u
     setCoopBargainOperationRevisionFloor(marks["op:bargain"] ?? 0);
     setCoopColosseumOperationRevisionFloor(marks["op:colosseum"] ?? 0);
     setCoopFaintSwitchOperationRevisionFloor(marks["op:faintSwitch"] ?? 0);
+    setCoopLearnMoveOperationRevisionFloor(marks["op:learnMove"] ?? 0);
     setCoopRevivalOperationRevisionFloor(marks["op:revival"] ?? 0);
     setCoopRewardOperationRevisionFloor(marks["op:reward"] ?? 0);
     setCoopMeOperationRevisionFloor(marks["op:me"] ?? 0);
@@ -2118,6 +2129,55 @@ function materializeCoopRevivalPromptFromOp(runtime: CoopRuntime, envelope: Coop
   return true;
 }
 
+/** Route journaled learn presentations/host terminals into the same relay seams as their raw carriers. */
+function materializeCoopLearnMoveFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const op = envelope.pendingOperation;
+  if (op?.kind === "LEARN_MOVE") {
+    const payload = op.payload as CoopLearnMovePayload;
+    if (payload.type === "prompt") {
+      runtime.interactionRelay.materializeCommittedInteractionOutcome(
+        COOP_LEARN_MOVE_FWD_SEQ_BASE + payload.partySlot,
+        {
+          k: "learnMoveForward",
+          partySlot: payload.partySlot,
+          moveId: payload.moveId,
+          maxMoveCount: payload.maxMoveCount,
+        },
+      );
+    }
+    return true;
+  }
+  if (op?.kind !== "LEARN_MOVE_BATCH") {
+    return false;
+  }
+  const payload = op.payload as CoopLearnMoveBatchPayload;
+  const seq = COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE + payload.partySlot;
+  if (payload.type === "prompt") {
+    runtime.interactionRelay.materializeCommittedInteractionOutcome(seq, {
+      k: "learnMoveBatchForward",
+      partySlot: payload.partySlot,
+      learnableIds: [...payload.learnableIds],
+      ownerIsGuest: payload.ownerIsGuest,
+    });
+    return true;
+  }
+  if (op.owner !== 0) {
+    return true;
+  }
+  const data = payload.assignments.flat();
+  runtime.interactionRelay.materializeCommittedInteractionChoice(
+    seq,
+    "learnMoveBatch",
+    payload.fallback ? -1 : payload.assignments.length,
+    data,
+    op.id,
+  );
+  return true;
+}
+
 /** Feed one journal-delivered colosseum board/pick into the receiver's existing safe FIFOs. */
 function materializeCoopColosseumActionFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
   if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
@@ -2134,7 +2194,11 @@ function materializeCoopColosseumActionFromOp(runtime: CoopRuntime, envelope: Co
     return false;
   }
   const seq = COOP_COLOSSEUM_SEQ_BASE + pinned;
-  if (payload.type === "board" && Array.isArray(payload.labels) && payload.labels.every(label => typeof label === "string")) {
+  if (
+    payload.type === "board"
+    && Array.isArray(payload.labels)
+    && payload.labels.every(label => typeof label === "string")
+  ) {
     runtime.interactionRelay.materializeCommittedInteractionOutcome(seq, {
       k: "mePresent",
       tokens: {},
@@ -2595,6 +2659,9 @@ function buildLocalCoopCapabilities(): CoopCapabilityKey[] {
   if (isCoopFaintSwitchOperationEnabled()) {
     caps.push(COOP_CAP_OP_FAINT_SWITCH);
   }
+  if (isCoopLearnMoveOperationEnabled()) {
+    caps.push(COOP_CAP_OP_LEARN_MOVE);
+  }
   if (isCoopRevivalOperationEnabled()) {
     caps.push(COOP_CAP_OP_REVIVAL);
   }
@@ -2645,6 +2712,7 @@ export function assembleCoopRuntime(
   resetCoopBargainOperationState();
   resetCoopColosseumOperationState();
   resetCoopFaintSwitchOperationState();
+  resetCoopLearnMoveOperationState();
   resetCoopRevivalOperationState();
   // Wave-2d: same fresh-control-plane reset for the reward-shop + biome-market operation state (SURFACE 3).
   resetCoopRewardOperationState();
@@ -2720,6 +2788,7 @@ export function assembleCoopRuntime(
   registerCoopOperationLiveSink("op:reward", envelope => materializeCoopRewardActionFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:me", envelope => materializeCoopMeOperationFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:revival", envelope => materializeCoopRevivalPromptFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:learnMove", envelope => materializeCoopLearnMoveFromOp(runtime, envelope));
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream, durability);
   wireCoopDurabilitySnapshotReceiver(controller, battleStream, durability);
@@ -2887,6 +2956,7 @@ export function clearCoopRuntime(): void {
   resetCoopBargainOperationState();
   resetCoopColosseumOperationState();
   resetCoopFaintSwitchOperationState();
+  resetCoopLearnMoveOperationState();
   resetCoopRevivalOperationState();
   // Wave-2d: drop the reward-shop + biome-market operation state too (SURFACE 3).
   resetCoopRewardOperationState();

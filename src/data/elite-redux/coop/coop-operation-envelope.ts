@@ -217,6 +217,30 @@ export type CoopRevivalPayload =
       readonly speciesId: number;
     };
 
+export type CoopLearnMovePayload =
+  | { readonly type: "prompt"; readonly partySlot: number; readonly moveId: number; readonly maxMoveCount: number }
+  | {
+      readonly type: "decision";
+      readonly partySlot: number;
+      readonly moveId: number;
+      readonly forgetSlot: number;
+      readonly maxMoveCount: number;
+    };
+
+export type CoopLearnMoveBatchPayload =
+  | {
+      readonly type: "prompt";
+      readonly partySlot: number;
+      readonly learnableIds: number[];
+      readonly ownerIsGuest: boolean;
+    }
+  | {
+      readonly type: "decision";
+      readonly partySlot: number;
+      readonly assignments: [number, number][];
+      readonly fallback: boolean;
+    };
+
 // -----------------------------------------------------------------------------
 // Wave-2c: mystery-encounter payloads (§2.1 #8/#9/#10, MYSTERY_ENCOUNTER phase). The ME surface is
 // owner-alternated with the choice-forwarding model (#693: the guest never runs the encounter

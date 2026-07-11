@@ -67,6 +67,8 @@ export const COOP_CAP_OP_ABILITY: CoopCapabilityKey = "opSurface.abilityPicker";
 export const COOP_CAP_OP_FAINT_SWITCH: CoopCapabilityKey = "opSurface.faintSwitch";
 /** The migrated Revival Blessing prompt + owner-resolved target stream. */
 export const COOP_CAP_OP_REVIVAL: CoopCapabilityKey = "opSurface.revival";
+/** The migrated per-move and batch move-learning control stream. */
+export const COOP_CAP_OP_LEARN_MOVE: CoopCapabilityKey = "opSurface.learnMove";
 /** The application-level durability journal (§4, coop-durability.ts / coop-operation-journal.ts). */
 export const COOP_CAP_DURABILITY_JOURNAL: CoopCapabilityKey = "durability.journal";
 /**

@@ -188,7 +188,7 @@ export interface CoopInteractionRelayOptions {
 // then only a genuinely-disconnected-partner safety net, not a deliberation timer.
 const DEFAULT_TIMEOUT_MS = 1_200_000;
 /** Choice kinds whose dual raw+journal carriers have an explicit payload-identity regression. */
-const COOP_DURABLE_CHOICE_ECHO_KINDS: ReadonlySet<string> = new Set(["abilityPicker"]);
+const COOP_DURABLE_CHOICE_ECHO_KINDS: ReadonlySet<string> = new Set(["abilityPicker", "learnMoveBatch"]);
 
 function defaultSchedule(cb: () => void, ms: number): () => void {
   const id = setTimeout(cb, ms);
@@ -847,14 +847,11 @@ export class CoopInteractionRelay {
   onRevivalPrompt: ((fieldIndex: number) => void) | null = null;
 
   /** Host-forwarded per-move picker presentation; runtime wires the authoritative guest opener. */
-  onLearnMoveForward:
-    | ((outcome: Extract<CoopInteractionOutcome, { k: "learnMoveForward" }>) => void)
-    | null = null;
+  onLearnMoveForward: ((outcome: Extract<CoopInteractionOutcome, { k: "learnMoveForward" }>) => void) | null = null;
 
   /** Host-forwarded batch picker presentation; runtime wires the authoritative guest opener. */
-  onLearnMoveBatchForward:
-    | ((outcome: Extract<CoopInteractionOutcome, { k: "learnMoveBatchForward" }>) => void)
-    | null = null;
+  onLearnMoveBatchForward: ((outcome: Extract<CoopInteractionOutcome, { k: "learnMoveBatchForward" }>) => void) | null =
+    null;
 
   /**
    * #856: fired when the partner (the sole-engine host) asks THIS client - the CATCHER - to drive the
