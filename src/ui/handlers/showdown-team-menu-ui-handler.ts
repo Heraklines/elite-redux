@@ -37,7 +37,12 @@ import { isMegaStage } from "#data/elite-redux/showdown/showdown-evolutions";
 import type { ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
 import { fetchMyShowdownRank, isRankServerConfigured } from "#data/elite-redux/showdown/showdown-rank-client";
 import type { ShowdownRankState } from "#data/elite-redux/showdown/showdown-rank-types";
-import { MEGA_STONE_ITEM, type ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
+import { exportShowdownTeam, importShowdownTeam } from "#data/elite-redux/showdown/showdown-set-codec";
+import {
+  MEGA_STONE_ITEM,
+  type ShowdownMonManifest,
+  type ShowdownRuleViolation,
+} from "#data/elite-redux/showdown/showdown-team";
 import { Button } from "#enums/buttons";
 import { MoveCategory } from "#enums/move-category";
 import { PokemonType } from "#enums/pokemon-type";
@@ -86,6 +91,14 @@ export interface ShowdownTeamMenuConfig {
   initialRenaming?: boolean;
   /** Deterministic initial confirm-question banner text (for the enter-lobby / delete prompt render recipe). */
   initialPromptText?: string;
+  /** Deterministic initial IMPORT paste-modal state (for the import-modal render recipe). */
+  initialImporting?: boolean;
+  /** Deterministic initial paste buffer shown in the import modal (for the render recipe). */
+  initialImportBuffer?: string;
+  /** Deterministic initial import ERROR list (for the import-error render recipe); non-null shows the list. */
+  initialImportErrors?: string[] | null;
+  /** Deterministic initial EXPORT confirmation banner (for the export-confirmation render recipe). */
+  initialExportNotice?: string;
   /**
    * Deterministic rank state for the header chip (render recipes). When DEFINED the live async fetch is
    * skipped and this exact state (or null = unranked) is shown; when undefined the handler fetches live.
@@ -105,6 +118,18 @@ export interface ShowdownTeamMenuConfig {
   onDelete?: (index: number) => void;
   /** Back out (Esc / B) to the title. */
   onExit?: () => void;
+  /** EXPORT (V): copy the given PS-format team text to the clipboard (production wires navigator.clipboard). */
+  copyToClipboard?: (text: string) => void;
+  /**
+   * IMPORT validation: run the shared rule engine over a set of parsed manifests (production wires
+   * `validateShowdownTeam` + the live `buildUnlockSnapshot`). Absent in the render recipes.
+   */
+  validateTeam?: (mons: ShowdownMonManifest[]) => ShowdownRuleViolation[];
+  /**
+   * IMPORT save: persist the imported manifests as a NEW named preset (production wires
+   * `gameData.saveShowdownTeamPreset`). The handler appends its own view + moves the cursor to it.
+   */
+  onImportSave?: (name: string, mons: ShowdownMonManifest[]) => void;
 }
 
 // ---- layout constants (logical px) ------------------------------------------------------------
@@ -170,6 +195,17 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
    */
   private promptText: string | null = null;
   private textInput: ShowdownEditorTextInput | null = null;
+  /** The MULTILINE paste capture (separate from the single-line rename input) for the import modal. */
+  private pasteInput: ShowdownEditorTextInput | null = null;
+  /** IMPORT paste-modal open: the off-screen multiline capture drives `importBuffer`, the handler draws it. */
+  private importing = false;
+  private importBuffer = "";
+  /** The per-mon import ERROR list (parse + validation), or null when not showing it. */
+  private importErrors: string[] | null = null;
+  /** The valid manifests to keep on a "drop invalid & save" fix-up (computed when the error list is raised). */
+  private importValidMons: ShowdownMonManifest[] = [];
+  /** A transient EXPORT confirmation banner ("Copied 'X' to clipboard"); cleared on next input. */
+  private exportNotice: string | null = null;
   private requestedSpriteKeys = new Set<string>();
   /** Ranked ladder: this player's rank for the card (fetched at show; null = offline/unranked). */
   private myRank: ShowdownRankState | null = null;
@@ -183,6 +219,11 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
   /** The flow injects the mobile hidden-input bridge (reused from the editor; keyboard needs none). */
   setTextInput(input: ShowdownEditorTextInput | null): void {
     this.textInput = input;
+  }
+
+  /** The flow injects the MULTILINE paste bridge for the import modal (a `DomShowdownPasteInput`). */
+  setPasteInput(input: ShowdownEditorTextInput | null): void {
+    this.pasteInput = input;
   }
 
   setup(): void {
@@ -208,6 +249,11 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.renameBuffer = this.renaming ? (this.hoveredPreset()?.name ?? "") : "";
     this.notice = null;
     this.promptText = config.initialPromptText ?? null;
+    this.importing = config.initialImporting ?? false;
+    this.importBuffer = config.initialImportBuffer ?? "";
+    this.importErrors = config.initialImportErrors ?? null;
+    this.importValidMons = [];
+    this.exportNotice = config.initialExportNotice ?? null;
     this.rankAvailable = config.rankAvailable ?? isRankServerConfigured();
     this.myRank = config.initialRankState ?? null;
     // Live path only: fetch the rank when the recipe did NOT pin it (deterministic recipes pass a state).
@@ -273,9 +319,17 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     if (this.renaming) {
       return this.processRenameInput(button);
     }
-    // Any live input clears a transient explain notice first.
-    if (this.notice != null && button !== Button.CANCEL && button !== Button.MENU) {
+    // The IMPORT sub-flow captures input while its paste modal / error list is up.
+    if (this.importing) {
+      return this.processImportInput(button);
+    }
+    if (this.importErrors != null) {
+      return this.processImportErrorInput(button);
+    }
+    // Any live input clears a transient explain notice / export banner first.
+    if ((this.notice != null || this.exportNotice != null) && button !== Button.CANCEL && button !== Button.MENU) {
       this.notice = null;
+      this.exportNotice = null;
       this.render();
     }
     let handled = false;
@@ -304,6 +358,14 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
         break;
       case Button.CYCLE_NATURE:
         handled = this.requestDelete();
+        break;
+      case Button.CYCLE_FORM:
+        // F: IMPORT a team from pasted PS text (reachable in the empty state too - import your first team).
+        handled = this.beginImport();
+        break;
+      case Button.CYCLE_TERA:
+        // V: EXPORT the hovered team to the clipboard.
+        handled = this.doExport();
         break;
       case Button.CANCEL:
       case Button.MENU:
@@ -489,8 +551,12 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
   clear(): void {
     super.clear();
     this.textInput?.close();
+    this.pasteInput?.close();
     this.renaming = false;
+    this.importing = false;
+    this.importErrors = null;
     this.notice = null;
+    this.exportNotice = null;
     this.container.setVisible(false);
   }
 
@@ -498,6 +564,160 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.renaming = false;
     this.textInput?.close();
     this.render();
+  }
+
+  // ---- EXPORT (V) -----------------------------------------------------------------------------
+
+  /** Copy the hovered team's PS-format text to the clipboard and flash a brief confirmation banner. */
+  private doExport(): boolean {
+    const preset = this.hoveredPreset();
+    if (preset == null || preset.mons.length === 0) {
+      return false; // nothing to export on the create row / an empty box
+    }
+    const text = exportShowdownTeam(preset.mons);
+    this.config!.copyToClipboard?.(text);
+    this.exportNotice = `Copied "${preset.name}" to clipboard (${preset.mons.length} Pokemon).`;
+    this.render();
+    return true;
+  }
+
+  // ---- IMPORT (F): paste modal -> parse + validate -> save or per-mon error list ----------------
+
+  /** Open the multiline paste modal (off-screen capture; the modal draws the buffer). */
+  private beginImport(): boolean {
+    this.importing = true;
+    this.importBuffer = "";
+    this.importErrors = null;
+    this.exportNotice = null;
+    this.pasteInput?.open("", value => {
+      this.importBuffer = value;
+      this.render();
+    });
+    this.render();
+    return true;
+  }
+
+  private processImportInput(button: Button): boolean {
+    switch (button) {
+      case Button.ACTION:
+      case Button.SUBMIT:
+        this.submitImport();
+        this.getUi().playSelect();
+        return true;
+      case Button.CANCEL:
+        // Backspace = delete a character while there is text (the native input edits the buffer); never
+        // bubble to the menu's own CANCEL. An empty buffer closes JUST the modal back to the menu.
+        if (this.importBuffer.length > 0 && this.pasteInput != null) {
+          return true;
+        }
+        this.closeImport();
+        return true;
+      case Button.MENU:
+        this.closeImport();
+        return true;
+      default:
+        return true; // swallow navigation while the paste modal is up
+    }
+  }
+
+  private closeImport(): void {
+    this.importing = false;
+    this.pasteInput?.close();
+    this.render();
+  }
+
+  /**
+   * Parse the pasted text (tolerant codec), VALIDATE the parsed mons against the live collection + rules,
+   * and either SAVE a clean team as a new preset, or raise the per-mon error list with a fix-up choice.
+   */
+  private submitImport(): void {
+    const parsed = importShowdownTeam(this.importBuffer);
+    // Precise parse errors (unknown species / move / item / ...), each already carrying its line number.
+    const errors: string[] = parsed.errors.map(e => e.message);
+
+    // Per-mon collection/format validation of the mons that DID parse, keeping only the individually-legal
+    // ones for the fix-up save (team-wide issues surface via the menu's own re-validation after save).
+    const valid: ShowdownMonManifest[] = [];
+    parsed.manifests.forEach((mon, i) => {
+      const violations = this.config!.validateTeam?.([mon]) ?? [];
+      if (violations.length === 0) {
+        valid.push(mon);
+      } else {
+        const label = this.monLabel(mon);
+        errors.push(`Pokemon ${i + 1} (${label}): ${violations[0].message}`);
+      }
+    });
+
+    this.pasteInput?.close();
+    this.importing = false;
+
+    if (parsed.manifests.length === 0 && errors.length === 0) {
+      // Empty / blank paste - nothing to import.
+      this.importErrors = null;
+      this.notice = "No Pokemon found in the pasted text.";
+      this.getUi().playError();
+      this.render();
+      return;
+    }
+
+    if (errors.length === 0) {
+      // Fully clean import: save straight away.
+      this.saveImported(parsed.manifests);
+      return;
+    }
+
+    // Some mons are broken: show the error list; the player chooses drop-invalid-and-save or cancel.
+    this.importValidMons = valid;
+    this.importErrors = errors;
+    this.getUi().playError();
+    this.render();
+  }
+
+  private processImportErrorInput(button: Button): boolean {
+    switch (button) {
+      case Button.ACTION:
+      case Button.SUBMIT:
+        // Drop invalid & save the valid remainder (if any).
+        if (this.importValidMons.length > 0) {
+          const mons = this.importValidMons;
+          this.importErrors = null;
+          this.importValidMons = [];
+          this.saveImported(mons);
+          this.getUi().playSelect();
+        } else {
+          this.getUi().playError();
+        }
+        return true;
+      case Button.CANCEL:
+      case Button.MENU:
+        this.importErrors = null;
+        this.importValidMons = [];
+        this.render();
+        return true;
+      default:
+        return true; // swallow navigation while the error list is up
+    }
+  }
+
+  /** Persist the imported mons as a NEW preset, then append the view locally + hover it. */
+  private saveImported(mons: ShowdownMonManifest[]): void {
+    const cfg = this.config!;
+    const name = "Imported Team";
+    cfg.onImportSave?.(name, mons.slice(0, 6));
+    const saved = mons.slice(0, 6);
+    const violations = cfg.validateTeam?.(saved) ?? [];
+    cfg.presets.push({ name, mons: saved, invalidReason: violations.length > 0 ? violations[0].message : null });
+    this.teamCursor = cfg.presets.length - 1;
+    this.monCursor = 0;
+    this.clampMonCursor();
+    this.ensureRowVisible();
+    this.notice = null;
+    this.render();
+  }
+
+  /** A short species label for a mon (for the import error list). */
+  private monLabel(mon: ShowdownMonManifest): string {
+    return getPokemonSpecies(mon.speciesId as SpeciesId)?.name ?? `#${mon.speciesId}`;
   }
 
   // ---- render ---------------------------------------------------------------------------------
@@ -559,9 +779,95 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     if (this.promptText != null) {
       this.renderPromptBanner();
     }
+    if (this.exportNotice != null) {
+      this.renderExportNotice();
+    }
     if (this.renaming) {
       this.renderRenameOverlay();
     }
+    if (this.importing) {
+      this.renderImportModal();
+    }
+    if (this.importErrors != null) {
+      this.renderImportErrorList();
+    }
+  }
+
+  /** The brief EXPORT confirmation banner (green, top of the body) - copied to clipboard. */
+  private renderExportNotice(): void {
+    const bh = 12;
+    const by = BODY_Y + 2;
+    this.fill(MARGIN, by, SCREEN_W - 2 * MARGIN, bh, 0x0d2a1c, 0.98);
+    this.outline(MARGIN, by, SCREEN_W - 2 * MARGIN, bh, GREEN_EDGE);
+    this.fill(MARGIN + 3, by + 4, 3, 3, 0x4bd08a, 1);
+    this.text(MARGIN + 9, by + 2, this.clip(this.exportNotice ?? "", 92), TextStyle.SUMMARY_GREEN, 0, FONT_TINY);
+  }
+
+  /** The IMPORT paste modal: a focused off-screen multiline capture; the modal draws the buffer + hints. */
+  private renderImportModal(): void {
+    const bw = 240;
+    const bh = 96;
+    const bx = (SCREEN_W - bw) / 2;
+    const by = (SCREEN_H - bh) / 2;
+    this.fill(0, 0, SCREEN_W, SCREEN_H, 0x000000, 0.6);
+    this.add(addWindow(bx, by, bw, bh));
+    this.fill(bx + 2, by + 2, bw - 4, bh - 4, 0x0d1524, 1);
+    this.text(bx + 8, by + 5, "IMPORT TEAM", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+    this.text(
+      bx + 8,
+      by + 14,
+      "Paste a Showdown team (blank line between sets).",
+      TextStyle.SUMMARY_GRAY,
+      0,
+      FONT_TINY,
+    );
+    // The captured buffer, first lines shown; a blinking-style caret at the end.
+    const fieldY = by + 24;
+    const fieldH = bh - 24 - 12;
+    this.fill(bx + 8, fieldY, bw - 16, fieldH, CELL_DIM, 1);
+    this.outline(bx + 8, fieldY, bw - 16, fieldH, GOLD);
+    const lines = (this.importBuffer.length > 0 ? this.importBuffer : "(paste here)").split("\n");
+    const shownLines = lines.slice(0, 7);
+    shownLines.forEach((ln, i) => {
+      const style = this.importBuffer.length > 0 ? TextStyle.WINDOW : TextStyle.SHADOW_TEXT;
+      const caret = this.importBuffer.length > 0 && i === shownLines.length - 1 ? "_" : "";
+      this.text(bx + 11, fieldY + 2 + i * 7, this.clip(`${ln}${caret}`, 74), style, 0, FONT_TINY);
+    });
+    if (lines.length > 7) {
+      this.text(bx + bw - 12, fieldY + fieldH - 7, `+${lines.length - 7}`, TextStyle.SUMMARY_GRAY, 1, FONT_TINY);
+    }
+    this.text(bx + 8, by + bh - 9, "Enter: import    Esc: cancel", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+  }
+
+  /**
+   * The IMPORT ERROR list: the precise per-mon parse + validation errors, with the fix-up choice
+   * (Enter = drop the invalid mons and save the rest; Esc = cancel the whole import).
+   */
+  private renderImportErrorList(): void {
+    const errors = this.importErrors ?? [];
+    const bw = 260;
+    const bh = 110;
+    const bx = (SCREEN_W - bw) / 2;
+    const by = (SCREEN_H - bh) / 2;
+    this.fill(0, 0, SCREEN_W, SCREEN_H, 0x000000, 0.6);
+    this.add(addWindow(bx, by, bw, bh));
+    this.fill(bx + 2, by + 2, bw - 4, bh - 4, 0x1a1012, 1);
+    this.fill(bx + 2, by + 2, bw - 4, 11, 0x3a0d12, 1);
+    this.text(bx + 8, by + 3, "IMPORT PROBLEMS", TextStyle.SUMMARY_RED, 0, FONT_NAME);
+    const savable = this.importValidMons.length;
+    this.text(bx + bw - 8, by + 4, `${savable} ok`, TextStyle.SUMMARY_GREEN, 1, FONT_TINY);
+    const listY = by + 15;
+    const shown = errors.slice(0, 8);
+    shown.forEach((msg, i) => {
+      this.fill(bx + 6, listY + 3 + i * 9, 2, 2, 0xe86464, 1);
+      this.text(bx + 11, listY + i * 9, this.clip(msg, 82), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    });
+    if (errors.length > 8) {
+      this.text(bx + 11, listY + 8 * 9, `...and ${errors.length - 8} more`, TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    }
+    const footer =
+      savable > 0 ? `Enter: drop invalid, save ${savable}    Esc: cancel` : "Nothing importable.    Esc: cancel";
+    this.text(bx + 8, by + bh - 9, footer, savable > 0 ? TextStyle.SUMMARY_GOLD : TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
   }
 
   /** The question banner shown beneath the Yes/No CONFIRM overlay (enter-lobby / delete), so the player
@@ -608,8 +914,11 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     if (onSaved) {
       x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_ABILITY, "E.png", "Edit");
       x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_SHINY, "R.png", "Rename");
-      this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_NATURE, "DEL.png", "Delete");
+      x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_NATURE, "DEL.png", "Delete");
+      x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_TERA, "V.png", "Export");
     }
+    // Import is reachable everywhere (incl. the empty state - paste in your first team).
+    this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_FORM, "F.png", "Import");
     this.hotkeyRight(SCREEN_W - 3, "ESC.png", "Back", "Back".length * 3.0 + 22);
   }
 

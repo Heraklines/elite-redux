@@ -216,6 +216,7 @@ input:-internal-autofill-selected {
     [data-ui-mode="POKEDEX"],
     [data-ui-mode="POKEDEX_PAGE"],
     [data-ui-mode="RUN_INFO"],
+    [data-ui-mode="SHOWDOWN_TEAM_MENU"],
     [data-ui-mode="SHOWDOWN_SET_EDITOR"]
   )
   #apadCycleForm,
@@ -249,7 +250,8 @@ input:-internal-autofill-selected {
   #apadCycleGender,
 #touchControls:not(.config-mode):not(
     [data-ui-mode="STARTER_SELECT"],
-    [data-ui-mode="POKEDEX"]
+    [data-ui-mode="POKEDEX"],
+    [data-ui-mode="SHOWDOWN_TEAM_MENU"]
   )
   #apadCycleTera {
   display: none;

@@ -212,6 +212,65 @@ describe.runIf(RUN)("showdown team menu - real-path acceptance", () => {
     expect(game.scene.gameData.showdownTeamPresets.length).toBe(0); // nothing saved on cancel
   });
 
+  // ---- P2: IMPORT -> save -> the menu shows it (the real dispatch loop) --------------------------
+
+  it("import (F): a clean paste saves a new preset and the menu shows it", async () => {
+    const phase = new TitlePhase();
+    (phase as any).openShowdownTeamMenu(() => {});
+    await wait(400);
+    const menu: any = game.scene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU];
+    menu.setPasteInput(null); // no headless DOM bridge; we set the buffer directly
+    const before = game.scene.gameData.showdownTeamPresets.length;
+
+    // F routes through the REAL buttonCycleOption dispatch (whitelist) -> beginImport.
+    cycle(Button.CYCLE_FORM);
+    await wait(30);
+    expect(menu.importing, "F opened the import paste modal via the real dispatch").toBe(true);
+
+    // A clean Garchomp set (cost 4, everything.prsv unlocks it) -> validates -> saved straight away.
+    menu.importBuffer = ["Garchomp @ Leftovers", "Nature: Jolly", "- Earthquake", "- Outrage"].join("\n");
+    press(Button.ACTION); // -> submitImport
+    await wait(30);
+
+    // The import -> save -> menu-shows-it LOOP: persisted to the account save AND appended to the live view.
+    expect(game.scene.gameData.showdownTeamPresets.length, "a new preset was saved to the account data").toBe(
+      before + 1,
+    );
+    const saved = game.scene.gameData.showdownTeamPresets.at(-1)!;
+    expect(saved.mons[0].speciesId).toBe(SpeciesId.GARCHOMP);
+    expect(saved.mons[0].moveset).toEqual([MoveId.EARTHQUAKE, MoveId.OUTRAGE]);
+    expect(menu.config.presets.at(-1).name, "the menu view shows the imported team").toBe("Imported Team");
+    expect(menu.teamCursor, "the cursor hovers the new team").toBe(menu.config.presets.length - 1);
+    expect(mode()).toBe(UiMode.SHOWDOWN_TEAM_MENU);
+  });
+
+  it("import (F): a broken paste raises the per-mon error list, then drop-invalid saves the rest", async () => {
+    const phase = new TitlePhase();
+    (phase as any).openShowdownTeamMenu(() => {});
+    await wait(400);
+    const menu: any = game.scene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU];
+    menu.setPasteInput(null);
+    const before = game.scene.gameData.showdownTeamPresets.length;
+
+    cycle(Button.CYCLE_FORM);
+    await wait(30);
+    // One valid mon + one unknown-species block.
+    menu.importBuffer = ["Garchomp @ Leftovers", "- Earthquake", "", "Notamon @ Leftovers", "- Tackle"].join("\n");
+    press(Button.ACTION); // submitImport -> some errors -> the error list is raised
+    await wait(30);
+    expect(menu.importErrors, "the per-mon error list is shown").not.toBeNull();
+    expect(menu.importErrors.some((m: string) => m.includes("unknown species 'Notamon'"))).toBe(true);
+    expect(menu.importValidMons.length, "the one valid mon is kept for the fix-up").toBe(1);
+    expect(game.scene.gameData.showdownTeamPresets.length, "nothing saved yet").toBe(before);
+
+    // Drop invalid & save the valid remainder (Enter).
+    press(Button.ACTION);
+    await wait(30);
+    expect(game.scene.gameData.showdownTeamPresets.length, "the valid mon was saved").toBe(before + 1);
+    expect(game.scene.gameData.showdownTeamPresets.at(-1)!.mons).toHaveLength(1);
+    expect(menu.importErrors, "the error list is dismissed after saving").toBeNull();
+  });
+
   it("G/V team-cycle: the editor RELOADS onto the sibling team mon (offline edit, dead-cycle red-proof)", async () => {
     // A 2-mon preset -> EDIT seeds BOTH mons into the grid, so the editor has siblings to cycle between.
     const mon = (root: SpeciesId, fielded: SpeciesId, move: MoveId) => ({

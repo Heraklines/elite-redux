@@ -23,8 +23,15 @@ import { applyCommunityChallengeToRun } from "#data/elite-redux/er-community-cha
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
 import { resetCommunityRunState } from "#data/elite-redux/er-community-run-state";
 import { setPendingShowdownPresetStarters } from "#data/elite-redux/showdown/showdown-battle-state";
+import { copyTextToClipboard } from "#data/elite-redux/showdown/showdown-clipboard";
 import { syncShowdownPendingSettlements } from "#data/elite-redux/showdown/showdown-escrow-client";
-import { manifestToStarter, starterToManifest } from "#data/elite-redux/showdown/showdown-manifest";
+import { isMegaStage } from "#data/elite-redux/showdown/showdown-evolutions";
+import {
+  buildUnlockSnapshot,
+  manifestToStarter,
+  starterToManifest,
+} from "#data/elite-redux/showdown/showdown-manifest";
+import { validateShowdownTeam } from "#data/elite-redux/showdown/showdown-team";
 import { buildTeamMenuPresetViews, runShowdownPresetBuild } from "#data/elite-redux/showdown/showdown-team-menu-flow";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
@@ -40,7 +47,7 @@ import type { Starter } from "#types/save-data";
 import type { OptionSelectConfig, OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { CoopLobbyStage } from "#ui/coop-lobby-stage";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
-import { DomShowdownEditorTextInput } from "#ui/showdown-editor-text-input";
+import { DomShowdownEditorTextInput, DomShowdownPasteInput } from "#ui/showdown-editor-text-input";
 import type { ShowdownTeamMenuConfig, ShowdownTeamMenuUiHandler } from "#ui/showdown-team-menu-ui-handler";
 import { isLocalServerConnected } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -444,6 +451,13 @@ export class TitlePhase extends Phase {
         onDelete: idx => gameData.deleteShowdownTeamPreset(idx),
         onCreate: () => this.openShowdownPresetBuild(undefined, showMenu),
         onEdit: idx => this.openShowdownPresetBuild(idx, showMenu),
+        // EXPORT (V): copy the hovered team's PS text to the clipboard (the handler shows the banner).
+        copyToClipboard: text => copyTextToClipboard(text),
+        // IMPORT validation: the SAME shared rule engine the editor's Done + the menu's render use, over
+        // the LIVE collection snapshot, so an imported team is gated exactly like a hand-built one.
+        validateTeam: mons => validateShowdownTeam(mons, buildUnlockSnapshot(gameData), isMegaStage),
+        // IMPORT save: persist the imported team as a new account-save preset (the handler appends its view).
+        onImportSave: (name, mons) => gameData.saveShowdownTeamPreset(name, mons),
         onEnterLobby: idx => {
           const preset = gameData.listShowdownTeamPresets()[idx];
           if (preset == null) {
@@ -456,10 +470,11 @@ export class TitlePhase extends Phase {
           this.openCoopLobby(setModeAndEnd, "authoritative", "versus", GameModes.SHOWDOWN);
         },
       };
-      // Inject the mobile/desktop native-keyboard bridge for the rename overlay (the same DOM-input
-      // infra the editor search uses), on the registered handler BEFORE show - mirrors the editor.
+      // Inject the mobile/desktop native-keyboard bridge for the rename overlay (single-line) AND the
+      // import paste modal (multiline), on the registered handler BEFORE show - mirrors the editor.
       const handler = globalScene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU] as ShowdownTeamMenuUiHandler | undefined;
       handler?.setTextInput(new DomShowdownEditorTextInput());
+      handler?.setPasteInput(new DomShowdownPasteInput());
       void globalScene.ui.setMode(UiMode.SHOWDOWN_TEAM_MENU, config);
     };
     // Clobber-safe deferral (reachable from the game-mode OPTION_SELECT handler, which returns true and

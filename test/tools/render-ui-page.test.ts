@@ -1089,6 +1089,47 @@ const RECIPES: Record<string, Recipe> = {
     ],
     diffTolerance: 0,
   },
+  // P2 IMPORT paste modal (F): the off-screen multiline capture; the modal draws the captured buffer +
+  // the Enter/Esc hints over the dimmed menu.
+  "showdown-team-menu-import": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => [
+      buildShowdownTeamMenuDemoConfig({
+        initialTeam: 0,
+        initialImporting: true,
+        initialImportBuffer:
+          "Garchomp @ Leftovers  [Stage: Base]\nAbility: Rough Skin\nNature: Jolly\n- Earthquake\n- Outrage",
+      }),
+    ],
+    diffTolerance: 0,
+  },
+  // P2 IMPORT error list: the precise per-mon parse + validation errors with the drop-invalid/cancel
+  // fix-up footer.
+  "showdown-team-menu-import-error": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => [
+      buildShowdownTeamMenuDemoConfig({
+        initialTeam: 0,
+        initialImportErrors: [
+          "line 3: unknown move 'Fooblast'",
+          "line 8: unknown species 'Notamon'",
+          "Pokemon 2 (Tyranitar): Ability 2 is not unlocked (slot 0).",
+        ],
+      }),
+    ],
+    diffTolerance: 0,
+  },
+  // P2 EXPORT confirmation banner (V): the brief green "copied to clipboard" banner at the top of the body.
+  "showdown-team-menu-export": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => [
+      buildShowdownTeamMenuDemoConfig({
+        initialTeam: 0,
+        initialExportNotice: 'Copied "Sand Rush" to clipboard (4 Pokemon).',
+      }),
+    ],
+    diffTolerance: 0,
+  },
   // interaction round-trips (the keystroke half is covered by showdown-editor-input.test.ts).
   "showdown-editor-nav": {
     mode: UiMode.SHOWDOWN_SET_EDITOR,
