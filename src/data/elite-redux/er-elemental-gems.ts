@@ -165,6 +165,10 @@ export function erTryApplyGem(
   if (!simulated) {
     globalScene.removeModifier(gem, !source.isPlayer());
     globalScene.updateModifiers(source.isPlayer());
+    // ER Fetch (er move 969) ledger: a shattered Gem is a "lost item". Record it
+    // with its gemType so Fetch can rebuild the exact Gem (Gems are consumed via
+    // removeModifier here, NOT Pokemon.loseHeldItem, so they need their own tap).
+    source.battleData.lostItems.push({ typeId: gem.type?.id ?? "", gemType: gem.gemType });
     globalScene.phaseManager.queueMessage(`The ${gemName(gem.gemType)} strengthened ${source.getNameToRender()}'s move!`);
   }
 }

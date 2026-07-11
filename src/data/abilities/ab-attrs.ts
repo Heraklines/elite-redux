@@ -4323,6 +4323,26 @@ export class OverruleCritAbAttr extends AbAttr {
 }
 
 /**
+ * Elite Redux — pure marker for Mental Pollution 816: "Applies ability
+ * suppression to OTHER Pokémon when the user becomes enraged; suppression lasts
+ * while those Pokémon remain on the field." No `apply` behavior of its own — the
+ * field-wide suppression is read at `Pokemon.canApplyAbility`: while an on-field
+ * holder of this marker currently carries the `ER_ENRAGE` tag, every OTHER
+ * on-field Pokémon (foes AND allies) has its suppressable abilities disabled for
+ * as long as it stays on the field. The enraged holder is self-exempt (it keeps
+ * its own ability). Unlike the old {@linkcode SuppressAttackerAbilityAbAttr}
+ * wire, this broadcasts on the enrage state itself, not on a foe landing a hit —
+ * a foe that never attacks is still suppressed.
+ */
+export class SuppressFieldAbilitiesWhenEnragedAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
  * Elite Redux — grants the holder's single-target enemy moves SPREAD targeting
  * (hit both opposing Pokemon) when the move carries `flag`. Used by Artillery
  * 377 (PULSE_MOVE), Amplifier 378 (SOUND_BASED) and Sweeping Edge 421
@@ -7324,6 +7344,7 @@ export const AbilityAttrs = Object.freeze({
   FloatAbAttr,
   PostWakeUpAbAttr,
   OverruleCritAbAttr,
+  SuppressFieldAbilitiesWhenEnragedAbAttr,
   IgnoreProtectByFlagAbAttr,
   SpreadTargetByFlagAbAttr,
   SetMoveAccuracyAbAttr,

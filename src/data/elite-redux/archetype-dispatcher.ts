@@ -121,7 +121,6 @@ import {
   PostTurnResetStatusAbAttr,
   PreHitResistTypeChangeAbAttr,
   PreserveBaseStatAbilitiesAbAttr,
-  PreventBerryUseAbAttr,
   PreventItemUseAbAttr,
   ProtectStatAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
@@ -134,6 +133,7 @@ import {
   StatMultiplierAbAttr,
   StealthRockImmunityAbAttr,
   SuperEffectiveMoveAbilityBypassAbAttr,
+  SuppressFieldAbilitiesWhenEnragedAbAttr,
   SuppressFieldEffectsAbAttr,
   SuppressWeatherEffectAbAttr,
   SwitchWhileRampagingAbAttr,
@@ -1665,18 +1665,18 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       return [par];
     }
     case 707:
-      // Gleam Eyes — on top of the Frisk (reveal) + Scare (SpAtk -1) composite
-      // parts, the dex adds an Embargo-style clause: foes' held items stop
-      // working. Mega Stones are unaffected (mega evolution isn't an item
-      // "consumption" this block intercepts). Delivered via the As One item-lock
-      // primitive (blocks berries + ER reactive items on all opponents).
-      // GAP: the dex bounds this to 2 turns on entry; a faithful turn-limited
-      // window needs a dedicated EMBARGO battler tag applied to the opponents
-      // (owned by the concurrent battler-tags batch — reported, not wired here),
-      // so this delivers the item-suppression while the holder is on the field.
-      // PreventBerryUse covers foe berries; PreventItemUse covers ER reactive
-      // single-use items.
-      return [new PreventBerryUseAbAttr(), new PreventItemUseAbAttr()];
+      // Gleam Eyes — dex: "reveals the opponents' held items, prevents them from
+      // working for 2 turns (Embargo-style; excludes Mega Stones), and lowers all
+      // foes' Sp. Atk by one stage on entry." The Frisk (reveal + the 2-turn
+      // ER_ITEM_DISABLED lock via DisableFoeItemsOnEntryAbAttr) and Scare
+      // (SpAtk -1) composite parts already deliver ALL three clauses — the Frisk
+      // part copies AbilityId.FRISK's ER attrs, which now include the real
+      // turn-limited item lock (init-elite-redux-vanilla-rebalance.ts §Round 10;
+      // enforced in PokemonHeldItemModifier.shouldApply + erApplyReactiveOnHit).
+      // No rider needed: the earlier As-One primitives (PreventBerryUse/
+      // PreventItemUse) were a PERMANENT field lock, over-broad vs the dex's exact
+      // 2-turn window — dropped in favour of the ER_ITEM_DISABLED tag.
+      return [];
     case 706: // Shocking Maw: "Bite moves have 50% paralysis chance"
       return [
         new ChanceStatusOnAttackAbAttr({
@@ -7460,14 +7460,17 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
           flags: [MoveFlags.SOUND_BASED],
         }),
       ]);
-    case 816: {
-      // Mental Pollution — "Suppresses others' abilities when it becomes
-      // enraged." Enraged is the ER_ENRAGE status. While the holder is enraged,
-      // any attacking foe has its ability suppressed.
-      const suppress = new SuppressAttackerAbilityAbAttr();
-      suppress.addCondition(holder => holder.getTag(BattlerTagType.ER_ENRAGE) != null);
-      return ok([suppress]);
-    }
+    case 816:
+      // Mental Pollution — "Applies ability suppression to OTHER Pokémon when the
+      // user becomes enraged. Suppression lasts while those Pokémon remain on the
+      // field." Enraged is the ER_ENRAGE status. This marker broadcasts a
+      // FIELD-WIDE ability suppression (read in Pokemon.canApplyAbility): while
+      // the holder is enraged, EVERY other on-field Pokémon (foes AND allies) has
+      // its suppressable abilities disabled for as long as it stays out — the
+      // enraged holder is self-exempt. Replaces the old PostDefend
+      // SuppressAttackerAbilityAbAttr wire, which only fired when a foe LANDED an
+      // attack on the enraged holder (a foe that never attacked kept its ability).
+      return ok([new SuppressFieldAbilitiesWhenEnragedAbAttr()]);
     case 817:
       // Madness Enhancement — "Enrages in fog, halves damage when enraged AND
       // takes NO damage from enrage." The holder enrages ITSELF (ER_ENRAGE) while

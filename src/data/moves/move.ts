@@ -39,6 +39,7 @@ import {
   erLoadedDiceMinHitBonus,
   erLuckyHeartChanceBonus,
 } from "#data/elite-redux/er-community-items";
+import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { clearErAilments } from "#data/elite-redux/er-status-cure";
 import { SpeciesFormChangeRevertWeatherFormTrigger } from "#data/form-change-triggers";
 import { getNonVolatileStatusEffects, getStatusEffectHealText, isNonVolatileStatusEffect } from "#data/status-effect";
@@ -87,7 +88,7 @@ import {
   PokemonMultiHitModifier,
   PreserveBerryModifier,
 } from "#modifiers/modifier";
-import { BerryModifierType } from "#modifiers/modifier-type";
+import { BerryModifierType, getModifierTypeFuncById } from "#modifiers/modifier-type";
 import { applyMoveAttrs } from "#moves/apply-attrs";
 import {
   invalidAssistMoves,
@@ -3819,22 +3820,53 @@ export class ErRandomBerryEffectAttr extends MoveEffectAttr {
 
 /**
  * Elite Redux Fetch (er move 969): "The user retrieves its lost item and
- * switches to an ally." ER's in-battle item model only tracks CONSUMED BERRIES
- * (`battleData.berriesEaten`, the same store Harvest restores from) — those are
- * the only held items that get used up / "lost" mid-battle. This attr restores
- * the user's MOST RECENTLY consumed berry as a held-item {@linkcode BerryModifier}
- * (the faithful "retrieves its lost item"), then the self-switch runs.
+ * switches to an ally." Retrieves the user's MOST RECENTLY lost held item as a
+ * fresh held item, then the self-switch runs ({@linkcode ForceSwitchOutAttr}).
  *
- * RESIDUAL (documented, not silently pretended): non-berry held items (gems,
- * Power Herb, etc.) are consumed via ad-hoc modifier removal and are NOT recorded
- * in any "lost item" ledger in this engine, so only the berry case is
- * retrievable without building a general consumed-item ledger. If Fetch is used
- * with no berry consumed this battle, nothing is retrieved (the switch still
- * happens).
+ * ER tracks two "lost item" ledgers on {@linkcode PokemonBattleData}:
+ *  - {@linkcode PokemonBattleData.lostItems} — NON-BERRY items lost in battle:
+ *    knocked-off items, consumed one-time items (White/Power Herb, etc.), and
+ *    shattered elemental Gems (each carries its `gemType` for a faithful rebuild).
+ *  - {@linkcode PokemonBattleData.berriesEaten} — consumed berries (shared with
+ *    Harvest).
+ *
+ * A non-berry lost item is preferred (it has no other recovery route, whereas
+ * berries also have Harvest); if the ledger is empty, Fetch falls back to the
+ * most-recently consumed berry. Either way the self-switch still happens.
+ *
+ * RESIDUAL (documented): generator-built items OTHER than Gems (which need
+ * pregen args this ledger does not record) can't be rebuilt and are skipped;
+ * such an entry is passed over in favour of the next recoverable lost item.
  */
 export class ErRetrieveConsumedItemAttr extends MoveEffectAttr {
   constructor() {
     super(true); // selfTarget
+  }
+
+  /** Rebuild a fresh held-item modifier for a lost-item ledger entry, or `undefined` if unrecoverable. */
+  private buildLostItem(
+    record: { typeId: string; gemType?: number },
+    user: Pokemon,
+  ): PokemonHeldItemModifier | undefined {
+    // Elemental Gems are generator-built; rebuild via their self-contained
+    // factory using the recorded gemType (the modifier registry has no plain
+    // func for them).
+    if (record.gemType !== undefined) {
+      const gem = erGemItemType(record.gemType).newModifier(user);
+      return gem instanceof PokemonHeldItemModifier ? gem : undefined;
+    }
+    const func = getModifierTypeFuncById(record.typeId);
+    if (!func) {
+      return;
+    }
+    const modifierType = func();
+    // Generator types need pregen args we don't ledger (Gems are the one
+    // exception, handled above). Skip — documented residual.
+    if (modifierType.is("ModifierTypeGenerator")) {
+      return;
+    }
+    const built = modifierType.withIdFromFunc(func).newModifier(user);
+    return built instanceof PokemonHeldItemModifier ? built : undefined;
   }
 
   override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
@@ -3842,6 +3874,31 @@ export class ErRetrieveConsumedItemAttr extends MoveEffectAttr {
       return false;
     }
 
+    // Prefer a NON-BERRY lost item (knocked-off / consumed one-time item / Gem).
+    const lost = user.battleData.lostItems;
+    while (lost.length > 0) {
+      const record = lost.pop()!; // most recently lost
+      const modifier = this.buildLostItem(record, user);
+      if (!modifier) {
+        continue; // unrecoverable class — try the next-most-recent
+      }
+      modifier.pokemonId = user.id;
+      if (user.isPlayer()) {
+        globalScene.addModifier(modifier);
+      } else {
+        globalScene.addEnemyModifier(modifier);
+      }
+      globalScene.updateModifiers(user.isPlayer());
+      globalScene.phaseManager.queueMessage(
+        i18next.t("abilityTriggers:postTurnLootCreateEatenBerry", {
+          pokemonNameWithAffix: getPokemonNameWithAffix(user),
+          berryName: modifier.type.name,
+        }),
+      );
+      return true;
+    }
+
+    // Fall back to the most recently consumed berry.
     const eaten = user.battleData.berriesEaten;
     if (eaten.length === 0) {
       return false;

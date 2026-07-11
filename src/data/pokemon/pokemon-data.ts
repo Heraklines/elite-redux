@@ -467,6 +467,16 @@ export class PokemonBattleData {
    * Transient (not serialized).
    */
   public cowardProtectUsed = false;
+  /**
+   * ER Fetch (er move 969) consumed-item ledger: NON-BERRY, re-grantable held
+   * items this Pokémon lost in battle (knocked off, a consumed one-time item, a
+   * shattered elemental Gem), most-recent last. Fetch retrieves the last entry
+   * as a fresh held item, then self-switches. Berries have their own ledger
+   * ({@linkcode berriesEaten}, shared with Harvest). Resets each battle; carries
+   * `gemType` for Gems so the exact Gem can be rebuilt. Serialized so it
+   * round-trips on a mid-battle save.
+   */
+  public lostItems: LostHeldItemRecord[] = [];
 
   constructor(source?: PokemonBattleData | Partial<PokemonBattleData>) {
     if (source != null) {
@@ -476,8 +486,19 @@ export class PokemonBattleData {
       this.anticipationDodgeUsed = source.anticipationDodgeUsed ?? false;
       this.rudeAwakeningTriggered = source.rudeAwakeningTriggered ?? false;
       this.cowardProtectUsed = source.cowardProtectUsed ?? false;
+      this.lostItems = source.lostItems ?? [];
     }
   }
+}
+
+/**
+ * A single {@linkcode PokemonBattleData.lostItems} entry: the modifier-type id of
+ * a lost held item, plus (for elemental Gems, which are generator-built) the
+ * {@linkcode PokemonType} the Gem boosts, so Fetch can rebuild the exact item.
+ */
+export interface LostHeldItemRecord {
+  readonly typeId: string;
+  readonly gemType?: number;
 }
 
 /**

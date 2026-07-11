@@ -29,6 +29,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { erIsHeldItemDisabled } from "#data/battler-tags";
 import { HitResult } from "#enums/hit-result";
 import { ModifierTier } from "#enums/modifier-tier";
 import { PokemonType } from "#enums/pokemon-type";
@@ -224,6 +225,15 @@ export function erApplyReactiveOnHit(
       .getHeldItems()
       .find((m): m is ErReactiveItemModifier => m instanceof ErReactiveItemModifier && m.kind === kind);
     if (!item) {
+      continue;
+    }
+    // ER Frisk / Supersweet Syrup / Gleam Eyes item lock (ER_ITEM_DISABLED, a
+    // real turn-limited tag): while this reactive item is the suppressed one, it
+    // does not fire. Honouring the tag here — not just the As-One PreventItemUse
+    // ability above — is what makes Gleam Eyes' exact 2-turn Embargo window real
+    // for the single-use reactive items (the permanent As-One field lock was
+    // dropped from case 707). Mega Stones are never the locked item.
+    if (erIsHeldItemDisabled(target, item.type?.id)) {
       continue;
     }
     const boosts = resolveReactiveProc(kind, moveType, hitResult, dealsDamage);

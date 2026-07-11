@@ -66,6 +66,7 @@ import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-tu
 import {
   erRecordAchievementDamageAndUpdate,
   erRecordAchievementFusion,
+  erRecordAchievementRelicSurvive,
   erRecordAchievementStatusSet,
 } from "#data/elite-redux/er-achievement-tracker";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
@@ -190,6 +191,7 @@ import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import {
   BaseStatModifier,
+  BerryModifier,
   CritBoosterModifier,
   EnemyDamageBoosterModifier,
   EnemyDamageReducerModifier,
@@ -3219,6 +3221,27 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         return false;
       }
     }
+    // ER Mental Pollution (816): while an OTHER on-field Pokémon holds an ACTIVE
+    // Mental Pollution AND is currently enraged (ER_ENRAGE), this Pokémon's
+    // suppressable abilities are disabled for as long as it stays on the field
+    // (foes and allies alike; the enraged holder is self-exempt). The enrage
+    // state itself broadcasts the suppression — a foe that never attacks the
+    // holder is still suppressed. Dynamic: lifts the moment the holder stops
+    // being enraged (i.e. switches out) or this mon leaves the field.
+    if (
+      ability.suppressable
+      && this.isOnField()
+      && globalScene
+        .getField(true)
+        .some(
+          p =>
+            p !== this
+            && p.getTag(BattlerTagType.ER_ENRAGE) != null
+            && p.hasAbilityWithAttr("SuppressFieldAbilitiesWhenEnragedAbAttr"),
+        )
+    ) {
+      return false;
+    }
     return (this.hp > 0 || ability.bypassFaint) && !ability.conditions.find(condition => !condition(this));
   }
 
@@ -5606,16 +5629,23 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       // ER relic (#439): Second Wind - once per biome, the first player mon that
       // would faint survives at 1 HP (like a one-shot Focus Sash). Checked last so
       // it only consumes its charge when nothing else already saved the mon.
+      let erRelicSaved = false;
       if (!surviveDamage.value && erTrySecondWind(this)) {
         surviveDamage.value = true;
+        erRelicSaved = true;
       }
       // ER relic (#439): Pharaoh's Ankh - once per battle, ANY player mon that
       // would faint clings to life at 1 HP (re-arms each battle).
       if (!surviveDamage.value && erTryPharaohAnkh(this)) {
         surviveDamage.value = true;
+        erRelicSaved = true;
       }
       if (surviveDamage.value) {
         damage = this.hp - 1;
+        // catalog-v2 (#900) IMMORTAL_OBJECT: a RELIC (not an ability) prevented this faint.
+        if (erRelicSaved) {
+          erRecordAchievementRelicSurvive(this);
+        }
       }
     }
 
@@ -7672,6 +7702,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
     if (forBattle) {
       applyAbAttrs("PostItemLostAbAttr", { pokemon: this });
+      // ER Fetch (er move 969) consumed-item ledger: record a NON-BERRY,
+      // re-grantable held item that was just lost IN BATTLE (knocked off,
+      // a consumed one-time item like White/Power Herb, etc.) so Fetch can
+      // retrieve "its lost item". Berries are tracked separately in
+      // `battleData.berriesEaten` (Harvest) and handled by Fetch's berry path;
+      // gems shatter through their own path (er-elemental-gems) and record there.
+      if (!(heldItem instanceof BerryModifier)) {
+        const typeId = heldItem.type?.id;
+        if (typeId) {
+          this.battleData.lostItems.push({ typeId });
+        }
+      }
     }
 
     return true;
