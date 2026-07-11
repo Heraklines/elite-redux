@@ -37,8 +37,9 @@ import { UiMode } from "#enums/ui-mode";
 import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
 import {
-  buildDuo,
-  type DuoRig,
+    buildDuo,
+    type DuoRig,
+    drainLoopback,
   driveGuestReplayTurn,
   installDuoLogCapture,
   withClient,
@@ -158,6 +159,11 @@ describe.skipIf(!RUN)(
       // lead faints FIRST, on the player turn); the guest slot's relayed SPLASH is moot (it already fainted);
       // the foe's ROCK_SLIDE then KOs the 1-HP host lead (the HOST lead faints SECOND, on the enemy turn).
       // Drive to TurnEndPhase - both replacement SwitchPhases open after, guest-owned first then host-owned.
+      // The focused harness drives only the host's real phase queue. Materialize the replay guest reaching
+      // the same post-replacement command boundary; production gets this from its own CommandPhase.
+      const commandPoint = `cmd:${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn}`;
+      withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.arrive(commandPoint));
+      await drainLoopback();
       await withClient(rig.hostCtx, async () => {
         game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
         await game.phaseInterceptor.to("TurnEndPhase");
@@ -206,6 +212,11 @@ describe.skipIf(!RUN)(
         }
         await game.phaseInterceptor.to("CommandPhase");
       });
+      await drainLoopback();
+      const guestBoundary = await withClient(rig.guestCtx, () =>
+        rig.guestRuntime.rendezvous.awaitPartner(commandPoint),
+      );
+      expect(guestBoundary.timedOut, "post-replacement command boundary was reciprocal").toBe(false);
 
       // No strand: the host reached the next CommandPhase.
       expect(

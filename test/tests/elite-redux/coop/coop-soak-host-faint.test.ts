@@ -39,8 +39,9 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
-  buildDuo,
-  type DuoRig,
+    buildDuo,
+    type DuoRig,
+    drainLoopback,
   driveGuestReplayTurn,
   installDuoLogCapture,
   withClient,
@@ -124,6 +125,11 @@ describe.skipIf(!RUN)("co-op SOAK host-owned faint: the driver drives the host's
 
     // TURN 1 on the HOST: its own slot 0 plays a harmless SPLASH; the guest slot's EARTHQUAKE (relayed)
     // faints the 1-HP host mon. Drive only to TurnEndPhase - the replacement SwitchPhase opens at TURN END.
+    // This focused test drives only the host's phase queue, so explicitly materialize the replay guest at
+    // the same next-command boundary instead of relying on the removed unilateral timeout continuation.
+    const commandPoint = `cmd:${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn}`;
+    withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.arrive(commandPoint));
+    await drainLoopback();
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.SPLASH, COOP_HOST_FIELD_INDEX);
       await game.phaseInterceptor.to("TurnEndPhase");
@@ -147,6 +153,9 @@ describe.skipIf(!RUN)("co-op SOAK host-owned faint: the driver drives the host's
       }
       await game.phaseInterceptor.to("CommandPhase");
     });
+    await drainLoopback();
+    const guestBoundary = await withClient(rig.guestCtx, () => rig.guestRuntime.rendezvous.awaitPartner(commandPoint));
+    expect(guestBoundary.timedOut, "post-replacement command boundary was reciprocal").toBe(false);
 
     expect(
       rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
