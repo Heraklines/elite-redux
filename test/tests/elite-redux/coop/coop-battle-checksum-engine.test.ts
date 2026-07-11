@@ -114,6 +114,20 @@ describe.skipIf(!RUN)("co-op battle checksum + resync - real engine (#633, TRACK
     expect(after).not.toBe(before);
   });
 
+  it("(A) a just-fainted enemy's stat stages remain checksum-visible at wave win (#878)", async () => {
+    await startCoopDouble();
+    const fainted = globalScene.getEnemyField(false)[0];
+    expect(fainted).toBeDefined();
+    fainted.hp = 0;
+    fainted.summonData.statStages = [0, 0, 0, 0, 0, 0, 0];
+    const before = captureCoopChecksum();
+
+    // getField(true) drops fainted mons. If checksum capture uses that active-only view, this
+    // divergence is invisible exactly at the wave-win boundary where the foe just disappeared.
+    fainted.summonData.statStages[0] = 6;
+    expect(captureCoopChecksum(), "fainted enemy stat-stage drift must move the checksum").not.toBe(before);
+  });
+
   it("(B) the checksum tracks across a real resolved turn (host vs guest-after-apply converge)", async () => {
     await startCoopDouble();
 
