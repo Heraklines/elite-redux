@@ -1357,3 +1357,11 @@ journal records committed classes, the soak publishes them as hit surfaces, and 
 totally and disjointly classify the registry. A real two-wave duo run observed both default-path classes
 (`op:wave`, `op:reward`) with zero desync findings. New operation adapters now auto-red coverage until they
 are classified and actually driven or carry an explicit forced-leg follow-up.
+
+### 8.12 All-class first-envelope loss recovery
+
+`5baab1484` runs the canonical twelve-class registry through the durability never-seen-class failure mode.
+Every first envelope is actually dropped; no live sink mutates before recovery; guest-only reconnect replays
+all twelve via `coopResyncAll`; all live seams converge; and every cumulative ACK drains from the host.
+The matrix validates generic carrier recovery, while concrete adapter mutation remains the responsibility of
+the existing per-surface real-engine duo tests and the pending forced-surface/browser campaign.

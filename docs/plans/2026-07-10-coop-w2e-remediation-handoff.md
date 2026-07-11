@@ -466,3 +466,16 @@ real two-engine probe completed 2/2 waves with zero heals/assertions/findings an
 Next: derive the fault-injection matrix from this same registry and require every authoritative class to
 survive carrier loss with live-state convergence. The known-undrivable continuous-soak legs remain explicit
 work, not silently treated as covered.
+
+## 22. Drop-every-operation-class durability campaign
+
+`5baab1484` derives an authoritative carrier-loss matrix from the canonical surface registry. For each of
+the twelve operation classes it drops the class's first envelope (the never-seen-class case), proves no
+receiver live mutation occurred, then performs the production-topology guest-only reconnect. Generic
+`coopResyncAll` replay must route every class through its live-mutation seam, cumulatively ACK it, and drain
+the host's unacked journal to zero. The campaign asserts exactly twelve faults were injected, preventing a
+vacuous green. The surrounding biome/wave/remediation durability suites pass 19/19.
+
+This proves the shared durability carrier for every class; it does not replace the dedicated real-engine
+duo suites that prove each adapter's concrete scene/party/UI mutation. The remaining final campaign must
+combine forced real-engine surface legs with authoritative backbone frame drops and browser-level clients.
