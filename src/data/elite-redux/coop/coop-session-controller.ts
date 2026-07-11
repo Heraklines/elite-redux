@@ -136,6 +136,8 @@ export interface CoopSessionOptions {
    * set. The runtime uses it to drive the per-surface activation from the negotiated intersection.
    */
   onCapabilitiesNegotiated?: ((negotiated: ReadonlySet<string>) => void) | undefined;
+  /** Publishes the host-negotiated operation epoch into every surface adapter. */
+  onEpochNegotiated?: ((epoch: number) => void) | undefined;
 }
 
 /**
@@ -176,6 +178,10 @@ export class CoopSessionController {
   private partnerCapabilities: string[] | undefined;
   /** #896 W2e-R2: the callback invoked with the frozen effective set each time it is (re)negotiated. */
   private readonly onCapabilitiesNegotiated: ((negotiated: ReadonlySet<string>) => void) | undefined;
+  private readonly onEpochNegotiated: ((epoch: number) => void) | undefined;
+  /** Candidate belongs to this controller; it becomes authoritative iff this side is host. */
+  private readonly epochCandidate: number;
+  private sessionEpochValue: number;
   /** #810 resume flow: guest-side offer handler + buffered offer, host-side reply waiter. */
   private resumeOfferHandler: ((wave: number) => void) | null = null;
   private pendingResumeOfferWave: number | null = null;
@@ -246,6 +252,9 @@ export class CoopSessionController {
     this.version = opts.version ?? "1";
     this.localCapabilities = opts.localCapabilities;
     this.onCapabilitiesNegotiated = opts.onCapabilitiesNegotiated;
+    this.onEpochNegotiated = opts.onEpochNegotiated;
+    this.epochCandidate = this.mintEpoch(0);
+    this.sessionEpochValue = this.role === "host" ? this.epochCandidate : 0;
     this.offMessage = transport.onMessage(msg => this.handleMessage(msg));
     // #868: watch the transport lifecycle so a RECONNECT (channel flap -> #805 hot-rejoin)
     // re-establishes the lobby handshake. Every lobby frame sent while the channel was dark is
@@ -262,6 +271,41 @@ export class CoopSessionController {
   /** #807 C: the partner's reported version ("?" before the handshake). */
   get partnerVersion(): string {
     return this.partnerVersionValue ?? "?";
+  }
+
+  /** The agreed host-authored control-plane epoch (0 only before a guest receives hello). */
+  get sessionEpoch(): number {
+    return this.sessionEpochValue;
+  }
+
+  /** Host-only hard boundary: cold resume/new run. Hot rejoin deliberately never calls this. */
+  beginNewOperationEpoch(reason: string): number {
+    if (this.role !== "host") {
+      coopWarn("launch", `IGNORE beginNewOperationEpoch(${reason}) on non-host role=${this.role}`);
+      return this.sessionEpochValue;
+    }
+    this.sessionEpochValue = this.mintEpoch(this.sessionEpochValue);
+    coopLog("launch", `EPOCH MINT epoch=${this.sessionEpochValue} reason=${reason}`);
+    this.onEpochNegotiated?.(this.sessionEpochValue);
+    this.sendHello();
+    return this.sessionEpochValue;
+  }
+
+  private mintEpoch(previous: number): number {
+    const candidate = Date.now() * 1024 + Math.floor(Math.random() * 1024);
+    return Number.isSafeInteger(candidate) && candidate > previous ? candidate : previous + 1;
+  }
+
+  private sendHello(): void {
+    this.transport.send({
+      t: "hello",
+      version: this.version,
+      username: this.username,
+      role: this.role,
+      tiebreak: this.tiebreak,
+      epoch: this.sessionEpochValue,
+      ...(this.localCapabilities === undefined ? {} : { capabilities: [...this.localCapabilities] }),
+    });
   }
 
   /**
@@ -364,6 +408,7 @@ export class CoopSessionController {
    * every non-resume outcome (no save, host picked New Game, guest declined, offer timeout).
    */
   sendResumeStartNew(): void {
+    this.beginNewOperationEpoch("start-new");
     const decisionId = `${Date.now().toString(36)}-${this.tiebreak.toString(36)}-${++this.resumeDecisionSeq}`;
     this.latestResumeDecision = { kind: "start-new", decisionId };
     coopLog("launch", `SEND resumeStartNew id=${decisionId} (#810 durable barrier release)`);
@@ -377,15 +422,8 @@ export class CoopSessionController {
       `session connect role=${this.role} partnerRole=${this.partnerRoleId} netcode=${this._netcodeMode} `
         + `username=${this.username} version=${this.version} tiebreak=${this.tiebreak}`,
     );
-    this.transport.send({
-      t: "hello",
-      version: this.version,
-      username: this.username,
-      role: this.role,
-      tiebreak: this.tiebreak,
-      // #896 W2e-R2: advertise our capability set (omit the field entirely when negotiation is not in use).
-      ...(this.localCapabilities === undefined ? {} : { capabilities: [...this.localCapabilities] }),
-    });
+    this.onEpochNegotiated?.(this.sessionEpochValue);
+    this.sendHello();
     // ER data-table fingerprint exchange (#633, diagnostics): compute + log + send OUR
     // fingerprint once, and retain it so the peer's inbound `dataFingerprint` is diffed
     // against it. This is the ROOT-cause catcher for the "two browsers, same build,
@@ -733,14 +771,7 @@ export class CoopSessionController {
     );
     // Re-announce identity (same shape as connect()'s hello). #896 W2e-R2: re-advertise capabilities
     // so a hot-rejoin re-runs the negotiation to the SAME frozen set (identical intersection inputs).
-    this.transport.send({
-      t: "hello",
-      version: this.version,
-      username: this.username,
-      role: this.role,
-      tiebreak: this.tiebreak,
-      ...(this.localCapabilities === undefined ? {} : { capabilities: [...this.localCapabilities] }),
-    });
+    this.sendHello();
     // Re-broadcast our own roster + ready.
     this.broadcastLocal();
     // The HOST re-broadcasts the run config it already decided (no-op before it has picked).
@@ -927,6 +958,9 @@ export class CoopSessionController {
           break;
         }
         this.resumeReplyWaiter = null;
+        if (msg.accept) {
+          this.beginNewOperationEpoch("cold-resume");
+        }
         waiter.finish(msg.accept);
         break;
       }
@@ -945,6 +979,7 @@ export class CoopSessionController {
         break;
       }
       case "hello": {
+        let announcePromotedHost = false;
         // #807 C (version negotiation): a protocol mismatch means someone runs a stale cached
         // bundle. Record + warn loudly; the runtime shows both players the hard-refresh banner.
         this.partnerVersionValue = msg.version;
@@ -974,6 +1009,15 @@ export class CoopSessionController {
           }
           this.role = iAmHost ? "host" : "guest";
           this.partnerRoleId = coopPartnerRole(this.role);
+          if (beforeRole === "host" && this.role === "guest") {
+            // Our old candidate was never authoritative. Clear it before adopting the actual host's
+            // epoch even when that numeric value is lower (role reconciliation defines authority).
+            this.sessionEpochValue = 0;
+          } else if (beforeRole === "guest" && this.role === "host") {
+            this.sessionEpochValue = this.epochCandidate;
+            this.onEpochNegotiated?.(this.sessionEpochValue);
+            announcePromotedHost = true;
+          }
           coopWarn(
             "launch",
             `hello ROLE-CONFLICT both claimed role=${msg.role}; tiebreak local=${this.tiebreak} peer=${peerTie} `
@@ -987,6 +1031,23 @@ export class CoopSessionController {
         }
         this._partnerConnected = true;
         this._partnerName = msg.username;
+        if (this.role === "guest") {
+          if (!Number.isSafeInteger(msg.epoch) || msg.epoch <= 0) {
+            coopWarn("launch", `DROP invalid host epoch=${msg.epoch}`);
+          } else if (msg.epoch < this.sessionEpochValue) {
+            coopWarn("launch", `DROP stale host epoch=${msg.epoch} current=${this.sessionEpochValue}`);
+          } else if (msg.epoch > this.sessionEpochValue) {
+            this.sessionEpochValue = msg.epoch;
+            coopLog("launch", `EPOCH ADOPT epoch=${msg.epoch} from host hello`);
+            this.onEpochNegotiated?.(msg.epoch);
+            this.sendHello();
+          }
+        } else if (msg.epoch !== 0 && msg.epoch !== this.sessionEpochValue) {
+          coopWarn("launch", `host IGNORE peer epoch=${msg.epoch} authoritative=${this.sessionEpochValue}`);
+        }
+        if (announcePromotedHost) {
+          this.sendHello();
+        }
         // #896 W2e-R2: (re)negotiate the capability set now the peer's advertised set is known. Runs on
         // the initial hello AND on a hot-rejoin re-announce (resyncLobbyState) -> same frozen result.
         this.negotiateCapabilities(msg.capabilities);

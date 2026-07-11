@@ -50,8 +50,8 @@ export type CoopRole = "host" | "guest";
  * changes shape. Carried in the hello; a mismatch means one player runs a stale cached bundle -
  * the top source of unreproducible ghost bugs - and both get told to hard-refresh.
  */
-// er-coop-15: resume boundary decisions are transaction-keyed and durable across a hot rejoin. Older
-// builds can lose the one-shot release or accept a delayed reply for the wrong offer, so mixed builds fail.
+// er-coop-15: resume decisions are transaction-keyed/durable, launch snapshots are re-answerable, and hello
+// carries the host-minted operation epoch. Older builds can lose/alias a boundary or accept prior-run ops.
 export const COOP_PROTOCOL_VERSION = "er-coop-15";
 
 /**
@@ -860,7 +860,16 @@ export type CoopMessage =
    * only. ABSENT on an older client -> treated as the empty set (all negotiated features off, legacy
    * paths engaged) - so this stays additive-optional and needs no COOP_PROTOCOL_VERSION bump.
    */
-  | { t: "hello"; version: string; username: string; role: CoopRole; tiebreak?: number; capabilities?: string[] }
+  | {
+      t: "hello";
+      version: string;
+      username: string;
+      role: CoopRole;
+      tiebreak?: number;
+      capabilities?: string[];
+      /** Host-minted control-plane epoch; the guest adopts and echoes it before operations begin. */
+      epoch: number;
+    }
   /** Keepalive / latency probe. */
   | { t: "ping"; ts: number }
   | { t: "pong"; ts: number }
@@ -1424,7 +1433,7 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "lifecycle":
       return `event=${msg.event}`;
     case "hello":
-      return `role=${msg.role} v=${msg.version} tiebreak=${msg.tiebreak ?? "(none)"}`;
+      return `role=${msg.role} v=${msg.version} epoch=${msg.epoch} tiebreak=${msg.tiebreak ?? "(none)"}`;
     case "ping":
     case "pong":
       return `ts=${msg.ts}`;

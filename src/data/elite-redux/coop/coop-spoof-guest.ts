@@ -92,7 +92,13 @@ export class SpoofGuest {
       `spoof connect role=${this.transport.role} username=${this.username} version=${this.version} `
         + `rosterSpecies=[${this.roster.map(e => e.speciesId).join(",")}]`,
     );
-    this.transport.send({ t: "hello", version: this.version, username: this.username, role: this.transport.role });
+    this.transport.send({
+      t: "hello",
+      version: this.version,
+      username: this.username,
+      role: this.transport.role,
+      epoch: 0,
+    });
   }
 
   /** Send the roster as "still choosing" (drives the host's "Partner is choosing..." state). */

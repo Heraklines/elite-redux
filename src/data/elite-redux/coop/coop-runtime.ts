@@ -150,6 +150,7 @@ import type {
   CoopWaveAdvancePayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import { applyCoopOperationEpoch } from "#data/elite-redux/coop/coop-operation-epoch";
 import {
   coopOperationDurabilityHooks,
   registerCoopOperationLiveSink,
@@ -2850,6 +2851,7 @@ export function assembleCoopRuntime(
     // #896 W2e-R2: advertise what THIS build supports+enables; the controller negotiates the effective
     // session set (intersection with the peer's) and stores it, and the surface adapters gate on it.
     localCapabilities: buildLocalCoopCapabilities(),
+    onEpochNegotiated: applyCoopOperationEpoch,
   });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
   // truth that rides along in broadcastRunConfig; on the GUEST it is only the pre-

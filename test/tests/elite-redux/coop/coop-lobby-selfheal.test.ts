@@ -146,6 +146,24 @@ describe("co-op lobby self-healing handshake (#868)", () => {
       guestHellos.some(msg => (msg as unknown as { epoch?: number }).epoch === epoch),
       "guest echoes the adopted host epoch",
     ).toBe(true);
+    expect(h.sessionEpoch).toBe(epoch);
+    expect(g.sessionEpoch).toBe(epoch);
+
+    // A wire-only hot rejoin keeps the control-plane identity intact.
+    host.setConnected(false);
+    guest.setConnected(false);
+    guest.setConnected(true);
+    host.setConnected(true);
+    await flush();
+    await flush();
+    expect(h.sessionEpoch, "hot rejoin does not mint").toBe(epoch);
+    expect(g.sessionEpoch, "hot rejoin does not mint").toBe(epoch);
+
+    // A hard run boundary mints on the host and is adopted by the guest.
+    const next = h.beginNewOperationEpoch("test-cold-resume");
+    await flush();
+    expect(next).toBeGreaterThan(epoch!);
+    expect(g.sessionEpoch, "cold resume adopts the new host epoch").toBe(next);
   });
 
   it("a delayed reply from an older resume offer cannot resolve the current offer", async () => {
