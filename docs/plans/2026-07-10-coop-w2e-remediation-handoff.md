@@ -321,3 +321,33 @@ repository-wide typecheck still reports unrelated pre-existing errors. Biome rep
 Next per-mon surfaces: learn-move and learn-move-batch, then catch-full and stormglass. Lobby/resume,
 renderer enforcement, quarantine/stat-stage cleanup, expanded model/soak coverage, the final
 drop-every-class campaign, and the full four-lane/final-long-soak gate remain open.
+
+## 16. Continuation evidence (per-mon operations: move learning)
+
+Per-move and batch move learning now share one durable operation stream. `86911ae43` first centralizes
+the two forward-presentation listeners into the interaction relay so raw and journal carriers reach the
+same opener. `247c3f01f` is the five-channel failure-first RED; `dbb5d5c45` adds negotiated
+`opSurface.learnMove`, typed `LEARN_MOVE` / `LEARN_MOVE_BATCH` prompt and decision payloads, the shared
+`op:learnMove` journal class, resume revision floor, monotonic operation addresses, and lifecycle-bounded
+exact-payload retries.
+
+Coverage includes the host's per-move forward prompt, the guest's forget/decline decision, the batch
+forward panel, the host-owned batch terminal used to close the guest watcher, and the guest-owned batch
+terminal applied by host authority. Host decisions are journaled before their low-latency raw carrier;
+guest decisions retry until the committed envelope confirms the exact assignment set. The host commits
+the decoded/fallback result it actually applies, and the journal/raw batch terminal is consumed exactly
+once. Existing empty-slot deterministic learns still converge through the unified authoritative state.
+
+Proof: the new operation matrix passes 5/5, capability/handshake regression passes 28/28, the legacy
+forward suite passes 5/5, and the real two-engine batch suite passes both guest-owned and host-owned
+flows with both panels closing and movesets converging. Biome reports no errors and touched-file
+TypeScript diagnostics are zero. The repository-wide typecheck retains unrelated pre-existing failures.
+
+Starting with this checkpoint, every completed migration slice is kept staging-safe: focused operation
+and two-engine regressions, formatting/type diagnostics, commit, push, and staging workflow dispatch occur
+before the next unfinished surface begins. Production remains explicitly forbidden without maintainer
+approval.
+
+Next per-mon surfaces: catch-full and stormglass. Lobby/resume, renderer enforcement,
+quarantine/stat-stage cleanup, expanded model/soak coverage, the final drop-every-class campaign, and the
+full four-lane/final-long-soak gate remain open.
