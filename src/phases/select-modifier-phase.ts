@@ -1292,16 +1292,18 @@ export class SelectModifierPhase extends BattlePhase {
 
   /**
    * Co-op (#839): the OWNER waits at the shop-pick-commit barrier until the partner has ALSO reached the
-   * shop, THEN opens the pickable screen. A dead/stuck partner resolves the wait via the anti-hang
-   * timeout (LOUD WARN) so the owner never hangs. Never throws - a barrier failure still opens the screen.
+   * shop, THEN opens the pickable screen. Lost arrivals are retransmitted; teardown/error aborts keep
+   * the pick screen closed rather than allowing an independent commit.
    */
   private async coopOpenOwnerShopAfterBarrier(
     modifierSelectCallback: ModifierSelectCallback,
     coopIsWatcher: boolean,
     spoofed: boolean,
   ): Promise<void> {
-    await this.coopAwaitShopBarrier(spoofed);
-    // #872: the barrier wait (up to the 60s anti-hang) can resume AFTER the scene moved on (run over /
+    if (!(await this.coopAwaitShopBarrier(spoofed))) {
+      return;
+    }
+    // #872: the barrier wait can resume AFTER the scene moved on (run over /
     // wave torn down / this phase superseded). Opening the shop then reads currentBattle.waveIndex on
     // null - an UNCAUGHT rejection that kills the client's phase machine (the live "game froze, only
     // arrow keys work" class). Bail loudly instead; the phase machine has already moved past us.
@@ -1340,24 +1342,25 @@ export class SelectModifierPhase extends BattlePhase {
     return false;
   }
 
-  /** Co-op (#839): block until the partner reaches the shop (or the anti-hang timeout fires). */
-  private async coopAwaitShopBarrier(spoofed: boolean): Promise<void> {
+  /** Co-op (#839): block until the partner reaches the shop; recovery timeouts retransmit. */
+  private async coopAwaitShopBarrier(spoofed: boolean): Promise<boolean> {
     try {
       if (spoofed) {
-        return; // hotseat: no real partner to wait for
+        return true; // hotseat: no real partner to wait for
       }
       const rendezvous = getCoopRendezvous();
       const point = this.coopShopPoint();
       if (rendezvous == null || point == null) {
-        return;
+        return true;
       }
       coopLog("rendezvous", `shop-pick-commit barrier AWAIT ${point}`);
       const result = await rendezvous.awaitPartner(point, getCoopRendezvousWaitMs());
       if (result.timedOut) {
         coopWarn(
           "rendezvous",
-          `shop-pick-commit barrier ${point} TIMED OUT - partner never reached the shop; opening pick screen anyway (anti-hang)`,
+          `shop-pick-commit barrier ${point} ABORTED during teardown/recovery - pick screen remains closed`,
         );
+        return false;
       } else if (result.crossPoint !== undefined) {
         // #847 CROSS-POINT: the partner is parked at another sync point (e.g. a phantom next command) and
         // will never reach this shop barrier. Open the pick screen now - the catch-up machinery reconciles.
@@ -1367,8 +1370,10 @@ export class SelectModifierPhase extends BattlePhase {
           `shop-pick-commit barrier ${point} CROSS-POINT release (partner at ${result.crossPoint}); opening pick screen`,
         );
       }
+      return true;
     } catch (e) {
-      coopWarn("rendezvous", "shop-pick-commit barrier threw (handled, opening screen)", e);
+      coopWarn("rendezvous", "shop-pick-commit barrier threw - FAIL CLOSED; pick screen remains closed", e);
+      return false;
     }
   }
 
@@ -1484,7 +1489,7 @@ export class SelectModifierPhase extends BattlePhase {
     // Co-op (#633 Fix #2 / #828): adopt the owner's EXACT rolled option list instead of the one we
     // rolled in start() - party luck changes the number of seeded upgrade draws, so our local pool (and
     // the shared RNG cursor) could diverge from the owner's. We wait briefly for the owner's streamed
-    // list; on timeout / unknown id we keep our own (divergent but no hang). SKIPPED when we are the
+    // list; on timeout / unknown id we fail closed and suppress the local pool. SKIPPED when we are the
     // option OWNER (the HOST on a guest-owned ME, #828): it ROLLED + STREAMED its own authoritative list
     // and only WATCHES the guest's pick, so it keeps that list rather than adopting (there is no other
     // streamer - it IS the streamer).

@@ -441,8 +441,8 @@ export class CommandPhase extends FieldPhase {
     // the same command point (both at command, both mons on field) - the missing reciprocal guard for
     // the faint-replacement lock (the wave-12 "sync issue": one player reaches its next move-choice
     // while the partner's replacement is not yet out / it already started a move, permanently locking
-    // the other). A dead/stuck partner cannot strand us: the barrier resolves after a generous timeout
-    // with a LOUD WARN and we PROCEED (the existing partner-command AI fallback then unwedges the turn).
+    // the other). A lost arrival is retransmitted after the recovery interval; timeout never authorizes
+    // this client to open the command UI independently.
     const pendingBarrier = this.coopNextCommandBarrier();
     if (pendingBarrier == null) {
       // SYNC fast-path: solo / spoof / no rendezvous / partner-half-exhausted / partner ALREADY at this
@@ -451,7 +451,11 @@ export class CommandPhase extends FieldPhase {
       this.openOwnCommandUi();
       return;
     }
-    void pendingBarrier.then(() => this.openOwnCommandUi());
+    void pendingBarrier.then(crossed => {
+      if (crossed) {
+        this.openOwnCommandUi();
+      }
+    });
   }
 
   /**
@@ -571,9 +575,10 @@ export class CommandPhase extends FieldPhase {
   /**
    * Returns `null` when NO waiting is needed (the caller opens the command UI synchronously - solo /
    * spoof / no rendezvous / partner half exhausted / partner already arrived at this command point),
-   * else a promise that resolves once the partner arrives (or the anti-hang timeout fires).
+   * else a promise that resolves true once the partner arrives/cross-point catch-up is classified,
+   * or false only if the waiter is explicitly aborted.
    */
-  private coopNextCommandBarrier(): Promise<void> | null {
+  private coopNextCommandBarrier(): Promise<boolean> | null {
     try {
       if (!globalScene.gameMode.isCoop || getCoopRuntime()?.spoof != null) {
         return null;
@@ -610,8 +615,9 @@ export class CommandPhase extends FieldPhase {
           if (result.timedOut) {
             coopWarn(
               "rendezvous",
-              `next-command barrier ${point} TIMED OUT - partner never reached command; opening UI anyway (anti-hang)`,
+              `next-command barrier ${point} ABORTED during teardown/recovery - command UI remains closed`,
             );
+            return false;
           } else if (result.crossPoint !== undefined) {
             // #847 CROSS-POINT: the partner is already at another sync point (e.g. the reward shop) and
             // will never reach this command point. Open the UI immediately - the downstream catch-up
@@ -621,13 +627,15 @@ export class CommandPhase extends FieldPhase {
               `next-command barrier ${point} CROSS-POINT release (partner at ${result.crossPoint}); opening UI`,
             );
           }
+          return true;
         })
         .catch((e: unknown) => {
-          coopWarn("rendezvous", "next-command barrier threw (handled, opening UI)", e);
+          coopWarn("rendezvous", "next-command barrier threw - FAIL CLOSED; command UI remains closed", e);
+          return false;
         });
     } catch (e) {
-      coopWarn("rendezvous", "next-command barrier threw (handled, opening UI)", e);
-      return null;
+      coopWarn("rendezvous", "next-command barrier threw - FAIL CLOSED; command UI remains closed", e);
+      return Promise.resolve(false);
     }
   }
 

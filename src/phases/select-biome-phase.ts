@@ -257,7 +257,9 @@ export class SelectBiomePhase extends BattlePhase {
     // coop-session pendingRemote fold) past this interaction, mismatching the relay seq and forcing a
     // one-sided deterministic fallback. Skipped when chained (already barriered) or spoofed (no real peer).
     if (!this.coopChained && !spoofed) {
-      await this.coopAwaitBoundaryBarrier();
+      if (!(await this.coopAwaitBoundaryBarrier())) {
+        return;
+      }
     }
     if (this.coopAdvancePinned < 0) {
       // Natural biome-end multi-node pick: pin its own counter AFTER the boundary barrier, in lockstep.
@@ -284,15 +286,15 @@ export class SelectBiomePhase extends BattlePhase {
    * Co-op (#858): the reciprocal boundary barrier between the preceding biome-shop interaction and a NATURAL
    * biome-end pick. Blocks until the partner has ALSO reached this wave's biome choice (both left the shop),
    * so neither pins the interaction counter while the other still holds the shop. The point derives from the
-   * WAVE only (never the drifting counter), so both compute it identically. A dead partner resolves via the
-   * anti-hang timeout (LOUD WARN) so this never strands the run. Never throws.
+   * WAVE only (never the drifting counter), so both compute it identically. Lost arrivals retransmit;
+   * teardown/error aborts remain closed rather than pinning a counter independently.
    */
-  private async coopAwaitBoundaryBarrier(): Promise<void> {
+  private async coopAwaitBoundaryBarrier(): Promise<boolean> {
     try {
       const rendezvous = getCoopRendezvous();
       const wave = globalScene.currentBattle?.waveIndex ?? -1;
       if (rendezvous == null || wave < 0) {
-        return;
+        return true;
       }
       const point = `biomepick:${wave}`;
       coopLog("rendezvous", `biome-pick boundary barrier RENDEZVOUS ${point} (#858)`);
@@ -300,16 +302,19 @@ export class SelectBiomePhase extends BattlePhase {
       if (result.timedOut) {
         coopWarn(
           "rendezvous",
-          `biome-pick boundary barrier ${point} TIMED OUT - partner never left the shop; proceeding (anti-hang) (#858)`,
+          `biome-pick boundary barrier ${point} ABORTED during teardown/recovery - remaining closed (#858)`,
         );
+        return false;
       } else if (result.crossPoint !== undefined) {
         coopLog(
           "rendezvous",
           `biome-pick boundary barrier ${point} CROSS-POINT release (partner at ${result.crossPoint}); proceeding (#858)`,
         );
       }
+      return true;
     } catch (e) {
-      coopWarn("rendezvous", "biome-pick boundary barrier threw (handled, proceeding) (#858)", e);
+      coopWarn("rendezvous", "biome-pick boundary barrier threw - FAIL CLOSED (#858)", e);
+      return false;
     }
   }
 

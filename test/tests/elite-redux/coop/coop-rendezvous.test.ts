@@ -7,7 +7,7 @@
 // Co-op RECIPROCAL RENDEZVOUS primitive (#839). Pure-logic test (no game engine): proves the
 // two-sided ready handshake over a real LoopbackTransport pair, and the three robustness
 // properties the co-op wire class demands: buffer-before-waiter (early arrival, #812 class),
-// idempotent duplicate arrival, and the anti-hang TIMEOUT that PROCEEDS with a LOUD WARN.
+// idempotent duplicate arrival, and timeout recovery that retransmits while keeping the boundary closed.
 // =============================================================================
 
 import { setCoopDebug } from "#data/elite-redux/coop/coop-debug";
@@ -31,15 +31,14 @@ function makeManualScheduler() {
       entry.cancelled = true;
     };
   };
-  const fireAll = () => {
-    for (const t of timers) {
-      if (!t.cancelled) {
-        t.cancelled = true;
-        t.cb();
-      }
+  const fireNext = () => {
+    const t = timers.find(entry => !entry.cancelled);
+    if (t != null) {
+      t.cancelled = true;
+      t.cb();
     }
   };
-  return { schedule, fireAll };
+  return { schedule, fireNext };
 }
 
 describe("co-op reciprocal rendezvous primitive (#839)", () => {
@@ -135,7 +134,7 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     guest.dispose();
   });
 
-  it("DEAD PARTNER: the await times out -> resolves timedOut=true and emits a LOUD 'RENDEZVOUS TIMEOUT' WARN", async () => {
+  it("LOST ARRIVAL: timeout retransmits and keeps the boundary closed until the partner arrives", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const pair = createLoopbackPair();
     const manual = makeManualScheduler();
@@ -144,14 +143,24 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
 
     const hostP = host.rendezvous("cmd:99:9");
     await flush();
-    // The partner is dead - fire the anti-hang timeout deterministically.
-    manual.fireAll();
-    const hr = await hostP;
+    let crossed = false;
+    void hostP.then(() => {
+      crossed = true;
+    });
+    manual.fireNext();
+    await flush();
+    expect(crossed, "a timeout never authorizes unilateral continuation").toBe(false);
+    expect(
+      warnSpy.mock.calls.some(c => String(c[0]).includes("RENDEZVOUS RECOVERY RETRY")),
+      "the timeout emits a loud recovery marker",
+    ).toBe(true);
+    expect(warnSpy.mock.calls.some(c => String(c[0]).includes("PROCEEDING"))).toBe(false);
 
-    expect(hr.timedOut).toBe(true);
+    // The peer/reconnect eventually supplies the exact arrival; only then may the boundary cross.
+    pair.guest.send({ t: "rendezvous", point: "cmd:99:9" });
+    const hr = await hostP;
+    expect(hr.timedOut).toBe(false);
     expect(hr.point).toBe("cmd:99:9");
-    const timeoutWarn = warnSpy.mock.calls.find(c => String(c[0]).includes("RENDEZVOUS TIMEOUT"));
-    expect(timeoutWarn, "the timeout emits a LOUD 'RENDEZVOUS TIMEOUT' WARN the soak can assert on").toBeTruthy();
 
     host.dispose();
   });
@@ -164,7 +173,7 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
 
     const hostP = host.rendezvous("cmd:2:1");
     guest.arrive("cmd:2:1"); // queues the real arrival on LoopbackTransport's delivery microtask
-    manual.fireAll(); // reproduce the loaded-pump race: wall timer fires before that queued delivery runs
+    manual.fireNext(); // reproduce the loaded-pump race: wall timer fires before that queued delivery runs
 
     const result = await hostP;
     expect(result.timedOut, "the already-queued partner arrival must beat the test-only timeout backstop").toBe(false);
@@ -174,24 +183,21 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     guest.dispose();
   });
 
-  it("FAULT-INJECTION: the arrival is DROPPED on the wire -> both sides time out with the LOUD WARN", async () => {
+  it("FAULT-INJECTION: first arrivals are dropped -> retry heals and neither side proceeds early", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    // Wrap the loopback so EVERY rendezvous arrival is dropped (a partner whose arrival never lands).
-    const faulted = wrapCoopFaultPair(
-      createLoopbackPair(),
-      { drop: 1, reorder: 0, delay: 0, faultable: msg => msg.t === "rendezvous" },
-      { seed: 839 },
-    );
+    const faulted = wrapCoopFaultPair(createLoopbackPair(), { drop: 0, reorder: 0, delay: 0 }, { seed: 839 });
+    faulted.armNextDrop("rendezvous", "both");
     const host = new CoopRendezvous(faulted.host, { timeoutMs: 40 });
     const guest = new CoopRendezvous(faulted.guest, { timeoutMs: 40 });
 
     const [hr, gr] = await Promise.all([host.rendezvous("cmd:7:1"), guest.rendezvous("cmd:7:1")]);
 
-    expect(hr.timedOut, "host barrier timed out (partner arrival dropped)").toBe(true);
-    expect(gr.timedOut, "guest barrier timed out (partner arrival dropped)").toBe(true);
+    expect(hr.timedOut, "host crossed only after the recovered exact arrival").toBe(false);
+    expect(gr.timedOut, "guest crossed only after the recovered exact arrival").toBe(false);
     expect(faulted.faultsInjected(), "the fault transport actually dropped the arrivals").toBeGreaterThan(0);
-    const warns = warnSpy.mock.calls.filter(c => String(c[0]).includes("RENDEZVOUS TIMEOUT"));
-    expect(warns.length, "both sides emitted the soak-assertable 'RENDEZVOUS TIMEOUT' WARN").toBeGreaterThanOrEqual(2);
+    const warns = warnSpy.mock.calls.filter(c => String(c[0]).includes("RENDEZVOUS RECOVERY RETRY"));
+    expect(warns.length, "at least one side emitted the recovery retry marker").toBeGreaterThanOrEqual(1);
+    expect(warnSpy.mock.calls.some(c => String(c[0]).includes("PROCEEDING"))).toBe(false);
 
     host.dispose();
     guest.dispose();
@@ -205,7 +211,7 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
   // NOT the anti-hang timeout WARN) instead of eating the full 60s. The exact live trace: the reward
   // owner walked to `shop:3:2` while the partner opened a phantom `cmd:3:2` - each ate the full timeout.
   // ===========================================================================================
-  it("#847 CROSS-POINT release (LIVE): awaiting P, the partner arrives at a DIFFERENT point Q -> resolve crossPoint=Q (info, not the timeout WARN)", async () => {
+  it("#847 CROSS-POINT release (LIVE) remains classified separately from timeout recovery", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const pair = createLoopbackPair();
     const host = new CoopRendezvous(pair.host);
@@ -225,19 +231,15 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     await flush();
     const hr = await hostP;
     expect(hostCrossed).toBe(true);
-    expect(hr.timedOut, "a cross-point release is NOT a dead-partner timeout").toBe(false);
-    expect(hr.crossPoint, "the release carries the partner's foreign point").toBe("cmd:3:2");
-    // The anti-hang timeout WARN the soak asserts on must NOT fire for a healthy cross-point release.
-    expect(
-      warnSpy.mock.calls.some(c => String(c[0]).includes("RENDEZVOUS TIMEOUT")),
-      "a cross-point release emits INFO, never the timeout WARN",
-    ).toBe(false);
+    expect(hr.timedOut).toBe(false);
+    expect(hr.crossPoint).toBe("cmd:3:2");
+    expect(warnSpy.mock.calls.some(c => String(c[0]).includes("RENDEZVOUS RECOVERY RETRY"))).toBe(false);
 
     host.dispose();
     guest.dispose();
   });
 
-  it("#847 CROSS-POINT release (BUFFERED): a foreign arrival buffered BEFORE the await installs still cross-releases (the exact berry-bush ordering)", async () => {
+  it("#847 CROSS-POINT release (BUFFERED) remains classified separately from timeout recovery", async () => {
     const pair = createLoopbackPair();
     const host = new CoopRendezvous(pair.host);
     const guest = new CoopRendezvous(pair.guest);
@@ -249,11 +251,9 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     await flush();
     expect(guest.partnerHasArrived("shop:3:2")).toBe(true);
 
-    // The guest now opens its own-slot command barrier: the buffered foreign shop arrival cross-releases
-    // it at await-START (no network wait, no timeout), so the guest proceeds immediately.
     const gr = await guest.rendezvous("cmd:3:2");
     expect(gr.timedOut).toBe(false);
-    expect(gr.crossPoint, "the buffered foreign shop arrival cross-releases the command barrier").toBe("shop:3:2");
+    expect(gr.crossPoint).toBe("shop:3:2");
 
     host.dispose();
     guest.dispose();

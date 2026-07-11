@@ -24,9 +24,9 @@
 //     installs its waiter is BUFFERED (remembered in a Set) and consumed on the next await.
 //   - DUPLICATE ARRIVAL: arrivals are set-membership, so a re-sent / re-delivered arrival
 //     for a point already seen is a harmless no-op (idempotent on both ends).
-//   - DEAD PARTNER: a partner that never arrives cannot strand the run forever - the await
-//     resolves `timedOut: true` after a generous, injectable timeout, emitting a LOUD WARN
-//     ("RENDEZVOUS TIMEOUT", assertable by the soak) so the leader PROCEEDS rather than hangs.
+//   - LOST ARRIVAL / DEAD PARTNER: the timeout retransmits the local arrival and keeps the
+//     boundary CLOSED. It never authorizes unilateral continuation. Transport reconnect handles
+//     a dead channel; a live lost frame heals on the retransmit.
 //
 // Engine-FREE (transport + wire types only) so it is unit-testable headlessly over a
 // LoopbackTransport, exactly like CoopInteractionRelay / CoopBattleStreamer.
@@ -51,8 +51,8 @@ let coopRendezvousWaitMs = 60_000;
  * reaches a barrier would sit through the full live-generous timeout PER COMMAND POINT (the 11-file
  * suite red of 2026-07-06). Default the wait to a tiny value in the test env so every existing and
  * future test gets it WITHOUT per-file injection; tests that exercise the barrier semantics
- * explicitly (block-until-arrive, timeout-WARN) still override via {@linkcode setCoopRendezvousWaitMs}.
- * Live builds never define VITEST, so production keeps the generous 60s anti-hang class.
+ * explicitly (block-until-arrive, recovery-retry WARN) still override via {@linkcode setCoopRendezvousWaitMs}.
+ * Live builds never define VITEST, so production keeps the generous 60s recovery interval.
  */
 const VITEST_DEFAULT_WAIT_MS = 50;
 let waitMsExplicitlySet = false;
@@ -89,15 +89,11 @@ function defaultSchedule(cb: () => void, ms: number): () => void {
 export interface CoopRendezvousResult {
   /** The sync point this result is for. */
   point: string;
-  /** True when the partner NEVER arrived and the anti-hang timeout fired (the run proceeds anyway). */
+  /** True only when the rendezvous was explicitly torn down/superseded; live timeout never resolves. */
   timedOut: boolean;
   /**
-   * #847 CROSS-POINT RELEASE: set to the OTHER sync point `Q` the partner arrived at while we awaited
-   * this point `P`. The partner having reached a DIFFERENT point that we have NOT locally reached proves
-   * it diverged onto another branch and will NEVER arrive at `P` (the berry-bush deadlock: the reward
-   * owner walked to the shop while the partner opened a phantom next command). Resolving is then an INFO
-   * release (NOT the anti-hang WARN) - the caller proceeds exactly as on timeout and the downstream
-   * catch-up machinery reconciles.
+   * Set to the OTHER sync point `Q` when the partner is already on a different branch. This remains a
+   * separate classified catch-up result; timeout/loss recovery never produces it.
    */
   crossPoint?: string;
 }
@@ -113,7 +109,7 @@ export interface CoopRendezvousOptions {
 /**
  * Rides a {@linkcode CoopTransport} to run reciprocal two-sided rendezvous barriers. One instance
  * per client. Both clients call {@linkcode rendezvous} (or {@linkcode arrive} + {@linkcode awaitPartner})
- * for the SAME `point`; each resolves only once BOTH have arrived (or the anti-hang timeout fires).
+ * for the SAME `point`; each resolves only once BOTH have arrived (or the waiter is explicitly torn down).
  */
 export class CoopRendezvous {
   private readonly transport: CoopTransport;
@@ -177,9 +173,9 @@ export class CoopRendezvous {
   }
 
   /**
-   * Block until the PARTNER has arrived at `point` (or the anti-hang timeout fires). Resolves
-   * immediately if the partner's arrival was already buffered. On timeout resolves `timedOut: true`
-   * after emitting a LOUD WARN - the caller then PROCEEDS rather than stranding the run.
+   * Block until the PARTNER has arrived at `point`. Resolves immediately if the partner's arrival was
+   * already buffered. On timeout, re-send our arrival and continue waiting: a timeout is evidence that
+   * recovery is needed, never permission to cross a shared boundary independently.
    */
   awaitPartner(point: string, timeoutMs = this.defaultTimeoutMs): Promise<CoopRendezvousResult> {
     if (this.partnerArrived.has(point)) {
@@ -191,10 +187,8 @@ export class CoopRendezvous {
       }
       return Promise.resolve({ point, timedOut: false });
     }
-    // #847 CROSS-POINT RELEASE (buffered): the partner's arrival for a DIFFERENT sync point may already be
-    // buffered BEFORE this await installs (the berry-bush trace: the guest had the host's `shop:3:2` arrival
-    // buffered before it opened its `cmd:3:2` await). Check the buffer for a FOREIGN arrival at await-START,
-    // not just on live receipt - a partner parked at Q proves it will never reach P. Resolve INFO (not WARN).
+    // A buffered FOREIGN arrival is a classified branch mismatch, not packet loss. Preserve the existing
+    // catch-up release until the authoritative phase-route operation replaces it.
     const buffered = this.foreignArrival(point);
     if (buffered !== undefined) {
       coopLog(
@@ -228,12 +222,9 @@ export class CoopRendezvous {
           this.pendingSince.delete(point);
         }
         if (res.timedOut) {
-          // The soak asserts on this exact substring. LOUD on purpose: a fired timeout means a
-          // partner that never reached the barrier, so proceeding is the anti-hang backstop.
           coopWarn(
             "rendezvous",
-            `RENDEZVOUS TIMEOUT point=${point} after ${timeoutMs}ms - partner never arrived; `
-              + `PROCEEDING (anti-hang backstop) role=${this.transport.role}`,
+            `RENDEZVOUS ABORT point=${point} - waiter torn down without partner arrival role=${this.transport.role}`,
           );
         } else if (res.crossPoint === undefined) {
           coopLog("rendezvous", `AWAIT point=${point} RESOLVE both-arrived role=${this.transport.role}`);
@@ -247,22 +238,36 @@ export class CoopRendezvous {
         }
         resolve(res);
       };
-      this.pending.set(point, finish);
-      cancelTimer = this.schedule(() => {
+      const armRecoveryTimer = (): (() => void) => this.schedule(() => {
         // #899: under the cooperative two-engine harness the partner's real loopback arrival may already
         // be queued for delivery when the tiny vitest wall timer fires. Give transport microtasks one
-        // event-driven turn before committing the unilateral timeout; otherwise the timer deletes this
-        // waiter and the queued arrival lands immediately afterward as an unusable buffer hit.
+        // event-driven turn before retransmitting.
         queueMicrotask(() => {
-          finish(this.partnerArrived.has(point) ? { point, timedOut: false } : { point, timedOut: true });
+          if (settled) {
+            return;
+          }
+          if (this.partnerArrived.has(point)) {
+            finish({ point, timedOut: false });
+            return;
+          }
+          coopWarn(
+            "rendezvous",
+            `RENDEZVOUS RECOVERY RETRY point=${point} after ${timeoutMs}ms - partner never arrived; `
+              + `RETRANSMITTING and KEEPING BOUNDARY CLOSED role=${this.transport.role}`,
+          );
+          // `arrive()` suppresses duplicates by design; recovery intentionally bypasses that suppression.
+          this.transport.send({ t: "rendezvous", point });
+          cancelTimer = armRecoveryTimer();
         });
       }, timeoutMs);
+      this.pending.set(point, finish);
+      cancelTimer = armRecoveryTimer();
     });
   }
 
   /**
-   * The full reciprocal barrier: ARRIVE at `point`, then block until the partner has also arrived (or
-   * the anti-hang timeout fires). Both clients call this for the same point; the client that reached
+   * The full reciprocal barrier: ARRIVE at `point`, then block until the partner has also arrived.
+   * Recovery timeouts retransmit without resolving. Both clients call this for the same point; the client that reached
    * the barrier FIRST blocks until the other arrives, the client that reached it SECOND resolves at
    * once (the first's arrival is already buffered). Neither crosses `point` until both have arrived.
    */
@@ -306,7 +311,7 @@ export class CoopRendezvous {
     return oldest;
   }
 
-  /** Stop listening and fail any in-flight waits (as timed out, so callers proceed). */
+  /** Stop listening and abort any in-flight waits; callers must remain closed on this result. */
   dispose(): void {
     this.offMessage();
     for (const finish of [...this.pending.values()]) {
@@ -357,14 +362,15 @@ export class CoopRendezvous {
       if (isCoopDebug()) {
         coopLog("rendezvous", `RECV arrival point=${point} -> deliver-to-waiter role=${this.transport.role}`);
       }
+      // Reciprocal ACK: our original arrival may have been the frame that was lost. Echo it once before
+      // releasing locally, so the peer that retransmitted cannot remain parked forever after we cross.
+      // The receiver de-duplicates `partnerArrived`, so this cannot form an ACK loop.
+      this.transport.send({ t: "rendezvous", point });
       waiter({ point, timedOut: false });
       return;
     }
-    // #847 CROSS-POINT RELEASE (live): no waiter for THIS point, but we may be parked awaiting a DIFFERENT
-    // point. If this arrival is for a point we have NOT locally reached (excluding it never satisfies our
-    // OWN progression), the partner has diverged onto another branch and will never reach the point(s) we
-    // await - release each such parked waiter INFO (crossPoint), NOT the dead-partner WARN. The arrival
-    // itself stays BUFFERED (partnerArrived) so its own eventual await still buffer-hits both-arrived.
+    // A live foreign arrival is a classified branch mismatch, not a lost exact-point frame. Preserve the
+    // existing catch-up release until the authoritative phase-route operation replaces it.
     if (this.pending.size > 0 && !this.localArrived.has(point)) {
       let released = false;
       for (const [waitPoint, finish] of [...this.pending.entries()]) {

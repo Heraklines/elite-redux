@@ -163,11 +163,12 @@ export class ErCrossroadsPhase extends Phase {
     // then CATCHES UP past this interaction's counter (the coop-session `pendingRemote` fold), so it pins
     // the WRONG counter, mismatches the relay seq, times out, and fires the deterministic Stay/Leave
     // fallback ONE-SIDED -> one client leaves + changes biome while the other stays -> biome divergence.
-    // The barrier makes the pin below read in LOCKSTEP; the anti-hang fallback can then only fire when the
-    // owner is TRULY absent (both time out at the barrier together), never while it holds another screen and
-    // never one-sided. Skipped in the hotseat spoof path (no real peer to rendezvous with).
+    // The barrier makes the pin below read in LOCKSTEP; timeout retransmits and never authorizes a one-sided
+    // pin. Skipped in the hotseat spoof path (no real peer to rendezvous with).
     if (!spoofed) {
-      await this.coopAwaitBoundaryBarrier();
+      if (!(await this.coopAwaitBoundaryBarrier())) {
+        return;
+      }
     }
     if (this.coopStartCounter < 0) {
       this.coopStartCounter = controller.interactionCounter();
@@ -190,15 +191,14 @@ export class ErCrossroadsPhase extends Phase {
    * one. Blocks until the PARTNER has ALSO reached this wave's crossroads (i.e. both clients have left the
    * shop), so neither pins the interaction counter while the other still holds the shop. The point derives
    * from the WAVE only (never the interaction counter - a drifting counter is the very thing this guards),
-   * so both clients compute it identically. A dead partner resolves via the anti-hang timeout (LOUD WARN)
-   * so this never strands the run. Never throws.
+   * so both clients compute it identically. Lost arrivals retransmit; teardown/error aborts remain closed.
    */
-  private async coopAwaitBoundaryBarrier(): Promise<void> {
+  private async coopAwaitBoundaryBarrier(): Promise<boolean> {
     try {
       const rendezvous = getCoopRendezvous();
       const wave = globalScene.currentBattle?.waveIndex ?? -1;
       if (rendezvous == null || wave < 0) {
-        return;
+        return true;
       }
       const point = `xroads:${wave}`;
       coopLog("rendezvous", `crossroads boundary barrier RENDEZVOUS ${point} (#858)`);
@@ -206,16 +206,19 @@ export class ErCrossroadsPhase extends Phase {
       if (result.timedOut) {
         coopWarn(
           "rendezvous",
-          `crossroads boundary barrier ${point} TIMED OUT - partner never left the shop; proceeding (anti-hang) (#858)`,
+          `crossroads boundary barrier ${point} ABORTED during teardown/recovery - remaining closed (#858)`,
         );
+        return false;
       } else if (result.crossPoint !== undefined) {
         coopLog(
           "rendezvous",
           `crossroads boundary barrier ${point} CROSS-POINT release (partner at ${result.crossPoint}); proceeding (#858)`,
         );
       }
+      return true;
     } catch (e) {
-      coopWarn("rendezvous", "crossroads boundary barrier threw (handled, proceeding) (#858)", e);
+      coopWarn("rendezvous", "crossroads boundary barrier threw - FAIL CLOSED (#858)", e);
+      return false;
     }
   }
 
