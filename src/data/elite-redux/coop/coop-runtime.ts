@@ -67,6 +67,7 @@ import {
   COOP_CAP_OP_BARGAIN,
   COOP_CAP_OP_BIOME,
   COOP_CAP_OP_COLOSSEUM,
+  COOP_CAP_OP_FAINT_SWITCH,
   COOP_CAP_OP_ME,
   COOP_CAP_OP_REWARD,
   COOP_CAP_OP_WAVE,
@@ -83,6 +84,11 @@ import {
 } from "#data/elite-redux/coop/coop-colosseum-operation";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { CoopDurabilityManager, isCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
+import {
+  isCoopFaintSwitchOperationEnabled,
+  resetCoopFaintSwitchOperationState,
+  setCoopFaintSwitchOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-faint-switch-operation";
 import {
   COOP_DEX_SYNC_SEQ,
   COOP_INTERACTION_LEAVE,
@@ -1483,6 +1489,7 @@ export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | u
     setCoopAbilityOperationRevisionFloor(marks["op:ability"] ?? 0);
     setCoopBargainOperationRevisionFloor(marks["op:bargain"] ?? 0);
     setCoopColosseumOperationRevisionFloor(marks["op:colosseum"] ?? 0);
+    setCoopFaintSwitchOperationRevisionFloor(marks["op:faintSwitch"] ?? 0);
     setCoopRewardOperationRevisionFloor(marks["op:reward"] ?? 0);
     setCoopMeOperationRevisionFloor(marks["op:me"] ?? 0);
     // Wave-2f KEYSTONE (W2e-R P0-3): floor the wave-advance producer + guest so a resumed run continues the
@@ -2563,6 +2570,9 @@ function buildLocalCoopCapabilities(): CoopCapabilityKey[] {
   if (isCoopColosseumOperationEnabled()) {
     caps.push(COOP_CAP_OP_COLOSSEUM);
   }
+  if (isCoopFaintSwitchOperationEnabled()) {
+    caps.push(COOP_CAP_OP_FAINT_SWITCH);
+  }
   if (isCoopMeOperationEnabled()) {
     caps.push(COOP_CAP_OP_ME);
   }
@@ -2609,6 +2619,7 @@ export function assembleCoopRuntime(
   resetCoopAbilityOperationState();
   resetCoopBargainOperationState();
   resetCoopColosseumOperationState();
+  resetCoopFaintSwitchOperationState();
   // Wave-2d: same fresh-control-plane reset for the reward-shop + biome-market operation state (SURFACE 3).
   resetCoopRewardOperationState();
   // Wave-2c: the mystery-encounter operation surface shares the same fresh-control-plane discipline (§8
@@ -2848,6 +2859,7 @@ export function clearCoopRuntime(): void {
   resetCoopAbilityOperationState();
   resetCoopBargainOperationState();
   resetCoopColosseumOperationState();
+  resetCoopFaintSwitchOperationState();
   // Wave-2d: drop the reward-shop + biome-market operation state too (SURFACE 3).
   resetCoopRewardOperationState();
   // Wave-2c: same teardown for the mystery-encounter operation surface.

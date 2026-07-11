@@ -7,6 +7,7 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { armCoopFaintSwitchIntentResend } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import {
   beginCoopFaintSwitchWindow,
   COOP_FAINT_SWITCH_SEQ_BASE,
@@ -87,7 +88,14 @@ export class CoopGuestFaintSwitchPhase extends Phase {
             // host can resolve the pick by IDENTITY when the two clients' party orders have
             // diverged (a blind slot index summons a DIFFERENT mon on the other engine).
             const pickedSpecies = picked.species?.speciesId ?? 0;
-            sendCoopFaintSwitchChoice(relay, this.fieldIndex, slotIndex, [0, pickedSpecies]);
+            const data = [0, pickedSpecies];
+            sendCoopFaintSwitchChoice(relay, this.fieldIndex, slotIndex, data);
+            armCoopFaintSwitchIntentResend({
+              payload: { fieldIndex: this.fieldIndex, partySlot: slotIndex, data },
+              wave: globalScene.currentBattle?.waveIndex ?? 0,
+              turn: globalScene.currentBattle?.turn ?? 0,
+              resend: () => sendCoopFaintSwitchChoice(relay, this.fieldIndex, slotIndex, data),
+            });
           } else if (slotIndex >= battlerCount && slotIndex < 6) {
             coopWarn(
               "replay",

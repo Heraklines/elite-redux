@@ -81,6 +81,9 @@ export function coopOperationClassForPhase(phase: CoopLogicalPhase): string | nu
 
 /** Resolve classes that share the generic INTERACTION logical phase by their closed operation kind. */
 function coopOperationClassForEnvelope(envelope: CoopAuthoritativeEnvelopeV1): string | null {
+  if (envelope.pendingOperation?.kind === "FAINT_SWITCH" && envelope.logicalPhase === "TURN_RESOLVE") {
+    return "op:faintSwitch";
+  }
   if (envelope.logicalPhase === "INTERACTION") {
     switch (envelope.pendingOperation?.kind) {
       case "BARGAIN":

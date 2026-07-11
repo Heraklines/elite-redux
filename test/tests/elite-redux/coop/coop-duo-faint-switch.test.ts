@@ -46,6 +46,7 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -107,7 +108,16 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
 
   it("guest picks CHARIZARD; the host summons THE GUEST'S pick; the guest materializes + can command it", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
-    const pair = createLoopbackPair();
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 0,
+        reorder: 0,
+        delay: 0,
+        faultable: msg => msg.t === "interactionChoice" && msg.kind === "switch",
+      },
+      { seed: 0xfa1718 },
+    );
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
     // DETECTION MODEL (#807): a guest-faint replacement is a PLAYER-FACING interaction - it must converge
@@ -149,6 +159,7 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     // GUEST renders turn 1: the faint presentation opens the guest's OWN picker
     // (CoopGuestFaintSwitchPhase). The headless guest has no human, so stub the ONE
     // PARTY open to pick CHARIZARD - the RELAY send + seq keying stay fully real.
+    pair.armNextDrop("interactionChoice", "guest");
     await withClient(rig.guestCtx, async () => {
       const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
       const realSetMode = ui.setMode.bind(ui);
@@ -176,6 +187,7 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       await game.phaseInterceptor.to("CommandPhase", false);
     });
     const hostReplacement = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+    expect(pair.faultsInjected(), "the guest's first replacement intent was actually dropped").toBe(1);
     expect(
       hostReplacement?.species.speciesId,
       "the HOST summoned THE GUEST'S pick (CHARIZARD), not the auto-pick (LAPRAS)",

@@ -63,6 +63,8 @@ export const COOP_CAP_OP_BARGAIN: CoopCapabilityKey = "opSurface.bargain";
 export const COOP_CAP_OP_COLOSSEUM: CoopCapabilityKey = "opSurface.colosseum";
 /** The migrated ER ability consumable picker outcome (§2.5 item 5). */
 export const COOP_CAP_OP_ABILITY: CoopCapabilityKey = "opSurface.abilityPicker";
+/** The migrated owner-resolved faint replacement intent (§2.5 item 6). */
+export const COOP_CAP_OP_FAINT_SWITCH: CoopCapabilityKey = "opSurface.faintSwitch";
 /** The application-level durability journal (§4, coop-durability.ts / coop-operation-journal.ts). */
 export const COOP_CAP_DURABILITY_JOURNAL: CoopCapabilityKey = "durability.journal";
 /**

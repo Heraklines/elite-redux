@@ -200,6 +200,13 @@ export interface CoopAbilityPickPayload {
   readonly data: number[];
 }
 
+/** FAINT_SWITCH intent: exact owner-selected party slot plus legacy baton/species identity metadata. */
+export interface CoopFaintSwitchPayload {
+  readonly fieldIndex: number;
+  readonly partySlot: number;
+  readonly data: number[];
+}
+
 // -----------------------------------------------------------------------------
 // Wave-2c: mystery-encounter payloads (§2.1 #8/#9/#10, MYSTERY_ENCOUNTER phase). The ME surface is
 // owner-alternated with the choice-forwarding model (#693: the guest never runs the encounter
