@@ -1384,3 +1384,10 @@ must be sanctioned by `WAVE_ADVANCE`; mystery-encounter leave/battle tails are s
 `EggLapsePhase` is allowlisted but is not incorrectly modeled as shared operation control. Protocol
 `er-coop-16` prevents mixed enforcement builds from pairing. Evidence: 26/26 pure tail assertions, 17/17
 real wave/biome/ME/egg tests, and 38/38 session/capability tests.
+
+### 8.15 Full-gate specialized-seed closure
+
+The first all-lane gate found a mixed-seed save/resume failure (`seed=606060`, wave 2). `9b2cab7e5`
+pre-seeds all specialized soak entrypoints before bootstrap and gives the ME campaign its explicit legal
+content stream. The exact resume replay is green, all three ME continuations are green, and lane C passes
+13/13 executed tests across eight files (one evidence-only skip). A fresh complete aggregate remains pending.

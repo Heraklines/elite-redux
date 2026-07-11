@@ -508,3 +508,16 @@ state is deterministic and account-local, not shared-run control.
 The incompatible behavior bumps the pairing protocol to `er-coop-16`. Pure strict-tail coverage passes
 26/26; real wave-10/biome/ME/egg coverage passes 17/17 with enforcement active; capability/session
 handshake coverage passes 38/38. An older renderer cannot silently pair and run a locally derived tail.
+
+## 25. Full-gate seed audit and lane-C closure
+
+The first complete four-lane run exposed one test-architecture red: the specialized save/resume soak
+serialized a mixed-seed run (`preseeded=false`) and failed full-state convergence at wave 2. `9b2cab7e5`
+pre-seeds every remaining catch, learn-move, ME, and resume campaign before `startBattle`. The ME fixtures
+also declare their stable `test` content stream explicitly because the default `828633` content makes wave
+12 a trainer battle, where forcing an ME is illegal; the same seed is passed through the driver and traced.
+
+The exact resume artifact now passes its 5-wave boot/convergence/continuation proof. All three continuous ME
+campaigns pass, including both ownership parities and post-ME continuation. Lane C reran green: eight files
+passed, one evidence-only file skipped, 13 tests passed, zero failed. This fixes the sole red artifact found
+by the aggregate run; a fresh all-lane aggregate rerun remains the final acceptance step.
