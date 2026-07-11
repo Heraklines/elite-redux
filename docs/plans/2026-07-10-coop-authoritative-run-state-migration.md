@@ -1365,3 +1365,13 @@ Every first envelope is actually dropped; no live sink mutates before recovery; 
 all twelve via `coopResyncAll`; all live seams converge; and every cumulative ACK drains from the host.
 The matrix validates generic carrier recovery, while concrete adapter mutation remains the responsibility of
 the existing per-surface real-engine duo tests and the pending forced-surface/browser campaign.
+
+### 8.13 Production-fidelity replay closure (#899)
+
+`68f960483` makes `SOAK_SEED` seed both the action policy and game content (default
+`coop-soak-<SOAK_SEED>`). This removes the old partial-replay behavior that let the same wave-2 key pass or
+strand in separate processes. Failure artifacts now carry full host/guest field causality plus periodic HP
+progress. Evidence: two identical 3-wave production runs, the full 12-wave production gate, and the
+independent-pair determinism contract are green; the latter no longer relies on an explicit `pinSeed`.
+`3ca47791c` pre-seeds the critical soak entrypoints before `startBattle`, extending the replay guarantee to
+the bootstrap wave as well as every subsequent crossing.

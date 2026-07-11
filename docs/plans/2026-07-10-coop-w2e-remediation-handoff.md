@@ -479,3 +479,19 @@ vacuous green. The surrounding biome/wave/remediation durability suites pass 19/
 This proves the shared durability carrier for every class; it does not replace the dedicated real-engine
 duo suites that prove each adapter's concrete scene/party/UI mutation. The remaining final campaign must
 combine forced real-engine surface legs with authoritative backbone frame drops and browser-level clients.
+
+## 23. #899 production-fidelity replay determinism and liveness tracing
+
+`68f960483` closes the source of the apparently nondeterministic wave-2 no-progress result. `SOAK_SEED`
+previously drove only action choices; the game's content RNG retained an unrelated framework seed. Two
+processes using the same printed replay key could therefore encounter different content and produce one
+pass plus one 60-turn strand. The driver now pins content to `coop-soak-<SOAK_SEED>` by default, while
+retaining an explicit `pinSeed` override for specialized contracts. `3ca47791c` adds the pre-bootstrap
+seeding helper to the nightly, production-fidelity, and independent-pair entrypoints, so wave 1 is included
+rather than only post-bootstrap crossings.
+
+No-progress artifacts now include host and guest field species/ids, HP/max HP, faint/status/stages,
+moves/PP, co-op ownership, and periodic player/enemy HP progress. The same production-fidelity seed passed
+3 waves twice, the exact 12-wave lane-P depth passed with zero hard failures, and the independent-pair
+determinism contract passes 3/3 without a test-only content seed. A printed soak seed is now a complete
+content-plus-action replay key for the complete critical run.
