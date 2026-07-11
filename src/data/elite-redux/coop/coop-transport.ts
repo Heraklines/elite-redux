@@ -55,7 +55,9 @@ export type CoopRole = "host" | "guest";
 // er-coop-16: shared boundary tails fail closed unless WAVE_ADVANCE or ME_TERMINAL sanctions them.
 // er-coop-17: shared reward/market option payloads are cached and explicitly re-requestable; watchers
 // never continue against a local roll when the authoritative stream is lost.
-export const COOP_PROTOCOL_VERSION = "er-coop-17";
+// er-coop-18: cross-branch rendezvous mismatches use an epoch-scoped, revisioned host phase route + guest
+// ACK. Older peers would ignore these frames and park, so mixed builds must refuse pairing explicitly.
+export const COOP_PROTOCOL_VERSION = "er-coop-18";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -911,6 +913,10 @@ export type CoopMessage =
    * (shop-pick-commit). See coop-rendezvous.ts.
    */
   | { t: "rendezvous"; point: string }
+  /** Host-authoritative branch selection when peers reach different rendezvous points. */
+  | { t: "phaseRoute"; epoch: number; revision: number; point: string; displacedPoint: string }
+  /** Guest confirms it adopted a host phaseRoute revision. */
+  | { t: "phaseRouteAck"; epoch: number; revision: number }
   /** #809: host asks the partner to pick a Revival Blessing target for its own mon. */
   | { t: "revivalPrompt"; fieldIndex: number; operationId?: string | undefined }
   /**
@@ -1026,7 +1032,15 @@ export type CoopMessage =
    * `wave`. The guest adopts these verbatim instead of regenerating (so it never rolls
    * its own enemy species/ability/IVs). Sent at encounter start.
    */
-  | { t: "enemyPartySync"; wave: number; enemies: CoopSerializedEnemy[]; meType?: number; battleType?: number }
+  | {
+      t: "enemyPartySync";
+      wave: number;
+      enemies: CoopSerializedEnemy[];
+      meType?: number;
+      battleType?: number;
+      /** Complete host state at the new-wave encounter boundary; additive for older peers. */
+      authoritativeState?: CoopAuthoritativeBattleStateV1;
+    }
   /**
    * Guest -> host (#633/#698, enemy-party handoff robustness): "(re)send me the enemy party
    * for `wave`". The host broadcasts `enemyPartySync` ONCE inside its EncounterPhase, AFTER the
@@ -1454,6 +1468,10 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return "(re)request";
     case "rendezvous":
       return `point=${msg.point}`;
+    case "phaseRoute":
+      return `epoch=${msg.epoch} rev=${msg.revision} point=${msg.point} displaced=${msg.displacedPoint}`;
+    case "phaseRouteAck":
+      return `epoch=${msg.epoch} rev=${msg.revision}`;
     case "coopAck":
       return `cls=${msg.cls} seq=${msg.seq}`;
     case "coopResync":

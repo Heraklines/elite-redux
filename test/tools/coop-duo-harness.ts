@@ -71,6 +71,8 @@ import { globalScene, initGlobalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import {
+  applyCoopAuthoritativeBattleState,
+  captureCoopAuthoritativeBattleState,
   captureCoopPlayerModifiers,
   reconcileArenaTags,
   reconcileCoopPlayerModifiers,
@@ -615,6 +617,13 @@ export function mirrorHostBattleToGuest(
   guestScene: BattleScene,
   opts?: { preserveGuestPlayerParty?: boolean },
 ): void {
+  // Production's enemyPartySync now pairs the new enemy manifest with a complete authoritative boundary
+  // state. Capture it under the host scene before reconstructing the guest, then apply it after the streamed
+  // enemies exist. This carries between-wave HP/items/party mutations without a harness-only heal.
+  const previousScene = globalScene;
+  initGlobalScene(hostScene);
+  const waveBoundaryState = captureCoopAuthoritativeBattleState(hostScene.currentBattle?.turn ?? 0);
+  initGlobalScene(previousScene);
   // 0. Adopt the host's SEED + run-config-derived scene state (#658 seed-pin). See adoptCoopHostRunConfig:
   //    this is the launch-handshake step the plain mirror skipped, and WHY a benign per-wave checksum
   //    mismatch appeared + self-healed via a resync. After it the guest's wave-start checksum MATCHES the
@@ -765,6 +774,7 @@ export function mirrorHostBattleToGuest(
   for (const mon of [...guestScene.getPlayerField(), ...guestScene.getEnemyField()]) {
     guestScene.field.add(mon);
   }
+  applyCoopAuthoritativeBattleState(waveBoundaryState ?? undefined, true);
   // The mons were cloned from the host's via a PokemonData round-trip, so their hp / status / stats /
   // moves already match the host exactly. The first replayed turn's CoopFinalizeTurnPhase checkpoint
   // re-asserts the host's authoritative end-of-turn state on top, so no pre-turn full resync is needed

@@ -96,6 +96,8 @@ export interface CoopRendezvousResult {
    * separate classified catch-up result; timeout/loss recovery never produces it.
    */
   crossPoint?: string;
+  /** Host-stated point that wins a cross-branch mismatch. Absent for an exact rendezvous. */
+  authoritativePoint?: string;
 }
 
 /** Options for {@linkcode CoopRendezvous} (timer injection for tests). */
@@ -104,6 +106,8 @@ export interface CoopRendezvousOptions {
   timeoutMs?: number;
   /** Timer injection (tests). Returns a cancel fn. Defaults to setTimeout/clearTimeout. */
   schedule?: (cb: () => void, ms: number) => () => void;
+  /** Negotiated session epoch; route/ACK frames from another epoch are rejected. */
+  getEpoch?: () => number;
 }
 
 /**
@@ -116,6 +120,7 @@ export class CoopRendezvous {
   private readonly defaultTimeoutMs: number;
   private readonly schedule: (cb: () => void, ms: number) => () => void;
   private readonly offMessage: () => void;
+  private readonly getEpoch: () => number;
 
   /** Points THIS client has arrived at (idempotent local arrival; suppresses a duplicate send). */
   private readonly localArrived = new Set<string>();
@@ -125,11 +130,18 @@ export class CoopRendezvous {
   private readonly pending = new Map<string, (res: CoopRendezvousResult) => void>();
   /** point -> when each parked wait began (stall-watchdog age, mirrors the relay). */
   private readonly pendingSince = new Map<string, number>();
+  private routeRevision = 0;
+  private latestGuestRoute: { revision: number; point: string; displacedPoint: string } | null = null;
+  private readonly pendingRouteAcks = new Map<
+    number,
+    { finish: () => void; abort: () => void; cancel: () => void; point: string; displacedPoint: string }
+  >();
 
   constructor(transport: CoopTransport, opts: CoopRendezvousOptions = {}) {
     this.transport = transport;
     this.defaultTimeoutMs = opts.timeoutMs ?? getCoopRendezvousWaitMs();
     this.schedule = opts.schedule ?? defaultSchedule;
+    this.getEpoch = opts.getEpoch ?? (() => 0);
     this.offMessage = transport.onMessage(msg => this.handle(msg));
   }
 
@@ -191,11 +203,22 @@ export class CoopRendezvous {
     // catch-up release until the authoritative phase-route operation replaces it.
     const buffered = this.foreignArrival(point);
     if (buffered !== undefined) {
+      if (this.transport.role === "host") {
+        return this.publishAuthoritativeRoute(point, buffered, timeoutMs);
+      }
+      const route = this.latestGuestRoute;
+      if (route != null && route.displacedPoint === point && route.point === buffered) {
+        return Promise.resolve({
+          point,
+          timedOut: false,
+          crossPoint: route.point,
+          authoritativePoint: route.point,
+        });
+      }
       coopLog(
         "rendezvous",
-        `AWAIT point=${point} -> CROSS-POINT release (partner already at ${buffered}, buffered) role=${this.transport.role}`,
+        `AWAIT point=${point} sees partner at ${buffered}; guest WAITING for host phaseRoute`,
       );
-      return Promise.resolve({ point, timedOut: false, crossPoint: buffered });
     }
     coopLog("rendezvous", `AWAIT point=${point} timeoutMs=${timeoutMs} -> network-wait role=${this.transport.role}`);
     // Supersede any stale waiter parked on this point (only one await per point at a time).
@@ -321,6 +344,12 @@ export class CoopRendezvous {
     this.pendingSince.clear();
     this.localArrived.clear();
     this.partnerArrived.clear();
+    for (const route of this.pendingRouteAcks.values()) {
+      route.cancel();
+      route.abort();
+    }
+    this.pendingRouteAcks.clear();
+    this.latestGuestRoute = null;
   }
 
   /**
@@ -342,9 +371,49 @@ export class CoopRendezvous {
     }
     this.localArrived.clear();
     this.partnerArrived.clear();
+    this.latestGuestRoute = null;
+    for (const route of this.pendingRouteAcks.values()) {
+      route.cancel();
+      route.abort();
+    }
+    this.pendingRouteAcks.clear();
   }
 
   private handle(msg: CoopMessage): void {
+    if (msg.t === "phaseRoute") {
+      if (this.transport.role !== "guest") {
+        return;
+      }
+      if (msg.epoch !== this.getEpoch()) {
+        coopWarn("rendezvous", `guest DROP phaseRoute stale epoch=${msg.epoch} current=${this.getEpoch()}`);
+        return;
+      }
+      if (this.latestGuestRoute == null || msg.revision >= this.latestGuestRoute.revision) {
+        this.latestGuestRoute = msg;
+      }
+      this.transport.send({ t: "phaseRouteAck", epoch: msg.epoch, revision: msg.revision });
+      for (const [waitPoint, finish] of [...this.pending.entries()]) {
+        if (waitPoint === msg.displacedPoint && waitPoint !== msg.point) {
+          coopWarn(
+            "rendezvous",
+            `guest ROUTED AWAY ${waitPoint} -> host-authoritative ${msg.point} rev=${msg.revision}`,
+          );
+          finish({ point: waitPoint, timedOut: false, crossPoint: msg.point, authoritativePoint: msg.point });
+        }
+      }
+      return;
+    }
+    if (msg.t === "phaseRouteAck") {
+      if (this.transport.role !== "host") {
+        return;
+      }
+      if (msg.epoch !== this.getEpoch()) {
+        coopWarn("rendezvous", `host DROP phaseRouteAck stale epoch=${msg.epoch} current=${this.getEpoch()}`);
+        return;
+      }
+      this.pendingRouteAcks.get(msg.revision)?.finish();
+      return;
+    }
     if (msg.t !== "rendezvous") {
       return;
     }
@@ -369,21 +438,40 @@ export class CoopRendezvous {
       waiter({ point, timedOut: false });
       return;
     }
-    // A live foreign arrival is a classified branch mismatch, not a lost exact-point frame. Preserve the
-    // existing catch-up release until the authoritative phase-route operation replaces it.
+    // A live foreign arrival is a branch mismatch. The host states the winning logical route and waits for
+    // its ACK; the guest remains parked until that route arrives. Neither side infers permission locally.
     if (this.pending.size > 0 && !this.localArrived.has(point)) {
       let released = false;
       for (const [waitPoint, finish] of [...this.pending.entries()]) {
         if (waitPoint !== point) {
-          coopLog(
-            "rendezvous",
-            `RECV arrival point=${point} -> CROSS-POINT release of AWAIT ${waitPoint} role=${this.transport.role}`,
-          );
-          finish({ point: waitPoint, timedOut: false, crossPoint: point });
+          if (this.transport.role === "host") {
+            void this.publishAuthoritativeRoute(waitPoint, point, this.defaultTimeoutMs).then(finish);
+          } else {
+            coopLog(
+              "rendezvous",
+              `RECV foreign arrival=${point} while awaiting=${waitPoint}; guest WAITING for host phaseRoute`,
+            );
+          }
           released = true;
         }
       }
       if (released) {
+        return;
+      }
+    }
+    // Host WATCHER branches (notably an odd-counter reward shop) announce their point but do not await it.
+    // If the guest instead reaches a foreign point on the SAME wave, there is therefore no pending host
+    // waiter to trigger the route above. The host's most-recent unmatched local arrival is still the
+    // authoritative logical phase: publish it proactively and require the guest ACK before that wrong branch
+    // can close. This is the live cmd:6:2 vs shop:6:5 softlock shape.
+    if (this.transport.role === "host" && !this.localArrived.has(point)) {
+      const localPoint = this.latestUnmatchedLocalPointForSameWave(point);
+      if (localPoint !== undefined) {
+        coopWarn(
+          "rendezvous",
+          `host PROACTIVE phaseRoute authoritative=${localPoint} displaced=${point} (host branch has no waiter)`,
+        );
+        void this.publishAuthoritativeRoute(localPoint, point, this.defaultTimeoutMs);
         return;
       }
     }
@@ -409,5 +497,76 @@ export class CoopRendezvous {
       }
     }
     return;
+  }
+
+  /** Most-recent host-local point on the same wave that the partner has not reached. */
+  private latestUnmatchedLocalPointForSameWave(foreignPoint: string): string | undefined {
+    const wave = this.pointWave(foreignPoint);
+    if (wave === undefined) {
+      return;
+    }
+    const local = [...this.localArrived];
+    for (let i = local.length - 1; i >= 0; i--) {
+      const point = local[i];
+      if (point !== foreignPoint && this.pointWave(point) === wave && !this.partnerArrived.has(point)) {
+        return point;
+      }
+    }
+    return;
+  }
+
+  private pointWave(point: string): number | undefined {
+    const value = Number(point.split(":")[1]);
+    return Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+  }
+
+  /** Host publishes the winning branch and retransmits it until the guest ACKs the revision. */
+  private publishAuthoritativeRoute(
+    point: string,
+    displacedPoint: string,
+    retryMs: number,
+  ): Promise<CoopRendezvousResult> {
+    const revision = ++this.routeRevision;
+    const epoch = this.getEpoch();
+    return new Promise(resolve => {
+      let settled = false;
+      let cancel = () => {};
+      const settle = (timedOut: boolean) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cancel();
+        this.pendingRouteAcks.delete(revision);
+        if (!timedOut) {
+          coopLog(
+            "rendezvous",
+            `host phaseRoute ACKED rev=${revision} authoritative=${point} displaced=${displacedPoint}`,
+          );
+        }
+        resolve(
+          timedOut
+            ? { point, timedOut: true }
+            : { point, timedOut: false, crossPoint: displacedPoint, authoritativePoint: point },
+        );
+      };
+      const finish = () => settle(false);
+      const abort = () => settle(true);
+      const sendAndArm = () => {
+        if (settled) {
+          return;
+        }
+        this.transport.send({ t: "phaseRoute", epoch, revision, point, displacedPoint });
+        cancel = this.schedule(() => {
+          coopWarn(
+            "rendezvous",
+            `host phaseRoute RETRY rev=${revision} authoritative=${point} displaced=${displacedPoint}`,
+          );
+          sendAndArm();
+        }, retryMs);
+      };
+      this.pendingRouteAcks.set(revision, { finish, abort, cancel: () => cancel(), point, displacedPoint });
+      sendAndArm();
+    });
   }
 }

@@ -43,6 +43,7 @@ import {
   isCoopWaveAdvanceOperationEnabled,
   resetCoopWaveAdvanceOperationFlag,
   resetCoopWaveAdvanceOperationState,
+  resolveCoopBiomeBoundaryFlag,
   resolveCoopVictoryTailControl,
   setCoopWaveAdvanceOperationEnabled,
 } from "#data/elite-redux/coop/coop-wave-operation";
@@ -270,6 +271,13 @@ describe("co-op WAVE-ADVANCE operation - the keystone (Wave-2f)", () => {
 // =====================================================================================
 // STRICT-TAILS gate: shared boundary tails require an authoritative wave/ME sanction under enforcement.
 // =====================================================================================
+it("normalizes an undefined ordinary-wave biome predicate to a concrete false wire flag", () => {
+  expect(resolveCoopBiomeBoundaryFlag(false, undefined)).toBe(false);
+  expect(resolveCoopBiomeBoundaryFlag(undefined, undefined)).toBe(false);
+  expect(resolveCoopBiomeBoundaryFlag(false, true)).toBe(true);
+  expect(resolveCoopBiomeBoundaryFlag(true, undefined)).toBe(true);
+});
+
 describe("co-op STRICT-TAILS renderer gate mode (Wave-2f, §3.3)", () => {
   beforeEach(() => {
     setCoopRendererGateEnforced(true);

@@ -205,11 +205,9 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
   });
 
   // ===========================================================================================
-  // #847 CROSS-POINT RELEASE (the berry-bush deadlock). While awaiting point P, learning the partner
-  // arrived at a DIFFERENT point Q it has ALSO not shared with us proves the partner diverged onto
-  // another branch and will NEVER reach P. Resolve the P-await immediately with `crossPoint: Q` (INFO,
-  // NOT the anti-hang timeout WARN) instead of eating the full 60s. The exact live trace: the reward
-  // owner walked to `shop:3:2` while the partner opened a phantom `cmd:3:2` - each ate the full timeout.
+  // HOST-AUTHORITATIVE CROSS-POINT ROUTE (the berry-bush deadlock). A foreign arrival proves the peers
+  // reached different branches. The host states its local point as the winning route, retransmits until
+  // the guest ACKs, and only then proceeds. The guest receives an explicit routed-away result.
   // ===========================================================================================
   it("#847 CROSS-POINT release (LIVE) remains classified separately from timeout recovery", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -233,13 +231,14 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     expect(hostCrossed).toBe(true);
     expect(hr.timedOut).toBe(false);
     expect(hr.crossPoint).toBe("cmd:3:2");
+    expect(hr.authoritativePoint).toBe("shop:3:2");
     expect(warnSpy.mock.calls.some(c => String(c[0]).includes("RENDEZVOUS RECOVERY RETRY"))).toBe(false);
 
     host.dispose();
     guest.dispose();
   });
 
-  it("#847 CROSS-POINT release (BUFFERED) remains classified separately from timeout recovery", async () => {
+  it("#847 buffered cross-point is resolved by the host route, never local guest inference", async () => {
     const pair = createLoopbackPair();
     const host = new CoopRendezvous(pair.host);
     const guest = new CoopRendezvous(pair.guest);
@@ -251,9 +250,52 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     await flush();
     expect(guest.partnerHasArrived("shop:3:2")).toBe(true);
 
-    const gr = await guest.rendezvous("cmd:3:2");
+    const guestP = guest.rendezvous("cmd:3:2");
+    await flush();
+    // Host now observes the guest's buffered cmd arrival while awaiting its authoritative shop point.
+    const [gr, hr] = await Promise.all([guestP, host.awaitPartner("shop:3:2")]);
     expect(gr.timedOut).toBe(false);
     expect(gr.crossPoint).toBe("shop:3:2");
+    expect(gr.authoritativePoint).toBe("shop:3:2");
+    expect(hr.authoritativePoint).toBe("shop:3:2");
+
+    host.dispose();
+    guest.dispose();
+  });
+
+  it("FAULT-INJECTION: lost phaseRoute and ACK retransmit until both adopt the host branch", async () => {
+    const faulted = wrapCoopFaultPair(createLoopbackPair(), { drop: 0, reorder: 0, delay: 0 }, { seed: 847 });
+    faulted.armNextDrop("phaseRoute", "host");
+    faulted.armNextDrop("phaseRouteAck", "guest");
+    const host = new CoopRendezvous(faulted.host, { timeoutMs: 20 });
+    const guest = new CoopRendezvous(faulted.guest, { timeoutMs: 20 });
+
+    const hostP = host.rendezvous("shop:8:4");
+    const guestP = guest.rendezvous("cmd:8:4");
+    const [hr, gr] = await Promise.all([hostP, guestP]);
+
+    expect(hr.authoritativePoint).toBe("shop:8:4");
+    expect(gr.authoritativePoint).toBe("shop:8:4");
+    expect(faulted.faultsInjected()).toBeGreaterThanOrEqual(2);
+
+    host.dispose();
+    guest.dispose();
+    faulted.host.close();
+  });
+
+  it("host shop WATCHER proactively routes a foreign guest command without a host waiter", async () => {
+    const pair = createLoopbackPair();
+    const host = new CoopRendezvous(pair.host);
+    const guest = new CoopRendezvous(pair.guest);
+
+    // Odd-counter shop: host is the WATCHER, so production only calls arrive(shop) and never awaitPartner.
+    host.arrive("shop:6:5");
+    await flush();
+    const gr = await guest.rendezvous("cmd:6:2");
+
+    expect(gr.timedOut).toBe(false);
+    expect(gr.authoritativePoint).toBe("shop:6:5");
+    expect(gr.point).toBe("cmd:6:2");
 
     host.dispose();
     guest.dispose();

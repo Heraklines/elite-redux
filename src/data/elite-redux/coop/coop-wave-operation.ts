@@ -345,6 +345,15 @@ export function isValidCoopWaveAdvancePayload(value: unknown): value is CoopWave
   return false;
 }
 
+/**
+ * Normalize the engine's loose biome-boundary predicates to a strict wire boolean. Some game modes return
+ * `undefined` from `isNewBiome()` on ordinary waves; `false || undefined` previously omitted biomeChange
+ * during JSON serialization, so the guest rejected the entire victory transition and entered a phantom turn.
+ */
+export function resolveCoopBiomeBoundaryFlag(hasRandomBiomes: unknown, isNewBiome: unknown): boolean {
+  return hasRandomBiomes === true || isNewBiome === true;
+}
+
 /** Resolve concrete victory-tail control from the authority statement, with local values only for legacy. */
 export function resolveCoopVictoryTailControl(
   transition: CoopWaveAdvancePayload | null,

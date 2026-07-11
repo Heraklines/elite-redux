@@ -53,12 +53,14 @@ import { Status } from "#data/status-effect";
 import { TerrainType } from "#data/terrain";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
+import { BerryType } from "#enums/berry-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { PersistentModifier } from "#modifiers/modifier";
+import { BerryModifierType } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
 import { GameManager } from "#test/framework/game-manager";
 import {
@@ -148,6 +150,20 @@ describe.skipIf(!RUN)(
         const charm = charmType.newModifier() as PersistentModifier;
         charm.stackCount = 2;
         globalScene.addModifier(charm, true);
+
+        // A dense held-item set matching the live divergence shape: two distinct same-id berries plus a
+        // generated held item on the other active mon. These are added AFTER the duo mirror, so the guest
+        // starts without them and the per-turn authoritative modifier materializer must reconstruct all
+        // instances (not merely the first matching type id).
+        const sitrus = new BerryModifierType(BerryType.SITRUS).newModifier(lead);
+        const lum = new BerryModifierType(BerryType.LUM).newModifier(lead);
+        const guestLead = globalScene.getPlayerField()[1];
+        const leftovers = modifierTypes.LEFTOVERS().withIdFromFunc(modifierTypes.LEFTOVERS).newModifier(guestLead);
+        for (const held of [sitrus, lum, leftovers]) {
+          if (held != null) {
+            globalScene.addModifier(held, true);
+          }
+        }
 
         globalScene.money = 12_345;
         globalScene.pokeballCounts[0] = 7;

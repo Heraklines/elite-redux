@@ -305,10 +305,17 @@ export class SelectBiomePhase extends BattlePhase {
           `biome-pick boundary barrier ${point} ABORTED during teardown/recovery - remaining closed (#858)`,
         );
         return false;
+      } else if (result.authoritativePoint !== undefined && result.authoritativePoint !== point) {
+        coopWarn(
+          "rendezvous",
+          `biome-pick boundary ${point} ROUTED AWAY to host-authoritative ${result.authoritativePoint}; closing stale phase`,
+        );
+        this.end();
+        return false;
       } else if (result.crossPoint !== undefined) {
         coopLog(
           "rendezvous",
-          `biome-pick boundary barrier ${point} CROSS-POINT release (partner at ${result.crossPoint}); proceeding (#858)`,
+          `biome-pick boundary ${point} host-authoritative route ACKED (partner had ${result.crossPoint}); proceeding (#858)`,
         );
       }
       return true;

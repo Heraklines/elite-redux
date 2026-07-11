@@ -253,6 +253,82 @@ describe.skipIf(!RUN)(
       logs.flush();
     }, 300_000);
 
+    it("DUO ME live repro: host-owned HOT_SPRING move-on crosses the pumped selected-dialogue prompt and empty-shop terminal", async () => {
+      await game.runToMysteryEncounter(MysteryEncounterType.ER_HOT_SPRING, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+      const hostScene = game.scene;
+      expect(hostScene.currentBattle.mysteryEncounter?.encounterType).toBe(MysteryEncounterType.ER_HOT_SPRING);
+
+      const pair = createLoopbackPair();
+      const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+      const counterBefore = rig.hostRuntime.controller.interactionCounter();
+      expect(counterBefore, "Hot Spring is host-owned at the initial even counter").toBe(0);
+
+      await withClient(rig.hostCtx, async () => {
+        // Dispose the encounter intro using the normal prompt path, then stop on the live selector.
+        game.onNextPrompt(
+          "MysteryEncounterPhase",
+          UiMode.MESSAGE,
+          () => hostScene.ui.getMessageHandler().processInput(Button.ACTION),
+          () => game.isCurrentPhase("MysteryEncounterOptionSelectedPhase"),
+        );
+        await game.phaseInterceptor.to("MysteryEncounterPhase");
+        await drainLoopback();
+
+        const selector = hostScene.ui.getHandler() as unknown as { unblockInput(): void };
+        selector.unblockInput();
+
+        // Exact live path: RIGHT selects "Move on", ACTION commits it through UI.processInput so
+        // the ME pump observes and relays both inputs. Existing ME helpers call the handler directly
+        // and therefore could not reproduce a pump/input-routing softlock here.
+        expect(hostScene.ui.processInput(Button.RIGHT), "owner can move the live Hot Spring cursor").toBe(true);
+        const realSetMode = hostScene.ui.setMode.bind(hostScene.ui);
+        const realShowText = hostScene.ui.showText.bind(hostScene.ui);
+        let messageModeReady = false;
+        let selectedRenderedAfterMode = false;
+        vi.spyOn(hostScene.ui, "setMode").mockImplementation(async (mode: UiMode, ...args: unknown[]) => {
+          await realSetMode(mode, ...args);
+          if (mode === UiMode.MESSAGE) {
+            messageModeReady = true;
+          }
+        });
+        vi.spyOn(hostScene.ui, "showText").mockImplementation((text, ...args) => {
+          if (text.includes("spring's keepers")) {
+            // Regression contract: the selected line must never be published until the asynchronous
+            // MYSTERY_ENCOUNTER -> MESSAGE transition has installed the final message handler.
+            selectedRenderedAfterMode = messageModeReady;
+          }
+          return realShowText(text, ...args);
+        });
+        expect(hostScene.ui.processInput(Button.ACTION), "owner can commit Move on through the ME pump").toBe(true);
+        expect(hostScene.ui.getMode(), "the selected line switched to the message handler").toBe(UiMode.MESSAGE);
+
+        // Hot Spring's move-on option queues an empty healing shop. Drive the real boundary and then
+        // the true PostMysteryEncounter terminal; the shop must not consume the ME counter itself.
+        await game.phaseInterceptor.to("SelectModifierPhase", false);
+        expect(
+          selectedRenderedAfterMode,
+          "Hot Spring selected narration rendered only after the MESSAGE transition completed",
+        ).toBe(true);
+        const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+        await driveHostRewardShopOwner(hostShop, { takeReward: false });
+        expect(rig.hostRuntime.controller.interactionCounter(), "empty ME shop did not double-advance").toBe(
+          counterBefore,
+        );
+        await game.phaseInterceptor.to("PostMysteryEncounterPhase");
+      });
+
+      expect(rig.hostRuntime.controller.interactionCounter(), "host completed the Hot Spring exactly once").toBe(
+        counterBefore + 1,
+      );
+      const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+      expect(guestReplay.settled, "guest left the exact Hot Spring terminal without parking").toBe(true);
+      expect(rig.guestRuntime.controller.interactionCounter(), "guest Hot Spring counter converged").toBe(
+        counterBefore + 1,
+      );
+
+      logs.flush();
+    }, 300_000);
+
     // ===========================================================================================
     // IT #2 - GUEST-OWNED non-battle ME (counter 1, odd). DISTINCT code path from the host-owned case,
     // and the #828 REWARD-OWNERSHIP fix's home test. TWO relayed picks, both owned by the GUEST:

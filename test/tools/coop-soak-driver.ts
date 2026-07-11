@@ -56,18 +56,17 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import {
-  adoptCoopHostPlayerPartyOrder,
   applyCoopCaptureParty,
   applyCoopFieldSnapshot,
+  applyCoopFullSnapshot,
   captureCoopCaptureParty,
-  captureCoopCheckpoint,
   captureCoopChecksum,
   captureCoopChecksumState,
   captureCoopDexBaseline,
   captureCoopFieldSnapshot,
+  captureCoopFullSnapshot,
   captureCoopSaveDataDigest,
   captureCoopSaveDataNormalized,
-  reconcileCoopPlayerField,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   getCoopChecksumAssertionCount,
@@ -282,7 +281,9 @@ export const SOAK_PROFILES: Record<SoakProfileName, SoakPartyConfig> = {
       SpeciesId.METAGROSS,
       SpeciesId.GARCHOMP,
     ],
-    moveset: [MoveId.BODY_SLAM, MoveId.SHADOW_BALL, MoveId.FLAMETHROWER, MoveId.THUNDERBOLT],
+    // EXPLOSION is used by the deterministic wave-2 self-KO leg below. It is issued through the real guest
+    // command relay and real move/faint/switch phases; the remaining slots preserve normal combat.
+    moveset: [MoveId.EXPLOSION, MoveId.SHADOW_BALL, MoveId.FLAMETHROWER, MoveId.THUNDERBOLT],
     heldItems: undefined,
   },
 };
@@ -310,6 +311,9 @@ export function resolveSoakLevel(): number | undefined {
   }
   return;
 }
+
+/** The level profile's deterministic real-combat faint/replacement coverage leg. */
+const LEVEL_FORCED_FAINT_WAVE = 2;
 
 /**
  * The soak FIDELITY mode (#879 review item 5). Selects how faithfully the driver reproduces PRODUCTION's
@@ -366,6 +370,15 @@ export interface SoakFinding {
   sample: string;
 }
 
+/** One checksum mismatch observed BEFORE any boundary heal, retained for causal gate diagnostics. */
+export interface SoakPreHealMismatch {
+  wave: number;
+  where: string;
+  fields: string[];
+  classification: "expected-renderer-money-lag" | "unexpected";
+  sample: string;
+}
+
 /** The outcome of a completed soak run (a passing run; a hard LOCKSTEP/NO-PARK/TEARDOWN breach THROWS). */
 export interface SoakResult {
   seed: number;
@@ -375,6 +388,8 @@ export interface SoakResult {
   skips: Record<string, number>;
   /** How many DIGEST one-heal graces fired (a converged run is 0). */
   resyncHeals: number;
+  /** Every pre-heal mismatch, classified before recovery can hide its cause. */
+  preHealMismatches: SoakPreHealMismatch[];
   /**
    * #838 Phase 5: how many PRODUCTION per-turn checksum ASSERTIONS fired during the run - the guest's
    * real {@linkcode CoopFinalizeTurnPhase} `verifyChecksum` counting a mismatch the full-state payload
@@ -961,7 +976,7 @@ function phaseStateDump(rig: DuoRig): Record<string, unknown> {
     fainted: mon.isFainted(),
     status: mon.status?.effect ?? 0,
     statStages: [...mon.getStatStages()],
-    moves: mon.getMoveset().map(move => move == null ? null : { id: move.moveId, ppUsed: move.ppUsed }),
+    moves: mon.getMoveset().map(move => (move == null ? null : { id: move.moveId, ppUsed: move.ppUsed })),
     coopOwner: mon.coopOwner,
   });
   return {
@@ -1117,6 +1132,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   const boundaryDigests: SoakBoundaryDigest[] = [];
   const findings: SoakFinding[] = [];
   let resyncHeals = 0;
+  const preHealMismatches: SoakPreHealMismatch[] = [];
   let wavesCompleted = 0;
   // #838 Phase 5: pin the LOUD assertion severity (console.error) and zero the counter so this run's
   // production per-turn checksum assertions are read back cleanly (the ER suite shares module state across
@@ -1225,6 +1241,29 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // no longer hide" evidence this mode exists to surface. Reading the guest scene is a plain field read; the
     // guest mon-command still rides the REAL relay the host applies for the guest slot.
     const commandScene = fidelity === "production" ? rig.guestScene : rig.hostScene;
+    // The faint-heavy profile must guarantee its namesake coverage instead of waiting for late-run damage
+    // RNG. On wave 2 the guest lead sends a genuine Explosion through this production command relay. The
+    // normal move, self-faint, guest-owned replacement relay and operation journal then execute unchanged.
+    if (profile === "level" && wave === LEVEL_FORCED_FAINT_WAVE && turn === 1) {
+      const guestMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+      const explosionSlot = guestMon?.getMoveset().findIndex(move => move?.moveId === MoveId.EXPLOSION) ?? -1;
+      if (explosionSlot >= 0 && moveSlots.includes(explosionSlot)) {
+        const target = commandScene.getEnemyField().find(mon => !mon.isFainted())?.getBattlerIndex();
+        if (target == null) {
+          fail("no-park", wave, "level forced-faint leg could not find a live Explosion target");
+        }
+        actionScript.push(`wave ${wave} turn ${turn}: forced-faint guest EXPLOSION self-KO`);
+        hitMode(UiMode.COMMAND);
+        hitMode(UiMode.FIGHT);
+        return {
+          command: Command.FIGHT,
+          cursor: explosionSlot,
+          moveId: MoveId.EXPLOSION,
+          targets: [target],
+        };
+      }
+      fail("no-park", wave, "level forced-faint leg could not issue Explosion from the guest lead");
+    }
     // #843 coverage #4: occasionally issue a VOLUNTARY SWITCH for the guest slot instead of a move, through
     // the REAL relay Command path (Command.POKEMON + party-slot cursor); the host summons the guest's pick
     // and the switch rides the per-turn checkpoint onto the guest's replay. Only when a legal guest-owned
@@ -1415,7 +1454,35 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     let chk = await captureChecksums();
     if (chk.host !== chk.guest) {
       resyncHeals++;
-      actionScript.push(`wave ${wave}: DIGEST mismatch @${where} -> one-heal resync`);
+      const hostState = await withClient(rig.hostCtx, () => JSON.parse(JSON.stringify(captureCoopChecksumState())));
+      const guestState = await withClient(rig.guestCtx, () => JSON.parse(JSON.stringify(captureCoopChecksumState())));
+      const fields = [...new Set([...Object.keys(hostState), ...Object.keys(guestState)])].filter(
+        k => JSON.stringify(hostState[k]) !== JSON.stringify(guestState[k]),
+      );
+      // The only intentionally tolerated pre-heal class: at a production-fidelity WAVE START the pure
+      // renderer may trail the host's just-awarded money. saveDataDigest necessarily changes with money.
+      // No other field or direction is covered, so this cannot hide a combat/party/biome divergence.
+      const allowedMoneyLagFields = new Set(["money", "saveDataDigest"]);
+      const expectedMoneyLag =
+        fidelity === "production"
+        && where === "wave-start"
+        && fields.includes("money")
+        && fields.every(f => allowedMoneyLagFields.has(f))
+        && Number(guestState.money) < Number(hostState.money);
+      const classification: SoakPreHealMismatch["classification"] = expectedMoneyLag
+        ? "expected-renderer-money-lag"
+        : "unexpected";
+      const sample = fields
+        .map(k => `${k}:host=${JSON.stringify(hostState[k])}/guest=${JSON.stringify(guestState[k])}`)
+        .join(" | ");
+      preHealMismatches.push({ wave, where, fields, classification, sample });
+      actionScript.push(
+        `wave ${wave}: DIGEST mismatch @${where} class=${classification} fields=[${fields.join(",")}] -> one-heal resync`,
+      );
+      // eslint-disable-next-line no-console
+      console.log(
+        `[coop-soak] PRE-HEAL ${classification} wave=${wave} where=${where} fields=[${fields.join(",")}] :: ${sample}`,
+      );
       await oneHeal();
       chk = await captureChecksums();
       if (chk.host !== chk.guest) {
@@ -1426,22 +1493,18 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   };
 
   /**
-   * The PRODUCTION RESYNC ANALOGUE (the stateSync heal): applyCoopFieldSnapshot + the field/party-order
-   * reconcile the guest's real CoopFullSnapshot resync runs on a checksum mismatch. This is the ONLY heal the
-   * production-fidelity mode permits (no full re-mirror / healGuestFromHost reset). Extracted so the wave-start
-   * boundary (production mode) + the post-turn detector share one faithful resync implementation.
+   * The exact PRODUCTION RESYNC path (stateSync heal): capture the host's real full snapshot and apply it
+   * through the authoritative-guest production materializer. Do not approximate this with a field snapshot
+   * plus party ordering: that omits bench Pokemon data (moves, abilities, HP/status, form and held items) and
+   * can falsely classify a production-healable divergence as unhealable.
    */
-  const resyncHealAnalogue = async (): Promise<void> => {
-    const snap = await withClient(rig.hostCtx, () => captureCoopFieldSnapshot());
-    const checkpoint = await withClient(rig.hostCtx, () => captureCoopCheckpoint());
-    const hostParty = rig.hostScene.getPlayerParty().map(p => p.species.speciesId);
-    await withClient(rig.guestCtx, () => {
-      if (checkpoint != null) {
-        reconcileCoopPlayerField(checkpoint.field);
-      }
-      applyCoopFieldSnapshot(snap ?? undefined, true);
-      adoptCoopHostPlayerPartyOrder(hostParty);
-    });
+  const resyncHealAnalogue = async (wave: number): Promise<void> => {
+    const snapshot = await withClient(rig.hostCtx, () => captureCoopFullSnapshot());
+    if (snapshot == null) {
+      fail("no-park", wave, "production full-snapshot resync capture returned null");
+      return;
+    }
+    await withClient(rig.guestCtx, () => applyCoopFullSnapshot(snapshot, true));
   };
 
   /**
@@ -1456,7 +1519,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const chk = await checkDigest(wave, "wave-start", async () => {
       if (fidelity === "production") {
         // Heals ONLY via the production trigger (checksum mismatch -> stateSync analogue); no full re-mirror.
-        await resyncHealAnalogue();
+        await resyncHealAnalogue(wave);
         return;
       }
       await remirrorWave(rig);
@@ -1477,25 +1540,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * wave (applying the per-turn checkpoint), its full state must EQUAL the host's WITHOUT a re-mirror (a
    * re-mirror would mask a replay desync by resetting the guest to the host). This is where a checkpoint /
    * replay divergence surfaces (the class that surfaced the historical move-PP desync). The one-heal is the
-   * production resync analogue: the per-turn full-field snapshot ({@linkcode applyCoopFieldSnapshot}) PLUS the
-   * bench party-ORDER adopt ({@linkcode adoptCoopHostPlayerPartyOrder}). #846: the field snapshot alone heals
-   * only ON-FIELD mons, so a BENCH transposition (host and guest promoted faint-replacements from the bench in
-   * a different order on a faint-heavy trainer gauntlet - seed 20260704 wave 66) stayed diverged and mis-read
-   * as a REAL finding; production's actual resync (applyCoopFullSnapshot) ALSO runs adoptCoopHostPlayerPartyOrder
-   * (coop-battle-engine.ts), which reorders ONLY the off-field bench to the host's speciesId sequence (on-field
-   * leads pinned). Running the SAME production heal here makes the one-heal a faithful resync analogue - NOT
-   * content narrowing (it is a real production heal mechanism) - so only a divergence production's resync ALSO
-   * cannot converge is recorded as a finding. A still-diverged state after this is a REAL desync -> a finding.
+   * exact production full-snapshot path. This includes the complete bench party, so a moveset/form/ability or
+   * held-item drift is judged by the recovery mechanism real clients use rather than a weaker approximation.
+   * A still-diverged state after this is a REAL desync -> a finding.
    */
   const assertPostTurnConverged = async (wave: number): Promise<void> => {
-    // #849 (World A): the post-turn one-heal is a LESSER mechanism than production's full resync. Neither
-    // applyCoopFieldSnapshot (writes per-BI data WITHOUT reordering) nor adoptCoopHostPlayerPartyOrder
-    // (reorders only the OFF-FIELD bench; on-field leads are PINNED) can reposition an ON-FIELD TRANSPOSITION -
-    // two on-field mons the host and guest hold in SWAPPED slots (a voluntary-switch party transposition
-    // production converges via reconcileCoopPlayerField, seed 20260706 wave 61). Running production's actual
-    // field reconcile FIRST makes the one-heal a faithful resync analogue ({@linkcode resyncHealAnalogue}) -
-    // only a divergence production's resync ALSO cannot converge is a finding. Identical in both fidelity modes.
-    await checkDigest(wave, "post-turn", resyncHealAnalogue);
+    await checkDigest(wave, "post-turn", () => resyncHealAnalogue(wave));
   };
 
   /**
@@ -1517,10 +1567,53 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     }
   };
 
+  /**
+   * The soak drives the host's real phase queue while the guest is a replay renderer, so the guest does not
+   * naturally execute its own CommandPhase. Materialize both halves of the guest's command rendezvous around
+   * the host crossing: arrive before the host reaches the boundary, then verify the host's reciprocal arrival
+   * afterwards. This is the split arrive/await form of the production reciprocal barrier, not a timeout or a
+   * unilateral continuation.
+   */
+  const crossCommandBoundaryWithReplayGuest = async (
+    wave: number,
+    turn: number,
+    beforeHostCross?: () => void,
+  ): Promise<void> => {
+    const point = `cmd:${wave}:${turn}`;
+    withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.arrive(point));
+    await drainLoopback();
+    await withClient(rig.hostCtx, async () => {
+      beforeHostCross?.();
+      await game.phaseInterceptor.to("CommandPhase");
+    });
+    await drainLoopback();
+    const guestResult = await withClient(rig.guestCtx, () => rig.guestRuntime.rendezvous.awaitPartner(point));
+    if (guestResult.timedOut || guestResult.crossPoint !== undefined) {
+      fail(
+        "no-park",
+        wave,
+        `replay guest did not reciprocally cross ${point} (timedOut=${guestResult.timedOut} crossPoint=${guestResult.crossPoint ?? "none"})`,
+      );
+    }
+    actionScript.push(`wave ${wave} turn ${turn}: replay guest reciprocally crossed ${point}`);
+  };
+
   /** Play ONE host wave to a win (bounded by the NO-PARK turn budget); the guest replays each turn. */
   const playWave = async (wave: number): Promise<void> => {
     for (let t = 0; t < MAX_TURNS_PER_WAVE; t++) {
       const turn = rig.hostScene.currentBattle.turn;
+      if (profile === "level" && wave === LEVEL_FORCED_FAINT_WAVE && t === 0) {
+        const guestLead = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+        const mirroredGuestLead = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+        if (guestLead == null || mirroredGuestLead == null || firstLegalBenchSlot(rig.hostScene, "guest") < 0) {
+          fail("no-park", wave, "level forced-faint leg requires a live guest lead and legal guest-owned bench");
+        }
+        guestLead.hp = 1;
+        withClientSync(rig.guestCtx, () => {
+          mirroredGuestLead.hp = 1;
+        });
+        actionScript.push(`wave ${wave} turn ${turn}: staged guest-owned lead at 1 HP on both engines`);
+      }
       // #849 per-turn SITUATION tap: snapshot the enemy on-field occupants BEFORE the turn so a mid-turn
       // enemy switch (a trainer sending its next mon after a KO, or an enemy voluntary switch) is detectable.
       const enemyIdsBefore = rig.hostScene.getEnemyField().map(e => e.id);
@@ -1609,9 +1702,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
 
       if (t === 0 || (t + 1) % 10 === 0) {
         actionScript.push(
-          `wave ${wave} turn ${turn}: progress enemyHp=[${rig.hostScene.getEnemyField()
+          `wave ${wave} turn ${turn}: progress enemyHp=[${rig.hostScene
+            .getEnemyField()
             .map(mon => `${mon.species.speciesId}:${mon.hp}/${mon.getMaxHp()}`)
-            .join(",")}] playerHp=[${rig.hostScene.getPlayerField()
+            .join(",")}] playerHp=[${rig.hostScene
+            .getPlayerField()
             .map(mon => `${mon.species.speciesId}:${mon.hp}/${mon.getMaxHp()}`)
             .join(",")}]`,
         );
@@ -1621,7 +1716,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         return;
       }
       // Not won yet: advance the host to the next turn's CommandPhase for another round.
-      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase"));
+      await crossCommandBoundaryWithReplayGuest(wave, rig.hostScene.currentBattle.turn);
     }
     fail("no-park", wave, `wave did not complete within ${MAX_TURNS_PER_WAVE} turns (enemies never all fainted)`);
   };
@@ -2456,14 +2551,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // #633 BUILD 1: if the NEXT wave is a designated ME, cross into it (force + park at its
         // MysteryEncounterPhase) instead of to("CommandPhase") - an ME wave has no CommandPhase.
         const nextMeType = opts.meWaves?.get(wave + 1);
-        await withClient(rig.hostCtx, async () => {
-          if (nextMeType == null) {
-            armHostFaintAutoPick();
-            await game.phaseInterceptor.to("CommandPhase");
-          } else {
+        if (nextMeType == null) {
+          await crossCommandBoundaryWithReplayGuest(wave + 1, 1, armHostFaintAutoPick);
+        } else {
+          await withClient(rig.hostCtx, async () => {
             await crossIntoMeWave(nextMeType);
-          }
-        });
+          });
+        }
       } catch (e) {
         // #846: the crossing itself can hit a run-end (a killing turn that also wiped the host, or a
         // between-wave game-over). Same rule: a terminal host state is a counted run-end, not a strand.
@@ -2528,6 +2622,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     wavesCompleted,
     skips,
     resyncHeals,
+    preHealMismatches,
     assertions: getCoopChecksumAssertionCount(),
     actionScript,
     boundaryDigests,

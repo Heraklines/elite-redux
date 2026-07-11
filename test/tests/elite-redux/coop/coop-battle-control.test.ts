@@ -356,6 +356,10 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     const relay = getCoopInteractionRelay()!;
     const sendSpy = vi.spyOn(relay, "sendInteractionChoice");
     const phase = new CoopReplayMePhase(1);
+    // This test isolates the duplicate-submit guard. startCoopDouble leaves this process in the HOST
+    // role, which is a watcher at odd counter 1 and is now correctly rejected before the duplicate
+    // guard. Model the real guest-owner branch explicitly; watcher rejection has its own regression.
+    vi.spyOn(phase, "canLocalPlayerSelect").mockReturnValue(true);
     // The live softlock: the option UI fired twice; the second call re-armed the outcome
     // await on the SAME seq, nulling the first waiter -> misread as host stall -> premature
     // leave + counter divergence. The guard must swallow the duplicate entirely.
@@ -395,7 +399,10 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     phase.start();
     await new Promise(r => setTimeout(r, 25));
 
-    expect(promptSpy, "the PARTNER was prompted").toHaveBeenCalledWith(guestMon.getFieldIndex());
+    expect(promptSpy, "the PARTNER was prompted with its durable operation id").toHaveBeenCalledWith(
+      guestMon.getFieldIndex(),
+      expect.any(String),
+    );
     expect(
       uiSpy.mock.calls.some(c => c[0] === UiMode.PARTY),
       "the HOST's party screen never opened for the partner's move",

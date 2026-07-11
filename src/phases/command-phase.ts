@@ -4,7 +4,11 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
-import { captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  applyCoopAuthoritativeBattleState,
+  captureCoopAuthoritativeBattleState,
+  captureCoopEnemies,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
@@ -17,6 +21,7 @@ import {
   coopOwnerOfPlayerFieldSlot,
   getCoopBattleStreamer,
   getCoopBattleSync,
+  coopHasPendingWaveAdvance,
   getCoopController,
   getCoopNetcodeMode,
   getCoopRendezvous,
@@ -51,6 +56,7 @@ import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { getMoveTargets } from "#moves/move-utils";
 import { FieldPhase } from "#phases/field-phase";
+import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
 import type { MoveTargetSet } from "#types/move-target-set";
 import type { TurnMove } from "#types/turn-move";
 import i18next from "i18next";
@@ -394,7 +400,13 @@ export class CommandPhase extends FieldPhase {
       // PER-TURN authoritative state (checkpoint + checksum) now streams via emitTurn at
       // TurnEnd (#633, TRACK-2 Phase B), so it is NOT re-sent here.
       if (this.fieldIndex === 0 && turn === 1) {
-        streamer.sendEnemyParty(waveIndex, captureCoopEnemies());
+        streamer.sendEnemyParty(
+          waveIndex,
+          captureCoopEnemies(),
+          undefined,
+          globalScene.currentBattle.battleType,
+          captureCoopAuthoritativeBattleState(turn) ?? undefined,
+        );
       }
     } else if (turn === 1) {
       // Guest: at the wave's first turn, adopt the host's exact enemy party (a belt-and-
@@ -405,6 +417,7 @@ export class CommandPhase extends FieldPhase {
         // #818: STRUCTURAL adopt - an ME-spawned battle's party exists only on the host,
         // so the guest must be able to BUILD it (species/count/shape), not just correct it.
         adoptCoopEnemiesStructural(enemies);
+        applyCoopAuthoritativeBattleState(streamer.consumeEnemyPartyState(waveIndex), true);
       }
     }
   }
@@ -618,13 +631,27 @@ export class CommandPhase extends FieldPhase {
               `next-command barrier ${point} ABORTED during teardown/recovery - command UI remains closed`,
             );
             return false;
+          } else if (result.authoritativePoint !== undefined && result.authoritativePoint !== point) {
+            coopWarn(
+              "rendezvous",
+              `next-command barrier ${point} ROUTED AWAY to host-authoritative ${result.authoritativePoint}; closing phantom command phase`,
+            );
+            // The live ME softlock can race waveResolved in AFTER finalize already queued a phantom turn.
+            // A host route to the reward shop sanctions discarding that locally-derived turn queue and
+            // materializing the same one-shot host WAVE_ADVANCE tail normal finalization would have queued.
+            if (result.authoritativePoint.startsWith("shop:") && coopHasPendingWaveAdvance()) {
+              globalScene.phaseManager.clearPhaseQueue();
+              CoopFinalizeTurnPhase.runPendingWaveAdvanceTail();
+            }
+            this.end();
+            return false;
           } else if (result.crossPoint !== undefined) {
             // #847 CROSS-POINT: the partner is already at another sync point (e.g. the reward shop) and
             // will never reach this command point. Open the UI immediately - the downstream catch-up
             // machinery reconciles. INFO, not the anti-hang WARN (no dead partner, no 60s wait).
             coopLog(
               "rendezvous",
-              `next-command barrier ${point} CROSS-POINT release (partner at ${result.crossPoint}); opening UI`,
+              `next-command barrier ${point} host-authoritative route ACKED (partner had ${result.crossPoint}); opening UI`,
             );
           }
           return true;

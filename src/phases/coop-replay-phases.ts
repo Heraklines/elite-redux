@@ -1086,7 +1086,7 @@ export class CoopFinalizeTurnPhase extends Phase {
         // waveIndex may not tick before the next wave's first replay phase starts, so clear the
         // mark NOW (the wave boundary) or the new wave's turn 1 is killed as a "stale duplicate".
         getCoopBattleStreamer()?.clearFinalizedMark();
-        this.maybeRunCoopWaveAdvance();
+        CoopFinalizeTurnPhase.runPendingWaveAdvanceTail();
       } else if (meBattleWon) {
         // #847: TERMINAL final turn of an ME-spawned battle. Run the ME victory tail (VictoryPhase ->
         // handleMysteryEncounterVictory -> reward shop) and DO NOT queue turn-end - opening a phantom
@@ -1117,7 +1117,7 @@ export class CoopFinalizeTurnPhase extends Phase {
         }
         // The turn-end phases were pushed to the back of the queue above; pushing the victory tail
         // here runs it AFTER they drain (the in-flight turn finishes first, per the Oracle ordering).
-        this.maybeRunCoopWaveAdvance();
+        CoopFinalizeTurnPhase.runPendingWaveAdvanceTail();
       }
     } catch {
       // The turn-end queue / wave-advance is best-effort; a failure here must never hang the turn.
@@ -1148,7 +1148,12 @@ export class CoopFinalizeTurnPhase extends Phase {
    * One-shot + wave-guarded by {@linkcode consumeCoopPendingWaveAdvance}; a duplicate `waveResolved`
    * is a no-op. Fully guarded so a missing-pokemon edge can never hang the guest.
    */
-  private maybeRunCoopWaveAdvance(): void {
+  /**
+   * Consume and materialize the host-stated wave tail. Public/static so a host phaseRoute can recover a
+   * guest that already escaped finalization into a phantom CommandPhase after the terminal signal raced in.
+   * The underlying consume is one-shot, so normal finalize and routed recovery cannot double-queue it.
+   */
+  public static runPendingWaveAdvanceTail(): void {
     const pending = consumeCoopPendingWaveAdvance();
     if (pending == null) {
       return;
@@ -1327,8 +1332,13 @@ export class CoopApplyResyncPhase extends Phase {
       // vanished; host waited on a pick that could never come). A resync older than the CURRENT
       // battle turn is dead on arrival: the per-turn checkpoint already healed anything it knew.
       const liveTurn = globalScene.currentBattle?.turn ?? 0;
-      if (this.turn > 0 && liveTurn > this.turn) {
-        coopWarn("resync", `turn=${this.turn} STALE (live turn=${liveTurn}) -> DROPPED (checkpoint supersedes)`);
+      const snapshotTurn = this.snapshot.authoritativeState?.turn;
+      if (coopResyncSnapshotIsStale(this.turn, snapshotTurn, liveTurn)) {
+        coopWarn(
+          "resync",
+          `requestTurn=${this.turn} snapshotTurn=${snapshotTurn ?? "legacy"} STALE (live turn=${liveTurn}) `
+            + "-> DROPPED (newer checkpoint supersedes)",
+        );
         this.end();
         return;
       }
@@ -1396,4 +1406,19 @@ export class CoopApplyResyncPhase extends Phase {
     }
     this.end();
   }
+}
+
+/**
+ * A stateSync request is correlated to the turn that detected drift, but the host captures its snapshot when
+ * the request ARRIVES. The host may already be on the next turn, making the returned snapshot newer than the
+ * request. Judge staleness by that authoritative snapshot turn when available; falling back to the request
+ * turn preserves the legacy-host guard.
+ */
+export function coopResyncSnapshotIsStale(
+  requestTurn: number,
+  snapshotTurn: number | undefined,
+  liveTurn: number,
+): boolean {
+  const capturedTurn = snapshotTurn ?? requestTurn;
+  return capturedTurn > 0 && liveTurn > capturedTurn;
 }

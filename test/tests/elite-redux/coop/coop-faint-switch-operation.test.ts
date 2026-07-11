@@ -12,10 +12,7 @@ import {
   setCoopFaintSwitchOperationEnabled,
   setCoopFaintSwitchRetryMs,
 } from "#data/elite-redux/coop/coop-faint-switch-operation";
-import {
-  COOP_FAINT_SWITCH_SEQ_BASE,
-  sendCoopFaintSwitchChoice,
-} from "#data/elite-redux/coop/coop-interaction-relay";
+import { COOP_FAINT_SWITCH_SEQ_BASE, sendCoopFaintSwitchChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { assembleCoopRuntime, clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -111,6 +108,41 @@ describe("co-op faint-switch operation migration", () => {
     });
     await new Promise(resolve => setTimeout(resolve, 30));
     expect(deliveredGuestIntents, "the committed envelope cancels further guest retries").toBe(1);
+    offCount();
+  });
+
+  it("stops a guest retry when authority commits the same field from a drifted turn counter", async () => {
+    setCoopFaintSwitchRetryMs(10);
+    const { host, guest } = createLoopbackPair();
+    assembleCoopRuntime(host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(guest, { username: "Guest", netcodeMode: "authoritative" });
+    const seq = COOP_FAINT_SWITCH_SEQ_BASE + COOP_GUEST_FIELD_INDEX;
+    let deliveredGuestIntents = 0;
+    const offCount = host.onMessage(msg => {
+      if (msg.t === "interactionChoice" && msg.seq === seq && msg.kind === "switch") {
+        deliveredGuestIntents++;
+      }
+    });
+    const payload = { fieldIndex: COOP_GUEST_FIELD_INDEX, partySlot: 3, data: [0, 6] };
+
+    sendCoopFaintSwitchChoice(guestRuntime.interactionRelay, payload.fieldIndex, payload.partySlot, payload.data);
+    armCoopFaintSwitchIntentResend({
+      payload,
+      wave: 12,
+      turn: 4,
+      resend: () =>
+        sendCoopFaintSwitchChoice(guestRuntime.interactionRelay, payload.fieldIndex, payload.partySlot, payload.data),
+    });
+    commitFaintSwitchAuthorityIntent({
+      payload,
+      ownerRole: "guest",
+      localRole: "host",
+      wave: 12,
+      turn: 5,
+    });
+    await new Promise(resolve => setTimeout(resolve, 35));
+
+    expect(deliveredGuestIntents, "no stale switch carrier may survive the authoritative commit").toBe(1);
     offCount();
   });
 });

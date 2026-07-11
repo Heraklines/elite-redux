@@ -4,7 +4,7 @@
  */
 
 import { COOP_CAP_OP_FAINT_SWITCH, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
-import { coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
 import {
   type CoopAuthoritativeEnvelopeV1,
@@ -12,7 +12,10 @@ import {
   type CoopPendingOperation,
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
-import { journalCoopCommittedEnvelope, registerCoopOperationApplier } from "#data/elite-redux/coop/coop-operation-journal";
+import {
+  journalCoopCommittedEnvelope,
+  registerCoopOperationApplier,
+} from "#data/elite-redux/coop/coop-operation-journal";
 import { CoopOperationGuest, CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopSeatOfRole } from "#data/elite-redux/coop/coop-session";
 import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
@@ -78,9 +81,11 @@ export function setCoopFaintSwitchOperationEpoch(value: number): void {
 }
 
 function coopFaintSwitchEventAddress(wave: number, turn: number, fieldIndex: number): number {
-  return Math.max(0, Math.trunc(wave)) * COOP_FAINT_SWITCH_WAVE_STRIDE
+  return (
+    Math.max(0, Math.trunc(wave)) * COOP_FAINT_SWITCH_WAVE_STRIDE
     + Math.max(0, Math.trunc(turn)) * COOP_FAINT_SWITCH_TURN_STRIDE
-    + Math.max(0, Math.trunc(fieldIndex)) * COOP_FAINT_SWITCH_FIELD_STRIDE;
+    + Math.max(0, Math.trunc(fieldIndex)) * COOP_FAINT_SWITCH_FIELD_STRIDE
+  );
 }
 
 export function coopFaintSwitchOperationAddress(
@@ -125,15 +130,28 @@ function context(wave: number, turn: number) {
 }
 
 function retryKey(payload: CoopFaintSwitchPayload, wave: number, turn: number): string {
-  return String(coopFaintSwitchEventAddress(wave, turn, payload.fieldIndex));
+  return `${payload.fieldIndex}:${coopFaintSwitchEventAddress(wave, turn, payload.fieldIndex)}`;
 }
 
-function cancelRetry(payload: CoopFaintSwitchPayload, wave: number, turn: number): void {
-  const key = retryKey(payload, wave, turn);
-  const timer = retries.get(key);
-  if (timer != null) {
-    clearTimeout(timer);
-    retries.delete(key);
+function cancelRetry(payload: CoopFaintSwitchPayload): void {
+  // The legacy carrier is addressed by owned field slot, while the peers may
+  // temporarily observe its wave/turn from different checkpoint revisions. A
+  // commit must therefore terminate retries by the stable shared identity.
+  // Replacements for the same field cannot legitimately overlap.
+  const fieldPrefix = `${payload.fieldIndex}:`;
+  let cancelled = 0;
+  for (const [key, timer] of retries) {
+    if (key.startsWith(fieldPrefix)) {
+      clearTimeout(timer);
+      retries.delete(key);
+      cancelled++;
+    }
+  }
+  if (cancelled > 0) {
+    coopLog(
+      "replay",
+      `faint-switch authority APPLIED field=${payload.fieldIndex} -> cancelled ${cancelled} intent retry timer(s)`,
+    );
   }
 }
 
@@ -182,12 +200,7 @@ export function commitFaintSwitchAuthorityIntent(params: {
       id: makeCoopOperationId(
         epoch,
         owner,
-        coopFaintSwitchOperationAddress(
-          params.wave,
-          params.turn,
-          params.payload.fieldIndex,
-          params.payload.partySlot,
-        ),
+        coopFaintSwitchOperationAddress(params.wave, params.turn, params.payload.fieldIndex, params.payload.partySlot),
       ),
       kind: "FAINT_SWITCH",
       owner,
@@ -207,13 +220,15 @@ export function commitFaintSwitchAuthorityIntent(params: {
 
 function validPayload(value: unknown): value is CoopFaintSwitchPayload {
   const payload = value as CoopFaintSwitchPayload | undefined;
-  return payload != null
+  return (
+    payload != null
     && Number.isSafeInteger(payload.fieldIndex)
     && payload.fieldIndex >= 0
     && payload.fieldIndex < 4
     && Number.isSafeInteger(payload.partySlot)
     && Array.isArray(payload.data)
-    && payload.data.every(Number.isFinite);
+    && payload.data.every(Number.isFinite)
+  );
 }
 
 function applyJournaledFaintSwitchEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
@@ -235,7 +250,7 @@ function applyJournaledFaintSwitchEnvelope(envelope: CoopAuthoritativeEnvelopeV1
   if (result.kind !== "applied") {
     return "rejected";
   }
-  cancelRetry(operation.payload, envelope.wave, envelope.turn);
+  cancelRetry(operation.payload);
   return "applied";
 }
 

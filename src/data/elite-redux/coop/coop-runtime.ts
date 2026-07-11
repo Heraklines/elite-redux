@@ -214,6 +214,7 @@ import {
   commitWaveAdvanceOwnerIntent,
   isCoopWaveAdvanceOperationEnabled,
   isValidCoopWaveAdvancePayload,
+  resolveCoopBiomeBoundaryFlag,
   resetCoopWaveAdvanceOperationState,
   setCoopWaveAdvanceOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-wave-operation";
@@ -417,7 +418,13 @@ function wireCoopEnemyPartyResponder(controller: CoopSessionController, battleSt
         return;
       }
       coopLog("stream", `re-broadcast enemyPartySync wave=${wave} count=${enemies.length} (host, on guest request)`);
-      battleStream.sendEnemyParty(wave, enemies);
+      battleStream.sendEnemyParty(
+        wave,
+        enemies,
+        undefined,
+        battle.battleType,
+        captureCoopAuthoritativeBattleState(battle.turn) ?? undefined,
+      );
     } catch (e) {
       /* a re-broadcast serialize/send failure must never break the host's encounter */
       coopWarn("stream", `host re-broadcast enemyPartySync failed wave=${wave}`, e);
@@ -1918,7 +1925,7 @@ export function buildCoopWaveAdvancePayload(outcome: CoopWaveOutcome, wave: numb
   let victoryKind: "wild" | "trainer" = "wild";
   try {
     const gameMode = globalScene.gameMode;
-    biomeChange = (gameMode?.hasRandomBiomes ?? false) || globalScene.isNewBiome();
+    biomeChange = resolveCoopBiomeBoundaryFlag(gameMode?.hasRandomBiomes, globalScene.isNewBiome());
     eggLapse = isVictory && ((gameMode?.isEndless ?? false) || !gameMode.isWaveFinal(wave));
     victoryKind = globalScene.currentBattle.battleType === BattleType.TRAINER ? "trainer" : "wild";
   } catch {
@@ -2869,7 +2876,7 @@ export function assembleCoopRuntime(
   const interactionRelay = new CoopInteractionRelay(transport, { isVersus: () => controller.isVersusSession() });
   const uiMirror = new CoopUiMirror(transport);
   const mePump = new CoopMePump(interactionRelay);
-  const rendezvous = new CoopRendezvous(transport);
+  const rendezvous = new CoopRendezvous(transport, { getEpoch: () => controller.sessionEpoch });
   // W2b/W2e (§4/§5): the application-level durability engine, flag-gated. Wave-2e plugs the operation
   // envelope in via the journal bridge's extractKey/apply hooks, so a committed op is journaled + ACKed +
   // resendable end-to-end (no longer a passive scaffold). Its reconnect() is wired into the #805 rejoin

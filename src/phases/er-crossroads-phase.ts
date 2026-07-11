@@ -209,10 +209,17 @@ export class ErCrossroadsPhase extends Phase {
           `crossroads boundary barrier ${point} ABORTED during teardown/recovery - remaining closed (#858)`,
         );
         return false;
+      } else if (result.authoritativePoint !== undefined && result.authoritativePoint !== point) {
+        coopWarn(
+          "rendezvous",
+          `crossroads boundary ${point} ROUTED AWAY to host-authoritative ${result.authoritativePoint}; closing stale phase`,
+        );
+        this.end();
+        return false;
       } else if (result.crossPoint !== undefined) {
         coopLog(
           "rendezvous",
-          `crossroads boundary barrier ${point} CROSS-POINT release (partner at ${result.crossPoint}); proceeding (#858)`,
+          `crossroads boundary ${point} host-authoritative route ACKED (partner had ${result.crossPoint}); proceeding (#858)`,
         );
       }
       return true;
