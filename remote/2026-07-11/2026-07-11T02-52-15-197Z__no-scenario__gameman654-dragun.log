@@ -1,0 +1,60 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrfrnbd9-2qrk
+mode:     ?  wave:?
+seed:     thiZafCfLQRpKmYKFa0Yhjsj
+party:    
+enemy:    
+
+----- COMMENT -----
+Softlock on this screen
+
+----- CONSOLE -----
+[02:51:02.809] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[02:51:03.450] LOG: [ER] build mrfrnbd9-2qrk
+[02:51:03.859] LOG: [dev-tools] loaded — 509 scenarios + Send Logs button
+[02:51:46.916] DEBUG: Destroying loading scene
+[02:51:46.916] DEBUG: Destroyed loading scene
+[02:51:47.001] LOG: Seed: thiZafCfLQRpKmYKFa0Yhjsj
+[02:51:47.001] LOG: Wave Seed: thiZafCfLQRpKmYKFa0Yhjsj 0
+[02:51:49.212] LOG: %cStart Phase LoginPhase color:green;
+[02:51:49.713] LOG: Client Session: xD91kFewZcfFP4vbDbMJXT2vqqSUyb8Y
+[02:51:50.462] DEBUG: Using cached system data
+[02:51:50.592] LOG: %cStart Phase TitlePhase color:green;
+[02:51:50.597] LOG: Getting Session Slot id: %d 0
+[02:51:50.623] LOG: use seasonal splash messages true
+[02:51:52.545] LOG: Getting Session Slot id: %d 0
+[02:51:52.550] WARN: [coop:launch] loadSession slot=0 REFUSED: co-op save without a live partner connection (#807)
+[02:51:52.557] ERROR: TypeError: Cannot read properties of undefined (reading 'getStartingBiome')
+TypeError: Cannot read properties of undefined (reading 'getStartingBiome')
+    at TitlePhase.end (https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:462:857)
+    at TitlePhase.loadSaveSlot (https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:461:1362)
+[02:51:52.560] ERROR: [unhandledrejection] TypeError: Cannot read properties of undefined (reading 'isCoop')
+TypeError: Cannot read properties of undefined (reading 'isCoop')
+    at UI.showText (https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:16700)
+    at TitlePhase.loadSaveSlot (https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:461:1399)
+[02:51:54.587] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:00.396] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:00.546] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:00.768] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:00.943] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:01.118] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:01.336] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:01.497] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:01.627] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:01.747] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:01.873] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:01.983] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:02.099] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:02.295] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:02.344] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:02.504] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:02.766] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:02.942] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:03.105] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:03.263] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:03.433] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:03.603] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+[02:52:03.763] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Ciquv7H6.js:1052:14526
+
+----- REPLAY TRACE (JSON) -----
+(none)
