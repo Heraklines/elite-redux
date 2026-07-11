@@ -117,6 +117,36 @@ function makeFlapPair(): { host: FlapTransport; guest: FlapTransport } {
 }
 
 describe("co-op lobby self-healing handshake (#868)", () => {
+  it("a resumeStartNew release lost during a flap is re-sent on reconnect", async () => {
+    const { host, guest } = makeFlapPair();
+    const h = new CoopSessionController(host, { username: "Host", tiebreak: 1 });
+    const g = new CoopSessionController(guest, { username: "Guest", tiebreak: 2 });
+    h.connect();
+    g.connect();
+    await flush();
+
+    let released = 0;
+    g.armResumeStartNewHandler(() => {
+      released++;
+    });
+
+    // The host decides while the wire is dark. This is a durable lobby decision: after
+    // reconnect the guest must observe it instead of waiting for the anti-hang timeout.
+    host.setConnected(false);
+    guest.setConnected(false);
+    h.sendResumeStartNew();
+    await flush();
+    expect(released).toBe(0);
+
+    guest.setConnected(true);
+    host.setConnected(true);
+    await flush();
+    await flush();
+    await flush();
+
+    expect(released, "the durable start-new decision healed immediately on reconnect").toBe(1);
+  });
+
   // -------------------------------------------------------------------------
   // REPRO (ii): a guest lock-in LOST during a channel flap must heal on reconnect,
   // so the HOST's proceedIfReady converges to bothReady (case b: "partner got kicked").
