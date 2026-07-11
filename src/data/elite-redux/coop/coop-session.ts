@@ -369,8 +369,8 @@ export class CoopInteractionTurn {
 
   /**
    * Resolves once the PARTNER'S broadcast counter reaches `need` (immediately when it already
-   * has), or after `timeoutMs` - the barrier degrades to "proceed anyway" (resync heals) so a
-   * disconnected partner can never freeze the waiter.
+   * has), or returns false after `timeoutMs` as a replay pulse. The controller requests a fresh
+   * counter and waits again; false is never permission for a shared boundary to proceed.
    */
   awaitRemoteCounter(need: number, timeoutMs: number): Promise<boolean> {
     if (this.remoteSeen >= need) {

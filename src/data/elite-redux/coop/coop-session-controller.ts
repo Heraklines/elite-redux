@@ -496,11 +496,23 @@ export class CoopSessionController {
   }
 
   /**
-   * #788: resolves once the partner's broadcast interaction counter catches up to OURS
-   * (immediately when it already has), or after `timeoutMs` (degrade to proceed; resync heals).
+   * #788: resolves once the partner's broadcast interaction counter catches up to OURS. A timeout
+   * requests an idempotent counter replay and waits again; it is never permission to cross alone.
    */
-  awaitPartnerInteraction(timeoutMs: number): Promise<boolean> {
-    return this.interactionTurn.awaitRemoteCounter(this.interactionTurn.toJSON(), timeoutMs);
+  async awaitPartnerInteraction(timeoutMs: number): Promise<boolean> {
+    const need = this.interactionTurn.toJSON();
+    while (this.interactionTurn.remoteCounterSeen() < need) {
+      const caughtUp = await this.interactionTurn.awaitRemoteCounter(need, timeoutMs);
+      if (caughtUp) {
+        return true;
+      }
+      coopWarn(
+        "interaction",
+        `partner counter replay needed local=${need} peerSeen=${this.interactionTurn.remoteCounterSeen()} - boundary stays closed`,
+      );
+      this.transport.send({ t: "requestInteractionCounter", need });
+    }
+    return true;
   }
 
   get partnerName(): string | null {
@@ -660,11 +672,7 @@ export class CoopSessionController {
         "interaction",
         `advanceInteraction ADVANCED+BROADCAST (fromCounter=${fromCounter === undefined ? "none" : fromCounter}) counter ${before} -> ${after} role=${this.role}; send interaction screen=${COOP_INTERACTION_TURN_SCREEN} choice=${choice}`,
       );
-      this.transport.send({
-        t: "interaction",
-        screen: COOP_INTERACTION_TURN_SCREEN,
-        choice: this.interactionTurn.toJSON(),
-      });
+      this.broadcastInteractionCounter("advance");
     } else {
       coopLog(
         "interaction",
@@ -793,6 +801,14 @@ export class CoopSessionController {
       this.requestRunConfig();
     }
     this.requestRoster();
+    this.broadcastInteractionCounter("reconnect");
+  }
+
+  /** Re-announce the current counter as an idempotent snapshot, never an increment. */
+  private broadcastInteractionCounter(reason: "advance" | "reconnect" | "request"): void {
+    const choice = this.interactionTurn.toJSON();
+    coopLog("interaction", `SEND counter snapshot reason=${reason} choice=${choice} role=${this.role}`);
+    this.transport.send({ t: "interaction", screen: COOP_INTERACTION_TURN_SCREEN, choice });
   }
 
   /**
@@ -1147,6 +1163,13 @@ export class CoopSessionController {
           this.interactionTurn.mergeRemote(msg.choice);
           this.emit();
         }
+        break;
+      case "requestInteractionCounter":
+        coopLog(
+          "interaction",
+          `RECV requestInteractionCounter need=${msg.need} local=${this.interactionTurn.toJSON()} role=${this.role}`,
+        );
+        this.broadcastInteractionCounter("request");
         break;
       case "runConfig":
         // The HOST decides difficulty + challenges + seed; the guest mirrors them

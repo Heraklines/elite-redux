@@ -59,7 +59,8 @@ export type CoopRole = "host" | "guest";
 // ACK. Older peers would ignore these frames and park, so mixed builds must refuse pairing explicitly.
 // er-coop-19: mystery-battle enemy parties are retained and re-requestable by interaction key; a guest
 // refuses local enemy derivation when the authoritative carrier is lost or malformed.
-export const COOP_PROTOCOL_VERSION = "er-coop-19";
+// er-coop-20: interaction-counter barriers request an idempotent counter replay and never timeout open.
+export const COOP_PROTOCOL_VERSION = "er-coop-20";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -1016,6 +1017,8 @@ export type CoopMessage =
   | { t: "requestRoster" }
   /** A choice on an alternation-owned interaction screen (reward / shop / ME) (P4). */
   | { t: "interaction"; screen: string; choice: unknown }
+  /** Ask the peer to replay its current interaction counter; `need` is diagnostic and monotonic. */
+  | { t: "requestInteractionCounter"; need: number }
   /**
    * Host -> guest (#633, TRACK-2): the AUTHORITATIVE full battle snapshot, sent to HEAL
    * a checksum mismatch. `blob` is an lz-string-compressed JSON {@linkcode CoopFullBattleSnapshot}
@@ -1470,6 +1473,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return "fp";
     case "interaction":
       return `screen=${msg.screen}`;
+    case "requestInteractionCounter":
+      return `need=${msg.need}`;
     case "requestRunConfig":
       return "(re)request";
     case "rendezvous":

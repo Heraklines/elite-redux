@@ -306,11 +306,9 @@ export class EncounterPhase extends BattlePhase {
       // the party sync until the partner's broadcast interaction counter catches up to ours
       // (its menu watcher advanced = menu done). The host itself keeps playing - its first
       // turn cannot resolve without the guest's command anyway, so nothing user-visible waits.
-      // Bounded (60s -> send anyway; resync heals) so a disconnected partner never freezes it.
-      void controller.awaitPartnerInteraction(getCoopWaveBarrierMs()).then(caughtUp => {
-        if (!caughtUp) {
-          coopWarn("replay", `wave-start barrier wave=${wave} timed out -> sending party anyway (resync heals)`);
-        }
+      // Timeout requests replay of the partner counter and stays closed; the host never exposes a future
+      // wave party while the peer is still completing the prior shared interaction.
+      void controller.awaitPartnerInteraction(getCoopWaveBarrierMs()).then(() => {
         // #862: the wave-start sync ALWAYS states the ME verdict - the encounter type when the
         // host rolled an ME, the explicit NO-ME sentinel otherwise. The guest's own presence
         // roll runs off per-client pity state that diverges after any one-sided ME anomaly

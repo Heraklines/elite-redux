@@ -78,6 +78,7 @@ export const COOP_AUTHORITATIVE_TYPES: ReadonlySet<CoopMessageType> = new Set<Co
   "battleCheckpoint",
   "interactionChoice",
   "interactionOutcome",
+  "interaction",
   "rewardOptions",
   "waveResolved",
   "waveEndState",

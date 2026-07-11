@@ -6,7 +6,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { getCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopController, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 
@@ -16,9 +16,8 @@ import { getCoopController, getCoopRuntime } from "#data/elite-redux/coop/coop-r
  * counter catches up - i.e. until they finished the same menu too. The v1 barrier only
  * deferred the next wave's DATA; the finishing player's own SCREEN still ran ahead ("you can
  * continue far ahead and then they have to go through the shop or the shop is gone"). This
- * phase makes the wait visible and real: "Waiting for <partner>...". Bounded by the same
- * injectable wait (60s live default) so a disconnected partner never freezes the run - the
- * gate lifts and the resync layer heals whatever drift remains.
+ * phase makes the wait visible and real: "Waiting for <partner>...". The timeout is a replay
+ * cadence, not an escape hatch: the boundary remains closed until the peer confirms the counter.
  */
 export class CoopPartnerSyncPhase extends Phase {
   public readonly phaseName = "CoopPartnerSyncPhase";
@@ -53,12 +52,8 @@ export class CoopPartnerSyncPhase extends Phase {
     } catch {
       /* cosmetic */
     }
-    void controller.awaitPartnerInteraction(getCoopWaveBarrierMs()).then(caughtUp => {
-      if (caughtUp) {
-        coopLog("interaction", `partner-sync gate: partner reached counter=${target} -> proceed`);
-      } else {
-        coopWarn("interaction", `partner-sync gate: timed out at counter=${target} -> proceeding (resync heals)`);
-      }
+    void controller.awaitPartnerInteraction(getCoopWaveBarrierMs()).then(() => {
+      coopLog("interaction", `partner-sync gate: partner reached counter=${target} -> proceed`);
       this.end();
     });
   }
