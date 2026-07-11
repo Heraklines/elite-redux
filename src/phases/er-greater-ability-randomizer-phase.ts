@@ -27,12 +27,11 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import {
-  COOP_ABILITY_KIND,
   COOP_ABILITY_OP,
-  COOP_ABILITY_OUTCOME,
   COOP_ABILITY_WAIT_MS,
   coopAbilityOpName,
   coopAbilityPickerSeq,
+  sendCoopAbilityPickerOutcome,
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
@@ -229,12 +228,7 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
       "ability",
       `greaterRandomizer OWNER relay OUTCOME seq=${this.coopSeq} op=${coopAbilityOpName(this.coopOutcome[0])} slot=${this.coopOutcome[1] ?? "-"} abilityId=${this.coopOutcome[2] ?? "-"} data=[${this.coopOutcome.join(",")}]`,
     );
-    getCoopInteractionRelay()?.sendInteractionChoice(
-      coopAbilityPickerSeq(this.coopSeq),
-      COOP_ABILITY_KIND,
-      COOP_ABILITY_OUTCOME,
-      [...this.coopOutcome],
-    );
+    sendCoopAbilityPickerOutcome(getCoopInteractionRelay(), this.coopSeq, this.coopOutcome);
   }
 
   /**

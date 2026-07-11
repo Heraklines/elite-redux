@@ -29,6 +29,7 @@
 // =============================================================================
 
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import type { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 // #840: COOP_ABILITY_SEQ_BASE declared in coop-seq-registry (single source of truth), re-exported below.
 import { COOP_ABILITY_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 
@@ -107,3 +108,17 @@ export const COOP_ABILITY_WAIT_MS = 1_200_000;
 
 /** Routing/logging label for the relayed ability outcome (the relay treats `kind` as opaque). */
 export const COOP_ABILITY_KIND = "abilityPicker";
+
+/** Production owner carrier seam; operation journaling layers onto this without changing phase callers. */
+export function sendCoopAbilityPickerOutcome(
+  relay: CoopInteractionRelay | null,
+  shopSeq: number,
+  data: number[],
+): void {
+  relay?.sendInteractionChoice(
+    coopAbilityPickerSeq(shopSeq),
+    COOP_ABILITY_KIND,
+    COOP_ABILITY_OUTCOME,
+    [...data],
+  );
+}
