@@ -6,6 +6,7 @@ import { bypassLogin } from "#constants/app-constants";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { broadcastCoopWaveResolved, clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { erRecordDailySeedWon } from "#data/elite-redux/er-achievement-detection";
 import { enqueueFounderPublish, recordLocalDraftAttempt } from "#data/elite-redux/er-community-challenges";
 import { getFounderRunState, setFounderRunState } from "#data/elite-redux/er-community-run-state";
 import { recordGhostTeamOnGameOver } from "#data/elite-redux/er-ghost-teams";
@@ -227,6 +228,8 @@ export class GameOverPhase extends BattlePhase {
           } else if (globalScene.gameMode.isDaily && newClear) {
             globalScene.gameData.gameStats.dailyRunSessionsWon++;
             globalScene.validateAchv(achvs.DAILY_VICTORY);
+            // catalog-v2 (#900) GROUNDHOG_WEEK: 7 distinct Daily seeds won (fresh victory only).
+            erRecordDailySeedWon(globalScene.seed);
           }
         }
 

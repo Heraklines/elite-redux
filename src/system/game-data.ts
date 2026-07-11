@@ -28,6 +28,7 @@ import {
   purgeCoopBufferedArrivals,
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
+import { getErAchievementRunState, restoreErAchievementRunState } from "#data/elite-redux/er-achievement-run-state";
 import {
   getCommunityAllowedSpecies,
   getFounderRunState,
@@ -296,6 +297,8 @@ export class GameData {
   public spentAchvPoints = 0;
   /** ER Ghost Trainer FX: owned entrance/aura effect bitsets + equipped picks. */
   public trainerFx: TrainerFxSaveData = {};
+  /** ER achievement rewards: earned trainer titles (display UI deferred; persistence only). */
+  public erTitles: string[] = [];
 
   /**
    * One-time gift flag: set `true` once the player has received the free 2
@@ -359,6 +362,7 @@ export class GameData {
     this.ghostProfile = null;
     this.spentAchvPoints = 0;
     this.trainerFx = {};
+    this.erTitles = [];
     this.autoEggRestock = defaultAutoEggRestockSettings();
     this.llmDirectorState = defaultDirectorState();
     this.showdownAppliedSettlements = [];
@@ -394,6 +398,7 @@ export class GameData {
       ghostProfile: this.ghostProfile,
       spentAchvPoints: this.spentAchvPoints,
       trainerFx: this.trainerFx,
+      erTitles: this.erTitles.slice(0),
     };
   }
 
@@ -987,6 +992,9 @@ export class GameData {
     this.ghostProfile = sanitizeGhostProfile(systemData.ghostProfile) ?? null;
     this.spentAchvPoints = Math.max(0, Math.round(systemData.spentAchvPoints ?? 0));
     this.trainerFx = sanitizeTrainerFxSaveData(systemData.trainerFx) ?? {};
+    this.erTitles = Array.isArray(systemData.erTitles)
+      ? systemData.erTitles.filter((t): t is string => typeof t === "string")
+      : [];
 
     this.eggPity = systemData.eggPity ? systemData.eggPity.slice(0) : [0, 0, 0, 0];
     this.unlockPity = systemData.unlockPity ? systemData.unlockPity.slice(0) : [0, 0, 0, 0];
@@ -1466,6 +1474,9 @@ export class GameData {
       erUsedTrainerKeys: getErUsedTrainerKeys(),
       // ER (#348): persist per-mon faint-free money streaks across save/load.
       erMoneyStreaks: getErMoneyStreakEntries(),
+      // ER achievement-expansion catalog-v2 (#900): persist run-local achievement state
+      // (bargain flags, black-market credit, learned-move stamps, PARALLEL_PLAY KO ids).
+      erAchievementRunState: getErAchievementRunState(),
       // ER (#357): persist the player's stolen resist berries (runtime ER
       // modifier types are dropped by the vanilla modifier registry on load).
       erResistBerries: getErResistBerryEntries(),
@@ -1648,6 +1659,9 @@ export class GameData {
     setErDifficulty(fromSession.erDifficulty ?? "ace");
     restoreErRunTrainerTracking(fromSession.erUsedTrainerKeys);
     restoreErMoneyStreaks(fromSession.erMoneyStreaks);
+    // ER achievement-expansion catalog-v2 (#900): restore run-local achievement state so a
+    // mid-run reload keeps an in-progress feat (bargain flags, black-market credit, etc.).
+    restoreErAchievementRunState(fromSession.erAchievementRunState);
     // ER: restore in-progress per-battle relic counters so a reload mid-battle
     // doesn't re-fire Cursed Idol / Pharaoh's Ankh (older saves -> empty/re-arm).
     restoreErRelicBattleState(fromSession.erRelicBattleState);

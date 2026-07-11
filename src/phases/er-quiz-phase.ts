@@ -23,6 +23,7 @@ import {
   coopQuizHostStreamSession,
   coopQuizPublishAnswer,
 } from "#data/elite-redux/coop/coop-quiz-mirror";
+import { erRecordQuizPerfect } from "#data/elite-redux/er-achievement-detection";
 import type { ErQuizQuestion } from "#data/elite-redux/er-quiz";
 import { erQuizOptionName, getErFootprintAsset } from "#data/elite-redux/er-quiz";
 import { SpeciesId } from "#enums/species-id";
@@ -348,6 +349,10 @@ export class ErQuizPhase extends Phase {
       forfeited: this.forfeited,
       correctItemIds: this.correctItemIds,
     };
+    // catalog-v2 (#900) FINAL_ANSWER: a perfect quiz run (every question correct).
+    if (result.perfect) {
+      erRecordQuizPerfect();
+    }
     this.onComplete(result);
     this.end();
   }

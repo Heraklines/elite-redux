@@ -838,7 +838,16 @@ export class MoveEffectPhase extends PokemonPhase {
       globalScene.applyModifiers(DamageMoneyRewardModifier, true, user, new NumberHolder(finalDmg));
     }
 
-    erRecordAchievementMoveDamage(user, target, this.move, this.useMode, finalDmg, isCritical, targetHpBefore);
+    erRecordAchievementMoveDamage(
+      user,
+      target,
+      this.move,
+      this.useMode,
+      finalDmg,
+      isCritical,
+      targetHpBefore,
+      result === HitResult.SUPER_EFFECTIVE,
+    );
 
     return [result, finalDmg, isCritical];
   }

@@ -3,7 +3,9 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import type { Egg } from "#data/egg";
 import type { EggHatchData } from "#data/egg-hatch-data";
+import { erRecordEggHatch } from "#data/elite-redux/er-achievement-detection";
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
+import { EggTier } from "#enums/egg-type";
 import { UiMode } from "#enums/ui-mode";
 import { EggCountChangedEvent } from "#events/egg";
 import type { PlayerPokemon } from "#field/pokemon";
@@ -352,6 +354,11 @@ export class EggHatchPhase extends Phase {
     }
     if (isShiny) {
       globalScene.validateAchv(achvs.HATCH_SHINY);
+    }
+    // catalog-v2 (#900): FOUR_MACHINES_ONE_DREAM (Rare+) / GOLDEN_TICKET (Legendary) - record the
+    // gacha machine this hatch came from, per hatched tier. Fresh event only (never a load scan).
+    if (this.egg?.sourceType != null) {
+      erRecordEggHatch(this.egg.sourceType, this.egg.tier >= EggTier.RARE, this.egg.tier === EggTier.LEGENDARY);
     }
     this.eggContainer.setVisible(false);
     const spriteKey = this.pokemon.getSpriteKey(true);

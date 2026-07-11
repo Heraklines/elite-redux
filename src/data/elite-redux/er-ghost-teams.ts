@@ -1284,6 +1284,20 @@ export function hasErGhostOverride(trainer: Trainer): boolean {
 }
 
 /**
+ * The species ids on this ghost trainer's snapshot team, or null when the trainer is
+ * not an ER ghost. Used by the achievement layer (IDENTITY_THEFT) to check whether the
+ * player fields a species that also appears on the ghost's team. Read-only accessor over
+ * the private {@linkcode GHOST_BY_TRAINER} map.
+ */
+export function getErGhostSnapshotSpecies(trainer: Trainer): number[] | null {
+  const snapshot = GHOST_BY_TRAINER.get(trainer);
+  if (!snapshot) {
+    return null;
+  }
+  return snapshot.party.map(member => member.speciesId);
+}
+
+/**
  * Build the ghost team's EnemyPokemon for `index` from the stored snapshot, or
  * `null` if this isn't a ghost trainer / the index is beyond the team. The mon
  * keeps its species/form/ability/IVs/nature/moveset but is re-levelled to the

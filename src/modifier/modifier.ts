@@ -2537,6 +2537,21 @@ export class ErRelicModifier extends PersistentModifier {
     return true;
   }
 
+  override add(modifiers: PersistentModifier[], virtual: boolean): boolean {
+    const result = super.add(modifiers, virtual);
+    // catalog-v2 (#900) MUSEUM_QUALITY: acquiring a relic KIND (deduped in the persisted set). Lazy
+    // import so the modifier module's static graph never pulls the achievement layer; fully guarded.
+    try {
+      const kind = this.kind;
+      void import("#data/elite-redux/er-achievement-detection")
+        .then(m => m.erRecordRelicAcquired(kind))
+        .catch(() => {});
+    } catch {
+      /* relic acquisition tracking must never disturb the modifier add */
+    }
+    return result;
+  }
+
   getMaxStackCount(): number {
     return ER_RELIC_CONFIG[this.kind].maxStack;
   }

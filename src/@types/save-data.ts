@@ -82,6 +82,12 @@ export interface SystemSaveData {
   spentAchvPoints?: number;
   /** ER Ghost Trainer FX: owned entrance/aura effect bitsets + equipped picks. */
   trainerFx?: TrainerFxSaveData;
+  /**
+   * ER achievement rewards: trainer titles the player has earned (e.g. "Champion
+   * Material" from CHAMPION_MATERIAL). Persisted so a title survives a reload / cloud
+   * round-trip; the display UI is intentionally deferred. Absent = none earned yet.
+   */
+  erTitles?: string[];
 }
 
 export interface SessionSaveData {
@@ -179,6 +185,13 @@ export interface SessionSaveData {
    * instead of resetting to base 0. Optional + absent for every solo / pre-W2b save (fully save-compatible).
    */
   coopControlPlane?: CoopControlPlaneSaveData | undefined;
+  /**
+   * ER achievement-expansion catalog-v2 (#900): run-local achievement state that must survive a
+   * mid-run save/reload (bargain accept/refuse flags, one-per-run black-market credit, learned-move
+   * wave stamps, PARALLEL_PLAY KO ids, LIFELINE per-wave revive dedupe). Optional + absent for older
+   * saves (restore fresh, empty state). See er-achievement-run-state.ts.
+   */
+  erAchievementRunState?: import("#data/elite-redux/er-achievement-run-state").ErAchievementRunSaveData;
 }
 
 export interface Unlocks {

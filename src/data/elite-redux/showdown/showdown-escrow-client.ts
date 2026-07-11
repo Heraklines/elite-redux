@@ -195,6 +195,22 @@ export async function syncShowdownPendingSettlements(gameData: SettlementGameDat
   if (applied === 0) {
     return 0;
   }
+  // catalog-v2 (#900): a grantUnlock settlement means this client WON that mon as a stake - record
+  // its provenance for PRODIGAL_MON. Lazy import so this network helper's static graph never pulls
+  // the achievement layer; fully guarded (never blocks the settlement flow).
+  try {
+    const wonSpecies = fresh
+      .map(i => i.mutation)
+      .filter((m): m is ShowdownSettlementMutation & { kind: "grantUnlock" } => m.kind === "grantUnlock")
+      .map(m => m.speciesId);
+    if (wonSpecies.length > 0) {
+      void import("#data/elite-redux/er-social-achievement-tracker")
+        .then(mod => mod.erRecordShowdownStakeWon(wonSpecies))
+        .catch(() => {});
+    }
+  } catch {
+    /* provenance recording must never disturb settlement */
+  }
   // I3: persist BEFORE acking. Ack (all fetched ids, incl. any already-in-ledger) ONLY on save success.
   const saved = (await gameData.saveSystem?.(true)) ?? false;
   if (saved) {

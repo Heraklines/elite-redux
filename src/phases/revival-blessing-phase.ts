@@ -4,6 +4,7 @@ import { COOP_REVIVAL_SEQ_BASE, getCoopFaintSwitchWaitMs } from "#data/elite-red
 import { commitRevivalAuthorityDecision, sendCoopRevivalPrompt } from "#data/elite-redux/coop/coop-revival-operation";
 import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REVIVAL_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
+import { erRecordCoopRevivePartnerMon } from "#data/elite-redux/er-social-achievement-tracker";
 import { SwitchType } from "#enums/switch-type";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
@@ -133,6 +134,9 @@ export class RevivalBlessingPhase extends BattlePhase {
     pokemon.resetTurnData();
     pokemon.resetStatus(true, false, false, false);
     pokemon.heal(Math.min(toDmgValue(0.5 * pokemon.getMaxHp()), pokemon.getMaxHp()));
+    // catalog-v2 (#900) LIFELINE_SUBSCRIPTION: a Revival Blessing revive of a co-op PARTNER's mon
+    // counts as a partner revive (the modifier revive path already reports; this path did not).
+    erRecordCoopRevivePartnerMon(pokemon);
     globalScene.phaseManager.queueMessage(
       i18next.t("moveTriggers:revivalBlessing", {
         pokemonName: pokemon.name,

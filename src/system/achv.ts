@@ -571,6 +571,78 @@ export function getAchievementDescription(localizationKey: string): string {
     case "lookCollector100":
     case "presetCurator":
     case "signatureStyle":
+    // Definitive achievement expansion (70 new): their .description keys exist in
+    // achv.json; without a case here they hit the default and render blank.
+    case "rankedAndFiled":
+    case "greatExpectations":
+    case "ultraInstinct":
+    case "masterPlan":
+    case "championMaterial":
+    case "fiveAlarmStreak":
+    case "metaBreaker":
+    case "capSpace":
+    case "houseMoney":
+    case "doubleOrNothing":
+    case "prodigalMon":
+    case "davidWasRanked":
+    case "zeroSumHero":
+    case "sixPack":
+    case "lifelineSubscription":
+    case "noIInTeam":
+    case "parallelPlay":
+    case "hellIsOtherPeople":
+    case "weBothLived":
+    case "naturalSelectionBias":
+    case "formationBreaker":
+    case "leftRightGoodnight":
+    case "lastMonStanding":
+    case "threePieceCombo":
+    case "oneHpAndADream":
+    case "noSell":
+    case "setupPayoff":
+    case "zeroToHero":
+    case "checkmateInOne":
+    case "formVoltron":
+    case "pureVanilla":
+    case "chargeItToTheGame":
+    case "theLongestTurn":
+    case "statusQuo":
+    case "immortalObject":
+    case "technicalDifficulties":
+    case "evictionNotice":
+    case "identityTheft":
+    case "deadRinger":
+    case "hellHouse":
+    case "tripleExorcism":
+    case "finalAnswer":
+    case "areYouNotEntertained":
+    case "sevenDeadlyCheckboxes":
+    case "readTheFinePrint":
+    case "justSayNo":
+    case "delveTooDeep":
+    case "strangerThanFiction":
+    case "museumQuality":
+    case "blackFriday":
+    case "biomeTourist":
+    case "fourMachinesOneDream":
+    case "goldenTicket":
+    case "fusionDance":
+    case "twoLegendsOneSlot":
+    case "crossVersionCompatibility":
+    case "labRat":
+    case "presetJetSet":
+    case "nameRecognition":
+    case "numberGoUp":
+    case "groundhogWeek":
+    case "hellAndBack":
+    case "glassCannon":
+    case "generationGap":
+    case "houseOfMirrors":
+    case "deadChannel":
+    case "warOfAttrition":
+    case "trinityTest":
+    case "oppositionResearch":
+    case "monoGenReduxVictory":
       return i18next.t(`achv:${localizationKey}.description`, { context: genderStr });
     case "relicHunter":
       return i18next.t("achv:relicHunter.description", { context: genderStr });
@@ -660,6 +732,22 @@ const puApexStackActive = () => {
 
 /** True when a given challenge id is active (value > 0) this run. */
 const challengeActive = (id: Challenges) => globalScene.gameMode.challenges.some(c => c.id === id && c.value > 0);
+
+/** True on the Elite or Hell ER difficulty tiers (the two hardest). */
+const isEliteOrHell = () => getErDifficulty() === "elite" || getErDifficulty() === "hell";
+
+/** True when either battle-format challenge (Doubles Only / Triples Only) is active. */
+const anyFormatChallengeActive = () =>
+  challengeActive(Challenges.DOUBLES_ONLY) || challengeActive(Challenges.TRIPLES_ONLY);
+
+/** True when any mono-roster challenge (Single Generation / Single Type / Monocolor) is active. */
+const anyMonoRosterChallengeActive = () =>
+  challengeActive(Challenges.SINGLE_GENERATION)
+  || challengeActive(Challenges.SINGLE_TYPE)
+  || challengeActive(Challenges.MONO_COLOR);
+
+/** The ER mono-gen "RDX" pseudo-generation value (ER customs, speciesId >= 10000). */
+const ER_RDX_CHALLENGE_GEN = 10;
 
 /** The eighteen mono-TYPE ribbon flags (one per type), for the Master of All achv. */
 const MONO_TYPE_RIBBONS = [
@@ -1393,6 +1481,181 @@ export const achvs = {
     "ghost_gem",
     120,
     () => challengeActive(Challenges.TRIPLES_ONLY) && challengeActive(Challenges.GHOST_TRAINERS),
+  ),
+
+  // === Definitive achievement expansion (70 new) ===========================
+  // Detection/tracking lives in the ER trackers (separate work); these carry NO
+  // conditionFunc so validate() is a pass-through EXCEPT the §2.8 full-run challenges,
+  // which are ChallengeAchvs validated at game-over on a challenge victory. Scores:
+  // Easy=25, Medium=50, Hard=75, Very-hard=100 (MASTER_PLAN 110, TRINITY_TEST 120,
+  // ARE_YOU_NOT_ENTERTAINED 120, CHAMPION_MATERIAL 150). Icons are existing item-atlas
+  // frames from the catalog's verified icon map.
+
+  // --- §2.1 Versus and ranked ---------------------------------------------
+  RANKED_AND_FILED: new Achv("rankedAndFiled", "rankedAndFiled.description", "pb", 25),
+  GREAT_EXPECTATIONS: new Achv("greatExpectations", "greatExpectations.description", "gb", 50),
+  ULTRA_INSTINCT: new Achv("ultraInstinct", "ultraInstinct.description", "ub", 75),
+  MASTER_PLAN: new Achv("masterPlan", "masterPlan.description", "mb", 110),
+  CHAMPION_MATERIAL: new Achv("championMaterial", "championMaterial.description", "classic_ribbon_15", 150),
+  FIVE_ALARM_STREAK: new Achv("fiveAlarmStreak", "fiveAlarmStreak.description", "flame_orb", 75),
+  META_BREAKER: new Achv("metaBreaker", "metaBreaker.description", "everstone", 100),
+  CAP_SPACE: new Achv("capSpace", "capSpace.description", "coupon", 75),
+  HOUSE_MONEY: new Achv("houseMoney", "houseMoney.description", "coin_case", 100),
+  DOUBLE_OR_NOTHING: new Achv("doubleOrNothing", "doubleOrNothing.description", "loaded_dice", 100),
+  PRODIGAL_MON: new Achv("prodigalMon", "prodigalMon.description", "linking_cord", 75),
+  // Secret until the ranked ladder exposes the OPPONENT's tier client-side (the
+  // pre-match tier comparison cannot be observed yet), so it ships hidden rather
+  // than visibly unearnable. Wire detection with the ranked-ladder expansion.
+  DAVID_WAS_RANKED: new Achv("davidWasRanked", "davidWasRanked.description", "lucky_punch", 75).setSecret(),
+  ZERO_SUM_HERO: new Achv("zeroSumHero", "zeroSumHero.description", "metal_powder", 100),
+
+  // --- §2.2 Co-op ---------------------------------------------------------
+  SIX_PACK: new Achv("sixPack", "sixPack.description", "exp_share", 25),
+  LIFELINE_SUBSCRIPTION: new Achv("lifelineSubscription", "lifelineSubscription.description", "max_revive", 75),
+  NO_I_IN_TEAM: new Achv("noIInTeam", "noIInTeam.description", "exp_balance", 50),
+  PARALLEL_PLAY: new Achv("parallelPlay", "parallelPlay.description", "multi_lens", 75),
+  HELL_IS_OTHER_PEOPLE: new Achv("hellIsOtherPeople", "hellIsOtherPeople.description", "flame_plate", 100),
+  WE_BOTH_LIVED: new Achv("weBothLived", "weBothLived.description", "sacred_ash", 100),
+
+  // --- §2.3 Battle, triples, ghost combat ---------------------------------
+  NATURAL_SELECTION_BIAS: new Achv("naturalSelectionBias", "naturalSelectionBias.description", "wide_lens", 75),
+  FORMATION_BREAKER: new Achv("formationBreaker", "formationBreaker.description", "ground_gem", 75),
+  LEFT_RIGHT_GOODNIGHT: new Achv("leftRightGoodnight", "leftRightGoodnight.description", "black_belt", 50),
+  LAST_MON_STANDING: new Achv("lastMonStanding", "lastMonStanding.description", "focus_band", 75),
+  THREE_PIECE_COMBO: new Achv("threePieceCombo", "threePieceCombo.description", "metronome", 75),
+  ONE_HP_AND_A_DREAM: new Achv("oneHpAndADream", "oneHpAndADream.description", "focus_sash", 100),
+  NO_SELL: new Achv("noSell", "noSell.description", "weakness_policy", 75),
+  SETUP_PAYOFF: new Achv("setupPayoff", "setupPayoff.description", "x_attack", 50),
+  ZERO_TO_HERO: new Achv("zeroToHero", "zeroToHero.description", "shell_bell", 75),
+  CHECKMATE_IN_ONE: new Achv("checkmateInOne", "checkmateInOne.description", "scope_lens", 100),
+  FORM_VOLTRON: new Achv("formVoltron", "formVoltron.description", "reveal_glass", 50),
+  PURE_VANILLA: new Achv("pureVanilla", "pureVanilla.description", "mint_neutral", 75),
+  CHARGE_IT_TO_THE_GAME: new Achv("chargeItToTheGame", "chargeItToTheGame.description", "power_herb", 50),
+  THE_LONGEST_TURN: new Achv("theLongestTurn", "theLongestTurn.description", "grip_claw", 50),
+  STATUS_QUO: new Achv("statusQuo", "statusQuo.description", "toxic_orb", 100),
+  IMMORTAL_OBJECT: new Achv("immortalObject", "immortalObject.description", "relic_band", 50),
+
+  // --- §2.4 Training ------------------------------------------------------
+  TECHNICAL_DIFFICULTIES: new Achv("technicalDifficulties", "technicalDifficulties.description", "tm_normal", 25),
+
+  // --- §2.5 Mystery encounters and events ---------------------------------
+  EVICTION_NOTICE: new Achv("evictionNotice", "evictionNotice.description", "spell_tag", 75),
+  IDENTITY_THEFT: new Achv("identityTheft", "identityTheft.description", "scanner", 75),
+  DEAD_RINGER: new Achv("deadRinger", "deadRinger.description", "reaper_cloth", 75),
+  HELL_HOUSE: new Achv("hellHouse", "hellHouse.description", "spooky_plate", 100),
+  TRIPLE_EXORCISM: new Achv("tripleExorcism", "tripleExorcism.description", "ghost_gem", 100),
+  FINAL_ANSWER: new Achv("finalAnswer", "finalAnswer.description", "wise_glasses", 50),
+  ARE_YOU_NOT_ENTERTAINED: new Achv("areYouNotEntertained", "areYouNotEntertained.description", "leaders_crest", 120),
+  SEVEN_DEADLY_CHECKBOXES: new Achv("sevenDeadlyCheckboxes", "sevenDeadlyCheckboxes.description", "prison_bottle", 100),
+  READ_THE_FINE_PRINT: new Achv("readTheFinePrint", "readTheFinePrint.description", "griseous_core", 75),
+  JUST_SAY_NO: new Achv("justSayNo", "justSayNo.description", "light_stone", 50),
+  DELVE_TOO_DEEP: new Achv("delveTooDeep", "delveTooDeep.description", "black_augurite", 100),
+  STRANGER_THAN_FICTION: new Achv("strangerThanFiction", "strangerThanFiction.description", "old_gateau", 75),
+
+  // --- §2.6 Collection, economy, fusion, Shiny Lab ------------------------
+  MUSEUM_QUALITY: new Achv("museumQuality", "museumQuality.description", "relic_gold", 75),
+  BLACK_FRIDAY: new Achv("blackFriday", "blackFriday.description", "black_glasses", 75),
+  BIOME_TOURIST: new Achv("biomeTourist", "biomeTourist.description", "map", 75),
+  FOUR_MACHINES_ONE_DREAM: new Achv("fourMachinesOneDream", "fourMachinesOneDream.description", "mystery_egg", 50),
+  GOLDEN_TICKET: new Achv("goldenTicket", "goldenTicket.description", "golden_mystic_ticket", 50),
+  FUSION_DANCE: new Achv("fusionDance", "fusionDance.description", "dna_splicers", 50),
+  TWO_LEGENDS_ONE_SLOT: new Achv("twoLegendsOneSlot", "twoLegendsOneSlot.description", "n_lunarizer", 75),
+  CROSS_VERSION_COMPATIBILITY: new Achv(
+    "crossVersionCompatibility",
+    "crossVersionCompatibility.description",
+    "n_solarizer",
+    75,
+  ),
+  LAB_RAT: new Achv("labRat", "labRat.description", "shiny_stone", 50),
+  PRESET_JET_SET: new Achv("presetJetSet", "presetJetSet.description", "pair_of_tickets", 75),
+  NAME_RECOGNITION: new Achv("nameRecognition", "nameRecognition.description", "silk_scarf", 75),
+  NUMBER_GO_UP: new Achv("numberGoUp", "numberGoUp.description", "amulet_coin", 50),
+
+  // --- §2.7 Victory meta-achievements -------------------------------------
+  GROUNDHOG_WEEK: new Achv("groundhogWeek", "groundhogWeek.description", "sun_flute", 100),
+
+  // --- §2.8 Full-run challenges (ChallengeAchv, validated at game-over) ----
+  HELL_AND_BACK: new ChallengeAchv(
+    "hellAndBack",
+    "hellAndBack.description",
+    "charcoal",
+    100,
+    () =>
+      getErDifficulty() === "hell"
+      && !anyFormatChallengeActive()
+      && !challengeActive(Challenges.USAGE_TIER)
+      && !anyMonoRosterChallengeActive()
+      && !challengeActive(Challenges.HARDCORE),
+  ),
+  GLASS_CANNON: new ChallengeAchv(
+    "glassCannon",
+    "glassCannon.description",
+    "prism_scale",
+    100,
+    () => isEliteOrHell() && isNuzlockeChallenge() && challengeActive(Challenges.FLIP_STAT),
+  ),
+  GENERATION_GAP: new ChallengeAchv(
+    "generationGap",
+    "generationGap.description",
+    "ghost_memory",
+    100,
+    () =>
+      isEliteOrHell() && challengeActive(Challenges.SINGLE_GENERATION) && challengeActive(Challenges.GHOST_TRAINERS),
+  ),
+  HOUSE_OF_MIRRORS: new ChallengeAchv(
+    "houseOfMirrors",
+    "houseOfMirrors.description",
+    "mirror_herb",
+    100,
+    () => isEliteOrHell() && challengeActive(Challenges.MONO_COLOR) && challengeActive(Challenges.INVERSE_BATTLE),
+  ),
+  DEAD_CHANNEL: new ChallengeAchv(
+    "deadChannel",
+    "deadChannel.description",
+    "douse_drive",
+    100,
+    () =>
+      getErDifficulty() === "hell"
+      && challengeActive(Challenges.MONO_COLOR)
+      && isNuzlockeChallenge()
+      && challengeActive(Challenges.GHOST_TRAINERS),
+  ),
+  WAR_OF_ATTRITION: new ChallengeAchv(
+    "warOfAttrition",
+    "warOfAttrition.description",
+    "macho_brace",
+    100,
+    () => getErDifficulty() === "hell" && challengeActive(Challenges.FRESH_START) && isNuzlockeChallenge(),
+  ),
+  TRINITY_TEST: new ChallengeAchv(
+    "trinityTest",
+    "trinityTest.description",
+    "hard_meteorite",
+    120,
+    () =>
+      getErDifficulty() === "hell"
+      && challengeActive(Challenges.SINGLE_GENERATION)
+      && challengeActive(Challenges.TRIPLES_ONLY)
+      && challengeActive(Challenges.GHOST_TRAINERS),
+  ),
+  OPPOSITION_RESEARCH: new ChallengeAchv(
+    "oppositionResearch",
+    "oppositionResearch.description",
+    "zoom_lens",
+    100,
+    () =>
+      isEliteOrHell()
+      && challengeActive(Challenges.INVERSE_BATTLE)
+      && challengeActive(Challenges.SINGLE_TYPE)
+      && challengeActive(Challenges.GHOST_TRAINERS),
+  ),
+  // Mono-Gen on the ER "RDX" pseudo-generation (value 10 = ER customs, speciesId >= 10000).
+  MONO_GEN_REDUX_VICTORY: new ChallengeAchv(
+    "monoGenReduxVictory",
+    "monoGenReduxVictory.description",
+    "upgrade",
+    75,
+    c => c instanceof SingleGenerationChallenge && c.value === ER_RDX_CHALLENGE_GEN,
   ),
 };
 

@@ -1,10 +1,18 @@
 import { globalScene } from "#app/global-scene";
+import {
+  erRecordGhostTrainerWin,
+  erRecordNameFxTrainerWin,
+  erRecordNaturalTripleWin,
+  erRecordPresetBossWin,
+} from "#data/elite-redux/er-achievement-detection";
+import { erAchvRun } from "#data/elite-redux/er-achievement-run-state";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { wavesSinceEnteredBiome } from "#data/elite-redux/er-biome-structure";
 import { ER_COMPOSITE_PARTS } from "#data/elite-redux/er-composite-parts";
-import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
+import { getErGhostSnapshotSpecies, hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { decodeErShinyLabParams } from "#data/elite-redux/er-shiny-lab-effects";
 import {
   erRecordCoopLegendaryCatch,
   erRecordCoopWaveWon,
@@ -16,6 +24,7 @@ import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
 import { HitCheckResult } from "#enums/hit-check-result";
 import { AbilityId } from "#enums/ability-id";
+import { Challenges } from "#enums/challenges";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { ErSpeciesId } from "#enums/er-species-id";
 import { MoveCategory } from "#enums/move-category";
@@ -30,6 +39,7 @@ import { TrainerType } from "#enums/trainer-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
 import { type Achv, achvs } from "#system/achv";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 type HitCheckEntry = readonly [HitCheckResult, number];
 
@@ -60,6 +70,31 @@ interface ErAchievementBattleState {
   enemyKoTurns?: Map<number, number>;
   /** Triple Battle feats (#900): enemy id -> the player mon that KO'd it + its field slot (Center Stage). */
   enemyKoKillers?: Map<number, { userId: number; fieldIndex: number }>;
+  // --- catalog-v2 (#900) battle-local trackers -----------------------------
+  /** The player side dealt at least one DIRECT attack-move hit this battle (STATUS_QUO inverse). */
+  playerDealtDirectDamage?: boolean;
+  /** Player mon ids a RELIC (not an ability) saved from a faint this battle (IMMORTAL_OBJECT). */
+  relicSavedMonIds?: Set<number>;
+  /** The player mon id that dealt the most recent enemy KO (IMMORTAL_OBJECT winning-KO link). */
+  lastEnemyKillerId?: number;
+  /** Per active player-mon KO stint (SETUP_PAYOFF + ZERO_TO_HERO); reset on switch-in / faint. */
+  koStints?: Map<number, { kos: number; hadPlusSix: boolean; enteredLowHp: boolean; healed: boolean }>;
+  /** NO_SELL: a player mon survived a super-effective hit at 1 HP; KO this attacker before it acts again. */
+  noSellToken?: { attackerId: number; survivorId: number };
+  /** CHARGE_IT_TO_THE_GAME: player user ids that were at <=25% HP while charging a two-turn move. */
+  chargeLowHpUserIds?: Set<number>;
+  /** CHECKMATE_IN_ONE: per boss-enemy full-HP / one-turn / OHKO tracking. */
+  bossDamageTracking?: Map<number, { firstDamageTurn: number; fullHpAtFirstDamage: boolean; ohkoUsed: boolean }>;
+  /** THE_LONGEST_TURN: distinct effect identifiers observed on the current turn. */
+  longestTurnNumber?: number;
+  longestTurnEffects?: Set<string>;
+  /** LAST_MON_STANDING: a turn began this battle with only the center ally conscious. */
+  lastMonStandingArmed?: boolean;
+  /** IDENTITY_THEFT: the player fields a species that also appears on the ghost snapshot. */
+  identityTheftArmed?: boolean;
+  /** FORMATION_BREAKER: signature of the current player move use + its running enemy-KO count. */
+  spreadKoKey?: string;
+  spreadKoCount?: number;
 }
 
 interface ErAchievementRunState {
@@ -231,6 +266,13 @@ function battleState(): ErAchievementBattleState {
       playerFaintedThisBattle: false,
       enemyKoTurns: new Map<number, number>(),
       enemyKoKillers: new Map<number, { userId: number; fieldIndex: number }>(),
+      playerDealtDirectDamage: false,
+      relicSavedMonIds: new Set<number>(),
+      koStints: new Map<number, { kos: number; hadPlusSix: boolean; enteredLowHp: boolean; healed: boolean }>(),
+      chargeLowHpUserIds: new Set<number>(),
+      bossDamageTracking: new Map<number, { firstDamageTurn: number; fullHpAtFirstDamage: boolean; ohkoUsed: boolean }>(),
+      lastMonStandingArmed: false,
+      identityTheftArmed: false,
     };
   }
   return battle.erAchievementState;
@@ -402,6 +444,353 @@ function checkFlash(): void {
   }
 }
 
+// =============================================================================
+// catalog-v2 (#900): the new battle / ghost / co-op win-site feats. Fired by string
+// key (declarations are owned by a concurrent agent), fully guarded, observer-only.
+// =============================================================================
+
+/** Fire achievements by STRING KEY (unknown keys skipped - the declaration may not exist yet). */
+function fireKeys(ids: readonly string[]): void {
+  const registry = achvs as unknown as Record<string, Achv>;
+  for (const id of ids) {
+    const achv = registry[id];
+    if (achv) {
+      globalScene.validateAchv(achv);
+    }
+  }
+}
+
+/** A mon is Gigantamax if its active form key is a gmax/gigantamax form. */
+function isGmaxForm(pokemon: Pokemon): boolean {
+  const formKey = pokemon.species.forms[pokemon.formIndex]?.formKey;
+  return !!formKey && (formKey.includes("gigantamax") || formKey.includes("gmax"));
+}
+
+function erHardMode(): boolean {
+  const d = getErDifficulty();
+  return d === "elite" || d === "hell";
+}
+
+function erHellMode(): boolean {
+  return getErDifficulty() === "hell";
+}
+
+/** True when the (just-won) enemy party contained a boss enemy. */
+function enemyPartyHasBoss(): boolean {
+  return globalScene.getEnemyParty().some(e => (e as { isBoss?: () => boolean }).isBoss?.() === true);
+}
+
+/** THE_LONGEST_TURN: note a distinct effect identifier for the current turn (fires at 10). */
+function noteTurnEffect(key: string): void {
+  const state = battleState();
+  const turn = globalScene.currentBattle.turn;
+  if (state.longestTurnNumber !== turn) {
+    state.longestTurnNumber = turn;
+    state.longestTurnEffects = new Set<string>();
+  }
+  state.longestTurnEffects!.add(key);
+  if (state.longestTurnEffects!.size >= 10) {
+    fireKeys(["THE_LONGEST_TURN"]);
+  }
+}
+
+/** FORM_VOLTRON: three DISTINCT party mons - one Mega, one Gmax, one that Terastallized this battle. */
+function hasDistinctFormTrio(party: Pokemon[]): boolean {
+  const mega = party.filter(isMegaForm);
+  const gmax = party.filter(isGmaxForm);
+  const tera = party.filter(p => p.isTerastallized);
+  for (const a of mega) {
+    for (const b of gmax) {
+      if (b.id === a.id) {
+        continue;
+      }
+      for (const c of tera) {
+        if (c.id !== a.id && c.id !== b.id) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/** PURE_VANILLA: every participating player mon is un-transformed (no Mega/Gmax/Tera/fusion). */
+function pureVanillaParticipants(): boolean {
+  const ids = globalScene.currentBattle.playerParticipantIds;
+  const parts = globalScene.getPlayerParty().filter(m => ids.has(m.id));
+  return (
+    parts.length > 0
+    && parts.every(m => !isMegaForm(m) && !isGmaxForm(m) && !m.isTerastallized && !m.isFusion())
+  );
+}
+
+/** LEFT_RIGHT_GOODNIGHT / THREE_PIECE_COMBO: allied slots that each scored a KO on the same turn. */
+function checkTripleSlotFeats(): void {
+  const state = battleState();
+  const killers = state.enemyKoKillers;
+  const turns = state.enemyKoTurns;
+  if (!killers || !turns) {
+    return;
+  }
+  const slotsByTurn = new Map<number, Set<number>>();
+  for (const [enemyId, killer] of killers) {
+    const turn = turns.get(enemyId);
+    if (turn == null) {
+      continue;
+    }
+    let set = slotsByTurn.get(turn);
+    if (!set) {
+      set = new Set<number>();
+      slotsByTurn.set(turn, set);
+    }
+    set.add(killer.fieldIndex);
+  }
+  for (const slots of slotsByTurn.values()) {
+    if (slots.has(0) && slots.has(2)) {
+      fireKeys(["LEFT_RIGHT_GOODNIGHT"]);
+    }
+    if (slots.has(0) && slots.has(1) && slots.has(2)) {
+      fireKeys(["THREE_PIECE_COMBO"]);
+    }
+  }
+}
+
+/** NO_I_IN_TEAM: in co-op, both players' sides each personally scored a KO this battle. */
+function coopBothSidesScored(): boolean {
+  const killers = battleState().enemyKoKillers;
+  if (!killers) {
+    return false;
+  }
+  const byId = new Map(globalScene.getPlayerParty().map(m => [m.id, m]));
+  const owners = new Set<unknown>();
+  for (const killer of killers.values()) {
+    const mon = byId.get(killer.userId) as { coopOwner?: unknown } | undefined;
+    if (mon?.coopOwner != null) {
+      owners.add(mon.coopOwner);
+    }
+  }
+  return owners.size >= 2;
+}
+
+/** The species ids of party mons wearing an active name-FX Shiny Lab effect. */
+function collectNameFxSpecies(): number[] {
+  const gameData = globalScene.gameData;
+  const out: number[] = [];
+  for (const mon of globalScene.getPlayerParty()) {
+    const rootId = gameData.getRootStarterSpeciesId(mon.species.speciesId);
+    const save = gameData.starterData[rootId]?.erShinyLab;
+    if (save && decodeErShinyLabParams(save.q).nameFx) {
+      out.push(mon.species.speciesId);
+    }
+  }
+  return out;
+}
+
+/** The distinct named Shiny Lab preset names equipped across the party. */
+function collectNamedPresets(): string[] {
+  const gameData = globalScene.gameData;
+  const names = new Set<string>();
+  for (const mon of globalScene.getPlayerParty()) {
+    const rootId = gameData.getRootStarterSpeciesId(mon.species.speciesId);
+    const save = gameData.starterData[rootId]?.erShinyLab;
+    if (save && typeof save.ln === "string" && save.ln.length > 0) {
+      names.add(save.ln);
+    }
+  }
+  return [...names];
+}
+
+/** Co-op win feats: SIX_PACK, NO_I_IN_TEAM, PARALLEL_PLAY. */
+function checkCoopWinFeats(hasTrainer: boolean, bossBattle: boolean, noAlliedFaint: boolean): void {
+  const party = globalScene.getPlayerParty();
+  if (hasTrainer && party.length >= 6 && noAlliedFaint) {
+    fireKeys(["SIX_PACK"]);
+  }
+  if (bossBattle && noAlliedFaint && coopBothSidesScored()) {
+    fireKeys(["NO_I_IN_TEAM"]);
+  }
+  if (globalScene.currentBattle.waveIndex < 50) {
+    const kos = erAchvRun().parallelPlayKoIds;
+    if (party.length >= 6 && party.every(m => kos.has(m.id))) {
+      fireKeys(["PARALLEL_PLAY"]);
+    }
+  }
+}
+
+/** Full-run completion feats fired at the final-boss win. */
+function checkRunCompletionFeats(isCoop: boolean, hard: boolean, hell: boolean, party: Pokemon[]): void {
+  if (erAchvRun().bargainAccepted) {
+    fireKeys(["READ_THE_FINE_PRINT"]);
+  }
+  if (isCoop) {
+    if (hell) {
+      fireKeys(["HELL_IS_OTHER_PEOPLE"]);
+    }
+    if (hard && party.length >= 6 && party.every(m => !m.isFainted())) {
+      fireKeys(["WE_BOTH_LIVED"]);
+    }
+  }
+}
+
+/** The consolidated catalog-v2 win-site check, fired from erRecordAchievementWaveWon. */
+function checkCatalogWinFeats(): void {
+  const battle = globalScene.currentBattle;
+  const state = battleState();
+  const party = globalScene.getPlayerParty();
+  const isCoop = globalScene.gameMode.isCoop;
+  const trainer = battle.trainer;
+  const ghost = !!trainer && hasErGhostOverride(trainer);
+  const isTriple = battle.arrangement.format.id === "triple";
+  const hard = erHardMode();
+  const hell = erHellMode();
+  const bossBattle = enemyPartyHasBoss();
+  const noAlliedFaint = !state.playerFaintedThisBattle;
+
+  if (isTriple && !globalScene.gameMode.hasChallenge(Challenges.TRIPLES_ONLY)) {
+    erRecordNaturalTripleWin();
+  }
+
+  if (ghost) {
+    erRecordGhostTrainerWin(!globalScene.gameMode.hasChallenge(Challenges.GHOST_TRAINERS), hell);
+    if (hard && noAlliedFaint && !party.some(isMegaForm)) {
+      fireKeys(["DEAD_RINGER"]);
+    }
+    if (state.identityTheftArmed) {
+      fireKeys(["IDENTITY_THEFT"]);
+    }
+  }
+
+  if (isTriple) {
+    checkTripleSlotFeats();
+    if (hard && state.lastMonStandingArmed) {
+      fireKeys(["LAST_MON_STANDING"]);
+    }
+  }
+
+  if (bossBattle) {
+    const conscious = party.filter(m => !m.isFainted());
+    if (conscious.length === 1 && conscious[0].hp === 1) {
+      fireKeys(["ONE_HP_AND_A_DREAM"]);
+    }
+    if (hard && !state.playerDealtDirectDamage) {
+      fireKeys(["STATUS_QUO"]);
+    }
+    if (hasDistinctFormTrio(party)) {
+      fireKeys(["FORM_VOLTRON"]);
+    }
+    if (hell && pureVanillaParticipants()) {
+      fireKeys(["PURE_VANILLA"]);
+    }
+    if (state.lastEnemyKillerId != null && state.relicSavedMonIds?.has(state.lastEnemyKillerId)) {
+      fireKeys(["IMMORTAL_OBJECT"]);
+    }
+    // catalog-v2 FUSION_DANCE / CROSS_VERSION_COMPATIBILITY: the winning KO was landed by a fused mon.
+    const killer = state.lastEnemyKillerId != null ? party.find(m => m.id === state.lastEnemyKillerId) : undefined;
+    if (killer?.isFusion() && killer.fusionSpecies) {
+      fireKeys(["FUSION_DANCE"]);
+      const a = killer.species.speciesId;
+      const b = killer.fusionSpecies.speciesId;
+      if (isReduxSpecies(a) !== isReduxSpecies(b)) {
+        fireKeys(["CROSS_VERSION_COMPATIBILITY"]);
+      }
+    }
+  }
+
+  if (isCoop) {
+    checkCoopWinFeats(!!trainer, bossBattle, noAlliedFaint);
+  }
+
+  if (trainer) {
+    const nameFxSpecies = collectNameFxSpecies();
+    if (nameFxSpecies.length > 0) {
+      erRecordNameFxTrainerWin(nameFxSpecies);
+    }
+  }
+  if (battle.waveIndex % 10 === 0) {
+    const presetNames = collectNamedPresets();
+    if (presetNames.length > 0) {
+      erRecordPresetBossWin(presetNames);
+    }
+  }
+
+  if (globalScene.gameMode.isWaveFinal(battle.waveIndex)) {
+    checkRunCompletionFeats(isCoop, hard, hell, party);
+  }
+
+  const run = erAchvRun();
+  if (run.bargainRefusedPendingBoss && bossBattle) {
+    run.bargainRefusedPendingBoss = false;
+    fireKeys(["JUST_SAY_NO"]);
+  }
+}
+
+/**
+ * catalog-v2 (#900): a turn is starting (from TurnInitPhase). Initializes per-mon KO stints for
+ * on-field leads, arms LAST_MON_STANDING when only the center ally is conscious in a triple, and
+ * arms IDENTITY_THEFT once when the player fields a species also on the ghost snapshot.
+ */
+export function erRecordAchievementTurnStart(): void {
+  try {
+    const state = battleState();
+    const field = globalScene.getPlayerField();
+    for (const mon of field) {
+      if (mon && !mon.isFainted() && state.koStints && !state.koStints.has(mon.id)) {
+        state.koStints.set(mon.id, {
+          kos: 0,
+          hadPlusSix: false,
+          enteredLowHp: mon.getHpRatio() <= 0.25,
+          healed: false,
+        });
+      }
+    }
+    if (globalScene.currentBattle.arrangement.format.id === "triple") {
+      const conscious = field.filter(m => !!m && !m.isFainted());
+      if (conscious.length === 1 && conscious[0]!.getFieldIndex() === 1) {
+        state.lastMonStandingArmed = true;
+      }
+    }
+    const trainer = globalScene.currentBattle.trainer;
+    if (!state.identityTheftArmed && trainer && hasErGhostOverride(trainer)) {
+      const snap = getErGhostSnapshotSpecies(trainer);
+      if (snap && snap.length > 0) {
+        const snapSet = new Set<number>(snap);
+        if (globalScene.getPlayerParty().some(m => hasSpeciesIn(m, snapSet))) {
+          state.identityTheftArmed = true;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[er-achv] turn-start detection failed:", e);
+  }
+}
+
+/** catalog-v2 (#900): a player mon was healed (ZERO_TO_HERO "no healing" invalidation). */
+export function erRecordAchievementHeal(pokemon: Pokemon): void {
+  try {
+    if (!pokemon.isPlayer()) {
+      return;
+    }
+    const stint = battleState().koStints?.get(pokemon.id);
+    if (stint) {
+      stint.healed = true;
+    }
+    noteTurnEffect(`heal:${pokemon.id}`);
+  } catch (e) {
+    console.warn("[er-achv] heal detection failed:", e);
+  }
+}
+
+/** catalog-v2 (#900): a RELIC (not an ability) prevented a player mon's faint (IMMORTAL_OBJECT). */
+export function erRecordAchievementRelicSurvive(pokemon: Pokemon): void {
+  try {
+    if (pokemon.isPlayer()) {
+      battleState().relicSavedMonIds?.add(pokemon.id);
+    }
+  } catch (e) {
+    console.warn("[er-achv] relic-survive detection failed:", e);
+  }
+}
+
 export function erRecordAchievementMoveResolution(
   user: Pokemon,
   move: Move,
@@ -417,6 +806,11 @@ export function erRecordAchievementMoveResolution(
   const state = battleState();
   // Realistic Flash: record turn move-order for both sides before branching.
   recordFlashOrder(user);
+  // catalog-v2 NO_SELL: the armed attacker is acting again - the "before it acts again" window closed.
+  if (!user.isPlayer() && state.noSellToken && user.id === state.noSellToken.attackerId) {
+    delete state.noSellToken;
+  }
+  noteTurnEffect(`move:${user.id}:${move.id}`);
   if (user.isPlayer()) {
     if (move.id === MoveId.QUASH && globalScene.arena.hasTag(ArenaTagType.TRICK_ROOM)) {
       globalScene.validateAchv(achvs.HOLLOW_WICKER_BASKET);
@@ -472,6 +866,7 @@ export function erRecordAchievementMoveDamage(
   damage: number,
   isCritical: boolean,
   targetHpBefore: number,
+  isSuperEffective = false,
 ): void {
   if (damage <= 0) {
     return;
@@ -480,8 +875,94 @@ export function erRecordAchievementMoveDamage(
   recordDamageSource(target, useMode === MoveUseMode.INDIRECT ? `auto:${user.id}:${move.id}` : `move:${user.id}`);
 
   const koFromFull = targetHpBefore === target.getMaxHp() && damage >= targetHpBefore;
+  const state = battleState();
+  const battle = globalScene.currentBattle;
+
+  // catalog-v2 NO_SELL: a player mon survived a super-effective attack at exactly 1 HP - arm a
+  // token that fires when this attacker is KO'd before it acts again (disarmed in move-resolution).
+  if (
+    !user.isPlayer()
+    && target.isPlayer()
+    && isSuperEffective
+    && useMode !== MoveUseMode.INDIRECT
+    && !target.isFainted()
+    && target.hp === 1
+    && targetHpBefore > 1
+  ) {
+    state.noSellToken = { attackerId: user.id, survivorId: target.id };
+  }
+
   if (!user.isPlayer() || !target.isEnemy()) {
     return;
+  }
+
+  // catalog-v2 STATUS_QUO: the player side dealt DIRECT attack damage this battle.
+  if (useMode !== MoveUseMode.INDIRECT && move.category !== MoveCategory.STATUS) {
+    state.playerDealtDirectDamage = true;
+  }
+
+  // catalog-v2 CHECKMATE_IN_ONE: per-boss full-HP / one-turn / OHKO tracking (elite|hell only).
+  if (target.isBoss()) {
+    const bt = state.bossDamageTracking!;
+    let entry = bt.get(target.id);
+    if (!entry) {
+      entry = { firstDamageTurn: battle.turn, fullHpAtFirstDamage: koFromFull || targetHpBefore >= target.getMaxHp(), ohkoUsed: false };
+      bt.set(target.id, entry);
+    }
+    if (move.hasAttr("OneHitKOAttr")) {
+      entry.ohkoUsed = true;
+    }
+    if (
+      target.isFainted()
+      && erHardMode()
+      && entry.firstDamageTurn === battle.turn
+      && entry.fullHpAtFirstDamage
+      && !entry.ohkoUsed
+    ) {
+      fireKeys(["CHECKMATE_IN_ONE"]);
+    }
+  }
+
+  if (target.isFainted()) {
+    // catalog-v2 FORMATION_BREAKER: one player move use KO'd all three opposing actives (triple).
+    const spreadKey = `${user.id}:${move.id}:${battle.turn}`;
+    if (state.spreadKoKey !== spreadKey) {
+      state.spreadKoKey = spreadKey;
+      state.spreadKoCount = 0;
+    }
+    state.spreadKoCount = (state.spreadKoCount ?? 0) + 1;
+    if (state.spreadKoCount >= 3 && battle.arrangement.format.id === "triple") {
+      fireKeys(["FORMATION_BREAKER"]);
+    }
+
+    // catalog-v2 IMMORTAL_OBJECT link: remember the mon that scored the latest enemy KO.
+    state.lastEnemyKillerId = user.id;
+
+    // catalog-v2 SETUP_PAYOFF / ZERO_TO_HERO: per-mon KO stint.
+    const stint = state.koStints?.get(user.id);
+    if (stint) {
+      stint.kos += 1;
+      if (stint.kos >= 3 && stint.hadPlusSix) {
+        fireKeys(["SETUP_PAYOFF"]);
+      }
+      if (stint.kos >= 3 && stint.enteredLowHp && !stint.healed) {
+        fireKeys(["ZERO_TO_HERO"]);
+      }
+    }
+
+    // catalog-v2 PARALLEL_PLAY: this mon scored a KO this run (co-op shared-party KO set).
+    erAchvRun().parallelPlayKoIds.add(user.id);
+
+    // catalog-v2 CHARGE_IT_TO_THE_GAME: a released charge move by a low-HP charger scored the KO.
+    if (state.chargeLowHpUserIds?.has(user.id)) {
+      fireKeys(["CHARGE_IT_TO_THE_GAME"]);
+    }
+
+    // catalog-v2 TECHNICAL_DIFFICULTIES: KO with a move learned in the immediately preceding reward phase.
+    const stampWave = erAchvRun().learnedMoveStamps.get(move.id);
+    if (stampWave != null && stampWave === battle.waveIndex - 1) {
+      fireKeys(["TECHNICAL_DIFFICULTIES"]);
+    }
   }
 
   // #900 Center Stage: attribute an enemy KO to the player mon + field slot that dealt
@@ -541,6 +1022,14 @@ export function erRecordAchievementEnemyFaint(fainted: Pokemon): void {
   checkEveryoneGetOut();
   // #900 One-Turn Clear: note the turn each foe went down (direct + indirect).
   battleState().enemyKoTurns?.set(fainted.id, globalScene.currentBattle.turn);
+  noteTurnEffect(`faint:${fainted.id}`);
+
+  // catalog-v2 NO_SELL: the armed super-effective attacker was KO'd before it acted again.
+  const noSell = battleState().noSellToken;
+  if (noSell && noSell.attackerId === fainted.id) {
+    delete battleState().noSellToken;
+    fireKeys(["NO_SELL"]);
+  }
 
   const indirect = fainted.turnData.attacksReceived.length === 0;
   if (!indirect) {
@@ -560,6 +1049,8 @@ export function erRecordAchievementEnemyFaint(fainted: Pokemon): void {
 export function erRecordAchievementPlayerFaint(fainted: Pokemon): void {
   recordFaintForLedger(fainted);
   checkEveryoneGetOut();
+  // catalog-v2: a fainted mon ends its KO stint (SETUP_PAYOFF / ZERO_TO_HERO).
+  battleState().koStints?.delete(fainted.id);
 
   const state = runState();
   if (state.absolWarningWave != null && globalScene.currentBattle.waveIndex > state.absolWarningWave) {
@@ -643,6 +1134,13 @@ export function erRecordAchievementWaveWon(): void {
   erRecordCoopWaveWon();
   erRecordSignatureStyleBossWin();
 
+  // catalog-v2 (#900): the new battle / ghost / co-op / run-completion win-site feats.
+  try {
+    checkCatalogWinFeats();
+  } catch (e) {
+    console.warn("[er-achv] catalog-v2 win-feat detection failed:", e);
+  }
+
   // Squatter: deliberately linger in one biome for >= 20 waves (only meaningful in
   // ER biome-routing runs, where the per-biome wave counter resets on each entry).
   if (erBiomeRoutingActive() && wavesSinceEnteredBiome(globalScene.currentBattle.waveIndex) >= 20) {
@@ -685,7 +1183,17 @@ export function erRecordAchievementShinyEncounter(): void {
 
 export function erRecordAchievementSwitchIn(pokemon: Pokemon): void {
   if (pokemon.isPlayer()) {
-    battleState().switchedInPlayerIds?.add(pokemon.id);
+    const state = battleState();
+    state.switchedInPlayerIds?.add(pokemon.id);
+    // catalog-v2: a fresh KO stint starts on switch-in (SETUP_PAYOFF "before switch-out" +
+    // ZERO_TO_HERO "no switching out" both reset here so a switch restarts the count).
+    state.koStints?.set(pokemon.id, {
+      kos: 0,
+      hadPlusSix: false,
+      enteredLowHp: pokemon.getHpRatio() <= 0.25,
+      healed: false,
+    });
+    noteTurnEffect(`switch:${pokemon.id}`);
   }
 }
 
@@ -695,6 +1203,11 @@ export function erRecordAchievementChargeMove(user: Pokemon, moveId: MoveId, ins
   if (!instantCharge && user.isPlayer() && globalScene.currentBattle.turn === 1) {
     battleState().turnOneChargedMoves?.add(`${user.id}:${moveId}`);
   }
+  // catalog-v2 CHARGE_IT_TO_THE_GAME: a player mon charging a two-turn move at <=25% HP.
+  if (!instantCharge && user.isPlayer() && user.getHpRatio() <= 0.25) {
+    battleState().chargeLowHpUserIds?.add(user.id);
+  }
+  noteTurnEffect(`charge:${user.id}:${moveId}`);
 }
 
 export function erRecordAchievementFormChange(pokemon: Pokemon, formKey: string): void {
@@ -711,6 +1224,14 @@ export function erRecordAchievementStatStage(pokemon: Pokemon, stat: Stat): void
   if (pokemon.isPlayer() && stat === Stat.DEF && pokemon.getStatStage(stat) >= 6 && hasSpeciesIn(pokemon, REDUX_SNORLAX_LINE)) {
     globalScene.validateAchv(achvs.METAL_SLIME);
   }
+  // catalog-v2 SETUP_PAYOFF: reaching +6 in ANY stat arms the KO-stint bonus flag.
+  if (pokemon.isPlayer() && stat !== Stat.HP && pokemon.getStatStage(stat) >= 6) {
+    const stint = battleState().koStints?.get(pokemon.id);
+    if (stint) {
+      stint.hadPlusSix = true;
+    }
+    noteTurnEffect(`stat:${pokemon.id}:${stat}`);
+  }
 }
 
 export function erRecordAchievementLearnMove(pokemon: Pokemon, moveId: MoveId): void {
@@ -721,6 +1242,22 @@ export function erRecordAchievementLearnMove(pokemon: Pokemon, moveId: MoveId): 
   if (moveId === MoveId.DRACO_METEOR && pokemon.getTypes().includes(PokemonType.PSYCHIC)) {
     globalScene.validateAchv(achvs.PK_STARSTORM);
   }
+  // catalog-v2 TECHNICAL_DIFFICULTIES: stamp the wave this move was learned on (a KO with it in
+  // the next battle - the immediately following one - unlocks the achievement).
+  if (pokemon.isPlayer()) {
+    erAchvRun().learnedMoveStamps.set(moveId, globalScene.currentBattle.waveIndex);
+  }
+}
+
+/** True when a species id belongs to the ER (RDX) custom generation (ids >= 10000). */
+function isReduxSpecies(speciesId: number): boolean {
+  return speciesId >= 10000;
+}
+
+/** True when a species id is legendary-class (legendary / sub-legendary / mythical). */
+function isLegendaryClassSpecies(speciesId: number): boolean {
+  const species = getPokemonSpecies(speciesId as SpeciesId);
+  return !!species && (species.legendary || species.subLegendary || species.mythical);
 }
 
 /** Original Dragon Spirit: a DNA Splicers fusion of Reshiram + Zekrom (in either order). */
@@ -728,6 +1265,10 @@ export function erRecordAchievementFusion(speciesA: number, speciesB: number): v
   const pair = new Set<number>([speciesA, speciesB]);
   if (pair.has(SpeciesId.RESHIRAM) && pair.has(SpeciesId.ZEKROM)) {
     globalScene.validateAchv(achvs.ORIGINAL_DRAGON_SPIRIT);
+  }
+  // catalog-v2 TWO_LEGENDS_ONE_SLOT: fuse two legendary-class Pokemon.
+  if (isLegendaryClassSpecies(speciesA) && isLegendaryClassSpecies(speciesB)) {
+    fireKeys(["TWO_LEGENDS_ONE_SLOT"]);
   }
 }
 

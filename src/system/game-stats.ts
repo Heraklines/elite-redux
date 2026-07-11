@@ -45,6 +45,31 @@ export class GameStats {
   public showdownMatchesPlayed: number;
   public showdownWins: number;
   public tripleBattleWins: number;
+  // ER achievement-expansion catalog-v2 (#900): account-lifetime counters + bitsets for the
+  // 70-achievement catalog (§6.3). Numbers default 0, arrays default [] via the constructor
+  // idiom, so an older save loads unchanged and starts counting from here. Bitset arrays hold
+  // the DISTINCT ids/keys already credited (dedupe on write); counters saturate at their gate.
+  public rankedWinStreak: number;
+  public rankedNoMegaWins: number;
+  public showdownStakedWins: number;
+  public showdownShinyStakeStreak: number;
+  public coopPartnerRevives: number;
+  public naturalTripleWins: number;
+  public naturalGhostWins: number;
+  public hellGhostWins: number;
+  public sevenSinsOutcomes: string[];
+  public mysteryEncounterTypesResolved: number[];
+  public relicKindsAcquired: string[];
+  public blackMarketRunCount: number;
+  public biomeShopTypesPurchased: string[];
+  public gachaRarePlusHatchSources: number[];
+  public gachaLegendaryHatchSources: number[];
+  public shinyLabSpeciesPurchased: number[];
+  public presetNamedBossWins: string[];
+  public nameFxTrainerWins: number;
+  public nameFxWinSpecies: number[];
+  public dailySeedsWon: string[];
+  public stakeWonSpecies: number[];
 
   constructor(source?: any) {
     this.playTime = source?.playTime || 0;
@@ -87,5 +112,26 @@ export class GameStats {
     this.showdownMatchesPlayed = source?.showdownMatchesPlayed || 0;
     this.showdownWins = source?.showdownWins || 0;
     this.tripleBattleWins = source?.tripleBattleWins || 0;
+    this.rankedWinStreak = source?.rankedWinStreak || 0;
+    this.rankedNoMegaWins = source?.rankedNoMegaWins || 0;
+    this.showdownStakedWins = source?.showdownStakedWins || 0;
+    this.showdownShinyStakeStreak = source?.showdownShinyStakeStreak || 0;
+    this.coopPartnerRevives = source?.coopPartnerRevives || 0;
+    this.naturalTripleWins = source?.naturalTripleWins || 0;
+    this.naturalGhostWins = source?.naturalGhostWins || 0;
+    this.hellGhostWins = source?.hellGhostWins || 0;
+    this.sevenSinsOutcomes = source?.sevenSinsOutcomes || [];
+    this.mysteryEncounterTypesResolved = source?.mysteryEncounterTypesResolved || [];
+    this.relicKindsAcquired = source?.relicKindsAcquired || [];
+    this.blackMarketRunCount = source?.blackMarketRunCount || 0;
+    this.biomeShopTypesPurchased = source?.biomeShopTypesPurchased || [];
+    this.gachaRarePlusHatchSources = source?.gachaRarePlusHatchSources || [];
+    this.gachaLegendaryHatchSources = source?.gachaLegendaryHatchSources || [];
+    this.shinyLabSpeciesPurchased = source?.shinyLabSpeciesPurchased || [];
+    this.presetNamedBossWins = source?.presetNamedBossWins || [];
+    this.nameFxTrainerWins = source?.nameFxTrainerWins || 0;
+    this.nameFxWinSpecies = source?.nameFxWinSpecies || [];
+    this.dailySeedsWon = source?.dailySeedsWon || [];
+    this.stakeWonSpecies = source?.stakeWonSpecies || [];
   }
 }

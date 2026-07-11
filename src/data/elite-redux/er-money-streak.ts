@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { erRecordMoneyStreakMilestone } from "#data/elite-redux/er-achievement-detection";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import type { Pokemon } from "#field/pokemon";
 
@@ -61,7 +62,10 @@ export function advanceErMoneyStreaks(): void {
       STREAKS.set(mon.id, 0);
       continue;
     }
-    STREAKS.set(mon.id, (STREAKS.get(mon.id) ?? 0) + 1);
+    const next = (STREAKS.get(mon.id) ?? 0) + 1;
+    STREAKS.set(mon.id, next);
+    // catalog-v2 (#900) NUMBER_GO_UP: a mon's money streak reached 20 qualifying waves this run.
+    erRecordMoneyStreakMilestone(next);
   }
   FAINTED_THIS_WAVE.clear();
 }

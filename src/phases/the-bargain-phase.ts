@@ -20,10 +20,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
-import {
-  adoptBargainWatcherOutcome,
-  commitBargainOwnerOutcome,
-} from "#data/elite-redux/coop/coop-bargain-operation";
+import { adoptBargainWatcherOutcome, commitBargainOwnerOutcome } from "#data/elite-redux/coop/coop-bargain-operation";
 import { applyCoopMeOutcome, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_BARGAIN_SEQ_BASE, COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -33,6 +30,8 @@ import {
   getCoopInteractionRelay,
   getCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
+import { erRecordSevenSinOutcome } from "#data/elite-redux/er-achievement-detection";
+import { erAchvRun } from "#data/elite-redux/er-achievement-run-state";
 import {
   BARGAIN_RELIC_CHOICES,
   BARGAIN_SIN_ORDER,
@@ -240,6 +239,10 @@ export class TheBargainPhase extends Phase {
     if (committed) {
       // The player accepted (and the deal was applied) one of Giratina's bargains.
       globalScene.validateAchv(achvs.DEVILS_BARGAIN);
+      // catalog-v2 (#900) SEVEN_DEADLY_CHECKBOXES: record this resolved sin outcome (7 classic sins).
+      erRecordSevenSinOutcome(key);
+      // catalog-v2 (#900) READ_THE_FINE_PRINT: carry an "accepted the bargain" flag to the run victory.
+      erAchvRun().bargainAccepted = true;
       this.coopBargainTerminal();
       this.end();
       return;
@@ -255,6 +258,8 @@ export class TheBargainPhase extends Phase {
       return;
     }
     this.resolving = true;
+    // catalog-v2 (#900) JUST_SAY_NO: refused the bargain - fires when the next boss is beaten.
+    erAchvRun().bargainRefusedPendingBoss = true;
     this.coopBargainTerminal();
     await globalScene.ui.setMode(UiMode.MESSAGE);
     await this.giratina(`${ns}:option.leave.line1`);

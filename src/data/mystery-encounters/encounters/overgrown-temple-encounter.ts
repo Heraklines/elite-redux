@@ -33,6 +33,7 @@
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
+import { erRecordDelveDeepestCleared } from "#data/elite-redux/er-achievement-detection";
 import { guardianForDepth } from "#data/elite-redux/er-delve-guardians";
 import { applyErGuardianTokens } from "#data/elite-redux/er-fight-tokens";
 import {
@@ -266,8 +267,13 @@ function delveConfig(encounter: MysteryEncounter): PressYourLuckConfig {
       // guardian tougher). A full party wipe ends the run as any battle would.
       haul.interrupts += 1;
       queueEncounterMessage(`${namespace}:templeWakes`);
+      // catalog-v2 (#900) DELVE_TOO_DEEP: winning a BOSS-tier guardian fight (the deepest tier).
+      const wasBossGuardian = haul.interrupts >= GUARDIAN_BOSS_AFTER_INTERRUPTS;
       encounter.doContinueEncounter = async () => {
         encounter.doContinueEncounter = undefined;
+        if (wasBossGuardian) {
+          erRecordDelveDeepestCleared();
+        }
         await resumePressYourLuck(delveConfig(encounter));
       };
       await transitionMysteryEncounterIntroVisuals(true, false);

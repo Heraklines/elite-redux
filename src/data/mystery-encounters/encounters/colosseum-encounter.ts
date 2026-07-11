@@ -22,6 +22,7 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
+import { erRecordColosseumFlawlessClear } from "#data/elite-redux/er-achievement-detection";
 import { setErColosseumBattleActive } from "#data/elite-redux/er-trainer-runtime-hook";
 import { trainerConfigs } from "#data/trainers/trainer-config";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -265,6 +266,12 @@ export const ColosseumEncounter: MysteryEncounter = MysteryEncounterBuilder.with
         }
         halfHealSurvivors();
         if (enc.misc.wins >= MAX_ROUNDS) {
+          // catalog-v2 (#900) ARE_YOU_NOT_ENTERTAINED: full gauntlet clear with no allied faint.
+          // Fainted mons stay down across rounds (only survivors are half-healed), so a live
+          // isFainted() scan at the full clear faithfully means "nobody fainted the whole run".
+          if (!globalScene.getPlayerParty().some(m => m.isFainted())) {
+            erRecordColosseumFlawlessClear();
+          }
           await endColosseum(enc.misc.wins);
         } else {
           globalScene.phaseManager.unshiftNew("ColosseumChoicePhase", enc.misc.wins);

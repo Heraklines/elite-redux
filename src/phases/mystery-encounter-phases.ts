@@ -26,6 +26,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ME_CHOICE_KINDS, COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
+import { erRecordMysteryEncounterResolved } from "#data/elite-redux/er-achievement-detection";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { BattleType } from "#enums/battle-type";
@@ -330,6 +331,9 @@ export class MysteryEncounterPhase extends Phase {
       globalScene.mysteryEncounterSaveData.encounteredEvents.push(
         new SeenEncounterData(encounter.encounterType, encounter.encounterTier, globalScene.currentBattle.waveIndex),
       );
+      // catalog-v2 (#900) STRANGER_THAN_FICTION: 15 distinct mystery-encounter types across fresh
+      // events. Recorded at fresh entry of a new encounter (deduped by type in the persisted set).
+      erRecordMysteryEncounterResolved(encounter.encounterType);
       // Dev-tools: a scenario that FORCED this encounter clears its ME overrides
       // here so it fires once instead of re-spawning every wave. No-op in prod.
       consumeClearMeOverrideAfterFirst();

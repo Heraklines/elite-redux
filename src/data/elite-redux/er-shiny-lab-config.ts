@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { erRecordShinyLabSpeciesPurchase } from "#data/elite-redux/er-achievement-detection";
 import { erRecordShinyLabEffectPurchased, erRecordShinyLabLoadout } from "#data/elite-redux/er-social-achievement-tracker";
 import {
   bitsetToErShinyLabAvailableSet,
@@ -212,6 +213,8 @@ export function buildErShinyLabConfig(speciesId: number): ErShinyLabConfig {
     persistConfig(entry, config, config.equipped, config.params);
     // #900 Look Collector: a fresh purchase may cross a "own N effects" threshold.
     erRecordShinyLabEffectPurchased();
+    // catalog-v2 (#900) LAB_RAT: buy Shiny Lab effects for 10 different species.
+    erRecordShinyLabSpeciesPurchase(config.speciesId);
   };
   config.onChange = (loadout, nextParams) => {
     config.equipped = sanitizeErShinyLabLoadout(loadout, config.owned);

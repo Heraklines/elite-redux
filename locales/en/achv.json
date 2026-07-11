@@ -793,5 +793,355 @@
     "name": "Phantom Formation",
     "name_female": "Phantom Formation",
     "description": "Win a run with both the Triples Only and Ghost Trainers challenges active."
+  },
+  "rankedAndFiled": {
+    "name": "Ranked and Filed",
+    "name_female": "Ranked and Filed",
+    "description": "Win your first ranked Showdown match."
+  },
+  "greatExpectations": {
+    "name": "Great Expectations",
+    "name_female": "Great Expectations",
+    "description": "Reach the Great Ball tier in ranked Showdown."
+  },
+  "ultraInstinct": {
+    "name": "Ultra Instinct",
+    "name_female": "Ultra Instinct",
+    "description": "Reach the Ultra Ball tier in ranked Showdown."
+  },
+  "masterPlan": {
+    "name": "Master Plan",
+    "name_female": "Master Plan",
+    "description": "Reach the Master Ball tier in ranked Showdown."
+  },
+  "championMaterial": {
+    "name": "Champion Material",
+    "name_female": "Champion Material",
+    "description": "Reach the Champion tier in ranked Showdown."
+  },
+  "fiveAlarmStreak": {
+    "name": "Five-Alarm Streak",
+    "name_female": "Five-Alarm Streak",
+    "description": "Win 5 ranked matches in a row."
+  },
+  "metaBreaker": {
+    "name": "Meta Breaker",
+    "name_female": "Meta Breaker",
+    "description": "Win 10 ranked matches without using Mega Evolution; the wins need not be consecutive."
+  },
+  "capSpace": {
+    "name": "Cap Space",
+    "name_female": "Cap Space",
+    "description": "Win a ranked match with a team whose total starter cost is at least 8 lower than the opponent's."
+  },
+  "houseMoney": {
+    "name": "House Money",
+    "name_female": "House Money",
+    "description": "Win 10 settled, non-void Showdown matches in which you staked at least one Pokémon."
+  },
+  "doubleOrNothing": {
+    "name": "Double or Nothing",
+    "name_female": "Double or Nothing",
+    "description": "Win three consecutive settled Showdown matches in which your stake includes at least one shiny Pokémon; voids break the streak."
+  },
+  "prodigalMon": {
+    "name": "The Prodigal Mon",
+    "name_female": "The Prodigal Mon",
+    "description": "Win a settled Showdown match with a Pokémon that you previously won as a stake."
+  },
+  "davidWasRanked": {
+    "name": "David Was Ranked",
+    "name_female": "David Was Ranked",
+    "description": "Defeat an opponent at least one full ranked tier above you."
+  },
+  "zeroSumHero": {
+    "name": "Zero-Sum Hero",
+    "name_female": "Zero-Sum Hero",
+    "description": "Win a settled ranked staked match without Mega Evolution, with every team member costing 3 or less, against an opponent whose total team cost is at least 8 higher."
+  },
+  "sixPack": {
+    "name": "Six-Pack",
+    "name_female": "Six-Pack",
+    "description": "Win a co-op trainer battle with all six shared party slots occupied and no allied faint."
+  },
+  "lifelineSubscription": {
+    "name": "Lifeline Subscription",
+    "name_female": "Lifeline Subscription",
+    "description": "Revive your partner 10 times across co-op runs, with at most one credited revive per wave."
+  },
+  "noIInTeam": {
+    "name": "No I in Team",
+    "name_female": "No I in Team",
+    "description": "Clear a co-op boss wave with each player's side scoring at least one KO and no allied faint."
+  },
+  "parallelPlay": {
+    "name": "Parallel Play",
+    "name_female": "Parallel Play",
+    "description": "Before wave 50, have each of the six shared party Pokémon score at least one KO in the same run."
+  },
+  "hellIsOtherPeople": {
+    "name": "Hell Is Other People",
+    "name_female": "Hell Is Other People",
+    "description": "Complete a full co-op run on Hell difficulty."
+  },
+  "weBothLived": {
+    "name": "We Both Lived",
+    "name_female": "We Both Lived",
+    "description": "Defeat the final boss in co-op on Elite or Hell with all six shared party Pokémon unfainted."
+  },
+  "naturalSelectionBias": {
+    "name": "Natural Selection Bias",
+    "name_female": "Natural Selection Bias",
+    "description": "Win 10 naturally rolled triple battles while Triples Only is not active."
+  },
+  "formationBreaker": {
+    "name": "Formation Breaker",
+    "name_female": "Formation Breaker",
+    "description": "KO all three opposing active Pokémon with one spread move."
+  },
+  "leftRightGoodnight": {
+    "name": "Left, Right, Goodnight",
+    "name_female": "Left, Right, Goodnight",
+    "description": "In a triple battle, have the left and right allied slots each score a KO in the same turn."
+  },
+  "lastMonStanding": {
+    "name": "Last Mon Standing",
+    "name_female": "Last Mon Standing",
+    "description": "On Elite or Hell, win a triple battle after beginning a turn with only the center Pokémon conscious."
+  },
+  "threePieceCombo": {
+    "name": "Three-Piece Combo",
+    "name_female": "Three-Piece Combo",
+    "description": "In a triple battle, have all three allied slots each score one KO in the same turn."
+  },
+  "oneHpAndADream": {
+    "name": "One HP and a Dream",
+    "name_female": "One HP and a Dream",
+    "description": "Defeat a boss with your last conscious Pokémon at exactly 1 HP."
+  },
+  "noSell": {
+    "name": "No Sell",
+    "name_female": "No Sell",
+    "description": "Survive a super-effective hit at 1 HP, then KO that attacker before it acts again."
+  },
+  "setupPayoff": {
+    "name": "Setup Payoff",
+    "name_female": "Setup Payoff",
+    "description": "Reach +6 in one stat and score 3 KOs with that Pokémon before it switches out."
+  },
+  "zeroToHero": {
+    "name": "Zero to Hero",
+    "name_female": "Zero to Hero",
+    "description": "Enter battle at 25% HP or less and score 3 KOs without healing or switching out."
+  },
+  "checkmateInOne": {
+    "name": "Checkmate in One",
+    "name_female": "Checkmate in One",
+    "description": "On Elite or Hell, defeat a boss from full HP in one turn without using an OHKO move."
+  },
+  "formVoltron": {
+    "name": "Form Voltron",
+    "name_female": "Form Voltron",
+    "description": "Win a boss battle with three distinct party members represented: one permanently Mega-evolved Pokémon, one Gigantamax-form Pokémon, and one Pokémon that Terastallizes during that battle."
+  },
+  "pureVanilla": {
+    "name": "Pure Vanilla",
+    "name_female": "Pure Vanilla",
+    "description": "On Hell, defeat a boss with no Mega-evolved, Gigantamax-form, Terastallized, or fused Pokémon participating."
+  },
+  "chargeItToTheGame": {
+    "name": "Charge It to the Game",
+    "name_female": "Charge It to the Game",
+    "description": "KO with a charging move after its user survived the charge turn at 25% HP or less."
+  },
+  "theLongestTurn": {
+    "name": "The Longest Turn",
+    "name_female": "The Longest Turn",
+    "description": "Trigger 10 distinct move, ability, item, or field effects in one turn."
+  },
+  "statusQuo": {
+    "name": "Status Quo",
+    "name_female": "Status Quo",
+    "description": "On Elite or Hell, defeat a boss after dealing no direct attack damage during the battle."
+  },
+  "immortalObject": {
+    "name": "Immortal Object",
+    "name_female": "Immortal Object",
+    "description": "Have a relic prevent a faint, then land the battle-winning KO with that Pokémon."
+  },
+  "technicalDifficulties": {
+    "name": "Technical Difficulties",
+    "name_female": "Technical Difficulties",
+    "description": "Score a KO with a move learned in the immediately preceding reward phase."
+  },
+  "evictionNotice": {
+    "name": "Eviction Notice",
+    "name_female": "Eviction Notice",
+    "description": "Defeat 5 naturally occurring ghost trainers while Ghost Trainers is not active."
+  },
+  "identityTheft": {
+    "name": "Identity Theft",
+    "name_female": "Identity Theft",
+    "description": "Defeat a ghost trainer while using at least one species that also appears on its snapshot team."
+  },
+  "deadRinger": {
+    "name": "Dead Ringer",
+    "name_female": "Dead Ringer",
+    "description": "Defeat a ghost trainer on Elite or Hell with no allied faint and without using Mega Evolution."
+  },
+  "hellHouse": {
+    "name": "Hell House",
+    "name_female": "Hell House",
+    "description": "Defeat 25 ghost trainers on Hell difficulty."
+  },
+  "tripleExorcism": {
+    "name": "Triple Exorcism",
+    "name_female": "Triple Exorcism",
+    "description": "On Hell difficulty, win a triple battle against a ghost trainer with no allied faint."
+  },
+  "finalAnswer": {
+    "name": "Final Answer",
+    "name_female": "Final Answer",
+    "description": "Answer every question correctly in one mystery quiz encounter."
+  },
+  "areYouNotEntertained": {
+    "name": "Are You Not Entertained?",
+    "name_female": "Are You Not Entertained?",
+    "description": "Clear the Colosseum mystery gauntlet without an allied faint."
+  },
+  "sevenDeadlyCheckboxes": {
+    "name": "Seven Deadly Checkboxes",
+    "name_female": "Seven Deadly Checkboxes",
+    "description": "Resolve all seven distinct Seven-Sins bargain outcomes across fresh encounters."
+  },
+  "readTheFinePrint": {
+    "name": "Read the Fine Print",
+    "name_female": "Read the Fine Print",
+    "description": "Accept Giratina's bargain and then complete that full run."
+  },
+  "justSayNo": {
+    "name": "Just Say No",
+    "name_female": "Just Say No",
+    "description": "Refuse Giratina's bargain, then defeat the next boss in that run."
+  },
+  "delveTooDeep": {
+    "name": "Delve Too Deep",
+    "name_female": "Delve Too Deep",
+    "description": "Clear the deepest tier of a delve mystery encounter."
+  },
+  "strangerThanFiction": {
+    "name": "Stranger Than Fiction",
+    "name_female": "Stranger Than Fiction",
+    "description": "Resolve 15 distinct mystery encounter types across fresh events."
+  },
+  "museumQuality": {
+    "name": "Museum Quality",
+    "name_female": "Museum Quality",
+    "description": "Acquire 5 distinct relic types through fresh acquisitions."
+  },
+  "blackFriday": {
+    "name": "Black Friday",
+    "name_female": "Black Friday",
+    "description": "Make a black-market purchase in 10 different runs."
+  },
+  "biomeTourist": {
+    "name": "Biome Tourist",
+    "name_female": "Biome Tourist",
+    "description": "Make a purchase from 8 distinct biome-specific shop types across fresh visits."
+  },
+  "fourMachinesOneDream": {
+    "name": "Four Machines, One Dream",
+    "name_female": "Four Machines, One Dream",
+    "description": "Hatch a Rare-or-better egg sourced from each of the four egg machines."
+  },
+  "goldenTicket": {
+    "name": "Golden Ticket",
+    "name_female": "Golden Ticket",
+    "description": "Hatch a Legendary egg sourced from each of the four egg machines."
+  },
+  "fusionDance": {
+    "name": "Fusion Dance",
+    "name_female": "Fusion Dance",
+    "description": "Defeat a boss with a fused Pokémon landing the winning KO."
+  },
+  "twoLegendsOneSlot": {
+    "name": "Two Legends, One Slot",
+    "name_female": "Two Legends, One Slot",
+    "description": "Fuse two legendary-class Pokémon."
+  },
+  "crossVersionCompatibility": {
+    "name": "Cross-Version Compatibility",
+    "name_female": "Cross-Version Compatibility",
+    "description": "Defeat a boss with a fused Pokémon whose two source species include one RDX-generation Pokémon and one non-RDX Pokémon."
+  },
+  "labRat": {
+    "name": "Lab Rat",
+    "name_female": "Lab Rat",
+    "description": "Buy Shiny Lab effects for 10 different species."
+  },
+  "presetJetSet": {
+    "name": "Preset Jet Set",
+    "name_female": "Preset Jet Set",
+    "description": "Win a boss wave with each of five different named Shiny Lab presets."
+  },
+  "nameRecognition": {
+    "name": "Name Recognition",
+    "name_female": "Name Recognition",
+    "description": "Win 25 trainer battles with name-FX active, spanning at least five species."
+  },
+  "numberGoUp": {
+    "name": "Number Go Up",
+    "name_female": "Number Go Up",
+    "description": "Extend the money-streak system to 20 consecutive qualifying waves in one run."
+  },
+  "groundhogWeek": {
+    "name": "Groundhog Week",
+    "name_female": "Groundhog Week",
+    "description": "Win seven distinct Daily Run seeds through fresh completions."
+  },
+  "hellAndBack": {
+    "name": "Hell and Back",
+    "name_female": "Hell and Back",
+    "description": "Complete a full Hell run with no format, usage-tier, mono-roster, or permadeath challenge active."
+  },
+  "glassCannon": {
+    "name": "Glass Cannon",
+    "name_female": "Glass Cannon",
+    "description": "Complete a full run on Elite or Hell with Nuzlocke and Flip Stats active."
+  },
+  "generationGap": {
+    "name": "Generation Gap",
+    "name_female": "Generation Gap",
+    "description": "Complete a full run on Elite or Hell with Mono-Gen and Ghost Trainers active."
+  },
+  "houseOfMirrors": {
+    "name": "House of Mirrors",
+    "name_female": "House of Mirrors",
+    "description": "Complete a full run on Elite or Hell with Monocolor and Inverse active."
+  },
+  "deadChannel": {
+    "name": "Dead Channel",
+    "name_female": "Dead Channel",
+    "description": "Complete a full Hell run with Monocolor, Nuzlocke, and Ghost Trainers active."
+  },
+  "warOfAttrition": {
+    "name": "War of Attrition",
+    "name_female": "War of Attrition",
+    "description": "Complete a full Hell run with Fresh Start and Nuzlocke active."
+  },
+  "trinityTest": {
+    "name": "Trinity Test",
+    "name_female": "Trinity Test",
+    "description": "Complete a full Hell run with Mono-Gen, Triples Only, and Ghost Trainers active."
+  },
+  "oppositionResearch": {
+    "name": "Opposition Research",
+    "name_female": "Opposition Research",
+    "description": "Complete a full run on Elite or Hell with Inverse, Mono-Type, and Ghost Trainers active."
+  },
+  "monoGenReduxVictory": {
+    "name": "Redux Means Redux",
+    "name_female": "Redux Means Redux",
+    "description": "Complete a full run using only RDX-generation Pokémon."
   }
 }

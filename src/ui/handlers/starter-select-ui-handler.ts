@@ -22,6 +22,7 @@ import { COOP_STARTER_COST_BUDGET } from "#data/elite-redux/coop/coop-roster";
 import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_SLOTS_PER_PLAYER } from "#data/elite-redux/coop/coop-session";
 import { matchesAbilityText } from "#data/elite-redux/er-ability-search";
+import { resetErAchievementRunState } from "#data/elite-redux/er-achievement-run-state";
 import { ER_BLACK_SHINY_TINT } from "#data/elite-redux/er-black-shinies";
 import { clearForcedCommunityDifficulty, getForcedCommunityDifficulty } from "#data/elite-redux/er-community-run-state";
 import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
@@ -7311,6 +7312,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 addTreasureFragments(Overrides.ER_TREASURE_FRAGMENTS_OVERRIDE);
               }
               resetErMoneyStreaks();
+              resetErAchievementRunState();
               globalScene.money = globalScene.gameMode.getStartingMoney();
               const starters = this.starters.slice(0);
               // ER: remember this team so it can be re-selected next run.

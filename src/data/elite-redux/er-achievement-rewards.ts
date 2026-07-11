@@ -99,6 +99,11 @@ export type RewardSpec =
   | { kind: "blackShiny"; species: SpeciesId | "random" }
   /** A specific Pokemon, caught (normal). */
   | { kind: "pokemon"; species: SpeciesId }
+  /**
+   * A trainer title, persisted to the system save (gameData.erTitles). Display UI is
+   * intentionally deferred - the grant only records the earned title so nothing is lost.
+   */
+  | { kind: "title"; title: string }
   /** Global Shiny Lab availability gates. Species still buy or catch ownership. */
   | { kind: "shinyLabEffects"; effects: string[] }
   /**
@@ -429,6 +434,295 @@ export const ER_ACHIEVEMENT_REWARDS: Record<string, RewardSpec | RewardSpec[]> =
   // clear: 1 Epic egg here + the +2 Premium run-completion bonus via RUN_COMPLETION_ACHV_IDS,
   // plus the Double Team ("echoes") aura gate folded in via ER_SHINY_LAB_EFFECT_ACHV.
   PHANTOM_FORMATION: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
+
+  // === Definitive achievement expansion (70 new) ===========================
+  // House rules hold: collection layer only (candy / eggs / vouchers / specific mon /
+  // tier 1-3 shiny + the CHAMPION_MATERIAL title), never money / charms / run-power, and
+  // no black shiny outside the apex stacks. Each achv's Shiny Lab effect gate
+  // (er-shiny-lab-effects) is folded in automatically on unlock. The §1.5 full-run IDs
+  // are in RUN_COMPLETION_ACHV_IDS (they get +2 Premium there), so their inline rows
+  // below have the 2-Premium floor SUBTRACTED to avoid double-counting.
+
+  // --- §2.1 Versus and ranked ---------------------------------------------
+  RANKED_AND_FILED: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  GREAT_EXPECTATIONS: [
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+    { kind: "eggs", tier: EggTier.RARE, count: 1 },
+  ],
+  ULTRA_INSTINCT: [
+    { kind: "shiny", tier: 1, species: "random" },
+    { kind: "eggs", tier: EggTier.EPIC, count: 1 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  MASTER_PLAN: [
+    { kind: "shiny", tier: 3, species: "random" },
+    { kind: "eggs", tier: EggTier.LEGENDARY, count: 3 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 2 },
+  ],
+  CHAMPION_MATERIAL: [
+    { kind: "shiny", tier: 3, species: "random" },
+    { kind: "shiny", tier: 3, species: "random" },
+    { kind: "shiny", tier: 3, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 5 },
+    { kind: "title", title: "Champion Material" },
+  ],
+  FIVE_ALARM_STREAK: [
+    { kind: "shiny", tier: 1, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 2 },
+  ],
+  META_BREAKER: [
+    { kind: "shiny", tier: 2, species: "random", minCost: 5 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  CAP_SPACE: [
+    { kind: "shiny", tier: 2, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  HOUSE_MONEY: [
+    { kind: "eggs", tier: EggTier.LEGENDARY, count: 20 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 5 },
+  ],
+  DOUBLE_OR_NOTHING: [
+    { kind: "shiny", tier: 2, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  PRODIGAL_MON: [
+    { kind: "shiny", tier: 1, species: "random" },
+    { kind: "eggs", tier: EggTier.EPIC, count: 10 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 2 },
+  ],
+  DAVID_WAS_RANKED: [
+    { kind: "shiny", tier: 1, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  ZERO_SUM_HERO: [
+    { kind: "shiny", tier: 2, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 3 },
+  ],
+
+  // --- §2.2 Co-op ---------------------------------------------------------
+  SIX_PACK: { kind: "candyTeam", perMon: 15 },
+  LIFELINE_SUBSCRIPTION: [
+    { kind: "eggs", tier: EggTier.EPIC, count: 10 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  NO_I_IN_TEAM: [
+    { kind: "eggs", tier: EggTier.RARE, count: 10 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  PARALLEL_PLAY: { kind: "shiny", tier: 1, species: "random" },
+  // §1.5 full-run floor: the 2 Premium vouchers come from RUN_COMPLETION_ACHV_IDS.
+  HELL_IS_OTHER_PEOPLE: [
+    { kind: "shiny", tier: 2, species: "random" },
+    { kind: "eggs", tier: EggTier.LEGENDARY, count: 15 },
+  ],
+  // §1.5 floor via RUN_COMPLETION_ACHV_IDS. Uniform random tier 1-3 (never black).
+  WE_BOTH_LIVED: [
+    { kind: "shiny", tier: "random", species: "random" },
+    { kind: "eggs", tier: EggTier.LEGENDARY, count: 10 },
+  ],
+
+  // --- §2.3 Battle, triples, ghost combat ---------------------------------
+  NATURAL_SELECTION_BIAS: [
+    { kind: "candyTeam", perMon: 20 },
+    { kind: "eggs", tier: EggTier.EPIC, count: 10 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  FORMATION_BREAKER: [
+    { kind: "candyTeam", perMon: 20 },
+    { kind: "shiny", tier: 1, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  LEFT_RIGHT_GOODNIGHT: [
+    { kind: "candyTeam", perMon: 15 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  LAST_MON_STANDING: [
+    { kind: "candyTeam", perMon: 20 },
+    { kind: "eggs", tier: EggTier.EPIC, count: 10 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  THREE_PIECE_COMBO: [
+    { kind: "candyTeam", perMon: 20 },
+    { kind: "eggs", tier: EggTier.EPIC, count: 10 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  ONE_HP_AND_A_DREAM: [
+    { kind: "candyTeam", perMon: 30 },
+    { kind: "shiny", tier: 3, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  NO_SELL: [
+    { kind: "candyTeam", perMon: 20 },
+    { kind: "eggs", tier: EggTier.EPIC, count: 20 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  SETUP_PAYOFF: [
+    { kind: "candyTeam", perMon: 15 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  ZERO_TO_HERO: [
+    { kind: "candyTeam", perMon: 20 },
+    { kind: "shiny", tier: 1, species: "random" },
+  ],
+  CHECKMATE_IN_ONE: [
+    { kind: "candyTeam", perMon: 30 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 3 },
+  ],
+  FORM_VOLTRON: [
+    { kind: "candyTeam", perMon: 15 },
+    { kind: "eggs", tier: EggTier.EPIC, count: 10 },
+  ],
+  PURE_VANILLA: [
+    { kind: "candyTeam", perMon: 20 },
+    { kind: "shiny", tier: 1, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  CHARGE_IT_TO_THE_GAME: [
+    { kind: "candyTeam", perMon: 15 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 2 },
+  ],
+  THE_LONGEST_TURN: [
+    { kind: "candyTeam", perMon: 15 },
+    { kind: "eggs", tier: EggTier.EPIC, count: 10 },
+  ],
+  STATUS_QUO: [
+    { kind: "candyTeam", perMon: 30 },
+    { kind: "shiny", tier: 2, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 2 },
+  ],
+  IMMORTAL_OBJECT: [
+    { kind: "candyTeam", perMon: 15 },
+    { kind: "eggs", tier: EggTier.RARE, count: 10 },
+  ],
+
+  // --- §2.4 Training ------------------------------------------------------
+  TECHNICAL_DIFFICULTIES: [
+    { kind: "candyTeam", perMon: 10 },
+    { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  ],
+
+  // --- §2.5 Mystery encounters and events ---------------------------------
+  EVICTION_NOTICE: [
+    { kind: "candyTeam", perMon: 20 },
+    { kind: "shiny", tier: 1, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  IDENTITY_THEFT: [
+    { kind: "candyTeam", perMon: 20 },
+    { kind: "shiny", tier: 1, species: "random" },
+  ],
+  DEAD_RINGER: [
+    { kind: "candyTeam", perMon: 20 },
+    { kind: "shiny", tier: 1, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  HELL_HOUSE: [
+    { kind: "candyTeam", perMon: 30 },
+    { kind: "shiny", tier: 2, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  TRIPLE_EXORCISM: [
+    { kind: "candyTeam", perMon: 30 },
+    { kind: "shiny", tier: 2, species: "random" },
+    { kind: "eggs", tier: EggTier.LEGENDARY, count: 10 },
+  ],
+  FINAL_ANSWER: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ARE_YOU_NOT_ENTERTAINED: [
+    { kind: "candyTeam", perMon: 30 },
+    { kind: "shiny", tier: 3, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 5 },
+  ],
+  SEVEN_DEADLY_CHECKBOXES: [
+    { kind: "shiny", tier: 2, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  // §1.5 floor via RUN_COMPLETION_ACHV_IDS (2 Premium subtracted from the inline row).
+  READ_THE_FINE_PRINT: { kind: "eggs", tier: EggTier.EPIC, count: 10 },
+  JUST_SAY_NO: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  DELVE_TOO_DEEP: [
+    { kind: "shiny", tier: 1, species: "random" },
+    { kind: "eggs", tier: EggTier.LEGENDARY, count: 10 },
+  ],
+  STRANGER_THAN_FICTION: [
+    { kind: "eggs", tier: EggTier.EPIC, count: 10 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 2 },
+  ],
+
+  // --- §2.6 Collection, economy, fusion, Shiny Lab ------------------------
+  MUSEUM_QUALITY: [
+    { kind: "eggs", tier: EggTier.LEGENDARY, count: 10 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 2 },
+  ],
+  BLACK_FRIDAY: [
+    { kind: "eggs", tier: EggTier.EPIC, count: 10 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 2 },
+  ],
+  BIOME_TOURIST: [
+    { kind: "eggs", tier: EggTier.LEGENDARY, count: 5 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 2 },
+  ],
+  FOUR_MACHINES_ONE_DREAM: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
+  GOLDEN_TICKET: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  FUSION_DANCE: [
+    { kind: "eggs", tier: EggTier.RARE, count: 10 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  TWO_LEGENDS_ONE_SLOT: [
+    { kind: "shiny", tier: 1, species: "random" },
+    { kind: "eggs", tier: EggTier.LEGENDARY, count: 5 },
+  ],
+  CROSS_VERSION_COMPATIBILITY: [
+    { kind: "eggs", tier: EggTier.EPIC, count: 10 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  LAB_RAT: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 2 },
+  PRESET_JET_SET: [
+    { kind: "eggs", tier: EggTier.EPIC, count: 10 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  NAME_RECOGNITION: [
+    { kind: "eggs", tier: EggTier.EPIC, count: 10 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  NUMBER_GO_UP: [
+    { kind: "eggs", tier: EggTier.RARE, count: 10 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+
+  // --- §2.7 Victory meta-achievements -------------------------------------
+  // GROUNDHOG_WEEK is NOT in RUN_COMPLETION_ACHV_IDS: it lists its 2 Premium inline.
+  GROUNDHOG_WEEK: [
+    { kind: "shiny", tier: 2, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 2 },
+  ],
+
+  // --- §2.8 Full-run challenges (§1.5: 2 Premium floor via RUN_COMPLETION) -
+  HELL_AND_BACK: [
+    { kind: "shiny", tier: 2, species: "random" },
+    { kind: "eggs", tier: EggTier.LEGENDARY, count: 1 },
+  ],
+  GLASS_CANNON: { kind: "shiny", tier: 2, species: "random" },
+  GENERATION_GAP: { kind: "shiny", tier: 2, species: "random" },
+  HOUSE_OF_MIRRORS: { kind: "shiny", tier: 2, species: "random" },
+  DEAD_CHANNEL: { kind: "shiny", tier: 3, species: "random" },
+  WAR_OF_ATTRITION: [
+    { kind: "shiny", tier: 3, species: "random" },
+    { kind: "eggs", tier: EggTier.LEGENDARY, count: 1 },
+  ],
+  TRINITY_TEST: [
+    { kind: "shiny", tier: 3, species: "random" },
+    { kind: "shiny", tier: 3, species: "random" },
+  ],
+  OPPOSITION_RESEARCH: [
+    { kind: "shiny", tier: 2, species: "random" },
+    { kind: "eggs", tier: EggTier.EPIC, count: 1 },
+  ],
+  // Darmanitan-Redux via the ER species bridge (same idiom as GOOD_CHIP / BREEDERS_IN_SPACE).
+  MONO_GEN_REDUX_VICTORY: [
+    { kind: "candyTeam", perMon: 20 },
+    { kind: "pokemon", species: ErSpeciesId.DARMANITAN_REDUX as unknown as SpeciesId },
+  ],
 };
 
 /**
@@ -493,6 +787,20 @@ const RUN_COMPLETION_ACHV_IDS = new Set<string>([
   "TYPECAST_TRIO",
   // #900 follow-up 2: Triples Only + Ghost Trainers full-run clear (any difficulty).
   "PHANTOM_FORMATION",
+  // Definitive expansion §1.5: the new full-run achievements. Each gets +2 Premium here,
+  // so their inline ER_ACHIEVEMENT_REWARDS rows have the 2-Premium floor subtracted.
+  "HELL_IS_OTHER_PEOPLE",
+  "WE_BOTH_LIVED",
+  "READ_THE_FINE_PRINT",
+  "HELL_AND_BACK",
+  "GLASS_CANNON",
+  "GENERATION_GAP",
+  "HOUSE_OF_MIRRORS",
+  "DEAD_CHANNEL",
+  "WAR_OF_ATTRITION",
+  "TRINITY_TEST",
+  "OPPOSITION_RESEARCH",
+  "MONO_GEN_REDUX_VICTORY",
 ]);
 
 /** The +2 Premium-voucher bonus a full-run-completion achievement gets, else nothing. */
@@ -609,6 +917,8 @@ export function describeRewardSpec(spec: RewardSpec, ctx?: RewardDescribeContext
     }
     case "pokemon":
       return speciesName(spec.species);
+    case "title":
+      return `the title "${spec.title}"`;
     case "shinyLabEffects":
       return spec.effects.length ? `Shiny Lab effects: ${spec.effects.map(effectLabel).join(", ")}` : null;
     case "randomAroundEffect":
@@ -661,6 +971,9 @@ function applyRewardSpec(spec: RewardSpec): GrantedReward | null {
     case "pokemon":
       grantPokemon(spec.species);
       return { text: describeRewardSpec(spec) ?? "", iconSpecies: spec.species };
+    case "title":
+      grantTitle(spec.title);
+      return { text: describeRewardSpec(spec) ?? "" };
     case "shinyLabEffects": {
       // Grant + announce only the effects NEWLY unlocked here (skip ones already owned).
       const granted = spec.effects.filter(effectId => grantErShinyLabEffectAvailability(effectId, false));
@@ -755,6 +1068,17 @@ function grantBlackShiny(species: SpeciesId): void {
 
 function grantPokemon(species: SpeciesId): void {
   orCaughtAttr(species, DexAttr.NON_SHINY | DexAttr.MALE | DexAttr.DEFAULT_VARIANT | DexAttr.DEFAULT_FORM);
+}
+
+/**
+ * Record an earned trainer title on the system save (dedup). Display UI is deferred;
+ * this persists it so nothing is lost when the display eventually ships.
+ */
+function grantTitle(title: string): void {
+  const titles = (globalScene.gameData.erTitles ??= []);
+  if (!titles.includes(title)) {
+    titles.push(title);
+  }
 }
 
 function orCaughtAttr(species: SpeciesId, bits: bigint): void {

@@ -39,6 +39,8 @@ import {
   getCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_SHOP_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
+import { erRecordBiomeShopPurchase, erRecordBlackMarketPurchase } from "#data/elite-redux/er-achievement-detection";
+import { erAchvRun } from "#data/elite-redux/er-achievement-run-state";
 import { erBiomeStockCount } from "#data/elite-redux/er-biome-economy";
 import { ModifierTier } from "#enums/modifier-tier";
 import { UiMode } from "#enums/ui-mode";
@@ -48,6 +50,7 @@ import type { ModifierTypeOption, PokemonModifierType } from "#modifiers/modifie
 import { getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-type";
 import type { ModifierSelectCallback } from "#phases/select-modifier-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
+import { SHOP_TYPE_BY_BIOME } from "#ui/handlers/biome-shop-ui-handler";
 import { NumberHolder } from "#utils/common";
 import i18next from "i18next";
 
@@ -494,7 +497,10 @@ export class BiomeShopPhase extends SelectModifierPhase {
 
   /** Never let a market continue against locally generated stock after authority was lost. */
   private coopBiomeAuthoritativeStockUnavailable(context: string): void {
-    coopWarn("reward", `biome market authoritative stock unavailable (${context}) -> FAIL CLOSED; local roll suppressed`);
+    coopWarn(
+      "reward",
+      `biome market authoritative stock unavailable (${context}) -> FAIL CLOSED; local roll suppressed`,
+    );
     try {
       globalScene.ui.showText(
         "Could not recover your partner's authoritative market stock. Reconnect to resume safely.",
@@ -508,11 +514,33 @@ export class BiomeShopPhase extends SelectModifierPhase {
     }
   }
 
+  /** catalog-v2 (#900): overridden true by the Black Market variant (BLACK_FRIDAY vs BIOME_TOURIST). */
+  protected erIsBlackMarket(): boolean {
+    return false;
+  }
+
   protected override applyModifier(modifier: Modifier, cost = -1, playSound = false): void {
     // Co-op (#673) OWNER: capture the buy BEFORE the stock decrement resets pendingIndex,
     // then relay it self-describing: [slotIntoStreamedStock] + data [targetPartySlot, moneyAfter].
     const coopBoughtSlot = this.coopBiomeOwner && cost !== -1 ? this.pendingIndex : -1;
     super.applyModifier(modifier, cost, playSound);
+    // catalog-v2 (#900): a completed paid purchase. BLACK_FRIDAY (black market, one credit per run)
+    // or BIOME_TOURIST (distinct biome shop types). Fully guarded - never disturbs the buy.
+    try {
+      if (cost !== -1) {
+        if (this.erIsBlackMarket()) {
+          const run = erAchvRun();
+          if (!run.blackMarketCredited) {
+            run.blackMarketCredited = true;
+            erRecordBlackMarketPurchase();
+          }
+        } else {
+          erRecordBiomeShopPurchase(SHOP_TYPE_BY_BIOME[globalScene.arena.biomeId] ?? "Market");
+        }
+      }
+    } catch {
+      /* achievement recording must never disturb the purchase */
+    }
     if (coopBoughtSlot >= 0) {
       const party = globalScene.getPlayerParty();
       const pokemonId = (modifier as unknown as { pokemonId?: number }).pokemonId;

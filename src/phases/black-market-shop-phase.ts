@@ -21,6 +21,10 @@ import { ModifierTier } from "#enums/modifier-tier";
 import { BiomeShopPhase } from "#phases/biome-shop-phase";
 
 export class BlackMarketShopPhase extends BiomeShopPhase {
+  protected override erIsBlackMarket(): boolean {
+    return true;
+  }
+
   protected override buildStock(): void {
     this.shopOptions = buildBlackMarketShopStock();
     // Bargain goods stock a few copies each (scarcer for the rarer odd find).

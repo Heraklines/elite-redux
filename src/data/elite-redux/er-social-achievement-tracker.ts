@@ -28,6 +28,7 @@
 
 import { globalScene } from "#app/global-scene";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
+import { erAchvRun } from "#data/elite-redux/er-achievement-run-state";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   decodeErShinyLabParams,
@@ -38,8 +39,14 @@ import {
   getShowdownMatchId,
   getShowdownOpponentManifest,
   getShowdownOwnManifest,
+  getShowdownRankedContext,
   isShowdownBattleActive,
 } from "#data/elite-redux/showdown/showdown-battle-state";
+import {
+  onRankedMatchWin,
+  onRankedTierFirstReached,
+} from "#data/elite-redux/showdown/showdown-rank-events";
+import { SHOWDOWN_RANK_TIER } from "#data/elite-redux/showdown/showdown-rank-types";
 import type { Pokemon } from "#field/pokemon";
 import { type Achv, achvs } from "#system/achv";
 
@@ -98,6 +105,103 @@ export interface ShowdownResultContext {
   anyOwnFainted: boolean;
   /** At least one of the local player's Pokemon Mega Evolved during the match. */
   ownMegaUsed: boolean;
+  /** catalog-v2: the match was RANKED (both players opted in). Optional (defaults false). */
+  ranked?: boolean;
+  /** catalog-v2: the species ids the local player fielded this match. Optional (defaults empty). */
+  ownSpeciesIds?: number[];
+  /** catalog-v2: species previously WON as a stake (PRODIGAL_MON provenance). Optional (defaults empty). */
+  stakeWonSpecies?: number[];
+}
+
+/**
+ * catalog-v2 (#900): the persisted ranked/wager counters, read + written across a settled result.
+ * Mirror `gameData.gameStats`. FIVE_ALARM/META/HOUSE_MONEY/DOUBLE_OR_NOTHING all live here.
+ */
+export interface ShowdownRankedWagerCounters {
+  rankedWinStreak: number;
+  rankedNoMegaWins: number;
+  showdownStakedWins: number;
+  showdownShinyStakeStreak: number;
+}
+
+/**
+ * PURE (catalog-v2): the ranked + wager achievements a settled/void result unlocks, plus the
+ * next value of each persisted counter. The caller writes `counters` back to gameStats.
+ *
+ * Server-authority note: the client cannot observe true server-settlement, so a non-void result at
+ * the result phase is treated as the settled outcome (the same optimistic approximation the existing
+ * Showdown feats use). Voids: FIVE_ALARM_STREAK neither counts nor resets; DOUBLE_OR_NOTHING breaks.
+ */
+export function evaluateShowdownRankedWager(
+  ctx: ShowdownResultContext,
+  counters: ShowdownRankedWagerCounters,
+): { ids: string[]; counters: ShowdownRankedWagerCounters } {
+  const ids: string[] = [];
+  const out: ShowdownRankedWagerCounters = { ...counters };
+  const ranked = ctx.ranked ?? false;
+  const ownSpeciesIds = ctx.ownSpeciesIds ?? [];
+  const stakeWonSpecies = ctx.stakeWonSpecies ?? [];
+  if (ctx.voided) {
+    // A void breaks the consecutive shiny-stake streak but leaves the ranked win streak intact.
+    out.showdownShinyStakeStreak = 0;
+    return { ids, counters: out };
+  }
+  if (ctx.won) {
+    if (ranked) {
+      out.rankedWinStreak = counters.rankedWinStreak + 1;
+      if (out.rankedWinStreak >= 5) {
+        ids.push("FIVE_ALARM_STREAK");
+      }
+      // META_BREAKER: ranked wins without a Mega (need not be consecutive).
+      if (!ctx.ownMegaUsed) {
+        out.rankedNoMegaWins = counters.rankedNoMegaWins + 1;
+        if (out.rankedNoMegaWins >= 10) {
+          ids.push("META_BREAKER");
+        }
+      }
+      // CAP_SPACE: ranked win, own total cost <= opponent total - 8.
+      if (ctx.ownTeamCost > 0 && ctx.oppTeamCost > 0 && ctx.ownTeamCost <= ctx.oppTeamCost - 8) {
+        ids.push("CAP_SPACE");
+      }
+      // ZERO_SUM_HERO: ranked staked win, no Mega, every own mon cost <= 3, opp total >= own + 8.
+      if (
+        ctx.staked
+        && !ctx.ownMegaUsed
+        && ctx.ownTeamMaxCost > 0
+        && ctx.ownTeamMaxCost <= 3
+        && ctx.oppTeamCost >= ctx.ownTeamCost + 8
+      ) {
+        ids.push("ZERO_SUM_HERO");
+      }
+    }
+    // HOUSE_MONEY: 10 settled non-void wins where you staked >= 1 mon (ranked or casual).
+    if (ctx.staked) {
+      out.showdownStakedWins = counters.showdownStakedWins + 1;
+      if (out.showdownStakedWins >= 10) {
+        ids.push("HOUSE_MONEY");
+      }
+    }
+    // DOUBLE_OR_NOTHING: 3 consecutive settled WINS each with a shiny in your stake.
+    if (ctx.staked && ctx.stakeShiny) {
+      out.showdownShinyStakeStreak = counters.showdownShinyStakeStreak + 1;
+      if (out.showdownShinyStakeStreak >= 3) {
+        ids.push("DOUBLE_OR_NOTHING");
+      }
+    } else {
+      out.showdownShinyStakeStreak = 0;
+    }
+    // PRODIGAL_MON: win while fielding a species previously won as a stake.
+    if (ownSpeciesIds.some(id => stakeWonSpecies.includes(id))) {
+      ids.push("PRODIGAL_MON");
+    }
+  } else {
+    // Settled loss: FIVE_ALARM resets; DOUBLE_OR_NOTHING breaks.
+    if (ranked) {
+      out.rankedWinStreak = 0;
+    }
+    out.showdownShinyStakeStreak = 0;
+  }
+  return { ids, counters: out };
 }
 
 /** Persistent Showdown tallies (mirrors `gameData.gameStats`), post-increment. */
@@ -230,6 +334,7 @@ export function erRecordShowdownResult(won: boolean, voided: boolean): void {
     }
 
     const ownManifest = getShowdownOwnManifest();
+    const ownSpeciesIds = ownManifest ? ownManifest.map(mon => mon.speciesId) : [];
     const ctx: ShowdownResultContext = {
       won,
       voided,
@@ -240,6 +345,9 @@ export function erRecordShowdownResult(won: boolean, voided: boolean): void {
       ownTeamMaxCost: manifestTeamMaxCost(ownManifest),
       anyOwnFainted: globalScene.getPlayerParty().some(mon => mon.isFainted()),
       ownMegaUsed,
+      ranked: getShowdownRankedContext() != null,
+      ownSpeciesIds,
+      stakeWonSpecies: stats.stakeWonSpecies ?? [],
     };
     fireAchvs(
       evaluateShowdownResult(ctx, {
@@ -247,10 +355,77 @@ export function erRecordShowdownResult(won: boolean, voided: boolean): void {
         wins: stats.showdownWins ?? 0,
       }),
     );
+    // catalog-v2: ranked + wager counters (FIVE_ALARM / META_BREAKER / HOUSE_MONEY /
+    // DOUBLE_OR_NOTHING / CAP_SPACE / ZERO_SUM_HERO / PRODIGAL_MON). Persist the new counters.
+    const wager = evaluateShowdownRankedWager(ctx, {
+      rankedWinStreak: stats.rankedWinStreak ?? 0,
+      rankedNoMegaWins: stats.rankedNoMegaWins ?? 0,
+      showdownStakedWins: stats.showdownStakedWins ?? 0,
+      showdownShinyStakeStreak: stats.showdownShinyStakeStreak ?? 0,
+    });
+    stats.rankedWinStreak = wager.counters.rankedWinStreak;
+    stats.rankedNoMegaWins = wager.counters.rankedNoMegaWins;
+    stats.showdownStakedWins = wager.counters.showdownStakedWins;
+    stats.showdownShinyStakeStreak = wager.counters.showdownShinyStakeStreak;
+    fireAchvs(wager.ids);
   } catch (e) {
     console.warn("[er-social-achv] showdown result detection failed:", e);
   }
 }
+
+/**
+ * catalog-v2 (#900): record the species the local player has WON as a Showdown stake (PRODIGAL_MON
+ * provenance). Called from the settlement sync after a grantUnlock settles - a grant means this
+ * client received the mon from the opponent. Client-side recording at settlement apply is the
+ * faithful approximation of the catalog's "server-authored provenance". Guarded + deduped.
+ */
+export function erRecordShowdownStakeWon(speciesIds: readonly number[]): void {
+  try {
+    if (speciesIds.length === 0) {
+      return;
+    }
+    const stats = globalScene.gameData.gameStats;
+    const set = new Set<number>(stats.stakeWonSpecies ?? []);
+    for (const id of speciesIds) {
+      set.add(id);
+    }
+    stats.stakeWonSpecies = [...set];
+  } catch (e) {
+    console.warn("[er-social-achv] showdown stake-won provenance failed:", e);
+  }
+}
+
+/**
+ * catalog-v2 (#900): the ranked ladder tier-reach + first-win achievements. These fire from the
+ * SERVER-AUTHORITATIVE rank events (a settled ranked result fans them out), so they are truly
+ * server-settled (unlike the optimistic wager counters above). Subscribed once at module load.
+ */
+function mapRankTierToAchv(tier: number): string | null {
+  switch (tier) {
+    case SHOWDOWN_RANK_TIER.greatball:
+      return "GREAT_EXPECTATIONS";
+    case SHOWDOWN_RANK_TIER.ultraball:
+      return "ULTRA_INSTINCT";
+    case SHOWDOWN_RANK_TIER.masterball:
+      return "MASTER_PLAN";
+    case SHOWDOWN_RANK_TIER.champion:
+      return "CHAMPION_MATERIAL";
+    default:
+      return null;
+  }
+}
+
+onRankedTierFirstReached(tier => {
+  const id = mapRankTierToAchv(tier);
+  if (id) {
+    fireAchvs([id]);
+  }
+});
+
+onRankedMatchWin(() => {
+  // RANKED_AND_FILED: win your first ranked match (validateAchv dedupes, so it fires once).
+  fireAchvs(["RANKED_AND_FILED"]);
+});
 
 // --- Co-op runs --------------------------------------------------------------
 
@@ -350,6 +525,18 @@ export function erRecordCoopRevivePartnerMon(pokemon: Pokemon): void {
         const localRole = m.getCoopController()?.role;
         if (localRole != null && monOwner !== localRole) {
           fireAchvs(["GUARDIAN_ANGEL"]);
+          // catalog-v2 (#900) LIFELINE_SUBSCRIPTION: revive your partner 10 times across co-op runs,
+          // at most one credited revive per wave (run-local per-wave dedupe).
+          const run = erAchvRun();
+          const wave = globalScene.currentBattle.waveIndex;
+          if (run.lastCreditedReviveWave !== wave) {
+            run.lastCreditedReviveWave = wave;
+            const stats = globalScene.gameData.gameStats;
+            stats.coopPartnerRevives = (stats.coopPartnerRevives ?? 0) + 1;
+            if (stats.coopPartnerRevives >= 10) {
+              fireAchvs(["LIFELINE_SUBSCRIPTION"]);
+            }
+          }
         }
       })
       .catch(() => {});
@@ -419,6 +606,10 @@ export function evaluateTripleWaveWon(ctx: TripleWaveContext): string[] {
   }
   if (ctx.oneTurnClear) {
     ids.push("ONE_TURN_CLEAR");
+  }
+  // catalog-v2 (#900) TRIPLE_EXORCISM: Hell + triple + ghost trainer win with no allied faint.
+  if (ctx.ghostTrainer && ctx.difficultyHell && !ctx.playerFainted) {
+    ids.push("TRIPLE_EXORCISM");
   }
   return ids;
 }

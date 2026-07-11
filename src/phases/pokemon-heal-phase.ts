@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import type { HealBlockTag } from "#data/battler-tags";
+import { erRecordAchievementHeal } from "#data/elite-redux/er-achievement-tracker";
 import { getStatusEffectHealText } from "#data/status-effect";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -123,6 +124,10 @@ export class PokemonHealPhase extends CommonAnimPhase {
         globalScene.validateAchvs(HealAchv, healAmount);
         if (healAmount.value > globalScene.gameData.gameStats.highestHeal) {
           globalScene.gameData.gameStats.highestHeal = healAmount.value;
+        }
+        // catalog-v2 (#900): a heal invalidates ZERO_TO_HERO for this mon's KO stint.
+        if (healAmount.value > 0 && !this.revive) {
+          erRecordAchievementHeal(pokemon);
         }
       }
       if (this.healStatus && !this.revive && pokemon.status) {

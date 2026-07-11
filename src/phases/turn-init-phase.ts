@@ -1,6 +1,7 @@
 import { consumePendingDevBattleSetup } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
+import { erRecordAchievementTurnStart } from "#data/elite-redux/er-achievement-tracker";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { BattleType } from "#enums/battle-type";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
@@ -21,6 +22,9 @@ export class TurnInitPhase extends FieldPhase {
   public readonly phaseName = "TurnInitPhase";
   start() {
     super.start();
+
+    // catalog-v2 (#900): a turn is starting - init KO stints, arm LAST_MON_STANDING / IDENTITY_THEFT.
+    erRecordAchievementTurnStart();
 
     // Local-only dev tools: a test scenario may stage mid-combat setup (e.g.
     // pre-boosted stat stages) to apply once both sides are on the field.
