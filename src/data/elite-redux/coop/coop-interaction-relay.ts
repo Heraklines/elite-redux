@@ -167,6 +167,8 @@ export interface CoopInteractionRelayOptions {
 // is still deciding (desync). 20min effectively means "wait for the human"; a timeout is
 // then only a genuinely-disconnected-partner safety net, not a deliberation timer.
 const DEFAULT_TIMEOUT_MS = 1_200_000;
+/** Choice kinds whose dual raw+journal carriers have an explicit payload-identity regression. */
+const COOP_DURABLE_CHOICE_ECHO_KINDS: ReadonlySet<string> = new Set(["abilityPicker"]);
 
 function defaultSchedule(cb: () => void, ms: number): () => void {
   const id = setTimeout(cb, ms);
@@ -262,6 +264,10 @@ export class CoopInteractionRelay {
   private readonly rawOutcomeCredits = new Map<string, number>();
   /** Journal outcomes awaiting a later raw legacy echo, which must be dropped rather than double-applied. */
   private readonly committedOutcomeCredits = new Map<string, number>();
+  /** Raw choices awaiting a same-delivery-turn journal carrier; keyed by seq + kind + exact payload. */
+  private readonly rawChoiceCredits = new Map<string, number>();
+  /** Journal choices awaiting a later raw legacy echo, which must be dropped rather than double-applied. */
+  private readonly committedChoiceCredits = new Map<string, number>();
 
   /** seq -> FIFO queue of choices that arrived before their waiter. */
   private readonly inbox = new Map<number, CoopInteractionChoice[]>();
@@ -348,6 +354,15 @@ export class CoopInteractionRelay {
     data?: number[],
     operationId?: string | undefined,
   ): void {
+    if (!COOP_DURABLE_CHOICE_ECHO_KINDS.has(kind)) {
+      this.deliverInteractionChoice(seq, { choice, data, kind, operationId });
+      return;
+    }
+    const key = this.choiceCreditKey(seq, kind, choice, data);
+    if (this.consumeEchoCredit(this.rawChoiceCredits, key)) {
+      return;
+    }
+    this.addEchoCredit(this.committedChoiceCredits, key);
     this.deliverInteractionChoice(seq, { choice, data, kind, operationId });
   }
 
@@ -463,10 +478,10 @@ export class CoopInteractionRelay {
    */
   materializeCommittedInteractionOutcome(seq: number, outcome: CoopInteractionOutcome): void {
     const key = `${seq}:${JSON.stringify(outcome)}`;
-    if (this.consumeOutcomeCredit(this.rawOutcomeCredits, key)) {
+    if (this.consumeEchoCredit(this.rawOutcomeCredits, key)) {
       return;
     }
-    this.addOutcomeCredit(this.committedOutcomeCredits, key);
+    this.addEchoCredit(this.committedOutcomeCredits, key);
     this.deliverInteractionOutcome(seq, outcome, "JOURNAL");
   }
 
@@ -748,6 +763,8 @@ export class CoopInteractionRelay {
     this.outcomeInbox.clear();
     this.rawOutcomeCredits.clear();
     this.committedOutcomeCredits.clear();
+    this.rawChoiceCredits.clear();
+    this.committedChoiceCredits.clear();
     this.rewardOptionsPending.clear();
     this.rewardOptionsInbox.clear();
     this.cancelledSeqs.clear();
@@ -779,6 +796,8 @@ export class CoopInteractionRelay {
     this.outcomeInbox.clear();
     this.rawOutcomeCredits.clear();
     this.committedOutcomeCredits.clear();
+    this.rawChoiceCredits.clear();
+    this.committedChoiceCredits.clear();
     this.rewardOptionsInbox.clear();
     // A seq sticky-cancelled in the PRIOR epoch must not keep resolving null in the NEW epoch (seqs reuse
     // low counters), so clear the cancel marks alongside the buffers.
@@ -877,10 +896,10 @@ export class CoopInteractionRelay {
     }
     if (msg.t === "interactionOutcome") {
       const key = `${msg.seq}:${JSON.stringify(msg.outcome)}`;
-      if (this.consumeOutcomeCredit(this.committedOutcomeCredits, key)) {
+      if (this.consumeEchoCredit(this.committedOutcomeCredits, key)) {
         return;
       }
-      this.addOutcomeCredit(this.rawOutcomeCredits, key);
+      this.addEchoCredit(this.rawOutcomeCredits, key);
       this.deliverInteractionOutcome(msg.seq, msg.outcome, "RECV");
       return;
     }
@@ -931,15 +950,33 @@ export class CoopInteractionRelay {
       choice: msg.choice,
       ...(msg.data === undefined ? {} : { data: [...msg.data] }),
     });
+    if (COOP_DURABLE_CHOICE_ECHO_KINDS.has(msg.kind)) {
+      const key = this.choiceCreditKey(msg.seq, msg.kind, msg.choice, msg.data);
+      if (this.consumeEchoCredit(this.committedChoiceCredits, key)) {
+        return;
+      }
+      this.addTransientRawChoiceCredit(key);
+    }
     // #861: carry the wire `kind` onto the choice so the KIND-VALIDATION can gate delivery + buffer-hits.
     this.deliverInteractionChoice(msg.seq, { choice: msg.choice, data: msg.data, kind: msg.kind });
   }
 
-  private addOutcomeCredit(credits: Map<string, number>, key: string): void {
+  private choiceCreditKey(seq: number, kind: string, choice: number, data: number[] | undefined): string {
+    return `${seq}:${kind}:${choice}:${JSON.stringify(data ?? null)}`;
+  }
+
+  private addEchoCredit(credits: Map<string, number>, key: string): void {
     credits.set(key, (credits.get(key) ?? 0) + 1);
   }
 
-  private consumeOutcomeCredit(credits: Map<string, number>, key: string): boolean {
+  private addTransientRawChoiceCredit(key: string): void {
+    this.addEchoCredit(this.rawChoiceCredits, key);
+    queueMicrotask(() => {
+      this.consumeEchoCredit(this.rawChoiceCredits, key);
+    });
+  }
+
+  private consumeEchoCredit(credits: Map<string, number>, key: string): boolean {
     const count = credits.get(key) ?? 0;
     if (count <= 0) {
       return false;

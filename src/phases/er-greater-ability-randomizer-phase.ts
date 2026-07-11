@@ -26,6 +26,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { adoptAbilityWatcherOutcome } from "#data/elite-redux/coop/coop-ability-operation";
 import {
   COOP_ABILITY_OP,
   COOP_ABILITY_WAIT_MS,
@@ -34,7 +35,7 @@ import {
   sendCoopAbilityPickerOutcome,
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import { getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ABILITY_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import type { BargainAbilityChoice } from "#data/elite-redux/er-bargain-sins";
 import {
@@ -228,7 +229,12 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
       "ability",
       `greaterRandomizer OWNER relay OUTCOME seq=${this.coopSeq} op=${coopAbilityOpName(this.coopOutcome[0])} slot=${this.coopOutcome[1] ?? "-"} abilityId=${this.coopOutcome[2] ?? "-"} data=[${this.coopOutcome.join(",")}]`,
     );
-    sendCoopAbilityPickerOutcome(getCoopInteractionRelay(), this.coopSeq, this.coopOutcome);
+    const controller = getCoopController();
+    sendCoopAbilityPickerOutcome(getCoopInteractionRelay(), this.coopSeq, this.coopOutcome, controller == null ? undefined : {
+      localRole: controller.role,
+      wave: globalScene.currentBattle?.waveIndex ?? 0,
+      turn: globalScene.currentBattle?.turn ?? 0,
+    });
   }
 
   /**
@@ -248,7 +254,18 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
       COOP_ABILITY_WAIT_MS,
       COOP_ABILITY_CHOICE_KINDS,
     );
-    const data = action?.data ?? [COOP_ABILITY_OP.CANCEL];
+    const controller = getCoopController();
+    const relayedData = action?.data ?? null;
+    const adopted =
+      controller != null
+      && adoptAbilityWatcherOutcome({
+        pinned: this.coopSeq,
+        data: relayedData,
+        localRole: controller.role,
+        wave: globalScene.currentBattle?.waveIndex ?? 0,
+        turn: globalScene.currentBattle?.turn ?? 0,
+      });
+    const data = adopted && relayedData != null ? relayedData : [COOP_ABILITY_OP.CANCEL];
     const op = data[0];
     coopLog(
       "ability",

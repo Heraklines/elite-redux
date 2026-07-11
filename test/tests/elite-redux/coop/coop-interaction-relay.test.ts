@@ -48,6 +48,45 @@ describe("co-op alternating-interaction relay (#633)", () => {
     expect(third?.choice).toBe(COOP_INTERACTION_LEAVE);
   });
 
+  it("deduplicates journal-first then raw interaction-choice carriers", async () => {
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopInteractionRelay(host);
+    const timer: { fire?: () => void } = {};
+    const watcher = new CoopInteractionRelay(guest, {
+      schedule: cb => {
+        timer.fire = cb;
+        return () => {};
+      },
+    });
+
+    watcher.materializeCommittedInteractionChoice(8, "abilityPicker", -3, [11], "1:0:800");
+    owner.sendInteractionChoice(8, "abilityPicker", -3, [11]);
+    expect((await watcher.awaitInteractionChoice(8))?.data).toEqual([11]);
+    const echo = watcher.awaitInteractionChoice(8, 1);
+    timer.fire?.();
+    expect(await echo).toBeNull();
+  });
+
+  it("deduplicates raw-first then journal interaction-choice carriers", async () => {
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopInteractionRelay(host);
+    const timer: { fire?: () => void } = {};
+    const watcher = new CoopInteractionRelay(guest, {
+      schedule: cb => {
+        timer.fire = cb;
+        return () => {};
+      },
+    });
+
+    owner.sendInteractionChoice(9, "abilityPicker", -3, [12, 2]);
+    await Promise.resolve();
+    watcher.materializeCommittedInteractionChoice(9, "abilityPicker", -3, [12, 2], "1:0:900");
+    expect((await watcher.awaitInteractionChoice(9))?.data).toEqual([12, 2]);
+    const echo = watcher.awaitInteractionChoice(9, 1);
+    timer.fire?.();
+    expect(await echo).toBeNull();
+  });
+
   it("times out to null so the watcher never hangs, then leaves", async () => {
     const { guest } = createLoopbackPair();
     const timer: { fire?: () => void } = {};

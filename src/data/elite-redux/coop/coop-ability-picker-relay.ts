@@ -28,10 +28,15 @@
 // well clear of the COOP_ACT_* range (defense-in-depth). The `choice` is also a dedicated sentinel.
 // =============================================================================
 
+import {
+  armCoopAbilityOutcomeResend,
+  commitAbilityOwnerOutcome,
+} from "#data/elite-redux/coop/coop-ability-operation";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import type { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 // #840: COOP_ABILITY_SEQ_BASE declared in coop-seq-registry (single source of truth), re-exported below.
 import { COOP_ABILITY_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 export { COOP_ABILITY_SEQ_BASE };
 
@@ -114,11 +119,21 @@ export function sendCoopAbilityPickerOutcome(
   relay: CoopInteractionRelay | null,
   shopSeq: number,
   data: number[],
+  context?: { localRole: CoopRole; wave: number; turn?: number },
 ): void {
+  if (context != null) {
+    commitAbilityOwnerOutcome({ pinned: shopSeq, data, ...context });
+  }
+  const derivedSeq = coopAbilityPickerSeq(shopSeq);
   relay?.sendInteractionChoice(
-    coopAbilityPickerSeq(shopSeq),
+    derivedSeq,
     COOP_ABILITY_KIND,
     COOP_ABILITY_OUTCOME,
     [...data],
   );
+  if (context?.localRole === "guest" && relay != null) {
+    armCoopAbilityOutcomeResend(shopSeq, data, () => {
+      relay.sendInteractionChoice(derivedSeq, COOP_ABILITY_KIND, COOP_ABILITY_OUTCOME, [...data]);
+    });
+  }
 }

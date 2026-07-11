@@ -87,6 +87,8 @@ function coopOperationClassForEnvelope(envelope: CoopAuthoritativeEnvelopeV1): s
         return "op:bargain";
       case "COLO_PICK":
         return "op:colosseum";
+      case "ABILITY_PICK":
+        return "op:ability";
       default:
         return null;
     }

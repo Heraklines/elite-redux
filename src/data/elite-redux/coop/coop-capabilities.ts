@@ -61,6 +61,8 @@ export const COOP_CAP_OP_WAVE: CoopCapabilityKey = "opSurface.wave";
 export const COOP_CAP_OP_BARGAIN: CoopCapabilityKey = "opSurface.bargain";
 /** The migrated multi-round colosseum board/pick stream (§2.5 item 5). */
 export const COOP_CAP_OP_COLOSSEUM: CoopCapabilityKey = "opSurface.colosseum";
+/** The migrated ER ability consumable picker outcome (§2.5 item 5). */
+export const COOP_CAP_OP_ABILITY: CoopCapabilityKey = "opSurface.abilityPicker";
 /** The application-level durability journal (§4, coop-durability.ts / coop-operation-journal.ts). */
 export const COOP_CAP_DURABILITY_JOURNAL: CoopCapabilityKey = "durability.journal";
 /**
