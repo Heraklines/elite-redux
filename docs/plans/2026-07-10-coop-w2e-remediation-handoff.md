@@ -379,3 +379,29 @@ zero diagnostics in touched files.
 Next per-mon surface: stormglass. Lobby/resume, renderer enforcement, quarantine/stat-stage cleanup,
 expanded model/soak coverage, the final drop-every-class campaign, and the full four-lane/final-long-soak
 gate remain open. The slice is ready for the staging sync/deploy checkpoint before stormglass begins.
+
+## 18. Continuation evidence (per-mon operations: Stormglass)
+
+The final section 2.5 item 6 surface is migrated. `1d64de872` is the failure-first carrier-loss suite;
+`7c58cc641` adds negotiated `opSurface.stormglass`, a typed host-resolved `STORMGLASS` payload,
+`op:stormglass` under `INTERACTION`, cold-resume revision flooring, journal-first commit, and
+Stormglass-scoped raw/journal choice echo suppression. The flag-off path remains the original singleton
+choice relay.
+
+The committed payload records both the selected option index and resolved numeric weather, while the
+existing guest watcher remains the only presentation/adoption seam. The operation never creates a second
+relic or arena mutation path: the watcher still calls the existing `setStormglassWeather` and
+`erStormglassApplyChosenWeather` functions. Because the pick is host-owned there is no pre-commit guest
+intent to retry; journal resend covers committed delivery loss.
+
+Proof: the operation and small-relay batch passes 7/7 with one unrelated gated test skipped, including raw
+choice loss and dual-carrier exactly-once. Capability/handshake plus the real solo picker/regression batch
+passes 20/20. A new gated two-engine Stormglass probe passes 1/1 while actually dropping the low-latency
+`stormglass` frame: the journal wakes the guest's real watcher and both engines persist/apply Sandstorm for
+five turns. Biome reports no new errors; the repository-wide TypeScript check retains unrelated failures
+and reports zero diagnostics in touched files.
+
+The in-run operation-surface migration list is now complete. Next is the architecture's deliberately-last
+lobby handshake + resume migration, followed by renderer allowlist enforcement, quarantine/stat-stage
+cleanup, expanded soak/model coverage, the final drop-every-class campaign, and the full four-lane/final
+long-soak gate. No final “no gaps” claim is made yet.
