@@ -232,6 +232,35 @@ function exoInnerDist(env) {
     return D;
   });
 }
+/* tight bounding box of the actual sprite content (gradients/lines/props must
+ * anchor to THIS, not the padded frame, or they read as floating boxes) */
+function exoBBox(env) {
+  return exoCached(`bbox:${env.species}:${env.PW}`, () => {
+    const A = env.baseAlpha();
+    const W = env.PW;
+    const H = env.PH;
+    let x0 = W;
+    let y0 = H;
+    let x1 = 0;
+    let y1 = 0;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        if (!A[y * W + x]) continue;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+    if (x1 < x0) {
+      x0 = 0;
+      y0 = 0;
+      x1 = W - 1;
+      y1 = H - 1;
+    }
+    return { x0, y0, x1, y1, w: x1 - x0 + 1, h: y1 - y0 + 1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+  });
+}
 /* white canvas whose alpha = the raw silhouette (for destination-in clips) */
 function exoMaskCv(env) {
   return exoCached(`mask:${env.species}:${env.PW}`, () => {
@@ -880,18 +909,18 @@ const EXOTIC = {
           const d = D[i];
           if (d < 0) continue;
           const f = (((d * 0.11 - s / STATES) % 1) + 1) % 1;
-          if (f < 0.13) {
-            const w = 1 - f / 0.13;
+          if (f < 0.14) {
+            const w = 1 - f / 0.14;
             px[i * 4] = 255;
             px[i * 4 + 1] = 255;
-            px[i * 4 + 2] = 255;
-            px[i * 4 + 3] = 110 * w;
-          } else if (Math.abs(f - 0.5) < 0.09) {
-            const w = 1 - Math.abs(f - 0.5) / 0.09;
-            px[i * 4] = 10;
-            px[i * 4 + 1] = 18;
-            px[i * 4 + 2] = 70;
-            px[i * 4 + 3] = 95 * w;
+            px[i * 4 + 2] = 235;
+            px[i * 4 + 3] = 165 * w;
+          } else if (Math.abs(f - 0.5) < 0.1) {
+            const w = 1 - Math.abs(f - 0.5) / 0.1;
+            px[i * 4] = 8;
+            px[i * 4 + 1] = 16;
+            px[i * 4 + 2] = 80;
+            px[i * 4 + 3] = 135 * w;
           }
         }
         tc.putImageData(id, 0, 0);
@@ -902,7 +931,7 @@ const EXOTIC = {
       c.globalCompositeOperation = "overlay";
       c.drawImage(cv, env.ox, env.oy);
       c.globalCompositeOperation = "screen";
-      c.globalAlpha = 0.35;
+      c.globalAlpha = 0.55;
       c.drawImage(cv, env.ox, env.oy);
       c.restore();
     },
@@ -1017,8 +1046,9 @@ const EXOTIC = {
         g.addColorStop(0, "rgba(140,200,255,0)");
         g.addColorStop(0.5, `rgba(220,240,255,${0.55 * w})`);
         g.addColorStop(1, "rgba(140,200,255,0)");
+        const bbT = exoBBox(env);
         c.fillStyle = g;
-        c.fillRect(env.ox + env.cx - 3, env.oy + env.cy - 0.45 * env.PH, 6, 0.85 * env.PH);
+        c.fillRect(env.ox + env.cx - 3, env.oy + bbT.y0 + 2, 6, bbT.h - 4);
         c.restore();
       }
     },
@@ -1073,11 +1103,12 @@ const EXOTIC = {
       const P = 6.5;
       const p = ((env.t % P) + P) % P;
       const nz = this._noise(env, Math.floor(env.t * 9) % 2);
+      const bbTV = exoBBox(env);
       c.save();
       c.imageSmoothingEnabled = false;
       if (p < 1.6) {
         const q = exoSmooth(p / 1.6);
-        const sy = Math.round(env.PH * (1 - q));
+        const sy = Math.round(bbTV.y0 + (1 - q) * (bbTV.h + 4) - 2);
         c.globalAlpha = 0.92;
         c.drawImage(nz, env.ox, env.oy);
         c.globalAlpha = 1;
@@ -1090,7 +1121,7 @@ const EXOTIC = {
         g.addColorStop(0.5, "rgba(220,250,255,0.8)");
         g.addColorStop(1, "rgba(120,220,255,0)");
         c.fillStyle = g;
-        c.fillRect(env.ox, env.oy + sy - 6, env.PW, 12);
+        c.fillRect(env.ox + bbTV.x0 - 5, env.oy + sy - 6, bbTV.w + 10, 12);
       } else if (p < 4.6) {
         const jbeat = Math.floor(env.t * 0.55);
         const jit = exoRand(env.seed, jbeat) > 0.55 && env.t * 0.55 - jbeat < 0.12;
@@ -1116,7 +1147,7 @@ const EXOTIC = {
         c.drawImage(env.look, env.ox, env.oy + yo - env.PH);
         c.globalCompositeOperation = "lighter";
         c.fillStyle = "rgba(160,230,255,0.25)";
-        c.fillRect(env.ox, env.oy + yo - 2, env.PW, 4);
+        c.fillRect(env.ox + bbTV.x0, env.oy + yo - 2, bbTV.w, 4);
         c.restore();
         c.globalAlpha = 0.3;
         c.drawImage(nz, env.ox, env.oy);
@@ -1472,10 +1503,11 @@ const EXOTIC = {
     front(c, env) {
       const p = this._p(env);
       if (p >= 1.6) return;
-      const rx = env.cx - 0.3 * env.PW;
-      const ry = env.cy - 0.32 * env.PH;
-      const rw = 0.6 * env.PW;
-      const rh = 0.56 * env.PH;
+      const bbFT = exoBBox(env);
+      const rx = bbFT.cx - bbFT.w * 0.26;
+      const ry = bbFT.cy - bbFT.h * 0.28;
+      const rw = bbFT.w * 0.52;
+      const rh = bbFT.h * 0.52;
       // body with the stolen region hollowed to a dim anchor
       const hollow = p < 1.42 ? Math.min(1, p / 0.2) : Math.max(0, 1 - (p - 1.42) / 0.1);
       const body = exoScratch(env, 0);
@@ -1485,7 +1517,8 @@ const EXOTIC = {
       if (hollow > 0) {
         bc.save();
         bc.globalCompositeOperation = "source-atop";
-        bc.fillStyle = `rgba(8,10,20,${0.62 * hollow})`;
+        bc.filter = "saturate(0.2)";
+        bc.fillStyle = `rgba(6,8,18,${0.82 * hollow})`;
         bc.fillRect(rx, ry, rw, rh);
         bc.restore();
       }
@@ -1697,6 +1730,9 @@ const EXOTIC = {
       for (let k = 0; k < N; k++) {
         const lag = 2 + Math.floor(exoRand(env.seed, k * 13 + Math.floor(env.t * 0.45 + k / N)) * 17);
         c.save();
+        c.beginPath();
+        c.rect(env.ox, env.oy, env.PW, env.PH);
+        c.clip();
         c.translate(cx, cy);
         c.rotate(0.42);
         c.beginPath();
@@ -1705,12 +1741,16 @@ const EXOTIC = {
         c.rotate(-0.42);
         c.translate(-cx, -cy);
         c.imageSmoothingEnabled = false;
-        c.drawImage(env.ring(lag), env.ox, env.oy + Math.sin(env.t * 1.5 + k * 2.1) * 0.8);
+        c.filter = "brightness(" + (0.86 + (lag / 19) * 0.28).toFixed(2) + ") saturate(" + (1.25 - (lag / 19) * 0.4).toFixed(2) + ")";
+        c.drawImage(env.ring(lag), env.ox + Math.sin(k * 5.1) * 0.8, env.oy + Math.sin(env.t * 1.5 + k * 2.1) * 1.6);
         c.restore();
       }
       // the seam that reassigns time
       const su = (((env.t * 0.45) % 1) + 1) % 1;
       c.save();
+      c.beginPath();
+      c.rect(env.ox, env.oy, env.PW, env.PH);
+      c.clip();
       c.translate(cx, cy);
       c.rotate(0.42);
       c.globalCompositeOperation = "lighter";
@@ -1763,12 +1803,23 @@ const EXOTIC = {
     draw(c, env) {
       const masks = exoBandMasks(env, 4);
       const lags = [16, 10, 5, 0];
+      const shade = [
+        "brightness(0.78) saturate(1.6) hue-rotate(-16deg)",
+        "brightness(0.9) saturate(1.3) hue-rotate(-8deg)",
+        "brightness(0.98) saturate(1.1)",
+        "none",
+      ];
       for (let b = 0; b < 4; b++) {
         const wob = b < 3 ? Math.round(2 * Math.sin(env.t * 2 + b * 1.4) + 2) : 0;
-        exoMasked(c, env, lags[b] + wob > 0 ? env.ring(lags[b] + wob) : env.look, masks[b], {
-          filter: b < 3 ? `saturate(${1 + (3 - b) * 0.08}) brightness(${1 - (3 - b) * 0.04})` : "none",
-        });
+        exoMasked(c, env, lags[b] + wob > 0 ? env.ring(lags[b] + wob) : env.look, masks[b], { filter: shade[b] });
       }
+      // a ripple of light travelling inward through the rings
+      const rq = (((env.t * 0.5) % 1) + 1) % 1;
+      const rb = Math.floor(rq * 4);
+      exoMasked(c, env, exoMaskCv(env), masks[Math.min(3, rb)], {
+        comp: "lighter",
+        alpha: 0.14 * Math.sin(((rq * 4) % 1) * Math.PI),
+      });
     },
   },
 
@@ -1791,12 +1842,13 @@ const EXOTIC = {
         c.globalAlpha = 0.22;
         c.drawImage(env.look, env.ox, env.oy); // the live self it owes
         c.globalAlpha = 1;
-        // accruing debt ticks
+        // accruing debt ticks beside the head
+        const bbFD = exoBBox(env);
         c.globalCompositeOperation = "lighter";
-        c.fillStyle = "rgba(255,220,120,0.8)";
+        c.fillStyle = "rgba(255,220,120,0.85)";
         const nT = Math.floor((p - 3.2) / 0.3);
         for (let i = 0; i <= nT && i < 5; i++) {
-          c.fillRect(env.ox + env.cx + 0.3 * env.PW, env.oy + env.cy - 0.4 * env.PH + i * 4, 3, 2);
+          c.fillRect(env.ox + bbFD.x1 + 5, env.oy + bbFD.y0 + 2 + i * 4, 3.5, 2);
         }
       } else {
         // repayment: two quantized bursts
@@ -1826,15 +1878,19 @@ const EXOTIC = {
         const by = env.oy + env.cy + Math.sin(a * 1.3 + k) * 0.3 * env.PH;
         const r = (0.09 + 0.02 * depth) * env.PW;
         const mag = 2.1;
-        const sx0 = env.cx + (exoRand(env.seed, k + 5) - 0.5) * 0.45 * env.PW;
-        const sy0 = env.cy + (exoRand(env.seed, k + 55) - 0.5) * 0.45 * env.PH;
+        // sample INSIDE the body so every bubble holds a real specimen
+        const bb = exoBBox(env);
+        const sx0 = bb.cx + (exoRand(env.seed, k + 5) - 0.5) * bb.w * 0.45;
+        const sy0 = bb.cy + (exoRand(env.seed, k + 55) - 0.5) * bb.h * 0.45;
         c.save();
         c.beginPath();
         c.arc(bx, by, r, 0, EXO_TAU);
         c.clip();
         c.imageSmoothingEnabled = false;
         c.globalAlpha = 0.95;
+        c.filter = "brightness(1.15)";
         c.drawImage(env.ring(4 + k * 5), bx - sx0 * mag, by - sy0 * mag, env.PW * mag, env.PH * mag);
+        c.filter = "none";
         c.globalCompositeOperation = "screen";
         const g = c.createRadialGradient(bx - r * 0.4, by - r * 0.4, 1, bx, by, r);
         g.addColorStop(0, "rgba(190,225,255,0.4)");
@@ -1926,8 +1982,9 @@ const EXOTIC = {
         c.restore();
         return;
       }
+      const bbRS = exoBBox(env);
       const q = p / 2.8;
-      const scanY = Math.round(env.PH * (1 - q));
+      const scanY = Math.round(bbRS.y1 + 3 - q * (bbRS.h + 6));
       const lag = Math.min(23, Math.floor(q * 20));
       if (scanY > 0) {
         c.drawImage(env.look, 0, 0, env.PW, scanY, env.ox, env.oy, env.PW, scanY);
@@ -1947,7 +2004,7 @@ const EXOTIC = {
       g.addColorStop(0.5, "rgba(220,255,245,0.75)");
       g.addColorStop(1, "rgba(120,255,220,0)");
       c.fillStyle = g;
-      c.fillRect(env.ox, env.oy + scanY - 4, env.PW, 8);
+      c.fillRect(env.ox + bbRS.x0 - 5, env.oy + scanY - 4, bbRS.w + 10, 8);
       c.restore();
       c.restore();
     },
@@ -1959,9 +2016,10 @@ const EXOTIC = {
     label: "Local Time Dilation",
     kind: "rig",
     draw(c, env) {
-      const zx = env.ox + env.cx + Math.sin(env.t * 0.35) * 0.28 * env.PW;
-      const zy = env.oy + env.cy + Math.cos(env.t * 0.27) * 0.24 * env.PH;
-      const r = 0.24 * env.PW;
+      const bbD = exoBBox(env);
+      const zx = env.ox + bbD.cx + Math.sin(env.t * 0.35) * bbD.w * 0.3;
+      const zy = env.oy + bbD.cy + Math.cos(env.t * 0.27) * bbD.h * 0.26;
+      const r = 0.22 * env.PW;
       c.save();
       c.imageSmoothingEnabled = false;
       c.drawImage(env.look, env.ox, env.oy);
@@ -1996,44 +2054,87 @@ const EXOTIC = {
   evodrum: {
     label: "Evolution Drum",
     kind: "exotic",
-    behind(c, env) {
+    /* normalized filmstrip of the whole line (uniform height, trimmed to content) */
+    _strip(env) {
       const chain = (env.evo && env.evo.chain) || [];
-      let S = chain.map(id => (id === env.species ? env.look : env.aux(id))).filter(Boolean);
-      if (S.length < 2) {
-        S = [env.ring(4), env.ring(12), env.look];
-      }
-      const n = env.compact ? 8 : 12;
-      const R = 0.55 * env.PW;
-      const dh = 0.72 * env.PH;
-      const dy = env.oy + env.cy;
-      const dx0 = env.ox + env.cx;
+      const S = chain.map(id => (id === env.species ? null : env.aux(id)));
+      const loaded = S.filter(Boolean).length;
+      return exoCached(`drum:${env.sig}:${loaded}`, () => {
+        const bb = exoBBox(env);
+        const H = 44;
+        const parts = [];
+        for (let i = 0; i < chain.length; i++) {
+          if (chain[i] === env.species) {
+            parts.push({ img: env.look, sx: bb.x0, sy: bb.y0, sw: bb.w, sh: bb.h });
+          } else if (S[i]) {
+            parts.push({ img: S[i], sx: 0, sy: 0, sw: S[i].width, sh: S[i].height });
+          }
+        }
+        if (parts.length < 2) {
+          parts.length = 0;
+          for (const lag of [14, 7, 0]) {
+            parts.push({ img: lag ? env.ring(lag) : env.look, sx: bb.x0, sy: bb.y0, sw: bb.w, sh: bb.h });
+          }
+        }
+        let tw = 0;
+        const widths = parts.map(pt => {
+          const w = Math.max(8, Math.round((pt.sw / pt.sh) * H) + 4);
+          tw += w;
+          return w;
+        });
+        const cv = document.createElement("canvas");
+        cv.width = tw;
+        cv.height = H;
+        const cc = cv.getContext("2d");
+        cc.imageSmoothingEnabled = false;
+        let x = 0;
+        for (let i = 0; i < parts.length; i++) {
+          const pt = parts[i];
+          cc.drawImage(pt.img, pt.sx, pt.sy, pt.sw, pt.sh, x + 2, 0, widths[i] - 4, H);
+          x += widths[i];
+        }
+        return cv;
+      });
+    },
+    behind(c, env) {
+      const strip = this._strip(env);
+      const bb = exoBBox(env);
+      const n = env.compact ? 10 : 14;
+      const R = 0.42 * env.PW + bb.w * 0.12;
+      const dh = bb.h * 0.85;
+      const dy = env.oy + bb.cy;
+      const dx0 = env.ox + bb.cx;
       c.save();
       c.imageSmoothingEnabled = false;
-      c.globalAlpha = 0.28;
+      // drum shell
+      c.globalAlpha = 0.25;
       c.fillStyle = "#05060d";
       c.beginPath();
-      c.ellipse(dx0, dy, R * 1.06, dh * 0.56, 0, 0, EXO_TAU);
+      c.ellipse(dx0, dy, R * 1.05, dh * 0.58, 0, 0, EXO_TAU);
       c.fill();
-      c.globalAlpha = 1;
+      // slats: the film strip wrapped around the cylinder, front face only
       for (let k = 0; k < n; k++) {
-        const a = env.t * 0.3 + (k / n) * EXO_TAU;
+        const a = env.t * 0.28 + (k / n) * EXO_TAU;
         const ca = Math.cos(a);
-        if (ca <= 0.06) continue; // back of the cylinder
-        const u = ((Math.sin(a * 0.5) + env.t * 0.02) % 1 + 1) % 1;
+        if (ca <= 0.08) continue;
         const uu = (((a / EXO_TAU) % 1) + 1) % 1;
-        const mi = Math.floor(uu * S.length) % S.length;
-        const colU = uu * S.length - Math.floor(uu * S.length);
-        const src = S[mi];
-        const sw = Math.max(2, src.width / 9);
+        const sw = strip.width / n;
         const x = dx0 + Math.sin(a) * R;
-        const w = Math.max(1.5, ca * ((R * EXO_TAU) / n) * 0.85);
-        c.globalAlpha = 0.55 + 0.35 * ca;
-        c.filter = `brightness(${0.55 + 0.45 * ca})`;
-        c.drawImage(src, Math.min(src.width - sw, colU * src.width), 0, sw, src.height, x - w / 2, dy - dh / 2, w, dh);
-        c.filter = "none";
-        void u;
+        const w = Math.max(1.5, ca * ((R * EXO_TAU) / n) * 0.8);
+        c.globalAlpha = 0.35 + 0.45 * ca;
+        c.filter = `brightness(${0.5 + 0.5 * ca}) saturate(0.9)`;
+        c.drawImage(strip, uu * strip.width, 0, Math.min(sw, strip.width - uu * strip.width), strip.height, x - w / 2, dy - dh / 2, w, dh);
       }
-      c.globalAlpha = 1;
+      c.filter = "none";
+      // drum rims
+      c.globalAlpha = 0.5;
+      c.strokeStyle = "#2c3348";
+      c.lineWidth = 1.5;
+      for (const ry of [-dh / 2 - 1, dh / 2 + 1]) {
+        c.beginPath();
+        c.ellipse(dx0, dy + ry, R, 3.2, 0, Math.PI, EXO_TAU);
+        c.stroke();
+      }
       c.restore();
     },
   },
@@ -2053,23 +2154,44 @@ const EXOTIC = {
       const src = target || env.ring(10);
       const P = 6;
       const p = ((env.t % P) + P) % P;
-      const asm = p < 1.6 ? (p < 0.4 ? exoSmooth(p / 0.4) : p < 1.2 ? 1 : exoSmooth((1.6 - p) / 0.4)) : 0;
-      const hx = env.ox + env.cx;
-      const hy = env.oy + Math.max(6, env.cy - 0.52 * env.PH);
+      const asm = p < 1.9 ? (p < 0.45 ? exoSmooth(p / 0.45) : p < 1.45 ? 1 : exoSmooth((1.9 - p) / 0.45)) : 0;
+      const bb = exoBBox(env);
+      const hx = env.ox + bb.cx;
+      const hy = env.oy + Math.max(8, bb.y0 - 10);
       const n = 8;
-      const fh = 0.3 * env.PH;
+      const fh = 0.32 * env.PH;
       const fs = fh / src.height;
       const fw = (src.width * fs) / n;
       c.save();
       c.imageSmoothingEnabled = false;
+      // halo behind the crown
       c.globalCompositeOperation = "lighter";
+      const g = c.createRadialGradient(hx, hy - 2, 1, hx, hy - 2, 0.2 * env.PW + asm * 8);
+      g.addColorStop(0, `rgba(255,236,170,${0.16 + 0.24 * asm})`);
+      g.addColorStop(1, "rgba(255,236,170,0)");
+      c.fillStyle = g;
+      c.fillRect(hx - 0.3 * env.PW, hy - 0.3 * env.PW, 0.6 * env.PW, 0.6 * env.PW);
+      // fragments: a tight jeweled arc that assembles into the relative's silhouette
       for (let k = 0; k < n; k++) {
-        const oa = env.t * 0.7 + (k / n) * EXO_TAU;
-        const ox2 = hx + Math.cos(oa) * 0.17 * env.PW * (1 - asm) + (k - (n - 1) / 2) * fw * asm;
-        const oy2 = hy + Math.sin(oa * 1.7) * 4 * (1 - asm) - fh * 0.5 * asm;
-        c.globalAlpha = 0.55 + 0.4 * asm;
-        c.filter = `brightness(${1.3 + 0.5 * asm}) saturate(1.3)`;
-        c.drawImage(src, (k * src.width) / n, 0, src.width / n, src.height, ox2 - fw / 2, oy2, fw, fh * (asm > 0 ? 1 : 0.55));
+        const arcA = Math.PI + ((k + 0.5) / n) * Math.PI; // upper semicircle
+        const wob = Math.sin(env.t * 2.2 + k * 1.7) * 1.6;
+        const ox2 = hx + Math.cos(arcA + Math.sin(env.t * 0.5) * 0.25) * 0.13 * env.PW * (1 - asm) + (k - (n - 1) / 2) * fw * asm;
+        const oy2 = hy + Math.sin(arcA) * 6 * (1 - asm) + wob * (1 - asm) - fh * 0.5 * asm;
+        c.globalAlpha = 0.7 + 0.3 * asm;
+        c.filter = `brightness(${1.35 + 0.45 * asm}) saturate(1.35)`;
+        const sliceH = asm > 0 ? src.height : src.height * 0.35;
+        const sliceY = asm > 0 ? 0 : src.height * (0.2 + 0.3 * exoRand(env.seed, k));
+        c.drawImage(
+          src,
+          (k * src.width) / n,
+          sliceY,
+          src.width / n,
+          sliceH,
+          ox2 - fw / 2,
+          oy2,
+          fw,
+          fh * (asm > 0 ? 1 : 0.4),
+        );
       }
       c.restore();
     },
@@ -2139,8 +2261,8 @@ const EXOTIC = {
     draw(c, env) {
       exoStamp(c, env, env.look, {});
       const px0 = env.ox + env.cx;
-      const py0 = env.oy + env.cy - 0.04 * env.PH;
-      const R = 0.14 * env.PW;
+      const py0 = env.oy + env.cy - 0.02 * env.PH;
+      const R = 0.1 * env.PW;
       c.save();
       c.globalCompositeOperation = "source-atop";
       const g0 = c.createRadialGradient(px0, py0, R * 0.2, px0, py0, R);
@@ -2157,10 +2279,12 @@ const EXOTIC = {
       c.clip();
       const hop = Math.abs(Math.sin(env.t * 2.6)) * 1.2;
       exoStamp(c, env, env.ring(2), {
-        x: px0 + Math.sin(env.t * 1.4) * 2,
-        y: py0 + R * 0.8 - hop,
-        s: (R * 1.5) / env.PH,
+        x: px0 + Math.sin(env.t * 1.4) * 1.5,
+        y: py0 + R * 0.85 - hop,
+        s: (R * 1.9) / env.PH,
         rot: -Math.sin(env.t * 1.4) * 0.14,
+        alpha: 1,
+        filter: "brightness(1.25)",
         anchorFeet: true,
       });
       c.restore();
@@ -2193,10 +2317,10 @@ const EXOTIC = {
       const flap = Math.sin(env.t * 1.6) * 0.16;
       for (const side of [-1, 1]) {
         c.save();
-        c.translate(env.ox + env.cx + side * 0.3 * env.PW, env.oy + env.cy - 0.12 * env.PH);
-        c.rotate(side * (0.5 + flap));
-        c.scale(side * 1.7, 1.5);
-        c.globalAlpha = 0.5;
+        c.translate(env.ox + env.cx + side * 0.26 * env.PW, env.oy + env.cy - 0.1 * env.PH);
+        c.rotate(side * (0.45 + flap));
+        c.scale(side * 1.05, 0.95);
+        c.globalAlpha = 0.32;
         c.globalCompositeOperation = "screen";
         c.imageSmoothingEnabled = false;
         c.filter = "saturate(1.6) brightness(1.25)";
@@ -2219,11 +2343,11 @@ const EXOTIC = {
       c.restore();
       // reliquary core at the chest
       const pulse = 0.85 + 0.15 * Math.sin(env.t * 3.4);
-      const cw = 0.13 * env.PW * pulse;
+      const cw = 0.085 * env.PW * pulse;
       c.save();
       c.globalCompositeOperation = "lighter";
       const g = c.createRadialGradient(bx, by + 0.06 * env.PH, 1, bx, by + 0.06 * env.PH, cw * 1.8);
-      g.addColorStop(0, "rgba(200,235,255,0.6)");
+      g.addColorStop(0, "rgba(200,235,255,0.42)");
       g.addColorStop(1, "rgba(120,170,255,0)");
       c.fillStyle = g;
       c.fillRect(bx - cw * 2, by - cw * 2 + 0.06 * env.PH, cw * 4, cw * 4);
@@ -2374,17 +2498,10 @@ const EXOTIC = {
     kind: "rig",
     draw(c, env) {
       const L = exoLumaClusters(env);
+      const bbSG = exoBBox(env);
       const la = env.t * 0.4;
-      const lx = env.cx + Math.cos(la) * 0.38 * env.PW;
-      const ly = env.cy + Math.sin(la * 0.7) * 0.28 * env.PH;
-      c.save();
-      c.globalCompositeOperation = "lighter";
-      const g = c.createRadialGradient(env.ox + lx, env.oy + ly, 2, env.ox + lx, env.oy + ly, 0.5 * env.PW);
-      g.addColorStop(0, "rgba(255,244,214,0.4)");
-      g.addColorStop(1, "rgba(255,244,214,0)");
-      c.fillStyle = g;
-      c.fillRect(env.ox, env.oy, env.PW, env.PH);
-      c.restore();
+      const lx = bbSG.cx + Math.cos(la) * bbSG.w * 0.4;
+      const ly = bbSG.cy + Math.sin(la * 0.7) * bbSG.h * 0.32;
       for (let cl = 0; cl < 3; cl++) {
         const d = Math.hypot(L.cent[cl][0] - lx, L.cent[cl][1] - ly) / (0.6 * env.PW);
         exoStamp(c, env, L.masks[cl], {
@@ -2397,6 +2514,18 @@ const EXOTIC = {
       c.globalAlpha = 0.9;
       c.drawImage(L.bound, env.ox, env.oy);
       c.restore();
+      // the light source shining THROUGH the panes (masked to the body)
+      const sSG = exoScratch(env, 2);
+      const scSG = sSG.getContext("2d");
+      scSG.clearRect(0, 0, env.PW, env.PH);
+      const gSG = scSG.createRadialGradient(lx, ly, 2, lx, ly, bbSG.w * 0.55);
+      gSG.addColorStop(0, "rgba(255,246,215,0.75)");
+      gSG.addColorStop(1, "rgba(255,246,215,0)");
+      scSG.fillStyle = gSG;
+      scSG.fillRect(0, 0, env.PW, env.PH);
+      scSG.globalCompositeOperation = "destination-in";
+      scSG.drawImage(exoMaskCv(env), 0, 0);
+      exoStamp(c, env, sSG, { comp: "screen", alpha: 0.85 });
     },
   },
 
@@ -2424,45 +2553,54 @@ const EXOTIC = {
           c.filter = "saturate(0.55) brightness(1.14) contrast(1.06)";
           c.drawImage(env.look, gx * cw, gy * ch, cw, ch, sx0, sy0, cw, ch);
           c.filter = "none";
-          // puppeteer thread to the segment
-          c.strokeStyle = "rgba(190,195,215,0.4)";
-          c.lineWidth = 0.75;
-          c.beginPath();
-          c.moveTo(sx0 + cw / 2, 0);
-          c.lineTo(sx0 + cw / 2, sy0 + 2);
-          c.stroke();
         }
       }
-      // hairline seams
-      c.strokeStyle = "rgba(30,32,44,0.35)";
-      c.lineWidth = 0.6;
-      for (let gx = 1; gx < cols; gx++) {
+      // puppeteer bar + short threads down to each column (anchored just above the body)
+      const bbP = exoBBox(env);
+      const barY = env.oy + Math.max(3, bbP.y0 - 14);
+      c.strokeStyle = "rgba(190,195,215,0.55)";
+      c.lineWidth = 1.2;
+      c.beginPath();
+      c.moveTo(env.ox + bbP.x0 - 4, barY);
+      c.lineTo(env.ox + bbP.x1 + 4, barY);
+      c.stroke();
+      c.lineWidth = 0.75;
+      c.strokeStyle = "rgba(190,195,215,0.4)";
+      for (let gx = 0; gx < cols; gx++) {
+        const tx = env.ox + exoClamp((gx + 0.5) * cw, bbP.x0, bbP.x1);
+        const lag0 = Math.sin(env.t * 2.2 - gx * 0.7) * 1.6 * (1 - snap) - snap * 2.5;
         c.beginPath();
-        c.moveTo(env.ox + gx * cw, env.oy + 6);
-        c.lineTo(env.ox + gx * cw, env.oy + env.PH - 6);
+        c.moveTo(tx, barY);
+        c.lineTo(tx, env.oy + bbP.y0 + 3 + lag0);
         c.stroke();
+      }
+      // seams + glaze, masked to the body
+      const sP = exoScratch(env, 2);
+      const scP = sP.getContext("2d");
+      scP.clearRect(0, 0, env.PW, env.PH);
+      scP.strokeStyle = "rgba(25,27,38,0.6)";
+      scP.lineWidth = 0.7;
+      for (let gx = 1; gx < cols; gx++) {
+        scP.beginPath();
+        scP.moveTo(gx * cw, 0);
+        scP.lineTo(gx * cw, env.PH);
+        scP.stroke();
       }
       for (let gy = 1; gy < rows; gy++) {
-        c.beginPath();
-        c.moveTo(env.ox + 6, env.oy + gy * ch);
-        c.lineTo(env.ox + env.PW - 6, env.oy + gy * ch);
-        c.stroke();
+        scP.beginPath();
+        scP.moveTo(0, gy * ch);
+        scP.lineTo(env.PW, gy * ch);
+        scP.stroke();
       }
-      // glaze highlight
-      c.globalCompositeOperation = "lighter";
-      c.globalAlpha = 0.16;
-      const g = c.createRadialGradient(
-        env.ox + env.cx - 0.15 * env.PW,
-        env.oy + env.cy - 0.2 * env.PH,
-        2,
-        env.ox + env.cx,
-        env.oy + env.cy,
-        0.5 * env.PW,
-      );
-      g.addColorStop(0, "#fff");
-      g.addColorStop(1, "rgba(255,255,255,0)");
-      c.fillStyle = g;
-      c.fillRect(env.ox, env.oy, env.PW, env.PH);
+      const gP = scP.createRadialGradient(bbP.cx - bbP.w * 0.2, bbP.cy - bbP.h * 0.25, 1, bbP.cx, bbP.cy, bbP.w * 0.6);
+      gP.addColorStop(0, "rgba(255,255,255,0.4)");
+      gP.addColorStop(1, "rgba(255,255,255,0)");
+      scP.fillStyle = gP;
+      scP.fillRect(0, 0, env.PW, env.PH);
+      scP.globalCompositeOperation = "destination-in";
+      scP.drawImage(exoMaskCv(env), 0, 0);
+      c.imageSmoothingEnabled = false;
+      c.drawImage(sP, env.ox, env.oy);
       c.restore();
     },
   },
@@ -2566,9 +2704,9 @@ const EXOTIC = {
             r /= n;
             g /= n;
             b /= n;
-            cc.fillStyle = `rgb(${(r * 0.5) | 0},${(g * 0.5) | 0},${(b * 0.5) | 0})`;
+            cc.fillStyle = `rgb(${(r * 0.42) | 0},${(g * 0.42) | 0},${(b * 0.42) | 0})`;
             cc.fillRect(x0, y0, cell, cell);
-            cc.strokeStyle = `rgb(${Math.min(255, r * 1.15) | 0},${Math.min(255, g * 1.15) | 0},${Math.min(255, b * 1.15) | 0})`;
+            cc.strokeStyle = `rgb(${Math.min(255, r * 1.3) | 0},${Math.min(255, g * 1.3) | 0},${Math.min(255, b * 1.3) | 0})`;
             cc.beginPath();
             cc.moveTo(x0 + 0.5, y0 + 0.5);
             cc.lineTo(x0 + cell - 0.5, y0 + cell - 0.5);
@@ -2581,12 +2719,13 @@ const EXOTIC = {
       });
     },
     draw(c, env) {
-      // embroidery hoop behind
+      // embroidery hoop hugging the body
+      const bbCS = exoBBox(env);
       c.save();
       c.strokeStyle = "#8a6b45";
       c.lineWidth = 3;
       c.beginPath();
-      c.ellipse(env.ox + env.cx, env.oy + env.cy, 0.52 * env.PW, 0.5 * env.PH, 0, 0, EXO_TAU);
+      c.ellipse(env.ox + bbCS.cx, env.oy + bbCS.cy, bbCS.w * 0.62 + 5, bbCS.h * 0.62 + 5, 0, 0, EXO_TAU);
       c.stroke();
       c.strokeStyle = "#5e4426";
       c.lineWidth = 1;
@@ -2768,9 +2907,9 @@ const EXOTIC = {
           c.translate(fcx + dx, fcy + dy);
           c.rotate(rot);
           c.scale(sc, sc);
-          if (amp > 0.05 && k % 3 === 1) {
+          if (amp > 0.05 && k % 4 === 1) {
             c.globalCompositeOperation = "multiply";
-            c.globalAlpha = 0.85;
+            c.globalAlpha = 0.65;
           }
           c.drawImage(env.look, gx * cw, gy * ch, cw, ch, -cw / 2, -ch / 2, cw, ch);
           c.restore();
@@ -2811,14 +2950,32 @@ const EXOTIC = {
       c.stroke();
       c.restore();
       exoStamp(c, env, env.look, { x: feetX, y: feetY, sx, sy, anchorFeet: true });
-      // balloon sheen
+      // balloon sheen, masked to the (scaled) body so it never floats off it
+      const bbI = exoBBox(env);
+      const sI = exoScratch(env, 2);
+      const scI = sI.getContext("2d");
+      scI.clearRect(0, 0, env.PW, env.PH);
+      scI.beginPath();
+      scI.ellipse(
+        bbI.cx - bbI.w * 0.18,
+        bbI.y0 + bbI.h * 0.3,
+        bbI.w * 0.2,
+        bbI.h * 0.22,
+        -0.4,
+        0,
+        EXO_TAU,
+      );
+      scI.fillStyle = "rgba(255,255,255,0.9)";
+      scI.fill();
+      scI.globalCompositeOperation = "destination-in";
+      scI.drawImage(exoMaskCv(env), 0, 0);
       c.save();
+      c.imageSmoothingEnabled = false;
       c.globalCompositeOperation = "lighter";
-      c.globalAlpha = 0.2;
-      c.beginPath();
-      c.ellipse(feetX - 0.13 * env.PW, env.oy + env.cy - 0.18 * env.PH * sy, 0.1 * env.PW, 0.16 * env.PH, -0.4, 0, EXO_TAU);
-      c.fillStyle = "#fff";
-      c.fill();
+      c.globalAlpha = 0.22;
+      c.translate(feetX, feetY);
+      c.scale(sx, sy);
+      c.drawImage(sI, -env.cx, -env.fy);
       c.restore();
       // leak: puffs stream out, then the patch flies in
       if (p < 1.2) {
@@ -2967,7 +3124,8 @@ const EXOTIC = {
       for (let i = 0; i < N; i++) {
         const u = i / (N - 1);
         const w = headward ? 1 - u : u;
-        const s = 1 + active * (0.55 * w * w - 0.14 * (1 - w));
+        const breathe = 0.05 * Math.sin(env.t * 2 - i * 0.55);
+        const s = 1 + breathe + active * (0.55 * w * w - 0.14 * (1 - w));
         const sw = env.PW * s;
         c.drawImage(env.look, 0, i * sh, env.PW, sh, env.ox + env.cx - (env.cx / env.PW) * sw, env.oy + i * sh, sw, sh + 0.5);
       }
@@ -3029,8 +3187,9 @@ const EXOTIC = {
       c.lineCap = "round";
       c.lineJoin = "round";
       for (const [w, col] of [
-        [3.2, "rgba(6,8,16,0.55)"],
-        [1.8, "rgba(10,12,24,0.95)"],
+        [4, "rgba(120,225,255,0.4)"],
+        [2.4, "rgba(8,10,20,0.98)"],
+        [0.9, "rgba(150,235,255,0.65)"],
       ]) {
         c.strokeStyle = col;
         c.lineWidth = w;
@@ -3044,9 +3203,13 @@ const EXOTIC = {
         c.stroke();
       }
       const hp = pts[Math.floor(head * N) % N];
-      c.fillStyle = "#e8f2ff";
+      c.fillStyle = "#0a0c14";
       c.beginPath();
-      c.arc(env.ox + hp[0], env.oy + hp[1], 1.1, 0, EXO_TAU);
+      c.arc(env.ox + hp[0], env.oy + hp[1], 2.4, 0, EXO_TAU);
+      c.fill();
+      c.fillStyle = "#eaf6ff";
+      c.beginPath();
+      c.arc(env.ox + hp[0] + 0.7, env.oy + hp[1] - 0.7, 1, 0, EXO_TAU);
       c.fill();
       // occasional nip + the body repels it
       const P = 6;
@@ -3086,19 +3249,19 @@ const EXOTIC = {
     label: "Surface Escape",
     kind: "exotic",
     _pass(c, env, wantFront) {
-      const links = env.compact ? 6 : 9;
+      const links = env.compact ? 10 : 16;
       const rx = (env.compact ? 0.42 : 0.52) * env.PW;
       const ry = 0.4 * env.PH;
       for (let i = 0; i < links; i++) {
-        const u = ((env.t * 0.13 + i * 0.024) % 1 + 1) % 1;
+        const u = ((env.t * 0.13 + i * 0.011) % 1 + 1) % 1;
         const a = u * EXO_TAU;
         const depth = Math.sin(a);
         if (depth >= 0 !== wantFront) continue;
         const px2 = env.ox + env.cx + Math.cos(a) * rx;
         const py2 = env.oy + env.cy + depth * ry * 0.35 - Math.cos(a * 2) * 4;
         const tang = a + Math.PI / 2;
-        const sw = 6;
-        const sx0 = exoClamp(env.cx - 0.25 * env.PW + i * sw, 0, env.PW - sw);
+        const sw = 7;
+        const sx0 = exoClamp(env.cx - 0.28 * env.PW + i * 3.5, 0, env.PW - sw);
         c.save();
         c.translate(px2, py2);
         c.rotate(tang);
@@ -3125,7 +3288,7 @@ const EXOTIC = {
     label: "Portal Anatomy",
     kind: "rig",
     draw(c, env) {
-      exoStamp(c, env, env.look, { filter: "brightness(0.3) saturate(0.55)" });
+      exoStamp(c, env, env.look, { filter: "brightness(0.42) saturate(0.6)" });
       const s = exoScratch(env, 3);
       const sc = s.getContext("2d");
       sc.clearRect(0, 0, env.PW, env.PH);
@@ -3157,7 +3320,7 @@ const EXOTIC = {
         const fs = h / img.height;
         const ix = env.cx + Math.sin(env.t * 0.4 + drawn * 2.6) * 0.16 * env.PW * depth2;
         const iy = env.cy + Math.cos(env.t * 0.31 + drawn * 1.9) * 0.13 * env.PH * depth2 + drawn * 6;
-        sc.globalAlpha = 0.55 + 0.35 * depth2;
+        sc.globalAlpha = 0.72 + 0.28 * depth2;
         sc.drawImage(img, ix - (img.width * fs) / 2, iy - h / 2, img.width * fs, h);
         drawn++;
       }
@@ -3166,7 +3329,7 @@ const EXOTIC = {
       sc.drawImage(exoMaskCv(env), 0, 0);
       sc.globalCompositeOperation = "source-over";
       exoStamp(c, env, s, {});
-      exoStamp(c, env, env.look, { alpha: 0.26 }); // present-self membrane
+      exoStamp(c, env, env.look, { alpha: 0.3 }); // present-self membrane
       // glass edge
       const pts = exoEdge(env);
       c.save();
@@ -3212,11 +3375,11 @@ const EXOTIC = {
         c.globalCompositeOperation = "lighter";
         c.fillStyle = col;
         c.beginPath();
-        c.arc(px2, py2, 1.6, 0, EXO_TAU);
+        c.arc(px2, py2, 2.3, 0, EXO_TAU);
         c.fill();
-        c.globalAlpha = 0.4;
+        c.globalAlpha = 0.45;
         c.beginPath();
-        c.arc(px2, py2, 3.4, 0, EXO_TAU);
+        c.arc(px2, py2, 5, 0, EXO_TAU);
         c.fill();
         c.restore();
         // landing pulse repaints the receiving cluster
@@ -3229,7 +3392,7 @@ const EXOTIC = {
           sc.fillStyle = col;
           sc.fillRect(0, 0, env.PW, env.PH);
           sc.globalCompositeOperation = "source-over";
-          exoStamp(c, env, s, { alpha: 0.45 * pulse, comp: "lighter" });
+          exoStamp(c, env, s, { alpha: 0.65 * pulse, comp: "lighter" });
         }
       }
     },
@@ -3261,9 +3424,9 @@ const EXOTIC = {
       c.save();
       c.imageSmoothingEnabled = false;
       c.translate(env.ox + env.cx, feetY);
-      c.scale(flip, -0.55);
-      c.globalAlpha = 0.4;
-      c.filter = agree ? "none" : "hue-rotate(140deg) saturate(1.6)";
+      c.scale(flip, -0.62);
+      c.globalAlpha = 0.55;
+      c.filter = agree ? "brightness(0.9)" : "hue-rotate(140deg) saturate(1.7) brightness(1.05)";
       c.drawImage(s, -env.cx, -env.fy);
       c.restore();
     },
@@ -3307,7 +3470,10 @@ const EXOTIC = {
       const S = this._state(env);
       if (S.p < 3.4) {
         const q = exoSmooth(S.p / 3.4);
-        this._disc(c, env, S, (0.14 + q * 0.42) * env.PW, 0.16 + q * 0.22);
+        c.save();
+        c.globalCompositeOperation = "screen";
+        this._disc(c, env, S, (0.14 + q * 0.42) * env.PW, 0.3 + q * 0.3);
+        c.restore();
       }
     },
     front(c, env) {
@@ -3372,14 +3538,14 @@ const EXOTIC = {
           const tq = Math.max(0, q - i * 0.06);
           const tx = env.ox - 0.2 * env.PW + tq * (feetX - env.ox + 0.2 * env.PW);
           const ty = env.oy - 0.15 * env.PH + tq * (feetY - env.oy + 0.15 * env.PH);
-          c.globalAlpha = 0.5 - i * 0.08;
+          c.globalAlpha = 0.6 - i * 0.09;
           c.fillStyle = i < 3 ? "#ffd27a" : "#ff8a4a";
           c.beginPath();
-          c.arc(tx, ty, 5 - i * 0.7, 0, EXO_TAU);
+          c.arc(tx, ty, 7.5 - i * 0.9, 0, EXO_TAU);
           c.fill();
         }
         c.restore();
-        exoBall(c, bx, by, 5.5, q * 9, 1);
+        exoBall(c, bx, by, 7.5, q * 9, 1);
       } else {
         const q2 = (p - 0.7) / 1.7;
         // shock ring + dust
@@ -3398,8 +3564,8 @@ const EXOTIC = {
           const dq = exoClamp(q2 * 1.6 - i * 0.06, 0, 1);
           if (dq <= 0 || dq >= 1) continue;
           const ang = exoRand(env.seed, i + 11) * Math.PI;
-          c.globalAlpha = (1 - dq) * 0.7;
-          c.fillStyle = "#b9a98a";
+          c.globalAlpha = (1 - dq) * 0.9;
+          c.fillStyle = "#cbbd9e";
           c.beginPath();
           c.arc(feetX + Math.cos(ang) * (6 + dq * 24) * (exoRand(env.seed, i) > 0.5 ? 1 : -1), feetY - Math.sin(ang) * dq * 14, 2.2 * (1 - dq * 0.5), 0, EXO_TAU);
           c.fill();
@@ -3640,7 +3806,7 @@ const EXOTIC = {
           y = t2 > 0 ? Math.min(feetY - 2, feetY - 2 - Math.abs(Math.sin(t2 * 6)) * 7 * Math.max(0, 1 - t2 * 1.4)) : feetY - 2;
         }
         let alpha = 1;
-        let r = 3.4;
+        let r = 5;
         if (p > 1.1) {
           const q2 = exoClamp((p - 1.1) / 0.6, 0, 1);
           if (grabbed) {
@@ -3663,6 +3829,13 @@ const EXOTIC = {
           }
         }
         if (alpha > 0) {
+          c.save();
+          c.globalAlpha = alpha * 0.3;
+          c.fillStyle = "#000";
+          c.beginPath();
+          c.ellipse(x, feetY + 1, r * 0.9, 2, 0, 0, EXO_TAU);
+          c.fill();
+          c.restore();
           this._item(c, env, kind, x, y, r, q * (4 + i), alpha);
         }
       }
@@ -3705,44 +3878,54 @@ const EXOTIC = {
       const feetX = env.ox + env.cx;
       const feetY = env.oy + env.fy;
       const col = this._avg(env);
+      const bb = exoBBox(env);
+      const midY = env.oy + bb.cy;
+      const midX = env.ox + bb.cx;
       c.save();
       c.imageSmoothingEnabled = false;
-      if (p < 0.6) {
-        // fold right half over the left
-        const q = exoSmooth(p / 0.6);
-        c.drawImage(env.look, 0, 0, env.cx, env.PH, env.ox, env.oy, env.cx, env.PH);
+      if (p < 0.65) {
+        // fold the TOP half down over the bottom - the mon visibly halves
+        const q = exoSmooth(p / 0.65);
         const k = Math.cos(q * Math.PI);
+        c.drawImage(env.look, 0, bb.cy, env.PW, env.PH - bb.cy, env.ox, midY, env.PW, env.PH - bb.cy);
         c.save();
-        c.translate(env.ox + env.cx, 0);
-        c.scale(Math.max(0.04, Math.abs(k)) * (k < 0 ? -1 : 1), 1);
-        c.translate(-(env.ox + env.cx), 0);
-        if (k < 0) c.filter = "brightness(0.7)";
-        c.drawImage(env.look, env.cx, 0, env.PW - env.cx, env.PH, env.ox + env.cx, env.oy, env.PW - env.cx, env.PH);
+        c.translate(0, midY);
+        c.scale(1, Math.max(0.05, Math.abs(k)) * (k < 0 ? -1 : 1));
+        c.translate(0, -midY);
+        if (k < 0) c.filter = "brightness(0.62)";
+        c.drawImage(env.look, 0, 0, env.PW, bb.cy, env.ox, env.oy, env.PW, bb.cy);
         c.restore();
-      } else if (p < 1.2) {
-        // fold the top half down (left half remains as the packet base)
-        const q = exoSmooth((p - 0.6) / 0.6);
+        // crease line
+        c.strokeStyle = "rgba(230,235,250,0.4)";
+        c.lineWidth = 0.75;
+        c.beginPath();
+        c.moveTo(env.ox + bb.x0, midY);
+        c.lineTo(env.ox + bb.x1, midY);
+        c.stroke();
+      } else if (p < 1.25) {
+        // then the LEFT half folds right over the remaining bottom strip
+        const q = exoSmooth((p - 0.65) / 0.6);
         const k = Math.cos(q * Math.PI);
         c.save();
         c.beginPath();
-        c.rect(env.ox, env.oy + env.cy, env.cx, env.PH - env.cy);
+        c.rect(midX, midY, env.PW, env.PH - bb.cy);
         c.clip();
-        c.drawImage(env.look, 0, 0, env.cx, env.PH, env.ox, env.oy, env.cx, env.PH);
+        c.drawImage(env.look, 0, bb.cy, env.PW, env.PH - bb.cy, env.ox, midY, env.PW, env.PH - bb.cy);
         c.restore();
         c.save();
-        c.translate(0, env.oy + env.cy);
-        c.scale(1, Math.max(0.04, Math.abs(k)) * (k < 0 ? -1 : 1));
-        c.translate(0, -(env.oy + env.cy));
-        if (k < 0) c.filter = "brightness(0.6)";
+        c.translate(midX, 0);
+        c.scale(Math.max(0.05, Math.abs(k)) * (k < 0 ? -1 : 1), 1);
+        c.translate(-midX, 0);
+        if (k < 0) c.filter = "brightness(0.55)";
         c.beginPath();
-        c.rect(env.ox, env.oy, env.cx, env.cy);
+        c.rect(env.ox, midY, midX - env.ox, env.PH - bb.cy);
         c.clip();
-        c.drawImage(env.look, 0, 0, env.cx, env.PH, env.ox, env.oy, env.cx, env.PH);
+        c.drawImage(env.look, 0, bb.cy, env.PW, env.PH - bb.cy, env.ox, midY, env.PW, env.PH - bb.cy);
         c.restore();
       } else {
         // the parcel: tips backward, then slides under its own shadow
-        const bw = env.cx * 0.6;
-        const bh = (env.PH - env.cy) * 0.5;
+        const bw = bb.w * 0.42;
+        const bh = bb.h * 0.36;
         let rot = 0;
         let scale = 1;
         let slide = 0;
@@ -4046,7 +4229,7 @@ const EXOTIC = {
       sc.drawImage(exoMaskCv(env), 0, 0);
       sc.globalCompositeOperation = "source-over";
       exoStamp(c, env, s, { alpha: 0.9 });
-      exoStamp(c, env, env.look, { alpha: 0.24 }); // ghost of the features
+      exoStamp(c, env, env.look, { alpha: 0.32 }); // ghost of the features
       // edge caustics
       const pts = exoEdge(env);
       c.save();
