@@ -12,6 +12,7 @@ import {
   COOP_FAINT_SWITCH_SEQ_BASE,
   endCoopFaintSwitchWindow,
   getCoopFaintSwitchWaitMs,
+  sendCoopFaintSwitchChoice,
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import { UiMode } from "#enums/ui-mode";
@@ -86,7 +87,7 @@ export class CoopGuestFaintSwitchPhase extends Phase {
             // host can resolve the pick by IDENTITY when the two clients' party orders have
             // diverged (a blind slot index summons a DIFFERENT mon on the other engine).
             const pickedSpecies = picked.species?.speciesId ?? 0;
-            relay.sendInteractionChoice(seq, "switch", slotIndex, [0, pickedSpecies]);
+            sendCoopFaintSwitchChoice(relay, this.fieldIndex, slotIndex, [0, pickedSpecies]);
           } else if (slotIndex >= battlerCount && slotIndex < 6) {
             coopWarn(
               "replay",

@@ -81,6 +81,16 @@ export function isCoopFaintSwitchSeq(seq: number): boolean {
   return slot >= 0 && slot < COOP_FAINT_SWITCH_SLOT_COUNT;
 }
 
+/** Production carrier seam for an owner-resolved faint replacement (including the no-pick sentinel). */
+export function sendCoopFaintSwitchChoice(
+  relay: CoopInteractionRelay | null,
+  fieldIndex: number,
+  partySlot: number,
+  data: number[],
+): void {
+  relay?.sendInteractionChoice(COOP_FAINT_SWITCH_SEQ_BASE + fieldIndex, "switch", partySlot, [...data]);
+}
+
 /**
  * #806 STALL-WATCHDOG SUPPRESSION (faint-replacement window). While a faint-replacement pick is pending -
  * the host AWAITING the partner's relayed choice ({@linkcode ShowdownEnemyFaintSwitchPhase} / the co-op
