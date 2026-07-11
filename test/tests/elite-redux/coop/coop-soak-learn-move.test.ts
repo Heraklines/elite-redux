@@ -30,7 +30,7 @@ import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
 import { installDuoLogCapture } from "#test/tools/coop-duo-harness";
 import { COOP_SOAK_SITUATIONS } from "#test/tools/coop-soak-coverage";
-import { runCoopSoak, SOAK_PROFILES } from "#test/tools/coop-soak-driver";
+import { prepareCoopSoakContent, runCoopSoak, SOAK_PROFILES } from "#test/tools/coop-soak-driver";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
@@ -79,6 +79,7 @@ describe.skipIf(!RUN)("CO-OP SOAK learn-move leg: accept-with-forget across two 
   });
 
   it("drives a level-up learn (accept + forget) on a guest-owned mon: LEARN_MOVE_BATCH + learnMoveBatch fire, moveset converges", async () => {
+    prepareCoopSoakContent(game, SEED);
     await game.classicMode.startBattle(...SOAK_PROFILES.god.species);
     // Set a RAW full 4-move moveset on every party mon (host side) so the learn's setMove is visible AND
     // combat has damaging moves. buildDuo (inside runCoopSoak) mirrors the host party onto the guest.

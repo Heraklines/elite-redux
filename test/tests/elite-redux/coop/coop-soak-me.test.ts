@@ -27,7 +27,12 @@ import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
 import { installDuoLogCapture } from "#test/tools/coop-duo-harness";
 import { logSoakCoverage } from "#test/tools/coop-soak-coverage";
-import { announceSoakSeed, runCoopSoak, SOAK_PROFILES } from "#test/tools/coop-soak-driver";
+import {
+  announceSoakSeed,
+  prepareCoopSoakContent,
+  runCoopSoak,
+  SOAK_PROFILES,
+} from "#test/tools/coop-soak-driver";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
@@ -35,6 +40,8 @@ const RUN = process.env.ER_SCENARIO === "1";
 
 /** The designated ME wave (valid: WILD-eligible, non-boss, %10 != 1, in [10,180]) - host-owned by counter parity. */
 const ME_WAVE = 12;
+/** Stable content stream where wave 12 is a legal wild ME wave; recorded by the driver for replay. */
+const ME_CONTENT_SEED = "test";
 
 describe.skipIf(!RUN)("NIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)", () => {
   let phaserGame: Phaser.Game;
@@ -87,12 +94,14 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: mid-run mystery-encounter continuatio
     const waves = ME_WAVE;
     announceSoakSeed(seed, waves);
 
+    prepareCoopSoakContent(game, seed, ME_CONTENT_SEED);
     await game.classicMode.startBattle(...SOAK_PROFILES.god.species);
     const result = await runCoopSoak(game, {
       seed,
       waves,
       logs,
       profile: "god",
+      pinSeed: ME_CONTENT_SEED,
       meWaves: new Map([[ME_WAVE, MysteryEncounterType.DEPARTMENT_STORE_SALE]]),
     });
 
@@ -158,12 +167,14 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: mid-run mystery-encounter continuatio
     const waves = ME_WAVE + 2; // drive the ME at 12, then survey 13 + 14 as plain battle waves
     announceSoakSeed(seed, waves);
 
+    prepareCoopSoakContent(game, seed, ME_CONTENT_SEED);
     await game.classicMode.startBattle(...SOAK_PROFILES.god.species);
     const result = await runCoopSoak(game, {
       seed,
       waves,
       logs,
       profile: "god",
+      pinSeed: ME_CONTENT_SEED,
       meWaves: new Map([[ME_WAVE, MysteryEncounterType.DEPARTMENT_STORE_SALE]]),
     });
 
@@ -215,12 +226,14 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: mid-run mystery-encounter continuatio
     const waves = GUEST_ME_WAVE + 1; // survey the wave past the guest-owned ME
     announceSoakSeed(seed, waves);
 
+    prepareCoopSoakContent(game, seed, ME_CONTENT_SEED);
     await game.classicMode.startBattle(...SOAK_PROFILES.god.species);
     const result = await runCoopSoak(game, {
       seed,
       waves,
       logs,
       profile: "god",
+      pinSeed: ME_CONTENT_SEED,
       meWaves: new Map([[GUEST_ME_WAVE, MysteryEncounterType.DEPARTMENT_STORE_SALE]]),
     });
 

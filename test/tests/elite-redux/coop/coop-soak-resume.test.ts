@@ -22,7 +22,7 @@ import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
 import { installDuoLogCapture } from "#test/tools/coop-duo-harness";
 import { COOP_SOAK_SITUATIONS } from "#test/tools/coop-soak-coverage";
-import { runCoopSoak, SOAK_PROFILES } from "#test/tools/coop-soak-driver";
+import { prepareCoopSoakContent, runCoopSoak, SOAK_PROFILES } from "#test/tools/coop-soak-driver";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
@@ -74,6 +74,7 @@ describe.skipIf(!RUN)(
     });
 
     it("serializes at a mid-soak wave, reboots the guest from the snapshot, converges byte-equal, and continues green", async () => {
+      prepareCoopSoakContent(game, SEED);
       await game.classicMode.startBattle(...SOAK_PROFILES.god.species);
       const result = await runCoopSoak(game, {
         seed: SEED,

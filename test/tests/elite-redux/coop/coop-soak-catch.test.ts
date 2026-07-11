@@ -31,7 +31,7 @@ import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
 import { installDuoLogCapture } from "#test/tools/coop-duo-harness";
 import { COOP_SOAK_SITUATIONS } from "#test/tools/coop-soak-coverage";
-import { runCoopSoak, SOAK_PROFILES } from "#test/tools/coop-soak-driver";
+import { prepareCoopSoakContent, runCoopSoak, SOAK_PROFILES } from "#test/tools/coop-soak-driver";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
@@ -93,6 +93,7 @@ describe.skipIf(!RUN)("CO-OP SOAK catch leg: seeded ball throw -> capture -> dex
     // A FOUR-mon party (not the full six) so the caught mon has room in the party - a full party triggers
     // the party-full CONFIRM/box sub-flow, which is a separate follow-up. Host owns slots 0,2; guest 1,3.
     const sp = SOAK_PROFILES.god.species;
+    prepareCoopSoakContent(game, SEED);
     await game.classicMode.startBattle(sp[0], sp[1], sp[2], sp[3]);
     const result = await runCoopSoak(game, {
       seed: SEED,
