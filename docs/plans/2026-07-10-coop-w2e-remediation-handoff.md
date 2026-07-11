@@ -266,3 +266,30 @@ Next: contract section 2.5 item 6, beginning with faint-switch, then revival, le
 and stormglass. Lobby/resume remains last. Renderer enforcement, quarantine/stat-stage cleanup, expanded
 model/soak coverage, the final drop-every-class campaign, and the full four-lane/final-long-soak gate all
 remain open; there is still no justified “no gaps” claim.
+
+## 14. Continuation evidence (per-mon operations: faint-switch)
+
+The first section 2.5 item 6 surface is migrated. `a05061889` centralizes the authoritative guest
+faint-replacement carrier without changing behavior. `19fca613e` is the failure-first RED: dropping the
+guest's one-shot `switch` intent made the host waiter resolve null, which would silently auto-pick a
+different bench mon. `a5fde83fc` adds the negotiated `opSurface.faintSwitch` capability, typed
+`FAINT_SWITCH` payload, `op:faintSwitch` durability class under `TURN_RESOLVE`, resume revision floor,
+stable wave/turn/field/final-party-slot addressing, lifecycle-bounded guest intent retry, and committed
+envelope cancellation.
+
+The authority journals the resolved replacement only after the existing species-identity and legality
+checks. Therefore a party-order repair or illegal/stale proposal records the actual authoritative fallback,
+not the rejected raw cursor. Host-owned replacements are journaled for trace completeness. Guest rendering
+still materializes the summoned mon from the existing out-of-band authoritative replacement checkpoint;
+the operation is the decision/confirmation plane and does not create a second party-mutation path. The
+no-legal-bench sentinel retries under the same stable event address, and session reset clears all timers.
+
+Proof: the focused operation suite and faulted real two-engine faint-switch path pass 4/4. In the real path,
+the first guest frame is actually dropped; the host still summons the guest-selected Charizard rather than
+its Lapras fallback, the guest materializes and commands it, party order converges, and forced-resync count
+stays zero. The malicious cross-owner switch guard, switch matrix, capability/handshake, and recovery batch
+passes 44/44; the gated half-wipe and simultaneous-double-faint suites remain green. Flag-off legacy relay
+behavior is covered. Touched-file TypeScript diagnostics are zero and Biome reports no errors.
+
+Next per-mon surface: Revival Blessing (`REVIVAL`), followed by learn-move/batch, catch-full, and stormglass.
+The full gate, final long soak, and architecture residuals listed in section 13 remain open.
