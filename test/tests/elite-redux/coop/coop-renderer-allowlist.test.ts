@@ -90,12 +90,12 @@ describe("co-op renderer ALLOWLIST gate (#633, accepted-review item 2)", () => {
     resetCoopRendererNeutralizedLog();
     resetCoopRendererWouldBlockLog();
     resetObservedCoopGuestPhases();
-    setCoopRendererGateEnforced(false);
+    setCoopRendererGateEnforced(true);
   });
   afterEach(() => {
     // Never leak the predicate / enforcement / logs into the next test file (solo / host read false).
     setCoopAuthoritativeGuestPredicate(null);
-    setCoopRendererGateEnforced(false);
+    setCoopRendererGateEnforced(true);
     resetCoopRendererNeutralizedLog();
     resetCoopRendererWouldBlockLog();
     resetObservedCoopGuestPhases();

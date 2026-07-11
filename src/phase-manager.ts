@@ -605,9 +605,9 @@ export class PhaseManager {
     // co-op GUEST is a pure renderer that resolves nothing: it renders the host's streamed outcome
     // via the CoopReplay* phases and applies the host's authoritative checkpoint. Only presentation +
     // input-intent phases (+ the transitional boundary tails) may be constructed on it; every other
-    // phase is a host-authoritative RESOLUTION / progression / reward LEAK. The gate runs warn-first:
-    // OBSERVE (default) preserves today's behavior (legacy denylist neutralizes; an unlisted phase runs
-    // but is logged WOULD-BLOCK), ENFORCE fails closed (neutralize + logged BLOCK). When it neutralizes,
+    // phase is a host-authoritative RESOLUTION / progression / reward LEAK. ENFORCE is the shipped default:
+    // every unlisted phase fails closed (neutralize + logged BLOCK). OBSERVE remains an explicit emergency
+    // rollback that preserves legacy behavior and logs WOULD-BLOCK. When the gate neutralizes,
     // substitute an inert no-op that occupies the queue slot and advances immediately - it can never
     // roll RNG, apply damage, or read per-account state. Hard-gated on the live authoritative GUEST, so
     // solo / host / lockstep are byte-for-byte unaffected (the predicate is false and this returns
