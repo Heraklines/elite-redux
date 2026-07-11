@@ -214,6 +214,7 @@ import {
   commitWaveAdvanceOwnerIntent,
   isCoopWaveAdvanceOperationEnabled,
   isValidCoopWaveAdvancePayload,
+  resolveCoopBiomeBoundaryFlag,
   resetCoopWaveAdvanceOperationState,
   setCoopWaveAdvanceOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-wave-operation";
@@ -1918,7 +1919,7 @@ export function buildCoopWaveAdvancePayload(outcome: CoopWaveOutcome, wave: numb
   let victoryKind: "wild" | "trainer" = "wild";
   try {
     const gameMode = globalScene.gameMode;
-    biomeChange = (gameMode?.hasRandomBiomes ?? false) || globalScene.isNewBiome();
+    biomeChange = resolveCoopBiomeBoundaryFlag(gameMode?.hasRandomBiomes, globalScene.isNewBiome());
     eggLapse = isVictory && ((gameMode?.isEndless ?? false) || !gameMode.isWaveFinal(wave));
     victoryKind = globalScene.currentBattle.battleType === BattleType.TRAINER ? "trainer" : "wild";
   } catch {
