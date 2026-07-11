@@ -84,12 +84,6 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     resetCoopOperationJournalLog();
     setCoopDurabilityEnabled(true);
     routed = [];
-    // Record every committed wave-advance op the guest routes into the live-mutation seam (overrides the
-    // production sink for the test; a real materializer feeds pendingWaveAdvance - proven in coop-runtime).
-    registerCoopOperationLiveSink("op:wave", env => {
-      routed.push(env.pendingOperation?.payload as CoopWaveAdvancePayload);
-      return true;
-    });
     game.override
       .battleStyle("double")
       .startingWave(1)
@@ -120,7 +114,14 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   /** Boot the host into a live battle + stand up the duo rig. */
   async function bootDuo(): Promise<DuoRig> {
     await game.classicMode.startBattle(SpeciesId.MAGIKARP, SpeciesId.MAGIKARP);
-    return buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    // Runtime assembly installs the receiver-bound production sink. Override it only after assembly for
+    // this boundary-seam recording test; production materialization is covered by the runtime/soak suites.
+    registerCoopOperationLiveSink("op:wave", env => {
+      routed.push(env.pendingOperation?.payload as CoopWaveAdvancePayload);
+      return true;
+    });
+    return rig;
   }
 
   /**

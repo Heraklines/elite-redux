@@ -2386,7 +2386,7 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
   }
   const op = envelope.pendingOperation;
   const parsed = op == null ? null : parseCoopOperationId(op.id);
-  if (op == null || op.owner !== 0 || parsed == null) {
+  if (op == null || (op.owner !== 0 && op.owner !== 1) || parsed == null) {
     return false;
   }
   const seq = Math.floor(parsed.pinnedSeq / 8000);
@@ -2395,7 +2395,8 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
     const pinned = seq - COOP_ME_PUMP_SEQ_BASE;
     const payload = op.payload as CoopMePresentPayload;
     if (
-      kindTag !== 0
+      op.owner !== 0
+      || kindTag !== 0
       || !Number.isSafeInteger(pinned)
       || pinned < 0
       || pinned >= 100_000
@@ -2434,7 +2435,8 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
   const pinned = seq - COOP_ME_TERM_SEQ_BASE;
   const payload = op.payload as CoopMeTerminalPayload;
   if (
-    kindTag !== 4
+    op.owner !== 0
+    || kindTag !== 4
     || !Number.isSafeInteger(pinned)
     || pinned < 0
     || pinned >= 100_000
