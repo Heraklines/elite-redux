@@ -20,14 +20,17 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
+import { BerryType } from "#enums/berry-type";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { BerryModifier } from "#modifiers/modifier";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
@@ -201,6 +204,46 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
         "wave 2: both engines agree on the leveled mon (no RARE_CANDY desync)",
       ).toBe(rig.guestScene.getPlayerParty()[SLOT].level);
     }
+    logs.flush();
+  }, 300_000);
+
+  it("a guest-owned generated BERRY reward preserves holder + concrete berry identity on both engines", async () => {
+    const SLOT = 1;
+    forceItemRewards(game.override, [{ name: "BERRY" }]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+
+    // Force the first reward interaction onto the guest-owned odd counter: this is the live direction that
+    // produced one host-only berry on the guest lead while every earlier turn checksum still matched.
+    await withClient(rig.hostCtx, () => rig.hostRuntime.controller.advanceInteraction());
+    await withClient(rig.guestCtx, () => rig.guestRuntime.controller.advanceInteraction());
+
+    const turn = rig.hostScene.currentBattle.turn;
+    await hostPlayWave(rig);
+    await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+    const { hostOwns } = await driveOneSlotReward(rig, SLOT);
+    expect(hostOwns, "the forced berry reward is guest-owned").toBe(false);
+
+    const berries = (scene: BattleScene): BerryModifier[] => {
+      const mon = scene.getPlayerParty()[SLOT];
+      return scene.modifiers.filter(
+        (modifier): modifier is BerryModifier => modifier instanceof BerryModifier && modifier.pokemonId === mon.id,
+      );
+    };
+    const hostBerries = berries(rig.hostScene);
+    const guestBerries = berries(rig.guestScene);
+    expect(hostBerries, "host watcher applied exactly one berry to the relayed slot").toHaveLength(1);
+    expect(guestBerries, "guest owner applied exactly one berry to its local slot").toHaveLength(1);
+    expect(guestBerries[0].berryType, "generated berry pregen identity survived option streaming").toBe(
+      hostBerries[0].berryType,
+    );
+    expect(Object.values(BerryType)).toContain(hostBerries[0].berryType);
+    expect(
+      await withClient(rig.guestCtx, () => captureCoopChecksum()),
+      "the post-reward guest checksum equals the host without waiting for a battle resync",
+    ).toBe(await withClient(rig.hostCtx, () => captureCoopChecksum()));
     logs.flush();
   }, 300_000);
 });

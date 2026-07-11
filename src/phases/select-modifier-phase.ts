@@ -689,6 +689,26 @@ export class SelectModifierPhase extends BattlePhase {
    */
   protected applyModifier(modifier: Modifier, cost = -1, playSound = false): void {
     const result = globalScene.addModifier(modifier, false, playSound, undefined, undefined, cost);
+    // Causal reward trace: record the exact generated identity + resolved holder and whether the engine
+    // accepted it on EACH side. A type-id-only log cannot distinguish two BERRY variants, and the live
+    // wave-15 divergence was exactly one host-only berry hidden behind shifted sorted modifier arrays.
+    // Reward application is cold (one line per pick) and the detail is debug-only.
+    if (globalScene.gameMode.isCoop && isCoopDebug()) {
+      const held = modifier instanceof PokemonHeldItemModifier ? modifier : null;
+      const holderSlot =
+        held == null ? -1 : globalScene.getPlayerParty().findIndex(pokemon => pokemon.id === held.pokemonId);
+      const pregen =
+        "getPregenArgs" in modifier.type && typeof modifier.type.getPregenArgs === "function"
+          ? modifier.type.getPregenArgs()
+          : [];
+      coopLog(
+        "reward",
+        `APPLY_RESULT pin=${this.coopInteractionStart} side=${this.coopWatcher ? "watcher" : "owner"} `
+          + `type=${modifier.type.id} class=${modifier.constructor.name} pregen=[${pregen.join(",")}] `
+          + `holderSlot=${holderSlot} holderId=${held?.pokemonId ?? -1} stack=${"stackCount" in modifier ? modifier.stackCount : -1} `
+          + `accepted=${result} cost=${cost}`,
+      );
+    }
     // Queue a copy of this phase when applying a TM, Memory Mushroom, or ER
     // Learner's Shroom. If the player selects one of these, then escapes out of
     // the move-learn without consuming it, they are returned to the shop in the
