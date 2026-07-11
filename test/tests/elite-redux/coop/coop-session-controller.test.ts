@@ -12,6 +12,7 @@
 import { CoopSessionController, type CoopSessionSnapshot } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { describe, expect, it } from "vitest";
 
 /** LoopbackTransport delivers on a microtask; flush before asserting. */
@@ -243,6 +244,26 @@ describe("co-op session controller (#633, P1)", () => {
       h.advanceInteraction();
       expect(h.snapshot().interactionOwner).toBe("guest");
       expect(h.snapshot().localInteractionTurn).toBe(false);
+    });
+
+    it("FAILURE-FIRST: a lost partner-completion counter is requested again and never times out open", async () => {
+      const pair = wrapCoopFaultPair(createLoopbackPair(), COOP_NO_FAULT_PROFILE, { seed: 0x434f554e });
+      const h = new CoopSessionController(pair.host);
+      const g = new CoopSessionController(pair.guest);
+
+      pair.armNextDrop("interaction", "host");
+      h.advanceInteraction(0);
+      g.advanceInteraction(0);
+      await flush();
+      expect(g.interactionCounter()).toBe(1);
+      expect(g.partnerInteractionCounterSeen(), "the host's first completion broadcast was actually lost").toBe(0);
+
+      await expect(
+        g.awaitPartnerInteraction(5),
+        "timeout must request the host's retained counter and remain closed until it arrives",
+      ).resolves.toBe(true);
+      expect(g.partnerInteractionCounterSeen()).toBe(1);
+      expect(pair.counters.host.oneShotDropped).toBe(1);
     });
   });
 
