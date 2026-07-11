@@ -448,3 +448,21 @@ Next: make soak completeness mechanically assert every registered operation surf
 the production-fidelity and drop-every-authoritative-class fault campaigns. Strict-tail ME/egg sanctioning,
 real-browser duo coverage, model-based fuzzing, and the final long multi-lane campaign remain open; no final
 "no gaps" claim is made yet.
+
+## 21. Authoritative-operation soak completeness
+
+`2542e7db9` (failure-first `ded5d0e3e`) closes a test-architecture hole in the #849 completeness
+backstop. The old runtime-derived inventory covered mirrored UI modes, relay kinds, sequence bands, and
+battle situations, but not the twelve migrated authoritative operation classes. A surface could therefore
+go completely cold without appearing in the completeness partition.
+
+`COOP_OPERATION_SURFACES` is now the canonical twelve-class inventory. Host journal commits feed an
+operation hit ledger into every soak result; expected surfaces derive from the canonical registry; and every
+class is classified as guaranteed, profile-dependent, or explicitly undrivable in the default continuous
+run with a named forced-leg follow-up. A total-and-disjoint partition test runs for both soak profiles. The
+real two-engine probe completed 2/2 waves with zero heals/assertions/findings and reported
+`HIT operations=[op:reward, op:wave]`, proving runtime accounting rather than static-list-only coverage.
+
+Next: derive the fault-injection matrix from this same registry and require every authoritative class to
+survive carrier loss with live-state convergence. The known-undrivable continuous-soak legs remain explicit
+work, not silently treated as covered.

@@ -1348,3 +1348,12 @@ just-fainted enemy therefore remains hash-visible through the wave-win boundary,
 Normal and versus-egress capture use the same representation, and the real two-engine serialization round trip
 proves the stronger checksum is healable. Evidence: 18/18 gated live-engine assertions and 47/47 pure
 checksum/checkpoint assertions.
+
+### 8.11 Authoritative-operation completeness registry
+
+`2542e7db9` (red proof `ded5d0e3e`) adds the missing operation dimension to the #849 soak completeness
+backstop. `COOP_OPERATION_SURFACES` canonically inventories all twelve migrated journal classes. The host
+journal records committed classes, the soak publishes them as hit surfaces, and the profile partitions must
+totally and disjointly classify the registry. A real two-wave duo run observed both default-path classes
+(`op:wave`, `op:reward`) with zero desync findings. New operation adapters now auto-red coverage until they
+are classified and actually driven or carry an explicit forced-leg follow-up.
