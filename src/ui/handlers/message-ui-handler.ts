@@ -233,8 +233,11 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
       this.prompt.setPosition(this.message.x + lastLineWidth + 2, this.message.y + (textLinesCount - 1) * 18 + 2);
       this.prompt.play("prompt");
     }
-    this.pendingPrompt = false;
-    this.awaitingActionInput = true;
+    // Publish prompt readiness LAST. The co-op ME input pump uses `pendingPrompt === false` as the
+    // handler-ready signal. Publishing it before `awaitingActionInput`/`onActionInput` created a real
+    // race where an ACTION was accepted by the pump (and relayed to the peer) while this handler still
+    // rejected it locally. The selected-option callback then never ran, parking both clients at MEs
+    // such as Hot Spring. Install the complete action continuation before exposing the ready flag.
     this.onActionInput = () => {
       if (this.prompt) {
         this.prompt.anims.stop();
@@ -254,6 +257,8 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
         }
       }
     };
+    this.awaitingActionInput = true;
+    this.pendingPrompt = false;
   }
 
   isTextAnimationInProgress() {
@@ -262,6 +267,15 @@ export abstract class MessageUiHandler extends AwaitableUiHandler {
     }
 
     return false;
+  }
+
+  /**
+   * Whether ACTION/CANCEL would be consumed by the message handler right now. Co-op input pumps must
+   * use this complete contract instead of inferring readiness from animation flags: a prompt can be
+   * visually settled while its action continuation is not yet installed (or has already been consumed).
+   */
+  isAwaitingPromptAction(): boolean {
+    return this.awaitingActionInput === true && this.onActionInput != null;
   }
 
   clearText() {

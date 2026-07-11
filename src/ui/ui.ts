@@ -435,7 +435,7 @@ export class UI extends Phaser.GameObjects.Container {
   private coopMeReady(): boolean {
     const handler = this.getHandler();
     if (handler instanceof MessageUiHandler) {
-      return !handler.isTextAnimationInProgress() && !handler.pendingPrompt;
+      return handler.isAwaitingPromptAction();
     }
     return true;
   }

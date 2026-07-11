@@ -592,7 +592,6 @@ export class MysteryEncounterPhase extends Phase {
     const optionSelectDialogue = globalScene.currentBattle?.mysteryEncounter?.selectedOption?.dialogue;
     if (optionSelectDialogue?.selected && optionSelectDialogue.selected.length > 0) {
       // Handle intermediate dialogue (between player selection event and the onOptionSelect logic)
-      globalScene.ui.setMode(UiMode.MESSAGE);
       const selectedDialogue = optionSelectDialogue.selected;
       let i = 0;
       const showNextDialogue = () => {
@@ -619,7 +618,11 @@ export class MysteryEncounterPhase extends Phase {
         }
       };
 
-      showNextDialogue();
+      // `setMode` is asynchronous even when MESSAGE is already active. Rendering immediately let the
+      // late mode transition clear the freshly-installed prompt/action callback: the selected line was
+      // visible but ACTION returned false forever (live Hot Spring / other simple ME softlock). Finish
+      // the handler transition first, then publish the dialogue and its continuation.
+      globalScene.ui.setMode(UiMode.MESSAGE).then(showNextDialogue);
     } else {
       endDialogueAndContinueEncounter();
     }
