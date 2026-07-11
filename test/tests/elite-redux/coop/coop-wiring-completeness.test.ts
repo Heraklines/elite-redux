@@ -121,4 +121,19 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
       `wire types with NO receiver anywhere (sender-only channels - the #820 class): ${missing.join(", ")}`,
     ).toEqual([]);
   });
+
+  it("FAILURE-FIRST: every ordinary wave requests lost enemy authority instead of locally rerolling", () => {
+    const encounterSource = readFileSync(
+      join(__dirname, "..", "..", "..", "..", "src", "phases", "encounter-phase.ts"),
+      "utf8",
+    );
+    expect(
+      encounterSource,
+      "EncounterPhase must use the existing requestEnemyParty recovery loop for the real production await",
+    ).toContain("streamer.awaitEnemyPartyWithRetry(");
+    expect(
+      encounterSource,
+      "the one-shot await is forbidden at the production wave boundary because its null path locally rerolls enemies",
+    ).not.toContain("enemies = await streamer.awaitEnemyParty(");
+  });
 });
