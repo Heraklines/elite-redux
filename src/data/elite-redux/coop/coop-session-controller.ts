@@ -179,10 +179,20 @@ export class CoopSessionController {
   /** #810 resume flow: guest-side offer handler + buffered offer, host-side reply waiter. */
   private resumeOfferHandler: ((wave: number) => void) | null = null;
   private pendingResumeOfferWave: number | null = null;
-  private resumeReplyWaiter: ((accept: boolean) => void) | null = null;
+  private resumeReplyWaiter: { decisionId: string; finish: (accept: boolean) => void } | null = null;
   /** #810 barrier: guest-side "start new" handler + buffered flag (host's release signal). */
   private resumeStartNewHandler: (() => void) | null = null;
   private pendingResumeStartNew = false;
+  /** Durable, host-authored lobby decision. Re-announced after a channel replacement. */
+  private latestResumeDecision:
+    | { readonly kind: "offer"; readonly decisionId: string; readonly wave: number }
+    | { readonly kind: "start-new"; readonly decisionId: string }
+    | null = null;
+  /** Guest-side identity of the latest offer; replies are structurally tied to it. */
+  private activeResumeOfferId: string | null = null;
+  /** Guest-side de-duplication of an offer re-announced after reconnect. */
+  private deliveredResumeOfferId: string | null = null;
+  private resumeDecisionSeq = 0;
 
   /** Both halves of the shared roster; local edits its own, partner's is mirrored. */
   private readonly roster = new CoopRoster();
@@ -303,18 +313,20 @@ export class CoopSessionController {
    * answer (false on a 60s no-reply timeout so the lobby can never hang on it).
    */
   offerResume(wave: number): Promise<boolean> {
-    coopLog("launch", `SEND resumeOffer wave=${wave} (#810)`);
-    this.transport.send({ t: "resumeOffer", wave });
+    const decisionId = `${Date.now().toString(36)}-${this.tiebreak.toString(36)}-${++this.resumeDecisionSeq}`;
+    this.latestResumeDecision = { kind: "offer", decisionId, wave };
+    coopLog("launch", `SEND resumeOffer id=${decisionId} wave=${wave} (#810 durable)`);
     return new Promise<boolean>(resolve => {
       const finish = (accept: boolean) => {
-        if (this.resumeReplyWaiter === finish) {
+        if (this.resumeReplyWaiter?.finish === finish) {
           this.resumeReplyWaiter = null;
         }
         resolve(accept);
       };
-      this.resumeReplyWaiter = finish;
+      this.resumeReplyWaiter = { decisionId, finish };
+      this.transport.send({ t: "resumeOffer", decisionId, wave });
       setTimeout(() => {
-        if (this.resumeReplyWaiter === finish) {
+        if (this.resumeReplyWaiter?.finish === finish) {
           this.resumeReplyWaiter = null;
           coopWarn("launch", "resumeOffer TIMEOUT (no reply in 60s) -> treated as declined (#810)");
           resolve(false);
@@ -325,8 +337,13 @@ export class CoopSessionController {
 
   /** #810 GUEST: answer the host's resume offer. */
   replyResume(accept: boolean): void {
-    coopLog("launch", `SEND resumeReply accept=${accept} (#810)`);
-    this.transport.send({ t: "resumeReply", accept });
+    const decisionId = this.activeResumeOfferId;
+    if (decisionId == null) {
+      coopWarn("launch", `DROP resumeReply accept=${accept}: no active host offer`);
+      return;
+    }
+    coopLog("launch", `SEND resumeReply id=${decisionId} accept=${accept} (#810 durable)`);
+    this.transport.send({ t: "resumeReply", decisionId, accept });
   }
 
   /**
@@ -347,8 +364,10 @@ export class CoopSessionController {
    * every non-resume outcome (no save, host picked New Game, guest declined, offer timeout).
    */
   sendResumeStartNew(): void {
-    coopLog("launch", "SEND resumeStartNew (#810 barrier release)");
-    this.transport.send({ t: "resumeStartNew" });
+    const decisionId = `${Date.now().toString(36)}-${this.tiebreak.toString(36)}-${++this.resumeDecisionSeq}`;
+    this.latestResumeDecision = { kind: "start-new", decisionId };
+    coopLog("launch", `SEND resumeStartNew id=${decisionId} (#810 durable barrier release)`);
+    this.transport.send({ t: "resumeStartNew", decisionId });
   }
 
   /** Announce ourselves to the partner. Call once the transport is connected. */
@@ -728,6 +747,16 @@ export class CoopSessionController {
     if (this.role === "host" && this._runConfig != null) {
       this.broadcastRunConfig(this._runConfig);
     }
+    if (this.role === "host" && this.latestResumeDecision != null) {
+      const decision = this.latestResumeDecision;
+      if (decision.kind === "offer") {
+        coopLog("launch", `RESEND resumeOffer id=${decision.decisionId} wave=${decision.wave} after reconnect`);
+        this.transport.send({ t: "resumeOffer", decisionId: decision.decisionId, wave: decision.wave });
+      } else {
+        coopLog("launch", `RESEND resumeStartNew id=${decision.decisionId} after reconnect`);
+        this.transport.send({ t: "resumeStartNew", decisionId: decision.decisionId });
+      }
+    }
     // Pull the peer's lobby state (heals a loss in the direction we don't own).
     if (this.role === "guest") {
       this.requestRunConfig();
@@ -876,7 +905,13 @@ export class CoopSessionController {
       }
       case "resumeOffer": {
         // #810: buffer if the UI has not armed its handler yet (offer can beat the arm).
-        coopLog("launch", `RECV resumeOffer wave=${msg.wave} (#810)`);
+        coopLog("launch", `RECV resumeOffer id=${msg.decisionId} wave=${msg.wave} (#810 durable)`);
+        this.activeResumeOfferId = msg.decisionId;
+        if (this.deliveredResumeOfferId === msg.decisionId) {
+          coopLog("launch", `IGNORE duplicate resumeOffer id=${msg.decisionId}`);
+          break;
+        }
+        this.deliveredResumeOfferId = msg.decisionId;
         if (this.resumeOfferHandler == null) {
           this.pendingResumeOfferWave = msg.wave;
         } else {
@@ -885,16 +920,21 @@ export class CoopSessionController {
         break;
       }
       case "resumeReply": {
-        coopLog("launch", `RECV resumeReply accept=${msg.accept} (#810)`);
+        coopLog("launch", `RECV resumeReply id=${msg.decisionId} accept=${msg.accept} (#810 durable)`);
         const waiter = this.resumeReplyWaiter;
+        if (waiter == null || waiter.decisionId !== msg.decisionId) {
+          coopWarn("launch", `DROP stale resumeReply id=${msg.decisionId} active=${waiter?.decisionId ?? "none"}`);
+          break;
+        }
         this.resumeReplyWaiter = null;
-        waiter?.(msg.accept);
+        waiter.finish(msg.accept);
         break;
       }
       case "resumeStartNew": {
         // #810 barrier release: buffer if the guest UI has not armed its handler yet
         // (the release can beat the arm), else fire it now.
-        coopLog("launch", "RECV resumeStartNew (#810 barrier release)");
+        coopLog("launch", `RECV resumeStartNew id=${msg.decisionId} (#810 durable barrier release)`);
+        this.activeResumeOfferId = null;
         if (this.resumeStartNewHandler == null) {
           this.pendingResumeStartNew = true;
         } else {

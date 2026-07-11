@@ -50,9 +50,9 @@ export type CoopRole = "host" | "guest";
  * changes shape. Carried in the hello; a mismatch means one player runs a stale cached bundle -
  * the top source of unreproducible ghost bugs - and both get told to hard-refresh.
  */
-// er-coop-14: waveResolved carries the complete host-stated transition. An er-coop-13 guest could
-// negotiate opSurface.wave yet still re-derive biomeChange locally, so mixed builds must fail pairing.
-export const COOP_PROTOCOL_VERSION = "er-coop-14";
+// er-coop-15: resume boundary decisions are transaction-keyed and durable across a hot rejoin. Older
+// builds can lose the one-shot release or accept a delayed reply for the wrong offer, so mixed builds fail.
+export const COOP_PROTOCOL_VERSION = "er-coop-15";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -910,16 +910,16 @@ export type CoopMessage =
   | { t: "catchFullPrompt"; pokemonName: string; speciesId: number; operationId?: string | undefined }
   /** #810 resume flow: host offers to resume the saved run with this partner at `wave`. */
   | { t: "meCursor"; index: number }
-  | { t: "resumeOffer"; wave: number }
+  | { t: "resumeOffer"; decisionId: string; wave: number }
   /** #810 resume flow: guest's answer to the offer. */
-  | { t: "resumeReply"; accept: boolean }
+  | { t: "resumeReply"; decisionId: string; accept: boolean }
   /**
    * #810 resume flow (barrier): host tells the guest "no resume - proceed to a NEW game".
    * Sent whenever the host will NOT resume (no matching save, host picked New Game, guest
    * declined, or the offer timed out), so the guest never sits blocked waiting for an offer
    * that will never come. The guest treats it as the release signal for its wait barrier.
    */
-  | { t: "resumeStartNew" }
+  | { t: "resumeStartNew"; decisionId: string }
   /** A forced/voluntary switch replacement: bring in party `partySlot` to `fieldIndex` (P2). */
   | { t: "switchChoice"; fieldIndex: number; partySlot: number }
   /**

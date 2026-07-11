@@ -40,6 +40,7 @@ const flush = () => new Promise<void>(resolve => queueMicrotask(resolve));
  */
 class FlapTransport implements CoopTransport {
   readonly role: CoopRole;
+  readonly sent: CoopMessage[] = [];
   private peer: FlapTransport | null = null;
   private _state: CoopConnectionState = "connected";
   private readonly msgHandlers = new Set<(msg: CoopMessage) => void>();
@@ -70,6 +71,7 @@ class FlapTransport implements CoopTransport {
   }
 
   send(msg: CoopMessage): void {
+    this.sent.push(msg);
     if (this._state !== "connected") {
       return; // dark: dropped at the source (like the real transport bailing on a closed channel)
     }
@@ -85,6 +87,13 @@ class FlapTransport implements CoopTransport {
         h(msg);
       }
     });
+  }
+
+  /** Test-only delivery of a delayed frame that was retained by an old wire. */
+  deliver(msg: CoopMessage): void {
+    for (const h of [...this.msgHandlers]) {
+      h(msg);
+    }
   }
 
   onMessage(handler: (msg: CoopMessage) => void): () => void {
@@ -117,6 +126,39 @@ function makeFlapPair(): { host: FlapTransport; guest: FlapTransport } {
 }
 
 describe("co-op lobby self-healing handshake (#868)", () => {
+  it("a delayed reply from an older resume offer cannot resolve the current offer", async () => {
+    const { host, guest } = makeFlapPair();
+    const h = new CoopSessionController(host, { username: "Host", tiebreak: 1 });
+    const g = new CoopSessionController(guest, { username: "Guest", tiebreak: 2 });
+    h.connect();
+    g.connect();
+    await flush();
+
+    g.armResumeOfferHandler(() => {});
+    const first = h.offerResume(10);
+    await flush();
+    const firstFrame = host.sent.find(
+      (msg): msg is Extract<CoopMessage, { t: "resumeOffer" }> => msg.t === "resumeOffer" && msg.wave === 10,
+    );
+    expect(firstFrame).toBeDefined();
+    g.replyResume(false);
+    await expect(first).resolves.toBe(false);
+
+    const second = h.offerResume(20);
+    await flush();
+    let secondSettled = false;
+    void second.then(() => {
+      secondSettled = true;
+    });
+
+    host.deliver({ t: "resumeReply", decisionId: firstFrame!.decisionId, accept: true });
+    await flush();
+    expect(secondSettled, "stale reply was rejected by transaction id").toBe(false);
+
+    g.replyResume(true);
+    await expect(second).resolves.toBe(true);
+  });
+
   it("a resumeStartNew release lost during a flap is re-sent on reconnect", async () => {
     const { host, guest } = makeFlapPair();
     const h = new CoopSessionController(host, { username: "Host", tiebreak: 1 });
