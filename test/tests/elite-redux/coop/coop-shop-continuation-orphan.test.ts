@@ -89,6 +89,9 @@ function makeStubScene(): BattleScene {
     animateMoneyChanged() {},
     playSound() {},
     triggerPokemonFormChange() {},
+    loadSpritesheet() {},
+    loadImage() {},
+    loadSe() {},
     load: {
       once(_event: string, callback: () => void): void {
         callback();
