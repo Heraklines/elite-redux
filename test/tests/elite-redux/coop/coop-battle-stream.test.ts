@@ -9,7 +9,7 @@
 // LoopbackTransport (the same "test via spoofing" path the rest of the suite uses).
 
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
-import type { CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
+import type { CoopAuthoritativeBattleStateV1, CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it } from "vitest";
 
@@ -19,6 +19,25 @@ const emptyCheckpoint = (): CoopBattleCheckpoint => ({
   weatherTurnsLeft: 0,
   terrain: 0,
   terrainTurnsLeft: 0,
+});
+
+const emptyAuthoritativeState = (wave: number): CoopAuthoritativeBattleStateV1 => ({
+  version: 1,
+  tick: wave,
+  wave,
+  turn: 1,
+  playerParty: [],
+  enemyParty: [],
+  field: [],
+  weather: 0,
+  weatherTurnsLeft: 0,
+  terrain: 0,
+  terrainTurnsLeft: 0,
+  arenaTags: [],
+  money: 123,
+  pokeballCounts: [],
+  playerModifiers: [],
+  enemyModifiers: [],
 });
 
 describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
@@ -65,6 +84,19 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
 
     const res = await guestStream.awaitEnemyParty(9);
     expect(res?.[0]?.data.speciesId).toBe(1);
+  });
+
+  it("pairs the complete new-wave state with enemyPartySync until the guest consumes it", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+    const state = emptyAuthoritativeState(9);
+
+    hostStream.sendEnemyParty(9, [{ fieldIndex: 2, data: { speciesId: 1 } }], -1, 0, state);
+    await guestStream.awaitEnemyParty(9);
+
+    expect(guestStream.consumeEnemyPartyState(9)).toEqual(state);
+    expect(guestStream.consumeEnemyPartyState(9), "boundary state is one-shot").toBeUndefined();
   });
 
   it("awaitEnemyParty resolves null on timeout (guest then generates its own - never hangs)", async () => {

@@ -366,6 +366,15 @@ export interface SoakFinding {
   sample: string;
 }
 
+/** One checksum mismatch observed BEFORE any boundary heal, retained for causal gate diagnostics. */
+export interface SoakPreHealMismatch {
+  wave: number;
+  where: string;
+  fields: string[];
+  classification: "expected-renderer-money-lag" | "unexpected";
+  sample: string;
+}
+
 /** The outcome of a completed soak run (a passing run; a hard LOCKSTEP/NO-PARK/TEARDOWN breach THROWS). */
 export interface SoakResult {
   seed: number;
@@ -375,6 +384,8 @@ export interface SoakResult {
   skips: Record<string, number>;
   /** How many DIGEST one-heal graces fired (a converged run is 0). */
   resyncHeals: number;
+  /** Every pre-heal mismatch, classified before recovery can hide its cause. */
+  preHealMismatches: SoakPreHealMismatch[];
   /**
    * #838 Phase 5: how many PRODUCTION per-turn checksum ASSERTIONS fired during the run - the guest's
    * real {@linkcode CoopFinalizeTurnPhase} `verifyChecksum` counting a mismatch the full-state payload
@@ -1117,6 +1128,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   const boundaryDigests: SoakBoundaryDigest[] = [];
   const findings: SoakFinding[] = [];
   let resyncHeals = 0;
+  const preHealMismatches: SoakPreHealMismatch[] = [];
   let wavesCompleted = 0;
   // #838 Phase 5: pin the LOUD assertion severity (console.error) and zero the counter so this run's
   // production per-turn checksum assertions are read back cleanly (the ER suite shares module state across
@@ -1415,7 +1427,35 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     let chk = await captureChecksums();
     if (chk.host !== chk.guest) {
       resyncHeals++;
-      actionScript.push(`wave ${wave}: DIGEST mismatch @${where} -> one-heal resync`);
+      const hostState = await withClient(rig.hostCtx, () => JSON.parse(JSON.stringify(captureCoopChecksumState())));
+      const guestState = await withClient(rig.guestCtx, () => JSON.parse(JSON.stringify(captureCoopChecksumState())));
+      const fields = [...new Set([...Object.keys(hostState), ...Object.keys(guestState)])].filter(
+        k => JSON.stringify(hostState[k]) !== JSON.stringify(guestState[k]),
+      );
+      // The only intentionally tolerated pre-heal class: at a production-fidelity WAVE START the pure
+      // renderer may trail the host's just-awarded money. saveDataDigest necessarily changes with money.
+      // No other field or direction is covered, so this cannot hide a combat/party/biome divergence.
+      const allowedMoneyLagFields = new Set(["money", "saveDataDigest"]);
+      const expectedMoneyLag =
+        fidelity === "production"
+        && where === "wave-start"
+        && fields.includes("money")
+        && fields.every(f => allowedMoneyLagFields.has(f))
+        && Number(guestState.money) < Number(hostState.money);
+      const classification: SoakPreHealMismatch["classification"] = expectedMoneyLag
+        ? "expected-renderer-money-lag"
+        : "unexpected";
+      const sample = fields
+        .map(k => `${k}:host=${JSON.stringify(hostState[k])}/guest=${JSON.stringify(guestState[k])}`)
+        .join(" | ");
+      preHealMismatches.push({ wave, where, fields, classification, sample });
+      actionScript.push(
+        `wave ${wave}: DIGEST mismatch @${where} class=${classification} fields=[${fields.join(",")}] -> one-heal resync`,
+      );
+      // eslint-disable-next-line no-console
+      console.log(
+        `[coop-soak] PRE-HEAL ${classification} wave=${wave} where=${where} fields=[${fields.join(",")}] :: ${sample}`,
+      );
       await oneHeal();
       chk = await captureChecksums();
       if (chk.host !== chk.guest) {
@@ -1515,6 +1555,37 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     if (hostOwnedFaintPending(rig) && firstLegalBenchSlot(rig.hostScene, "host") >= 0) {
       registerHostFaintAutoPick(game, rig);
     }
+  };
+
+  /**
+   * The soak drives the host's real phase queue while the guest is a replay renderer, so the guest does not
+   * naturally execute its own CommandPhase. Materialize both halves of the guest's command rendezvous around
+   * the host crossing: arrive before the host reaches the boundary, then verify the host's reciprocal arrival
+   * afterwards. This is the split arrive/await form of the production reciprocal barrier, not a timeout or a
+   * unilateral continuation.
+   */
+  const crossCommandBoundaryWithReplayGuest = async (
+    wave: number,
+    turn: number,
+    beforeHostCross?: () => void,
+  ): Promise<void> => {
+    const point = `cmd:${wave}:${turn}`;
+    withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.arrive(point));
+    await drainLoopback();
+    await withClient(rig.hostCtx, async () => {
+      beforeHostCross?.();
+      await game.phaseInterceptor.to("CommandPhase");
+    });
+    await drainLoopback();
+    const guestResult = await withClient(rig.guestCtx, () => rig.guestRuntime.rendezvous.awaitPartner(point));
+    if (guestResult.timedOut || guestResult.crossPoint !== undefined) {
+      fail(
+        "no-park",
+        wave,
+        `replay guest did not reciprocally cross ${point} (timedOut=${guestResult.timedOut} crossPoint=${guestResult.crossPoint ?? "none"})`,
+      );
+    }
+    actionScript.push(`wave ${wave} turn ${turn}: replay guest reciprocally crossed ${point}`);
   };
 
   /** Play ONE host wave to a win (bounded by the NO-PARK turn budget); the guest replays each turn. */
@@ -1621,7 +1692,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         return;
       }
       // Not won yet: advance the host to the next turn's CommandPhase for another round.
-      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase"));
+      await crossCommandBoundaryWithReplayGuest(wave, rig.hostScene.currentBattle.turn);
     }
     fail("no-park", wave, `wave did not complete within ${MAX_TURNS_PER_WAVE} turns (enemies never all fainted)`);
   };
@@ -2456,14 +2527,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // #633 BUILD 1: if the NEXT wave is a designated ME, cross into it (force + park at its
         // MysteryEncounterPhase) instead of to("CommandPhase") - an ME wave has no CommandPhase.
         const nextMeType = opts.meWaves?.get(wave + 1);
-        await withClient(rig.hostCtx, async () => {
-          if (nextMeType == null) {
-            armHostFaintAutoPick();
-            await game.phaseInterceptor.to("CommandPhase");
-          } else {
+        if (nextMeType == null) {
+          await crossCommandBoundaryWithReplayGuest(wave + 1, 1, armHostFaintAutoPick);
+        } else {
+          await withClient(rig.hostCtx, async () => {
             await crossIntoMeWave(nextMeType);
-          }
-        });
+          });
+        }
       } catch (e) {
         // #846: the crossing itself can hit a run-end (a killing turn that also wiped the host, or a
         // between-wave game-over). Same rule: a terminal host state is a counted run-end, not a strand.
@@ -2528,6 +2598,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     wavesCompleted,
     skips,
     resyncHeals,
+    preHealMismatches,
     assertions: getCoopChecksumAssertionCount(),
     actionScript,
     boundaryDigests,

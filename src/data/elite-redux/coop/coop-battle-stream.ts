@@ -189,6 +189,8 @@ export class CoopBattleStreamer {
   private lastCheckpoint: CoopCheckpointEnvelope | null = null;
   /** Latest enemy party the guest has not yet adopted (consumed at the wave's first turn). */
   private lastEnemyParty: { wave: number; enemies: CoopSerializedEnemy[] } | null = null;
+  /** New-wave state paired with enemyPartySync; consumed after the guest has built the streamed enemies. */
+  private readonly enemyPartyStateByWave = new Map<number, CoopAuthoritativeBattleStateV1>();
   /** wave -> resolver for an in-flight {@linkcode awaitLaunchSnapshot} (#633 M4 push-snapshot launch). */
   private readonly launchSnapshotWaiters = new Map<number, (res: string | null) => void>();
   /** Latest launch snapshot that arrived before its waiter (race buffer, keyed by wave). */
@@ -283,7 +285,13 @@ export class CoopBattleStreamer {
   // --- HOST side --------------------------------------------------------------
 
   /** HOST: send the exact enemy party the guest must adopt verbatim for `wave`. */
-  sendEnemyParty(wave: number, enemies: CoopSerializedEnemy[], meType?: number, battleType?: number): void {
+  sendEnemyParty(
+    wave: number,
+    enemies: CoopSerializedEnemy[],
+    meType?: number,
+    battleType?: number,
+    authoritativeState?: CoopAuthoritativeBattleStateV1,
+  ): void {
     coopLog(
       "replay",
       `host SEND enemyPartySync wave=${wave} count=${enemies.length} meType=${meType ?? "-"} battleType=${battleType ?? "-"}`,
@@ -294,7 +302,15 @@ export class CoopBattleStreamer {
       enemies,
       ...(meType === undefined ? {} : { meType }),
       ...(battleType === undefined ? {} : { battleType }),
+      ...(authoritativeState === undefined ? {} : { authoritativeState }),
     });
+  }
+
+  /** GUEST: consume the complete state paired with this wave's enemy-party handoff, if supplied. */
+  consumeEnemyPartyState(wave: number): CoopAuthoritativeBattleStateV1 | undefined {
+    const state = this.enemyPartyStateByWave.get(wave);
+    this.enemyPartyStateByWave.delete(wave);
+    return state;
   }
 
   /**
@@ -1203,6 +1219,7 @@ export class CoopBattleStreamer {
     this.liveWaiter = null;
     this.lastCheckpoint = null;
     this.lastEnemyParty = null;
+    this.enemyPartyStateByWave.clear();
     this.lastLaunchSnapshot = null;
     this.lastSentLaunchSnapshot = null;
     this.consumedLaunchSnapshotWaves.clear();
@@ -1222,6 +1239,9 @@ export class CoopBattleStreamer {
   private handle(msg: CoopMessage): void {
     switch (msg.t) {
       case "enemyPartySync": {
+        if (msg.authoritativeState !== undefined) {
+          this.enemyPartyStateByWave.set(msg.wave, msg.authoritativeState);
+        }
         // #825: remember the host's rolled ME type for this wave so a guest that
         // generates its encounter AFTER the sync arrives adopts the host's roll.
         if (msg.meType !== undefined) {

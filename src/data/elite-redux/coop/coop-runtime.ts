@@ -418,7 +418,13 @@ function wireCoopEnemyPartyResponder(controller: CoopSessionController, battleSt
         return;
       }
       coopLog("stream", `re-broadcast enemyPartySync wave=${wave} count=${enemies.length} (host, on guest request)`);
-      battleStream.sendEnemyParty(wave, enemies);
+      battleStream.sendEnemyParty(
+        wave,
+        enemies,
+        undefined,
+        battle.battleType,
+        captureCoopAuthoritativeBattleState(battle.turn) ?? undefined,
+      );
     } catch (e) {
       /* a re-broadcast serialize/send failure must never break the host's encounter */
       coopWarn("stream", `host re-broadcast enemyPartySync failed wave=${wave}`, e);

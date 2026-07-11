@@ -160,6 +160,16 @@ describe.skipIf(!RUN || !FIDELITY_ON)(
             `[coop-soak-fidelity-gate] FINDING [${f.fields}] waves ${f.firstWave}-${f.lastWave} x${f.occurrences} :: ${f.sample}`,
           );
         }
+        for (const m of result.preHealMismatches) {
+          // eslint-disable-next-line no-console
+          console.log(
+            `[coop-soak-fidelity-gate] PRE-HEAL ${m.classification} wave=${m.wave} where=${m.where} `
+              + `fields=[${m.fields.join(",")}] :: ${m.sample}`,
+          );
+        }
+        // Persist both client traces before any verdict assertion. A red fidelity gate is most valuable when
+        // the exact owner send / watcher adopt sequence survives without requiring a diagnostic rerun.
+        logs.flush();
 
         // ===== GATE 1 (anti-"silent pass-after-wave-1"): the run must SURVEY THE FULL bounded wave count. =====
         // A god party at this bounded depth steamrolls, so a terminal run-end (wipe -> GameOver -> Title) or a
@@ -209,7 +219,16 @@ describe.skipIf(!RUN || !FIDELITY_ON)(
           );
         }
 
-        logs.flush();
+        // ===== GATE 4: a successful heal must not hide a causal replication bug. =====
+        // Expected renderer money lag is classified narrowly in the driver. Every other PRE-heal
+        // mismatch is a failure even if the snapshot subsequently converges it.
+        const unexpectedPreHeals = result.preHealMismatches.filter(m => m.classification === "unexpected");
+        expect(
+          unexpectedPreHeals,
+          `production-fidelity soak observed ${unexpectedPreHeals.length} unexpected pre-heal mismatch(es) `
+            + `(replay SOAK_SEED=${seed}): `
+            + unexpectedPreHeals.map(m => `wave${m.wave}@${m.where}[${m.fields.join(",")}]`).join("; "),
+        ).toEqual([]);
       },
       SOAK_TEST_TIMEOUT_MS,
     );

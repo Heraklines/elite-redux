@@ -4,7 +4,11 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
-import { captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  applyCoopAuthoritativeBattleState,
+  captureCoopAuthoritativeBattleState,
+  captureCoopEnemies,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
@@ -394,7 +398,13 @@ export class CommandPhase extends FieldPhase {
       // PER-TURN authoritative state (checkpoint + checksum) now streams via emitTurn at
       // TurnEnd (#633, TRACK-2 Phase B), so it is NOT re-sent here.
       if (this.fieldIndex === 0 && turn === 1) {
-        streamer.sendEnemyParty(waveIndex, captureCoopEnemies());
+        streamer.sendEnemyParty(
+          waveIndex,
+          captureCoopEnemies(),
+          undefined,
+          globalScene.currentBattle.battleType,
+          captureCoopAuthoritativeBattleState(turn) ?? undefined,
+        );
       }
     } else if (turn === 1) {
       // Guest: at the wave's first turn, adopt the host's exact enemy party (a belt-and-
@@ -405,6 +415,7 @@ export class CommandPhase extends FieldPhase {
         // #818: STRUCTURAL adopt - an ME-spawned battle's party exists only on the host,
         // so the guest must be able to BUILD it (species/count/shape), not just correct it.
         adoptCoopEnemiesStructural(enemies);
+        applyCoopAuthoritativeBattleState(streamer.consumeEnemyPartyState(waveIndex), true);
       }
     }
   }

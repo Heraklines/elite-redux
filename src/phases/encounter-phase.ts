@@ -8,7 +8,12 @@ import { handleTutorial, Tutorial } from "#app/tutorial";
 import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { getCharVariantFromDialogue } from "#data/dialogue";
-import { captureCoopDexBaseline, captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  applyCoopAuthoritativeBattleState,
+  captureCoopAuthoritativeBattleState,
+  captureCoopDexBaseline,
+  captureCoopEnemies,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
@@ -259,6 +264,10 @@ export class EncounterPhase extends BattlePhase {
         /* one enemy failed to reconstruct; leave the slot for normal generation */
       }
     }
+    // The enemy handoff is also the first coherent boundary of the new wave. Apply the host's complete
+    // state here so between-wave HP/modifier/party mutations are visible before the first command, rather
+    // than relying on a later checksum mismatch to repair them after the player has already seen stale UI.
+    applyCoopAuthoritativeBattleState(streamer.consumeEnemyPartyState(battle.waveIndex), true);
   }
 
   /**
@@ -280,6 +289,7 @@ export class EncounterPhase extends BattlePhase {
     try {
       const wave = globalScene.currentBattle.waveIndex;
       const enemies = captureCoopEnemies();
+      const authoritativeState = captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
       // #788 (live "I could pick a reward and continue without my partner"): the HOST reaches
       // the next wave SECONDS before the guest finishes replaying the between-wave menu, and
       // handing the guest the NEXT wave's party mid-menu is the desync window. BARRIER: defer
@@ -303,6 +313,7 @@ export class EncounterPhase extends BattlePhase {
           // #867: state the host-authoritative WILD-vs-TRAINER verdict so the guest adopts it in
           // newBattle instead of re-deriving via isWaveTrainer (the wave-42 saveDataDigest split).
           globalScene.currentBattle?.battleType,
+          authoritativeState ?? undefined,
         );
       });
     } catch {
