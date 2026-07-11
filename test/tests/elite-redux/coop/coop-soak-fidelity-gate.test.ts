@@ -42,6 +42,7 @@ import { GameManager } from "#test/framework/game-manager";
 import { installDuoLogCapture } from "#test/tools/coop-duo-harness";
 import {
   announceSoakSeed,
+  prepareCoopSoakContent,
   resolveSoakFidelity,
   resolveSoakSeed,
   resolveSoakWaves,
@@ -125,6 +126,7 @@ describe.skipIf(!RUN || !FIDELITY_ON)(
       async () => {
         const seed = resolveSoakSeed();
         announceSoakSeed(seed, WAVES);
+        prepareCoopSoakContent(game, seed);
         // eslint-disable-next-line no-console
         console.log(`[coop-soak-fidelity-gate] MODE=production seed=${seed} waves=${WAVES} profile=god`);
 

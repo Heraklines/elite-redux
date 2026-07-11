@@ -40,7 +40,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import { installDuoLogCapture } from "#test/tools/coop-duo-harness";
-import { runCoopSoak, type SoakBoundaryDigest } from "#test/tools/coop-soak-driver";
+import { prepareCoopSoakContent, runCoopSoak, type SoakBoundaryDigest } from "#test/tools/coop-soak-driver";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -102,6 +102,7 @@ describe.skipIf(!RUN)("DETERMINISM CONTRACT: identical seeded script => identica
 
   /** Run one independent pair through the identical seeded script; return its per-boundary digests. */
   async function runPair(): Promise<SoakBoundaryDigest[]> {
+    prepareCoopSoakContent(game, SCRIPT_SEED);
     await game.classicMode.startBattle(
       SpeciesId.SNORLAX,
       SpeciesId.GENGAR,

@@ -978,6 +978,13 @@ function phaseStateDump(rig: DuoRig): Record<string, unknown> {
   };
 }
 
+/** Pin the content RNG before `startBattle`; callers use the same replay key as the action policy. */
+export function prepareCoopSoakContent(game: GameManager, seed: number, pinSeed?: string): string {
+  const contentSeed = pinSeed ?? `coop-soak-${seed}`;
+  game.scene.setSeed(contentSeed);
+  return contentSeed;
+}
+
 // ---------------------------------------------------------------------------
 // #849 COMPLETENESS BACKSTOP taps (module-level so the driver body stays readable).
 // ---------------------------------------------------------------------------
@@ -1151,8 +1158,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   // the framework's unrelated run seed. The same printed replay could therefore pass or strand on different
   // enemies (observed twice at seed 20260710 wave 2), making its artifact non-reproducible. Pin content too.
   const contentSeed = opts.pinSeed ?? `coop-soak-${seed}`;
-  game.scene.setSeed(contentSeed);
-  actionScript.push(`content seed=${contentSeed}`);
+  const preseeded = game.scene.seed === contentSeed;
+  if (!preseeded) {
+    // Backward-compatible fallback for specialized callers not yet migrated; critical gate/nightly callers
+    // pre-seed before startBattle so wave 1 is covered too.
+    prepareCoopSoakContent(game, seed, opts.pinSeed);
+  }
+  actionScript.push(`content seed=${contentSeed} preseeded=${preseeded}`);
 
   // #843 CATCH LEG (BUILD 1): when a catch leg is configured, shorten the dexSync broadcast delay so the
   // host's post-catch dexSync timer fires DURING the guest-ctx reconcile drain (not during the host throw),
