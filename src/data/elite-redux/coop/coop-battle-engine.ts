@@ -2056,8 +2056,9 @@ export function captureCoopChecksumState(): CoopChecksumState {
     return captureVersusGuestChecksumState();
   }
   const arena = globalScene.arena;
-  const field = globalScene
-    .getField(true)
+  // #878: checksum the SAME slot-present view carried by checkpoints/snapshots. `getField(true)` drops a
+  // just-fainted foe, making its summonData (notably statStages) invisible exactly at wave win.
+  const field = getCoopSerializableField()
     .filter((m): m is Pokemon => m != null)
     .map(readChecksumMon)
     .sort((a, b) => a.bi - b.bi);
@@ -2141,8 +2142,8 @@ function readEnemyBenchHpDigest(): [number, number, number][] {
  */
 function captureVersusGuestChecksumState(): CoopChecksumState {
   const arena = globalScene.arena;
-  const field = globalScene
-    .getField(true)
+  // Egress mirror of the normal #878 slot-present capture (includes just-fainted mons).
+  const field = getCoopSerializableField()
     .filter((m): m is Pokemon => m != null)
     .map(readChecksumMon)
     .map(mon => ({ ...mon, bi: swapBi(mon.bi) }))
