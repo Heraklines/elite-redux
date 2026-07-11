@@ -846,6 +846,16 @@ export class CoopInteractionRelay {
    */
   onRevivalPrompt: ((fieldIndex: number) => void) | null = null;
 
+  /** Host-forwarded per-move picker presentation; runtime wires the authoritative guest opener. */
+  onLearnMoveForward:
+    | ((outcome: Extract<CoopInteractionOutcome, { k: "learnMoveForward" }>) => void)
+    | null = null;
+
+  /** Host-forwarded batch picker presentation; runtime wires the authoritative guest opener. */
+  onLearnMoveBatchForward:
+    | ((outcome: Extract<CoopInteractionOutcome, { k: "learnMoveBatchForward" }>) => void)
+    | null = null;
+
   /**
    * #856: fired when the partner (the sole-engine host) asks THIS client - the CATCHER - to drive the
    * full-party keep/release picker for a wild catch it threw. Wired by the runtime (queues
@@ -1032,6 +1042,16 @@ export class CoopInteractionRelay {
   }
 
   private deliverInteractionOutcome(seq: number, outcome: CoopInteractionOutcome, source: "RECV" | "JOURNAL"): void {
+    // Forward-only presentations are consumed by persistent runtime openers rather than a phase-local
+    // outcome waiter. Routing them here lets raw and durable carriers share the relay's echo suppression.
+    if (outcome.k === "learnMoveForward" && this.onLearnMoveForward != null) {
+      this.onLearnMoveForward(outcome);
+      return;
+    }
+    if (outcome.k === "learnMoveBatchForward" && this.onLearnMoveBatchForward != null) {
+      this.onLearnMoveBatchForward(outcome);
+      return;
+    }
     const waiter = this.outcomePending.get(seq);
     if (waiter) {
       if (isCoopDebug()) {

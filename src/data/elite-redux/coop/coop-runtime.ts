@@ -1233,15 +1233,12 @@ function wireCoopDexSync(transport: CoopTransport): void {
   });
 }
 
-function wireCoopLearnMoveForward(transport: CoopTransport): void {
-  offLearnMoveForward = transport.onMessage(msg => {
-    if (msg.t !== "interactionOutcome" || msg.outcome.k !== "learnMoveForward") {
-      return;
-    }
+function wireCoopLearnMoveForward(relay: CoopInteractionRelay): void {
+  relay.onLearnMoveForward = outcome => {
     if (!isCoopAuthoritativeGuest()) {
       return;
     }
-    const { partySlot, moveId, maxMoveCount } = msg.outcome;
+    const { partySlot, moveId, maxMoveCount } = outcome;
     if (learnMoveForwardInFlight.has(partySlot)) {
       coopLog("learnmove", `recv learnMoveForward slot=${partySlot} IGNORE (picker already in-flight)`);
       return;
@@ -1268,7 +1265,10 @@ function wireCoopLearnMoveForward(transport: CoopTransport): void {
       learnMoveForwardInFlight.delete(partySlot);
       coopWarn("learnmove", `learn-move picker open failed slot=${partySlot} (host await falls back)`, e);
     }
-  });
+  };
+  offLearnMoveForward = () => {
+    relay.onLearnMoveForward = null;
+  };
 }
 
 /** Co-op (#633 BUG3+5): clear a slot's in-flight learn-move picker mark once its phase ends. */
@@ -1284,15 +1284,12 @@ export function clearCoopLearnMoveForwardInFlight(partySlot: number): void {
  * {@linkcode isCoopAuthoritativeGuest} (a dead no-op for solo / host / lockstep). An in-flight slot guard
  * ignores a duplicate present for a slot whose panel is still open. Cleared in {@linkcode clearCoopRuntime}.
  */
-function wireCoopLearnMoveBatchForward(transport: CoopTransport): void {
-  offLearnMoveBatchForward = transport.onMessage(msg => {
-    if (msg.t !== "interactionOutcome" || msg.outcome.k !== "learnMoveBatchForward") {
-      return;
-    }
+function wireCoopLearnMoveBatchForward(relay: CoopInteractionRelay): void {
+  relay.onLearnMoveBatchForward = outcome => {
     if (!isCoopAuthoritativeGuest()) {
       return;
     }
-    const { partySlot, learnableIds, ownerIsGuest } = msg.outcome;
+    const { partySlot, learnableIds, ownerIsGuest } = outcome;
     if (learnMoveBatchForwardInFlight.has(partySlot)) {
       coopLog("learnmove", `recv learnMoveBatchForward slot=${partySlot} IGNORE (panel already in-flight)`);
       return;
@@ -1317,7 +1314,10 @@ function wireCoopLearnMoveBatchForward(transport: CoopTransport): void {
       learnMoveBatchForwardInFlight.delete(partySlot);
       coopWarn("learnmove", `batch panel open failed slot=${partySlot} (host await falls back)`, e);
     }
-  });
+  };
+  offLearnMoveBatchForward = () => {
+    relay.onLearnMoveBatchForward = null;
+  };
 }
 
 /**
@@ -2728,8 +2728,8 @@ export function assembleCoopRuntime(
   wireCoopWaveEndState(controller, battleStream);
   wireCoopMeChecksumCheck(battleStream, durability);
   wireCoopLiveEvents(controller, battleStream);
-  wireCoopLearnMoveForward(transport);
-  wireCoopLearnMoveBatchForward(transport);
+  wireCoopLearnMoveForward(interactionRelay);
+  wireCoopLearnMoveBatchForward(interactionRelay);
   wireCoopDexSync(transport);
   wireShowdownResult(transport, controller);
   wireCoopDisconnectReaction(transport, interactionRelay, runtime);
