@@ -1332,8 +1332,13 @@ export class CoopApplyResyncPhase extends Phase {
       // vanished; host waited on a pick that could never come). A resync older than the CURRENT
       // battle turn is dead on arrival: the per-turn checkpoint already healed anything it knew.
       const liveTurn = globalScene.currentBattle?.turn ?? 0;
-      if (this.turn > 0 && liveTurn > this.turn) {
-        coopWarn("resync", `turn=${this.turn} STALE (live turn=${liveTurn}) -> DROPPED (checkpoint supersedes)`);
+      const snapshotTurn = this.snapshot.authoritativeState?.turn;
+      if (coopResyncSnapshotIsStale(this.turn, snapshotTurn, liveTurn)) {
+        coopWarn(
+          "resync",
+          `requestTurn=${this.turn} snapshotTurn=${snapshotTurn ?? "legacy"} STALE (live turn=${liveTurn}) `
+            + "-> DROPPED (newer checkpoint supersedes)",
+        );
         this.end();
         return;
       }
@@ -1401,4 +1406,19 @@ export class CoopApplyResyncPhase extends Phase {
     }
     this.end();
   }
+}
+
+/**
+ * A stateSync request is correlated to the turn that detected drift, but the host captures its snapshot when
+ * the request ARRIVES. The host may already be on the next turn, making the returned snapshot newer than the
+ * request. Judge staleness by that authoritative snapshot turn when available; falling back to the request
+ * turn preserves the legacy-host guard.
+ */
+export function coopResyncSnapshotIsStale(
+  requestTurn: number,
+  snapshotTurn: number | undefined,
+  liveTurn: number,
+): boolean {
+  const capturedTurn = snapshotTurn ?? requestTurn;
+  return capturedTurn > 0 && liveTurn > capturedTurn;
 }
