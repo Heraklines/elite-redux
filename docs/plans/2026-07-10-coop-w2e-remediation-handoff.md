@@ -428,3 +428,23 @@ and biome-operation suites pass together under an adversarial host-boundary/gues
 guest retains the host payload, never calls its contradictory `isNewBiome`, and keeps that exact payload
 active for the concrete Victory queue. Touched-file TypeScript diagnostics are zero; repository-wide
 pre-existing failures remain.
+
+## 20. Quarantine closure and fainted-slot checksum closure
+
+The last gate quarantine is closed in `999e4adb9`. The learn-move continuation test's eleven assertions were
+already correct; its four unhandled asynchronous errors came from incomplete scene/Pokemon loader stubs. The
+stub now implements the production continuation's move, money-text, sound, form, and loader seams, the file
+passes 11/11 with no unhandled errors, and `scripts/run-coop-gate.mjs` has no quarantined files left.
+
+The #878 checksum blind spot is closed in `dbd45b0b6` (failure-first `756adf9e2`). Checksum capture previously
+used `getField(true)`, which drops a just-fainted enemy at the exact wave-win boundary, while authoritative
+snapshots and checkpoints retain slot-present battlers. A change to that enemy's `statStages` was consequently
+invisible. Normal and versus-egress checksums now use the same `getCoopSerializableField()` view as the data
+plane. The real-engine reproduction proves the digest changes; the live capture -> JSON wire -> guest apply ->
+recapture suite passes 18/18, and pure checksum/checkpoint coverage passes 47/47. This makes the added state both
+detectable and reproducible instead of creating an unhealable checksum mismatch.
+
+Next: make soak completeness mechanically assert every registered operation surface is exercised, then expand
+the production-fidelity and drop-every-authoritative-class fault campaigns. Strict-tail ME/egg sanctioning,
+real-browser duo coverage, model-based fuzzing, and the final long multi-lane campaign remain open; no final
+"no gaps" claim is made yet.

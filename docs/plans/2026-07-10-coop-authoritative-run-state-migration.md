@@ -1338,3 +1338,13 @@ Strict-tail sanctioning remains observe-only: the matrix exposed expected ME/egg
 tails are governed by `ME_TERMINAL`/local egg continuation rather than a standard `WAVE_ADVANCE`. They remain
 explicitly allowlisted until their operation-specific sanction is wired; this does not reopen arbitrary phases,
 because every non-allowlisted phase is already denied by default.
+
+### 8.10 Test-gate and checksum-view closure
+
+`999e4adb9` removes the final quarantine after repairing the learn-move continuation harness's incomplete
+production stubs; all eleven assertions now complete without asynchronous errors. `dbd45b0b6` (red proof
+`756adf9e2`) also aligns checksum capture with the authoritative data plane's slot-present battler view. A
+just-fainted enemy therefore remains hash-visible through the wave-win boundary, including its `statStages`.
+Normal and versus-egress capture use the same representation, and the real two-engine serialization round trip
+proves the stronger checksum is healable. Evidence: 18/18 gated live-engine assertions and 47/47 pure
+checksum/checkpoint assertions.
