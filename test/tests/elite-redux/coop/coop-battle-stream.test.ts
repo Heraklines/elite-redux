@@ -523,7 +523,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       expect(await guestStream.awaitLaunchSnapshot(1)).toBe(SESSION_JSON);
     });
 
-    it("awaitLaunchSnapshot resolves null on timeout (guest then builds its own launch - never hangs)", async () => {
+    it("awaitLaunchSnapshot resolves null on timeout (authoritative caller fails closed)", async () => {
       const { guest } = createLoopbackPair();
       const timer: { fire?: () => void } = {};
       const guestStream = new CoopBattleStreamer(guest, {

@@ -305,10 +305,19 @@ export class SelectStarterPhase extends Phase {
       console.log("[coop-launch] guest: clearing STARTER_SELECT -> MESSAGE, then launch");
       void globalScene.ui.setMode(UiMode.MESSAGE).then(async () => {
         // #633 M4 push-snapshot launch: the AUTHORITATIVE guest BOOTS from the host's full
-        // session snapshot - it rolls no enemy / arena / party of its own, so it can never
-        // diverge at launch (the whole point of M4). On timeout / parse failure / legacy
-        // lockstep it falls back to building its own launch below, so it can never hang.
-        if (getCoopNetcodeMode() === "authoritative" && (await this.tryCoopGuestSnapshotBoot())) {
+        // session snapshot - it rolls no enemy / arena / party of its own. An authoritative
+        // guest must FAIL CLOSED if that boundary cannot be adopted; generating a local launch
+        // here creates two valid-looking but different runs and guarantees a later desync.
+        if (getCoopNetcodeMode() === "authoritative") {
+          if (!(await this.tryCoopGuestSnapshotBoot())) {
+            globalScene.ui.showText(
+              "Could not recover the host's co-op launch state. Reconnect and try again.",
+              null,
+              null,
+              null,
+              true,
+            );
+          }
           return;
         }
         this.initBattle(merged, true, owners);
@@ -338,7 +347,7 @@ export class SelectStarterPhase extends Phase {
    * the production-hardened resume machinery ({@linkcode GameData.applyCoopLaunchSession}), then queues
    * the LOADED {@linkcode EncounterPhase} (which renders the applied session and GENERATES NOTHING - its
    * `shouldAdoptCoopEnemyParty` returns false for a loaded phase). Returns false on no-streamer /
-   * timeout / unparseable snapshot so the caller falls back to building its own launch (never hangs).
+   * timeout / unparseable snapshot so the caller can stop at an explicit recovery screen.
    * This is the whole point of M4: the guest computes NOTHING at launch, so it cannot desync.
    */
   private async tryCoopGuestSnapshotBoot(): Promise<boolean> {
@@ -349,7 +358,7 @@ export class SelectStarterPhase extends Phase {
     console.log("[coop-launch] guest: awaiting host launch snapshot (push-snapshot boot, no poll)");
     const json = await streamer.awaitLaunchSnapshot(COOP_LAUNCH_WAVE);
     if (json == null) {
-      console.warn("[coop-launch] guest: no launch snapshot (timeout), falling back to own launch");
+      console.warn("[coop-launch] guest: no launch snapshot (timeout), failing closed");
       return false;
     }
     const booted = await globalScene.gameData.applyCoopLaunchSession(json);

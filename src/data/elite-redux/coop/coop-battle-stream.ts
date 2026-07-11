@@ -29,6 +29,7 @@ import type {
   CoopBattleCheckpoint,
   CoopBattleEvent,
   CoopCapturePresentation,
+  CoopConnectionState,
   CoopFullMonSnapshot,
   CoopMessage,
   CoopSerializedEnemy,
@@ -120,6 +121,7 @@ export class CoopBattleStreamer {
   private readonly timeoutMs: number;
   private readonly schedule: (cb: () => void, ms: number) => () => void;
   private readonly offMessage: () => void;
+  private readonly offStateChange: () => void;
 
   /** turn -> resolver for an in-flight {@linkcode awaitTurn}. */
   private readonly pending = new Map<number, (res: CoopTurnResolution | null) => void>();
@@ -191,6 +193,10 @@ export class CoopBattleStreamer {
   private readonly launchSnapshotWaiters = new Map<number, (res: string | null) => void>();
   /** Latest launch snapshot that arrived before its waiter (race buffer, keyed by wave). */
   private lastLaunchSnapshot: { wave: number; session: string } | null = null;
+  /** Guest-side exact-once guard: reconnect resends cannot leave a second snapshot buffered. */
+  private readonly consumedLaunchSnapshotWaves = new Set<number>();
+  /** HOST: latest authoritative launch/resume snapshot, retained so a lost push is re-answerable. */
+  private lastSentLaunchSnapshot: { wave: number; session: string } | null = null;
   /** GUEST: handler for the host's authoritative ghost-team pool (#633 ghost-pool sync). */
   private ghostPoolHandler: ((pool: GhostTeamSnapshot[]) => void) | null = null;
   /** GUEST: the host's ghost pool that arrived before a handler subscribed (delivered on subscribe). */
@@ -262,6 +268,15 @@ export class CoopBattleStreamer {
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.schedule = opts.schedule ?? defaultSchedule;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
+    this.offStateChange = transport.onStateChange((state: CoopConnectionState) => {
+      if (state !== "connected") {
+        return;
+      }
+      for (const wave of this.launchSnapshotWaiters.keys()) {
+        coopLog("stream", `guest RE-SEND requestLaunchSnapshot wave=${wave} after reconnect`);
+        this.transport.send({ t: "requestLaunchSnapshot", wave });
+      }
+    });
     coopLog("stream", `streamer CONSTRUCT timeout=${this.timeoutMs}ms onMessage registered`);
   }
 
@@ -290,6 +305,7 @@ export class CoopBattleStreamer {
    * `enemyPartySync` + the `requestEnemyParty` poll for the launch (and every hard-transition) boundary.
    */
   sendLaunchSnapshot(wave: number, session: string): void {
+    this.lastSentLaunchSnapshot = { wave, session };
     coopLog("replay", `host SEND launchSnapshot wave=${wave} sessionLen=${session.length}`);
     this.transport.send({ t: "launchSnapshot", wave, session });
   }
@@ -674,6 +690,7 @@ export class CoopBattleStreamer {
     const buffered = this.lastLaunchSnapshot;
     if (buffered != null && buffered.wave === wave) {
       this.lastLaunchSnapshot = null;
+      this.consumedLaunchSnapshotWaves.add(wave);
       coopLog(
         "stream",
         `guest awaitLaunchSnapshot wave=${wave} RESOLVE (buffered race) len=${buffered.session.length}`,
@@ -702,7 +719,7 @@ export class CoopBattleStreamer {
         if (res == null) {
           coopWarn(
             "stream",
-            `guest awaitLaunchSnapshot wave=${wave} -> null (timeout/superseded), guest falls back to its own launch`,
+            `guest awaitLaunchSnapshot wave=${wave} -> null (timeout/superseded), authoritative caller fails closed`,
           );
         } else {
           coopLog("stream", `guest awaitLaunchSnapshot wave=${wave} RESOLVE len=${res.length}`);
@@ -710,6 +727,11 @@ export class CoopBattleStreamer {
         resolve(res);
       };
       this.launchSnapshotWaiters.set(wave, finish);
+      // A reliable ordered channel does not recover a frame lost while no handler/channel existed or a
+      // mid-send SCTP abort. Ask the host to replay its retained boundary snapshot after the waiter is
+      // parked; the response is idempotent and wave-keyed, so it cannot satisfy another launch.
+      coopLog("stream", `guest SEND requestLaunchSnapshot wave=${wave}`);
+      this.transport.send({ t: "requestLaunchSnapshot", wave });
       cancelTimer = this.schedule(() => finish(null), timeoutMs);
     });
   }
@@ -1156,6 +1178,7 @@ export class CoopBattleStreamer {
         + ` meBattle=${this.meBattlePartyWaiters.size} stateSync=${this.stateSyncWaiters.size}) + null-out all handlers`,
     );
     this.offMessage();
+    this.offStateChange();
     for (const finish of [...this.pending.values()]) {
       finish(null);
     }
@@ -1180,6 +1203,9 @@ export class CoopBattleStreamer {
     this.liveWaiter = null;
     this.lastCheckpoint = null;
     this.lastEnemyParty = null;
+    this.lastLaunchSnapshot = null;
+    this.lastSentLaunchSnapshot = null;
+    this.consumedLaunchSnapshotWaves.clear();
     this.enemyPartyHandler = null;
     this.checkpointHandler = null;
     this.ghostPoolHandler = null;
@@ -1225,6 +1251,10 @@ export class CoopBattleStreamer {
         return;
       }
       case "launchSnapshot": {
+        if (this.consumedLaunchSnapshotWaves.has(msg.wave)) {
+          coopLog("replay", `guest IGNORE duplicate launchSnapshot wave=${msg.wave} (already consumed)`);
+          return;
+        }
         // GUEST: hand the authoritative launch snapshot to a parked awaitLaunchSnapshot (consumed),
         // else buffer it for the next await (the host may race ahead of the guest reaching its await).
         const waiter = this.launchSnapshotWaiters.get(msg.wave);
@@ -1234,10 +1264,24 @@ export class CoopBattleStreamer {
         );
         if (waiter) {
           this.lastLaunchSnapshot = null;
+          this.consumedLaunchSnapshotWaves.add(msg.wave);
           waiter(msg.session);
           return;
         }
         this.lastLaunchSnapshot = { wave: msg.wave, session: msg.session };
+        return;
+      }
+      case "requestLaunchSnapshot": {
+        const cached = this.lastSentLaunchSnapshot;
+        if (cached?.wave !== msg.wave) {
+          coopWarn(
+            "stream",
+            `host RECV requestLaunchSnapshot wave=${msg.wave} -> no matching cache (cached=${cached?.wave ?? "none"})`,
+          );
+          return;
+        }
+        coopLog("stream", `host RECV requestLaunchSnapshot wave=${msg.wave} -> RESEND len=${cached.session.length}`);
+        this.transport.send({ t: "launchSnapshot", wave: cached.wave, session: cached.session });
         return;
       }
       case "meBattleEnemyPartySync": {

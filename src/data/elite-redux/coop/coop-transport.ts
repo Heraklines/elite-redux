@@ -1036,6 +1036,8 @@ export type CoopMessage =
    * (its EncounterPhase), replacing the narrow `enemyPartySync` + the `requestEnemyParty` poll.
    */
   | { t: "launchSnapshot"; wave: number; session: string }
+  /** Guest -> host: re-send the cached authoritative launch/resume snapshot for this exact wave. */
+  | { t: "requestLaunchSnapshot"; wave: number }
   /**
    * Host -> guest (#633, authoritative ME battle handoff): the EXACT enemy party the host
    * generated for a mystery-encounter-SPAWNED battle. Unlike `enemyPartySync` (keyed by the
@@ -1395,6 +1397,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `wave=${msg.wave}`;
     case "launchSnapshot":
       return `wave=${msg.wave} session=${msg.session.length}b`;
+    case "requestLaunchSnapshot":
+      return `wave=${msg.wave}`;
     case "meBattleEnemyPartySync":
       return `key=${msg.key} enemies=${msg.enemies.length}`;
     case "ghostPool":
