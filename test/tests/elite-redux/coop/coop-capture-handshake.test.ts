@@ -20,6 +20,7 @@ import {
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
+import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import { GameModes } from "#enums/game-modes";
 import { SpeciesId } from "#enums/species-id";
 import { PokemonData } from "#system/pokemon-data";
@@ -76,6 +77,24 @@ describe("co-op wave-advance merge preserves captureParty across a same-wave sup
   it("a STALE earlier-wave signal keeps the existing later-wave pending (returns null)", () => {
     const wave3 = mergeCoopPendingWaveAdvance(null, 3, "win", undefined);
     expect(mergeCoopPendingWaveAdvance(wave3, 2, "capture", PARTY)).toBeNull();
+  });
+});
+
+describe("co-op wave-advance preserves the host-stated transition at the wave-10 map boundary", () => {
+  const transition: CoopWaveAdvancePayload = {
+    wave: 10,
+    outcome: "win",
+    nextLogicalPhase: "WAVE_VICTORY",
+    nextWave: 11,
+    biomeChange: true,
+    eggLapse: true,
+    meBoundary: "none",
+    victoryKind: "wild",
+  };
+
+  it("never discards biomeChange and re-derives it from the guest scene", () => {
+    const pending = mergeCoopPendingWaveAdvance(null, 10, "win", undefined, undefined, transition);
+    expect(pending?.transition, "the pending tail retains the host's complete wave-10 statement").toEqual(transition);
   });
 });
 
