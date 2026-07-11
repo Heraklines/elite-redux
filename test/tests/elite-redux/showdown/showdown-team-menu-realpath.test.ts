@@ -271,6 +271,41 @@ describe.runIf(RUN)("showdown team menu - real-path acceptance", () => {
     expect(menu.importErrors, "the error list is dismissed after saving").toBeNull();
   });
 
+  // ---- P2: AUTO-REMEMBER prefill (confirm a set -> the next pick of that species pre-fills it) -----
+
+  it("auto-remember: confirming a set stores it and the next CREATE of that species pre-fills it", async () => {
+    // Enter the offline build so the real grid handler exists with live dex state.
+    const phase = new TitlePhase();
+    (phase as any).openShowdownTeamMenu(() => {});
+    await wait(400);
+    press(Button.ACTION);
+    await wait(500);
+    await confirmYesIfPrompted();
+    expect(mode()).toBe(UiMode.STARTER_SELECT);
+    const grid: any = game.scene.ui.handlers[UiMode.STARTER_SELECT];
+
+    // Highlight a caught species + populate the detail cursors (mirrors the freeze-bug recipe).
+    const sp = getPokemonSpecies(SpeciesId.BULBASAUR);
+    grid.lastSpecies = sp;
+    grid.speciesStarterDexEntry = game.scene.gameData.dexData[SpeciesId.BULBASAUR];
+    grid.setSpeciesDetails(sp, {}, false);
+
+    // Build a fresh CREATE config, shape a set, and REMEMBER it through the real commit-time helper (the
+    // exact call commitShowdownEditor makes) - which exports codec text into localStorage.
+    const cfg0 = grid.buildShowdownEditorConfig(sp, SpeciesId.BULBASAUR, -1);
+    cfg0.set.moves = [MoveId.TACKLE, MoveId.VINE_WHIP, null, null];
+    cfg0.set.nature = 3; // an arbitrary distinct nature
+    grid.rememberShowdownSet(sp, SpeciesId.BULBASAUR, { stage: cfg0.stage, set: cfg0.set });
+
+    // A subsequent FRESH create config for the SAME species (no in-session selection) pre-fills from the
+    // remembered set. RED-PROOF (auto-remember prefill): drop the prefill fallbacks in buildShowdownEditorConfig
+    // (or the rememberShowdownSet write) and these go back to the grid defaults.
+    grid.showdownSelections.delete(SpeciesId.BULBASAUR);
+    const cfg1 = grid.buildShowdownEditorConfig(sp, SpeciesId.BULBASAUR, -1);
+    expect(cfg1.set.moves.slice(0, 2), "moves pre-filled from last-used").toEqual([MoveId.TACKLE, MoveId.VINE_WHIP]);
+    expect(cfg1.set.nature, "nature pre-filled from last-used").toBe(3);
+  });
+
   it("G/V team-cycle: the editor RELOADS onto the sibling team mon (offline edit, dead-cycle red-proof)", async () => {
     // A 2-mon preset -> EDIT seeds BOTH mons into the grid, so the editor has siblings to cycle between.
     const mon = (root: SpeciesId, fielded: SpeciesId, move: MoveId) => ({
