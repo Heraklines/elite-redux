@@ -511,6 +511,18 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       expect(await guestStream.awaitLaunchSnapshot(1)).toBe(SESSION_JSON);
     });
 
+    it("a guest that missed the launchSnapshot re-requests the host's cached snapshot", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host);
+
+      // The push lands before the guest streamer exists, reproducing a lost boundary frame.
+      hostStream.sendLaunchSnapshot(1, SESSION_JSON);
+      await new Promise(r => setTimeout(r, 0));
+      const guestStream = new CoopBattleStreamer(guest);
+
+      expect(await guestStream.awaitLaunchSnapshot(1)).toBe(SESSION_JSON);
+    });
+
     it("awaitLaunchSnapshot resolves null on timeout (guest then builds its own launch - never hangs)", async () => {
       const { guest } = createLoopbackPair();
       const timer: { fire?: () => void } = {};
