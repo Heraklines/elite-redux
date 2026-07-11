@@ -45,6 +45,13 @@ numeric runtime id (`ER_ID_MAP.abilities[erId]` / `.moves[erId]`).
 - Other repeated notes to skim for shared fixes: Toxic-Terrain interactions,
   offense-side status procs, powder-move immunity, crash-damage recoil scaling.
 
+## ✅ Progress log (update after each committed batch)
+
+Append one line per committed fix batch: `Batch N (commit <hash>): <er_ids> — <note>`.
+An agent resuming should skip er_ids already listed here.
+
+- **Batch 1 (commit 3450e90f0)** — systemic Overgrow/Blaze/Torrent/Swarm (ability 65/66/67/68) + WRONG/ORPHANED gaps. FIXED: ability 352 (Sage Power), 809 (Blur), 810 (Elude); move 65 (Drill Peck), 66 (Submission), 112 (Barrier), 148 (Flash), 168 (Thief), 181 (Powder Snow), 264 (Focus Punch), 445 (Captivate), 513 (Reflect Type), 597 (Aromatic Mist), 669 (Tearful Look), 895 (Barb Barrage), 906 (Hard Press), 950 (Eerie Fog move). **Still BLOCKED (need new engine primitives — leave for later):** move 271 (Trick), 289 (Snatch), 382 (Me First), 472 (Wonder Room), 478 (Magic Room), 970 (Transmute).
+
 ## Section A — Numeric conflicts (dex `er-moves.ts` wins) — 173 findings
 
 Fix: make the runtime value match the `er-moves.ts` dex value stated in each note
