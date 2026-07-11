@@ -259,9 +259,9 @@ export class CoopReplayTurnPhase extends Phase {
         this.end();
         return;
       }
-    } catch {
+    } catch (error) {
       // A bad stream payload must never hang the guest's turn.
-      coopWarn("replay", `guest replay turn=${this.turn}: payload error -> finishTurnNoStream`);
+      coopWarn("replay", `guest replay turn=${this.turn}: payload error -> finishTurnNoStream`, error);
       this.finishTurnNoStream();
     }
   }
