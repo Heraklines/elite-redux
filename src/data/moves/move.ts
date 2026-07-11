@@ -979,6 +979,20 @@ export abstract class Move implements Localizable {
             return true;
           }
         }
+        // ER Demolitionist (616) — ALL of the holder's moves ignore protection on
+        // its FIRST turn out ("Readied Action ... ignores Protection for one
+        // turn"). Marker scanned by name (registration-free); gated on the holder
+        // not yet having acted this send-out (empty moveHistory), the same
+        // first-turn predicate as its Readied-Action ATK ×2.
+        {
+          const history = user.summonData?.moveHistory;
+          if (!history || history.length === 0) {
+            const attrs = user.getAllActiveAbilityAttrs();
+            if (attrs.some(a => a?.constructor?.name === "IgnoreProtectFirstTurnAbAttr")) {
+              return true;
+            }
+          }
+        }
         break;
       case MoveFlags.DANCE_MOVE:
       case MoveFlags.SOUND_BASED: {

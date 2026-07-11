@@ -24,14 +24,20 @@
 
 import { AbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
-import { PokemonMove } from "#data/moves/pokemon-move";
-import { MoveId } from "#enums/move-id";
+import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
+import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
 import type { Pokemon } from "#field/pokemon";
 
 export interface OnOpponentSwitchOutOptions {
   /** Move id to spawn against the switching-out opponent. */
   readonly moveId: MoveId;
+  /**
+   * Optional ER-specified base-power override for the switch-strike. Omit to use
+   * the move's registered full power. Used by Super Sniper 806 ("strike foes
+   * before they finish switching out for 50% power" — Pursuit at half its 40 BP).
+   */
+  readonly power?: number;
 }
 
 export class OnOpponentSwitchOutAbAttr extends AbAttr {
@@ -48,7 +54,7 @@ export class OnOpponentSwitchOutAbAttr extends AbAttr {
       "MovePhase",
       holder,
       [leavingOpponent.getBattlerIndex()],
-      new PokemonMove(this.opts.moveId),
+      scriptedPokemonMove(this.opts.moveId, this.opts.power),
       MoveUseMode.INDIRECT,
     );
   }

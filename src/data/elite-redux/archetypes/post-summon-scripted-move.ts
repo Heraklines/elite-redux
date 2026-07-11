@@ -52,6 +52,13 @@ export interface PostSummonScriptedMoveOptions {
    * single-foe behavior.
    */
   readonly allOpponents?: boolean;
+  /**
+   * When `true`, the scripted cast bypasses the accuracy check (accuracy -1,
+   * Swift/Aerial-Ace style) so it cannot miss or be evaded. Required for on-entry
+   * moves the ER dex says "cannot miss / ignores accuracy checks" — e.g. Sand Pit
+   * 745's Sand Tomb. Forwarded to {@linkcode scriptedPokemonMove}'s `alwaysHit`.
+   */
+  readonly alwaysHit?: boolean;
   readonly oncePerBattleKey?: string;
   /**
    * Cap the number of casts this battle (per wave). Requires
@@ -166,7 +173,10 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
       "MovePhase",
       pokemon,
       targets,
-      scriptedPokemonMove(this.opts.moveId, this.opts.power, { nonReflectable: this.opts.nonReflectable ?? false }),
+      scriptedPokemonMove(this.opts.moveId, this.opts.power, {
+        nonReflectable: this.opts.nonReflectable ?? false,
+        alwaysHit: this.opts.alwaysHit ?? false,
+      }),
       useMode,
     );
   }

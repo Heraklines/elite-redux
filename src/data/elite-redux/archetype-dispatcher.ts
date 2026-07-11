@@ -82,13 +82,14 @@ import {
   FloatAbAttr,
   FogRestoreDisguiseFormChangeAbAttr,
   ForceSwitchOutImmunityAbAttr,
+  FullBurnDamageImmunityAbAttr,
   GorillaTacticsAbAttr,
   getWeatherCondition,
   IgnoreGenderInfatuationAbAttr,
   IgnoreMoveEffectsAbAttr,
   IgnoreOpponentStatStagesAbAttr,
   IgnoreProtectByFlagAbAttr,
-  IgnoreProtectOnContactAbAttr,
+  IgnoreProtectFirstTurnAbAttr,
   IgnoreTypeImmunityAbAttr,
   IgnoreTypeStatusEffectImmunityAbAttr,
   MoveAbilityBypassAbAttr,
@@ -113,6 +114,7 @@ import {
   PostStatStageChangeStatStageChangeAbAttr,
   PostSummonAddBattlerTagAbAttr,
   PostSummonClearAllyStatStagesAbAttr,
+  PostSummonClearOpponentPositiveStatStagesAbAttr,
   PostSummonFogRestoreDisguiseAbAttr,
   PostSummonRemoveArenaTagAbAttr,
   PostSummonStatStageChangeAbAttr,
@@ -216,6 +218,7 @@ import { MoveCategoryOverrideAbAttr } from "#data/elite-redux/archetypes/move-ca
 import { MoveFlagInjectionAbAttr } from "#data/elite-redux/archetypes/move-flag-injection";
 import { MovingFirstTrapFlinchAbAttr } from "#data/elite-redux/archetypes/moving-first-trap-flinch";
 import { ErMultiHeadedAbAttr } from "#data/elite-redux/archetypes/multi-headed";
+import { OverrideMultiHitCountAbAttr } from "#data/elite-redux/archetypes/multi-hit-count-override";
 import { NullifyFirstNHitsAbAttr } from "#data/elite-redux/archetypes/nullify-first-n-hits";
 import { OffensiveTypeChartOverrideAbAttr } from "#data/elite-redux/archetypes/offensive-type-chart-override";
 import { OnCritStatBoostLowestAbAttr } from "#data/elite-redux/archetypes/on-crit-stat-boost-lowest";
@@ -237,6 +240,7 @@ import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persiste
 import { PoisonedFoePurgeAbAttr } from "#data/elite-redux/archetypes/poisoned-foe-purge";
 import { PostAttackChangeTargetTypeAbAttr } from "#data/elite-redux/archetypes/post-attack-change-target-type";
 import { PostAttackContactSuppressTargetAbilityAbAttr } from "#data/elite-redux/archetypes/post-attack-contact-suppress-target-ability";
+import { PostAttackRemoveTargetTypeAbAttr } from "#data/elite-redux/archetypes/post-attack-remove-target-type";
 import { PostAttackScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-attack-scripted-move";
 import {
   PostAttackSetHazardByMoveTypeAbAttr,
@@ -282,6 +286,7 @@ import {
 } from "#data/elite-redux/archetypes/recharge-on-electric-terrain";
 import { RecoilDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/recoil-damage-multiplier";
 import { ReflectDamageOnDefendAbAttr } from "#data/elite-redux/archetypes/reflect-damage-on-defend";
+import { RemoveScreensOnTypedAttackAbAttr } from "#data/elite-redux/archetypes/remove-screens-on-typed-attack";
 import { RepeatMovePowerBoostAbAttr } from "#data/elite-redux/archetypes/repeat-move-power-boost";
 import { SandSecondaryEffectImmunityAbAttr, SandStatusImmunityAbAttr } from "#data/elite-redux/archetypes/sand-cloak";
 import { SePriorityBonusAbAttr } from "#data/elite-redux/archetypes/se-priority-bonus";
@@ -1734,6 +1739,21 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       // (-30% special damage) resolves; add the dropped Huge Wings component —
       // wing/wind/air-based (AIR_BASED) moves at 1.3x, mirroring Giant Wings er371.
       return [new FlagDamageBoostAbAttr({ flag: MoveFlags.AIR_BASED, multiplier: 1.3 })];
+    case 499: // Refrigerator: "Filter + Illuminate + removes Ghost-typing on the
+      // target when landing an attack." Filter (SE 0.65) + Illuminate (1.2x
+      // accuracy) resolve as the composite parts; add the on-hit Ghost strip.
+      return [new PostAttackRemoveTargetTypeAbAttr({ type: PokemonType.GHOST })];
+    case 682: // Iron Giant: "Heatproof + Juggernaut" — but the dex says burn deals
+      // NO damage (Heatproof only halves it) AND burn's Attack drop is nullified.
+      // Append FULL burn-tick immunity (wins over Heatproof's 0.5 as it runs after
+      // it) + the burn-Attack-halving waiver. Fire ×0.5 + Juggernaut come from the
+      // composite parts.
+      return [new FullBurnDamageImmunityAbAttr(), new BypassBurnDamageReductionAbAttr()];
+    case 805: // Sepia Lens: "Tinted Lens + Sand Guard" — the dex also grants
+      // immunity to sandstorm chip damage (like other Ground-types). The parts
+      // wire the NVE-doubling + in-sand special reduction / priority immunity;
+      // add the sandstorm-damage immunity marker.
+      return [new BlockWeatherDamageAttr(WeatherType.SANDSTORM)];
     // (er 909 Lightsaber relocated to dispatchBespokeR48 — it's a pure
     // hand-wired ability with no vanilla-ability parts, so it's classified
     // `bespoke` rather than `composite-vanilla-mashup`.)
@@ -2126,21 +2146,34 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
       }
     }
   }
-  // Stainless Steel 829 (Fort Knox + Steelworker) — the Normal→Steel conversion +
-  // the Steel-type "resists Ghost & Steel" riders are wired, but Steelworker's
-  // "otherwise it gains Steel STAB" was dropped. Append StabAdd(STEEL); its
-  // built-in "move type not already one of the user's types" guard means it only
-  // fires for NON-Steel users (Steel users get natural STAB instead), matching
-  // the description's either/or wording.
+  // Stainless Steel 829 (Fort Knox + Steelworker) — dex: "If the user is
+  // Steel-type it RESISTS GHOST AND STEEL, otherwise it gains Steel STAB." The
+  // Steelworker part contributes the Normal→Steel conversion (kept) but ALSO an
+  // UNCONDITIONAL Ghost 0.5 + DARK 0.5 resist (wrong: resists Dark not Steel, and
+  // ungated). Strip those inherited ReceivedTypeDamageMultiplier resists and
+  // replace with GHOST + STEEL at 0.5 GATED on the holder being Steel-type. The
+  // StabAdd(STEEL) covers the "otherwise Steel STAB" branch — its built-in "move
+  // type not already one of the user's types" guard makes it a no-op for Steel
+  // users (who get natural STAB), so both branches coexist correctly.
   if (erAbilityId === 829) {
-    out.push(new StabAddAbAttr({ targetType: PokemonType.STEEL }));
+    for (let i = out.length - 1; i >= 0; i--) {
+      if (out[i].constructor.name === "ReceivedTypeDamageMultiplierAbAttr") {
+        out.splice(i, 1);
+      }
+    }
+    const ghostResist = new ReceivedTypeDamageMultiplierAbAttr(PokemonType.GHOST, 0.5);
+    ghostResist.addCondition(holder => holder.isOfType(PokemonType.STEEL));
+    const steelResist = new ReceivedTypeDamageMultiplierAbAttr(PokemonType.STEEL, 0.5);
+    steelResist.addCondition(holder => holder.isOfType(PokemonType.STEEL));
+    out.push(ghostResist, steelResist, new StabAddAbAttr({ targetType: PokemonType.STEEL }));
   }
-  // Super Sniper 806 (Sniper + switch-strike) — the Sniper crit ×2.25 is wired,
-  // but the "attacks strike foes before they finish switching out" clause was
-  // only an AI hint. Wire the real switch-strike via OnOpponentSwitchOut (Pursuit
-  // at the leaving foe), the same engine hook 656 Tag uses.
+  // Super Sniper 806 (Sniper + switch-strike) — the Sniper crit ×2.25 is wired.
+  // Dex: "attacks strike foes before they finish switching out for 50% power."
+  // Fire the switch-strike via OnOpponentSwitchOut (the same engine hook 656 Tag
+  // uses) at HALF Pursuit's 40 BP (= 20 BP, the "50% power" the dex specifies) —
+  // NOT full-power Pursuit, which would land at ~2×.
   if (erAbilityId === 806) {
-    out.push(new OnOpponentSwitchOutAbAttr({ moveId: MoveId.PURSUIT }));
+    out.push(new OnOpponentSwitchOutAbAttr({ moveId: MoveId.PURSUIT, power: 20 }));
   }
   // Caretaker 783 (Healer + Friend Guard) — the Healer part cures only the ALLY
   // (30%/turn). The description is "30% chance to cure status for BOTH the user
@@ -2192,12 +2225,47 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
     );
   }
   // Qigong 762 (Always hits + Fighting Spirit + Rampage) — the wired parts give
-  // never-miss + clear-RECHARGING-on-KO, but the "Fighting Spirit" piece
-  // (Normal-type moves become Fighting + Fighting STAB) was dropped; append it.
+  // never-miss + clear-RECHARGING-on-KO. Append the "Fighting Spirit" piece
+  // (Normal-type moves become Fighting + Fighting STAB) AND the dropped clause
+  // "if the user is Fighting-type their Fighting-type moves break screens" — a
+  // Fighting-typed break-screens attr gated on the holder being Fighting-type.
   if (erAbilityId === 762) {
+    const breakScreens = new RemoveScreensOnTypedAttackAbAttr({ type: PokemonType.FIGHTING });
+    breakScreens.addCondition(holder => holder.isOfType(PokemonType.FIGHTING));
     out.push(
       new TypeConversionAbAttr({ source: { kind: "type", type: PokemonType.NORMAL }, newType: PokemonType.FIGHTING }),
       new StabAddAbAttr({ targetType: PokemonType.FIGHTING }),
+      breakScreens,
+    );
+  }
+  // Best Offense 844 / Magus Blades 846 — both resolve Mystic Blades (er505),
+  // which bundles an undocumented SLICING ×1.3 damage boost that NEITHER dex
+  // grants (they only make Keen Edge moves Special + use 20% Sp.Def). Strip that
+  // SLICING FlagDamageBoost for these two only — scoped so Blade's Essence (513),
+  // whose dex DOES explicitly grant the 30%, keeps its boost, and Mystic Blades
+  // 505's own standalone wiring is untouched.
+  if (erAbilityId === 844 || erAbilityId === 846) {
+    for (let i = out.length - 1; i >= 0; i--) {
+      const a = out[i];
+      if (a instanceof FlagDamageBoostAbAttr && a.getBoostFlag() === MoveFlags.SLICING_MOVE) {
+        out.splice(i, 1);
+      }
+    }
+  }
+  // Magus Blades 846 — Dual Wield's (er433) double-hit masks PULSE|SLICING, but
+  // 846's dex only makes KEEN EDGE (slicing) moves hit twice. Rebuild the
+  // double-hit SLICING-only (removing the inherited PULSE|SLICING pair) so pulse
+  // moves don't wrongly double-strike. Keep the 0.7 per-hit power.
+  if (erAbilityId === 846) {
+    for (let i = out.length - 1; i >= 0; i--) {
+      const a = out[i];
+      if (a instanceof HitMultiplierAbAttr || a instanceof HitMultiplierPowerAbAttr) {
+        out.splice(i, 1);
+      }
+    }
+    out.push(
+      new HitMultiplierAbAttr({ filter: { flag: MoveFlags.SLICING_MOVE }, extraStrikes: 1 }),
+      new HitMultiplierPowerAbAttr({ filter: { flag: MoveFlags.SLICING_MOVE }, multiplier: 0.7 }),
     );
   }
   // Icicle Fist 1017 (Iron Fist + "30% chance to cause frostbite with punches")
@@ -3619,10 +3687,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // forced switches or self-switch moves, matching the dex.
       return ok([new ArenaTrapAbAttr(() => true)]);
     case 677:
-      // Petrify — "Clears stat buffs then lowers speed by one stage on entry."
-      // Composite: clear all opponent stats (Haze-style) + speed -1.
+      // Petrify — "Removes stat RAISES from OPPOSING Pokemon, then drops their
+      // Speed by 1 stage on entry." Clear ONLY the opponents' POSITIVE stat
+      // stages (not Haze's field-wide reset of ALL stages both sides, which would
+      // also wipe the foes' debuffs and the user's/ally's own boosts) + Speed -1.
       return ok([
-        new PostSummonScriptedMoveAbAttr({ moveId: MoveId.HAZE }),
+        new PostSummonClearOpponentPositiveStatStagesAbAttr(),
         new PostSummonStatStageChangeAbAttr([Stat.SPD], -1, false, true),
       ]);
     case 529:
@@ -3747,13 +3817,15 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new FirstTurnStatMultiplierAbAttr({ stat: Stat.SPATK, multiplier: 1.2 }),
       ]);
     case 616:
-      // Demolitionist — "Readied Action + Ignores Protect + screens break on
-      // the readied turn." ATK x2 on the first turn + ignore-Protect on contact
-      // (Unseen Fist) + break the foe's screens on entry (the readied-turn
-      // screen break; Reflect / Light Screen / Aurora Veil).
+      // Demolitionist — "Readied Action + Ignores Protection effects for ONE turn
+      // + screens break on the readied turn." ATK x2 on the first turn + all-moves
+      // ignore-Protect gated to the first/readied turn (NOT Unseen-Fist's
+      // contact-only permanent bypass) + break the foe's screens on entry (Reflect
+      // / Light Screen / Aurora Veil). The first-turn ignore-Protect shares the
+      // same empty-moveHistory predicate as the ATK x2.
       return ok([
         new FirstTurnStatMultiplierAbAttr({ stat: Stat.ATK, multiplier: 2.0 }),
-        new IgnoreProtectOnContactAbAttr(),
+        new IgnoreProtectFirstTurnAbAttr(),
         new PostSummonRemoveArenaTagAbAttr([ArenaTagType.REFLECT, ArenaTagType.LIGHT_SCREEN, ArenaTagType.AURORA_VEIL]),
       ]);
     case 619:
@@ -4162,8 +4234,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 745:
-      // Sand Pit — "Attacks with 20BP Sand Tomb on switch-in."
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.SAND_TOMB, power: 20 })]);
+      // Sand Pit — "Attacks with 20BP Sand Tomb on switch-in. Hits ALL opposing
+      // Pokemon and cannot miss." allOpponents spreads it to both foes in doubles;
+      // alwaysHit (accuracy -1) makes it bypass the accuracy check.
+      return ok([
+        new PostSummonScriptedMoveAbAttr({ moveId: MoveId.SAND_TOMB, power: 20, allOpponents: true, alwaysHit: true }),
+      ]);
     case 461:
       // Monkey Business — "Uses Tickle on entry."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TICKLE })]);
@@ -6685,10 +6761,12 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
     case 960:
       // Giant Shuriken — "Water Shuriken hits once with 100BP and +1 crit."
       // Power boost on Water Shuriken (15BP -> ~100BP = 6.67x) + the +1 crit
-      // stage gated on the Water Shuriken move id.
+      // stage + force it to EXACTLY 1 hit (overriding its native 2-5 MultiHit,
+      // which otherwise landed 2-5×~100BP).
       return ok([
         new MovePowerBoostAbAttr((_user, _t, move) => move?.id === MoveId.WATER_SHURIKEN, 6.67),
         new CritStageBonusAbAttr({ bonus: 1, filter: { moveIds: [MoveId.WATER_SHURIKEN] } }),
+        new OverrideMultiHitCountAbAttr({ moveId: MoveId.WATER_SHURIKEN, hits: 1 }),
       ]);
     case 963:
       // Wrestle Showman — "Flying Press gains +10BP and causes Taunt."
@@ -7309,10 +7387,12 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       return ok([suppress]);
     }
     case 817:
-      // Madness Enhancement — "Enrages in fog, halves damage when enraged." The
-      // holder enrages ITSELF (ER_ENRAGE) while fog is active, and halves incoming
-      // damage whenever it is enraged OR fog is active (the fog auto-enrage, which
-      // also covers fog rolling in mid-battle).
+      // Madness Enhancement — "Enrages in fog, halves damage when enraged AND
+      // takes NO damage from enrage." The holder enrages ITSELF (ER_ENRAGE) while
+      // fog is active, halves incoming damage whenever enraged OR fog is active,
+      // and (the missing clause) is IMMUNE to enrage's 33% self-recoil —
+      // BlockRecoilDamageAttr is exactly what the ER_ENRAGE tick consults to waive
+      // the recoil (battler-tags.ts).
       return ok([
         new ReceivedMoveDamageMultiplierAbAttr(
           target =>
@@ -7320,6 +7400,7 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
             || globalScene.arena.weather?.weatherType === WeatherType.FOG,
           0.5,
         ),
+        new BlockRecoilDamageAttr(),
         new PostSummonAddBattlerTagAbAttr(BattlerTagType.ER_ENRAGE, 1).addCondition(
           () => globalScene.arena.weather?.weatherType === WeatherType.FOG,
         ),

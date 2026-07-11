@@ -2947,6 +2947,38 @@ export class PostSummonClearAllyStatStagesAbAttr extends PostSummonAbAttr {
 }
 
 /**
+ * Elite Redux — Petrify (677): on entry, clear only the POSITIVE stat stages of
+ * every active OPPONENT (their buffs), leaving their negative stages — and both
+ * sides' own stages — untouched. Unlike Haze (a field-wide reset of ALL stages
+ * on BOTH sides, which also wipes the foes' debuffs and the user's/ally's own
+ * boosts), this is opponents-only and positive-only, matching the dex ("Removes
+ * stat RAISES from OPPOSING Pokemon").
+ */
+export class PostSummonClearOpponentPositiveStatStagesAbAttr extends PostSummonAbAttr {
+  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+    return pokemon
+      .getOpponents()
+      .some(opp => opp.isActive(true) && BATTLE_STATS.some(stat => opp.getStatStage(stat) > 0));
+  }
+
+  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
+    if (simulated) {
+      return;
+    }
+    for (const target of pokemon.getOpponents()) {
+      if (!target.isActive(true)) {
+        continue;
+      }
+      for (const stat of BATTLE_STATS) {
+        if (target.getStatStage(stat) > 0) {
+          target.setStatStage(stat, 0);
+        }
+      }
+    }
+  }
+}
+
+/**
  * Raises the user's Attack Special Attack stat by one stage depending on the lower of the foes' defensive stats.
  * @see {@link https://bulbapedia.bulbagarden.net/wiki/Download_(Ability) | Download (Bulbapedia)}
  */
@@ -5648,6 +5680,25 @@ export class ReduceBurnDamageAbAttr extends AbAttr {
   }
 }
 
+/**
+ * ER Iron Giant (682) — FULL immunity to burn tick damage (not merely halved
+ * like Heatproof). Extends {@linkcode ReduceBurnDamageAbAttr} so the existing
+ * `applyAbAttrs("ReduceBurnDamageAbAttr")` call in post-turn-status-effect-phase
+ * picks it up by parent-class instance check; sets the burn tick to 0 outright
+ * (the parent's `toDmgValue` floor of 1 can never fully zero it via a 0
+ * multiplier). Appended AFTER Heatproof's 0.5 reducer in the composite so it
+ * always wins regardless of application order.
+ */
+export class FullBurnDamageImmunityAbAttr extends ReduceBurnDamageAbAttr {
+  constructor() {
+    super(0);
+  }
+
+  override apply({ burnDamage }: ReduceBurnDamageAbAttrParams): void {
+    burnDamage.value = 0;
+  }
+}
+
 export interface DoubleBerryEffectAbAttrParams extends AbAttrBaseParams {
   /** The value of the berry effect that will be doubled by the ability's application */
   effectValue: NumberHolder;
@@ -6259,6 +6310,25 @@ export class IgnoreProtectByFlagAbAttr extends AbAttr {
   constructor(flag: MoveFlags) {
     super(false);
     this.flag = flag;
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
+ * Elite Redux — Demolitionist (616): the holder's moves (ALL moves, not just
+ * contact) bypass the target's protection on its FIRST turn out ("Readied Action
+ * ... ignores Protection effects for one turn"). A pure marker scanned by name
+ * in {@linkcode Move.doesFlagEffectApply} (IGNORE_PROTECT), which gates the
+ * bypass on the holder not yet having acted this send-out (the same first-turn
+ * predicate — empty `summonData.moveHistory` — that drives its Readied-Action
+ * ATK ×2). Unlike {@linkcode IgnoreProtectOnContactAbAttr} (Unseen Fist), it is
+ * not contact-restricted, and unlike a permanent bypass it lapses after turn 1.
+ */
+export class IgnoreProtectFirstTurnAbAttr extends AbAttr {
+  private declare readonly _: never;
+  constructor() {
+    super(false);
   }
 
   override apply(_params: AbAttrBaseParams): void {}

@@ -44,6 +44,7 @@
 
 import { MovePowerBoostAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { BATTLE_STATS, type BattleStat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -248,9 +249,14 @@ export class ConditionalDamageAbAttr extends MovePowerBoostAbAttr {
       case "target-has-lowered-stat":
         return ConditionalDamageAbAttr.evalAnyStatLowered(target);
       case "any-active-asleep":
-        // Any active Pokemon (user/ally/opponent) genuinely asleep. Comatose is
-        // an ability, not a SLEEP status, so a Comatose mon does NOT satisfy it.
-        return globalScene.getField(true).some(p => p.status?.effect === StatusEffect.SLEEP);
+        // Any active Pokemon (user/ally/opponent) that is asleep OR treated as
+        // asleep. A Comatose holder is "considered asleep" (Dreamscape 859 wraps
+        // Comatose + Dreamcatcher, so its own sleep-boost is effectively always
+        // on) — mirrors the SLEEP-or-Comatose test the engine uses everywhere
+        // else (move.ts, move-condition.ts, ab-attrs.ts).
+        return globalScene
+          .getField(true)
+          .some(p => p.status?.effect === StatusEffect.SLEEP || p.hasAbility(AbilityId.COMATOSE));
     }
   }
 

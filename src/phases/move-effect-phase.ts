@@ -203,6 +203,19 @@ export class MoveEffectPhase extends PokemonPhase {
       }
       // If Multi-Lens is applicable, add hits equal to the number of held Multi-Lenses
       globalScene.applyModifiers(PokemonMultiHitModifier, user.isPlayer(), user, move.id, hitCount);
+      // ER multi-hit COUNT override (Giant Shuriken 960: Water Shuriken hits
+      // exactly once). Scanned by name — registration-free, same pattern as the
+      // MoveCategoryOverrideAbAttr scan in Pokemon.getAttackDamage. Runs LAST
+      // (after native multi-hit + Parental Bond + Multi-Lens) so the forced count
+      // wins.
+      for (const attr of user.getAllActiveAbilityAttrs()) {
+        if (attr?.constructor?.name === "OverrideMultiHitCountAbAttr") {
+          const forced = (attr as unknown as { resolveHits: (m: typeof move) => number | null }).resolveHits(move);
+          if (forced != null) {
+            hitCount.value = forced;
+          }
+        }
+      }
       // Set the user's relevant turnData fields to reflect the final hit count
       user.turnData.hitCount = hitCount.value;
       user.turnData.hitsLeft = hitCount.value;
