@@ -120,7 +120,7 @@ ${css}
     <span><span class="dot aura"></span><b>Surface FX</b> - on-sprite aura</span>
     <span><span class="dot aro"></span><b>Around FX</b> - aura around the mon (some partial)</span>
     <span><span class="dot exo"></span><b>Exotic</b> - multi-sprite layers around the mon</span>
-    <span><span class="dot rig"></span><b>Rig</b> - the body itself transforms</span>
+    <span><span class="dot rig"></span><b>Form</b> - the body itself transforms</span>
     <span><span class="dot mom"></span><b>Moment</b> - auto-looping event sequences</span>
     <span class="hint">mix one of each - click tiles or use the dropdowns</span>
   </div>
@@ -140,7 +140,7 @@ ${css}
       <div class="row"><label class="ls">Surface FX</label><select id="sel_surface" class="sel"></select></div>
       <div class="row"><label class="la">Around FX</label><select id="sel_around" class="sel"></select></div>
       <div class="row"><label class="lx">Exotic</label><select id="sel_exotic" class="sel"></select></div>
-      <div class="row"><label class="lr">Rig</label><select id="sel_rig" class="sel"></select></div>
+      <div class="row"><label class="lr">Form</label><select id="sel_rig" class="sel"></select></div>
       <div class="row"><label class="lm">Moment</label><select id="sel_moment" class="sel"></select></div>
       <div class="row"><label class="lp">Clustering</label><select id="sel_cluster" class="sel" title="How the cluster palettes segment the sprite's colors"></select></div>
       <div class="row"><label>Speed (master)</label><input id="speed" type="range" min="0.1" max="3" step="0.05" value="1"></div>
@@ -189,7 +189,7 @@ ${css}
 <div class="grid" id="aroGrid"></div>
 <div class="section-title"><h3>Exotic (multi-sprite)</h3><span class="cnt"><span id="exoCount"></span></span><span>layered copies of the full look around the mon - depth orbits, time echoes, companions</span></div>
 <div class="grid" id="exoGrid"></div>
-<div class="section-title"><h3>Body Rig</h3><span class="cnt"><span id="rigCount"></span></span><span>the body itself transforms - fake 3D, materials, lineage recolors (one at a time, stacks with everything else)</span></div>
+<div class="section-title"><h3>Form</h3><span class="cnt"><span id="rigCount"></span></span><span>the body itself transforms - fake 3D, materials, lineage recolors (one at a time, stacks with everything else)</span></div>
 <div class="grid" id="rigGrid"></div>
 <div class="section-title"><h3>Moments</h3><span class="cnt"><span id="momCount"></span></span><span>finite event sequences that loop automatically - watch a few seconds</span></div>
 <div class="grid" id="momGrid"></div>

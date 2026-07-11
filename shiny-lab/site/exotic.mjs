@@ -320,6 +320,7 @@ function exoLumaClusters(env) {
     }
     const masks = [];
     const cent = [];
+    const cols = [];
     for (let cl = 0; cl < 3; cl++) {
       const m = document.createElement("canvas");
       m.width = W;
@@ -329,6 +330,9 @@ function exoLumaClusters(env) {
       let n = 0;
       let sx = 0;
       let sy = 0;
+      let cr = 0;
+      let cg = 0;
+      let cb = 0;
       for (let i = 0; i < W * H; i++) {
         if (idx[i] !== cl) continue;
         id.data[i * 4] = ld[i * 4];
@@ -338,10 +342,14 @@ function exoLumaClusters(env) {
         n++;
         sx += i % W;
         sy += Math.floor(i / W);
+        cr += ld[i * 4];
+        cg += ld[i * 4 + 1];
+        cb += ld[i * 4 + 2];
       }
       mc.putImageData(id, 0, 0);
       masks.push(m);
       cent.push(n ? [sx / n, sy / n] : [env.cx, env.cy]);
+      cols.push(n ? `rgb(${(cr / n) | 0},${(cg / n) | 0},${(cb / n) | 0})` : "rgb(150,160,200)");
     }
     const bound = document.createElement("canvas");
     bound.width = W;
@@ -361,7 +369,7 @@ function exoLumaClusters(env) {
       }
     }
     bc.putImageData(bid, 0, 0);
-    return { idx, masks, cent, bound };
+    return { idx, masks, cent, cols, bound };
   });
 }
 /* n alpha-mask canvases banding the body by inner distance (rim -> core) */
@@ -4240,6 +4248,2724 @@ const EXOTIC = {
         c.globalAlpha = (tw - 0.45) * 1.2;
         c.fillStyle = "#dceeff";
         c.fillRect(env.ox + pts[i][0], env.oy + pts[i][1], 1, 1);
+      }
+      c.restore();
+    },
+  },
+
+  /* ================= CELESTIAL MONUMENTS (catalog batch A) ====================== */
+
+  /* the mon eclipses a colossal black sun: body goes eclipse-dark, silhouette rim
+   * burns molten, a writhing corona flares behind the disc */
+  blacksun: {
+    label: "Black Sun Coronation",
+    kind: "rig",
+    draw(c, env) {
+      const bb = exoBBox(env);
+      const R = Math.max(bb.w, bb.h) * (env.compact ? 0.62 : 0.72);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.cy - bb.h * 0.05;
+      // writhing corona spikes behind the disc
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      const nSp = env.compact ? 16 : 26;
+      for (let k = 0; k < nSp; k++) {
+        const a = (k / nSp) * EXO_TAU + Math.sin(env.t * 0.7 + k * 1.7) * 0.07;
+        const len = R * (0.16 + 0.2 * (0.5 + 0.5 * Math.sin(env.t * 2.1 + k * 2.3 + exoRand(env.seed, k) * 6)));
+        c.globalAlpha = 0.4 + 0.2 * Math.sin(env.t * 3 + k);
+        c.fillStyle = k % 3 ? "#ffb347" : "#ff5c2e";
+        c.beginPath();
+        c.moveTo(x + Math.cos(a - 0.06) * R, y + Math.sin(a - 0.06) * R);
+        c.lineTo(x + Math.cos(a + 0.06) * R, y + Math.sin(a + 0.06) * R);
+        c.lineTo(x + Math.cos(a) * (R + len), y + Math.sin(a) * (R + len));
+        c.closePath();
+        c.fill();
+      }
+      // the blazing rim ring
+      c.globalAlpha = 0.9;
+      c.strokeStyle = "#ffd9a0";
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(x, y, R, 0, EXO_TAU);
+      c.stroke();
+      c.restore();
+      // the black sun disc
+      const g = c.createRadialGradient(x, y, R * 0.2, x, y, R);
+      g.addColorStop(0, "#05060a");
+      g.addColorStop(0.82, "#0a0c14");
+      g.addColorStop(1, "#241406");
+      c.save();
+      c.fillStyle = g;
+      c.beginPath();
+      c.arc(x, y, R, 0, EXO_TAU);
+      c.fill();
+      c.restore();
+      // eclipse-dark body with a molten silhouette rim
+      exoStamp(c, env, env.look, { filter: "brightness(0.24) saturate(0.6)" });
+      const pts = exoEdge(env);
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      for (const p of pts) {
+        const tw = 0.5 + 0.5 * Math.sin(env.t * 3 + p[0] * 0.4 + p[1] * 0.23);
+        if (tw < 0.25) continue;
+        c.globalAlpha = 0.2 + 0.6 * tw;
+        c.fillStyle = tw > 0.72 ? "#ffe9c0" : "#ff9a3d";
+        c.fillRect(env.ox + p[0] + p[2], env.oy + p[1] + p[3], 1, 1);
+      }
+      c.restore();
+    },
+  },
+
+  /* biblically-accurate engine: counter-rotating rings of small winged selves, the
+   * rings studded with blinking eyes, a burning halo floating over the head */
+  seraphengine: {
+    label: "Seraph Engine",
+    kind: "exotic",
+    behind(c, env) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.cy;
+      const R0 = Math.max(bb.w, bb.h) * 0.62;
+      for (let ring = 1; ring >= 0; ring--) {
+        const R = R0 * (1 + ring * 0.42);
+        const n = (env.compact ? 5 : 8) + ring * 4;
+        const dir = ring % 2 ? -1 : 1;
+        const base = env.t * 0.18 * dir + ring * 0.4;
+        for (let k = 0; k < n; k++) {
+          const a = base + (k / n) * EXO_TAU;
+          exoStamp(c, env, env.ring(2 + ring * 6), {
+            x: x + Math.cos(a) * R,
+            y: y + Math.sin(a) * R * 0.86,
+            s: 0.2 - ring * 0.05,
+            rot: a + Math.PI / 2,
+            alpha: 0.42 - ring * 0.14,
+            filter: `sepia(1) hue-rotate(${8 + ring * 22}deg) saturate(2.2) brightness(1.3)`,
+          });
+        }
+        c.save();
+        c.globalCompositeOperation = "lighter";
+        c.globalAlpha = 0.3;
+        c.strokeStyle = "#ffe9b0";
+        c.lineWidth = 1;
+        c.beginPath();
+        c.ellipse(x, y, R, R * 0.86, 0, 0, EXO_TAU);
+        c.stroke();
+        // blinking eyes riding the ring
+        const ne = 10 + ring * 6;
+        for (let e = 0; e < ne; e++) {
+          const a = -base * 1.4 + (e / ne) * EXO_TAU;
+          const blink = 0.5 + 0.5 * Math.sin(env.t * 1.3 + e * 2.7 + ring * 5);
+          if (blink < 0.35) continue;
+          const ex = x + Math.cos(a) * R;
+          const ey = y + Math.sin(a) * R * 0.86;
+          c.globalAlpha = 0.7 * blink;
+          c.fillStyle = "#fff6dd";
+          c.beginPath();
+          c.ellipse(ex, ey, 2.3, 1.2 * blink, a, 0, EXO_TAU);
+          c.fill();
+          c.fillStyle = "#3a66ff";
+          c.beginPath();
+          c.arc(ex, ey, 0.8, 0, EXO_TAU);
+          c.fill();
+        }
+        c.restore();
+      }
+    },
+    front(c, env) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.y0 - 6 + Math.sin(env.t * 1.1) * 1.2;
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.globalAlpha = 0.7 + 0.2 * Math.sin(env.t * 2.3);
+      c.strokeStyle = "#ffe08a";
+      c.lineWidth = 2;
+      c.beginPath();
+      c.ellipse(x, y, bb.w * 0.3, bb.w * 0.1, 0, 0, EXO_TAU);
+      c.stroke();
+      c.globalAlpha *= 0.35;
+      c.lineWidth = 5;
+      c.strokeStyle = "#ffca3a";
+      c.beginPath();
+      c.ellipse(x, y, bb.w * 0.3, bb.w * 0.1, 0, 0, EXO_TAU);
+      c.stroke();
+      c.restore();
+    },
+  },
+
+  /* flanking columns of stacked selves rise like organ pipes, arches of light
+   * vaulting between them over the mon's head */
+  cathedralselves: {
+    label: "Cathedral of Selves",
+    kind: "exotic",
+    behind(c, env) {
+      const bb = exoBBox(env);
+      const feetY = env.oy + env.fy;
+      const midX = env.ox + bb.cx;
+      const hUnit = Math.max(8, env.fy - bb.y0);
+      const pairs = env.compact ? 2 : 3;
+      for (let p = pairs; p >= 1; p--) {
+        const aR = bb.w * (0.55 + p * 0.42);
+        const baseS = 0.4 - p * 0.07;
+        for (const side of [-1, 1]) {
+          const colX = midX + side * aR;
+          let yCur = feetY;
+          for (let tR = 0; tR < 3; tR++) {
+            const s = baseS * (1 - tR * 0.26);
+            const sway = Math.sin(env.t * 0.6 + p * 1.4 + tR * 1.1 + side) * 1.1;
+            exoStamp(c, env, env.ring(3 + p * 4 + tR * 6), {
+              x: colX + sway,
+              y: yCur,
+              sx: s * side, // outer columns mirror inward
+              sy: s,
+              alpha: (0.64 - p * 0.1) * (1 - tR * 0.16),
+              filter: `brightness(${0.55 + tR * 0.18}) saturate(0.8)`,
+              anchorFeet: true,
+            });
+            yCur -= hUnit * s * 0.92;
+          }
+        }
+        // vaulted arch of light between the pair
+        const stackTop = feetY - hUnit * baseS * (0.92 * (1 + 0.74) + 0.48);
+        c.save();
+        c.globalCompositeOperation = "lighter";
+        c.globalAlpha = 0.24 + 0.08 * Math.sin(env.t * 0.9 + p);
+        c.strokeStyle = "#ffe2a0";
+        c.lineWidth = 2;
+        c.beginPath();
+        c.moveTo(midX - aR, stackTop);
+        c.quadraticCurveTo(midX, stackTop - bb.h * 0.8, midX + aR, stackTop);
+        c.stroke();
+        c.restore();
+      }
+    },
+  },
+
+  /* the mon is the sun of a tiny solar system: its evolution line rides visible
+   * orbital rings like planets, a radiant core pulsing at the heart */
+  orreryheart: {
+    label: "Orrery Heart",
+    kind: "exotic",
+    _pass(c, env, wantFront) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.cy;
+      const chain = (env.evo?.chain || []).filter(s => s !== env.species);
+      const bodies = env.compact ? 2 : 3;
+      for (let k = 0; k < bodies; k++) {
+        const R = Math.max(bb.w, bb.h) * (0.58 + k * 0.28);
+        const a = env.t * (0.5 - k * 0.13) + k * 2.1;
+        const depth = Math.sin(a);
+        if (!wantFront) {
+          // orbit ring (once, from the behind pass)
+          c.save();
+          c.globalAlpha = 0.3;
+          c.strokeStyle = "#b9c8ea";
+          c.lineWidth = 1;
+          c.beginPath();
+          c.ellipse(x, y, R, R * 0.3, 0, 0, EXO_TAU);
+          c.stroke();
+          c.restore();
+        }
+        if (depth >= 0 !== wantFront) continue;
+        const px = x + Math.cos(a) * R;
+        const py = y + depth * R * 0.3;
+        const aux = chain.length ? env.aux(chain[k % chain.length]) : null;
+        if (aux) {
+          exoStampImg(c, env, aux, {
+            x: px,
+            y: py,
+            h: bb.h * (0.24 + 0.06 * depth),
+            alpha: 0.75 + 0.25 * depth,
+            filter: `brightness(${0.85 + 0.25 * depth})`,
+          });
+        } else {
+          exoStamp(c, env, env.ring(2), {
+            x: px,
+            y: py,
+            s: 0.17 + 0.05 * depth,
+            alpha: 0.75 + 0.25 * depth,
+            filter: `brightness(${0.85 + 0.25 * depth})`,
+          });
+        }
+      }
+    },
+    behind(c, env) {
+      this._pass(c, env, false);
+      // the radiant core behind the chest
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.cy;
+      const r = Math.max(6, bb.w * 0.3) * (1 + 0.12 * Math.sin(env.t * 2.4));
+      const g = c.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, "rgba(255,236,180,0.55)");
+      g.addColorStop(1, "rgba(255,200,90,0)");
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.fillStyle = g;
+      c.fillRect(x - r, y - r, r * 2, r * 2);
+      c.restore();
+    },
+    front(c, env) {
+      this._pass(c, env, true);
+    },
+  },
+
+  /* a colossal ancestral titan of the same self looms behind, breathing slowly,
+   * dark motes drifting up through its silhouette */
+  leviathanmantle: {
+    label: "Leviathan Mantle",
+    kind: "exotic",
+    behind(c, env) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const feetY = env.oy + env.fy;
+      for (let k = 1; k >= 0; k--) {
+        const S = (env.compact ? 1.7 : 2.1) + k * 0.9;
+        const breathe = 1 + 0.018 * Math.sin(env.t * 0.55 + k * 1.7);
+        exoStamp(c, env, env.ring(6 + k * 8), {
+          x: x + Math.sin(env.t * 0.3 + k * 2) * 2,
+          y: feetY - 2,
+          s: S * breathe,
+          alpha: k ? 0.13 : 0.3,
+          filter: `brightness(${k ? 0.28 : 0.4}) saturate(1.4) blur(${k ? 2 : 1}px)`,
+          anchorFeet: true,
+        });
+      }
+      // dark motes rising through the titan
+      c.save();
+      for (let i = 0; i < 10; i++) {
+        const q = ((env.t * (0.1 + exoRand(env.seed, i) * 0.12) + exoRand(env.seed, i + 40)) % 1 + 1) % 1;
+        const mx = x + (exoRand(env.seed, i + 80) - 0.5) * bb.w * 2.4;
+        const my = feetY - q * bb.h * 2.4;
+        c.globalAlpha = Math.sin(q * Math.PI) * 0.4;
+        c.fillStyle = i % 3 ? "#2a3350" : "#4a5a86";
+        c.fillRect(mx, my, 1.5, 1.5);
+      }
+      c.restore();
+    },
+  },
+
+  /* a tilted black-hole diadem floats over the head: lensed rings of the mon's own
+   * colors swirl around a pure-black disc, starlight spiralling in */
+  eventhorizon: {
+    label: "Event-Horizon Diadem",
+    kind: "exotic",
+    _pos(env) {
+      const bb = exoBBox(env);
+      return {
+        x: env.ox + bb.cx,
+        y: env.oy + bb.y0 - Math.max(8, bb.h * 0.3),
+        r: Math.max(8, bb.w * 0.24),
+      };
+    },
+    behind(c, env) {
+      const { x, y, r } = this._pos(env);
+      // lensed accretion bands sampling the look
+      for (let k = 0; k < 3; k++) {
+        const rr = r * (1.3 + k * 0.24);
+        c.save();
+        c.translate(x, y);
+        c.rotate(env.t * (0.8 - k * 0.2) + k * 2);
+        c.scale(1, 0.4);
+        c.globalCompositeOperation = "screen";
+        c.globalAlpha = 0.75 - k * 0.16;
+        c.imageSmoothingEnabled = false;
+        c.beginPath();
+        c.arc(0, 0, rr, 0, EXO_TAU);
+        c.arc(0, 0, rr * 0.74, 0, EXO_TAU, true);
+        c.clip();
+        c.drawImage(env.look, -rr, -rr, rr * 2, rr * 2);
+        c.restore();
+      }
+      // infalling starlight
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 12; i++) {
+        const q = ((env.t * (0.25 + exoRand(env.seed, i) * 0.2) + exoRand(env.seed, i + 50)) % 1 + 1) % 1;
+        const a = exoRand(env.seed, i + 100) * EXO_TAU + env.t * 1.4 + q * 5;
+        const d = (1 - q) * r * 2.6 + r * 0.9;
+        c.globalAlpha = q * 0.8;
+        c.fillStyle = i % 4 ? "#cdd8ff" : "#ffd9a8";
+        c.fillRect(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.42, 1.2, 1.2);
+      }
+      c.restore();
+    },
+    front(c, env) {
+      const { x, y, r } = this._pos(env);
+      c.save();
+      const g = c.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, "#000");
+      g.addColorStop(0.85, "#04050a");
+      g.addColorStop(1, "#2a1a3e");
+      c.fillStyle = g;
+      c.beginPath();
+      c.ellipse(x, y, r, r * 0.46, 0, 0, EXO_TAU);
+      c.fill();
+      // photon rim
+      c.globalCompositeOperation = "lighter";
+      c.globalAlpha = 0.8 + 0.2 * Math.sin(env.t * 3.1);
+      c.strokeStyle = "#cfa8ff";
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.ellipse(x, y, r, r * 0.46, 0, 0, EXO_TAU);
+      c.stroke();
+      c.restore();
+    },
+  },
+
+  /* a slow-turning halo of ceremonial swords orbits the body, blades flashing as
+   * they catch the light */
+  bladehalo: {
+    label: "Blade Halo",
+    kind: "exotic",
+    _pass(c, env, wantFront) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.cy - bb.h * 0.08;
+      const n = env.compact ? 6 : 10;
+      const R = Math.max(bb.w, bb.h) * 0.64;
+      const L = Math.max(14, bb.h * 0.42);
+      for (let k = 0; k < n; k++) {
+        const a = env.t * 0.55 + (k / n) * EXO_TAU;
+        const depth = Math.sin(a);
+        if (depth >= 0 !== wantFront) continue;
+        const px = x + Math.cos(a) * R;
+        const py = y + depth * R * 0.24;
+        const s = 0.75 + 0.25 * depth;
+        c.save();
+        c.translate(px, py);
+        c.rotate(a + Math.PI / 2 + Math.sin(env.t * 2 + k) * 0.07);
+        c.scale(s, s);
+        c.globalAlpha = 0.8 + 0.2 * depth;
+        // blade
+        c.fillStyle = "#dfe6f2";
+        c.beginPath();
+        c.moveTo(0, -L / 2);
+        c.lineTo(2.2, L * 0.28);
+        c.lineTo(0, L / 2);
+        c.lineTo(-2.2, L * 0.28);
+        c.closePath();
+        c.fill();
+        c.fillStyle = "#8f9ab0";
+        c.fillRect(-0.5, -L / 2 + 2, 1, L * 0.72);
+        // crossguard + grip
+        c.fillStyle = "#c8a24a";
+        c.fillRect(-3.4, L * 0.28, 6.8, 1.6);
+        c.fillStyle = "#5a3b2a";
+        c.fillRect(-1, L * 0.28 + 1.6, 2, 4);
+        // travelling glint
+        const gl = 0.5 + 0.5 * Math.sin(env.t * 3 + k * 2.4);
+        if (gl > 0.72) {
+          c.globalCompositeOperation = "lighter";
+          c.globalAlpha = (gl - 0.72) * 3;
+          c.fillStyle = "#fff";
+          c.fillRect(-0.9, -L / 2 + L * 0.2, 1.8, 3);
+        }
+        c.restore();
+      }
+    },
+    behind(c, env) {
+      this._pass(c, env, false);
+    },
+    front(c, env) {
+      this._pass(c, env, true);
+    },
+  },
+
+  /* a golden gate-ring stands behind the mon, a starfield glimmering inside it,
+   * rune ticks wheeling along the rim, a pillar of light rising through */
+  celestialgate: {
+    label: "Celestial Gate",
+    kind: "exotic",
+    behind(c, env) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.cy - bb.h * 0.1;
+      const R = Math.max(bb.w, bb.h) * (env.compact ? 0.85 : 1.02);
+      c.save();
+      // starfield disc
+      const g = c.createRadialGradient(x, y, 0, x, y, R);
+      g.addColorStop(0, "rgba(30,20,70,0.85)");
+      g.addColorStop(0.8, "rgba(12,8,34,0.8)");
+      g.addColorStop(1, "rgba(6,6,16,0)");
+      c.fillStyle = g;
+      c.beginPath();
+      c.arc(x, y, R, 0, EXO_TAU);
+      c.fill();
+      for (let i = 0; i < 40; i++) {
+        const sa = exoRand(env.seed, i * 3) * EXO_TAU;
+        const sr = Math.sqrt(exoRand(env.seed, i * 3 + 1)) * R * 0.92;
+        const tw = 0.5 + 0.5 * Math.sin(env.t * (1 + exoRand(env.seed, i) * 2) + i);
+        c.globalAlpha = 0.25 + 0.6 * tw;
+        c.fillStyle = i % 5 ? "#dfe8ff" : "#ffd9a8";
+        c.fillRect(x + Math.cos(sa) * sr, y + Math.sin(sa) * sr, 1, 1);
+      }
+      // the gate ring
+      c.globalCompositeOperation = "lighter";
+      c.globalAlpha = 0.85;
+      c.strokeStyle = "#e8c876";
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(x, y, R, 0, EXO_TAU);
+      c.stroke();
+      c.globalAlpha = 0.35;
+      c.lineWidth = 5;
+      c.strokeStyle = "#9a7ce8";
+      c.beginPath();
+      c.arc(x, y, R * 1.06, 0, EXO_TAU);
+      c.stroke();
+      // wheeling rune ticks
+      const nr = 14;
+      for (let i = 0; i < nr; i++) {
+        const a = env.t * 0.12 + (i / nr) * EXO_TAU;
+        const l1 = R * 1.0;
+        const l2 = R * (1.08 + 0.05 * ((i * 7) % 3));
+        c.globalAlpha = 0.4 + 0.4 * Math.sin(env.t * 1.6 + i * 2.2);
+        c.strokeStyle = "#ffe9b0";
+        c.lineWidth = 1.4;
+        c.beginPath();
+        c.moveTo(x + Math.cos(a) * l1, y + Math.sin(a) * l1);
+        c.lineTo(x + Math.cos(a) * l2, y + Math.sin(a) * l2);
+        c.stroke();
+      }
+      // pillar of light rising through the gate
+      const pg = c.createLinearGradient(0, y + R, 0, y - R * 1.3);
+      pg.addColorStop(0, "rgba(255,238,190,0)");
+      pg.addColorStop(0.4, `rgba(255,238,190,${0.12 + 0.05 * Math.sin(env.t * 0.8)})`);
+      pg.addColorStop(1, "rgba(255,238,190,0)");
+      c.fillStyle = pg;
+      c.fillRect(x - bb.w * 0.5, y - R * 1.3, bb.w, R * 2.3);
+      c.restore();
+    },
+  },
+
+  /* a basilica of constellations: tiers of star-nodes vault a dome overhead,
+   * linked by faint lines, columns of starlight dropping to the ground */
+  astralbasilica: {
+    label: "Astral Basilica",
+    kind: "exotic",
+    _tiers(env) {
+      return exoCached(`basil:${env.species}:${env.PW}`, () => {
+        const bb = exoBBox(env);
+        const base = Math.max(bb.w, bb.h);
+        const tiers = [];
+        for (let tR = 0; tR < 3; tR++) {
+          const n = 5 + tR * 2;
+          const R = base * (0.62 + tR * 0.3);
+          const tier = [];
+          for (let i = 0; i < n; i++) {
+            const a = Math.PI + (i / (n - 1)) * Math.PI;
+            const j = (exoRand(env.seed + tR * 7, i * 3) - 0.5) * base * 0.08;
+            tier.push([bb.cx + Math.cos(a) * R + j, bb.cy - bb.h * 0.08 + Math.sin(a) * R * 0.75 + j * 0.5]);
+          }
+          tiers.push(tier);
+        }
+        return tiers;
+      });
+    },
+    behind(c, env) {
+      const tiers = this._tiers(env);
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.lineWidth = 1;
+      for (let tR = 0; tR < tiers.length; tR++) {
+        const tier = tiers[tR];
+        c.globalAlpha = 1;
+        c.strokeStyle = "rgba(140,170,255,0.32)";
+        c.beginPath();
+        for (let i = 0; i < tier.length; i++) {
+          i ? c.lineTo(env.ox + tier[i][0], env.oy + tier[i][1]) : c.moveTo(env.ox + tier[i][0], env.oy + tier[i][1]);
+        }
+        c.stroke();
+        if (tR + 1 < tiers.length) {
+          const nxt = tiers[tR + 1];
+          c.strokeStyle = "rgba(140,170,255,0.16)";
+          for (let i = 0; i < tier.length; i++) {
+            const nb = nxt[Math.round((i / (tier.length - 1)) * (nxt.length - 1))];
+            c.beginPath();
+            c.moveTo(env.ox + tier[i][0], env.oy + tier[i][1]);
+            c.lineTo(env.ox + nb[0], env.oy + nb[1]);
+            c.stroke();
+          }
+        }
+      }
+      // columns from the outer tier ends down to the ground
+      const outer = tiers[tiers.length - 1];
+      c.strokeStyle = "rgba(140,170,255,0.24)";
+      for (const end of [outer[0], outer[outer.length - 1]]) {
+        c.beginPath();
+        c.moveTo(env.ox + end[0], env.oy + end[1]);
+        c.lineTo(env.ox + end[0], env.oy + env.fy);
+        c.stroke();
+      }
+      // twinkling star nodes
+      let sIdx = 0;
+      for (const tier of tiers) {
+        for (const nd of tier) {
+          const tw = 0.5 + 0.5 * Math.sin(env.t * 1.7 + sIdx * 2.13);
+          const px = env.ox + nd[0];
+          const py = env.oy + nd[1];
+          c.globalAlpha = 0.35 + 0.6 * tw;
+          c.fillStyle = sIdx % 6 === 3 ? "#ffd9a8" : "#eaf0ff";
+          c.fillRect(px - 0.5, py - 0.5, 1, 1);
+          if (tw > 0.6) {
+            const L2 = 1 + (tw - 0.6) * 6;
+            c.globalAlpha = (tw - 0.6) * 1.6;
+            c.fillRect(px - L2, py - 0.35, L2 * 2, 0.7);
+            c.fillRect(px - 0.35, py - L2, 0.7, L2 * 2);
+          }
+          sIdx++;
+        }
+      }
+      c.restore();
+    },
+  },
+
+  /* rings of light keep condensing onto the body and bursting into sparks at the
+   * moment of contact - an endless coronation */
+  halocollapse: {
+    label: "Halo Collapse",
+    kind: "exotic",
+    _pass(c, env, wantFront) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.cy;
+      const Rmax = Math.max(bb.w, bb.h) * 1.1;
+      const Rmin = Math.max(bb.w, bb.h) * 0.34;
+      for (let k = 0; k < 2; k++) {
+        const q = ((env.t * 0.42 + k * 0.5) % 1 + 1) % 1;
+        if (q < 0.78) {
+          const R = Rmax - (Rmax - Rmin) * exoSmooth(q / 0.78);
+          c.save();
+          c.globalCompositeOperation = "lighter";
+          c.strokeStyle = k ? "#8ad2ff" : "#ffd27a";
+          c.lineWidth = 1.5 + (1 - q);
+          c.globalAlpha = 0.3 + 0.55 * q;
+          c.beginPath();
+          if (wantFront) c.ellipse(x, y, R, R * 0.32, 0, 0, Math.PI);
+          else c.ellipse(x, y, R, R * 0.32, 0, Math.PI, EXO_TAU);
+          c.stroke();
+          c.restore();
+        } else if (wantFront) {
+          // contact burst
+          const p = (q - 0.78) / 0.22;
+          c.save();
+          c.globalCompositeOperation = "lighter";
+          for (let i = 0; i < 14; i++) {
+            const a = exoRand(env.seed, k * 40 + i) * EXO_TAU;
+            const d = Rmin + p * 14 * (0.5 + exoRand(env.seed, k * 40 + i + 20));
+            c.globalAlpha = (1 - p) * 0.9;
+            c.fillStyle = i % 3 ? (k ? "#bfe6ff" : "#ffe9b8") : "#fff";
+            c.fillRect(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.5, 1.5, 1.5);
+          }
+          c.restore();
+          // flash washing over the body
+          exoStamp(c, env, exoMaskCv(env), { alpha: (1 - p) * 0.3, comp: "lighter" });
+        }
+      }
+    },
+    behind(c, env) {
+      this._pass(c, env, false);
+    },
+    front(c, env) {
+      this._pass(c, env, true);
+    },
+  },
+
+  /* ================= IMPOSSIBLE BODIES (catalog batch B) ======================== */
+
+  /* a true 4D hypercube wireframe rotates through the mon, tiny caged selves
+   * riding the far vertices */
+  tesseract: {
+    label: "Tesseract Menagerie",
+    kind: "exotic",
+    _proj(env) {
+      const bb = exoBBox(env);
+      const R = Math.max(bb.w, bb.h) * 0.75;
+      const a = env.t * 0.4;
+      const b = env.t * 0.23;
+      const ca = Math.cos(a);
+      const sa = Math.sin(a);
+      const cb = Math.cos(b);
+      const sb = Math.sin(b);
+      const pts = [];
+      for (let v = 0; v < 16; v++) {
+        const x = v & 1 ? 1 : -1;
+        const y = v & 2 ? 1 : -1;
+        const z = v & 4 ? 1 : -1;
+        const w = v & 8 ? 1 : -1;
+        const x2 = x * ca - w * sa;
+        const w2 = x * sa + w * ca;
+        const y2 = y * cb - z * sb;
+        const z2 = y * sb + z * cb;
+        const pw = 1 / (2.2 - w2);
+        pts.push([env.ox + bb.cx + x2 * pw * R * 1.7, env.oy + bb.cy + y2 * pw * R * 1.7, z2 * pw]);
+      }
+      return pts;
+    },
+    behind(c, env) {
+      const pts = this._proj(env);
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      for (let v = 0; v < 16; v++) {
+        for (let bit = 0; bit < 4; bit++) {
+          const u = v | (1 << bit);
+          if (u === v) continue;
+          const p = pts[v];
+          const q = pts[u];
+          c.globalAlpha = 0.16 + 0.28 * ((p[2] + q[2]) * 0.9 + 0.5);
+          c.strokeStyle = bit === 3 ? "#b78aff" : "#7ad2ff";
+          c.lineWidth = bit === 3 ? 1.4 : 1;
+          c.beginPath();
+          c.moveTo(p[0], p[1]);
+          c.lineTo(q[0], q[1]);
+          c.stroke();
+        }
+      }
+      c.restore();
+      for (let v = 0; v < 16; v += 5) {
+        const p = pts[v];
+        if (p[2] >= 0) continue;
+        exoStamp(c, env, env.ring(3 + v), { x: p[0], y: p[1], s: 0.11, alpha: 0.5, filter: `hue-rotate(${v * 24}deg)` });
+      }
+    },
+    front(c, env) {
+      const pts = this._proj(env);
+      for (let v = 0; v < 16; v += 5) {
+        const p = pts[v];
+        if (p[2] < 0) continue;
+        exoStamp(c, env, env.ring(3 + v), { x: p[0], y: p[1], s: 0.13, alpha: 0.75, filter: `hue-rotate(${v * 24}deg)` });
+      }
+    },
+  },
+
+  /* the body is dissected into its three tonal panes, sliding apart along a
+   * diagonal while godray shafts pour through the gaps */
+  godray: {
+    label: "Godray Dissection",
+    kind: "rig",
+    draw(c, env) {
+      const lc = exoLumaClusters(env);
+      const bb = exoBBox(env);
+      const ang = -0.7;
+      const dx = Math.cos(ang);
+      const dy = Math.sin(ang);
+      const sep = (env.compact ? 3 : 5) * (0.5 + 0.5 * Math.sin(env.t * 0.7));
+      // the three panes, separated along the dissection axis
+      for (let k = 0; k < 3; k++) {
+        const off = (k - 1) * sep;
+        exoMasked(c, env, env.look, lc.masks[k], {
+          x: env.ox + env.cx + dx * off,
+          y: env.oy + env.cy + dy * off,
+          filter: k === 2 ? "brightness(1.12)" : k === 0 ? "brightness(0.9)" : "none",
+        });
+      }
+      // godray shafts through the seams (short, fading at both ends)
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.translate(env.ox + bb.cx, env.oy + bb.cy);
+      c.rotate(ang + Math.PI / 2);
+      const shaft = bb.h * 0.85;
+      for (let i = 0; i < 3; i++) {
+        const w = 1.5 + i;
+        const gx = (i - 1) * sep * 2.2;
+        const g = c.createLinearGradient(0, -shaft, 0, shaft);
+        g.addColorStop(0, "rgba(255,244,200,0)");
+        g.addColorStop(0.35, "rgba(255,244,200,0.4)");
+        g.addColorStop(0.65, "rgba(255,244,200,0.4)");
+        g.addColorStop(1, "rgba(255,244,200,0)");
+        c.globalAlpha = 0.3 + 0.2 * Math.sin(env.t * 1.3 + i * 2);
+        c.fillStyle = g;
+        c.fillRect(gx - w / 2, -shaft, w, shaft * 2);
+      }
+      c.restore();
+    },
+  },
+
+  /* superposition bloom: ghost petals of the self breathe outward around the true
+   * body, then the wavefunction collapses back to one in a flash */
+  quantumrose: {
+    label: "Quantum Rose",
+    kind: "exotic",
+    behind(c, env) {
+      const bb = exoBBox(env);
+      const cyc = ((env.t * 0.3) % 1 + 1) % 1;
+      const collapse = cyc > 0.8 ? (cyc - 0.8) / 0.2 : 0;
+      const n = env.compact ? 5 : 8;
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * EXO_TAU + env.t * 0.15;
+        const spread = (1 - collapse) * (0.5 + 0.5 * Math.sin(env.t * 0.9 + k)) * bb.w * 0.42;
+        exoStamp(c, env, env.ring(2 + (k % 3) * 4), {
+          x: env.ox + env.cx + Math.cos(a) * spread,
+          y: env.oy + env.cy + Math.sin(a) * spread * 0.6,
+          rot: Math.sin(a) * 0.18 * (1 - collapse),
+          alpha: (0.16 + 0.1 * Math.sin(env.t * 2 + k * 2.6)) * (1 - collapse * 0.85),
+          comp: "screen",
+          filter: `hue-rotate(${(k / n) * 80 - 40}deg) saturate(1.5)`,
+        });
+      }
+      if (collapse > 0) {
+        exoStamp(c, env, exoMaskCv(env), { alpha: Math.sin(collapse * Math.PI) * 0.28, comp: "lighter" });
+      }
+    },
+  },
+
+  /* selves wind upward in a shrinking helix above the head, dissolving into a
+   * point of light at the spire */
+  spiralcathedral: {
+    label: "Spiral Cathedral",
+    kind: "exotic",
+    behind(c, env) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const topY = env.oy + bb.y0;
+      const n = env.compact ? 6 : 10;
+      for (let k = n - 1; k >= 0; k--) {
+        const u = k / n;
+        const a = env.t * 0.5 + u * EXO_TAU * 1.6;
+        const R = bb.w * 0.5 * (1 - u * 0.85);
+        const s = 0.34 * (1 - u * 0.8);
+        exoStamp(c, env, env.ring(2 + k * 2), {
+          x: x + Math.cos(a) * R,
+          y: topY - u * bb.h * 1.5 - 4,
+          sx: s * (Math.cos(a) >= 0 ? 1 : -1),
+          sy: s,
+          alpha: 0.55 * (1 - u * 0.6),
+          filter: `brightness(${1 + u * 0.6}) saturate(${1 - u * 0.5})`,
+        });
+      }
+      // apex light
+      const ay = topY - bb.h * 1.5 - 6;
+      const g = c.createRadialGradient(x, ay, 0, x, ay, 10);
+      g.addColorStop(0, "rgba(255,250,220,0.9)");
+      g.addColorStop(1, "rgba(255,250,220,0)");
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.globalAlpha = 0.7 + 0.3 * Math.sin(env.t * 2.7);
+      c.fillStyle = g;
+      c.fillRect(x - 10, ay - 10, 20, 20);
+      c.restore();
+    },
+  },
+
+  /* a ring blade hovers overhead, periodically dropping clean through the body -
+   * the halves slide apart along a glowing cut, then rejoin as it rises */
+  haloguillotine: {
+    label: "Halo Guillotine",
+    kind: "rig",
+    draw(c, env) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const q = ((env.t * 0.3) % 1 + 1) % 1;
+      const topY = env.oy + bb.y0 - 12;
+      const botY = env.oy + env.fy + 3;
+      let ringY;
+      let split = 0;
+      if (q < 0.5) {
+        ringY = topY + Math.sin(env.t * 1.7) * 1.5;
+      } else if (q < 0.62) {
+        const d = exoSmooth((q - 0.5) / 0.12);
+        ringY = topY + (botY - topY) * d;
+        split = d;
+      } else if (q < 0.85) {
+        ringY = botY;
+        split = 1;
+      } else {
+        const r2 = exoSmooth((q - 0.85) / 0.15);
+        ringY = botY - (botY - topY) * r2;
+        split = 1 - r2;
+      }
+      const cutY = env.cy;
+      const off = split * (env.compact ? 2.5 : 4);
+      // bottom half slides right
+      c.save();
+      c.beginPath();
+      c.rect(env.ox - 20, env.oy + cutY, env.PW + 40, env.PH - cutY + 40);
+      c.clip();
+      exoStamp(c, env, env.look, { x: env.ox + env.cx + off });
+      c.restore();
+      // top half slides left
+      c.save();
+      c.beginPath();
+      c.rect(env.ox - 20, env.oy - 20, env.PW + 40, cutY + 20);
+      c.clip();
+      exoStamp(c, env, env.look, { x: env.ox + env.cx - off });
+      c.restore();
+      // the glowing cut
+      if (split > 0.03) {
+        c.save();
+        c.globalCompositeOperation = "lighter";
+        c.globalAlpha = split * 0.85;
+        c.fillStyle = "#ffe9c0";
+        c.fillRect(env.ox + bb.x0 - 3, env.oy + cutY - 0.6, bb.w + 6, 1.2);
+        c.restore();
+      }
+      // the ring blade
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.strokeStyle = "#ffd9a0";
+      c.lineWidth = 2.2;
+      c.globalAlpha = 0.9;
+      c.beginPath();
+      c.ellipse(x, ringY, bb.w * 0.75, bb.w * 0.16, 0, 0, EXO_TAU);
+      c.stroke();
+      c.globalAlpha = 0.3;
+      c.lineWidth = 5;
+      c.strokeStyle = "#ff9a3d";
+      c.beginPath();
+      c.ellipse(x, ringY, bb.w * 0.75, bb.w * 0.16, 0, 0, EXO_TAU);
+      c.stroke();
+      c.restore();
+    },
+  },
+
+  /* a travelling crease folds the lower body under like paper - below the fold
+   * the self runs mirrored, joined at a bright crease line */
+  paradoxfold: {
+    label: "Paradox Fold",
+    kind: "rig",
+    draw(c, env) {
+      const bb = exoBBox(env);
+      const q = 0.5 + 0.42 * Math.sin(env.t * 0.5);
+      const foldY = env.oy + bb.y0 + bb.h * q;
+      // above the crease: the true self
+      c.save();
+      c.beginPath();
+      c.rect(env.ox - 20, env.oy - 20, env.PW + 40, foldY - env.oy + 20);
+      c.clip();
+      exoStamp(c, env, env.look, {});
+      c.restore();
+      // below: mirrored, folded under
+      c.save();
+      c.beginPath();
+      c.rect(env.ox - 20, foldY, env.PW + 40, env.PH + 40);
+      c.clip();
+      exoStamp(c, env, env.look, { sx: -1.04, sy: 0.98, filter: "brightness(0.8)" });
+      c.restore();
+      // crease shadow + highlight
+      c.save();
+      const g = c.createLinearGradient(0, foldY, 0, foldY + 6);
+      g.addColorStop(0, "rgba(0,0,0,0.4)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      c.fillStyle = g;
+      c.fillRect(env.ox + bb.x0 - 4, foldY, bb.w + 8, 6);
+      c.globalCompositeOperation = "lighter";
+      c.globalAlpha = 0.5 + 0.2 * Math.sin(env.t * 2.4);
+      c.fillStyle = "#cfe0ff";
+      c.fillRect(env.ox + bb.x0 - 4, foldY - 0.6, bb.w + 8, 1);
+      c.restore();
+    },
+  },
+
+  /* the body shatters into mosaic tiles that ascend in a wave and settle back,
+   * over and over - a cyclic rapture */
+  mosaicascension: {
+    label: "Mosaic Ascension",
+    kind: "rig",
+    draw(c, env) {
+      const bb = exoBBox(env);
+      const T = env.compact ? 6 : 5;
+      const cyc = ((env.t * 0.22) % 1 + 1) % 1;
+      const w = cyc < 0.5 ? cyc * 2 : (1 - cyc) * 2; // ascend then settle
+      c.save();
+      c.imageSmoothingEnabled = false;
+      for (let ty = bb.y0; ty <= bb.y1; ty += T) {
+        for (let tx = bb.x0; tx <= bb.x1; tx += T) {
+          const h = exoRand(env.seed, tx * 7 + ty * 13);
+          const rowU = (ty - bb.y0) / Math.max(1, bb.h); // 0 at crown
+          const lift = exoSmooth(exoClamp(w * 1.7 - rowU * 0.8 - h * 0.35, 0, 1));
+          const rise = lift * (10 + h * 26);
+          const drift = (h - 0.5) * lift * 10;
+          c.globalAlpha = 1 - lift * 0.7;
+          c.drawImage(env.look, tx, ty, T, T, env.ox + tx + drift, env.oy + ty - rise, T, T);
+        }
+      }
+      c.restore();
+    },
+  },
+
+  /* the body becomes lace: pulsing voids are punched in doily rings near the rim,
+   * a black core and starlight showing through the holes */
+  voidlace: {
+    label: "Void Lace",
+    kind: "rig",
+    draw(c, env) {
+      const bb = exoBBox(env);
+      // the void beneath
+      exoStamp(c, env, exoMaskCv(env), { filter: "brightness(0)", alpha: 0.92 });
+      // starlight inside the void
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 12; i++) {
+        const sx2 = bb.x0 + exoRand(env.seed, i * 3) * bb.w;
+        const sy2 = bb.y0 + exoRand(env.seed, i * 3 + 1) * bb.h;
+        const tw = 0.5 + 0.5 * Math.sin(env.t * 2.1 + i * 2.7);
+        c.globalAlpha = 0.5 * tw;
+        c.fillStyle = i % 4 ? "#cdd8ff" : "#ffd9a8";
+        c.fillRect(env.ox + sx2, env.oy + sy2, 1, 1);
+      }
+      c.restore();
+      // the lace-cut self on top
+      const s = exoScratch(env, 3);
+      const sc = s.getContext("2d");
+      sc.clearRect(0, 0, env.PW, env.PH);
+      sc.imageSmoothingEnabled = false;
+      sc.drawImage(env.look, 0, 0);
+      sc.save();
+      sc.globalCompositeOperation = "destination-out";
+      const pts = exoContour(env);
+      for (let ringI = 0; ringI < 3; ringI++) {
+        const inw = 0.18 + ringI * 0.24;
+        const step = 4 + ringI * 2;
+        for (let i = 0; i < pts.length; i += step) {
+          const px = pts[i][0] + (env.cx - pts[i][0]) * inw;
+          const py = pts[i][1] + (env.cy - pts[i][1]) * inw;
+          const r = 1.6 + 2.1 * (0.5 + 0.5 * Math.sin(env.t * 1.8 + i * 0.9 + ringI * 2.4));
+          sc.beginPath();
+          sc.arc(px, py, r, 0, EXO_TAU);
+          sc.fill();
+        }
+      }
+      sc.restore();
+      exoStamp(c, env, s, {});
+    },
+  },
+
+  /* the mon as a three-aspect deity: gold and shadow selves fan out behind it
+   * inside a burning mandorla, flame beads arcing over the trinity */
+  triuneidol: {
+    label: "Triune Idol",
+    kind: "exotic",
+    behind(c, env) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.cy;
+      // mandorla
+      const g = c.createRadialGradient(x, y, 0, x, y, bb.h * 0.9);
+      g.addColorStop(0, "rgba(255,224,150,0.28)");
+      g.addColorStop(0.7, "rgba(190,120,60,0.12)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.fillStyle = g;
+      c.beginPath();
+      c.ellipse(x, y, bb.w * 0.95, bb.h * 0.95, 0, 0, EXO_TAU);
+      c.fill();
+      c.restore();
+      // the gold and shadow aspects
+      const sway = Math.sin(env.t * 0.6) * 0.045;
+      for (const side of [-1, 1]) {
+        exoStamp(c, env, env.ring(5), {
+          x: x + side * bb.w * 0.34,
+          y: y + 1,
+          rot: side * (0.32 + sway),
+          s: 0.94,
+          alpha: 0.55,
+          filter: side < 0 ? "sepia(1) saturate(2.4) brightness(1.15)" : "brightness(0.45) saturate(1.3) hue-rotate(250deg)",
+        });
+      }
+      // flame beads arcing over the trinity
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 7; i++) {
+        const a = Math.PI + (i / 6) * Math.PI;
+        const fx = x + Math.cos(a) * bb.w * 0.72;
+        const fy2 = y - bb.h * 0.2 + Math.sin(a) * bb.h * 0.62;
+        const tw = 0.5 + 0.5 * Math.sin(env.t * 2.2 + i * 1.9);
+        c.globalAlpha = 0.3 + 0.5 * tw;
+        c.fillStyle = "#ffd27a";
+        c.beginPath();
+        c.arc(fx, fy2, 1 + tw, 0, EXO_TAU);
+        c.fill();
+      }
+      c.restore();
+    },
+  },
+
+  /* levitating stones wheel above the head in a slow crown, pebbles falling
+   * upward from the ground to join it */
+  gravitycrown: {
+    label: "Gravity Crown",
+    kind: "exotic",
+    _pass(c, env, wantFront) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.y0 - Math.max(6, bb.h * 0.16);
+      const n = env.compact ? 7 : 11;
+      for (let k = 0; k < n; k++) {
+        const a = env.t * (0.5 + 0.13 * (k % 3)) + (k / n) * EXO_TAU;
+        const depth = Math.sin(a);
+        if (depth >= 0 !== wantFront) continue;
+        const R = bb.w * (0.34 + 0.1 * ((k * 13) % 3));
+        const px = x + Math.cos(a) * R;
+        const py = y + depth * R * 0.28 - Math.sin(env.t * 1.4 + k) * 1.2;
+        const sz = 1.4 + exoRand(env.seed, k) * 2.4 + depth * 0.5;
+        c.save();
+        c.translate(px, py);
+        c.rotate(env.t * 0.8 + k * 2.1);
+        c.globalAlpha = 0.85 + 0.15 * depth;
+        c.fillStyle = ["#5d6470", "#767e8c", "#4a4f5c"][k % 3];
+        c.beginPath();
+        for (let v = 0; v < 5; v++) {
+          const va = (v / 5) * EXO_TAU;
+          const vr = sz * (0.7 + 0.5 * exoRand(env.seed, k * 9 + v));
+          v ? c.lineTo(Math.cos(va) * vr, Math.sin(va) * vr) : c.moveTo(Math.cos(va) * vr, Math.sin(va) * vr);
+        }
+        c.closePath();
+        c.fill();
+        c.globalAlpha *= 0.5;
+        c.fillStyle = "#aab2c2";
+        c.fillRect(-sz * 0.3, -sz * 0.45, sz * 0.55, sz * 0.4);
+        c.restore();
+      }
+      if (!wantFront) {
+        // anti-gravity shimmer beneath the crown
+        const g = c.createRadialGradient(x, y + 3, 0, x, y + 3, bb.w * 0.5);
+        g.addColorStop(0, "rgba(150,190,255,0.14)");
+        g.addColorStop(1, "rgba(150,190,255,0)");
+        c.save();
+        c.globalCompositeOperation = "lighter";
+        c.fillStyle = g;
+        c.fillRect(x - bb.w * 0.5, y + 3 - bb.w * 0.5, bb.w, bb.w);
+        c.restore();
+      }
+    },
+    behind(c, env) {
+      this._pass(c, env, false);
+    },
+    front(c, env) {
+      this._pass(c, env, true);
+      // a pebble falling up to join the crown
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const yTop = env.oy + bb.y0 - Math.max(6, bb.h * 0.16);
+      const q = ((env.t * 0.35) % 1 + 1) % 1;
+      const py = env.oy + env.fy + 4 - q * (env.fy + 4 - (yTop - env.oy));
+      c.save();
+      c.globalAlpha = Math.sin(q * Math.PI) * 0.9;
+      c.fillStyle = "#6b7382";
+      c.fillRect(x + bb.w * 0.4 - 1, py, 2, 2);
+      c.restore();
+    },
+  },
+
+  /* ================= IDENTITY AS MYTHOLOGY (catalog batch C) ==================== */
+
+  /* the whole evolutionary line ascends behind the mon in a column of light -
+   * ancestors below, the apex form looming god-sized at the top */
+  evoapotheosis: {
+    label: "Evolution Apotheosis",
+    kind: "exotic",
+    behind(c, env) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const chain = (env.evo?.chain || []).filter(s => s !== env.species);
+      // the column of light
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      const g = c.createLinearGradient(0, env.oy + env.fy, 0, env.oy + bb.y0 - bb.h * 2.2);
+      g.addColorStop(0, "rgba(255,240,200,0)");
+      g.addColorStop(0.5, `rgba(255,240,200,${0.1 + 0.04 * Math.sin(env.t * 0.8)})`);
+      g.addColorStop(1, "rgba(255,240,200,0)");
+      c.fillStyle = g;
+      c.fillRect(x - bb.w * 0.8, env.oy + bb.y0 - bb.h * 2.2, bb.w * 1.6, bb.h * 2.2 + (env.fy - bb.y0));
+      c.restore();
+      // ascending line members (or ghost selves when the line is just us)
+      const rungs = env.compact ? 2 : 3;
+      for (let k = 0; k < rungs; k++) {
+        const u = (k + 1) / (rungs + 0.4);
+        const id = chain.length ? chain[Math.min(k, chain.length - 1)] : null;
+        const aux = id ? env.aux(id) : null;
+        const py = env.oy + bb.y0 - u * bb.h * 1.9 + Math.sin(env.t * 0.7 + k * 1.9) * 1.6;
+        const alpha = 0.42 - k * 0.1;
+        const hgt = bb.h * (0.55 + u * 0.9); // grows toward the apex
+        if (aux) {
+          exoStampImg(c, env, aux, {
+            x: x + Math.sin(env.t * 0.4 + k * 2.4) * 3,
+            y: py,
+            h: hgt,
+            alpha,
+            filter: "brightness(1.35) saturate(0.65)",
+          });
+        } else {
+          exoStamp(c, env, env.ring(4 + k * 6), {
+            x: x + Math.sin(env.t * 0.4 + k * 2.4) * 3,
+            y: py,
+            s: hgt / env.PH,
+            alpha,
+            filter: "brightness(1.35) saturate(0.65)",
+          });
+        }
+      }
+      // motes rising in the column
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 8; i++) {
+        const q = ((env.t * (0.12 + exoRand(env.seed, i) * 0.1) + exoRand(env.seed, i + 30)) % 1 + 1) % 1;
+        c.globalAlpha = Math.sin(q * Math.PI) * 0.7;
+        c.fillStyle = "#ffedbe";
+        c.fillRect(x + (exoRand(env.seed, i + 60) - 0.5) * bb.w * 1.3, env.oy + env.fy - q * bb.h * 2.6, 1, 1);
+      }
+      c.restore();
+    },
+  },
+
+  /* two-faced god: the left half is the self, the right half is its next (or
+   * previous) form, joined at a burning seam */
+  janusmantle: {
+    label: "Janus Mantle",
+    kind: "rig",
+    draw(c, env) {
+      const bb = exoBBox(env);
+      const other =
+        env.evo?.next?.length ? env.aux(env.evo.next[0]) : env.evo?.prev ? env.aux(env.evo.prev) : null;
+      const seamX = env.ox + bb.cx + Math.sin(env.t * 0.6) * 1.2;
+      // left half: the true self
+      c.save();
+      c.beginPath();
+      c.rect(env.ox - 20, env.oy - 20, seamX - (env.ox - 20), env.PH + 40);
+      c.clip();
+      exoStamp(c, env, env.look, {});
+      c.restore();
+      // right half: the other face (mirrored so both look outward)
+      c.save();
+      c.beginPath();
+      c.rect(seamX, env.oy - 20, env.ox + env.PW + 40 - seamX, env.PH + 40);
+      c.clip();
+      if (other) {
+        exoStampImg(c, env, other, {
+          x: env.ox + bb.cx,
+          y: env.oy + env.fy,
+          h: bb.h,
+          flip: true,
+          alpha: 0.95,
+          filter: "saturate(1.1)",
+          anchorFeet: true,
+        });
+      } else {
+        exoStamp(c, env, env.look, { sx: -1, filter: "invert(1) hue-rotate(180deg)" });
+      }
+      c.restore();
+      // the burning seam
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      for (let y = bb.y0; y <= bb.y1; y += 2) {
+        const tw = 0.5 + 0.5 * Math.sin(env.t * 3 + y * 0.4);
+        c.globalAlpha = 0.25 + 0.55 * tw;
+        c.fillStyle = tw > 0.7 ? "#fff5d9" : "#ffb45a";
+        c.fillRect(seamX - 0.6, env.oy + y, 1.2, 2);
+      }
+      c.restore();
+    },
+  },
+
+  /* the mon enshrined as a living relic: a gilded reliquary arch frames it, votive
+   * sparks drift up, tiny selves kneel at its feet in worship */
+  shinyreliquary: {
+    label: "Shiny Reliquary",
+    kind: "exotic",
+    behind(c, env) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const w = bb.w * 0.85;
+      const top = env.oy + bb.y0 - bb.h * 0.32;
+      const bot = env.oy + env.fy + 4;
+      // inner glow of the shrine
+      const g = c.createRadialGradient(x, env.oy + bb.cy, 0, x, env.oy + bb.cy, bb.h * 0.9);
+      g.addColorStop(0, "rgba(255,226,150,0.22)");
+      g.addColorStop(1, "rgba(255,226,150,0)");
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.fillStyle = g;
+      c.fillRect(x - bb.w, env.oy + bb.cy - bb.h, bb.w * 2, bb.h * 2);
+      // the gilded arch
+      c.globalAlpha = 0.9;
+      c.strokeStyle = "#e8c876";
+      c.lineWidth = 2;
+      c.beginPath();
+      c.moveTo(x - w, bot);
+      c.lineTo(x - w, top + w * 0.6);
+      c.arc(x, top + w * 0.6, w, Math.PI, 0);
+      c.lineTo(x + w, bot);
+      c.stroke();
+      // inner filigree line
+      c.globalAlpha = 0.45;
+      c.lineWidth = 1;
+      c.beginPath();
+      c.moveTo(x - w + 3, bot);
+      c.lineTo(x - w + 3, top + w * 0.6);
+      c.arc(x, top + w * 0.6, w - 3, Math.PI, 0);
+      c.lineTo(x + w - 3, bot);
+      c.stroke();
+      // gems on the arch
+      for (let i = 0; i < 5; i++) {
+        const a = Math.PI + ((i + 0.5) / 5) * Math.PI;
+        const gx = x + Math.cos(a) * w;
+        const gy = top + w * 0.6 + Math.sin(a) * w;
+        const tw = 0.5 + 0.5 * Math.sin(env.t * 2 + i * 2.4);
+        c.globalAlpha = 0.5 + 0.5 * tw;
+        c.fillStyle = ["#ff6a8a", "#7ad2ff", "#b7ff8a", "#ffd27a", "#c9a0ff"][i];
+        c.fillRect(gx - 1.5, gy - 1.5, 3, 3);
+      }
+      // votive sparks
+      for (let i = 0; i < 8; i++) {
+        const q = ((env.t * (0.14 + exoRand(env.seed, i) * 0.1) + exoRand(env.seed, i + 25)) % 1 + 1) % 1;
+        c.globalAlpha = Math.sin(q * Math.PI) * 0.6;
+        c.fillStyle = "#ffe9b8";
+        c.fillRect(x + (exoRand(env.seed, i + 50) - 0.5) * w * 1.6, bot - 6 - q * bb.h * 1.2, 1, 1);
+      }
+      c.restore();
+    },
+    front(c, env) {
+      // tiny kneeling selves in worship at the feet
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const feetY = env.oy + env.fy;
+      for (const side of [-1, 1]) {
+        const bow = 0.28 + 0.1 * Math.sin(env.t * 1.1 + side);
+        exoStamp(c, env, env.ring(4), {
+          x: x + side * bb.w * 0.78,
+          y: feetY + 2,
+          sx: -side * 0.13,
+          sy: 0.13,
+          rot: side * bow,
+          alpha: 0.85,
+          filter: "brightness(0.8)",
+          anchorFeet: true,
+        });
+      }
+    },
+  },
+
+  /* a heraldic crest hammered out of the mon's own colors hangs behind it: shield,
+   * mantling banners, and its miniature rampant on the field, forge sparks flying */
+  crestforge: {
+    label: "Species Crest Forge",
+    kind: "exotic",
+    behind(c, env) {
+      const bb = exoBBox(env);
+      const lc = exoLumaClusters(env);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.cy - bb.h * 0.12;
+      const w = bb.w * 0.95;
+      const h = bb.h * 1.05;
+      const rock = Math.sin(env.t * 0.5) * 0.02;
+      c.save();
+      c.translate(x, y);
+      c.rotate(rock);
+      // mantling banners
+      for (const side of [-1, 1]) {
+        c.save();
+        c.globalAlpha = 0.8;
+        c.fillStyle = lc.cols[0];
+        c.beginPath();
+        c.moveTo(side * w * 0.45, -h * 0.42);
+        c.quadraticCurveTo(side * w * 0.95, -h * 0.1 + Math.sin(env.t * 1.3 + side) * 2, side * w * 0.7, h * 0.4);
+        c.quadraticCurveTo(side * w * 0.6, h * 0.1, side * w * 0.45, -h * 0.1);
+        c.closePath();
+        c.fill();
+        c.restore();
+      }
+      // the shield
+      c.beginPath();
+      c.moveTo(-w * 0.5, -h * 0.45);
+      c.lineTo(w * 0.5, -h * 0.45);
+      c.lineTo(w * 0.5, h * 0.1);
+      c.quadraticCurveTo(w * 0.5, h * 0.42, 0, h * 0.55);
+      c.quadraticCurveTo(-w * 0.5, h * 0.42, -w * 0.5, h * 0.1);
+      c.closePath();
+      c.save();
+      c.clip();
+      // per-pale field in the mon's two dominant tones
+      c.fillStyle = lc.cols[1];
+      c.fillRect(-w * 0.5, -h * 0.45, w * 0.5, h * 1.1);
+      c.fillStyle = lc.cols[2];
+      c.fillRect(0, -h * 0.45, w * 0.5, h * 1.1);
+      c.globalAlpha = 0.25;
+      c.fillStyle = "#000";
+      c.fillRect(-w * 0.5, h * 0.25, w, h * 0.35);
+      c.restore();
+      // shield rim
+      c.globalAlpha = 0.95;
+      c.strokeStyle = "#e8c876";
+      c.lineWidth = 1.6;
+      c.stroke();
+      c.restore();
+      // the mon rampant on the field (small, tilted)
+      exoStamp(c, env, env.ring(3), {
+        x,
+        y: y - h * 0.06,
+        s: 0.32,
+        rot: rock - 0.18,
+        alpha: 0.95,
+        filter: "brightness(1.1) saturate(1.2)",
+      });
+      // forge sparks off the rim
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 7; i++) {
+        const q = ((env.t * (0.5 + exoRand(env.seed, i) * 0.4) + exoRand(env.seed, i + 15)) % 1 + 1) % 1;
+        const a = -0.5 - exoRand(env.seed, i + 30) * 1.6;
+        const d = q * 16;
+        c.globalAlpha = (1 - q) * 0.85;
+        c.fillStyle = i % 2 ? "#ffca6a" : "#fff0c8";
+        c.fillRect(x + w * 0.48 + Math.cos(a) * d, y - h * 0.4 + Math.sin(a) * d + q * q * 10, 1.3, 1.3);
+      }
+      c.restore();
+    },
+  },
+
+  /* the mon's name burns in orbit around it, each letter a floating sigil glyph
+   * flaring as it crosses the front */
+  namesigil: {
+    label: "Name Sigil",
+    kind: "exotic",
+    _pass(c, env, wantFront) {
+      const name = (env.name || "PKMN").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12) || "PKMN";
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.cy;
+      const R = Math.max(bb.w, bb.h) * 0.68;
+      c.save();
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      for (let k = 0; k < name.length; k++) {
+        const a = env.t * 0.4 + (k / name.length) * EXO_TAU;
+        const depth = Math.sin(a);
+        if (depth >= 0 !== wantFront) continue;
+        const px = x + Math.cos(a) * R;
+        const py = y + depth * R * 0.3;
+        const sz = 8 + 3 * depth;
+        const flare = depth > 0.7 ? (depth - 0.7) / 0.3 : 0;
+        c.save();
+        c.translate(px, py);
+        c.rotate(Math.cos(a) * 0.2);
+        c.font = `700 ${sz}px monospace`;
+        if (flare > 0) {
+          c.globalCompositeOperation = "lighter";
+          c.globalAlpha = flare * 0.5;
+          c.fillStyle = "#ffefc4";
+          c.fillText(name[k], 0, 0);
+        }
+        c.globalCompositeOperation = "lighter";
+        c.globalAlpha = 0.55 + 0.45 * depth;
+        c.fillStyle = flare > 0 ? "#fff3d0" : "#ffb45a";
+        c.fillText(name[k], 0, 0);
+        c.restore();
+      }
+      c.restore();
+    },
+    behind(c, env) {
+      this._pass(c, env, false);
+    },
+    front(c, env) {
+      this._pass(c, env, true);
+    },
+  },
+
+  /* the mon's types made godhead: one emblem ring per type hovers above, raining
+   * thin beams of its own color down over the body */
+  typedeity: {
+    label: "Type Deity Crown",
+    kind: "exotic",
+    behind(c, env) {
+      const types = env.types && env.types.length > 0 ? env.types : ["NORMAL"];
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const topY = env.oy + bb.y0 - Math.max(10, bb.h * 0.28);
+      const n = types.length;
+      for (let k = 0; k < n; k++) {
+        const col = EXO_TYPE_COLORS[types[k]] || "#a8a878";
+        const ox2 = (k - (n - 1) / 2) * Math.max(16, bb.w * 0.5);
+        const ey = topY + Math.sin(env.t * 1.2 + k * 2.4) * 1.6;
+        const r = Math.max(5, bb.w * 0.14);
+        c.save();
+        // the beam
+        c.globalCompositeOperation = "lighter";
+        const g = c.createLinearGradient(0, ey, 0, env.oy + env.fy);
+        g.addColorStop(0, col + "88");
+        g.addColorStop(1, col + "00");
+        c.globalAlpha = 0.3 + 0.14 * Math.sin(env.t * 1.7 + k * 3);
+        c.fillStyle = g;
+        c.fillRect(x + ox2 - r * 0.5, ey, r, env.oy + env.fy - ey);
+        // the emblem ring
+        c.globalAlpha = 0.9;
+        c.strokeStyle = col;
+        c.lineWidth = 2;
+        c.beginPath();
+        c.arc(x + ox2, ey, r, 0, EXO_TAU);
+        c.stroke();
+        c.globalAlpha = 0.5;
+        c.fillStyle = col;
+        c.beginPath();
+        c.arc(x + ox2, ey, r * 0.4 + 0.6 * Math.sin(env.t * 2.6 + k), 0, EXO_TAU);
+        c.fill();
+        // orbiting spark on the ring
+        const sa = env.t * 2 + k * 2.1;
+        c.globalAlpha = 0.95;
+        c.fillStyle = "#fff";
+        c.fillRect(x + ox2 + Math.cos(sa) * r - 0.7, ey + Math.sin(sa) * r - 0.7, 1.4, 1.4);
+        c.restore();
+      }
+    },
+  },
+
+  /* the body re-tiled from its whole lineage: shifting mosaic cells swap between
+   * the self and its evolution-line forms */
+  evomosaic: {
+    label: "Evolution Mosaic",
+    kind: "rig",
+    draw(c, env) {
+      const bb = exoBBox(env);
+      const chain = (env.evo?.chain || []).filter(s => s !== env.species);
+      const others = chain.map(id => env.aux(id)).filter(Boolean);
+      exoStamp(c, env, env.look, {});
+      if (!others.length) {
+        // no line: shimmer a hue-shifted self through the tiles instead
+        others.push(null);
+      }
+      const T = env.compact ? 7 : 6;
+      c.save();
+      c.imageSmoothingEnabled = false;
+      const A = env.baseAlpha();
+      for (let ty = bb.y0; ty <= bb.y1; ty += T) {
+        for (let tx = bb.x0; tx <= bb.x1; tx += T) {
+          const mx = Math.min(env.PW - 1, tx + (T >> 1));
+          const my = Math.min(env.PH - 1, ty + (T >> 1));
+          if (!A[my * env.PW + mx]) continue;
+          const h = exoRand(env.seed, tx * 11 + ty * 17);
+          const ph = 0.5 + 0.5 * Math.sin(env.t * 0.9 + h * EXO_TAU);
+          if (ph < 0.62) continue; // most tiles stay the true self
+          const o = others[Math.floor(h * others.length) % others.length];
+          const a = exoClamp((ph - 0.62) / 0.38, 0, 1) * 0.95;
+          c.save();
+          c.beginPath();
+          c.rect(env.ox + tx, env.oy + ty, T, T);
+          c.clip();
+          c.globalAlpha = a;
+          if (o) {
+            // map this tile through the other form's frame (normalized coords)
+            const u = (tx - bb.x0) / Math.max(1, bb.w);
+            const v = (ty - bb.y0) / Math.max(1, bb.h);
+            c.drawImage(o, u * o.width - (T / 2), v * o.height - (T / 2), o.width * (T / Math.max(1, bb.w)) * 2, o.height * (T / Math.max(1, bb.h)) * 2, env.ox + tx, env.oy + ty, T, T);
+          } else {
+            c.filter = "hue-rotate(120deg)";
+            c.drawImage(env.look, tx, ty, T, T, env.ox + tx, env.oy + ty, T, T);
+          }
+          c.restore();
+        }
+      }
+      c.restore();
+      // faint grout lines where tiles are swapping
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.globalAlpha = 0.12 + 0.06 * Math.sin(env.t * 1.4);
+      c.strokeStyle = "#cfe0ff";
+      c.lineWidth = 0.5;
+      for (let ty = bb.y0; ty <= bb.y1 + T; ty += T) {
+        c.beginPath();
+        c.moveTo(env.ox + bb.x0, env.oy + ty);
+        c.lineTo(env.ox + bb.x1, env.oy + ty);
+        c.stroke();
+      }
+      c.restore();
+    },
+  },
+
+  /* a golden crown floats over the head, each jewel a gem-cut miniature of the mon
+   * glittering inside its facets */
+  iconjewels: {
+    label: "Icon Crown Jewels",
+    kind: "exotic",
+    front(c, env) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.y0 - Math.max(7, bb.h * 0.18) + Math.sin(env.t * 1.2) * 1.3;
+      const w = Math.max(14, bb.w * 0.5);
+      const hh = w * 0.42;
+      c.save();
+      // band
+      c.fillStyle = "#e8c876";
+      c.fillRect(x - w / 2, y, w, 3);
+      c.strokeStyle = "#a8843c";
+      c.lineWidth = 0.7;
+      c.strokeRect(x - w / 2, y, w, 3);
+      // points
+      const nPt = 5;
+      for (let i = 0; i < nPt; i++) {
+        const px = x - w / 2 + (i / (nPt - 1)) * w;
+        c.fillStyle = "#e8c876";
+        c.beginPath();
+        c.moveTo(px - w * 0.09, y);
+        c.lineTo(px, y - hh * (i === (nPt >> 1) ? 1 : 0.62));
+        c.lineTo(px + w * 0.09, y);
+        c.closePath();
+        c.fill();
+      }
+      // the jewels: gem-cut minis of the look
+      for (let i = 0; i < 3; i++) {
+        const px = x + (i - 1) * w * 0.3;
+        const py = y - hh * (i === 1 ? 0.55 : 0.3);
+        const r = w * (i === 1 ? 0.11 : 0.085);
+        c.save();
+        c.beginPath();
+        for (let v = 0; v < 6; v++) {
+          const va = (v / 6) * EXO_TAU - Math.PI / 2;
+          v ? c.lineTo(px + Math.cos(va) * r, py + Math.sin(va) * r) : c.moveTo(px + Math.cos(va) * r, py + Math.sin(va) * r);
+        }
+        c.closePath();
+        c.clip();
+        c.imageSmoothingEnabled = false;
+        const mag = (r * 5) / Math.max(1, bb.w);
+        c.filter = `saturate(1.8) brightness(1.25) hue-rotate(${i * 40 - 40}deg)`;
+        c.drawImage(env.look, px - env.cx * mag + Math.sin(env.t + i) * 2, py - env.cy * mag, env.PW * mag, env.PH * mag);
+        c.filter = "none";
+        // facet shine
+        const tw = 0.5 + 0.5 * Math.sin(env.t * 2.6 + i * 2.1);
+        c.globalCompositeOperation = "lighter";
+        c.globalAlpha = 0.25 + 0.45 * tw;
+        c.fillStyle = "#fff";
+        c.fillRect(px - r, py - r, r * 0.8, r * 0.5);
+        c.restore();
+        c.strokeStyle = "#a8843c";
+        c.lineWidth = 0.8;
+        c.beginPath();
+        for (let v = 0; v < 6; v++) {
+          const va = (v / 6) * EXO_TAU - Math.PI / 2;
+          v ? c.lineTo(px + Math.cos(va) * r, py + Math.sin(va) * r) : c.moveTo(px + Math.cos(va) * r, py + Math.sin(va) * r);
+        }
+        c.closePath();
+        c.stroke();
+      }
+      c.restore();
+    },
+  },
+
+  /* ================= IMPOSSIBLE MATERIALS (catalog batch D) ===================== */
+
+  /* the body turns to stone and cracks open at the heart: an amethyst geode cavity
+   * glitters inside, pulsing with inner light */
+  geodeheart: {
+    label: "Geode Heart",
+    kind: "rig",
+    _crack(env) {
+      return exoCached(`geode:${env.species}:${env.PW}`, () => {
+        const bb = exoBBox(env);
+        const pts = [];
+        const n = 9;
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * EXO_TAU;
+          const r = (0.16 + exoRand(env.seed, i * 3) * 0.11) * Math.min(bb.w, bb.h);
+          pts.push([bb.cx + Math.cos(a) * r * 1.15, bb.cy + Math.sin(a) * r]);
+        }
+        return pts;
+      });
+    },
+    draw(c, env) {
+      // stone-dark body
+      exoStamp(c, env, env.look, { filter: "brightness(0.55) saturate(0.5)" });
+      const pts = this._crack(env);
+      const bb = exoBBox(env);
+      // geode cavity built in a scratch canvas so it can never spill off the body
+      const s = exoScratch(env, 3);
+      const sc = s.getContext("2d");
+      sc.clearRect(0, 0, env.PW, env.PH);
+      sc.save();
+      sc.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        i ? sc.lineTo(pts[i][0], pts[i][1]) : sc.moveTo(pts[i][0], pts[i][1]);
+      }
+      sc.closePath();
+      sc.clip();
+      sc.fillStyle = "#12081e";
+      sc.fillRect(bb.x0, bb.y0, bb.w, bb.h);
+      for (let i = 0; i < 10; i++) {
+        const a = exoRand(env.seed, i + 100) * EXO_TAU;
+        const len = 4 + exoRand(env.seed, i + 120) * 7;
+        const tw = 0.5 + 0.5 * Math.sin(env.t * 1.9 + i * 2.2);
+        sc.globalAlpha = 0.55 + 0.45 * tw;
+        sc.fillStyle = ["#b78aff", "#8a6aff", "#d9c2ff"][i % 3];
+        sc.beginPath();
+        sc.moveTo(bb.cx + Math.cos(a + 0.35) * 2, bb.cy + Math.sin(a + 0.35) * 2);
+        sc.lineTo(bb.cx + Math.cos(a) * len, bb.cy + Math.sin(a) * len);
+        sc.lineTo(bb.cx + Math.cos(a - 0.35) * 2, bb.cy + Math.sin(a - 0.35) * 2);
+        sc.closePath();
+        sc.fill();
+      }
+      // inner heart-light
+      const g = sc.createRadialGradient(bb.cx, bb.cy, 0, bb.cx, bb.cy, 9);
+      g.addColorStop(0, `rgba(210,160,255,${0.5 + 0.3 * Math.sin(env.t * 2.4)})`);
+      g.addColorStop(1, "rgba(210,160,255,0)");
+      sc.globalAlpha = 1;
+      sc.globalCompositeOperation = "lighter";
+      sc.fillStyle = g;
+      sc.fillRect(bb.cx - 9, bb.cy - 9, 18, 18);
+      sc.restore();
+      // crack rim
+      sc.globalCompositeOperation = "source-over";
+      sc.globalAlpha = 0.7;
+      sc.strokeStyle = "#d9c2ff";
+      sc.lineWidth = 1;
+      sc.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        i ? sc.lineTo(pts[i][0], pts[i][1]) : sc.moveTo(pts[i][0], pts[i][1]);
+      }
+      sc.closePath();
+      sc.stroke();
+      sc.globalAlpha = 1;
+      // clamp to the silhouette, then stamp
+      sc.globalCompositeOperation = "destination-in";
+      sc.drawImage(exoMaskCv(env), 0, 0);
+      sc.globalCompositeOperation = "source-over";
+      exoStamp(c, env, s, {});
+    },
+  },
+
+  /* the body carved from cathedral ice: cold blue glaze, specular glints, icicles
+   * along the underside and a slow cold mist at the feet */
+  frostbasilica: {
+    label: "Frost Basilica",
+    kind: "rig",
+    draw(c, env) {
+      const bb = exoBBox(env);
+      const s = exoScratch(env, 3);
+      const sc = s.getContext("2d");
+      sc.clearRect(0, 0, env.PW, env.PH);
+      sc.imageSmoothingEnabled = false;
+      sc.drawImage(env.look, 0, 0);
+      sc.globalCompositeOperation = "source-atop";
+      const g = sc.createLinearGradient(0, bb.y0, 0, bb.y1);
+      g.addColorStop(0, "rgba(196,228,255,0.42)");
+      g.addColorStop(1, "rgba(88,138,220,0.52)");
+      sc.fillStyle = g;
+      sc.fillRect(0, 0, env.PW, env.PH);
+      sc.globalCompositeOperation = "source-over";
+      exoStamp(c, env, s, {});
+      // icicles along the lower contour
+      const cont = exoContour(env);
+      c.save();
+      for (let i = 0; i < cont.length; i += 7) {
+        const p = cont[i];
+        if (p[1] < env.cy + bb.h * 0.18) continue;
+        const len = 2.5 + exoRand(env.seed, i) * 4.5;
+        c.globalAlpha = 0.75;
+        c.fillStyle = "#cfe8ff";
+        c.beginPath();
+        c.moveTo(env.ox + p[0] - 1.3, env.oy + p[1]);
+        c.lineTo(env.ox + p[0] + 1.3, env.oy + p[1]);
+        c.lineTo(env.ox + p[0], env.oy + p[1] + len);
+        c.closePath();
+        c.fill();
+        // a drip
+        const q = ((env.t * 0.5 + exoRand(env.seed, i + 7)) % 1 + 1) % 1;
+        if (exoRand(env.seed, i + 14) > 0.6) {
+          c.globalAlpha = (1 - q) * 0.8;
+          c.fillRect(env.ox + p[0] - 0.5, env.oy + p[1] + len + q * 8, 1, 1.6);
+        }
+      }
+      // specular edge glints
+      c.globalCompositeOperation = "lighter";
+      const pts = exoEdge(env);
+      for (let i = 0; i < pts.length; i += 3) {
+        const p = pts[i];
+        const tw = Math.sin(env.t * 2.4 + p[0] * 0.45 + p[1] * 0.3);
+        if (tw < 0.74) continue;
+        c.globalAlpha = (tw - 0.74) * 3.5;
+        c.fillStyle = "#eaf6ff";
+        c.fillRect(env.ox + p[0], env.oy + p[1], 1, 1);
+      }
+      // cold mist at the feet
+      for (let i = 0; i < 5; i++) {
+        const q = ((env.t * 0.1 + i / 5) % 1 + 1) % 1;
+        c.globalAlpha = Math.sin(q * Math.PI) * 0.12;
+        c.fillStyle = "#dceeff";
+        c.beginPath();
+        c.ellipse(env.ox + bb.cx + (exoRand(env.seed, i) - 0.5) * bb.w, env.oy + env.fy + 2 - q * 4, 7 + q * 8, 2.5, 0, 0, EXO_TAU);
+        c.fill();
+      }
+      c.restore();
+    },
+  },
+
+  /* the body is a captive sun: roiling plasma cells inside a white-hot core,
+   * corona tongues licking off the silhouette */
+  solarplasma: {
+    label: "Solar Plasma Skin",
+    kind: "rig",
+    draw(c, env) {
+      const s = exoScratch(env, 3);
+      const sc = s.getContext("2d");
+      sc.clearRect(0, 0, env.PW, env.PH);
+      sc.imageSmoothingEnabled = false;
+      sc.drawImage(env.look, 0, 0);
+      sc.globalCompositeOperation = "source-atop";
+      const g = sc.createRadialGradient(env.cx, env.cy, 0, env.cx, env.cy, Math.max(env.PW, env.PH) * 0.5);
+      g.addColorStop(0, "rgba(255,240,190,0.75)");
+      g.addColorStop(0.55, "rgba(255,150,50,0.62)");
+      g.addColorStop(1, "rgba(200,40,10,0.66)");
+      sc.fillStyle = g;
+      sc.fillRect(0, 0, env.PW, env.PH);
+      // roiling plasma cells
+      for (let i = 0; i < 12; i++) {
+        const a = exoRand(env.seed, i) * EXO_TAU + env.t * (0.2 + exoRand(env.seed, i + 9) * 0.3);
+        const r = 2 + exoRand(env.seed, i + 20) * 4;
+        const px = env.cx + Math.cos(a) * (exoRand(env.seed, i + 30) * env.PW * 0.28);
+        const py = env.cy + Math.sin(a * 1.3) * (exoRand(env.seed, i + 40) * env.PH * 0.3);
+        sc.globalAlpha = 0.3 + 0.25 * Math.sin(env.t * 2.2 + i * 2.4);
+        sc.fillStyle = i % 3 ? "#ffdf9a" : "#fff7dd";
+        sc.beginPath();
+        sc.arc(px, py, r, 0, EXO_TAU);
+        sc.fill();
+      }
+      sc.globalAlpha = 1;
+      sc.globalCompositeOperation = "source-over";
+      exoStamp(c, env, s, {});
+      // corona tongues off the edge
+      const pts = exoEdge(env);
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      for (let i = 0; i < pts.length; i += 3) {
+        const p = pts[i];
+        const tw = Math.sin(env.t * 2.6 + p[0] * 0.33 + p[1] * 0.41);
+        if (tw < 0.5) continue;
+        const len = (tw - 0.5) * 7;
+        c.globalAlpha = (tw - 0.5) * 1.4;
+        c.strokeStyle = "#ffb347";
+        c.lineWidth = 1;
+        c.beginPath();
+        c.moveTo(env.ox + p[0], env.oy + p[1]);
+        c.lineTo(env.ox + p[0] + p[2] * len, env.oy + p[1] + p[3] * len);
+        c.stroke();
+      }
+      c.restore();
+    },
+  },
+
+  /* the mon brushed in sumi ink: black-water trails ribbon off the stroke, wisps
+   * curl from the back, a red hanko seal signs the piece */
+  inkdragon: {
+    label: "Ink Dragon Calligraphy",
+    kind: "rig",
+    draw(c, env) {
+      const bb = exoBBox(env);
+      // ink trails (older frames smeared into the wash)
+      for (let k = 3; k >= 1; k--) {
+        exoStamp(c, env, env.ring(k * 5), {
+          x: env.ox + env.cx - k * 4,
+          y: env.oy + env.cy + Math.sin(env.t * 1.1 + k) * 2,
+          sx: 1 + k * 0.04,
+          sy: 1 - k * 0.03,
+          alpha: 0.18 - k * 0.035,
+          filter: "brightness(0) blur(1px)",
+        });
+      }
+      // the brushed body
+      exoStamp(c, env, env.look, { filter: "grayscale(1) contrast(1.5) brightness(0.9)" });
+      // ink wisps curling off the back
+      c.save();
+      for (let i = 0; i < 6; i++) {
+        const q = ((env.t * (0.16 + exoRand(env.seed, i) * 0.12) + exoRand(env.seed, i + 33)) % 1 + 1) % 1;
+        const px = env.ox + bb.x0 + exoRand(env.seed, i + 66) * bb.w;
+        const py = env.oy + bb.y0 + 2 - q * 14;
+        c.globalAlpha = Math.sin(q * Math.PI) * 0.4;
+        c.fillStyle = "#1a1d24";
+        c.beginPath();
+        c.arc(px + Math.sin(q * 9 + i) * 3, py, 1.6 * (1 - q * 0.5), 0, EXO_TAU);
+        c.fill();
+      }
+      // the red hanko seal
+      const sx2 = env.ox + Math.min(env.PW - 9, bb.x1 + 4);
+      const sy2 = env.oy + env.fy - 8;
+      c.globalAlpha = 0.85;
+      c.fillStyle = "#c23b2e";
+      c.fillRect(sx2, sy2, 7, 7);
+      c.fillStyle = "#f5e9d9";
+      c.fillRect(sx2 + 1.5, sy2 + 1.6, 4, 1.1);
+      c.fillRect(sx2 + 1.5, sy2 + 4.3, 4, 1.1);
+      c.restore();
+    },
+  },
+
+  /* volcanic-glass body under polar light: near-black sheen with an aurora band
+   * sweeping across it, curtains of aurora rippling behind */
+  obsidianaurora: {
+    label: "Obsidian Aurora",
+    kind: "rig",
+    draw(c, env) {
+      const bb = exoBBox(env);
+      // aurora curtains behind
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 3; i++) {
+        const px = env.ox + bb.cx + (i - 1) * bb.w * 0.5 + Math.sin(env.t * 0.5 + i * 2) * 6;
+        const col = i % 2 ? "80,255,180" : "170,110,255";
+        const g = c.createLinearGradient(0, env.oy + bb.y0 - bb.h * 0.7, 0, env.oy + env.fy);
+        g.addColorStop(0, `rgba(${col},0)`);
+        g.addColorStop(0.4, `rgba(${col},${0.16 + 0.08 * Math.sin(env.t * 1.1 + i)})`);
+        g.addColorStop(1, `rgba(${col},0)`);
+        c.fillStyle = g;
+        c.fillRect(px - 5, env.oy + bb.y0 - bb.h * 0.7, 10 + i * 3, bb.h * 1.7);
+      }
+      c.restore();
+      // the obsidian body with a sweeping sheen
+      const s = exoScratch(env, 3);
+      const sc = s.getContext("2d");
+      sc.clearRect(0, 0, env.PW, env.PH);
+      sc.imageSmoothingEnabled = false;
+      sc.drawImage(env.look, 0, 0);
+      sc.globalCompositeOperation = "source-atop";
+      sc.fillStyle = "rgba(8,10,18,0.62)";
+      sc.fillRect(0, 0, env.PW, env.PH);
+      const sw = ((env.t * 0.25) % 1 + 1) % 1;
+      const bx = bb.x0 - bb.w * 0.4 + sw * bb.w * 1.8;
+      const g2 = sc.createLinearGradient(bx - 13, 0, bx + 13, 0);
+      g2.addColorStop(0, "rgba(120,255,190,0)");
+      g2.addColorStop(0.5, "rgba(150,240,255,0.7)");
+      g2.addColorStop(1, "rgba(190,120,255,0)");
+      sc.fillStyle = g2;
+      sc.fillRect(bx - 13, 0, 26, env.PH);
+      sc.globalCompositeOperation = "source-over";
+      exoStamp(c, env, s, {});
+      // glassy edge glints
+      const pts = exoEdge(env);
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      for (let i = 0; i < pts.length; i += 4) {
+        const p = pts[i];
+        const tw = Math.sin(env.t * 2 + p[0] * 0.5 + p[1] * 0.3);
+        if (tw < 0.72) continue;
+        c.globalAlpha = (tw - 0.72) * 3;
+        c.fillStyle = "#d8f6ff";
+        c.fillRect(env.ox + p[0], env.oy + p[1], 1, 1);
+      }
+      c.restore();
+    },
+  },
+
+  /* a blacked-out body lit only by its own glowing anatomy: the tonal boundary
+   * lines burn neon, hue slowly cycling, a pulse racing around the outline */
+  neonanatomy: {
+    label: "Neon Anatomy",
+    kind: "rig",
+    draw(c, env) {
+      const lc = exoLumaClusters(env);
+      const hue = (env.t * 40) % 360;
+      // dark shell
+      exoStamp(c, env, env.look, { filter: "brightness(0.42) saturate(0.55)" });
+      // neon veins = the cluster boundary lines, glowing
+      exoStamp(c, env, lc.bound, {
+        comp: "lighter",
+        filter: `invert(1) sepia(1) saturate(9) hue-rotate(${hue}deg) blur(1px)`,
+        alpha: 0.32,
+      });
+      exoStamp(c, env, lc.bound, {
+        comp: "lighter",
+        filter: `invert(1) sepia(1) saturate(9) hue-rotate(${hue}deg) brightness(1.2)`,
+        alpha: 0.4 + 0.15 * Math.sin(env.t * 2.2),
+      });
+      // pulse racing along the outline
+      const pts = exoContour(env);
+      const u = ((env.t * 0.35) % 1 + 1) % 1;
+      const i0 = Math.floor(u * pts.length);
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      for (let d = 0; d < 8; d++) {
+        const p = pts[(i0 + d) % pts.length];
+        c.globalAlpha = (1 - d / 8) * 0.9;
+        c.fillStyle = `hsl(${hue}, 100%, 75%)`;
+        c.fillRect(env.ox + p[0] - 1, env.oy + p[1] - 1, 2, 2);
+      }
+      c.restore();
+    },
+  },
+
+  /* the body plated in iridescent scales: a hue wave rolls across the scallop
+   * rows, white sparkles riding the crest */
+  scaletide: {
+    label: "Iridescent Scale Tide",
+    kind: "rig",
+    draw(c, env) {
+      const bb = exoBBox(env);
+      const s = exoScratch(env, 3);
+      const sc = s.getContext("2d");
+      sc.clearRect(0, 0, env.PW, env.PH);
+      sc.imageSmoothingEnabled = false;
+      sc.drawImage(env.look, 0, 0);
+      sc.globalCompositeOperation = "source-atop";
+      const SS = env.compact ? 5 : 4;
+      let row = 0;
+      for (let ry = bb.y0; ry <= bb.y1 + SS; ry += SS * 0.8, row++) {
+        for (let rx = bb.x0 - (row % 2 ? SS / 2 : 0); rx <= bb.x1 + SS; rx += SS) {
+          const wv = Math.sin(env.t * 2 - (rx + ry) * 0.16);
+          const hue = 160 + wv * 90 + row * 6;
+          sc.globalAlpha = 0.24 + 0.18 * wv;
+          sc.fillStyle = `hsl(${hue}, 90%, 65%)`;
+          sc.beginPath();
+          sc.arc(rx, ry, SS * 0.55, 0, Math.PI);
+          sc.fill();
+        }
+      }
+      sc.globalAlpha = 1;
+      sc.globalCompositeOperation = "source-over";
+      exoStamp(c, env, s, {});
+      // sparkles on the wave crest
+      const pts = exoEdge(env);
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      for (let i = 0; i < pts.length; i += 2) {
+        const p = pts[i];
+        const wv = Math.sin(env.t * 2 - (p[0] + p[1]) * 0.16);
+        if (wv < 0.86) continue;
+        c.globalAlpha = (wv - 0.86) * 6;
+        c.fillStyle = "#fff";
+        c.fillRect(env.ox + p[0], env.oy + p[1], 1, 1);
+      }
+      c.restore();
+    },
+  },
+
+  /* ================= MOMENT SPECTACLES (catalog batch E) ======================== */
+
+  /* the storm dims the stage; bolts strike left and right, each leaving a standing
+   * gilded icon-panel of the mon; a final bolt hits the mon itself */
+  lightningicon: {
+    label: "Lightning Iconostasis",
+    kind: "moment",
+    _p(env) {
+      const P = 7;
+      return ((env.t % P) + P) % P;
+    },
+    _bolt(c, x0, y0, y1, seed, w) {
+      c.beginPath();
+      let x = x0;
+      c.moveTo(x, y0);
+      const segs = 7;
+      for (let i = 1; i <= segs; i++) {
+        const y = y0 + ((y1 - y0) * i) / segs;
+        x = x0 + (i < segs ? (exoRand(seed, i) - 0.5) * 14 : 0);
+        c.lineTo(x, y);
+      }
+      c.lineWidth = w;
+      c.stroke();
+    },
+    behind(c, env) {
+      const p = this._p(env);
+      const bb = exoBBox(env);
+      // storm dim
+      const dim = p < 0.5 ? exoSmooth(p / 0.5) : p > 5.4 ? Math.max(0, 1 - (p - 5.4) / 1.2) : 1;
+      if (dim > 0) {
+        c.save();
+        c.globalAlpha = 0.4 * dim;
+        c.fillStyle = "#060814";
+        c.fillRect(0, 0, env.EW, env.EH);
+        c.restore();
+      }
+      const sideX = Math.max(24, bb.w * 1.05);
+      for (let k = 0; k < 2; k++) {
+        const strikeT = 0.8 + k * 0.55;
+        const px = env.ox + bb.cx + (k ? 1 : -1) * sideX;
+        if (p >= strikeT && p < strikeT + 0.22) {
+          const f = 1 - (p - strikeT) / 0.22;
+          c.save();
+          c.globalCompositeOperation = "lighter";
+          c.globalAlpha = 0.9 * f;
+          c.strokeStyle = "#eaf2ff";
+          this._bolt(c, px, 0, env.oy + env.fy, env.seed + k * 31, 2);
+          c.globalAlpha = 0.45 * f;
+          c.strokeStyle = "#8ab8ff";
+          this._bolt(c, px, 0, env.oy + env.fy, env.seed + k * 31, 5);
+          c.restore();
+        }
+        if (p >= strikeT) {
+          // the icon-panel the bolt left standing
+          const life = exoClamp((p - strikeT) / 0.15, 0, 1) * (p > 5.2 ? exoClamp(1 - (p - 5.2) / 1.2, 0, 1) : 1);
+          if (life > 0) {
+            exoStamp(c, env, env.ring(20), {
+              x: px,
+              y: env.oy + env.cy,
+              s: 0.48,
+              alpha: 0.5 * life,
+              filter: "sepia(1) saturate(3) brightness(1.3)",
+            });
+            c.save();
+            c.globalCompositeOperation = "lighter";
+            c.globalAlpha = 0.55 * life;
+            c.strokeStyle = "#ffd98a";
+            c.lineWidth = 1.3;
+            c.strokeRect(px - bb.w * 0.3, env.oy + bb.cy - bb.h * 0.36, bb.w * 0.6, bb.h * 0.72);
+            c.restore();
+          }
+        }
+      }
+      // the final center bolt, into the mon
+      if (p >= 1.9 && p < 2.12) {
+        const f = 1 - (p - 1.9) / 0.22;
+        c.save();
+        c.globalCompositeOperation = "lighter";
+        c.globalAlpha = 0.95 * f;
+        c.strokeStyle = "#fff6dd";
+        this._bolt(c, env.ox + bb.cx, 0, env.oy + bb.y0 + 2, env.seed + 99, 2.4);
+        c.restore();
+      }
+    },
+    front(c, env) {
+      const p = this._p(env);
+      // body flash on the center strike
+      if (p >= 1.9 && p < 2.5) {
+        const f = 1 - (p - 1.9) / 0.6;
+        exoStamp(c, env, exoMaskCv(env), { alpha: f * 0.55, comp: "lighter" });
+      }
+    },
+  },
+
+  /* a beam opens in the sky and a crown descends onto the mon's head; a shockwave
+   * rings out and ghost subjects kneel while it rests */
+  crownfall: {
+    label: "Crownfall Arrival",
+    kind: "moment",
+    _p(env) {
+      const P = 7;
+      return ((env.t % P) + P) % P;
+    },
+    front(c, env) {
+      const p = this._p(env);
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const headY = env.oy + bb.y0 - 3;
+      if (p < 2.4) {
+        const bi = p < 0.4 ? p / 0.4 : p > 2.0 ? 1 - (p - 2.0) / 0.4 : 1;
+        c.save();
+        c.globalCompositeOperation = "lighter";
+        // soft-edged beam: bright core fading to nothing at the sides
+        const g = c.createLinearGradient(x - bb.w * 0.3, 0, x + bb.w * 0.3, 0);
+        g.addColorStop(0, "rgba(255,240,200,0)");
+        g.addColorStop(0.5, `rgba(255,240,200,${0.22 * bi})`);
+        g.addColorStop(1, "rgba(255,240,200,0)");
+        c.fillStyle = g;
+        c.fillRect(x - bb.w * 0.3, 0, bb.w * 0.6, env.oy + env.fy);
+        c.restore();
+      }
+      if (p >= 0.4 && p < 6.2) {
+        const d = exoSmooth(exoClamp((p - 0.4) / 1.4, 0, 1));
+        const fade = p > 5.4 ? exoClamp(1 - (p - 5.4) / 0.8, 0, 1) : 1;
+        const cy2 = -10 + (headY + 10) * d + (d >= 1 ? Math.sin(env.t * 1.4) : 0);
+        const w = Math.max(12, bb.w * 0.44);
+        c.save();
+        c.globalAlpha = fade;
+        c.fillStyle = "#e8c876";
+        c.fillRect(x - w / 2, cy2, w, 3);
+        for (let i = 0; i < 4; i++) {
+          const px = x - w / 2 + ((i + 0.5) / 4) * w;
+          c.beginPath();
+          c.moveTo(px - w * 0.1, cy2);
+          c.lineTo(px, cy2 - w * 0.24);
+          c.lineTo(px + w * 0.1, cy2);
+          c.closePath();
+          c.fill();
+        }
+        c.fillStyle = "#ff5f7a";
+        c.fillRect(x - 1.2, cy2 + 0.8, 2.4, 1.6);
+        c.restore();
+        if (p >= 1.8 && p < 2.5) {
+          const q = (p - 1.8) / 0.7;
+          c.save();
+          c.globalCompositeOperation = "lighter";
+          c.globalAlpha = (1 - q) * 0.8;
+          c.strokeStyle = "#ffe9b8";
+          c.lineWidth = 1.5;
+          c.beginPath();
+          c.ellipse(x, headY + 2, q * bb.w * 0.9 + 2, (q * bb.w * 0.9 + 2) * 0.35, 0, 0, EXO_TAU);
+          c.stroke();
+          c.restore();
+        }
+      }
+      if (p >= 2.2 && p < 5.4) {
+        const a2 = exoClamp((p - 2.2) / 0.5, 0, 1) * exoClamp((5.4 - p) / 0.5, 0, 1);
+        for (const side of [-1, 1]) {
+          exoStamp(c, env, env.ring(4), {
+            x: x + side * bb.w * 0.85,
+            y: env.oy + env.fy + 2,
+            sx: -side * 0.16,
+            sy: 0.16,
+            rot: side * 0.3,
+            alpha: 0.5 * a2,
+            filter: "brightness(0.7)",
+            anchorFeet: true,
+          });
+        }
+      }
+    },
+  },
+
+  /* a star-headed spear plunges into the ground beside the mon, hums while
+   * planted, then is wrenched free in a burst of starlight */
+  starspear: {
+    label: "Star Spear Extraction",
+    kind: "moment",
+    _p(env) {
+      const P = 6.5;
+      return ((env.t % P) + P) % P;
+    },
+    _spear(c, x, y, len, a) {
+      c.save();
+      c.translate(x, y);
+      if (a) c.rotate(a);
+      c.fillStyle = "#cfe0ff";
+      c.fillRect(-0.8, -len, 1.6, len);
+      c.fillStyle = "#fff2c8";
+      c.beginPath();
+      for (let v = 0; v < 8; v++) {
+        const va = (v / 8) * EXO_TAU - Math.PI / 2;
+        const vr = v % 2 ? 2 : 5;
+        v
+          ? c.lineTo(Math.cos(va) * vr, -len + Math.sin(va) * vr)
+          : c.moveTo(Math.cos(va) * vr, -len + Math.sin(va) * vr);
+      }
+      c.closePath();
+      c.fill();
+      c.restore();
+    },
+    front(c, env) {
+      const p = this._p(env);
+      const bb = exoBBox(env);
+      const gx = env.ox + bb.cx + Math.max(14, bb.w * 0.75);
+      const gy = env.oy + env.fy;
+      const len = Math.max(18, bb.h * 0.8);
+      if (p < 0.5) {
+        const d = exoSmooth(p / 0.5);
+        this._spear(c, gx, -20 + (gy + 20) * d, len, 0);
+      } else if (p < 0.8) {
+        const q = (p - 0.5) / 0.3;
+        this._spear(c, gx, gy, len, 0);
+        c.save();
+        c.globalCompositeOperation = "lighter";
+        c.globalAlpha = (1 - q) * 0.9;
+        c.strokeStyle = "#ffe9b8";
+        c.lineWidth = 1.4;
+        c.beginPath();
+        c.ellipse(gx, gy, 3 + q * 14, (3 + q * 14) * 0.3, 0, 0, EXO_TAU);
+        c.stroke();
+        c.restore();
+      } else if (p < 3.2) {
+        // planted and humming
+        this._spear(c, gx, gy, len, Math.sin(env.t * 3.2) * 0.02);
+        c.save();
+        c.globalCompositeOperation = "lighter";
+        const g = c.createRadialGradient(gx, gy, 0, gx, gy, 8);
+        g.addColorStop(0, `rgba(255,242,200,${0.25 + 0.12 * Math.sin(env.t * 2.7)})`);
+        g.addColorStop(1, "rgba(255,242,200,0)");
+        c.fillStyle = g;
+        c.fillRect(gx - 8, gy - 8, 16, 16);
+        c.restore();
+      } else if (p < 4.4) {
+        const q = exoSmooth((p - 3.2) / 1.2);
+        this._spear(c, gx, gy - q * (gy + 40), len, 0);
+        c.save();
+        c.globalCompositeOperation = "lighter";
+        for (let i = 0; i < 10; i++) {
+          const sq = ((q * 1.4 + exoRand(env.seed, i)) % 1 + 1) % 1;
+          c.globalAlpha = Math.sin(sq * Math.PI) * 0.8 * (1 - q * 0.5);
+          c.fillStyle = i % 3 ? "#cfe0ff" : "#fff2c8";
+          c.fillRect(gx + (exoRand(env.seed, i + 20) - 0.5) * 16, gy - sq * 30, 1.4, 1.4);
+        }
+        c.restore();
+      }
+    },
+  },
+
+  /* a great spoked wheel of light spins up behind the mon, locks with a flash,
+   * and pours a verdict beam down over it */
+  judgmentwheel: {
+    label: "Judgment Wheel",
+    kind: "moment",
+    _p(env) {
+      const P = 7;
+      return ((env.t % P) + P) % P;
+    },
+    behind(c, env) {
+      const p = this._p(env);
+      if (p >= 5.8) return;
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.cy - bb.h * 0.1;
+      const R = Math.max(bb.w, bb.h) * 0.95;
+      const grow = exoSmooth(exoClamp(p / 0.8, 0, 1));
+      const fade = p > 4.9 ? exoClamp(1 - (p - 4.9) / 0.9, 0, 1) : 1;
+      const spin = p < 3.2 ? p * p * 0.55 : 3.2 * 3.2 * 0.55;
+      const lock = p >= 3.2 && p < 3.5 ? 1 - (p - 3.2) / 0.3 : 0;
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.globalAlpha = (0.5 + (p < 3.2 ? 0.2 * Math.sin(env.t * 4) : 0)) * grow * fade;
+      c.strokeStyle = "#ffe2a0";
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(x, y, Math.max(1, R * grow), 0, EXO_TAU);
+      c.stroke();
+      c.beginPath();
+      c.arc(x, y, Math.max(1, R * grow * 0.55), 0, EXO_TAU);
+      c.stroke();
+      for (let i = 0; i < 8; i++) {
+        const a = spin + (i / 8) * EXO_TAU;
+        c.beginPath();
+        c.moveTo(x + Math.cos(a) * R * grow * 0.14, y + Math.sin(a) * R * grow * 0.14);
+        c.lineTo(x + Math.cos(a) * R * grow, y + Math.sin(a) * R * grow);
+        c.stroke();
+      }
+      if (lock > 0) {
+        c.globalAlpha = lock * 0.7;
+        c.fillStyle = "#fff6dd";
+        c.beginPath();
+        c.arc(x, y, R, 0, EXO_TAU);
+        c.fill();
+      }
+      if (p >= 3.5 && p < 4.9) {
+        const b = Math.sin(((p - 3.5) / 1.4) * Math.PI);
+        const g = c.createLinearGradient(x - bb.w * 0.45, 0, x + bb.w * 0.45, 0);
+        g.addColorStop(0, "rgba(255,246,221,0)");
+        g.addColorStop(0.5, `rgba(255,246,221,${0.32 * b})`);
+        g.addColorStop(1, "rgba(255,246,221,0)");
+        c.globalAlpha = 1;
+        c.fillStyle = g;
+        c.fillRect(x - bb.w * 0.45, 0, bb.w * 0.9, env.oy + env.fy);
+      }
+      c.restore();
+    },
+  },
+
+  /* the mon leaps into the sky and eclipses a blazing sun - a black silhouette in
+   * a ring of fire - then slams back down with a shockwave */
+  impacteclipse: {
+    label: "Impact Eclipse",
+    kind: "moment",
+    _p(env) {
+      const P = 6;
+      return ((env.t % P) + P) % P;
+    },
+    hidesBase(env) {
+      const p = this._p(env);
+      return p >= 0.4 && p < 3.9;
+    },
+    _sun(env) {
+      const bb = exoBBox(env);
+      return {
+        x: env.ox + bb.cx,
+        y: Math.max(16, env.oy + bb.y0 - bb.h * 1.1),
+        r: Math.max(9, bb.w * 0.3),
+      };
+    },
+    behind(c, env) {
+      const p = this._p(env);
+      if (p >= 4.6) return;
+      const s2 = this._sun(env);
+      const a2 = p < 0.4 ? p / 0.4 : p > 4.1 ? 1 - (p - 4.1) / 0.5 : 1;
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      const g = c.createRadialGradient(s2.x, s2.y, 0, s2.x, s2.y, s2.r * 2.2);
+      g.addColorStop(0, `rgba(255,246,214,${0.95 * a2})`);
+      g.addColorStop(0.45, `rgba(255,214,130,${0.55 * a2})`);
+      g.addColorStop(1, "rgba(255,214,130,0)");
+      c.fillStyle = g;
+      c.fillRect(s2.x - s2.r * 2.2, s2.y - s2.r * 2.2, s2.r * 4.4, s2.r * 4.4);
+      c.restore();
+    },
+    front(c, env) {
+      const p = this._p(env);
+      if (p < 0.4 || p >= 3.9) return;
+      const bb = exoBBox(env);
+      const s2 = this._sun(env);
+      const groundY = env.oy + env.fy;
+      let y = env.oy + env.cy;
+      let scale = 1;
+      let dark = 0;
+      if (p < 1.3) {
+        const q = exoSmooth((p - 0.4) / 0.9);
+        y = env.oy + env.cy - q * (env.oy + env.cy - s2.y);
+        scale = 1 - q * 0.45;
+        dark = q;
+      } else if (p < 2.8) {
+        y = s2.y + Math.sin(env.t * 1.8);
+        scale = 0.55;
+        dark = 1;
+      } else {
+        const q = exoSmooth(exoClamp((p - 2.8) / 0.55, 0, 1));
+        y = s2.y + q * (env.oy + env.cy - s2.y);
+        scale = 0.55 + q * 0.45;
+        dark = 1 - q;
+      }
+      exoStamp(c, env, env.look, { y, s: scale, filter: `brightness(${1 - 0.85 * dark})` });
+      if (p >= 1.3 && p < 2.8) {
+        c.save();
+        c.globalCompositeOperation = "lighter";
+        c.globalAlpha = 0.8 + 0.2 * Math.sin(env.t * 5);
+        c.strokeStyle = "#ffd9a0";
+        c.lineWidth = 1.6;
+        c.beginPath();
+        c.arc(s2.x, y, Math.max(bb.w, bb.h) * 0.32, 0, EXO_TAU);
+        c.stroke();
+        c.restore();
+      }
+      if (p >= 3.3 && p < 3.9) {
+        const q = (p - 3.3) / 0.6;
+        c.save();
+        c.globalCompositeOperation = "lighter";
+        c.globalAlpha = (1 - q) * 0.85;
+        c.strokeStyle = "#ffd9a0";
+        c.lineWidth = 2 - q;
+        c.beginPath();
+        c.ellipse(env.ox + env.cx, groundY, 4 + q * bb.w * 1.4, (4 + q * bb.w * 1.4) * 0.3, 0, 0, EXO_TAU);
+        c.stroke();
+        c.restore();
+      }
+    },
+  },
+
+  /* black petals spiral in and entomb the mon in a closed rose bud, hold, then
+   * burst open in a scatter of petals and light */
+  blackrose: {
+    label: "Black Rose Burial",
+    kind: "moment",
+    _p(env) {
+      const P = 8;
+      return ((env.t % P) + P) % P;
+    },
+    _petal(c, x, y, a, s, alpha, col) {
+      c.save();
+      c.translate(x, y);
+      c.rotate(a);
+      c.globalAlpha = alpha;
+      c.fillStyle = col;
+      c.beginPath();
+      c.moveTo(0, 0);
+      c.quadraticCurveTo(s * 0.65, -s * 0.5, 0, -s);
+      c.quadraticCurveTo(-s * 0.65, -s * 0.5, 0, 0);
+      c.closePath();
+      c.fill();
+      // violet rim so the black petals read against the dark stage
+      c.globalAlpha = alpha * 0.8;
+      c.strokeStyle = "#6a4a8e";
+      c.lineWidth = 0.8;
+      c.stroke();
+      c.restore();
+    },
+    front(c, env) {
+      const p = this._p(env);
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const y = env.oy + bb.cy;
+      const RB = Math.max(bb.w, bb.h);
+      if (p < 2.2) {
+        // petals spiral in
+        const q = exoSmooth(p / 2.2);
+        for (let i = 0; i < 16; i++) {
+          const a0 = exoRand(env.seed, i) * EXO_TAU;
+          const a = a0 + q * 4 + env.t * 0.2;
+          const d = (1 - q) * RB * 1.6 + RB * 0.4;
+          this._petal(
+            c,
+            x + Math.cos(a) * d,
+            y + Math.sin(a) * d * 0.8,
+            a + Math.PI / 2,
+            4 + exoRand(env.seed, i + 8) * 3,
+            0.55 + 0.4 * q,
+            i % 3 ? "#2a1838" : "#3a1848",
+          );
+        }
+      } else if (p < 4.6) {
+        // the closed bud entombs the body
+        const close = exoSmooth(exoClamp((p - 2.2) / 0.7, 0, 1));
+        for (let L = 2; L >= 0; L--) {
+          const n = 6 + L * 2;
+          for (let i = 0; i < n; i++) {
+            const a = (i / n) * EXO_TAU + L * 0.4 + Math.sin(env.t * 0.8 + L) * 0.03;
+            const d = RB * (0.1 + L * 0.13) * close;
+            this._petal(
+              c,
+              x + Math.cos(a) * d,
+              y + Math.sin(a) * d * 0.9 + RB * (0.4 - L * 0.13) * close,
+              a + Math.PI,
+              RB * (0.52 - L * 0.1) * close,
+              0.96,
+              L % 2 ? "#2a1838" : "#301640",
+            );
+          }
+        }
+        // dew glints on the bud
+        if (close >= 1) {
+          c.save();
+          c.globalCompositeOperation = "lighter";
+          for (let i = 0; i < 5; i++) {
+            const tw = Math.sin(env.t * 3 + i * 2.4);
+            if (tw < 0.6) continue;
+            c.globalAlpha = (tw - 0.6) * 1.6;
+            c.fillStyle = "#cfa8ff";
+            c.fillRect(x + (exoRand(env.seed, i + 70) - 0.5) * RB * 0.6, y + (exoRand(env.seed, i + 90) - 0.4) * RB * 0.5, 1.2, 1.2);
+          }
+          c.restore();
+        }
+      } else if (p < 5.4) {
+        // burst open
+        const q = (p - 4.6) / 0.8;
+        for (let i = 0; i < 20; i++) {
+          const a = exoRand(env.seed, i + 40) * EXO_TAU;
+          const d = q * RB * (1.2 + exoRand(env.seed, i + 60));
+          this._petal(
+            c,
+            x + Math.cos(a) * d,
+            y + Math.sin(a) * d * 0.85 - q * 6,
+            a + q * 5,
+            4.5,
+            (1 - q) * 0.9,
+            i % 3 ? "#2a1838" : "#3a1848",
+          );
+        }
+        exoStamp(c, env, exoMaskCv(env), { alpha: (1 - q) * 0.3, comp: "lighter" });
+      }
+    },
+  },
+
+  /* the body dissolves into a constellation that drifts up into the night, hangs
+   * there wheeling, then the stars fall back and reassemble the mon */
+  constellationasc: {
+    label: "Constellation Ascension",
+    kind: "moment",
+    _p(env) {
+      const P = 7.5;
+      return ((env.t % P) + P) % P;
+    },
+    hidesBase(env) {
+      const p = this._p(env);
+      return p >= 0.9 && p < 5.9;
+    },
+    _stars(env) {
+      return exoCached(`constasc:${env.species}:${env.PW}`, () => {
+        const pts = exoEdge(env);
+        const out = [];
+        for (let i = 0; i < 14; i++) {
+          const p = pts[Math.floor(exoRand(env.seed, i * 5) * pts.length)] || [env.cx, env.cy];
+          out.push([p[0], p[1]]);
+        }
+        return out;
+      });
+    },
+    front(c, env) {
+      const p = this._p(env);
+      const bb = exoBBox(env);
+      const stars = this._stars(env);
+      const rise = Math.max(20, bb.h * 0.9);
+      let q = 0;
+      let bodyA = 0;
+      if (p < 0.9) {
+        // pre-shimmer on the still-visible base
+        c.save();
+        c.globalCompositeOperation = "lighter";
+        for (let i = 0; i < stars.length; i++) {
+          const tw = Math.sin(env.t * 6 + i * 2.1);
+          if (tw < 0.5) continue;
+          c.globalAlpha = (tw - 0.5) * (p / 0.9);
+          c.fillStyle = "#eaf0ff";
+          c.fillRect(env.ox + stars[i][0], env.oy + stars[i][1], 1.4, 1.4);
+        }
+        c.restore();
+        return;
+      }
+      if (p < 2.1) {
+        q = exoSmooth((p - 0.9) / 1.2);
+        bodyA = 1 - q;
+      } else if (p < 4.4) {
+        q = 1;
+      } else if (p < 5.9) {
+        q = 1 - exoSmooth((p - 4.4) / 1.2);
+        bodyA = 1 - q;
+      } else {
+        return;
+      }
+      if (bodyA > 0) {
+        exoStamp(c, env, env.look, { alpha: bodyA });
+      }
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      const pos = stars.map((s2, i) => {
+        const ra = (i / stars.length) * EXO_TAU + 0.5;
+        const rx = bb.cx + Math.cos(ra) * bb.w * 0.55;
+        const ry = bb.cy - rise + Math.sin(ra) * bb.h * 0.4;
+        return [
+          env.ox + s2[0] + (rx - s2[0]) * q,
+          env.oy + s2[1] + (ry - s2[1]) * q + (q >= 1 ? Math.sin(env.t * 1.3 + i) * 1.4 : 0),
+        ];
+      });
+      c.globalAlpha = 0.35 * q;
+      c.strokeStyle = "#9ab8ff";
+      c.lineWidth = 0.8;
+      c.beginPath();
+      for (let i = 0; i < pos.length; i++) {
+        i ? c.lineTo(pos[i][0], pos[i][1]) : c.moveTo(pos[i][0], pos[i][1]);
+      }
+      c.closePath();
+      c.stroke();
+      for (let i = 0; i < pos.length; i++) {
+        const tw = 0.6 + 0.4 * Math.sin(env.t * 3 + i * 2.3);
+        c.globalAlpha = tw;
+        c.fillStyle = i % 5 === 2 ? "#ffd9a8" : "#eaf0ff";
+        c.fillRect(pos[i][0] - 1, pos[i][1] - 1, 2, 2);
+      }
+      c.restore();
+    },
+  },
+
+  /* a throne of light rises behind the mon and its ancestors materialize at its
+   * flanks, bowing before they fade */
+  throneancestors: {
+    label: "Throne of Ancestors",
+    kind: "moment",
+    _p(env) {
+      const P = 8;
+      return ((env.t % P) + P) % P;
+    },
+    behind(c, env) {
+      const p = this._p(env);
+      if (p >= 7) return;
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const grow = exoSmooth(exoClamp(p / 1.1, 0, 1));
+      const fade = p > 6 ? exoClamp(1 - (p - 6), 0, 1) : 1;
+      const a2 = grow * fade;
+      if (a2 <= 0) return;
+      const W = Math.max(26, bb.w * 1.7);
+      const H = Math.max(30, bb.h * 1.6);
+      const baseY = env.oy + env.fy + 2;
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.globalAlpha = 0.3 * a2;
+      c.fillStyle = "#ffe2a0";
+      c.fillRect(x - W * 0.32, baseY - H, W * 0.64, H * 0.86);
+      c.fillRect(x - W * 0.32, baseY - H - 8 * grow, 3, H * 0.4);
+      c.fillRect(x + W * 0.32 - 3, baseY - H - 8 * grow, 3, H * 0.4);
+      c.fillRect(x - W * 0.5, baseY - H * 0.42, W * 0.18, H * 0.42);
+      c.fillRect(x + W * 0.32, baseY - H * 0.42, W * 0.18, H * 0.42);
+      c.globalAlpha = 0.7 * a2;
+      c.strokeStyle = "#ffd98a";
+      c.lineWidth = 1.2;
+      c.strokeRect(x - W * 0.32, baseY - H, W * 0.64, H * 0.86);
+      c.restore();
+      const chain = (env.evo?.chain || []).filter(s => s !== env.species);
+      const appear = exoClamp((p - 1.2) / 0.8, 0, 1) * fade;
+      if (appear > 0) {
+        const bow = p > 4 ? exoSmooth(exoClamp((p - 4) / 0.8, 0, 1)) * 0.3 : 0;
+        for (let k = 0; k < 2; k++) {
+          const side = k ? 1 : -1;
+          const id = chain.length ? chain[k % chain.length] : null;
+          const aux = id ? env.aux(id) : null;
+          const px = x + side * W * 0.62;
+          if (aux) {
+            exoStampImg(c, env, aux, {
+              x: px,
+              y: baseY,
+              h: bb.h * 0.72,
+              alpha: 0.5 * appear,
+              rot: side * bow,
+              flip: side > 0,
+              filter: "brightness(1.25) saturate(0.5)",
+              anchorFeet: true,
+            });
+          } else {
+            exoStamp(c, env, env.ring(8 + k * 6), {
+              x: px,
+              y: baseY,
+              sx: -side * 0.5,
+              sy: 0.5,
+              rot: side * bow,
+              alpha: 0.4 * appear,
+              filter: "brightness(1.25) saturate(0.5)",
+              anchorFeet: true,
+            });
+          }
+        }
+      }
+    },
+  },
+
+  /* ================= SCENE-SPLIT RIFT (catalog batch F) ========================= */
+
+  /* the whole stage is torn along a crackling rift: a cold world on one side, a
+   * hot one on the other, and the mon graded half-and-half where it straddles */
+  scenesplit: {
+    label: "Scene-Split Rift",
+    kind: "rig",
+    draw(c, env) {
+      const bb = exoBBox(env);
+      const x = env.ox + bb.cx;
+      const wob = Math.sin(env.t * 0.7) * 3;
+      const seg = 9;
+      const xs = [];
+      for (let i = 0; i <= seg; i++) {
+        xs.push(x + wob + (exoRand(env.seed, i * 3) - 0.5) * 10 + Math.sin(env.t * 1.3 + i * 1.7) * 1.5);
+      }
+      const leftPath = () => {
+        c.beginPath();
+        c.moveTo(0, 0);
+        for (let i = 0; i <= seg; i++) c.lineTo(xs[i], (env.EH * i) / seg);
+        c.lineTo(0, env.EH);
+        c.closePath();
+      };
+      const rightPath = () => {
+        c.beginPath();
+        c.moveTo(env.EW, 0);
+        for (let i = 0; i <= seg; i++) c.lineTo(xs[i], (env.EH * i) / seg);
+        c.lineTo(env.EW, env.EH);
+        c.closePath();
+      };
+      // the two worlds: a soft glow bleeding out from the rift, not a solid panel
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      leftPath();
+      c.save();
+      c.clip();
+      const gl = c.createLinearGradient(x - env.EW * 0.2, 0, x, 0);
+      gl.addColorStop(0, "rgba(58,102,255,0)");
+      gl.addColorStop(1, "rgba(58,102,255,0.17)");
+      c.fillStyle = gl;
+      c.fillRect(0, 0, env.EW, env.EH);
+      c.restore();
+      rightPath();
+      c.save();
+      c.clip();
+      const gr = c.createLinearGradient(x + env.EW * 0.2, 0, x, 0);
+      gr.addColorStop(0, "rgba(255,122,58,0)");
+      gr.addColorStop(1, "rgba(255,122,58,0.15)");
+      c.fillStyle = gr;
+      c.fillRect(0, 0, env.EW, env.EH);
+      c.restore();
+      c.restore();
+      // the mon, graded per world half
+      c.save();
+      leftPath();
+      c.clip();
+      exoStamp(c, env, env.look, { filter: "saturate(0.8) hue-rotate(40deg) brightness(0.94)" });
+      c.restore();
+      c.save();
+      rightPath();
+      c.clip();
+      exoStamp(c, env, env.look, { filter: "saturate(1.25) hue-rotate(-25deg) brightness(1.06)" });
+      c.restore();
+      // the crackling rift
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.strokeStyle = "#eaf2ff";
+      c.lineWidth = 1.4;
+      c.globalAlpha = 0.6 + 0.3 * Math.sin(env.t * 6);
+      c.beginPath();
+      for (let i = 0; i <= seg; i++) {
+        i ? c.lineTo(xs[i], (env.EH * i) / seg) : c.moveTo(xs[i], (env.EH * i) / seg);
+      }
+      c.stroke();
+      for (let i = 0; i < 6; i++) {
+        const q = ((env.t * (0.6 + exoRand(env.seed, i) * 0.6) + exoRand(env.seed, i + 44)) % 1 + 1) % 1;
+        const yy = exoRand(env.seed, i + 88) * env.EH;
+        const idx = Math.min(seg, Math.floor((yy / env.EH) * seg));
+        c.globalAlpha = (1 - q) * 0.9;
+        c.fillStyle = i % 2 ? "#8ab8ff" : "#ffb47a";
+        c.fillRect(xs[idx] + (exoRand(env.seed, i + 120) - 0.5) * 2 + q * 8 * (i % 2 ? -1 : 1), yy, 1.3, 1.3);
       }
       c.restore();
     },
