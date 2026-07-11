@@ -1,0 +1,586 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrg49jgl-52ax
+mode:     6  wave:?
+seed:     5vGvVuF1X3FIznrcgWPhxxJY
+party:    
+enemy:    
+
+----- COMMENT -----
+waiting forever
+
+----- CO-OP CONTROL PLANE -----
+session:  role=guest seat=1 gen=0g netcode=authoritative
+phase:    running=TurnInitPhase queue=[]
+interact: counter=0 awaiting=none
+rendez:   awaiting=[] localArrived=[] partnerArrived=[]
+transport(local): state=connected lastRx=5s
+
+----- CONSOLE -----
+[08:46:52.943] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[08:46:53.548] LOG: [ER] build mrg49jgl-52ax
+[08:46:53.959] LOG: [dev-tools] loaded — 509 scenarios + Send Logs button
+[08:47:19.687] DEBUG: Destroying loading scene
+[08:47:19.688] DEBUG: Destroyed loading scene
+[08:47:20.048] LOG: Seed: 5vGvVuF1X3FIznrcgWPhxxJY
+[08:47:20.048] LOG: Wave Seed: 5vGvVuF1X3FIznrcgWPhxxJY 0
+[08:47:25.108] LOG: %cStart Phase LoginPhase color:green;
+[08:47:25.420] LOG: Client Session: SIzzNNnAxJ7xfLQqEr6YUKqX8RHiiZUI
+[08:47:25.892] DEBUG: Using cached system data
+[08:47:26.102] LOG: %cStart Phase TitlePhase color:green;
+[08:47:26.104] LOG: Getting Session Slot id: %d 4
+[08:47:26.146] LOG: use seasonal splash messages true
+[08:47:32.638] LOG: [coop:lobby] start announce name=Heraklines1
+[08:47:33.272] LOG: [coop:lobby] announced id=a6ffe074-8b22-4900-acc2-3a91ab3c6a2f -> begin polling
+[08:47:33.617] LOG: [coop:lobby] poll players=1
+[08:47:34.613] LOG: [coop:lobby] request target=dd9f5dc9-d79d-4dfb-99a9-89e35f8dc7a8 (self=a6ffe074-8b22-4900-acc2-3a91ab3c6a2f)
+[08:47:35.316] LOG: [coop:lobby] poll players=1
+[08:47:37.123] LOG: [coop:lobby] poll players=1
+[08:47:38.929] LOG: [coop:lobby] poll players=1
+[08:47:40.782] LOG: [coop:lobby] poll players=1
+[08:47:42.601] LOG: [coop:lobby] poll matched code=PHCEYA role=guest -> connect
+[08:47:42.601] LOG: [coop:launch] lobby connect code=PHCEYA role=guest name=Heraklines1
+[08:47:42.603] LOG: [coop:launch] connectCoopWithCode code=PHCEYA role=guest username=Heraklines1
+[08:47:42.604] LOG: [coop:launch] exchange SDP start code=PHCEYA role=guest (ice=fetched)
+[08:47:42.920] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[08:47:42.949] LOG: [coop:launch] await peer signal start code=PHCEYA role=guest timeout=60000ms
+[08:47:44.487] LOG: [coop:launch] await peer signal resolve code=PHCEYA role=guest (1981b)
+[08:47:44.487] LOG: [coop:launch] guest received offer code=PHCEYA -> answering
+[08:47:44.532] LOG: [coop:launch] iceConnectionState=checking code=PHCEYA role=guest
+[08:47:44.533] LOG: [coop:launch] pcConnectionState=connecting code=PHCEYA role=guest
+[08:47:44.965] LOG: [coop:launch] guest pushing answer code=PHCEYA (ICE gathered)
+[08:47:44.965] LOG: [coop:launch] pushSignal code=PHCEYA role=guest sdpBytes=1940
+[08:47:46.562] LOG: [coop:launch] iceConnectionState=connected code=PHCEYA role=guest
+[08:47:46.766] LOG: [coop:launch] pcConnectionState=connected code=PHCEYA role=guest
+[08:47:47.308] LOG: [coop:launch] guest datachannel event label=coop state=open code=PHCEYA
+[08:47:47.309] LOG: [coop:launch] data channel already open
+[08:47:47.309] LOG: [coop:webrtc] ctor role=guest readyState=open state=connected
+[08:47:47.309] LOG: [coop:launch] connectCoopSession role=guest state=connected username=Heraklines1 netcode=authoritative
+[08:47:47.309] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[08:47:47.310] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[08:47:47.310] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[08:47:47.310] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[08:47:47.310] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[08:47:47.310] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[08:47:47.310] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[08:47:47.310] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[08:47:47.310] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[08:47:47.310] LOG: [coop:launch] peer session ready role=guest netcode=authoritative -> connecting
+[08:47:47.310] LOG: [coop:launch] session connect role=guest partnerRole=host netcode=authoritative username=Heraklines1 version=er-coop-16 tiebreak=0.28510794927740923
+[08:47:47.311] LOG: [coop:webrtc] raw tx role=guest t=hello bytes=431
+[08:47:47.340] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=6ba757f0b644976c(1107) movesName=fad7fe8932ec09a1(1107) movesets=573b3b198f518a35(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=d96ec4d9a76806d2(1047)
+[08:47:47.341] LOG: [coop:webrtc] raw tx role=guest t=dataFingerprint bytes=329
+[08:47:47.341] LOG: [coop:launch] lobby connected code=PHCEYA role=guest -> onConnected
+[08:47:47.342] LOG: [coop:webrtc] channel OPEN role=guest gen=0
+[08:47:47.345] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:47:47.345] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:47:47.345] LOG: [coop:launch] EPOCH ADOPT epoch=1826569898160141 from host hello
+[08:47:47.345] LOG: [coop:webrtc] raw tx role=guest t=hello bytes=446
+[08:47:47.345] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:47:47.345] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:47:47.345] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:47:47.346] LOG: [coop:webrtc] raw rx role=guest t=dataFingerprint bytes=329 handlers=10
+[08:47:47.346] LOG: [coop:checksum] MATCH - data tables identical across clients
+[08:47:47.346] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:47:47.346] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:47:47.346] LOG: [coop:launch] EPOCH ADOPT epoch=1826569898191527 from host hello
+[08:47:47.346] LOG: [coop:webrtc] raw tx role=guest t=hello bytes=446
+[08:47:47.346] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:47:47.346] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:47:47.346] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:47:47.346] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:47:47.346] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:47:47.348] LOG: [coop-launch] title challenge-gate: role=guest isCoopGuest=true -> SelectStarterPhase
+[08:47:47.348] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[08:47:47.348] WARN: [coop:gate] ALLOWLIST BLOCK phase=SelectStarterPhase (not a guest presentation/input-intent phase; neutralized to CoopInertPhase)
+[08:47:47.348] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[08:47:47.348] WARN: [coop:gate] ALLOWLIST BLOCK phase=EncounterPhase (not a guest presentation/input-intent phase; neutralized to CoopInertPhase)
+[08:47:47.348] LOG: %cStart Phase CoopInertPhase color:green;
+[08:47:47.348] LOG: %cStart Phase CoopInertPhase color:green;
+[08:47:47.348] LOG: %cStart Phase TurnInitPhase color:green;
+[08:47:47.349] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of null (reading 'mysteryEncounter') @ https://elite-redux-staging.pages.dev/assets/loading-scene-Dxmv7vKZ.js:3:100379
+[08:47:52.315] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[08:47:52.315] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- lastRx=5s transport=connected journal=0/0 queue=0
+[08:48:22.274] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:22.274] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:22.274] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:22.274] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:22.274] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1329 handlers=10
+[08:48:22.275] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:22.275] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:22.275] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:22.275] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:22.275] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:22.275] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=false partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:22.275] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:22.275] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:22.275] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:22.275] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:22.275] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:22.275] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:22.275] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:22.275] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:22.275] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:22.276] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:22.276] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:25.253] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:25.253] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:25.253] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:25.254] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:25.254] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:25.254] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:25.254] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:25.254] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:25.254] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:25.254] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:25.254] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:25.254] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:25.254] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:25.254] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:25.254] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:25.254] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:25.254] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:25.254] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:25.254] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:25.254] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:25.257] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:25.257] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:25.258] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:25.258] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:26.968] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:26.968] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:26.968] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:26.968] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:26.968] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:26.968] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:26.968] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:26.968] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:26.968] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:26.968] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:26.968] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:26.968] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:26.968] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:26.968] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:26.968] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:26.968] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:26.968] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:26.968] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:26.968] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:26.968] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:26.968] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:26.968] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:26.968] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:26.968] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:27.315] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[08:48:27.315] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- lastRx=0s transport=connected journal=0/0 queue=0
+[08:48:28.280] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:28.280] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:28.280] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:28.280] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:28.280] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:28.280] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:28.280] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:28.280] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:28.280] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:28.280] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:28.280] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:28.280] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:28.280] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:28.280] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:28.280] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:28.280] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:28.280] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:28.280] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:28.280] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:28.280] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:28.280] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:28.280] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:28.280] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:28.280] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:30.271] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:30.271] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:30.271] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:30.271] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:30.271] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:30.280] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:30.280] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:30.280] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:30.280] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:30.280] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:30.280] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:30.280] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:30.280] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:30.280] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:30.280] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:30.280] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:30.280] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:30.280] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:30.280] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:30.280] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:30.290] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:30.290] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:30.290] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:30.290] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:32.271] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:32.271] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:32.271] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:32.272] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:32.272] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:32.272] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:32.272] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:32.272] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:32.272] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:32.272] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:32.272] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:32.272] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:32.272] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:32.272] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:32.272] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:32.272] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:32.272] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:32.272] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:32.272] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:32.272] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:32.272] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:32.272] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:32.272] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:32.272] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:34.268] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:34.268] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:34.268] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:34.268] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:34.268] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:34.268] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:34.268] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:34.268] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:34.268] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:34.268] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:34.268] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:34.268] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:34.268] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:34.268] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:34.276] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:34.276] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:34.276] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:34.276] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:34.276] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:34.276] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:34.276] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:34.276] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:34.276] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:34.276] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:36.268] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:36.268] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:36.268] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:36.268] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:36.268] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:36.269] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:36.269] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:36.269] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:36.269] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:36.269] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:36.269] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:36.269] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:36.269] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:36.269] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:36.269] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:36.269] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:36.269] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:36.269] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:36.269] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:36.269] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:36.269] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:36.269] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:36.269] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:36.269] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:38.268] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:38.268] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:38.268] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:38.268] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:38.268] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:38.299] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:38.299] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:38.299] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:38.299] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:38.299] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:38.299] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:38.299] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:38.299] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:38.299] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:38.299] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:38.299] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:38.299] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:38.299] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:38.300] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:38.300] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:38.300] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:38.300] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:38.300] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:38.300] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:40.275] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:40.275] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:40.275] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:40.275] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:40.275] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:40.278] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:40.278] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:40.278] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:40.278] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:40.278] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:40.278] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:40.278] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:40.278] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:40.278] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:40.278] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:40.278] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:40.278] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:40.278] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:40.278] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:40.278] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:40.278] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:40.278] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:40.278] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:40.278] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:43.246] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:43.246] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:43.246] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:43.246] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:43.246] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:43.246] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:43.246] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:43.246] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:43.246] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:43.246] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:43.246] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:43.246] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:43.246] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:43.246] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:43.247] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:43.247] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:43.247] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:43.247] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:43.247] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:43.247] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:43.247] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:43.247] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:43.247] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:43.247] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:45.252] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:45.252] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:45.252] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:45.252] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:45.252] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:45.261] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:45.261] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:45.261] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:45.261] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:45.261] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:45.261] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:45.261] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:45.261] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:45.261] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:45.261] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:45.261] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:45.261] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:45.261] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:45.270] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:45.270] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:45.270] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:45.270] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:45.270] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:45.270] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:47.253] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:47.253] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:47.253] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:47.253] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:47.253] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:47.263] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:47.263] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:47.263] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:47.263] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:47.263] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:47.263] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:47.263] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:47.263] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:47.263] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:47.263] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:47.263] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:47.263] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:47.263] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:47.263] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:47.264] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:47.264] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:47.264] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:47.264] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:47.264] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:49.294] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:49.294] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:49.294] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:49.294] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:49.294] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:49.549] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:49.549] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:49.549] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:49.549] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:49.549] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:49.549] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:49.549] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:49.549] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:49.549] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:49.549] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:49.549] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:49.549] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:49.549] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:49.549] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:49.549] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:49.549] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:49.549] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:49.549] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:49.549] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:51.271] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:51.271] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:51.271] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:51.271] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:51.271] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:51.271] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:51.271] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:51.271] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:51.271] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:51.271] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:51.271] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:51.271] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:51.271] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:51.271] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:51.271] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:51.271] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:51.271] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:51.271] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:51.271] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:51.271] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:51.271] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:51.271] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:51.271] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:51.271] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:53.285] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:53.285] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:53.285] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:53.285] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:53.285] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:53.286] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:53.286] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:53.286] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:53.286] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:53.286] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:53.286] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:53.286] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:53.286] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:53.286] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:53.286] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:53.286] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:53.286] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:53.286] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:53.286] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:53.286] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:53.286] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:53.286] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:53.286] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:53.286] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:55.267] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:55.267] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:55.267] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:55.268] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:55.268] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:55.270] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:55.270] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:55.270] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:55.270] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:55.270] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:55.270] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:55.270] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:55.270] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:55.270] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:55.270] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:55.270] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:55.270] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:55.270] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:55.270] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:55.270] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:55.270] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:55.270] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:55.270] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:55.270] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:57.259] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:57.259] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:57.259] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:57.259] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:57.259] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:57.259] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:57.259] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:57.259] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:57.259] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:57.259] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:57.260] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:57.260] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:57.260] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:57.260] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:57.260] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:57.260] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:57.260] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:57.260] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:57.260] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:57.260] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:57.267] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:57.267] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:57.267] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:57.267] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:48:59.248] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:48:59.248] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:48:59.248] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:59.248] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:59.248] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:59.249] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:48:59.249] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:48:59.249] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:48:59.249] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:48:59.249] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:48:59.249] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:48:59.249] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:48:59.249] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:59.249] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:59.249] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:48:59.249] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:48:59.249] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:59.249] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:48:59.250] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:48:59.250] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:48:59.250] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:48:59.250] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:48:59.250] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:48:59.250] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:49:01.260] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=444 handlers=10
+[08:49:01.260] LOG: [coop:launch] hello recv partner=Arctic Flame partnerRole=host (local role=guest; no conflict)
+[08:49:01.260] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:49:01.260] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:49:01.260] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:49:01.267] LOG: [coop:webrtc] raw rx role=guest t=rosterSync bytes=1328 handlers=10
+[08:49:01.267] LOG: [coop:roster] add ACCEPT role=host speciesId=489 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[08:49:01.267] LOG: [coop:roster] add ACCEPT role=host speciesId=456 cost=0.25 hasStarter=true -> count=2 spent=2.25 remaining=2.75
+[08:49:01.267] LOG: [coop:roster] add ACCEPT role=host speciesId=999 cost=2 hasStarter=true -> count=3 spent=4.25 remaining=0.75
+[08:49:01.267] LOG: [coop:roster] replace role=host requested=3 accepted=3 spent=4.25 species=[489,456,999]
+[08:49:01.267] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[08:49:01.267] LOG: [coop:roster] rosterSync RECV partner=host entries=3 partnerReady=true partnerCount=3 -> bothReady=false (local role=guest)
+[08:49:01.267] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:49:01.267] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:49:01.267] LOG: [coop:webrtc] raw rx role=guest t=runConfig bytes=585 handlers=10
+[08:49:01.267] LOG: [coop:runtime] guest received difficulty=elite netcode=authoritative kind=coop
+[08:49:01.267] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:49:01.267] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[08:49:01.267] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=62 handlers=10
+[08:49:01.267] LOG: [coop:launch] RECV resumeStartNew id=mrg4g74q-0.tg8yi3ipnee-1 (#810 durable barrier release)
+[08:49:01.267] LOG: [coop:webrtc] raw rx role=guest t=requestRoster bytes=21 handlers=10
+[08:49:01.267] LOG: [coop:roster] requestRoster RECV -> re-broadcast local roster+ready (role=guest) (#868)
+[08:49:01.267] LOG: [coop:roster] rosterSync SEND role=guest entries=0 ready=false spent=0 species=[]
+[08:49:01.267] LOG: [coop:webrtc] raw tx role=guest t=rosterSync bytes=374
+[08:49:06.321] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+
+----- REPLAY TRACE (JSON) -----
+(none)
