@@ -27,6 +27,7 @@ import {
   COOP_ABILITY_OP,
   COOP_ABILITY_OUTCOME,
   coopAbilityPickerSeq,
+  sendCoopAbilityPickerOutcome,
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
 import {
   COOP_INTERACTION_LEAVE,
@@ -35,7 +36,9 @@ import {
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { describe, expect, it } from "vitest";
+import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
+import { afterEach, describe, expect, it } from "vitest";
 
 // The reward-shop interaction seq the OWNER is pinned to (the seq the shop watch loop awaits).
 const SHOP_SEQ = 42;
@@ -62,6 +65,8 @@ const OUTCOMES: { name: string; data: number[] }[] = [
 ];
 
 describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", () => {
+  afterEach(() => clearCoopRuntime());
+
   it("the COOP_ABILITY_OUTCOME sentinel is distinct from every reward cursor + LEAVE/REROLL", () => {
     // A reward/shop cursor is always >= 0; the ability sentinel must be a unique negative value so
     // the shop's watch loop can never confuse a relayed ability outcome with a reward pick.
@@ -145,5 +150,30 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
     const res = await awaited;
     expect(res?.choice).toBe(COOP_ABILITY_OUTCOME);
     expect(res?.data?.[0]).toBe(COOP_ABILITY_OP.CANCEL);
+  });
+
+  it("DURABILITY: dropping only abilityPicker still materializes the committed outcome for the guest", async () => {
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 1,
+        reorder: 0,
+        delay: 0,
+        faultable: msg => msg.t === "interactionChoice" && msg.kind === COOP_ABILITY_KIND,
+      },
+      { seed: 0xab1117 },
+    );
+    const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
+    setCoopRuntime(hostRuntime);
+
+    sendCoopAbilityPickerOutcome(hostRuntime.interactionRelay, SHOP_SEQ, [COOP_ABILITY_OP.CAP_RUNUNLOCK, 2]);
+    const outcome = await guestRuntime.interactionRelay.awaitInteractionChoice(SEQ, 25);
+
+    expect(pair.faultsInjected(), "the raw abilityPicker carrier was actually dropped").toBe(1);
+    expect(outcome?.data, "the committed outcome reached the real guest choice FIFO").toEqual([
+      COOP_ABILITY_OP.CAP_RUNUNLOCK,
+      2,
+    ]);
   });
 });
