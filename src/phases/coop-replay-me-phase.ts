@@ -20,6 +20,7 @@ import {
   setOnMePinCleared,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
+import { isCoopOperationJournalActive } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   getCoopBattleStreamer,
   getCoopController,
@@ -423,6 +424,9 @@ export class CoopReplayMePhase extends Phase {
       localRole: getCoopController()?.role ?? "guest",
       wave: globalScene.currentBattle?.waveIndex ?? -1,
       turn: 0,
+      resend: isCoopOperationJournalActive()
+        ? () => relay.sendInteractionChoice(this.seq, ME_CHOICE_KIND, index)
+        : undefined,
     });
     // #831: for a REPEATED option-select round (delve / Safari) beginNewRound reset pickSent so THIS pick is
     // allowed, and this re-armed race INHERITS the live 9M terminal arm (awaitOutcomeThenTerminal reads
@@ -440,7 +444,8 @@ export class CoopReplayMePhase extends Phase {
 
   public relayGuestSubPick(value: number): void {
     coopLog("me", "guest relays ME sub-pick", { seq: this.seq, kind: ME_SUBPICK_KIND, value });
-    getCoopInteractionRelay()?.sendInteractionChoice(this.seq, ME_SUBPICK_KIND, value); // P1b on seq_me (FIFO)
+    const relay = getCoopInteractionRelay();
+    relay?.sendInteractionChoice(this.seq, ME_SUBPICK_KIND, value); // P1b on seq_me (FIFO)
     // Wave-2c: DUAL-RUN - mint the typed ME_SUB intent (the guest owner's captured slot/index). The step
     // ordinal disambiguates repeated sub-picks that FIFO on the same seq. No-op when the flag is OFF.
     commitMeOwnerIntent({
@@ -452,6 +457,10 @@ export class CoopReplayMePhase extends Phase {
       localRole: getCoopController()?.role ?? "guest",
       wave: globalScene.currentBattle?.waveIndex ?? -1,
       turn: 0,
+      resend:
+        relay != null && isCoopOperationJournalActive()
+          ? () => relay.sendInteractionChoice(this.seq, ME_SUBPICK_KIND, value)
+          : undefined,
     });
   }
 
@@ -777,13 +786,20 @@ export class CoopReplayMePhase extends Phase {
       kind: "ME_TERMINAL",
       seq: this.seqTerm,
       pinned: this.interactionCounter,
-      res: action == null ? null : { choice: action.choice, data: action.data },
+      res: action == null ? null : { choice: action.choice, data: action.data, operationId: action.operationId },
       terminal: legacyIsBattle ? "battle" : "leave",
       hostTurn: action?.data?.[0],
       localRole: getCoopController()?.role ?? "guest",
       wave: globalScene.currentBattle?.waveIndex ?? -1,
       turn: 0,
     });
+    if (!terminalDecision.adopt && terminalDecision.reason === "await-journal") {
+      const relay = getCoopInteractionRelay();
+      if (relay != null) {
+        this.awaitHostTerminal(relay);
+        return;
+      }
+    }
     const isBattleTerminal = terminalDecision.adopt ? terminalDecision.terminal === "battle" : legacyIsBattle;
     coopLog("me", "host terminal resolved", {
       seqTerm: this.seqTerm,

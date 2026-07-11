@@ -44,13 +44,24 @@ export function isRankServerConfigured(): boolean {
   return rankBase() != null;
 }
 
+/**
+ * Sticky per-session guard: once the ranked routes answer 404 (the `/showdown/rank*` endpoints are not
+ * deployed on this worker yet), stop hitting them for the rest of the session. Without this the rank
+ * chip re-fetches on EVERY Team Menu / wager open and the browser logs a fresh `GET .../showdown/rank
+ * 404` each time - console spam for a feature that is simply awaiting a worker deploy. Casual play is
+ * unaffected and the chip renders the neutral "Unranked" state (fetch resolves null). Cleared only by a
+ * page reload (i.e. a fresh deploy that ships the route). NOTE: the FIRST 404 is still emitted by the
+ * browser itself (unsuppressable for a real `fetch`); this collapses the repeat noise to that one line.
+ */
+let rankRouteMissing = false;
+
 async function rankFetch(path: string, init: RequestInit): Promise<Response | null> {
   const base = rankBase();
-  if (!base) {
+  if (!base || rankRouteMissing) {
     return null;
   }
   try {
-    return await fetch(`${base}${path}`, {
+    const res = await fetch(`${base}${path}`, {
       ...init,
       headers: {
         "Content-Type": "application/json",
@@ -58,6 +69,12 @@ async function rankFetch(path: string, init: RequestInit): Promise<Response | nu
         ...(init.headers ?? {}),
       },
     });
+    // 404 = the ranked routes aren't deployed on this worker. Latch it so we don't re-probe (and re-spam
+    // the console) on every subsequent menu/wager open this session.
+    if (res.status === 404) {
+      rankRouteMissing = true;
+    }
+    return res;
   } catch {
     // offline / no endpoint — surface as null (ranked simply doesn't count; casual is unaffected).
     return null;

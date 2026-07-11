@@ -28,11 +28,7 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import { checksumState } from "#data/elite-redux/coop/coop-battle-checksum";
-import {
-  applyCoopFullSnapshot,
-  captureCoopChecksumState,
-  captureCoopFullSnapshot,
-} from "#data/elite-redux/coop/coop-battle-engine";
+import { captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -67,9 +63,12 @@ function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
 }
 
-/** The private PhaseTree seam we read to retrieve the runtime-queued guest picker (find, no mutation). */
+/** Test seam for the runtime-queued guest picker. */
 interface PhaseQueueSeam {
-  phaseManager: { phaseQueue: { find(name: string): Phase | undefined } };
+  phaseManager: {
+    phaseQueue: { find(name: string): Phase | undefined };
+    tryRemovePhase(name: "CoopGuestRevivalPhase", filter: (phase: Phase) => boolean): boolean;
+  };
 }
 
 /** The minimal guest UI seam whose setMode we stub to drive the REVIVAL_BLESSING picker headlessly. */
@@ -194,8 +193,9 @@ describe.skipIf(!RUN)(
 
       // ===== (D) GUEST (SYNC, no microtask flush): run the real picker phase. Stub the guest UI's PARTY open
       // to auto-pick slot 3 (the OWNER'S choice); the phase relays the pick under the revival seq band. The
-      // MESSAGE setMode returns a never-resolving promise so the phase's own end() (a shiftPhase) can never
-      // fire cross-ctx under the host later. The relayed pick is queued on the loopback, NOT flushed here. =====
+      // MESSAGE setMode returns a never-resolving promise so the phase's own end() cannot fire later under
+      // the wrong shared-process client context. After the pick is sent, retire this queued UI-driver phase
+      // explicitly—the production picker does the same via end()—so it cannot sit ahead of turn finalize. =====
       withClientSync(rig.guestCtx, () => {
         const ui = rig.guestScene.ui as unknown as StubbableUi;
         const realSetMode = ui.setMode.bind(ui);
@@ -213,6 +213,11 @@ describe.skipIf(!RUN)(
           return realSetMode(...args);
         };
         (guestPicker as Phase).start();
+        const removed = (rig.guestScene as unknown as PhaseQueueSeam).phaseManager.tryRemovePhase(
+          "CoopGuestRevivalPhase",
+          phase => phase === guestPicker,
+        );
+        expect(removed, "completed guest revival picker retired before replay finalize").toBe(true);
       });
 
       // ===== (E) HOST: drain so the relayed pick is delivered while the HOST runtime is live -> the host's
@@ -225,11 +230,9 @@ describe.skipIf(!RUN)(
         await game.phaseInterceptor.to("TurnEndPhase");
       });
 
-      // ===== (F) GUEST: replay the turn (applies the host's per-turn checkpoint). NB the per-turn checkpoint
-      // carries FIELD state but NOT bench-mon hp/fainted (by design: `benchHp` is a CHECKSUM digest for
-      // DETECTION only - see readBenchHpDigest in coop-battle-engine - and the revive is HEALED by the resync
-      // backstop, exactly the #719 reward-shop Revive path). So after the replay the guest bench mon is still
-      // fainted; the checksum DETECTS the divergence and the full-snapshot resync closes it (driven below). =====
+      // ===== (F) GUEST: replay the turn. The ordinary authoritative checkpoint must carry the mutated
+      // bench HP/status directly; requiring a checksum mismatch + heavy stateSync here would expose a visible
+      // transient desync after every bench revive and make recovery—not convergence—the normal path. =====
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn);
       });
@@ -259,45 +262,15 @@ describe.skipIf(!RUN)(
         "host: the revived bench mon was NOT summoned onto the field (no phantom summon)",
       ).toBe(false);
 
-      // (2) DETECTION: the per-turn checkpoint does NOT reconcile bench hp, so the guest's slot-3 BLASTOISE is
-      // still fainted after the replay - and the two engines' benchHp digests DIVERGE, which the per-turn
-      // checksum DETECTS (the mismatch that triggers the resync backstop in production).
-      const hostState1 = await withClient(rig.hostCtx, () => captureCoopChecksumState());
-      const guestState1 = await withClient(rig.guestCtx, () => captureCoopChecksumState());
-      withClientSync(rig.guestCtx, () => {
-        expect(
-          rig.guestScene.getPlayerParty()[OWNER_PICK_SLOT].isFainted(),
-          "guest: after the checkpoint replay the bench mon is still fainted (bench hp is not in the per-turn checkpoint)",
-        ).toBe(true);
-      });
-      expect(
-        guestState1.benchHp,
-        "detection: the bench hp/fainted digest DIVERGES between the engines (host revived, guest fainted)",
-      ).not.toEqual(hostState1.benchHp);
-      expect(checksumState(guestState1), "detection: the per-turn checksum catches the bench divergence").not.toBe(
-        checksumState(hostState1),
-      );
-
-      // (3) HEAL: drive the full-snapshot resync backstop (the checksum mismatch's response). Its benchParty
-      // reconcile revives the guest bench mon - the mon then lands IDENTICALLY on both engines.
-      const snapshot = await withClient(rig.hostCtx, () => captureCoopFullSnapshot());
-      expect(snapshot, "host produced a full resync snapshot").not.toBeNull();
-      if (snapshot == null) {
-        throw new Error("host full snapshot was null - cannot drive the resync heal");
-      }
-      await withClient(rig.guestCtx, () => {
-        applyCoopFullSnapshot(snapshot, true);
-      });
-
-      // CONVERGENCE: the revived mon is now ALIVE on the guest too, IDENTICAL to the host (species, hp, slot),
-      // the fallback mon stays fainted on both, and there is NO phantom summon on the guest either.
+      // (2) DATA-PLANE CONVERGENCE: the revived bench mon is already identical immediately after the normal
+      // turn replay—no full snapshot, no heal-masked bug, and no phantom summon.
       withClientSync(rig.guestCtx, () => {
         const guestPicked = rig.guestScene.getPlayerParty()[OWNER_PICK_SLOT];
         const guestFallback = rig.guestScene.getPlayerParty()[FIRST_FAINTED_SLOT];
         expect(guestPicked.species.speciesId, "guest: the revived mon is BLASTOISE (same species, same slot)").toBe(
           SpeciesId.BLASTOISE,
         );
-        expect(guestPicked.hp > 0 && !guestPicked.isFainted(), "guest: the owner-picked mon is alive after heal").toBe(
+        expect(guestPicked.hp > 0 && !guestPicked.isFainted(), "guest: the owner-picked mon is already alive").toBe(
           true,
         );
         expect(guestPicked.hp, "guest: both engines agree on the revived mon's HP").toBe(hostPicked.hp);
@@ -310,15 +283,16 @@ describe.skipIf(!RUN)(
         ).toBe(false);
       });
 
-      // BYTE-LEVEL CONVERGENCE: post-heal the two engines' checksum states (bench hp/fainted included) match.
+      // BYTE-LEVEL CONVERGENCE: the ordinary checkpoint leaves the checksum states matched immediately.
       const hostState2 = await withClient(rig.hostCtx, () => captureCoopChecksumState());
       const guestState2 = await withClient(rig.guestCtx, () => captureCoopChecksumState());
-      expect(guestState2.benchHp, "post-heal: both engines agree on the full bench hp/fainted vector").toEqual(
+      expect(guestState2.benchHp, "checkpoint: both engines agree on the full bench hp/fainted vector").toEqual(
         hostState2.benchHp,
       );
-      expect(checksumState(guestState2), "post-heal: the two engines' checksums converge").toBe(
+      expect(checksumState(guestState2), "checkpoint: the two engines' checksums converge").toBe(
         checksumState(hostState2),
       );
+      expect(resyncProbe.count(), "a normal bench revive requires zero forced full-state resyncs").toBe(0);
 
       logs.flush();
     }, 300_000);

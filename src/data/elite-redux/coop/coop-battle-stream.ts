@@ -89,6 +89,9 @@ const DEFAULT_TIMEOUT_MS = 1_200_000;
  */
 export const COOP_WAVE_NO_ME = -1;
 
+/** Reserved `stateSync.seq` for an unsolicited durability deep-gap snapshot (§4.4). */
+export const COOP_DURABILITY_SNAPSHOT_SEQ = -2_147_000_000;
+
 /**
  * How many past turns of buffered LIVE battle events to retain (#633, animation layer). A handful is
  * plenty: a turn's events are consumed at that turn's boundary, so retention only needs to cover a
@@ -201,6 +204,8 @@ export class CoopBattleStreamer {
   private readonly stateSyncInbox = new Map<number, string>();
   /** GUEST: monotonic resync request counter (each desync request bumps it). */
   private stateSyncSeq = 0;
+  /** GUEST: live apply callback for an unsolicited deep-gap durability snapshot. */
+  private durabilitySnapshotHandler: ((blob: string) => void) | null = null;
   /** WATCHER: handler for the owner's ME-boundary checksum (#633, TRACK-2 Phase C). */
   private meChecksumHandler: ((seq: number, checksum: string) => void) | null = null;
   /** GUEST: handler for the host's ME narration lines (#633, TRACK-2 Phase C, non-battle ME). */
@@ -384,6 +389,16 @@ export class CoopBattleStreamer {
   sendStateSync(blob: string, seq: number): void {
     coopLog("resync", `host SEND stateSync seq=${seq} blobLen=${blob.length}`);
     this.transport.send({ t: "stateSync", blob, seq });
+  }
+
+  /** HOST: push the heavy state snapshot selected when the requested journal gap was evicted. */
+  sendDurabilitySnapshot(blob: string): void {
+    this.sendStateSync(blob, COOP_DURABILITY_SNAPSHOT_SEQ);
+  }
+
+  /** GUEST: install the production live apply callback for deep-gap snapshot pushes. */
+  onDurabilitySnapshot(handler: (blob: string) => void): void {
+    this.durabilitySnapshotHandler = handler;
   }
 
   /**
@@ -1166,6 +1181,7 @@ export class CoopBattleStreamer {
     this.ghostPoolHandler = null;
     this.lastGhostPool = null;
     this.stateSyncRequestHandler = null;
+    this.durabilitySnapshotHandler = null;
     this.enemyPartyRequestHandler = null;
     this.meChecksumHandler = null;
     this.meMessageHandler = null;
@@ -1317,6 +1333,11 @@ export class CoopBattleStreamer {
         this.stateSyncRequestHandler?.(msg.turn, msg.seq);
         return;
       case "stateSync": {
+        if (msg.seq === COOP_DURABILITY_SNAPSHOT_SEQ) {
+          coopLog("resync", `guest RECV durability snapshot blobLen=${msg.blob.length} -> live apply`);
+          this.durabilitySnapshotHandler?.(msg.blob);
+          return;
+        }
         // GUEST: deliver to a parked awaiter for this seq, else buffer it (race).
         const waiter = this.stateSyncWaiters.get(msg.seq);
         coopLog(

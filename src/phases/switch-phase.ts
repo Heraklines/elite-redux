@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { commitFaintSwitchAuthorityIntent } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import {
   beginCoopFaintSwitchWindow,
   COOP_FAINT_SWITCH_SEQ_BASE,
@@ -163,6 +164,18 @@ export class SwitchPhase extends BattlePhase {
                 );
                 slotIndex = this.coopAutoPickReplacement();
               }
+              const authoritativePick = globalScene.getPlayerParty()[slotIndex];
+              commitFaintSwitchAuthorityIntent({
+                payload: {
+                  fieldIndex: this.fieldIndex,
+                  partySlot: slotIndex,
+                  data: [0, authoritativePick?.species?.speciesId ?? 0],
+                },
+                ownerRole: coopOwnerOfPlayerFieldSlot(this.fieldIndex),
+                localRole: coopController.role,
+                wave: globalScene.currentBattle.waveIndex,
+                turn: globalScene.currentBattle.turn ?? 0,
+              });
               if (slotIndex >= battlerCount && slotIndex < 6) {
                 globalScene.phaseManager.unshiftNew(
                   "SwitchSummonPhase",
@@ -208,6 +221,15 @@ export class SwitchPhase extends BattlePhase {
           `owner slot=${this.fieldIndex}: no legal same-owner replacement (half wiped) -> close picker, slot stays empty`,
         );
         coopRelay.sendInteractionChoice(seq, "switch", -1, [0]);
+        if (getCoopNetcodeMode() === "authoritative") {
+          commitFaintSwitchAuthorityIntent({
+            payload: { fieldIndex: this.fieldIndex, partySlot: -1, data: [0] },
+            ownerRole: coopController.role,
+            localRole: coopController.role,
+            wave: globalScene.currentBattle.waveIndex,
+            turn: globalScene.currentBattle.turn ?? 0,
+          });
+        }
         return super.end();
       }
       // OWNER: pick normally, and relay the chosen slot (+ baton flag) so the watcher mirrors it.
@@ -217,7 +239,17 @@ export class SwitchPhase extends BattlePhase {
         fieldIndex,
         (slotIndex: number, option: PartyOption) => {
           const isBaton = option === PartyOption.PASS_BATON;
-          coopRelay.sendInteractionChoice(seq, "switch", slotIndex, isBaton ? [1] : [0]);
+          const data = isBaton ? [1] : [0];
+          coopRelay.sendInteractionChoice(seq, "switch", slotIndex, data);
+          if (getCoopNetcodeMode() === "authoritative") {
+            commitFaintSwitchAuthorityIntent({
+              payload: { fieldIndex: this.fieldIndex, partySlot: slotIndex, data },
+              ownerRole: coopController.role,
+              localRole: coopController.role,
+              wave: globalScene.currentBattle.waveIndex,
+              turn: globalScene.currentBattle.turn ?? 0,
+            });
+          }
           if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
             const switchType = isBaton ? SwitchType.BATON_PASS : this.switchType;
             globalScene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);

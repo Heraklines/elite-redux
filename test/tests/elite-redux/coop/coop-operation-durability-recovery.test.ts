@@ -19,6 +19,7 @@
 //              for that class so requests no coopResync, and the host never proactively resends.
 // =============================================================================
 
+import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import {
   type CoopApplyOutcome,
   type CoopDurabilityHooks,
@@ -26,6 +27,7 @@ import {
   type CoopJournalEntry,
   setCoopDurabilityEnabled,
 } from "#data/elite-redux/coop/coop-durability";
+import { adoptCoopSnapshotHighWater } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -175,6 +177,25 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     guestMgr.dispose();
   });
 
+  it("I2b production seam: a stateSync snapshot fast-forwards every stamped operation class", async () => {
+    const pair = createLoopbackPair();
+    const hostMgr = new CoopDurabilityManager(pair.host);
+    const guestMgr = new CoopDurabilityManager(pair.guest);
+
+    for (let revision = 1; revision <= 3; revision++) {
+      hostMgr.commit("op:wave", revision, waveMsg(revision));
+    }
+    await flush();
+    expect(hostMgr.unackedCount()).toBe(3);
+
+    adoptCoopSnapshotHighWater(guestMgr, { journalHighWater: { "op:wave": 3 } });
+    await flush();
+
+    expect(hostMgr.unackedCount(), "snapshot adoption must ACK every operation revision it subsumed").toBe(0);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
   // ===========================================================================================
   // I3 - OVERFLOW RESYNC: when the bounded journal ring has EVICTED the ops the receiver is missing (the
   // peer was gone long enough), a reconnect must DETECT the gap (the ring's oldest retained is past the
@@ -211,6 +232,42 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     ).toEqual([]);
     hostMgr.dispose();
     guestMgr.dispose();
+  });
+
+  it("I3b production carrier: a deep-gap snapshot crosses the live stream and fast-forwards the guest", async () => {
+    const pair = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(pair.host);
+    const guestStream = new CoopBattleStreamer(pair.guest);
+    const guestMgr = new CoopDurabilityManager(pair.guest);
+    let liveSnapshotHead = 0;
+    const hostMgr = new CoopDurabilityManager(
+      pair.host,
+      {
+        sendFullSnapshot: (cls, head) => {
+          hostStream.sendDurabilitySnapshot(JSON.stringify({ journalHighWater: { [cls]: head } }));
+        },
+      },
+      3,
+    );
+    guestStream.onDurabilitySnapshot(blob => {
+      const snapshot = JSON.parse(blob) as { journalHighWater: Record<string, number> };
+      liveSnapshotHead = snapshot.journalHighWater.wave ?? 0;
+      adoptCoopSnapshotHighWater(guestMgr, snapshot);
+    });
+
+    for (let revision = 1; revision <= 6; revision++) {
+      hostMgr.commit("wave", revision, waveMsg(revision));
+    }
+    await flush();
+    pair.guest.send({ t: "coopResyncAll" });
+    await flush();
+
+    expect(liveSnapshotHead, "the deep-gap full snapshot must reach the guest's live apply callback").toBe(6);
+    expect(hostMgr.unackedCount(), "snapshot adoption must ACK the evicted operation range").toBe(0);
+    hostMgr.dispose();
+    guestMgr.dispose();
+    hostStream.dispose();
+    guestStream.dispose();
   });
 
   // ===========================================================================================

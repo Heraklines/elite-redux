@@ -7,7 +7,8 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { COOP_REVIVAL_SEQ_BASE } from "#data/elite-redux/coop/coop-interaction-relay";
+import { COOP_REVIVAL_SEQ_BASE, sendCoopRevivalChoice } from "#data/elite-redux/coop/coop-interaction-relay";
+import { armCoopRevivalIntentResend } from "#data/elite-redux/coop/coop-revival-operation";
 import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import { UiMode } from "#enums/ui-mode";
 import { PartyUiHandler, PartyUiMode } from "#ui/handlers/party-ui-handler";
@@ -60,7 +61,21 @@ export class CoopGuestRevivalPhase extends Phase {
               "replay",
               `guest revival picker PICK slot=${this.fieldIndex} -> party[${slotIndex}] sp=${pickedSpecies} seq=${seq}`,
             );
-            relay.sendInteractionChoice(seq, "revival", slotIndex, [0, pickedSpecies]);
+            const data = [0, pickedSpecies];
+            const wave = globalScene.currentBattle?.waveIndex ?? 0;
+            const turn = globalScene.currentBattle?.turn ?? 0;
+            sendCoopRevivalChoice(relay, this.fieldIndex, slotIndex, data);
+            armCoopRevivalIntentResend({
+              payload: {
+                type: "decision",
+                fieldIndex: this.fieldIndex,
+                partySlot: slotIndex,
+                speciesId: pickedSpecies,
+              },
+              wave,
+              turn,
+              resend: () => sendCoopRevivalChoice(relay, this.fieldIndex, slotIndex, data),
+            });
           }
           void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => this.end());
         },

@@ -20,9 +20,27 @@
 
 import { globalScene } from "#app/global-scene";
 import {
+  armCoopAbilityJournalMaterialization,
+  COOP_ABILITY_ACTION_STRIDE,
+  isCoopAbilityOperationEnabled,
+  resetCoopAbilityOperationState,
+  setCoopAbilityOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-ability-operation";
+import {
+  COOP_ABILITY_KIND,
+  COOP_ABILITY_OUTCOME,
+  coopAbilityPickerSeq,
+} from "#data/elite-redux/coop/coop-ability-picker-relay";
+import {
   setCoopAuthoritativeGuestPredicate,
   setShowdownGuestFlipPredicate,
 } from "#data/elite-redux/coop/coop-authoritative-gate";
+import {
+  armCoopBargainJournalMaterialization,
+  isCoopBargainOperationEnabled,
+  resetCoopBargainOperationState,
+  setCoopBargainOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-bargain-operation";
 import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   applyCoopDexDelta,
@@ -38,33 +56,66 @@ import {
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import {
+  armCoopBiomeJournalMaterialization,
   isCoopBiomeOperationEnabled,
   resetCoopBiomeOperationState,
   setCoopBiomeOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-biome-operation";
 import {
   COOP_CAP_DURABILITY_JOURNAL,
+  COOP_CAP_OP_ABILITY,
+  COOP_CAP_OP_BARGAIN,
   COOP_CAP_OP_BIOME,
+  COOP_CAP_OP_CATCH_FULL,
+  COOP_CAP_OP_COLOSSEUM,
+  COOP_CAP_OP_FAINT_SWITCH,
+  COOP_CAP_OP_LEARN_MOVE,
   COOP_CAP_OP_ME,
+  COOP_CAP_OP_REVIVAL,
   COOP_CAP_OP_REWARD,
+  COOP_CAP_OP_STORMGLASS,
   COOP_CAP_OP_WAVE,
   COOP_CAP_RENDERER_ALLOWLIST_ENFORCE,
   type CoopCapabilityKey,
   clearNegotiatedCoopCapabilities,
 } from "#data/elite-redux/coop/coop-capabilities";
+import {
+  isCoopCatchFullOperationEnabled,
+  resetCoopCatchFullOperationState,
+  setCoopCatchFullOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-catch-full-operation";
 import { getCoopChecksumAssertionCount } from "#data/elite-redux/coop/coop-checksum-assert";
+import {
+  COOP_COLOSSEUM_ACTION_STRIDE,
+  isCoopColosseumOperationEnabled,
+  resetCoopColosseumOperationState,
+  setCoopColosseumOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-colosseum-operation";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { CoopDurabilityManager, isCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
 import {
+  isCoopFaintSwitchOperationEnabled,
+  resetCoopFaintSwitchOperationState,
+  setCoopFaintSwitchOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-faint-switch-operation";
+import {
   COOP_DEX_SYNC_SEQ,
+  COOP_INTERACTION_LEAVE,
   CoopInteractionRelay,
+  coopBiomeShopSeq,
   isCoopFaintSwitchSeq,
   isCoopFaintSwitchWindowOpen,
   resetCoopFaintSwitchWindows,
 } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  isCoopLearnMoveOperationEnabled,
+  resetCoopLearnMoveOperationState,
+  setCoopLearnMoveOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-learn-move-operation";
 import { COOP_DISCONNECT_GRACE_MS } from "#data/elite-redux/coop/coop-lifecycle";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import {
+  armCoopMeJournalTerminal,
   commitMeOwnerIntent,
   isCoopMeOperationEnabled,
   resetCoopMeOperationState,
@@ -76,11 +127,28 @@ import {
   coopMeInteractionStartValue,
   setCoopMeInteractionStart,
 } from "#data/elite-redux/coop/coop-me-pin-state";
-import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
+import { COOP_ME_BATTLE_HANDOFF, CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import type {
+  CoopAbilityPickPayload,
   CoopAuthoritativeEnvelopeV1,
+  CoopBargainPayload,
+  CoopBiomePickPayload,
+  CoopCatchFullPayload,
+  CoopColosseumPayload,
+  CoopCrossroadsPickPayload,
+  CoopLearnMoveBatchPayload,
+  CoopLearnMovePayload,
+  CoopMePickPayload,
+  CoopMePresentPayload,
+  CoopMeSubPayload,
+  CoopMeTerminalPayload,
+  CoopRevivalPayload,
+  CoopRewardActionPayload,
+  CoopShopBuyPayload,
+  CoopStormglassPayload,
   CoopWaveAdvancePayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
+import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   coopOperationDurabilityHooks,
   registerCoopOperationLiveSink,
@@ -89,14 +157,39 @@ import {
 } from "#data/elite-redux/coop/coop-operation-journal";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import {
+  isCoopRevivalOperationEnabled,
+  resetCoopRevivalOperationState,
+  setCoopRevivalOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-revival-operation";
+import {
+  armCoopRewardJournalMaterialization,
+  COOP_REWARD_ACTION_STRIDE,
   isCoopRewardOperationEnabled,
   resetCoopRewardOperationState,
   setCoopRewardOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-reward-operation";
-import { COOP_ME_TERM_SEQ_BASE, COOP_REJOIN_SYNC_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import {
+  COOP_BARGAIN_SEQ_BASE,
+  COOP_BIOME_PICK_SEQ_BASE,
+  COOP_BIOME_SHOP_CHOICE_KINDS,
+  COOP_COLOSSEUM_SEQ_BASE,
+  COOP_CROSSROADS_SEQ_BASE,
+  COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE,
+  COOP_LEARN_MOVE_FWD_SEQ_BASE,
+  COOP_ME_PUMP_SEQ_BASE,
+  COOP_ME_TERM_SEQ_BASE,
+  COOP_REJOIN_SYNC_SEQ_BASE,
+  COOP_REWARD_CHOICE_KINDS,
+  COOP_STORMGLASS_SEQ,
+} from "#data/elite-redux/coop/coop-seq-registry";
 import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
+import {
+  isCoopStormglassOperationEnabled,
+  resetCoopStormglassOperationState,
+  setCoopStormglassOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-stormglass-operation";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopCapturePresentation,
@@ -194,7 +287,11 @@ function wireCoopLiveEvents(controller: CoopSessionController, battleStream: Coo
  * HOST role so a guest/solo client never answers. Best-effort + guarded - a serialize
  * failure never breaks the host's turn.
  */
-function wireCoopResyncResponder(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
+function wireCoopResyncResponder(
+  controller: CoopSessionController,
+  battleStream: CoopBattleStreamer,
+  durability: CoopDurabilityManager | undefined,
+): void {
   battleStream.onStateSyncRequest((_turn, seq) => {
     coopLog("resync", `recv requestStateSync turn=${_turn} seq=${seq} role=${controller.role}`);
     if (controller.role !== "host") {
@@ -207,12 +304,79 @@ function wireCoopResyncResponder(controller: CoopSessionController, battleStream
         coopWarn("resync", `host has no live snapshot for requestStateSync seq=${seq} -> no reply`);
         return;
       }
-      const blob = compressToBase64(JSON.stringify(snapshot));
+      const blob = compressToBase64(
+        JSON.stringify({
+          ...snapshot,
+          journalHighWater: durability?.controlPlaneHighWater() ?? {},
+        } satisfies CoopFullBattleSnapshot),
+      );
       coopLog("resync", `send stateSync seq=${seq} blob=${blob.length}b`);
       battleStream.sendStateSync(blob, seq);
     } catch (e) {
       /* a resync serialize/send failure must never break the host's turn */
       coopWarn("resync", `host stateSync send failed seq=${seq}`, e);
+    }
+  });
+}
+
+/** Fast-forward the durability receiver through every operation revision a full DATA snapshot subsumes. */
+export function adoptCoopSnapshotHighWater(
+  durability: CoopDurabilityManager | undefined,
+  snapshot: Pick<CoopFullBattleSnapshot, "journalHighWater">,
+): void {
+  if (durability == null) {
+    return;
+  }
+  for (const [cls, revision] of Object.entries(snapshot.journalHighWater ?? {})) {
+    if (Number.isFinite(revision) && revision > 0) {
+      durability.adoptSnapshot(cls, revision);
+    }
+  }
+}
+
+/** Host-side deep-gap escalation: push a heavy snapshot stamped at the evicted class's journal head. */
+function sendCoopDurabilitySnapshot(
+  controller: CoopSessionController,
+  battleStream: CoopBattleStreamer,
+  cls: string,
+  headRevision: number,
+): void {
+  if (controller.role !== "host") {
+    return;
+  }
+  try {
+    const snapshot = captureCoopFullSnapshot();
+    if (snapshot == null) {
+      coopWarn("resync", `durability snapshot unavailable cls=${cls} head=${headRevision}`);
+      return;
+    }
+    const stamped = {
+      ...snapshot,
+      journalHighWater: { [cls]: headRevision },
+    } satisfies CoopFullBattleSnapshot;
+    battleStream.sendDurabilitySnapshot(compressToBase64(JSON.stringify(stamped)));
+  } catch (e) {
+    coopWarn("resync", `durability snapshot send failed cls=${cls} head=${headRevision}`, e);
+  }
+}
+
+/** Guest-side deep-gap application: mutate live state, then ACK exactly the revisions it subsumed. */
+function wireCoopDurabilitySnapshotReceiver(
+  controller: CoopSessionController,
+  battleStream: CoopBattleStreamer,
+  durability: CoopDurabilityManager | undefined,
+): void {
+  battleStream.onDurabilitySnapshot(blob => {
+    if (controller.role !== "guest") {
+      return;
+    }
+    try {
+      const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
+      applyCoopFullSnapshot(snapshot, isCoopAuthoritativeGuest());
+      adoptCoopSnapshotHighWater(durability, snapshot);
+      coopLog("resync", `durability deep-gap snapshot applied blob=${blob.length}b`);
+    } catch (e) {
+      coopWarn("resync", "durability deep-gap snapshot apply failed", e);
     }
   });
 }
@@ -511,7 +675,10 @@ function wireCoopWaveEndState(controller: CoopSessionController, battleStream: C
  * turning the pump's silent "identical state" assumption into detect-and-heal (reusing the
  * Phase A machinery). Additive: on a match nothing changes, so the working pump is intact.
  */
-function wireCoopMeChecksumCheck(battleStream: CoopBattleStreamer): void {
+function wireCoopMeChecksumCheck(
+  battleStream: CoopBattleStreamer,
+  durability: CoopDurabilityManager | undefined,
+): void {
   battleStream.onMeChecksum((seq, ownerChecksum) => {
     const ours = captureCoopChecksum();
     if (ownerChecksum === COOP_CHECKSUM_SENTINEL || ours === COOP_CHECKSUM_SENTINEL || ownerChecksum === ours) {
@@ -542,11 +709,9 @@ function wireCoopMeChecksumCheck(battleStream: CoopBattleStreamer): void {
         // whether this early heal converges - the AUTHORITATIVE convergence is the ME terminal's
         // comprehensive meResync (applyCoopMeOutcome), which the guest still adopts. The still-diverged
         // path below is advisory by design (#839): it must never disrupt the encounter.
-        applyCoopFullSnapshot(
-          JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot,
-          isCoopAuthoritativeGuest(),
-          /* suppressResummon */ true,
-        );
+        const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
+        applyCoopFullSnapshot(snapshot, isCoopAuthoritativeGuest(), /* suppressResummon */ true);
+        adoptCoopSnapshotHighWater(durability, snapshot);
         const healed = captureCoopChecksum();
         if (healed === ownerChecksum) {
           coopLog("resync", `me-entry seq=${seq} ok (healed=${healed})`);
@@ -857,10 +1022,9 @@ export function wireCoopStallWatchdog(
               return;
             }
             try {
-              applyCoopFullSnapshot(
-                JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot,
-                isCoopAuthoritativeGuest(),
-              );
+              const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
+              applyCoopFullSnapshot(snapshot, isCoopAuthoritativeGuest());
+              adoptCoopSnapshotHighWater(runtime.durability, snapshot);
               coopLog("resync", `stall-recovery snapshot applied seq=${seq} blob=${blob.length}b`);
             } catch {
               coopWarn("resync", `stall-recovery snapshot apply FAILED seq=${seq}`);
@@ -1054,10 +1218,9 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
                 return;
               }
               try {
-                applyCoopFullSnapshot(
-                  JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot,
-                  isCoopAuthoritativeGuest(),
-                );
+                const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
+                applyCoopFullSnapshot(snapshot, isCoopAuthoritativeGuest());
+                adoptCoopSnapshotHighWater(runtime.durability, snapshot);
                 coopLog("resync", `post-rejoin snapshot applied seq=${seq} blob=${blob.length}b`);
               } catch {
                 coopWarn("resync", `post-rejoin snapshot apply FAILED seq=${seq} (checksum backstop heals next turn)`);
@@ -1094,15 +1257,12 @@ function wireCoopDexSync(transport: CoopTransport): void {
   });
 }
 
-function wireCoopLearnMoveForward(transport: CoopTransport): void {
-  offLearnMoveForward = transport.onMessage(msg => {
-    if (msg.t !== "interactionOutcome" || msg.outcome.k !== "learnMoveForward") {
-      return;
-    }
+function wireCoopLearnMoveForward(relay: CoopInteractionRelay): void {
+  relay.onLearnMoveForward = outcome => {
     if (!isCoopAuthoritativeGuest()) {
       return;
     }
-    const { partySlot, moveId, maxMoveCount } = msg.outcome;
+    const { partySlot, moveId, maxMoveCount } = outcome;
     if (learnMoveForwardInFlight.has(partySlot)) {
       coopLog("learnmove", `recv learnMoveForward slot=${partySlot} IGNORE (picker already in-flight)`);
       return;
@@ -1129,7 +1289,10 @@ function wireCoopLearnMoveForward(transport: CoopTransport): void {
       learnMoveForwardInFlight.delete(partySlot);
       coopWarn("learnmove", `learn-move picker open failed slot=${partySlot} (host await falls back)`, e);
     }
-  });
+  };
+  offLearnMoveForward = () => {
+    relay.onLearnMoveForward = null;
+  };
 }
 
 /** Co-op (#633 BUG3+5): clear a slot's in-flight learn-move picker mark once its phase ends. */
@@ -1145,15 +1308,12 @@ export function clearCoopLearnMoveForwardInFlight(partySlot: number): void {
  * {@linkcode isCoopAuthoritativeGuest} (a dead no-op for solo / host / lockstep). An in-flight slot guard
  * ignores a duplicate present for a slot whose panel is still open. Cleared in {@linkcode clearCoopRuntime}.
  */
-function wireCoopLearnMoveBatchForward(transport: CoopTransport): void {
-  offLearnMoveBatchForward = transport.onMessage(msg => {
-    if (msg.t !== "interactionOutcome" || msg.outcome.k !== "learnMoveBatchForward") {
-      return;
-    }
+function wireCoopLearnMoveBatchForward(relay: CoopInteractionRelay): void {
+  relay.onLearnMoveBatchForward = outcome => {
     if (!isCoopAuthoritativeGuest()) {
       return;
     }
-    const { partySlot, learnableIds, ownerIsGuest } = msg.outcome;
+    const { partySlot, learnableIds, ownerIsGuest } = outcome;
     if (learnMoveBatchForwardInFlight.has(partySlot)) {
       coopLog("learnmove", `recv learnMoveBatchForward slot=${partySlot} IGNORE (panel already in-flight)`);
       return;
@@ -1178,7 +1338,10 @@ function wireCoopLearnMoveBatchForward(transport: CoopTransport): void {
       learnMoveBatchForwardInFlight.delete(partySlot);
       coopWarn("learnmove", `batch panel open failed slot=${partySlot} (host await falls back)`, e);
     }
-  });
+  };
+  offLearnMoveBatchForward = () => {
+    relay.onLearnMoveBatchForward = null;
+  };
 }
 
 /**
@@ -1354,6 +1517,14 @@ export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | u
     // per-class high-water so the committed-op revision stream continues MONOTONICALLY at N+1 across the resume
     // (the epoch is unchanged, so the restored receiver marks stay valid; §1.4/§4.6 monotonic-continue contract).
     setCoopBiomeOperationRevisionFloor(marks["op:biome"] ?? 0);
+    setCoopAbilityOperationRevisionFloor(marks["op:ability"] ?? 0);
+    setCoopBargainOperationRevisionFloor(marks["op:bargain"] ?? 0);
+    setCoopCatchFullOperationRevisionFloor(marks["op:catchFull"] ?? 0);
+    setCoopColosseumOperationRevisionFloor(marks["op:colosseum"] ?? 0);
+    setCoopFaintSwitchOperationRevisionFloor(marks["op:faintSwitch"] ?? 0);
+    setCoopLearnMoveOperationRevisionFloor(marks["op:learnMove"] ?? 0);
+    setCoopRevivalOperationRevisionFloor(marks["op:revival"] ?? 0);
+    setCoopStormglassOperationRevisionFloor(marks["op:stormglass"] ?? 0);
     setCoopRewardOperationRevisionFloor(marks["op:reward"] ?? 0);
     setCoopMeOperationRevisionFloor(marks["op:me"] ?? 0);
     // Wave-2f KEYSTONE (W2e-R P0-3): floor the wave-advance producer + guest so a resumed run continues the
@@ -1796,6 +1967,372 @@ registerCoopOperationLiveSink("op:wave", (envelope: CoopAuthoritativeEnvelopeV1)
 });
 
 /**
+ * Production biome live-materializer. Captures the RECEIVING runtime rather than consulting the ambient
+ * singleton: transport delivery is asynchronous, and the two-engine harness may be driving the partner's
+ * scene when this receiver callback runs. Real clients have one runtime, but keeping the dependency explicit
+ * makes the production wiring correct under both topologies.
+ */
+function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const op = envelope.pendingOperation;
+  const parsed = op == null ? null : parseCoopOperationId(op.id);
+  if (op == null || parsed == null) {
+    return false;
+  }
+  if (op.kind === "BIOME_PICK") {
+    const payload = op.payload as CoopBiomePickPayload;
+    if (
+      parsed.pinnedSeq < COOP_BIOME_PICK_SEQ_BASE
+      || parsed.pinnedSeq >= COOP_STORMGLASS_SEQ
+      || typeof payload?.biomeId !== "number"
+      || typeof payload.nodeIndex !== "number"
+    ) {
+      return false;
+    }
+    runtime.interactionRelay.materializeCommittedInteractionChoice(parsed.pinnedSeq, "biomePick", payload.nodeIndex, [
+      payload.biomeId,
+    ]);
+    armCoopBiomeJournalMaterialization(op.id);
+    return true;
+  }
+  if (op.kind === "CROSSROADS_PICK") {
+    const payload = op.payload as CoopCrossroadsPickPayload;
+    if (
+      parsed.pinnedSeq < COOP_CROSSROADS_SEQ_BASE
+      || parsed.pinnedSeq >= COOP_BIOME_PICK_SEQ_BASE
+      || typeof payload?.optionIndex !== "number"
+    ) {
+      return false;
+    }
+    runtime.interactionRelay.materializeCommittedInteractionChoice(parsed.pinnedSeq, "crossroads", payload.optionIndex);
+    armCoopBiomeJournalMaterialization(op.id);
+    return true;
+  }
+  return false;
+}
+
+/** Feed one journal-led reward/market action into this receiver's existing safe FIFO apply loop. */
+function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const op = envelope.pendingOperation;
+  const parsed = op == null ? null : parseCoopOperationId(op.id);
+  if (op == null || parsed == null || parsed.pinnedSeq < 0) {
+    return false;
+  }
+  const pinned = Math.floor(parsed.pinnedSeq / COOP_REWARD_ACTION_STRIDE);
+  const ordinal = parsed.pinnedSeq % COOP_REWARD_ACTION_STRIDE;
+  if (!Number.isSafeInteger(pinned) || !Number.isSafeInteger(ordinal) || ordinal < 0) {
+    return false;
+  }
+  if (op.kind === "REWARD") {
+    const payload = op.payload as CoopRewardActionPayload;
+    if (
+      typeof payload?.label !== "string"
+      || !COOP_REWARD_CHOICE_KINDS.some(kind => kind === payload.label)
+      || typeof payload.choice !== "number"
+      || typeof payload.terminal !== "boolean"
+      || (payload.data !== undefined && (!Array.isArray(payload.data) || !payload.data.every(Number.isFinite)))
+    ) {
+      return false;
+    }
+    runtime.interactionRelay.materializeCommittedInteractionChoice(
+      pinned,
+      payload.label,
+      payload.choice,
+      payload.data,
+      op.id,
+    );
+    armCoopRewardJournalMaterialization(op.id, pinned);
+    return true;
+  }
+  if (op.kind === "SHOP_BUY") {
+    const payload = op.payload as CoopShopBuyPayload;
+    if (
+      typeof payload?.slot !== "number"
+      || typeof payload.terminal !== "boolean"
+      || (payload.data !== undefined && (!Array.isArray(payload.data) || !payload.data.every(Number.isFinite)))
+    ) {
+      return false;
+    }
+    runtime.interactionRelay.materializeCommittedInteractionChoice(
+      coopBiomeShopSeq(pinned),
+      COOP_BIOME_SHOP_CHOICE_KINDS[0],
+      payload.slot,
+      payload.data,
+      op.id,
+    );
+    armCoopRewardJournalMaterialization(op.id, pinned);
+    return true;
+  }
+  return false;
+}
+
+/** Feed a journal-delivered Giratina bargain terminal into the receiver's real outcome waiter. */
+function materializeCoopBargainOutcomeFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const op = envelope.pendingOperation;
+  const parsed = op == null ? null : parseCoopOperationId(op.id);
+  const payload = op?.payload as CoopBargainPayload | undefined;
+  if (
+    op?.kind !== "BARGAIN"
+    || parsed == null
+    || !Number.isSafeInteger(parsed.pinnedSeq)
+    || parsed.pinnedSeq < 0
+    || payload?.outcome?.k !== "meResync"
+  ) {
+    return false;
+  }
+  armCoopBargainJournalMaterialization(op.id);
+  runtime.interactionRelay.materializeCommittedInteractionOutcome(
+    COOP_BARGAIN_SEQ_BASE + parsed.pinnedSeq,
+    payload.outcome,
+  );
+  return true;
+}
+
+/** Feed one journal-delivered ability outcome into the receiver's dedicated picker FIFO. */
+function materializeCoopAbilityOutcomeFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const operation = envelope.pendingOperation;
+  const parsed = operation == null ? null : parseCoopOperationId(operation.id);
+  const payload = operation?.payload as CoopAbilityPickPayload | undefined;
+  if (
+    operation?.kind !== "ABILITY_PICK"
+    || parsed == null
+    || payload == null
+    || !Array.isArray(payload.data)
+    || !payload.data.every(Number.isFinite)
+  ) {
+    return false;
+  }
+  if (operation.owner === 1) {
+    return true; // guest owner already applied its own picker result; envelope is confirmation only.
+  }
+  const pinned = Math.floor(parsed.pinnedSeq / COOP_ABILITY_ACTION_STRIDE);
+  if (!Number.isSafeInteger(pinned) || pinned < 0) {
+    return false;
+  }
+  armCoopAbilityJournalMaterialization(operation.id);
+  runtime.interactionRelay.materializeCommittedInteractionChoice(
+    coopAbilityPickerSeq(pinned),
+    COOP_ABILITY_KIND,
+    COOP_ABILITY_OUTCOME,
+    [...payload.data],
+    operation.id,
+  );
+  return true;
+}
+
+/** Feed a journal-delivered Revival Blessing prompt into the guest's existing picker seam. */
+function materializeCoopRevivalPromptFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const operation = envelope.pendingOperation;
+  const payload = operation?.payload as CoopRevivalPayload | undefined;
+  if (operation?.kind !== "REVIVAL" || payload?.type !== "prompt") {
+    return false;
+  }
+  runtime.interactionRelay.materializeCommittedRevivalPrompt(payload.fieldIndex, operation.id);
+  return true;
+}
+
+/** Feed a journal-delivered wild catch-full prompt into the guest's existing picker seam. */
+function materializeCoopCatchFullPromptFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const operation = envelope.pendingOperation;
+  const payload = operation?.payload as CoopCatchFullPayload | undefined;
+  if (operation?.kind !== "CATCH_FULL" || payload?.type !== "prompt") {
+    return false;
+  }
+  runtime.interactionRelay.materializeCommittedCatchFullPrompt(payload.pokemonName, payload.speciesId, operation.id);
+  return true;
+}
+
+/** Feed the host's committed one-time Stormglass choice into the guest watcher seam. */
+function materializeCoopStormglassFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const operation = envelope.pendingOperation;
+  const payload = operation?.payload as CoopStormglassPayload | undefined;
+  if (operation?.kind !== "STORMGLASS" || payload == null) {
+    return false;
+  }
+  runtime.interactionRelay.materializeCommittedInteractionChoice(
+    COOP_STORMGLASS_SEQ,
+    "stormglass",
+    payload.weatherIndex,
+    undefined,
+    operation.id,
+  );
+  return true;
+}
+
+/** Route journaled learn presentations/host terminals into the same relay seams as their raw carriers. */
+function materializeCoopLearnMoveFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const op = envelope.pendingOperation;
+  if (op?.kind === "LEARN_MOVE") {
+    const payload = op.payload as CoopLearnMovePayload;
+    if (payload.type === "prompt") {
+      runtime.interactionRelay.materializeCommittedInteractionOutcome(
+        COOP_LEARN_MOVE_FWD_SEQ_BASE + payload.partySlot,
+        {
+          k: "learnMoveForward",
+          partySlot: payload.partySlot,
+          moveId: payload.moveId,
+          maxMoveCount: payload.maxMoveCount,
+        },
+      );
+    }
+    return true;
+  }
+  if (op?.kind !== "LEARN_MOVE_BATCH") {
+    return false;
+  }
+  const payload = op.payload as CoopLearnMoveBatchPayload;
+  const seq = COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE + payload.partySlot;
+  if (payload.type === "prompt") {
+    runtime.interactionRelay.materializeCommittedInteractionOutcome(seq, {
+      k: "learnMoveBatchForward",
+      partySlot: payload.partySlot,
+      learnableIds: [...payload.learnableIds],
+      ownerIsGuest: payload.ownerIsGuest,
+    });
+    return true;
+  }
+  if (op.owner !== 0) {
+    return true;
+  }
+  const data = payload.assignments.flat();
+  runtime.interactionRelay.materializeCommittedInteractionChoice(
+    seq,
+    "learnMoveBatch",
+    payload.fallback ? -1 : payload.assignments.length,
+    data,
+    op.id,
+  );
+  return true;
+}
+
+/** Feed one journal-delivered colosseum board/pick into the receiver's existing safe FIFOs. */
+function materializeCoopColosseumActionFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const op = envelope.pendingOperation;
+  const parsed = op == null ? null : parseCoopOperationId(op.id);
+  const payload = op?.payload as CoopColosseumPayload | undefined;
+  if (op?.kind !== "COLO_PICK" || parsed == null || parsed.pinnedSeq < 0 || payload == null) {
+    return false;
+  }
+  const pinned = Math.floor(parsed.pinnedSeq / COOP_COLOSSEUM_ACTION_STRIDE);
+  if (!Number.isSafeInteger(pinned) || pinned < 0) {
+    return false;
+  }
+  const seq = COOP_COLOSSEUM_SEQ_BASE + pinned;
+  if (
+    payload.type === "board"
+    && Array.isArray(payload.labels)
+    && payload.labels.every(label => typeof label === "string")
+  ) {
+    runtime.interactionRelay.materializeCommittedInteractionOutcome(seq, {
+      k: "mePresent",
+      tokens: {},
+      meetsReqs: [],
+      labels: [],
+      subPrompt: { kind: "secondary", labels: [...payload.labels] },
+    });
+    return true;
+  }
+  if (payload.type === "decision" && Number.isSafeInteger(payload.index)) {
+    // A guest-owned decision was already applied locally by its capture UI; its committed envelope only
+    // confirms/cancels intent resend. Feeding it back into the same pinned FIFO would poison the next round.
+    if (op.owner === 1) {
+      return true;
+    }
+    runtime.interactionRelay.materializeCommittedInteractionChoice(seq, "coloPick", payload.index, undefined, op.id);
+    return true;
+  }
+  return false;
+}
+
+/** Feed journal-delivered ME presentation/terminal operations into the receiver's existing safe waiters. */
+function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const op = envelope.pendingOperation;
+  const parsed = op == null ? null : parseCoopOperationId(op.id);
+  if (op == null || op.owner !== 0 || parsed == null) {
+    return false;
+  }
+  const seq = Math.floor(parsed.pinnedSeq / 8000);
+  const kindTag = Math.floor((parsed.pinnedSeq % 8000) / 1000);
+  if (op.kind === "ME_PRESENT") {
+    const pinned = seq - COOP_ME_PUMP_SEQ_BASE;
+    const payload = op.payload as CoopMePresentPayload;
+    if (
+      kindTag !== 0
+      || !Number.isSafeInteger(pinned)
+      || pinned < 0
+      || pinned >= 100_000
+      || payload?.present !== true
+      || payload.presentation?.k !== "mePresent"
+    ) {
+      return false;
+    }
+    runtime.interactionRelay.materializeCommittedInteractionOutcome(seq, payload.presentation);
+    return true;
+  }
+  if (op.kind === "ME_PICK") {
+    const payload = op.payload as CoopMePickPayload;
+    return kindTag === 1 && Number.isInteger(payload?.optionIndex);
+  }
+  if (op.kind === "ME_SUB") {
+    const payload = op.payload as CoopMeSubPayload;
+    return kindTag === 2 && Number.isInteger(payload?.value);
+  }
+  if (op.kind !== "ME_TERMINAL") {
+    return false;
+  }
+  const pinned = seq - COOP_ME_TERM_SEQ_BASE;
+  const payload = op.payload as CoopMeTerminalPayload;
+  if (
+    kindTag !== 4
+    || !Number.isSafeInteger(pinned)
+    || pinned < 0
+    || pinned >= 100_000
+    || (payload?.terminal !== "leave" && payload?.terminal !== "battle")
+    || (payload.hostTurn !== undefined && !Number.isFinite(payload.hostTurn))
+  ) {
+    return false;
+  }
+  runtime.interactionRelay.materializeCommittedInteractionChoice(
+    seq,
+    "meBtn",
+    payload.terminal === "battle" ? COOP_ME_BATTLE_HANDOFF : COOP_INTERACTION_LEAVE,
+    payload.hostTurn === undefined ? undefined : [payload.hostTurn],
+    op.id,
+  );
+  armCoopMeJournalTerminal(op.id, pinned);
+  return true;
+}
+
+/**
  * Co-op WAVE-END authoritative capture (#838): the HOST streams the COMPLETE post-exp authoritative
  * battle state (whole player + enemy party as serialized PokemonData, seating, arena, modifiers, money,
  * ER substrates), captured HERE in the host's `BattleEndPhase` AFTER the wave's exp/level/evolution
@@ -2157,8 +2694,32 @@ export function connectCoopSession(
  */
 function buildLocalCoopCapabilities(): CoopCapabilityKey[] {
   const caps: CoopCapabilityKey[] = [];
+  if (isCoopAbilityOperationEnabled()) {
+    caps.push(COOP_CAP_OP_ABILITY);
+  }
   if (isCoopBiomeOperationEnabled()) {
     caps.push(COOP_CAP_OP_BIOME);
+  }
+  if (isCoopBargainOperationEnabled()) {
+    caps.push(COOP_CAP_OP_BARGAIN);
+  }
+  if (isCoopCatchFullOperationEnabled()) {
+    caps.push(COOP_CAP_OP_CATCH_FULL);
+  }
+  if (isCoopColosseumOperationEnabled()) {
+    caps.push(COOP_CAP_OP_COLOSSEUM);
+  }
+  if (isCoopFaintSwitchOperationEnabled()) {
+    caps.push(COOP_CAP_OP_FAINT_SWITCH);
+  }
+  if (isCoopLearnMoveOperationEnabled()) {
+    caps.push(COOP_CAP_OP_LEARN_MOVE);
+  }
+  if (isCoopRevivalOperationEnabled()) {
+    caps.push(COOP_CAP_OP_REVIVAL);
+  }
+  if (isCoopStormglassOperationEnabled()) {
+    caps.push(COOP_CAP_OP_STORMGLASS);
   }
   if (isCoopMeOperationEnabled()) {
     caps.push(COOP_CAP_OP_ME);
@@ -2203,6 +2764,14 @@ export function assembleCoopRuntime(
   // addresses) can never collide with a prior run's already-applied operationIds. NOT a hot rejoin (that
   // pulls a snapshot without re-assembling), so this never wipes a live pending op.
   resetCoopBiomeOperationState();
+  resetCoopAbilityOperationState();
+  resetCoopBargainOperationState();
+  resetCoopCatchFullOperationState();
+  resetCoopColosseumOperationState();
+  resetCoopFaintSwitchOperationState();
+  resetCoopLearnMoveOperationState();
+  resetCoopRevivalOperationState();
+  resetCoopStormglassOperationState();
   // Wave-2d: same fresh-control-plane reset for the reward-shop + biome-market operation state (SURFACE 3).
   resetCoopRewardOperationState();
   // Wave-2c: the mystery-encounter operation surface shares the same fresh-control-plane discipline (§8
@@ -2244,8 +2813,13 @@ export function assembleCoopRuntime(
   // envelope in via the journal bridge's extractKey/apply hooks, so a committed op is journaled + ACKed +
   // resendable end-to-end (no longer a passive scaffold). Its reconnect() is wired into the #805 rejoin
   // below and its journal depth/unacked feed the health line. Absent when the flag is OFF (legacy behavior).
+  const operationDurabilityHooks = coopOperationDurabilityHooks();
   const durability = isCoopDurabilityEnabled()
-    ? new CoopDurabilityManager(transport, coopOperationDurabilityHooks())
+    ? new CoopDurabilityManager(transport, {
+        ...operationDurabilityHooks,
+        sendFullSnapshot: (cls, headRevision) =>
+          sendCoopDurabilitySnapshot(controller, battleStream, cls, headRevision),
+      })
     : undefined;
   // Install the active manager so the migrated surface adapters' commit path journals into it (Wave-2e).
   // null when durability is OFF -> journalCoopCommittedEnvelope is a no-op (pure legacy dual-run).
@@ -2262,15 +2836,29 @@ export function assembleCoopRuntime(
     localTransport: transport,
     durability,
   };
+  // Per-runtime production sink: a journal-delivered biome op feeds this receiver's own relay. In a real
+  // process there is one runtime; in the duo harness the final (guest) assembly intentionally owns the one
+  // module-level sink, matching the sole receiver topology.
+  registerCoopOperationLiveSink("op:biome", envelope => materializeCoopBiomeChoiceFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:ability", envelope => materializeCoopAbilityOutcomeFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:bargain", envelope => materializeCoopBargainOutcomeFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:colosseum", envelope => materializeCoopColosseumActionFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:reward", envelope => materializeCoopRewardActionFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:me", envelope => materializeCoopMeOperationFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:revival", envelope => materializeCoopRevivalPromptFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:catchFull", envelope => materializeCoopCatchFullPromptFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:stormglass", envelope => materializeCoopStormglassFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:learnMove", envelope => materializeCoopLearnMoveFromOp(runtime, envelope));
   wireCoopGhostPoolSync(controller, battleStream);
-  wireCoopResyncResponder(controller, battleStream);
+  wireCoopResyncResponder(controller, battleStream, durability);
+  wireCoopDurabilitySnapshotReceiver(controller, battleStream, durability);
   wireCoopEnemyPartyResponder(controller, battleStream);
   wireCoopWaveResolved(controller, battleStream);
   wireCoopWaveEndState(controller, battleStream);
-  wireCoopMeChecksumCheck(battleStream);
+  wireCoopMeChecksumCheck(battleStream, durability);
   wireCoopLiveEvents(controller, battleStream);
-  wireCoopLearnMoveForward(transport);
-  wireCoopLearnMoveBatchForward(transport);
+  wireCoopLearnMoveForward(interactionRelay);
+  wireCoopLearnMoveBatchForward(interactionRelay);
   wireCoopDexSync(transport);
   wireShowdownResult(transport, controller);
   wireCoopDisconnectReaction(transport, interactionRelay, runtime);
@@ -2424,6 +3012,14 @@ export function clearCoopRuntime(): void {
   // Wave-2a: drop the biome-travel operation state (host/guest appliers + last-applied pin) so a new
   // session's interaction counter (which re-inits from base 0) never collides with a prior session's ops.
   resetCoopBiomeOperationState();
+  resetCoopAbilityOperationState();
+  resetCoopBargainOperationState();
+  resetCoopCatchFullOperationState();
+  resetCoopColosseumOperationState();
+  resetCoopFaintSwitchOperationState();
+  resetCoopLearnMoveOperationState();
+  resetCoopRevivalOperationState();
+  resetCoopStormglassOperationState();
   // Wave-2d: drop the reward-shop + biome-market operation state too (SURFACE 3).
   resetCoopRewardOperationState();
   // Wave-2c: same teardown for the mystery-encounter operation surface.

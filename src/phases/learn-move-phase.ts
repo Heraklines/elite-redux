@@ -5,6 +5,11 @@ import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
+  armCoopLearnMoveIntentResend,
+  commitCoopLearnMoveDecision,
+  sendCoopLearnMovePrompt,
+} from "#data/elite-redux/coop/coop-learn-move-operation";
+import {
   advanceCoopInteractionForContinuation,
   clearCoopLearnMoveForwardInFlight,
   getCoopController,
@@ -53,10 +58,10 @@ export const COOP_LEARN_MOVE_FWD_WAIT_MS = 1_200_000;
 
 export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   public readonly phaseName = "LearnMovePhase";
-  private moveId: MoveId;
+  private readonly moveId: MoveId;
   private messageMode: UiMode;
-  private learnMoveType: LearnMoveType;
-  private cost: number;
+  private readonly learnMoveType: LearnMoveType;
+  private readonly cost: number;
 
   constructor(
     partyMemberIndex: number,
@@ -155,6 +160,21 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       return;
     }
     getCoopInteractionRelay()?.sendInteractionChoice(COOP_LEARN_MOVE_SEQ, "learnMove", moveIndex);
+    if (getCoopNetcodeMode() === "authoritative" && controller.role === "host") {
+      commitCoopLearnMoveDecision({
+        payload: {
+          type: "decision",
+          partySlot: this.partyMemberIndex,
+          moveId: this.moveId,
+          forgetSlot: moveIndex,
+          maxMoveCount: this.getPokemon().getMaxMoveCount(),
+        },
+        ownerRole: "host",
+        localRole: "host",
+        wave: globalScene.currentBattle?.waveIndex ?? 0,
+        turn: globalScene.currentBattle?.turn ?? 0,
+      });
+    }
   }
 
   /**
@@ -370,12 +390,18 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       moveId: this.moveId,
       maxMoveCount,
     });
-    relay.sendInteractionOutcome(seq, "learnMoveForward", {
-      k: "learnMoveForward",
-      partySlot: slot,
-      moveId: this.moveId,
-      maxMoveCount,
-    });
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    const turn = globalScene.currentBattle?.turn ?? 0;
+    sendCoopLearnMovePrompt(
+      relay,
+      {
+        type: "prompt",
+        partySlot: slot,
+        moveId: this.moveId,
+        maxMoveCount,
+      },
+      { localRole: "host", wave, turn },
+    );
     const mirror = getCoopUiMirror();
     // Render the picker READ-ONLY (no-op callback: the outcome is the relayed pick, never this
     // callback) and mirror the GUEST's live cursor so the host watches the partner choose.
@@ -388,7 +414,15 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       coopWarn("learnmove", "guest forward pick null (timeout/disconnect); keeping current moves", { slot, seq });
     }
     // null -> getMaxMoveCount() sentinel -> applyForgetResult keeps current moves + ends (no hang).
-    await this.applyForgetResult(res?.choice ?? maxMoveCount, move, pokemon);
+    const forgetSlot = res?.choice ?? maxMoveCount;
+    commitCoopLearnMoveDecision({
+      payload: { type: "decision", partySlot: slot, moveId: this.moveId, forgetSlot, maxMoveCount },
+      ownerRole: "guest",
+      localRole: "host",
+      wave,
+      turn,
+    });
+    await this.applyForgetResult(forgetSlot, move, pokemon);
   }
 
   /**
@@ -432,6 +466,19 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       // Relay the human's forget-slot to the host (the sole engine); it applies the forget + learns.
       coopLog("learnmove", "guest relays owned-mon forget-pick (#835)", { seq, moveIndex });
       getCoopInteractionRelay()?.sendInteractionChoice(seq, "learnMove", moveIndex);
+      const payload = {
+        type: "decision" as const,
+        partySlot: slot,
+        moveId: this.moveId,
+        forgetSlot: moveIndex,
+        maxMoveCount: pokemon.getMaxMoveCount(),
+      };
+      armCoopLearnMoveIntentResend({
+        payload,
+        wave: globalScene.currentBattle?.waveIndex ?? 0,
+        turn: globalScene.currentBattle?.turn ?? 0,
+        resend: () => getCoopInteractionRelay()?.sendInteractionChoice(seq, "learnMove", moveIndex),
+      });
       // DEFERRED continuation cleanup: now that the pick is committed, remove the back-out SelectModifier
       // copy + advance the alternation (the same commit the immediate no-op path does, but AFTER the pick
       // instead of before it - so the picker overlay lived long enough for the human to use it).

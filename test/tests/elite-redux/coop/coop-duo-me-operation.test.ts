@@ -66,6 +66,7 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { runMysteryEncounterToEnd, runSelectMysteryEncounterOption } from "#test/utils/encounter-test-utils";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -169,6 +170,90 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     // Lockstep, same as the legacy suite: both advanced once for the whole ME.
     expect(rig.hostRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
     expect(rig.guestRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
+    logs.flush();
+  }, 300_000);
+
+  it("DURABILITY: dropping only the 9M leave sentinel still materializes the host-stated terminal", async () => {
+    await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+    const hostScene = game.scene;
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 1,
+        reorder: 0,
+        delay: 0,
+        faultable: msg =>
+          msg.t === "interactionChoice" && msg.kind === "meBtn" && msg.seq >= 9_000_000 && msg.choice === -1,
+      },
+      { seed: 0x6d3e },
+    );
+    const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+    const adoptSpy = vi.spyOn(meOp, "adoptMeWatcherChoice");
+
+    await withClient(rig.hostCtx, async () => {
+      await runMysteryEncounterToEnd(game, 1);
+      await game.phaseInterceptor.to("SelectModifierPhase", false);
+      const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+      await driveHostRewardShopOwner(hostShop, { takeReward: false });
+      await game.phaseInterceptor.to("PostMysteryEncounterPhase");
+    });
+    expect(pair.faultsInjected(), "the legacy 9M ME leave sentinel must actually be dropped").toBeGreaterThan(0);
+
+    const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+    expect(guestReplay.settled, "the durable ME_TERMINAL must settle the real guest replay phase").toBe(true);
+    const terminalAdopts = adoptSpy.mock.results
+      .map(result => (result.type === "return" ? result.value : null))
+      .filter((value): value is Extract<meOp.CoopMeAdoptDecision, { adopt: true }> => value?.adopt === true);
+    expect(
+      terminalAdopts.some(value => value.kind === "ME_TERMINAL" && value.terminal === "leave"),
+      "the journal-delivered terminal states leave before the guest exits the encounter",
+    ).toBe(true);
+    expect(rig.guestRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
+    logs.flush();
+  }, 300_000);
+
+  it("DURABILITY: dropping the top-level mePresent still materializes the host presentation", async () => {
+    await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+    const hostScene = game.scene;
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 1,
+        reorder: 0,
+        delay: 0,
+        faultable: msg =>
+          msg.t === "interactionOutcome"
+          && msg.kind === "mePresent"
+          && msg.outcome.k === "mePresent"
+          && msg.outcome.subPrompt == null,
+      },
+      { seed: 0x6d3f },
+    );
+    const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+    const hostEncounter = hostScene.currentBattle.mysteryEncounter!;
+    const populateHostTokens = hostEncounter.populateDialogueTokensFromRequirements.bind(hostEncounter);
+    vi.spyOn(hostEncounter, "populateDialogueTokensFromRequirements").mockImplementation(() => {
+      populateHostTokens();
+      hostEncounter.dialogueTokens.durableProof = "host-authoritative";
+    });
+    rig.guestScene.currentBattle.mysteryEncounter!.dialogueTokens.durableProof = "guest-local";
+
+    await withClient(rig.hostCtx, async () => {
+      await runMysteryEncounterToEnd(game, 1);
+      await game.phaseInterceptor.to("SelectModifierPhase", false);
+      const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+      await driveHostRewardShopOwner(hostShop, { takeReward: false });
+      await game.phaseInterceptor.to("PostMysteryEncounterPhase");
+    });
+    expect(pair.faultsInjected(), "the legacy top-level mePresent must actually be dropped").toBeGreaterThan(0);
+
+    const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+    expect(guestReplay.settled, "the guest replay still reaches its terminal").toBe(true);
+    expect(
+      rig.guestScene.currentBattle.mysteryEncounter!.dialogueTokens.durableProof,
+      "the journal-delivered presentation must replace the guest-local token source",
+    ).toBe("host-authoritative");
     logs.flush();
   }, 300_000);
 

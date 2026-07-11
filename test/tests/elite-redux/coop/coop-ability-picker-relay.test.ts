@@ -23,22 +23,33 @@
 // watch loop can never misread an ability outcome as a reward pick).
 
 import {
+  adoptAbilityWatcherOutcome,
+  resetCoopAbilityOperationFlag,
+  resetCoopAbilityOutcomeRetryMs,
+  setCoopAbilityOperationEnabled,
+  setCoopAbilityOutcomeRetryMs,
+} from "#data/elite-redux/coop/coop-ability-operation";
+import {
   COOP_ABILITY_KIND,
   COOP_ABILITY_OP,
   COOP_ABILITY_OUTCOME,
   coopAbilityPickerSeq,
+  sendCoopAbilityPickerOutcome,
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
 import {
   COOP_INTERACTION_LEAVE,
   COOP_INTERACTION_REROLL,
   CoopInteractionRelay,
 } from "#data/elite-redux/coop/coop-interaction-relay";
+import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { describe, expect, it } from "vitest";
+import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
+import { afterEach, describe, expect, it } from "vitest";
 
 // The reward-shop interaction seq the OWNER is pinned to (the seq the shop watch loop awaits).
 const SHOP_SEQ = 42;
+const GUEST_SHOP_SEQ = 43;
 // The DEDICATED seq the ability outcome actually rides - the shop loop never awaits this, so it can
 // never steal the outcome (the BLOCKING bug the review caught). The picker phases use exactly this.
 const SEQ = coopAbilityPickerSeq(SHOP_SEQ);
@@ -62,6 +73,12 @@ const OUTCOMES: { name: string; data: number[] }[] = [
 ];
 
 describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", () => {
+  afterEach(() => {
+    resetCoopAbilityOutcomeRetryMs();
+    resetCoopAbilityOperationFlag();
+    clearCoopRuntime();
+  });
+
   it("the COOP_ABILITY_OUTCOME sentinel is distinct from every reward cursor + LEAVE/REROLL", () => {
     // A reward/shop cursor is always >= 0; the ability sentinel must be a unique negative value so
     // the shop's watch loop can never confuse a relayed ability outcome with a reward pick.
@@ -145,5 +162,125 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
     const res = await awaited;
     expect(res?.choice).toBe(COOP_ABILITY_OUTCOME);
     expect(res?.data?.[0]).toBe(COOP_ABILITY_OP.CANCEL);
+  });
+
+  it("keeps the pure legacy abilityPicker carrier working when the operation flag is off", async () => {
+    setCoopAbilityOperationEnabled(false);
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopInteractionRelay(host);
+    const watcher = new CoopInteractionRelay(guest);
+    const awaited = watcher.awaitInteractionChoice(SEQ);
+
+    sendCoopAbilityPickerOutcome(owner, SHOP_SEQ, [COOP_ABILITY_OP.CAP_CYCLE], {
+      localRole: "host",
+      wave: 1,
+    });
+
+    expect((await awaited)?.data).toEqual([COOP_ABILITY_OP.CAP_CYCLE]);
+  });
+
+  it("DURABILITY: dropping only abilityPicker still materializes the committed outcome for the guest", async () => {
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 1,
+        reorder: 0,
+        delay: 0,
+        faultable: msg => msg.t === "interactionChoice" && msg.kind === COOP_ABILITY_KIND,
+      },
+      { seed: 0xab1117 },
+    );
+    const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
+    setCoopRuntime(hostRuntime);
+
+    sendCoopAbilityPickerOutcome(hostRuntime.interactionRelay, SHOP_SEQ, [COOP_ABILITY_OP.CAP_RUNUNLOCK, 2], {
+      localRole: "host",
+      wave: 1,
+    });
+    const outcome = await guestRuntime.interactionRelay.awaitInteractionChoice(SEQ, 25);
+
+    expect(pair.faultsInjected(), "the raw abilityPicker carrier was actually dropped").toBe(1);
+    expect(outcome?.data, "the committed outcome reached the real guest choice FIFO").toEqual([
+      COOP_ABILITY_OP.CAP_RUNUNLOCK,
+      2,
+    ]);
+    expect(
+      adoptAbilityWatcherOutcome({
+        pinned: SHOP_SEQ,
+        data: outcome?.data ?? null,
+        localRole: "guest",
+        wave: 1,
+      }),
+      "the watcher phase admits the journal-materialized result through its ledger gate",
+    ).toBe(true);
+  });
+
+  it("EXACTLY ONCE: the journal and raw carriers produce only one consumable ability action", async () => {
+    const pair = createLoopbackPair();
+    const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
+    setCoopRuntime(hostRuntime);
+    const firstAwait = guestRuntime.interactionRelay.awaitInteractionChoice(SEQ, 25);
+
+    sendCoopAbilityPickerOutcome(hostRuntime.interactionRelay, SHOP_SEQ, [COOP_ABILITY_OP.CAP_CYCLE], {
+      localRole: "host",
+      wave: 1,
+    });
+
+    const first = await firstAwait;
+    expect(first?.data).toEqual([COOP_ABILITY_OP.CAP_CYCLE]);
+    expect(
+      adoptAbilityWatcherOutcome({
+        pinned: SHOP_SEQ,
+        data: first?.data ?? null,
+        localRole: "guest",
+        wave: 1,
+      }),
+    ).toBe(true);
+    expect(
+      await guestRuntime.interactionRelay.awaitInteractionChoice(SEQ, 10),
+      "the second carrier is an echo, not a second purchase",
+    ).toBeNull();
+  });
+
+  it("INTENT RECOVERY: a dropped guest-owned abilityPicker is resent until the host commits it", async () => {
+    setCoopAbilityOutcomeRetryMs(10);
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 0,
+        reorder: 0,
+        delay: 0,
+        faultable: msg => msg.t === "interactionChoice" && msg.kind === COOP_ABILITY_KIND,
+      },
+      { seed: 0xab1118 },
+    );
+    const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
+    const guestSeq = coopAbilityPickerSeq(GUEST_SHOP_SEQ);
+    const data = [COOP_ABILITY_OP.GRAND, 1, 261];
+    pair.armNextDrop("interactionChoice", "guest");
+    const hostAwait = hostRuntime.interactionRelay.awaitInteractionChoice(guestSeq, 100);
+
+    setCoopRuntime(guestRuntime);
+    sendCoopAbilityPickerOutcome(guestRuntime.interactionRelay, GUEST_SHOP_SEQ, data, {
+      localRole: "guest",
+      wave: 1,
+    });
+    setCoopRuntime(hostRuntime);
+
+    const action = await hostAwait;
+    expect(pair.faultsInjected(), "the first guest intent was actually dropped").toBe(1);
+    expect(action?.data, "the resend reached the host authority").toEqual(data);
+    expect(
+      adoptAbilityWatcherOutcome({
+        pinned: GUEST_SHOP_SEQ,
+        data: action?.data ?? null,
+        localRole: "host",
+        wave: 1,
+      }),
+      "the host authority committed the guest-owned result",
+    ).toBe(true);
   });
 });

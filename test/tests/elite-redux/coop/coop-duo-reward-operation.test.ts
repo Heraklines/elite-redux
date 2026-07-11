@@ -65,6 +65,7 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -180,6 +181,54 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
     );
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once").toBe(counterBefore + 1);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced the counter once").toBe(counterBefore + 1);
+    logs.flush();
+  }, 300_000);
+
+  it("DURABILITY: dropping only the reward relay still applies the committed party-target action on the guest", async () => {
+    expect(isCoopRewardOperationEnabled(), "the migrated reward-operation path is active for this test").toBe(true);
+
+    const SLOT = 0;
+    forceItemRewards(game.override, [{ name: "LEFTOVERS" }]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 1,
+        reorder: 0,
+        delay: 0,
+        faultable: msg => msg.t === "interactionChoice" && msg.kind === "reward",
+      },
+      { seed: 0x5e7a2d },
+    );
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+
+    const turn = rig.hostScene.currentBattle.turn;
+    await hostPlayWave(rig);
+    await withClient(rig.guestCtx, async () => {
+      await driveGuestReplayTurn(rig.guestScene, turn);
+    });
+
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+    expect(counterBefore % 2, "wave 1 reward is host-owned (even counter)").toBe(0);
+    await withClient(rig.hostCtx, async () => {
+      await game.phaseInterceptor.to("SelectModifierPhase", false);
+    });
+    const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestModsBefore = rig.guestScene.modifiers.length;
+
+    await withClient(rig.hostCtx, () => driveHostPartyRewardOwner(hostShop, { slot: SLOT }));
+    expect(pair.faultsInjected(), "the legacy reward action must actually be dropped").toBeGreaterThan(0);
+    await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+
+    expect(
+      rig.guestScene.modifiers.length,
+      "the journal-delivered committed action, including its nested party sub-pick, mutates live guest state",
+    ).toBe(guestModsBefore + 1);
+    expect(rig.guestRuntime.controller.interactionCounter(), "the durable terminal advances the guest once").toBe(
+      counterBefore + 1,
+    );
     logs.flush();
   }, 300_000);
 

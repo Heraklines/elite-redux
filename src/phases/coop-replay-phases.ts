@@ -47,7 +47,11 @@ import {
 import { recordCoopChecksumAssertion } from "#data/elite-redux/coop/coop-checksum-assert";
 import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import { COOP_FAINT_SWITCH_SEQ_BASE, isCoopFaintSwitchSeq } from "#data/elite-redux/coop/coop-interaction-relay";
+import { armCoopFaintSwitchIntentResend } from "#data/elite-redux/coop/coop-faint-switch-operation";
+import {
+  isCoopFaintSwitchSeq,
+  sendCoopFaintSwitchChoice,
+} from "#data/elite-redux/coop/coop-interaction-relay";
 import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   buildCoopWaveAdvancePayload,
@@ -582,12 +586,15 @@ export class CoopFaintReplayPhase extends PokemonPhase {
         // auto-pick fallback. Relay an immediate NO-PICK sentinel (-1) on the same seq - the
         // host's legality check rejects it instantly and runs auto-pick (which, with this side
         // truly empty, cleanly skips the summon: the lone-survivor flow). Zero wait either way.
-        getCoopInteractionRelay()?.sendInteractionChoice(
-          COOP_FAINT_SWITCH_SEQ_BASE + this.battlerIndex,
-          "switch",
-          -1,
-          [0],
-        );
+        const relay = getCoopInteractionRelay();
+        const data = [0];
+        sendCoopFaintSwitchChoice(relay, this.battlerIndex, -1, data);
+        armCoopFaintSwitchIntentResend({
+          payload: { fieldIndex: this.battlerIndex, partySlot: -1, data },
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: globalScene.currentBattle?.turn ?? 0,
+          resend: () => sendCoopFaintSwitchChoice(relay, this.battlerIndex, -1, data),
+        });
         return; // nothing to send out - the host's flow decides (wipe / lone survivor)
       }
       globalScene.phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", this.battlerIndex);

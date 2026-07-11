@@ -25,19 +25,27 @@
 // follow-up (noted so the guarantee is not overclaimed).
 // =============================================================================
 
+import {
+  commitMeOwnerIntent,
+  resetCoopMeOperationFlag,
+  resetCoopMeOperationState,
+  setCoopMeOperationEnabled,
+  setCoopMeOperationEpoch,
+} from "#data/elite-redux/coop/coop-me-operation";
 import type {
   CoopLogicalPhase,
   CoopOperationKind,
   CoopPendingOperation,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import { coopOperationDurabilityHooks } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
   type CoopIntentValidator,
   CoopOperationHost,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 /** A minimal, complete authoritative DATA plane (§1.2) - the envelope embeds it unchanged. */
 function makeState(wave = 3, turn = 1): CoopAuthoritativeBattleStateV1 {
@@ -82,6 +90,83 @@ const GUEST_OWNER = 1; // an odd seat = guest-owned interaction (guest->host rel
 const PIN = 9_700_100;
 
 describe("W2e-R2 I5: pre-commit intent loss - owner re-send with the deterministic id is committed exactly once", () => {
+  it("I5 production seam: a guest owner receives the stable operationId needed to arm a resend", () => {
+    setCoopMeOperationEnabled(true);
+    resetCoopMeOperationState();
+    setCoopMeOperationEpoch(EPOCH);
+    try {
+      const params = {
+        kind: "ME_PICK" as const,
+        seq: 8_000_003,
+        pinned: 3,
+        payload: { optionIndex: 1 },
+        localRole: "guest" as const,
+        wave: 12,
+        turn: 0,
+      };
+      const first = commitMeOwnerIntent(params);
+      const repeated = commitMeOwnerIntent(params);
+      expect(first, "the owner seam must return the proposal identity used by the resend tracker").toBe(
+        makeCoopOperationId(EPOCH, GUEST_OWNER, params.seq * 8000 + 1000),
+      );
+      expect(repeated, "re-registering the same slot must reuse, never remint, the operationId").toBe(first);
+    } finally {
+      resetCoopMeOperationFlag();
+      resetCoopMeOperationState();
+    }
+  });
+
+  it("I5 production seam: a lost guest proposal is resent until its committed envelope arrives", async () => {
+    vi.useFakeTimers();
+    setCoopMeOperationEnabled(true);
+    resetCoopMeOperationState();
+    setCoopMeOperationEpoch(EPOCH);
+    const resend = vi.fn();
+    try {
+      commitMeOwnerIntent({
+        kind: "ME_PICK",
+        seq: 8_000_003,
+        pinned: 3,
+        payload: { optionIndex: 1 },
+        localRole: "guest",
+        wave: 12,
+        turn: 0,
+        resend,
+      });
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(
+        resend,
+        "a dropped pre-commit proposal must be retried with the same relay payload",
+      ).toHaveBeenCalledOnce();
+
+      const host = new CoopOperationHost({ epoch: EPOCH });
+      const committed = host.submit(
+        makeIntent(EPOCH, GUEST_OWNER, 8_000_003 * 8000 + 1000, { optionIndex: 1 }, "ME_PICK"),
+        makeCtx("MYSTERY_ENCOUNTER", 12, 0),
+        ACCEPT,
+      );
+      expect(committed.kind).toBe("committed");
+      if (committed.kind !== "committed") {
+        throw new Error("expected the authority to commit the resent ME proposal");
+      }
+      coopOperationDurabilityHooks().apply?.({
+        cls: "op:me",
+        seq: committed.envelope.revision,
+        msg: { t: "envelope", envelope: committed.envelope },
+      });
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(
+        resend,
+        "the authority's committed envelope must stop the proposal resend lifecycle",
+      ).toHaveBeenCalledOnce();
+    } finally {
+      resetCoopMeOperationFlag();
+      resetCoopMeOperationState();
+      vi.useRealTimers();
+    }
+  });
+
   // I5a - the core recovery: a lost intent, re-sent by the owner, commits exactly once; the late original reacks.
   it("I5a: a lost pre-commit intent recovered by owner re-send commits EXACTLY ONCE (the late original reacks)", () => {
     const host = new CoopOperationHost({ epoch: EPOCH });

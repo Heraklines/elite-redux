@@ -96,6 +96,7 @@ import {
   snapshotErGhostRunState,
 } from "#data/elite-redux/er-ghost-teams";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
+import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
 import {
   type ErRelicBattleStateData,
   getErRelicBattleState,
@@ -110,6 +111,7 @@ import {
 } from "#data/elite-redux/showdown/showdown-battle-state";
 import { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
 import { swapArenaTagSide } from "#data/elite-redux/showdown/showdown-side-swap";
+import { PokemonMove } from "#data/moves/pokemon-move";
 import { Terrain, TerrainType } from "#data/terrain";
 import { Weather } from "#data/weather";
 import { BattleType } from "#enums/battle-type";
@@ -122,7 +124,7 @@ import { TrainerSlot } from "#enums/trainer-slot";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import { EnemyPokemon, PlayerPokemon, type Pokemon } from "#field/pokemon";
-import { PersistentModifier } from "#modifiers/modifier";
+import { Modifier, PersistentModifier } from "#modifiers/modifier";
 import type { ModifierOverride } from "#modifiers/modifier-type";
 import { PokemonModifierType, PokemonReviveModifierType } from "#modifiers/modifier-type";
 import { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
@@ -132,6 +134,7 @@ import {
   coopMeInteractionStartValue,
   coopSetMePinForGuest,
 } from "#phases/mystery-encounter-phases";
+import { ModifierData } from "#system/modifier-data";
 import { PokemonData } from "#system/pokemon-data";
 import type { GameManager } from "#test/framework/game-manager";
 import type { GameWrapper } from "#test/framework/game-wrapper";
@@ -1901,8 +1904,13 @@ export async function driveGuestMirrorQuiz(
 /** The minimal GameManager surface the replay loader drives (so the harness need not import GameManager). */
 export interface ReplayGameManager {
   scene: BattleScene;
-  override: { battleStyle(s: "single" | "double"): unknown; startingLevel(n: number): unknown };
-  classicMode: { startBattle(...species: number[]): Promise<void> };
+  override: {
+    battleStyle(s: "single" | "double"): unknown;
+    moveset(moves: number[]): unknown;
+    startingLevel(n: number): unknown;
+    startingWave(wave: number | null): unknown;
+  };
+  classicMode: { runToSummon(...species: number[]): Promise<void> };
   move: { select(move: number, pkmIndex?: number, target?: number | null): void };
   phaseInterceptor: { to(target: string, runTarget?: boolean): Promise<void> };
 }
@@ -2009,6 +2017,49 @@ function feedHostFightMove(
   }
 }
 
+/** Restore the window-start session state after the test launcher has built the checkpoint wave. */
+function restoreCoopReplayCheckpoint(scene: BattleScene, checkpoint: NonNullable<ReplayTrace["checkpoint"]>): void {
+  const party = scene.getPlayerParty();
+  party.splice(0, party.length);
+  for (const [index, raw] of checkpoint.party.entries()) {
+    const checkpointMoves = (raw.moveset ?? []).map(move => PokemonMove.loadMove(move));
+    const data = new PokemonData(raw);
+    data.ivs ??= [31, 31, 31, 31, 31, 31];
+    const mon = new PlayerPokemon(
+      getPokemonSpecies(data.species),
+      data.level,
+      data.abilityIndex,
+      data.formIndex,
+      data.gender,
+      data.shiny ?? false,
+      data.variant ?? 0,
+      data.ivs,
+      data.nature ?? 0,
+      data,
+    );
+    mon.coopOwner = data.coopOwner ?? (index % 2 === 0 ? "host" : "guest");
+    mon.calculateStats();
+    // Test overrides may replace a constructor's moveset; the checkpoint is authoritative.
+    mon.moveset = checkpointMoves;
+    party.push(mon);
+  }
+
+  scene.money = checkpoint.money;
+  scene.pokeballCounts = Object.fromEntries(
+    Object.entries(checkpoint.pokeballCounts).map(([kind, count]) => [Number(kind), count]),
+  );
+
+  scene.modifiers = [];
+  for (const raw of checkpoint.modifiers) {
+    const data = new ModifierData(raw, true);
+    const ctor = Modifier[data.className as keyof typeof Modifier] ?? resolveErModifierClass(data.className);
+    const modifier = data.toModifier(ctor);
+    if (modifier != null) {
+      scene.addModifier(modifier, true);
+    }
+  }
+}
+
 /**
  * Replay a captured {@linkcode ReplayTrace} across BOTH engines (#record-replay, Phase 1). Seeds the
  * HOST run, flips to co-op, and walks the trace's events wave-by-wave feeding commands + interactions
@@ -2016,9 +2067,10 @@ function feedHostFightMove(
  * the interaction counters stay lockstep). THROWS on a no-progress stall (the hang detector) so a
  * regression fails loudly. Returns a {@linkcode ReplayResult} a test asserts reproduction off.
  *
- * SCOPE (Phase 1): the run is reached via `game.classicMode.startBattle` from the roster's SPECIES
- * (not a full PokemonData rebuild + launch handshake - that is a Phase-2 production-capture concern;
- * for the synthetic-trace test the species + seed + level + commands fully determine the run). Commands
+ * The run stops before its first EncounterPhase to pin the captured seed; when a window checkpoint exists,
+ * the launcher starts at its wave and then restores its full PokemonData party, modifiers, money, and ball
+ * inventory before the duo runtime is assembled. A legacy trace without a checkpoint still boots from its header.
+ * Commands
  * are the wave-loop FIGHT class (both slots) and interactions are the reward-shop owner/watcher leave +
  * non-party pick the existing drivers support; richer command/interaction classes extend the same loop.
  *
@@ -2041,20 +2093,47 @@ export async function replayCoopTrace(
   const commandEvents = trace.events.filter(isReplayCommandEvent);
   const interactionEvents = trace.events.filter(isReplayInteractionEvent);
 
-  // ===== Seed the HOST run from the trace: double battle (co-op is a double), the roster's species,
-  // the difficulty/level. The seed is pinned by the deterministic run-start; the species + commands
-  // reproduce the run. We derive the species from the roster's serialized PokemonData. =====
+  // ===== Seed the HOST run. Prefer the window-start checkpoint's ACTUAL party/wave/seed over the stale
+  // launch header; absent checkpoint preserves the v1/header behavior. =====
+  // Detach from the trace object: constructors/test overrides must never mutate the forensic evidence
+  // that a second host/guest rebuild still needs later in this loader.
+  const checkpoint = trace.checkpoint == null
+    ? undefined
+    : (structuredClone(trace.checkpoint) as NonNullable<ReplayTrace["checkpoint"]>);
+  const bootRoster = checkpoint?.party ?? trace.roster;
+  const bootSeed = checkpoint?.seed ?? trace.seed;
   game.override.battleStyle("double");
-  const rosterSpecies = trace.roster.map(d => d.species).filter((s): s is number => typeof s === "number");
+  if (checkpoint != null) {
+    game.override.startingWave(checkpoint.wave);
+  }
+  const rosterSpecies = bootRoster.map(d => d.species).filter((s): s is number => typeof s === "number");
   if (rosterSpecies.length < 2) {
     throw new Error(`replayCoopTrace: co-op needs >=2 roster mons, got ${rosterSpecies.length}`);
   }
-  await game.classicMode.startBattle(...rosterSpecies.slice(0, 2));
+  // Stop immediately before EncounterPhase so the captured seed is installed before the battle/enemies
+  // are generated. Calling startBattle after OverridesHelper.seed would let the title reset replace it
+  // with the test framework's default seed, producing a superficially valid but non-representative replay.
+  await game.classicMode.runToSummon(...rosterSpecies.slice(0, 2));
+  game.scene.setSeed(bootSeed);
+  await game.phaseInterceptor.to("CommandPhase");
+  if (checkpoint != null) {
+    // The test launcher may use a global player-moveset override to make the throwaway bootstrap battle
+    // deterministic. Pokemon.getMoveset() reapplies that override on every read (and mutates the stored
+    // moves), so it must end before the authoritative checkpoint party is installed.
+    game.override.moveset([]);
+    restoreCoopReplayCheckpoint(game.scene, checkpoint);
+  }
 
   // ===== Flip to co-op + stand up the guest engine over one loopback pair (host owns EVEN interaction
   // counters, guest owns ODD - the production parity rule buildDuo wires). =====
   const pair = createLoopbackPair();
   const rig = await buildDuo(game as unknown as Parameters<typeof buildDuo>[0], pair, setCoopRuntime, replayToCoop);
+  if (checkpoint != null) {
+    // `buildDuo` constructs a second scene while test overrides are live. Reassert the checkpoint on the
+    // host afterward, then mirror that exact post-checkpoint state into the guest before any event replays.
+    await withClient(rig.hostCtx, () => restoreCoopReplayCheckpoint(rig.hostScene, checkpoint));
+    await remirrorWave(rig);
+  }
 
   // The captured waves, in order (a Set keeps them unique + sorted).
   const waves = [...new Set(commandEvents.map(c => c.wave))].sort((a, b) => a - b);

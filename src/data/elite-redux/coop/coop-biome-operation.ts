@@ -111,13 +111,18 @@ let authorityHost: CoopOperationHost | null = null;
 let watchGuest: CoopOperationGuest | null = null;
 
 /**
- * A SEPARATE applier for the durability JOURNAL replay path (Wave-2e), distinct from `watchGuest`. In
- * dual-run the LEGACY relay-adopt path (watchGuest) drives the phase's biome switch, so the journal MUST
- * NOT consume the operationId that path dedupes on (that would make the live adopt see its own op as a
- * duplicate and fall back). The journal is the DURABILITY ledger - it converges the op history over a cut
- * without touching the live adopt path. Lazily created; reset on session boundaries.
+ * Journal-consumed operationIds whose production live sink has fed the committed choice into the real
+ * biome/crossroads phase path, but whose phase has not adopted that choice yet. This bridges the intentional
+ * safe-boundary handoff: the ONE ledger consumes first in the durability handler, then the phase consumes
+ * this marker exactly once instead of mistaking the committed choice for an ordinary duplicate and falling
+ * into the deterministic (potentially wrong-biome) fallback.
  */
-let journalWatchGuest: CoopOperationGuest | null = null;
+const pendingJournalMaterializations = new Set<string>();
+
+/** Arm the one safe-boundary phase handoff after the production sink accepted this committed operation. */
+export function armCoopBiomeJournalMaterialization(operationId: string): void {
+  pendingJournalMaterializations.add(operationId);
+}
 
 /**
  * The highest interaction-counter (pinned) value the local client has already ADOPTED a biome-travel op at
@@ -180,7 +185,7 @@ export function setCoopBiomeOperationEpoch(next: number): void {
 export function resetCoopBiomeOperationState(): void {
   authorityHost = null;
   watchGuest = null;
-  journalWatchGuest = null;
+  pendingJournalMaterializations.clear();
   lastAppliedPinned = -1;
   revisionFloor = 0;
 }
@@ -199,7 +204,6 @@ export function setCoopBiomeOperationRevisionFloor(hw: number): void {
   // Recreate the host + guests so the new floor takes effect on next use (they were created at the old floor).
   authorityHost = null;
   watchGuest = null;
-  journalWatchGuest = null;
 }
 
 // -----------------------------------------------------------------------------
@@ -218,14 +222,6 @@ function guest(): CoopOperationGuest {
     watchGuest = new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
   }
   return watchGuest;
-}
-
-/** The dedicated journal-replay applier (Wave-2e), separate from the live relay-adopt `guest()`. */
-function journalGuest(): CoopOperationGuest {
-  if (journalWatchGuest == null) {
-    journalWatchGuest = new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
-  }
-  return journalWatchGuest;
 }
 
 /**
@@ -396,12 +392,29 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
     // adopted (a leftover from an earlier interaction), or a re-delivery of an already-applied op (same
     // operationId), can NEVER overwrite the live decision. The pinned counter is monotonic across all
     // interactions, so a legitimate current pick is always >= the last adopted one.
-    if (params.pinned < lastAppliedPinned || guest().hasApplied(opId)) {
+    if (params.pinned < lastAppliedPinned) {
       coopWarn(
         "reward",
         `biome op WATCHER REJECT stale/dup id=${opId} pinned=${params.pinned} lastApplied=${lastAppliedPinned} (Wave-2a)`,
       );
       return { adopt: false, reason: "stale-or-duplicate" };
+    }
+
+    // ONE LEDGER + safe-boundary materialization: the journal may have consumed the operation before this
+    // real phase resumed. Its live sink fed the authoritative choice into the local relay and armed this
+    // marker. Consume the marker exactly once and let the existing phase apply that host-stated choice;
+    // an ordinary relay duplicate (no marker) remains a no-op as before.
+    if (guest().hasApplied(opId)) {
+      if (!pendingJournalMaterializations.delete(opId)) {
+        coopWarn(
+          "reward",
+          `biome op WATCHER REJECT duplicate id=${opId} pinned=${params.pinned} lastApplied=${lastAppliedPinned} (Wave-2a)`,
+        );
+        return { adopt: false, reason: "stale-or-duplicate" };
+      }
+      lastAppliedPinned = params.pinned;
+      coopLog("reward", `biome op WATCHER materialize JOURNAL choice kind=${params.kind} id=${opId}`);
+      return { adopt: true, choice: params.res.choice, data: params.res.data };
     }
 
     // Apply through the guest applier (surface-local dense revision; classifies + records the op).
@@ -452,21 +465,26 @@ function applyJournaledBiomeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coo
   if (op == null || op.status !== "applied") {
     return "duplicate";
   }
-  const g = journalGuest();
+  const g = guest();
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
   }
-  const res = g.applyEnvelope(envelope);
+  // Re-key to the guest-local dense revision so the live relay and journal carriers share ONE applier
+  // without creating artificial gaps when either carrier wins the race.
+  const res = g.applyEnvelope({
+    ...envelope,
+    sessionEpoch: epoch,
+    revision: g.getLastAppliedRevision() + 1,
+  });
   if (res.kind !== "applied") {
     // A transient non-applicable result (a gap the manager already guards against, or a fail-closed):
     // leave it retriable (do NOT ACK). Never a permanent condition (a permanent one is a duplicate above).
     return "rejected";
   }
-  // W2e-R P0-1: route the newly-consumed op INTO the ONE live-mutation seam (not a sidecar history log). The
-  // production biome materializer (pushing SwitchBiomePhase on the guest) is the PARKED keystone wave-advance
-  // work, so no sink is registered in production yet - the op is recorded + ACK'd as durably delivered and
-  // its live biome reconciled by the DATA plane (rejoin snapshot). A test registers a sink to PROVE the
-  // carrier routes here. See routeCoopOperationToLiveSink / the W2e-R residuals in the surface doc header.
+  // Route the newly-consumed op into the production live sink. It feeds the committed choice into the
+  // receiver's local interaction relay, so the existing SelectBiomePhase / ErCrossroadsPhase safe apply path
+  // performs the real mutation. That production sink arms the one-shot phase handoff itself; headless
+  // recording sinks can still prove routing without changing live adoption semantics.
   routeCoopOperationToLiveSink("op:biome", envelope);
   coopLog("reward", `biome op JOURNAL apply id=${op.id} rev=${envelope.revision} (Wave-2e/W2e-R)`);
   return "applied";

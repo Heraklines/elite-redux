@@ -22,7 +22,7 @@
 // top and is individually flag-gated (§5).
 // =============================================================================
 
-import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
+import type { CoopAuthoritativeBattleStateV1, CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 
 /** A co-op player seat id (0..N-1). The host/authority is a specific id, conventionally 0. */
 export type CoopPlayerId = number;
@@ -185,6 +185,73 @@ export interface CoopShopBuyPayload {
   readonly terminal: boolean;
 }
 
+/** BARGAIN outcome: the host-stated full run-state blob applied by the watcher verbatim. */
+export interface CoopBargainPayload {
+  readonly outcome: CoopInteractionOutcome;
+}
+
+/** COLO_PICK stream: repeated host-stated boards and owner decisions within one pinned gauntlet. */
+export type CoopColosseumPayload =
+  | { readonly type: "board"; readonly labels: string[] }
+  | { readonly type: "decision"; readonly index: number };
+
+/** ABILITY_PICK outcome: literal operation code and resolved slots/ability id. */
+export interface CoopAbilityPickPayload {
+  readonly data: number[];
+}
+
+/** FAINT_SWITCH intent: exact owner-selected party slot plus legacy baton/species identity metadata. */
+export interface CoopFaintSwitchPayload {
+  readonly fieldIndex: number;
+  readonly partySlot: number;
+  readonly data: number[];
+}
+
+/** REVIVAL control stream: host prompt followed by the host-resolved owner decision. */
+export type CoopRevivalPayload =
+  | { readonly type: "prompt"; readonly fieldIndex: number }
+  | {
+      readonly type: "decision";
+      readonly fieldIndex: number;
+      readonly partySlot: number;
+      readonly speciesId: number;
+    };
+
+/** Wild-catch full-party presentation followed by the host-resolved owner decision. */
+export type CoopCatchFullPayload =
+  | { readonly type: "prompt"; readonly pokemonName: string; readonly speciesId: number }
+  | { readonly type: "decision"; readonly speciesId: number; readonly partySlot: number };
+
+/** Host-resolved one-time Stormglass weather selection. */
+export interface CoopStormglassPayload {
+  readonly weatherIndex: number;
+  readonly weather: number;
+}
+
+export type CoopLearnMovePayload =
+  | { readonly type: "prompt"; readonly partySlot: number; readonly moveId: number; readonly maxMoveCount: number }
+  | {
+      readonly type: "decision";
+      readonly partySlot: number;
+      readonly moveId: number;
+      readonly forgetSlot: number;
+      readonly maxMoveCount: number;
+    };
+
+export type CoopLearnMoveBatchPayload =
+  | {
+      readonly type: "prompt";
+      readonly partySlot: number;
+      readonly learnableIds: number[];
+      readonly ownerIsGuest: boolean;
+    }
+  | {
+      readonly type: "decision";
+      readonly partySlot: number;
+      readonly assignments: [number, number][];
+      readonly fallback: boolean;
+    };
+
 // -----------------------------------------------------------------------------
 // Wave-2c: mystery-encounter payloads (§2.1 #8/#9/#10, MYSTERY_ENCOUNTER phase). The ME surface is
 // owner-alternated with the choice-forwarding model (#693: the guest never runs the encounter
@@ -225,6 +292,8 @@ export interface CoopMeButtonPayload {
 export interface CoopMePresentPayload {
   /** Whether the host has an ME this wave (the #862 host-authoritative presence verdict; false = the guest self-rolled a phantom). */
   readonly present: boolean;
+  /** Exact host-rendered presentation. Required when `present` is true so journal replay never re-derives from guest state. */
+  readonly presentation?: Extract<CoopInteractionOutcome, { k: "mePresent" }>;
 }
 
 /** ME_TERMINAL intent/outcome: the ME's terminal transition (#10). Carries the host-stated resolution (#859). */

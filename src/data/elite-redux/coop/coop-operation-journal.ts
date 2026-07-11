@@ -79,6 +79,40 @@ export function coopOperationClassForPhase(phase: CoopLogicalPhase): string | nu
   }
 }
 
+/** Resolve classes that share the generic INTERACTION logical phase by their closed operation kind. */
+function coopOperationClassForEnvelope(envelope: CoopAuthoritativeEnvelopeV1): string | null {
+  if (envelope.pendingOperation?.kind === "FAINT_SWITCH" && envelope.logicalPhase === "TURN_RESOLVE") {
+    return "op:faintSwitch";
+  }
+  if (envelope.pendingOperation?.kind === "REVIVAL" && envelope.logicalPhase === "TURN_RESOLVE") {
+    return "op:revival";
+  }
+  if (envelope.pendingOperation?.kind === "CATCH_FULL" && envelope.logicalPhase === "TURN_RESOLVE") {
+    return "op:catchFull";
+  }
+  if (
+    (envelope.pendingOperation?.kind === "LEARN_MOVE" || envelope.pendingOperation?.kind === "LEARN_MOVE_BATCH")
+    && envelope.logicalPhase === "TURN_RESOLVE"
+  ) {
+    return "op:learnMove";
+  }
+  if (envelope.logicalPhase === "INTERACTION") {
+    switch (envelope.pendingOperation?.kind) {
+      case "BARGAIN":
+        return "op:bargain";
+      case "COLO_PICK":
+        return "op:colosseum";
+      case "ABILITY_PICK":
+        return "op:ability";
+      case "STORMGLASS":
+        return "op:stormglass";
+      default:
+        return null;
+    }
+  }
+  return coopOperationClassForPhase(envelope.logicalPhase);
+}
+
 /**
  * A surface's guest-side applier: route a replayed committed envelope INTO the surface's idempotent
  * guest applier (invariant 5) AND its live-mutation seam. Returns a {@linkcode CoopApplyOutcome} that
@@ -149,7 +183,7 @@ export function journalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelope
   if (manager == null) {
     return;
   }
-  const cls = coopOperationClassForPhase(envelope.logicalPhase);
+  const cls = coopOperationClassForEnvelope(envelope);
   if (cls == null) {
     return;
   }
@@ -214,7 +248,7 @@ export function coopOperationDurabilityHooks(): CoopDurabilityHooks {
   return {
     extractKey: msg => {
       if (msg.t === "envelope") {
-        const cls = coopOperationClassForPhase(msg.envelope.logicalPhase);
+        const cls = coopOperationClassForEnvelope(msg.envelope);
         return cls == null ? null : { cls, seq: msg.envelope.revision };
       }
       return null;

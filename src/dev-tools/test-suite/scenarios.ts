@@ -2126,24 +2126,30 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "(note) Showdown Team Menu + Set Editor: rename Backspace / editor G-V cycling / rank chip",
+    label: "(note) Showdown Team Menu + Set Editor: G-V cycling / grid-exit / rename Backspace / rank chip",
     description:
       "UI/FLOW fixes - NON-battle screens, so verify at Title -> Showdown (the TEAM MENU) and inside a mon's\n"
-      + "SET EDITOR, not here. THREE live fixes:\n"
+      + "SET EDITOR, not here. Live fixes:\n"
       + "1) RENAME BACKSPACE (Team Menu): hover a saved team, press R to rename, then press BACKSPACE. It must\n"
       + "   DELETE one character and stay in the rename box. Previously Backspace yanked you out of the whole\n"
       + "   menu to the TITLE screen. Enter saves; Esc closes just the rename box (never the title).\n"
-      + "2) EDITOR TEAM-MON CYCLING (Set Editor): with >1 team mon, G = previous mon, V = next mon. They must\n"
-      + "   cycle from ANY field while browsing (incl. an item/move field). Previously the search text-capture\n"
-      + "   lingered on those fields and swallowed every printable hotkey (G/V and F/R/E/N) - all dead. To\n"
-      + "   SEARCH a move/item now, press A (Space) to open the dropdown, THEN type; Esc closes it and the\n"
-      + "   hotkeys are live again.\n"
-      + "3) RANK CHIP (Team Menu): the ranked-ladder badge is now a COMPACT one-line chip in the header (next\n"
-      + "   to the team count), not the big card that used to cover the preview's MOVESET. The full preview\n"
-      + "   (sprite, abilities+innates, item, all 4 moves) must be unobstructed.\n"
+      + "2) EDITOR TEAM-MON CYCLING (Set Editor): with >1 team mon, G = previous mon, V = next mon (shoulder\n"
+      + "   buttons too). Pressing them must ACTUALLY switch which team mon you are editing - the sprite,\n"
+      + "   abilities, moves and stats reload onto the sibling. Previously it did NOTHING: the editor re-open\n"
+      + "   was skipped (same-mode overlay no-op), so it kept showing the first mon. Cycle from ANY field\n"
+      + "   while browsing; to SEARCH a move/item press A (Space) to open the dropdown, THEN type (Esc closes\n"
+      + "   it and the hotkeys are live again).\n"
+      + "3) GETTING OUT OF THE BUILD (grid -> Team Menu): from the offline Create/Edit grid press Cancel (B),\n"
+      + "   confirm Yes. It must return to the TEAM MENU with the grid fully GONE (no frozen / stuck starter\n"
+      + "   select left painted underneath). Previously the grid stayed visible/stranded under the menu.\n"
+      + "4) RANK CHIP (Team Menu): the ranked-ladder badge is a COMPACT one-line chip in the header (next to\n"
+      + "   the team count), not the big card that used to cover the preview's MOVESET; the full preview must\n"
+      + "   be unobstructed. If the rank server route isn't deployed the chip just shows Unranked (no repeated\n"
+      + "   console 404 on every menu open now).\n"
       + "Rendered + asserted headlessly: test/tools/render-ui-page.test.ts (showdown-team-menu* incl. the two\n"
-      + "rank-chip pages) + test/tests/elite-redux/showdown/showdown-team-menu-input.test.ts (rename Backspace\n"
-      + "never exits) + showdown-editor-input.test.ts (capture lifecycle + G/V cycling).",
+      + "rank-chip pages) + showdown-team-menu-realpath.test.ts (REAL-PATH: G/V reloads the sibling mon;\n"
+      + "grid-exit hides the grid + shows the menu) + showdown-team-menu-input.test.ts (rename Backspace never\n"
+      + "exits) + showdown-editor-input.test.ts (capture lifecycle + G/V dispatch).",
     setup: () => {
       resetDevOverrides();
       setOverrides({ STARTING_WAVE_OVERRIDE: 1 });

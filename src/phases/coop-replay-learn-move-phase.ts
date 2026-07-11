@@ -8,6 +8,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { allMoves } from "#data/data-lists";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { armCoopLearnMoveIntentResend } from "#data/elite-redux/coop/coop-learn-move-operation";
 import {
   clearCoopLearnMoveForwardInFlight,
   getCoopInteractionRelay,
@@ -53,6 +54,12 @@ export function openCoopLearnMovePickerInline(partySlot: number, moveId: number,
     clearCoopLearnMoveForwardInFlight(partySlot);
     coopLog("learnmove", "guest relays move-forget pick (inline)", { seq, kind: LEARN_MOVE_CHOICE_KIND, moveIndex });
     getCoopInteractionRelay()?.sendInteractionChoice(seq, LEARN_MOVE_CHOICE_KIND, moveIndex);
+    armCoopLearnMoveIntentResend({
+      payload: { type: "decision", partySlot, moveId, forgetSlot: moveIndex, maxMoveCount },
+      wave: globalScene.currentBattle?.waveIndex ?? 0,
+      turn: globalScene.currentBattle?.turn ?? 0,
+      resend: () => getCoopInteractionRelay()?.sendInteractionChoice(seq, LEARN_MOVE_CHOICE_KIND, moveIndex),
+    });
     // Restore whatever screen the picker overlaid (e.g. the parked shop watcher). #848: the picker is opened
     // with setModeWithoutClear WITHOUT chaining, so revertMode ONLY closes it when there IS a chained mode to
     // pop (the TM-Case parked shop). In a LEVEL-UP context (the batch-panel fallback) the modeChain is empty
@@ -161,6 +168,18 @@ export class CoopReplayLearnMovePhase extends Phase {
     clearCoopLearnMoveForwardInFlight(this.partySlot);
     coopLog("learnmove", "guest relays move-forget pick", { seq: this.seq, kind: LEARN_MOVE_CHOICE_KIND, moveIndex });
     getCoopInteractionRelay()?.sendInteractionChoice(this.seq, LEARN_MOVE_CHOICE_KIND, moveIndex);
+    armCoopLearnMoveIntentResend({
+      payload: {
+        type: "decision",
+        partySlot: this.partySlot,
+        moveId: this.moveId,
+        forgetSlot: moveIndex,
+        maxMoveCount: this.maxMoveCount,
+      },
+      wave: globalScene.currentBattle?.waveIndex ?? 0,
+      turn: globalScene.currentBattle?.turn ?? 0,
+      resend: () => getCoopInteractionRelay()?.sendInteractionChoice(this.seq, LEARN_MOVE_CHOICE_KIND, moveIndex),
+    });
     void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
   }
 }

@@ -68,6 +68,7 @@ import {
   installDuoLogCapture,
   withClient,
 } from "#test/tools/coop-duo-harness";
+import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -279,6 +280,74 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
     });
     expect(dup.adopt, "a duplicate re-delivery of an already-applied op is a no-op (invariant 5)").toBe(false);
 
+    logs.flush();
+  }, 300_000);
+
+  it("DURABILITY: dropping only biomePick still materializes the committed op through the real guest travel path", async () => {
+    expect(isCoopBiomeOperationEnabled(), "the migrated biome-operation path is active for this test").toBe(true);
+
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 1,
+        reorder: 0,
+        delay: 0,
+        faultable: msg => msg.t === "interactionChoice" && msg.kind === "biomePick",
+      },
+      { seed: 0xb10e },
+    );
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+
+    rig.hostScene.currentBattle.waveIndex = 11;
+    rig.guestScene.currentBattle.waveIndex = 11;
+
+    const pinned = rig.hostRuntime.controller.interactionCounter();
+    expect(pinned % 2, "this leg requires the host to own the biome interaction").toBe(0);
+    const ownerBiome = BiomeId.VOLCANO;
+    const fallbackBiome = BiomeId.SWAMP;
+    const guestSwitch = vi.spyOn(rig.guestScene.phaseManager, "unshiftNew");
+    vi.spyOn(rig.guestScene, "generateRandomBiome").mockReturnValue(fallbackBiome);
+
+    const ownerCap = installUiCapture(rig.hostScene);
+    try {
+      setErPendingNodes([{ biome: ownerBiome, revealed: true } satisfies ErRouteNode]);
+      await withClient(rig.hostCtx, async () => {
+        setCoopBiomeInteractionStart(pinned);
+        new SelectBiomePhase().start();
+        await drainLoopback();
+      });
+    } finally {
+      ownerCap.restore();
+    }
+    expect(pair.faultsInjected(), "the legacy biomePick relay must actually be dropped").toBeGreaterThan(0);
+
+    const watcherCap = installUiCapture(rig.guestScene);
+    try {
+      setErPendingNodes([
+        { biome: fallbackBiome, revealed: true },
+        { biome: ownerBiome, revealed: true },
+      ] satisfies ErRouteNode[]);
+      await withClient(rig.guestCtx, async () => {
+        setCoopBiomeInteractionStart(pinned);
+        new SelectBiomePhase().start();
+        for (let i = 0; i < 80; i++) {
+          await drainLoopback();
+          if (biomeArg(guestSwitch) !== undefined) {
+            return;
+          }
+        }
+        throw new Error("durable biome op did not wake the guest's real SelectBiomePhase");
+      });
+    } finally {
+      watcherCap.restore();
+    }
+
+    expect(
+      biomeArg(guestSwitch),
+      "the journal-delivered committed op, not the dropped legacy relay or deterministic fallback, drives travel",
+    ).toBe(ownerBiome);
+    expect(biomeArg(guestSwitch)).not.toBe(fallbackBiome);
     logs.flush();
   }, 300_000);
 });

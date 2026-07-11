@@ -6,7 +6,7 @@ import { captureCoopChecksum, captureCoopMeOutcome } from "#data/elite-redux/coo
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_INTERACTION_LEAVE } from "#data/elite-redux/coop/coop-interaction-relay";
-import { commitMeOwnerIntent } from "#data/elite-redux/coop/coop-me-operation";
+import { commitMeOwnerIntent, nextCoopMePresentationStep } from "#data/elite-redux/coop/coop-me-operation";
 import {
   coopMeHandoffBattleStarted,
   coopMeInProgress,
@@ -405,7 +405,8 @@ export class MysteryEncounterPhase extends Phase {
         kind: "ME_PRESENT",
         seq: seqMe,
         pinned: coopMeInteractionStartValue(),
-        payload: { present: true },
+        step: nextCoopMePresentationStep(),
+        payload: { present: true, presentation: present },
         localRole: getCoopController()?.role ?? "host",
         wave: globalScene.currentBattle?.waveIndex ?? -1,
         turn: 0,

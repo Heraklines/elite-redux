@@ -81,6 +81,26 @@ export function isCoopFaintSwitchSeq(seq: number): boolean {
   return slot >= 0 && slot < COOP_FAINT_SWITCH_SLOT_COUNT;
 }
 
+/** Production carrier seam for an owner-resolved faint replacement (including the no-pick sentinel). */
+export function sendCoopFaintSwitchChoice(
+  relay: CoopInteractionRelay | null,
+  fieldIndex: number,
+  partySlot: number,
+  data: number[],
+): void {
+  relay?.sendInteractionChoice(COOP_FAINT_SWITCH_SEQ_BASE + fieldIndex, "switch", partySlot, [...data]);
+}
+
+/** Production carrier seam for a Revival Blessing owner's target decision. */
+export function sendCoopRevivalChoice(
+  relay: CoopInteractionRelay | null,
+  fieldIndex: number,
+  partySlot: number,
+  data: number[],
+): void {
+  relay?.sendInteractionChoice(COOP_REVIVAL_SEQ_BASE + fieldIndex, "revival", partySlot, [...data]);
+}
+
 /**
  * #806 STALL-WATCHDOG SUPPRESSION (faint-replacement window). While a faint-replacement pick is pending -
  * the host AWAITING the partner's relayed choice ({@linkcode ShowdownEnemyFaintSwitchPhase} / the co-op
@@ -139,6 +159,8 @@ export interface CoopInteractionChoice {
    * wire; may be undefined for a synthetic choice.
    */
   kind?: string;
+  /** Local-only durable carrier correlation. Never serialized on the legacy interactionChoice wire arm. */
+  operationId?: string | undefined;
 }
 
 /** Options for {@linkcode CoopInteractionRelay} (timer injection for tests). */
@@ -165,6 +187,8 @@ export interface CoopInteractionRelayOptions {
 // is still deciding (desync). 20min effectively means "wait for the human"; a timeout is
 // then only a genuinely-disconnected-partner safety net, not a deliberation timer.
 const DEFAULT_TIMEOUT_MS = 1_200_000;
+/** Choice kinds whose dual raw+journal carriers have an explicit payload-identity regression. */
+const COOP_DURABLE_CHOICE_ECHO_KINDS: ReadonlySet<string> = new Set(["abilityPicker", "learnMoveBatch", "stormglass"]);
 
 function defaultSchedule(cb: () => void, ms: number): () => void {
   const id = setTimeout(cb, ms);
@@ -256,6 +280,20 @@ export class CoopInteractionRelay {
   private readonly schedule: (cb: () => void, ms: number) => () => void;
   private readonly isVersus: () => boolean;
   private readonly offMessage: () => void;
+  /** Raw outcomes awaiting their matching journal carrier; keyed by seq + exact JSON payload. */
+  private readonly rawOutcomeCredits = new Map<string, number>();
+  /** Journal outcomes awaiting a later raw legacy echo, which must be dropped rather than double-applied. */
+  private readonly committedOutcomeCredits = new Map<string, number>();
+  /** Raw choices awaiting a same-delivery-turn journal carrier; keyed by seq + kind + exact payload. */
+  private readonly rawChoiceCredits = new Map<string, number>();
+  /** Journal choices awaiting a later raw legacy echo, which must be dropped rather than double-applied. */
+  private readonly committedChoiceCredits = new Map<string, number>();
+  /** Raw/journal prompt echo credits, keyed by the prompt operation id. */
+  private readonly rawRevivalPromptCredits = new Map<string, number>();
+  private readonly committedRevivalPromptCredits = new Map<string, number>();
+  /** Raw/journal wild catch-full prompt echo credits, keyed by the prompt operation id. */
+  private readonly rawCatchFullPromptCredits = new Map<string, number>();
+  private readonly committedCatchFullPromptCredits = new Map<string, number>();
 
   /** seq -> FIFO queue of choices that arrived before their waiter. */
   private readonly inbox = new Map<number, CoopInteractionChoice[]>();
@@ -295,15 +333,38 @@ export class CoopInteractionRelay {
   }
 
   /** #809: ask the partner to open its Revival Blessing picker for `fieldIndex`. */
-  promptRevival(fieldIndex: number): void {
+  promptRevival(fieldIndex: number, operationId?: string): void {
     coopLog("relay", `SEND revivalPrompt fieldIndex=${fieldIndex} (#809)`);
-    this.transport.send({ t: "revivalPrompt", fieldIndex });
+    this.transport.send({ t: "revivalPrompt", fieldIndex, ...(operationId === undefined ? {} : { operationId }) });
+  }
+
+  /** Deliver a committed prompt through the same picker seam, suppressing its raw legacy echo. */
+  materializeCommittedRevivalPrompt(fieldIndex: number, operationId: string): void {
+    if (this.consumeEchoCredit(this.rawRevivalPromptCredits, operationId)) {
+      return;
+    }
+    this.addEchoCredit(this.committedRevivalPromptCredits, operationId);
+    this.onRevivalPrompt?.(fieldIndex);
   }
 
   /** #856: ask the CATCHER partner to open its full-party keep/release picker for a wild catch. */
-  promptCatchFull(pokemonName: string, speciesId: number): void {
+  promptCatchFull(pokemonName: string, speciesId: number, operationId?: string): void {
     coopLog("relay", `SEND catchFullPrompt sp=${speciesId} name=${pokemonName} (#856)`);
-    this.transport.send({ t: "catchFullPrompt", pokemonName, speciesId });
+    this.transport.send({
+      t: "catchFullPrompt",
+      pokemonName,
+      speciesId,
+      ...(operationId === undefined ? {} : { operationId }),
+    });
+  }
+
+  /** Deliver a committed catch-full prompt through the picker seam, suppressing its raw legacy echo. */
+  materializeCommittedCatchFullPrompt(pokemonName: string, speciesId: number, operationId: string): void {
+    if (this.consumeEchoCredit(this.rawCatchFullPromptCredits, operationId)) {
+      return;
+    }
+    this.addEchoCredit(this.committedCatchFullPromptCredits, operationId);
+    this.onCatchFullPrompt?.(pokemonName, speciesId);
   }
 
   /** OWNER: send one pick for interaction `seq` (`kind` is routing/logging only). */
@@ -326,6 +387,32 @@ export class CoopInteractionRelay {
       choice,
       ...(data === undefined ? {} : { data: [...data] }),
     });
+  }
+
+  /**
+   * Deliver a host-COMMITTED interaction choice from the durable operation carrier into the same local
+   * FIFO/waiter seam as a live legacy `interactionChoice` frame. This is deliberately local-only: the
+   * journal already transported and authenticated the committed envelope, so re-sending it would create a
+   * second network carrier. A waiting phase wakes immediately; otherwise the choice is buffered until that
+   * phase opens. The surface adapter still performs its normal operation-ledger adopt before mutating.
+   */
+  materializeCommittedInteractionChoice(
+    seq: number,
+    kind: string,
+    choice: number,
+    data?: number[],
+    operationId?: string | undefined,
+  ): void {
+    if (!COOP_DURABLE_CHOICE_ECHO_KINDS.has(kind)) {
+      this.deliverInteractionChoice(seq, { choice, data, kind, operationId });
+      return;
+    }
+    const key = this.choiceCreditKey(seq, kind, choice, data);
+    if (this.consumeEchoCredit(this.rawChoiceCredits, key)) {
+      return;
+    }
+    this.addEchoCredit(this.committedChoiceCredits, key);
+    this.deliverInteractionChoice(seq, { choice, data, kind, operationId });
   }
 
   /**
@@ -431,6 +518,20 @@ export class CoopInteractionRelay {
       coopLog("relay", `SEND interactionOutcome seq=${seq} kind=${kind} ${summarizeOutcome(outcome)}`);
     }
     this.transport.send({ t: "interactionOutcome", seq, kind, outcome });
+  }
+
+  /**
+   * Deliver a host-COMMITTED outcome from the durable carrier into the real outcome FIFO. The matching
+   * legacy frame may arrive before or after the envelope; one credit on either side suppresses that echo,
+   * so the phase observes exactly one presentation without caring which carrier won the race.
+   */
+  materializeCommittedInteractionOutcome(seq: number, outcome: CoopInteractionOutcome): void {
+    const key = `${seq}:${JSON.stringify(outcome)}`;
+    if (this.consumeEchoCredit(this.rawOutcomeCredits, key)) {
+      return;
+    }
+    this.addEchoCredit(this.committedOutcomeCredits, key);
+    this.deliverInteractionOutcome(seq, outcome, "JOURNAL");
   }
 
   /**
@@ -709,6 +810,14 @@ export class CoopInteractionRelay {
     this.inbox.clear();
     this.outcomePending.clear();
     this.outcomeInbox.clear();
+    this.rawOutcomeCredits.clear();
+    this.committedOutcomeCredits.clear();
+    this.rawChoiceCredits.clear();
+    this.committedChoiceCredits.clear();
+    this.rawRevivalPromptCredits.clear();
+    this.committedRevivalPromptCredits.clear();
+    this.rawCatchFullPromptCredits.clear();
+    this.committedCatchFullPromptCredits.clear();
     this.rewardOptionsPending.clear();
     this.rewardOptionsInbox.clear();
     this.cancelledSeqs.clear();
@@ -738,6 +847,14 @@ export class CoopInteractionRelay {
     }
     this.inbox.clear();
     this.outcomeInbox.clear();
+    this.rawOutcomeCredits.clear();
+    this.committedOutcomeCredits.clear();
+    this.rawChoiceCredits.clear();
+    this.committedChoiceCredits.clear();
+    this.rawRevivalPromptCredits.clear();
+    this.committedRevivalPromptCredits.clear();
+    this.rawCatchFullPromptCredits.clear();
+    this.committedCatchFullPromptCredits.clear();
     this.rewardOptionsInbox.clear();
     // A seq sticky-cancelled in the PRIOR epoch must not keep resolving null in the NEW epoch (seqs reuse
     // low counters), so clear the cancel marks alongside the buffers.
@@ -749,6 +866,13 @@ export class CoopInteractionRelay {
    * own mon. Wired by the runtime (queues CoopGuestRevivalPhase); null in engine-free tests.
    */
   onRevivalPrompt: ((fieldIndex: number) => void) | null = null;
+
+  /** Host-forwarded per-move picker presentation; runtime wires the authoritative guest opener. */
+  onLearnMoveForward: ((outcome: Extract<CoopInteractionOutcome, { k: "learnMoveForward" }>) => void) | null = null;
+
+  /** Host-forwarded batch picker presentation; runtime wires the authoritative guest opener. */
+  onLearnMoveBatchForward: ((outcome: Extract<CoopInteractionOutcome, { k: "learnMoveBatchForward" }>) => void) | null =
+    null;
 
   /**
    * #856: fired when the partner (the sole-engine host) asks THIS client - the CATCHER - to drive the
@@ -795,39 +919,64 @@ export class CoopInteractionRelay {
     return true;
   }
 
+  /** Route a trusted local/wire choice to an accepting waiter or the per-seq FIFO. */
+  private deliverInteractionChoice(seq: number, choice: CoopInteractionChoice): void {
+    const waiter = this.pending.get(seq);
+    if (waiter && kindAccepted(choice.kind, waiter.expectedKinds)) {
+      if (isCoopDebug()) {
+        coopLog("relay", `DELIVER interactionChoice seq=${seq} -> waiter ${summarizeChoice(choice)}`);
+      }
+      waiter.finish(choice);
+      return;
+    }
+    if (waiter) {
+      coopWarn(
+        "relay",
+        `DELIVER interactionChoice seq=${seq} kind=${choice.kind ?? "?"} MISMATCH parked waiter `
+          + `(expected [${(waiter.expectedKinds ?? []).join(",")}]) -> BUFFER, waiter stays parked (#861)`,
+      );
+    }
+    const queue = this.inbox.get(seq) ?? [];
+    queue.push(choice);
+    this.inbox.set(seq, queue);
+    if (isCoopDebug()) {
+      coopLog(
+        "relay",
+        `DELIVER interactionChoice seq=${seq} -> BUFFER inbox depth=${queue.length} ${summarizeChoice(choice)}`,
+      );
+    }
+  }
+
   private handle(msg: CoopMessage): void {
     if (msg.t === "revivalPrompt") {
       coopLog("relay", `RECV revivalPrompt fieldIndex=${msg.fieldIndex} (#809)`);
+      if (msg.operationId !== undefined) {
+        if (this.consumeEchoCredit(this.committedRevivalPromptCredits, msg.operationId)) {
+          return;
+        }
+        this.addEchoCredit(this.rawRevivalPromptCredits, msg.operationId);
+      }
       this.onRevivalPrompt?.(msg.fieldIndex);
       return;
     }
     if (msg.t === "catchFullPrompt") {
       coopLog("relay", `RECV catchFullPrompt sp=${msg.speciesId} name=${msg.pokemonName} (#856)`);
+      if (msg.operationId !== undefined) {
+        if (this.consumeEchoCredit(this.committedCatchFullPromptCredits, msg.operationId)) {
+          return;
+        }
+        this.addEchoCredit(this.rawCatchFullPromptCredits, msg.operationId);
+      }
       this.onCatchFullPrompt?.(msg.pokemonName, msg.speciesId);
       return;
     }
     if (msg.t === "interactionOutcome") {
-      const waiter = this.outcomePending.get(msg.seq);
-      if (waiter) {
-        if (isCoopDebug()) {
-          coopLog(
-            "relay",
-            `RECV interactionOutcome seq=${msg.seq} -> deliver-to-waiter ${summarizeOutcome(msg.outcome)}`,
-          );
-        }
-        waiter(msg.outcome);
+      const key = `${msg.seq}:${JSON.stringify(msg.outcome)}`;
+      if (this.consumeEchoCredit(this.committedOutcomeCredits, key)) {
         return;
       }
-      // No waiter yet - buffer FIFO for the next awaitInteractionOutcome(seq).
-      const queue = this.outcomeInbox.get(msg.seq) ?? [];
-      queue.push(msg.outcome);
-      this.outcomeInbox.set(msg.seq, queue);
-      if (isCoopDebug()) {
-        coopLog(
-          "relay",
-          `RECV interactionOutcome seq=${msg.seq} -> BUFFER outcomeInbox depth=${queue.length} ${summarizeOutcome(msg.outcome)}`,
-        );
-      }
+      this.addEchoCredit(this.rawOutcomeCredits, key);
+      this.deliverInteractionOutcome(msg.seq, msg.outcome, "RECV");
       return;
     }
     if (msg.t === "rewardOptions") {
@@ -868,8 +1017,6 @@ export class CoopInteractionRelay {
     if (this.isForgedCrossOwnerSwitch(msg.seq, msg.choice)) {
       return;
     }
-    // #861: carry the wire `kind` onto the choice so the KIND-VALIDATION can gate delivery + buffer-hits.
-    const choice: CoopInteractionChoice = { choice: msg.choice, data: msg.data, kind: msg.kind };
     // #record-replay: capture this RECEIVED (partner-owned) interaction pick so the host's single trace
     // captures EVERY committed interaction, not just its own (no-op unless recording on the host).
     recordReplayInteraction({
@@ -879,32 +1026,71 @@ export class CoopInteractionRelay {
       choice: msg.choice,
       ...(msg.data === undefined ? {} : { data: [...msg.data] }),
     });
-    const waiter = this.pending.get(msg.seq);
-    // #861: only deliver straight to a parked waiter when the incoming kind is one that waiter declared it
-    // consumes. A mismatch (a stale/cross-family arrival at this reused seq) is NOT delivered - it falls
-    // through to the buffer + is loudly logged, and the waiter stays parked for its genuine pick.
-    if (waiter && kindAccepted(msg.kind, waiter.expectedKinds)) {
-      if (isCoopDebug()) {
-        coopLog("relay", `RECV interactionChoice seq=${msg.seq} -> deliver-to-waiter ${summarizeChoice(choice)}`);
+    if (COOP_DURABLE_CHOICE_ECHO_KINDS.has(msg.kind)) {
+      const key = this.choiceCreditKey(msg.seq, msg.kind, msg.choice, msg.data);
+      if (this.consumeEchoCredit(this.committedChoiceCredits, key)) {
+        return;
       }
-      waiter.finish(choice);
+      this.addTransientRawChoiceCredit(key);
+    }
+    // #861: carry the wire `kind` onto the choice so the KIND-VALIDATION can gate delivery + buffer-hits.
+    this.deliverInteractionChoice(msg.seq, { choice: msg.choice, data: msg.data, kind: msg.kind });
+  }
+
+  private choiceCreditKey(seq: number, kind: string, choice: number, data: number[] | undefined): string {
+    return `${seq}:${kind}:${choice}:${JSON.stringify(data ?? null)}`;
+  }
+
+  private addEchoCredit(credits: Map<string, number>, key: string): void {
+    credits.set(key, (credits.get(key) ?? 0) + 1);
+  }
+
+  private addTransientRawChoiceCredit(key: string): void {
+    this.addEchoCredit(this.rawChoiceCredits, key);
+    queueMicrotask(() => {
+      this.consumeEchoCredit(this.rawChoiceCredits, key);
+    });
+  }
+
+  private consumeEchoCredit(credits: Map<string, number>, key: string): boolean {
+    const count = credits.get(key) ?? 0;
+    if (count <= 0) {
+      return false;
+    }
+    if (count === 1) {
+      credits.delete(key);
+    } else {
+      credits.set(key, count - 1);
+    }
+    return true;
+  }
+
+  private deliverInteractionOutcome(seq: number, outcome: CoopInteractionOutcome, source: "RECV" | "JOURNAL"): void {
+    // Forward-only presentations are consumed by persistent runtime openers rather than a phase-local
+    // outcome waiter. Routing them here lets raw and durable carriers share the relay's echo suppression.
+    if (outcome.k === "learnMoveForward" && this.onLearnMoveForward != null) {
+      this.onLearnMoveForward(outcome);
       return;
     }
-    if (waiter) {
-      coopWarn(
-        "relay",
-        `RECV interactionChoice seq=${msg.seq} kind=${msg.kind} MISMATCH parked waiter `
-          + `(expected [${(waiter.expectedKinds ?? []).join(",")}]) -> BUFFER, waiter stays parked (#861)`,
-      );
+    if (outcome.k === "learnMoveBatchForward" && this.onLearnMoveBatchForward != null) {
+      this.onLearnMoveBatchForward(outcome);
+      return;
     }
-    // No (accepting) waiter yet - buffer FIFO for the next awaitInteractionChoice(seq).
-    const queue = this.inbox.get(msg.seq) ?? [];
-    queue.push(choice);
-    this.inbox.set(msg.seq, queue);
+    const waiter = this.outcomePending.get(seq);
+    if (waiter) {
+      if (isCoopDebug()) {
+        coopLog("relay", `${source} interactionOutcome seq=${seq} -> deliver-to-waiter ${summarizeOutcome(outcome)}`);
+      }
+      waiter(outcome);
+      return;
+    }
+    const queue = this.outcomeInbox.get(seq) ?? [];
+    queue.push(outcome);
+    this.outcomeInbox.set(seq, queue);
     if (isCoopDebug()) {
       coopLog(
         "relay",
-        `RECV interactionChoice seq=${msg.seq} -> BUFFER inbox depth=${queue.length} ${summarizeChoice(choice)}`,
+        `${source} interactionOutcome seq=${seq} -> BUFFER outcomeInbox depth=${queue.length} ${summarizeOutcome(outcome)}`,
       );
     }
   }

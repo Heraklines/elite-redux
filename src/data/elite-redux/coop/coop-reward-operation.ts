@@ -53,7 +53,7 @@
 // surface behaves EXACTLY as before (pure legacy pass-through).
 //
 // FLAG (§5.4): `isCoopRewardOperationEnabled()`. Default ON, version-gated by the existing
-// COOP_PROTOCOL_VERSION (er-coop-12; NO new wire arms this wave - the control fields ride the existing
+// COOP_PROTOCOL_VERSION (er-coop-13; NO new wire arms this wave - the control fields ride the existing
 // relay carrier, the Wave-2a "carrier" delta). `COOP_REWARD_OP=off` forces legacy for CI/soak/rollback.
 // State is per-session and reset on session boundaries (assembleCoopRuntime / clearCoopRuntime).
 // =============================================================================
@@ -90,6 +90,8 @@ export type CoopShopSurface = "reward" | "market";
 export interface CoopRewardRelayAction {
   readonly choice: number;
   readonly data?: number[] | undefined;
+  /** Present only when the durability live sink supplied this action. */
+  readonly operationId?: string | undefined;
 }
 
 /** The watcher's adoption verdict for a relayed reward/market action. */
@@ -105,7 +107,7 @@ export type CoopRewardAdoptDecision =
 
 /**
  * Default ON. Activation is HARD-GATED by the #806 protocol-version handshake (COOP_PROTOCOL_VERSION,
- * er-coop-12): a mixed-build pair refuses to pair / banners, so a live session has both peers on the
+ * er-coop-13): a mixed-build pair refuses to pair / banners, so a live session has both peers on the
  * envelope build. The legacy path stays selectable (rollback = set false). CI/soak force legacy via
  * the COOP_REWARD_OP=off env override.
  */
@@ -126,13 +128,11 @@ let authorityHost: CoopOperationHost | null = null;
 /** The watcher applier that gates adoption of a relayed action. Lazily created; null until first use. */
 let watchGuest: CoopOperationGuest | null = null;
 
-/**
- * A SEPARATE applier for the durability JOURNAL replay path (Wave-2e), distinct from `watchGuest`. In
- * dual-run the LEGACY relay-adopt path (watchGuest) drives the phase's shop action, so the journal MUST
- * NOT consume the operationId that path dedupes on. The journal is the DURABILITY ledger that converges the
- * action history over a cut without touching the live adopt path. Lazily created; reset on session bounds.
- */
-let journalWatchGuest: CoopOperationGuest | null = null;
+/** Pinned streams for which the journal became the live carrier; raw legacy echoes no longer mutate them. */
+const journalLeadingStarts = new Set<number>();
+
+/** Journal-consumed operations waiting for their safe phase-loop materialization. */
+const pendingJournalMaterializations = new Set<string>();
 
 /**
  * The highest pinned interaction start the local client has ADOPTED any action at AS A WATCHER. A pick
@@ -149,7 +149,13 @@ let lastAdoptedStart = -1;
 let lastLeftStart = -1;
 
 /** ACTION ORDINAL stride: pin * STRIDE + ordinal must not overflow into the next pin's op-id space. */
-const ACTION_STRIDE = 100_000;
+export const COOP_REWARD_ACTION_STRIDE = 100_000;
+
+/** Arm one journal-led action before its production sink feeds the real reward/market FIFO. */
+export function armCoopRewardJournalMaterialization(operationId: string, pinned: number): void {
+  journalLeadingStarts.add(pinned);
+  pendingJournalMaterializations.add(operationId);
+}
 
 /** The owner's per-interaction monotonic action ordinal (for the committed op-id). Reset when the pin changes. */
 let ownerOrdinal = 0;
@@ -208,7 +214,8 @@ export function setCoopRewardOperationEpoch(next: number): void {
 export function resetCoopRewardOperationState(): void {
   authorityHost = null;
   watchGuest = null;
-  journalWatchGuest = null;
+  journalLeadingStarts.clear();
+  pendingJournalMaterializations.clear();
   lastAdoptedStart = -1;
   lastLeftStart = -1;
   ownerOrdinal = 0;
@@ -230,7 +237,6 @@ export function setCoopRewardOperationRevisionFloor(hw: number): void {
   revisionFloor = hw;
   authorityHost = null;
   watchGuest = null;
-  journalWatchGuest = null;
 }
 
 // -----------------------------------------------------------------------------
@@ -249,14 +255,6 @@ function guest(): CoopOperationGuest {
     watchGuest = new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
   }
   return watchGuest;
-}
-
-/** The dedicated journal-replay applier (Wave-2e), separate from the live relay-adopt `guest()`. */
-function journalGuest(): CoopOperationGuest {
-  if (journalWatchGuest == null) {
-    journalWatchGuest = new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
-  }
-  return journalWatchGuest;
 }
 
 /** The operation kind for a surface (the §2 successor of the reward / biomeShop relay kinds). */
@@ -357,7 +355,7 @@ export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): vo
   try {
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
     const ordinal = nextOwnerOrdinal(params.pinned);
-    const opId = makeCoopOperationId(epoch, ownerSeat, params.pinned * ACTION_STRIDE + ordinal);
+    const opId = makeCoopOperationId(epoch, ownerSeat, params.pinned * COOP_REWARD_ACTION_STRIDE + ordinal);
     const payload = buildPayload(params.surface, params.label, params.choice, params.data, params.terminal);
     const intent: CoopPendingOperation = {
       id: opId,
@@ -451,7 +449,7 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
 
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
     const ordinal = peekWatcherOrdinal(params.pinned);
-    const opId = makeCoopOperationId(epoch, ownerSeat, params.pinned * ACTION_STRIDE + ordinal);
+    const opId = makeCoopOperationId(epoch, ownerSeat, params.pinned * COOP_REWARD_ACTION_STRIDE + ordinal);
     const payload = buildPayload(params.surface, "relay", params.action.choice, params.action.data, params.terminal);
     const intent: CoopPendingOperation = {
       id: opId,
@@ -480,8 +478,28 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
       }
     }
 
-    // Exact re-delivery of an already-applied action is a no-op (invariant 5).
+    // Once the durability journal wins one action in this pinned FIFO, it leads the remainder of the
+    // interaction. Ignore raw legacy echoes (or raw later actions that raced ahead) and await their tagged
+    // committed envelope. This prevents a reordered echo from being mistaken for the next ordinal.
+    if (journalLeadingStarts.has(params.pinned) && params.action.operationId !== opId) {
+      return { adopt: false, reason: "await-journal" };
+    }
+
+    // The journal consumes the ONE shared ledger before the safe phase loop resumes. A tagged durable action
+    // with the matching one-shot marker is therefore legitimate materialization, not a duplicate.
     if (guest().hasApplied(opId)) {
+      if (params.action.operationId === opId && pendingJournalMaterializations.delete(opId)) {
+        watcherOrdinal += 1;
+        lastAdoptedStart = Math.max(lastAdoptedStart, params.pinned);
+        if (params.terminal) {
+          lastLeftStart = Math.max(lastLeftStart, params.pinned);
+        }
+        coopLog(
+          "reward",
+          `${params.surface} op WATCHER materialize JOURNAL choice=${params.action.choice} terminal=${params.terminal} id=${opId}`,
+        );
+        return { adopt: true };
+      }
       coopWarn("reward", `${params.surface} op WATCHER REJECT duplicate id=${opId} (Wave-2d)`);
       return { adopt: false, reason: "duplicate" };
     }
@@ -542,16 +560,20 @@ function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Co
   if (op == null || op.status !== "applied") {
     return "duplicate";
   }
-  const g = journalGuest();
+  const g = guest();
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
   }
-  const res = g.applyEnvelope(envelope);
+  const res = g.applyEnvelope({
+    ...envelope,
+    sessionEpoch: epoch,
+    revision: g.getLastAppliedRevision() + 1,
+  });
   if (res.kind !== "applied") {
     return "rejected"; // transient non-applicable (retriable); never a permanent condition (that is a duplicate above).
   }
-  // W2e-R P0-1: route the newly-consumed action INTO the ONE live-mutation seam (see the biome adapter). The
-  // production reward materializer is keystone-blocked; a test registers a sink to PROVE the routing.
+  // Route the newly-consumed action into the production sink. It feeds the tagged committed choice into the
+  // receiver's existing reward/market FIFO; the phase remains the sole safe mutation site.
   routeCoopOperationToLiveSink("op:reward", envelope);
   coopLog("reward", `shop op JOURNAL apply kind=${op.kind} id=${op.id} rev=${envelope.revision} (Wave-2e/W2e-R)`);
   return "applied";

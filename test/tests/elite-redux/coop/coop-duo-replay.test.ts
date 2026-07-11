@@ -42,6 +42,7 @@ import {
   type ReplayTrace,
   validateReplayTrace,
 } from "#data/elite-redux/replay-trace";
+import { PokemonMove } from "#data/moves/pokemon-move";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -92,6 +93,7 @@ function rosterMon(species: SpeciesId, level: number, coopOwner: "host" | "guest
     variant: 0,
   });
   data.coopOwner = coopOwner;
+  data.moveset = [new PokemonMove(MoveId.TACKLE), new PokemonMove(MoveId.SPLASH)];
   return data;
 }
 
@@ -227,6 +229,54 @@ describe.skipIf(!RUN)(
       ).toBe(true);
       // NO resync storm: a converged run requests at most a handful of resyncs (<= 1 per wave).
       expect(result.resyncCount, `resyncs bounded (got ${result.resyncCount} over 2 waves)`).toBeLessThanOrEqual(2);
+    }, 300_000);
+
+    it("boots a replay from the window checkpoint party instead of the original launch roster", async () => {
+      const checkpointParty = [
+        rosterMon(SpeciesId.SNORLAX, 61, "host"),
+        rosterMon(SpeciesId.GENGAR, 62, "guest"),
+      ];
+      checkpointParty[0].moveset = [new PokemonMove(MoveId.THUNDER_PUNCH)];
+      checkpointParty[1].moveset = [new PokemonMove(MoveId.SHADOW_BALL)];
+      const trace = makeReplayTrace({
+        seed: "original-launch-seed",
+        gameModeId: GameModes.COOP,
+        roster: [rosterMon(SpeciesId.PIKACHU, 5, "host"), rosterMon(SpeciesId.ABRA, 5, "guest")],
+        events: [],
+        coopRunConfig: {
+          difficulty: "youngster",
+          challenges: [],
+          seed: "original-launch-seed",
+          netcodeMode: "authoritative",
+        },
+      });
+      trace.checkpoint = {
+        wave: 7,
+        seed: "checkpoint-window-seed",
+        party: checkpointParty,
+        modifiers: [],
+        money: 4_321,
+        pokeballCounts: { "0": 7 },
+      };
+
+      const result = await replayCoopTrace(game as unknown as ReplayGameManager, trace);
+
+      expect(result.divergences).toEqual([]);
+      expect(
+        game.scene.getPlayerParty().slice(0, 2).map(p => [p.species.speciesId, p.level]),
+        "the replay must begin from the caught/leveled checkpoint party, not the stale header roster",
+      ).toEqual([
+        [SpeciesId.SNORLAX, 61],
+        [SpeciesId.GENGAR, 62],
+      ]);
+      expect(game.scene.getPlayerParty().slice(0, 2).map(p => p.getMoveset()[0]?.moveId)).toEqual([
+        MoveId.THUNDER_PUNCH,
+        MoveId.SHADOW_BALL,
+      ]);
+      expect(game.scene.currentBattle.waveIndex).toBe(7);
+      expect(game.scene.seed).toBe("checkpoint-window-seed");
+      expect(game.scene.money).toBe(4_321);
+      expect(game.scene.pokeballCounts[0]).toBe(7);
     }, 300_000);
 
     // =========================================================================================

@@ -248,7 +248,15 @@ export class CoopRendezvous {
         resolve(res);
       };
       this.pending.set(point, finish);
-      cancelTimer = this.schedule(() => finish({ point, timedOut: true }), timeoutMs);
+      cancelTimer = this.schedule(() => {
+        // #899: under the cooperative two-engine harness the partner's real loopback arrival may already
+        // be queued for delivery when the tiny vitest wall timer fires. Give transport microtasks one
+        // event-driven turn before committing the unilateral timeout; otherwise the timer deletes this
+        // waiter and the queued arrival lands immediately afterward as an unusable buffer hit.
+        queueMicrotask(() => {
+          finish(this.partnerArrived.has(point) ? { point, timedOut: false } : { point, timedOut: true });
+        });
+      }, timeoutMs);
     });
   }
 

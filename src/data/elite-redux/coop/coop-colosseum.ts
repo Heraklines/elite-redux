@@ -53,6 +53,11 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import {
+  armCoopColosseumDecisionResend,
+  commitColosseumBoard,
+  commitColosseumDecision,
+} from "#data/elite-redux/coop/coop-colosseum-operation";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
@@ -153,6 +158,16 @@ export function coopColosseumStreamBoard(labels: string[]): void {
     labels: [],
     subPrompt: { kind: "secondary", labels },
   };
+  const controller = getCoopController();
+  if (controller != null) {
+    commitColosseumBoard({
+      pinned: coopMeInteractionStartValue(),
+      labels,
+      localRole: controller.role,
+      wave: globalScene?.currentBattle?.waveIndex ?? 0,
+      turn: globalScene?.currentBattle?.turn ?? 0,
+    });
+  }
   coopLog("me", "colosseum: host streams board present (#829)", { seq, labels: labels.length });
   getCoopInteractionRelay()?.sendInteractionOutcome(seq, COOP_COLOSSEUM_BOARD_KIND, present);
 }
@@ -170,8 +185,26 @@ export function coopColosseumSendDecision(index: number): void {
     return;
   }
   const seq = coopColosseumSeq(coopMeInteractionStartValue());
+  const controller = getCoopController();
+  if (controller != null) {
+    commitColosseumDecision({
+      pinned: coopMeInteractionStartValue(),
+      index,
+      localRole: controller.role,
+      wave: globalScene?.currentBattle?.waveIndex ?? 0,
+      turn: globalScene?.currentBattle?.turn ?? 0,
+    });
+  }
   coopLog("me", "colosseum: relay board decision (#829)", { seq, index });
   getCoopInteractionRelay()?.sendInteractionChoice(seq, COOP_COLOSSEUM_PICK_KIND, index);
+  if (controller?.role === "guest") {
+    const relay = getCoopInteractionRelay();
+    if (relay != null) {
+      armCoopColosseumDecisionResend(coopMeInteractionStartValue(), index, () => {
+        relay.sendInteractionChoice(seq, COOP_COLOSSEUM_PICK_KIND, index);
+      });
+    }
+  }
 }
 
 /**
@@ -188,7 +221,20 @@ export function coopColosseumAwaitDecision(timeoutMs?: number): Promise<number |
   }
   const seq = coopColosseumSeq(coopMeInteractionStartValue());
   coopLog("me", "colosseum: await board decision (#829)", { seq, timeoutMs: timeoutMs ?? "default" });
-  return relay.awaitInteractionChoice(seq, timeoutMs, COOP_COLO_CHOICE_KINDS).then(pick => pick?.choice ?? null);
+  return relay.awaitInteractionChoice(seq, timeoutMs, COOP_COLO_CHOICE_KINDS).then(pick => {
+    const index = pick?.choice ?? null;
+    const controller = getCoopController();
+    if (index != null && controller?.role === "host") {
+      commitColosseumDecision({
+        pinned: coopMeInteractionStartValue(),
+        index,
+        localRole: controller.role,
+        wave: globalScene?.currentBattle?.waveIndex ?? 0,
+        turn: globalScene?.currentBattle?.turn ?? 0,
+      });
+    }
+    return index;
+  });
 }
 
 /**

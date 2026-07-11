@@ -57,6 +57,22 @@ export const COOP_CAP_OP_ME: CoopCapabilityKey = "opSurface.me";
 export const COOP_CAP_OP_REWARD: CoopCapabilityKey = "opSurface.reward";
 /** The migrated post-battle wave-advance operation surface - THE KEYSTONE (coop-wave-operation.ts, §2.5 item 4). */
 export const COOP_CAP_OP_WAVE: CoopCapabilityKey = "opSurface.wave";
+/** The migrated Giratina bargain terminal operation (§2.5 item 5). */
+export const COOP_CAP_OP_BARGAIN: CoopCapabilityKey = "opSurface.bargain";
+/** The migrated multi-round colosseum board/pick stream (§2.5 item 5). */
+export const COOP_CAP_OP_COLOSSEUM: CoopCapabilityKey = "opSurface.colosseum";
+/** The migrated ER ability consumable picker outcome (§2.5 item 5). */
+export const COOP_CAP_OP_ABILITY: CoopCapabilityKey = "opSurface.abilityPicker";
+/** The migrated owner-resolved faint replacement intent (§2.5 item 6). */
+export const COOP_CAP_OP_FAINT_SWITCH: CoopCapabilityKey = "opSurface.faintSwitch";
+/** The migrated Revival Blessing prompt + owner-resolved target stream. */
+export const COOP_CAP_OP_REVIVAL: CoopCapabilityKey = "opSurface.revival";
+/** The migrated per-move and batch move-learning control stream. */
+export const COOP_CAP_OP_LEARN_MOVE: CoopCapabilityKey = "opSurface.learnMove";
+/** The migrated wild-catch full-party keep/release control stream. */
+export const COOP_CAP_OP_CATCH_FULL: CoopCapabilityKey = "opSurface.catchFull";
+/** The migrated one-time Stormglass weather choice. */
+export const COOP_CAP_OP_STORMGLASS: CoopCapabilityKey = "opSurface.stormglass";
 /** The application-level durability journal (§4, coop-durability.ts / coop-operation-journal.ts). */
 export const COOP_CAP_DURABILITY_JOURNAL: CoopCapabilityKey = "durability.journal";
 /**

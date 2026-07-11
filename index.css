@@ -193,10 +193,12 @@ input:-internal-autofill-selected {
   display: none;
 }
 
-/* Show #apadStats only in battle and shop */
+/* Show #apadStats in battle, shop, and the Showdown Set Editor (its Set Menu opens on STATS). */
 #touchControls:not([data-ui-mode="COMMAND"]):not([data-ui-mode="FIGHT"]):not(
     [data-ui-mode="BALL"]
-  ):not([data-ui-mode="TARGET_SELECT"]):not([data-ui-mode="MODIFIER_SELECT"])
+  ):not([data-ui-mode="TARGET_SELECT"]):not([data-ui-mode="MODIFIER_SELECT"]):not(
+    [data-ui-mode="SHOWDOWN_SET_EDITOR"]
+  )
   #apadStats {
   display: none;
 }
@@ -216,6 +218,7 @@ input:-internal-autofill-selected {
     [data-ui-mode="POKEDEX"],
     [data-ui-mode="POKEDEX_PAGE"],
     [data-ui-mode="RUN_INFO"],
+    [data-ui-mode="SHOWDOWN_TEAM_MENU"],
     [data-ui-mode="SHOWDOWN_SET_EDITOR"]
   )
   #apadCycleForm,
@@ -249,7 +252,8 @@ input:-internal-autofill-selected {
   #apadCycleGender,
 #touchControls:not(.config-mode):not(
     [data-ui-mode="STARTER_SELECT"],
-    [data-ui-mode="POKEDEX"]
+    [data-ui-mode="POKEDEX"],
+    [data-ui-mode="SHOWDOWN_TEAM_MENU"]
   )
   #apadCycleTera {
   display: none;

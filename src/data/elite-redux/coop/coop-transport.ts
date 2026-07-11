@@ -47,7 +47,7 @@ export type CoopRole = "host" | "guest";
  * changes shape. Carried in the hello; a mismatch means one player runs a stale cached bundle -
  * the top source of unreproducible ghost bugs - and both get told to hard-refresh.
  */
-export const COOP_PROTOCOL_VERSION = "er-coop-12";
+export const COOP_PROTOCOL_VERSION = "er-coop-13";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -466,6 +466,8 @@ export interface CoopFullMonSnapshot {
 export interface CoopFullBattleSnapshot {
   /** #807 monotonic state tick (Source-style snapshot sequencing); absent on legacy senders. */
   tick?: number;
+  /** Operation revisions whose effects this authoritative snapshot already subsumes (§4.4). */
+  journalHighWater?: Record<string, number> | undefined;
   /** Every occupied field mon's full state, by battler index. */
   field: CoopFullMonSnapshot[];
   /** `WeatherType` enum value (0 = none) + turns remaining. */
@@ -893,14 +895,14 @@ export type CoopMessage =
    */
   | { t: "rendezvous"; point: string }
   /** #809: host asks the partner to pick a Revival Blessing target for its own mon. */
-  | { t: "revivalPrompt"; fieldIndex: number }
+  | { t: "revivalPrompt"; fieldIndex: number; operationId?: string | undefined }
   /**
    * #856: host asks the CATCHER (the partner who threw the ball) to drive the FULL-party keep/release
    * picker for a successful wild catch. The recipient opens the real replace-or-skip picker and relays the
    * chosen party slot on {@linkcode COOP_CATCH_FULL_SEQ}; the host applies the authoritative release+add.
    * `speciesId` is the caught mon's root species (for a locally-localized picker header on the recipient).
    */
-  | { t: "catchFullPrompt"; pokemonName: string; speciesId: number }
+  | { t: "catchFullPrompt"; pokemonName: string; speciesId: number; operationId?: string | undefined }
   /** #810 resume flow: host offers to resume the saved run with this partner at `wave`. */
   | { t: "meCursor"; index: number }
   | { t: "resumeOffer"; wave: number }

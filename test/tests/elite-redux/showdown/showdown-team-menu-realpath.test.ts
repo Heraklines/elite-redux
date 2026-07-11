@@ -196,11 +196,168 @@ describe.runIf(RUN)("showdown team menu - real-path acceptance", () => {
     await confirmYesIfPrompted(); // Yes -> showdownBuildOnCancel -> settle -> reopen the menu
 
     expect(mode()).toBe(UiMode.SHOWDOWN_TEAM_MENU); // returned to the menu, NOT the title
+    // "stuck getting out of the custom starter select" red-proof: mode flipping to the menu is NOT
+    // enough - the GRID container must be HIDDEN, or it stays painted (and input-live under the menu),
+    // which is exactly what the player saw. The confirmExit CONFIRM is an unchained overlay, so the old
+    // `revertMode()` was a no-op and the grid was never cleared. Assert the source is gone + dest shown.
+    const grid: any = game.scene.ui.handlers[UiMode.STARTER_SELECT];
+    const menuHandler: any = game.scene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU];
+    expect(grid.starterSelectContainer.visible, "the grid must be HIDDEN once we exit to the menu").toBe(false);
+    expect(menuHandler.container.visible, "the Team Menu container is shown after the grid exit").toBe(true);
     // Live fix #5 net: settle must restore the LIVE gameMode OBJECT (the old code restored
     // getGameMode(phase.gameMode) where phase.gameMode is undefined at the title -> every
     // subsequent setMode crashed on gameMode.isCoop, live "naming doesn't advance").
     expect(game.scene.gameMode, "gameMode restored to a real object after settle").toBeDefined();
     expect(game.scene.gameMode.isShowdown).toBeFalsy(); // borrowed gameMode cleanly restored
     expect(game.scene.gameData.showdownTeamPresets.length).toBe(0); // nothing saved on cancel
+  });
+
+  // ---- P2: IMPORT -> save -> the menu shows it (the real dispatch loop) --------------------------
+
+  it("import (F): a clean paste saves a new preset and the menu shows it", async () => {
+    const phase = new TitlePhase();
+    (phase as any).openShowdownTeamMenu(() => {});
+    await wait(400);
+    const menu: any = game.scene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU];
+    menu.setPasteInput(null); // no headless DOM bridge; we set the buffer directly
+    const before = game.scene.gameData.showdownTeamPresets.length;
+
+    // F routes through the REAL buttonCycleOption dispatch (whitelist) -> beginImport.
+    cycle(Button.CYCLE_FORM);
+    await wait(30);
+    expect(menu.importing, "F opened the import paste modal via the real dispatch").toBe(true);
+
+    // A clean Garchomp set (cost 4, everything.prsv unlocks it) -> validates -> saved straight away.
+    menu.importBuffer = ["Garchomp @ Leftovers", "Nature: Jolly", "- Earthquake", "- Outrage"].join("\n");
+    press(Button.ACTION); // -> submitImport
+    await wait(30);
+
+    // The import -> save -> menu-shows-it LOOP: persisted to the account save AND appended to the live view.
+    expect(game.scene.gameData.showdownTeamPresets.length, "a new preset was saved to the account data").toBe(
+      before + 1,
+    );
+    const saved = game.scene.gameData.showdownTeamPresets.at(-1)!;
+    expect(saved.mons[0].speciesId).toBe(SpeciesId.GARCHOMP);
+    expect(saved.mons[0].moveset).toEqual([MoveId.EARTHQUAKE, MoveId.OUTRAGE]);
+    expect(menu.config.presets.at(-1).name, "the menu view shows the imported team").toBe("Imported Team");
+    expect(menu.teamCursor, "the cursor hovers the new team").toBe(menu.config.presets.length - 1);
+    expect(mode()).toBe(UiMode.SHOWDOWN_TEAM_MENU);
+  });
+
+  it("import (F): a broken paste raises the per-mon error list, then drop-invalid saves the rest", async () => {
+    const phase = new TitlePhase();
+    (phase as any).openShowdownTeamMenu(() => {});
+    await wait(400);
+    const menu: any = game.scene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU];
+    menu.setPasteInput(null);
+    const before = game.scene.gameData.showdownTeamPresets.length;
+
+    cycle(Button.CYCLE_FORM);
+    await wait(30);
+    // One valid mon + one unknown-species block.
+    menu.importBuffer = ["Garchomp @ Leftovers", "- Earthquake", "", "Notamon @ Leftovers", "- Tackle"].join("\n");
+    press(Button.ACTION); // submitImport -> some errors -> the error list is raised
+    await wait(30);
+    expect(menu.importErrors, "the per-mon error list is shown").not.toBeNull();
+    expect(menu.importErrors.some((m: string) => m.includes("unknown species 'Notamon'"))).toBe(true);
+    expect(menu.importValidMons.length, "the one valid mon is kept for the fix-up").toBe(1);
+    expect(game.scene.gameData.showdownTeamPresets.length, "nothing saved yet").toBe(before);
+
+    // Drop invalid & save the valid remainder (Enter).
+    press(Button.ACTION);
+    await wait(30);
+    expect(game.scene.gameData.showdownTeamPresets.length, "the valid mon was saved").toBe(before + 1);
+    expect(game.scene.gameData.showdownTeamPresets.at(-1)!.mons).toHaveLength(1);
+    expect(menu.importErrors, "the error list is dismissed after saving").toBeNull();
+  });
+
+  // ---- P2: AUTO-REMEMBER prefill (confirm a set -> the next pick of that species pre-fills it) -----
+
+  it("auto-remember: confirming a set stores it and the next CREATE of that species pre-fills it", async () => {
+    // Enter the offline build so the real grid handler exists with live dex state.
+    const phase = new TitlePhase();
+    (phase as any).openShowdownTeamMenu(() => {});
+    await wait(400);
+    press(Button.ACTION);
+    await wait(500);
+    await confirmYesIfPrompted();
+    expect(mode()).toBe(UiMode.STARTER_SELECT);
+    const grid: any = game.scene.ui.handlers[UiMode.STARTER_SELECT];
+
+    // Highlight a caught species + populate the detail cursors (mirrors the freeze-bug recipe).
+    const sp = getPokemonSpecies(SpeciesId.BULBASAUR);
+    grid.lastSpecies = sp;
+    grid.speciesStarterDexEntry = game.scene.gameData.dexData[SpeciesId.BULBASAUR];
+    grid.setSpeciesDetails(sp, {}, false);
+
+    // Build a fresh CREATE config, shape a set, and REMEMBER it through the real commit-time helper (the
+    // exact call commitShowdownEditor makes) - which exports codec text into localStorage.
+    const cfg0 = grid.buildShowdownEditorConfig(sp, SpeciesId.BULBASAUR, -1);
+    cfg0.set.moves = [MoveId.TACKLE, MoveId.VINE_WHIP, null, null];
+    cfg0.set.nature = 3; // an arbitrary distinct nature
+    grid.rememberShowdownSet(sp, SpeciesId.BULBASAUR, { stage: cfg0.stage, set: cfg0.set });
+
+    // A subsequent FRESH create config for the SAME species (no in-session selection) pre-fills from the
+    // remembered set. RED-PROOF (auto-remember prefill): drop the prefill fallbacks in buildShowdownEditorConfig
+    // (or the rememberShowdownSet write) and these go back to the grid defaults.
+    grid.showdownSelections.delete(SpeciesId.BULBASAUR);
+    const cfg1 = grid.buildShowdownEditorConfig(sp, SpeciesId.BULBASAUR, -1);
+    expect(cfg1.set.moves.slice(0, 2), "moves pre-filled from last-used").toEqual([MoveId.TACKLE, MoveId.VINE_WHIP]);
+    expect(cfg1.set.nature, "nature pre-filled from last-used").toBe(3);
+  });
+
+  it("G/V team-cycle: the editor RELOADS onto the sibling team mon (offline edit, dead-cycle red-proof)", async () => {
+    // A 2-mon preset -> EDIT seeds BOTH mons into the grid, so the editor has siblings to cycle between.
+    const mon = (root: SpeciesId, fielded: SpeciesId, move: MoveId) => ({
+      speciesId: fielded,
+      formIndex: 0,
+      level: 100,
+      shiny: false,
+      variant: 0,
+      abilityIndex: 0,
+      nature: 0,
+      ivs: [31, 31, 31, 31, 31, 31] as number[],
+      moveset: [move],
+      item: "LEFTOVERS",
+      rootSpeciesId: root,
+      erBlackShiny: false,
+      baseCost: 4,
+    });
+    game.scene.gameData.saveShowdownTeamPreset("Duo", [
+      mon(SpeciesId.GIBLE, SpeciesId.GARCHOMP, MoveId.EARTHQUAKE),
+      mon(SpeciesId.LARVITAR, SpeciesId.TYRANITAR, MoveId.CRUNCH),
+    ]);
+    const phase = new TitlePhase();
+    (phase as any).openShowdownTeamMenu(() => {});
+    await wait(400);
+    cycle(Button.CYCLE_ABILITY); // E -> seeded EDIT build
+    await wait(700);
+    expect(mode()).toBe(UiMode.STARTER_SELECT);
+    const grid: any = game.scene.ui.handlers[UiMode.STARTER_SELECT];
+    await grid.showdownSeedInFlight; // the seeded party loads its icons asynchronously
+    await wait(100);
+    expect(grid.starterSpecies.length, "both preset mons seeded into the grid").toBe(2);
+
+    // Open the Set Editor on slot 0, then cycle with V (next) and G (prev).
+    grid.openShowdownEditor(0);
+    await wait(200);
+    expect(mode(), "the Set Editor opened on slot 0").toBe(UiMode.SHOWDOWN_SET_EDITOR);
+    const editor: any = game.scene.ui.handlers[UiMode.SHOWDOWN_SET_EDITOR];
+    const slot0Root = editor.config.rootSpeciesId;
+
+    // V (CYCLE_TERA) = NEXT team mon. With the dead-cycle bug, openShowdownEditor's setOverlayMode
+    // no-ops (this.mode === SHOWDOWN_SET_EDITOR) and the editor keeps rendering slot 0; the fix
+    // re-renders in place so the config root actually changes to the sibling.
+    game.scene.ui.getHandler().processInput(Button.CYCLE_TERA);
+    await wait(200);
+    expect(mode(), "still in the editor after V").toBe(UiMode.SHOWDOWN_SET_EDITOR);
+    expect(editor.container.visible, "editor stays visible after cycling").toBe(true);
+    const slot1Root = editor.config.rootSpeciesId;
+    expect(slot1Root, "V reloaded the editor onto the OTHER team mon").not.toBe(slot0Root);
+
+    // G (CYCLE_GENDER) = PREV -> back to slot 0.
+    game.scene.ui.getHandler().processInput(Button.CYCLE_GENDER);
+    await wait(200);
+    expect(editor.config.rootSpeciesId, "G cycled back to the first mon").toBe(slot0Root);
   });
 });

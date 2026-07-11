@@ -32,6 +32,12 @@ import {
   coopColosseumStreamBoard,
   runColosseumGuestRoundLoop,
 } from "#data/elite-redux/coop/coop-colosseum";
+import {
+  resetCoopColosseumDecisionRetryMs,
+  resetCoopColosseumOperationFlag,
+  setCoopColosseumDecisionRetryMs,
+  setCoopColosseumOperationEnabled,
+} from "#data/elite-redux/coop/coop-colosseum-operation";
 import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
@@ -43,6 +49,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome, CoopMessage, CoopSerializedEnemy } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { COLOSSEUM_CASH_OUT, COLOSSEUM_CONTINUE } from "#ui/colosseum-ui-handler";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -51,6 +58,8 @@ const BOARD_LABELS = ["CONTINUE (risk for S+)", "CASH OUT (claim S)"];
 
 describe("co-op Colosseum between-rounds board relay (#829)", () => {
   afterEach(() => {
+    resetCoopColosseumDecisionRetryMs();
+    resetCoopColosseumOperationFlag();
     clearCoopRuntime();
     setCoopMeInteractionStart(-1); // drop the ME pin so the next file starts clean
   });
@@ -91,6 +100,90 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
     coopColosseumSendDecision(1); // CASH OUT
     const decision = await guestRelay.awaitInteractionChoice(seq);
     expect(decision?.choice).toBe(1);
+  });
+
+  it("keeps the pure legacy board/pick carriers working when the operation flag is off", async () => {
+    setCoopColosseumOperationEnabled(false);
+    const { seq, guestRelay } = rig(4);
+    coopColosseumStreamBoard([...BOARD_LABELS]);
+    expect((await guestRelay.awaitInteractionOutcome(seq))?.k).toBe("mePresent");
+    coopColosseumSendDecision(COLOSSEUM_CASH_OUT);
+    expect((await guestRelay.awaitInteractionChoice(seq))?.choice).toBe(COLOSSEUM_CASH_OUT);
+  });
+
+  it("DURABILITY: dropping only coloBoard still materializes the committed board for the guest", async () => {
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 1,
+        reorder: 0,
+        delay: 0,
+        faultable: msg => msg.t === "interactionOutcome" && msg.kind === "coloBoard",
+      },
+      { seed: 0xc010 },
+    );
+    const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
+    setCoopRuntime(hostRuntime);
+    setCoopMeInteractionStart(4);
+
+    coopColosseumStreamBoard([...BOARD_LABELS]);
+    const present = await guestRuntime.interactionRelay.awaitInteractionOutcome(coopColosseumSeq(4), 25);
+
+    expect(pair.faultsInjected(), "the raw coloBoard carrier was actually dropped").toBe(1);
+    expect(present?.k, "the committed board reached the real guest outcome FIFO").toBe("mePresent");
+    if (present?.k === "mePresent") {
+      expect(present.subPrompt).toEqual({ kind: "secondary", labels: BOARD_LABELS });
+    }
+  });
+
+  it("DURABILITY: dropping only coloPick still materializes the committed decision for the guest", async () => {
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 1,
+        reorder: 0,
+        delay: 0,
+        faultable: msg => msg.t === "interactionChoice" && msg.kind === "coloPick",
+      },
+      { seed: 0xc011 },
+    );
+    const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
+    setCoopRuntime(hostRuntime);
+    setCoopMeInteractionStart(4);
+
+    coopColosseumSendDecision(COLOSSEUM_CONTINUE);
+    const decision = await guestRuntime.interactionRelay.awaitInteractionChoice(coopColosseumSeq(4), 25);
+
+    expect(pair.faultsInjected(), "the raw coloPick carrier was actually dropped").toBe(1);
+    expect(decision?.choice, "the committed decision reached the real guest choice FIFO").toBe(COLOSSEUM_CONTINUE);
+  });
+
+  it("INTENT RECOVERY: a dropped guest-owned coloPick is resent until the host commits it", async () => {
+    setCoopColosseumDecisionRetryMs(10);
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 0,
+        reorder: 0,
+        delay: 0,
+        faultable: msg => msg.t === "interactionChoice" && msg.kind === "coloPick",
+      },
+      { seed: 0xc012 },
+    );
+    const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
+    setCoopMeInteractionStart(5);
+    pair.armNextDrop("interactionChoice", "guest");
+    setCoopRuntime(hostRuntime);
+    const hostDecision = coopColosseumAwaitDecision(100);
+    setCoopRuntime(guestRuntime);
+    coopColosseumSendDecision(COLOSSEUM_CONTINUE);
+    setCoopRuntime(hostRuntime);
+
+    expect(pair.faultsInjected(), "the first guest intent was actually dropped").toBe(1);
+    expect(await hostDecision, "the retry reached the host authority").toBe(COLOSSEUM_CONTINUE);
   });
 
   it("awaits the guest owner's relayed decision index (guest-owned)", async () => {

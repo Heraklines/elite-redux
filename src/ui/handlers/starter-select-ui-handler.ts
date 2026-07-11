@@ -44,11 +44,14 @@ import {
   renderErShinyLabLook,
 } from "#data/elite-redux/er-shiny-lab-renderer";
 import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
+import { copyTextToClipboard } from "#data/elite-redux/showdown/showdown-clipboard";
 import { isMegaStage, listEvolutionStages, listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
 import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
 import { collectShowdownLegalMoves, collectUnlockedEggMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
 import { buildUnlockSnapshot, starterToManifest } from "#data/elite-redux/showdown/showdown-manifest";
 import { getShowdownPickWaitMs } from "#data/elite-redux/showdown/showdown-session";
+import { exportShowdownSet, importShowdownSet } from "#data/elite-redux/showdown/showdown-set-codec";
+import { getLastUsedSet, rememberLastUsedSet } from "#data/elite-redux/showdown/showdown-species-sets";
 import {
   COST_CAP,
   HIGH_COST_MIN,
@@ -117,7 +120,7 @@ import { MessageUiHandler } from "#ui/message-ui-handler";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { PokemonIconAnimHelper, PokemonIconAnimMode } from "#ui/pokemon-icon-anim-helper";
 import { ScrollBar } from "#ui/scroll-bar";
-import { DomShowdownEditorTextInput } from "#ui/showdown-editor-text-input";
+import { DomShowdownEditorTextInput, DomShowdownPasteInput } from "#ui/showdown-editor-text-input";
 import type {
   ShowdownEditorSet,
   ShowdownEditorStage,
@@ -4024,9 +4027,21 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // The registered handler instance is reused across opens, so re-injecting each open is harmless.
     const editor = ui.handlers[UiMode.SHOWDOWN_SET_EDITOR] as ShowdownSetEditorUiHandler | undefined;
     editor?.setTextInput(new DomShowdownEditorTextInput());
-    // Open as an OVERLAY (chains onto the mode stack) rather than setMode: setMode would CLEAR this
-    // StarterSelect (hide its grid, reset its cursor), and returning via setMode(STARTER_SELECT) with no
-    // callback arg re-runs show() into an EMPTY screen (its init is gated on `args[0] instanceof
+    editor?.setPasteInput(new DomShowdownPasteInput()); // multiline capture for the Set Menu's Import
+    // TEAM CYCLE (G / V / shoulder): when the editor is ALREADY the active mode, this is a slot switch,
+    // not a fresh open. `setOverlayMode(SHOWDOWN_SET_EDITOR)` would then be a NO-OP - `setModeInternal`
+    // early-returns on `this.mode === mode`, so the editor would keep rendering the OLD slot and G/V/
+    // shoulder would look dead ("the button to change the mon doesnt work"). Re-render the live editor
+    // handler in place with the new slot's config instead: mode is already correct, render() clears its
+    // dynamic children first (no leak), and there is no mode-chain churn or fade. This is the ONLY
+    // same-mode reopen path; the first open (from the grid) still chains as an overlay below.
+    if (ui.getMode() === UiMode.SHOWDOWN_SET_EDITOR) {
+      editor?.show([config]);
+      return;
+    }
+    // First open: as an OVERLAY (chains onto the mode stack) rather than setMode: setMode would CLEAR
+    // this StarterSelect (hide its grid, reset its cursor), and returning via setMode(STARTER_SELECT)
+    // with no callback arg re-runs show() into an EMPTY screen (its init is gated on `args[0] instanceof
     // Function`). As an overlay the grid stays alive underneath the editor's opaque backdrop, and the
     // editor's Done/Cancel revertMode() back to it intact - no empty-screen softlock.
     ui.setOverlayMode(UiMode.SHOWDOWN_SET_EDITOR, config);
@@ -4040,19 +4055,31 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     const existing = isEdit ? this.starters[editIndex] : null;
     const selection = this.showdownSelections.get(root);
 
-    // Fielded STAGE: edit -> the stored starter's stage; create -> a stored selection or the base grid form.
+    // AUTO-REMEMBER prefill (P2): on a FRESH create (no existing slot, no in-session selection yet), seed
+    // from this species' last-used set (stored as codec text in localStorage on the previous confirm). The
+    // stage / ability / item / moves / nature are pre-filled; shiny stays a per-mon identity pick (the grid
+    // props + the editor's highest-owned default). Only a clean parse for THIS root is used; the editor's
+    // Done still re-validates, so a since-changed unlock can never let a stale prefill through.
+    const prefill = !isEdit && selection == null ? this.loadShowdownPrefill(root) : null;
+    const prefillMoves = prefill?.moveset ?? [];
+
+    // Fielded STAGE: edit -> the stored starter's stage; create -> a stored selection, then the remembered
+    // last-used set, then the base grid form.
     const stage: ShowdownEditorStage = {
-      speciesId: existing?.showdownSpeciesId ?? selection?.speciesId ?? root,
-      formIndex: existing?.showdownFormIndex ?? selection?.formIndex ?? props.formIndex,
+      speciesId: existing?.showdownSpeciesId ?? selection?.speciesId ?? prefill?.speciesId ?? root,
+      formIndex: existing?.showdownFormIndex ?? selection?.formIndex ?? prefill?.formIndex ?? props.formIndex,
     };
 
     // The editable SET - a FRESH copy (the editor mutates it in place, so edits only land on Done/commit).
-    const moves = (existing?.moveset ?? this.starterMoveset ?? []).slice(0, 4);
+    const moves = (existing?.moveset ?? (prefillMoves.length > 0 ? prefillMoves : this.starterMoveset) ?? []).slice(
+      0,
+      4,
+    );
     const set: ShowdownEditorSet = {
-      abilityIndex: existing?.abilityIndex ?? this.abilityCursor,
-      item: existing?.showdownItem ?? selection?.item ?? SHOWDOWN_ITEM_POOL[0],
+      abilityIndex: existing?.abilityIndex ?? prefill?.abilityIndex ?? this.abilityCursor,
+      item: existing?.showdownItem ?? selection?.item ?? prefill?.item ?? SHOWDOWN_ITEM_POOL[0],
       moves: [0, 1, 2, 3].map(i => (moves[i] ?? null) as MoveId | null),
-      nature: existing?.nature ?? (this.natureCursor as unknown as Nature),
+      nature: existing?.nature ?? (prefill?.nature as Nature | undefined) ?? (this.natureCursor as unknown as Nature),
       shiny: existing?.shiny ?? props.shiny,
       variant: existing?.variant ?? props.variant,
     };
@@ -4115,6 +4142,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       // it empty (init gated on the callback arg).
       onCancel: () => void this.getUi().revertMode(),
       onCycleTeam: dir => this.cycleShowdownEditorTeam(editIndex, dir),
+      // Set Menu Export: copy the PS-format set text to the clipboard (guarded util; headless = no-op).
+      copyToClipboard: text => copyTextToClipboard(text),
     };
   }
 
@@ -4168,6 +4197,37 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     return starterToManifest(temp, gameData);
   }
 
+  /**
+   * Showdown auto-remember (P2): load this species' last-used set (codec text in localStorage) and parse it
+   * back to a manifest for pre-filling a fresh CREATE. Returns null when there is no remembered set, the
+   * text no longer parses, or it is for a DIFFERENT root (a stale key) - the caller then falls back to the
+   * grid defaults. The editor's Done-time re-validation is the final gate, so a stale prefill is harmless.
+   */
+  private loadShowdownPrefill(root: number): ShowdownMonManifest | null {
+    const text = getLastUsedSet(root);
+    if (text == null) {
+      return null;
+    }
+    const parsed = importShowdownSet(text);
+    return parsed.manifest != null && parsed.manifest.rootSpeciesId === root ? parsed.manifest : null;
+  }
+
+  /**
+   * Showdown auto-remember (P2): export the just-confirmed set to codec text and store it as this species'
+   * last-used. Reuses {@linkcode buildProvisionalShowdownManifest} so the remembered text is byte-identical
+   * to what Export would produce for the same set.
+   */
+  private rememberShowdownSet(
+    species: PokemonSpecies,
+    root: number,
+    result: { stage: ShowdownEditorStage; set: ShowdownEditorSet },
+  ): void {
+    const { gameData } = globalScene;
+    const props = gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(root));
+    const manifest = this.buildProvisionalShowdownManifest(root, result.stage, result.set, props, gameData);
+    rememberLastUsedSet(root, exportShowdownSet(manifest));
+  }
+
   /** Showdown: the OTHER line's mega species name (for the editor's greyed "mega used" reason line). */
   private showdownMegaBudgetSpentByName(rootSpeciesId: number): string | undefined {
     const other = this.starters.find(
@@ -4194,6 +4254,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     const moveset = set.moves.filter((m): m is MoveId => m != null) as StarterMoveset;
     // Record the fielded stage + item so applyShowdownSelection / the party icon field the chosen stage.
     this.showdownSelections.set(root, { speciesId: stage.speciesId, formIndex: stage.formIndex, item: set.item });
+    // AUTO-REMEMBER (P2): stamp the just-confirmed set as this species' last-used, so the NEXT time the
+    // player picks this line the editor pre-fills it. Stored as codec text (the storage format) in
+    // localStorage; a headless / storage-full write is a safe no-op inside `rememberLastUsedSet`.
+    this.rememberShowdownSet(species, root, result);
 
     if (editIndex >= 0) {
       // EDIT in place (shiny/variant stay grid-chosen; the editor does not change them in P1).
@@ -7028,10 +7092,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             const onCancel = this.showdownBuildOnCancel;
             this.showdownBuildOnCancel = null;
             this.clearText();
-            void ui.revertMode().then(() => {
-              this.blockInput = false;
-              onCancel();
-            });
+            // The confirmExit box is an UNCHAINED overlay (`setModeWithoutClear` above) painted over the
+            // still-visible grid, so `revertMode()` here is a no-op (nothing was pushed onto the mode
+            // chain) and the flow's follow-up `setMode(SHOWDOWN_TEAM_MENU)` clears the CONFIRM handler,
+            // NOT this grid - stranding `starterSelectContainer` VISIBLE under the menu (the "stuck
+            // getting out of the custom starter select menu" report). Tear THIS grid down explicitly
+            // (clear() hides its container + resets its state) before handing back to the flow, which
+            // opens the Team Menu instantly (SHOWDOWN_TEAM_MENU is a noTransitionMode - no fade race).
+            this.clear();
+            this.blockInput = false;
+            onCancel();
             return;
           }
           ui.setMode(UiMode.STARTER_SELECT);

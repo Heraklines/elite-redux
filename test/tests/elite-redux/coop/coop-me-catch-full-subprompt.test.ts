@@ -25,6 +25,12 @@
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import * as meOp from "#data/elite-redux/coop/coop-me-operation";
+import {
+  resetCoopMeOperationFlag,
+  resetCoopMeOperationState,
+  setCoopMeOperationEnabled,
+} from "#data/elite-redux/coop/coop-me-operation";
 import { setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   assembleCoopRuntime,
@@ -51,10 +57,14 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
 
   beforeEach(() => {
     prevGlobalScene = globalScene;
+    setCoopMeOperationEnabled(true);
+    resetCoopMeOperationState();
   });
 
   afterEach(() => {
     clearCoopRuntime();
+    resetCoopMeOperationFlag();
+    resetCoopMeOperationState();
     setCoopMeInteractionStart(-1); // drop the ME pin so the next file starts clean
     // Citizenship (#710): restore the real scene so the NEXT ER_SCENARIO file's GameManager does not reuse
     // one of this file's stubs. Order-robust: each stub file restores before the next file's beforeEach.
@@ -99,6 +109,40 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
 
     // The helper resolves to exactly the guest's slot (the host then releases slot 2 + adds the new mon there).
     expect(await hostAwait).toBe(2);
+  });
+
+  it("HOST commits the exact catch-full sub-prompt as a durable ME_PRESENT step", async () => {
+    const commitSpy = vi.spyOn(meOp, "commitMeOwnerIntent");
+    const { seqMe, guestRelay } = hostRig(3);
+
+    const hostAwait = coopHostStreamCatchFullAwaitSlot("Rattata");
+    await guestRelay.awaitInteractionOutcome(seqMe);
+    guestRelay.sendInteractionChoice(seqMe, "meSub", 2);
+    expect(await hostAwait).toBe(2);
+
+    const presentationCommits = commitSpy.mock.calls.filter(call => call[0].kind === "ME_PRESENT");
+    expect(
+      presentationCommits,
+      "the host must durably commit the follow-up presentation before awaiting input",
+    ).toHaveLength(1);
+    expect(presentationCommits[0][0].seq).toBe(seqMe);
+    expect((presentationCommits[0][0].payload as { presentation?: CoopInteractionOutcome }).presentation).toMatchObject(
+      { k: "mePresent", subPrompt: { kind: "catchFull", pokemonName: "Rattata" } },
+    );
+  });
+
+  it("HOST commits the guest-owned catch-full slot as a durable ME_SUB step", async () => {
+    const commitSpy = vi.spyOn(meOp, "commitMeOwnerIntent");
+    const { seqMe, guestRelay } = hostRig(3);
+
+    const hostAwait = coopHostStreamCatchFullAwaitSlot("Rattata");
+    await guestRelay.awaitInteractionOutcome(seqMe);
+    guestRelay.sendInteractionChoice(seqMe, "meSub", 2);
+    expect(await hostAwait).toBe(2);
+
+    const subCommits = commitSpy.mock.calls.filter(call => call[0].kind === "ME_SUB");
+    expect(subCommits, "the authority must commit the guest proposal after accepting its slot").toHaveLength(1);
+    expect(subCommits[0][0]).toMatchObject({ seq: seqMe, payload: { value: 2 }, localRole: "host" });
   });
 
   it("HOST LOUDLY declines (resolves null) when the guest cancels / relays an out-of-range slot (skip the grant)", async () => {

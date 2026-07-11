@@ -61,3 +61,45 @@ export class DomShowdownEditorTextInput implements ShowdownEditorTextInput {
     this.input = null;
   }
 }
+
+/**
+ * The MULTILINE sibling of {@linkcode DomShowdownEditorTextInput} - the Team Menu's IMPORT paste capture.
+ * Same off-screen `rexInputText` capture surface (the handler draws the buffer itself), but a `textarea`
+ * with a large maxLength so a whole team paste (blank-line-separated PS sets) fits. It satisfies the same
+ * {@linkcode ShowdownEditorTextInput} seam, so the Team Menu holds it as a second injected input for paste.
+ */
+export class DomShowdownPasteInput implements ShowdownEditorTextInput {
+  private input: InputText | null = null;
+  private changeHandler: ((value: string) => void) | null = null;
+
+  open(initial: string, onFilterChange: (value: string) => void): void {
+    if (typeof globalScene?.add?.rexInputText !== "function") {
+      return; // headless / no-DOM: inert no-op (tests drive the buffer directly)
+    }
+    this.close();
+    // A textarea capture surface with a generous cap (a 6-mon PS team is well under this); kept off-screen
+    // so the native keyboard rises on mobile while the handler renders the captured text in its modal.
+    const input = addTextInputObject(-1000, -1000, 300, 200, TextStyle.TOOLTIP_CONTENT, {
+      type: "textarea",
+      maxLength: 4000,
+    });
+    input.setText(initial);
+    this.changeHandler = () => onFilterChange(input.text);
+    input.on("textchange", this.changeHandler);
+    input.setFocus();
+    this.input = input;
+  }
+
+  close(): void {
+    if (this.input == null) {
+      return;
+    }
+    if (this.changeHandler != null) {
+      this.input.off("textchange", this.changeHandler);
+      this.changeHandler = null;
+    }
+    this.input.setBlur();
+    this.input.destroy();
+    this.input = null;
+  }
+}
