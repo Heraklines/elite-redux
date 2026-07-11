@@ -2,6 +2,7 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { fieldPositionForSlot } from "#data/battle-format";
+import { erApplyPendingRevives } from "#data/elite-redux/archetypes/post-faint-deferred-revive";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { getPokeballAtlasKey, getPokeballTintColor } from "#data/pokeball";
 import { BattleType } from "#enums/battle-type";
@@ -274,6 +275,12 @@ export class SummonPhase extends PartyMemberPokemonPhase {
 
   onEnd(): void {
     const pokemon = this.getPokemon();
+
+    // ER (629 Shallow Grave / 899 Backup Power): a fainted holder flagged for a
+    // deferred revive is restored to a fraction of its max HP as a living bench
+    // reserve when its side next sends out a party member. No-op unless a
+    // flagged, fainted member is waiting on this side.
+    erApplyPendingRevives(this.player);
 
     if (pokemon.isShiny(true)) {
       globalScene.phaseManager.unshiftNew("ShinySparklePhase", pokemon.getBattlerIndex());

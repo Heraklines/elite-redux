@@ -120,9 +120,10 @@ describe.skipIf(!RUN)("ER Aftermath (106) — detonates on KO", () => {
     expect(player.getInverseHp()).toBeGreaterThan(0);
   });
 
-  it("Balloon Bomb (614 = Aftermath + Inflatable) inherits the detonation via its composite", async () => {
-    // Balloon Bomb's composite resolves its "Aftermath" part to the patched
-    // vanilla ability, so the explosion comes along for free.
+  it("Balloon Bomb (614, bespoke) detonates on KO via the shared true-detonate primitive", async () => {
+    // 614 is now bespoke: Inflatable stat-trigger + the TRUE any-KO spread
+    // detonate (PostFaintSpreadDetonateAbAttr) + an explosion-flinch rider. A
+    // damaging KO still detonates and damages the adjacent player.
     game.override.enemyAbility(ER_ID_MAP.abilities[614] as AbilityId);
     await game.classicMode.startBattle([SpeciesId.SNORLAX]);
 

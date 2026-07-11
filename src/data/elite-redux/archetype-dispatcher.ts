@@ -250,8 +250,8 @@ import { PostDamageForceAttackerOutAbAttr } from "#data/elite-redux/archetypes/p
 import { PostDefendChangeAttackerTypeAbAttr } from "#data/elite-redux/archetypes/post-defend-change-attacker-type";
 import { PostDefendHpGatedSelfTagAbAttr } from "#data/elite-redux/archetypes/post-defend-hp-gated-self-tag";
 import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
-import { PostFaintDetonateAbAttr } from "#data/elite-redux/archetypes/post-faint-detonate";
-import { PostFaintReviveAbAttr } from "#data/elite-redux/archetypes/post-faint-revive";
+import { PostFaintDeferredReviveAbAttr } from "#data/elite-redux/archetypes/post-faint-deferred-revive";
+import { PostFaintSpreadDetonateAbAttr } from "#data/elite-redux/archetypes/post-faint-spread-detonate";
 import { PostItemLostScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-item-lost-scripted-move";
 import { PostSummonApplyTagOnFoesAbAttr } from "#data/elite-redux/archetypes/post-summon-apply-tag-on-foes";
 import { PostSummonClearTerrainAbAttr } from "#data/elite-redux/archetypes/post-summon-clear-terrain";
@@ -263,7 +263,7 @@ import { PostTurnDrainAbAttr } from "#data/elite-redux/archetypes/post-turn-drai
 import { PostTurnFoeStatDropAbAttr } from "#data/elite-redux/archetypes/post-turn-foe-stat-drop";
 import { PostTurnRandomPureTypeAbAttr } from "#data/elite-redux/archetypes/post-turn-random-type";
 import { PostTurnScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-turn-scripted-move";
-import { PostVictoryClearTagAbAttr } from "#data/elite-redux/archetypes/post-victory-clear-tag";
+import { PostVictoryClearRechargeAbAttr } from "#data/elite-redux/archetypes/post-victory-clear-recharge";
 import {
   AllyFaintPowerBoostAbAttr,
   AllyFaintPowerBoostExpireAbAttr,
@@ -2367,11 +2367,9 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
  *     The "spreads on contact" piece is deferred — partial wire.
  *   - 722 Whiplash → {@linkcode StatChangeOnCategoryAttackAbAttr} (PHYSICAL, opponent
  *     DEF -1).
- *   - 729 Victory Bomb → {@linkcode PostFaintDetonateAbAttr} (power: 100, Fire,
- *     no flinch). On a lethal damaging hit the holder uses a real 100 BP Fire
- *     Explosion (animation + all-adjacent spread + self-KO). The "works
- *     regardless of how KOed" clause covers damaging-move KOs only (the
- *     PreDefend surface can't observe status/weather/recoil KOs).
+ *   - 729 Victory Bomb → {@linkcode PostFaintSpreadDetonateAbAttr} (power: 100,
+ *     Fire, no flinch). A TRUE on-faint hook: on ANY KO cause it deals a 100 BP
+ *     Fire spread hit directly to every adjacent foe (cannot miss).
  *   - 807 Woodland Curse → {@linkcode EntryEffectAbAttr} (scripted-move: FORESTS_CURSE).
  *     The "Adds Grass type on contact" piece is deferred — partial wire.
  *   - 991 Resilience → {@linkcode PassiveRecoveryAbAttr} (hp-below-fraction: 0.5, 1/4).
@@ -2798,17 +2796,47 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           target: "opponent",
         }),
       ]);
+    case 614:
+      // Balloon Bomb (reclassified bespoke) — "Uses a 100 BP Explosion or
+      // Outburst (whichever is higher) when knocked out. Using explosion moves
+      // will always Flinch the target. When hit by any Fire or Flying moves,
+      // boost Defense and Special Defense by one stage each." Three pieces:
+      //   1. Inflatable stat-trigger (Def+SpDef +1 when hit by Fire/Flying) —
+      //      the same StatTriggerOnHitAbAttr the ER Inflatable (290) archetype
+      //      produces.
+      //   2. TRUE any-KO 100 BP self-destruct (Normal — Explosion/Outburst,
+      //      category by the holder's higher offensive stat), the shared
+      //      PostFaintSpreadDetonateAbAttr also used by 729. Replaces the old
+      //      Aftermath composite part (contact-only fixed chip → any-KO spread).
+      //   3. Always-flinch rider on the holder's OWN explosion moves (Explosion
+      //      / Self-Destruct / Misty Explosion) via PostAttackApplyBattlerTag.
+      return ok([
+        new StatTriggerOnHitAbAttr({
+          stats: [
+            { stat: Stat.DEF, stages: 1 },
+            { stat: Stat.SPDEF, stages: 1 },
+          ],
+          filter: { types: [PokemonType.FLYING, PokemonType.FIRE] },
+        }),
+        new PostFaintSpreadDetonateAbAttr({ power: 100, flinch: false, type: PokemonType.NORMAL }),
+        new PostAttackApplyBattlerTagAbAttr(
+          false,
+          (_user, _target, move) =>
+            move.id === MoveId.EXPLOSION || move.id === MoveId.SELF_DESTRUCT || move.id === MoveId.MISTY_EXPLOSION
+              ? 100
+              : 0,
+          BattlerTagType.FLINCHED,
+        ),
+      ]);
     case 729:
       // Victory Bomb — "When fainting, retaliate with a 100 BP Fire-type
-      // Explosion targeting all adjacent Pokemon." PostFaintDetonateAbAttr
-      // clamps the lethal hit and has the holder use a real 100 BP Fire
-      // Explosion (animation + spread + self-KO). No flinch rider (unlike
-      // Aftermath). Known limit: the "works regardless of how KOed" clause only
-      // covers damaging-move KOs — the PreDefend surface can't see status/
-      // weather/recoil KOs (a fainted holder can't run a move; see the
-      // primitive's header). Still a large fidelity gain over the prior flat
-      // 25%-chip approximation.
-      return ok([new PostFaintDetonateAbAttr({ power: 100, flinch: false, type: PokemonType.FIRE })]);
+      // Explosion targeting all adjacent Pokemon. Cannot miss. Works regardless
+      // of how the user was KOed." A TRUE on-faint hook
+      // (PostFaintSpreadDetonateAbAttr) fires from FaintPhase on ANY KO cause
+      // (damaging move, burn/poison chip, weather, recoil, entry hazard) and
+      // deals the 100 BP Fire spread hit directly to every adjacent foe — no
+      // MovePhase, so a fainted holder can still detonate and it cannot miss.
+      return ok([new PostFaintSpreadDetonateAbAttr({ power: 100, flinch: false, type: PokemonType.FIRE })]);
     case 775:
       // Flame Coat — non-Fire-types take 1/8 dmg every turn.
       return ok([
@@ -5310,9 +5338,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // Round 45 — broad approximations for remaining bespoke abilities
     // -------------------------------------------------------------------------
     case 275:
-      // Rampage — "No recharge after a KO, if it usually would need to
-      // recharge." Recharge-skip needs RechargingTag immunity on KO. The
-      // tag exists but no clean removal hook fires on KO. Defer.
+      // Rampage — recharge-clear on KO. Handled by dispatchBespokeR48 (which
+      // runs first and returns PostVictoryClearRechargeAbAttr); this branch is
+      // unreachable and kept only so the id is accounted for in this switch.
       return SKIP_BESPOKE;
     case 284:
       // Exploit Weakness — "Targets lowest defense vs statused foes."
@@ -7156,8 +7184,16 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
     // Round 48 (original) wires below.
     // -------------------------------------------------------------------------
     case 275:
-      // Rampage — "No recharge after a KO."
-      return ok([new PostVictoryClearTagAbAttr({ tags: [BattlerTagType.RECHARGING] })]);
+      // Rampage — "Rampage eliminates recharge turns when the user successfully
+      // KOs an opponent with a direct attack." PostVictoryClearRechargeAbAttr
+      // rides the PostVictory hook (only the KO-scorer, per the dex "when the
+      // user knocks out") and removes the RECHARGING tag AND the placeholder
+      // move RechargingTag queued — so the holder acts freely next turn instead
+      // of recharging. (Replaces the earlier PostVictoryClearTagAbAttr wire,
+      // which was PostKnockOut-based — it over-fired on any field KO and left
+      // the queued placeholder move behind.) Also inherited by 480 Berserker
+      // Rage (composite Tipping Point + Rampage).
+      return ok([new PostVictoryClearRechargeAbAttr()]);
     case 284:
       // Exploit Weakness — "Targets lowest defense vs statused foes."
       return ok([new DefenseStatSwapOnStatusedFoeAbAttr()]);
@@ -7311,9 +7347,14 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // Flinch chance gated on fog being active.
       return ok([new PreemptivePriorityCounterAbAttr().addCondition(getWeatherCondition(WeatherType.FOG))]);
     case 629:
-      // Shallow Grave — "Revives at 25% HP once after fainting in fog."
-      // Uses the real WeatherType.FOG (no longer MISTY proxy).
-      return ok([new PostFaintReviveAbAttr({ hpFraction: 0.25, requireWeather: [WeatherType.FOG] })]);
+      // Shallow Grave — "After fainting while fog is active, the user revives at
+      // 25% max HP when sending out your next party member. This still activates
+      // when the user faints on the last turn of fog." A TRUE deferred revive:
+      // the holder actually faints (leaves field), then is restored to 25% max
+      // HP as a living bench reserve when its side next sends out a party member
+      // (see PostFaintDeferredReviveAbAttr). Gated on fog at faint time (so the
+      // last-fog-turn faint still arms).
+      return ok([new PostFaintDeferredReviveAbAttr({ hpFraction: 0.25, requireWeather: [WeatherType.FOG] })]);
     case 634:
       // Last Stand — covered in R20; kept here as no-op (return null to fall through).
       return null;
@@ -7499,8 +7540,12 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         }),
       ]);
     case 899:
-      // Backup Power — "Revives at 25% HP once after fainting in Electric Terrain."
-      return ok([new PostFaintReviveAbAttr({ hpFraction: 0.25, requireTerrain: [TerrainType.ELECTRIC] })]);
+      // Backup Power — "Revives at 25% HP once after fainting in Electric
+      // Terrain." A TRUE deferred revive: the holder actually faints (leaves
+      // field, fires faint interactions) and is restored to 25% max HP as a
+      // living bench reserve at the next send-out on its side (see
+      // PostFaintDeferredReviveAbAttr). Gated on Electric Terrain at faint time.
+      return ok([new PostFaintDeferredReviveAbAttr({ hpFraction: 0.25, requireTerrain: [TerrainType.ELECTRIC] })]);
     case 904:
       // Strong Foundation — "Takes 1/2 Water and Ground damage and can't be forced out."
       return ok([

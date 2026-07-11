@@ -51,7 +51,7 @@ import { NullifyFirstNHitsAbAttr } from "#data/elite-redux/archetypes/nullify-fi
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import { PassiveRecoveryAbAttr } from "#data/elite-redux/archetypes/passive-recovery";
 import { PostDefendHpGatedSelfTagAbAttr } from "#data/elite-redux/archetypes/post-defend-hp-gated-self-tag";
-import { PostFaintDetonateAbAttr } from "#data/elite-redux/archetypes/post-faint-detonate";
+import { PostFaintSpreadDetonateAbAttr } from "#data/elite-redux/archetypes/post-faint-spread-detonate";
 import { PreFaintReviveAbAttr } from "#data/elite-redux/archetypes/pre-faint-revive";
 import { PriorityModifierAbAttr } from "#data/elite-redux/archetypes/priority-modifier";
 import { StabAddAbAttr } from "#data/elite-redux/archetypes/stab-add";
@@ -897,11 +897,11 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(attr.getTarget()).toBe("opponent");
   });
 
-  it("er id 729 (Victory Bomb) wires PostFaintDetonate (100 BP Fire, no flinch)", () => {
+  it("er id 729 (Victory Bomb) wires PostFaintSpreadDetonate (100 BP Fire, no flinch)", () => {
     const res = dispatchArchetype("bespoke", null, 729);
     expect(res.skipReason).toBeNull();
-    const attr = res.attrs[0] as PostFaintDetonateAbAttr;
-    expect(attr).toBeInstanceOf(PostFaintDetonateAbAttr);
+    const attr = res.attrs[0] as PostFaintSpreadDetonateAbAttr;
+    expect(attr).toBeInstanceOf(PostFaintSpreadDetonateAbAttr);
     expect(attr.getPower()).toBe(100);
     expect(attr.getType()).toBe(PokemonType.FIRE);
     expect(attr.getFlinch()).toBe(false);

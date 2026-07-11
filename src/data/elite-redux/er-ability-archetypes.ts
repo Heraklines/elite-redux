@@ -388,7 +388,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   611: { erAbilityId: 611, archetype: "bespoke", params: null },
   612: { erAbilityId: 612, archetype: "bespoke", params: null },
   613: { erAbilityId: 613, archetype: "composite-vanilla-mashup", params: {"parts":["Fur coat","Magic Guard"]} },
-  614: { erAbilityId: 614, archetype: "composite-vanilla-mashup", params: {"parts":["Aftermath","Inflatable"]} },
+  614: { erAbilityId: 614, archetype: "bespoke", params: null },
   615: { erAbilityId: 615, archetype: "composite-vanilla-mashup", params: {"parts":["Strong Jaw","Flaming Jaws"]} },
   616: { erAbilityId: 616, archetype: "bespoke", params: null },
   617: { erAbilityId: 617, archetype: "type-damage-boost", params: {"type":"ROCK","multiplier":1.2,"lowHpMultiplier":1.5,"lowHpThreshold":0.3333333333333333} },
