@@ -3848,6 +3848,22 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok(
         ateConditionalAttrs({ newType: PokemonType.FIRE, outcome: { kind: "status", effect: StatusEffect.BURN } }),
       );
+    case 404:
+      // Mineralize (rom "mineralize"): "Changes the user's Normal-type moves to
+      // Rock-type. If the user is Rock-type its Rock-type moves have a 10% bleed
+      // chance, otherwise it gains Rock STAB." (Was wrongly classified
+      // type-conversion with a flat ×1.2 boost — fixed via the -ate-conditional
+      // helper: no flat boost, conditional Rock STAB, 10% ER_BLEED when Rock.)
+      return ok(
+        ateConditionalAttrs({ newType: PokemonType.ROCK, outcome: { kind: "tag", tag: BattlerTagType.ER_BLEED } }),
+      );
+    case 507:
+      // Fertilize (rom "fertilize"): "Changes the user's Normal-type moves to
+      // Grass-type. If the user is Grass-type its Grass-type moves heal for 10%
+      // of damage dealt, otherwise it gains Grass STAB." The on-type branch is a
+      // DETERMINISTIC 10% lifesteal (NOT a probabilistic status roll) — modeled
+      // with the helper's `heal` outcome.
+      return ok(ateConditionalAttrs({ newType: PokemonType.GRASS, outcome: { kind: "heal", fraction: 0.1 } }));
     case 794:
       // Deadly Precision (rom): "Always land super effective attacks on the
       // opponent. Allows super effective attacks to ignore the target's
@@ -4799,10 +4815,11 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 388:
-      // Discipline — "Can switch while rampaging. Can't be confused or
-      // intimidated." Wire the BattlerTag immunity side (CONFUSED). The
-      // rampage-switch piece needs a movestate primitive.
-      return ok([new BattlerTagImmunityAbAttrEr({ tags: [BattlerTagType.CONFUSED] })]);
+      // er 388 is Thundercall — handled in dispatchBespokeR48 (consulted first;
+      // 1.5x-vs-Water + Infiltrator screen/Substitute bypass). This main-switch
+      // entry is dead (it was a mislabeled "Discipline" wire from the dump's
+      // array-index drift); kept as a marker.
+      return SKIP_BESPOKE;
     case 398:
       // Fungal Infection — "Contact moves inflict Leech Seed on the target."
       return ok([
@@ -6502,19 +6519,22 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
     // to either re-wire to the correct spec or SKIP. Each entry here
     // overrides the earlier mis-wired case.
     // -------------------------------------------------------------------------
-    case 388:
-      // Thundercall — "Triggers Smite at 20% power when using an Electric move."
-      // Thunder Shock is the closest vanilla analog to ER's Smite (Electric,
-      // paralysis chance); cast at 20% of Smite's 120 BP ≈ 24 BP, GATED on the
-      // holder using an Electric-type move. (Bug fix: the type gate the comment
-      // described was missing, so it previously fired on every attack.)
+    case 388: {
+      // Thundercall — ER 2.65 dex (slug "thundercall"): "Deal 1.5x damage to
+      // Water-type Pokemon and bypass defensive screens (Light Screen, Reflect,
+      // Aurora Veil)/Substitutes." The slug-keyed ROM description is authoritative
+      // over the drifted er-abilities.ts dump entry ("Smite follow-up"), which was
+      // the prior (wrong) wire. Two pieces:
+      //   - 1.5x when the TARGET is Water (mirrors Marine Apex / case 389).
+      //   - Vanilla Infiltrator's attrs verbatim (AbilityId 151) for the
+      //     screen + Substitute bypass (same copy pattern as King of the Jungle
+      //     / case 1028).
+      const infiltratorAttrs = allAbilities[151]?.attrs ?? [];
       return ok([
-        new PostAttackScriptedMoveAbAttr({
-          moveId: MoveId.THUNDER_SHOCK,
-          power: 24,
-          typeFilter: [PokemonType.ELECTRIC],
-        }),
+        new MovePowerBoostAbAttr((_user, target) => !!target && target.isOfType(PokemonType.WATER), 1.5),
+        ...infiltratorAttrs,
       ]);
+    }
     case 392:
       // Logical id 392 is Arctic Fur — "Weakens incoming physical and
       // special moves by 35%." Simple damage reduction (all moves, 0.35).

@@ -31,6 +31,7 @@ import {
 } from "#data/battler-tags";
 import { getBerryEffectFunc } from "#data/berry";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { HitMultiplierAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
 import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
@@ -7355,6 +7356,29 @@ export class RemoveBattlerTagAttr extends MoveEffectAttr {
 export class FlinchAttr extends AddBattlerTagAttr {
   constructor() {
     super(BattlerTagType.FLINCHED, false);
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    // ER Primal Maw (and other `hit-multiplier` abilities) add an extra strike
+    // that "independently rolls secondary effects on each hit EXCEPT flinch". If
+    // this user's ability added the extra strike(s) to THIS move, only allow the
+    // flinch roll on the FIRST strike so the doubled hit can't inflate the flinch
+    // chance (e.g. Bite 30% → ~51% without this guard). Scoped to
+    // HitMultiplierAbAttr specifically: native multi-hit moves (Double Kick, etc.
+    // — excluded by canBeMultiStrikeEnhanced) and vanilla Parental Bond are
+    // unaffected and keep their own per-strike flinch behavior.
+    if (
+      move.canBeMultiStrikeEnhanced(user)
+      && user
+        .getAllActiveAbilityAttrs()
+        .some(a => a instanceof HitMultiplierAbAttr && HitMultiplierAbAttr.matchesFilter(a.getFilter(), user, move))
+    ) {
+      const strikeIndex = user.turnData.hitCount - user.turnData.hitsLeft; // 0-based
+      if (strikeIndex > 0) {
+        return false;
+      }
+    }
+    return super.apply(user, target, move, args);
   }
 }
 

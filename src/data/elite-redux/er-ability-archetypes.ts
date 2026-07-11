@@ -206,7 +206,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   400: { erAbilityId: 400, archetype: "bespoke", params: null },
   401: { erAbilityId: 401, archetype: "bespoke", params: null },
   403: { erAbilityId: 403, archetype: "bespoke", params: null },
-  404: { erAbilityId: 404, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"ROCK","multiplier":1.2} },
+  404: { erAbilityId: 404, archetype: "bespoke", params: null }, // Mineralize: Normal->Rock -ate + conditional 10% ER_BLEED (Rock holder) / Rock STAB (see dispatchBespoke)
   405: { erAbilityId: 405, archetype: "bespoke", params: null },
   406: { erAbilityId: 406, archetype: "bespoke", params: null },
   407: { erAbilityId: 407, archetype: "bespoke", params: null },
@@ -303,7 +303,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   504: { erAbilityId: 504, archetype: "bespoke", params: null },
   505: { erAbilityId: 505, archetype: "bespoke", params: null },
   506: { erAbilityId: 506, archetype: "bespoke", params: null },
-  507: { erAbilityId: 507, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"GRASS","multiplier":1.2} },
+  507: { erAbilityId: 507, archetype: "bespoke", params: null }, // Fertilize: Normal->Grass -ate + conditional 10% lifesteal (Grass holder) / Grass STAB (see dispatchBespoke)
   508: { erAbilityId: 508, archetype: "composite-vanilla-mashup", params: {"parts":["Cute Charm","heal 25% damage vs infatuated"]} },
   509: { erAbilityId: 509, archetype: "type-damage-boost", params: {"type":"FIGHTING","multiplier":1.2,"lowHpMultiplier":1.5,"lowHpThreshold":0.3333333333333333} },
   511: { erAbilityId: 511, archetype: "bespoke", params: null },

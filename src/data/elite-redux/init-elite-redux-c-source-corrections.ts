@@ -181,7 +181,13 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_TRIPLE_KICK", { power: 20 }], // ER dump + Nextdex: 20 BP (the 25 was a stale c-source divergence; ramps per strike)
   ["MOVE_THIEF", { pp: 25 }],
   ["MOVE_MIND_READER", { pp: 5 }],
-  ["MOVE_NIGHTMARE", { pp: 15, chance: 0 }],
+  // ER Nightmare is a 120-BP damaging Ghost move that ALSO applies the 1/4-HP
+  // nightmare chip (dex: "makes them lose 1/4 HP each turn"). ER effectChance is
+  // 100, so the chip is GUARANTEED — chance = -1 makes the AddBattlerTagAttr fire
+  // unconditionally (the C-source `chance: 0` was a status-move artifact that
+  // gated the chip out once the move became damaging). Category → SPECIAL is set
+  // in the NIGHTMARE move-patcher.
+  ["MOVE_NIGHTMARE", { pp: 15, chance: -1 }],
   ["MOVE_FLAME_WHEEL", { power: 40, pp: 10, chance: 0 }],
   ["MOVE_SNORE", { power: 50 }],
   ["MOVE_FLAIL", { power: 1, pp: 15 }],

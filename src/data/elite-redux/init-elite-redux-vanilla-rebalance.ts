@@ -75,6 +75,7 @@ import {
   PostBiomeChangeWeatherChangeAbAttr,
   PostDefendApplyBattlerTagAbAttr,
   PostDefendContactApplyTagChanceAbAttr,
+  PostDefendPartyStatusHealAbAttr,
   PostDefendStatStageChangeAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   PostSummonAbAttr,
@@ -271,6 +272,19 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     },
   ],
   [AbilityId.SURGE_SURFER, ab => mutateStatMultiplier(ab, Stat.SPD, 1.5)],
+
+  // Seed Sower (869): ER dex adds "Also heals all party Pokemon's status
+  // conditions" on top of vanilla's Grassy-Terrain-on-direct-hit. Append a
+  // party-status-heal on the SAME PostDefend (direct-hit) trigger. The ability's
+  // .bypassFaint() lets both halves still fire when the hit KOs the holder.
+  [
+    AbilityId.SEED_SOWER,
+    ab => {
+      if (!ab.attrs.some(a => a instanceof PostDefendPartyStatusHealAbAttr)) {
+        ab.attrs.push(new PostDefendPartyStatusHealAbAttr());
+      }
+    },
+  ],
 
   // Teraform Zero (739): ER spec is "Tera Shell + clears weather and terrain on
   // first entry". Vanilla pokerogue only wired the weather/terrain clear, so add

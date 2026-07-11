@@ -1052,6 +1052,45 @@ export class PostDefendTerrainChangeAbAttr extends PostDefendAbAttr {
   }
 }
 
+/**
+ * Elite Redux — heals the status conditions of the holder's WHOLE party (bench
+ * included) when the holder takes damage from a direct attack. ER 2.65 dex adds
+ * this to Seed Sower ("Also heals all party Pokemon's status conditions"), on
+ * the same direct-hit trigger as its Grassy Terrain half. Paired with the
+ * vanilla {@linkcode PostDefendTerrainChangeAbAttr} via the ER rebalance patcher;
+ * the ability's `.bypassFaint()` lets it still fire when the hit KOs the holder.
+ */
+export class PostDefendPartyStatusHealAbAttr extends PostDefendAbAttr {
+  private getParty(pokemon: Pokemon): Pokemon[] {
+    return pokemon.isPlayer() ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
+  }
+
+  override canApply({ pokemon, hitResult }: PostMoveInteractionAbAttrParams): boolean {
+    // Direct-hit gate (same as PostDefendTerrainChangeAbAttr): a genuinely
+    // connecting damaging hit. Only fire when a party member actually has a
+    // status to clear (avoid a no-op trigger message).
+    if (hitResult >= HitResult.NO_EFFECT) {
+      return false;
+    }
+    return this.getParty(pokemon).some(p => p.status != null);
+  }
+
+  override apply({ simulated, pokemon }: PostMoveInteractionAbAttrParams): void {
+    if (simulated) {
+      return;
+    }
+    for (const partyPokemon of this.getParty(pokemon)) {
+      if (partyPokemon.status != null) {
+        globalScene.phaseManager.queueMessage(
+          getStatusEffectHealText(partyPokemon.status.effect, getPokemonNameWithAffix(partyPokemon)),
+        );
+        partyPokemon.resetStatus(false);
+        partyPokemon.updateInfo();
+      }
+    }
+  }
+}
+
 export class PostDefendContactApplyStatusEffectAbAttr extends PostDefendAbAttr {
   private readonly chance: number;
   private readonly effects: readonly StatusEffect[];
@@ -3049,7 +3088,10 @@ export class PostSummonCopyAbilityAbAttr extends PostSummonAbAttr {
     const targets = pokemon
       // Triple: Trace can only copy an ADJACENT foe's ability (binary: all foes adjacent).
       .getAdjacentOpponents()
-      .filter(t => t.getAbility().copiable || t.getAbility().id === AbilityId.WONDER_GUARD);
+      // ER 2.65 dex (ability 36 Trace): "Cannot copy Trace, Wonder Guard, and most form related
+      // abilities." Wonder Guard is `.uncopiable()`, so filtering to `copiable` already excludes it.
+      // (Vanilla PokeRogue force-included WONDER_GUARD here so Trace COULD copy it — the ER dex wins.)
+      .filter(t => t.getAbility().copiable);
     if (targets.length === 0) {
       return false;
     }
@@ -7228,6 +7270,7 @@ export const AbilityAttrs = Object.freeze({
   PostDefendHpGatedStatStageChangeAbAttr,
   PostDefendIllusionBreakAbAttr,
   PostDefendMoveDisableAbAttr,
+  PostDefendPartyStatusHealAbAttr,
   PostDefendPerishSongAbAttr,
   PostDefendStatStageChangeAbAttr,
   PostDefendStealHeldItemAbAttr,

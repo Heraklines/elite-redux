@@ -19,6 +19,13 @@
 //     (CONFUSED tag), else Psychic STAB.
 //   - Immolate   (er 279): Normal → FIRE; if Fire-type, 10% burn (BURN), else
 //     Fire STAB. (Immolate is also the second half of Solar Flare / er 366.)
+//   - Mineralize (er 404): Normal → ROCK; if Rock-type, 10% bleed (ER_BLEED tag),
+//     else Rock STAB.
+//
+// A fourth member replaces the probabilistic on-type secondary with a
+// DETERMINISTIC self-heal (the `{ kind: "heal" }` outcome, NO random roll):
+//   - Fertilize  (er 507): Normal → GRASS; if Grass-type, its Grass moves heal
+//     10% of the damage dealt, else Grass STAB.
 //
 // Composition (three primitives, all self-gating so they never overlap):
 //   1. `TypeConversionAbAttr` — every Normal move becomes <T> (no flat power
@@ -33,17 +40,26 @@
 
 import type { AbAttr } from "#abilities/ab-attrs";
 import { PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
+import { globalScene } from "#app/global-scene";
+import { getPokemonNameWithAffix } from "#app/messages";
 import { StabAddAbAttr } from "#data/elite-redux/archetypes/stab-add";
 import { TypeConversionAbAttr } from "#data/elite-redux/archetypes/type-conversion";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
 import { PokemonType } from "#enums/pokemon-type";
 import type { StatusEffect } from "#enums/status-effect";
+import { toDmgValue } from "#utils/common";
+import i18next from "i18next";
 
-/** The secondary the 10% roll inflicts on the target: a status or a battler tag. */
+/**
+ * The secondary the on-type branch inflicts. A `status`/`tag` is rolled at
+ * `chance`% on the TARGET; a `heal` fires DETERMINISTICALLY (no roll) and heals
+ * the HOLDER by a fraction of the damage dealt (the Fertilize / er 507 shape).
+ */
 export type AteSecondaryOutcome =
   | { readonly kind: "status"; readonly effect: StatusEffect }
-  | { readonly kind: "tag"; readonly tag: BattlerTagType };
+  | { readonly kind: "tag"; readonly tag: BattlerTagType }
+  | { readonly kind: "heal"; readonly fraction: number };
 
 /** Construction options for the `-ate`-conditional helper. */
 export interface AteConditionalOptions {
@@ -82,6 +98,9 @@ export class AteConditionalStatusAbAttr extends PostAttackAbAttr {
     const chance = opts.chance ?? 10;
     if (!(chance >= 0 && chance <= 100)) {
       throw new Error(`[AteConditionalStatusAbAttr] chance must be in [0, 100]; got ${chance}`);
+    }
+    if (opts.outcome.kind === "heal" && !(opts.outcome.fraction > 0 && opts.outcome.fraction <= 1)) {
+      throw new Error(`[AteConditionalStatusAbAttr] heal fraction must be in (0, 1]; got ${opts.outcome.fraction}`);
     }
     this.newType = opts.newType;
     this.outcome = opts.outcome;
@@ -122,6 +141,13 @@ export class AteConditionalStatusAbAttr extends PostAttackAbAttr {
     if (!pokemon.isOfType(this.newType) || pokemon.getMoveType(move) !== this.newType) {
       return false;
     }
+    // Heal branch (Fertilize / er 507): DETERMINISTIC self-heal off damage dealt
+    // — no random roll, and it targets the HOLDER, so the target-facing gates
+    // (IgnoreMoveEffects / canSetStatus / canAddTag) don't apply. Only require a
+    // genuine damaging hit and that the holder can still benefit from healing.
+    if (this.outcome.kind === "heal") {
+      return params.damage > 0 && !pokemon.isFullHp();
+    }
     if (target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr")) {
       return false;
     }
@@ -140,6 +166,23 @@ export class AteConditionalStatusAbAttr extends PostAttackAbAttr {
       return;
     }
     const { pokemon, opponent: target } = params;
+    if (this.outcome.kind === "heal") {
+      const healAmount = toDmgValue(params.damage * this.outcome.fraction);
+      if (healAmount <= 0) {
+        return;
+      }
+      globalScene.phaseManager.unshiftNew(
+        "PokemonHealPhase",
+        pokemon.getBattlerIndex(),
+        healAmount,
+        i18next.t("abilityTriggers:postAttackHeal", {
+          pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+          abilityName: pokemon.getAbility()?.name ?? "",
+        }),
+        true,
+      );
+      return;
+    }
     if (this.outcome.kind === "status") {
       target.trySetStatus(this.outcome.effect, pokemon);
       return;

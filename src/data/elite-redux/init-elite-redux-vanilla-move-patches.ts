@@ -77,6 +77,7 @@ import {
   StatStageChangeAttr,
   StatusCategoryOnAllyAttr,
   StatusEffectAttr,
+  SwapStatStagesAttr,
   TerrainChangeAttr,
   VariableMoveTypeAttr,
   WeatherChangeAttr,
@@ -268,10 +269,16 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     },
   ],
   // NIGHTMARE: vanilla status (NightmareTag) → ER Special Ghost damaging.
+  // ER dex (longDescription): "Deals heavy damage to a sleeping foe and makes
+  // them lose 1/4 HP each turn." So it's a 120-BP damaging move that ALSO keeps
+  // the nightmare chip — do NOT strip the AddBattlerTagAttr(NIGHTMARE). The tag
+  // still self-requires the target asleep (the retained targetSleptOrComatose
+  // condition), so it only lands on a sleeping foe, matching the dex. The chip is
+  // a GUARANTEED effect: its `chance` is forced to -1 in the c-source-corrections
+  // map (the last writer of move.chance) so the AddBattlerTagAttr fires every use.
   [
     MoveId.NIGHTMARE,
     move => {
-      removeAttrsByName(move, ["AddBattlerTagAttr"]); // strips NightmareTag attr
       setCategory(move, MoveCategory.SPECIAL);
     },
   ],
@@ -1194,6 +1201,17 @@ const ER_ID_MECHANIC_PATCHERS: ReadonlyMap<number, (move: MutableMove) => void> 
   [326, (move: MutableMove) => (move.accuracy = -1)], // Extrasensory
   [868, (move: MutableMove) => (move.accuracy = -1)], // Kowtow Cleave
   [905, (move: MutableMove) => (move.accuracy = -1)], // Tachyon Cutter
+  // Speed Swap (er 646): ER longDescription "Swaps Speed stat AND stat boosts
+  // with the target." The native SwapStatAttr(Stat.SPD) swaps only the base
+  // stat (getStat excludes stages), so append the vanilla SwapStatStagesAttr
+  // (Heart/Guard/Power Swap's stage-swap attr) scoped to SPD to ALSO exchange
+  // the SPD stat stages.
+  [
+    646, // Speed Swap
+    (move: MutableMove) => {
+      addAttrUnique(move, new SwapStatStagesAttr([Stat.SPD]));
+    },
+  ],
 ]);
 
 // =============================================================================
