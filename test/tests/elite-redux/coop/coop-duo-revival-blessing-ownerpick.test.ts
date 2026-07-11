@@ -63,9 +63,12 @@ function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
 }
 
-/** The private PhaseTree seam we read to retrieve the runtime-queued guest picker (find, no mutation). */
+/** Test seam for the runtime-queued guest picker. */
 interface PhaseQueueSeam {
-  phaseManager: { phaseQueue: { find(name: string): Phase | undefined } };
+  phaseManager: {
+    phaseQueue: { find(name: string): Phase | undefined };
+    tryRemovePhase(name: "CoopGuestRevivalPhase", filter: (phase: Phase) => boolean): boolean;
+  };
 }
 
 /** The minimal guest UI seam whose setMode we stub to drive the REVIVAL_BLESSING picker headlessly. */
@@ -190,8 +193,9 @@ describe.skipIf(!RUN)(
 
       // ===== (D) GUEST (SYNC, no microtask flush): run the real picker phase. Stub the guest UI's PARTY open
       // to auto-pick slot 3 (the OWNER'S choice); the phase relays the pick under the revival seq band. The
-      // MESSAGE setMode returns a never-resolving promise so the phase's own end() (a shiftPhase) can never
-      // fire cross-ctx under the host later. The relayed pick is queued on the loopback, NOT flushed here. =====
+      // MESSAGE setMode returns a never-resolving promise so the phase's own end() cannot fire later under
+      // the wrong shared-process client context. After the pick is sent, retire this queued UI-driver phase
+      // explicitly—the production picker does the same via end()—so it cannot sit ahead of turn finalize. =====
       withClientSync(rig.guestCtx, () => {
         const ui = rig.guestScene.ui as unknown as StubbableUi;
         const realSetMode = ui.setMode.bind(ui);
@@ -209,6 +213,11 @@ describe.skipIf(!RUN)(
           return realSetMode(...args);
         };
         (guestPicker as Phase).start();
+        const removed = (rig.guestScene as unknown as PhaseQueueSeam).phaseManager.tryRemovePhase(
+          "CoopGuestRevivalPhase",
+          phase => phase === guestPicker,
+        );
+        expect(removed, "completed guest revival picker retired before replay finalize").toBe(true);
       });
 
       // ===== (E) HOST: drain so the relayed pick is delivered while the HOST runtime is live -> the host's
