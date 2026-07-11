@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_STORMGLASS_SEQ } from "#data/elite-redux/coop/coop-seq-registry";
+import { getCoopOperationJournalApplied } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   commitCoopStormglassDecision,
   resetCoopStormglassOperationFlag,
   setCoopStormglassOperationEnabled,
 } from "#data/elite-redux/coop/coop-stormglass-operation";
-import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { WeatherType } from "#enums/weather-type";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
@@ -56,6 +57,11 @@ describe("co-op Stormglass operation migration", () => {
 
     expect(pair.faultsInjected(), "the raw stormglass choice was actually dropped").toBe(1);
     expect(await awaited).toMatchObject({ choice: 2, kind: "stormglass" });
+    expect(
+      getCoopOperationJournalApplied().find(envelope => envelope.pendingOperation?.kind === "STORMGLASS")
+        ?.pendingOperation?.payload,
+      "the exact resolved index and weather are trace-replayable",
+    ).toEqual({ weatherIndex: 2, weather: WeatherType.SANDSTORM });
   });
 
   it("EXACTLY ONCE: journal and raw carriers leave no phantom second weather choice", async () => {

@@ -71,6 +71,8 @@ export const COOP_CAP_OP_REVIVAL: CoopCapabilityKey = "opSurface.revival";
 export const COOP_CAP_OP_LEARN_MOVE: CoopCapabilityKey = "opSurface.learnMove";
 /** The migrated wild-catch full-party keep/release control stream. */
 export const COOP_CAP_OP_CATCH_FULL: CoopCapabilityKey = "opSurface.catchFull";
+/** The migrated one-time Stormglass weather choice. */
+export const COOP_CAP_OP_STORMGLASS: CoopCapabilityKey = "opSurface.stormglass";
 /** The application-level durability journal (§4, coop-durability.ts / coop-operation-journal.ts). */
 export const COOP_CAP_DURABILITY_JOURNAL: CoopCapabilityKey = "durability.journal";
 /**

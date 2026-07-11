@@ -31,6 +31,7 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopController, getCoopInteractionRelay, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_STORMGLASS_CHOICE_KINDS, COOP_STORMGLASS_SEQ } from "#data/elite-redux/coop/coop-seq-registry";
+import { commitCoopStormglassDecision } from "#data/elite-redux/coop/coop-stormglass-operation";
 import {
   erStormglassApplyChosenWeather,
   getStormglassWeather,
@@ -113,7 +114,14 @@ export class ErStormglassPickerPhase extends Phase {
     // Co-op OWNER: relay the chosen weather index so the guest applies the identical weather.
     if (globalScene.gameMode.isCoop && this.coopOwner) {
       try {
-        getCoopInteractionRelay()?.sendInteractionChoice(COOP_STORMGLASS_SEQ, "stormglass", index);
+        const relay = getCoopInteractionRelay();
+        if (relay != null) {
+          commitCoopStormglassDecision(relay, index, weather, {
+            localRole: "host",
+            wave: globalScene.currentBattle?.waveIndex ?? 0,
+            turn: globalScene.currentBattle?.turn ?? 0,
+          });
+        }
         coopLog("reward", `stormglass OWNER commit weather=${weather} index=${index} (#130)`);
       } catch {
         coopWarn("reward", "stormglass OWNER relay send threw (handled - watcher heals on checkpoint) (#130)");

@@ -188,7 +188,7 @@ export interface CoopInteractionRelayOptions {
 // then only a genuinely-disconnected-partner safety net, not a deliberation timer.
 const DEFAULT_TIMEOUT_MS = 1_200_000;
 /** Choice kinds whose dual raw+journal carriers have an explicit payload-identity regression. */
-const COOP_DURABLE_CHOICE_ECHO_KINDS: ReadonlySet<string> = new Set(["abilityPicker", "learnMoveBatch"]);
+const COOP_DURABLE_CHOICE_ECHO_KINDS: ReadonlySet<string> = new Set(["abilityPicker", "learnMoveBatch", "stormglass"]);
 
 function defaultSchedule(cb: () => void, ms: number): () => void {
   const id = setTimeout(cb, ms);

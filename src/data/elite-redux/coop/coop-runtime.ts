@@ -73,6 +73,7 @@ import {
   COOP_CAP_OP_ME,
   COOP_CAP_OP_REVIVAL,
   COOP_CAP_OP_REWARD,
+  COOP_CAP_OP_STORMGLASS,
   COOP_CAP_OP_WAVE,
   COOP_CAP_RENDERER_ALLOWLIST_ENFORCE,
   type CoopCapabilityKey,
@@ -144,6 +145,7 @@ import type {
   CoopRevivalPayload,
   CoopRewardActionPayload,
   CoopShopBuyPayload,
+  CoopStormglassPayload,
   CoopWaveAdvancePayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
@@ -183,6 +185,11 @@ import {
 import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
+import {
+  isCoopStormglassOperationEnabled,
+  resetCoopStormglassOperationState,
+  setCoopStormglassOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-stormglass-operation";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopCapturePresentation,
@@ -1517,6 +1524,7 @@ export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | u
     setCoopFaintSwitchOperationRevisionFloor(marks["op:faintSwitch"] ?? 0);
     setCoopLearnMoveOperationRevisionFloor(marks["op:learnMove"] ?? 0);
     setCoopRevivalOperationRevisionFloor(marks["op:revival"] ?? 0);
+    setCoopStormglassOperationRevisionFloor(marks["op:stormglass"] ?? 0);
     setCoopRewardOperationRevisionFloor(marks["op:reward"] ?? 0);
     setCoopMeOperationRevisionFloor(marks["op:me"] ?? 0);
     // Wave-2f KEYSTONE (W2e-R P0-3): floor the wave-advance producer + guest so a resumed run continues the
@@ -2151,6 +2159,26 @@ function materializeCoopCatchFullPromptFromOp(runtime: CoopRuntime, envelope: Co
   return true;
 }
 
+/** Feed the host's committed one-time Stormglass choice into the guest watcher seam. */
+function materializeCoopStormglassFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const operation = envelope.pendingOperation;
+  const payload = operation?.payload as CoopStormglassPayload | undefined;
+  if (operation?.kind !== "STORMGLASS" || payload == null) {
+    return false;
+  }
+  runtime.interactionRelay.materializeCommittedInteractionChoice(
+    COOP_STORMGLASS_SEQ,
+    "stormglass",
+    payload.weatherIndex,
+    undefined,
+    operation.id,
+  );
+  return true;
+}
+
 /** Route journaled learn presentations/host terminals into the same relay seams as their raw carriers. */
 function materializeCoopLearnMoveFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
   if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
@@ -2690,6 +2718,9 @@ function buildLocalCoopCapabilities(): CoopCapabilityKey[] {
   if (isCoopRevivalOperationEnabled()) {
     caps.push(COOP_CAP_OP_REVIVAL);
   }
+  if (isCoopStormglassOperationEnabled()) {
+    caps.push(COOP_CAP_OP_STORMGLASS);
+  }
   if (isCoopMeOperationEnabled()) {
     caps.push(COOP_CAP_OP_ME);
   }
@@ -2740,6 +2771,7 @@ export function assembleCoopRuntime(
   resetCoopFaintSwitchOperationState();
   resetCoopLearnMoveOperationState();
   resetCoopRevivalOperationState();
+  resetCoopStormglassOperationState();
   // Wave-2d: same fresh-control-plane reset for the reward-shop + biome-market operation state (SURFACE 3).
   resetCoopRewardOperationState();
   // Wave-2c: the mystery-encounter operation surface shares the same fresh-control-plane discipline (§8
@@ -2815,6 +2847,7 @@ export function assembleCoopRuntime(
   registerCoopOperationLiveSink("op:me", envelope => materializeCoopMeOperationFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:revival", envelope => materializeCoopRevivalPromptFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:catchFull", envelope => materializeCoopCatchFullPromptFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:stormglass", envelope => materializeCoopStormglassFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:learnMove", envelope => materializeCoopLearnMoveFromOp(runtime, envelope));
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream, durability);
@@ -2986,6 +3019,7 @@ export function clearCoopRuntime(): void {
   resetCoopFaintSwitchOperationState();
   resetCoopLearnMoveOperationState();
   resetCoopRevivalOperationState();
+  resetCoopStormglassOperationState();
   // Wave-2d: drop the reward-shop + biome-market operation state too (SURFACE 3).
   resetCoopRewardOperationState();
   // Wave-2c: same teardown for the mystery-encounter operation surface.

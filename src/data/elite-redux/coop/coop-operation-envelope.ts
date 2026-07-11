@@ -222,6 +222,12 @@ export type CoopCatchFullPayload =
   | { readonly type: "prompt"; readonly pokemonName: string; readonly speciesId: number }
   | { readonly type: "decision"; readonly speciesId: number; readonly partySlot: number };
 
+/** Host-resolved one-time Stormglass weather selection. */
+export interface CoopStormglassPayload {
+  readonly weatherIndex: number;
+  readonly weather: number;
+}
+
 export type CoopLearnMovePayload =
   | { readonly type: "prompt"; readonly partySlot: number; readonly moveId: number; readonly maxMoveCount: number }
   | {
