@@ -141,10 +141,12 @@ import type {
   CoopFaintSwitchPayload,
   CoopLearnMoveBatchPayload,
   CoopLearnMovePayload,
+  CoopMeButtonPayload,
   CoopMePickPayload,
   CoopMePresentPayload,
   CoopMeSubPayload,
   CoopMeTerminalPayload,
+  CoopQuizAnswerPayload,
   CoopRevivalPayload,
   CoopRewardActionPayload,
   CoopShopBuyPayload,
@@ -1997,9 +1999,9 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
  * double-builds. Guest-only + authoritative-only; a host / solo / lockstep client no-ops. Returns true iff
  * it enqueued the materialization. Best-effort - never throws into the durability handler.
  */
-function materializeCoopWaveAdvanceFromOp(payload: CoopWaveAdvancePayload): boolean {
+function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, payload: CoopWaveAdvancePayload): boolean {
   try {
-    if (getCoopNetcodeMode() !== "authoritative" || getCoopController()?.role !== "guest") {
+    if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
       return false; // only the authoritative GUEST renders the tail; the host resolves it directly.
     }
     if (typeof payload.wave !== "number") {
@@ -2032,17 +2034,6 @@ function materializeCoopWaveAdvanceFromOp(payload: CoopWaveAdvancePayload): bool
     return false;
   }
 }
-
-// Register the FIRST production live-mutation sink (Wave-2f KEYSTONE): a journal-delivered `op:wave` envelope
-// routes here to rebuild the guest's wave-advance tail. Runs once at import; the sink is role/wave-gated, so
-// it no-ops off-session / on the host / for an already-resolved wave.
-registerCoopOperationLiveSink("op:wave", (envelope: CoopAuthoritativeEnvelopeV1) => {
-  const op = envelope.pendingOperation;
-  if (op == null || op.kind !== "WAVE_ADVANCE") {
-    return false;
-  }
-  return materializeCoopWaveAdvanceFromOp(op.payload as CoopWaveAdvancePayload);
-});
 
 /**
  * Production biome live-materializer. Captures the RECEIVING runtime rather than consulting the ambient
@@ -2423,6 +2414,19 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
   if (op.kind === "ME_SUB") {
     const payload = op.payload as CoopMeSubPayload;
     return kindTag === 2 && Number.isInteger(payload?.value);
+  }
+  if (op.kind === "ME_BUTTON") {
+    const payload = op.payload as CoopMeButtonPayload;
+    return kindTag === 3 && Number.isInteger(payload?.button);
+  }
+  if (op.kind === "QUIZ_ANSWER") {
+    const payload = op.payload as CoopQuizAnswerPayload;
+    return (
+      kindTag === 5
+      && Number.isInteger(payload?.questionIndex)
+      && payload.questionIndex >= 0
+      && Number.isInteger(payload.choice)
+    );
   }
   if (op.kind !== "ME_TERMINAL") {
     return false;
@@ -2969,6 +2973,13 @@ export function assembleCoopRuntime(
   registerCoopOperationLiveSink("op:stormglass", envelope => materializeCoopStormglassFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:learnMove", envelope => materializeCoopLearnMoveFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:faintSwitch", envelope => materializeCoopFaintSwitchFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:wave", envelope => {
+    const operation = envelope.pendingOperation;
+    return (
+      operation?.kind === "WAVE_ADVANCE"
+      && materializeCoopWaveAdvanceFromOp(runtime, operation.payload as CoopWaveAdvancePayload)
+    );
+  });
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream, durability);
   wireCoopDurabilitySnapshotReceiver(controller, battleStream, durability);
