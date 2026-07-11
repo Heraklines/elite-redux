@@ -370,27 +370,24 @@ export class BiomeShopPhase extends SelectModifierPhase {
    * streamed stock (recomputing per-slot quantities from each option's tier - erBiomeStockCount is pure, so
    * they match the host's buildStock exactly), THEN open + DRIVE the real market like a normal owner (each
    * buy relays via applyModifier's coopBiomeOwner gate). Mirrors SelectModifierPhase.startCoopOwnerAdoptOptions
-   * (#828). A stream timeout falls back to a local roll (divergent but never a hang, like the watcher path).
+   * (#828). A missing/invalid stream fails closed with a recovery message; local stock is never generated.
    */
   private async coopBiomeDriveAdoptOptions(): Promise<void> {
     const relay = getCoopInteractionRelay();
     if (relay == null) {
-      // No live session (defensive): roll locally so the market still opens, never hangs.
-      this.buildStock();
-      this.openBiomeShop();
+      this.coopBiomeAuthoritativeStockUnavailable("guest owner has no live relay");
       return;
     }
     const streamed = await relay.awaitRewardOptions(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL, COOP_BIOME_WAIT_MS);
     const rebuilt = streamed == null ? null : reconstructRewardOptions(streamed, globalScene.getPlayerParty());
     if (rebuilt == null) {
-      coopWarn("reward", "biome market guest owner: stock stream timed out -> local roll fallback");
-      this.buildStock();
-    } else {
-      this.shopOptions = rebuilt;
-      // Per-slot stock counts are NOT streamed (only the options are); recompute them from each option's
-      // resolved tier - erBiomeStockCount is pure, so this matches the host's buildStock quantities exactly.
-      this.qtys = this.shopOptions.map(o => erBiomeStockCount(o.type.getOrInferTier() ?? ModifierTier.GREAT));
+      this.coopBiomeAuthoritativeStockUnavailable("guest owner could not recover/reconstruct streamed stock");
+      return;
     }
+    this.shopOptions = rebuilt;
+    // Per-slot stock counts are NOT streamed (only the options are); recompute them from each option's
+    // resolved tier - erBiomeStockCount is pure, so this matches the host's buildStock quantities exactly.
+    this.qtys = this.shopOptions.map(o => erBiomeStockCount(o.type.getOrInferTier() ?? ModifierTier.GREAT));
     if (this.shopOptions.length === 0) {
       this.coopBiomeTerminal();
       this.end();
@@ -409,7 +406,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
   private async coopBiomeWatch(): Promise<void> {
     const relay = getCoopInteractionRelay();
     if (relay == null) {
-      this.end();
+      this.coopBiomeAuthoritativeStockUnavailable("watcher has no live relay");
       return;
     }
     globalScene.ui.showText("Your partner is browsing the market...", null, undefined, null, true);
@@ -427,12 +424,11 @@ export class BiomeShopPhase extends SelectModifierPhase {
       const streamed = await relay.awaitRewardOptions(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL, COOP_BIOME_WAIT_MS);
       const rebuilt = streamed == null ? null : reconstructRewardOptions(streamed, globalScene.getPlayerParty());
       if (rebuilt == null) {
-        coopWarn("reward", "biome market watcher: stock stream timed out -> local roll fallback");
-        this.buildStock();
-      } else {
-        this.shopOptions = rebuilt;
-        this.qtys = this.shopOptions.map(() => 99);
+        this.coopBiomeAuthoritativeStockUnavailable("watcher could not recover/reconstruct streamed stock");
+        return;
       }
+      this.shopOptions = rebuilt;
+      this.qtys = this.shopOptions.map(() => 99);
     }
     const seq = coopBiomeShopSeq(this.coopBiomeStart);
     for (;;) {
@@ -494,6 +490,22 @@ export class BiomeShopPhase extends SelectModifierPhase {
     advanceCoopInteractionForContinuation(this.coopBiomeStart);
     globalScene.ui.clearText();
     globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
+  }
+
+  /** Never let a market continue against locally generated stock after authority was lost. */
+  private coopBiomeAuthoritativeStockUnavailable(context: string): void {
+    coopWarn("reward", `biome market authoritative stock unavailable (${context}) -> FAIL CLOSED; local roll suppressed`);
+    try {
+      globalScene.ui.showText(
+        "Could not recover your partner's authoritative market stock. Reconnect to resume safely.",
+        null,
+        undefined,
+        null,
+        true,
+      );
+    } catch {
+      /* the phase remains parked even if the cosmetic banner cannot render */
+    }
   }
 
   protected override applyModifier(modifier: Modifier, cost = -1, playSound = false): void {

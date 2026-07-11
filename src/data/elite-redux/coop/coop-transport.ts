@@ -53,7 +53,9 @@ export type CoopRole = "host" | "guest";
 // er-coop-15: resume decisions are transaction-keyed/durable, launch snapshots are re-answerable, and hello
 // carries the host-minted operation epoch. Older builds can lose/alias a boundary or accept prior-run ops.
 // er-coop-16: shared boundary tails fail closed unless WAVE_ADVANCE or ME_TERMINAL sanctions them.
-export const COOP_PROTOCOL_VERSION = "er-coop-16";
+// er-coop-17: shared reward/market option payloads are cached and explicitly re-requestable; watchers
+// never continue against a local roll when the authoritative stream is lost.
+export const COOP_PROTOCOL_VERSION = "er-coop-17";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -1169,6 +1171,8 @@ export type CoopMessage =
    * `reroll` is the reroll round these options belong to (a fresh roll per reroll).
    */
   | { t: "rewardOptions"; seq: number; reroll: number; options: CoopSerializedRewardOption[] }
+  /** Watcher -> option owner: replay the exact cached reward/market option payload for this key. */
+  | { t: "requestRewardOptions"; seq: number; reroll: number }
   /**
    * Owner -> watcher (#633): a COSMETIC live-cursor button on a shared interaction
    * screen. The watcher replays `button` into its identical screen so the partner
@@ -1429,6 +1433,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `len=${msg.text.length}`;
     case "rewardOptions":
       return `seq=${msg.seq} reroll=${msg.reroll} options=${msg.options.length}`;
+    case "requestRewardOptions":
+      return `seq=${msg.seq} reroll=${msg.reroll}`;
     case "uiInput":
       return `seq=${msg.seq} n=${msg.n} button=${msg.button} mode=${msg.mode}`;
     case "lifecycle":

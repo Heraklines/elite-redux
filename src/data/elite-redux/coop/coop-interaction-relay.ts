@@ -280,6 +280,7 @@ export class CoopInteractionRelay {
   private readonly schedule: (cb: () => void, ms: number) => () => void;
   private readonly isVersus: () => boolean;
   private readonly offMessage: () => void;
+  private readonly offState: () => void;
   /** Raw outcomes awaiting their matching journal carrier; keyed by seq + exact JSON payload. */
   private readonly rawOutcomeCredits = new Map<string, number>();
   /** Journal outcomes awaiting a later raw legacy echo, which must be dropped rather than double-applied. */
@@ -314,6 +315,8 @@ export class CoopInteractionRelay {
   private readonly rewardOptionsInbox = new Map<string, CoopSerializedRewardOption[]>();
   /** "seq:reroll" -> resolver for the in-flight {@linkcode awaitRewardOptions}. */
   private readonly rewardOptionsPending = new Map<string, (res: CoopSerializedRewardOption[] | null) => void>();
+  /** Owner-side replay cache for exact option payloads. Bounded; cleared at session boundaries. */
+  private readonly sentRewardOptions = new Map<string, CoopSerializedRewardOption[]>();
 
   /**
    * #698 resync-rescue: seqs that have been STICKY-cancelled by {@linkcode cancelWaiters}. Any await
@@ -330,6 +333,15 @@ export class CoopInteractionRelay {
     this.schedule = opts.schedule ?? defaultSchedule;
     this.isVersus = opts.isVersus ?? (() => false);
     this.offMessage = transport.onMessage(msg => this.handle(msg));
+    this.offState = transport.onStateChange(state => {
+      if (state !== "connected") {
+        return;
+      }
+      for (const key of this.rewardOptionsPending.keys()) {
+        const [seq, reroll] = key.split(":").map(Number);
+        this.transport.send({ t: "requestRewardOptions", seq, reroll });
+      }
+    });
   }
 
   /** #809: ask the partner to open its Revival Blessing picker for `fieldIndex`. */
@@ -594,6 +606,14 @@ export class CoopInteractionRelay {
 
   /** OWNER: stream the exact reward-option list rolled for `seq` / `reroll` (#633 Fix #2). */
   sendRewardOptions(seq: number, reroll: number, options: CoopSerializedRewardOption[]): void {
+    const key = `${seq}:${reroll}`;
+    this.sentRewardOptions.set(key, options);
+    if (this.sentRewardOptions.size > 64) {
+      const oldest = this.sentRewardOptions.keys().next().value;
+      if (oldest !== undefined) {
+        this.sentRewardOptions.delete(oldest);
+      }
+    }
     if (isCoopDebug()) {
       coopLog(
         "relay",
@@ -606,8 +626,8 @@ export class CoopInteractionRelay {
   /**
    * WATCHER: take the owner's rolled reward-option list for `seq` / `reroll`. Resolves
    * immediately if it already arrived (buffered), else waits for it, or resolves `null`
-   * on timeout (the watcher then falls back to its own locally-rolled options - divergent
-   * but never a hang).
+   * on timeout. Callers must treat null as an authoritative recovery boundary and never
+   * continue with locally-rolled options.
    */
   awaitRewardOptions(
     seq: number,
@@ -654,7 +674,7 @@ export class CoopInteractionRelay {
         if (res === null) {
           coopWarn(
             "relay",
-            `AWAIT rewardOptions key=${key} RESOLVE null (TIMEOUT or supersede) -> watcher falls back to own roll (DIVERGENT)`,
+            `AWAIT rewardOptions key=${key} RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED`,
           );
         } else {
           coopLog("relay", `AWAIT rewardOptions key=${key} RESOLVE count=${res.length}`);
@@ -663,6 +683,8 @@ export class CoopInteractionRelay {
       };
       this.rewardOptionsPending.set(key, finish);
       cancelTimer = this.schedule(() => finish(null), timeoutMs);
+      coopLog("relay", `SEND requestRewardOptions key=${key} (authoritative replay)`);
+      this.transport.send({ t: "requestRewardOptions", seq, reroll });
     });
   }
 
@@ -670,8 +692,8 @@ export class CoopInteractionRelay {
    * #698 resync-rescue (WATCHER-only safety net): STICKY-cancel every in-flight watcher wait so a guest
    * parked on an interaction the owner already left (e.g. an orphaned reward shop after a TM/Memory
    * continuation) can never block the phase queue ahead of a resync snapshot apply. Each parked
-   * choice/outcome/rewardOptions waiter resolves to `null` (every await site treats null as "leave the
-   * screen / keep own roll", never a hang), and the waiter's seq is recorded so a phase that immediately
+   * choice/outcome/rewardOptions waiter resolves to `null` (reward-option await sites fail closed; other
+   * legacy interaction waits take their bounded recovery path), and the waiter's seq is recorded so a phase that immediately
    * RE-parks on the same seq also resolves null at once. A no-op when nothing is parked. Unlike
    * {@linkcode dispose}, the relay stays alive (the transport listener is untouched) - the session
    * continues after the resync heals the state.
@@ -796,6 +818,7 @@ export class CoopInteractionRelay {
       coopLog("relay", "dispose() (no in-flight waiters)");
     }
     this.offMessage();
+    this.offState();
     for (const waiter of [...this.pending.values()]) {
       waiter.finish(null);
     }
@@ -820,6 +843,7 @@ export class CoopInteractionRelay {
     this.committedCatchFullPromptCredits.clear();
     this.rewardOptionsPending.clear();
     this.rewardOptionsInbox.clear();
+    this.sentRewardOptions.clear();
     this.cancelledSeqs.clear();
   }
 
@@ -856,6 +880,7 @@ export class CoopInteractionRelay {
     this.rawCatchFullPromptCredits.clear();
     this.committedCatchFullPromptCredits.clear();
     this.rewardOptionsInbox.clear();
+    this.sentRewardOptions.clear();
     // A seq sticky-cancelled in the PRIOR epoch must not keep resolving null in the NEW epoch (seqs reuse
     // low counters), so clear the cancel marks alongside the buffers.
     this.cancelledSeqs.clear();
@@ -1007,6 +1032,17 @@ export class CoopInteractionRelay {
       } catch {
         /* the notification must never break the buffer path */
       }
+      return;
+    }
+    if (msg.t === "requestRewardOptions") {
+      const key = `${msg.seq}:${msg.reroll}`;
+      const options = this.sentRewardOptions.get(key);
+      if (options == null) {
+        coopWarn("relay", `RECV requestRewardOptions key=${key} -> no authoritative cache`);
+        return;
+      }
+      coopLog("relay", `RECV requestRewardOptions key=${key} -> REPLAY count=${options.length}`);
+      this.transport.send({ t: "rewardOptions", seq: msg.seq, reroll: msg.reroll, options });
       return;
     }
     if (msg.t !== "interactionChoice") {

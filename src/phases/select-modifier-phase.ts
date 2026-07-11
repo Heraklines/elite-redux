@@ -1143,14 +1143,16 @@ export class SelectModifierPhase extends BattlePhase {
   }
 
   /** WATCHER (#633 Fix #2): replace our locally-rolled options with the owner's streamed list
-   *  for THIS reroll round. On timeout / unknown id, keep our own list (never hangs). */
-  private async coopAdoptOwnerRewardOptions(): Promise<void> {
+   *  for THIS reroll round. False means the authoritative list could not be recovered: callers
+   *  MUST remain parked and must never expose or apply the locally-rolled divergent list. */
+  private async coopAdoptOwnerRewardOptions(): Promise<boolean> {
     if (this.coopInteractionStart < 0) {
-      return;
+      return true;
     }
     const relay = getCoopInteractionRelay();
     if (relay == null) {
-      return;
+      this.coopShowAuthoritativeOptionsUnavailable();
+      return false;
     }
     try {
       coopLog(
@@ -1163,24 +1165,44 @@ export class SelectModifierPhase extends BattlePhase {
         COOP_REWARD_WAIT_MS,
       );
       if (serialized == null) {
-        coopLog(
+        coopWarn(
           "reward",
-          `WATCHER got no owner options (timeout/null) -> keeping local roll (count=${this.typeOptions.length})`,
+          `WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=${this.typeOptions.length})`,
         );
-        return;
+        this.coopShowAuthoritativeOptionsUnavailable();
+        return false;
       }
       const rebuilt = reconstructRewardOptions(serialized, globalScene.getPlayerParty());
       if (rebuilt == null) {
-        coopLog("reward", "WATCHER could not reconstruct owner's options -> keeping local roll");
-      } else {
-        coopLog(
-          "reward",
-          `WATCHER ADOPTED owner reward options (was=${this.typeOptions.length} now=${rebuilt.length} ids=[${serialized.map(o => o.id).join(",")}])`,
-        );
-        this.typeOptions = rebuilt;
+        coopWarn("reward", "WATCHER could not reconstruct owner's options -> FAIL CLOSED; local roll suppressed");
+        this.coopShowAuthoritativeOptionsUnavailable();
+        return false;
       }
+      coopLog(
+        "reward",
+        `WATCHER ADOPTED owner reward options (was=${this.typeOptions.length} now=${rebuilt.length} ids=[${serialized.map(o => o.id).join(",")}])`,
+      );
+      this.typeOptions = rebuilt;
+      return true;
+    } catch (e) {
+      coopWarn("reward", "WATCHER authoritative option adoption threw -> FAIL CLOSED", e);
+      this.coopShowAuthoritativeOptionsUnavailable();
+      return false;
+    }
+  }
+
+  /** A recoverable, explicit stop is safer than silently continuing with a different option pool. */
+  private coopShowAuthoritativeOptionsUnavailable(): void {
+    try {
+      globalScene.ui.showText(
+        "Could not recover your partner's authoritative reward options. Reconnect to resume safely.",
+        null,
+        undefined,
+        null,
+        true,
+      );
     } catch {
-      /* an await/reconstruct failure leaves our own list in place; never hang */
+      /* the fail-closed phase remains parked even if the cosmetic banner cannot render */
     }
   }
 
@@ -1435,7 +1457,9 @@ export class SelectModifierPhase extends BattlePhase {
    * + drives synchronously in start() and never lands here.
    */
   private async startCoopOwnerAdoptOptions(modifierSelectCallback: ModifierSelectCallback): Promise<void> {
-    await this.coopAdoptOwnerRewardOptions();
+    if (!(await this.coopAdoptOwnerRewardOptions())) {
+      return;
+    }
     // #872: the adopt wait can also outlive the scene (see coopShopSceneAlive).
     if (!this.coopShopSceneAlive("owner adopt-options open")) {
       return;
@@ -1465,7 +1489,9 @@ export class SelectModifierPhase extends BattlePhase {
     // and only WATCHES the guest's pick, so it keeps that list rather than adopting (there is no other
     // streamer - it IS the streamer).
     if (this.coopAdoptsOptions) {
-      await this.coopAdoptOwnerRewardOptions();
+      if (!(await this.coopAdoptOwnerRewardOptions())) {
+        return;
+      }
       // #872: the adopt wait can resume after teardown - the setMode below reads
       // currentBattle.waveIndex via getRerollCost and would NPE-kill the client.
       if (!this.coopShopSceneAlive("watcher adopt-options open")) {
