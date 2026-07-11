@@ -213,3 +213,25 @@ Biome reports no errors (only pre-existing warnings/notices in the large runtime
 
 The journal sweep is not complete. Colosseum and ability-picker are next in the contract's order, followed
 by the per-mon in-battle classes. The full gate and long soak remain unclaimed.
+
+## 12. Continuation evidence (journal coverage sweep: colosseum)
+
+The repeated colosseum board stream is now migrated. `cf6a95de8` and `a06c89c34` are the failure-first
+RED commits: dropping only the host's `coloBoard` presentation or `coloPick` decision left the guest's
+real outcome/choice FIFO empty. `50693e5ab` adds the negotiated `opSurface.colosseum` capability,
+multi-action `COLO_PICK` payload, ordinal-addressed `op:colosseum` journal class, resume revision floor,
+and production materializers for repeated board/decision pairs. The flag-off legacy path remains tested.
+
+The opposite direction had a separate pre-commit hole. `8ee06a641` proves a dropped guest-owned
+`coloPick` made the host time out; `5a443b6ab` adds lifecycle-bounded owner resend, reusing the same
+decision until the host's committed envelope returns and cancels it. Guest-owner confirmations are not
+fed back into the same pinned choice FIFO, preventing a prior round's confirmation from poisoning the
+next round.
+
+Proof: `coop-colosseum-board.test.ts` 13/13, covering repeated round loops, both ownership directions,
+both raw-carrier drops, guest-intent loss, and flag-off fallback. Capability/handshake/recovery regression
+suites remain green; touched-file TypeScript diagnostics are zero. Biome reports no new errors (existing
+complexity/no-void notices remain). The full gate and long soak remain unclaimed.
+
+Next journal surface: ability picker. Per-mon in-battle operations, lobby/resume, enforcement, quarantine,
+expanded soak coverage, and the final drop-every-class campaign remain open.
