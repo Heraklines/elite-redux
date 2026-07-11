@@ -459,6 +459,22 @@ export class CoopRendezvous {
         return;
       }
     }
+    // Host WATCHER branches (notably an odd-counter reward shop) announce their point but do not await it.
+    // If the guest instead reaches a foreign point on the SAME wave, there is therefore no pending host
+    // waiter to trigger the route above. The host's most-recent unmatched local arrival is still the
+    // authoritative logical phase: publish it proactively and require the guest ACK before that wrong branch
+    // can close. This is the live cmd:6:2 vs shop:6:5 softlock shape.
+    if (this.transport.role === "host" && !this.localArrived.has(point)) {
+      const localPoint = this.latestUnmatchedLocalPointForSameWave(point);
+      if (localPoint !== undefined) {
+        coopWarn(
+          "rendezvous",
+          `host PROACTIVE phaseRoute authoritative=${localPoint} displaced=${point} (host branch has no waiter)`,
+        );
+        void this.publishAuthoritativeRoute(localPoint, point, this.defaultTimeoutMs);
+        return;
+      }
+    }
     // No waiter yet - buffer for the next awaitPartner(point) (the #812 early-arrival class).
     if (isCoopDebug()) {
       coopLog("rendezvous", `RECV arrival point=${point} -> BUFFER (no waiter yet) role=${this.transport.role}`);
@@ -481,6 +497,27 @@ export class CoopRendezvous {
       }
     }
     return;
+  }
+
+  /** Most-recent host-local point on the same wave that the partner has not reached. */
+  private latestUnmatchedLocalPointForSameWave(foreignPoint: string): string | undefined {
+    const wave = this.pointWave(foreignPoint);
+    if (wave === undefined) {
+      return;
+    }
+    const local = [...this.localArrived];
+    for (let i = local.length - 1; i >= 0; i--) {
+      const point = local[i];
+      if (point !== foreignPoint && this.pointWave(point) === wave && !this.partnerArrived.has(point)) {
+        return point;
+      }
+    }
+    return;
+  }
+
+  private pointWave(point: string): number | undefined {
+    const value = Number(point.split(":")[1]);
+    return Number.isSafeInteger(value) && value >= 0 ? value : undefined;
   }
 
   /** Host publishes the winning branch and retransmits it until the guest ACKs the revision. */

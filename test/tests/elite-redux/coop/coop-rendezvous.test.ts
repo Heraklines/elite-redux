@@ -283,6 +283,24 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     faulted.host.close();
   });
 
+  it("host shop WATCHER proactively routes a foreign guest command without a host waiter", async () => {
+    const pair = createLoopbackPair();
+    const host = new CoopRendezvous(pair.host);
+    const guest = new CoopRendezvous(pair.guest);
+
+    // Odd-counter shop: host is the WATCHER, so production only calls arrive(shop) and never awaitPartner.
+    host.arrive("shop:6:5");
+    await flush();
+    const gr = await guest.rendezvous("cmd:6:2");
+
+    expect(gr.timedOut).toBe(false);
+    expect(gr.authoritativePoint).toBe("shop:6:5");
+    expect(gr.point).toBe("cmd:6:2");
+
+    host.dispose();
+    guest.dispose();
+  });
+
   it("#847 a partner arrival at a point WE ALSO reached does NOT cross-release the NEXT barrier (stale shared past-point guard)", async () => {
     const pair = createLoopbackPair();
     const host = new CoopRendezvous(pair.host);
