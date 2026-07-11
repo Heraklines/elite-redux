@@ -519,6 +519,54 @@ export class RaiseHighestOffenseDefenseStatAttr extends MoveEffectAttr {
 }
 
 /**
+ * ER Eerie Fog (move 950): sets the ER-custom {@linkcode WeatherType.EERIE_FOG}
+ * (a Ghost/Psychic weather, NOT vanilla FOG) for 8 turns. Vanilla
+ * {@linkcode WeatherChangeAttr} always requests pokerogue's default 5-turn
+ * duration; ER's fog is an 8-turn weather (matching Fog Machine / the fog-summon
+ * abilities), so pass the turn count explicitly. The per-turn positive-boost
+ * decay that honors Ghost/Psychic immunity is implemented by the EERIE_FOG
+ * weather itself (weather-effect-phase.ts), so no immediate stat-reset rider is
+ * needed on the move.
+ */
+export class ErEerieFogWeatherAttr extends WeatherChangeAttr {
+  constructor() {
+    super(WeatherType.EERIE_FOG);
+  }
+
+  override apply(user: Pokemon, _target: Pokemon, _move: Move, _args: any[]): boolean {
+    return globalScene.arena.trySetWeather(WeatherType.EERIE_FOG, user, 8);
+  }
+}
+
+/**
+ * ER Reflect Type (move 513, effect 269): "The user projects its type onto the
+ * foe, making it the same type." This is the REVERSE of vanilla
+ * {@linkcode CopyTypeAttr} (which makes the USER copy the TARGET's types) — here
+ * the TARGET is overwritten with the USER's types.
+ */
+export class ErReflectTypeOntoTargetAttr extends MoveEffectAttr {
+  constructor() {
+    super(false); // targets the foe
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args?: any[]): boolean {
+    if (!super.apply(user, target, move, args)) {
+      return false;
+    }
+    const userTypes = user.getTypes(true, true);
+    // Replace UNKNOWN (typeless) with Normal, mirroring CopyTypeAttr.
+    const unknownIndex = userTypes.indexOf(PokemonType.UNKNOWN);
+    if (unknownIndex !== -1) {
+      userTypes[unknownIndex] = PokemonType.NORMAL;
+    }
+    target.summonData.types = userTypes;
+    target.updateInfo();
+    globalScene.phaseManager.queueMessage(`${user.name} projected its type onto ${target.name}!`);
+    return true;
+  }
+}
+
+/**
  * ER Pitfall (937): "30% chance to TRAP the target AND make attacks always hit
  * it." Both effects share a SINGLE `move.chance` roll — either both land or
  * neither. The previous wiring used two independent `AddBattlerTagAttr`s, each
@@ -757,12 +805,13 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // Beatdown — hits 2-5 times.
       return ok(0, [new MultiHitAttr(MultiHitType.TWO_TO_FIVE)]);
     case 950:
-      // Eerie Fog — ghost status move that sets fog weather for 8 turns. The
-      // "drains stat boosts from non-Ghost/Psychic mons" piece is bespoke (no
-      // vanilla weather → stat-strip primitive). First-pass: WeatherChangeAttr
-      // sets FOG; ER abilities keyed on fog (e.g. Rest in Peace, Soul Tap)
-      // then activate around it.
-      return ok(0, [new WeatherChangeAttr(WeatherType.FOG)]);
+      // Eerie Fog — Ghost status move that sets the ER-custom EERIE_FOG weather
+      // for 8 turns (a distinct Ghost/Psychic weather with NO accuracy debuff,
+      // unlike vanilla FOG). The weather itself drains positive stat boosts each
+      // turn from non-Ghost/Psychic mons (weather-effect-phase.ts), honoring the
+      // Ghost/Psychic immunity — so the immediate single-target ResetStatsAttr
+      // rider (previously in init-elite-redux-custom-moves.ts) is dropped.
+      return ok(0, [new ErEerieFogWeatherAttr()]);
     case 951:
       // Mystic Dance — self-status: raises user's SpAtk and Speed by 1 each.
       // DANCE_MOVE flag triggers Dancer-style ability copies.

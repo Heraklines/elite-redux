@@ -2064,13 +2064,18 @@ function patchHealerChance(_ability: MutableAbility): void {
 
 /**
  * Add a "type-X-moves get a +1.2x baseline boost" attr alongside the vanilla
- * low-HP boost. Used by OVERGROW/BLAZE/TORRENT/SWARM. Vanilla:
- *   - `LowHpMoveTypePowerBoostAbAttr` — fires at HP <= 1/3.
- * ER:
- *   - 1.2x ALWAYS, 1.5x at low HP — keep vanilla, add baseline.
+ * low-HP boost. Used by OVERGROW/BLAZE/TORRENT/SWARM.
+ *
+ * ER C-source (battle_util.c) is MUTUALLY EXCLUSIVE: `HP <= 1/3 ? 1.5 : 1.2`.
+ * The vanilla `LowHpMoveTypePowerBoostAbAttr` already supplies the ×1.5 at
+ * HP <= 1/3, so the baseline ×1.2 must be gated to HP > 1/3 — otherwise both
+ * fire below 1/3 HP and stack to 1.2×1.5 = 1.8× (bug). Gating makes the two
+ * boosts exclusive, exactly matching the dex if/else.
  */
 function addBaselineTypeBoost(ability: MutableAbility, type: PokemonType, multiplier: number): void {
-  ability.attrs.push(new MoveTypePowerBoostAbAttr(type, multiplier));
+  ability.attrs.push(
+    new MoveTypePowerBoostAbAttr(type, multiplier).addCondition(pokemon => pokemon.getHpRatio() > 0.33),
+  );
 }
 
 /**

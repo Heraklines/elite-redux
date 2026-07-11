@@ -181,4 +181,12 @@ export enum BattlerTagType {
    * (transient effect).
    */
   ER_EMPOWERED_SWITCH_IN = "ER_EMPOWERED_SWITCH_IN",
+  /**
+   * Elite Redux Sage Power (ability 352) move-lock. Behaves exactly like
+   * {@linkcode GORILLA_TACTICS} (locks the holder into the first move it uses
+   * for the rest of the battle) but WITHOUT the ×1.5 physical Attack boost
+   * Gorilla Tactics applies in `onAdd` — Sage Power grants only +50% Special
+   * Attack (via a separate StatMultiplier) plus the move lock, per the 2.65 dex.
+   */
+  ER_SAGE_POWER_LOCK = "ER_SAGE_POWER_LOCK",
 }

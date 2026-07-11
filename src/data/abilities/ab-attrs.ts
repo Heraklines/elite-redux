@@ -2083,6 +2083,29 @@ export class GorillaTacticsAbAttr extends ExecutedMoveAbAttr {
   }
 }
 
+/**
+ * Elite Redux Sage Power (ability 352) move-lock. Identical to
+ * {@linkcode GorillaTacticsAbAttr} but adds the {@linkcode BattlerTagType.ER_SAGE_POWER_LOCK}
+ * tag, which locks the holder into its first move WITHOUT Gorilla Tactics'
+ * spurious ×1.5 physical Attack boost. The +50% Special Attack is supplied by a
+ * separate `StatMultiplierAbAttr(SPATK, 1.5)` on the ability.
+ */
+export class SagePowerMoveLockAbAttr extends ExecutedMoveAbAttr {
+  constructor(showAbility = false) {
+    super(showAbility);
+  }
+
+  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+    return !pokemon.getTag(BattlerTagType.ER_SAGE_POWER_LOCK);
+  }
+
+  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
+    if (!simulated) {
+      pokemon.addTag(BattlerTagType.ER_SAGE_POWER_LOCK);
+    }
+  }
+}
+
 /*
 Subclasses that override the `canApply` and `apply` are not allowed to change the type of their parameters.
 This is suggested via the `Closed` type.
@@ -7364,6 +7387,7 @@ export const AbilityAttrs = Object.freeze({
   FriskAbAttr,
   FullHpResistTypeAbAttr,
   GorillaTacticsAbAttr,
+  SagePowerMoveLockAbAttr,
   HealFromBerryUseAbAttr,
   IgnoreContactAbAttr,
   IgnoreMoveEffectsAbAttr,

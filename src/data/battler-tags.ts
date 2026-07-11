@@ -616,6 +616,57 @@ export class GorillaTacticsTag extends MoveRestrictionBattlerTag {
 }
 
 /**
+ * Elite Redux Sage Power (ability 352) move-lock tag. Identical to
+ * {@linkcode GorillaTacticsTag} — locks the holder into the first move it uses
+ * for the rest of the battle — but does NOT apply Gorilla Tactics' ×1.5 physical
+ * Attack boost in {@linkcode onAdd}. Sage Power grants only +50% Special Attack
+ * (wired as a separate StatMultiplier on the ability) plus the move lock, per the
+ * ER 2.65 dex.
+ */
+export class SagePowerLockTag extends MoveRestrictionBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_SAGE_POWER_LOCK;
+  /** ID of the move that the user is locked into using. */
+  public readonly moveId: MoveId = MoveId.NONE;
+
+  constructor() {
+    super(BattlerTagType.ER_SAGE_POWER_LOCK, BattlerTagLapseType.CUSTOM, 0);
+  }
+
+  override isMoveRestricted(move: MoveId): boolean {
+    return move !== this.moveId;
+  }
+
+  /** Mirrors {@linkcode GorillaTacticsTag.canAdd}: needs a valid non-Struggle prior move. */
+  override canAdd(pokemon: Pokemon): boolean {
+    const lastSelectedMove = pokemon.getLastNonVirtualMove();
+    return lastSelectedMove != null && lastSelectedMove.move !== MoveId.STRUGGLE;
+  }
+
+  /**
+   * Sets this tag's {@linkcode moveId} — but, unlike Gorilla Tactics, applies NO
+   * Attack boost. Sage Power's only stat effect is the +50% Special Attack wired
+   * on the ability itself.
+   */
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    // Bang is justified as tag is not added if prior move doesn't exist
+    (this as Mutable<SagePowerLockTag>).moveId = pokemon.getLastNonVirtualMove()!.move;
+  }
+
+  public override loadTag(source: BaseBattlerTag & Pick<SagePowerLockTag, "tagType" | "moveId">): void {
+    super.loadTag(source);
+    (this as Mutable<SagePowerLockTag>).moveId = source.moveId;
+  }
+
+  override selectionDeniedText(pokemon: Pokemon): string {
+    return i18next.t("battle:canOnlyUseMove", {
+      moveName: allMoves[this.moveId].name,
+      pokemonName: getPokemonNameWithAffix(pokemon),
+    });
+  }
+}
+
+/**
  * BattlerTag that represents the "recharge" effects of moves like Hyper Beam.
  */
 export class RechargingTag extends SerializableBattlerTag {
@@ -4589,6 +4640,8 @@ export function getBattlerTag(
       return new ThroatChoppedTag();
     case BattlerTagType.GORILLA_TACTICS:
       return new GorillaTacticsTag();
+    case BattlerTagType.ER_SAGE_POWER_LOCK:
+      return new SagePowerLockTag();
     case BattlerTagType.UNBURDEN:
       return new UnburdenTag();
     case BattlerTagType.SUBSTITUTE:
@@ -4765,6 +4818,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.ELECTRIFIED]: ElectrifiedTag;
   [BattlerTagType.THROAT_CHOPPED]: ThroatChoppedTag;
   [BattlerTagType.GORILLA_TACTICS]: GorillaTacticsTag;
+  [BattlerTagType.ER_SAGE_POWER_LOCK]: SagePowerLockTag;
   [BattlerTagType.UNBURDEN]: UnburdenTag;
   [BattlerTagType.SUBSTITUTE]: SubstituteTag;
   [BattlerTagType.AUTOTOMIZED]: AutotomizedTag;

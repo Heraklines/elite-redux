@@ -80,7 +80,6 @@ import {
   PsychoShiftEffectAttr,
   RemoveArenaTrapAttr,
   RemoveScreensAttr,
-  ResetStatsAttr,
   SelfStatusMove,
   SemiInvulnerableAttr,
   SpDefDefAttr,
@@ -979,10 +978,11 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       // AddBattlerTagAttr rolls (P(both) ~= 9%, often only one landed).
       move.attr(PitfallTrapAndAlwaysHitAttr);
       break;
-    // ---- Boost-drain (clears the target's stat stages) ----
-    case 950: // Eerie Fog — sets fog (WeatherChange wired) + drains foe boosts
-      move.attr(ResetStatsAttr, false);
-      break;
+    // Eerie Fog (950): the EERIE_FOG weather (wired in move-archetype-dispatcher)
+    // drains positive boosts each turn from non-Ghost/Psychic mons, honoring the
+    // Ghost/Psychic immunity. The old immediate ResetStatsAttr(false) rider full-
+    // reset only the single target and ignored that immunity, so it is removed —
+    // the weather's per-turn decay is the faithful mechanic.
     // ---- Break the target's screens (Light Screen / Reflect / Aurora Veil) ----
     case 762: // Iron Fangs
       move.attr(RemoveScreensAttr, (_user, target) => (target.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY));

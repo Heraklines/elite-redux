@@ -116,7 +116,9 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_BUBBLE_BEAM", { power: 25 }],
   ["MOVE_HYPER_BEAM", { accuracy: 90 }],
   ["MOVE_DRILL_PECK", { chance: 0 }],
-  ["MOVE_SUBMISSION", { power: 150, accuracy: 80, pp: 15 }],
+  // ER 2.65 dex (er-moves.ts id 66): power 120 / acc 100 / pp 10 / 33% recoil.
+  // The prior 150/80/15 pin was the stale C-source value that overrode the dex.
+  ["MOVE_SUBMISSION", { power: 120, accuracy: 100, pp: 10 }],
   ["MOVE_SEISMIC_TOSS", { pp: 20 }],
   ["MOVE_STRENGTH", { power: 110, pp: 5, chance: 100 }],
   ["MOVE_ABSORB", { power: 35, pp: 25, chance: 0 }],
@@ -194,7 +196,10 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_CONVERSION_2", { pp: 30 }],
   ["MOVE_COTTON_SPORE", { pp: 40 }],
   ["MOVE_REVERSAL", { power: 1, pp: 15 }],
-  ["MOVE_POWDER_SNOW", { power: 40, pp: 25, chance: 10 }],
+  // ER 2.65 dex (er-moves.ts id 181): power 80 / pp 20 / 30% frostbite. The prior
+  // 40/25/10 pin was the stale vanilla value; the FREEZE→ER_FROSTBITE swap is in
+  // the move-patch table (MOVE_POWDER_SNOW).
+  ["MOVE_POWDER_SNOW", { power: 80, pp: 20, chance: 30 }],
   ["MOVE_MACH_PUNCH", { pp: 30 }],
   ["MOVE_FEINT_ATTACK", { power: 60, pp: 20 }],
   ["MOVE_MUD_SLAP", { power: 25, accuracy: 100, pp: 10 }], // ER: 25BP/100%/10PP 2-5 hits, NO acc drop (attrs in move-patches)

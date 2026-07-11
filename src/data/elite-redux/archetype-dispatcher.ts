@@ -83,7 +83,6 @@ import {
   FogRestoreDisguiseFormChangeAbAttr,
   ForceSwitchOutImmunityAbAttr,
   FullBurnDamageImmunityAbAttr,
-  GorillaTacticsAbAttr,
   getWeatherCondition,
   IgnoreGenderInfatuationAbAttr,
   IgnoreMoveEffectsAbAttr,
@@ -127,6 +126,7 @@ import {
   ReceivedTypeDamageMultiplierAbAttr,
   RedirectTypeMoveAbAttr,
   ReflectStatStageChangeAbAttr,
+  SagePowerMoveLockAbAttr,
   SelfStatDropImmunityAbAttr,
   SetMoveAccuracyAbAttr,
   SpreadTargetByFlagAbAttr,
@@ -4770,11 +4770,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // stat." Same shape as 301 Cryptic Power but at 1.5x instead of 2x.
       return ok([new StatMultiplierAbAttr(Stat.SPATK, 1.5)]);
     case 352:
-      // Sage Power — "Ups Special Attack by 50% and locks move." R52
-      // audit-fix: previously SpAtk-only partial; now also adds vanilla
-      // GorillaTacticsAbAttr for the move-lock piece (locks after the
-      // holder's first move of the wave).
-      return ok([new StatMultiplierAbAttr(Stat.SPATK, 1.5), new GorillaTacticsAbAttr()]);
+      // Sage Power — "Ups Special Attack by 50% and locks move." (Sp.Atk ONLY.)
+      // audit-fix: previously used vanilla GorillaTacticsAbAttr whose tag onAdd
+      // ALSO applied a spurious ×1.5 physical Attack (Choice-Band-style) the dex
+      // never grants. Now uses SagePowerMoveLockAbAttr → the ER_SAGE_POWER_LOCK
+      // tag, which locks the first move WITHOUT any Attack boost. The +50% Sp.Atk
+      // is the separate StatMultiplier below.
+      return ok([new StatMultiplierAbAttr(Stat.SPATK, 1.5), new SagePowerMoveLockAbAttr()]);
     case 599: {
       // Dead Power — "1.5x Attack boost. 20% chance to curse on contact moves."
       // Wire both pieces: StatMultiplier(ATK, 1.5) for the attack boost +
@@ -5200,13 +5202,23 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // Round 35 — SpeedBonusToStat (defensive) + DamageReduction wires
     // -------------------------------------------------------------------------
     case 809:
-      // Blur — "Uses Speed as defense stat when hit by CONTACT." Defensive
-      // SpeedBonus → DEF, gated to contact moves only (the contact gate was missing).
-      return ok([new SpeedBonusToStatAbAttr({ stat: Stat.DEF, speedFraction: 1, filter: { contact: "only" } })]);
+      // Blur — "Uses its Speed stat instead of Defense OR Special Defense when
+      // hit by CONTACT moves." REPLACE (not add) on BOTH defensive stats: a
+      // special contact move (e.g. Draining Kiss) substitutes SpDef, a physical
+      // one substitutes Def. Gated to contact moves only.
+      return ok([
+        new SpeedBonusToStatAbAttr({ stat: Stat.DEF, speedFraction: 1, replace: true, filter: { contact: "only" } }),
+        new SpeedBonusToStatAbAttr({ stat: Stat.SPDEF, speedFraction: 1, replace: true, filter: { contact: "only" } }),
+      ]);
     case 810:
-      // Elude — "Uses Speed as defense stat when hit by NON-contact." Gated to
-      // non-contact moves only (the gate was missing — it was identical to Blur).
-      return ok([new SpeedBonusToStatAbAttr({ stat: Stat.DEF, speedFraction: 1, filter: { contact: "non" } })]);
+      // Elude — "Uses its Speed stat instead of Defense OR Special Defense when
+      // hit by NON-contact moves." REPLACE on BOTH defensive stats (non-contact
+      // moves are overwhelmingly special → SpDef is the common path). Gated to
+      // non-contact moves only.
+      return ok([
+        new SpeedBonusToStatAbAttr({ stat: Stat.DEF, speedFraction: 1, replace: true, filter: { contact: "non" } }),
+        new SpeedBonusToStatAbAttr({ stat: Stat.SPDEF, speedFraction: 1, replace: true, filter: { contact: "non" } }),
+      ]);
     case 838:
       // Guardian Coat — "Provides immunity to Sandstorm/Hail weather damage,
       // blocks all powder moves, and reduces incoming PHYSICAL damage by 20%."

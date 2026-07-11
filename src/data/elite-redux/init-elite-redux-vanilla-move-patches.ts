@@ -44,6 +44,7 @@ import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { type ErPledgeRule, ErPledgeWeatherEffectAttr } from "#data/elite-redux/er-pledge-weather-effect";
 import {
   BestEffectivenessChartOverrideAttr,
+  ErReflectTypeOntoTargetAttr,
   RaiseHighestOffenseDefenseStatAttr,
 } from "#data/elite-redux/move-archetype-dispatcher";
 import {
@@ -81,6 +82,8 @@ import {
   StatStageChangeAttr,
   StatusCategoryOnAllyAttr,
   StatusEffectAttr,
+  StealHeldItemChanceAttr,
+  SuppressAbilitiesIfActedAttr,
   SwapStatStagesAttr,
   TerrainChangeAttr,
   VariableMoveTypeAttr,
@@ -263,14 +266,18 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       addAttrUnique(move, new ErSuperEffectiveVsTypeAttr(PokemonType.FAIRY, 1));
     },
   ],
-  // FLASH: vanilla status (accuracy -1) → ER Special Electric damaging, ACC drop.
+  // FLASH: vanilla status (accuracy -1) → ER Special Electric damaging, 50% ATK drop.
+  // Dex effect 22 "Attack Down Hit" / longDesc "50% chance to drop foe's Atk"
+  // (er-moves.ts id 148, effectChance 50). The vanilla ACC-drop must be removed
+  // and replaced with an ATK-drop secondary (uses the numeric-patched move.chance=50).
   [
     MoveId.FLASH,
     move => {
       setCategory(move, MoveCategory.SPECIAL);
       retypeMove(move, PokemonType.ELECTRIC);
       orFlag(move, MoveFlags.FIELD_BASED);
-      // Vanilla FLASH already has StatStageChange(ACC, -1); keep.
+      removeAttrsByCtor(move, [StatStageChangeAttr]);
+      addAttrUnique(move, new StatStageChangeAttr([Stat.ATK], -1, false));
     },
   ],
   // NIGHTMARE: vanilla status (NightmareTag) → ER Special Ghost damaging.
@@ -327,12 +334,23 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       addAttrUnique(move, new ErDecorateSideBoostAttr());
     },
   ],
-  // CAPTIVATE: vanilla status (SpAtk -2 opposite-gender) → ER Special Fairy damaging.
+  // CAPTIVATE: vanilla status (SpAtk -2 opposite-gender, ALL_NEAR_ENEMIES) → ER
+  // Special Fairy 65-BP single-target attack that deals DOUBLE damage vs an
+  // infatuated foe (dex effect 233, er-moves.ts id 445). Strip the vanilla
+  // SpAtk-drop, the opposite-gender fail condition, and the spread target; add
+  // the ×2-vs-infatuated power multiplier.
   [
     MoveId.CAPTIVATE,
     move => {
       setCategory(move, MoveCategory.SPECIAL);
       retypeMove(move, PokemonType.FAIRY);
+      removeAttrsByCtor(move, [StatStageChangeAttr]);
+      clearMoveFailureConditions(move);
+      move.moveTarget = MoveTarget.NEAR_OTHER;
+      addAttrUnique(
+        move,
+        new MovePowerMultiplierAttr((_user, target) => (target.getTag(BattlerTagType.INFATUATED) ? 2 : 1)),
+      );
     },
   ],
 
@@ -1246,6 +1264,135 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       addAttrUnique(move, new AddBattlerTagAttr(BattlerTagType.ER_ENRAGE, false));
     },
   ],
+
+  // =====================================================================
+  // Remaining-dex audit batch (Section A/B fixes)
+  // =====================================================================
+  // DRILL_PECK (er 65): dex "High crit" (effect 6). Add the high-crit ratio.
+  [MoveId.DRILL_PECK, move => addAttrUnique(move, new HighCritAttr())],
+  // SUBMISSION (er 66): dex 33% recoil (numeric 120/100/10 comes from the
+  // c-source correction). Vanilla ships RecoilAttr(0.25) = 25% recoil; replace
+  // it with a 1/3 (≈33%) recoil.
+  [
+    MoveId.SUBMISSION,
+    move => {
+      removeAttrsByCtor(move, [RecoilAttr]);
+      addAttrUnique(move, new RecoilAttr(false, 1 / 3));
+    },
+  ],
+  // BARRIER (er 112, effect 61): "The user sets Light Screen and Reflect if
+  // Psychic Terrain is active." Strip the vanilla Def+2 and add the two
+  // Psychic-Terrain-gated screen setters (5 turns, self side).
+  [
+    MoveId.BARRIER,
+    move => {
+      removeAttrsByCtor(move, [StatStageChangeAttr]);
+      addAttrUnique(move, new ErPsychicTerrainScreenAttr(ArenaTagType.LIGHT_SCREEN, 5, false, true));
+      move.addAttr(new ErPsychicTerrainScreenAttr(ArenaTagType.REFLECT, 5, false, true));
+    },
+  ],
+  // THIEF (er 168): dex effectChance 100 ("Steals or removes the foe's item")
+  // + "+1 priority if the user has no item". Vanilla StealHeldItemChanceAttr is
+  // hardcoded 30%; replace with a 100% steal and add the itemless-priority attr.
+  [
+    MoveId.THIEF,
+    move => {
+      removeAttrsByCtor(move, [StealHeldItemChanceAttr]);
+      addAttrUnique(move, new StealHeldItemChanceAttr(1.0));
+      addAttrUnique(
+        move,
+        new IncrementMovePriorityAttr(user => user.getHeldItems().filter(i => i.isTransferable).length === 0, 1),
+      );
+    },
+  ],
+  // POWDER_SNOW (er 181): dex 30% frostbite (ER_FROSTBITE tag), power 80 / pp 20
+  // (numeric via the c-source correction). Swap the inherited vanilla
+  // StatusEffectAttr(FREEZE) for the ER frostbite battler tag.
+  [
+    MoveId.POWDER_SNOW,
+    move => {
+      removeAttrsByName(move, ["StatusEffectAttr"]);
+      addAttrUnique(move, new AddBattlerTagAttr(BattlerTagType.ER_FROSTBITE, false, false, 4, 6));
+    },
+  ],
+  // FOCUS_PUNCH (er 264): dex "Damage reduced to 40 BP if hit" (NOT a full
+  // interrupt). Remove the vanilla PreUseInterruptAttr (which makes the move
+  // fail outright when the user is struck) and instead scale power down to 40
+  // when the user took damage before acting.
+  [
+    MoveId.FOCUS_PUNCH,
+    move => {
+      removeAttrsByName(move, ["PreUseInterruptAttr"]);
+      addAttrUnique(
+        move,
+        new MovePowerMultiplierAttr((user, _target, m) =>
+          user.turnData.attacksReceived.some(r => r.damage > 0) ? 40 / m.power : 1,
+        ),
+      );
+    },
+  ],
+  // REFLECT_TYPE (er 513, effect 269): "The user projects its type onto the foe."
+  // Vanilla CopyTypeAttr does the REVERSE (user copies target); swap it for the
+  // ER attr that writes the user's types onto the target.
+  [
+    MoveId.REFLECT_TYPE,
+    move => {
+      removeAttrsByName(move, ["CopyTypeAttr"]);
+      addAttrUnique(move, new ErReflectTypeOntoTargetAttr() as MoveAttr);
+    },
+  ],
+  // AROMATIC_MIST (er 597): dex "Sharply raises the Special Defense of the user
+  // and its partner" (+2, user INCLUDED). Vanilla is +1 to the ally only and
+  // fails in single battles. Rebuild as +2 SpDef to USER_AND_ALLIES, no
+  // single-battle fail.
+  [
+    MoveId.AROMATIC_MIST,
+    move => {
+      removeAttrsByCtor(move, [StatStageChangeAttr]);
+      clearMoveFailureConditions(move);
+      move.moveTarget = MoveTarget.USER_AND_ALLIES;
+      // selfTarget=false: the USER_AND_ALLIES target set already includes the
+      // user, so the attr applies +2 to each resolved target (user + allies).
+      // (Mirrors Magnetic Flux, move.ts:12478.)
+      addAttrUnique(move, new StatStageChangeAttr([Stat.SPDEF], 2, false));
+    },
+  ],
+  // TEARFUL_LOOK (er 669): dex drops Special Attack ONLY. Vanilla-derived attr
+  // drops both ATK and SPATK; rebuild with SPATK only.
+  [
+    MoveId.TEARFUL_LOOK,
+    move => {
+      removeAttrsByCtor(move, [StatStageChangeAttr]);
+      addAttrUnique(move, new StatStageChangeAttr([Stat.SPATK], -1, false));
+    },
+  ],
+  // BARB_BARRAGE (er 895): dex "50% boost if target is statused" (×1.5 for ANY
+  // status). Vanilla returns ×2 and only for POISON/TOXIC. Replace the power
+  // multiplier with ×1.5 gated on the target carrying any status.
+  [
+    MoveId.BARB_BARRAGE,
+    move => {
+      removeAttrsByCtor(move, [MovePowerMultiplierAttr]);
+      addAttrUnique(
+        move,
+        new MovePowerMultiplierAttr((_user, target) =>
+          target.status && target.status.effect !== StatusEffect.NONE ? 1.5 : 1,
+        ),
+      );
+    },
+  ],
+  // HARD_PRESS (er 906): dex = fixed power 80 Steel + "negate the foe's Ability
+  // if it has moved already" (effect 211). Vanilla keeps OpponentHighHpPowerAttr
+  // (scales power with target HP, overriding the fixed 80) and has no ability
+  // negation. Strip the HP-scaling attr so the numeric 80 holds, and add the
+  // vanilla "suppress ability if target already acted" attr (Core Enforcer's).
+  [
+    MoveId.HARD_PRESS,
+    move => {
+      removeAttrsByName(move, ["OpponentHighHpPowerAttr"]);
+      addAttrUnique(move, new SuppressAbilitiesIfActedAttr());
+    },
+  ],
 ]);
 
 /**
@@ -1390,6 +1537,20 @@ class ErMatchUserSecondTypeAttr extends VariableMoveTypeAttr {
     }
     moveType.value = second;
     return true;
+  }
+}
+
+// ER Barrier (move 112, effect 61): "The user sets Light Screen and Reflect if
+// Psychic Terrain is active." Screen-setting attr that ONLY applies while Psychic
+// Terrain is up; off-terrain it no-ops (contributing no move-level fail condition
+// beyond the base). Both screens share this gate, so under Psychic Terrain both
+// land together and otherwise the move simply fails.
+class ErPsychicTerrainScreenAttr extends AddArenaTagAttr {
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (globalScene.arena.terrain?.terrainType !== TerrainType.PSYCHIC) {
+      return false;
+    }
+    return super.apply(user, target, move, args);
   }
 }
 

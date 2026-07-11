@@ -14996,4 +14996,458 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  // ===========================================================================
+  // remaining-dex audit batch — moves & abilities
+  // ===========================================================================
+  // ABILITY — Overgrow/Blaze/Torrent/Swarm (65-68): baseline boost no longer stacks
+  {
+    label: "Ability: Overgrow is 1.5x below 1/3 HP (not 1.8x)",
+    description:
+      "Overgrow/Blaze/Torrent/Swarm (65-68): ER's always-on +20% type boost used to\n"
+      + "STACK with the low-HP +50% (1.2x1.5 = 1.8x below 1/3 HP). ER is mutually\n"
+      + "exclusive: 1.2x above 1/3 HP, 1.5x at/below 1/3 HP.\n"
+      + "DO: turn 1 at FULL HP, use SEED BOMB (note the damage). Turn 2, the foe has\n"
+      + "been pre-set to chip you below 1/3 HP; use SEED BOMB again.\n"
+      + "EXPECT: the low-HP Grass hit is ~1.25x the full-HP hit (1.5 vs 1.2), NOT ~1.5x\n"
+      + "(which would be the old 1.8x stack).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.OVERGROW,
+        MOVESET_OVERRIDE: [MoveId.SEED_BOMB],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.VENUSAUR, {
+          moveset: [MoveId.SEED_BOMB, MoveId.GIGA_DRAIN, MoveId.SLUDGE_BOMB, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // ABILITY — Sage Power (352): move-lock WITHOUT the spurious ATK boost
+  {
+    label: "Ability: Sage Power locks move, no Attack boost",
+    description:
+      "Sage Power (352): '+50% Special Attack and locks into the first move.' It used\n"
+      + "to borrow Gorilla Tactics, which ALSO gave a bogus +50% physical Attack.\n"
+      + "DO: use TACKLE (this locks the mon into Tackle). Try to pick another move next\n"
+      + "turn — only Tackle is selectable.\n"
+      + "EXPECT: the move lock works, but the holder's physical Attack is UNCHANGED (no\n"
+      + "Gorilla ATK boost). Only Special Attack is buffed.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.SAGE_POWER),
+        MOVESET_OVERRIDE: [MoveId.TACKLE, MoveId.EMBER],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.ALAKAZAM, {
+          moveset: [MoveId.TACKLE, MoveId.EMBER, MoveId.PSYCHIC, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // ABILITY — Blur (809) / Elude (810): Speed substitutes for the defensive stat
+  {
+    label: "Ability: Blur uses Speed vs contact hits",
+    description:
+      "Blur (809): 'Uses Speed instead of Defense OR Special Defense when hit by\n"
+      + "CONTACT moves.' (Elude 810 is the same for NON-contact.) It used to only cover\n"
+      + "Defense and ADD Speed instead of REPLACING it.\n"
+      + "DO: let the fast foe hit your slow-but-speedy Electrode with a CONTACT move\n"
+      + "(TACKLE) and a special CONTACT move (DRAINING KISS).\n"
+      + "EXPECT: both take very little damage — Electrode's huge Speed is used as BOTH\n"
+      + "Def and SpDef against contact hits.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.BLUR),
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE, MoveId.DRAINING_KISS],
+      });
+      return [
+        makeStarter(SpeciesId.ELECTRODE, {
+          moveset: [MoveId.SPLASH, MoveId.THUNDERBOLT, MoveId.VOLT_SWITCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // MOVE — Flash (148): drops Attack (not Accuracy)
+  {
+    label: "Move: Flash drops the foe's Attack",
+    description:
+      "Flash (148) is an ER Electric special move that has a 50% chance to drop the\n"
+      + "foe's ATTACK (it used to drop Accuracy).\n"
+      + "DO: use FLASH a few times.\n"
+      + "EXPECT: on a proc, the foe's ATTACK falls (not its Accuracy).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 80,
+        MOVESET_OVERRIDE: [MoveId.FLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.FLASH, MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // MOVE — Thief (168): 100% steal + itemless +1 priority
+  {
+    label: "Move: Thief steals with 100% reliability",
+    description:
+      "Thief (168): 'Steals or removes the foe's item' (100%, not 30%), and gains +1\n"
+      + "priority when the user holds NO item.\n"
+      + "DO: use THIEF once (you hold nothing; the foe holds a Sitrus Berry).\n"
+      + "EXPECT: the steal ALWAYS lands (foe's item gone, now on your mon), and Thief\n"
+      + "moved with +1 priority (before the foe).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 80,
+        MOVESET_OVERRIDE: [MoveId.THIEF],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_HELD_ITEMS_OVERRIDE: [{ name: "BERRY", type: BerryType.SITRUS }],
+      });
+      return [
+        makeStarter(SpeciesId.WEAVILE, {
+          moveset: [MoveId.THIEF, MoveId.ICE_SHARD, MoveId.SWORDS_DANCE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // MOVE — Reflect Type (513): projects the USER's type onto the target
+  {
+    label: "Move: Reflect Type makes the foe your type",
+    description:
+      "Reflect Type (513): 'The user projects its type onto the foe, making it the\n"
+      + "same type.' (The port had it backwards — user copied the foe.)\n"
+      + "DO: use REFLECT TYPE on the Normal-type Snorlax.\n"
+      + "EXPECT: the FOE becomes Grass/Poison (your Venusaur's typing) — check the\n"
+      + "type-effectiveness of your next move against it.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 80,
+        MOVESET_OVERRIDE: [MoveId.REFLECT_TYPE, MoveId.SLUDGE_BOMB],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.VENUSAUR, {
+          moveset: [MoveId.REFLECT_TYPE, MoveId.SLUDGE_BOMB, MoveId.GIGA_DRAIN, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // MOVE — Aromatic Mist (597): +2 SpDef to the USER and its ally (doubles)
+  {
+    label: "Move: Aromatic Mist +2 SpDef to user and ally",
+    description:
+      "Aromatic Mist (597): 'Sharply raises the Special Defense of the user AND its\n"
+      + "partner.' The port only gave +1 to the ally and failed in singles.\n"
+      + "DO: (double battle) use AROMATIC MIST with the left mon.\n"
+      + "EXPECT: BOTH your mons gain +2 Special Defense (the user included).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 80,
+        BATTLE_STYLE_OVERRIDE: "double",
+        MOVESET_OVERRIDE: [MoveId.AROMATIC_MIST, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.BLASTOISE, {
+          moveset: [MoveId.AROMATIC_MIST, MoveId.SPLASH, MoveId.SURF, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.CHARIZARD, {
+          moveset: [MoveId.AROMATIC_MIST, MoveId.SPLASH, MoveId.FLAMETHROWER, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // MOVE — Tearful Look (669): drops Special Attack ONLY
+  {
+    label: "Move: Tearful Look drops Sp. Atk only",
+    description:
+      "Tearful Look (669): 'The foe's Special Attack is lowered.' The port also\n"
+      + "dropped physical Attack.\n"
+      + "DO: use TEARFUL LOOK.\n"
+      + "EXPECT: the foe's Special Attack falls by 1; its physical Attack is UNCHANGED.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 80,
+        MOVESET_OVERRIDE: [MoveId.TEARFUL_LOOK],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SYLVEON, {
+          moveset: [MoveId.TEARFUL_LOOK, MoveId.MOONBLAST, MoveId.CALM_MIND, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // MOVE — Barb Barrage (895): x1.5 vs any statused foe
+  {
+    label: "Move: Barb Barrage x1.5 vs a statused foe",
+    description:
+      "Barb Barrage (895): '30% poison; 50% power boost if the target is statused'\n"
+      + "(x1.5 for ANY status). The port only doubled vs POISON.\n"
+      + "DO: the foe is pre-set with PARALYSIS. Use BARB BARRAGE (note damage), then\n"
+      + "compare against a clean foe (rerun without the status).\n"
+      + "EXPECT: ~1.5x damage against the statused foe (works for paralysis/burn/etc.,\n"
+      + "not just poison).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        MOVESET_OVERRIDE: [MoveId.BARB_BARRAGE],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_STATUS_OVERRIDE: StatusEffect.PARALYSIS,
+      });
+      return [
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.BARB_BARRAGE, MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // MOVE — Hard Press (906): fixed 80 power + negate ability if foe already moved
+  {
+    label: "Move: Hard Press is fixed 80 BP + ability negate",
+    description:
+      "Hard Press (906): dex is a FIXED 80-BP Steel move that 'negates the foe's\n"
+      + "Ability if it has already moved this turn.' The port kept the vanilla\n"
+      + "HP-scaling power and had no ability negation.\n"
+      + "DO: your slower mon uses HARD PRESS after the FASTER foe has moved.\n"
+      + "EXPECT: damage is constant regardless of the foe's HP, AND the foe's ability\n"
+      + "is suppressed for the rest of the battle (it moved first).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        MOVESET_OVERRIDE: [MoveId.HARD_PRESS],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.JOLTEON, // fast — acts before your Snorlax
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.VOLT_ABSORB,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.HARD_PRESS, MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // MOVE — Eerie Fog (950): sets ER EERIE_FOG weather (not vanilla FOG)
+  {
+    label: "Move: Eerie Fog sets EERIE FOG weather",
+    description:
+      "Eerie Fog (950) sets ER's distinct EERIE FOG weather for 8 turns (a Ghost/\n"
+      + "Psychic weather with NO accuracy debuff), not vanilla Fog. Each turn it drains\n"
+      + "positive stat boosts from non-Ghost/Psychic mons.\n"
+      + "DO: use EERIE FOG.\n"
+      + "EXPECT: the weather banner reads 'An eerie fog crept in!' (EERIE FOG, 8 turns).\n"
+      + "Non-Ghost/Psychic mons lose a stage off each positive boost every turn.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 80,
+        WEATHER_OVERRIDE: WeatherType.NONE,
+        MOVESET_OVERRIDE: [erMove(ErMoveId.EERIE_FOG)],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [erMove(ErMoveId.EERIE_FOG), MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // MOVE — Captivate (445): x2 damage vs an infatuated foe
+  {
+    label: "Move: Captivate doubles vs an infatuated foe",
+    description:
+      "Captivate (445): a Fairy special 65-BP move that deals DOUBLE damage to an\n"
+      + "INFATUATED foe (no gender gate, single-target). The port kept the vanilla\n"
+      + "SpAtk-drop + opposite-gender fail and never doubled.\n"
+      + "DO: turn 1 use ATTRACT to infatuate the foe, turn 2 use CAPTIVATE (compare to a\n"
+      + "Captivate on a non-infatuated foe).\n"
+      + "EXPECT: Captivate hits ~2x harder against the infatuated foe.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        MOVESET_OVERRIDE: [MoveId.CAPTIVATE, MoveId.ATTRACT],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.CAPTIVATE, MoveId.ATTRACT, MoveId.MOONBLAST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // MOVE — Focus Punch (264): reduced to 40 BP when hit (not interrupted)
+  {
+    label: "Move: Focus Punch hits at 40 BP when struck",
+    description:
+      "Focus Punch (264): 'Damage reduced to 40 BP if hit' (it no longer FAILS when\n"
+      + "the user takes damage before acting).\n"
+      + "DO: use FOCUS PUNCH; the faster foe hits you first with Tackle.\n"
+      + "EXPECT: Focus Punch still LANDS (at reduced power), instead of being\n"
+      + "interrupted/failing.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        MOVESET_OVERRIDE: [MoveId.FOCUS_PUNCH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.JOLTEON,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [
+        makeStarter(SpeciesId.MACHAMP, {
+          moveset: [MoveId.FOCUS_PUNCH, MoveId.KNOCK_OFF, MoveId.BULK_UP, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // MOVE — Submission (66): dex 120/100/10, 33% recoil
+  {
+    label: "Move: Submission is 120 BP with 33% recoil",
+    description:
+      "Submission (66): ER dex is 120 power / 100 acc / 10 PP with 33% recoil (the\n"
+      + "port had 150/80/15 and 25% recoil).\n"
+      + "DO: use SUBMISSION on a bulky foe.\n"
+      + "EXPECT: it never misses at close range (100 acc) and the recoil you take is\n"
+      + "~1/3 of the damage dealt.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        MOVESET_OVERRIDE: [MoveId.SUBMISSION],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SHUCKLE,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.MACHAMP, {
+          moveset: [MoveId.SUBMISSION, MoveId.KNOCK_OFF, MoveId.BULK_UP, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // MOVE — Powder Snow (181): power 80, 30% frostbite; Drill Peck (65): high crit
+  {
+    label: "Move: Powder Snow 80 BP + frostbite; Drill Peck high crit",
+    description:
+      "Powder Snow (181) is now power 80 with a 30% chance to FROSTBITE (ER status,\n"
+      + "halves Sp. Atk), not the vanilla 40-BP freeze. Drill Peck (65) now has a HIGH\n"
+      + "CRIT ratio.\n"
+      + "DO: use POWDER SNOW a few times (watch for the frostbite proc); use DRILL PECK\n"
+      + "repeatedly (watch the crit rate).\n"
+      + "EXPECT: Powder Snow hits noticeably harder (80 BP) and can inflict FROSTBITE;\n"
+      + "Drill Peck crits far more often than a normal move.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 80,
+        MOVESET_OVERRIDE: [MoveId.POWDER_SNOW, MoveId.DRILL_PECK],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.ARTICUNO, {
+          moveset: [MoveId.POWDER_SNOW, MoveId.DRILL_PECK, MoveId.ICE_BEAM, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // MOVE — Barrier (112): sets Light Screen + Reflect under Psychic Terrain
+  {
+    label: "Move: Barrier sets both screens in Psychic Terrain",
+    description:
+      "Barrier (112): 'The user sets Light Screen AND Reflect if Psychic Terrain is\n"
+      + "active.' (The port kept the vanilla Def+2.)\n"
+      + "DO: (Psychic Terrain is pre-set) use BARRIER.\n"
+      + "EXPECT: BOTH Reflect and Light Screen go up on your side (no Def+2). Off Psychic\n"
+      + "Terrain the move fails.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 80,
+        STARTING_TERRAIN_OVERRIDE: TerrainType.PSYCHIC,
+        MOVESET_OVERRIDE: [MoveId.BARRIER],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.ALAKAZAM, {
+          moveset: [MoveId.BARRIER, MoveId.PSYCHIC, MoveId.CALM_MIND, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
 ];
