@@ -3706,6 +3706,23 @@ export class SelfStatDropImmunityAbAttr extends PreStatStageChangeAbAttr {
   }
 }
 
+/**
+ * Elite Redux — a field-wide variant of {@linkcode SelfStatDropImmunityAbAttr}.
+ *
+ * The base attr only cancels the HOLDER's own self-inflicted stat drops (it is
+ * applied by {@linkcode StatStageChangePhase} on the very mon whose stat is
+ * dropping). This subclass is additionally consulted on the ally of a
+ * self-dropping mon, so the holder can shield its DOUBLES PARTNER from self
+ * drops too (ER Evaporate 444 — "Mist protects the entire team from stat
+ * reductions, including self drops"). Behaviour on the holder itself is
+ * unchanged: because it extends {@linkcode SelfStatDropImmunityAbAttr}, the
+ * phase's existing `SelfStatDropImmunityAbAttr` pass still matches it via
+ * `instanceof`. Only mons carrying THIS attr opt into the ally coverage, so
+ * every other consumer of the base attr (Limber / Clear Body / …) stays
+ * holder-only.
+ */
+export class UserFieldSelfStatDropImmunityAbAttr extends SelfStatDropImmunityAbAttr {}
+
 export interface ConfusionOnStatusEffectAbAttrParams extends AbAttrBaseParams {
   /** The status effect that was applied */
   effect: StatusEffect;
@@ -7500,6 +7517,7 @@ export const AbilityAttrs = Object.freeze({
   TypeImmunityAbAttr,
   TypeImmunityHealAbAttr,
   UserFieldBattlerTagImmunityAbAttr,
+  UserFieldSelfStatDropImmunityAbAttr,
   UserFieldIgnoreMoveEffectsAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
   UserFieldStatusEffectImmunityAbAttr,

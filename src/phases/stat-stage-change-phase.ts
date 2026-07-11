@@ -203,6 +203,20 @@ export class StatStageChangePhase extends PokemonPhase {
           simulated: simulate,
           stages: this.stages,
         });
+        // ER Evaporate (444): a field-wide self-drop immunity — the holder's Mist
+        // also shields its doubles PARTNER from self-inflicted drops. Only mons
+        // carrying UserFieldSelfStatDropImmunityAbAttr opt into this ally pass, so
+        // every ordinary SelfStatDropImmunityAbAttr consumer stays holder-only.
+        const selfDropAlly = pokemon.getAlly();
+        if (!cancelled.value && selfDropAlly != null) {
+          applyAbAttrs("UserFieldSelfStatDropImmunityAbAttr", {
+            pokemon: selfDropAlly,
+            stat,
+            cancelled,
+            simulated: simulate,
+            stages: this.stages,
+          });
+        }
       }
 
       // If one stat stage decrease is cancelled, simulate the rest of the applications

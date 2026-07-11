@@ -108,7 +108,6 @@ import {
   PostDefendContactDamageAbAttr,
   PostDefendHpGatedStatStageChangeAbAttr,
   PostDefendMoveDisableAbAttr,
-  PostDefendStatStageChangeAbAttr,
   PostDefendWeatherChangeAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   PostStatStageChangeStatStageChangeAbAttr,
@@ -122,6 +121,7 @@ import {
   PostTurnResetStatusAbAttr,
   PreHitResistTypeChangeAbAttr,
   PreserveBaseStatAbilitiesAbAttr,
+  PreventBerryUseAbAttr,
   PreventItemUseAbAttr,
   ProtectStatAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
@@ -138,6 +138,7 @@ import {
   SuppressWeatherEffectAbAttr,
   SwitchWhileRampagingAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
+  UserFieldSelfStatDropImmunityAbAttr,
   WeightMultiplierAbAttr,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
@@ -165,6 +166,10 @@ import {
 } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
 import { ConditionalDamageAbAttr, type DamageCondition } from "#data/elite-redux/archetypes/conditional-damage";
+import {
+  FirstDefendAttackerAtkDropAbAttr,
+  FirstDefendDamageReductionAbAttr,
+} from "#data/elite-redux/archetypes/consume-on-first-defend";
 import { ContactQuashAbAttr } from "#data/elite-redux/archetypes/contact-quash";
 import { CopyMoveByFilterAbAttr } from "#data/elite-redux/archetypes/copy-move-by-filter";
 import { CounterAttackOnHitAbAttr } from "#data/elite-redux/archetypes/counter-attack-on-hit";
@@ -326,7 +331,7 @@ import {
 import { SuperEffectiveMultiplierBoostAbAttr } from "#data/elite-redux/archetypes/super-effective-multiplier-boost";
 import { SuppressAttackerAbilityAbAttr } from "#data/elite-redux/archetypes/suppress-attacker-ability";
 import { TargetHighestStatDropAbAttr } from "#data/elite-redux/archetypes/target-highest-stat-drop";
-import { TimeLimitedDamageReductionAbAttr } from "#data/elite-redux/archetypes/time-limited-damage-reduction";
+import { TimeLimitedEffectivenessFloorAbAttr } from "#data/elite-redux/archetypes/time-limited-effectiveness-floor";
 import { TrapDurationModifierAbAttr } from "#data/elite-redux/archetypes/trap-duration-modifier";
 import { TurnDecayDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/turn-decay-damage-multiplier";
 import { TypeConversionAbAttr, TypeConversionPowerBoostAbAttr } from "#data/elite-redux/archetypes/type-conversion";
@@ -1659,6 +1664,19 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       par.addCondition(holder => holder.isOfType(PokemonType.ELECTRIC));
       return [par];
     }
+    case 707:
+      // Gleam Eyes — on top of the Frisk (reveal) + Scare (SpAtk -1) composite
+      // parts, the dex adds an Embargo-style clause: foes' held items stop
+      // working. Mega Stones are unaffected (mega evolution isn't an item
+      // "consumption" this block intercepts). Delivered via the As One item-lock
+      // primitive (blocks berries + ER reactive items on all opponents).
+      // GAP: the dex bounds this to 2 turns on entry; a faithful turn-limited
+      // window needs a dedicated EMBARGO battler tag applied to the opponents
+      // (owned by the concurrent battler-tags batch — reported, not wired here),
+      // so this delivers the item-suppression while the holder is on the field.
+      // PreventBerryUse covers foe berries; PreventItemUse covers ER reactive
+      // single-use items.
+      return [new PreventBerryUseAbAttr(), new PreventItemUseAbAttr()];
     case 706: // Shocking Maw: "Bite moves have 50% paralysis chance"
       return [
         new ChanceStatusOnAttackAbAttr({
@@ -3023,16 +3041,17 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 296:
       // Lead Coat — "Takes 40% less from physical moves. This Pokémon's Speed
-      // is 0.9x." 40% physical damage reduction + an always-on SPD x0.9 penalty.
-      // Previously archetype-classified as damage-reduction-generic, which only
-      // wired the reduction half and dropped the Speed penalty. (The weight
-      // triple in the full description has no battle primitive — omitted.)
+      // is 0.9x. Triples the holder's weight." 40% physical damage reduction +
+      // an always-on SPD x0.9 penalty + the weight-triple (affects Heavy Slam /
+      // Low Kick / Grass Knot / etc.), mirroring its special-side twin Chrome
+      // Coat (539). The weight-triple was previously dropped in the port.
       return ok([
         new DamageReductionAbAttr({
           reduction: 0.4,
           filter: { kind: "category", category: MoveCategory.PHYSICAL },
         }),
         new StatMultiplierAbAttr(Stat.SPD, 0.9),
+        new WeightMultiplierAbAttr(3),
       ]);
     case 539:
       // Chrome Coat — "Reduces special damage taken by 40%, decreases Speed by
@@ -6763,19 +6782,12 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         new PostAttackApplyBattlerTagAbAttr(false, () => 10, BattlerTagType.CURSED),
       ]);
     case 932:
-      // Drakelp Head — "Weakens first move taken and drops opponent's
-      // attack." Approximate: TimeLimitedDamageReduction for first turn
-      // (factor 0.5, 1 turn — handles "weakens first move taken") + on-
-      // hit -1 ATK drop on attacker via vanilla PostDefendStatStageChange.
-      return ok([
-        new TimeLimitedDamageReductionAbAttr({ factor: 0.5, turns: 1 }),
-        new PostDefendStatStageChangeAbAttr(
-          (_target, _user, move) => move.category !== MoveCategory.STATUS,
-          Stat.ATK,
-          -1,
-          false, // selfTarget=false: drop on the attacker
-        ),
-      ]);
+      // Drakelp Head — "Weakens the FIRST move taken and drops that attacker's
+      // Attack." A single consume-on-first-defend one-shot: only the first
+      // damaging hit of the battle is halved AND that attacker's Attack drops one
+      // stage, then the ability is spent (per-battle flag on waveData). The prior
+      // wiring blanket-halved everything in turn 1 and dropped ATK on EVERY hit.
+      return ok([new FirstDefendDamageReductionAbAttr(), new FirstDefendAttackerAtkDropAbAttr()]);
     case 933:
       // Polarity — "Increases the party's highest stat by 30%." Uses the
       // new PersistentFieldAuraAbAttr — 1.3x on all 5 main stats (gain
@@ -7256,9 +7268,14 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // from stat reductions, INCLUDING self-drops." Vanilla Mist (checked in
       // stat-stage-change-phase) only blocks OTHER-source drops (!selfTarget);
       // to also cover the holder's OWN drops (Overheat / Close Combat / Draco
-      // Meteor) while the Evaporate-set Mist is up, add a SelfStatDropImmunity
-      // gated on the holder's own side holding the MIST tag.
-      const mistSelfDropImmunity = new SelfStatDropImmunityAbAttr();
+      // Meteor) while the Evaporate-set Mist is up, add a self-drop immunity
+      // gated on the holder's own side holding the MIST tag. The field-wide
+      // variant (UserFieldSelfStatDropImmunityAbAttr) also shields the DOUBLES
+      // PARTNER's self-drops — the dex's "Mist protects the entire team from stat
+      // reductions, including self drops." (StatStageChangePhase consults it on
+      // the ally of any self-dropping mon; it still covers the holder itself
+      // because it extends SelfStatDropImmunityAbAttr.)
+      const mistSelfDropImmunity = new UserFieldSelfStatDropImmunityAbAttr();
       mistSelfDropImmunity.addCondition(pokemon => {
         const ownSide = pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
         return !!globalScene.arena.getTagOnSide(ArenaTagType.MIST, ownSide);
@@ -7422,8 +7439,13 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         }),
       ]);
     case 773:
-      // Soothsayer — "Resists all attacks for three turns on first entry."
-      return ok([new TimeLimitedDamageReductionAbAttr({ factor: 0.5, turns: 3 })]);
+      // Soothsayer — "On entry, all attacks received are considered not very
+      // effective for three turns." A time-boxed Tera-Shell-style effectiveness
+      // FLOOR (clamps the received type multiplier to 0.5x — a 2x/4x hit drops to
+      // 0.5x; an already-resisted hit is untouched), NOT a flat x0.5 damage cut.
+      // (The prior TimeLimitedDamageReduction over-reduced resisted hits and
+      // under-reduced super-effective ones.)
+      return ok([new TimeLimitedEffectivenessFloorAbAttr({ turns: 3 })]);
     case 808:
       // Malodor — "Suppresses attacker's abilities on contact."
       return ok([new SuppressAttackerAbilityAbAttr({ contactOnly: true })]);

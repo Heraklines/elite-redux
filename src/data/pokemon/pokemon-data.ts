@@ -503,6 +503,14 @@ export class PokemonWaveData {
    * the rest of the wave data; transient (not serialized).
    */
   public entryEffectsFired: Set<string> = new Set<string>();
+  /**
+   * Whether a "consume on first defend" ability (ER Drakelp Head 932) has already
+   * spent its one-shot this battle — it weakens only the FIRST damaging hit taken
+   * and drops that attacker's Attack once, then is inert for the rest of the
+   * encounter. Resets with the rest of the wave data (per-battle); transient (not
+   * serialized).
+   */
+  public firstDefendConsumed = false;
 }
 
 /**
