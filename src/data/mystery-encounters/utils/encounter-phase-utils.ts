@@ -695,13 +695,13 @@ export async function initBattleWithEnemyConfig(partyConfig: EnemyPartyConfig): 
  * battle party and REBUILD `battle.enemyParty` from it, replacing the guest's locally-rolled mons
  * so both clients fight the host's exact boss. Mirrors {@linkcode buildCoopEnemy}'s adopt path
  * (used at wave start) but keyed by the ME interaction since the battle spawns mid-wave. Fully
- * guarded: a timeout / bad entry leaves the locally-generated party in place (divergent but never
- * a hang). Pushes the adopted mons' load promises onto `loadEnemyAssets` (awaited by the caller).
+ * guarded: transport loss is replayed by key; a missing or malformed authority payload aborts this
+ * transition instead of retaining locally generated enemies. Pushes adopted asset loads to the caller.
  */
 async function adoptCoopMeBattleParty(battle: Battle, loadEnemyAssets: Promise<void>[]): Promise<void> {
   const enemies = await coopGuestAwaitMeBattleParty();
   if (enemies == null || enemies.length === 0) {
-    return; // no host party (timeout / not applicable) - keep the locally-generated one.
+    throw new Error("Authoritative co-op mystery battle party was empty");
   }
   const trainerSlot = battle.battleType === BattleType.TRAINER ? TrainerSlot.TRAINER : TrainerSlot.NONE;
   const rebuilt: EnemyPokemon[] = [];
@@ -717,9 +717,8 @@ async function adoptCoopMeBattleParty(battle: Battle, loadEnemyAssets: Promise<v
       rebuilt[entry.fieldIndex] = built;
     }
   }
-  // Only swap in the host's party if we reconstructed at least the lead - otherwise keep ours.
-  if (rebuilt[0] == null) {
-    return;
+  if (rebuilt[0] == null || rebuilt.filter(Boolean).length !== enemies.length) {
+    throw new Error("Authoritative co-op mystery battle party could not be reconstructed completely");
   }
   // Tear the locally-rolled mons off the field, then install the host's verbatim.
   for (const local of battle.enemyParty) {

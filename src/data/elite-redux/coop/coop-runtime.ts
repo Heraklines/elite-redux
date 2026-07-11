@@ -214,8 +214,8 @@ import {
   commitWaveAdvanceOwnerIntent,
   isCoopWaveAdvanceOperationEnabled,
   isValidCoopWaveAdvancePayload,
-  resolveCoopBiomeBoundaryFlag,
   resetCoopWaveAdvanceOperationState,
+  resolveCoopBiomeBoundaryFlag,
   setCoopWaveAdvanceOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-wave-operation";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
@@ -2582,8 +2582,8 @@ export function coopHostStreamMeBattleParty(): void {
 /**
  * GUEST (#633 ME battle handoff): await the host's authoritative ME-spawned-battle enemy party,
  * keyed by the ME interaction. Returns the host's serialized enemies for the caller to rebuild
- * `battle.enemyParty` from, or `null` when not applicable / on timeout (the guest then keeps its
- * own locally-rolled party - divergent but never a hang). Called from `initBattleWithEnemyConfig`.
+ * `battle.enemyParty` from, or `null` only when this is not an active guest handoff. A live handoff
+ * fails closed after its replay/reconnect ceiling; it never authorizes a locally rolled party.
  */
 export async function coopGuestAwaitMeBattleParty(timeoutMs?: number): Promise<CoopSerializedEnemy[] | null> {
   if (!coopMeHandoffActive() || active!.controller.role !== "guest") {
@@ -2594,14 +2594,13 @@ export async function coopGuestAwaitMeBattleParty(timeoutMs?: number): Promise<C
   try {
     const enemies = await active!.battleStream.awaitMeBattleEnemyParty(key, timeoutMs);
     if (enemies == null) {
-      coopWarn("me", `guest await ME-battle party TIMEOUT key=${key} -> keeping local party`);
-    } else {
-      coopLog("me", `guest await ME-battle party resolve key=${key} enemies=${enemies.length}`);
+      throw new Error(`Authoritative ME-battle party unavailable for ${key}; refusing local derivation`);
     }
+    coopLog("me", `guest await ME-battle party resolve key=${key} enemies=${enemies.length}`);
     return enemies;
   } catch (e) {
     coopWarn("me", `guest await ME-battle party failed key=${key}`, e);
-    return null;
+    throw e;
   }
 }
 

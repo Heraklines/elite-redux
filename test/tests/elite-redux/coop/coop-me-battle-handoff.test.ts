@@ -208,7 +208,7 @@ describe("co-op authoritative ME battle handoff (#633)", () => {
     guestStream.dispose();
   });
 
-  it("FIX: a stale/missing ME battle party times out to null (the guest falls back, never hangs)", async () => {
+  it("FIX: a stale/missing ME battle party times out to null so the production caller can fail closed", async () => {
     const { host, guest } = createLoopbackPair();
     const hostStream = new CoopBattleStreamer(host);
     const guestStream = new CoopBattleStreamer(guest);
@@ -216,7 +216,7 @@ describe("co-op authoritative ME battle handoff (#633)", () => {
     const key = meBattleHandoffKey(7, 0);
     // No host send: the await must resolve null after the (short, injected) timeout.
     const got = await guestStream.awaitMeBattleEnemyParty(key, 10);
-    expect(got, "a missing ME party times out to null - the guest generates its own, never hangs").toBeNull();
+    expect(got, "a missing ME party times out to null - it is never permission to use a local roll").toBeNull();
 
     hostStream.dispose();
     guestStream.dispose();

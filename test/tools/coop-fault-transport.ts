@@ -86,6 +86,7 @@ export const COOP_AUTHORITATIVE_TYPES: ReadonlySet<CoopMessageType> = new Set<Co
   "stateSync",
   "enemyPartySync",
   "launchSnapshot",
+  "meBattleEnemyPartySync",
   "rendezvous",
 ]);
 

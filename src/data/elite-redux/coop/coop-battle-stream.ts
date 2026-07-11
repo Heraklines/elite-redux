@@ -185,6 +185,8 @@ export class CoopBattleStreamer {
   private readonly meBattlePartyWaiters = new Map<string, (res: CoopSerializedEnemy[] | null) => void>();
   /** ME-battle key -> a party that arrived before its waiter (race buffer, #633 ME handoff). */
   private readonly meBattlePartyInbox = new Map<string, CoopSerializedEnemy[]>();
+  /** HOST: retained authoritative ME parties, re-answerable by exact interaction key after loss/reconnect. */
+  private readonly sentMeBattleParties = new Map<string, CoopSerializedEnemy[]>();
   /** Latest authoritative checkpoint (+ checksum) the guest has not yet applied. */
   private lastCheckpoint: CoopCheckpointEnvelope | null = null;
   /** Latest enemy party the guest has not yet adopted (consumed at the wave's first turn). */
@@ -278,6 +280,10 @@ export class CoopBattleStreamer {
         coopLog("stream", `guest RE-SEND requestLaunchSnapshot wave=${wave} after reconnect`);
         this.transport.send({ t: "requestLaunchSnapshot", wave });
       }
+      for (const key of this.meBattlePartyWaiters.keys()) {
+        coopLog("stream", `guest RE-SEND requestMeBattleEnemyParty key=${key} after reconnect`);
+        this.transport.send({ t: "requestMeBattleEnemyParty", key });
+      }
     });
     coopLog("stream", `streamer CONSTRUCT timeout=${this.timeoutMs}ms onMessage registered`);
   }
@@ -335,6 +341,15 @@ export class CoopBattleStreamer {
    * regardless of who OWNED the encounter.
    */
   sendMeBattleEnemyParty(key: string, enemies: CoopSerializedEnemy[]): void {
+    this.sentMeBattleParties.delete(key);
+    this.sentMeBattleParties.set(key, enemies);
+    while (this.sentMeBattleParties.size > 8) {
+      const oldest = this.sentMeBattleParties.keys().next().value;
+      if (oldest === undefined) {
+        break;
+      }
+      this.sentMeBattleParties.delete(oldest);
+    }
     coopLog("replay", `host SEND meBattleEnemyPartySync key=${key} count=${enemies.length}`);
     this.transport.send({ t: "meBattleEnemyPartySync", key, enemies });
   }
@@ -829,9 +844,9 @@ export class CoopBattleStreamer {
    * GUEST (#633, authoritative ME battle handoff): await the host's authoritative enemy party
    * for an ME-spawned battle keyed by `key` (`meBattleHandoffKey`). Resolves immediately with
    * the buffered party if the host already sent it, else waits for it, or resolves `null` on
-   * timeout (the guest then keeps its locally-rolled party - divergent but never a hang). The
-   * guest calls this at the ME battle handoff, BEFORE entering the battle, so it adopts the
-   * host's boss verbatim. Mirrors {@linkcode awaitEnemyParty} exactly, keyed by string.
+   * timeout. The waiter immediately requests replay of the host's retained keyed party and repeats
+   * that request after reconnect, so a lost first carrier cannot make the guest use a local roll.
+   * A null result is teardown/protocol failure and callers must fail closed.
    */
   awaitMeBattleEnemyParty(key: string, timeoutMs = this.timeoutMs): Promise<CoopSerializedEnemy[] | null> {
     // Already buffered for this key (the host raced ahead) -> consume + return immediately.
@@ -863,7 +878,7 @@ export class CoopBattleStreamer {
         if (res == null) {
           coopWarn(
             "stream",
-            `guest awaitMeBattleEnemyParty key=${key} -> null (timeout/superseded), guest keeps locally-rolled party`,
+            `guest awaitMeBattleEnemyParty key=${key} -> null (timeout/superseded), authoritative caller fails closed`,
           );
         } else {
           coopLog("stream", `guest awaitMeBattleEnemyParty key=${key} RESOLVE count=${res.length}`);
@@ -871,6 +886,8 @@ export class CoopBattleStreamer {
         resolve(res);
       };
       this.meBattlePartyWaiters.set(key, finish);
+      coopLog("stream", `guest SEND requestMeBattleEnemyParty key=${key}`);
+      this.transport.send({ t: "requestMeBattleEnemyParty", key });
       cancelTimer = this.schedule(() => finish(null), timeoutMs);
     });
   }
@@ -1211,6 +1228,7 @@ export class CoopBattleStreamer {
     this.enemyPartyWaiters.clear();
     this.meBattlePartyWaiters.clear();
     this.meBattlePartyInbox.clear();
+    this.sentMeBattleParties.clear();
     this.stateSyncWaiters.clear();
     this.stateSyncInbox.clear();
     this.inbox.clear();
@@ -1318,6 +1336,16 @@ export class CoopBattleStreamer {
           return;
         }
         this.meBattlePartyInbox.set(msg.key, msg.enemies);
+        return;
+      }
+      case "requestMeBattleEnemyParty": {
+        const enemies = this.sentMeBattleParties.get(msg.key);
+        if (enemies == null) {
+          coopWarn("stream", `host RECV requestMeBattleEnemyParty key=${msg.key} -> no retained party`);
+          return;
+        }
+        coopLog("stream", `host RECV requestMeBattleEnemyParty key=${msg.key} -> RESEND count=${enemies.length}`);
+        this.transport.send({ t: "meBattleEnemyPartySync", key: msg.key, enemies });
         return;
       }
       case "turnResolution": {

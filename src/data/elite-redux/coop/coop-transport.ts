@@ -57,7 +57,9 @@ export type CoopRole = "host" | "guest";
 // never continue against a local roll when the authoritative stream is lost.
 // er-coop-18: cross-branch rendezvous mismatches use an epoch-scoped, revisioned host phase route + guest
 // ACK. Older peers would ignore these frames and park, so mixed builds must refuse pairing explicitly.
-export const COOP_PROTOCOL_VERSION = "er-coop-18";
+// er-coop-19: mystery-battle enemy parties are retained and re-requestable by interaction key; a guest
+// refuses local enemy derivation when the authoritative carrier is lost or malformed.
+export const COOP_PROTOCOL_VERSION = "er-coop-19";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -1075,6 +1077,8 @@ export type CoopMessage =
    * battle is host-authoritative regardless of who OWNED the encounter.
    */
   | { t: "meBattleEnemyPartySync"; key: string; enemies: CoopSerializedEnemy[] }
+  /** Guest -> host: replay the retained authoritative ME-battle party for this exact interaction key. */
+  | { t: "requestMeBattleEnemyParty"; key: string }
   /**
    * Host -> guest (#633): the host's fetched GHOST-TEAM POOL. Ghost teams are pulled
    * per-client from the shared server pool, so the two clients otherwise download
@@ -1429,6 +1433,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `wave=${msg.wave}`;
     case "meBattleEnemyPartySync":
       return `key=${msg.key} enemies=${msg.enemies.length}`;
+    case "requestMeBattleEnemyParty":
+      return `key=${msg.key}`;
     case "ghostPool":
       return `pool=${msg.pool.length}`;
     case "battleEvent":
