@@ -495,3 +495,16 @@ moves/PP, co-op ownership, and periodic player/enemy HP progress. The same produ
 3 waves twice, the exact 12-wave lane-P depth passed with zero hard failures, and the independent-pair
 determinism contract passes 3/3 without a test-only content seed. A printed soak seed is now a complete
 content-plus-action replay key for the complete critical run.
+
+## 24. Operation-sanctioned boundary-tail enforcement
+
+`b01faa56f` closes the strict-tail residual. Strict sanction checks now default on and follow the main
+renderer mode: staging/default enforcement neutralizes an unsanctioned shared boundary tail, while the
+emergency renderer-observe rollback logs `TAIL WOULD-BLOCK` and lets it run. `ME_TERMINAL` publishes the
+exact leave/battle tail sanction before construction, alongside the existing `WAVE_ADVANCE` sanction.
+`EggLapsePhase` remains allowlisted but is correctly excluded from shared-operation sanctioning because egg
+state is deterministic and account-local, not shared-run control.
+
+The incompatible behavior bumps the pairing protocol to `er-coop-16`. Pure strict-tail coverage passes
+26/26; real wave-10/biome/ME/egg coverage passes 17/17 with enforcement active; capability/session
+handshake coverage passes 38/38. An older renderer cannot silently pair and run a locally derived tail.

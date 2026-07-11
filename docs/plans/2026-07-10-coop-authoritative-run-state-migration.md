@@ -1375,3 +1375,12 @@ progress. Evidence: two identical 3-wave production runs, the full 12-wave produ
 independent-pair determinism contract are green; the latter no longer relies on an explicit `pinSeed`.
 `3ca47791c` pre-seeds the critical soak entrypoints before `startBattle`, extending the replay guarantee to
 the bootstrap wave as well as every subsequent crossing.
+
+### 8.14 Strict-tail enforcement closure
+
+`b01faa56f` makes shared boundary sanctions fail closed under the default renderer enforcement. Wave tails
+must be sanctioned by `WAVE_ADVANCE`; mystery-encounter leave/battle tails are sanctioned by the adopted
+`ME_TERMINAL`. Renderer observe mode remains the emergency log-and-run rollback. Account-local deterministic
+`EggLapsePhase` is allowlisted but is not incorrectly modeled as shared operation control. Protocol
+`er-coop-16` prevents mixed enforcement builds from pairing. Evidence: 26/26 pure tail assertions, 17/17
+real wave/biome/ME/egg tests, and 38/38 session/capability tests.
