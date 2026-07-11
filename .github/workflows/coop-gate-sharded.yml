@@ -2,6 +2,17 @@ name: Co-op Gate (Sharded)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feat/elite-redux-port
+    paths:
+      - ".github/workflows/coop-gate-sharded.yml"
+      - "scripts/run-coop-gate.mjs"
+      - "src/**/coop/**"
+      - "src/phases/**"
+      - "src/system/**"
+      - "test/tests/elite-redux/coop/**"
+      - "test/tools/coop-*.ts"
 
 concurrency:
   group: coop-gate-sharded-${{ github.ref }}
