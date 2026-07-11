@@ -293,3 +293,31 @@ behavior is covered. Touched-file TypeScript diagnostics are zero and Biome repo
 
 Next per-mon surface: Revival Blessing (`REVIVAL`), followed by learn-move/batch, catch-full, and stormglass.
 The full gate, final long soak, and architecture residuals listed in section 13 remain open.
+
+## 15. Continuation evidence (per-mon operations: Revival Blessing)
+
+Revival Blessing is now migrated across both halves of its control path. `052e97a7e` is the
+failure-first carrier-loss suite; `ad2b1cfc2` adds the negotiated `opSurface.revival` capability,
+typed prompt/decision `REVIVAL` stream, `op:revival` durability class under `TURN_RESOLVE`, cold-resume
+revision floor, journal-first prompt commit, identity-tagged raw-prompt echo suppression, and
+lifecycle-bounded guest decision retry. The host commits the final species-resolved, legality-checked
+target (including its deterministic fallback), so traces state what actually mutated rather than an
+untrusted cursor. Host-owned local decisions are journaled for trace completeness. The flag-off path
+remains the original raw prompt/choice behavior.
+
+The existing two-engine probe contained a test-harness false negative: it deliberately parked the
+completed `CoopGuestRevivalPhase` ahead of `CoopFinalizeTurnPhase`, then asserted bench state before the
+normal turn authoritative state had applied. `216876617` records that apparent RED; `393fe355b` retires
+the completed picker exactly as production does and proves the unified per-turn authoritative state
+already carries the revived bench member. No redundant checkpoint schema was added.
+
+Proof: `coop-revival-operation.test.ts` passes 4/4 (flag-off fallback, raw-prompt loss, dual-carrier
+exactly-once, guest-choice loss/retry/cancellation). Capability, handshake, and recovery regression
+suites pass 27/27. The corrected real two-engine owner-pick probe passes with the guest-selected second
+fainted mon alive at identical HP on both engines, the first fainted fallback untouched, no phantom
+summon, matching checksum, and zero forced resyncs. Touched-file TypeScript diagnostics are zero; the
+repository-wide typecheck still reports unrelated pre-existing errors. Biome reports no errors.
+
+Next per-mon surfaces: learn-move and learn-move-batch, then catch-full and stormglass. Lobby/resume,
+renderer enforcement, quarantine/stat-stage cleanup, expanded model/soak coverage, the final
+drop-every-class campaign, and the full four-lane/final-long-soak gate remain open.
