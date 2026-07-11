@@ -126,6 +126,28 @@ function makeFlapPair(): { host: FlapTransport; guest: FlapTransport } {
 }
 
 describe("co-op lobby self-healing handshake (#868)", () => {
+  it("the host mints a nonzero operation epoch and the guest echoes the same epoch", async () => {
+    const { host, guest } = makeFlapPair();
+    const h = new CoopSessionController(host, { username: "Host", tiebreak: 1 });
+    const g = new CoopSessionController(guest, { username: "Guest", tiebreak: 2 });
+    h.connect();
+    g.connect();
+    await flush();
+    await flush();
+
+    const hostHello = host.sent.find((msg): msg is Extract<CoopMessage, { t: "hello" }> => msg.t === "hello");
+    const guestHellos = guest.sent.filter(
+      (msg): msg is Extract<CoopMessage, { t: "hello" }> => msg.t === "hello",
+    );
+    const epoch = (hostHello as unknown as { epoch?: number } | undefined)?.epoch;
+    expect(epoch, "host-authored epoch is carried in hello").toBeTypeOf("number");
+    expect(epoch).toBeGreaterThan(0);
+    expect(
+      guestHellos.some(msg => (msg as unknown as { epoch?: number }).epoch === epoch),
+      "guest echoes the adopted host epoch",
+    ).toBe(true);
+  });
+
   it("a delayed reply from an older resume offer cannot resolve the current offer", async () => {
     const { host, guest } = makeFlapPair();
     const h = new CoopSessionController(host, { username: "Host", tiebreak: 1 });
