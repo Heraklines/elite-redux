@@ -43,6 +43,13 @@ import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { isMegaStage, listEvolutionStages, listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
 import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
 import { collectShowdownLegalMoves, collectUnlockedEggMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
+import { rankByFilter } from "#data/elite-redux/showdown/showdown-search-normalize";
+import { exportShowdownSet, importShowdownSet } from "#data/elite-redux/showdown/showdown-set-codec";
+import {
+  listNamedSpeciesSets,
+  type ShowdownNamedSet,
+  saveNamedSpeciesSet,
+} from "#data/elite-redux/showdown/showdown-species-sets";
 import { MEGA_STONE_ITEM, type ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { Button } from "#enums/buttons";
@@ -163,7 +170,20 @@ export interface ShowdownSetEditorConfig {
    * (`dir` = -1 previous / +1 next). Absent when there is no sibling to cycle to.
    */
   onCycleTeam?: (dir: number) => void;
+  /** EXPORT set: copy the given PS-format set text to the clipboard (production wires navigator.clipboard). */
+  copyToClipboard?: (text: string) => void;
+  /** Deterministic initial Set Menu view (for the render recipes): the menu / import / load / save sub-state. */
+  initialSetMenu?: SetMenuView;
+  /** Deterministic initial Set Menu paste buffer (import view render recipe). */
+  initialSetMenuBuffer?: string;
+  /** Deterministic initial Set Menu notice banner (export-confirmation / import-error render recipe). */
+  initialSetMenuNotice?: string;
+  /** Deterministic named-set list injected for the load-list render recipe (production reads localStorage). */
+  demoNamedSets?: { name: string; text: string }[];
 }
+
+/** The Set Menu sub-state: closed, the option list, the paste-import modal, the load list, or the save-name prompt. */
+export type SetMenuView = "closed" | "menu" | "import" | "load" | "save";
 
 /** The edited result the flow wiring writes back into the team (stage + set). */
 export interface ShowdownEditorResult {
@@ -275,62 +295,11 @@ function categoryLabel(cat: MoveCategory): string {
   return MoveCategory[cat]?.charAt(0) ?? "?";
 }
 
-/**
- * Lowercase + strip apostrophes (straight AND curly) so a query and a name compare equal across the
- * punctuation a player never types: "kings" == "king's", "farfetchd" == "farfetch'd".
- */
-function stripSoftPunct(s: string): string {
-  return s.toLowerCase().replace(/['’‘]/g, "");
-}
-
-/**
- * Collapse ALL word separators (spaces + hyphens) after {@linkcode stripSoftPunct}, so a query typed with
- * no separators still prefix-matches the real name: "uturn" -> "U-turn", "stonee" -> "Stone Edge",
- * "kingsshield" -> "King's Shield". This is the separator-insensitive comparison key.
- */
-function collapseSearchKey(s: string): string {
-  return stripSoftPunct(s).replace(/[\s-]+/g, "");
-}
-
-/** The word tokens of a name (apostrophe-stripped, split on spaces + hyphens) for word-prefix ranking. */
-function searchWords(s: string): string[] {
-  return stripSoftPunct(s)
-    .split(/[\s-]+/)
-    .filter(Boolean);
-}
-
-/**
- * Typeahead ranking - Showdown-standard "autocomplete" order. Case-insensitive and separator-insensitive
- * (apostrophes/hyphens/spaces normalized on BOTH sides). A non-matching row is dropped; a match ranks by
- * tier, then alphabetically within a tier:
- *   (0) EXACT PREFIX  - the whole name starts with the query ("ea" -> Earthquake; "sto" -> Stone Edge;
- *       "kings" -> King's Shield; "uturn" -> U-turn).
- *   (1) WORD PREFIX   - a later word starts with the query ("sto" -> Bleakwind Storm's "Storm").
- *   (2) SUBSTRING     - the query appears anywhere else.
- * So a one-char "e" surfaces every Earthquake-class prefix match above a mere substring hit like "Blaze".
- * Exported for the ranking-matrix unit tests.
- */
-export function rankByFilter<T>(items: T[], nameOf: (item: T) => string, filter: string): T[] {
-  const fKey = collapseSearchKey(filter);
-  if (fKey.length === 0) {
-    return [...items].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
-  }
-  const tierOf = (name: string): number => {
-    const nameKey = collapseSearchKey(name);
-    if (nameKey.startsWith(fKey)) {
-      return 0;
-    }
-    if (searchWords(name).some(word => word.startsWith(fKey))) {
-      return 1;
-    }
-    return nameKey.includes(fKey) ? 2 : 3;
-  };
-  return items
-    .map(item => ({ item, name: nameOf(item), tier: tierOf(nameOf(item)) }))
-    .filter(entry => entry.tier < 3)
-    .sort((a, b) => (a.tier === b.tier ? a.name.localeCompare(b.name) : a.tier - b.tier))
-    .map(entry => entry.item);
-}
+// The separator-insensitive name normalization + typeahead ranking now live in the PURE
+// `showdown-search-normalize` module so the PS-format text codec resolves names through the SAME
+// comparison. Re-exported here (from the local import above) so existing importers - the
+// search-matrix unit tests - keep resolving `rankByFilter` from this handler module unchanged.
+export { rankByFilter };
 
 export class ShowdownSetEditorUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
@@ -346,8 +315,24 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   /** A pending Done-time rule violation (mega budget / cost cap / ...), shown inline until the set is fixed. */
   private validationError: string | null = null;
   private textInput: ShowdownEditorTextInput | null = null;
+  /** The MULTILINE paste capture for the Set Menu's Import (separate from the single-line search/save input). */
+  private pasteInput: ShowdownEditorTextInput | null = null;
   /** Full-sprite atlas keys already requested this session (avoid re-queuing the same async load). */
   private requestedSpriteKeys = new Set<string>();
+
+  // ---- Set Menu (Save / Load / Export / Import a single set; STATS opens it) --------------------
+  /** The Set Menu sub-state: closed / the option list / paste-import / load list / save-name prompt. */
+  private setMenu: SetMenuView = "closed";
+  /** Cursor within the Set Menu option list. */
+  private setMenuCursor = 0;
+  /** Cursor within the load list. */
+  private setLoadCursor = 0;
+  /** The named sets shown in the load list (snapshotted when the load view opens). */
+  private setLoadList: ShowdownNamedSet[] = [];
+  /** The import paste buffer / the save-name buffer (the active one depends on the view). */
+  private setMenuBuffer = "";
+  /** A transient Set Menu notice (export confirmation / import error), cleared on the next input. */
+  private setMenuNotice: string | null = null;
 
   constructor() {
     super(UiMode.SHOWDOWN_SET_EDITOR);
@@ -356,6 +341,11 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   /** The flow injects the mobile hidden-input bridge (keyboard/controller need none). */
   setTextInput(input: ShowdownEditorTextInput | null): void {
     this.textInput = input;
+  }
+
+  /** The flow injects the MULTILINE paste bridge for the Set Menu's Import (a `DomShowdownPasteInput`). */
+  setPasteInput(input: ShowdownEditorTextInput | null): void {
+    this.pasteInput = input;
   }
 
   setup(): void {
@@ -387,6 +377,13 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.paneCursor = config.initialPaneCursor ?? 0;
     this.paneScroll = 0;
     this.validationError = null;
+    // Set Menu (deterministic knobs for the render recipes; live opens fresh at STATS).
+    this.setMenu = config.initialSetMenu ?? "closed";
+    this.setMenuCursor = 0;
+    this.setLoadCursor = 0;
+    this.setLoadList = this.setMenu === "load" ? this.currentNamedSets() : [];
+    this.setMenuBuffer = config.initialSetMenuBuffer ?? "";
+    this.setMenuNotice = config.initialSetMenuNotice ?? null;
     this.container.setVisible(true);
     if (this.paneOpen) {
       this.ensurePaneCursorVisible();
@@ -428,6 +425,10 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   processInput(button: Button): boolean {
     if (this.config == null) {
       return false;
+    }
+    // The Set Menu (Save / Load / Export / Import) captures input while any of its views is open.
+    if (this.setMenu !== "closed") {
+      return this.processSetMenuInput(button);
     }
     return this.paneOpen ? this.processPaneInput(button) : this.processFieldInput(button);
   }
@@ -487,12 +488,13 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         handled = this.cycleNature(1);
         break;
       case Button.STATS:
-        // Shoulder: page to the PREVIOUS already-picked team mon.
-        handled = this.cycleTeam(-1);
+        // Shoulder / C: open the SET MENU (Save / Load / Export / Import this one set). Team cycling stays
+        // fully reachable on G (prev) / V (next), so repurposing the redundant shoulder loses nothing.
+        handled = this.openSetMenu();
         break;
       case Button.CYCLE_GENDER:
-        // G hotkey: PREVIOUS team mon (a keyboard-reachable partner to the shoulder; free key, no
-        // collision with the F/R/E/N field hotkeys or the arrows, and printable-suppressed while typing).
+        // G hotkey: PREVIOUS team mon (a keyboard-reachable partner to V; free key, no collision with the
+        // F/R/E/N field hotkeys or the arrows, and printable-suppressed while typing).
         handled = this.cycleTeam(-1);
         break;
       case Button.CYCLE_TERA:
@@ -506,13 +508,316 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     return handled;
   }
 
-  /** Switch which already-picked team mon the editor is shaping (shoulder / G / V). No-op if unwired. */
+  /** Switch which already-picked team mon the editor is shaping (G / V). No-op if unwired. */
   private cycleTeam(dir: number): boolean {
     if (this.config?.onCycleTeam == null) {
       return false;
     }
     this.config.onCycleTeam(dir);
     return true;
+  }
+
+  // ---- Set Menu: Save / Load / Export / Import this single set ---------------------------------
+
+  private static readonly SET_MENU_OPTIONS = ["Export set", "Import set", "Save set", "Load set"] as const;
+
+  /** The current set as a wire manifest, so it can be exported / remembered / round-tripped through the codec. */
+  private currentManifest(): ShowdownMonManifest {
+    const cfg = this.config!;
+    const moveset = cfg.set.moves.filter((m): m is MoveId => m != null);
+    return {
+      speciesId: cfg.stage.speciesId,
+      formIndex: cfg.stage.formIndex,
+      level: 100,
+      shiny: cfg.set.shiny,
+      variant: cfg.set.variant,
+      abilityIndex: cfg.set.abilityIndex,
+      nature: cfg.set.nature,
+      ivs: [31, 31, 31, 31, 31, 31],
+      moveset,
+      item: cfg.set.item,
+      rootSpeciesId: cfg.rootSpeciesId,
+      erBlackShiny: false,
+      baseCost: cfg.team[cfg.activeSlot]?.baseCost ?? 0,
+    };
+  }
+
+  /** This species' named sets (production reads localStorage; the render recipe injects `demoNamedSets`). */
+  private currentNamedSets(): ShowdownNamedSet[] {
+    return this.config?.demoNamedSets ?? listNamedSpeciesSets(this.config!.rootSpeciesId);
+  }
+
+  /** STATS: open the Set Menu option list (closes any open search pane + native capture first). */
+  private openSetMenu(): boolean {
+    this.paneOpen = false;
+    this.filter = "";
+    this.syncCapture();
+    this.setMenu = "menu";
+    this.setMenuCursor = 0;
+    this.setMenuNotice = null;
+    this.render();
+    return true;
+  }
+
+  private closeSetMenu(): void {
+    this.setMenu = "closed";
+    this.setMenuBuffer = "";
+    this.setMenuNotice = null;
+    this.pasteInput?.close();
+    this.textInput?.close();
+    this.render();
+  }
+
+  private processSetMenuInput(button: Button): boolean {
+    switch (this.setMenu) {
+      case "import":
+        return this.processSetImportInput(button);
+      case "save":
+        return this.processSetSaveInput(button);
+      case "load":
+        return this.processSetLoadInput(button);
+      default:
+        return this.processSetMenuListInput(button);
+    }
+  }
+
+  private processSetMenuListInput(button: Button): boolean {
+    const n = ShowdownSetEditorUiHandler.SET_MENU_OPTIONS.length;
+    switch (button) {
+      case Button.UP:
+        this.setMenuNotice = null;
+        this.setMenuCursor = (this.setMenuCursor - 1 + n) % n;
+        this.render();
+        return true;
+      case Button.DOWN:
+        this.setMenuNotice = null;
+        this.setMenuCursor = (this.setMenuCursor + 1) % n;
+        this.render();
+        return true;
+      case Button.ACTION:
+      case Button.SUBMIT:
+        this.selectSetMenuOption();
+        return true;
+      case Button.CANCEL:
+      case Button.MENU:
+      case Button.STATS:
+        this.closeSetMenu();
+        this.getUi().playSelect();
+        return true;
+      default:
+        return true; // swallow the field hotkeys while the menu is open
+    }
+  }
+
+  private selectSetMenuOption(): void {
+    switch (ShowdownSetEditorUiHandler.SET_MENU_OPTIONS[this.setMenuCursor]) {
+      case "Export set":
+        this.doExportSet();
+        break;
+      case "Import set":
+        this.beginSetImport();
+        break;
+      case "Save set":
+        this.beginSetSave();
+        break;
+      case "Load set":
+        this.beginSetLoad();
+        break;
+    }
+  }
+
+  /** Export the current set to the clipboard + a confirmation notice (stays in the menu). */
+  private doExportSet(): void {
+    const text = exportShowdownSet(this.currentManifest());
+    this.config!.copyToClipboard?.(text);
+    this.setMenuNotice = "Copied this set to the clipboard.";
+    this.getUi().playSelect();
+    this.render();
+  }
+
+  // -- Import a pasted set into the editor ------------------------------------------------------
+
+  private beginSetImport(): void {
+    this.setMenu = "import";
+    this.setMenuBuffer = "";
+    this.setMenuNotice = null;
+    this.pasteInput?.open("", value => {
+      this.setMenuBuffer = value;
+      this.render();
+    });
+    this.render();
+  }
+
+  private processSetImportInput(button: Button): boolean {
+    switch (button) {
+      case Button.ACTION:
+      case Button.SUBMIT:
+        this.submitSetImport();
+        return true;
+      case Button.CANCEL:
+        if (this.setMenuBuffer.length > 0 && this.pasteInput != null) {
+          return true; // the DOM input edits the buffer (back = delete a char)
+        }
+        this.pasteInput?.close();
+        this.setMenu = "menu";
+        this.render();
+        return true;
+      case Button.MENU:
+        this.pasteInput?.close();
+        this.setMenu = "menu";
+        this.render();
+        return true;
+      default:
+        return true;
+    }
+  }
+
+  /** Parse the pasted set and apply it if it belongs to THIS line; otherwise explain per-mon. */
+  private submitSetImport(): void {
+    const parsed = importShowdownSet(this.setMenuBuffer);
+    this.pasteInput?.close();
+    if (parsed.manifest == null) {
+      this.setMenu = "menu";
+      this.setMenuNotice = parsed.errors[0]?.message ?? "Could not read that set.";
+      this.getUi().playError();
+      this.render();
+      return;
+    }
+    const mon = parsed.manifest;
+    // The editor edits ONE line: a pasted set for a different species can't be applied here.
+    if (mon.rootSpeciesId !== this.config!.rootSpeciesId) {
+      const name = getPokemonSpecies(mon.speciesId as SpeciesId)?.name ?? `#${mon.speciesId}`;
+      this.setMenu = "menu";
+      this.setMenuNotice = `That set is for ${name}, not this line.`;
+      this.getUi().playError();
+      this.render();
+      return;
+    }
+    this.applyManifest(mon);
+    this.setMenu = "closed";
+    this.setMenuNotice = null;
+    this.getUi().playSelect();
+    this.render();
+  }
+
+  /** Overwrite the editor's stage + set from an imported/loaded manifest for THIS line. */
+  private applyManifest(mon: ShowdownMonManifest): void {
+    const cfg = this.config!;
+    cfg.stage = { speciesId: mon.speciesId, formIndex: mon.formIndex };
+    cfg.set.abilityIndex = Math.max(0, Math.min(mon.abilityIndex, 2));
+    cfg.set.item = mon.item;
+    cfg.set.nature = mon.nature ?? cfg.set.nature;
+    cfg.set.moves = [0, 1, 2, 3].map(i => (mon.moveset[i] ?? null) as MoveId | null);
+    // Shiny stays a per-mon identity pick unless the pasted variant is owned.
+    if (mon.shiny && cfg.unlocks.ownedVariants.includes(mon.variant)) {
+      cfg.set.shiny = true;
+      cfg.set.variant = mon.variant;
+    }
+    this.validationError = null;
+  }
+
+  // -- Save the current set under a name --------------------------------------------------------
+
+  private beginSetSave(): void {
+    this.setMenu = "save";
+    this.setMenuBuffer = "";
+    this.setMenuNotice = null;
+    this.textInput?.open("", value => {
+      this.setMenuBuffer = value;
+      this.render();
+    });
+    this.render();
+  }
+
+  private processSetSaveInput(button: Button): boolean {
+    switch (button) {
+      case Button.ACTION:
+      case Button.SUBMIT:
+        this.commitSetSave();
+        return true;
+      case Button.CANCEL:
+        if (this.setMenuBuffer.length > 0 && this.textInput != null) {
+          return true; // back = delete a char
+        }
+        this.textInput?.close();
+        this.setMenu = "menu";
+        this.render();
+        return true;
+      case Button.MENU:
+        this.textInput?.close();
+        this.setMenu = "menu";
+        this.render();
+        return true;
+      default:
+        return true;
+    }
+  }
+
+  private commitSetSave(): void {
+    const name = this.setMenuBuffer.trim();
+    this.textInput?.close();
+    if (name.length > 0) {
+      saveNamedSpeciesSet(this.config!.rootSpeciesId, name, exportShowdownSet(this.currentManifest()));
+      this.setMenuNotice = `Saved as "${name.slice(0, 24)}".`;
+      this.getUi().playSelect();
+    }
+    this.setMenu = "menu";
+    this.render();
+  }
+
+  // -- Load a named set -------------------------------------------------------------------------
+
+  private beginSetLoad(): void {
+    this.setLoadList = this.currentNamedSets();
+    this.setLoadCursor = 0;
+    this.setMenu = "load";
+    this.setMenuNotice = null;
+    this.render();
+  }
+
+  private processSetLoadInput(button: Button): boolean {
+    const n = this.setLoadList.length;
+    switch (button) {
+      case Button.UP:
+        if (n > 0) {
+          this.setLoadCursor = (this.setLoadCursor - 1 + n) % n;
+          this.render();
+        }
+        return true;
+      case Button.DOWN:
+        if (n > 0) {
+          this.setLoadCursor = (this.setLoadCursor + 1) % n;
+          this.render();
+        }
+        return true;
+      case Button.ACTION:
+      case Button.SUBMIT: {
+        const entry = this.setLoadList[this.setLoadCursor];
+        if (entry == null) {
+          this.getUi().playError();
+          return true;
+        }
+        const parsed = importShowdownSet(entry.text);
+        if (parsed.manifest != null && parsed.manifest.rootSpeciesId === this.config!.rootSpeciesId) {
+          this.applyManifest(parsed.manifest);
+          this.closeSetMenu();
+          this.getUi().playSelect();
+        } else {
+          this.setMenu = "menu";
+          this.setMenuNotice = "That saved set no longer fits this line.";
+          this.getUi().playError();
+          this.render();
+        }
+        return true;
+      }
+      case Button.CANCEL:
+      case Button.MENU:
+        this.setMenu = "menu";
+        this.render();
+        return true;
+      default:
+        return true;
+    }
   }
 
   private processPaneInput(button: Button): boolean {
@@ -977,6 +1282,127 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     if (this.validationError != null) {
       this.renderValidationBanner();
     }
+    // The Set Menu (Save / Load / Export / Import) draws over everything while open.
+    if (this.setMenu !== "closed") {
+      this.renderSetMenu();
+    }
+  }
+
+  // -- Set Menu overlays ------------------------------------------------------------------------
+
+  private renderSetMenu(): void {
+    this.fill(0, 0, SCREEN_W, SCREEN_H, 0x000000, 0.6);
+    if (this.setMenu === "import") {
+      this.renderSetImportModal();
+      return;
+    }
+    if (this.setMenu === "save") {
+      this.renderSetSaveModal();
+      return;
+    }
+    if (this.setMenu === "load") {
+      this.renderSetLoadList();
+      return;
+    }
+    this.renderSetMenuList();
+  }
+
+  private renderSetMenuList(): void {
+    const bw = 140;
+    const opts = ShowdownSetEditorUiHandler.SET_MENU_OPTIONS;
+    const bh = 26 + opts.length * 12;
+    const bx = (SCREEN_W - bw) / 2;
+    const by = (SCREEN_H - bh) / 2;
+    this.add(addWindow(bx, by, bw, bh));
+    this.fill(bx + 2, by + 2, bw - 4, bh - 4, 0x0d1524, 1);
+    this.text(bx + 8, by + 5, "SET MENU", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+    opts.forEach((opt, i) => {
+      const oy = by + 16 + i * 12;
+      const focused = i === this.setMenuCursor;
+      this.fill(bx + 6, oy, bw - 12, 10, focused ? ACCENT : CELL_DIM, 1);
+      if (focused) {
+        this.fill(bx + 6, oy, 2, 10, GOLD, 1);
+      }
+      this.text(bx + 12, oy + 2, opt, focused ? TextStyle.SUMMARY_GOLD : TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    });
+    const footer = this.setMenuNotice ?? "Enter: choose    Esc: close";
+    this.text(
+      bx + 8,
+      by + bh - 9,
+      this.clip(footer, 44),
+      this.setMenuNotice ? TextStyle.SUMMARY_GREEN : TextStyle.SUMMARY_GRAY,
+      0,
+      FONT_TINY,
+    );
+  }
+
+  private renderSetImportModal(): void {
+    const bw = 240;
+    const bh = 92;
+    const bx = (SCREEN_W - bw) / 2;
+    const by = (SCREEN_H - bh) / 2;
+    this.add(addWindow(bx, by, bw, bh));
+    this.fill(bx + 2, by + 2, bw - 4, bh - 4, 0x0d1524, 1);
+    this.text(bx + 8, by + 5, "IMPORT SET", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+    this.text(bx + 8, by + 14, "Paste one Showdown set for this line.", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    const fieldY = by + 24;
+    const fieldH = bh - 24 - 12;
+    this.fill(bx + 8, fieldY, bw - 16, fieldH, CELL_DIM, 1);
+    this.outline(bx + 8, fieldY, bw - 16, fieldH, GOLD);
+    const lines = (this.setMenuBuffer.length > 0 ? this.setMenuBuffer : "(paste here)").split("\n").slice(0, 6);
+    lines.forEach((ln, i) => {
+      const style = this.setMenuBuffer.length > 0 ? TextStyle.WINDOW : TextStyle.SHADOW_TEXT;
+      const caret = this.setMenuBuffer.length > 0 && i === lines.length - 1 ? "_" : "";
+      this.text(bx + 11, fieldY + 2 + i * 7, this.clip(`${ln}${caret}`, 74), style, 0, FONT_TINY);
+    });
+    this.text(bx + 8, by + bh - 9, "Enter: import    Esc: back", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+  }
+
+  private renderSetSaveModal(): void {
+    const bw = 200;
+    const bh = 40;
+    const bx = (SCREEN_W - bw) / 2;
+    const by = (SCREEN_H - bh) / 2;
+    this.add(addWindow(bx, by, bw, bh));
+    this.fill(bx + 2, by + 2, bw - 4, bh - 4, 0x0d1524, 1);
+    this.text(bx + 8, by + 5, "SAVE SET AS", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+    this.fill(bx + 8, by + 16, bw - 16, 12, CELL_DIM, 1);
+    this.outline(bx + 8, by + 16, bw - 16, 12, GOLD);
+    const shown = this.setMenuBuffer.length > 0 ? this.setMenuBuffer : "Set";
+    this.text(bx + 12, by + 18, `${this.clip(shown, 30)}_`, TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+    this.text(bx + 8, by + 30, "Enter: save    Esc: back", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+  }
+
+  private renderSetLoadList(): void {
+    const bw = 200;
+    const rows = Math.max(1, Math.min(this.setLoadList.length, 6));
+    const bh = 24 + rows * 11;
+    const bx = (SCREEN_W - bw) / 2;
+    const by = (SCREEN_H - bh) / 2;
+    this.add(addWindow(bx, by, bw, bh));
+    this.fill(bx + 2, by + 2, bw - 4, bh - 4, 0x0d1524, 1);
+    this.text(bx + 8, by + 5, "LOAD SET", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+    if (this.setLoadList.length === 0) {
+      this.text(bx + 8, by + 18, "No saved sets for this line yet.", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    } else {
+      this.setLoadList.slice(0, 6).forEach((entry, i) => {
+        const ly = by + 15 + i * 11;
+        const focused = i === this.setLoadCursor;
+        this.fill(bx + 6, ly, bw - 12, 9, focused ? ACCENT : CELL_DIM, 1);
+        if (focused) {
+          this.fill(bx + 6, ly, 2, 9, GOLD, 1);
+        }
+        this.text(
+          bx + 12,
+          ly + 1,
+          this.clip(entry.name, 30),
+          focused ? TextStyle.SUMMARY_GOLD : TextStyle.SUMMARY_GRAY,
+          0,
+          FONT_TINY,
+        );
+      });
+    }
+    this.text(bx + 8, by + bh - 9, "Enter: load    Esc: back", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
   }
 
   /** A centered red refusal banner shown when Done is rejected - the specific rule message. */
@@ -1090,8 +1516,10 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     // wired team cycling (a live build with >1 slot). Discoverable keyboard partners to the shoulders.
     if (this.config?.onCycleTeam != null) {
       x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_GENDER, "G.png", "Prev");
-      this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_TERA, "V.png", "Next Mon");
+      x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_TERA, "V.png", "Next Mon");
     }
+    // The SET MENU (Save / Load / Export / Import this set) on the STATS shoulder / C.
+    this.hotkey(x, SettingKeyboard.BUTTON_STATS, "C.png", "Sets");
     // Leave + commit hints on the right (Esc = back out to the grid; Enter = commit). These use WIDE
     // glyphs (ESC / ENTER), so their labels sit further right than the narrow-letter hotkeys.
     const doneW = "Done".length * 3.0 + 22;
@@ -1682,9 +2110,14 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     super.clear();
     this.clearDynamic();
     this.textInput?.close();
+    this.pasteInput?.close();
     this.container.setVisible(false);
     this.config = null;
     this.validationError = null;
+    this.setMenu = "closed";
+    this.setMenuBuffer = "";
+    this.setMenuNotice = null;
+    this.setLoadList = [];
     this.requestedSpriteKeys.clear();
   }
 }

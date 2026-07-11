@@ -44,6 +44,7 @@ import {
   renderErShinyLabLook,
 } from "#data/elite-redux/er-shiny-lab-renderer";
 import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
+import { copyTextToClipboard } from "#data/elite-redux/showdown/showdown-clipboard";
 import { isMegaStage, listEvolutionStages, listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
 import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
 import { collectShowdownLegalMoves, collectUnlockedEggMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
@@ -119,7 +120,7 @@ import { MessageUiHandler } from "#ui/message-ui-handler";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { PokemonIconAnimHelper, PokemonIconAnimMode } from "#ui/pokemon-icon-anim-helper";
 import { ScrollBar } from "#ui/scroll-bar";
-import { DomShowdownEditorTextInput } from "#ui/showdown-editor-text-input";
+import { DomShowdownEditorTextInput, DomShowdownPasteInput } from "#ui/showdown-editor-text-input";
 import type {
   ShowdownEditorSet,
   ShowdownEditorStage,
@@ -4026,6 +4027,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // The registered handler instance is reused across opens, so re-injecting each open is harmless.
     const editor = ui.handlers[UiMode.SHOWDOWN_SET_EDITOR] as ShowdownSetEditorUiHandler | undefined;
     editor?.setTextInput(new DomShowdownEditorTextInput());
+    editor?.setPasteInput(new DomShowdownPasteInput()); // multiline capture for the Set Menu's Import
     // TEAM CYCLE (G / V / shoulder): when the editor is ALREADY the active mode, this is a slot switch,
     // not a fresh open. `setOverlayMode(SHOWDOWN_SET_EDITOR)` would then be a NO-OP - `setModeInternal`
     // early-returns on `this.mode === mode`, so the editor would keep rendering the OLD slot and G/V/
@@ -4140,6 +4142,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       // it empty (init gated on the callback arg).
       onCancel: () => void this.getUi().revertMode(),
       onCycleTeam: dir => this.cycleShowdownEditorTeam(editIndex, dir),
+      // Set Menu Export: copy the PS-format set text to the clipboard (guarded util; headless = no-op).
+      copyToClipboard: text => copyTextToClipboard(text),
     };
   }
 

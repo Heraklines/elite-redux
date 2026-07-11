@@ -1018,6 +1018,49 @@ const RECIPES: Record<string, Recipe> = {
     ],
     diffTolerance: 0,
   },
+  // P2 SET MENU (STATS/C): the Save / Load / Export / Import option list over the editor.
+  "showdown-editor-set-menu": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [buildShowdownEditorDemoConfig({ initialSetMenu: "menu" })],
+    diffTolerance: 0,
+  },
+  // P2 EXPORT confirmation: the Set Menu list with the "copied to clipboard" notice in its footer.
+  "showdown-editor-set-export": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [
+      buildShowdownEditorDemoConfig({
+        initialSetMenu: "menu",
+        initialSetMenuNotice: "Copied this set to the clipboard.",
+      }),
+    ],
+    diffTolerance: 0,
+  },
+  // P2 IMPORT SET paste modal (single set) over the editor.
+  "showdown-editor-set-import": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [
+      buildShowdownEditorDemoConfig({
+        initialSetMenu: "import",
+        initialSetMenuBuffer:
+          "Garchomp @ Life Orb  [Stage: Base]\nAbility: Rough Skin\nNature: Adamant\n- Earthquake\n- Scale Shot",
+      }),
+    ],
+    diffTolerance: 0,
+  },
+  // P2 LOAD SET named-set list (injected demoNamedSets so the golden is deterministic).
+  "showdown-editor-set-load": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [
+      buildShowdownEditorDemoConfig({
+        initialSetMenu: "load",
+        demoNamedSets: [
+          { name: "Sand Sweeper", text: "Garchomp @ Life Orb\n- Earthquake" },
+          { name: "Bulky SD", text: "Garchomp @ Leftovers\n- Swords Dance" },
+        ],
+      }),
+    ],
+    diffTolerance: 0,
+  },
   // Showdown TEAM PRESET MENU (addendum): the pre-pairing entry screen. Left = stylish preset boxes
   // (name + validity marker + 6 mini icons) with a trailing create box; right = the hovered mon's
   // full sprite + ability/innates + item + moveset (live preview). Multi-team with hover preview on
