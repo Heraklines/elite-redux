@@ -8,11 +8,8 @@ on:
     paths:
       - ".github/workflows/coop-gate-sharded.yml"
       - "scripts/run-coop-gate.mjs"
-      - "src/**/coop/**"
-      - "src/phases/**"
-      - "src/system/**"
-      - "test/tests/elite-redux/coop/**"
-      - "test/tools/coop-*.ts"
+      - "src/**"
+      - "test/**"
 
 concurrency:
   group: coop-gate-sharded-${{ github.ref }}
@@ -60,11 +57,15 @@ jobs:
             --shard "${{ matrix.shard }}/${{ matrix.total }}" \
             2>&1 | tee "coop-gate-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log"
 
-      - name: Upload shard log
+      - name: Upload shard diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coop-gate-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}
-          path: coop-gate-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log
+          path: |
+            coop-gate-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log
+            dev-logs/coop-duo/**
+            dev-logs/coop-soak/**
+            .vitest-reports/blob.json
           retention-days: 7
           if-no-files-found: warn

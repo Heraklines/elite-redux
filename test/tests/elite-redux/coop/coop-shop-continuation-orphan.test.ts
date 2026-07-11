@@ -77,11 +77,7 @@ function makeStubScene(): BattleScene {
       setMode(): Promise<boolean> {
         return Promise.resolve(true);
       },
-      showText(
-        _text: string,
-        _delay: unknown,
-        callback?: (() => void) | null,
-      ): void {
+      showText(_text: string, _delay: unknown, callback?: (() => void) | null): void {
         callback?.();
       },
       showTextPromise(): Promise<void> {
@@ -132,6 +128,8 @@ function driveGuestLearnMove(phase: LearnMovePhase): void {
     getNameToRender: () => "Stubmon",
     species: { getName: () => "Stubmon" },
     isEnemy: () => false,
+    // Pure-renderer guest seam: learning the mirrored move must not mutate the local achievement run.
+    isPlayer: () => false,
   };
   const fn = (phase as unknown as Record<string, (...args: unknown[]) => void>).coopAuthoritativeLearnMove;
   fn.call(phase, pokemon.moveset, { id: MoveId.TACKLE, name: "Tackle" }, pokemon);

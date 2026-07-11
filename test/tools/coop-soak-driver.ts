@@ -1609,7 +1609,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     beforeHostCross?: () => void,
   ): Promise<void> => {
     const point = `cmd:${wave}:${turn}`;
-    withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.arrive(point));
+    withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.reannounce(point));
     await drainLoopback();
     await withClient(rig.hostCtx, async () => {
       beforeHostCross?.();
@@ -1727,6 +1727,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // are far tougher, and DO KO the host) - the SwitchPhase parked forever.
         armHostFaintAutoPick();
       });
+      const waveWon = rig.hostScene.currentBattle.enemyParty.every(e => e.isFainted());
+      if (!waveWon) {
+        // The authoritative queue can leave TurnEndPhase and reach the next CommandPhase while the
+        // guest is still rendering this turn. Announce the replay guest's independent readiness
+        // before that presentation work so the strict reciprocal barrier cannot become one-sided.
+        withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.reannounce(`cmd:${wave}:${turn + 1}`));
+        await drainLoopback();
+      }
       await withClient(rig.guestCtx, () => driveGuestReplayTurnWithFaint(rig, turn));
 
       if (t === 0 || (t + 1) % 10 === 0) {
@@ -1741,11 +1749,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         );
       }
 
-      if (rig.hostScene.currentBattle.enemyParty.every(e => e.isFainted())) {
+      if (waveWon) {
         return;
       }
       // Not won yet: advance the host to the next turn's CommandPhase for another round.
-      await crossCommandBoundaryWithReplayGuest(wave, rig.hostScene.currentBattle.turn);
+      // TurnInitPhase increments `currentBattle.turn` while crossing, so the point the guest must
+      // pre-arrive is the NEXT turn, not the just-completed turn still visible at TurnEndPhase.
+      await crossCommandBoundaryWithReplayGuest(wave, turn + 1);
     }
     fail("no-park", wave, `wave did not complete within ${MAX_TURNS_PER_WAVE} turns (enemies never all fainted)`);
   };
@@ -2121,9 +2131,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     }
 
     // ===== TURN 2: HOST throws the ball at the lone survivor via the REAL BALL menu -> AttemptCapturePhase. =====
-    await withClient(rig.hostCtx, async () => {
+    await crossCommandBoundaryWithReplayGuest(wave, turn1 + 1, () => {
       armHostFaintAutoPick(); // drive any host faint replacement opened on this crossing
-      await game.phaseInterceptor.to("CommandPhase");
     });
     // Grant the host a catch ball (a determinism knob, like the moveset override), reconcile the guest so the
     // checksum stays matched, then SCOPE the dexSync delta to this catch (the run-start baseline). Done HERE
@@ -2292,8 +2301,20 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       `[coop-soak] LEARN-MOVE wave ${wave} (seed ${seed}): host=[${hostMoves.join(",")}] guest=[${guestMoves.join(",")}]`,
     );
 
-    // Clear any leftover batch-panel phases on the guest, then play the wave + shop as normal.
+    // Clear any leftover batch-panel phases on the guest. This specialized seam deliberately opened the
+    // batch panel on top of an already-materialized slot-0 CommandPhase; mirrored panel input can advance
+    // that synthetic old prompt to slot 1. Rebuild this SAME turn through TurnInitPhase (which queues both
+    // player commands, enemy commands, and TurnStart; it does not increment the battle turn) so combat
+    // resumes from a complete clean queue rather than only the two UI phases.
     withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.clearPhaseQueue());
+    await withClient(rig.hostCtx, async () => {
+      await rig.hostScene.ui.setMode(UiMode.MESSAGE);
+      rig.hostScene.ui.resetModeChain();
+      const pm = rig.hostScene.phaseManager;
+      pm.clearAllPhases();
+      pm.shiftPhase();
+      await game.phaseInterceptor.to("CommandPhase");
+    });
     await playWave(wave);
     await assertPostTurnConverged(wave);
     await driveRewardShop(wave);

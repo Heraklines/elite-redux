@@ -134,6 +134,24 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     guest.dispose();
   });
 
+  it("point-specific reannounce repairs an arrival the peer did not observe", async () => {
+    const faulted = wrapCoopFaultPair(createLoopbackPair(), { drop: 0, reorder: 0, delay: 0 }, { seed: 840 });
+    faulted.armNextDrop("rendezvous", "guest");
+    const host = new CoopRendezvous(faulted.host);
+    const guest = new CoopRendezvous(faulted.guest);
+
+    guest.arrive("cmd:3:2");
+    await flush();
+    expect(host.partnerHasArrived("cmd:3:2")).toBe(false);
+
+    guest.reannounce("cmd:3:2");
+    await flush();
+    expect(host.partnerHasArrived("cmd:3:2")).toBe(true);
+
+    host.dispose();
+    guest.dispose();
+  });
+
   it("LOST ARRIVAL: timeout retransmits and keeps the boundary closed until the partner arrives", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const pair = createLoopbackPair();

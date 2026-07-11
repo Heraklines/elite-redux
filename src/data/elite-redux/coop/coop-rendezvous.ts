@@ -185,6 +185,20 @@ export class CoopRendezvous {
   }
 
   /**
+   * Re-announce one specific local arrival, bypassing {@linkcode arrive}'s duplicate suppression.
+   * Used when a cooperative scheduler knows the peer may not have observed the original frame; unlike
+   * {@linkcode resendArrivals}, this cannot replay unrelated historical barrier points.
+   */
+  reannounce(point: string): void {
+    if (!this.localArrived.has(point)) {
+      this.arrive(point);
+      return;
+    }
+    coopLog("rendezvous", `REANNOUNCE point=${point} role=${this.transport.role}`);
+    this.transport.send({ t: "rendezvous", point });
+  }
+
+  /**
    * Block until the PARTNER has arrived at `point`. Resolves immediately if the partner's arrival was
    * already buffered. On timeout, re-send our arrival and continue waiting: a timeout is evidence that
    * recovery is needed, never permission to cross a shared boundary independently.
@@ -215,10 +229,7 @@ export class CoopRendezvous {
           authoritativePoint: route.point,
         });
       }
-      coopLog(
-        "rendezvous",
-        `AWAIT point=${point} sees partner at ${buffered}; guest WAITING for host phaseRoute`,
-      );
+      coopLog("rendezvous", `AWAIT point=${point} sees partner at ${buffered}; guest WAITING for host phaseRoute`);
     }
     coopLog("rendezvous", `AWAIT point=${point} timeoutMs=${timeoutMs} -> network-wait role=${this.transport.role}`);
     // Supersede any stale waiter parked on this point (only one await per point at a time).
@@ -261,28 +272,29 @@ export class CoopRendezvous {
         }
         resolve(res);
       };
-      const armRecoveryTimer = (): (() => void) => this.schedule(() => {
-        // #899: under the cooperative two-engine harness the partner's real loopback arrival may already
-        // be queued for delivery when the tiny vitest wall timer fires. Give transport microtasks one
-        // event-driven turn before retransmitting.
-        queueMicrotask(() => {
-          if (settled) {
-            return;
-          }
-          if (this.partnerArrived.has(point)) {
-            finish({ point, timedOut: false });
-            return;
-          }
-          coopWarn(
-            "rendezvous",
-            `RENDEZVOUS RECOVERY RETRY point=${point} after ${timeoutMs}ms - partner never arrived; `
-              + `RETRANSMITTING and KEEPING BOUNDARY CLOSED role=${this.transport.role}`,
-          );
-          // `arrive()` suppresses duplicates by design; recovery intentionally bypasses that suppression.
-          this.transport.send({ t: "rendezvous", point });
-          cancelTimer = armRecoveryTimer();
-        });
-      }, timeoutMs);
+      const armRecoveryTimer = (): (() => void) =>
+        this.schedule(() => {
+          // #899: under the cooperative two-engine harness the partner's real loopback arrival may already
+          // be queued for delivery when the tiny vitest wall timer fires. Give transport microtasks one
+          // event-driven turn before retransmitting.
+          queueMicrotask(() => {
+            if (settled) {
+              return;
+            }
+            if (this.partnerArrived.has(point)) {
+              finish({ point, timedOut: false });
+              return;
+            }
+            coopWarn(
+              "rendezvous",
+              `RENDEZVOUS RECOVERY RETRY point=${point} after ${timeoutMs}ms - partner never arrived; `
+                + `RETRANSMITTING and KEEPING BOUNDARY CLOSED role=${this.transport.role}`,
+            );
+            // `arrive()` suppresses duplicates by design; recovery intentionally bypasses that suppression.
+            this.transport.send({ t: "rendezvous", point });
+            cancelTimer = armRecoveryTimer();
+          });
+        }, timeoutMs);
       this.pending.set(point, finish);
       cancelTimer = armRecoveryTimer();
     });

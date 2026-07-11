@@ -91,6 +91,11 @@ import {
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import {
+  type ErAchievementRunSaveData,
+  getErAchievementRunState,
+  restoreErAchievementRunState,
+} from "#data/elite-redux/er-achievement-run-state";
+import {
   erBiomeOverstayAnchor,
   getErBiomeLength,
   getErBiomeStartWave,
@@ -243,6 +248,7 @@ export interface ClientCtx {
  * divergence can be reproduced + healed here instead of collapsing onto a shared map.
  */
 interface CoopModuleLetSnapshot {
+  achievementRun: ErAchievementRunSaveData | undefined;
   moneyStreaks: [number, number][];
   overstayAnchor: number | null;
   biomeLength: number | null;
@@ -252,6 +258,7 @@ interface CoopModuleLetSnapshot {
 
 function snapshotModuleLets(): CoopModuleLetSnapshot {
   return {
+    achievementRun: getErAchievementRunState(),
     moneyStreaks: getErMoneyStreakEntries(),
     overstayAnchor: erBiomeOverstayAnchor(),
     biomeLength: getErBiomeLength(),
@@ -261,6 +268,7 @@ function snapshotModuleLets(): CoopModuleLetSnapshot {
 }
 
 function restoreModuleLets(s: CoopModuleLetSnapshot): void {
+  restoreErAchievementRunState(s.achievementRun);
   restoreErMoneyStreaks(s.moneyStreaks);
   setErBiomeOverstayAnchor(s.overstayAnchor);
   setErBiomeStructureExtent(s.biomeLength, s.biomeStartWave);

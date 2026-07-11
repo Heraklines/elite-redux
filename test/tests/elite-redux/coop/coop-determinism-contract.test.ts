@@ -33,6 +33,7 @@
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { resetErAchievementRunState } from "#data/elite-redux/er-achievement-run-state";
 import { setErBiomeOverstayAnchor } from "#data/elite-redux/er-biome-structure";
 import { restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { restoreErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
@@ -68,6 +69,7 @@ describe.skipIf(!RUN)("DETERMINISM CONTRACT: identical seeded script => identica
     setCoopFaintSwitchWaitMs(4000);
     // Reset the shared ER module-let substrates so BOTH independent pairs start from the identical
     // process-global slate (production has one process per client; here they share this test process).
+    resetErAchievementRunState();
     restoreErMoneyStreaks([]);
     setErBiomeOverstayAnchor(null);
     restoreErRelicBattleState(undefined);

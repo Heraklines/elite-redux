@@ -40,8 +40,12 @@ const RUN = process.env.ER_SCENARIO === "1";
 const LEARN_WAVE = 3;
 const TOTAL_WAVES = 5;
 const SEED = 515151;
-/** A RAW 4-move moveset (NOT via override, which would mask the learn's setMove) - none is WATER_GUN. */
-const RAW_MOVESET = [MoveId.BODY_SLAM, MoveId.SHADOW_BALL, MoveId.FLAMETHROWER, MoveId.THUNDERBOLT];
+/**
+ * A RAW 4-move moveset (NOT via override, which would mask the learn's setMove) - none is WATER_GUN.
+ * The seeded host pick on the learn wave is slot 2; keep that move spread-targeted so this specialized
+ * interaction test does not depend on the one-process harness's unrelated deferred target prompt.
+ */
+const RAW_MOVESET = [MoveId.BODY_SLAM, MoveId.SHADOW_BALL, MoveId.DAZZLING_GLEAM, MoveId.THUNDERBOLT];
 
 describe.skipIf(!RUN)("CO-OP SOAK learn-move leg: accept-with-forget across two engines (#848/#849 BUILD 2)", () => {
   let phaserGame: Phaser.Game;
