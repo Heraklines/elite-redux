@@ -6,7 +6,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { fieldPositionForSlot } from "#data/battle-format";
-import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { FieldPosition } from "#enums/field-position";
 import { EnemyPokemon, Pokemon } from "#field/pokemon";
 import { EnemyBattleInfo } from "#ui/enemy-battle-info";
@@ -109,6 +109,10 @@ export function settleCoopTrainerPresentation(which: "player" | "enemy"): void {
     // ShowTrainerPhase restores `visible`, but not alpha. Keep the persistent player trainer ready for
     // its next entrance while container visibility provides the absolute hidden postcondition.
     trainer.setVisible(false).setAlpha(1);
+    // Some reconstructed/headless trainer shells implement the setters as presentation stubs. Preserve the
+    // same absolute postcondition on the public Phaser properties so a stale overlay cannot survive either.
+    trainer.visible = false;
+    trainer.alpha = 1;
     return;
   }
 
@@ -163,11 +167,26 @@ function settleInfoImmediately(pokemon: Pokemon): void {
   }
 }
 
+/**
+ * Authoritative checkpoint reconstruction can create a Pokemon before any summon phase has called `init()`.
+ * Such an object may already be in the logical/Phaser field container while still having no sprite or battle
+ * info children.  Presentation recovery must materialize those children itself; merely toggling the container
+ * leaves the exact live symptom this adapter exists to repair (the mon and its UI bar are both absent).
+ */
+function ensurePokemonPresentationNodes(pokemon: Pokemon): boolean {
+  if (pokemon.getSprite() != null && pokemon.getBattleInfo() != null) {
+    return false;
+  }
+  pokemon.init();
+  return true;
+}
+
 function showPokemonPresentation(pokemon: Pokemon, slot: number, capacity: number, side: "player" | "enemy"): boolean {
   if (pokemon.isFainted()) {
     hidePokemonPresentation(pokemon);
     return false;
   }
+  const newlyInitialized = ensurePokemonPresentationNodes(pokemon);
   killPresentationTweens(pokemon);
   const newlySeated = !isActuallyInFieldContainer(pokemon);
   if (newlySeated) {
@@ -217,6 +236,13 @@ function showPokemonPresentation(pokemon: Pokemon, slot: number, capacity: numbe
     } catch {
       /* headless */
     }
+  }
+  if (newlyInitialized || newlySeated) {
+    // `init()` creates the safe substitute placeholders synchronously. Load the real atlas without blocking
+    // checkpoint application, and never use a summon/fieldSetup phase as an asset-loading side channel.
+    void pokemon.loadAssets(false).catch(error => {
+      coopWarn("resync", `presentation asset load failed pokemon=${pokemon.id} side=${side} slot=${slot}`, error);
+    });
   }
   return newlySeated;
 }
