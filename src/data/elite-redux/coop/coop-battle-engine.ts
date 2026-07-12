@@ -1102,7 +1102,30 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
  */
 export function captureCoopEnemies(): CoopSerializedEnemy[] {
   try {
-    return globalScene.getEnemyParty().map((enemy, index) => {
+    const enemies = globalScene.getEnemyParty();
+    // Runtime ids are RNG-derived and a restored wave seed can revisit an earlier cursor. Same-side duplicate
+    // ids make field seats and held-item ownership fundamentally ambiguous, so the host authority repairs them
+    // once at the manifest boundary. Use a deterministic probe rather than consuming gameplay RNG; the chosen
+    // id is carried to the guest below and by all later authoritative snapshots.
+    const usedIds = new Set<number>();
+    for (const [index, enemy] of enemies.entries()) {
+      if (!usedIds.has(enemy.id)) {
+        usedIds.add(enemy.id);
+        continue;
+      }
+      const duplicateId = enemy.id;
+      let replacementId = (duplicateId + index + 1) >>> 0;
+      while (usedIds.has(replacementId)) {
+        replacementId = (replacementId + 1) >>> 0;
+      }
+      enemy.id = replacementId;
+      usedIds.add(replacementId);
+      coopWarn(
+        "enemy",
+        `duplicate same-side pokemon id=${duplicateId} at partyIndex=${index} -> authoritative id=${replacementId}`,
+      );
+    }
+    return enemies.map((enemy, index) => {
       // Stat-affecting generation hooks can lower max HP after the constructor initialized current HP,
       // briefly leaving an invalid 42/40-style host state. Every checkpoint serializer already clamps this;
       // normalize the sole authority at the earlier enemy-manifest boundary too so host UI, guest adoption,
@@ -1115,6 +1138,7 @@ export function captureCoopEnemies(): CoopSerializedEnemy[] {
       return {
         fieldIndex: index,
         data: {
+          id: enemy.id,
           speciesId: enemy.species.speciesId,
           formIndex: enemy.formIndex,
           level: enemy.level,
@@ -1353,6 +1377,21 @@ export function applyCoopEnemies(enemies: CoopSerializedEnemy[]): void {
         continue;
       }
       try {
+        const id = num(d, "id");
+        if (id !== undefined && enemy.id !== id >>> 0) {
+          const previousId = enemy.id;
+          const authoritativeId = id >>> 0;
+          // The same-species path keeps the guest's existing object and its locally reconstructed held
+          // modifiers. Move those bindings with the object before adopting the host id; otherwise the mon
+          // becomes visually correct while its items remain orphaned under the discarded local id.
+          for (const modifier of globalScene.findModifiers(
+            m => m instanceof PokemonHeldItemModifier && m.pokemonId === previousId,
+            false,
+          )) {
+            modifier.pokemonId = authoritativeId;
+          }
+          enemy.id = authoritativeId;
+        }
         const abilityIndex = num(d, "abilityIndex");
         if (abilityIndex !== undefined) {
           enemy.abilityIndex = abilityIndex;
@@ -3065,9 +3104,12 @@ export function applyCoopAuthoritativeBattleState(
       [globalScene.getPlayerParty() as Pokemon[], playerParty],
       [globalScene.getEnemyParty() as Pokemon[], enemyParty],
     ] as const) {
-      const hostById = new Map(hostParty.map(data => [data.id, data]));
-      for (const mon of liveParty) {
-        const hostData = hostById.get(mon.id);
+      for (const [index, mon] of liveParty.entries()) {
+        // reconcileAuthoritativeParty has just made the live party order identical to the host party. Match
+        // this final derived-stat reassert by that canonical position: leaveField can reset a fainted mon's
+        // summon data (and, on older payloads, its local id can still differ), but it cannot change its party
+        // position. This closes the last post-reconcile 40/42-style fainted max-HP drift.
+        const hostData = hostParty[index];
         if (hostData != null && Array.isArray(hostData.stats) && hostData.stats.length > 0) {
           mon.stats = [...hostData.stats];
           mon.hp = Math.max(0, Math.min(Math.trunc(hostData.hp), mon.getMaxHp()));

@@ -486,21 +486,6 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       this.stellarTypesBoosted = dataSource.stellarTypesBoosted ?? [];
     } else {
       this.id = randSeedInt(4294967296);
-      // A wave seed can revisit an earlier RNG position and reproduce an id already held by the persistent
-      // player party or another member generated earlier in this enemy party. Identity drives modifiers,
-      // authoritative field seating, and replay maps, so resolve the collision before any dependent state is
-      // created. Extra draws occur only on collision and remain deterministic for the sole authority.
-      try {
-        const usedIds = new Set([
-          ...globalScene.getPlayerParty().map(p => p.id),
-          ...globalScene.getEnemyParty().map(p => p.id),
-        ]);
-        for (let attempts = 0; usedIds.has(this.id) && attempts < 32; attempts++) {
-          this.id = randSeedInt(4294967296);
-        }
-      } catch {
-        // Scene bootstrap can construct Pokemon before a current battle/party exists; the first id remains.
-      }
       this.ivs = ivs || getIvsFromId(this.id);
 
       if (this.gender === undefined) {

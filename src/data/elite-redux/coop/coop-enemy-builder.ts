@@ -62,6 +62,10 @@ export function buildCoopEnemy(
   }
   const level = Math.max(1, Math.floor(coopNum(data, "level") ?? fallbackLevel));
   const enemy = globalScene.addEnemyPokemon(species, level, trainerSlot, false);
+  const id = coopNum(data, "id");
+  if (id !== undefined) {
+    enemy.id = id >>> 0;
+  }
   const formIndex = coopNum(data, "formIndex");
   if (formIndex !== undefined) {
     enemy.formIndex = formIndex;

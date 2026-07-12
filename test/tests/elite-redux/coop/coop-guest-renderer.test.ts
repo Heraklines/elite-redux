@@ -1334,6 +1334,24 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(coopEngine.captureCoopChecksum(), "the checksum is stable across an idempotent re-apply").toBe(hostChecksum);
   });
 
+  it("normalizes a same-side runtime-id collision and streams the repaired identity", async () => {
+    await startCoopGuest();
+    const enemies = globalScene.getEnemyParty();
+    expect(enemies.length).toBeGreaterThanOrEqual(2);
+    enemies[1].id = enemies[0].id;
+
+    const serialized = coopEngine.captureCoopEnemies();
+    const firstId = serialized[0].data.id;
+    const secondId = serialized[1].data.id;
+    expect(firstId, "the first enemy keeps its runtime identity").toBe(enemies[0].id);
+    expect(secondId, "the duplicate gets a deterministic distinct identity").toBe(enemies[1].id);
+    expect(secondId, "the manifest never contains ambiguous same-side identities").not.toBe(firstId);
+
+    const rebuilt = buildCoopEnemy(serialized[1].data, enemies[1].level, TrainerSlot.NONE);
+    expect(rebuilt, "the repaired enemy reconstructs").not.toBeNull();
+    expect(rebuilt!.id, "the guest adopts the host's repaired runtime identity").toBe(secondId);
+  });
+
   // (J) BOSS-SEGMENT ROUND-TRIP (#633, A/BLOCKING-2): the core of the boss-adopt fix. Boss state lives
   // ONLY on EnemyPokemon and `addEnemyPokemon` reconstructs with boss hardcoded `false`, so an adopted
   // boss rendered NORMAL bars + lost the segment-damage split. This asserts the full serialize ->
