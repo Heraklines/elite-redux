@@ -4,7 +4,7 @@ name: Nightly Co-op Soak
 # finds desyncs / strands / leaks BY MACHINE (the DIGEST / LOCKSTEP / NO-PARK / TEARDOWN
 # invariants) instead of by live players. Nightly at ~03:00 UTC. It runs THREE legs
 # (#832 profiles + #633/#828 coverage), serialized, each covering a different strand:
-#   - god   (SOAK_WAVES=200): the level-300 steamroller must clear the complete classic journey,
+#   - god   (SOAK_WAVES=200): the level-500 steamroller must clear the complete classic journey,
 #            including the late milestone/reward tails and final biome where deep desyncs live.
 #   - level (SOAK_WAVES=55):  the level-65 party that FAINTS reliably through its ~wave-40-48
 #            death spiral and WIPES cleanly (a legitimate terminal), staying below the ~60+
@@ -68,7 +68,7 @@ jobs:
       max-parallel: 4
       matrix:
         include:
-          # GOD (audit priority: the DEEP-WAVE strand). The level-300 legendary steamroller reaches the
+          # GOD (audit priority: the DEEP-WAVE strand). The level-500 legendary steamroller reaches the
           # endgame (waves 70-200) where the LATE-game co-op desyncs live; it faints only occasionally.
           - profile: god
             waves_default: "200"

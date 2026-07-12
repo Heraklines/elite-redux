@@ -215,7 +215,7 @@ export function announceSoakSeed(seed: number, waves: number): void {
 
 // ---------------------------------------------------------------------------
 // The soak PARTY PROFILE (#832). SOAK_PROFILE selects which starter party + level edge the test stands up:
-//   - "god" (DEFAULT, unset = byte-identical to today): a level-300 legendary steamroller that reaches the
+//   - "god" (DEFAULT): a level-500 legendary steamroller that reaches the
 //     deep endgame. It faints only OCCASIONALLY, so the FAINT-replacement co-op surfaces are PROBABILISTIC.
 //   - "level": the wave-appropriate level-65 party (SNORLAX/GENGAR/DRAGONITE/TYRANITAR/METAGROSS/GARCHOMP,
 //     the team where #845-#848 were found). It takes REAL damage and FAINTS reliably through its ~wave-40-48
@@ -252,7 +252,11 @@ export interface SoakPartyConfig {
 /** The two soak party profiles (#832). "god" is today's config verbatim (byte-identical when SOAK_PROFILE is unset). */
 export const SOAK_PROFILES: Record<SoakProfileName, SoakPartyConfig> = {
   god: {
-    startingLevel: 300,
+    // This profile is the deterministic start-to-finish architecture carrier, not a difficulty test.
+    // Level 300 could still wipe on the seeded wave-180 boss after surveying 179 clean waves, silently
+    // shortening the only full-classic campaign. Level 500 preserves all control/reward/biome content while
+    // keeping the party alive through wave 200; the level profile remains the representative damage/faint leg.
+    startingLevel: 500,
     species: [
       SpeciesId.ETERNATUS,
       SpeciesId.RAYQUAZA,
@@ -2680,7 +2684,16 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   let runEnded: { wave: number; reason: string } | undefined;
 
   // ===== The wave loop. =====
+  const captureOperationHits = (): void => {
+    for (const cls of getCoopOperationJournalCommittedClasses()) {
+      hits.operations.add(cls);
+    }
+  };
   for (let wave = 1; wave <= waves; wave++) {
+    // Sample cumulatively before the next wave can terminal and clear the runtime's session-local diagnostic
+    // ledger. A wave-180 GameOver used to erase 179 waves of op:wave/op:reward evidence before the sole
+    // end-of-run sample, making guaranteed operation coverage falsely report cold.
+    captureOperationHits();
     if (crossedUndrivableWave(wave)) {
       break;
     }
@@ -2939,9 +2952,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   // (the guest plays on solo, {@linkcode hostHalfExhausted} recorded per wave in the loop above). Any
   // run-end here is a TRUE terminal (full wipe / GameOver / Title), so nothing extra to record.
 
-  for (const cls of getCoopOperationJournalCommittedClasses()) {
-    hits.operations.add(cls);
-  }
+  captureOperationHits();
 
   assertTeardown();
   return {

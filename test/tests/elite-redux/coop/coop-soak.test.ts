@@ -96,7 +96,7 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
     logs = installDuoLogCapture(`soak-${Date.now()}`);
     // #832 PROFILE-DRIVEN PARTY. The party (level + species + moveset + held items) comes from SOAK_PROFILES
     // so the override + the coverage assertion share one source of truth. "god" (default / SOAK_PROFILE unset)
-    // is byte-identical to today (the level-300 legendary steamroller reaching the endgame); "level" is the
+    // is the level-500 legendary steamroller that must finish the full classic run; "level" is the
     // faint-heavy level-65 party that GUARANTEES the single-faint/switch/replace channel (#845-#848).
     profile = resolveSoakProfile();
     const party = SOAK_PROFILES[profile];
@@ -214,6 +214,13 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
             + `proven-survivable floor of ${coverageFloor} (a party this weak this early is a regression, `
             + `not the late-game level ceiling; replay SOAK_SEED=${seed})`,
         ).toBeGreaterThanOrEqual(coverageFloor);
+      }
+      if (profile === "god") {
+        expect(
+          result.runEnded,
+          `the god profile is the start-to-finish carrier and may not stop before wave ${waves}`,
+        ).toBeUndefined();
+        expect(result.wavesCompleted, "the god profile completed the requested classic journey").toBe(waves);
       }
       // THE PRIMARY GATE: the soak found NO unhealed host-vs-guest DIGEST desync. A finding here is the
       // machine doing its job - a REAL co-op divergence the resync did not converge; it is surfaced above +
