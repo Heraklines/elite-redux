@@ -484,6 +484,27 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(field[COOP_GUEST_FIELD_INDEX].isActive(), "player guest mon untouched by enemy reconcile").toBe(true);
   });
 
+  it("an already-rendered faint still adopts the host's FAINT status and move PP", async () => {
+    await startCoopGuest();
+    const enemy = globalScene.getEnemyField(false)[0];
+    enemy.hp = 0;
+    enemy.doSetStatus(StatusEffect.FAINT);
+    enemy.getMoveset()[0].ppUsed = 3;
+    const checkpoint = coopEngine.captureCoopCheckpoint();
+    expect(checkpoint).not.toBeNull();
+
+    // The renderer already played the faint but retained stale non-visual state.
+    enemy.status = null;
+    enemy.getMoveset()[0].ppUsed = 0;
+    expect(enemy.isFainted()).toBe(true);
+
+    expect(coopEngine.applyCoopCheckpoint(checkpoint!)).toBe(true);
+    expect(enemy.status?.effect, "FAINT status converges even after the animation made hp zero").toBe(
+      StatusEffect.FAINT,
+    );
+    expect(enemy.getMoveset()[0].ppUsed, "move PP converges on an already-fainted slot").toBe(3);
+  });
+
   // (A) PLAYER-FAINT RENDER (#633 partner-death sync, HALF A): the PLAYER-side mirror of the
   // enemy-field reconcile. In the authoritative double a co-op partner's mon (a player mon at bi 0/1)
   // can FAINT on the host, but the guest's per-mon numeric apply only matches by bi and never REMOVES,

@@ -1003,10 +1003,12 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
           );
           mon.setStat(Stat.HP, state.maxHp);
         }
-        // hp is pre-clamped to [0, maxHp]; only the surviving (still-active) mons are
-        // corrected - a 0-hp host mon the guest hasn't fainted is left for the relayed
-        // commands to resolve, not force-fainted here.
-        if (!mon.isFainted()) {
+        // hp is pre-clamped to [0, maxHp]. A host-fainted mon must still receive the FAINT status,
+        // stat stages and move PP even when the renderer's animation already reduced it to zero; skipping
+        // every scalar merely because the local mon was already fainted left status/PP permanently stale.
+        // We still avoid force-fainting a locally alive mon from a legacy ambiguous zero-hp entry unless the
+        // host explicitly marks the slot fainted.
+        if (!mon.isFainted() || state.fainted) {
           if (isCoopDebug()) {
             const wantHp = Math.min(state.hp, mon.getMaxHp());
             const guestStatus = mon.status?.effect ?? 0;
