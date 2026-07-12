@@ -1309,107 +1309,111 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   // the SAME move the host selects for the guest slot. #843: it reads the HOST's AUTHORITATIVE guest-slot mon
   // (not the guest's own wave-start mirror), so its PP-aware pick matches the host's playWave guest-select
   // EXACTLY even after the host has depleted a move's PP mid-wave (the guest mirror's PP is stale until the
-  // checkpoint). Reading the host object is a plain field read - it needs no globalScene swap.
+  // checkpoint). Production-fidelity reads run under the guest client context because Pokemon legality,
+  // field membership, trapping, and move usability consult process-global scene services internally.
   rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots, offer }) => {
-    const wave = rig.hostScene.currentBattle.waveIndex;
-    const turn = rig.hostScene.currentBattle.turn;
-    // #879 PRODUCTION-FIDELITY command SOURCE. In "harness" mode the guest answerer reads the HOST's
-    // authoritative guest-slot mon (byte-identical to today - a stale guest still borrows the host's move). In
-    // "production" mode it reads the GUEST's OWN rendered scene (its own field mon / moveset / PP / enemy
-    // field), exactly as a live guest client would: if the guest has DRIFTED (wrong mon on-field, spent PP,
-    // stale enemy), it now constructs a DIFFERENT command than the host - which either desyncs loudly at the
-    // per-turn checkpoint or picks an illegal/no-op move the framework rejects. That is the "a stale guest can
-    // no longer hide" evidence this mode exists to surface. Reading the guest scene is a plain field read; the
-    // guest mon-command still rides the REAL relay the host applies for the guest slot.
-    const commandScene = fidelity === "production" ? rig.guestScene : rig.hostScene;
-    // The faint-heavy profile must guarantee its namesake coverage instead of waiting for late-run damage
-    // RNG. On wave 2 the guest lead sends a genuine Explosion through this production command relay. The
-    // normal move, self-faint, guest-owned replacement relay and operation journal then execute unchanged.
-    if (profile === "level" && wave === LEVEL_FORCED_FAINT_WAVE && turn === 1) {
-      const guestMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
-      const explosionSlot = guestMon?.getMoveset().findIndex(move => move?.moveId === MoveId.EXPLOSION) ?? -1;
-      if (explosionSlot >= 0 && moveSlots.includes(explosionSlot)) {
-        const offeredExplosion =
-          offer?.moves.find(move => move.moveId === MoveId.EXPLOSION)
-          ?? offer?.moves.find(move => move.slot === explosionSlot);
-        const explosionTargets = offeredExplosion?.targetSets[0];
-        if (explosionTargets == null) {
-          return fail("desync", wave, "host did not offer the guest's locally legal Explosion command");
+    const compute = () => {
+      const wave = rig.hostScene.currentBattle.waveIndex;
+      const turn = rig.hostScene.currentBattle.turn;
+      // #879 PRODUCTION-FIDELITY command SOURCE. In "harness" mode the guest answerer reads the HOST's
+      // authoritative guest-slot mon (byte-identical to today - a stale guest still borrows the host's move). In
+      // "production" mode it reads the GUEST's OWN rendered scene (its own field mon / moveset / PP / enemy
+      // field), exactly as a live guest client would: if the guest has DRIFTED (wrong mon on-field, spent PP,
+      // stale enemy), it now constructs a DIFFERENT command than the host - which either desyncs loudly at the
+      // per-turn checkpoint or picks an illegal/no-op move the framework rejects. That is the "a stale guest can
+      // no longer hide" evidence this mode exists to surface. Reading the guest scene is a plain field read; the
+      // guest mon-command still rides the REAL relay the host applies for the guest slot.
+      const commandScene = fidelity === "production" ? rig.guestScene : rig.hostScene;
+      // The faint-heavy profile must guarantee its namesake coverage instead of waiting for late-run damage
+      // RNG. On wave 2 the guest lead sends a genuine Explosion through this production command relay. The
+      // normal move, self-faint, guest-owned replacement relay and operation journal then execute unchanged.
+      if (profile === "level" && wave === LEVEL_FORCED_FAINT_WAVE && turn === 1) {
+        const guestMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+        const explosionSlot = guestMon?.getMoveset().findIndex(move => move?.moveId === MoveId.EXPLOSION) ?? -1;
+        if (explosionSlot >= 0 && moveSlots.includes(explosionSlot)) {
+          const offeredExplosion =
+            offer?.moves.find(move => move.moveId === MoveId.EXPLOSION)
+            ?? offer?.moves.find(move => move.slot === explosionSlot);
+          const explosionTargets = offeredExplosion?.targetSets[0];
+          if (explosionTargets == null) {
+            return fail("desync", wave, "host did not offer the guest's locally legal Explosion command");
+          }
+          actionScript.push(`wave ${wave} turn ${turn}: forced-faint guest EXPLOSION self-KO`);
+          hitMode(UiMode.COMMAND);
+          hitMode(UiMode.FIGHT);
+          return {
+            command: Command.FIGHT,
+            cursor: explosionSlot,
+            moveId: MoveId.EXPLOSION,
+            targets: [...explosionTargets],
+          };
         }
-        actionScript.push(`wave ${wave} turn ${turn}: forced-faint guest EXPLOSION self-KO`);
+        fail("no-park", wave, "level forced-faint leg could not issue Explosion from the guest lead");
+      }
+      // #843 coverage #4: occasionally issue a VOLUNTARY SWITCH for the guest slot instead of a move, through
+      // the REAL relay Command path (Command.POKEMON + party-slot cursor); the host summons the guest's pick
+      // and the switch rides the per-turn checkpoint onto the guest's replay. Only when a legal guest-owned
+      // bench mon exists AND the mon is NOT TRAPPED (#846: a trainer enemy's Shadow Tag / Arena Trap / trapping
+      // move / Fairy Lock / ER FEAR makes the switch ILLEGAL - the real command menu greys out the POKEMON
+      // option, so issuing Command.POKEMON for a trapped mon soft-locks the command resolution; isTrapped is
+      // the exact gate the menu uses). Else fall through to a move.
+      const guestSwitchMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+      const benchSlot = firstLegalBenchSlot(commandScene, "guest");
+      if (
+        switchesThisTurn(seed, wave, turn, GUEST_SWITCH_SALT)
+        && benchSlot >= 0
+        && guestSwitchMon != null
+        && !guestSwitchMon.isTrapped()
+      ) {
+        const offeredSwitch = offer?.switches.find(candidate => candidate.slot === benchSlot);
+        if (offeredSwitch?.canNormal !== true) {
+          fail("desync", wave, `guest selected switch party[${benchSlot}] outside the host legal offer`);
+        }
+        actionScript.push(`wave ${wave} turn ${turn}: guest SWITCH -> party[${benchSlot}]`);
+        // #849 COMMAND-issue tap: a guest voluntary switch drives the COMMAND menu + the PARTY picker.
         hitMode(UiMode.COMMAND);
-        hitMode(UiMode.FIGHT);
-        return {
-          command: Command.FIGHT,
-          cursor: explosionSlot,
-          moveId: MoveId.EXPLOSION,
-          targets: [...explosionTargets],
-        };
+        hitMode(UiMode.PARTY);
+        return { command: Command.POKEMON, cursor: benchSlot };
       }
-      fail("no-park", wave, "level forced-faint leg could not issue Explosion from the guest lead");
-    }
-    // #843 coverage #4: occasionally issue a VOLUNTARY SWITCH for the guest slot instead of a move, through
-    // the REAL relay Command path (Command.POKEMON + party-slot cursor); the host summons the guest's pick
-    // and the switch rides the per-turn checkpoint onto the guest's replay. Only when a legal guest-owned
-    // bench mon exists AND the mon is NOT TRAPPED (#846: a trainer enemy's Shadow Tag / Arena Trap / trapping
-    // move / Fairy Lock / ER FEAR makes the switch ILLEGAL - the real command menu greys out the POKEMON
-    // option, so issuing Command.POKEMON for a trapped mon soft-locks the command resolution; isTrapped is
-    // the exact gate the menu uses). Else fall through to a move.
-    const guestSwitchMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
-    const benchSlot = firstLegalBenchSlot(commandScene, "guest");
-    if (
-      switchesThisTurn(seed, wave, turn, GUEST_SWITCH_SALT)
-      && benchSlot >= 0
-      && guestSwitchMon != null
-      && !guestSwitchMon.isTrapped()
-    ) {
-      const offeredSwitch = offer?.switches.find(candidate => candidate.slot === benchSlot);
-      if (offeredSwitch?.canNormal !== true) {
-        fail("desync", wave, `guest selected switch party[${benchSlot}] outside the host legal offer`);
-      }
-      actionScript.push(`wave ${wave} turn ${turn}: guest SWITCH -> party[${benchSlot}]`);
-      // #849 COMMAND-issue tap: a guest voluntary switch drives the COMMAND menu + the PARTY picker.
-      hitMode(UiMode.COMMAND);
-      hitMode(UiMode.PARTY);
-      return { command: Command.POKEMON, cursor: benchSlot };
-    }
-    const guestMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
-    const { guestTarget, guestTargetMon } = pickTargets(commandScene);
-    const { slot, moveId } = resolveChosenMove(
-      guestMon,
-      guestTargetMon,
-      seed,
-      wave,
-      GUEST_SLOT_SALT,
-      profile === "level",
-    );
-    const offeredMove =
-      offer?.moves.find(move => move.moveId === moveId) ?? offer?.moves.find(move => move.slot === slot);
-    // The renderer can hold a provisionally seated enemy whose internal battler index is still -1.
-    // Target UI order is the visible enemy-field order, not `isActive(true)` (which depends on that
-    // very index), so preserve the human's ordinal choice and map it onto the host's legal target sets.
-    const guestTargetOrdinal = commandScene.getEnemyField().findIndex(mon => mon.id === guestTargetMon.id);
-    const offeredTargets =
-      offeredMove?.targetSets.find(targets => targets.includes(guestTarget))
-      ?? (offeredMove?.targetSets.length === 1 ? offeredMove.targetSets[0] : undefined)
-      ?? (guestTargetOrdinal >= 0 ? offeredMove?.targetSets[guestTargetOrdinal] : undefined);
-    if (offeredMove != null && offeredTargets == null) {
-      fail(
-        "desync",
+      const guestMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+      const { guestTarget, guestTargetMon } = pickTargets(commandScene);
+      const { slot, moveId } = resolveChosenMove(
+        guestMon,
+        guestTargetMon,
+        seed,
         wave,
-        `guest command slot=${slot} move=${moveId} target=${guestTarget} is outside the host legal offer`,
+        GUEST_SLOT_SALT,
+        profile === "level",
       );
-    }
-    // Legacy screen-open evidence only: the provider bypasses the guest UI, so it may claim COMMAND/FIGHT
-    // navigation but deliberately earns no TARGET_SELECT or uiRelay coverage.
-    hitMode(UiMode.COMMAND);
-    hitMode(UiMode.FIGHT);
-    return {
-      command: Command.FIGHT,
-      cursor: offeredMove?.slot ?? slot,
-      moveId: offeredMove?.moveId ?? moveId,
-      targets: [...(offeredTargets ?? [guestTarget])],
+      const offeredMove =
+        offer?.moves.find(move => move.moveId === moveId) ?? offer?.moves.find(move => move.slot === slot);
+      // The renderer can hold a provisionally seated enemy whose internal battler index is still -1.
+      // Target UI order is the visible enemy-field order, not `isActive(true)` (which depends on that
+      // very index), so preserve the human's ordinal choice and map it onto the host's legal target sets.
+      const guestTargetOrdinal = commandScene.getEnemyField().findIndex(mon => mon.id === guestTargetMon.id);
+      const offeredTargets =
+        offeredMove?.targetSets.find(targets => targets.includes(guestTarget))
+        ?? (offeredMove?.targetSets.length === 1 ? offeredMove.targetSets[0] : undefined)
+        ?? (guestTargetOrdinal >= 0 ? offeredMove?.targetSets[guestTargetOrdinal] : undefined);
+      if (offeredMove != null && offeredTargets == null) {
+        fail(
+          "desync",
+          wave,
+          `guest command slot=${slot} move=${moveId} target=${guestTarget} is outside the host legal offer`,
+        );
+      }
+      // Legacy screen-open evidence only: the provider bypasses the guest UI, so it may claim COMMAND/FIGHT
+      // navigation but deliberately earns no TARGET_SELECT or uiRelay coverage.
+      hitMode(UiMode.COMMAND);
+      hitMode(UiMode.FIGHT);
+      return {
+        command: Command.FIGHT,
+        cursor: offeredMove?.slot ?? slot,
+        moveId: offeredMove?.moveId ?? moveId,
+        targets: [...(offeredTargets ?? [guestTarget])],
+      };
     };
+    return fidelity === "production" ? withClientSync(rig.guestCtx, compute) : compute();
   });
 
   /** Capture BOTH clients' full-state checksums (each under its own ctx). */
