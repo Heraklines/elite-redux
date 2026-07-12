@@ -356,18 +356,23 @@ export function resetCoopStateTicks(): void {
   coopLastAppliedStateTick = -1;
 }
 
+/** Clamp impossible HP created by a late max-HP recalculation before publishing authoritative state. */
+export function normalizeCoopHpBoundsAtAuthorityBoundary(): void {
+  for (const mon of [...globalScene.getPlayerParty(), ...globalScene.getEnemyParty()]) {
+    const maxHp = mon.getMaxHp();
+    if (mon.hp > maxHp) {
+      coopWarn("checkpoint", `authority clamps impossible hp id=${mon.id} ${mon.hp}->${maxHp}`);
+      mon.hp = maxHp;
+    }
+  }
+}
+
 export function captureCoopCheckpoint(): CoopBattleCheckpoint | null {
   try {
     // A late stat/modifier recalculation can lower max HP after the previous numeric HP write.
     // Never publish the impossible `hp > maxHp` state: the receiver necessarily clamps PokemonData,
     // which otherwise creates a permanent host/guest checksum split (long-run seed 20470471 wave 26).
-    for (const mon of [...globalScene.getPlayerParty(), ...globalScene.getEnemyParty()]) {
-      const maxHp = mon.getMaxHp();
-      if (mon.hp > maxHp) {
-        coopWarn("checkpoint", `authority clamps impossible hp id=${mon.id} ${mon.hp}->${maxHp}`);
-        mon.hp = maxHp;
-      }
-    }
+    normalizeCoopHpBoundsAtAuthorityBoundary();
     // Serialize player ACTIVE mons + enemy SLOT-PRESENT mons (incl. just-fainted ones) so a
     // foe the host KOd this turn still rides the payload with fainted:true (#633 enemy-field
     // reconcile) - that entry drives the guest's removal of the dead enemy.

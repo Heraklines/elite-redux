@@ -15,6 +15,7 @@ import {
   captureCoopAuthoritativeBattleState,
   captureCoopDexBaseline,
   captureCoopEnemies,
+  normalizeCoopHpBoundsAtAuthorityBoundary,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
@@ -541,6 +542,7 @@ export class EncounterPhase extends BattlePhase {
     // This is the final stat-bearing encounter hook. Serialize only after it so held-item/stat recalculation
     // cannot make the first visible frame differ from the retained carrier.
     globalScene.updateModifiers(false);
+    normalizeCoopHpBoundsAtAuthorityBoundary();
     if (this.coopAdoptedEnemyParty && this.coopEnemyAuthority != null) {
       applyCoopEnemies(this.coopEnemyAuthority);
     }
