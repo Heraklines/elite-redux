@@ -29,7 +29,6 @@ const EVENT_SCHEDULE = new Map([
   [14, MysteryEncounterType.ER_HOT_SPRING], // empty healing-shop terminal
   [16, MysteryEncounterType.BERRIES_ABOUND], // explicit leave after a battle-capable offer
   [18, MysteryEncounterType.ER_PICNIC], // account-local candy/affection surface; safe move-on branch
-  [21, MysteryEncounterType.TRASH_TO_TREASURE], // direct held-item mutation
   [24, MysteryEncounterType.FIELD_TRIP], // guest-owned party + nested move sub-picks
   [26, MysteryEncounterType.ER_TOWN_RAFFLE], // money spend + seeded generated reward identity
   [28, MysteryEncounterType.ER_FORTUNE_TELLER], // queued future event + world-map reveal mutation
@@ -38,6 +37,7 @@ const EVENT_SCHEDULE = new Map([
   [36, MysteryEncounterType.WEIRD_DREAM], // legal-range transformation encounter, leave branch
   [39, MysteryEncounterType.ER_CLEANSING_FONT], // party-wide heal/status continuation
   [42, MysteryEncounterType.ER_DRAGONS_HOARD], // catch-capable boss surface; safe decline terminal
+  [44, MysteryEncounterType.TRASH_TO_TREASURE], // direct held-item mutation
 ]);
 
 /** One-based safe non-battle option for each event; both ownership parities use the same semantic choice. */
@@ -46,7 +46,6 @@ const EVENT_OPTIONS = new Map([
   [14, 2],
   [16, 3],
   [18, 4],
-  [21, 2],
   [24, 1],
   [26, 1],
   [28, 1],
@@ -55,6 +54,7 @@ const EVENT_OPTIONS = new Map([
   [36, 3],
   [39, 1],
   [42, 2],
+  [44, 2],
 ]);
 
 /** Field Trip option 1: choose party slot 0, then that Pokemon's move slot 0. */
