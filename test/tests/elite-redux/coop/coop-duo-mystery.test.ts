@@ -623,6 +623,7 @@ describe.skipIf(!RUN)(
       const pair = createLoopbackPair();
       const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
+      const authoritativePartyAtSelection = hostScene.getPlayerParty().map(mon => mon.species.speciesId);
 
       await withClient(rig.hostCtx, async () => {
         await runSelectMysteryEncounterOption(game, 1);
@@ -636,13 +637,12 @@ describe.skipIf(!RUN)(
 
       const hostEnemies = hostScene.currentBattle.enemyParty;
       const guestEnemies = rig.guestScene.currentBattle.enemyParty;
-      const authoritativeParty = hostScene.getPlayerParty().map(mon => mon.species.speciesId);
       expect(hostEnemies, "the complete live co-op party is mirrored as the enemy trainer team").toHaveLength(
-        authoritativeParty.length,
+        authoritativePartyAtSelection.length,
       );
-      expect(hostEnemies.map(mon => mon.species.speciesId)).toEqual(authoritativeParty);
+      expect(hostEnemies.map(mon => mon.species.speciesId)).toEqual(authoritativePartyAtSelection);
       expect(new Set(hostEnemies.map(mon => mon.id)).size, "every mirror receives a unique authoritative id").toBe(
-        authoritativeParty.length,
+        authoritativePartyAtSelection.length,
       );
       expect(
         guestEnemies.map(mon => ({ id: mon.id, species: mon.species.speciesId })),
