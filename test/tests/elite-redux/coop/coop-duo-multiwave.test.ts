@@ -189,10 +189,17 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
       expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Fight through COMMAND UI").toBe(true);
       expect(rig.guestScene.ui.getMode(), "guest reaches the move picker").toBe(UiMode.FIGHT);
       expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Tackle through FIGHT UI").toBe(true);
-      if (rig.guestScene.ui.getMode() === UiMode.TARGET_SELECT) {
-        rig.guestScene.ui.processInput(Button.RIGHT);
-        expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms the second enemy target").toBe(true);
-      }
+      // The direct guest scene has a deliberately MANUAL phase manager: choosing Tackle ends the current
+      // CommandPhase and queues the REAL SelectTargetPhase, but does not auto-start it. Start that queued
+      // production phase before reading TARGET_SELECT; checking the UI immediately after the Fight click
+      // used to see the stale FIGHT mode, skip the target input, and then park forever on the untouched
+      // SelectTargetPhase when the queue driver reached it.
+      const targetPhase = await driveClientPhaseQueueTo(rig.guestScene, "SelectTargetPhase");
+      targetPhase.start();
+      await drainLoopback();
+      expect(rig.guestScene.ui.getMode(), "guest reaches the real target picker").toBe(UiMode.TARGET_SELECT);
+      expect(rig.guestScene.ui.processInput(Button.RIGHT), "guest moves to the second enemy target").toBe(true);
+      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms the second enemy target").toBe(true);
       await drainLoopback();
       await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase");
     });
