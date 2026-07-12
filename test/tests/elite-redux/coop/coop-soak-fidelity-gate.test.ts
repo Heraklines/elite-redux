@@ -20,13 +20,9 @@
 //
 // 🔴 HONESTY (#897 step 4). The gate for the HARD invariants (LOCKSTEP / NO-PARK / TEARDOWN) is UNCONDITIONAL:
 // a breach throws and reds the gate - this is the reviewer's core ask and it holds today at the bounded depth.
-// The SOFTER co-op-fidelity classes - unhealed DIGEST divergences (the #891 guest money-lag class) and the
-// per-turn production checksum ASSERTION count - are the ones the prod path is still closing. This test's
-// scoping is driven by the re-run triage (#891): the constants HONEST_DIGEST_GATE / HONEST_ASSERT_GATE below
-// are flipped ON only for the classes proven CLEAN at the bounded depth on the current HEAD, and left OFF
-// (report-only, with a loud TODO naming the excluded invariant + task #891) for any class still open - never
-// by weakening an assertion, only by scoping the gate to what genuinely holds. See the report / the driver
-// header for the class-by-class state.
+// Unhealed DIGEST divergences and production checksum assertions are unconditional too. An open invariant
+// belongs on a red candidate; a report-only switch inside a deploy gate would let a later change silently
+// weaken the evidence again.
 //
 // HOW TO RUN (what LANE P runs; SOAK_WAVES + SOAK_FIDELITY are supplied by the gate):
 //   SOAK_FIDELITY=production SOAK_WAVES=12 ER_SCENARIO=1 \
@@ -61,20 +57,11 @@ const FIDELITY_ON = resolveSoakFidelity() === "production";
 const WAVES = Number(process.env.SOAK_WAVES) > 0 ? resolveSoakWaves() : 12;
 const SOAK_TEST_TIMEOUT_MS = Math.max(600_000, WAVES * 12_000);
 
-// 🔴 #897/#891 HONESTY GATES. Flipped ON only for the co-op-fidelity classes PROVEN clean at the bounded depth
-// on the current HEAD (re-run triage). OFF = report-only with a loud TODO (the class is still open; scoping the
-// gate OUT of it is honest, weakening an assertion to force green is not). See the file header.
-//
 // #891 RE-RUN TRIAGE (2026-07-10, seed 20260710, SOAK_WAVES=20 god prod-fidelity, current HEAD): BOTH classes
 // are CLEAN - findings=0, assertions=0, over-grants=0, runEnded=no across all 20 waves (resyncHeals=5-9 all
 // converged). The prior #891 findings are FIXED-SINCE: the guest money-lag is now the BENIGN guest-below-host
 // renderer lag (re-synced at each wave-start mirror via adoptCoopHostRunConfig, never a finding), and the
-// reward-shop strand does not reproduce (boss/milestone reward tails at waves 10 & 20 crossed cleanly). So
-// both gates start ON, GREEN HONESTLY - no assertion weakened, no class scoped out. If a future seed reddens
-// either, flip the offending one OFF (report-only + TODO(#891)) rather than weaken it, and file the divergence.
-const HONEST_DIGEST_GATE = true; // unhealed DIGEST divergences (the #891 guest money-lag class) - gate ON, clean.
-const HONEST_ASSERT_GATE = true; // production per-turn checksum assertion count - gate ON, clean.
-
+// reward-shop strand does not reproduce (boss/milestone reward tails at waves 10 & 20 crossed cleanly).
 describe.skipIf(!RUN || !FIDELITY_ON)(
   "GATING production-fidelity co-op SOAK: hard invariants red the gate (#897)",
   () => {
@@ -171,6 +158,14 @@ describe.skipIf(!RUN || !FIDELITY_ON)(
         // the exact owner send / watcher adopt sequence survives without requiring a diagnostic rerun.
         logs.flush();
 
+        // Console exceptions are failures even if the harness managed to keep advancing. Lane P previously
+        // passed while repeatedly printing animation TypeErrors, which is not behavior a human client can
+        // tolerate and made the green result materially misleading.
+        expect(
+          logs.errors,
+          `production-fidelity soak emitted ${logs.errors.length} console error(s): ${logs.errors.join(" | ")}`,
+        ).toEqual([]);
+
         // ===== GATE 1 (anti-"silent pass-after-wave-1"): the run must SURVEY THE FULL bounded wave count. =====
         // A god party at this bounded depth steamrolls, so a terminal run-end (wipe -> GameOver -> Title) or a
         // short survey is a REAL regression, not the late-game level ceiling. This is what stops a run that
@@ -185,39 +180,20 @@ describe.skipIf(!RUN || !FIDELITY_ON)(
           `production-fidelity soak surveyed only ${result.wavesCompleted}/${WAVES} waves (replay SOAK_SEED=${seed})`,
         ).toBe(WAVES);
 
-        // ===== GATE 2 (co-op fidelity, HONESTY-SCOPED #891): unhealed DIGEST divergences. =====
-        if (HONEST_DIGEST_GATE) {
-          expect(
-            result.findings,
-            `production-fidelity soak found ${result.findings.length} unhealed DIGEST desync(s) at bounded depth `
-              + `${WAVES} (replay SOAK_SEED=${seed}): `
-              + result.findings.map(f => `[${f.fields}]@${f.firstWave}`).join(", "),
-          ).toEqual([]);
-        } else if (result.findings.length > 0) {
-          // eslint-disable-next-line no-console
-          console.log(
-            "[coop-soak-fidelity-gate] 🔴 TODO(#891): DIGEST-divergence gate is SCOPED OUT (report-only) because a "
-              + `REAL-OPEN production-fidelity divergence reproduces at bounded depth ${WAVES}: `
-              + `${result.findings.map(f => `[${f.fields}]@${f.firstWave}`).join(", ")}. The HARD invariants `
-              + "(LOCKSTEP/NO-PARK/TEARDOWN) still gate above; re-enable HONEST_DIGEST_GATE once #891 lands.",
-          );
-        }
+        // ===== GATE 2: unhealed DIGEST divergences. =====
+        expect(
+          result.findings,
+          `production-fidelity soak found ${result.findings.length} unhealed DIGEST desync(s) at bounded depth `
+            + `${WAVES} (replay SOAK_SEED=${seed}): `
+            + result.findings.map(f => `[${f.fields}]@${f.firstWave}`).join(", "),
+        ).toEqual([]);
 
-        // ===== GATE 3 (co-op fidelity, HONESTY-SCOPED #891): production per-turn checksum ASSERTION count. =====
-        if (HONEST_ASSERT_GATE) {
-          expect(
-            result.assertions,
-            `production-fidelity soak tripped ${result.assertions} production checksum assertion(s) at bounded depth `
-              + `${WAVES} - a per-turn full-state divergence the heal-once had to close (replay SOAK_SEED=${seed})`,
-          ).toBe(0);
-        } else if (result.assertions > 0) {
-          // eslint-disable-next-line no-console
-          console.log(
-            "[coop-soak-fidelity-gate] 🔴 TODO(#891): checksum-ASSERTION gate is SCOPED OUT (report-only) because "
-              + `${result.assertions} production per-turn assertion(s) reproduce at bounded depth ${WAVES}. The HARD `
-              + "invariants still gate above; re-enable HONEST_ASSERT_GATE once #891 lands.",
-          );
-        }
+        // ===== GATE 3: production per-turn checksum ASSERTION count. =====
+        expect(
+          result.assertions,
+          `production-fidelity soak tripped ${result.assertions} production checksum assertion(s) at bounded depth `
+            + `${WAVES} - a per-turn full-state divergence the heal-once had to close (replay SOAK_SEED=${seed})`,
+        ).toBe(0);
 
         // ===== GATE 4: a successful heal must not hide a causal replication bug. =====
         // Expected renderer money lag is classified narrowly in the driver. Every other PRE-heal

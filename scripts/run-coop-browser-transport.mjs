@@ -90,6 +90,9 @@ async function configurePage(page, label, browserErrors) {
   page.on("pageerror", error => browserErrors.push(`[${label}:page] ${error.stack ?? error.message}`));
   page.on("console", message => {
     const text = message.text();
+    if (message.type() === "error") {
+      browserErrors.push(`[${label}:console] ${text}`);
+    }
     if (/\[coop:(?:launch|webrtc|session)\]/.test(text)) {
       process.stdout.write(`[${label}] ${text}\n`);
     }

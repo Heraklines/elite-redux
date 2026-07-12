@@ -7,11 +7,28 @@ on:
       - feat/elite-redux-port
     paths:
       - ".github/workflows/coop-gate-sharded.yml"
+      - ".github/actions/setup-deps/**"
+      - ".nvmrc"
+      - "assets"
+      - "assets/**"
+      - "biome.json*"
+      - "index.css"
+      - "index.html"
+      - "locales"
+      - "locales/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "patches/**"
+      - "public/**"
       - "scripts/run-coop-gate.mjs"
       - "scripts/run-coop-static-gate.mjs"
       - "scripts/run-coop-browser-transport.mjs"
       - "src/**"
       - "test/**"
+      - "tsconfig*.json"
+      - "vite.config.ts"
+      - "vitest.config.ts"
+      - "workers/**"
 
 concurrency:
   group: coop-gate-sharded-${{ github.ref }}
@@ -60,9 +77,23 @@ jobs:
 
       - uses: ./.github/actions/setup-deps
 
-      - name: Check changed-file types, formatting, and lint
+      - name: Resolve last successful full-gate base
         env:
-          COOP_BASE_SHA: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          base="$(
+            gh api \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/coop-gate-sharded.yml/runs?branch=feat%2Felite-redux-port&status=success&per_page=10" \
+              --jq ".workflow_runs[] | select(.head_sha != \"${GITHUB_SHA}\") | .head_sha" \
+              | head -n 1
+          )"
+          if [ -z "$base" ]; then
+            base="${{ github.event.before }}"
+          fi
+          echo "COOP_BASE_SHA=$base" >> "$GITHUB_ENV"
+
+      - name: Check changed-file types, formatting, and lint
         run: node scripts/run-coop-static-gate.mjs
 
   gate:
@@ -87,6 +118,10 @@ jobs:
           - { lane: C, shard: 2, total: 3 }
           - { lane: C, shard: 3, total: 3 }
           - { lane: P, shard: 1, total: 1 }
+          - { lane: S, shard: 1, total: 3 }
+          - { lane: S, shard: 2, total: 3 }
+          - { lane: S, shard: 3, total: 3 }
+          - { lane: T, shard: 1, total: 1 }
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -115,6 +150,22 @@ jobs:
             coop-gate-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log
             dev-logs/coop-duo/**
             dev-logs/coop-soak/**
-            .vitest-reports/blob.json
+            .vitest-reports/**
           retention-days: 7
           if-no-files-found: warn
+
+  coop-required:
+    name: Co-op required aggregate
+    if: always()
+    needs: [browser, static, gate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every co-op checkpoint job
+        env:
+          BROWSER_RESULT: ${{ needs.browser.result }}
+          STATIC_RESULT: ${{ needs.static.result }}
+          GATE_RESULT: ${{ needs.gate.result }}
+        run: |
+          test "$BROWSER_RESULT" = success
+          test "$STATIC_RESULT" = success
+          test "$GATE_RESULT" = success
