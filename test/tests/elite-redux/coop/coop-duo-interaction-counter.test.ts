@@ -123,6 +123,11 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     const pair = createLoopbackPair();
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
+    // This scenario verifies reward relay/counter symmetry for returning players. The first-time item
+    // tutorial is a separate MESSAGE interaction that deliberately blocks reward ACTION input until its
+    // text is acknowledged; keep it out of this call-chain proof on both simulated clients.
+    rig.hostScene.enableTutorials = false;
+    rig.guestScene.enableTutorials = false;
 
     // ===== Wave 1: host plays to a win + guest replays (reach the reward shop, counter 0 = host owns). =====
     const turn = rig.hostScene.currentBattle.turn;
@@ -186,16 +191,11 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
       expect(rig.hostScene.ui.getMode(), "the owner reached the real reward UI").toBe(UiMode.MODIFIER_SELECT);
       resetCoopUiRelayTrace();
       let accepted = false;
-      // The host scene is not Phaser's active scene in this same-process two-engine harness, so its
-      // reward intro will not receive game-loop ticks automatically. Advance the REAL scene clock +
-      // tween manager until the real handler enables input, then press the public ACTION boundary.
-      let animationTime = 0;
-      for (let i = 0; i < 600 && !accepted; i++) {
-        animationTime += 16;
-        rig.hostScene.time.update(animationTime, 16);
-        rig.hostScene.tweens.update(animationTime, 16);
-        await Promise.resolve();
+      for (let i = 0; i < 500 && !accepted; i++) {
         accepted = rig.hostScene.ui.processInput(Button.ACTION);
+        if (!accepted) {
+          await new Promise(resolve => setTimeout(resolve, 5));
+        }
       }
       expect(accepted, "the owner takes the deterministic LURE via UI after its intro animation").toBe(true);
       expect(
