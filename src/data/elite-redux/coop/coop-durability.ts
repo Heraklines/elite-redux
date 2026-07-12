@@ -562,7 +562,7 @@ export interface CoopDurabilityHooks {
    * when absent the manager replays whatever the ring holds (the existing per-surface snapshot heal covers
    * the deep gap in that case, so this is not required for correctness of the shallow-gap path).
    */
-  sendFullSnapshot?: (cls: string, headRevision: number) => void;
+  sendFullSnapshot?: (cls: string, headRevision: number, controlHighWater: Record<string, number>) => void;
 }
 
 /**
@@ -684,7 +684,7 @@ export class CoopDurabilityManager {
       // fallback when no snapshot hook is wired).
       const head = this.journal.highWaterMark(cls);
       coopLog("durability", `resync cls=${cls} from=${from} DEEPER than ring -> full snapshot at head=${head}`);
-      this.hooks.sendFullSnapshot?.(cls, head);
+      this.hooks.sendFullSnapshot?.(cls, head, this.controlPlaneHighWater());
       return;
     }
     const tail = this.journal.tailFrom(cls, from);
@@ -747,7 +747,7 @@ export class CoopDurabilityManager {
           "durability",
           `${reason} cls=${cls} OVERFLOW: ring evicted ops the peer needs (acked=${acked} deeper than ring) -> full snapshot at head=${head}`,
         );
-        this.hooks.sendFullSnapshot?.(cls, head);
+        this.hooks.sendFullSnapshot?.(cls, head, this.controlPlaneHighWater());
         continue; // the retained tail is unusable (a gap at the evicted ops); the snapshot heals it
       }
       const tail = this.journal.resendTail(cls);

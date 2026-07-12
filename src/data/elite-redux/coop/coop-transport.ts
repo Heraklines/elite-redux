@@ -62,7 +62,9 @@ export type CoopRole = "host" | "guest";
 // er-coop-20: interaction-counter barriers request an idempotent counter replay and never timeout open.
 // er-coop-21: wave-party carriers include the complete encounter descriptor so a late/replayed carrier
 // atomically replaces locally-derived battle type, format, mystery type, levels, and trainer presentation.
-export const COOP_PROTOCOL_VERSION = "er-coop-21";
+// er-coop-22: full state-sync snapshots atomically bind the session epoch, host checksum, and every
+// control high-water mark; receivers advance control only after safe-boundary checksum convergence.
+export const COOP_PROTOCOL_VERSION = "er-coop-22";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -271,14 +273,16 @@ export interface CoopSerializedTrainer {
   name?: string | undefined;
   partnerName?: string | undefined;
   nameWithTitle?: string | undefined;
-  renderNames?: {
-    none: string;
-    noneWithTitle: string;
-    trainer: string;
-    trainerWithTitle: string;
-    partner: string;
-    partnerWithTitle: string;
-  } | undefined;
+  renderNames?:
+    | {
+        none: string;
+        noneWithTitle: string;
+        trainer: string;
+        trainerWithTitle: string;
+        partner: string;
+        partnerWithTitle: string;
+      }
+    | undefined;
   encounterMessages?: string[] | undefined;
   victoryMessages?: string[] | undefined;
   defeatMessages?: string[] | undefined;
@@ -523,6 +527,10 @@ export interface CoopFullMonSnapshot {
 export interface CoopFullBattleSnapshot {
   /** #807 monotonic state tick (Source-style snapshot sequencing); absent on legacy senders. */
   tick?: number;
+  /** Session epoch this atomic DATA+CONTROL snapshot belongs to. */
+  sessionEpoch?: number | undefined;
+  /** Host checksum captured with this snapshot; control marks advance only after it matches post-apply. */
+  checksum?: string | undefined;
   /** Operation revisions whose effects this authoritative snapshot already subsumes (§4.4). */
   journalHighWater?: Record<string, number> | undefined;
   /** Every occupied field mon's full state, by battler index. */

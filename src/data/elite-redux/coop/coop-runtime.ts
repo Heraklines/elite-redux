@@ -315,6 +315,8 @@ function wireCoopResyncResponder(
       const blob = compressToBase64(
         JSON.stringify({
           ...snapshot,
+          sessionEpoch: controller.sessionEpoch,
+          checksum: captureCoopChecksum(),
           journalHighWater: durability?.controlPlaneHighWater() ?? {},
         } satisfies CoopFullBattleSnapshot),
       );
@@ -342,12 +344,53 @@ export function adoptCoopSnapshotHighWater(
   }
 }
 
+/** Queue one DATA+CONTROL snapshot for safe-boundary apply; ACK control only after checksum convergence. */
+function queueCoopAtomicSnapshotApply(
+  controller: CoopSessionController,
+  durability: CoopDurabilityManager | undefined,
+  snapshot: CoopFullBattleSnapshot,
+  label: string,
+  onHealed?: (() => void) | undefined,
+): boolean {
+  if (
+    snapshot.sessionEpoch !== controller.sessionEpoch
+    || snapshot.checksum == null
+    || snapshot.checksum === COOP_CHECKSUM_SENTINEL
+  ) {
+    coopWarn(
+      "resync",
+      `${label} refused epoch=${snapshot.sessionEpoch ?? "legacy"}/${controller.sessionEpoch} `
+        + `checksum=${snapshot.checksum ?? "missing"}`,
+    );
+    return false;
+  }
+  const snapshotTurn = snapshot.authoritativeState?.turn ?? globalScene.currentBattle?.turn ?? 0;
+  globalScene.phaseManager.pushNew(
+    "CoopApplyResyncPhase",
+    snapshot,
+    snapshotTurn,
+    snapshot.checksum,
+    undefined,
+    healed => {
+      if (!healed) {
+        coopWarn("resync", `${label} did not converge -> control marks withheld`);
+        return;
+      }
+      adoptCoopSnapshotHighWater(durability, snapshot);
+      onHealed?.();
+      coopLog("resync", `${label} atomically applied`);
+    },
+  );
+  return true;
+}
+
 /** Host-side deep-gap escalation: push a heavy snapshot stamped at the evicted class's journal head. */
 function sendCoopDurabilitySnapshot(
   controller: CoopSessionController,
   battleStream: CoopBattleStreamer,
   cls: string,
   headRevision: number,
+  controlHighWater: Record<string, number>,
 ): void {
   if (controller.role !== "host") {
     return;
@@ -360,7 +403,12 @@ function sendCoopDurabilitySnapshot(
     }
     const stamped = {
       ...snapshot,
-      journalHighWater: { [cls]: headRevision },
+      sessionEpoch: controller.sessionEpoch,
+      checksum: captureCoopChecksum(),
+      journalHighWater: {
+        ...controlHighWater,
+        [cls]: Math.max(controlHighWater[cls] ?? 0, headRevision),
+      },
     } satisfies CoopFullBattleSnapshot;
     battleStream.sendDurabilitySnapshot(compressToBase64(JSON.stringify(stamped)));
   } catch (e) {
@@ -380,9 +428,12 @@ function wireCoopDurabilitySnapshotReceiver(
     }
     try {
       const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
-      applyCoopFullSnapshot(snapshot, isCoopAuthoritativeGuest());
-      adoptCoopSnapshotHighWater(durability, snapshot);
-      coopLog("resync", `durability deep-gap snapshot applied blob=${blob.length}b`);
+      queueCoopAtomicSnapshotApply(
+        controller,
+        durability,
+        snapshot,
+        `durability deep-gap snapshot blob=${blob.length}b`,
+      );
     } catch (e) {
       coopWarn("resync", "durability deep-gap snapshot apply failed", e);
     }
@@ -771,12 +822,26 @@ function wireCoopMeChecksumCheck(
         // path below is advisory by design (#839): it must never disrupt the encounter.
         const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
         applyCoopFullSnapshot(snapshot, isCoopAuthoritativeGuest(), /* suppressResummon */ true);
-        adoptCoopSnapshotHighWater(durability, snapshot);
         const healed = captureCoopChecksum();
-        if (healed === ownerChecksum) {
+        const targetChecksum = snapshot.checksum ?? ownerChecksum;
+        if (healed === targetChecksum) {
+          adoptCoopSnapshotHighWater(durability, snapshot);
           coopLog("resync", `me-entry seq=${seq} ok (healed=${healed})`);
         } else {
-          coopWarn("resync", `me-entry seq=${seq} still-diverged owner=${ownerChecksum} watcher=${healed}`);
+          coopWarn("resync", `me-entry seq=${seq} still-diverged owner=${targetChecksum} watcher=${healed}`);
+          // The cheap mid-ME apply could not converge. Queue the comprehensive safe-boundary apply; its
+          // phase holds play if convergence still fails and advances control marks only after success.
+          const liveController = getCoopController();
+          if (liveController == null) {
+            coopWarn("resync", `me-entry seq=${seq} cannot queue comprehensive snapshot (no live controller)`);
+            return;
+          }
+          queueCoopAtomicSnapshotApply(
+            liveController,
+            durability,
+            { ...snapshot, checksum: targetChecksum },
+            `me-entry seq=${seq} comprehensive snapshot`,
+          );
         }
       } catch (e) {
         /* a malformed resync blob must never crash the ME flow */
@@ -1089,9 +1154,12 @@ export function wireCoopStallWatchdog(
             }
             try {
               const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
-              applyCoopFullSnapshot(snapshot, isCoopAuthoritativeGuest());
-              adoptCoopSnapshotHighWater(runtime.durability, snapshot);
-              coopLog("resync", `stall-recovery snapshot applied seq=${seq} blob=${blob.length}b`);
+              queueCoopAtomicSnapshotApply(
+                runtime.controller,
+                runtime.durability,
+                snapshot,
+                `stall-recovery snapshot seq=${seq} blob=${blob.length}b`,
+              );
             } catch {
               coopWarn("resync", `stall-recovery snapshot apply FAILED seq=${seq}`);
             }
@@ -1285,9 +1353,12 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
               }
               try {
                 const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
-                applyCoopFullSnapshot(snapshot, isCoopAuthoritativeGuest());
-                adoptCoopSnapshotHighWater(runtime.durability, snapshot);
-                coopLog("resync", `post-rejoin snapshot applied seq=${seq} blob=${blob.length}b`);
+                queueCoopAtomicSnapshotApply(
+                  runtime.controller,
+                  runtime.durability,
+                  snapshot,
+                  `post-rejoin snapshot seq=${seq} blob=${blob.length}b`,
+                );
               } catch {
                 coopWarn("resync", `post-rejoin snapshot apply FAILED seq=${seq} (checksum backstop heals next turn)`);
               }
@@ -2942,8 +3013,8 @@ export function assembleCoopRuntime(
   const durability = isCoopDurabilityEnabled()
     ? new CoopDurabilityManager(transport, {
         ...operationDurabilityHooks,
-        sendFullSnapshot: (cls, headRevision) =>
-          sendCoopDurabilitySnapshot(controller, battleStream, cls, headRevision),
+        sendFullSnapshot: (cls, headRevision, controlHighWater) =>
+          sendCoopDurabilitySnapshot(controller, battleStream, cls, headRevision, controlHighWater),
       })
     : undefined;
   // Install the active manager so the migrated surface adapters' commit path journals into it (Wave-2e).

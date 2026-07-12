@@ -207,11 +207,18 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
   it("I3: coopResyncAll on an overflowed class escalates to a full snapshot instead of resending an unusable partial tail", async () => {
     const pair = createLoopbackPair();
     const hostGate = new ChannelGate(pair.host);
-    const snapshots: number[] = [];
+    const snapshots: Array<{ cls: string; head: number; marks: Record<string, number> }> = [];
     // Ring capacity 3: after 6 commits it retains 4,5,6 and EVICTS 1,2,3.
-    const hostMgr = new CoopDurabilityManager(hostGate, { sendFullSnapshot: (_cls, head) => snapshots.push(head) }, 3);
+    const hostMgr = new CoopDurabilityManager(
+      hostGate,
+      {
+        sendFullSnapshot: (cls, head, marks) => snapshots.push({ cls, head, marks }),
+      },
+      3,
+    );
     const guestMgr = new CoopDurabilityManager(pair.guest);
 
+    hostMgr.commit("reward", 1, waveMsg(1));
     for (let w = 1; w <= 6; w++) {
       hostMgr.commit("wave", w, waveMsg(w));
     }
@@ -225,7 +232,9 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     pair.guest.send({ t: "coopResyncAll" });
     await flush();
 
-    expect(snapshots, "an overflowed deep gap must escalate to a full snapshot on coopResyncAll").toEqual([6]);
+    expect(snapshots, "an overflowed deep gap must escalate with the complete atomic control frontier").toEqual([
+      { cls: "wave", head: 6, marks: { reward: 1, wave: 6 } },
+    ]);
     expect(
       hostGate.sentTypes.filter(t => t === "waveResolved"),
       "the unusable partial tail must NOT be resent for an overflowed class",
