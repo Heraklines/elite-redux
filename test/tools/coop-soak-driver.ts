@@ -2527,6 +2527,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     if (crossedUndrivableWave(wave)) {
       break;
     }
+    // Arm a scheduled NEXT-wave ME before this wave's shared terminal. A reward TAKE (and some crossroads
+    // tails) can synchronously shift through NewBattlePhase/EncounterPhase all the way to the next
+    // CommandPhase before driveRewardShop returns. Setting the override only in the post-wave crossing was
+    // therefore too late and attempted to "force" an already-constructed normal battle. Priming one boundary
+    // early makes both LEAVE and immediate terminal-reward paths deterministic and production-representative.
+    const scheduledNextMe = opts.meWaves?.get(wave + 1);
+    if (scheduledNextMe != null) {
+      game.override.mysteryEncounterChance(100).mysteryEncounter(scheduledNextMe);
+    }
     const currentBiome = rig.hostScene.arena.biomeId;
     if (currentBiome !== previousBiome) {
       biomeTransitions++;
@@ -2703,7 +2712,21 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           await crossCommandBoundaryWithReplayGuest(wave + 1, 1, armHostFaintAutoPick);
         } else {
           await withClient(rig.hostCtx, async () => {
-            await crossIntoMeWave(nextMeType);
+            const battle = rig.hostScene.currentBattle;
+            const alreadyConstructed =
+              battle.waveIndex === wave + 1
+              && battle.battleType === BattleType.MYSTERY_ENCOUNTER
+              && battle.mysteryEncounter?.encounterType === nextMeType;
+            if (alreadyConstructed) {
+              // The prior terminal already consumed the primed override. Park at the same boundary
+              // crossIntoMeWave promises, then clear the rate so later unscheduled waves remain ordinary.
+              if (rig.hostScene.phaseManager.getCurrentPhase()?.phaseName !== "MysteryEncounterPhase") {
+                await game.phaseInterceptor.to("MysteryEncounterPhase", false);
+              }
+              game.override.mysteryEncounterChance(0);
+            } else {
+              await crossIntoMeWave(nextMeType);
+            }
           });
         }
       } catch (e) {
