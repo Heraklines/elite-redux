@@ -40,6 +40,7 @@ import {
   resetCoopTailWouldBlockLog,
 } from "#data/elite-redux/coop/coop-renderer-gate";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
+import { commitRewardOwnerIntent } from "#data/elite-redux/coop/coop-reward-operation";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -308,6 +309,23 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     await withClient(rig.hostCtx, async () => {
       hostShop.start(); // owner: streams the rolled TM_CASE options + opens the owner screen
       await drainLoopback();
+    });
+
+    // driveGuestTmCaseRegression injects the nested party pick at the legacy carrier seam because
+    // the headless owner menu cannot be clicked. Production emits the authoritative REWARD envelope
+    // alongside that frame; explicitly commit the identical action so this regression exercises the
+    // current journal-led path instead of a raw-only frame that must now fail closed.
+    await withClient(rig.hostCtx, () => {
+      commitRewardOwnerIntent({
+        surface: "reward",
+        pinned: hostShop.coopInteractionStart,
+        label: "reward",
+        choice: 0,
+        data: [0, pick.slot, pick.moveIndex],
+        terminal: false,
+        localRole: "host",
+        wave: rig.hostScene.currentBattle.waveIndex,
+      });
     });
 
     // Drive the GUEST watcher through the relayed TM_CASE pick + its no-op LearnMovePhase.

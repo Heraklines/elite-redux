@@ -39,6 +39,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import { commitRewardOwnerIntent } from "#data/elite-redux/coop/coop-reward-operation";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -269,6 +270,24 @@ describe.skipIf(!RUN)("co-op DUO reward sub-pickers: owner drives, watcher adopt
     const { hostShop, guestShop } = await reachShops(rig);
     await withClient(rig.hostCtx, async () => {
       hostShop.start();
+    });
+
+    // The production owner send is dual-carried: the legacy interactionChoice plus the
+    // authoritative REWARD envelope. This helper injects the legacy frame directly because
+    // headless Phaser cannot drive the nested party menu, so commit the matching envelope here
+    // before the guest watcher consumes it. Raw-only injection is intentionally rejected now
+    // that the journal is the leading carrier for migrated reward actions.
+    await withClient(rig.hostCtx, () => {
+      commitRewardOwnerIntent({
+        surface: "reward",
+        pinned: hostShop.coopInteractionStart,
+        label: "reward",
+        choice: 0,
+        data: [0, pick.slot, pick.moveIndex],
+        terminal: false,
+        localRole: "host",
+        wave: rig.hostScene.currentBattle.waveIndex,
+      });
     });
 
     // GUEST watcher: adopt the relayed pick, apply it (queues the continuation copy + LearnMovePhase),
