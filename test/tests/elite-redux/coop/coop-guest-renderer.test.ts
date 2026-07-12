@@ -1394,6 +1394,17 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // isBoss() is `!!this.bossSegments`, so it reads false for both 0 and the never-promoted undefined -
     // the load-bearing guarantee: a normal enemy round-trips as a normal mon, no spurious boss bars.
     expect(rebuiltNonBoss!.isBoss(), "a non-boss enemy round-trips as a normal mon (no spurious boss)").toBe(false);
+    const forcedMaxHp = rebuiltNonBoss!.getMaxHp() + 7;
+    const rebuiltWithForeignContext = buildCoopEnemy(
+      { ...nonBossBlob, hp: forcedMaxHp, maxHp: forcedMaxHp },
+      hostNonBoss.level,
+      TrainerSlot.TRAINER,
+    );
+    expect(
+      rebuiltWithForeignContext!.getMaxHp(),
+      "the wave-start carrier forces authoritative maxHp when local reconstruction differs",
+    ).toBe(forcedMaxHp);
+    expect(rebuiltWithForeignContext!.hp, "current hp clamps against the authoritative maxHp").toBe(forcedMaxHp);
     const rebuiltSegments = rebuiltNonBoss!.bossSegments;
     const rebuiltSegmentsIsPositive = typeof rebuiltSegments === "number" && rebuiltSegments > 0;
     expect(

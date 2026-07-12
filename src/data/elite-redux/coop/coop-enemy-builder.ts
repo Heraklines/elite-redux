@@ -23,6 +23,7 @@ import type { CoopSerializedEnemy, CoopSerializedPokemon } from "#data/elite-red
 import type { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import type { Nature } from "#enums/nature";
+import { Stat } from "#enums/stat";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { EnemyPokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
@@ -125,11 +126,18 @@ export function buildCoopEnemy(
       `guest adopt enemy bi=${trainerSlot} isBoss segments=${bossSegments} index=${enemy.bossSegmentIndex}`,
     );
   }
-  // Clamp current hp to the host's authoritative maxHp ceiling when present (so an adopted boss/normal
-  // mon whose maxHp diverged at adopt time still clamps correctly), else our freshly-computed maxHp.
+  // The serialized maxHp is authoritative state, not merely an hp clamp. ER modifiers and per-client
+  // constructor context can make an otherwise identical species/level/IV reconstruction calculate a
+  // different HP stat (the continuous ME+biome journey caught host=40, guest=42). Force the host ceiling
+  // before assigning current hp, exactly like the full-snapshot materializer, so the first visible frame
+  // of a wave is already converged rather than waiting for a later checksum heal.
+  const maxHp = coopNum(data, "maxHp");
+  if (maxHp !== undefined && maxHp > 0 && enemy.getMaxHp() !== Math.trunc(maxHp)) {
+    coopWarn("enemy", `buildCoopEnemy maxHp authority host=${Math.trunc(maxHp)} guest=${enemy.getMaxHp()} -> applied`);
+    enemy.setStat(Stat.HP, Math.trunc(maxHp));
+  }
   const hp = coopNum(data, "hp");
   if (hp !== undefined) {
-    const maxHp = coopNum(data, "maxHp");
     const ceiling = maxHp !== undefined && maxHp > 0 ? maxHp : enemy.getMaxHp();
     enemy.hp = Math.max(0, Math.min(hp, ceiling));
   }
