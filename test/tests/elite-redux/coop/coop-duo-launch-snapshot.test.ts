@@ -38,7 +38,7 @@ import { materializeCoopLoadedPlayerField } from "#phases/encounter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -118,14 +118,17 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
     // the presentation-only materializer. Exercise that exact seam and require BOTH seats + UI bars.
     await withClient(rig.guestCtx, () => {
       const capacity = rig.guestScene.currentBattle.arrangement.playerCapacity;
+      const seats = rig.guestScene.getPlayerParty().slice(0, capacity);
+      const spriteVisible = seats.map(mon => vi.spyOn(mon.getSprite(), "setVisible"));
+      const infoVisible = seats.map(mon => vi.spyOn(mon, "showInfo"));
       expect(materializeCoopLoadedPlayerField(), "both launch leads are materialized").toBe(capacity);
       const field = rig.guestScene.getPlayerField(true);
       expect(field, "guest renders every active co-op player seat").toHaveLength(capacity);
-      for (const mon of field) {
+      for (const [index, mon] of field.entries()) {
         expect(mon.isOnField(), `${mon.name} is seated`).toBe(true);
         expect(mon.visible, `${mon.name} container is visible`).toBe(true);
-        expect(mon.getSprite().visible, `${mon.name} sprite is visible`).toBe(true);
-        expect(mon.getBattleInfo().visible, `${mon.name} battle UI is visible`).toBe(true);
+        expect(spriteVisible[index], `${mon.name} sprite was explicitly shown`).toHaveBeenCalledWith(true);
+        expect(infoVisible[index], `${mon.name} battle UI was explicitly shown`).toHaveBeenCalledOnce();
       }
     });
 
