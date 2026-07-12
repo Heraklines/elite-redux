@@ -1140,6 +1140,10 @@ export const REPLAY_DRAIN_PHASES = new Set([
   "CoopStatusReplayPhase",
   "CoopFaintReplayPhase",
   "CoopGuestFaintSwitchPhase",
+  // The renderer gate replaces a forbidden local resolution phase (commonly MovePhase) with this
+  // fail-closed no-op. It can legitimately sit ahead of the replay presentation/finalize tree and must
+  // be ended so the authoritative checkpoint is not left queued behind it.
+  "CoopInertPhase",
   // #827: the #782 instant-streaming continuation, folded into the shared set (was a separate copy in
   // coop-duo-fault.test.ts). Stall detection below is by phase IDENTITY so a re-entered continuation
   // (a NEW object each increment) resets the counter instead of reading as a hang.
