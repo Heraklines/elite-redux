@@ -8,6 +8,7 @@ on:
     paths:
       - ".github/workflows/coop-gate-sharded.yml"
       - "scripts/run-coop-gate.mjs"
+      - "scripts/run-coop-static-gate.mjs"
       - "src/**"
       - "test/**"
 
