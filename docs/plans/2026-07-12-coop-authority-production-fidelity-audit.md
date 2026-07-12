@@ -4,7 +4,9 @@ Date: 2026-07-12
 
 Audited branch: `heraklines/feat/elite-redux-port`
 
-Audited source SHA: `cf714363a15927e84521b69d1b00c5a186e88480`
+Initial audited source SHA: `cf714363a15927e84521b69d1b00c5a186e88480`
+
+Latest remote re-audit SHA: `efc009aa180c289155b63f02201dc48acdad900c`
 
 Latest staging source checkpoint: `9585dacdd`
 
@@ -32,13 +34,18 @@ checkpoint waited behind it.
 
 The green soaks did not contradict the player. They exercised a materially different system. They copied
 or repaired wave state, installed a test-only command responder, directly invoked phases/handlers, and
-often ran host and guest under one process-global scene. The newest attempt to remove only two of those
-shortcuts is red because it found the guest still sitting on `TitlePhase`. That red is valuable evidence
-that earlier green results overstated lifecycle fidelity.
+often ran host and guest under one process-global scene. The latest three test commits now drive public
+guest command/fight/target input, but still clear the guest queue and force `TurnInitPhase` instead of
+booting through the production lobby/load lifecycle. The newest exact-SHA gate is also red: its scheduled
+transport disabled automatic delivery, drove a reward owner before the reciprocal watcher, and never
+delivered the guest's counter acknowledgement back to the host. `CoopPartnerSyncPhase` correctly kept the
+next-wave boundary closed. Both red failures are valuable evidence that earlier green results overstated
+lifecycle fidelity.
 
-The branch must not be called deployable at `cf714363a`. Full gate run `29204456430` is red in Lane B2.
+The branch must not be called deployable at `efc009aa1`. Full gate run `29206057813` is red in Lane B2.
 The previous exact SHA `4f6e786ad` passed the full sharded gate and six-profile Nightly, but the newly
-added real-queue journey proves those green results did not cover the production guest lifecycle.
+strengthened journey proves those green results did not cover the production guest lifecycle or even all
+scheduled-transport acknowledgements.
 
 ## Evidence checkpoint
 
@@ -46,13 +53,30 @@ added real-queue journey proves those green results did not cover the production
 
 | Evidence | Result | Meaning |
 | --- | --- | --- |
+| Full gate, `29206057813`, SHA `efc009aa1` | RED | Three-wave journey parks in `CoopPartnerSyncPhase`; the test did not deliver the reciprocal reward/counter acknowledgement after disabling automatic transport. |
 | Full gate, `29204456430`, SHA `cf714363a` | RED | Guest journey hangs on `TitlePhase`; latest source is not a green checkpoint. |
 | Full gate, `29204101398`, SHA `4f6e786ad` | GREEN | All then-classified tests passed, but before the real queue-crossing assertion. |
 | Six-profile Nightly, `29204108055`, SHA `4f6e786ad` | GREEN | Long harness campaigns passed; this did not prove production UI/phase lifecycle. |
 | Staging deploy, `29202804876`, SHA `9585dacdd` | GREEN deploy | This is the code testers exercised in the latest reports. |
 
-Commits after `9585dacdd` through `cf714363a` primarily change tests/harness behavior. They do not remove
-the production recovery/transaction defects demonstrated by the newest tester logs.
+The commits through `efc009aa1` add useful production fixes for the unkeyed trainer vitamin and trainer
+presentation, and make the journey use public command/target UI. They do not remove the recovery/transaction
+defects demonstrated by the newest tester logs, and none of them is present on the staging SHA above.
+
+### Remote advancement during this audit
+
+Three remote commits landed while the audit was in progress:
+
+- `828733495` assigns a stable trainer-vitamin type ID and materializes an authoritative guest's trainer
+  field without running structural summon hooks.
+- `f2e9808a9` initializes mirrored command substrate needed by the second engine.
+- `efc009aa1` drives the guest's public command, fight, and target handlers in the multi-wave journey.
+
+Those are directionally correct. They do not constitute a production client bootstrap: the fixture still
+constructs a second scene, mirrors host state into it, clears its phase queue, and shifts directly to
+`TurnInitPhase`. The latest gate failure also shows that the scheduled test transport remains manual enough
+to omit a message that production transport would normally deliver. The journey should therefore be
+described as a two-engine component integration test, not an end-to-end production game.
 
 ### Live wave-4 transaction timeline
 
@@ -128,8 +152,8 @@ The following changes are worth keeping:
 - Public reward UI and real queued phase crossing began replacing direct test handler calls.
 - The sharded CI redesign reduced full-gate wall time by roughly 36-38 percent, and six Nightly profiles
   now run concurrently.
-- Most importantly, `cf714363a` did not paper over the next failure. It exposed the stale `TitlePhase` and
-  turned the newest gate red.
+- Most importantly, the strengthened journey has repeatedly kept the gate red rather than accepting a
+  false green: first at stale `TitlePhase`, then at an undelivered reciprocal reward acknowledgement.
 
 ## Stop-ship architecture findings
 
@@ -747,7 +771,8 @@ Co-op may be called bulletproof only when all of the following are true at the s
 
 ## What to tell the implementation agent now
 
-1. Do not make `cf714363a` green by skipping `TitlePhase`; replace the guest bootstrap.
+1. Do not call the forced `clearAllPhases()`/`shiftPhase()` guest setup a production bootstrap. Replace it
+   with the same lobby, load, encounter, and command lifecycle used by two browser clients.
 2. Treat the live wave-4 logs as two independent bugs: malformed vitamin serialization and un-wakeable
    recovery ordering. Verify both with separate tests.
 3. Stop calling dual-run surfaces authoritative. The journal is durable, but the guest still mutates.
