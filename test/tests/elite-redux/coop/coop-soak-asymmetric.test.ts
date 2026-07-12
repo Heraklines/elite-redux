@@ -133,12 +133,15 @@ describe.skipIf(!RUN)("co-op SOAK asymmetric continuation: host half out, guest 
     // The GUEST's own-slot command is EARTHQUAKE - a spread move that also hits its ALLY (the host's slot).
     // With the host mon at 1 HP on BOTH engines it faints deterministically turn 1; from turn 2 on (the host
     // mon gone) EARTHQUAKE hits only the level-100 foes, which shrug it off so the wave stays open.
-    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-      command: Command.FIGHT,
-      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-      moveId: MoveId.EARTHQUAKE,
-      targets: [BattlerIndex.ENEMY],
-    }));
+    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots, offer }) => {
+      const earthquake = offer?.moves.find(move => move.moveId === MoveId.EARTHQUAKE);
+      return {
+        command: Command.FIGHT,
+        cursor: earthquake?.slot ?? moveSlots[0] ?? 0,
+        moveId: MoveId.EARTHQUAKE,
+        targets: [...(earthquake?.targetSets[0] ?? [BattlerIndex.ENEMY])],
+      };
+    });
     rig.hostScene.getPlayerField()[hostFieldIdx].hp = 1;
     withClientSync(rig.guestCtx, () => {
       rig.guestScene.getPlayerField()[hostFieldIdx].hp = 1;
@@ -229,9 +232,15 @@ describe.skipIf(!RUN)("co-op SOAK asymmetric continuation: host half out, guest 
 
     // The guest answers the host's relay: turn 1 EARTHQUAKE (spread) faints the 1-HP host ally; every solo turn
     // after that a harmless SPLASH, so the wave stays open and the survivor keeps commanding turn after turn.
-    rig.guestRuntime.battleSync.onCommandRequest(({ turn }) => {
+    rig.guestRuntime.battleSync.onCommandRequest(({ turn, offer }) => {
+      const earthquake = offer?.moves.find(move => move.moveId === MoveId.EARTHQUAKE);
       if (turn <= 1) {
-        return { command: Command.FIGHT, cursor: 0, moveId: MoveId.EARTHQUAKE, targets: [BattlerIndex.ENEMY] };
+        return {
+          command: Command.FIGHT,
+          cursor: earthquake?.slot ?? 0,
+          moveId: MoveId.EARTHQUAKE,
+          targets: [...(earthquake?.targetSets[0] ?? [BattlerIndex.ENEMY])],
+        };
       }
       return { command: Command.FIGHT, cursor: 1, moveId: MoveId.SPLASH, targets: [BattlerIndex.PLAYER_2] };
     });

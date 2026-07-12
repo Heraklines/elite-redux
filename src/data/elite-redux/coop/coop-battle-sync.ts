@@ -35,6 +35,7 @@ import type {
   CoopTransport,
   SerializedCommand,
 } from "#data/elite-redux/coop/coop-transport";
+import { Command } from "#enums/command";
 
 /** The inbound request a responder answers (the legal move slots the host offers). */
 export interface CoopCommandRequest {
@@ -71,6 +72,51 @@ const DEFAULT_TIMEOUT_MS = 1_200_000;
 function defaultSchedule(cb: () => void, ms: number): () => void {
   const id = setTimeout(cb, ms);
   return () => clearTimeout(id);
+}
+
+/**
+ * The responder API is a dev/test convenience; production humans broadcast their already-resolved
+ * local command and never install one. Bring legacy responders onto the protocol-24 offer so their
+ * hand-authored cursor/target shortcuts represent a command the real UI could actually emit.
+ */
+function normalizeResponderCommand(
+  command: SerializedCommand,
+  offer: CoopBattleCommandOffer | undefined,
+): SerializedCommand {
+  if (offer == null || command.command !== Command.FIGHT) {
+    return command;
+  }
+  const move =
+    (command.moveId == null ? undefined : offer.moves.find(candidate => candidate.moveId === command.moveId))
+    ?? offer.moves.find(candidate => candidate.slot === command.cursor);
+  if (move == null) {
+    return command;
+  }
+  const targets = move.targetSets.find(candidate => {
+    const validation = validateCoopBattleCommand(
+      { ...command, cursor: move.slot, moveId: move.moveId, targets: candidate },
+      offer,
+    );
+    return validation.valid;
+  });
+  const requestedTargets = command.targets;
+  return {
+    ...command,
+    cursor: move.slot,
+    moveId: move.moveId,
+    targets:
+      requestedTargets != null && move.targetSets.some(set => sameNumberSet(requestedTargets, set))
+        ? requestedTargets
+        : [...(targets ?? move.targetSets[0] ?? [])],
+  };
+}
+
+function sameNumberSet(left: readonly number[], right: readonly number[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  const sortedRight = [...right].sort((a, b) => a - b);
+  return [...left].sort((a, b) => a - b).every((value, index) => value === sortedRight[index]);
 }
 
 /**
@@ -332,12 +378,15 @@ export class CoopBattleSync {
     if (responder == null) {
       return;
     }
-    const command = responder({
-      fieldIndex: req.fieldIndex,
-      turn: req.turn,
-      moveSlots: req.moveSlots,
-      offer: req.offer,
-    });
+    const command = normalizeResponderCommand(
+      responder({
+        fieldIndex: req.fieldIndex,
+        turn: req.turn,
+        moveSlots: req.moveSlots,
+        offer: req.offer,
+      }),
+      req.offer,
+    );
     if (isCoopDebug()) {
       coopLog(
         "relay",
@@ -536,7 +585,9 @@ export class CoopBattleSync {
               "security",
               `rejected peer command fieldIndex=${msg.fieldIndex} turn=${msg.turn} reason=${validation.reason ?? "invalid"}`,
             );
-            this.sendCommandRequest(request);
+            // Stay parked on the original offer. An immediate re-request lets a deterministic
+            // bad responder create an unbounded request/reply recursion; a corrected local
+            // broadcast or the normal reconnect reannounce can still satisfy this waiter.
             return;
           }
         }

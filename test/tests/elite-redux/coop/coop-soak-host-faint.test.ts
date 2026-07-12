@@ -39,9 +39,9 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
-    buildDuo,
-    type DuoRig,
-    drainLoopback,
+  buildDuo,
+  type DuoRig,
+  drainLoopback,
   driveGuestReplayTurn,
   installDuoLogCapture,
   withClient,
@@ -110,12 +110,15 @@ describe.skipIf(!RUN)("co-op SOAK host-owned faint: the driver drives the host's
     // The GUEST's own-slot command is EARTHQUAKE - a spread move that also hits its ALLY (the host's
     // field slot 0). Kept at 1 HP on BOTH engines, that host mon faints deterministically (no enemy AI,
     // no target rolls); the level-100 foes shrug the EQ off so the wave does not end early.
-    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-      command: Command.FIGHT,
-      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-      moveId: MoveId.EARTHQUAKE,
-      targets: [BattlerIndex.ENEMY],
-    }));
+    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots, offer }) => {
+      const earthquake = offer?.moves.find(move => move.moveId === MoveId.EARTHQUAKE);
+      return {
+        command: Command.FIGHT,
+        cursor: earthquake?.slot ?? moveSlots[0] ?? 0,
+        moveId: MoveId.EARTHQUAKE,
+        targets: [...(earthquake?.targetSets[0] ?? [BattlerIndex.ENEMY])],
+      };
+    });
     rig.hostScene.getPlayerField()[COOP_HOST_FIELD_INDEX].hp = 1;
     withClientSync(rig.guestCtx, () => {
       rig.guestScene.getPlayerField()[COOP_HOST_FIELD_INDEX].hp = 1;

@@ -1243,7 +1243,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   // (not the guest's own wave-start mirror), so its PP-aware pick matches the host's playWave guest-select
   // EXACTLY even after the host has depleted a move's PP mid-wave (the guest mirror's PP is stale until the
   // checkpoint). Reading the host object is a plain field read - it needs no globalScene swap.
-  rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => {
+  rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots, offer }) => {
     const wave = rig.hostScene.currentBattle.waveIndex;
     const turn = rig.hostScene.currentBattle.turn;
     // #879 PRODUCTION-FIDELITY command SOURCE. In "harness" mode the guest answerer reads the HOST's
@@ -1262,12 +1262,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       const guestMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
       const explosionSlot = guestMon?.getMoveset().findIndex(move => move?.moveId === MoveId.EXPLOSION) ?? -1;
       if (explosionSlot >= 0 && moveSlots.includes(explosionSlot)) {
-        const target = commandScene
-          .getEnemyField()
-          .find(mon => !mon.isFainted())
-          ?.getBattlerIndex();
-        if (target == null) {
-          fail("no-park", wave, "level forced-faint leg could not find a live Explosion target");
+        const offeredExplosion = offer?.moves.find(
+          move => move.slot === explosionSlot && move.moveId === MoveId.EXPLOSION,
+        );
+        if (offeredExplosion == null || offeredExplosion.targetSets.length === 0) {
+          fail("desync", wave, "host did not offer the guest's locally legal Explosion command");
         }
         actionScript.push(`wave ${wave} turn ${turn}: forced-faint guest EXPLOSION self-KO`);
         hitMode(UiMode.COMMAND);
@@ -1276,7 +1275,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           command: Command.FIGHT,
           cursor: explosionSlot,
           moveId: MoveId.EXPLOSION,
-          targets: [target],
+          targets: [...offeredExplosion.targetSets[0]],
         };
       }
       fail("no-park", wave, "level forced-faint leg could not issue Explosion from the guest lead");
@@ -1296,6 +1295,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       && guestSwitchMon != null
       && !guestSwitchMon.isTrapped()
     ) {
+      const offeredSwitch = offer?.switches.find(candidate => candidate.slot === benchSlot);
+      if (offeredSwitch?.canNormal !== true) {
+        fail("desync", wave, `guest selected switch party[${benchSlot}] outside the host legal offer`);
+      }
       actionScript.push(`wave ${wave} turn ${turn}: guest SWITCH -> party[${benchSlot}]`);
       // #849 COMMAND-issue tap: a guest voluntary switch drives the COMMAND menu + the PARTY picker.
       hitMode(UiMode.COMMAND);
@@ -1305,15 +1308,24 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const guestMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
     const { guestTarget, guestTargetMon } = pickTargets(commandScene);
     const { slot, moveId } = resolveChosenMove(guestMon, guestTargetMon, seed, wave, GUEST_SLOT_SALT);
+    const offeredMove = offer?.moves.find(move => move.slot === slot && move.moveId === moveId);
+    const offeredTargets = offeredMove?.targetSets.find(targets => targets.includes(guestTarget));
+    if (offeredMove == null || offeredTargets == null) {
+      fail(
+        "desync",
+        wave,
+        `guest command slot=${slot} move=${moveId} target=${guestTarget} is outside the host legal offer`,
+      );
+    }
     // #849 COMMAND-issue tap: a guest FIGHT command drives COMMAND + FIGHT (+ TARGET_SELECT for the target).
     hitMode(UiMode.COMMAND);
     hitMode(UiMode.FIGHT);
     hitMode(UiMode.TARGET_SELECT);
     return {
       command: Command.FIGHT,
-      cursor: moveSlots.includes(slot) ? slot : (moveSlots[0] ?? 0),
+      cursor: slot,
       moveId,
-      targets: [guestTarget],
+      targets: [...offeredTargets],
     };
   });
 

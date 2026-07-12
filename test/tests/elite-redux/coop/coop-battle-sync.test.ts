@@ -194,14 +194,22 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host);
     const guestSync = new CoopBattleSync(guest);
+    let requests = 0;
+    const off = guest.onMessage(message => {
+      if (message.t === "commandRequest") {
+        requests++;
+      }
+    });
     const awaited = hostSync.requestPartnerCommand(1, 4, [1], "guest", legalOffer);
 
     guestSync.broadcastLocalCommand(1, 4, { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [99] }, "guest");
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(hostSync.describePendingRequests()).toHaveLength(1);
+    expect(requests, "an invalid deterministic responder cannot create a request/reply recursion").toBe(1);
 
     guestSync.broadcastLocalCommand(1, 4, { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] }, "guest");
     expect(await awaited).toMatchObject({ moveId: 55, targets: [2] });
+    off();
     hostSync.dispose();
     guestSync.dispose();
   });
