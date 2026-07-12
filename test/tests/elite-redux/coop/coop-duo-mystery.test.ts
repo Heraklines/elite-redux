@@ -636,12 +636,13 @@ describe.skipIf(!RUN)(
 
       const hostEnemies = hostScene.currentBattle.enemyParty;
       const guestEnemies = rig.guestScene.currentBattle.enemyParty;
-      expect(hostEnemies, "the complete two-member player squad is mirrored as the enemy trainer team").toHaveLength(
-        party.length,
+      const authoritativeParty = hostScene.getPlayerParty().map(mon => mon.species.speciesId);
+      expect(hostEnemies, "the complete live co-op party is mirrored as the enemy trainer team").toHaveLength(
+        authoritativeParty.length,
       );
-      expect(hostEnemies.map(mon => mon.species.speciesId)).toEqual(party);
+      expect(hostEnemies.map(mon => mon.species.speciesId)).toEqual(authoritativeParty);
       expect(new Set(hostEnemies.map(mon => mon.id)).size, "every mirror receives a unique authoritative id").toBe(
-        party.length,
+        authoritativeParty.length,
       );
       expect(
         guestEnemies.map(mon => ({ id: mon.id, species: mon.species.speciesId })),
