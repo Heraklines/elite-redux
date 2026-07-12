@@ -25,6 +25,12 @@ This smart-sharded workflow is the standing default for all future co-op checkpo
 - Do not replace external sharding with many concurrent local Vitest processes. Separate runners provide the speedup without recreating CPU/memory contention.
 - Keep `fail-fast: false` so every shard returns evidence. Download the per-shard log artifact, fix all reproducible failures in one batch, and let the next pushed checkpoint rerun the matrix.
 - A red shard blocks staging promotion. A green focused test is useful during development but does not replace the checkpoint gate.
+- For an architecture-completion or release-confidence milestone, also require the external `Nightly Co-op
+  Soak` matrix to pass at the checkpoint SHA. Its standing matrix uses six independent runners: three
+  deterministic 200-wave god campaigns with widely separated seeds, the faint-heavy level campaign, the
+  Mystery/asymmetric campaign, and the thirteen-event continuous journey with repeated biome transitions.
+  Ordinary intermediate staging checkpoints may use the sharded gate alone so testers can keep working, but
+  they must not be described as full-run architecture assurance until this expanded matrix is green.
 - Deploy only to staging unless the user explicitly authorizes production. Keep intermediate staging checkpoints functional for multiplayer testers.
 
 When changing the lane composition or shard count, preserve deterministic, exhaustive file assignment and verify with `--list` that every file appears in exactly one shard. Use historical-duration balancing when timing data is available, fall back to stable deterministic weighting when it is not, and keep the resulting assignment reproducible. Optimize the slowest shard rather than merely increasing concurrency, and do not weaken assertions or omit scenarios to make a shard faster.

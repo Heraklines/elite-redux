@@ -18,14 +18,18 @@ and line it was read from. Where a path could not be fully resolved statically i
 is marked UNKNOWN with what blocks verification.
 
 Scope of the ME registry: `initMysteryEncounters()` in
-`src/data/mystery-encounters/mystery-encounters.ts:370-460` registers **90**
+`src/data/mystery-encounters/mystery-encounters.ts` currently registers **91**
 encounters into `allMysteryEncounters`. In addition `ER_THE_BARGAIN` exists as a
 type (`src/enums/mystery-encounter-type.ts:231`) and is reachable ONLY through the
 Mystery Gauntlet (`src/data/elite-redux/er-mystery-gauntlet.ts:65`), not the biome
-pools, so the reachable interactive-encounter total is **91**. `FIELD_TRIP` and
+pools, so the reachable interactive-encounter total is **92**. This count increased
+when the previously orphaned `ER_LOST_WANDERER` definition was registered and added
+to the Plains pool. `FIELD_TRIP` and
 `AN_OFFER_YOU_CANT_REFUSE` are registered but biome-disabled
 (`mystery-encounters.ts:204,212`); they remain gauntlet-forceable. The Mystery
-Gauntlet can force ANY registered entry, so all 91 are in scope.
+Gauntlet can force ANY registered entry, so all 92 are in scope. The structural
+`coop-me-registry-completeness.test.ts` gate now derives this count from the enum and
+registry, preventing a future definition from being silently omitted again.
 
 ---
 
@@ -365,8 +369,9 @@ control; P2 = silent visual divergence; P3 = backstop needs loudness.
 
 ## Enumeration summary
 
-- ME registry enumerated: 90 registered in `initMysteryEncounters`
-  (`mystery-encounters.ts:371-460`), + `ER_THE_BARGAIN` gauntlet-only = 91 reachable.
+- Current ME registry: 91 registered in `initMysteryEncounters`, +
+  `ER_THE_BARGAIN` gauntlet-only = 92 reachable. The group counts below describe the
+  original audit snapshot; the executable completeness gate is the current authority.
 - OK (standard mirrored surfaces): ~67 registered MEs (GROUP OK-STANDARD) + GROUP
   QUIZ (8) + GROUP BARGAIN (1, with a P3 note).
 - Flagged: GROUP REPEAT (9, P0), GROUP COLOSSEUM (1, P0/P1), GROUP SHOP-BIOME (3,
