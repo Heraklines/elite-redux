@@ -349,13 +349,18 @@ export class CoopReplayTurnPhase extends Phase {
     boundary: "turnResolution" | "replacement",
     reason: string,
   ): void {
-    const controller = getCoopController();
-    const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    const generation = coopSessionGeneration();
-    if (controller == null) {
-      terminateCoopAuthoritySession(reason);
+    // An awaited frame may resolve while teardown is restoring another scene/runtime in the one-process
+    // harness (and the same race exists during a real navigation). Never route an obsolete continuation
+    // through the next scene's terminal UI.
+    if (this.ended || getCoopBattleStreamer() !== streamer) {
       return;
     }
+    const controller = getCoopController();
+    const generation = coopSessionGeneration();
+    if (controller == null) {
+      return;
+    }
+    const wave = globalScene?.currentBattle?.waveIndex ?? 0;
     void streamer
       .broadcastAuthorityFailure({
         epoch: controller.sessionEpoch,

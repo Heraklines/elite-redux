@@ -15,8 +15,9 @@ export function terminateCoopAuthoritySession(reason: string): void {
     return;
   }
   terminalInProgress = true;
+  const scene = globalScene;
   coopWarn("checkpoint", `TERMINAL authority failure: ${reason}`);
-  const interrupted = globalScene.phaseManager.getCurrentPhase();
+  const interrupted = scene.phaseManager.getCurrentPhase();
   const visibleMessage =
     "The shared battle could not be synchronized safely. Reconnect to resume from your co-op save.";
   try {
@@ -25,11 +26,11 @@ export function terminateCoopAuthoritySession(reason: string): void {
     /* terminal cleanup continues */
   }
   try {
-    globalScene.phaseManager.clearPhaseQueue();
+    scene.phaseManager.clearPhaseQueue();
     clearCoopRuntime();
-    globalScene.reset();
-    globalScene.phaseManager.unshiftNew("TitlePhase");
-    if (globalScene.phaseManager.getCurrentPhase() === interrupted) {
+    scene.reset();
+    scene.phaseManager.unshiftNew("TitlePhase");
+    if (scene.phaseManager.getCurrentPhase() === interrupted) {
       interrupted?.end();
     }
   } catch (error) {
@@ -42,7 +43,7 @@ export function terminateCoopAuthoritySession(reason: string): void {
   // recorded in developer logs.
   queueMicrotask(() => {
     try {
-      globalScene.ui.showText(visibleMessage, null, undefined, 6000);
+      scene.ui.showText(visibleMessage, null, undefined, 6000);
     } catch {
       /* cosmetic */
     }

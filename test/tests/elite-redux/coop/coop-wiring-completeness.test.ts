@@ -220,14 +220,18 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
       "streamer.scheduleAuthorityRetry(",
     );
     expect(replay, "an ambient timer cannot fire under another duo client context").not.toContain("setTimeout(");
+    const terminal = readFileSync(join(root, "data", "elite-redux", "coop", "coop-authority-terminal.ts"), "utf8");
     for (const terminalPostcondition of [
       "membership.terminate()",
-      "globalScene.ui.showText(",
-      "globalScene.phaseManager.clearPhaseQueue()",
-      "globalScene.reset()",
-      'globalScene.phaseManager.unshiftNew("TitlePhase")',
+      "scene.ui.showText(",
+      "scene.phaseManager.clearPhaseQueue()",
+      "scene.reset()",
+      'scene.phaseManager.unshiftNew("TitlePhase")',
     ]) {
-      expect(replay, `terminal replacement failure retains ${terminalPostcondition}`).toContain(terminalPostcondition);
+      expect(terminal, `shared authority terminal retains ${terminalPostcondition}`).toContain(terminalPostcondition);
     }
+    expect(replay, "turn and replacement failures route through the shared terminal helper").toContain(
+      "terminateCoopAuthoritySession(",
+    );
   });
 });

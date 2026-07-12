@@ -16,6 +16,23 @@ export class MockSprite implements MockGameObject {
   public list: MockGameObject[] = [];
   public name: string;
   public active = true;
+
+  /** Mirror Phaser's public render state instead of hiding it behind the wrapped sprite. */
+  public get visible(): boolean {
+    return this.phaserSprite.visible;
+  }
+
+  public set visible(value: boolean) {
+    this.phaserSprite.visible = value;
+  }
+
+  public get alpha(): number {
+    return this.phaserSprite.alpha;
+  }
+
+  public set alpha(value: number) {
+    this.phaserSprite.alpha = value;
+  }
   constructor(textureManager, x, y, texture) {
     this.textureManager = textureManager;
     this.scene = textureManager.scene;

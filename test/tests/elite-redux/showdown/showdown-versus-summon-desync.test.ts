@@ -36,7 +36,6 @@ import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { PokemonMove } from "#data/moves/pokemon-move";
@@ -64,6 +63,7 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import { generateStarters } from "#test/utils/game-manager-utils";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -209,8 +209,9 @@ describe.skipIf(!RUN)("Showdown versus - turn-1 initial-summon ability desync (t
   it("guest renders the host's turn-1 entry ability, does not DERIVE it locally (weather parity)", async () => {
     await startHostShowdown(guestTeam());
 
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig: ShowdownDuoRig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown);
+    pair.setAutomaticDelivery(false);
 
     // Plant a DROUGHT INNATE on the host's OWN lead (its local PLAYER). The slot override rides the
     // snapshot into the guest, where the SAME mon is the local ENEMY. On the host (player) the innate is
@@ -263,8 +264,9 @@ describe.skipIf(!RUN)("Showdown versus - turn-1 initial-summon ability desync (t
     // A forced resync (requestStateSync) here would be the laggy "paper over it" behavior we must avoid.
     await startHostShowdown(guestTeam());
 
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig: ShowdownDuoRig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown);
+    pair.setAutomaticDelivery(false);
 
     // The guest commands its own team with a harmless SPLASH each turn (the host's EnemyCommandPhase await).
     rig.guestPeer.onCommandRequest(() => ({

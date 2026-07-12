@@ -96,6 +96,7 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
     const snapshot = {
       tick: 17,
       authoritativeState: state(18),
+      sessionEpoch: runtime.controller.sessionEpoch,
     } as CoopFullBattleSnapshot;
     currentPhase = new CoopApplyResyncPhase(snapshot, 1, "old-checksum", undefined);
     const phaseInternals = currentPhase as unknown as {
@@ -126,6 +127,10 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
     const replacement = {
       t: "battleCheckpoint",
       reason: "replacement",
+      epoch: runtime.controller.sessionEpoch,
+      wave: 4,
+      turn: 2,
+      revision: 20,
       checkpoint: checkpoint(19),
       checksum: "deadbeefdeadbeef",
       fullField: fullField(),
@@ -160,11 +165,15 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
     expect(phaseInternals.recoveryTickFloor, "successful verification commits the recovery floor").toBe(20);
   });
 
-  it("does not consume a newer-tick frame from another logical turn", async () => {
+  it("drops a newer-tick frame from another logical turn before it can enter the recovery inbox", async () => {
     const runtime = startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
     runtime.controller.role = "guest";
     currentPhase = new CoopApplyResyncPhase(
-      { tick: 17, authoritativeState: state(18) } as CoopFullBattleSnapshot,
+      {
+        tick: 17,
+        authoritativeState: state(18),
+        sessionEpoch: runtime.controller.sessionEpoch,
+      } as CoopFullBattleSnapshot,
       1,
       "old-checksum",
       undefined,
@@ -180,6 +189,10 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
     runtime.partnerTransport?.send({
       t: "battleCheckpoint",
       reason: "replacement",
+      epoch: runtime.controller.sessionEpoch,
+      wave: 4,
+      turn: 3,
+      revision: 20,
       checkpoint: checkpoint(19),
       checksum: "deadbeefdeadbeef",
       fullField: fullField(),
@@ -188,6 +201,6 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
     await new Promise(resolve => setTimeout(resolve, 0));
 
     expect(applied).not.toHaveBeenCalled();
-    expect(getCoopBattleStreamer()?.peekCheckpoint()?.reason).toBe("replacement");
+    expect(getCoopBattleStreamer()?.peekCheckpoint()).toBeNull();
   });
 });

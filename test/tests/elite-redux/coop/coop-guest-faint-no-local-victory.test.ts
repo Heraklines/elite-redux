@@ -17,9 +17,8 @@
 // does) and NEVER runs queueTurnEndPhases; victory arrives ONLY via the host's waveResolved tail.
 // Solo / host / lockstep keep queueTurnEndPhases verbatim (byte-identical).
 //
-// The two touched paths are CoopFinalizeTurnPhase.finishTurn() (the normal post-checkpoint finalize)
-// and CoopReplayTurnPhase.finishTurnNoStream() (the host-stall fallback - no checkpoint). Both are
-// asserted here.
+// The authoritative path is CoopFinalizeTurnPhase.finishTurn(). Protocol 32 deliberately has no
+// no-stream gameplay fallback: missing authority routes both peers to the visible terminal instead.
 //
 // This drives the REAL private methods over a REAL local co-op session (the same engine-free spoof
 // path the rest of the co-op suite uses): startLocalCoopSession in "authoritative" netcode, then flip
@@ -34,7 +33,6 @@ import { globalScene, initGlobalScene } from "#app/global-scene";
 import { clearCoopRuntime, getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
 import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
-import { CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 // --- The recorder behind the injected stub scene: the two end-of-turn levers the fix toggles.
@@ -46,7 +44,7 @@ const rec = {
   turn: 1,
 };
 
-/** Minimal BattleScene-shaped stub exposing only the members finishTurn / finishTurnNoStream touch. */
+/** Minimal BattleScene-shaped stub exposing only the members finishTurn touches. */
 function makeStubScene(): BattleScene {
   return {
     currentBattle: {
@@ -171,30 +169,5 @@ describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory
     expect(rec.incrementTurnCalls).toBe(0);
     expect(rec.clearLastTurnOrderCalls).toBe(0);
     expect(rec.turn).toBe(1);
-  });
-
-  it("CoopReplayTurnPhase.finishTurnNoStream(): the host-stall fallback ALSO advances minimally on the authoritative guest", () => {
-    startAuthoritativeGuestSession();
-
-    const phase = new CoopReplayTurnPhase(1);
-    stubEnd(phase);
-    callPrivate(phase, "finishTurnNoStream");
-
-    expect(rec.queueTurnEndCalls).toBe(0);
-    expect(rec.incrementTurnCalls).toBe(1);
-    expect(rec.turn).toBe(2);
-    expect(rec.clearLastTurnOrderCalls).toBe(1);
-    expect(rec.pushedPhases).toHaveLength(0);
-  });
-
-  it("CoopReplayTurnPhase.finishTurnNoStream(): solo / host / lockstep keeps queueTurnEndPhases", () => {
-    // No session -> isCoopAuthoritativeGuest() reads false -> the original turn-end path.
-    const phase = new CoopReplayTurnPhase(1);
-    stubEnd(phase);
-    callPrivate(phase, "finishTurnNoStream");
-
-    expect(rec.queueTurnEndCalls).toBe(1);
-    expect(rec.incrementTurnCalls).toBe(0);
-    expect(rec.clearLastTurnOrderCalls).toBe(0);
   });
 });

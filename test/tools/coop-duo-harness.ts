@@ -2621,6 +2621,7 @@ export async function buildShowdownDuo(
     netcodeMode: "authoritative",
     kind: "versus",
   });
+  const scheduledPair = pair as typeof pair & { flush?: (role: "host" | "guest", limit?: number) => number };
   hostRuntime.controller.role = "host";
   guestRuntime.controller.role = "guest";
 
@@ -2651,6 +2652,7 @@ export async function buildShowdownDuo(
     ghost: snapshotGhostState(),
     moduleLets: snapshotModuleLets(),
     mePins: { ...IDLE_ME_PINS },
+    ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("host") } : {}),
   };
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
@@ -2663,6 +2665,7 @@ export async function buildShowdownDuo(
     ghost: emptyGhostSnapshot(),
     moduleLets: snapshotModuleLets(),
     mePins: { ...IDLE_ME_PINS },
+    ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("guest") } : {}),
   };
   await withClient(guestCtx, () => {
     toShowdownGameMode(guestScene);

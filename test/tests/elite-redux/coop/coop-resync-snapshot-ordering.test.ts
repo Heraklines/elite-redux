@@ -33,13 +33,17 @@ function state(tick: number, wave = 4, turn = 2): CoopAuthoritativeBattleStateV1
   };
 }
 
-function heldSnapshot(): Pick<CoopFullBattleSnapshot, "tick" | "authoritativeState"> {
-  return { tick: 17, authoritativeState: state(18) };
+function heldSnapshot(): Pick<CoopFullBattleSnapshot, "tick" | "authoritativeState" | "sessionEpoch"> {
+  return { tick: 17, authoritativeState: state(18), sessionEpoch: 7 };
 }
 
 function replacementEnvelope(checkpointTick = 19, stateTick = 20): CoopCheckpointEnvelope {
   return {
     reason: "replacement",
+    epoch: 7,
+    wave: 4,
+    turn: 2,
+    revision: stateTick,
     checkpoint: {
       tick: checkpointTick,
       field: [],

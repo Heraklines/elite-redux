@@ -391,7 +391,10 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     });
     await new Promise(r => setTimeout(r, 0));
     expect(envelopes, "the temporary recovery observer was removed").toHaveLength(2);
-    expect(legacyReasons, "the independent legacy observer remains installed").toEqual(["replacement", "later"]);
+    expect(
+      legacyReasons,
+      "the independent legacy observer sees the requested retransmit and remains installed",
+    ).toEqual(["replacement", "replacement", "later"]);
     guestStream.dispose();
     hostStream.dispose();
   });

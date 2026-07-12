@@ -131,7 +131,7 @@ describe.skipIf(!RUN)("co-op DUO live events: host emits per-event, guest applie
     });
 
     // (1) HOST EMITTED per-event LIVE: at least one HP update + a move were streamed as `battleEvent`s.
-    const emittedKinds = emitSpy.mock.calls.map(c => (c[2] as CoopBattleEvent).k);
+    const emittedKinds = emitSpy.mock.calls.map(c => c[4].k);
     expect(emitSpy.mock.calls.length, "host emitted live battle events over the loopback").toBeGreaterThan(0);
     expect(emittedKinds, "host streamed per-event HP updates mid-turn (the animation layer)").toContain("hp");
     expect(emittedKinds, "host streamed the move-used event mid-turn").toContain("moveUsed");

@@ -15,8 +15,8 @@
 //
 // The fix peeks the still-PENDING advance (coopHasPendingWaveAdvance) and routes the single-turn win
 // through the TERMINAL branch: run the wave-advance tail (VictoryPhase), advance NO turn - exactly like a
-// multi-turn wave whose advance had already signaled. The same guard gates the host-stall fallback
-// CoopReplayTurnPhase.finishTurnNoStream so it never starts the phantom turn either.
+// multi-turn wave whose advance had already signaled. Protocol 32 has no gameplay fallback on a missing
+// commit; that condition terminates visibly instead of manufacturing a local turn.
 //
 // The pending advance is set through the REAL wired receive path: startLocalCoopSession exposes the
 // spoof partner's transport endpoint, so sending a genuine host->guest `waveResolved` over it fires the
@@ -26,6 +26,7 @@
 
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
+import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   type CoopRuntime,
   clearCoopRuntime,
@@ -33,10 +34,8 @@ import {
   getCoopController,
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
-import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import type { CoopAuthoritativeBattleStateV1, CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
 import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
-import { CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 /** LoopbackTransport delivers on a microtask; let it drain before asserting. */
@@ -55,7 +54,7 @@ const rec = {
 };
 
 /**
- * Minimal BattleScene-shaped stub exposing only the members finishTurn / finishTurnNoStream and the
+ * Minimal BattleScene-shaped stub exposing only the members finishTurn and the
  * "win" arm of maybeRunCoopWaveAdvance touch (getEnemyParty -> battlerArg, pushNew("VictoryPhase")).
  */
 function makeStubScene(): BattleScene {
@@ -226,21 +225,6 @@ describe("#698 - single-turn-win finalize must not start a phantom next turn", (
     // Instead the wave-advance tail runs: the pending advance is consumed and a VictoryPhase is queued.
     expect(coopHasPendingWaveAdvance()).toBe(false);
     expect(rec.pushedPhases).toContain("VictoryPhase");
-  });
-
-  it("CoopReplayTurnPhase.finishTurnNoStream(): the host-stall fallback ALSO skips the phantom turn when an advance is pending", async () => {
-    await startGuestWithPendingWin();
-
-    const phase = new CoopReplayTurnPhase(1);
-    stubEnd(phase);
-    callPrivate(phase, "finishTurnNoStream");
-
-    // No phantom turn, no turn-end engine. The fallback has no wave-advance tail, so it leaves the
-    // pending advance in place for the next finalize / checkpoint resync to consume.
-    expect(rec.incrementTurnCalls).toBe(0);
-    expect(rec.clearLastTurnOrderCalls).toBe(0);
-    expect(rec.queueTurnEndCalls).toBe(0);
-    expect(coopHasPendingWaveAdvance()).toBe(true);
   });
 
   it("CoopFinalizeTurnPhase.finishTurn(): with NO pending advance the guest still advances the turn minimally (BUG1 path intact)", async () => {

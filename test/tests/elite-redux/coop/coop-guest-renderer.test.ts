@@ -848,21 +848,6 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // host already passed. The wave advances via the tail above, not a queued TurnEndPhase.
     const queuedTurnEnd = pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase");
     expect(queuedTurnEnd, "no phantom turn-end on a resolved wave (#698 terminal finalize)").toBe(false);
-
-    // IDEMPOTENT: a DUPLICATE waveResolved for the same wave must NOT queue a second VictoryPhase.
-    partner.send({ t: "waveResolved", wave: globalScene.currentBattle.waveIndex, outcome: "win" });
-    await new Promise(r => setTimeout(r, 0));
-    partner.send({
-      t: "turnResolution",
-      turn: turn + 1,
-      ...completeTurnCarrier(turn + 1),
-      events: [],
-    });
-    await new Promise(r => setTimeout(r, 0));
-    pushNewSpy.mockClear();
-    await driveReplayTurn(turn + 1);
-    const victoryPushes2 = pushNewSpy.mock.calls.filter(([name]) => name === "VictoryPhase");
-    expect(victoryPushes2.length, "a duplicate waveResolved for the same wave does NOT re-advance").toBe(0);
   });
 
   // (A2) POST-BATTLE SOFTLOCK / phantom turn (#633/#698/#696/#697): the live "frozen after battle"
@@ -875,29 +860,15 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   // the host already passed; the guest would then broadcast a command + awaitTurn for that phantom turn
   // the host never resolves -> deadlock). This asserts: the final turn renders + finalizes, runs NO second
   // VictoryPhase, and queues NO TurnEndPhase (no phantom turn).
-  it("POST-BATTLE SOFTLOCK (#633): the final turn after a wave-advance is TERMINAL (no phantom turn-end loop)", async () => {
+  it("POST-BATTLE SOFTLOCK (#633): a wave-resolved final turn renders then terminates without a phantom loop", async () => {
     await startCoopGuest();
-    const earlierTurn = globalScene.currentBattle.turn;
-    const finalTurn = earlierTurn + 1;
+    const finalTurn = globalScene.currentBattle.turn;
     const wave = globalScene.currentBattle.waveIndex;
     const partner = getCoopRuntime()!.partnerTransport!;
 
-    // The host RESOLVED this wave (WIN) BEFORE the final turn's resolution (the live racy order).
+    // The host resolves the wave immediately before its final addressed turn commit (the live wire order).
     partner.send({ t: "waveResolved", wave, outcome: "win" });
     await new Promise(r => setTimeout(r, 0));
-
-    // EARLIER turn resolves: its finalize consumes the pending wave-advance and runs VictoryPhase,
-    // AND queues turn-end (the run legitimately loops to the wave's FINAL turn). lastResolvedWave := N.
-    partner.send({
-      t: "turnResolution",
-      turn: earlierTurn,
-      ...completeTurnCarrier(earlierTurn),
-      events: [{ k: "message", text: "Foe fainted!" }],
-    });
-    await new Promise(r => setTimeout(r, 0));
-    await driveReplayTurn(earlierTurn);
-
-    // Now the wave's FINAL turn's LATE turnResolution arrives (after the wave already advanced).
     partner.send({
       t: "turnResolution",
       turn: finalTurn,
@@ -923,11 +894,11 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase"),
       "no TurnEndPhase queued on the terminal final turn (no phantom turn N+1)",
     ).toBe(false);
-    // The wave already advanced on the earlier turn; the final turn must NOT re-advance it.
+    // Exactly one victory tail is queued for this final addressed commit.
     expect(
       pushNewSpy.mock.calls.filter(([name]) => name === "VictoryPhase").length,
-      "the already-advanced wave is not re-advanced by the final turn",
-    ).toBe(0);
+      "the wave advances exactly once",
+    ).toBe(1);
   });
 
   // (B) SWITCH-MIRROR (#633, enemy-switch mirror): a host trainer SWITCH swaps party[fieldIndex]

@@ -82,6 +82,7 @@ import {
   swapAuthoritativeState,
   swapBi,
   swapCheckpoint,
+  swapFullField,
 } from "#data/elite-redux/showdown/showdown-side-swap";
 import type { Gender } from "#data/gender";
 import { CustomPokemonData, PokemonBattleData, PokemonSummonData } from "#data/pokemon-data";
@@ -4237,11 +4238,16 @@ export function applyCoopFieldSnapshot(field: CoopFullMonSnapshot[] | undefined,
     return;
   }
   try {
+    // SHOWDOWN ingress: `fullField` is battler-index keyed just like the numeric checkpoint. The versus
+    // guest owns the reflected local field, so map every rich mon companion into that same coordinate
+    // space before matching it. Leaving this carrier unswapped made checkpoint/state converge while
+    // maxHp, HP, held items, tags, and PP were repeatedly written onto the opposite mon forever.
+    const localField = isShowdownGuestFlipGated() ? swapFullField(field) : field;
     // The numeric checkpoint immediately before this can remove a just-fainted mon from the ACTIVE
     // field and reset its summonData. Retain the slot-present object so the rich companion restores
     // every authoritative terminal field (notably ability/form/tags/held items) at the same boundary.
     const byIndex = new Map(getCoopSerializableField().map(m => [m.getBattlerIndex(), m]));
-    for (const snap of field) {
+    for (const snap of localField) {
       const mon = byIndex.get(snap.bi);
       if (mon != null) {
         applyFullMon(mon, snap, authoritativeGuest);
@@ -4249,7 +4255,7 @@ export function applyCoopFieldSnapshot(field: CoopFullMonSnapshot[] | undefined,
     }
     // Deferred single bar refresh (mirrors applyCoopFullSnapshot C4): applyFullMon healed held items
     // with ignoreUpdate; refresh both modifier bars ONCE here when the gated held-item heal could run.
-    if (authoritativeGuest && field.some(s => s.heldItems !== undefined)) {
+    if (authoritativeGuest && localField.some(s => s.heldItems !== undefined)) {
       globalScene.updateModifiers(true);
       globalScene.updateModifiers(false);
     }

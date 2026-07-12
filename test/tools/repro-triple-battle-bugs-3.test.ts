@@ -262,18 +262,21 @@ describe.skipIf(!RUN)("repro: triple-battle bugs round 3 (2026-07-07 report)", (
     // voluntary AI switch rather than corrupting all three commands with one target.
     const realScores = Trainer.prototype.getPartyMemberMatchupScores;
     let scoreCalls = 0;
-    vi.spyOn(Trainer.prototype, "getPartyMemberMatchupScores").mockImplementation(
-      function (trainerSlot, forSwitch, useBestMove) {
-        scoreCalls++;
-        if (scoreCalls === 1) {
-          return [[3, 1_000_000]];
-        }
-        if (scoreCalls <= 3) {
-          return []; // the other two active enemies stay in; exactly one voluntary switch
-        }
-        return realScores.call(this, trainerSlot, forSwitch, useBestMove); // faint replacement uses real AI
-      },
-    );
+    vi.spyOn(Trainer.prototype, "getPartyMemberMatchupScores").mockImplementation(function (
+      this: Trainer,
+      trainerSlot,
+      forSwitch,
+      useBestMove,
+    ) {
+      scoreCalls++;
+      if (scoreCalls === 1) {
+        return [[3, 1_000_000]];
+      }
+      if (scoreCalls <= 3) {
+        return []; // the other two active enemies stay in; exactly one voluntary switch
+      }
+      return realScores.call(this, trainerSlot, forSwitch, useBestMove); // faint replacement uses real AI
+    });
 
     // Slot 0 switches to Shuckle before moves resolve. A player in slot 1 KOs the
     // DIFFERENT enemy slot 1; the faint replacement must account for the party swap

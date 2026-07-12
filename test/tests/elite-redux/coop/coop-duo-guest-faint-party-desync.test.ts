@@ -152,12 +152,12 @@ describe.skipIf(!RUN)(
       });
 
       // Pull the captured turn-1 resolution payload (the PARKED stale checkpoint - tick N, bi1 fainted).
-      const call = emitTurnSpy.mock.calls.find(c => c[0] === turn);
+      const call = emitTurnSpy.mock.calls.find(c => c[2] === turn);
       expect(call, "the host emitted a turn-1 resolution payload").toBeDefined();
-      const staleCheckpoint = call?.[2] as CoopBattleCheckpoint;
-      const staleChecksum = call?.[3] as string;
-      const stalePreimage = call?.[4] as string | undefined;
-      const staleFullField = call?.[5] as CoopFullMonSnapshot[] | undefined;
+      const staleCheckpoint = call?.[4] as CoopBattleCheckpoint;
+      const staleChecksum = call?.[5] as string;
+      const stalePreimage = call?.[6] as string | undefined;
+      const staleFullField = call?.[7] as CoopFullMonSnapshot[] | undefined;
       expect(staleFullField, "the resolution carried the on-field fullField snapshot").toBeDefined();
 
       // GUEST renders turn 1: the faint presentation opens the guest's OWN picker; stub the ONE PARTY open to

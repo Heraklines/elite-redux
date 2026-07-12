@@ -91,7 +91,11 @@ async function configurePage(page, label, browserErrors) {
   page.on("console", message => {
     const text = message.text();
     if (message.type() === "error") {
-      browserErrors.push(`[${label}:console] ${text}`);
+      const location = message.location();
+      const source = location.url
+        ? ` (${location.url}${location.lineNumber == null ? "" : `:${location.lineNumber}`})`
+        : "";
+      browserErrors.push(`[${label}:console] ${text}${source}`);
     }
     if (/\[coop:(?:launch|webrtc|session)\]/.test(text)) {
       process.stdout.write(`[${label}] ${text}\n`);

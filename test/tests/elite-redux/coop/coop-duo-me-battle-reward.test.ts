@@ -41,11 +41,12 @@ import {
   setCoopMeBattleInteractionCounter,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { GameModes } from "#enums/game-modes";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
-import { CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
+import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuoForMe,
@@ -193,16 +194,16 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
         "guest detects the ME battle WON directly (spawned ME battle + all enemies fainted) (#847)",
       ).toBe(true);
 
-      // Exercise the REAL guest finalize DECISION (the no-stream fallback branch, coop-replay-turn-phase):
+      // Exercise the REAL guest finalize DECISION after an authoritative commit:
       // with the ME battle won it must run the ME victory tail (pushNew VictoryPhase), NOT increment into a
       // phantom turn N+1. `end()` is stubbed so the branch decision runs without the phase's queue-shift
       // side effects (we assert the decision, not the downstream VictoryPhase). Reverting the #847 branch
       // flips this to an incrementTurn (turnAfter+1, no VictoryPhase) - the compile-safe FAILS-BEFORE.
       const pushNewSpy = vi.spyOn(rig.guestScene.phaseManager, "pushNew");
       const turnBefore = rig.guestScene.currentBattle.turn;
-      const finalize = new CoopReplayTurnPhase(turnBefore);
+      const finalize = new CoopFinalizeTurnPhase(turnBefore, {} as CoopBattleCheckpoint, "test-checksum");
       vi.spyOn(finalize, "end").mockImplementation(() => {});
-      (finalize as unknown as { finishTurnNoStream(): void }).finishTurnNoStream();
+      (finalize as unknown as { finishTurn(): void }).finishTurn();
       const names = pushNewSpy.mock.calls.map(c => c[0] as string);
       pushNewSpy.mockRestore();
       return { names, turnBefore, turnAfter: rig.guestScene.currentBattle.turn };

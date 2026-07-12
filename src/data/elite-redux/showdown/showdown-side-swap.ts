@@ -32,6 +32,7 @@ import type {
   CoopBattleCheckpoint,
   CoopBattleEvent,
   CoopFullBattleSnapshot,
+  CoopFullMonSnapshot,
   CoopSerializedArenaTag,
 } from "#data/elite-redux/coop/coop-transport";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -154,6 +155,17 @@ export function swapCheckpoint(cp: CoopBattleCheckpoint): CoopBattleCheckpoint {
 }
 
 /**
+ * Reflect the rich per-mon companion carried beside a checkpoint / turn result. This carrier has
+ * its own battler indices and is applied independently from both the numeric checkpoint and the
+ * id-keyed authoritative state, so it must cross the Showdown perspective boundary independently
+ * too. Keeping the transform here prevents a future ingress path from swapping two of the three
+ * carriers while silently writing HP, PP, tags, or held items onto the opposite local side.
+ */
+export function swapFullField(field: readonly CoopFullMonSnapshot[]): CoopFullMonSnapshot[] {
+  return field.map(mon => ({ ...mon, bi: swapBi(mon.bi) }));
+}
+
+/**
  * Reflect the {@linkcode CoopFullBattleSnapshot} resync (stateSync). The heavy lifting is the
  * embedded id-keyed {@linkcode CoopAuthoritativeBattleStateV1} (the modern unified path the guest
  * actually adopts), which is recursed. The legacy field/arena-tag seating is mirrored too so an
@@ -164,7 +176,7 @@ export function swapCheckpoint(cp: CoopBattleCheckpoint): CoopBattleCheckpoint {
 export function swapFullSnapshot(snap: CoopFullBattleSnapshot): CoopFullBattleSnapshot {
   return {
     ...snap,
-    field: snap.field.map(mon => ({ ...mon, bi: swapBi(mon.bi) })),
+    field: swapFullField(snap.field),
     arenaTags: snap.arenaTags.map(swapArenaTag),
     ...(snap.authoritativeState === undefined
       ? {}
