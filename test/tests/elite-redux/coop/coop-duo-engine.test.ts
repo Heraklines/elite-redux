@@ -112,6 +112,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
           // #851: echo the request's owner exactly as the real answerRequest does, so the host's
           // owner-keyed pending request is matched (a stub that dropped it would strand the await).
           ...(msg.owner == null ? {} : { owner: msg.owner }),
+          ...(msg.epoch == null ? {} : { epoch: msg.epoch, wave: msg.wave, pokemonId: msg.pokemonId }),
           command: { command: Command.FIGHT, cursor: 0, moveId: MoveId.TACKLE, targets: [BattlerIndex.ENEMY] },
         });
       }

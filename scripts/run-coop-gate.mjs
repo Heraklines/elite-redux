@@ -154,7 +154,10 @@ const LANE_ISOLATE = { A: false, B: true, C: true, P: true, Q: false };
  * Files proven by aggregate canary to retain process-global Phaser state despite Vitest module isolation.
  * Keep only measured exceptions here: the shard still uses one fast controller for every compatible file.
  */
-const FRESH_PROCESS_FILES = new Set([`${COOP_DIR_REL}/coop-duo-engine.test.ts`]);
+const FRESH_PROCESS_FILES = new Set([
+  `${COOP_DIR_REL}/coop-duo-multiwave.test.ts`,
+  `${COOP_DIR_REL}/coop-duo-reward-subpickers.test.ts`,
+]);
 
 /**
  * Per-lane EXTRA env (merged over ER_SCENARIO=1). Only LANE P (#897) needs any: it forces the soak driver
