@@ -56,7 +56,9 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import {
+  applyCoopAuthoritativeBattleState,
   applyCoopCaptureParty,
+  applyCoopCheckpoint,
   applyCoopFieldSnapshot,
   applyCoopFullSnapshot,
   captureCoopCaptureParty,
@@ -1313,6 +1315,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   // field membership, trapping, and move usability consult process-global scene services internally.
   rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots, offer }) => {
     const compute = () => {
+      // Production's guest is already parked in CoopReplayTurnPhase when a post-faint host reaches the
+      // next command. The single-process soak crosses the host first, so consume the same queued
+      // out-of-band replacement carrier here, under the guest context, before reading its command UI.
+      const replacement = rig.guestRuntime.battleStream.consumeCheckpoint();
+      if (replacement != null && applyCoopCheckpoint(replacement.checkpoint)) {
+        if (applyCoopAuthoritativeBattleState(replacement.authoritativeState, true)) {
+          rig.guestRuntime.battleStream.retainAppliedOutOfBandCheckpoint(replacement);
+        }
+      }
       const wave = rig.hostScene.currentBattle.waveIndex;
       const turn = rig.hostScene.currentBattle.turn;
       // #879 PRODUCTION-FIDELITY command SOURCE. In "harness" mode the guest answerer reads the HOST's
