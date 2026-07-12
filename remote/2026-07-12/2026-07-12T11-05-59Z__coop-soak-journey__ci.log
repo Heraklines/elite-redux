@@ -1,0 +1,67 @@
+===== COOP SOAK RESULT =====
+profile: journey
+verdict: PASS
+waves_requested: 200
+run: 29190174638 (feat/elite-redux-port)
+timestamp: 2026-07-12T11-05-59Z
+
+----- driver lines -----
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=110 guest=0
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=390 guest=110
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[coop-soak] ME DRIVEN wave 14 (seed 828633): ER_HOT_SPRING [host-owned]
+[coop-soak] ME DRIVEN wave 16 (seed 828633): BERRIES_ABOUND [host-owned]
+[coop-soak] ME DRIVEN wave 18 (seed 828633): ER_PICNIC [host-owned]
+[coop-soak] ME DRIVEN wave 24 (seed 828633): FIELD_TRIP [guest-owned]
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1150 guest=390
+[coop-soak] ME DRIVEN wave 26 (seed 828633): ER_TOWN_RAFFLE [guest-owned]
+[coop-soak] ME DRIVEN wave 28 (seed 828633): ER_FORTUNE_TELLER [guest-owned]
+[coop-soak] ME DRIVEN wave 32 (seed 828633): TELEPORTING_HIJINKS [battle-handoff]
+[coop-soak] ME DRIVEN wave 34 (seed 828633): ER_STILL_WATERS [host-owned]
+[22m[39m[coop-soak] scalar-lag wave 35 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1840 guest=960
+[coop-soak] ME DRIVEN wave 36 (seed 828633): WEIRD_DREAM [host-owned]
+[coop-soak] ME DRIVEN wave 39 (seed 828633): ER_CLEANSING_FONT [guest-owned]
+[coop-soak] ME DRIVEN wave 42 (seed 828633): ER_DRAGONS_HOARD [guest-owned]
+[coop-soak] ME DRIVEN wave 44 (seed 828633): TRASH_TO_TREASURE [guest-owned]
+
+----- vitest result tail -----
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[coop:launch] clearCoopRuntime role=guest netcode=authoritative gen->1
+[coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: -1, termSeq: -1, wasOwner: false }
+[coop:transport] state guest connected -> closed
+[coop:transport] state host connected -> disconnected
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=true)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+[coop:reward] WATCHER timed out waiting for partner -> leaving reward screen
+[coop:reward] WATCHER timed out waiting for partner -> leaving reward screen
+[coop:reward] WATCHER timed out waiting for partner -> leaving reward screen
+[coop:reward] WATCHER timed out waiting for partner -> leaving reward screen
+[coop:reward] WATCHER timed out waiting for partner -> leaving reward screen
+[34mCould not recover your partner's authoritative reward options. Reconnect to resume safely.[39m
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[33m[coop:runtime] partner channel disconnected -> entering membership recovery (shared waits retained)[39m
+[33m[coop:relay] cancelWaiters() sticky-cancel seqs=[21,23,25,37,39,27] (resync rescue) -> selected resolve null[39m
+[33m[coop:relay] AWAIT interactionChoice seq=21 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+[33m[coop:relay] AWAIT interactionChoice seq=23 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+[33m[coop:relay] AWAIT interactionChoice seq=25 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+[33m[coop:relay] AWAIT interactionChoice seq=37 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+[33m[coop:relay] AWAIT interactionChoice seq=39 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+[33m[coop:relay] AWAIT rewardOptions key=27:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mco-op continuous journey: many mystery events plus biome transitions > plays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift[39m
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [33m54942[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak-journey.test.ts:101:3[39m
+
+[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m   Start at [22m 11:04:40
+[2m   Duration [22m 79.58s[2m (transform 18.94s, setup 23.13s, import 174ms, tests 55.38s, environment 737ms)[22m
+
