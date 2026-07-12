@@ -257,6 +257,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     globalScene.currentBattle.turnCommands = {};
     // The renderer gate neutralizes SummonPhase, which normally owns this hide tween. Model the
     // live launch residue and require the first command boundary to enforce the presentation result.
+    const trainerVisibilitySpy = vi.spyOn(globalScene.trainer, "setVisible");
     globalScene.trainer.setVisible(true);
     const setModeSpy = vi.spyOn(globalScene.ui, "setMode");
 
@@ -269,7 +270,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(cmd?.skip).toBe(true);
     const openedCommandMenu = setModeSpy.mock.calls.some(([mode]) => mode === UiMode.COMMAND);
     expect(openedCommandMenu, "guest opens no menu for the host's slot").toBe(false);
-    expect(globalScene.trainer.visible, "authoritative guest clears the launch trainer before command UI").toBe(false);
+    expect(
+      trainerVisibilitySpy,
+      "authoritative guest clears the launch trainer before command UI",
+    ).toHaveBeenCalledWith(false);
   });
 
   it("the guest's TurnStartPhase DIVERTS to CoopReplayTurnPhase: no MovePhase, no resolution", async () => {
