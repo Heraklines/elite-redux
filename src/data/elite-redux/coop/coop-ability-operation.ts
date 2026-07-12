@@ -13,9 +13,10 @@ import {
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  applyCoopOperationEnvelope,
+  isCoopOperationJournalActive,
   journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
-  routeCoopOperationToLiveSink,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import { CoopOperationGuest, CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
@@ -203,6 +204,9 @@ export function adoptAbilityWatcherOutcome(params: {
     }
     return false;
   }
+  if (isCoopOperationJournalActive()) {
+    return false;
+  }
   const operation: CoopPendingOperation = {
     id,
     kind: "ABILITY_PICK",
@@ -281,10 +285,7 @@ function applyJournaledAbilityEnvelope(envelope: CoopAuthoritativeEnvelopeV1): C
   if (g.hasApplied(operation.id)) {
     return "duplicate";
   }
-  if (!routeCoopOperationToLiveSink("op:ability", envelope)) {
-    return "rejected";
-  }
-  const result = g.applyEnvelope({ ...envelope, sessionEpoch: epoch, revision: g.getLastAppliedRevision() + 1 });
+  const result = applyCoopOperationEnvelope(g, "op:ability", envelope);
   if (result.kind !== "applied") {
     return "rejected";
   }

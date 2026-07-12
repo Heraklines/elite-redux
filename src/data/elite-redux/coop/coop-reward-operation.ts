@@ -70,9 +70,10 @@ import {
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  applyCoopOperationEnvelope,
+  isCoopOperationJournalActive,
   journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
-  routeCoopOperationToLiveSink,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
@@ -505,6 +506,10 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
       return { adopt: false, reason: "duplicate" };
     }
 
+    if (isCoopOperationJournalActive()) {
+      return { adopt: false, reason: "await-authoritative-envelope" };
+    }
+
     // Apply through the guest applier (surface-local dense revision; classifies + records the op).
     const appliedOp: CoopPendingOperation = { ...intent, status: "applied" };
     const g = guest();
@@ -564,15 +569,7 @@ function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Co
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
   }
-  if (!routeCoopOperationToLiveSink("op:reward", envelope)) {
-    return "rejected";
-  }
-  const res = g.applyEnvelope({
-    ...envelope,
-    sessionEpoch: epoch,
-    revision: g.getLastAppliedRevision() + 1,
-  });
-  if (res.kind !== "applied") {
+  if (applyCoopOperationEnvelope(g, "op:reward", envelope) !== "applied") {
     return "rejected"; // transient non-applicable (retriable); never a permanent condition (that is a duplicate above).
   }
   // Route the newly-consumed action into the production sink. It feeds the tagged committed choice into the

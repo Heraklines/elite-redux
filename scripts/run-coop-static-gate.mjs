@@ -19,7 +19,14 @@ function run(executable, args, opts = {}) {
   });
 }
 
-const changedResult = run("git", ["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"]);
+const configuredBase = process.env.COOP_BASE_SHA?.trim();
+const base = configuredBase && !/^0+$/.test(configuredBase) ? configuredBase : "HEAD^";
+const baseExists = run("git", ["cat-file", "-e", `${base}^{commit}`]);
+if (baseExists.status !== 0) {
+  process.stderr.write(`Co-op static gate cannot resolve base commit ${base}; checkout history is incomplete.\n`);
+  process.exit(1);
+}
+const changedResult = run("git", ["diff", "--name-only", "--diff-filter=ACMR", base, "HEAD"]);
 if (changedResult.status !== 0) {
   process.stderr.write(changedResult.stderr ?? "Unable to enumerate changed files.\n");
   process.exit(1);
@@ -30,13 +37,19 @@ const changed = new Set(
     .map(file => file.trim().replaceAll("\\", "/"))
     .filter(Boolean),
 );
+if (changed.size === 0) {
+  process.stderr.write(`Co-op static gate resolved zero changed files for ${base}..HEAD; refusing a vacuous pass.\n`);
+  process.exit(1);
+}
 
 function isCoopStaticScope(file) {
   return (
     file.startsWith("src/data/elite-redux/coop/")
     || file.startsWith("src/phases/coop-")
     || file.startsWith("test/tests/elite-redux/coop/")
-    || (file.startsWith("test/tools/coop-") && file !== "test/tools/coop-soak-driver.ts")
+    || file.startsWith("test/tools/coop-")
+    || file === "src/phases/command-phase.ts"
+    || file === "src/phases/title-phase.ts"
   );
 }
 
@@ -48,6 +61,20 @@ const diagnostics = [...typeOutput.matchAll(/^([^\r\n(]+)\((\d+),(\d+)\): error 
   column: match[3],
   message: match[4],
 }));
+const TYPE_DIAGNOSTIC_BASELINE = 299;
+if (typecheck.status !== 0 && diagnostics.length === 0) {
+  process.stderr.write(
+    "Repository typecheck failed but the static gate parsed zero diagnostics; refusing a false green.\n",
+  );
+  process.stderr.write(typeOutput);
+  process.exit(1);
+}
+if (diagnostics.length > TYPE_DIAGNOSTIC_BASELINE) {
+  process.stderr.write(
+    `Repository TypeScript diagnostic ratchet regressed: ${diagnostics.length} > ${TYPE_DIAGNOSTIC_BASELINE}.\n`,
+  );
+  process.exit(1);
+}
 const changedDiagnostics = diagnostics.filter(
   diagnostic => changed.has(diagnostic.file) || isCoopStaticScope(diagnostic.file),
 );

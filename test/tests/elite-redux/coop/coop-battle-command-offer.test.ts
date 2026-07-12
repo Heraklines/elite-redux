@@ -11,8 +11,25 @@ import { describe, expect, it } from "vitest";
 
 const offer: CoopBattleCommandOffer = {
   moves: [
-    { slot: 0, moveId: 33, targetSets: [[2], [3]], canTera: true },
-    { slot: 2, moveId: 89, targetSets: [[2, 3]], canTera: false },
+    {
+      slot: 0,
+      moveId: 33,
+      targetSets: [[2], [3]],
+      targetRefSets: [[{ side: "enemy", pokemonId: 200 }], [{ side: "enemy", pokemonId: 300 }]],
+      canTera: true,
+    },
+    {
+      slot: 2,
+      moveId: 89,
+      targetSets: [[2, 3]],
+      targetRefSets: [
+        [
+          { side: "enemy", pokemonId: 200 },
+          { side: "enemy", pokemonId: 300 },
+        ],
+      ],
+      canTera: false,
+    },
   ],
   switches: [
     { slot: 2, canNormal: true, canBaton: false },
@@ -20,6 +37,7 @@ const offer: CoopBattleCommandOffer = {
   ],
   ballTypes: [0, 2],
   ballTargets: [2],
+  ballTargetRefs: [{ side: "enemy", pokemonId: 200 }],
   canRun: false,
 };
 
@@ -37,6 +55,18 @@ describe("host-authored co-op battle command offers", () => {
     expect(
       validateCoopBattleCommand({ command: Command.FIGHT, cursor: 0, moveId: 33, targets: [99] }, offer).reason,
     ).toBe("targets-not-offered");
+    expect(
+      validateCoopBattleCommand(
+        {
+          command: Command.FIGHT,
+          cursor: 0,
+          moveId: 33,
+          targets: [-1],
+          targetRefs: [{ side: "enemy", pokemonId: 300 }],
+        },
+        offer,
+      ).valid,
+    ).toBe(true);
     expect(
       validateCoopBattleCommand(
         { command: Command.FIGHT, cursor: 0, moveId: 33, targets: [2], useMode: MoveUseMode.IGNORE_PP },

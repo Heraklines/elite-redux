@@ -25,11 +25,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
         with:
-          submodules: recursive
+          fetch-depth: 0
 
       - uses: ./.github/actions/setup-deps
 
       - name: Check changed-file types, formatting, and lint
+        env:
+          COOP_BASE_SHA: ${{ github.event.before }}
         run: node scripts/run-coop-static-gate.mjs
 
   gate:
@@ -57,8 +59,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
-        with:
-          submodules: recursive
 
       - uses: ./.github/actions/setup-deps
 

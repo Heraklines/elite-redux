@@ -13,9 +13,9 @@ import {
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  applyCoopOperationEnvelope,
   journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
-  routeCoopOperationToLiveSink,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import { CoopOperationGuest, CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
@@ -244,10 +244,7 @@ function applyJournaledColosseumEnvelope(envelope: CoopAuthoritativeEnvelopeV1):
   if (g.hasApplied(op.id)) {
     return "duplicate";
   }
-  if (!routeCoopOperationToLiveSink("op:colosseum", envelope)) {
-    return "rejected";
-  }
-  const result = g.applyEnvelope({ ...envelope, sessionEpoch: epoch, revision: g.getLastAppliedRevision() + 1 });
+  const result = applyCoopOperationEnvelope(g, "op:colosseum", envelope);
   if (result.kind !== "applied") {
     return "rejected";
   }

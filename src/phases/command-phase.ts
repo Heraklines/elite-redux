@@ -31,7 +31,11 @@ import {
   recordCoopOwnSlotCommand,
   recordCoopPartnerSlotCommand,
 } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopBattleCommandOffer, SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopBattleCommandOffer,
+  CoopBattleTargetRef,
+  SerializedCommand,
+} from "#data/elite-redux/coop/coop-transport";
 import { reloadCurrentWave } from "#data/elite-redux/er-reset-wave";
 import { recordSinglePlayerCommand } from "#data/elite-redux/replay-single-recording";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
@@ -337,6 +341,13 @@ export class CommandPhase extends FieldPhase {
   }
 
   /** Build the complete action set from host state; no peer-derived legality enters this object. */
+  private coopTargetRef(battlerIndex: number): CoopBattleTargetRef | null {
+    const pokemon = [...globalScene.getPlayerField(), ...globalScene.getEnemyField()].find(
+      candidate => candidate.getBattlerIndex() === battlerIndex,
+    );
+    return pokemon == null ? null : { side: pokemon.isPlayer() ? "player" : "enemy", pokemonId: pokemon.id };
+  }
+
   private buildCoopPartnerCommandOffer(partner: PlayerPokemon, slotOwner: "host" | "guest"): CoopBattleCommandOffer {
     const moves = partner
       .getMoveset()
@@ -353,6 +364,11 @@ export class CommandPhase extends FieldPhase {
           slot,
           moveId: move.moveId,
           targetSets: targetSets.length > 0 ? targetSets : [[]],
+          targetRefSets: (targetSets.length > 0 ? targetSets : [[]]).map(targets =>
+            targets
+              .map(target => this.coopTargetRef(target))
+              .filter((target): target is CoopBattleTargetRef => target != null),
+          ),
           canTera: canTerastallize(partner) && currentTeras + plannedTera < MAX_TERAS_PER_ARENA,
         };
       });
@@ -364,6 +380,14 @@ export class CommandPhase extends FieldPhase {
         targetSets: struggleTargets.multiple
           ? [struggleTargets.targets]
           : struggleTargets.targets.map(target => [target]),
+        targetRefSets: (struggleTargets.multiple
+          ? [struggleTargets.targets]
+          : struggleTargets.targets.map(target => [target])
+        ).map(targets =>
+          targets
+            .map(target => this.coopTargetRef(target))
+            .filter((target): target is CoopBattleTargetRef => target != null),
+        ),
         canTera: false,
       });
     }
@@ -392,6 +416,10 @@ export class CommandPhase extends FieldPhase {
         .getEnemyField()
         .filter(pokemon => pokemon.isActive(true))
         .map(pokemon => pokemon.getBattlerIndex()),
+      ballTargetRefs: globalScene
+        .getEnemyField()
+        .filter(pokemon => pokemon.isActive(true))
+        .map(pokemon => ({ side: "enemy" as const, pokemonId: pokemon.id })),
       canRun: this.canOfferPartnerRun(partner),
     };
   }
@@ -475,7 +503,11 @@ export class CommandPhase extends FieldPhase {
     // so the guest's independent broadcast matches even after a host-half-wipe recenter reseats the
     // survivor at a different field index than the guest has reconciled to (the 20-min-stall class).
     void sync
-      .requestPartnerCommand(this.fieldIndex, globalScene.currentBattle.turn, moveSlots, slotOwner, offer)
+      .requestPartnerCommand(this.fieldIndex, globalScene.currentBattle.turn, moveSlots, slotOwner, offer, {
+        epoch: controller.sessionEpoch,
+        wave: globalScene.currentBattle.waveIndex,
+        pokemonId: partner.id,
+      })
       .then(cmd => {
         // A relayed BALL / RUN (the partner threw a Poke Ball or fled) is applied
         // verbatim, NOT routed through the move path: its `cursor` is a ball type,
@@ -1008,13 +1040,20 @@ export class CommandPhase extends FieldPhase {
       cursor: turnCommand.cursor ?? -1,
       moveId,
       targets,
+      targetRefs: targets
+        .map(target => this.coopTargetRef(target))
+        .filter((target): target is CoopBattleTargetRef => target != null),
       useMode,
       // #633 Fix #4a: carry the Terastallize flag so the watcher teras the partner's mon.
       ...(tera ? { tera: true } : {}),
     };
     // #851: stamp OUR resolved owner (== controller.role past the guard above) so the host's
     // partner-slot await matches by owner even across a post-half-wipe field-index skew.
-    sync.broadcastLocalCommand(this.fieldIndex, globalScene.currentBattle.turn, ownFightCommand, controller.role);
+    sync.broadcastLocalCommand(this.fieldIndex, globalScene.currentBattle.turn, ownFightCommand, controller.role, {
+      epoch: controller.sessionEpoch,
+      wave: globalScene.currentBattle.waveIndex,
+      pokemonId: this.getPokemon().id,
+    });
     // #record-replay: capture the own-slot FIGHT command (no-op unless recording).
     recordCoopOwnSlotCommand(this.fieldIndex, ownFightCommand);
   }
@@ -1469,15 +1508,23 @@ export class CommandPhase extends FieldPhase {
             .filter(p => p.isActive(true))
             .map(p => p.getBattlerIndex())
         : [];
-    const ownActionCommand = {
+    const targetRefs = targets
+      .map(target => this.coopTargetRef(target))
+      .filter((target): target is CoopBattleTargetRef => target != null);
+    const ownActionCommand: SerializedCommand = {
       command,
       cursor,
-      targets,
+      ...(command === Command.BALL ? { targets } : {}),
+      ...(command === Command.BALL ? { targetRefs } : {}),
       ...(command === Command.POKEMON ? { baton } : {}),
     };
     // #851: stamp OUR resolved owner (== controller.role past the guard above) so the peer's
     // partner-slot await matches by owner even across a post-half-wipe field-index skew.
-    sync.broadcastLocalCommand(this.fieldIndex, globalScene.currentBattle.turn, ownActionCommand, controller.role);
+    sync.broadcastLocalCommand(this.fieldIndex, globalScene.currentBattle.turn, ownActionCommand, controller.role, {
+      epoch: controller.sessionEpoch,
+      wave: globalScene.currentBattle.waveIndex,
+      pokemonId: this.getPokemon().id,
+    });
     // #record-replay: capture the own-slot BALL/RUN/POKEMON command (no-op unless recording).
     recordCoopOwnSlotCommand(this.fieldIndex, ownActionCommand);
   }

@@ -55,9 +55,10 @@ import {
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  applyCoopOperationEnvelope,
+  isCoopOperationJournalActive,
   journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
-  routeCoopOperationToLiveSink,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
@@ -418,6 +419,10 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
       return { adopt: true, choice: params.res.choice, data: params.res.data };
     }
 
+    if (isCoopOperationJournalActive()) {
+      return { adopt: false, reason: "await-authoritative-envelope" };
+    }
+
     // Apply through the guest applier (surface-local dense revision; classifies + records the op).
     const appliedOp: CoopPendingOperation = { ...intent, status: "applied" };
     const g = guest();
@@ -469,17 +474,7 @@ function applyJournaledBiomeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coo
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
   }
-  if (!routeCoopOperationToLiveSink("op:biome", envelope)) {
-    return "rejected";
-  }
-  // Re-key to the guest-local dense revision so the live relay and journal carriers share ONE applier
-  // without creating artificial gaps when either carrier wins the race.
-  const res = g.applyEnvelope({
-    ...envelope,
-    sessionEpoch: epoch,
-    revision: g.getLastAppliedRevision() + 1,
-  });
-  if (res.kind !== "applied") {
+  if (applyCoopOperationEnvelope(g, "op:biome", envelope) !== "applied") {
     // A transient non-applicable result (a gap the manager already guards against, or a fail-closed):
     // leave it retriable (do NOT ACK). Never a permanent condition (a permanent one is a duplicate above).
     return "rejected";

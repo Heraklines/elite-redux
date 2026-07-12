@@ -669,7 +669,7 @@ settled addresses dedupe repeat carriers. Target normalization is limited to una
 The exact checkpoint SHA `5490babcb` passed the full 13-shard gate in run `29176964353` (the same-SHA failed
 job rerun passed) and staging-only deployment `29177285683` completed successfully.
 
-## 33. One global authoritative operation sequence (in progress)
+## 33. One global authoritative operation sequence
 
 Protocol 25 retires independent per-surface revisions. All twelve operation hosts share one epoch clock;
 all receiver appliers share one cursor; and durability carries one dense `op:global` stream while routing
@@ -678,5 +678,26 @@ terminal, wave advance, biome map, or reward action could each be locally dense 
 orders. Cold-resume migration derives a deterministic global floor from legacy disjoint class marks, and an
 atomic snapshot advances the shared cursor only after material convergence.
 
-Static checks pass locally. Remote sharded verification and staging promotion are intentionally pending
-until the implementation/test chunk is complete.
+Exact SHA `0a12664c4` passed all thirteen gameplay shards plus static in run `29177743451`; staging-only
+deployment `29177937038` completed successfully.
+
+## 34. Independent-audit containment and lobby apply ACK (in progress)
+
+An independent audit of `0a12664c4` found four stop-ship seams despite the green gameplay matrix: the
+production switch/run serializer emitted forbidden empty target arrays; the shallow static checkout could
+enumerate zero changed files; operation journal adapters invoked live sinks before validating the untouched
+epoch/global revision and then re-keyed the envelope; and per-file Vitest CLI startup dominated gate time.
+
+Protocol 26 addresses these as one containment checkpoint. Action serialization omits irrelevant fields;
+rejected commands resolve through a host-chosen legal default rather than a twenty-minute local-AI path;
+command addresses include epoch, authoritative wave, owner, and host-stable Pokemon identity; and target
+choices carry side plus Pokemon identity so ambiguous double/triple geometry maps to host battler indices.
+All operation surfaces now inspect the untouched envelope before any live sink and advance the shared cursor
+only after the sink succeeds. The static job fetches the real base SHA, refuses empty ranges/parser failures,
+checks shared entrypoints and the soak driver, and ratchets the repository diagnostic count.
+
+The gate canary uses one Vitest controller per shard with sequential isolated forks, historical Lane-B
+balancing, and no asset submodule checkout. `AGENTS.md` records that workflow only subject to the full canary
+returning equivalent coverage and green results. The lobby start-new release is also apply-ACK-gated: the
+host cannot enter team selection until the guest's exact decision handler ran; duplicate/reconnect delivery
+re-ACKs without re-entering UI. Remote verification and staging promotion are pending.

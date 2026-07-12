@@ -70,9 +70,10 @@ import {
   parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  applyCoopOperationEnvelope,
+  isCoopOperationJournalActive,
   journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
-  routeCoopOperationToLiveSink,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
@@ -577,6 +578,10 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
       return { adopt: false, reason: "stale-or-duplicate" };
     }
 
+    if (isCoopOperationJournalActive()) {
+      return { adopt: false, reason: "await-authoritative-envelope" };
+    }
+
     // Apply through the guest applier (surface-local dense revision; classifies + records the op).
     const appliedOp: CoopPendingOperation = { ...intent, status: "applied" };
     const g = guest();
@@ -638,15 +643,7 @@ function applyJournaledMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopAp
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
   }
-  if (!routeCoopOperationToLiveSink("op:me", envelope)) {
-    return "rejected";
-  }
-  const res = g.applyEnvelope({
-    ...envelope,
-    sessionEpoch: epoch,
-    revision: g.getLastAppliedRevision() + 1,
-  });
-  if (res.kind !== "applied") {
+  if (applyCoopOperationEnvelope(g, "op:me", envelope) !== "applied") {
     return "rejected"; // transient non-applicable (retriable); never a permanent condition (that is a duplicate above).
   }
   // Route newly-consumed ME operations into the production live sink. Supported terminal operations feed

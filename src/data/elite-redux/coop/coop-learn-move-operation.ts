@@ -16,9 +16,9 @@ import {
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  applyCoopOperationEnvelope,
   journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
-  routeCoopOperationToLiveSink,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import { CoopOperationGuest, CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
@@ -275,12 +275,7 @@ function applyEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome 
   if (g.hasApplied(op.id)) {
     return "duplicate";
   }
-  if (!routeCoopOperationToLiveSink("op:learnMove", envelope)) {
-    return "rejected";
-  }
-  if (
-    g.applyEnvelope({ ...envelope, sessionEpoch: epoch, revision: g.getLastAppliedRevision() + 1 }).kind !== "applied"
-  ) {
+  if (applyCoopOperationEnvelope(g, "op:learnMove", envelope) !== "applied") {
     return "rejected";
   }
   if (op.payload.type === "decision") {

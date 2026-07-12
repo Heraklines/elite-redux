@@ -19,10 +19,19 @@ import { describe, expect, it } from "vitest";
 
 describe("co-op battle command relay (#633, LIVE-C)", () => {
   const legalOffer: CoopBattleCommandOffer = {
-    moves: [{ slot: 1, moveId: 55, targetSets: [[2], [3]], canTera: false }],
+    moves: [
+      {
+        slot: 1,
+        moveId: 55,
+        targetSets: [[2], [3]],
+        targetRefSets: [[{ side: "enemy", pokemonId: 200 }], [{ side: "enemy", pokemonId: 300 }]],
+        canTera: false,
+      },
+    ],
     switches: [{ slot: 4, canNormal: true, canBaton: false }],
     ballTypes: [0],
     ballTargets: [2],
+    ballTargetRefs: [{ side: "enemy", pokemonId: 200 }],
     canRun: false,
   };
 
@@ -190,31 +199,56 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     guestSync.dispose();
   });
 
-  it("rejects a live illegal reply without resolving, then accepts an exact offered command", async () => {
+  it("keeps two same-owner active Pokemon on distinct epoch/wave/entity command addresses", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    const firstAddress = { epoch: 7, wave: 20, pokemonId: 101 };
+    const secondAddress = { epoch: 7, wave: 20, pokemonId: 202 };
+
+    const first = hostSync.requestPartnerCommand(0, 3, [1], "guest", legalOffer, firstAddress);
+    const second = hostSync.requestPartnerCommand(2, 3, [1], "guest", legalOffer, secondAddress);
+    guestSync.broadcastLocalCommand(
+      0,
+      3,
+      { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] },
+      "guest",
+      firstAddress,
+    );
+    guestSync.broadcastLocalCommand(2, 3, { command: Command.POKEMON, cursor: 4 }, "guest", secondAddress);
+
+    await expect(first).resolves.toMatchObject({ command: Command.FIGHT, moveId: 55 });
+    await expect(second).resolves.toMatchObject({ command: Command.POKEMON, cursor: 4 });
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("rejects a live illegal reply and immediately commits the host-authored legal default", async () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host);
     const guestSync = new CoopBattleSync(guest);
     let requests = 0;
+    let rejections = 0;
     const off = guest.onMessage(message => {
       if (message.t === "commandRequest") {
         requests++;
+      } else if (message.t === "commandRejected") {
+        rejections++;
       }
     });
     const awaited = hostSync.requestPartnerCommand(1, 4, [1], "guest", legalOffer);
 
     guestSync.broadcastLocalCommand(1, 4, { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [99] }, "guest");
-    await new Promise(resolve => setTimeout(resolve, 0));
-    expect(hostSync.describePendingRequests()).toHaveLength(1);
+    expect(await awaited).toMatchObject({ command: Command.FIGHT, moveId: 55, targets: [2] });
+    expect(hostSync.describePendingRequests()).toHaveLength(0);
     expect(requests, "an invalid deterministic responder cannot create a request/reply recursion").toBe(1);
-
-    guestSync.broadcastLocalCommand(1, 4, { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] }, "guest");
-    expect(await awaited).toMatchObject({ moveId: 55, targets: [2] });
+    expect(rejections).toBe(1);
     off();
     hostSync.dispose();
     guestSync.dispose();
   });
 
-  it("rejects an illegal pre-wait buffer instead of consuming it", async () => {
+  it("rejects an illegal pre-wait buffer and resolves with the authoritative default", async () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host);
     const guestSync = new CoopBattleSync(guest);
@@ -222,8 +256,7 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     await new Promise(resolve => setTimeout(resolve, 0));
 
     const awaited = hostSync.requestPartnerCommand(1, 5, [1], "guest", legalOffer);
-    guestSync.broadcastLocalCommand(1, 5, { command: Command.POKEMON, cursor: 4 }, "guest");
-    expect(await awaited).toMatchObject({ command: Command.POKEMON, cursor: 4 });
+    expect(await awaited).toMatchObject({ command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] });
     hostSync.dispose();
     guestSync.dispose();
   });
@@ -234,7 +267,15 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     const guestSync = new CoopBattleSync(guest);
     const soleTargetOffer: CoopBattleCommandOffer = {
       ...legalOffer,
-      moves: [{ slot: 1, moveId: 55, targetSets: [[2]], canTera: false }],
+      moves: [
+        {
+          slot: 1,
+          moveId: 55,
+          targetSets: [[2]],
+          targetRefSets: [[{ side: "enemy", pokemonId: 200 }]],
+          canTera: false,
+        },
+      ],
     };
 
     guestSync.broadcastLocalCommand(1, 8, { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [-1] }, "guest");
@@ -242,6 +283,50 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     const command = await hostSync.requestPartnerCommand(1, 8, [1], "guest", soleTargetOffer);
 
     expect(command).toMatchObject({ moveId: 55, targets: [2] });
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("maps an ambiguous local battler index through stable side plus Pokemon identity", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.broadcastLocalCommand(
+      1,
+      9,
+      {
+        command: Command.FIGHT,
+        cursor: 1,
+        moveId: 55,
+        targets: [-1],
+        targetRefs: [{ side: "enemy", pokemonId: 300 }],
+      },
+      "guest",
+    );
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const command = await hostSync.requestPartnerCommand(1, 9, [1], "guest", legalOffer);
+    expect(command).toMatchObject({ moveId: 55, targets: [3], targetRefs: [{ side: "enemy", pokemonId: 300 }] });
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it.each([
+    { command: Command.POKEMON, cursor: 4, targets: [], baton: false },
+    { command: Command.RUN, cursor: 0, targets: [] },
+  ])("normalizes the former production $command wire shape by removing irrelevant targets", async raw => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.broadcastLocalCommand(1, 12, raw, "guest");
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const command = await hostSync.requestPartnerCommand(1, 12, [1], "guest", {
+      ...legalOffer,
+      canRun: raw.command === Command.RUN,
+    });
+    expect(command).toMatchObject({ command: raw.command, cursor: raw.cursor });
+    expect(command).not.toHaveProperty("targets");
     hostSync.dispose();
     guestSync.dispose();
   });

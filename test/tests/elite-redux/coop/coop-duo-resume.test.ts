@@ -188,7 +188,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const guestBefore = await withClient(rig.guestCtx, () => captureCoopChecksum());
 
     // HOST chose New Game (or had no matching save): it relays the barrier release.
-    host.sendResumeStartNew();
+    await host.sendResumeStartNew();
     await flush();
     expect(released, "the guest wait barrier was released by resumeStartNew").toBe(1);
     expect(offered, "no resume offer was surfaced on the New Game path").toBe(0);

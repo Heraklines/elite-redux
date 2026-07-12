@@ -67,7 +67,7 @@ export type CoopRole = "host" | "guest";
 // control high-water mark; receivers advance control only after safe-boundary checksum convergence.
 // er-coop-23: hot rejoin preserves active waits and reissues command/barrier control state; terminal
 // disconnect ends shared play instead of taking an uncommitted local fallback/AI/solo branch.
-export const COOP_PROTOCOL_VERSION = "er-coop-25";
+export const COOP_PROTOCOL_VERSION = "er-coop-26";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -112,6 +112,8 @@ export interface SerializedCommand {
   moveId?: number;
   /** For FIGHT: resolved target battler indices. */
   targets?: number[];
+  /** Stable target identities; host maps these to its own battler indices before commit. */
+  targetRefs?: CoopBattleTargetRef[];
   /** `MoveUseMode` enum value. */
   useMode?: number;
   /** For POKEMON (switch): whether it is a Baton switch (passes stat changes) (#633). */
@@ -120,11 +122,18 @@ export interface SerializedCommand {
   tera?: boolean;
 }
 
+export interface CoopBattleTargetRef {
+  side: "player" | "enemy";
+  pokemonId: number;
+}
+
 /** One exact host-legal move choice, including every legal resolved target set. */
 export interface CoopBattleMoveOffer {
   slot: number;
   moveId: number;
   targetSets: number[][];
+  /** Stable identities aligned one-for-one with `targetSets`. */
+  targetRefSets: CoopBattleTargetRef[][];
   canTera: boolean;
 }
 
@@ -134,6 +143,7 @@ export interface CoopBattleCommandOffer {
   switches: { slot: number; canNormal: boolean; canBaton: boolean }[];
   ballTypes: number[];
   ballTargets: number[];
+  ballTargetRefs: CoopBattleTargetRef[];
   canRun: boolean;
 }
 
@@ -995,6 +1005,9 @@ export type CoopMessage =
       moveSlots: number[];
       offer?: CoopBattleCommandOffer | undefined;
       owner?: CoopRole;
+      epoch?: number;
+      wave?: number;
+      pokemonId?: number;
     }
   /**
    * A player's battle command for their own field slot (phase P2 / LIVE-C reply). `owner`
@@ -1002,7 +1015,28 @@ export type CoopMessage =
    * `coopOwner` for the slot, so the awaiter matches by OWNER (stable across a post-half-wipe
    * index skew) instead of the raw `fieldIndex`. Absent on an older client -> fieldIndex fallback.
    */
-  | { t: "command"; fieldIndex: number; turn: number; command: SerializedCommand; decline?: boolean; owner?: CoopRole }
+  | {
+      t: "command";
+      fieldIndex: number;
+      turn: number;
+      command: SerializedCommand;
+      decline?: boolean;
+      owner?: CoopRole;
+      epoch?: number;
+      wave?: number;
+      pokemonId?: number;
+    }
+  /** Host -> peer: its command was invalid; host committed the deterministic legal default for this address. */
+  | {
+      t: "commandRejected";
+      fieldIndex: number;
+      turn: number;
+      reason: string;
+      owner?: CoopRole;
+      epoch?: number;
+      wave?: number;
+      pokemonId?: number;
+    }
   | { t: "stallBeat"; waitingMs: number }
   /**
    * Either client -> peer (#839, reciprocal rendezvous barrier): "I reached sync `point`". A named
@@ -1039,6 +1073,8 @@ export type CoopMessage =
    * that will never come. The guest treats it as the release signal for its wait barrier.
    */
   | { t: "resumeStartNew"; decisionId: string }
+  /** Guest -> host: the exact start-new decision was applied to the lobby UI, so the host may enter team select. */
+  | { t: "resumeDecisionAck"; decisionId: string }
   /** A forced/voluntary switch replacement: bring in party `partySlot` to `fieldIndex` (P2). */
   | { t: "switchChoice"; fieldIndex: number; partySlot: number }
   /**

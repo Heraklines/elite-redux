@@ -13,9 +13,10 @@ import {
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  applyCoopOperationEnvelope,
+  isCoopOperationJournalActive,
   journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
-  routeCoopOperationToLiveSink,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import { CoopOperationGuest, CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
@@ -174,6 +175,9 @@ export function adoptBargainWatcherOutcome(params: {
     if (g.hasApplied(id)) {
       return pendingJournalMaterializations.delete(id);
     }
+    if (isCoopOperationJournalActive()) {
+      return false;
+    }
     const intent = intentFor(params.pinned, params.outcome);
     const result = g.applyEnvelope({
       version: 1,
@@ -205,10 +209,7 @@ function applyJournaledBargainEnvelope(envelope: CoopAuthoritativeEnvelopeV1): C
   if (g.hasApplied(op.id)) {
     return "duplicate";
   }
-  if (!routeCoopOperationToLiveSink("op:bargain", envelope)) {
-    return "rejected";
-  }
-  const result = g.applyEnvelope({ ...envelope, sessionEpoch: epoch, revision: g.getLastAppliedRevision() + 1 });
+  const result = applyCoopOperationEnvelope(g, "op:bargain", envelope);
   if (result.kind !== "applied") {
     return "rejected";
   }

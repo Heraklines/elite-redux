@@ -143,16 +143,12 @@ function categorize() {
 }
 
 /**
- * Per-lane vitest MODULE isolation. Heavy lanes also get PROCESS isolation in {@linkcode runLane}; `--isolate`
- * alone resets module contexts but Vitest still reuses the worker process, so Phaser heaps and asynchronous
- * scene work can survive between files. Lane A (engine-free stub repros) is deliberately `--no-isolate`:
+ * Per-lane Vitest module isolation. Heavy lanes use isolated fork workers under one Vitest controller so
+ * files stay isolated while Vite transformation/setup is cached once per shard. Lane A is deliberately `--no-isolate`:
  * those files intentionally CHAIN a real `globalScene` across the dir (capture prevGlobalScene -> restore),
  * so isolating them would strand a stub with no real scene to chain; Lane A is already reliably green as-is.
  */
 const LANE_ISOLATE = { A: false, B: true, C: true, P: true, Q: false };
-
-/** Lanes whose files each run in a fresh, sequential Vitest process (heap + timer isolation). */
-const LANE_PROCESS_ISOLATE = { A: false, B: true, C: true, P: true, Q: false };
 
 /**
  * Per-lane EXTRA env (merged over ER_SCENARIO=1). Only LANE P (#897) needs any: it forces the soak driver
@@ -168,10 +164,9 @@ const LANE_ENV = {
 };
 
 /**
- * Run one lane sequentially. Heavy lanes execute one file per Vitest child process; this is still one worker
- * at a time on the runner, but releases the entire heap and kills leaked async scene work between files.
- * Lane A keeps one grouped process for its intentional shared-scene chain. Every file runs even after a red
- * so one checkpoint returns the complete failure batch.
+ * Run one shard through one Vitest controller. `--pool=forks --no-file-parallelism --isolate` gives heavy
+ * files isolated sequential workers while retaining the controller's transformation cache. This avoids the
+ * measured ~20-25s repeated startup per file and keeps a complete multi-file blob report.
  */
 function runLane(name, files) {
   if (files.length === 0) {
@@ -190,32 +185,20 @@ function runLane(name, files) {
     .join(" ");
   // eslint-disable-next-line no-console
   console.log(
-    `\n=== LANE ${name}: ${files.length} files (sequential, ${LANE_PROCESS_ISOLATE[name] ? "fresh process/file" : "single process"}, ${isolate}${extraEnv ? `, ${extraEnv}` : ""}) ===`,
+    `\n=== LANE ${name}: ${files.length} files (one controller, sequential fork pool, ${isolate}${extraEnv ? `, ${extraEnv}` : ""}) ===`,
   );
   const started = Date.now();
-  const groups = LANE_PROCESS_ISOLATE[name] ? files.map(file => [file]) : [files];
-  let failures = 0;
-  for (const [index, group] of groups.entries()) {
-    if (groups.length > 1) {
-      console.log(`\n--- LANE ${name} FILE ${index + 1}/${groups.length}: ${group[0]} ---`);
-    }
-    // shell:true + a single command string lets Windows resolve npx.cmd through PATHEXT. Paths are repo-relative
-    // and contain no spaces. Only one child exists at a time, so external sharding supplies all concurrency.
-    const cmd = `npx vitest run ${group.join(" ")} --no-file-parallelism ${isolate}`;
-    const res = spawnSync(cmd, {
-      cwd: REPO_ROOT,
-      env: { ...process.env, ER_SCENARIO: "1", ...(LANE_ENV[name] ?? {}) },
-      stdio: ["ignore", "inherit", "inherit"],
-      encoding: "utf8",
-      shell: true,
-    });
-    if (res.status !== 0) {
-      failures++;
-    }
-  }
+  const cmd = `npx vitest run ${files.join(" ")} --pool=forks --no-file-parallelism ${isolate}`;
+  const res = spawnSync(cmd, {
+    cwd: REPO_ROOT,
+    env: { ...process.env, ER_SCENARIO: "1", ...(LANE_ENV[name] ?? {}) },
+    stdio: ["ignore", "inherit", "inherit"],
+    encoding: "utf8",
+    shell: true,
+  });
   const ms = Date.now() - started;
-  const ok = failures === 0;
-  return { name, files: files.length, ok, ms, summary: ok ? "PASS" : `FAIL (${failures} file process(es))` };
+  const ok = res.status === 0;
+  return { name, files: files.length, ok, ms, summary: ok ? "PASS" : "FAIL" };
 }
 
 function fmtMs(ms) {
@@ -252,10 +235,53 @@ function parseShard(args) {
   return { index, total, label: `${index}/${total}` };
 }
 
-/** Deterministic round-robin file partition. Every file appears in exactly one shard. */
-function selectShard(files, shard) {
+/**
+ * Historical Lane-B wall times from green run 29177743451. Unlisted files use the measured median (27s).
+ * Largest-processing-time assignment minimizes the slowest runner while remaining stable and exhaustive.
+ */
+const LANE_B_SECONDS = new Map([
+  ["coop-duo-exploration.test.ts", 49.31],
+  ["coop-battle-control.test.ts", 43.97],
+  ["coop-duo-fault.test.ts", 43.42],
+  ["coop-savedata-digest.test.ts", 42.49],
+  ["coop-duo-reward-subpickers.test.ts", 41.15],
+  ["coop-determinism-contract.test.ts", 38.45],
+  ["coop-guest-renderer.test.ts", 38.26],
+  ["coop-duo-voluntary-switch-transposition.test.ts", 37.62],
+  ["coop-duo-mystery.test.ts", 35.77],
+  ["coop-duo-replay.test.ts", 35.72],
+  ["coop-duo-biome-choice.test.ts", 34.63],
+  ["coop-duo-multiwave.test.ts", 34.36],
+  ["coop-battle-checksum-engine.test.ts", 33.61],
+  ["coop-battle-events.test.ts", 33.14],
+  ["coop-duo-seating.test.ts", 31.95],
+]);
+
+function selectWeightedShard(files, shard) {
+  const bins = Array.from({ length: shard.total }, () => ({ seconds: 0, files: [] }));
+  const weighted = files
+    .map(file => ({ file, seconds: LANE_B_SECONDS.get(file) ?? 27 }))
+    .sort((a, b) => b.seconds - a.seconds || a.file.localeCompare(b.file));
+  for (const item of weighted) {
+    let target = 0;
+    for (let i = 1; i < bins.length; i++) {
+      if (bins[i].seconds < bins[target].seconds) {
+        target = i;
+      }
+    }
+    bins[target].files.push(item.file);
+    bins[target].seconds += item.seconds;
+  }
+  return bins[shard.index - 1].files.sort();
+}
+
+/** Deterministic partition. Every file appears in exactly one shard. */
+function selectShard(files, shard, lane) {
   if (shard == null) {
     return files;
+  }
+  if (lane === "B") {
+    return selectWeightedShard(files, shard);
   }
   return files.filter((_file, index) => index % shard.total === shard.index - 1);
 }
@@ -282,7 +308,7 @@ function main() {
     const listedLanes = only == null ? Object.entries(lanes) : [[only, lanes[only]]];
     let listedTotal = 0;
     for (const [name, allFiles] of listedLanes) {
-      const files = selectShard(allFiles, shard);
+      const files = selectShard(allFiles, shard, name);
       listedTotal += files.length;
       // eslint-disable-next-line no-console
       console.log(
@@ -304,7 +330,7 @@ function main() {
 
   const results = [];
   for (const name of gatingOrder) {
-    const files = selectShard(lanes[name], shard);
+    const files = selectShard(lanes[name], shard, name);
     if (shard != null) {
       console.log(`lane ${name} external-compute shard ${shard.label}: ${files.length}/${lanes[name].length} files`);
     }

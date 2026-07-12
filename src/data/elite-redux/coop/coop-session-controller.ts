@@ -191,7 +191,14 @@ export class CoopSessionController {
   private resumeReplyWaiter: { decisionId: string; finish: (accept: boolean) => void } | null = null;
   /** #810 barrier: guest-side "start new" handler + buffered flag (host's release signal). */
   private resumeStartNewHandler: (() => void) | null = null;
-  private pendingResumeStartNew = false;
+  private pendingResumeStartNewId: string | null = null;
+  private appliedResumeStartNewId: string | null = null;
+  private resumeStartNewAckWaiter: {
+    readonly decisionId: string;
+    readonly promise: Promise<void>;
+    readonly finish: () => void;
+  } | null = null;
+  private ackedResumeStartNewId: string | null = null;
   /** Durable, host-authored lobby decision. Re-announced after a channel replacement. */
   private latestResumeDecision:
     | { readonly kind: "offer"; readonly decisionId: string; readonly wave: number }
@@ -422,9 +429,13 @@ export class CoopSessionController {
    */
   armResumeStartNewHandler(handler: () => void): void {
     this.resumeStartNewHandler = handler;
-    if (this.pendingResumeStartNew) {
-      this.pendingResumeStartNew = false;
+    if (this.pendingResumeStartNewId != null) {
+      const decisionId = this.pendingResumeStartNewId;
+      this.pendingResumeStartNewId = null;
+      this.resumeStartNewHandler = null;
       handler();
+      this.appliedResumeStartNewId = decisionId;
+      this.transport.send({ t: "resumeDecisionAck", decisionId });
     }
   }
 
@@ -432,12 +443,28 @@ export class CoopSessionController {
    * #810 barrier HOST: tell the guest to stop waiting and proceed to a NEW game. Sent on
    * every non-resume outcome (no save, host picked New Game, guest declined, offer timeout).
    */
-  sendResumeStartNew(): void {
+  sendResumeStartNew(): Promise<void> {
+    if (
+      this.latestResumeDecision?.kind === "start-new"
+      && this.ackedResumeStartNewId === this.latestResumeDecision.decisionId
+    ) {
+      return Promise.resolve();
+    }
+    if (this.latestResumeDecision?.kind === "start-new" && this.resumeStartNewAckWaiter != null) {
+      this.transport.send({ t: "resumeStartNew", decisionId: this.latestResumeDecision.decisionId });
+      return this.resumeStartNewAckWaiter.promise;
+    }
     this.beginNewOperationEpoch("start-new");
     const decisionId = `${Date.now().toString(36)}-${this.tiebreak.toString(36)}-${++this.resumeDecisionSeq}`;
     this.latestResumeDecision = { kind: "start-new", decisionId };
     coopLog("launch", `SEND resumeStartNew id=${decisionId} (#810 durable barrier release)`);
+    let finish!: () => void;
+    const promise = new Promise<void>(resolve => {
+      finish = resolve;
+    });
+    this.resumeStartNewAckWaiter = { decisionId, promise, finish };
     this.transport.send({ t: "resumeStartNew", decisionId });
+    return promise;
   }
 
   /** Announce ourselves to the partner. Call once the transport is connected. */
@@ -1075,13 +1102,35 @@ export class CoopSessionController {
         // (the release can beat the arm), else fire it now.
         coopLog("launch", `RECV resumeStartNew id=${msg.decisionId} (#810 durable barrier release)`);
         this.activeResumeOfferId = null;
+        if (this.appliedResumeStartNewId === msg.decisionId) {
+          coopLog("launch", `RE-ACK duplicate resumeStartNew id=${msg.decisionId}`);
+          this.transport.send({ t: "resumeDecisionAck", decisionId: msg.decisionId });
+          break;
+        }
         if (this.resumeStartNewHandler == null) {
-          this.pendingResumeStartNew = true;
+          this.pendingResumeStartNewId = msg.decisionId;
         } else {
           const handler = this.resumeStartNewHandler;
           this.resumeStartNewHandler = null;
           handler();
+          this.appliedResumeStartNewId = msg.decisionId;
+          this.transport.send({ t: "resumeDecisionAck", decisionId: msg.decisionId });
         }
+        break;
+      }
+      case "resumeDecisionAck": {
+        const waiter = this.resumeStartNewAckWaiter;
+        if (waiter == null || waiter.decisionId !== msg.decisionId) {
+          coopWarn(
+            "launch",
+            `DROP stale resumeDecisionAck id=${msg.decisionId} active=${waiter?.decisionId ?? "none"}`,
+          );
+          break;
+        }
+        coopLog("launch", `RECV resumeDecisionAck id=${msg.decisionId} -> start-new committed on both peers`);
+        this.resumeStartNewAckWaiter = null;
+        this.ackedResumeStartNewId = msg.decisionId;
+        waiter.finish();
         break;
       }
       case "hello": {

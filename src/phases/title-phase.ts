@@ -897,8 +897,11 @@ export class TitlePhase extends Phase {
             );
             // Every host non-resume path relays the release so the waiting guest never hangs.
             const hostStartNew = () => {
-              controller.sendResumeStartNew();
-              startNewRun();
+              globalScene.ui.setMode(UiMode.MESSAGE);
+              globalScene.ui.showText(`Waiting for ${partner} to enter team selection...`, null);
+              void controller.sendResumeStartNew().then(() => {
+                startNewRun();
+              });
             };
             if (marker == null) {
               // Release the guest only when the host actually presses Start. Sending this before

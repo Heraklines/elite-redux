@@ -30,6 +30,19 @@ function sameTargets(actual: readonly number[] | undefined, expected: readonly n
   return sortedActual.every((target, index) => target === sortedExpected[index]);
 }
 
+function sameTargetRefs(
+  actual: readonly { side: string; pokemonId: number }[] | undefined,
+  expected: readonly { side: string; pokemonId: number }[],
+): boolean {
+  if (actual == null || actual.length !== expected.length) {
+    return false;
+  }
+  const key = (target: { side: string; pokemonId: number }) => `${target.side}:${target.pokemonId}`;
+  const sortedActual = actual.map(key).sort();
+  const sortedExpected = expected.map(key).sort();
+  return sortedActual.every((target, index) => target === sortedExpected[index]);
+}
+
 function validateMove(command: SerializedCommand, move: CoopBattleMoveOffer | undefined): CoopCommandValidation {
   if (move == null) {
     return invalid("move-slot-not-offered");
@@ -43,14 +56,21 @@ function validateMove(command: SerializedCommand, move: CoopBattleMoveOffer | un
   if (command.tera === true && !move.canTera) {
     return invalid("tera-not-offered");
   }
-  if (!move.targetSets.some(targets => sameTargets(command.targets, targets))) {
+  const stableMatch = move.targetRefSets.some(targets => sameTargetRefs(command.targetRefs, targets));
+  if (!stableMatch && !move.targetSets.some(targets => sameTargets(command.targets, targets))) {
     return invalid("targets-not-offered");
   }
   return { valid: true };
 }
 
 function validateSwitch(command: SerializedCommand, offer: CoopBattleCommandOffer): CoopCommandValidation {
-  if (command.moveId != null || command.targets != null || command.useMode != null || command.tera != null) {
+  if (
+    command.moveId != null
+    || command.targets != null
+    || command.targetRefs != null
+    || command.useMode != null
+    || command.tera != null
+  ) {
     return invalid("switch-has-fight-fields");
   }
   if (command.baton != null && typeof command.baton !== "boolean") {
@@ -73,13 +93,16 @@ function validateBall(command: SerializedCommand, offer: CoopBattleCommandOffer)
   if (!offer.ballTypes.includes(command.cursor)) {
     return invalid("ball-type-not-offered");
   }
-  return sameTargets(command.targets, offer.ballTargets) ? { valid: true } : invalid("ball-targets-not-offered");
+  return sameTargetRefs(command.targetRefs, offer.ballTargetRefs) || sameTargets(command.targets, offer.ballTargets)
+    ? { valid: true }
+    : invalid("ball-targets-not-offered");
 }
 
 function validateRun(command: SerializedCommand, offer: CoopBattleCommandOffer): CoopCommandValidation {
   if (
     command.moveId != null
     || command.targets != null
+    || command.targetRefs != null
     || command.useMode != null
     || command.tera != null
     || command.baton != null

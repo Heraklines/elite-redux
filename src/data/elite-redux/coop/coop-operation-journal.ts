@@ -56,6 +56,7 @@ import type {
   CoopDurabilityManager,
 } from "#data/elite-redux/coop/coop-durability";
 import type { CoopAuthoritativeEnvelopeV1, CoopLogicalPhase } from "#data/elite-redux/coop/coop-operation-envelope";
+import type { CoopOperationGuest } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   type CoopOperationSurfaceClass,
   isCoopOperationSurfaceClass,
@@ -267,6 +268,29 @@ export function routeCoopOperationToLiveSink(cls: string, envelope: CoopAuthorit
     // The operation remains unacknowledged and retriable.
     return false;
   }
+}
+
+/**
+ * Validate the untouched authoritative identity before any engine mutation, then route and atomically
+ * advance the shared guest cursor. A stale epoch, global gap, unknown kind, or duplicate can never reach a
+ * live sink. Sink failure leaves the cursor unchanged so durability can retry honestly.
+ */
+export function applyCoopOperationEnvelope(
+  guest: CoopOperationGuest,
+  cls: string,
+  envelope: CoopAuthoritativeEnvelopeV1,
+): CoopApplyOutcome {
+  const inspected = guest.inspectEnvelope(envelope);
+  if (inspected.kind === "duplicate") {
+    return "duplicate";
+  }
+  if (inspected.kind !== "applied") {
+    return "rejected";
+  }
+  if (!routeCoopOperationToLiveSink(cls, envelope)) {
+    return "rejected";
+  }
+  return guest.applyEnvelope(envelope).kind === "applied" ? "applied" : "rejected";
 }
 
 /**

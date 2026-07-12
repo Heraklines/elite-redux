@@ -58,9 +58,10 @@ import {
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  applyCoopOperationEnvelope,
+  isCoopOperationJournalActive,
   journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
-  routeCoopOperationToLiveSink,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
@@ -490,6 +491,10 @@ export function adoptWaveAdvanceWatcherChoice(params: CoopWaveAdvanceWatcherAdop
       return { adopt: false, reason: "stale-or-duplicate", stale: true };
     }
 
+    if (isCoopOperationJournalActive()) {
+      return { adopt: false, reason: "await-authoritative-envelope", stale: false };
+    }
+
     // Apply through the guest applier (surface-local dense revision; classifies + records the op). A fail-
     // closed unknown-kind or a guest-applier gap is a FAIL-LOUD reject (stale:false) - the caller must NOT
     // silently derive under the flag.
@@ -565,18 +570,7 @@ function applyJournaledWaveEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coop
   if (g.hasApplied(op.id)) {
     return "duplicate"; // the relay-adopt path or a prior journal delivery already consumed it - ACK, no re-apply.
   }
-  if (!routeCoopOperationToLiveSink("op:wave", envelope)) {
-    return "rejected";
-  }
-  // Re-key to the guest-local dense revision (the ONE-ledger stream) so the shared applier never spuriously
-  // gaps/duplicates on the host's revision; the op is deduped by operationId (invariant 5).
-  const rekeyed: CoopAuthoritativeEnvelopeV1 = {
-    ...envelope,
-    sessionEpoch: epoch,
-    revision: g.getLastAppliedRevision() + 1,
-  };
-  const res = g.applyEnvelope(rekeyed);
-  if (res.kind !== "applied") {
+  if (applyCoopOperationEnvelope(g, "op:wave", envelope) !== "applied") {
     // A transient non-applicable result (fail-closed / gap): leave it retriable (do NOT ACK). Never a
     // permanent condition (a permanent one is the duplicate above).
     return "rejected";

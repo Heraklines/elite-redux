@@ -387,7 +387,8 @@ export class CoopOperationGuest {
     return this.lastGoodEnvelope;
   }
 
-  public applyEnvelope(env: CoopAuthoritativeEnvelopeV1): CoopGuestApplyResult {
+  /** Classify an envelope without advancing the cursor; live sinks must pass this before mutating engine state. */
+  public inspectEnvelope(env: CoopAuthoritativeEnvelopeV1): CoopGuestApplyResult {
     // 1. Epoch guard (§1.6 rule 1): an envelope from another epoch is DROPPED.
     if (env.sessionEpoch !== this.epoch) {
       return { kind: "dropped-epoch" };
@@ -426,7 +427,16 @@ export class CoopOperationGuest {
       return { kind: "gap", missingFrom: this.revisionClock.revision + 1 }; // a hole: request the tail (§4.4).
     }
 
-    // 5. Apply (revision === last + 1). The caller adopts the embedded authoritativeState now.
+    return { kind: "applied", envelope: env, op };
+  }
+
+  public applyEnvelope(env: CoopAuthoritativeEnvelopeV1): CoopGuestApplyResult {
+    const inspected = this.inspectEnvelope(env);
+    if (inspected.kind !== "applied") {
+      return inspected;
+    }
+    const op = inspected.op;
+    // Apply only after the untouched envelope passed epoch/kind/global-revision validation.
     this.revisionClock.revision = env.revision;
     if (op != null) {
       this.appliedIds.add(op.id);

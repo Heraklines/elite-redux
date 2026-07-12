@@ -22,6 +22,10 @@ import {
   parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  applyCoopOperationEnvelope,
+  registerCoopOperationLiveSink,
+} from "#data/elite-redux/coop/coop-operation-journal";
+import {
   type CoopCommitContext,
   type CoopIntentValidator,
   CoopOperationGuest,
@@ -412,6 +416,36 @@ describe("CoopOperationGuest: idempotent applier (§1.6, §1.7)", () => {
 
 // =============================================================================
 describe("host + guest end-to-end: revision totally orders the run (§1.5, §1.6)", () => {
+  it("never invokes a live sink before untouched epoch and global revision validation", () => {
+    const host = new CoopOperationHost({ epoch: 2 });
+    const guest = new CoopOperationGuest({ epoch: 2 });
+    const committed = host.submit(makeIntent(2, 0, 10), makeCtx(), ACCEPT);
+    if (committed.kind !== "committed") {
+      throw new Error("fixture");
+    }
+    let mutations = 0;
+    registerCoopOperationLiveSink("op:test-order", () => {
+      mutations++;
+      return true;
+    });
+    try {
+      expect(applyCoopOperationEnvelope(guest, "op:test-order", { ...committed.envelope, sessionEpoch: 1 })).toBe(
+        "rejected",
+      );
+      expect(applyCoopOperationEnvelope(guest, "op:test-order", { ...committed.envelope, revision: 2 })).toBe(
+        "rejected",
+      );
+      expect(mutations).toBe(0);
+      expect(guest.getLastAppliedRevision()).toBe(0);
+
+      expect(applyCoopOperationEnvelope(guest, "op:test-order", committed.envelope)).toBe("applied");
+      expect(mutations).toBe(1);
+      expect(guest.getLastAppliedRevision()).toBe(1);
+    } finally {
+      registerCoopOperationLiveSink("op:test-order", null);
+    }
+  });
+
   it("shares one dense revision across different operation surfaces and parks cross-class reordering", () => {
     const hostClock = { epoch: 1, revision: 0 };
     const guestClock = { epoch: 1, revision: 0 };

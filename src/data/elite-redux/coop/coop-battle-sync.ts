@@ -36,6 +36,7 @@ import type {
   SerializedCommand,
 } from "#data/elite-redux/coop/coop-transport";
 import { Command } from "#enums/command";
+import { MoveUseMode } from "#enums/move-use-mode";
 
 /** The inbound request a responder answers (the legal move slots the host offers). */
 export interface CoopCommandRequest {
@@ -45,6 +46,13 @@ export interface CoopCommandRequest {
   moveSlots: number[];
   /** Full host-authored action set. Required by protocol 24 production sessions. */
   offer?: CoopBattleCommandOffer | undefined;
+}
+
+/** Host-stable identity for one active monster command surface. */
+export interface CoopCommandAddress {
+  epoch: number;
+  wave: number;
+  pokemonId: number;
 }
 
 /** Turns a {@linkcode CoopCommandRequest} into the command to send back. */
@@ -116,7 +124,29 @@ function normalizeLocalCommand(
   command: SerializedCommand,
   offer: CoopBattleCommandOffer | undefined,
 ): SerializedCommand {
-  if (offer == null || command.command !== Command.FIGHT) {
+  if (offer == null) {
+    return command;
+  }
+  if (command.command === Command.POKEMON) {
+    return {
+      command: Command.POKEMON,
+      cursor: command.cursor,
+      ...(command.baton == null ? {} : { baton: command.baton }),
+    };
+  }
+  if (command.command === Command.RUN) {
+    return { command: Command.RUN, cursor: command.cursor };
+  }
+  if (command.command === Command.BALL) {
+    const stable = sameTargetRefSet(command.targetRefs, offer.ballTargetRefs);
+    return {
+      command: Command.BALL,
+      cursor: command.cursor,
+      targets: [...(stable ? offer.ballTargets : (command.targets ?? []))],
+      targetRefs: [...(stable ? offer.ballTargetRefs : (command.targetRefs ?? []))],
+    };
+  }
+  if (command.command !== Command.FIGHT) {
     return command;
   }
   const move =
@@ -126,12 +156,28 @@ function normalizeLocalCommand(
     return command;
   }
   const requestedTargets = command.targets;
+  const stableIndex = move.targetRefSets.findIndex(set => sameTargetRefSet(command.targetRefs, set));
   const exactTargets =
     requestedTargets == null ? undefined : move.targetSets.find(set => sameNumberSet(requestedTargets, set));
   // A single legal set is not a choice (self/spread/sole target), so authority can repair a stale
   // guest battler index. Multiple target sets represent a real human choice and must never be guessed.
-  const targets = exactTargets ?? (move.targetSets.length === 1 ? move.targetSets[0] : requestedTargets);
-  return { ...command, cursor: move.slot, moveId: move.moveId, ...(targets == null ? {} : { targets: [...targets] }) };
+  const targets =
+    stableIndex >= 0
+      ? move.targetSets[stableIndex]
+      : (exactTargets ?? (move.targetSets.length === 1 ? move.targetSets[0] : requestedTargets));
+  const targetRefs =
+    stableIndex >= 0
+      ? move.targetRefSets[stableIndex]
+      : move.targetSets.length === 1
+        ? move.targetRefSets[0]
+        : command.targetRefs;
+  return {
+    ...command,
+    cursor: move.slot,
+    moveId: move.moveId,
+    ...(targets == null ? {} : { targets: [...targets] }),
+    ...(targetRefs == null ? {} : { targetRefs: [...targetRefs] }),
+  };
 }
 
 function sameNumberSet(left: readonly number[], right: readonly number[]): boolean {
@@ -140,6 +186,43 @@ function sameNumberSet(left: readonly number[], right: readonly number[]): boole
   }
   const sortedRight = [...right].sort((a, b) => a - b);
   return [...left].sort((a, b) => a - b).every((value, index) => value === sortedRight[index]);
+}
+
+function sameTargetRefSet(
+  left: readonly { side: string; pokemonId: number }[] | undefined,
+  right: readonly { side: string; pokemonId: number }[],
+): boolean {
+  if (left == null || left.length !== right.length) {
+    return false;
+  }
+  const key = (target: { side: string; pokemonId: number }) => `${target.side}:${target.pokemonId}`;
+  const sortedRight = right.map(key).sort();
+  return left
+    .map(key)
+    .sort()
+    .every((value, index) => value === sortedRight[index]);
+}
+
+function defaultCommandFromOffer(offer: CoopBattleCommandOffer): SerializedCommand | null {
+  const move = offer.moves[0];
+  if (move != null) {
+    return {
+      command: Command.FIGHT,
+      cursor: move.slot,
+      moveId: move.moveId,
+      targets: [...(move.targetSets[0] ?? [])],
+      targetRefs: [...(move.targetRefSets[0] ?? [])],
+      useMode: MoveUseMode.NORMAL,
+    };
+  }
+  const normalSwitch = offer.switches.find(candidate => candidate.canNormal);
+  if (normalSwitch != null) {
+    return { command: Command.POKEMON, cursor: normalSwitch.slot, baton: false };
+  }
+  if (offer.canRun) {
+    return { command: Command.RUN, cursor: 0 };
+  }
+  return null;
 }
 
 /**
@@ -155,12 +238,12 @@ function sameNumberSet(left: readonly number[], right: readonly number[]): boole
  * field index when the owner is absent (older client / a call site with no owner) - both sides
  * then agree on the fieldIndex key exactly as before (version-handshake safe).
  */
-function commandKey(fieldIndex: number, turn: number, owner?: CoopRole): string {
+function commandKey(fieldIndex: number, turn: number, owner?: CoopRole, address?: CoopCommandAddress): string {
   // #819: scope by WAVE too - an ME-spawned battle resets `turn` to 1 within the run, so a
   // stale wave-N buffered command must never satisfy wave-M's request for the same slot+turn.
   let wave = 0;
   try {
-    wave = globalScene.currentBattle?.waveIndex ?? 0;
+    wave = address?.wave ?? globalScene.currentBattle?.waveIndex ?? 0;
   } catch {
     /* engine-free tests have no scene - 0 scopes them all to one battle, the old behavior */
   }
@@ -168,8 +251,20 @@ function commandKey(fieldIndex: number, turn: number, owner?: CoopRole): string 
   // field index (numeric) is the fallback. The two value spaces are disjoint, so a mixed session
   // can never key-collide - but paired clients share a protocol version, so it is owner on both
   // or fieldIndex on both.
-  const slot = owner ?? fieldIndex;
-  return `${wave}:${slot}:${turn}`;
+  const slot = `${owner ?? fieldIndex}:${address?.pokemonId ?? "legacy"}`;
+  return `${address?.epoch ?? 0}:${wave}:${slot}:${turn}`;
+}
+
+function commandAddressOf(message: {
+  epoch?: number;
+  wave?: number;
+  pokemonId?: number;
+}): CoopCommandAddress | undefined {
+  return Number.isSafeInteger(message.epoch)
+    && Number.isSafeInteger(message.wave)
+    && Number.isSafeInteger(message.pokemonId)
+    ? { epoch: message.epoch!, wave: message.wave!, pokemonId: message.pokemonId! }
+    : undefined;
 }
 
 /**
@@ -192,6 +287,7 @@ export class CoopBattleSync {
       moveSlots: number[];
       offer?: CoopBattleCommandOffer | undefined;
       owner?: CoopRole | undefined;
+      address?: CoopCommandAddress | undefined;
     }
   >();
   /**
@@ -213,7 +309,13 @@ export class CoopBattleSync {
   /** The local human's committed pick, retained so a replaced channel can request it again. */
   private readonly localOutbox = new Map<
     string,
-    { fieldIndex: number; turn: number; command: SerializedCommand; owner?: CoopRole }
+    {
+      fieldIndex: number;
+      turn: number;
+      command: SerializedCommand;
+      owner?: CoopRole;
+      address?: CoopCommandAddress;
+    }
   >();
   /** Latest authority offer received for each local command address. */
   private readonly peerOffers = new Map<string, CoopBattleCommandOffer>();
@@ -247,6 +349,7 @@ export class CoopBattleSync {
     moveSlots: number[];
     offer?: CoopBattleCommandOffer | undefined;
     owner?: CoopRole | undefined;
+    address?: CoopCommandAddress | undefined;
   }): void {
     this.transport.send({
       t: "commandRequest",
@@ -255,6 +358,7 @@ export class CoopBattleSync {
       moveSlots: request.moveSlots,
       ...(request.offer == null ? {} : { offer: request.offer }),
       ...(request.owner == null ? {} : { owner: request.owner }),
+      ...(request.address == null ? {} : request.address),
     });
   }
 
@@ -276,8 +380,9 @@ export class CoopBattleSync {
     moveSlots: number[],
     owner?: CoopRole,
     offer?: CoopBattleCommandOffer,
+    address?: CoopCommandAddress,
   ): Promise<SerializedCommand | null> {
-    const key = commandKey(fieldIndex, turn, owner);
+    const key = commandKey(fieldIndex, turn, owner, address);
     const slotPrefix = key.slice(0, key.lastIndexOf(":") + 1); // `wave:fieldIndex:` (#819)
     // Supersede any stale in-flight request on this SLOT (the turn has moved on, so an
     // older-turn await is moot) and prune any stale older-turn buffered command for it,
@@ -327,6 +432,7 @@ export class CoopBattleSync {
         moveSlots: number[];
         offer?: CoopBattleCommandOffer | undefined;
         owner?: CoopRole | undefined;
+        address?: CoopCommandAddress | undefined;
       };
       const finish = (cmd: SerializedCommand | null) => {
         if (settled) {
@@ -349,6 +455,7 @@ export class CoopBattleSync {
         moveSlots: [...moveSlots],
         ...(offer == null ? {} : { offer }),
         ...(owner == null ? {} : { owner }),
+        ...(address == null ? {} : { address }),
       };
       this.pending.set(key, request);
       cancelTimer = this.schedule(() => {
@@ -377,6 +484,7 @@ export class CoopBattleSync {
     moveSlots: number[];
     offer?: CoopBattleCommandOffer | undefined;
     owner?: CoopRole;
+    address?: CoopCommandAddress;
   }[] = [];
   /** #812: injected by the runtime (cycle-free); true = this client owns the field slot. */
   private slotOwnershipProbe: ((fieldIndex: number) => boolean) | null = null;
@@ -425,6 +533,7 @@ export class CoopBattleSync {
       turn: req.turn,
       command,
       ...(req.owner == null ? {} : { owner: req.owner }),
+      ...(req.address == null ? {} : req.address),
     });
   }
 
@@ -458,7 +567,13 @@ export class CoopBattleSync {
    * makes two real humans trade actual moves: each client commands only its own
    * slot interactively and broadcasts it; the other client awaits and applies it.
    */
-  broadcastLocalCommand(fieldIndex: number, turn: number, command: SerializedCommand, owner?: CoopRole): void {
+  broadcastLocalCommand(
+    fieldIndex: number,
+    turn: number,
+    command: SerializedCommand,
+    owner?: CoopRole,
+    address?: CoopCommandAddress,
+  ): void {
     if (isCoopDebug()) {
       coopLog(
         "relay",
@@ -467,7 +582,7 @@ export class CoopBattleSync {
     }
     // #851: stamp the local mon's resolved owner so the peer's awaiting request (which keys by the
     // SAME owner) matches even when the survivor sits at a different field index across the two engines.
-    const key = commandKey(fieldIndex, turn, owner);
+    const key = commandKey(fieldIndex, turn, owner, address);
     const normalizedCommand = normalizeLocalCommand(command, this.peerOffers.get(key));
     const prefix = key.slice(0, key.lastIndexOf(":") + 1);
     for (const cachedKey of [...this.localOutbox.keys()]) {
@@ -477,13 +592,20 @@ export class CoopBattleSync {
         this.settled.delete(cachedKey);
       }
     }
-    this.localOutbox.set(key, { fieldIndex, turn, command: normalizedCommand, ...(owner == null ? {} : { owner }) });
+    this.localOutbox.set(key, {
+      fieldIndex,
+      turn,
+      command: normalizedCommand,
+      ...(owner == null ? {} : { owner }),
+      ...(address == null ? {} : { address }),
+    });
     this.transport.send({
       t: "command",
       fieldIndex,
       turn,
       command: normalizedCommand,
       ...(owner == null ? {} : { owner }),
+      ...(address == null ? {} : address),
     });
   }
 
@@ -520,6 +642,7 @@ export class CoopBattleSync {
     moveSlots: number[];
     offer?: CoopBattleCommandOffer | undefined;
     owner?: CoopRole;
+    address?: CoopCommandAddress;
   }[] {
     return [...this.pending.values()].map(request => ({
       fieldIndex: request.fieldIndex,
@@ -527,12 +650,14 @@ export class CoopBattleSync {
       moveSlots: [...request.moveSlots],
       ...(request.offer == null ? {} : { offer: request.offer }),
       ...(request.owner == null ? {} : { owner: request.owner }),
+      ...(request.address == null ? {} : { address: request.address }),
     }));
   }
 
   private handle(msg: CoopMessage): void {
     if (msg.t === "commandRequest") {
-      const key = commandKey(msg.fieldIndex, msg.turn, msg.owner);
+      const address = commandAddressOf(msg);
+      const key = commandKey(msg.fieldIndex, msg.turn, msg.owner, address);
       if (msg.offer != null) {
         this.peerOffers.set(key, msg.offer);
       }
@@ -550,6 +675,7 @@ export class CoopBattleSync {
           turn: msg.turn,
           command: normalizedCommand,
           ...(msg.owner == null ? {} : { owner: msg.owner }),
+          ...(address == null ? {} : address),
         });
         return;
       }
@@ -574,6 +700,7 @@ export class CoopBattleSync {
             moveSlots: msg.moveSlots,
             ...(msg.offer == null ? {} : { offer: msg.offer }),
             ...(msg.owner == null ? {} : { owner: msg.owner }),
+            ...(address == null ? {} : { address }),
           });
           return;
         }
@@ -589,6 +716,7 @@ export class CoopBattleSync {
           command: { command: 0, cursor: -1 } as SerializedCommand,
           decline: true,
           ...(msg.owner == null ? {} : { owner: msg.owner }),
+          ...(address == null ? {} : address),
         });
         return;
       }
@@ -598,13 +726,24 @@ export class CoopBattleSync {
         moveSlots: msg.moveSlots,
         ...(msg.offer == null ? {} : { offer: msg.offer }),
         ...(msg.owner == null ? {} : { owner: msg.owner }),
+        ...(address == null ? {} : { address }),
       });
+      return;
+    }
+    if (msg.t === "commandRejected") {
+      const key = commandKey(msg.fieldIndex, msg.turn, msg.owner, commandAddressOf(msg));
+      this.localOutbox.delete(key);
+      coopWarn(
+        "relay",
+        `host rejected local command fieldIndex=${msg.fieldIndex} turn=${msg.turn} reason=${msg.reason}; authoritative default applied`,
+      );
       return;
     }
     if (msg.t === "command") {
       // #851: key by the sender's owner when present (stable across a post-half-wipe index skew),
       // else the field index (unchanged). Both the pending resolver and any buffer use this key.
-      const key = commandKey(msg.fieldIndex, msg.turn, msg.owner);
+      const address = commandAddressOf(msg);
+      const key = commandKey(msg.fieldIndex, msg.turn, msg.owner, address);
       const request = this.pending.get(key);
       if (this.settled.has(key)) {
         coopLog("relay", `recv command DUPLICATE fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> ignored`);
@@ -626,9 +765,24 @@ export class CoopBattleSync {
               "security",
               `rejected peer command fieldIndex=${msg.fieldIndex} turn=${msg.turn} reason=${validation.reason ?? "invalid"}`,
             );
-            // Stay parked on the original offer. An immediate re-request lets a deterministic
-            // bad responder create an unbounded request/reply recursion; a corrected local
-            // broadcast or the normal reconnect reannounce can still satisfy this waiter.
+            this.transport.send({
+              t: "commandRejected",
+              fieldIndex: msg.fieldIndex,
+              turn: msg.turn,
+              reason: validation.reason ?? "invalid",
+              ...(msg.owner == null ? {} : { owner: msg.owner }),
+              ...(address == null ? {} : address),
+            });
+            const authoritativeDefault = defaultCommandFromOffer(request.offer);
+            if (authoritativeDefault == null) {
+              coopWarn("security", "invalid peer command had no legal authoritative default; request remains parked");
+              return;
+            }
+            coopWarn(
+              "security",
+              `committing authoritative default command=${authoritativeDefault.command} cursor=${authoritativeDefault.cursor}`,
+            );
+            request.finish(authoritativeDefault);
             return;
           }
         }
@@ -638,7 +792,7 @@ export class CoopBattleSync {
             `recv command fieldIndex=${msg.fieldIndex} turn=${msg.turn} command=${msg.command.command} -> resolved awaiting request`,
           );
         }
-        request.finish(msg.command);
+        request.finish(request.offer == null ? msg.command : normalizeLocalCommand(msg.command, request.offer));
       } else {
         if (isCoopDebug()) {
           coopLog(

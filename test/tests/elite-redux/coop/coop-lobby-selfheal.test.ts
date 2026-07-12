@@ -136,9 +136,7 @@ describe("co-op lobby self-healing handshake (#868)", () => {
     await flush();
 
     const hostHello = host.sent.find((msg): msg is Extract<CoopMessage, { t: "hello" }> => msg.t === "hello");
-    const guestHellos = guest.sent.filter(
-      (msg): msg is Extract<CoopMessage, { t: "hello" }> => msg.t === "hello",
-    );
+    const guestHellos = guest.sent.filter((msg): msg is Extract<CoopMessage, { t: "hello" }> => msg.t === "hello");
     const epoch = (hostHello as unknown as { epoch?: number } | undefined)?.epoch;
     expect(epoch, "host-authored epoch is carried in hello").toBeTypeOf("number");
     expect(epoch).toBeGreaterThan(0);
@@ -216,7 +214,7 @@ describe("co-op lobby self-healing handshake (#868)", () => {
     // reconnect the guest must observe it instead of waiting for the anti-hang timeout.
     host.setConnected(false);
     guest.setConnected(false);
-    h.sendResumeStartNew();
+    const committed = h.sendResumeStartNew();
     await flush();
     expect(released).toBe(0);
 
@@ -227,6 +225,39 @@ describe("co-op lobby self-healing handshake (#868)", () => {
     await flush();
 
     expect(released, "the durable start-new decision healed immediately on reconnect").toBe(1);
+    await expect(
+      committed,
+      "the host advances only after the guest applied and ACKed the release",
+    ).resolves.toBeUndefined();
+  });
+
+  it("parks the host until the guest UI applies the exact start-new decision", async () => {
+    const { host, guest } = makeFlapPair();
+    const h = new CoopSessionController(host, { username: "Host", tiebreak: 1 });
+    const g = new CoopSessionController(guest, { username: "Guest", tiebreak: 2 });
+    h.connect();
+    g.connect();
+    await flush();
+
+    const committed = h.sendResumeStartNew();
+    let hostReleased = false;
+    void committed.then(() => {
+      hostReleased = true;
+    });
+    await flush();
+    expect(hostReleased, "receipt without a guest UI handler is not application").toBe(false);
+
+    let guestReleased = 0;
+    g.armResumeStartNewHandler(() => {
+      guestReleased++;
+    });
+    await expect(committed).resolves.toBeUndefined();
+    expect(guestReleased).toBe(1);
+    expect(hostReleased).toBe(true);
+
+    h.resyncLobbyState();
+    await flush();
+    expect(guestReleased, "a replayed committed decision re-ACKs without re-entering team select").toBe(1);
   });
 
   // -------------------------------------------------------------------------
