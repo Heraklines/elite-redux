@@ -90,7 +90,9 @@ function surgeConfig(): PressYourLuckConfig {
       const surge = getSurge();
       // Grant one permanent vitamin of the session's stat to the channelled mon.
       // The vitamin's own stat cap naturally enforces the spec's "~20% max".
-      const mod = new BaseStatBoosterModifierType(surge.stat).newModifier(surge.pokemon);
+      const vitaminType = new BaseStatBoosterModifierType(surge.stat);
+      vitaminType.id = "BASE_STAT_BOOSTER";
+      const mod = vitaminType.newModifier(surge.pokemon);
       if (mod) {
         globalScene.addModifier(mod);
         surge.granted.push(mod);

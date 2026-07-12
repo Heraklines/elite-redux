@@ -2,6 +2,35 @@ import { globalScene } from "#app/global-scene";
 import { PersistentModifier } from "#modifiers/modifier";
 import type { GeneratedPersistentModifierType, ModifierType } from "#modifiers/modifier-type";
 import { getModifierTypeFuncById, ModifierTypeGenerator } from "#modifiers/modifier-type";
+import type { ModifierTypeFunc } from "#types/modifier-types";
+
+/**
+ * Runtime modifier types which cannot live in the static modifier-type table.
+ *
+ * A few ER held-item families have one concrete type per runtime variant (for
+ * example one Ward Stone type per tier and one resist berry per damage type).
+ * They still need the exact same `typeId -> factory` round trip as a static
+ * modifier: co-op snapshots and session saves both reconstruct through
+ * {@linkcode ModifierData.toModifier}. Keep that extension point here, at the
+ * reconstruction boundary, instead of teaching every caller about ER types.
+ */
+const modifierDataTypeFactories = new Map<string, ModifierTypeFunc>();
+
+/** Register (or refresh during HMR) a dynamic modifier-type factory. */
+export function registerModifierDataTypeFactory(typeId: string, factory: ModifierTypeFunc): void {
+  if (typeof typeId !== "string" || typeId.trim().length === 0) {
+    throw new Error("Cannot register a ModifierData factory without a stable typeId");
+  }
+  if (getModifierTypeFuncById(typeId)) {
+    throw new Error(`ModifierData extension typeId '${typeId}' collides with the static modifier registry`);
+  }
+  modifierDataTypeFactories.set(typeId, factory);
+}
+
+/** Resolve a static or dynamically registered modifier-type factory. */
+export function getModifierDataTypeFactory(typeId: string): ModifierTypeFunc | undefined {
+  return getModifierTypeFuncById(typeId) ?? modifierDataTypeFactories.get(typeId);
+}
 
 export class ModifierData {
   public player: boolean;
@@ -29,7 +58,7 @@ export class ModifierData {
   }
 
   toModifier(_constructor: any): PersistentModifier | null {
-    const typeFunc = getModifierTypeFuncById(this.typeId);
+    const typeFunc = getModifierDataTypeFactory(this.typeId);
     if (!typeFunc) {
       return null;
     }

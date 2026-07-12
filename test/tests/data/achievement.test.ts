@@ -1,5 +1,6 @@
 import type { BattleScene } from "#app/battle-scene";
 import { TurnHeldItemTransferModifier } from "#modifiers/modifier";
+import type { ModifierType } from "#modifiers/modifier-type";
 import {
   Achv,
   AchvTier,
@@ -198,7 +199,7 @@ describe("ModifierAchv", () => {
 
   it("should validate the achievement based on the modifier function", () => {
     const modifierAchv = new ModifierAchv("", "Test Description", "modifier_icon", 10, () => true);
-    const modifier = new TurnHeldItemTransferModifier(null!, 3, 1);
+    const modifier = new TurnHeldItemTransferModifier({ id: "TEST_TRANSFER_ITEM" } as ModifierType, 3, 1);
 
     expect(modifierAchv.validate([modifier])).toBe(true);
   });

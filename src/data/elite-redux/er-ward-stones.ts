@@ -88,13 +88,19 @@ export const ER_WARD_STONE_CONFIG: Readonly<Record<ErWardStoneTier, WardStoneCon
   },
 };
 
-const TIER_ORDER: readonly ErWardStoneTier[] = ["minor", "greater", "prime"];
+/** Canonical variant order used by type IDs and the legacy save side-channel. */
+export const ER_WARD_STONE_TIERS: readonly ErWardStoneTier[] = ["minor", "greater", "prime"];
+
+/** Stable ModifierData identity for a Ward Stone tier. */
+export function erWardStoneTypeId(tier: ErWardStoneTier): string {
+  return `ER_WARD_STONE_${tier.toUpperCase()}`;
+}
 
 // Editor-managed charge/recharge overrides (er-balance-tuning.json), applied
 // over the shipped config ONCE at module load — the tuning JSON is static per
 // build, and patching the config here wires every consumer (the modifier's
 // stack cap, recharge loop AND the item descriptions) in one place.
-for (const tier of TIER_ORDER) {
+for (const tier of ER_WARD_STONE_TIERS) {
   const cfg = ER_WARD_STONE_CONFIG[tier] as { maxCharges: number; rechargeWaves: number };
   cfg.maxCharges = erBalanceMap("er.items.wardStoneCharges")[tier] ?? cfg.maxCharges;
   cfg.rechargeWaves = erBalanceMap("er.items.wardStoneRechargeWaves")[tier] ?? cfg.rechargeWaves;
@@ -224,6 +230,10 @@ export function erWardStoneModifierType(tier: ErWardStoneTier): PokemonHeldItemM
     cfg.icon,
     (type, args) => new ErWardStoneModifier(type as PokemonHeldItemModifierType, (args[0] as Pokemon).id, tier),
   );
+  // Ward Stones are created by trainer generation, theft, restore and co-op
+  // reconstruction, none of which necessarily passes through the reward-pool
+  // reverse lookup. Pin the variant ID at the factory itself.
+  mt.id = erWardStoneTypeId(tier);
   // ER items live outside the i18n catalogue — pin the live strings (same
   // pattern as the resist berries / recreated items).
   Object.defineProperty(mt, "name", { get: () => cfg.name, configurable: true });
@@ -461,14 +471,15 @@ export function advanceErWardStoneCharges(): void {
 
 // -----------------------------------------------------------------------------
 // Session persistence — player stones (incl. charge state) survive reload via
-// the ER side channel, like the resist berries.
+// ordinary ModifierData now, while this legacy side channel remains for old
+// saves. The restore is additive/deduplicated, so both paths can coexist.
 // -----------------------------------------------------------------------------
 
 /** [pokemonId, tierIndex, charges, waveProgress] per player-owned stone. */
 export function getErWardStoneEntries(): [number, number, number, number][] {
   try {
     const stones = globalScene.findModifiers(m => m instanceof ErWardStoneModifier, true) as ErWardStoneModifier[];
-    return stones.map(s => [s.pokemonId, TIER_ORDER.indexOf(s.tier), s.charges, s.waveProgress]);
+    return stones.map(s => [s.pokemonId, ER_WARD_STONE_TIERS.indexOf(s.tier), s.charges, s.waveProgress]);
   } catch {
     return [];
   }
@@ -481,7 +492,7 @@ export function restoreErWardStones(entries: readonly [number, number, number, n
   }
   try {
     for (const [pokemonId, tierIndex, charges, waveProgress] of entries) {
-      const tier = TIER_ORDER[tierIndex];
+      const tier = ER_WARD_STONE_TIERS[tierIndex];
       if (!tier) {
         continue;
       }

@@ -182,7 +182,7 @@ describe.skipIf(!RUN)("co-op shop Check-Team op convergence (#633 B9b) - watcher
     const party = buildCoopParty([SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.GYARADOS]);
     // Give the slot-2 mon (Gyarados) a persistent held item so the RELEASE must strip it.
     const victim = party[2];
-    const held = modifierTypes.LEFTOVERS().newModifier(victim);
+    const held = modifierTypes.LEFTOVERS().withIdFromFunc(modifierTypes.LEFTOVERS).newModifier(victim);
     if (held != null) {
       game.scene.addModifier(held, true);
     }

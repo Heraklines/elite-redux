@@ -38,15 +38,37 @@ import {
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import type { CoopFullBattleSnapshot, CoopFullMonSnapshot } from "#data/elite-redux/coop/coop-transport";
+import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
+import {
+  ErResistBerryModifier,
+  erResistBerryModifierType,
+  getErResistBerryEntries,
+  restoreErResistBerries,
+} from "#data/elite-redux/er-resist-berries";
 import { applyErTrainerVitaminCatchup } from "#data/elite-redux/er-trainer-runtime-hook";
+import {
+  ErWardStoneModifier,
+  erWardStoneModifierType,
+  getErWardStoneEntries,
+  restoreErWardStones,
+} from "#data/elite-redux/er-ward-stones";
 import { BerryType } from "#enums/berry-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
+import * as Modifier from "#modifiers/modifier";
 import { BaseStatModifier, BerryModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
-import { BaseStatBoosterModifierType, BerryModifierType } from "#modifiers/modifier-type";
+import {
+  BaseStatBoosterModifierType,
+  BerryModifierType,
+  getModifierTypeFuncById,
+  type ModifierType,
+  type ModifierTypeGenerator,
+} from "#modifiers/modifier-type";
+import { ModifierData } from "#system/modifier-data";
 import { GameManager } from "#test/framework/game-manager";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import Phaser from "phaser";
@@ -103,6 +125,19 @@ const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
 
 describe("co-op held-item + ball sync pure core (#698, RISKY #1-#4)", () => {
   const base = checksumState(state());
+
+  it("persistent modifiers reject an empty identity, while direct vitamin/berry grants are self-identifying", () => {
+    expect(() => new BaseStatModifier({ id: "" } as ModifierType, 1, Stat.HP)).toThrow(/stable ModifierType\.id/);
+    const vitaminType = new BaseStatBoosterModifierType(Stat.HP);
+    expect(vitaminType.id).toBe("BASE_STAT_BOOSTER");
+    expect(() => new BaseStatModifier(vitaminType, 1, Stat.HP)).not.toThrow();
+    for (const berryType of Object.values(BerryType).filter((value): value is BerryType => typeof value === "number")) {
+      expect(new BerryModifierType(berryType).id, BerryType[berryType]).toBe("BERRY");
+    }
+    const rareSpeciesGenerator = getModifierTypeFuncById("RARE_SPECIES_STAT_BOOSTER")() as ModifierTypeGenerator;
+    expect(rareSpeciesGenerator.id).toBe("RARE_SPECIES_STAT_BOOSTER");
+    expect(rareSpeciesGenerator.generateType([], ["LIGHT_BALL"])?.id).toBe("RARE_SPECIES_STAT_BOOSTER");
+  });
 
   it("snapshot held-items + ball counts round-trip JSON byte-identical", () => {
     const snap: Partial<CoopFullBattleSnapshot> = {
@@ -236,8 +271,12 @@ describe.skipIf(!RUN)("co-op held-item + ball heal - real engine (#698, RISKY #1
     clearCoopRuntime();
   });
 
-  const startCoopDouble = async () => {
-    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+  const startCoopDouble = async (withBench = false) => {
+    if (withBench) {
+      await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.BLISSEY);
+    } else {
+      await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    }
     startLocalCoopSession({ username: "Host", netcodeMode: "authoritative" });
     game.scene.gameMode = getGameMode(GameModes.COOP);
     expect(game.scene.gameMode.isCoop).toBe(true);
@@ -421,7 +460,7 @@ describe.skipIf(!RUN)("co-op held-item + ball heal - real engine (#698, RISKY #1
   });
 
   it("(B1 regression) a BENCH mon's held item is NOT in the on-field digest (no false resync)", async () => {
-    await startCoopDouble();
+    await startCoopDouble(true);
     const party = globalScene.getPlayerParty();
     const onFieldCount = globalScene.getPlayerField(false).length;
     // Need at least one bench mon to exercise this.
@@ -436,6 +475,51 @@ describe.skipIf(!RUN)("co-op held-item + ball heal - real engine (#698, RISKY #1
     // Give the BENCH mon an item: the ON-FIELD digest must be identical (bench excluded).
     giveHeld(bench, modifierTypes.LEFTOVERS);
     expect(JSON.stringify(captureCoopChecksumState().heldItems)).toBe(digestBefore);
+  });
+
+  it("bench Ward Stone + resist berry round-trip and legacy side-channel restore de-duplicates", async () => {
+    await startCoopDouble(true);
+    const party = globalScene.getPlayerParty();
+    const bench = party[2];
+    expect(bench, "third starter is an actual off-field bench mon").toBeDefined();
+    expect(bench.isOnField(), "identity test exercises a bench holder").toBe(false);
+
+    const ward = erWardStoneModifierType("greater").newModifier(bench) as ErWardStoneModifier;
+    ward.charges = 1;
+    ward.waveProgress = 7;
+    const berry = erResistBerryModifierType(PokemonType.FIRE).newModifier(bench) as ErResistBerryModifier;
+    globalScene.addModifier(ward, true);
+    globalScene.addModifier(berry, true);
+
+    const wardSideChannel = getErWardStoneEntries();
+    const berrySideChannel = getErResistBerryEntries();
+    const blobs = [ward, berry].map(modifier => new ModifierData(modifier, true));
+    expect(blobs.map(blob => blob.typeId)).toEqual(["ER_WARD_STONE_GREATER", "ER_RESIST_BERRY_FIRE"]);
+
+    globalScene.removeModifier(ward);
+    globalScene.removeModifier(berry);
+    for (const data of blobs) {
+      const ctor =
+        (Modifier as unknown as Record<string, new (...args: any[]) => Modifier.PersistentModifier>)[data.className]
+        ?? resolveErModifierClass(data.className);
+      const rebuilt = data.toModifier(ctor);
+      expect(rebuilt, `${data.typeId} rebuilt through the production ModifierData path`).not.toBeNull();
+      expect((rebuilt as PokemonHeldItemModifier).pokemonId).toBe(bench.id);
+      globalScene.addModifier(rebuilt!, true);
+    }
+
+    // GameData applies the ordinary ModifierData list first, then these legacy
+    // ER side channels. Their `already` checks must leave exactly one of each.
+    restoreErWardStones(wardSideChannel);
+    restoreErResistBerries(berrySideChannel);
+    const benchItems = globalScene.findModifiers(
+      modifier => modifier instanceof PokemonHeldItemModifier && modifier.pokemonId === bench.id,
+      true,
+    );
+    expect(benchItems.filter(modifier => modifier instanceof ErWardStoneModifier)).toHaveLength(1);
+    expect(benchItems.filter(modifier => modifier instanceof ErResistBerryModifier)).toHaveLength(1);
+    const rebuiltWard = benchItems.find(modifier => modifier instanceof ErWardStoneModifier) as ErWardStoneModifier;
+    expect([rebuiltWard.charges, rebuiltWard.waveProgress]).toEqual([1, 7]);
   });
 
   it("(#698 BUG 1) a host mon with 2 DISTINCT same-type-id berries converges on the guest (both survive)", async () => {

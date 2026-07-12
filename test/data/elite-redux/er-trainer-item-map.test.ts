@@ -6,7 +6,10 @@
 // (gems/plates), species items, recreated ER-only items, and mega stones.
 import {
   ER_ITEM_CONVERT_CHANCE,
+  ER_ITEM_RECREATE,
   ER_ITEM_TO_MODIFIER_KEY,
+  ER_ITEM_TO_SPECIES_KEY,
+  ER_ITEM_TO_TYPE,
   isErMegaStone,
   resolveErTrainerItem,
 } from "#data/elite-redux/er-trainer-item-map";
@@ -37,6 +40,38 @@ describe("ER trainer held-item resolver", () => {
       expect(res!.kind, label).toBe("modifier");
       if (res!.kind === "modifier") {
         expect(res!.make(), label).toBeTruthy();
+        expect(res!.make().id, `${label} has a serialization identity`).toBeTruthy();
+      }
+    }
+  });
+
+  it("every non-mega conversion pins the canonical stable type id", () => {
+    for (const [rawId, key] of Object.entries(ER_ITEM_TO_MODIFIER_KEY)) {
+      const resolved = resolveErTrainerItem(Number(rawId));
+      expect(resolved?.kind, `flat item ${rawId}`).toBe("modifier");
+      if (resolved?.kind === "modifier") {
+        expect(resolved.make().id, `flat item ${rawId}`).toBe(key);
+      }
+    }
+    for (const rawId of Object.keys(ER_ITEM_TO_TYPE)) {
+      const resolved = resolveErTrainerItem(Number(rawId));
+      expect(resolved?.kind, `type item ${rawId}`).toBe("modifier");
+      if (resolved?.kind === "modifier") {
+        expect(resolved.make().id, `type item ${rawId}`).toBe("ATTACK_TYPE_BOOSTER");
+      }
+    }
+    for (const rawId of Object.keys(ER_ITEM_TO_SPECIES_KEY)) {
+      const resolved = resolveErTrainerItem(Number(rawId));
+      expect(resolved?.kind, `species item ${rawId}`).toBe("modifier");
+      if (resolved?.kind === "modifier") {
+        expect(resolved.make().id, `species item ${rawId}`).toBe("SPECIES_STAT_BOOSTER");
+      }
+    }
+    for (const rawId of Object.keys(ER_ITEM_RECREATE)) {
+      const resolved = resolveErTrainerItem(Number(rawId));
+      expect(resolved?.kind, `recreated item ${rawId}`).toBe("modifier");
+      if (resolved?.kind === "modifier") {
+        expect(resolved.make().id, `recreated item ${rawId}`).toMatch(/^ER_/);
       }
     }
   });

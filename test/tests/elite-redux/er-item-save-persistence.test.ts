@@ -16,6 +16,7 @@
 
 import type { BattleScene } from "#app/battle-scene";
 import { initGlobalScene } from "#app/global-scene";
+import { EvolutionItem } from "#balance/pokemon-evolutions";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { ErGemModifier, erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
@@ -28,21 +29,54 @@ import {
   ErLifeOrbModifier,
   ErRockyHelmetModifier,
 } from "#data/elite-redux/er-recreated-items";
+import {
+  ER_RESIST_BERRY_BY_TYPE,
+  ErResistBerryModifier,
+  erResistBerryModifierType,
+  erResistBerryTypeId,
+} from "#data/elite-redux/er-resist-berries";
 import { ErSeedModifier, erSeedItemType } from "#data/elite-redux/er-terrain-seeds";
+import {
+  ER_WARD_STONE_CONFIG,
+  ER_WARD_STONE_TIERS,
+  ErWardStoneModifier,
+  erWardStoneModifierType,
+  erWardStoneTypeId,
+} from "#data/elite-redux/er-ward-stones";
+import { BerryType } from "#enums/berry-type";
+import { FormChangeItem } from "#enums/form-change-item";
+import { MoveId } from "#enums/move-id";
+import { Nature } from "#enums/nature";
 import { PokemonType } from "#enums/pokemon-type";
+import { Stat } from "#enums/stat";
 import * as Modifier from "#modifiers/modifier";
-import { ErCommunityItemModifier, type PersistentModifier } from "#modifiers/modifier";
+import { ErCommunityItemModifier, PersistentModifier } from "#modifiers/modifier";
 import {
   erCommunityItemModifierType,
   erCommunityItemTypeId,
   getModifierTypeFuncById,
   type ModifierType,
+  ModifierTypeGenerator,
 } from "#modifiers/modifier-type";
-import { ModifierData } from "#system/modifier-data";
+import { getModifierDataTypeFactory, ModifierData } from "#system/modifier-data";
 import { beforeAll, describe, expect, it } from "vitest";
 
 /** Minimal stand-in - the round-trip never reads the type, only stores it. */
 const stubType = (id: string): ModifierType => ({ id }) as unknown as ModifierType;
+
+class IdentityProbeModifier extends PersistentModifier {
+  clone(): PersistentModifier {
+    return new IdentityProbeModifier(this.type, this.stackCount);
+  }
+
+  apply(): boolean {
+    return true;
+  }
+
+  getMaxStackCount(): number {
+    return 1;
+  }
+}
 
 /** Reconstruct exactly as GameData.toModifier does: ctor(type, ...getArgs, stackCount). */
 function roundTrip<T extends ErGemModifier | ErReactiveItemModifier | ErSeedModifier | ErAssaultVestModifier>(
@@ -77,15 +111,48 @@ describe("ER held-item save persistence", () => {
     initGlobalScene({ getPokemonById: () => ({ isPlayer: () => false }) } as unknown as BattleScene);
   });
 
-  it("registers the un-side-channeled ER classes, and NOT the side-channeled ones", () => {
+  it("fails at construction instead of admitting an untraceable persistent modifier", () => {
+    expect(() => new IdentityProbeModifier(stubType(""))).toThrow(/stable ModifierType\.id/);
+    expect(() => new IdentityProbeModifier(stubType("TRACEABLE"))).not.toThrow();
+  });
+
+  it("every dynamic generator pins its own registry id, including rare variants", () => {
+    const cases: [string, unknown[]][] = [
+      ["SPECIES_STAT_BOOSTER", ["DEEP_SEA_TOOTH"]],
+      ["RARE_SPECIES_STAT_BOOSTER", ["LIGHT_BALL"]],
+      ["TEMP_STAT_STAGE_BOOSTER", [Stat.ATK]],
+      ["BASE_STAT_BOOSTER", [Stat.HP]],
+      ["ATTACK_TYPE_BOOSTER", [PokemonType.FIRE]],
+      ["MINT", [Nature.HARDY]],
+      ["TERA_SHARD", [PokemonType.WATER]],
+      ["BERRY", [BerryType.SITRUS]],
+      ["TM_COMMON", [MoveId.TACKLE]],
+      ["TM_GREAT", [MoveId.TACKLE]],
+      ["TM_ULTRA", [MoveId.TACKLE]],
+      ["EVOLUTION_ITEM", [EvolutionItem.LINKING_CORD]],
+      ["RARE_EVOLUTION_ITEM", [EvolutionItem.BLACK_AUGURITE]],
+      ["FORM_CHANGE_ITEM", [FormChangeItem.ABOMASITE]],
+      ["RARE_FORM_CHANGE_ITEM", [FormChangeItem.SHARP_METEORITE]],
+      ["MYSTERY_ENCOUNTER_SHUCKLE_JUICE", [10]],
+      ["MYSTERY_ENCOUNTER_BLACK_SLUDGE", [2.5]],
+    ];
+    for (const [id, pregenArgs] of cases) {
+      const generator = getModifierTypeFuncById(id)();
+      expect(generator, id).toBeInstanceOf(ModifierTypeGenerator);
+      expect(generator.id, `${id} generator identity`).toBe(id);
+      const concrete = (generator as ModifierTypeGenerator).generateType([], pregenArgs);
+      expect(concrete, `${id} concrete type`).not.toBeNull();
+      expect(concrete!.id, `${id} concrete identity`).toBe(id);
+    }
+  });
+
+  it("registers every ER class used by save/co-op reconstruction", () => {
     expect(resolveErModifierClass("ErGemModifier")).toBe(ErGemModifier);
     expect(resolveErModifierClass("ErSeedModifier")).toBe(ErSeedModifier);
     expect(resolveErModifierClass("ErReactiveItemModifier")).toBe(ErReactiveItemModifier);
     expect(resolveErModifierClass("ErAssaultVestModifier")).toBe(ErAssaultVestModifier);
-    // Resist berries (#357) + ward stones (#358) restore via their own session
-    // side-channels - registering them here too would double-attach on load.
-    expect(resolveErModifierClass("ErResistBerryModifier")).toBeUndefined();
-    expect(resolveErModifierClass("ErWardStoneModifier")).toBeUndefined();
+    expect(resolveErModifierClass("ErResistBerryModifier")).toBe(ErResistBerryModifier);
+    expect(resolveErModifierClass("ErWardStoneModifier")).toBe(ErWardStoneModifier);
     // Vanilla classes are resolved by the caller's Modifier[className], not here.
     expect(resolveErModifierClass("PokemonHeldItemModifier")).toBeUndefined();
   });
@@ -165,5 +232,44 @@ describe("ER held-item save persistence", () => {
       expect(restored!.charges).toBe(1);
       expect(restored!.waveProgress).toBe(4);
     }
+  });
+
+  it("round-trips EVERY Ward Stone tier through ModifierData with mutable charge state", () => {
+    const ids = new Set<string>();
+    for (const [index, tier] of ER_WARD_STONE_TIERS.entries()) {
+      const id = erWardStoneTypeId(tier);
+      const type = erWardStoneModifierType(tier);
+      expect(type.id, tier).toBe(id);
+      expect(getModifierDataTypeFactory(id), `${id} dynamic factory`).toBeDefined();
+      ids.add(id);
+
+      const max = ER_WARD_STONE_CONFIG[tier].maxCharges;
+      const original = new ErWardStoneModifier(type, 700 + index, tier, Math.max(0, max - 1), 4 + index, 1);
+      const restored = reload(original) as ErWardStoneModifier | null;
+      expect(restored, tier).toBeInstanceOf(ErWardStoneModifier);
+      expect(restored!.pokemonId).toBe(700 + index);
+      expect(restored!.tier).toBe(tier);
+      expect(restored!.charges).toBe(Math.max(0, max - 1));
+      expect(restored!.waveProgress).toBe(4 + index);
+    }
+    expect(ids.size).toBe(ER_WARD_STONE_TIERS.length);
+  });
+
+  it("round-trips EVERY resist-berry variant through ModifierData", () => {
+    const ids = new Set<string>();
+    for (const [index, resistType] of [...ER_RESIST_BERRY_BY_TYPE.keys()].entries()) {
+      const id = erResistBerryTypeId(resistType);
+      const type = erResistBerryModifierType(resistType);
+      expect(type.id, PokemonType[resistType]).toBe(id);
+      expect(getModifierDataTypeFactory(id), `${id} dynamic factory`).toBeDefined();
+      ids.add(id);
+
+      const original = new ErResistBerryModifier(type, 800 + index, resistType, 1);
+      const restored = reload(original) as ErResistBerryModifier | null;
+      expect(restored, PokemonType[resistType]).toBeInstanceOf(ErResistBerryModifier);
+      expect(restored!.pokemonId).toBe(800 + index);
+      expect(restored!.resistType).toBe(resistType);
+    }
+    expect(ids.size).toBe(ER_RESIST_BERRY_BY_TYPE.size);
   });
 });

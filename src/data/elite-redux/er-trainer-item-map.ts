@@ -137,16 +137,37 @@ export function resolveErTrainerItem(itemId: number): ErItemResolution {
   if (key !== undefined) {
     const func = getModifierTypeFuncById(key);
     if (func) {
-      return { kind: "modifier", make: func };
+      return {
+        kind: "modifier",
+        make: () => {
+          const modifierType = func();
+          modifierType.id = key;
+          return modifierType;
+        },
+      };
     }
   }
   const type = ER_ITEM_TO_TYPE[itemId];
   if (type !== undefined) {
-    return { kind: "modifier", make: () => new AttackTypeBoosterModifierType(type, TYPE_BOOST_ITEM_BOOST_PERCENT) };
+    return {
+      kind: "modifier",
+      make: () => {
+        const modifierType = new AttackTypeBoosterModifierType(type, TYPE_BOOST_ITEM_BOOST_PERCENT);
+        modifierType.id = "ATTACK_TYPE_BOOSTER";
+        return modifierType;
+      },
+    };
   }
   const speciesKey = ER_ITEM_TO_SPECIES_KEY[itemId];
   if (speciesKey !== undefined) {
-    return { kind: "modifier", make: () => new SpeciesStatBoosterModifierType(speciesKey) };
+    return {
+      kind: "modifier",
+      make: () => {
+        const modifierType = new SpeciesStatBoosterModifierType(speciesKey);
+        modifierType.id = "SPECIES_STAT_BOOSTER";
+        return modifierType;
+      },
+    };
   }
   return null;
 }

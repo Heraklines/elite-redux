@@ -87,17 +87,22 @@ export function clearErFightTokens(): void {
 function statusToken(status: StatusEffect): PersistentModifier | null {
   switch (status) {
     case StatusEffect.BURN:
-      return new EnemyAttackStatusEffectChanceModifier(modifierTypes.ENEMY_ATTACK_BURN_CHANCE(), StatusEffect.BURN, 5, 1);
+      return new EnemyAttackStatusEffectChanceModifier(
+        modifierTypes.ENEMY_ATTACK_BURN_CHANCE().withIdFromFunc(modifierTypes.ENEMY_ATTACK_BURN_CHANCE),
+        StatusEffect.BURN,
+        5,
+        1,
+      );
     case StatusEffect.POISON:
       return new EnemyAttackStatusEffectChanceModifier(
-        modifierTypes.ENEMY_ATTACK_POISON_CHANCE(),
+        modifierTypes.ENEMY_ATTACK_POISON_CHANCE().withIdFromFunc(modifierTypes.ENEMY_ATTACK_POISON_CHANCE),
         StatusEffect.POISON,
         5,
         1,
       );
     case StatusEffect.PARALYSIS:
       return new EnemyAttackStatusEffectChanceModifier(
-        modifierTypes.ENEMY_ATTACK_PARALYZE_CHANCE(),
+        modifierTypes.ENEMY_ATTACK_PARALYZE_CHANCE().withIdFromFunc(modifierTypes.ENEMY_ATTACK_PARALYZE_CHANCE),
         StatusEffect.PARALYSIS,
         5,
         1,
@@ -136,13 +141,45 @@ export function applyErGuardianTokens(depth: number, opts: ErGuardianTokenOpts =
   const recovery = opts.attrition ? Math.min(MAX_RECOVERY, Math.ceil((d + 1) / 2)) : 0;
   const wantStatus = opts.statusType != null && d >= 3;
 
-  addStacks(() => new EnemyDamageBoosterModifier(modifierTypes.ENEMY_DAMAGE_BOOSTER(), 5, 1), damage);
-  addStacks(() => new EnemyDamageReducerModifier(modifierTypes.ENEMY_DAMAGE_REDUCTION(), 2.5, 1), defense);
+  addStacks(
+    () =>
+      new EnemyDamageBoosterModifier(
+        modifierTypes.ENEMY_DAMAGE_BOOSTER().withIdFromFunc(modifierTypes.ENEMY_DAMAGE_BOOSTER),
+        5,
+        1,
+      ),
+    damage,
+  );
+  addStacks(
+    () =>
+      new EnemyDamageReducerModifier(
+        modifierTypes.ENEMY_DAMAGE_REDUCTION().withIdFromFunc(modifierTypes.ENEMY_DAMAGE_REDUCTION),
+        2.5,
+        1,
+      ),
+    defense,
+  );
   if (endure > 0) {
-    addStacks(() => new EnemyEndureChanceModifier(modifierTypes.ENEMY_ENDURE_CHANCE(), 2, 1), endure);
+    addStacks(
+      () =>
+        new EnemyEndureChanceModifier(
+          modifierTypes.ENEMY_ENDURE_CHANCE().withIdFromFunc(modifierTypes.ENEMY_ENDURE_CHANCE),
+          2,
+          1,
+        ),
+      endure,
+    );
   }
   if (recovery > 0) {
-    addStacks(() => new EnemyTurnHealModifier(modifierTypes.ENEMY_HEAL(), 2, 1), recovery);
+    addStacks(
+      () =>
+        new EnemyTurnHealModifier(
+          modifierTypes.ENEMY_HEAL().withIdFromFunc(modifierTypes.ENEMY_HEAL),
+          2,
+          1,
+        ),
+      recovery,
+    );
   }
   if (wantStatus && opts.statusType != null) {
     const tok = statusToken(opts.statusType);

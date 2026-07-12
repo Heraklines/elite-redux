@@ -7319,7 +7319,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
     onBattleStart: () => {
       for (const member of globalScene.getPlayerParty()) {
-        const orb = modifierTypes.FROSTBITE_ORB().newModifier(member) as PokemonHeldItemModifier | null;
+        const orb = modifierTypes
+          .FROSTBITE_ORB()
+          .withIdFromFunc(modifierTypes.FROSTBITE_ORB)
+          .newModifier(member) as PokemonHeldItemModifier | null;
         if (orb) {
           globalScene.addModifier(orb, true);
         }
@@ -7358,7 +7361,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
     onBattleStart: () => {
       for (const member of globalScene.getPlayerParty()) {
-        const orb = modifierTypes.FROSTBITE_ORB().newModifier(member) as PokemonHeldItemModifier | null;
+        const orb = modifierTypes
+          .FROSTBITE_ORB()
+          .withIdFromFunc(modifierTypes.FROSTBITE_ORB)
+          .newModifier(member) as PokemonHeldItemModifier | null;
         if (orb) {
           globalScene.addModifier(orb, true);
         }
@@ -12484,7 +12490,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
       // checksum-multiset convergence the unit test asserts).
       const holder = party[1];
       if (holder != null) {
-        const item = modifierTypes.LEFTOVERS().newModifier(holder);
+        const item = modifierTypes.LEFTOVERS().withIdFromFunc(modifierTypes.LEFTOVERS).newModifier(holder);
         if (item != null) {
           globalScene.addModifier(item, true);
         }

@@ -134,6 +134,7 @@ export function bargainBestCombatStat(pokemon: PlayerPokemon): Stat {
  * it serializes exactly like a bought vitamin). Capped by the mon's IV in the stat. */
 export function bargainGrantStatBoost(pokemon: PlayerPokemon, stat: Stat, stacks: number): void {
   const generator = modifierTypes.BASE_STAT_BOOSTER() as ModifierTypeGenerator;
+  generator.id = "BASE_STAT_BOOSTER";
   const vitamin = generator.generateType(globalScene.getPlayerParty(), [stat]);
   if (!vitamin) {
     return;

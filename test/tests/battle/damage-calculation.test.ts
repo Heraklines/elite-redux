@@ -67,9 +67,17 @@ describe("Battle Mechanics - Damage Calculation", () => {
 
     await game.classicMode.startBattle(SpeciesId.SHUCKLE);
 
-    const dmg_redux_modifier = modifierTypes.ENEMY_DAMAGE_REDUCTION().newModifier() as EnemyPersistentModifier;
+    const dmg_redux_modifier = modifierTypes
+      .ENEMY_DAMAGE_REDUCTION()
+      .withIdFromFunc(modifierTypes.ENEMY_DAMAGE_REDUCTION)
+      .newModifier() as EnemyPersistentModifier;
     dmg_redux_modifier.stackCount = 1000;
-    await game.scene.addEnemyModifier(modifierTypes.ENEMY_DAMAGE_REDUCTION().newModifier() as EnemyPersistentModifier);
+    await game.scene.addEnemyModifier(
+      modifierTypes
+        .ENEMY_DAMAGE_REDUCTION()
+        .withIdFromFunc(modifierTypes.ENEMY_DAMAGE_REDUCTION)
+        .newModifier() as EnemyPersistentModifier,
+    );
 
     const aggron = game.field.getEnemyPokemon();
 

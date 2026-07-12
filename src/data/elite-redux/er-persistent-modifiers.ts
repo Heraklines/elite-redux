@@ -19,17 +19,31 @@
 // must also serialize its extra ctor args via getArgs() to round-trip - the
 // classes with custom fields do.)
 //
-// NOTE: Resist Berries (#357) and Ward Stones (#358) are deliberately NOT here -
-// they already restore via dedicated session side-channels (restoreErResistBerries
-// / restoreErWardStones in GameData). Adding them here too would double-attach
-// them on load.
+// Resist Berries (#357) and Ward Stones (#358) also retain their legacy session
+// side-channels for mutable charge/progress compatibility. They are registered
+// here as well because enemy snapshots and co-op held-item heals reconstruct
+// through ModifierData. GameData loads the ordinary modifier list first; each
+// side-channel restore has an `already` guard, so this does not double-attach.
 // =============================================================================
 
 import { ErGemModifier } from "#data/elite-redux/er-elemental-gems";
 import { ErReactiveItemModifier } from "#data/elite-redux/er-reactive-items";
 import { ErAssaultVestModifier, ErLifeOrbModifier, ErRockyHelmetModifier } from "#data/elite-redux/er-recreated-items";
+import {
+  ER_RESIST_BERRY_BY_TYPE,
+  ErResistBerryModifier,
+  erResistBerryModifierType,
+  erResistBerryTypeId,
+} from "#data/elite-redux/er-resist-berries";
 import { ErSeedModifier } from "#data/elite-redux/er-terrain-seeds";
+import {
+  ER_WARD_STONE_TIERS,
+  ErWardStoneModifier,
+  erWardStoneModifierType,
+  erWardStoneTypeId,
+} from "#data/elite-redux/er-ward-stones";
 import type { PersistentModifier } from "#modifiers/modifier";
+import { registerModifierDataTypeFactory } from "#system/modifier-data";
 
 /** ER custom PersistentModifier subclasses, keyed by class name. */
 const ER_PERSISTENT_MODIFIER_CLASSES: Record<string, new (...args: any[]) => PersistentModifier> = {
@@ -39,7 +53,18 @@ const ER_PERSISTENT_MODIFIER_CLASSES: Record<string, new (...args: any[]) => Per
   ErLifeOrbModifier,
   ErAssaultVestModifier,
   ErRockyHelmetModifier,
+  ErResistBerryModifier,
+  ErWardStoneModifier,
 };
+
+// Dynamic variant families are intentionally kept out of modifierTypeInitObj:
+// their finite runtime variants are registered at the ModifierData boundary.
+for (const tier of ER_WARD_STONE_TIERS) {
+  registerModifierDataTypeFactory(erWardStoneTypeId(tier), () => erWardStoneModifierType(tier));
+}
+for (const resistType of ER_RESIST_BERRY_BY_TYPE.keys()) {
+  registerModifierDataTypeFactory(erResistBerryTypeId(resistType), () => erResistBerryModifierType(resistType));
+}
 
 /**
  * Resolve an ER custom held-item class by its serialized class name, for the

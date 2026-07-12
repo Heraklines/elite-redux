@@ -162,7 +162,7 @@ async function spawnNextTrainerOrEndEncounter() {
     await showEncounterDialogue(`${namespace}:victory`, `${namespace}:speaker`);
 
     // Give 10x Voucher
-    const newModifier = modifierTypes.VOUCHER_PREMIUM().newModifier();
+    const newModifier = modifierTypes.VOUCHER_PREMIUM().withIdFromFunc(modifierTypes.VOUCHER_PREMIUM).newModifier();
     globalScene.addModifier(newModifier);
     globalScene.playSound("item_fanfare");
     await showEncounterText(i18next.t("battle:rewardGain", { modifierName: newModifier?.type.name }));

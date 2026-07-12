@@ -56,6 +56,15 @@ export const ER_RESIST_BERRY_BY_TYPE: ReadonlyMap<PokemonType, { name: string; i
   [PokemonType.NORMAL, { name: "Chilan Berry", icon: "chilan_berry" }],
 ]);
 
+/** Stable ModifierData identity for one concrete resist-berry variant. */
+export function erResistBerryTypeId(resistType: PokemonType): string {
+  const typeName = PokemonType[resistType];
+  if (!ER_RESIST_BERRY_BY_TYPE.has(resistType) || typeof typeName !== "string") {
+    throw new Error(`Cannot build a stable resist-berry id for PokemonType ${resistType}`);
+  }
+  return `ER_RESIST_BERRY_${typeName}`;
+}
+
 /** Per-mon roll chance (%) that a trainer mon holds a resist berry. */
 export const ER_RESIST_BERRY_CHANCE_PCT: Readonly<Record<string, number>> = {
   // ER (#420): doubled on Elite/Hell, Ace raised to 5 (was 1/5/10).
@@ -117,6 +126,9 @@ export function erResistBerryModifierType(resistType: PokemonType): PokemonHeldI
     info?.icon ?? "berry",
     (type, args) => new ErResistBerryModifier(type as PokemonHeldItemModifierType, (args[0] as Pokemon).id, resistType),
   );
+  // These berries enter through trainer rolls/theft/restore rather than the
+  // reward pool, so no later reverse lookup can be relied upon to fill this.
+  mt.id = erResistBerryTypeId(resistType);
   // ER items live outside the i18n catalogue — pin the live strings (the
   // `name` accessor is an i18n GETTER, so it must be redefined, same pattern
   // as er-recreated-items' withErText).
@@ -271,11 +283,10 @@ export function maybeAssignErResistBerry(enemy: EnemyPokemon): void {
 
 // -----------------------------------------------------------------------------
 // Session persistence — a STOLEN berry on the player's team must survive
-// save/reload. ER runtime modifier types aren't in the vanilla modifier
-// registry (PersistentModifierData silently drops them on load), so the
-// player's berries ride the session save as a tiny side-channel field, like
-// erMoneyStreaks. Enemy-held berries are per-battle state and aren't restored
-// (same limitation as all ER recreated trainer items).
+// save/reload. The family now has stable per-type ModifierData registrations,
+// while this legacy side channel remains for backwards compatibility with
+// saves written before those registrations existed. Its `already` check makes
+// the two restore paths safely additive rather than duplicating an item.
 // -----------------------------------------------------------------------------
 
 /** [pokemonId, resistType] for every player-owned resist berry. */

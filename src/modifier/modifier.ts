@@ -198,6 +198,11 @@ export abstract class PersistentModifier extends Modifier {
   private declare _: never;
 
   constructor(type: ModifierType, stackCount = 1) {
+    if (typeof type?.id !== "string" || type.id.trim().length === 0) {
+      throw new Error(
+        "PersistentModifier requires a stable ModifierType.id before construction; id-less modifiers cannot be saved or synchronized",
+      );
+    }
     super(type);
     this.stackCount = stackCount;
     this.virtualStackCount = 0;
