@@ -492,6 +492,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     enemy.getMoveset()[0].ppUsed = 3;
     const checkpoint = coopEngine.captureCoopCheckpoint();
     expect(checkpoint).not.toBeNull();
+    expect(
+      checkpoint!.field.find(state => state.bi === enemy.getBattlerIndex())?.moves?.[0]?.ppUsed,
+      "host checkpoint captures the active move PP before the renderer diverges",
+    ).toBe(3);
 
     // The renderer already played the faint but retained stale non-visual state.
     enemy.status = null;

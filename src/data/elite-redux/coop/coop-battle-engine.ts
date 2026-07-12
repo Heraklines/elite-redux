@@ -1028,7 +1028,17 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
           for (let i = 0; i < 7 && i < stages.length; i++) {
             stages[i] = state.statStages[i];
           }
-          repairErTags(mon, state.erTags);
+          // A volatile-tag read can fail after field reconciliation has removed/reset a fainted mon.
+          // Tag repair is independent of the authoritative scalar fields below: never let one malformed
+          // or temporarily detached tag container prevent PP/form/tera/ownership from converging.
+          try {
+            repairErTags(mon, state.erTags);
+          } catch (error) {
+            coopWarn(
+              "checkpoint",
+              `mon bi=${mon.getBattlerIndex()} ER-tag repair failed; continuing scalar adoption: ${String(error)}`,
+            );
+          }
           // #798 PP sync: adopt the host's ppUsed PER MATCHING MOVE ID. Deliberately
           // conservative - never adds/removes/reorders moves (learn-move has its own relay);
           // an id mismatch skips that slot and the resync backstop still heals it.
@@ -1085,8 +1095,13 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
           }
           void mon.updateInfo();
         }
-      } catch {
-        /* one mon's correction failed; leave it and continue */
+      } catch (error) {
+        // Checkpoint apply is the hot recovery boundary. A silent partial apply makes a persistent
+        // divergence look like a transport failure, so retain isolation while emitting the exact mon.
+        coopWarn(
+          "checkpoint",
+          `mon bi=${mon.getBattlerIndex()} correction failed; continuing other mons: ${String(error)}`,
+        );
       }
     }
     // Correct weather / terrain type if it drifted (turn counts are approximate).
