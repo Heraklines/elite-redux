@@ -208,6 +208,9 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
       // have distinct runtimes/processes. Reassert that proven owner session on the host runtime so the
       // public UI input is routed through its actual owner mirror, not blocked as a phantom watcher.
       rig.hostRuntime.uiMirror.beginSession("owner", UiMode.MODIFIER_SELECT, counterBefore * 64);
+      // The same incomplete tween mock skips updateCursorTarget(), leaving the active cursor on the
+      // bottom control row. Navigate through the public handler to reward row 1 / option 0.
+      expect(rig.hostScene.ui.processInput(Button.UP), "the public UI selects the reward row").toBe(true);
       resetCoopUiRelayTrace();
       let accepted = false;
       for (let i = 0; i < 500 && !accepted; i++) {
