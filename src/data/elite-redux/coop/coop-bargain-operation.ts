@@ -83,7 +83,7 @@ function guest(): CoopOperationGuest {
 }
 
 function bargainOperationId(pinned: number): string {
-  return makeCoopOperationId(epoch, coopInteractionOwnerSeat(pinned), pinned);
+  return makeCoopOperationId(epoch, coopInteractionOwnerSeat(pinned), pinned, "BARGAIN");
 }
 
 function controlContext(
@@ -210,7 +210,7 @@ function applyJournaledBargainEnvelope(envelope: CoopAuthoritativeEnvelopeV1): C
     return "duplicate";
   }
   const result = applyCoopOperationEnvelope(g, "op:bargain", envelope);
-  if (result.kind !== "applied") {
+  if (result !== "applied") {
     return "rejected";
   }
   return "applied";

@@ -81,7 +81,7 @@ function makeIntent(
   payload: unknown,
   kind: CoopOperationKind = "BIOME_PICK",
 ): CoopPendingOperation {
-  return { id: makeCoopOperationId(epoch, owner, pinnedSeq), kind, owner, status: "proposed", payload };
+  return { id: makeCoopOperationId(epoch, owner, pinnedSeq, kind), kind, owner, status: "proposed", payload };
 }
 
 const ACCEPT: CoopIntentValidator = () => ({ ok: true });
@@ -135,7 +135,7 @@ describe("W2e-R2 I5: pre-commit intent loss - owner re-send with the determinist
       const first = commitMeOwnerIntent(params);
       const repeated = commitMeOwnerIntent(params);
       expect(first, "the owner seam must return the proposal identity used by the resend tracker").toBe(
-        makeCoopOperationId(EPOCH, GUEST_OWNER, params.seq * 8000 + 1000),
+        makeCoopOperationId(EPOCH, GUEST_OWNER, params.seq * 8000 + 1000, "ME_PICK"),
       );
       expect(repeated, "re-registering the same slot must reuse, never remint, the operationId").toBe(first);
     } finally {
@@ -220,7 +220,7 @@ describe("W2e-R2 I5: pre-commit intent loss - owner re-send with the determinist
   it("I5b: a timeout-default and the late real intent collide on the deterministic id -> reack, no double-apply", () => {
     const host = new CoopOperationHost({ epoch: EPOCH });
     const ctx = makeCtx();
-    const id = makeCoopOperationId(EPOCH, GUEST_OWNER, PIN);
+    const id = makeCoopOperationId(EPOCH, GUEST_OWNER, PIN, "BIOME_PICK");
 
     // The guest's intent was lost; the host commits a DEFAULT for the slot under the deterministic id.
     const defaultOp: CoopPendingOperation = {

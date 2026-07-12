@@ -357,7 +357,12 @@ export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): vo
   try {
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
     const ordinal = nextOwnerOrdinal(params.pinned);
-    const opId = makeCoopOperationId(epoch, ownerSeat, params.pinned * COOP_REWARD_ACTION_STRIDE + ordinal);
+    const opId = makeCoopOperationId(
+      epoch,
+      ownerSeat,
+      params.pinned * COOP_REWARD_ACTION_STRIDE + ordinal,
+      kindFor(params.surface),
+    );
     const payload = buildPayload(params.surface, params.label, params.choice, params.data, params.terminal);
     const intent: CoopPendingOperation = {
       id: opId,
@@ -451,7 +456,12 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
 
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
     const ordinal = peekWatcherOrdinal(params.pinned);
-    const opId = makeCoopOperationId(epoch, ownerSeat, params.pinned * COOP_REWARD_ACTION_STRIDE + ordinal);
+    const opId = makeCoopOperationId(
+      epoch,
+      ownerSeat,
+      params.pinned * COOP_REWARD_ACTION_STRIDE + ordinal,
+      kindFor(params.surface),
+    );
     const payload = buildPayload(params.surface, "relay", params.action.choice, params.action.data, params.terminal);
     const intent: CoopPendingOperation = {
       id: opId,

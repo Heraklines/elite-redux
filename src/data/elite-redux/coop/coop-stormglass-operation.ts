@@ -113,7 +113,7 @@ export function commitCoopStormglassDecision(
     try {
       const owner = coopSeatOfRole("host");
       const operation: CoopPendingOperation = {
-        id: makeCoopOperationId(epoch, owner, revisionFloor + ++ordinal),
+        id: makeCoopOperationId(epoch, owner, revisionFloor + ++ordinal, "STORMGLASS"),
         kind: "STORMGLASS",
         owner,
         status: "proposed",
@@ -160,7 +160,7 @@ function applyJournaledStormglassEnvelope(envelope: CoopAuthoritativeEnvelopeV1)
     return "duplicate";
   }
   const result = applyCoopOperationEnvelope(g, "op:stormglass", envelope);
-  if (result.kind !== "applied") {
+  if (result !== "applied") {
     return "rejected";
   }
   return "applied";

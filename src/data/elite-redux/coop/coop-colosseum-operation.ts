@@ -171,7 +171,12 @@ function commit(params: {
 }): void {
   const actionOrdinal = nextOrdinal(params.pinned);
   const op: CoopPendingOperation = {
-    id: makeCoopOperationId(epoch, params.owner, params.pinned * COOP_COLOSSEUM_ACTION_STRIDE + actionOrdinal),
+    id: makeCoopOperationId(
+      epoch,
+      params.owner,
+      params.pinned * COOP_COLOSSEUM_ACTION_STRIDE + actionOrdinal,
+      "COLO_PICK",
+    ),
     kind: "COLO_PICK",
     owner: params.owner,
     status: "proposed",
@@ -245,7 +250,7 @@ function applyJournaledColosseumEnvelope(envelope: CoopAuthoritativeEnvelopeV1):
     return "duplicate";
   }
   const result = applyCoopOperationEnvelope(g, "op:colosseum", envelope);
-  if (result.kind !== "applied") {
+  if (result !== "applied") {
     return "rejected";
   }
   const payload = op.payload as CoopColosseumPayload | undefined;

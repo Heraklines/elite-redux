@@ -528,18 +528,18 @@ export interface SoakOptions {
   resumeWaves?: ReadonlySet<number>;
 }
 
-/** A structured HARD invariant breach (LOCKSTEP / NO-PARK / TEARDOWN) the driver throws after writing the
+/** A structured HARD invariant breach (DESYNC / LOCKSTEP / NO-PARK / TEARDOWN) the driver throws after writing the
  * failure artifact. (An unhealed DIGEST divergence is recorded as a {@linkcode SoakFinding} + continues,
  * not thrown, so a long soak surveys the whole run.) */
 export class SoakInvariantError extends Error {
-  public readonly invariant: "lockstep" | "no-park" | "teardown";
+  public readonly invariant: "desync" | "lockstep" | "no-park" | "teardown";
   public readonly seed: number;
   public readonly wave: number;
   public readonly detail: string;
   public readonly artifactDir: string;
 
   public constructor(
-    invariant: "lockstep" | "no-park" | "teardown",
+    invariant: "desync" | "lockstep" | "no-park" | "teardown",
     seed: number,
     wave: number,
     detail: string,
@@ -983,7 +983,7 @@ function phaseStateDump(rig: DuoRig): Record<string, unknown> {
     status: mon.status?.effect ?? 0,
     statStages: [...mon.getStatStages()],
     moves: mon.getMoveset().map(move => (move == null ? null : { id: move.moveId, ppUsed: move.ppUsed })),
-    coopOwner: mon.coopOwner,
+    coopOwner: (mon as Pokemon & { coopOwner?: "host" | "guest" }).coopOwner,
   });
   return {
     hostPhase: rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? "none",
@@ -1265,7 +1265,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         const offeredExplosion =
           offer?.moves.find(move => move.moveId === MoveId.EXPLOSION)
           ?? offer?.moves.find(move => move.slot === explosionSlot);
-        if (offeredExplosion == null || offeredExplosion.targetSets.length === 0) {
+        const explosionTargets = offeredExplosion?.targetSets[0];
+        if (explosionTargets == null) {
           fail("desync", wave, "host did not offer the guest's locally legal Explosion command");
         }
         actionScript.push(`wave ${wave} turn ${turn}: forced-faint guest EXPLOSION self-KO`);
@@ -1275,7 +1276,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           command: Command.FIGHT,
           cursor: explosionSlot,
           moveId: MoveId.EXPLOSION,
-          targets: [...offeredExplosion.targetSets[0]],
+          targets: [...explosionTargets],
         };
       }
       fail("no-park", wave, "level forced-faint leg could not issue Explosion from the guest lead");
@@ -1361,7 +1362,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     return { hostSaveState, guestSaveState };
   };
 
-  const fail = (invariant: "lockstep" | "no-park" | "teardown", wave: number, detail: string): never => {
+  const fail = (invariant: "desync" | "lockstep" | "no-park" | "teardown", wave: number, detail: string): never => {
     const dir = writeSoakArtifact(logs, {
       seed,
       wave,

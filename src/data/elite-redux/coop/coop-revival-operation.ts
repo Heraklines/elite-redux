@@ -141,7 +141,7 @@ function commitAction(params: {
   try {
     const owner = coopSeatOfRole(params.ownerRole);
     const operation: CoopPendingOperation = {
-      id: makeCoopOperationId(epoch, owner, actionAddress(params.payload, params.wave, params.turn)),
+      id: makeCoopOperationId(epoch, owner, actionAddress(params.payload, params.wave, params.turn), "REVIVAL"),
       kind: "REVIVAL",
       owner,
       status: "proposed",
@@ -263,7 +263,7 @@ function applyJournaledRevivalEnvelope(envelope: CoopAuthoritativeEnvelopeV1): C
     return "duplicate";
   }
   const result = applyCoopOperationEnvelope(g, "op:revival", envelope);
-  if (result.kind !== "applied") {
+  if (result !== "applied") {
     return "rejected";
   }
   if (operation.payload.type !== "prompt") {

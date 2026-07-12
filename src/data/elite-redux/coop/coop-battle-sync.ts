@@ -485,6 +485,7 @@ export class CoopBattleSync {
     offer?: CoopBattleCommandOffer | undefined;
     owner?: CoopRole;
     address?: CoopCommandAddress;
+    address?: CoopCommandAddress;
   }[] = [];
   /** #812: injected by the runtime (cycle-free); true = this client owns the field slot. */
   private slotOwnershipProbe: ((fieldIndex: number) => boolean) | null = null;

@@ -233,7 +233,7 @@ export class CoopOperationHost {
   ): CoopHostSubmitResult {
     // 1. Epoch guard (§1.4): an id from another epoch can never satisfy a live op. Rejected as cross-epoch.
     const parsed = parseCoopOperationId(intent.id);
-    if (parsed == null || parsed.epoch !== this.epoch) {
+    if (parsed == null || parsed.epoch !== this.epoch || parsed.kind !== intent.kind || parsed.owner !== intent.owner) {
       return { kind: "rejected-late", reason: "epoch-mismatch" };
     }
 
@@ -401,6 +401,12 @@ export class CoopOperationGuest {
     const op = env.pendingOperation;
     if (op != null && !this.isKnownKind(op.kind)) {
       return { kind: "fail-closed", reason: "unknown-kind" };
+    }
+    if (op != null) {
+      const parsed = parseCoopOperationId(op.id);
+      if (parsed == null || parsed.epoch !== env.sessionEpoch || parsed.kind !== op.kind || parsed.owner !== op.owner) {
+        return { kind: "fail-closed", reason: "unknown-kind" };
+      }
     }
 
     // 3. Control signals that do NOT advance revision (§1.3): rejection / supersession / an in-flight (reconnect) op.

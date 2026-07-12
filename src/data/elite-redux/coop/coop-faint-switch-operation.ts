@@ -203,6 +203,7 @@ export function commitFaintSwitchAuthorityIntent(params: {
         epoch,
         owner,
         coopFaintSwitchOperationAddress(params.wave, params.turn, params.payload.fieldIndex, params.payload.partySlot),
+        "FAINT_SWITCH",
       ),
       kind: "FAINT_SWITCH",
       owner,
@@ -249,7 +250,7 @@ function applyJournaledFaintSwitchEnvelope(envelope: CoopAuthoritativeEnvelopeV1
     return "duplicate";
   }
   const result = applyCoopOperationEnvelope(g, "op:faintSwitch", envelope);
-  if (result.kind !== "applied") {
+  if (result !== "applied") {
     return "rejected";
   }
   cancelRetry(operation.payload);

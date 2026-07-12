@@ -408,7 +408,7 @@ export function commitWaveAdvanceOwnerIntent(params: CoopWaveAdvanceOwnerCommitP
   try {
     const intent: CoopPendingOperation = {
       // Pinned on the WAVE index (one advance per wave) - the cross-wave stale-ordering address.
-      id: makeCoopOperationId(epoch, HOST_SEAT, params.payload.wave),
+      id: makeCoopOperationId(epoch, HOST_SEAT, params.payload.wave, "WAVE_ADVANCE"),
       kind: "WAVE_ADVANCE",
       owner: HOST_SEAT,
       status: "proposed",
@@ -476,7 +476,7 @@ export function adoptWaveAdvanceWatcherChoice(params: CoopWaveAdvanceWatcherAdop
     return { adopt: false, reason: "malformed-transition", stale: false };
   }
   try {
-    const opId = makeCoopOperationId(epoch, HOST_SEAT, params.payload.wave);
+    const opId = makeCoopOperationId(epoch, HOST_SEAT, params.payload.wave, "WAVE_ADVANCE");
 
     // Stale / duplicate rejection (invariant 6, the successor of the lastResolvedWave double-advance guard):
     // a wave-advance for a wave STRICTLY BELOW the last adopted one (a leftover from an earlier wave), or a

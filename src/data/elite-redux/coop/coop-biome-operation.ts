@@ -299,7 +299,7 @@ export function commitBiomeOwnerIntent(params: CoopBiomeOwnerCommitParams): void
   try {
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
     const intent: CoopPendingOperation = {
-      id: makeCoopOperationId(epoch, ownerSeat, params.seq),
+      id: makeCoopOperationId(epoch, ownerSeat, params.seq, params.kind),
       kind: params.kind,
       owner: ownerSeat,
       status: "proposed",
@@ -368,7 +368,7 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
   }
   try {
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
-    const opId = makeCoopOperationId(epoch, ownerSeat, params.seq);
+    const opId = makeCoopOperationId(epoch, ownerSeat, params.seq, params.kind);
     const payload: CoopBiomePickPayload | CoopCrossroadsPickPayload =
       params.kind === "BIOME_PICK"
         ? { biomeId: params.res.data?.[0] ?? -1, nodeIndex: params.res.choice }

@@ -11,6 +11,7 @@ import {
   type CoopAuthoritativeEnvelopeV1,
   type CoopPendingOperation,
   makeCoopOperationId,
+  parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
@@ -118,7 +119,12 @@ function peekWatcherOrdinal(pinned: number): number {
 }
 
 function opId(pinned: number, ordinal: number): string {
-  return makeCoopOperationId(epoch, coopInteractionOwnerSeat(pinned), pinned * COOP_ABILITY_ACTION_STRIDE + ordinal);
+  return makeCoopOperationId(
+    epoch,
+    coopInteractionOwnerSeat(pinned),
+    pinned * COOP_ABILITY_ACTION_STRIDE + ordinal,
+    "ABILITY_PICK",
+  );
 }
 
 function context(wave: number, turn: number) {
@@ -286,12 +292,12 @@ function applyJournaledAbilityEnvelope(envelope: CoopAuthoritativeEnvelopeV1): C
     return "duplicate";
   }
   const result = applyCoopOperationEnvelope(g, "op:ability", envelope);
-  if (result.kind !== "applied") {
+  if (result !== "applied") {
     return "rejected";
   }
-  const parsed = /^\d+:\d+:(\d+)$/.exec(operation.id);
+  const parsed = parseCoopOperationId(operation.id);
   if (parsed != null) {
-    const pinned = Math.floor(Number(parsed[1]) / COOP_ABILITY_ACTION_STRIDE);
+    const pinned = Math.floor(parsed.pinnedSeq / COOP_ABILITY_ACTION_STRIDE);
     cancelRetry(pinned, payload.data);
   }
   return "applied";

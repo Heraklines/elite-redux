@@ -68,7 +68,7 @@ function makeIntent(
   kind: CoopOperationKind = "BIOME_PICK",
   payload: unknown = { biomeId: 12, nodeIndex: 0 },
 ): CoopPendingOperation {
-  return { id: makeCoopOperationId(epoch, owner, pinnedSeq), kind, owner, status: "proposed", payload };
+  return { id: makeCoopOperationId(epoch, owner, pinnedSeq, kind), kind, owner, status: "proposed", payload };
 }
 
 const ACCEPT: CoopIntentValidator = () => ({ ok: true });
@@ -78,17 +78,23 @@ const REFUSE =
 
 // =============================================================================
 describe("coop-operation-envelope: id mint/parse + closed-union guards (§1.1, §1.7, §1.8)", () => {
-  it("mints and parses `${epoch}:${owner}:${pinnedSeq}` round-trip", () => {
-    const id = makeCoopOperationId(2, 1, 9_700_042);
-    expect(id).toBe("2:1:9700042");
-    expect(parseCoopOperationId(id)).toEqual({ epoch: 2, owner: 1, pinnedSeq: 9_700_042 });
+  it("mints and parses the epoch-owner-kind-sequence tuple round-trip", () => {
+    const id = makeCoopOperationId(2, 1, 9_700_042, "REWARD");
+    expect(id).toBe("2:1:REWARD:9700042");
+    expect(parseCoopOperationId(id)).toEqual({ epoch: 2, owner: 1, kind: "REWARD", pinnedSeq: 9_700_042 });
+  });
+
+  it("never aliases two operation classes at the same epoch, owner, and local sequence", () => {
+    const wave = makeCoopOperationId(2, 0, 1, "WAVE_ADVANCE");
+    const reward = makeCoopOperationId(2, 0, 1, "REWARD");
+    expect(wave).not.toBe(reward);
   });
 
   it("parse rejects a malformed id", () => {
     expect(parseCoopOperationId("nope")).toBeNull();
     expect(parseCoopOperationId("1:2")).toBeNull();
     expect(parseCoopOperationId("a:b:c")).toBeNull();
-    expect(parseCoopOperationId("1:2:3:4")).toBeNull();
+    expect(parseCoopOperationId("1:2:NOPE:4")).toBeNull();
   });
 
   it("recognizes the closed phase + kind unions and rejects unknowns (fail-closed source, §1.7)", () => {
@@ -374,7 +380,7 @@ describe("CoopOperationGuest: idempotent applier (§1.6, §1.7)", () => {
       turn: 1,
       logicalPhase: "BIOME_SELECT",
       pendingOperation: {
-        id: makeCoopOperationId(1, 1, 9_700_010),
+        id: makeCoopOperationId(1, 1, 9_700_010, "BIOME_PICK"),
         kind: "BIOME_PICK",
         owner: 1,
         status: "superseded",
@@ -396,7 +402,7 @@ describe("CoopOperationGuest: idempotent applier (§1.6, §1.7)", () => {
       turn: 1,
       logicalPhase: "BIOME_SELECT",
       pendingOperation: {
-        id: makeCoopOperationId(1, 1, 9_700_010),
+        id: makeCoopOperationId(1, 1, 9_700_010, "BIOME_PICK"),
         kind: "BIOME_PICK",
         owner: 1,
         status: "committed",
@@ -409,7 +415,7 @@ describe("CoopOperationGuest: idempotent applier (§1.6, §1.7)", () => {
     if (res.kind !== "pending") {
       throw new Error("expected pending");
     }
-    expect(res.op.id).toBe(makeCoopOperationId(1, 1, 9_700_010));
+    expect(res.op.id).toBe(makeCoopOperationId(1, 1, 9_700_010, "BIOME_PICK"));
     expect(guest.getLastAppliedRevision()).toBe(0);
   });
 });

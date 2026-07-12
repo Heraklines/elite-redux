@@ -128,7 +128,7 @@ function commitAction(params: {
   try {
     const owner = coopSeatOfRole(params.ownerRole);
     const operation: CoopPendingOperation = {
-      id: makeCoopOperationId(epoch, owner, revisionFloor + ++ordinal),
+      id: makeCoopOperationId(epoch, owner, revisionFloor + ++ordinal, "CATCH_FULL"),
       kind: "CATCH_FULL",
       owner,
       status: "proposed",
@@ -246,7 +246,7 @@ function applyJournaledCatchFullEnvelope(envelope: CoopAuthoritativeEnvelopeV1):
     return "duplicate";
   }
   const result = applyCoopOperationEnvelope(g, "op:catchFull", envelope);
-  if (result.kind !== "applied") {
+  if (result !== "applied") {
     return "rejected";
   }
   if (operation.payload.type !== "prompt") {

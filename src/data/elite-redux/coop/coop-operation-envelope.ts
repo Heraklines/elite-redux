@@ -35,7 +35,7 @@ export type CoopRevision = number;
 
 /**
  * Globally unique id for one operation, minted by the PROPOSER (host or guest) (§1.3, §1.8):
- * `${epoch}:${owner}:${pinnedSeq}`. Unique WITHOUT a host round-trip, and it embeds its epoch so
+ * `${epoch}:${owner}:${kind}:${pinnedSeq}`. Unique WITHOUT a host round-trip, and it embeds its epoch so
  * the idempotency + late-rejection machinery (§1.6) is structural, not per-call-site.
  */
 export type CoopOperationId = string;
@@ -373,25 +373,36 @@ export interface CoopWaveAdvancePayload {
  * is the interaction-counter value (or biome pin) the op was pinned at, so the id embeds BOTH its epoch
  * (cross-epoch rejection) AND the counter it advanced past (the peerAdvancedPastInteraction successor).
  */
-export function makeCoopOperationId(epoch: CoopSessionEpoch, owner: CoopPlayerId, pinnedSeq: number): CoopOperationId {
-  return `${epoch}:${owner}:${pinnedSeq}`;
+export function makeCoopOperationId(
+  epoch: CoopSessionEpoch,
+  owner: CoopPlayerId,
+  pinnedSeq: number,
+  kind: CoopOperationKind,
+): CoopOperationId {
+  return `${epoch}:${owner}:${kind}:${pinnedSeq}`;
 }
 
 /** Parse an operation id back into its components, or null if it is not a well-formed id. */
 export function parseCoopOperationId(
   id: CoopOperationId,
-): { epoch: CoopSessionEpoch; owner: CoopPlayerId; pinnedSeq: number } | null {
+): { epoch: CoopSessionEpoch; owner: CoopPlayerId; kind: CoopOperationKind; pinnedSeq: number } | null {
   const parts = id.split(":");
-  if (parts.length !== 3) {
+  if (parts.length !== 4) {
     return null;
   }
   const epoch = Number(parts[0]);
   const owner = Number(parts[1]);
-  const pinnedSeq = Number(parts[2]);
-  if (!Number.isInteger(epoch) || !Number.isInteger(owner) || !Number.isInteger(pinnedSeq)) {
+  const kind = parts[2];
+  const pinnedSeq = Number(parts[3]);
+  if (
+    !Number.isInteger(epoch)
+    || !Number.isInteger(owner)
+    || !isKnownCoopOperationKind(kind)
+    || !Number.isInteger(pinnedSeq)
+  ) {
     return null;
   }
-  return { epoch, owner, pinnedSeq };
+  return { epoch, owner, kind, pinnedSeq };
 }
 
 /** The closed set of logical phases the guest recognizes. A value outside it FAILS CLOSED (§1.7). */

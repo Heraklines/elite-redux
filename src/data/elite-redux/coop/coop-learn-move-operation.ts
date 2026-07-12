@@ -133,7 +133,7 @@ function commit(params: {
   try {
     const owner = coopSeatOfRole(params.ownerRole);
     const operation: CoopPendingOperation = {
-      id: makeCoopOperationId(epoch, owner, nextAddress()),
+      id: makeCoopOperationId(epoch, owner, nextAddress(), kindOf(params.payload)),
       kind: kindOf(params.payload),
       owner,
       status: "proposed",

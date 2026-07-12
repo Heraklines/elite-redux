@@ -438,7 +438,7 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
     }
     const addr = meOpAddr(params.kind, params.seq, params.step ?? 0);
     const intent: CoopPendingOperation = {
-      id: makeCoopOperationId(epoch, ownerSeat, addr),
+      id: makeCoopOperationId(epoch, ownerSeat, addr, params.kind),
       kind: params.kind,
       owner: ownerSeat,
       status: "proposed",
@@ -514,7 +514,7 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
   try {
     const ownerSeat = ownerSeatFor(params.kind, params.pinned);
     const addr = meOpAddr(params.kind, params.seq, params.step ?? 0);
-    const derivedOpId = makeCoopOperationId(epoch, ownerSeat, addr);
+    const derivedOpId = makeCoopOperationId(epoch, ownerSeat, addr, params.kind);
     const relayedOp = params.res.operationId == null ? null : parseCoopOperationId(params.res.operationId);
     const addrBase = meOpAddr(params.kind, params.seq, 0);
     if (
