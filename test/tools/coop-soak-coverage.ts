@@ -32,10 +32,11 @@
 // driven nor declared undrivable - classify it") - this is what makes new content
 // auto-red.
 //
-// GATING. The FULL enforcement (every GUARANTEED surface hit + the partition check)
-// runs only when the run surveyed at least COMPLETENESS_ASSERT_MIN waves. Below that
-// (the 25-wave PR default) the coverage is REPORT-ONLY (logSoakCoverage, assert
-// nothing) so PRs stay green + fast. See assertSoakCompleteness.
+// GATING. The FULL depth-dependent enforcement (every GUARANTEED surface hit + the
+// partition check) runs only when the run surveyed at least COMPLETENESS_ASSERT_MIN
+// waves. Below that the cold-surface coverage is REPORT-ONLY so PRs stay green + fast.
+// Registry contradictions observed by ANY run are always RED: an undeclared UI ->
+// operation edge, or a supposedly-undrivable edge that the run actually drove.
 //
 // This module imports the registries + the UiMode enum (leaves) + node fs/path; it does
 // NOT import the coop runtime, so it stays a pure test-side classifier.
@@ -44,6 +45,7 @@
 import {
   COOP_OPERATION_SURFACES,
   COOP_OPERATION_UI_CONTRACTS,
+  type CoopOperationSurfaceClass,
 } from "#data/elite-redux/coop/coop-operation-surface-registry";
 import { COOP_RELAY_KINDS, COOP_SEQ_BANDS, coopSeqBandRange } from "#data/elite-redux/coop/coop-seq-registry";
 import { COOP_UI_AUTHORITATIVE_COMMIT_MODES, COOP_UI_MIRRORED_MODES } from "#data/elite-redux/coop/coop-ui-registry";
@@ -154,6 +156,40 @@ const sitKey = (s: string): string => `situation:${s}`;
 const operationKey = (cls: string): string => `operation:${cls}`;
 const uiRelayKey = (m: UiMode): string => `uiRelay:${UiMode[m]}`;
 const uiOperationKey = (mode: UiMode, cls: string): string => `uiOperation:${UiMode[mode]}->${cls}`;
+
+/**
+ * Reviewed UI -> operation coverage debt. This list is deliberately EXPLICIT and independent of
+ * {@linkcode COOP_OPERATION_UI_CONTRACTS}: deriving the exemptions from that contract would make every new
+ * contract edge exempt itself automatically, turning the anti-silent-drop check into a tautology. Adding a
+ * tuple here is therefore a conscious review decision with the common follow-up attached in
+ * {@linkcode KNOWN_UNDRIVABLE}; deleting one promotes the edge to enforced coverage.
+ */
+export const REVIEWED_UNDRIVABLE_UI_OPERATIONS = [
+  [UiMode.OPTION_SELECT, "op:ability"],
+  [UiMode.PARTY, "op:ability"],
+  [UiMode.ER_BARGAIN, "op:ability"],
+  [UiMode.ER_BARGAIN, "op:bargain"],
+  [UiMode.PARTY, "op:bargain"],
+  [UiMode.OPTION_SELECT, "op:bargain"],
+  [UiMode.ER_MAP, "op:biome"],
+  [UiMode.OPTION_SELECT, "op:biome"],
+  [UiMode.PARTY, "op:catchFull"],
+  [UiMode.COLOSSEUM, "op:colosseum"],
+  [UiMode.PARTY, "op:faintSwitch"],
+  [UiMode.SUMMARY, "op:learnMove"],
+  [UiMode.CONFIRM, "op:learnMove"],
+  [UiMode.LEARN_MOVE_BATCH, "op:learnMove"],
+  [UiMode.MYSTERY_ENCOUNTER, "op:me"],
+  [UiMode.ER_QUIZ, "op:me"],
+  [UiMode.PARTY, "op:me"],
+  [UiMode.OPTION_SELECT, "op:me"],
+  [UiMode.PARTY, "op:revival"],
+  [UiMode.MODIFIER_SELECT, "op:reward"],
+  [UiMode.BIOME_SHOP, "op:reward"],
+  [UiMode.CONFIRM, "op:reward"],
+  [UiMode.PARTY, "op:reward"],
+  [UiMode.OPTION_SELECT, "op:stormglass"],
+] as const satisfies readonly (readonly [UiMode, CoopOperationSurfaceClass])[];
 
 /**
  * The EXPECTED surface set, derived AT RUNTIME from the registries (never hardcoded): every mirrored
@@ -357,22 +393,20 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
         },
       ] as const,
   ),
-  ...Object.entries(COOP_OPERATION_UI_CONTRACTS).flatMap(([cls, contract]) =>
-    contract.uiModes.map(
-      mode =>
-        [
-          uiOperationKey(mode, cls),
-          {
-            reason:
-              `the soak does not yet prove the complete ${UiMode[mode]} owner-input -> ${cls} authority `
-              + "commit -> watcher-apply chain; a synchronous local carrier hit cannot prove the later "
-              + "cross-client commit/adoption for guest-owned input",
-            followupTask:
-              `add a continuous two-client ${UiMode[mode]} journey that carries one causal intent id through `
-              + `${cls} commit, apply, visual acknowledgement, and state convergence`,
-          },
-        ] as const,
-    ),
+  ...REVIEWED_UNDRIVABLE_UI_OPERATIONS.map(
+    ([mode, cls]) =>
+      [
+        uiOperationKey(mode, cls),
+        {
+          reason:
+            `the soak does not yet prove the complete ${UiMode[mode]} owner-input -> ${cls} authority `
+            + "commit -> watcher-apply chain; a synchronous local carrier hit cannot prove the later "
+            + "cross-client commit/adoption for guest-owned input",
+          followupTask:
+            `add a continuous two-client ${UiMode[mode]} journey that carries one causal intent id through `
+            + `${cls} commit, apply, visual acknowledgement, and state convergence`,
+        },
+      ] as const,
   ),
   [
     modeKey(UiMode.BALL),
@@ -1057,7 +1091,7 @@ export function logSoakCoverage(hits: SoakHitSet, profile: SoakProfileName = "go
   log(`[coop-soak-coverage] UNDRIVABLE (${KNOWN_UNDRIVABLE.size} deliberate omissions, each with a follow-up task):`);
   for (const key of sorted(KNOWN_UNDRIVABLE.keys())) {
     const entry = KNOWN_UNDRIVABLE.get(key)!;
-    const observed = hit.has(key) ? " [OBSERVED this run despite being undrivable - consider promoting]" : "";
+    const observed = hit.has(key) ? " [OBSERVED => ENFORCEMENT RED until this edge is promoted]" : "";
     log(`[coop-soak-coverage]   SKIP ${key} - ${entry.reason} => FOLLOW-UP: ${entry.followupTask}${observed}`);
   }
 
@@ -1124,6 +1158,37 @@ export interface SoakCompletenessOptions {
   ledgerPath?: string;
 }
 
+/** Enforce deterministic UI-operation registry contradictions independently of soak depth. */
+function assertObservedUiOperationContracts(
+  hits: SoakHitSet,
+  expected: ReadonlySet<string>,
+  opts: SoakCompletenessOptions,
+): void {
+  const observedKeys = sorted(hits.uiOperations).map(pair => `uiOperation:${pair}`);
+  const undeclared = observedKeys.filter(key => !expected.has(key));
+  const stillUndrivable = observedKeys.filter(key => KNOWN_UNDRIVABLE.has(key));
+  const reds: string[] = [];
+  if (undeclared.length > 0) {
+    reds.push(
+      `UNDECLARED UI-OPERATION EDGE: production observed ${undeclared.length} edge(s) absent from `
+        + `COOP_OPERATION_UI_CONTRACTS; review and declare or remove the call chain: [${undeclared.join(", ")}]`,
+    );
+  }
+  if (stillUndrivable.length > 0) {
+    reds.push(
+      `OBSERVED UI-OPERATION STILL UNDRIVABLE: the run drove ${stillUndrivable.length} edge(s) that remain `
+        + "exempt; delete each exemption and classify it as GUARANTEED/PROBABILISTIC with a continuous "
+        + `watcher-apply assertion: [${stillUndrivable.join(", ")}]`,
+    );
+  }
+  if (reds.length > 0) {
+    throw new Error(
+      `[coop-soak-coverage] UI-OPERATION CONTRACT FAILED (seed ${opts.seed}, ${opts.wavesCompleted} waves):\n`
+        + reds.map(red => `  - ${red}`).join("\n"),
+    );
+  }
+}
+
 /**
  * THE BACKSTOP. Enforces (when the run is deep enough) that:
  *   1. The three classification buckets (UNDRIVABLE / GUARANTEED / PROBABILISTIC) EXACTLY partition the
@@ -1134,11 +1199,12 @@ export interface SoakCompletenessOptions {
  *   3. Every PROBABILISTIC surface is covered by the cross-run UNION ledger (a hard RED once the ledger is
  *      mature, a loud WARN before that).
  *
- * GATING: the full enforcement runs only when wavesCompleted >= the PROFILE's gate (god: 60; level: 30).
- * Below that it is REPORT-ONLY (logSoakCoverage handles the human-readable report; this asserts nothing).
- * A run that ends via a runEnded terminal at >= the gate STILL enforces (the guaranteed cadence surfaces
- * were all hit by that depth). Throws an Error on a RED (the vitest test fails with the exact cold surfaces
- * + seed).
+ * GATING: the full depth-dependent enforcement runs only when wavesCompleted >= the PROFILE's gate (god:
+ * 60; level: 30). Below that it is REPORT-ONLY for cold expected surfaces. Observed registry contradictions
+ * are ALWAYS enforced: an observed UI -> operation edge absent from the declared contract is a RED, as is
+ * an observed edge still classified as undrivable. A run that ends via a runEnded terminal at >= the gate
+ * STILL enforces (the guaranteed cadence surfaces were all hit by that depth). Throws an Error on a RED (the
+ * vitest test fails with the exact surfaces + seed).
  *
  * 🔴 #832 LEVEL-PROFILE FAINT CHANNEL: under "level" the faint surfaces are the profile's whole reason to
  * exist, so they are enforced at ANY depth (BEFORE the gate check) - a level run that ends without them is
@@ -1152,6 +1218,12 @@ export function assertSoakCompleteness(hits: SoakHitSet, opts: SoakCompletenessO
   const ledgerPath = opts.ledgerPath ?? coverageLedgerPath(profile);
   const hit = hitSurfaces(hits);
   const expected = expectedSurfaces();
+
+  // Registry contradictions are deterministic evidence, not depth-dependent coverage. Enforce them in
+  // EVERY run (including the shallow PR survey): an unexpected edge means production reached a call chain
+  // the reviewed contract does not describe, while an observed-undrivable edge means the exemption is stale
+  // and must be promoted to a real journey assertion rather than remaining a permanent skip.
+  assertObservedUiOperationContracts(hits, expected, opts);
 
   // 🔴 #832 LEVEL FAINT CHANNEL (always-on, gate-independent): the level party is BUILT to faint reliably,
   // so the faint/switch/replace machinery (#845-#848 - the richest desync surface) MUST have been exercised.

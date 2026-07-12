@@ -26,6 +26,13 @@ import {
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import {
+  beginCoopUiRelayInput,
+  endCoopUiRelayInput,
+  getCoopUiRelayEdges,
+  recordCoopUiRelayCarrier,
+} from "#data/elite-redux/coop/coop-ui-relay-trace";
+import { UiMode } from "#enums/ui-mode";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -75,6 +82,17 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     // The dev extras on TOP of the shared factory, never instead of it.
     expect(runtime.spoof, "dev path attaches the spoof partner").toBeDefined();
     expect(runtime.partnerTransport, "dev path exposes the partner transport").toBeDefined();
+  });
+
+  it("clearCoopRuntime scopes UI-relay diagnostics to one session even when no runtime is active", () => {
+    clearCoopRuntime();
+    const inputId = beginCoopUiRelayInput(UiMode.MODIFIER_SELECT);
+    recordCoopUiRelayCarrier("operation", "prior session reward", "op:reward");
+    endCoopUiRelayInput(inputId);
+    expect(getCoopUiRelayEdges()).toHaveLength(1);
+
+    clearCoopRuntime();
+    expect(getCoopUiRelayEdges()).toEqual([]);
   });
 
   it("every CoopMessage wire type has at least one RECEIVER in src (no sender-only channels)", () => {

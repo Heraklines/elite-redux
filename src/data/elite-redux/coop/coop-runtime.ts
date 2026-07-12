@@ -222,6 +222,7 @@ import {
 } from "#data/elite-redux/coop/coop-transport";
 import { setCoopLiveEmitter } from "#data/elite-redux/coop/coop-turn-recorder";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
+import { resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import {
   commitWaveAdvanceOwnerIntent,
   isCoopWaveAdvanceOperationEnabled,
@@ -3437,6 +3438,9 @@ export function installCoopRuntimeLiveEmitter(runtime: CoopRuntime): void {
 
 /** Tear down and forget the live co-op session (closing its transport). */
 export function clearCoopRuntime(): void {
+  // UI -> relay -> operation diagnostics are SESSION evidence. Reset even when there is no active runtime:
+  // every production start/connect path clears first, so a fresh pairing must never inherit prior-run edges.
+  resetCoopUiRelayTrace();
   if (active == null) {
     return;
   }
