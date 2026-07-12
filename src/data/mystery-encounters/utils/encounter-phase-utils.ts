@@ -379,7 +379,22 @@ export async function initBattleWithEnemyConfig(partyConfig: EnemyPartyConfig): 
     globalScene.currentBattle.trainer = newTrainer;
     loadEnemyAssets.push(newTrainer.loadAssets().then(() => newTrainer.initSprite()));
 
-    battle.enemyLevels = globalScene.currentBattle.trainer.getPartyLevels(globalScene.currentBattle.waveIndex);
+    const generatedLevels = globalScene.currentBattle.trainer.getPartyLevels(globalScene.currentBattle.waveIndex);
+    const configuredParty = partyConfig.pokemonConfigs;
+    if (configuredParty && configuredParty.length > 0) {
+      // An explicit ME party is an authoritative structural statement, not a prefix for the
+      // generic trainer template. Iterating the template's party length used to append unrelated
+      // generated mons (and truncate configs longer than that template), so Still Waters could
+      // mirror a two-mon party as three enemies. Preserve the one scripted exception required by
+      // co-op doubles: a single config gets one generated partner for the second field slot.
+      const partySize = Math.max(configuredParty.length, doubleTrainer ? 2 : 1);
+      battle.enemyLevels = Array.from(
+        { length: partySize },
+        (_, index) => configuredParty[index]?.level ?? generatedLevels[index] ?? battle.getLevelForWave(),
+      );
+    } else {
+      battle.enemyLevels = generatedLevels;
+    }
   } else {
     // Wild
     globalScene.currentBattle.mysteryEncounter!.encounterMode = MysteryEncounterMode.WILD_BATTLE;
