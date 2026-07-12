@@ -662,7 +662,9 @@ export function mirrorHostBattleToGuest(
   // Pokemon.getMaxHp() can consult the active scene's modifier substrate. Capture every HOST scalar while
   // the host is still the active global scene; calling hostEnemy.getMaxHp() later under the guest context
   // made the production-fidelity mirror manufacture small max-HP drift from guest modifiers.
-  const hostEnemyScalars = hostScene.getEnemyParty().map(enemy => ({ maxHp: enemy.getMaxHp(), hp: enemy.hp }));
+  const hostEnemyScalars = hostScene
+    .getEnemyParty()
+    .map(enemy => ({ stats: [...enemy.stats], maxHp: enemy.getMaxHp(), hp: enemy.hp }));
   const hostPlayerScalars = hostScene.getPlayerParty().map(player => ({ maxHp: player.getMaxHp(), hp: player.hp }));
   initGlobalScene(previousScene);
   // 0. Adopt the host's SEED + run-config-derived scene state (#658 seed-pin). See adoptCoopHostRunConfig:
@@ -806,6 +808,9 @@ export function mirrorHostBattleToGuest(
     const hostScalar = (flip ? hostPlayerScalars : hostEnemyScalars)[hostEnemyIndex];
     const authoritativeMaxHp = hostScalar?.maxHp ?? enemy.getMaxHp();
     const authoritativeHp = hostScalar?.hp ?? hostEnemy.hp;
+    if (hostScalar?.stats.length === 6) {
+      enemy.stats = [...hostScalar.stats];
+    }
     enemy.setStat(Stat.HP, authoritativeMaxHp);
     enemy.hp = Math.max(0, Math.min(authoritativeHp, authoritativeMaxHp));
     enemyParty.push(enemy);
@@ -833,6 +838,9 @@ export function mirrorHostBattleToGuest(
       if (hostEnemy != null) {
         const hostScalar = hostEnemyScalars[index];
         const maxHp = hostScalar?.maxHp ?? enemy.getMaxHp();
+        if (hostScalar?.stats.length === 6) {
+          enemy.stats = [...hostScalar.stats];
+        }
         enemy.setStat(Stat.HP, maxHp);
         enemy.hp = Math.max(0, Math.min(hostScalar?.hp ?? hostEnemy.hp, maxHp));
       }

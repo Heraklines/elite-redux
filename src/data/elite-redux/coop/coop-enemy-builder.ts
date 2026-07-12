@@ -107,8 +107,15 @@ export function buildCoopEnemy(
       enemy.summonData.moveset = moves.slice();
     }
   }
-  // Form / nature / IVs changed -> recompute stats + name, then align current hp.
+  // Form / nature / IVs changed -> recompute as a backwards-compatible fallback. Modern manifests carry
+  // the host's finished six-stat array because ER generation hooks can make local reconstruction differ.
   enemy.calculateStats();
+  if (Array.isArray(data.stats)) {
+    const stats = (data.stats as unknown[]).filter((n): n is number => typeof n === "number").slice(0, 6);
+    if (stats.length === 6 && stats.every(stat => Number.isFinite(stat) && stat > 0)) {
+      enemy.stats = stats.map(stat => Math.trunc(stat));
+    }
+  }
   enemy.generateName();
   // Boss adopt (#633, A/BLOCKING-2): boss state lives ONLY on EnemyPokemon and `addEnemyPokemon`
   // reconstructs with boss hardcoded `false`, so an adopted boss renders normal bars. Re-assert the

@@ -1398,6 +1398,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(bossBlob.bossSegments, "the serialized boss carries the explicit host segment COUNT").toBe(4);
     expect(bossBlob.bossSegmentIndex, "the serialized boss carries the host's decremented INDEX").toBe(1);
     expect(bossBlob.maxHp, "the serialized boss carries the host's maxHp ceiling").toBe(hostBossMaxHp);
+    expect(bossBlob.stats, "the serialized boss carries every completed authoritative stat").toEqual(hostBoss.stats);
     // The non-boss enemy serializes isBoss=false and a NON-POSITIVE bossSegments (0 or, for a
     // never-promoted mon in this harness, undefined) - either way the guest's self-gating reconstruct
     // (bossSegments !== undefined && > 0) skips setBoss, so a normal enemy is never spuriously promoted.
@@ -1444,6 +1445,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // ceiling as a rebuild, otherwise equal species can still render different bars/checksums.
     const sameSpecies = globalScene.getEnemyParty()[0];
     const correctedMaxHp = sameSpecies.getMaxHp() + 11;
+    const correctedStats = sameSpecies.stats.map((stat, index) => stat + index + 11);
     coopEngine.applyCoopEnemies([
       {
         fieldIndex: 0,
@@ -1451,11 +1453,13 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
           speciesId: sameSpecies.species.speciesId,
           hp: correctedMaxHp,
           maxHp: correctedMaxHp,
+          stats: correctedStats,
         },
       },
     ]);
     expect(sameSpecies.getMaxHp(), "same-species correction forces the host maxHp ceiling").toBe(correctedMaxHp);
     expect(sameSpecies.hp, "same-species current hp clamps against the authoritative ceiling").toBe(correctedMaxHp);
+    expect(sameSpecies.stats, "same-species correction adopts all six authoritative stats").toEqual(correctedStats);
     const rebuiltSegments = rebuiltNonBoss!.bossSegments;
     const rebuiltSegmentsIsPositive = typeof rebuiltSegments === "number" && rebuiltSegments > 0;
     expect(

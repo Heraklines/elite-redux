@@ -1162,6 +1162,10 @@ export function captureCoopEnemies(): CoopSerializedEnemy[] {
           gender: enemy.gender,
           ivs: [...enemy.ivs],
           moveset: enemy.getMoveset().map(m => m.moveId),
+          // All six calculated stats are authority state. Species/level/IV/nature equality is not enough:
+          // ER generation hooks and run modifiers can alter the constructor's final stat array differently
+          // on two clients. Carry the finished values so the renderer never derives battle geometry locally.
+          stats: [...enemy.stats],
           hp: enemy.hp,
           // Boss adopt (#633, A/BLOCKING-2): boss state lives ONLY on EnemyPokemon and is hardcoded
           // `false` on the guest's `addEnemyPokemon` reconstruct, so an adopted boss renders normal
@@ -1445,8 +1449,15 @@ export function applyCoopEnemies(enemies: CoopSerializedEnemy[]): void {
             enemy.moveset = moveIds.map(id => new PokemonMove(id));
           }
         }
-        // IVs / nature changed -> recompute stats, then align current hp.
+        // IVs / nature changed -> recompute as a backwards-compatible fallback, then overwrite with the
+        // authority's completed stat array when protocol data supplies it.
         enemy.calculateStats();
+        if (Array.isArray(d.stats)) {
+          const stats = (d.stats as unknown[]).filter((n): n is number => typeof n === "number").slice(0, 6);
+          if (stats.length === 6 && stats.every(stat => Number.isFinite(stat) && stat > 0)) {
+            enemy.stats = stats.map(stat => Math.trunc(stat));
+          }
+        }
         // Boss adopt mirror (#633, A/MINOR-2): the mid-wave by-index overwrite must ALSO re-assert
         // boss state, with the EXPLICIT host count (never the diverged-RNG `getEncounterBossSegments`
         // fallback) + the host's index. This path runs at the wave's first-turn boundary with the bar
