@@ -47,7 +47,7 @@ describe.skipIf(!RUN)("co-op classic finale stage-one normalization", () => {
     unrelatedBoss.setBoss(true, 2);
     unrelatedBoss.hp = unrelatedBoss.getMaxHp();
 
-    unrelatedBoss.damage(unrelatedBoss.hp, false, true, true);
+    unrelatedBoss.damage(unrelatedBoss.hp, true, true, true);
 
     expect(unrelatedBoss.hp, "only Eternatus/Cascoon stage one may be held at 1 HP").toBe(0);
   });

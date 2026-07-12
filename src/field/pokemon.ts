@@ -4940,7 +4940,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
      * stat the formula reads here (e.g. Speed in place of Def/SpDef when confused
      * or enraged); the attr is gated, so this is a no-op for every other ability.
      */
-    const defensiveStatHolder = new NumberHolder(isPhysical ? Stat.DEF : Stat.SPDEF);
+    const defensiveStatHolder = new NumberHolder<EffectiveStat>(isPhysical ? Stat.DEF : Stat.SPDEF);
     if (!ignoreAbility) {
       applyAbAttrs("DefensiveStatSubstituteAbAttr", {
         pokemon: this,
@@ -6825,11 +6825,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
 
-    /**
-     * If this Pokemon falls asleep or freezes in the middle of a multi-hit attack,
-     * cancel the attack's subsequent hits.
-     */
-    if (effect === StatusEffect.SLEEP || effect === StatusEffect.FREEZE) {
+    /** If this Pokemon falls asleep in the middle of a multi-hit attack, cancel its subsequent hits. */
+    // FREEZE returns above after being translated to Frostbite, so it cannot reach this branch.
+    if (effect === StatusEffect.SLEEP) {
       const currentPhase = globalScene.phaseManager.getCurrentPhase();
       if (currentPhase.is("MoveEffectPhase") && currentPhase.getUserPokemon() === this) {
         this.turnData.hitCount = 1;
