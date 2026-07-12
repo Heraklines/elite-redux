@@ -54,7 +54,7 @@ import {
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -142,6 +142,18 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
       await game.phaseInterceptor.to("SelectModifierPhase", false);
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as CounterPhaseSeam;
+    // Capture the exact public UI arguments emitted by the production phase. GameWrapper's lightweight
+    // tween mock calls `addCounter.onComplete` but never `onUpdate`, so the intro cannot naturally arm
+    // ModifierSelectUiHandler in this headless scene; re-showing an already-active handler below is the
+    // framework-faithful way to bypass only that mock limitation while retaining UI -> phase -> relay.
+    let ownerModifierArgs: unknown[] | null = null;
+    const originalSetMode = rig.hostScene.ui.setMode.bind(rig.hostScene.ui);
+    vi.spyOn(rig.hostScene.ui, "setMode").mockImplementation((mode, ...args) => {
+      if (mode === UiMode.MODIFIER_SELECT) {
+        ownerModifierArgs = args;
+      }
+      return originalSetMode(mode, ...args);
+    });
     withClientSync(rig.hostCtx, () => {
       hostShop.start(); // pins coopInteractionStart to counterBefore + opens the owner screen
     });
@@ -189,6 +201,8 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
         await new Promise(resolve => setTimeout(resolve, 5));
       }
       expect(rig.hostScene.ui.getMode(), "the owner reached the real reward UI").toBe(UiMode.MODIFIER_SELECT);
+      expect(ownerModifierArgs, "the production phase supplied the modifier UI callback").not.toBeNull();
+      await rig.hostScene.ui.setMode(UiMode.MODIFIER_SELECT, ...(ownerModifierArgs ?? []));
       resetCoopUiRelayTrace();
       let accepted = false;
       for (let i = 0; i < 500 && !accepted; i++) {
