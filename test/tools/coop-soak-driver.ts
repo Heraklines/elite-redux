@@ -132,7 +132,7 @@ import {
   type SoakHitSet,
   type SoakProfileName,
 } from "#test/tools/coop-soak-coverage";
-import { runMysteryEncounterToEnd } from "#test/utils/encounter-test-utils";
+import { runMysteryEncounterToEnd, runSelectMysteryEncounterOption } from "#test/utils/encounter-test-utils";
 import type { PartyUiHandler } from "#ui/handlers/party-ui-handler";
 import fs from "node:fs";
 import path from "node:path";
@@ -504,6 +504,13 @@ export interface SoakOptions {
    * nested selector and mistaking a test-driver omission for an engine softlock.
    */
   meSubPicks?: ReadonlyMap<number, readonly number[]>;
+  /**
+   * Forced ME waves whose selected option intentionally spawns a battle. These waves exercise the complete
+   * authoritative ME terminal -> enemy-party adoption -> shared battle -> ME reward-tail continuation instead
+   * of the non-battle meResync/leave terminal. Keeping this explicit makes the campaign schedule deterministic:
+   * encounter option callbacks do not expose static "spawns battle" metadata before they execute.
+   */
+  meBattleWaves?: ReadonlySet<number>;
   /**
    * #843/#849 CATCH LEG (BUILD 1). A set of wave indices where the soak DRIVES a seeded ball throw ->
    * capture -> dexSync instead of an all-faint win. On each such wave the driver faints ONE wild enemy (the
@@ -1932,11 +1939,46 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
     const option = Math.max(1, Math.trunc(opts.meOptions?.get(wave) ?? 1));
+    const battleSpawning = opts.meBattleWaves?.has(wave) === true;
     // #849: the guest opens the real MYSTERY_ENCOUNTER screen (the mirrored mode); record it.
     hitMode(UiMode.MYSTERY_ENCOUNTER);
 
     let mePath: "host-owned" | "guest-owned" | "battle-handoff";
-    if (hostOwns) {
+    if (hostOwns && battleSpawning) {
+      // BATTLE-HANDOFF: the selected option terminates the ME pump with the dedicated 9M sentinel instead of
+      // a non-battle meResync/LEAVE. Park the host after it has generated + streamed the authoritative enemy
+      // manifest, let the guest's real replay terminal adopt that manifest and boot its own ME battle, then
+      // drive the same bounded multi-turn battle/reward machinery used by normal waves. This is the production
+      // path that used to be absent from the continuous campaign, allowing an ME->battle strand to hide behind
+      // focused handoff tests.
+      await withClient(rig.hostCtx, async () => {
+        await runSelectMysteryEncounterOption(game, option);
+        await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
+      });
+      const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+      await withClient(rig.guestCtx, async () => {
+        await drainGuestMeReplayToSettle(replay);
+        if (rig.guestScene.phaseManager.getCurrentPhase()?.phaseName !== "MysteryEncounterBattlePhase") {
+          fail(
+            "no-park",
+            wave,
+            `guest ME battle handoff did not boot MysteryEncounterBattlePhase (current=${rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"})`,
+          );
+        }
+      });
+      if (rig.hostScene.getEnemyParty().length !== rig.guestScene.getEnemyParty().length) {
+        fail(
+          "desync",
+          wave,
+          `ME battle enemy manifest count diverged at handoff (host=${rig.hostScene.getEnemyParty().length} guest=${rig.guestScene.getEnemyParty().length})`,
+        );
+      }
+      await crossCommandBoundaryWithReplayGuest(wave, rig.hostScene.currentBattle.turn);
+      await playWave(wave);
+      await assertPostTurnConverged(wave);
+      await driveRewardShop(wave);
+      mePath = "battle-handoff";
+    } else if (hostOwns) {
       // HOST-OWNED: park the host at its embedded shop, start the guest replay while the presentation is
       // buffered, then let BOTH real shop phases rendezvous before the owner commits LEAVE. The previous
       // owner-only shortcut called the shop's private terminal while its async shop-pick barrier was still

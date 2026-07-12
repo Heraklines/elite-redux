@@ -45,6 +45,7 @@ const EVENT_OPTIONS = new Map([
 
 /** Field Trip option 1: choose party slot 0, then that Pokemon's move slot 0. */
 const EVENT_SUB_PICKS = new Map<number, readonly number[]>([[19, [0, 0]]]);
+const EVENT_BATTLE_WAVES = new Set([32]);
 
 describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome transitions", () => {
   let phaserGame: Phaser.Game;
@@ -94,6 +95,7 @@ describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome 
       meWaves: EVENT_SCHEDULE,
       meOptions: EVENT_OPTIONS,
       meSubPicks: EVENT_SUB_PICKS,
+      meBattleWaves: EVENT_BATTLE_WAVES,
     });
 
     expect(result.wavesCompleted, "the campaign continued after the final forced event").toBe(LAST_WAVE);
@@ -105,7 +107,7 @@ describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome 
     expect(
       new Set(result.mysteryEncounters.map(event => event.path)),
       "both alternating owners were exercised",
-    ).toEqual(new Set(["host-owned", "guest-owned"]));
+    ).toEqual(new Set(["host-owned", "guest-owned", "battle-handoff"]));
     expect(result.biomeTransitions, "the same continuous run crossed multiple biome boundaries").toBeGreaterThanOrEqual(
       2,
     );
