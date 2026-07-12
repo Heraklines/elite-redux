@@ -659,6 +659,11 @@ export function mirrorHostBattleToGuest(
   const previousScene = globalScene;
   initGlobalScene(hostScene);
   const waveBoundaryState = captureCoopAuthoritativeBattleState(hostScene.currentBattle?.turn ?? 0);
+  // Pokemon.getMaxHp() can consult the active scene's modifier substrate. Capture every HOST scalar while
+  // the host is still the active global scene; calling hostEnemy.getMaxHp() later under the guest context
+  // made the production-fidelity mirror manufacture small max-HP drift from guest modifiers.
+  const hostEnemyScalars = hostScene.getEnemyParty().map(enemy => ({ maxHp: enemy.getMaxHp(), hp: enemy.hp }));
+  const hostPlayerScalars = hostScene.getPlayerParty().map(player => ({ maxHp: player.getMaxHp(), hp: player.hp }));
   initGlobalScene(previousScene);
   // 0. Adopt the host's SEED + run-config-derived scene state (#658 seed-pin). See adoptCoopHostRunConfig:
   //    this is the launch-handshake step the plain mirror skipped, and WHY a benign per-wave checksum
@@ -759,7 +764,7 @@ export function mirrorHostBattleToGuest(
   const enemyParty: EnemyPokemon[] = [];
   // Versus flip: the guest's local ENEMY party is the host's PLAYER party (the opponent). Co-op: the
   // host's own enemy party.
-  for (const hostEnemy of flip ? hostScene.getPlayerParty() : hostScene.getEnemyParty()) {
+  for (const [hostEnemyIndex, hostEnemy] of (flip ? hostScene.getPlayerParty() : hostScene.getEnemyParty()).entries()) {
     const data = new PokemonData(hostEnemy);
     const enemy = new EnemyPokemon(
       getPokemonSpecies(hostEnemy.species.speciesId),
@@ -798,8 +803,11 @@ export function mirrorHostBattleToGuest(
     // A PokemonData constructor can recalculate a different HP ceiling under the guest's module context.
     // The production wave carrier applies the serialized host ceiling in applyCoopEnemies; this direct
     // two-engine mirror must model that same boundary rather than injecting harness-only pre-turn drift.
-    enemy.setStat(Stat.HP, hostEnemy.getMaxHp());
-    enemy.hp = Math.max(0, Math.min(hostEnemy.hp, hostEnemy.getMaxHp()));
+    const hostScalar = (flip ? hostPlayerScalars : hostEnemyScalars)[hostEnemyIndex];
+    const authoritativeMaxHp = hostScalar?.maxHp ?? enemy.getMaxHp();
+    const authoritativeHp = hostScalar?.hp ?? hostEnemy.hp;
+    enemy.setStat(Stat.HP, authoritativeMaxHp);
+    enemy.hp = Math.max(0, Math.min(authoritativeHp, authoritativeMaxHp));
     enemyParty.push(enemy);
   }
   guestScene.currentBattle.enemyParty = enemyParty;
@@ -823,10 +831,10 @@ export function mirrorHostBattleToGuest(
     for (const [index, enemy] of guestScene.getEnemyParty().entries()) {
       const hostEnemy = hostEnemies[index];
       if (hostEnemy != null) {
-        const maxHp = hostEnemy.getMaxHp();
-        hostEnemy.hp = Math.max(0, Math.min(hostEnemy.hp, maxHp));
+        const hostScalar = hostEnemyScalars[index];
+        const maxHp = hostScalar?.maxHp ?? enemy.getMaxHp();
         enemy.setStat(Stat.HP, maxHp);
-        enemy.hp = hostEnemy.hp;
+        enemy.hp = Math.max(0, Math.min(hostScalar?.hp ?? hostEnemy.hp, maxHp));
       }
     }
   }

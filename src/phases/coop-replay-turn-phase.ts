@@ -181,6 +181,20 @@ export class CoopReplayTurnPhase extends Phase {
           // until we send that command.
           const envelope = streamer.consumeCheckpoint();
           if (envelope != null) {
+            const currentWave = globalScene.currentBattle?.waveIndex ?? 0;
+            const checkpointWave = envelope.authoritativeState?.wave;
+            if (checkpointWave != null && checkpointWave !== currentWave) {
+              // A replacement carrier can arrive after its turn already advanced through a win tail.
+              // It is then obsolete, not an interaction for the next battle. The old unkeyed inbox let
+              // that wave-N frame divert wave N+1's replay and skip its real resolution (PP/enemies stayed
+              // pre-turn until a later heal). Drop it before ANY checkpoint/command-control side effect.
+              coopWarn(
+                "checkpoint",
+                `guest discard OUT-OF-BAND checkpoint reason=${envelope.reason} wave=${checkpointWave} `
+                  + `while replaying wave=${currentWave} turn=${this.turn}`,
+              );
+              continue;
+            }
             coopLog(
               "checkpoint",
               `guest apply OUT-OF-BAND checkpoint mid-park reason=${envelope.reason} turn=${this.turn}`,
