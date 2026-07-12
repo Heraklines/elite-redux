@@ -43,7 +43,10 @@ import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 
 /** A fully-resolved turn the guest renders: ordered events + the authoritative state. */
 export interface CoopTurnResolution {
+  epoch: number;
+  wave: number;
   turn: number;
+  revision: number;
   events: CoopBattleEvent[];
   checkpoint: CoopBattleCheckpoint;
   /** The host's full-state checksum at this boundary (#633, TRACK-2). */
@@ -63,6 +66,10 @@ export interface CoopTurnResolution {
 /** An out-of-turn authoritative checkpoint + the host's matching full-state checksum. */
 export interface CoopCheckpointEnvelope {
   reason: string;
+  epoch: number;
+  wave: number;
+  turn: number;
+  revision: number;
   checkpoint: CoopBattleCheckpoint;
   /** The host's full-state checksum at this boundary (#633, TRACK-2). */
   checksum: string;
@@ -78,17 +85,266 @@ export interface CoopBattleStreamerOptions {
   timeoutMs?: number;
   /** Timer injection (tests). Returns a cancel fn. Defaults to setTimeout/clearTimeout. */
   schedule?: (cb: () => void, ms: number) => () => void;
+  /** Clock paired with the injected scheduler so absolute retry deadlines stay deterministic in tests. */
+  now?: () => number;
+  /** Production address source used to reject cross-session/wave traffic before buffering it. */
+  authorityContext?: () => { epoch: number; wave: number; turn: number };
+}
+
+export type CoopAuthorityFailure = Extract<CoopMessage, { t: "authorityFailure" }>;
+
+const AUTHORITY_RETRY_MS = 2_000;
+const AUTHORITY_FATAL_RETRY_MS = 500;
+const AUTHORITY_FATAL_DEADLINE_MS = 3_000;
+const AUTHORITY_ACK_RETENTION = 32;
+
+function rememberBounded<K, V>(map: Map<K, V>, key: K, value: V): void {
+  map.set(key, value);
+  while (map.size > AUTHORITY_ACK_RETENTION) {
+    const oldest = map.keys().next().value as K | undefined;
+    if (oldest === undefined) {
+      break;
+    }
+    map.delete(oldest);
+  }
+}
+
+function isSafeAddressPart(value: unknown, allowZero = true): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && (allowZero ? value >= 0 : value > 0);
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isValidBattlerIndex(value: unknown): value is number {
+  // Protocol 32 supports the current single/double/triple topology and leaves room for six seats per side.
+  // A future topology protocol replaces this conservative ceiling with the negotiated manifest.
+  return isSafeAddressPart(value) && value <= 11;
+}
+
+function isNumberArray(value: unknown, length?: number): value is number[] {
+  return Array.isArray(value) && (length === undefined || value.length === length) && value.every(isFiniteNumber);
+}
+
+function isStrictChecksum(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{16}$/i.test(value) && value !== COOP_CHECKSUM_SENTINEL;
+}
+
+function isStrictFullField(value: unknown): value is CoopFullMonSnapshot[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    return false;
+  }
+  const seen = new Set<number>();
+  for (const raw of value) {
+    if (raw == null || typeof raw !== "object") {
+      return false;
+    }
+    const bi = (raw as { bi?: unknown }).bi;
+    const mon = raw as Record<string, unknown>;
+    if (
+      !isValidBattlerIndex(bi)
+      || seen.has(bi)
+      || !isSafeAddressPart(mon.partyIndex)
+      || !isSafeAddressPart(mon.speciesId, false)
+      || !isFiniteNumber(mon.hp)
+      || (mon.hp as number) < 0
+      || !isFiniteNumber(mon.maxHp)
+      || (mon.maxHp as number) <= 0
+      || !isSafeAddressPart(mon.status)
+      || !isNumberArray(mon.statStages, 7)
+      || typeof mon.fainted !== "boolean"
+      || !isSafeAddressPart(mon.abilityId)
+      || !isSafeAddressPart(mon.formIndex)
+      || !Array.isArray(mon.moves)
+      || !mon.moves.every(
+        move =>
+          Array.isArray(move) && move.length === 2 && isSafeAddressPart(move[0], false) && isSafeAddressPart(move[1]),
+      )
+      || !Array.isArray(mon.tags) // BattlerTagType is a string enum at runtime.  The historical wire type calls these
+      || // `number[]` through an unsafe cast, so accepting numbers as well keeps old captures
+      // readable while allowing the production values (for example "SEEDED"/"ENCORE").
+      !mon.tags.every(tag => (typeof tag === "string" && tag.length > 0) || isSafeAddressPart(tag))
+    ) {
+      return false;
+    }
+    seen.add(bi);
+  }
+  return true;
+}
+
+function isStrictCheckpoint(value: unknown): value is CoopBattleCheckpoint {
+  if (value == null || typeof value !== "object") {
+    return false;
+  }
+  const checkpoint = value as CoopBattleCheckpoint;
+  if (
+    !isSafeAddressPart(checkpoint.tick, false)
+    || !Array.isArray(checkpoint.field)
+    || checkpoint.field.length === 0
+    || typeof checkpoint.weather !== "number"
+    || typeof checkpoint.weatherTurnsLeft !== "number"
+    || typeof checkpoint.terrain !== "number"
+    || typeof checkpoint.terrainTurnsLeft !== "number"
+  ) {
+    return false;
+  }
+  const seen = new Set<number>();
+  return checkpoint.field.every(raw => {
+    if (raw == null || typeof raw !== "object") {
+      return false;
+    }
+    const mon = raw as unknown as Record<string, unknown>;
+    const valid =
+      isValidBattlerIndex(mon.bi)
+      && !seen.has(mon.bi as number)
+      && isSafeAddressPart(mon.partyIndex)
+      && isSafeAddressPart(mon.speciesId, false)
+      && isFiniteNumber(mon.hp)
+      && (mon.hp as number) >= 0
+      && isFiniteNumber(mon.maxHp)
+      && (mon.maxHp as number) > 0
+      && isSafeAddressPart(mon.status)
+      && isNumberArray(mon.statStages, 7)
+      && typeof mon.fainted === "boolean";
+    if (valid) {
+      seen.add(mon.bi as number);
+    }
+    return valid;
+  });
+}
+
+function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
+  if (value == null || typeof value !== "object") {
+    return false;
+  }
+  const event = value as Record<string, unknown>;
+  switch (event.k) {
+    case "message":
+      return typeof event.text === "string";
+    case "moveUsed":
+      return (
+        isValidBattlerIndex(event.bi)
+        && isSafeAddressPart(event.moveId, false)
+        && Array.isArray(event.targets)
+        && event.targets.every(isValidBattlerIndex)
+      );
+    case "hp":
+      return (
+        isValidBattlerIndex(event.bi)
+        && isFiniteNumber(event.hp)
+        && event.hp >= 0
+        && isFiniteNumber(event.maxHp)
+        && event.maxHp > 0
+        && (event.sp === undefined || isFiniteNumber(event.sp))
+      );
+    case "faint":
+      return (
+        isValidBattlerIndex(event.bi)
+        && (event.narrate === undefined || typeof event.narrate === "boolean")
+        && (event.sp === undefined || isFiniteNumber(event.sp))
+      );
+    case "statStage":
+      return isValidBattlerIndex(event.bi) && isSafeAddressPart(event.stat) && isFiniteNumber(event.value);
+    case "status":
+      return isValidBattlerIndex(event.bi) && isSafeAddressPart(event.status);
+    case "weather":
+      return isSafeAddressPart(event.weather) && isSafeAddressPart(event.turnsLeft);
+    case "terrain":
+      return isSafeAddressPart(event.terrain) && isSafeAddressPart(event.turnsLeft);
+    case "switch":
+      return isValidBattlerIndex(event.bi) && isSafeAddressPart(event.partySlot);
+    default:
+      return false;
+  }
+}
+
+function isStrictAuthoritativeState(value: unknown): value is CoopAuthoritativeBattleStateV1 {
+  if (value == null || typeof value !== "object") {
+    return false;
+  }
+  const state = value as CoopAuthoritativeBattleStateV1;
+  const partiesValid = [state.playerParty, state.enemyParty].every(
+    party =>
+      Array.isArray(party)
+      && party.length > 0
+      && party.every(mon => mon != null && typeof mon === "object" && isSafeAddressPart(mon.id)),
+  );
+  const seenSeats = new Set<number>();
+  const fieldValid =
+    Array.isArray(state.field)
+    && state.field.length > 0
+    && state.field.every(seat => {
+      const valid =
+        (seat.side === "player" || seat.side === "enemy")
+        && isValidBattlerIndex(seat.bi)
+        && !seenSeats.has(seat.bi)
+        && isSafeAddressPart(seat.partyIndex)
+        && isSafeAddressPart(seat.pokemonId)
+        && typeof seat.presented === "boolean";
+      if (valid) {
+        seenSeats.add(seat.bi);
+      }
+      return valid;
+    });
+  return (
+    state.version === 1
+    && isSafeAddressPart(state.tick, false)
+    && isSafeAddressPart(state.wave, false)
+    && isSafeAddressPart(state.turn, false)
+    && partiesValid
+    && fieldValid
+    && isSafeAddressPart(state.weather)
+    && isSafeAddressPart(state.weatherTurnsLeft)
+    && isSafeAddressPart(state.terrain)
+    && isSafeAddressPart(state.terrainTurnsLeft)
+    && Array.isArray(state.arenaTags)
+    && state.arenaTags.every(tag => tag != null && typeof tag === "object")
+    && isFiniteNumber(state.money)
+    && Array.isArray(state.pokeballCounts)
+    && state.pokeballCounts.every(
+      entry => Array.isArray(entry) && entry.length === 2 && isSafeAddressPart(entry[0]) && isSafeAddressPart(entry[1]),
+    )
+    && Array.isArray(state.playerModifiers)
+    && state.playerModifiers.every(modifier => modifier != null && typeof modifier === "object")
+    && Array.isArray(state.enemyModifiers)
+    && state.enemyModifiers.every(modifier => modifier != null && typeof modifier === "object")
+  );
 }
 
 function hasCompleteAuthorityCompanions(
-  msg: Pick<CoopCheckpointEnvelope, "checksum" | "fullField" | "authoritativeState">,
+  msg: Pick<
+    CoopCheckpointEnvelope,
+    "epoch" | "wave" | "turn" | "revision" | "checkpoint" | "checksum" | "fullField" | "authoritativeState"
+  >,
 ): boolean {
+  const state = msg.authoritativeState;
+  if (
+    !isSafeAddressPart(msg.epoch, false)
+    || !isSafeAddressPart(msg.wave, false)
+    || !isSafeAddressPart(msg.turn, false)
+    || !isSafeAddressPart(msg.revision, false)
+    || !isStrictChecksum(msg.checksum)
+    || !isStrictCheckpoint(msg.checkpoint)
+    || !isStrictFullField(msg.fullField)
+    || !isStrictAuthoritativeState(state)
+    || state.tick !== msg.revision
+    || state.tick <= (msg.checkpoint.tick as number)
+    || state.wave !== msg.wave
+    || state.turn !== msg.turn
+    || !Array.isArray(state.playerParty)
+    || !Array.isArray(state.enemyParty)
+    || !Array.isArray(state.field)
+  ) {
+    return false;
+  }
+  const checkpointBis = new Set(msg.checkpoint.field.map(mon => mon.bi));
+  const fullFieldBis = new Set(msg.fullField.map(mon => mon.bi));
+  const stateBis = new Set(state.field.map(seat => seat.bi));
   return (
-    msg.checksum !== COOP_CHECKSUM_SENTINEL
-    && Array.isArray(msg.fullField)
-    && msg.fullField.length > 0
-    && msg.authoritativeState != null
-    && typeof msg.authoritativeState === "object"
+    checkpointBis.size === fullFieldBis.size
+    && checkpointBis.size === stateBis.size
+    && [...checkpointBis].every(bi => fullFieldBis.has(bi) && stateBis.has(bi))
   );
 }
 
@@ -122,6 +378,30 @@ function defaultSchedule(cb: () => void, ms: number): () => void {
   return () => clearTimeout(id);
 }
 
+function authorityKey(address: { epoch: number; wave: number; turn: number; revision: number }): string {
+  return `${address.epoch}:${address.wave}:${address.turn}:${address.revision}`;
+}
+
+function pendingTurnKey(address: { epoch: number; wave: number; turn: number }): string {
+  return `${address.epoch}:${address.wave}:${address.turn}`;
+}
+
+function sameAuthorityAddress(
+  left: { epoch: number; wave: number; turn: number; revision: number },
+  right: { epoch: number; wave: number; turn: number; revision: number },
+): boolean {
+  return (
+    left.epoch === right.epoch
+    && left.wave === right.wave
+    && left.turn === right.turn
+    && left.revision === right.revision
+  );
+}
+
+function authorityFailureKey(failure: CoopAuthorityFailure): string {
+  return `${failure.failureId}:${failure.epoch}:${failure.wave}:${failure.turn}:${failure.revision}:${failure.boundary}`;
+}
+
 /**
  * Rides on a {@linkcode CoopTransport} to stream host-authoritative battle state to
  * the guest. One instance per client. The HOST calls the `send*` methods; the GUEST
@@ -136,6 +416,8 @@ export class CoopBattleStreamer {
   private readonly transport: CoopTransport;
   private readonly timeoutMs: number;
   private readonly schedule: (cb: () => void, ms: number) => () => void;
+  private readonly now: () => number;
+  private readonly authorityContext: (() => { epoch: number; wave: number; turn: number }) | undefined;
   private readonly offMessage: () => void;
   private readonly offStateChange: () => void;
 
@@ -145,6 +427,17 @@ export class CoopBattleStreamer {
   private readonly pendingSince = new Map<number, number>();
   /** turn -> a resolution that arrived before its waiter (race buffer). */
   private readonly inbox = new Map<number, CoopTurnResolution>();
+  /** HOST: complete turn commits remain replayable until the guest ACKs exact convergence. */
+  private readonly sentTurnCommits = new Map<string, Extract<CoopMessage, { t: "turnResolution" }>>();
+  private readonly sentTurnCommitTimers = new Map<string, () => void>();
+  /** GUEST: every turn requested but not yet apply+checksum ACKed, including reconnect replay. */
+  private readonly requestedTurnCommits = new Map<
+    string,
+    { epoch: number; wave: number; turn: number; revision?: number }
+  >();
+  private readonly turnRequestTimers = new Map<string, () => void>();
+  private readonly turnCommitHandlers = new Set<(resolution: CoopTurnResolution) => void>();
+  private readonly ackedTurnCommits = new Map<string, Extract<CoopMessage, { t: "turnCommitAck" }>>();
   /**
    * GUEST: live battle events buffered by turn, keyed inner by `seq` so a duplicate / out-of-order
    * `battleEvent` is de-duped + a stutter (a missing seq) is tolerated (#633, animation layer LIVE).
@@ -213,7 +506,22 @@ export class CoopBattleStreamer {
   /** Latest authoritative checkpoint (+ checksum) the guest has not yet applied. */
   private lastCheckpoint: CoopCheckpointEnvelope | null = null;
   /** HOST: latest complete replacement frame, retained for explicit guest retransmit requests. */
-  private lastSentReplacementCheckpoint: CoopCheckpointEnvelope | null = null;
+  private readonly sentReplacementCheckpoints = new Map<string, CoopCheckpointEnvelope>();
+  private readonly sentReplacementTimers = new Map<string, () => void>();
+  private readonly ackedReplacementCommits = new Map<string, Extract<CoopMessage, { t: "battleCheckpointAck" }>>();
+  /** HOST: bounded proof that a causally newer replacement was ACKed before an old turn is superseded. */
+  private readonly hostAppliedReplacementAcks = new Map<string, Extract<CoopMessage, { t: "battleCheckpointAck" }>>();
+  private authorityFailureHandlers = new Set<(failure: CoopAuthorityFailure) => void>();
+  private lastAuthorityFailure: CoopAuthorityFailure | null = null;
+  /** Receiver-side exactly-once guard: duplicates are re-ACKed without routing terminal cleanup twice. */
+  private readonly ackedAuthorityFailures = new Map<string, Extract<CoopMessage, { t: "authorityFailureAck" }>>();
+  private pendingAuthorityFailure: {
+    message: CoopAuthorityFailure;
+    deadline: number;
+    cancel: () => void;
+    resolve: (acked: boolean) => void;
+  } | null = null;
+  private authorityFailureRevision = 0;
   /**
    * Latest out-of-band checkpoint the live replay pump already applied to unblock an
    * intra-turn interaction. Presentation phases can subsequently mutate that state
@@ -307,10 +615,28 @@ export class CoopBattleStreamer {
     this.transport = transport;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.schedule = opts.schedule ?? defaultSchedule;
+    this.now = opts.now ?? Date.now;
+    this.authorityContext = opts.authorityContext;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
     this.offStateChange = transport.onStateChange((state: CoopConnectionState) => {
       if (state !== "connected") {
         return;
+      }
+      for (const commit of this.sentTurnCommits.values()) {
+        coopLog(
+          "stream",
+          `host RE-SEND retained turn commit e=${commit.epoch} wave=${commit.wave} turn=${commit.turn} rev=${commit.revision} after reconnect`,
+        );
+        this.transport.send(commit);
+      }
+      for (const replacement of this.sentReplacementCheckpoints.values()) {
+        this.transport.send({ t: "battleCheckpoint", ...replacement });
+      }
+      if (this.pendingAuthorityFailure != null) {
+        this.transport.send(this.pendingAuthorityFailure.message);
+      }
+      for (const request of this.requestedTurnCommits.values()) {
+        this.sendTurnCommitRequest(request);
       }
       for (const wave of this.launchSnapshotWaiters.keys()) {
         coopLog("stream", `guest RE-SEND requestLaunchSnapshot wave=${wave} after reconnect`);
@@ -326,6 +652,68 @@ export class CoopBattleStreamer {
       }
     });
     coopLog("stream", `streamer CONSTRUCT timeout=${this.timeoutMs}ms onMessage registered`);
+  }
+
+  private currentAuthorityAddress(turn?: number): { epoch: number; wave: number; turn: number } | null {
+    try {
+      const current = this.authorityContext?.();
+      if (current == null) {
+        return null;
+      }
+      return { ...current, ...(turn === undefined ? {} : { turn }) };
+    } catch {
+      return null;
+    }
+  }
+
+  private acceptsCurrentAddress(address: { epoch: number; wave: number; turn: number }, exactTurn = true): boolean {
+    const current = this.currentAuthorityAddress();
+    if (current == null) {
+      return true;
+    }
+    return (
+      address.epoch === current.epoch && address.wave === current.wave && (!exactTurn || address.turn === current.turn)
+    );
+  }
+
+  private retainAndRetryTurnCommit(commit: Extract<CoopMessage, { t: "turnResolution" }>): void {
+    const key = authorityKey(commit);
+    this.sentTurnCommits.set(key, commit);
+    this.sentTurnCommitTimers.get(key)?.();
+    const retry = () => {
+      const retained = this.sentTurnCommits.get(key);
+      if (retained == null) {
+        this.sentTurnCommitTimers.delete(key);
+        return;
+      }
+      coopLog(
+        "stream",
+        `host RE-SEND unacked turn commit e=${retained.epoch} wave=${retained.wave} turn=${retained.turn} rev=${retained.revision}`,
+      );
+      this.transport.send(retained);
+      this.sentTurnCommitTimers.set(key, this.schedule(retry, AUTHORITY_RETRY_MS));
+    };
+    this.sentTurnCommitTimers.set(key, this.schedule(retry, AUTHORITY_RETRY_MS));
+  }
+
+  private retainAndRetryReplacement(envelope: CoopCheckpointEnvelope): void {
+    const key = authorityKey(envelope);
+    this.sentReplacementCheckpoints.set(key, envelope);
+    this.sentReplacementTimers.get(key)?.();
+    const retry = () => {
+      const retained = this.sentReplacementCheckpoints.get(key);
+      if (retained == null) {
+        this.sentReplacementTimers.delete(key);
+        return;
+      }
+      coopLog(
+        "checkpoint",
+        `host RE-SEND unacked replacement e=${retained.epoch} wave=${retained.wave} turn=${retained.turn} rev=${retained.revision}`,
+      );
+      this.transport.send({ t: "battleCheckpoint", ...retained });
+      this.sentReplacementTimers.set(key, this.schedule(retry, AUTHORITY_RETRY_MS));
+    };
+    this.sentReplacementTimers.set(key, this.schedule(retry, AUTHORITY_RETRY_MS));
   }
 
   // --- HOST side --------------------------------------------------------------
@@ -448,6 +836,8 @@ export class CoopBattleStreamer {
    * present the guest can deep-diff it against its own on a mismatch to find the drift field.
    */
   emitTurn(
+    epoch: number,
+    wave: number,
     turn: number,
     events: CoopBattleEvent[],
     checkpoint: CoopBattleCheckpoint,
@@ -456,20 +846,29 @@ export class CoopBattleStreamer {
     fullField: CoopFullMonSnapshot[],
     authoritativeState: CoopAuthoritativeBattleStateV1,
   ): void {
+    const revision = authoritativeState.tick;
     coopLog(
       "replay",
-      `host SEND turnResolution turn=${turn} events=${events.length} checksum=${checksum} preimage=${preimage !== undefined} fullField=${fullField?.length ?? 0} authoritativeState=${authoritativeState === undefined ? 0 : 1}`,
+      `host SEND turnResolution e=${epoch} wave=${wave} turn=${turn} rev=${revision} events=${events.length} checksum=${checksum}`,
     );
-    this.transport.send({
+    const commit: Extract<CoopMessage, { t: "turnResolution" }> = {
       t: "turnResolution",
+      epoch,
+      wave,
       turn,
+      revision,
       events,
       checkpoint,
       checksum,
       preimage,
       fullField,
       authoritativeState,
-    });
+    };
+    if (!hasCompleteAuthorityCompanions(commit) || typeof preimage !== "string" || preimage.length === 0) {
+      throw new Error(`refusing malformed turn commit e=${epoch} wave=${wave} turn=${turn} rev=${revision}`);
+    }
+    this.retainAndRetryTurnCommit(commit);
+    this.transport.send(commit);
   }
 
   /**
@@ -479,12 +878,12 @@ export class CoopBattleStreamer {
    * replays in order + de-dupes against the turn-end batch). PRESENTATION ONLY - the turn-end
    * checkpoint is still the source of truth, so a dropped / reordered live event only stutters.
    */
-  emitEvent(turn: number, seq: number, event: CoopBattleEvent): void {
+  emitEvent(epoch: number, wave: number, turn: number, seq: number, event: CoopBattleEvent): void {
     // HOT PATH (per battle event): build the trace string only when debug is on.
     if (isCoopDebug()) {
       coopLog("replay", `host EMIT live battleEvent turn=${turn} seq=${seq} k=${event.k}`);
     }
-    this.transport.send({ t: "battleEvent", turn, seq, event });
+    this.transport.send({ t: "battleEvent", epoch, wave, turn, seq, event });
   }
 
   /**
@@ -493,20 +892,37 @@ export class CoopBattleStreamer {
    */
   sendCheckpoint(
     reason: string,
+    epoch: number,
+    wave: number,
+    turn: number,
     checkpoint: CoopBattleCheckpoint,
     checksum: string,
     fullField: CoopFullMonSnapshot[],
     authoritativeState: CoopAuthoritativeBattleStateV1,
   ): void {
+    const revision = authoritativeState.tick;
     coopLog(
       "checksum",
-      `host SEND battleCheckpoint reason=${reason} checksum=${checksum} fullField=${fullField.length} authoritativeState=1`,
+      `host SEND battleCheckpoint reason=${reason} e=${epoch} wave=${wave} turn=${turn} rev=${revision} checksum=${checksum}`,
     );
-    const envelope: CoopCheckpointEnvelope = { reason, checkpoint, checksum, fullField, authoritativeState };
+    const envelope: CoopCheckpointEnvelope = {
+      reason,
+      epoch,
+      wave,
+      turn,
+      revision,
+      checkpoint,
+      checksum,
+      fullField,
+      authoritativeState,
+    };
+    if (!hasCompleteAuthorityCompanions(envelope)) {
+      throw new Error(`refusing malformed ${reason} commit e=${epoch} wave=${wave} turn=${turn} rev=${revision}`);
+    }
     if (reason === "replacement") {
-      // One bounded frame closes loss/transient-apply retries without an unbounded journal. A durable ACK
-      // that clears this retention is still future protocol work; a later replacement safely supersedes it.
-      this.lastSentReplacementCheckpoint = envelope;
+      // Retain every addressed revision until its exact post-apply checksum ACK.  The map is intentionally
+      // not "latest only": simultaneous/future multi-seat replacement transactions can overlap.
+      this.retainAndRetryReplacement(envelope);
     }
     this.transport.send({
       t: "battleCheckpoint",
@@ -515,12 +931,144 @@ export class CoopBattleStreamer {
   }
 
   /** GUEST: request the host's retained complete replacement frame after a failed transactional apply. */
-  requestReplacementCheckpoint(checkpointTick: number | undefined, stateTick: number | undefined): void {
+  requestReplacementCheckpoint(envelope: CoopCheckpointEnvelope): void {
     this.transport.send({
       t: "requestBattleCheckpoint",
       reason: "replacement",
-      checkpointTick: Number.isSafeInteger(checkpointTick) ? (checkpointTick as number) : -1,
-      stateTick: Number.isSafeInteger(stateTick) ? (stateTick as number) : -1,
+      epoch: envelope.epoch,
+      wave: envelope.wave,
+      turn: envelope.turn,
+      revision: envelope.revision,
+      checkpointTick: envelope.checkpoint.tick as number,
+      stateTick: envelope.authoritativeState.tick,
+    });
+  }
+
+  private sendTurnCommitRequest(request: { epoch: number; wave: number; turn: number; revision?: number }): void {
+    this.transport.send({ t: "requestTurnCommit", ...request });
+  }
+
+  /** GUEST: keep requesting one exact logical turn until its verified ACK clears the request. */
+  requestTurnCommit(epoch: number, wave: number, turn: number, revision?: number): void {
+    const key = pendingTurnKey({ epoch, wave, turn });
+    const request = { epoch, wave, turn, ...(revision === undefined ? {} : { revision }) };
+    this.requestedTurnCommits.set(key, request);
+    this.sendTurnCommitRequest(request);
+    if (this.turnRequestTimers.has(key)) {
+      return;
+    }
+    const retry = () => {
+      const pending = this.requestedTurnCommits.get(key);
+      if (pending == null) {
+        this.turnRequestTimers.delete(key);
+        return;
+      }
+      this.sendTurnCommitRequest(pending);
+      this.turnRequestTimers.set(key, this.schedule(retry, AUTHORITY_RETRY_MS));
+    };
+    this.turnRequestTimers.set(key, this.schedule(retry, AUTHORITY_RETRY_MS));
+  }
+
+  onTurnCommit(handler: (resolution: CoopTurnResolution) => void): () => void {
+    this.turnCommitHandlers.add(handler);
+    return () => this.turnCommitHandlers.delete(handler);
+  }
+
+  acknowledgeTurnCommit(resolution: CoopTurnResolution, superseding?: CoopCheckpointEnvelope): void {
+    const ack: Extract<CoopMessage, { t: "turnCommitAck" }> = {
+      t: "turnCommitAck",
+      epoch: resolution.epoch,
+      wave: resolution.wave,
+      turn: resolution.turn,
+      revision: resolution.revision,
+      checkpointTick: resolution.checkpoint.tick as number,
+      stateTick: resolution.authoritativeState.tick,
+      checksum: resolution.checksum,
+      status: superseding == null ? "applied" : "superseded",
+      ...(superseding == null
+        ? {}
+        : {
+            supersededByRevision: superseding.revision,
+            supersededByChecksum: superseding.checksum,
+          }),
+    };
+    const key = authorityKey(resolution);
+    rememberBounded(this.ackedTurnCommits, key, ack);
+    if (this.inbox.get(resolution.turn)?.revision === resolution.revision) {
+      this.inbox.delete(resolution.turn);
+    }
+    const pendingKey = pendingTurnKey(resolution);
+    this.requestedTurnCommits.delete(pendingKey);
+    this.turnRequestTimers.get(pendingKey)?.();
+    this.turnRequestTimers.delete(pendingKey);
+    this.transport.send(ack);
+  }
+
+  acknowledgeReplacement(envelope: CoopCheckpointEnvelope): void {
+    const ack: Extract<CoopMessage, { t: "battleCheckpointAck" }> = {
+      t: "battleCheckpointAck",
+      reason: "replacement",
+      epoch: envelope.epoch,
+      wave: envelope.wave,
+      turn: envelope.turn,
+      revision: envelope.revision,
+      checkpointTick: envelope.checkpoint.tick as number,
+      stateTick: envelope.authoritativeState.tick,
+      checksum: envelope.checksum,
+    };
+    rememberBounded(this.ackedReplacementCommits, authorityKey(envelope), ack);
+    this.transport.send(ack);
+  }
+
+  onAuthorityFailure(handler: (failure: CoopAuthorityFailure) => void): () => void {
+    this.authorityFailureHandlers.add(handler);
+    return () => this.authorityFailureHandlers.delete(handler);
+  }
+
+  consumeAuthorityFailure(): CoopAuthorityFailure | null {
+    const failure = this.lastAuthorityFailure;
+    this.lastAuthorityFailure = null;
+    return failure;
+  }
+
+  /** Retain and retry a fatal boundary until the peer acknowledges receipt or the absolute deadline expires. */
+  broadcastAuthorityFailure(
+    failure: Omit<CoopAuthorityFailure, "t" | "failureId" | "revision"> & {
+      failureId?: string;
+      revision?: number;
+    },
+  ): Promise<boolean> {
+    if (this.pendingAuthorityFailure != null) {
+      return Promise.resolve(false);
+    }
+    const message: CoopAuthorityFailure = {
+      t: "authorityFailure",
+      ...failure,
+      revision:
+        Number.isSafeInteger(failure.revision) && (failure.revision as number) > 0
+          ? (failure.revision as number)
+          : ++this.authorityFailureRevision,
+      failureId:
+        failure.failureId
+        ?? `${failure.epoch}:${failure.wave}:${failure.turn}:${failure.boundary}:${Date.now().toString(36)}`,
+    };
+    return new Promise(resolve => {
+      const deadline = this.now() + AUTHORITY_FATAL_DEADLINE_MS;
+      const send = () => {
+        const pending = this.pendingAuthorityFailure;
+        if (pending == null || pending.message.failureId !== message.failureId) {
+          return;
+        }
+        this.transport.send(message);
+        if (this.now() >= deadline) {
+          this.pendingAuthorityFailure = null;
+          resolve(false);
+          return;
+        }
+        pending.cancel = this.schedule(send, AUTHORITY_FATAL_RETRY_MS);
+      };
+      this.pendingAuthorityFailure = { message, deadline, cancel: () => {}, resolve };
+      send();
     });
   }
 
@@ -531,6 +1079,10 @@ export class CoopBattleStreamer {
    */
   scheduleAuthorityRetry(callback: () => void, ms: number): () => void {
     return this.schedule(callback, ms);
+  }
+
+  authorityNow(): number {
+    return this.now();
   }
 
   /** HOST: send the authoritative full-state snapshot answering a guest's `requestStateSync`. */
@@ -1261,6 +1813,10 @@ export class CoopBattleStreamer {
   }
 
   awaitTurn(turn: number): Promise<CoopTurnResolution | null> {
+    const address = this.currentAuthorityAddress(turn);
+    if (address != null && this.authorityContext != null) {
+      this.requestTurnCommit(address.epoch, address.wave, address.turn);
+    }
     // Supersede any stale waiter for this turn.
     const staleTurn = this.pending.get(turn);
     if (staleTurn != null) {
@@ -1270,6 +1826,9 @@ export class CoopBattleStreamer {
     const buffered = this.inbox.get(turn);
     if (buffered !== undefined) {
       this.inbox.delete(turn);
+      if (this.authorityContext != null) {
+        this.requestTurnCommit(buffered.epoch, buffered.wave, buffered.turn, buffered.revision);
+      }
       coopLog("replay", `guest awaitTurn turn=${turn} RESOLVE (buffered race) events=${buffered.events.length}`);
       return Promise.resolve(buffered);
     }
@@ -1291,6 +1850,9 @@ export class CoopBattleStreamer {
         if (res == null) {
           coopWarn("replay", `guest awaitTurn turn=${turn} STALL -> null (timeout/superseded)`);
         } else {
+          if (this.authorityContext != null) {
+            this.requestTurnCommit(res.epoch, res.wave, res.turn, res.revision);
+          }
           coopLog(
             "replay",
             `guest awaitTurn turn=${turn} RESOLVE events=${res.events.length} checksum=${res.checksum}`,
@@ -1383,6 +1945,18 @@ export class CoopBattleStreamer {
       finish(null);
     }
     this.pending.clear();
+    for (const cancel of this.turnRequestTimers.values()) {
+      cancel();
+    }
+    this.turnRequestTimers.clear();
+    this.requestedTurnCommits.clear();
+    for (const cancel of this.sentTurnCommitTimers.values()) {
+      cancel();
+    }
+    this.sentTurnCommitTimers.clear();
+    this.sentTurnCommits.clear();
+    this.turnCommitHandlers.clear();
+    this.ackedTurnCommits.clear();
     this.enemyPartyWaiters.clear();
     this.meBattlePartyWaiters.clear();
     this.meBattlePartyInbox.clear();
@@ -1394,7 +1968,21 @@ export class CoopBattleStreamer {
     this.liveEventHandler = null;
     this.liveWaiter = null;
     this.lastCheckpoint = null;
-    this.lastSentReplacementCheckpoint = null;
+    for (const cancel of this.sentReplacementTimers.values()) {
+      cancel();
+    }
+    this.sentReplacementTimers.clear();
+    this.sentReplacementCheckpoints.clear();
+    this.ackedReplacementCommits.clear();
+    this.hostAppliedReplacementAcks.clear();
+    this.authorityFailureHandlers.clear();
+    this.lastAuthorityFailure = null;
+    this.ackedAuthorityFailures.clear();
+    if (this.pendingAuthorityFailure != null) {
+      this.pendingAuthorityFailure.cancel();
+      this.pendingAuthorityFailure.resolve(false);
+      this.pendingAuthorityFailure = null;
+    }
     this.appliedOutOfBandCheckpoint = null;
     this.lastEnemyParty = null;
     this.sentEnemyParties.clear();
@@ -1517,7 +2105,14 @@ export class CoopBattleStreamer {
         return;
       }
       case "turnResolution": {
-        if (typeof msg.preimage !== "string" || !hasCompleteAuthorityCompanions(msg)) {
+        if (
+          typeof msg.preimage !== "string"
+          || msg.preimage.length === 0
+          || !Array.isArray(msg.events)
+          || !msg.events.every(isStrictBattleEvent)
+          || !hasCompleteAuthorityCompanions(msg)
+          || !this.acceptsCurrentAddress(msg)
+        ) {
           coopWarn(
             "replay",
             `guest DROP malformed turnResolution turn=${msg.turn} preimage=${typeof msg.preimage === "string"} `
@@ -1526,8 +2121,17 @@ export class CoopBattleStreamer {
           );
           return;
         }
+        const acked = this.ackedTurnCommits.get(authorityKey(msg));
+        if (acked != null) {
+          coopLog("replay", `guest RE-ACK duplicate turn commit e=${msg.epoch} wave=${msg.wave} turn=${msg.turn}`);
+          this.transport.send(acked);
+          return;
+        }
         const res: CoopTurnResolution = {
+          epoch: msg.epoch,
+          wave: msg.wave,
           turn: msg.turn,
+          revision: msg.revision,
           events: msg.events,
           checkpoint: msg.checkpoint,
           checksum: msg.checksum,
@@ -1552,9 +2156,30 @@ export class CoopBattleStreamer {
           }
           this.inbox.set(msg.turn, res);
         }
+        for (const handler of [...this.turnCommitHandlers]) {
+          try {
+            handler(res);
+          } catch (error) {
+            coopWarn("stream", `turn commit observer threw turn=${res.turn} (isolated)`, error);
+          }
+        }
         return;
       }
       case "battleEvent": {
+        if (
+          !isSafeAddressPart(msg.epoch, false)
+          || !isSafeAddressPart(msg.wave, false)
+          || !isSafeAddressPart(msg.turn, false)
+          || !isSafeAddressPart(msg.seq)
+          || !isStrictBattleEvent(msg.event)
+          || !this.acceptsCurrentAddress(msg)
+        ) {
+          coopWarn(
+            "replay",
+            `guest DROP cross-address/malformed battleEvent e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} seq=${msg.seq}`,
+          );
+          return;
+        }
         // GUEST: buffer the live event by (turn, seq) - de-duped (a re-sent seq overwrites identically)
         // and order-tolerant (the seq, not arrival order, drives replay). Then fire any live handler.
         // HOT PATH (per battle event): build the trace string only when debug is on.
@@ -1572,7 +2197,7 @@ export class CoopBattleStreamer {
         return;
       }
       case "battleCheckpoint": {
-        if (!hasCompleteAuthorityCompanions(msg)) {
+        if (!hasCompleteAuthorityCompanions(msg) || !this.acceptsCurrentAddress(msg)) {
           coopWarn(
             "checkpoint",
             `guest DROP malformed battleCheckpoint reason=${msg.reason} `
@@ -1581,11 +2206,37 @@ export class CoopBattleStreamer {
           );
           return;
         }
+        const acked = this.ackedReplacementCommits.get(authorityKey(msg));
+        if (acked != null) {
+          coopLog(
+            "checkpoint",
+            `guest RE-ACK duplicate replacement e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
+          );
+          this.transport.send(acked);
+          return;
+        }
+        if (
+          this.lastCheckpoint != null
+          && this.lastCheckpoint.epoch === msg.epoch
+          && this.lastCheckpoint.wave === msg.wave
+          && this.lastCheckpoint.turn === msg.turn
+          && this.lastCheckpoint.revision > msg.revision
+        ) {
+          coopWarn(
+            "checkpoint",
+            `guest DROP out-of-order checkpoint rev=${msg.revision} behind buffered=${this.lastCheckpoint.revision}`,
+          );
+          return;
+        }
         // Buffer for the guest's next consumeCheckpoint() (applied at a turn boundary),
         // carrying the host's checksum so the guest can verify convergence after applying.
         coopLog("checksum", `guest RECV battleCheckpoint reason=${msg.reason} checksum=${msg.checksum}`);
         const envelope: CoopCheckpointEnvelope = {
           reason: msg.reason,
+          epoch: msg.epoch,
+          wave: msg.wave,
+          turn: msg.turn,
+          revision: msg.revision,
           checkpoint: msg.checkpoint,
           checksum: msg.checksum,
           fullField: msg.fullField,
@@ -1597,13 +2248,91 @@ export class CoopBattleStreamer {
         this.checkpointHandler?.(msg.reason, msg.checkpoint);
         return;
       }
+      case "requestTurnCommit": {
+        if (
+          !isSafeAddressPart(msg.epoch, false)
+          || !isSafeAddressPart(msg.wave, false)
+          || !isSafeAddressPart(msg.turn, false)
+          || (msg.revision !== undefined && !isSafeAddressPart(msg.revision, false))
+          || !this.acceptsCurrentAddress(msg, false)
+        ) {
+          coopWarn("stream", `host DROP malformed/cross-session turn request ${JSON.stringify(msg)}`);
+          return;
+        }
+        const retained = [...this.sentTurnCommits.values()]
+          .filter(
+            commit =>
+              commit.epoch === msg.epoch
+              && commit.wave === msg.wave
+              && commit.turn === msg.turn
+              && (msg.revision === undefined || commit.revision === msg.revision),
+          )
+          .sort((a, b) => b.revision - a.revision)[0];
+        if (retained == null) {
+          this.transport.send({
+            t: "turnCommitPending",
+            epoch: msg.epoch,
+            wave: msg.wave,
+            turn: msg.turn,
+          });
+          return;
+        }
+        this.transport.send(retained);
+        return;
+      }
+      case "turnCommitPending": {
+        if (!this.acceptsCurrentAddress(msg)) {
+          coopWarn(
+            "stream",
+            `guest DROP cross-address turnCommitPending e=${msg.epoch} wave=${msg.wave} turn=${msg.turn}`,
+          );
+          return;
+        }
+        coopLog("stream", `guest host-liveness pending turn commit e=${msg.epoch} wave=${msg.wave} turn=${msg.turn}`);
+        return;
+      }
+      case "turnCommitAck": {
+        const retained = this.sentTurnCommits.get(authorityKey(msg));
+        const supersedingAck =
+          msg.status === "superseded"
+            ? [...this.hostAppliedReplacementAcks.values()].find(
+                ack =>
+                  ack.epoch === msg.epoch
+                  && ack.wave === msg.wave
+                  && ack.turn === msg.turn
+                  && ack.revision === msg.supersededByRevision
+                  && ack.checksum === msg.supersededByChecksum
+                  && ack.revision > msg.revision,
+              )
+            : undefined;
+        if (
+          retained == null
+          || retained.checkpoint.tick !== msg.checkpointTick
+          || retained.authoritativeState.tick !== msg.stateTick
+          || retained.checksum !== msg.checksum
+          || (msg.status !== "applied" && msg.status !== "superseded")
+          || (msg.status === "superseded" && supersedingAck == null)
+        ) {
+          coopWarn(
+            "stream",
+            `host REFUSE mismatched turn ACK e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
+          );
+          return;
+        }
+        const key = authorityKey(msg);
+        this.sentTurnCommits.delete(key);
+        this.sentTurnCommitTimers.get(key)?.();
+        this.sentTurnCommitTimers.delete(key);
+        return;
+      }
       case "requestBattleCheckpoint": {
-        const retained = this.lastSentReplacementCheckpoint;
+        const retained = this.sentReplacementCheckpoints.get(authorityKey(msg));
         if (
           msg.reason !== "replacement"
           || retained == null
-          || retained.authoritativeState == null
-          || retained.fullField == null
+          || !sameAuthorityAddress(msg, retained)
+          || msg.checkpointTick !== retained.checkpoint.tick
+          || msg.stateTick !== retained.authoritativeState.tick
         ) {
           coopWarn(
             "checkpoint",
@@ -1619,12 +2348,96 @@ export class CoopBattleStreamer {
         );
         this.transport.send({
           t: "battleCheckpoint",
-          reason: "replacement",
-          checkpoint: retained.checkpoint,
-          checksum: retained.checksum,
-          fullField: retained.fullField,
-          authoritativeState: retained.authoritativeState,
+          ...retained,
         });
+        return;
+      }
+      case "battleCheckpointAck": {
+        const key = authorityKey(msg);
+        const retained = this.sentReplacementCheckpoints.get(key);
+        if (
+          retained == null
+          || msg.reason !== "replacement"
+          || !sameAuthorityAddress(msg, retained)
+          || msg.checkpointTick !== retained.checkpoint.tick
+          || msg.stateTick !== retained.authoritativeState.tick
+          || msg.checksum !== retained.checksum
+        ) {
+          coopWarn(
+            "checkpoint",
+            `host REFUSE mismatched replacement ACK e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
+          );
+          return;
+        }
+        rememberBounded(this.hostAppliedReplacementAcks, key, msg);
+        this.sentReplacementCheckpoints.delete(key);
+        this.sentReplacementTimers.get(key)?.();
+        this.sentReplacementTimers.delete(key);
+        return;
+      }
+      case "authorityFailure": {
+        if (
+          typeof msg.failureId !== "string"
+          || msg.failureId.length === 0
+          || typeof msg.reason !== "string"
+          || msg.reason.length === 0
+          || !isSafeAddressPart(msg.epoch, false)
+          || !isSafeAddressPart(msg.wave, false)
+          || !isSafeAddressPart(msg.turn, false)
+          || !isSafeAddressPart(msg.revision, false)
+          || (msg.boundary !== "turnResolution" && msg.boundary !== "replacement")
+          || !this.acceptsCurrentAddress(msg)
+        ) {
+          coopWarn("stream", `DROP malformed/cross-address authorityFailure id=${msg.failureId}`);
+          return;
+        }
+        const failureKey = authorityFailureKey(msg);
+        const priorAck = this.ackedAuthorityFailures.get(failureKey);
+        if (priorAck != null) {
+          this.transport.send(priorAck);
+          return;
+        }
+        const ack: Extract<CoopMessage, { t: "authorityFailureAck" }> = {
+          t: "authorityFailureAck",
+          failureId: msg.failureId,
+          epoch: msg.epoch,
+          wave: msg.wave,
+          turn: msg.turn,
+          revision: msg.revision,
+          boundary: msg.boundary,
+        };
+        rememberBounded(this.ackedAuthorityFailures, failureKey, ack);
+        this.transport.send(ack);
+        this.lastAuthorityFailure = msg;
+        for (const handler of [...this.authorityFailureHandlers]) {
+          try {
+            handler(msg);
+          } catch (error) {
+            coopWarn("stream", `authority failure observer threw id=${msg.failureId} (isolated)`, error);
+          }
+        }
+        for (const finish of [...this.pending.values()]) {
+          finish(null);
+        }
+        this.checkpointWaiter?.();
+        return;
+      }
+      case "authorityFailureAck": {
+        const pending = this.pendingAuthorityFailure;
+        if (
+          pending == null
+          || pending.message.failureId !== msg.failureId
+          || pending.message.epoch !== msg.epoch
+          || pending.message.wave !== msg.wave
+          || pending.message.turn !== msg.turn
+          || pending.message.revision !== msg.revision
+          || pending.message.boundary !== msg.boundary
+        ) {
+          return;
+        }
+        pending.cancel();
+        this.pendingAuthorityFailure = null;
+        pending.resolve(true);
         return;
       }
       case "requestEnemyParty": {

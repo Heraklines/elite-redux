@@ -45,9 +45,9 @@ const authoritativeState: CoopAuthoritativeBattleStateV1 = {
   tick: 2,
   wave: 1,
   turn: 1,
-  playerParty: [],
-  enemyParty: [],
-  field: [],
+  playerParty: [{ id: 1 }],
+  enemyParty: [{ id: 2 }],
+  field: [{ side: "player", bi: 0, partyIndex: 0, pokemonId: 1, presented: true }],
   weather: 0,
   weatherTurnsLeft: 0,
   terrain: 0,
@@ -58,6 +58,7 @@ const authoritativeState: CoopAuthoritativeBattleStateV1 = {
   playerModifiers: [],
   enemyModifiers: [],
 };
+const address = { epoch: 7, wave: 1, turn: 1, revision: 2 } as const;
 
 /** Connected pair + an inbox that collects every message the guest receives. */
 function captureGuestInbox(): { host: ReturnType<typeof createLoopbackPair>["host"]; received: CoopMessage[] } {
@@ -102,6 +103,7 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
       { k: "weather", weather: 3, turnsLeft: 5 },
     ];
     const checkpoint: CoopBattleCheckpoint = {
+      tick: 1,
       field: [
         {
           bi: 0,
@@ -131,7 +133,7 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
     };
     host.send({
       t: "turnResolution",
-      turn: 1,
+      ...address,
       events,
       checkpoint,
       checksum: "abcd1234abcd1234",
@@ -162,6 +164,7 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
   it("battleCheckpoint carries an out-of-turn authoritative sync", async () => {
     const { host, received } = captureGuestInbox();
     const checkpoint: CoopBattleCheckpoint = {
+      tick: 1,
       field: [
         {
           bi: 1,
@@ -182,6 +185,7 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
     host.send({
       t: "battleCheckpoint",
       reason: "switch",
+      ...address,
       checkpoint,
       checksum: "abcd1234abcd1234",
       fullField,
@@ -197,6 +201,58 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
     expect(msg.reason).toBe("switch");
     expect(msg.checkpoint.field[0].status).toBe(4);
     expect(msg.checkpoint.field[0].statStages[0]).toBe(1);
+  });
+
+  it("protocol-32 request, ACK, and fatal-control frames preserve their exact address", async () => {
+    const { host, received } = captureGuestInbox();
+    const control: CoopMessage[] = [
+      { t: "requestTurnCommit", ...address },
+      { t: "turnCommitPending", epoch: address.epoch, wave: address.wave, turn: address.turn },
+      {
+        t: "turnCommitAck",
+        ...address,
+        checkpointTick: 1,
+        stateTick: 2,
+        checksum: "abcd1234abcd1234",
+        status: "applied",
+      },
+      {
+        t: "requestBattleCheckpoint",
+        reason: "replacement",
+        ...address,
+        checkpointTick: 1,
+        stateTick: 2,
+      },
+      {
+        t: "battleCheckpointAck",
+        reason: "replacement",
+        ...address,
+        checkpointTick: 1,
+        stateTick: 2,
+        checksum: "abcd1234abcd1234",
+      },
+      {
+        t: "authorityFailure",
+        failureId: "fatal-1",
+        ...address,
+        boundary: "turnResolution",
+        reason: "capture failed",
+      },
+      {
+        t: "authorityFailureAck",
+        failureId: "fatal-1",
+        ...address,
+        boundary: "turnResolution",
+      },
+    ];
+
+    for (const message of control) {
+      host.send(message);
+    }
+    await flush();
+
+    expect(received).toEqual(control);
+    expect(received.every(message => "epoch" in message && message.epoch === address.epoch)).toBe(true);
   });
 
   it("an unknown/older client ignores a streaming message gracefully (forward-compat)", async () => {
@@ -216,9 +272,27 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
     expect(() =>
       host.send({
         t: "turnResolution",
-        turn: 1,
+        ...address,
         events: [],
-        checkpoint: { field: [], weather: 0, weatherTurnsLeft: 0, terrain: 0, terrainTurnsLeft: 0 },
+        checkpoint: {
+          tick: 1,
+          field: [
+            {
+              bi: 0,
+              partyIndex: 0,
+              speciesId: 1,
+              hp: 1,
+              maxHp: 1,
+              status: 0,
+              statStages: [],
+              fainted: false,
+            },
+          ],
+          weather: 0,
+          weatherTurnsLeft: 0,
+          terrain: 0,
+          terrainTurnsLeft: 0,
+        },
         checksum: "abcd1234abcd1234",
         preimage: "{}",
         fullField,

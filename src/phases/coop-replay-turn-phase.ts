@@ -7,6 +7,7 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
+import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
 import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   applyCoopAuthoritativeBattleState,
@@ -17,18 +18,14 @@ import {
   drainCoopApplyFailures,
   reapplyAcceptedCoopAuthoritativeBattleState,
 } from "#data/elite-redux/coop/coop-battle-engine";
-import type { CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
+import type { CoopAuthorityFailure, CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
-  clearCoopRuntime,
-  coopHasPendingWaveAdvance,
   coopLocalOwnedPlayerFieldSlot,
-  coopMeHandoffBattleWon,
   coopSessionGeneration,
   getCoopBattleStreamer,
-  getCoopRuntime,
+  getCoopController,
   isCoopAuthoritativeGuest,
-  queueCoopMeBattleVictoryTail,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 import { swapBattleEvent } from "#data/elite-redux/showdown/showdown-side-swap";
@@ -86,6 +83,8 @@ export class CoopReplayTurnPhase extends Phase {
   private replacementRetryUnsubscribe: (() => void) | null = null;
   private replacementRetryCancelTimer: (() => void) | null = null;
   private replacementRetryAttempts = 0;
+  private replacementRetryDeadline = 0;
+  private authorityFailureUnsubscribe: (() => void) | null = null;
   private ended = false;
 
   constructor(turn: number, rendered = 0, hpChain?: [number, number][]) {
@@ -120,6 +119,8 @@ export class CoopReplayTurnPhase extends Phase {
   public override end(): void {
     this.ended = true;
     this.clearReplacementRetryWake();
+    this.authorityFailureUnsubscribe?.();
+    this.authorityFailureUnsubscribe = null;
     if (activeCoopReplayTurnPhase === this) {
       activeCoopReplayTurnPhase = null;
     }
@@ -131,9 +132,15 @@ export class CoopReplayTurnPhase extends Phase {
     activeCoopReplayTurnPhase = this;
     const streamer = getCoopBattleStreamer();
     if (streamer == null) {
-      // No live session (defensive): just end the turn so the run never hangs.
-      coopWarn("replay", `guest replay turn=${this.turn}: no streamer -> finishTurnNoStream`);
-      this.finishTurnNoStream();
+      terminateCoopAuthoritySession(`No authority stream was available for turn ${this.turn}.`);
+      return;
+    }
+    this.authorityFailureUnsubscribe = streamer.onAuthorityFailure(failure => {
+      this.handleAuthorityFailure(streamer, failure);
+    });
+    const bufferedFailure = streamer.consumeAuthorityFailure();
+    if (bufferedFailure != null) {
+      this.handleAuthorityFailure(streamer, bufferedFailure);
       return;
     }
     // #790 (live post-resync strand): a DUPLICATE replay phase for an already-finalized turn
@@ -212,7 +219,7 @@ export class CoopReplayTurnPhase extends Phase {
           if (envelope != null) {
             const currentWave = globalScene.currentBattle?.waveIndex ?? 0;
             const checkpointWave = envelope.authoritativeState?.wave;
-            if (checkpointWave != null && checkpointWave !== currentWave) {
+            if (checkpointWave !== currentWave || envelope.turn !== this.turn) {
               // A replacement carrier can arrive after its turn already advanced through a win tail.
               // It is then obsolete, not an interaction for the next battle. The old unkeyed inbox let
               // that wave-N frame divert wave N+1's replay and skip its real resolution (PP/enemies stayed
@@ -245,6 +252,7 @@ export class CoopReplayTurnPhase extends Phase {
             }
             streamer.consumeCheckpoint();
             streamer.retainAppliedOutOfBandCheckpoint(envelope);
+            streamer.acknowledgeReplacement(envelope);
             // Showdown versus (Task F1): the versus guest owns its ENTIRE player field (a 1v1 -> field
             // slot 0). The co-op seat map used by coopLocalOwnedPlayerFieldSlot() resolves the fixed
             // GUEST slot (COOP_GUEST_FIELD_INDEX = 1), which is EMPTY in a 1v1 single battle - so the
@@ -278,13 +286,12 @@ export class CoopReplayTurnPhase extends Phase {
           continue;
         }
         if (raced.res == null) {
-          // No resolution arrived (host stall) - end the turn defensively; the guest re-syncs on
-          // the next checkpoint rather than hanging forever.
-          coopWarn(
-            "replay",
-            `guest replay turn=${this.turn}: ending without applied resolution (stall) -> finishTurnNoStream`,
-          );
-          this.finishTurnNoStream();
+          const failure = streamer.consumeAuthorityFailure();
+          if (failure == null) {
+            this.failAuthority(streamer, "turnResolution", `Turn ${this.turn} authority was unavailable.`);
+          } else {
+            this.handleAuthorityFailure(streamer, failure);
+          }
           return;
         }
         // 3) Resolution: render the REMAINING positions (exactly-once merge from the watermark -
@@ -302,7 +309,6 @@ export class CoopReplayTurnPhase extends Phase {
           `guest replay turn=${this.turn}: RESOLVE renderedLive=${this.rendered} remaining=${remaining.length} batch=${raced.res.events.length}`,
         );
         this.renderEvents(remaining);
-        streamer.markTurnFinalized(globalScene.currentBattle?.waveIndex ?? 0, this.turn);
         coopLog("replay", `guest replay turn=${this.turn}: unshift CoopFinalizeTurnPhase (checkpoint apply deferred)`);
         globalScene.phaseManager.unshiftNew(
           "CoopFinalizeTurnPhase",
@@ -312,15 +318,57 @@ export class CoopReplayTurnPhase extends Phase {
           raced.res.preimage,
           raced.res.fullField,
           raced.res.authoritativeState,
+          raced.res.epoch,
+          raced.res.wave,
+          raced.res.revision,
         );
         this.end();
         return;
       }
     } catch (error) {
-      // A bad stream payload must never hang the guest's turn.
-      coopWarn("replay", `guest replay turn=${this.turn}: payload error -> finishTurnNoStream`, error);
-      this.finishTurnNoStream();
+      coopWarn("replay", `guest replay turn=${this.turn}: payload error -> authority terminal`, error);
+      this.failAuthority(streamer, "turnResolution", `Turn ${this.turn} authority replay failed.`);
     }
+  }
+
+  private handleAuthorityFailure(
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    failure: CoopAuthorityFailure,
+  ): void {
+    const generation = coopSessionGeneration();
+    streamer.scheduleAuthorityRetry(() => {
+      if (generation !== coopSessionGeneration() || getCoopBattleStreamer() !== streamer) {
+        return;
+      }
+      terminateCoopAuthoritySession(failure.reason);
+    }, 0);
+  }
+
+  private failAuthority(
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    boundary: "turnResolution" | "replacement",
+    reason: string,
+  ): void {
+    const controller = getCoopController();
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    const generation = coopSessionGeneration();
+    if (controller == null) {
+      terminateCoopAuthoritySession(reason);
+      return;
+    }
+    void streamer
+      .broadcastAuthorityFailure({
+        epoch: controller.sessionEpoch,
+        wave,
+        turn: this.turn,
+        boundary,
+        reason,
+      })
+      .then(() => {
+        if (generation === coopSessionGeneration() && getCoopBattleStreamer() === streamer) {
+          terminateCoopAuthoritySession(reason);
+        }
+      });
   }
 
   private clearReplacementRetryWake(): void {
@@ -334,8 +382,8 @@ export class CoopReplayTurnPhase extends Phase {
    * Keep the failed frame retained and hold the current safe boundary without spinning. A transport
    * retransmission (including the same tick pair) or a newer replacement frame wakes the exact production
    * pump and retries transactionally. The stream scheduler bounds a lost response; exhaustion terminates
-   * shared play visibly. There is intentionally no auto-command fallback, and the protocol still needs a
-   * durable replacement ACK to clear host retention.
+   * shared play visibly. There is intentionally no auto-command fallback; protocol 32 clears only the
+   * exact retained replacement revision after its apply+checksum ACK.
    */
   private parkForReplacementRetry(
     streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
@@ -343,6 +391,9 @@ export class CoopReplayTurnPhase extends Phase {
   ): void {
     if (this.replacementRetryUnsubscribe != null) {
       return;
+    }
+    if (this.replacementRetryDeadline === 0) {
+      this.replacementRetryDeadline = streamer.authorityNow() + REPLACEMENT_RETRY_LIMIT * REPLACEMENT_RETRY_TIMEOUT_MS;
     }
     if (this.replacementRetryAttempts >= REPLACEMENT_RETRY_LIMIT) {
       this.terminateReplacementRecovery(
@@ -380,6 +431,11 @@ export class CoopReplayTurnPhase extends Phase {
         this.replacementRetryCancelTimer = streamer.scheduleAuthorityRetry(onRetryTimeout, 25);
         return;
       }
+      if (streamer.authorityNow() >= this.replacementRetryDeadline) {
+        this.clearReplacementRetryWake();
+        this.failAuthority(streamer, "replacement", `Replacement authority failed for turn ${this.turn}.`);
+        return;
+      }
       this.clearReplacementRetryWake();
       coopWarn(
         "checkpoint",
@@ -391,37 +447,18 @@ export class CoopReplayTurnPhase extends Phase {
     this.replacementRetryCancelTimer = streamer.scheduleAuthorityRetry(onRetryTimeout, REPLACEMENT_RETRY_TIMEOUT_MS);
     // Subscribe and arm the timeout before requesting: LoopbackTransport may deliver in the next microtask,
     // and a response must be able to cancel every wake resource deterministically.
-    streamer.requestReplacementCheckpoint(failed.checkpoint.tick, failed.authoritativeState?.tick);
+    streamer.requestReplacementCheckpoint(failed);
   }
 
   /** Bound an unreconstructible replacement with a visible terminal, never an indefinite parked phase. */
   private terminateReplacementRecovery(reason: string): void {
     this.clearReplacementRetryWake();
-    coopWarn("checkpoint", `TERMINAL replacement synchronization failure: ${reason}`);
-    try {
-      getCoopRuntime()?.membership.terminate();
-    } catch {
-      /* terminal cleanup continues */
+    const streamer = getCoopBattleStreamer();
+    if (streamer == null) {
+      terminateCoopAuthoritySession(reason);
+      return;
     }
-    try {
-      globalScene.ui.showText(
-        "The shared battle could not be synchronized safely. Reconnect to resume from your co-op save.",
-        null,
-        undefined,
-        6000,
-      );
-    } catch {
-      /* terminal cleanup continues */
-    }
-    try {
-      globalScene.phaseManager.clearPhaseQueue();
-      clearCoopRuntime();
-      globalScene.reset();
-      globalScene.phaseManager.unshiftNew("TitlePhase");
-    } catch (error) {
-      coopWarn("checkpoint", "replacement terminal routing partially failed", error);
-    }
-    this.end();
+    this.failAuthority(streamer, "replacement", reason);
   }
 
   /**
@@ -636,52 +673,5 @@ export class CoopReplayTurnPhase extends Phase {
       .map(([k, n]) => `${k}=${n}`)
       .join(" ");
     coopLog("replay", `guest replay turn=${this.turn}: rendered phases [${breakdown || "none"}]`);
-  }
-
-  /**
-   * Defensive end-of-turn when NO host resolution is available (no live streamer, or the host
-   * stalled past the streamer's grace). There is no checkpoint to apply here, so we never reach
-   * {@linkcode CoopFinalizeTurnPhase}; just queue the guest's own turn-end phases so the run loops,
-   * then end. The guest re-syncs on the next checkpoint rather than hanging forever. A pending
-   * wave-advance (if any) is left for the next turn's finalize phase to consume (it is one-shot +
-   * wave-guarded), so it is never lost.
-   */
-  private finishTurnNoStream(): void {
-    coopLog("replay", `guest replay turn=${this.turn}: finishTurnNoStream (queue turn-end, no checkpoint)`);
-    try {
-      // BUG1 (faint auto-switch premature-victory deadlock): same hazard as CoopFinalizeTurnPhase. This
-      // is the host-stall fallback (awaitTurn resolved null). If the host stalls on the exact turn an
-      // hp=1 enemy survives, running the REAL damaging turn-end phases lets the authoritative guest
-      // LOCALLY faint that enemy -> a premature local VictoryPhase / BattleEnd -> the same deadlock. So
-      // on the authoritative guest advance the turn MINIMALLY (the guest re-syncs on the next
-      // checkpoint); victory only ever arrives via the host's waveResolved. Solo / host / lockstep keep
-      // the original turn-end run. (CoopReplayTurnPhase is guest-only; the gate is for symmetry and so a
-      // future lockstep guest is unaffected.)
-      if (isCoopAuthoritativeGuest()) {
-        // #847 ME battle-handoff WIN (host-stall fallback): the host's ME-battle win emits NO waveResolved
-        // (VictoryPhase's isMysteryEncounter branch returns first), so coopHasPendingWaveAdvance is false
-        // here even though the ME battle is over. Detect it directly and run the ME victory tail (reward
-        // shop) instead of a phantom turn - otherwise a host stall on the ME battle's final turn strands
-        // the guest with no reward transition.
-        if (coopMeHandoffBattleWon()) {
-          queueCoopMeBattleVictoryTail();
-        } else if (!coopHasPendingWaveAdvance()) {
-          // #698 softlock: do NOT advance the turn when a wave-advance is already PENDING (the host has won
-          // the wave). Incrementing here would start a phantom turn N+1 the host already passed -> the guest
-          // then awaits a turn-N+1 resolution the host (now in the reward shop) never sends -> softlock right
-          // after the battle. This is the same hazard the streamed finishTurn guards via
-          // coopHasPendingWaveAdvance; mirror it here. With an advance pending, end the turn flat - the
-          // host's pending waveResolved drives the post-battle tail on the next finalize / checkpoint resync.
-          globalScene.currentBattle.incrementTurn();
-          globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
-        }
-      } else {
-        globalScene.phaseManager.queueTurnEndPhases();
-      }
-    } catch {
-      // The turn-end queue is best-effort; a failure here must never hang the turn.
-      coopWarn("replay", `guest replay turn=${this.turn}: queueTurnEndPhases failed`);
-    }
-    this.end();
   }
 }

@@ -21,15 +21,15 @@ const flush = () => new Promise<void>(resolve => queueMicrotask(resolve));
 
 describe("co-op session controller (#633, P1)", () => {
   describe("functional compatibility launch barrier", () => {
-    it("rejects an er-coop-30 peer that cannot carry/retransmit complete protocol-31 authority", async () => {
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-31");
+    it("rejects an er-coop-31 peer that cannot carry retained protocol-32 authority", async () => {
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-32");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",
         version: COOP_PROTOCOL_VERSION,
       });
       controller.connect();
-      guest.send({ t: "hello", version: "er-coop-30", username: "Cached", role: "guest", epoch: 0 });
+      guest.send({ t: "hello", version: "er-coop-31", username: "Cached", role: "guest", epoch: 0 });
       await flush();
 
       expect(controller.versionMismatch).toBe(true);

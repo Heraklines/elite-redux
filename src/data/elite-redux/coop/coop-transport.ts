@@ -72,7 +72,10 @@ export type CoopRole = "host" | "guest";
 // and can reveal pre-intro/fainted seats, so cached mixed builds must refuse pairing instead of degrading.
 // er-coop-31: turn/replacement authority requires checkpoint + fullField + state + non-sentinel checksum;
 // replacement frames are retained and explicitly re-requestable before the guest can reopen control.
-export const COOP_PROTOCOL_VERSION = "er-coop-31";
+// er-coop-32: battle events and authority commits are epoch/wave/turn addressed; complete turn and
+// replacement commits are retained until exact apply+checksum ACK, and fatal capture failures use an
+// acknowledged terminal handshake instead of leaving either peer in a local fallback.
+export const COOP_PROTOCOL_VERSION = "er-coop-32";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -1258,7 +1261,7 @@ export type CoopMessage =
    * still the source of truth, so a dropped / reordered / late `battleEvent` only stutters the
    * animation; it can never desync the guest (the checkpoint reconciles all state).
    */
-  | { t: "battleEvent"; turn: number; seq: number; event: CoopBattleEvent }
+  | { t: "battleEvent"; epoch: number; wave: number; turn: number; seq: number; event: CoopBattleEvent }
   /**
    * Host -> guest (#633, LIVE-D): a fully-resolved turn. `events` is the ordered visible
    * log the guest narrates/animates; `checkpoint` is the AUTHORITATIVE post-turn state the
@@ -1274,7 +1277,11 @@ export type CoopMessage =
    */
   | {
       t: "turnResolution";
+      epoch: number;
+      wave: number;
       turn: number;
+      /** Commit identity; equal to authoritativeState.tick for protocol 32. */
+      revision: number;
       events: CoopBattleEvent[];
       checkpoint: CoopBattleCheckpoint;
       checksum: string;
@@ -1299,14 +1306,78 @@ export type CoopMessage =
   | {
       t: "battleCheckpoint";
       reason: string;
+      epoch: number;
+      wave: number;
+      turn: number;
+      /** Commit identity; equal to authoritativeState.tick for protocol 32. */
+      revision: number;
       checkpoint: CoopBattleCheckpoint;
       checksum: string;
       /** Complete per-mon field companion for modern out-of-band authority frames. */
       fullField: CoopFullMonSnapshot[];
       authoritativeState: CoopAuthoritativeBattleStateV1;
     }
-  /** Guest -> host: re-send the retained complete out-of-band replacement authority frame. */
-  | { t: "requestBattleCheckpoint"; reason: "replacement"; checkpointTick: number; stateTick: number }
+  /** Guest -> host: request the exact retained turn commit, or learn that the host is still resolving it. */
+  | { t: "requestTurnCommit"; epoch: number; wave: number; turn: number; revision?: number }
+  | { t: "turnCommitPending"; epoch: number; wave: number; turn: number }
+  /** Guest -> host: ACK only after the complete turn commit applied and checksum-converged. */
+  | {
+      t: "turnCommitAck";
+      epoch: number;
+      wave: number;
+      turn: number;
+      revision: number;
+      checkpointTick: number;
+      stateTick: number;
+      checksum: string;
+      status: "applied" | "superseded";
+      supersededByRevision?: number;
+      supersededByChecksum?: string;
+    }
+  /** Guest -> host: re-send one exact retained replacement authority frame. */
+  | {
+      t: "requestBattleCheckpoint";
+      reason: "replacement";
+      epoch: number;
+      wave: number;
+      turn: number;
+      revision: number;
+      checkpointTick: number;
+      stateTick: number;
+    }
+  /** Guest -> host: ACK only after the complete replacement applied and checksum-converged. */
+  | {
+      t: "battleCheckpointAck";
+      reason: "replacement";
+      epoch: number;
+      wave: number;
+      turn: number;
+      revision: number;
+      checkpointTick: number;
+      stateTick: number;
+      checksum: string;
+    }
+  /** Either peer -> peer: a control-critical authority boundary could not be produced/applied safely. */
+  | {
+      t: "authorityFailure";
+      failureId: string;
+      epoch: number;
+      wave: number;
+      turn: number;
+      /** Stream-local terminal revision; positive even when no state carrier could be captured. */
+      revision: number;
+      boundary: "turnResolution" | "replacement";
+      reason: string;
+    }
+  | {
+      t: "authorityFailureAck";
+      failureId: string;
+      epoch: number;
+      wave: number;
+      turn: number;
+      revision: number;
+      boundary: "turnResolution" | "replacement";
+    }
   /**
    * Owner -> watcher (#633): the owner's pick on an ALTERNATING-control interaction
    * screen (reward shop / biome shop / mystery encounter). Same seed -> both clients
@@ -1601,13 +1672,25 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "ghostPool":
       return `pool=${msg.pool.length}`;
     case "battleEvent":
-      return `turn=${msg.turn} seq=${msg.seq} k=${msg.event.k}`;
+      return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} seq=${msg.seq} k=${msg.event.k}`;
     case "turnResolution":
-      return `turn=${msg.turn} events=${msg.events.length} checksum=${msg.checksum}`;
+      return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} events=${msg.events.length} checksum=${msg.checksum}`;
     case "battleCheckpoint":
-      return `reason=${msg.reason} checksum=${msg.checksum}`;
+      return `reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} checksum=${msg.checksum}`;
+    case "requestTurnCommit":
+      return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision ?? "pending"}`;
+    case "turnCommitPending":
+      return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn}`;
+    case "turnCommitAck":
+      return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} checksum=${msg.checksum}`;
     case "requestBattleCheckpoint":
-      return `reason=${msg.reason} checkpointTick=${msg.checkpointTick} stateTick=${msg.stateTick}`;
+      return `reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} checkpointTick=${msg.checkpointTick} stateTick=${msg.stateTick}`;
+    case "battleCheckpointAck":
+      return `reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} checksum=${msg.checksum}`;
+    case "authorityFailure":
+      return `id=${msg.failureId} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} boundary=${msg.boundary}`;
+    case "authorityFailureAck":
+      return `id=${msg.failureId} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} boundary=${msg.boundary}`;
     case "interactionChoice":
       return `seq=${msg.seq} kind=${msg.kind} choice=${msg.choice}`;
     case "interactionOutcome":

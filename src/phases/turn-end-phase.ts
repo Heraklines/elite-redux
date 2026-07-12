@@ -2,9 +2,11 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { fieldPositionForSlot } from "#data/battle-format";
+import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
 import { captureCoopAuthoritativeCarrier } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
+  coopSessionGeneration,
   getCoopBattleStreamer,
   getCoopController,
   isAuthoritativeBattleSession,
@@ -154,9 +156,9 @@ export class TurnEndPhase extends FieldPhase {
 
     this.erAutoShiftNonAdjacentSurvivors();
 
-    this.emitCoopTurn();
-
-    this.end();
+    if (this.emitCoopTurn()) {
+      this.end();
+    }
   }
 
   /**
@@ -220,26 +222,44 @@ export class TurnEndPhase extends FieldPhase {
    * Hard no-op for solo / non-host; the recording is closed either way so it never leaks
    * into the next turn.
    */
-  private emitCoopTurn(): void {
+  private emitCoopTurn(): boolean {
     const recording = endCoopRecording();
     // Core-battle authoritative stream: co-op OR showdown-versus (C3). Solo/non-host no-op.
     if (!isAuthoritativeBattleSession()) {
-      return;
+      return true;
     }
     const controller = getCoopController();
     const streamer = getCoopBattleStreamer();
     if (controller == null || streamer == null || controller.role !== "host" || recording.turn < 0) {
-      return;
+      return true;
     }
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    const fatal = (reason: string): false => {
+      const generation = coopSessionGeneration();
+      void streamer
+        .broadcastAuthorityFailure({
+          epoch: controller.sessionEpoch,
+          wave,
+          turn: recording.turn,
+          boundary: "turnResolution",
+          reason,
+        })
+        .then(() => {
+          if (generation === coopSessionGeneration()) {
+            terminateCoopAuthoritySession(reason);
+          }
+        });
+      return false;
+    };
     try {
       const carrier = captureCoopAuthoritativeCarrier(recording.turn, "turnResolution");
       if (carrier == null) {
-        // Fail closed: a partial modern frame is not a recoverable compatibility payload. The missing
-        // durability ACK/resend for this withheld turn remains explicit control-plane debt.
-        coopWarn("checkpoint", `host withheld incomplete turnResolution turn=${recording.turn}`);
-        return;
+        coopWarn("checkpoint", `host could not capture complete turnResolution turn=${recording.turn}`);
+        return fatal(`Host could not capture complete turn authority for wave ${wave}, turn ${recording.turn}.`);
       }
       streamer.emitTurn(
+        controller.sessionEpoch,
+        carrier.authoritativeState.wave,
         recording.turn,
         recording.events,
         carrier.checkpoint,
@@ -248,9 +268,10 @@ export class TurnEndPhase extends FieldPhase {
         carrier.fullField,
         carrier.authoritativeState,
       );
+      return true;
     } catch (error) {
-      // Keep the authoritative engine alive, but never disguise a failed send as a complete turn.
       coopWarn("checkpoint", `host failed to emit turnResolution turn=${recording.turn}`, error);
+      return fatal(`Host could not publish complete turn authority for wave ${wave}, turn ${recording.turn}.`);
     }
   }
 }

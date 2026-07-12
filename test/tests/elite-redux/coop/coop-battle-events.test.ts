@@ -38,7 +38,7 @@ import {
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import type { CoopBattleCheckpoint, CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
+import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
@@ -59,11 +59,21 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 const RUN = process.env.ER_SCENARIO === "1";
 
-function completeTurnCarrier(_turn: number) {
-  // These legacy animation tests isolate the numeric checkpoint. Protocol 31 still requires the rich
-  // companions on the wire; a non-seated dummy fullField + unsupported state version exercise the existing
-  // guarded fallback without letting pre-checkpoint live PokemonData overwrite the synthetic checkpoint.
-  return { preimage: "{}", fullField: [{ bi: 99 } as never], authoritativeState: { version: 0 } as never };
+function completeTurnCarrier(turn: number) {
+  const carrier = coopEngine.captureCoopAuthoritativeCarrier(turn, "turnResolution");
+  if (carrier == null) {
+    throw new Error(`test could not capture a production turn carrier for turn ${turn}`);
+  }
+  const epoch = getCoopController()?.sessionEpoch;
+  if (epoch == null || epoch <= 0) {
+    throw new Error("test has no negotiated co-op session epoch");
+  }
+  return {
+    epoch,
+    wave: carrier.authoritativeState.wave,
+    revision: carrier.authoritativeState.tick,
+    ...carrier,
+  };
 }
 
 describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, animation layer)", () => {
@@ -106,27 +116,49 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     return field;
   };
 
-  /** Build a checkpoint that snaps every field mon to an exact, recognizable hp. */
-  const checkpointFromField = (hp: number): CoopBattleCheckpoint => {
-    const field = globalScene.getField(true).filter(m => m != null);
-    return {
-      field: field.map(m => ({
-        bi: m.getBattlerIndex(),
-        partyIndex: (m.isPlayer() ? globalScene.getPlayerParty() : (globalScene.getEnemyParty() as Pokemon[])).indexOf(
-          m,
-        ),
-        speciesId: m.species.speciesId,
-        hp,
-        maxHp: m.getMaxHp(),
-        status: 0,
-        statStages: [0, 0, 0, 0, 0, 0, 0],
-        fainted: false,
-      })),
-      weather: 0,
-      weatherTurnsLeft: 0,
-      terrain: 0,
-      terrainTurnsLeft: 0,
+  /** Capture the same complete P32 carrier production emits, then put this one-engine guest fixture back. */
+  const carrierWithFieldHp = (turn: number, hp: number) => {
+    const mons = globalScene.getField(true).filter((m): m is Pokemon => m != null);
+    const before = mons.map(mon => mon.hp);
+    try {
+      for (const mon of mons) {
+        mon.hp = hp;
+      }
+      return completeTurnCarrier(turn);
+    } finally {
+      mons.forEach((mon, index) => {
+        mon.hp = before[index];
+      });
+    }
+  };
+
+  /** Capture a real post-faint authority boundary while leaving the local fixture alive for replay. */
+  const carrierWithKo = (turn: number, mon: Pokemon) => {
+    const before = {
+      hp: mon.hp,
+      status: mon.status,
+      summonData: mon.summonData,
+      tempSummonData: mon.tempSummonData,
+      switchOutStatus: mon.switchOutStatus,
+      onField: mon.isOnField(),
     };
+    try {
+      mon.hp = 0;
+      mon.doSetStatus(StatusEffect.FAINT);
+      mon.resetSummonData();
+      mon.switchOutStatus = true;
+      globalScene.field.remove(mon);
+      return completeTurnCarrier(turn);
+    } finally {
+      mon.summonData = before.summonData;
+      mon.tempSummonData = before.tempSummonData;
+      mon.switchOutStatus = before.switchOutStatus;
+      if (before.onField) {
+        globalScene.field.add(mon);
+      }
+      mon.hp = before.hp;
+      mon.status = before.status;
+    }
   };
 
   /**
@@ -269,10 +301,11 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     // A rich event stream: a move animation, an HP drain on the host's mon, a stat change, a status anim,
     // and a faint on an enemy. Every kind the host can emit. The checkpoint snaps every mon to hp=9.
     const partner = getCoopRuntime()!.partnerTransport!;
+    const carrier = carrierWithFieldHp(turn, 9);
     partner.send({
       t: "turnResolution",
       turn,
-      ...completeTurnCarrier(turn),
+      ...carrier,
       events: [
         { k: "message", text: "Snorlax used Tackle!" },
         { k: "moveUsed", bi: BattlerIndex.PLAYER, moveId: MoveId.TACKLE, targets: [enemy0.getBattlerIndex()] },
@@ -281,8 +314,6 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
         { k: "status", bi: enemy0.getBattlerIndex(), status: 0 },
         { k: "faint", bi: enemy0.getBattlerIndex() },
       ],
-      checkpoint: checkpointFromField(9),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -310,8 +341,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const beforeAtk = hostMon.getStatStage(Stat.ATK);
     hostMon.hp = 5;
     hostMon.setStatStage(Stat.ATK, 2);
-    const hostCheckpoint = coopEngine.captureCoopCheckpoint()!;
-    const hostChecksum = coopEngine.captureCoopChecksum();
+    const carrier = completeTurnCarrier(turn);
+    const hostChecksum = carrier.checksum;
     // Restore the live field to the pre-turn state (the guest has not yet seen the host's outcome).
     hostMon.hp = beforeHp;
     hostMon.setStatStage(Stat.ATK, beforeAtk);
@@ -323,14 +354,12 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     partner.send({
       t: "turnResolution",
       turn,
-      ...completeTurnCarrier(turn),
+      ...carrier,
       events: [
         { k: "moveUsed", bi: enemy0.getBattlerIndex(), moveId: MoveId.TACKLE, targets: [BattlerIndex.PLAYER] },
         { k: "hp", bi: BattlerIndex.PLAYER, hp: 5, maxHp: hostMon.getMaxHp() },
         { k: "statStage", bi: BattlerIndex.PLAYER, stat: Stat.ATK, value: 2 },
       ],
-      checkpoint: hostCheckpoint,
-      checksum: hostChecksum,
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -344,12 +373,15 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(coopEngine.captureCoopChecksum(), "the post-render checksum converges to the host's").toBe(hostChecksum);
   });
 
-  it("(B) ROBUSTNESS: a garbled event stream (bad indices / unknown mon) never throws or hangs; checkpoint still corrects", async () => {
+  it("(B) ROBUSTNESS: a malformed event makes the complete authority frame fail closed", async () => {
     const field = await startCoopGuest();
     const turn = globalScene.currentBattle.turn;
+    const beforeHp = field.map(mon => mon.hp);
+    let accepted = 0;
+    const offCommit = getCoopRuntime()!.battleStream.onTurnCommit(() => accepted++);
 
-    // Deliberately garbled: out-of-range battler indices, a faint on a nonexistent slot, a move from
-    // an unknown user. None of these must throw or hang the pump; the checkpoint still snaps to hp=8.
+    // P32 validates the entire carrier before it can enter a replay inbox.  A corrupt presentation
+    // event cannot be smuggled beside otherwise valid mechanical authority.
     const partner = getCoopRuntime()!.partnerTransport!;
     partner.send({
       t: "turnResolution",
@@ -361,19 +393,16 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
         { k: "statStage", bi: -5, stat: 99, value: 99 },
         { k: "faint", bi: 99 },
         { k: "status", bi: 99, status: 999 },
-      ],
-      checkpoint: checkpointFromField(8),
-      checksum: coopEngine.captureCoopChecksum(),
+      ] as never,
     });
     await new Promise(r => setTimeout(r, 0));
+    offCommit();
 
-    // A garbled stream never throws or hangs; the deferred finalize checkpoint still corrects the field.
-    await expect(driveReplayTurn(turn), "a garbled event stream never throws").resolves.not.toThrow();
-
-    // The checkpoint still applied: every mon snaps to the host's hp (8) despite the garbage events.
-    for (const mon of field) {
-      expect(mon.hp, "the checkpoint still corrects the field after garbled events").toBe(8);
-    }
+    expect(accepted, "the malformed carrier never reaches replay/finalization").toBe(0);
+    expect(
+      field.map(mon => mon.hp),
+      "rejecting malformed authority leaves the live field untouched",
+    ).toEqual(beforeHp);
   });
 
   // ===========================================================================
@@ -381,41 +410,6 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   // is applied LAST (in CoopFinalizeTurnPhase), so a host faint can animate + the checksum
   // stays byte-identical. This is the must-ship gate (faints animate).
   // ===========================================================================
-
-  /**
-   * Build a checkpoint that marks `koBi` fainted (hp 0) and snaps every OTHER field mon to its
-   * CURRENT live hp (a no-op for them). The KOd mon excluded by the host equals the KOd mon the
-   * guest's faint phase leaveField's, so the host checksum captured with `koBi` fainted matches the
-   * guest's post-finalize checksum exactly.
-   */
-  const checkpointKO = (koBi: number): CoopBattleCheckpoint => {
-    const live = globalScene.getField(true).filter((m): m is Pokemon => m != null);
-    return {
-      field: live.map(m => {
-        const bi = m.getBattlerIndex();
-        const ko = bi === koBi;
-        return {
-          bi,
-          partyIndex: (m.isPlayer()
-            ? globalScene.getPlayerParty()
-            : (globalScene.getEnemyParty() as Pokemon[])
-          ).indexOf(m),
-          speciesId: m.species.speciesId,
-          hp: ko ? 0 : m.hp,
-          maxHp: m.getMaxHp(),
-          status: m.status?.effect ?? 0,
-          // Preserve each surviving mon's CURRENT stat stages so the snap is a true no-op for them
-          // (the host hashes the same live stages); only the KOd mon is removed.
-          statStages: [...m.getStatStages()],
-          fainted: ko,
-        };
-      }),
-      weather: 0,
-      weatherTurnsLeft: 0,
-      terrain: 0,
-      terrainTurnsLeft: 0,
-    };
-  };
 
   it("(Step 1) a host KO ANIMATES (MoveAnim->HpDrain->Faint->Finalize) with the mon PRESENT, and the checksum MATCHES", async () => {
     const field = await startCoopGuest();
@@ -427,24 +421,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     // fainted (hp 0) so getField(true) excludes it - exactly what the host hashes after its FaintPhase
     // leaveField'd the foe - capture the checksum, then RESTORE enemy0 alive (still on-field) so the
     // guest starts the turn with the foe present and must animate the faint itself.
-    const koOrigHp = enemy0.hp;
-    const koOrigSummonData = enemy0.summonData;
-    const koOrigTempSummonData = enemy0.tempSummonData;
-    enemy0.hp = 0;
-    enemy0.doSetStatus(StatusEffect.FAINT);
-    // A real host FaintPhase has already run leaveField(clearEffects=true) before the
-    // end-of-turn checksum: volatile summon/temp state is reset and the mon is off-field.
-    enemy0.resetSummonData();
-    enemy0.switchOutStatus = true;
-    globalScene.field.remove(enemy0);
-    const hostChecksum = coopEngine.captureCoopChecksum();
-    const hostCheckpoint = checkpointKO(koBi);
-    enemy0.summonData = koOrigSummonData;
-    enemy0.tempSummonData = koOrigTempSummonData;
-    enemy0.switchOutStatus = false;
-    globalScene.field.add(enemy0);
-    enemy0.hp = koOrigHp;
-    enemy0.status = null;
+    const carrier = carrierWithKo(turn, enemy0);
+    const hostChecksum = carrier.checksum;
     expect(enemy0.isOnField(), "enemy0 is alive on the guest's pre-turn field").toBe(true);
 
     // Record the ORDER the replay phases run + whether the FAINT phase saw the mon PRESENT (not snapped
@@ -483,14 +461,12 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     partner.send({
       t: "turnResolution",
       turn,
-      ...completeTurnCarrier(turn),
+      ...carrier,
       events: [
         { k: "moveUsed", bi: BattlerIndex.PLAYER, moveId: MoveId.TACKLE, targets: [koBi] },
         { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
         { k: "faint", bi: koBi },
       ],
-      checkpoint: hostCheckpoint,
-      checksum: hostChecksum,
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -587,17 +563,16 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     // The host's recorded stream for an end-of-turn poison KO: a message, the hp drain to 0, the faint -
     // NO moveUsed (poison is not a move). The checkpoint marks the enemy fainted (its end state).
     const partner = getCoopRuntime()!.partnerTransport!;
+    const carrier = carrierWithKo(turn, enemy0);
     partner.send({
       t: "turnResolution",
       turn,
-      ...completeTurnCarrier(turn),
+      ...carrier,
       events: [
         { k: "message", text: "The enemy is hurt by poison!" },
         { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
         { k: "faint", bi: koBi },
       ],
-      checkpoint: checkpointKO(koBi),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -620,14 +595,18 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const turn = globalScene.currentBattle.turn;
     const streamer = getCoopRuntime()!.battleStream;
     const partner = getCoopRuntime()!.partnerTransport!;
+    const address = {
+      epoch: getCoopController()!.sessionEpoch,
+      wave: globalScene.currentBattle.waveIndex,
+    };
 
     // The host streams three live events OUT OF ORDER (seq 2 then 0 then 1), and RE-SENDS seq 1
     // (a duplicate the transport can deliver). The guest must return them sorted asc by seq, with the
     // re-sent seq de-duped (the latest copy for a seq wins, one entry per seq).
-    partner.send({ t: "battleEvent", turn, seq: 2, event: { k: "faint", bi: BattlerIndex.ENEMY } });
-    partner.send({ t: "battleEvent", turn, seq: 0, event: { k: "message", text: "live-0" } });
-    partner.send({ t: "battleEvent", turn, seq: 1, event: { k: "message", text: "live-1-first" } });
-    partner.send({ t: "battleEvent", turn, seq: 1, event: { k: "message", text: "live-1-resent" } });
+    partner.send({ t: "battleEvent", ...address, turn, seq: 2, event: { k: "faint", bi: BattlerIndex.ENEMY } });
+    partner.send({ t: "battleEvent", ...address, turn, seq: 0, event: { k: "message", text: "live-0" } });
+    partner.send({ t: "battleEvent", ...address, turn, seq: 1, event: { k: "message", text: "live-1-first" } });
+    partner.send({ t: "battleEvent", ...address, turn, seq: 1, event: { k: "message", text: "live-1-resent" } });
     await new Promise(r => setTimeout(r, 0));
 
     const consumed = streamer.consumeLiveEvents(turn);
@@ -651,22 +630,28 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const enemy0 = globalScene.getEnemyField(false)[0];
     const koBi = enemy0.getBattlerIndex();
     const partner = getCoopRuntime()!.partnerTransport!;
+    const carrier = carrierWithKo(turn, enemy0);
+    const address = { epoch: carrier.epoch, wave: carrier.wave };
 
     // The host streams the hp drain LIVE first (seq 1), then the turn-end batch carries the SAME ordered
     // events (message seq0, hp seq1, faint seq2). seq == batch index, so the merge must render the hp
     // event EXACTLY ONCE (sourced from the live channel for seq 1, filled from the batch for 0 + 2).
-    partner.send({ t: "battleEvent", turn, seq: 1, event: { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() } });
+    partner.send({
+      t: "battleEvent",
+      ...address,
+      turn,
+      seq: 1,
+      event: { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
+    });
     partner.send({
       t: "turnResolution",
       turn,
-      ...completeTurnCarrier(turn),
+      ...carrier,
       events: [
         { k: "message", text: "The enemy is hurt by poison!" },
         { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
         { k: "faint", bi: koBi },
       ],
-      checkpoint: checkpointKO(koBi),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 

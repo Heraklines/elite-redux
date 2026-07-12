@@ -75,8 +75,21 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 const RUN = process.env.ER_SCENARIO === "1";
 
-function completeTurnCarrier(_turn: number) {
-  return { preimage: "{}", fullField: [{ bi: 99 } as never], authoritativeState: { version: 0 } as never };
+function completeTurnCarrier(turn: number) {
+  const carrier = coopEngine.captureCoopAuthoritativeCarrier(turn, "turnResolution");
+  if (carrier == null) {
+    throw new Error(`test could not capture a production turn carrier for turn ${turn}`);
+  }
+  const epoch = getCoopController()?.sessionEpoch;
+  if (epoch == null || epoch <= 0) {
+    throw new Error("test has no negotiated co-op session epoch");
+  }
+  return {
+    epoch,
+    wave: carrier.authoritativeState.wave,
+    revision: carrier.authoritativeState.tick,
+    ...carrier,
+  };
 }
 
 describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 Phase B)", () => {
@@ -174,29 +187,19 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     return field;
   };
 
-  /** Build a checkpoint that snaps every field mon to an exact, recognizable hp. */
-  const checkpointFromField = (hp: number): CoopBattleCheckpoint => {
-    const field = globalScene.getField(true).filter(m => m != null);
-    return {
-      field: field.map(m => ({
-        bi: m.getBattlerIndex(),
-        // Stable party-slot identity (#633, enemy-switch mirror): mirror the real builder -
-        // enemy -> enemy-party index, player -> player-party index.
-        partyIndex: (m.isPlayer() ? globalScene.getPlayerParty() : (globalScene.getEnemyParty() as Pokemon[])).indexOf(
-          m,
-        ),
-        speciesId: m.species.speciesId,
-        hp,
-        maxHp: m.getMaxHp(),
-        status: 0,
-        statStages: [0, 0, 0, 0, 0, 0, 0],
-        fainted: false,
-      })),
-      weather: 0,
-      weatherTurnsLeft: 0,
-      terrain: 0,
-      terrainTurnsLeft: 0,
-    };
+  const carrierWithFieldHp = (turn: number, hp: number) => {
+    const mons = globalScene.getField(true).filter((m): m is Pokemon => m != null);
+    const before = mons.map(mon => mon.hp);
+    try {
+      for (const mon of mons) {
+        mon.hp = hp;
+      }
+      return completeTurnCarrier(turn);
+    } finally {
+      mons.forEach((mon, index) => {
+        mon.hp = before[index];
+      });
+    }
   };
 
   /**
@@ -404,17 +407,12 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // phase's awaitTurn resolves with it. The checkpoint snaps every mon to hp=7 - a value
     // the live engine never produces on its own, so reading 7 PROVES the guest applied it.
     const partner = getCoopRuntime()!.partnerTransport!;
-    const checkpoint = checkpointFromField(7);
-    const authoritativeMaxHp = field[0].getMaxHp() + 9;
-    const hostSlot = checkpoint.field.find(state => state.bi === field[0].getBattlerIndex())!;
-    hostSlot.maxHp = authoritativeMaxHp;
+    const carrier = carrierWithFieldHp(turn, 7);
     partner.send({
       t: "turnResolution",
       turn,
-      ...completeTurnCarrier(turn),
+      ...carrier,
       events: [{ k: "message", text: "Magikarp used Splash!" }],
-      checkpoint,
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -426,9 +424,6 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     for (const mon of field) {
       expect(mon.hp, "guest field snaps to the host's streamed checkpoint hp").toBe(7);
     }
-    expect(field[0].getMaxHp(), "guest adopts the checkpoint's authoritative maxHp every turn").toBe(
-      authoritativeMaxHp,
-    );
     // BUG1 (deadlock fix): the authoritative-guest finalize does NOT run the real (damaging) turn-end
     // phases - those let the guest locally chip a host-surviving mon to a premature faint/victory. It
     // advances the turn MINIMALLY (incrementTurn), so the drained queue auto-runs the next turn's
@@ -838,8 +833,6 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       turn,
       ...completeTurnCarrier(turn),
       events: [{ k: "message", text: "Foe fainted!" }],
-      checkpoint: checkpointFromField(0),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -864,8 +857,6 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       turn: turn + 1,
       ...completeTurnCarrier(turn + 1),
       events: [],
-      checkpoint: checkpointFromField(0),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
     pushNewSpy.mockClear();
@@ -902,8 +893,6 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       turn: earlierTurn,
       ...completeTurnCarrier(earlierTurn),
       events: [{ k: "message", text: "Foe fainted!" }],
-      checkpoint: checkpointFromField(0),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
     await driveReplayTurn(earlierTurn);
@@ -914,8 +903,6 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       turn: finalTurn,
       ...completeTurnCarrier(finalTurn),
       events: [{ k: "message", text: "Critical hit!" }],
-      checkpoint: checkpointFromField(0),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -1107,8 +1094,6 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       turn,
       ...completeTurnCarrier(turn),
       events: [{ k: "message", text: "Got away safely!" }],
-      checkpoint: checkpointFromField(10),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -1146,8 +1131,6 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       turn,
       ...completeTurnCarrier(turn),
       events: [{ k: "message", text: "The run ended." }],
-      checkpoint: checkpointFromField(0),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 

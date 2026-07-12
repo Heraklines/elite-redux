@@ -32,6 +32,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { Phase } from "#app/phase";
 import { CommonBattleAnim, MoveAnim } from "#data/battle-anims";
+import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
 import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   applyCoopAuthoritativeBattleState,
@@ -46,7 +47,11 @@ import {
   drainCoopApplyFailures,
   reapplyAcceptedCoopAuthoritativeBattleState,
 } from "#data/elite-redux/coop/coop-battle-engine";
-import type { CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
+import type {
+  CoopAuthorityFailure,
+  CoopCheckpointEnvelope,
+  CoopTurnResolution,
+} from "#data/elite-redux/coop/coop-battle-stream";
 import { recordCoopChecksumAssertion } from "#data/elite-redux/coop/coop-checksum-assert";
 import { collectCanonicalDiff, logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
@@ -862,6 +867,13 @@ export class CoopFinalizeTurnPhase extends Phase {
   public readonly phaseName = "CoopFinalizeTurnPhase";
 
   private readonly turn: number;
+  private turnCommitRetryUnsubscribe: (() => void) | null = null;
+  private turnCommitRetryCancel: (() => void) | null = null;
+  private authorityFailureUnsubscribe: (() => void) | null = null;
+  private turnCommitDeadline = 0;
+  private ended = false;
+  private supersedingCheckpoint: CoopCheckpointEnvelope | null | undefined;
+  private turnCommitSupersededBy: CoopCheckpointEnvelope | undefined;
 
   constructor(
     turn: number,
@@ -870,6 +882,9 @@ export class CoopFinalizeTurnPhase extends Phase {
     private readonly preimage?: string,
     private readonly fullField?: CoopFullMonSnapshot[],
     private readonly authoritativeState?: CoopAuthoritativeBattleStateV1,
+    private readonly epoch?: number,
+    private readonly wave?: number,
+    private readonly revision?: number,
   ) {
     super();
     this.turn = turn;
@@ -877,6 +892,35 @@ export class CoopFinalizeTurnPhase extends Phase {
 
   public override start(): void {
     super.start();
+    if (this.isModernTurnCommit()) {
+      this.startModernTurnCommit();
+      return;
+    }
+    if (isCoopAuthoritativeGuest()) {
+      const streamer = getCoopBattleStreamer();
+      const controller = getCoopController();
+      const wave = globalScene.currentBattle?.waveIndex ?? 0;
+      const reason = `Turn ${this.turn} arrived without a complete protocol-32 authority address.`;
+      if (streamer == null || controller == null) {
+        terminateCoopAuthoritySession(reason);
+        return;
+      }
+      const generation = coopSessionGeneration();
+      void streamer
+        .broadcastAuthorityFailure({
+          epoch: controller.sessionEpoch,
+          wave,
+          turn: this.turn,
+          boundary: "turnResolution",
+          reason,
+        })
+        .then(() => {
+          if (generation === coopSessionGeneration() && getCoopBattleStreamer() === streamer) {
+            terminateCoopAuthoritySession(reason);
+          }
+        });
+      return;
+    }
     coopLog("checksum", `guest finalize turn=${this.turn}: apply checkpoint + verify checksum=${this.checksum}`);
     try {
       // Snap the field + arena to the host's authoritative post-turn state. This is the SAME apply the
@@ -943,6 +987,263 @@ export class CoopFinalizeTurnPhase extends Phase {
       coopWarn("checksum", `guest finalize turn=${this.turn}: apply/verify threw (handled)`);
     }
     this.finishTurn();
+  }
+
+  public override end(): void {
+    this.ended = true;
+    this.clearTurnCommitRetry();
+    this.authorityFailureUnsubscribe?.();
+    this.authorityFailureUnsubscribe = null;
+    super.end();
+  }
+
+  private isModernTurnCommit(): boolean {
+    return (
+      Number.isSafeInteger(this.epoch)
+      && (this.epoch as number) > 0
+      && Number.isSafeInteger(this.wave)
+      && (this.wave as number) > 0
+      && Number.isSafeInteger(this.turn)
+      && this.turn > 0
+      && Number.isSafeInteger(this.revision)
+      && (this.revision as number) > 0
+      && Number.isSafeInteger(this.checkpoint.tick)
+      && (this.checkpoint.tick as number) > 0
+      && Array.isArray(this.fullField)
+      && this.fullField.length > 0
+      && this.authoritativeState?.version === 1
+      && this.authoritativeState.tick === this.revision
+      && this.authoritativeState.wave === this.wave
+      && this.authoritativeState.turn === this.turn
+    );
+  }
+
+  private modernTurnResolution(): CoopTurnResolution {
+    return {
+      epoch: this.epoch as number,
+      wave: this.wave as number,
+      turn: this.turn,
+      revision: this.revision as number,
+      checkpoint: this.checkpoint,
+      checksum: this.checksum,
+      preimage: this.preimage as string,
+      fullField: this.fullField as CoopFullMonSnapshot[],
+      authoritativeState: this.authoritativeState as CoopAuthoritativeBattleStateV1,
+      events: [],
+    };
+  }
+
+  private startModernTurnCommit(): void {
+    const streamer = getCoopBattleStreamer();
+    if (streamer == null) {
+      terminateCoopAuthoritySession(`No authority stream was available to finalize turn ${this.turn}.`);
+      return;
+    }
+    this.authorityFailureUnsubscribe = streamer.onAuthorityFailure(failure => {
+      this.handleModernAuthorityFailure(streamer, failure);
+    });
+    const bufferedFailure = streamer.consumeAuthorityFailure();
+    if (bufferedFailure != null) {
+      this.handleModernAuthorityFailure(streamer, bufferedFailure);
+      return;
+    }
+    const resolution = this.modernTurnResolution();
+    if (this.applyModernTurnCommit(streamer, resolution)) {
+      this.completeModernTurnCommit(streamer, resolution);
+      return;
+    }
+    this.parkModernTurnCommit(streamer, resolution);
+  }
+
+  private applyModernTurnCommit(
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    resolution: CoopTurnResolution,
+  ): boolean {
+    const checkpointTick = resolution.checkpoint.tick as number;
+    const stateTick = resolution.authoritativeState.tick;
+    try {
+      const admittedBefore = coopAppliedStateTick();
+      if (admittedBefore > stateTick) {
+        this.supersedingCheckpoint ??= streamer.consumeAppliedOutOfBandCheckpoint();
+        const superseding = this.supersedingCheckpoint;
+        if (
+          superseding == null
+          || superseding.reason !== "replacement"
+          || superseding.epoch !== resolution.epoch
+          || superseding.wave !== resolution.wave
+          || superseding.turn !== resolution.turn
+          || superseding.revision <= resolution.revision
+          || superseding.authoritativeState.tick !== admittedBefore
+        ) {
+          coopWarn(
+            "checksum",
+            `guest finalize turn=${this.turn}: commit ${checkpointTick}/${stateTick} superseded by unproven tick=${admittedBefore}`,
+          );
+          return false;
+        }
+        const stateApplied = reapplyAcceptedCoopAuthoritativeBattleState(
+          superseding.authoritativeState,
+          isCoopAuthoritativeGuest(),
+        );
+        if (stateApplied) {
+          applyCoopFieldSnapshot(superseding.fullField, isCoopAuthoritativeGuest());
+        }
+        const failures = drainCoopApplyFailures();
+        const checksum = captureCoopChecksum();
+        const converged =
+          stateApplied
+          && failures.length === 0
+          && checksum !== COOP_CHECKSUM_SENTINEL
+          && checksum === superseding.checksum;
+        if (converged) {
+          this.turnCommitSupersededBy = superseding;
+        }
+        return converged;
+      }
+
+      if (admittedBefore > checkpointTick && admittedBefore < stateTick) {
+        coopWarn(
+          "checksum",
+          `guest finalize turn=${this.turn}: invalid partial tick window ${checkpointTick}<${admittedBefore}<${stateTick}`,
+        );
+        return false;
+      }
+      const checkpointAlreadyApplied = admittedBefore === checkpointTick || admittedBefore === stateTick;
+      const checkpointApplied = checkpointAlreadyApplied || applyCoopCheckpoint(resolution.checkpoint);
+      const admittedAfterCheckpoint = coopAppliedStateTick();
+      const stateAlreadyApplied = admittedAfterCheckpoint === stateTick;
+      const stateApplied =
+        checkpointApplied
+        && (stateAlreadyApplied
+          ? reapplyAcceptedCoopAuthoritativeBattleState(resolution.authoritativeState, isCoopAuthoritativeGuest())
+          : applyCoopAuthoritativeBattleState(resolution.authoritativeState, isCoopAuthoritativeGuest()));
+      if (stateApplied) {
+        // Protocol 32 treats fullField as a required companion, not an unused fallback. Drain only after both
+        // state appliers ran so a per-mon rich failure can never be hidden behind a matching narrow checksum.
+        applyCoopFieldSnapshot(resolution.fullField, isCoopAuthoritativeGuest());
+      }
+      const failures = drainCoopApplyFailures();
+      const checksum = captureCoopChecksum();
+      const converged =
+        checkpointApplied
+        && stateApplied
+        && failures.length === 0
+        && checksum !== COOP_CHECKSUM_SENTINEL
+        && checksum === resolution.checksum;
+      if (!converged) {
+        coopWarn(
+          "checksum",
+          `guest finalize turn=${this.turn}: commit NOT converged checkpoint=${checkpointApplied} state=${stateApplied} `
+            + `failures=${failures.length} host=${resolution.checksum} guest=${checksum}`,
+        );
+      }
+      return converged;
+    } catch (error) {
+      coopWarn("checksum", `guest finalize turn=${this.turn}: committed apply threw`, error);
+      return false;
+    }
+  }
+
+  private completeModernTurnCommit(
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    resolution: CoopTurnResolution,
+  ): void {
+    this.clearTurnCommitRetry();
+    streamer.acknowledgeTurnCommit(resolution, this.turnCommitSupersededBy);
+    streamer.markTurnFinalized(resolution.wave, resolution.turn);
+    coopLog(
+      "checksum",
+      `guest finalize ACK e=${resolution.epoch} wave=${resolution.wave} turn=${resolution.turn} rev=${resolution.revision}`,
+    );
+    this.finishTurn();
+  }
+
+  private clearTurnCommitRetry(): void {
+    this.turnCommitRetryUnsubscribe?.();
+    this.turnCommitRetryUnsubscribe = null;
+    this.turnCommitRetryCancel?.();
+    this.turnCommitRetryCancel = null;
+  }
+
+  private parkModernTurnCommit(
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    failed: CoopTurnResolution,
+  ): void {
+    if (this.turnCommitRetryUnsubscribe != null || this.ended) {
+      return;
+    }
+    if (this.turnCommitDeadline === 0) {
+      this.turnCommitDeadline = streamer.authorityNow() + 6_000;
+    }
+    this.turnCommitRetryUnsubscribe = streamer.onTurnCommit(next => {
+      if (
+        next.epoch !== failed.epoch
+        || next.wave !== failed.wave
+        || next.turn !== failed.turn
+        || next.revision !== failed.revision
+      ) {
+        return;
+      }
+      this.clearTurnCommitRetry();
+      if (this.applyModernTurnCommit(streamer, next)) {
+        this.completeModernTurnCommit(streamer, next);
+      } else {
+        this.parkModernTurnCommit(streamer, next);
+      }
+    });
+    const generation = coopSessionGeneration();
+    const deadlineCheck = () => {
+      if (this.ended || generation !== coopSessionGeneration()) {
+        return;
+      }
+      if (getCoopBattleStreamer() !== streamer || globalScene.phaseManager.getCurrentPhase() !== this) {
+        this.turnCommitRetryCancel = streamer.scheduleAuthorityRetry(deadlineCheck, 25);
+        return;
+      }
+      if (streamer.authorityNow() >= this.turnCommitDeadline) {
+        this.clearTurnCommitRetry();
+        this.failModernTurnCommit(streamer, `Turn ${this.turn} authority did not converge before its deadline.`);
+        return;
+      }
+      streamer.requestTurnCommit(failed.epoch, failed.wave, failed.turn, failed.revision);
+      this.turnCommitRetryCancel = streamer.scheduleAuthorityRetry(deadlineCheck, 500);
+    };
+    streamer.requestTurnCommit(failed.epoch, failed.wave, failed.turn, failed.revision);
+    this.turnCommitRetryCancel = streamer.scheduleAuthorityRetry(deadlineCheck, 500);
+  }
+
+  private handleModernAuthorityFailure(
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    failure: CoopAuthorityFailure,
+  ): void {
+    const generation = coopSessionGeneration();
+    streamer.scheduleAuthorityRetry(() => {
+      if (generation === coopSessionGeneration() && getCoopBattleStreamer() === streamer) {
+        terminateCoopAuthoritySession(failure.reason);
+      }
+    }, 0);
+  }
+
+  private failModernTurnCommit(streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>, reason: string): void {
+    const controller = getCoopController();
+    const generation = coopSessionGeneration();
+    if (controller == null || this.epoch == null || this.wave == null) {
+      terminateCoopAuthoritySession(reason);
+      return;
+    }
+    void streamer
+      .broadcastAuthorityFailure({
+        epoch: this.epoch,
+        wave: this.wave,
+        turn: this.turn,
+        boundary: "turnResolution",
+        reason,
+      })
+      .then(() => {
+        if (generation === coopSessionGeneration() && getCoopBattleStreamer() === streamer) {
+          terminateCoopAuthoritySession(reason);
+        }
+      });
   }
 
   /**
@@ -1385,6 +1686,10 @@ export class CoopApplyResyncPhase extends Phase {
   private settled = false;
   /** Temporary wake subscription while this phase is deliberately holding a safe boundary. */
   private stopCheckpointWake: (() => void) | undefined;
+  private stopCheckpointRetry: (() => void) | undefined;
+  private stopAuthorityFailure: (() => void) | undefined;
+  private recoveryDeadline = 0;
+  private ended = false;
   /** The last fully-verified recovery carrier; failed attempts never advance this floor. */
   private recoveryTickFloor: number;
 
@@ -1400,8 +1705,13 @@ export class CoopApplyResyncPhase extends Phase {
   }
 
   public override end(): void {
+    this.ended = true;
     this.stopCheckpointWake?.();
     this.stopCheckpointWake = undefined;
+    this.stopCheckpointRetry?.();
+    this.stopCheckpointRetry = undefined;
+    this.stopAuthorityFailure?.();
+    this.stopAuthorityFailure = undefined;
     super.end();
   }
 
@@ -1506,6 +1816,7 @@ export class CoopApplyResyncPhase extends Phase {
     // If an older delayed finalizer is still queued, let it reassert this already-accepted frame
     // after its presentation drains instead of clobbering the recovered replacement.
     getCoopBattleStreamer()?.retainAppliedOutOfBandCheckpoint(envelope);
+    getCoopBattleStreamer()?.acknowledgeReplacement(envelope);
     try {
       globalScene.ui.clearText();
     } catch {
@@ -1546,6 +1857,7 @@ export class CoopApplyResyncPhase extends Phase {
       // Apply while the carrier remains retained. A structured failure, throw, or checksum mismatch leaves
       // this exact frame buffered and its ticks below recoveryTickFloor, so an identical resend can retry it.
       if (!this.applySupersedingCheckpoint(latest)) {
+        streamer.requestReplacementCheckpoint(latest);
         return false;
       }
       // Only clear THIS envelope after full verification. A synchronous re-entrant delivery may have
@@ -1561,8 +1873,66 @@ export class CoopApplyResyncPhase extends Phase {
       return true;
     }
     this.stopCheckpointWake = streamer.onCheckpointEnvelope(envelope => {
-      tryLatest(envelope);
+      if (!tryLatest(envelope) && coopCheckpointSupersedesResync(this.snapshot, envelope, this.recoveryTickFloor)) {
+        streamer.requestReplacementCheckpoint(envelope);
+      }
     });
+    this.stopAuthorityFailure = streamer.onAuthorityFailure(failure => {
+      const generation = coopSessionGeneration();
+      streamer.scheduleAuthorityRetry(() => {
+        if (generation === coopSessionGeneration() && getCoopBattleStreamer() === streamer) {
+          terminateCoopAuthoritySession(failure.reason);
+        }
+      }, 0);
+    });
+    const bufferedFailure = streamer.consumeAuthorityFailure();
+    if (bufferedFailure != null) {
+      terminateCoopAuthoritySession(bufferedFailure.reason);
+      return true;
+    }
+    const generation = coopSessionGeneration();
+    if (this.recoveryDeadline === 0) {
+      this.recoveryDeadline = streamer.authorityNow() + 6_000;
+    }
+    const deadlineCheck = () => {
+      if (this.ended || generation !== coopSessionGeneration()) {
+        return;
+      }
+      if (getCoopBattleStreamer() !== streamer || globalScene.phaseManager.getCurrentPhase() !== this) {
+        this.stopCheckpointRetry = streamer.scheduleAuthorityRetry(deadlineCheck, 25);
+        return;
+      }
+      const latest = streamer.peekCheckpoint();
+      if (latest != null && coopCheckpointSupersedesResync(this.snapshot, latest, this.recoveryTickFloor)) {
+        streamer.requestReplacementCheckpoint(latest);
+      }
+      if (streamer.authorityNow() >= this.recoveryDeadline) {
+        this.stopCheckpointRetry = undefined;
+        const controller = getCoopController();
+        const state = this.snapshot.authoritativeState;
+        const reason = `Replacement authority could not recover held turn ${this.turn}.`;
+        if (controller == null || state == null) {
+          terminateCoopAuthoritySession(reason);
+          return;
+        }
+        void streamer
+          .broadcastAuthorityFailure({
+            epoch: controller.sessionEpoch,
+            wave: state.wave,
+            turn: state.turn,
+            boundary: "replacement",
+            reason,
+          })
+          .then(() => {
+            if (generation === coopSessionGeneration() && getCoopBattleStreamer() === streamer) {
+              terminateCoopAuthoritySession(reason);
+            }
+          });
+        return;
+      }
+      this.stopCheckpointRetry = streamer.scheduleAuthorityRetry(deadlineCheck, 500);
+    };
+    this.stopCheckpointRetry = streamer.scheduleAuthorityRetry(deadlineCheck, 500);
     // Defensive lost-wakeup close: transports are synchronous today, but a future delivery scheduler
     // could place an envelope between the first peek and subscription.
     return tryLatest();
@@ -1712,7 +2082,7 @@ function isCoopRecoveryTick(value: unknown): value is number {
  * fail-closed. The apply site additionally requires both appliers + structured-failure drain + checksum.
  */
 export function coopCheckpointSupersedesResync(
-  snapshot: Pick<CoopFullBattleSnapshot, "tick" | "authoritativeState">,
+  snapshot: Pick<CoopFullBattleSnapshot, "tick" | "authoritativeState" | "sessionEpoch">,
   envelope: CoopCheckpointEnvelope,
   tickFloor = Math.max(snapshot.tick ?? -1, snapshot.authoritativeState?.tick ?? -1),
 ): boolean {
@@ -1723,6 +2093,12 @@ export function coopCheckpointSupersedesResync(
     envelope.reason !== "replacement"
     || heldState == null
     || candidateState == null
+    || !Number.isSafeInteger(envelope.epoch)
+    || envelope.epoch <= 0
+    || snapshot.sessionEpoch !== envelope.epoch
+    || envelope.wave !== candidateState.wave
+    || envelope.turn !== candidateState.turn
+    || envelope.revision !== candidateState.tick
     || !Array.isArray(envelope.fullField)
     || envelope.fullField.length === 0
     || envelope.checksum === COOP_CHECKSUM_SENTINEL
