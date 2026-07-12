@@ -61,6 +61,7 @@ const EVENT_OPTIONS = new Map([
 /** Field Trip option 1: choose party slot 0, then that Pokemon's move slot 0. */
 const EVENT_SUB_PICKS = new Map<number, readonly number[]>([[24, [0, 0]]]);
 const EVENT_BATTLE_WAVES = new Set([32]);
+const EVENT_NO_REWARD_WAVES = new Set([39]);
 
 describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome transitions", () => {
   let phaserGame: Phaser.Game;
@@ -112,6 +113,7 @@ describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome 
       meOptions: EVENT_OPTIONS,
       meSubPicks: EVENT_SUB_PICKS,
       meBattleWaves: EVENT_BATTLE_WAVES,
+      meNoRewardWaves: EVENT_NO_REWARD_WAVES,
     });
 
     expect(result.wavesCompleted, "the campaign continued after the final forced event").toBe(LAST_WAVE);

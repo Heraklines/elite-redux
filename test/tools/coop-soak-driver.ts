@@ -512,6 +512,12 @@ export interface SoakOptions {
    */
   meBattleWaves?: ReadonlySet<number>;
   /**
+   * Forced non-battle ME waves whose selected option intentionally has no embedded reward shop. The driver
+   * parks these at PostMysteryEncounterPhase and lets the normal authoritative terminal close the encounter,
+   * instead of waiting for a SelectModifierPhase that the event contract never queues.
+   */
+  meNoRewardWaves?: ReadonlySet<number>;
+  /**
    * #843/#849 CATCH LEG (BUILD 1). A set of wave indices where the soak DRIVES a seeded ball throw ->
    * capture -> dexSync instead of an all-faint win. On each such wave the driver faints ONE wild enemy (the
    * host attacks it while the guest SWITCHES, so no move redirect KOs the survivor), then HOST-throws a
@@ -1943,6 +1949,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const hostOwns = counterBefore % 2 === 0;
     const option = Math.max(1, Math.trunc(opts.meOptions?.get(wave) ?? 1));
     const battleSpawning = opts.meBattleWaves?.has(wave) === true;
+    const noRewardShop = opts.meNoRewardWaves?.has(wave) === true;
     // #849: the guest opens the real MYSTERY_ENCOUNTER screen (the mirrored mode); record it.
     hitMode(UiMode.MYSTERY_ENCOUNTER);
 
@@ -2015,48 +2022,52 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       let hostShop!: ShopPhaseSeam;
       await withClient(rig.hostCtx, async () => {
         await runMysteryEncounterToEnd(game, option);
-        await game.phaseInterceptor.to("SelectModifierPhase", false);
-        hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+        await game.phaseInterceptor.to(noRewardShop ? "PostMysteryEncounterPhase" : "SelectModifierPhase", false);
+        if (!noRewardShop) {
+          hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+        }
       });
       const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
 
-      // Start the owner shop synchronously so its option stream + arrival are queued, then flush them under
-      // the guest context. CoopReplayMePhase's reward-options handoff ends detached and automatically starts
-      // the guest's own SelectModifierPhase watcher, whose arrival releases the host barrier.
-      withClientSync(rig.hostCtx, () => hostShop.start());
-      let guestShop!: ShopPhaseSeam;
-      await withClient(rig.guestCtx, async () => {
-        for (let i = 0; i < 8; i++) {
-          await drainLoopback();
-          const current = rig.guestScene.phaseManager.getCurrentPhase();
-          if (current?.phaseName === "SelectModifierPhase") {
-            guestShop = current as unknown as ShopPhaseSeam;
-            break;
+      if (!noRewardShop) {
+        // Start the owner shop synchronously so its option stream + arrival are queued, then flush them under
+        // the guest context. CoopReplayMePhase's reward-options handoff ends detached and automatically starts
+        // the guest's own SelectModifierPhase watcher, whose arrival releases the host barrier.
+        withClientSync(rig.hostCtx, () => hostShop.start());
+        let guestShop!: ShopPhaseSeam;
+        await withClient(rig.guestCtx, async () => {
+          for (let i = 0; i < 8; i++) {
+            await drainLoopback();
+            const current = rig.guestScene.phaseManager.getCurrentPhase();
+            if (current?.phaseName === "SelectModifierPhase") {
+              guestShop = current as unknown as ShopPhaseSeam;
+              break;
+            }
           }
+        });
+        if (guestShop == null) {
+          fail("no-park", wave, "guest never reached the host-owned ME embedded reward shop");
         }
-      });
-      if (guestShop == null) {
-        fail("no-park", wave, "guest never reached the host-owned ME embedded reward shop");
-      }
 
-      // Flush the guest arrival under the host context, then commit the already-started owner shop exactly
-      // once (do not call driveHostRewardShopOwner: it would start the phase/barrier a second time).
-      await withClient(rig.hostCtx, async () => {
-        await drainLoopback();
-        hostShop.coopEndMirror();
-        hostShop.coopRelaySend(-1, undefined, "skip");
-        hostShop.end();
-        hostShop.coopAdvanceInteraction();
-        await drainLoopback();
-      });
-      await withClient(rig.guestCtx, async () => {
-        for (let i = 0; i < 8; i++) {
+        // Flush the guest arrival under the host context, then commit the already-started owner shop exactly
+        // once (do not call driveHostRewardShopOwner: it would start the phase/barrier a second time).
+        await withClient(rig.hostCtx, async () => {
           await drainLoopback();
-          if (rig.guestScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase") {
-            break;
+          hostShop.coopEndMirror();
+          hostShop.coopRelaySend(-1, undefined, "skip");
+          hostShop.end();
+          hostShop.coopAdvanceInteraction();
+          await drainLoopback();
+        });
+        await withClient(rig.guestCtx, async () => {
+          for (let i = 0; i < 8; i++) {
+            await drainLoopback();
+            if (rig.guestScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase") {
+              break;
+            }
           }
-        }
-      });
+        });
+      }
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
       await withClient(rig.guestCtx, async () => {
         // The shop handoff marks the replay detached/settled before the true 9M terminal. Drain first so
@@ -2086,10 +2097,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         }
       });
       await withClient(rig.hostCtx, async () => {
-        await game.phaseInterceptor.to("SelectModifierPhase", false);
-        const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-        if (hostShop.phaseName === "SelectModifierPhase") {
-          await driveHostRewardShopOwner(hostShop, { takeReward: false });
+        await game.phaseInterceptor.to(noRewardShop ? "PostMysteryEncounterPhase" : "SelectModifierPhase", false);
+        if (!noRewardShop) {
+          const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+          if (hostShop.phaseName === "SelectModifierPhase") {
+            await driveHostRewardShopOwner(hostShop, { takeReward: false });
+          }
         }
         await game.phaseInterceptor.to("PostMysteryEncounterPhase");
       });
