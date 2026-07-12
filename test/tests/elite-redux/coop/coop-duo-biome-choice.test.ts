@@ -11,8 +11,8 @@
 //
 // BOTH sides are REAL BattleScene engines paired over createLoopbackPair, driven with
 // the harness owner/watcher pattern (the reward-shop recipe): the owner drives the real
-// phase (its UI mocked headlessly, exactly like driveHostRewardShopOwner mocks the party
-// picker), streams its cursor + relays its pick; the watcher opens the mirrored copy and
+// phase; the World-Map case presses the public ER_MAP UI while the simpler crossroads captures
+// its option callback, streams its cursor + relays its pick; the watcher opens the mirrored copy and
 // adopts the relayed pick. Asserts, across two engines:
 //   1. CROSSROADS STAY: owner picks Stay -> both continue in the SAME biome, matching
 //      overstay/notoriety state; the counter advances exactly once on BOTH.
@@ -51,10 +51,12 @@ import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
+import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { type ErRouteNode, getErPendingNodes, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import { erBiomeOverstayAnchor, resetErBiomeStructure } from "#data/elite-redux/er-biome-structure";
 import { getRevealedMapNodes, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { BiomeId } from "#enums/biome-id";
+import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -328,7 +330,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     const { ownerCtx, watcherCtx } = ownerCtxFor(rig, counterBefore);
 
     // ===== Step A: the CROSSROADS (owner picks LEAVE - defers its terminal to the map pick). =====
-    let ownerCap = installUiCapture(ownerCtx.scene);
+    const ownerCap = installUiCapture(ownerCtx.scene);
     let watcherCap = installUiCapture(watcherCtx.scene);
     try {
       await arriveBoundary(watcherCtx, "xroads:11");
@@ -355,16 +357,24 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     // owner engine clears the shared global at its terminal - production-faithful restore).
     const pinAfterLeave = coopBiomeInteractionStartValue();
     expect(pinAfterLeave, "the crossroads Leave pinned the biome interaction").toBe(counterBefore);
-    ownerCap = installUiCapture(ownerCtx.scene);
     watcherCap = installUiCapture(watcherCtx.scene);
     try {
       await arriveBoundary(watcherCtx, "biomepick:11");
       setCoopBiomeInteractionStart(pinAfterLeave); // the owner engine's chained pin
       await withClient(ownerCtx, async () => {
         const phase = new SelectBiomePhase();
-        phase.start(); // reaches coopBiomePickOwner (ER_MAP mocked), beginSession("owner")
-        expect(ownerCap.erMapConfig, "owner opened the real ER_MAP route picker").toBeDefined();
-        ownerCap.erMapConfig!.onSelect(chosen); // owner picks VOLCANO -> relays + applies
+        phase.start(); // reaches coopBiomePickOwner and opens the real ER_MAP handler
+        for (let i = 0; i < 100 && ownerCtx.scene.ui.getMode() !== UiMode.ER_MAP; i++) {
+          await drainLoopback();
+        }
+        expect(ownerCtx.scene.ui.getMode(), "owner opened the real ER_MAP route picker").toBe(UiMode.ER_MAP);
+        resetCoopUiRelayTrace();
+        expect(ownerCtx.scene.ui.processInput(Button.RIGHT), "owner moves to the non-default route via UI").toBe(true);
+        expect(ownerCtx.scene.ui.processInput(Button.ACTION), "owner commits VOLCANO via the real map UI").toBe(true);
+        expect(
+          getCoopUiRelayEdges().some(edge => edge.mode === UiMode.ER_MAP && edge.carrier === "interactionChoice"),
+          "the public World-Map input reached the production biome relay",
+        ).toBe(true);
         await drainLoopback();
       });
       setCoopBiomeInteractionStart(pinAfterLeave); // the watcher engine's own chained pin
@@ -380,7 +390,6 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         throw new Error("biome pick WATCH HANG: watcher never adopted the owner's biome");
       });
     } finally {
-      ownerCap.restore();
       watcherCap.restore();
     }
 
