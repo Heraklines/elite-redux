@@ -239,9 +239,7 @@ function runLane(name, files) {
       return true;
     }
     invocation++;
-    const reportArg = process.env.GITHUB_ACTIONS
-      ? ` --outputFile=.vitest-reports/blob-${name}-${invocation}.json`
-      : "";
+    const reportArg = process.env.GITHUB_ACTIONS ? ` --outputFile=.vitest-reports/blob-${name}-${invocation}.json` : "";
     const cmd = `npx vitest run ${selected.join(" ")} --pool=forks --no-file-parallelism ${isolate}${reportArg}`;
     return (
       spawnSync(cmd, {

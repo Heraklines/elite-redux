@@ -161,10 +161,8 @@ function isStrictFullField(value: unknown): value is CoopFullMonSnapshot[] {
         move =>
           Array.isArray(move) && move.length === 2 && isSafeAddressPart(move[0], false) && isSafeAddressPart(move[1]),
       )
-      || !Array.isArray(mon.tags) // BattlerTagType is a string enum at runtime.  The historical wire type calls these
-      || // `number[]` through an unsafe cast, so accepting numbers as well keeps old captures
-      // readable while allowing the production values (for example "SEEDED"/"ENCORE").
-      !mon.tags.every(tag => (typeof tag === "string" && tag.length > 0) || isSafeAddressPart(tag))
+      || !Array.isArray(mon.tags) // BattlerTagType is a string enum at runtime.  The historical wire type calls these // `number[]` through an unsafe cast, so accepting numbers as well keeps old captures // readable while allowing the production values (for example "SEEDED"/"ENCORE").
+      || !mon.tags.every(tag => (typeof tag === "string" && tag.length > 0) || isSafeAddressPart(tag))
     ) {
       return false;
     }
