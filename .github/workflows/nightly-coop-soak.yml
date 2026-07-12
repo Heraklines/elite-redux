@@ -37,9 +37,9 @@ on:
   workflow_dispatch:
     inputs:
       soak_waves:
-        description: "Number of waves to soak (nightly default 200)"
+        description: "Optional wave override for every profile (blank = each profile's calibrated default)"
         type: string
-        default: "200"
+        default: ""
       soak_seed:
         description: "Optional fixed SOAK_SEED to replay a run (empty = date-derived)"
         type: string
