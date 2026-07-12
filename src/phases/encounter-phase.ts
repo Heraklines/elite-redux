@@ -22,6 +22,10 @@ import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { settleCoopFieldPresentation } from "#data/elite-redux/coop/coop-field-presentation";
 import {
+  clearCoopAuthoritativeGuestPlayerTrainer,
+  markCoopAuthoritativeSummonPresentationPending,
+} from "#data/elite-redux/coop/coop-presentation";
+import {
   getCoopBattleStreamer,
   getCoopController,
   getCoopNetcodeMode,
@@ -363,6 +367,12 @@ export class EncounterPhase extends BattlePhase {
 
   start() {
     super.start();
+
+    // ReturnPhase is structural and therefore neutralized on the authoritative guest.
+    // Its subsequent player SummonPhase never owns ShowTrainerPhase's exit there, so clear
+    // the unmatched throw sprite before any async enemy-authority wait. This base seam covers
+    // ordinary, next-wave, and new-biome encounters.
+    clearCoopAuthoritativeGuestPlayerTrainer();
 
     // #record-replay (Phase 2): begin recording this run's replay trace at the first EncounterPhase
     // (seed + the starting party are both established here). Two mutually-exclusive, idempotent enables:
@@ -880,6 +890,7 @@ export class EncounterPhase extends BattlePhase {
             enemyPokemon.tint(0, 0.5);
           } else if (battle.battleType === BattleType.TRAINER) {
             enemyPokemon.setVisible(false);
+            markCoopAuthoritativeSummonPresentationPending(enemyPokemon);
             globalScene.currentBattle.trainer?.tint(0, 0.5);
           }
           // Multi-format: position each on-field enemy by slot (LEFT/CENTER/RIGHT for 3).

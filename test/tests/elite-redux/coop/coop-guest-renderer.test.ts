@@ -28,6 +28,7 @@ import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { adoptCoopEnemiesStructural, buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { CoopInteractionRelay, setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import { markCoopAuthoritativeSummonPresentationPending } from "#data/elite-redux/coop/coop-presentation";
 import {
   isCoopRendererGateEnforced,
   setCoopRendererGateEnforced,
@@ -59,8 +60,13 @@ import { SpeciesId } from "#enums/species-id";
 import { StatusEffect } from "#enums/status-effect";
 import { SwitchType } from "#enums/switch-type";
 import { TrainerSlot } from "#enums/trainer-slot";
+import { TrainerType } from "#enums/trainer-type";
+import { TrainerVariant } from "#enums/trainer-variant";
 import { UiMode } from "#enums/ui-mode";
 import { EnemyPokemon, type Pokemon } from "#field/pokemon";
+import { Trainer } from "#field/trainer";
+import { EncounterPhase } from "#phases/encounter-phase";
+import { NextEncounterPhase } from "#phases/next-encounter-phase";
 import { VoucherType } from "#system/voucher";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -252,7 +258,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     ).toBeUndefined();
   });
 
-  it("the guest's host-slot CommandPhase auto-resolves to an inert command (no menu, no await)", async () => {
+  it("the guest's host-slot CommandPhase restores gated summon presentation, then auto-resolves", async () => {
     await startCoopGuest();
     globalScene.currentBattle.turnCommands = {};
     // The renderer gate neutralizes SummonPhase, which normally owns this hide tween. Model the
@@ -260,6 +266,25 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const trainerVisibilitySpy = vi.spyOn(globalScene.trainer, "setVisible");
     globalScene.trainer.setVisible(true);
     trainerVisibilitySpy.mockClear();
+    // Live trainer-wave ordering: authoritative apply has already seated these enemies, then
+    // EncounterPhase hides them before its SummonPhases. The renderer gate neutralizes both
+    // summons, so CommandPhase must restore the containers, sprites, and info panels without
+    // re-seating or re-running any battle hooks.
+    const enemyField = globalScene.getEnemyField(true).filter(enemy => enemy.isOnField());
+    expect(enemyField.length, "the fixture has seated enemies to render").toBeGreaterThan(0);
+    for (const enemy of enemyField) {
+      enemy.setVisible(false);
+      enemy.getSprite().setVisible(false);
+      enemy.getBattleInfo().setVisible(false);
+      markCoopAuthoritativeSummonPresentationPending(enemy);
+    }
+    // A hidden but UNMARKED battler models intentional invisibility (Fly/Dig,
+    // Substitute focus, Commander). The postcondition must not reveal it.
+    const intentionallyHidden = globalScene.getPlayerField(true).find(pokemon => pokemon.isOnField())!;
+    intentionallyHidden.setVisible(false);
+    const enemyTrainer = new Trainer(TrainerType.YOUNGSTER, TrainerVariant.DEFAULT, 0);
+    enemyTrainer.setAlpha(1);
+    globalScene.currentBattle.trainer = enemyTrainer;
     const setModeSpy = vi.spyOn(globalScene.ui, "setMode");
 
     // Field slot 0 is the HOST's mon from the guest's POV: the guest must NOT open a menu
@@ -275,6 +300,42 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       trainerVisibilitySpy,
       "authoritative guest clears the launch trainer before command UI",
     ).toHaveBeenCalledWith(false);
+    expect(enemyTrainer.alpha, "the enemy trainer reaches its normal post-summon hidden state").toBe(0);
+    expect(enemyTrainer.visible, "the enemy trainer cannot be revived by its unfinished fade tween").toBe(false);
+    for (const enemy of enemyField) {
+      expect(enemy.isOnField(), "presentation repair does not change authoritative seating").toBe(true);
+      expect(enemy.visible, "the seated enemy container is visible").toBe(true);
+      expect(enemy.getSprite().visible, "the seated enemy sprite is visible").toBe(true);
+      expect(enemy.getBattleInfo().visible, "the seated enemy info panel is visible").toBe(true);
+    }
+    expect(intentionallyHidden.visible, "unmarked intentional battler invisibility is preserved").toBe(false);
+  });
+
+  it("clears the gated guest's player trainer before the next-encounter authority wait", async () => {
+    await startCoopGuest();
+    const trainerVisibilitySpy = vi.spyOn(globalScene.trainer, "setVisible");
+    globalScene.trainer.setVisible(true);
+    trainerVisibilitySpy.mockClear();
+    // Keep this regression at the production EncounterPhase.start seam without starting
+    // its intentional fail-closed network wait in a single-client test.
+    const encounterPrototype = EncounterPhase.prototype as unknown as {
+      shouldAdoptCoopEnemyParty: () => boolean;
+      runEncounter: () => void;
+    };
+    const shouldAdoptSpy = vi.spyOn(encounterPrototype, "shouldAdoptCoopEnemyParty").mockReturnValue(false);
+    const runEncounterSpy = vi.spyOn(encounterPrototype, "runEncounter").mockImplementation(() => {});
+    try {
+      new NextEncounterPhase().start();
+      expect(runEncounterSpy, "normal encounter startup still follows the cleanup").toHaveBeenCalledOnce();
+      expect(
+        trainerVisibilitySpy,
+        "the unmatched ShowTrainerPhase residue is cleared before waiting for enemy authority",
+      ).toHaveBeenCalledWith(false);
+      expect(globalScene.trainer.visible).toBe(false);
+    } finally {
+      runEncounterSpy.mockRestore();
+      shouldAdoptSpy.mockRestore();
+    }
   });
 
   it("the guest's TurnStartPhase DIVERTS to CoopReplayTurnPhase: no MovePhase, no resolution", async () => {

@@ -8,6 +8,10 @@ export abstract class BattlePhase extends Phase {
       console.warn("Enemy trainer is missing!");
       return;
     }
+    // Co-op's presentation-only command postcondition may hard-hide this container after
+    // structural SummonPhase is neutralized. Every legitimate trainer re-entry funnels through
+    // this method, so restore the container before revealing its child sprites / alpha tween.
+    globalScene.currentBattle.trainer.setVisible(true);
     const sprites = globalScene.currentBattle.trainer.getSprites();
     const tintSprites = globalScene.currentBattle.trainer.getTintSprites();
     for (let i = 0; i < sprites.length; i++) {
