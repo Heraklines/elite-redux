@@ -1385,7 +1385,7 @@ export function applyCoopEnemies(enemies: CoopSerializedEnemy[]): void {
           // modifiers. Move those bindings with the object before adopting the host id; otherwise the mon
           // becomes visually correct while its items remain orphaned under the discarded local id.
           for (const modifier of globalScene.findModifiers(
-            m => m instanceof PokemonHeldItemModifier && m.pokemonId === previousId,
+            (m): m is PokemonHeldItemModifier => m instanceof PokemonHeldItemModifier && m.pokemonId === previousId,
             false,
           )) {
             modifier.pokemonId = authoritativeId;
@@ -3097,25 +3097,6 @@ export function applyCoopAuthoritativeBattleState(
     reconcileAuthoritativeParty("player", playerParty, authoritativeGuest);
     reconcileAuthoritativeParty("enemy", enemyParty, authoritativeGuest);
     reconcileAuthoritativeField(state, playerParty, enemyParty);
-    // Field reconciliation can call leaveField on fainted/unseated mons, which resets summon data and may
-    // recalculate derived stats after the party-data apply above. Reassert the host's explicit stat arrays at
-    // the completed boundary so fainted slots remain checksum-identical too.
-    for (const [liveParty, hostParty] of [
-      [globalScene.getPlayerParty() as Pokemon[], playerParty],
-      [globalScene.getEnemyParty() as Pokemon[], enemyParty],
-    ] as const) {
-      for (const [index, mon] of liveParty.entries()) {
-        // reconcileAuthoritativeParty has just made the live party order identical to the host party. Match
-        // this final derived-stat reassert by that canonical position: leaveField can reset a fainted mon's
-        // summon data (and, on older payloads, its local id can still differ), but it cannot change its party
-        // position. This closes the last post-reconcile 40/42-style fainted max-HP drift.
-        const hostData = hostParty[index];
-        if (hostData != null && Array.isArray(hostData.stats) && hostData.stats.length > 0) {
-          mon.stats = [...hostData.stats];
-          mon.hp = Math.max(0, Math.min(Math.trunc(hostData.hp), mon.getMaxHp()));
-        }
-      }
-    }
     const arena = globalScene.arena;
     if ((arena.weather?.weatherType ?? 0) !== state.weather) {
       arena.trySetWeather(state.weather as WeatherType);
@@ -3143,6 +3124,22 @@ export function applyCoopAuthoritativeBattleState(
       Phaser.Math.RND.sow([state.waveSeed]);
     }
     restoreCoopModuleLetSubstrates(state);
+    // Field reconciliation, modifier reconciliation, and ER substrate restoration can all recalculate
+    // derived stats after the party-data apply. Reassert the host's explicit arrays at the TRUE completed
+    // data boundary so fainted/off-field slots remain checksum-identical too. Party reconciliation has made
+    // live order authoritative, which is stable even for an older payload whose local runtime id differed.
+    for (const [liveParty, hostParty] of [
+      [globalScene.getPlayerParty() as Pokemon[], playerParty],
+      [globalScene.getEnemyParty() as Pokemon[], enemyParty],
+    ] as const) {
+      for (const [index, mon] of liveParty.entries()) {
+        const hostData = hostParty[index];
+        if (hostData != null && Array.isArray(hostData.stats) && hostData.stats.length > 0) {
+          mon.stats = [...hostData.stats];
+          mon.hp = Math.max(0, Math.min(Math.trunc(hostData.hp), mon.getMaxHp()));
+        }
+      }
+    }
     // PHASE 3 (#838): reconcile the RENDER to the freshly-applied DATA over every on-field mon -
     // unconditional cheap refresh (battle-info bars, status badge, boss segments, both held-item bars)
     // + a sprite-key-gated re-summon. Runs LAST so it sees the final field composition + modifier state.
