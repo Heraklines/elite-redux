@@ -111,6 +111,29 @@ function normalizeResponderCommand(
   };
 }
 
+/** Repair only authority-unambiguous geometry drift for a real local human command. */
+function normalizeLocalCommand(
+  command: SerializedCommand,
+  offer: CoopBattleCommandOffer | undefined,
+): SerializedCommand {
+  if (offer == null || command.command !== Command.FIGHT) {
+    return command;
+  }
+  const move =
+    (command.moveId == null ? undefined : offer.moves.find(candidate => candidate.moveId === command.moveId))
+    ?? offer.moves.find(candidate => candidate.slot === command.cursor);
+  if (move == null) {
+    return command;
+  }
+  const requestedTargets = command.targets;
+  const exactTargets =
+    requestedTargets == null ? undefined : move.targetSets.find(set => sameNumberSet(requestedTargets, set));
+  // A single legal set is not a choice (self/spread/sole target), so authority can repair a stale
+  // guest battler index. Multiple target sets represent a real human choice and must never be guessed.
+  const targets = exactTargets ?? (move.targetSets.length === 1 ? move.targetSets[0] : requestedTargets);
+  return { ...command, cursor: move.slot, moveId: move.moveId, ...(targets == null ? {} : { targets: [...targets] }) };
+}
+
 function sameNumberSet(left: readonly number[], right: readonly number[]): boolean {
   if (left.length !== right.length) {
     return false;
@@ -192,6 +215,8 @@ export class CoopBattleSync {
     string,
     { fieldIndex: number; turn: number; command: SerializedCommand; owner?: CoopRole }
   >();
+  /** Latest authority offer received for each local command address. */
+  private readonly peerOffers = new Map<string, CoopBattleCommandOffer>();
   /** Exactly-once command addresses; late duplicate frames cannot poison a restarted waiter. */
   private readonly settled = new Set<string>();
   private responder: CoopCommandResponder | null = null;
@@ -443,14 +468,23 @@ export class CoopBattleSync {
     // #851: stamp the local mon's resolved owner so the peer's awaiting request (which keys by the
     // SAME owner) matches even when the survivor sits at a different field index across the two engines.
     const key = commandKey(fieldIndex, turn, owner);
+    const normalizedCommand = normalizeLocalCommand(command, this.peerOffers.get(key));
     const prefix = key.slice(0, key.lastIndexOf(":") + 1);
     for (const cachedKey of [...this.localOutbox.keys()]) {
       if (cachedKey.startsWith(prefix) && Number(cachedKey.slice(prefix.length)) < turn) {
         this.localOutbox.delete(cachedKey);
+        this.peerOffers.delete(cachedKey);
+        this.settled.delete(cachedKey);
       }
     }
-    this.localOutbox.set(key, { fieldIndex, turn, command, ...(owner == null ? {} : { owner }) });
-    this.transport.send({ t: "command", fieldIndex, turn, command, ...(owner == null ? {} : { owner }) });
+    this.localOutbox.set(key, { fieldIndex, turn, command: normalizedCommand, ...(owner == null ? {} : { owner }) });
+    this.transport.send({
+      t: "command",
+      fieldIndex,
+      turn,
+      command: normalizedCommand,
+      ...(owner == null ? {} : { owner }),
+    });
   }
 
   /** Whether a responder is installed (this client can answer requests). */
@@ -465,6 +499,7 @@ export class CoopBattleSync {
     this.cancelPending();
     this.inbox.clear();
     this.localOutbox.clear();
+    this.peerOffers.clear();
     this.settled.clear();
     this.responder = null;
     this.bufferedRequests.length = 0;
@@ -497,17 +532,23 @@ export class CoopBattleSync {
 
   private handle(msg: CoopMessage): void {
     if (msg.t === "commandRequest") {
-      const cached = this.localOutbox.get(commandKey(msg.fieldIndex, msg.turn, msg.owner));
+      const key = commandKey(msg.fieldIndex, msg.turn, msg.owner);
+      if (msg.offer != null) {
+        this.peerOffers.set(key, msg.offer);
+      }
+      const cached = this.localOutbox.get(key);
       if (cached != null) {
         coopLog(
           "relay",
           `peer recv commandRequest fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> replay retained local command`,
         );
+        const normalizedCommand = normalizeLocalCommand(cached.command, msg.offer);
+        this.localOutbox.set(key, { ...cached, command: normalizedCommand });
         this.transport.send({
           t: "command",
           fieldIndex: msg.fieldIndex,
           turn: msg.turn,
-          command: cached.command,
+          command: normalizedCommand,
           ...(msg.owner == null ? {} : { owner: msg.owner }),
         });
         return;

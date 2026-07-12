@@ -1309,7 +1309,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const { guestTarget, guestTargetMon } = pickTargets(commandScene);
     const { slot, moveId } = resolveChosenMove(guestMon, guestTargetMon, seed, wave, GUEST_SLOT_SALT);
     const offeredMove = offer?.moves.find(move => move.slot === slot && move.moveId === moveId);
-    const offeredTargets = offeredMove?.targetSets.find(targets => targets.includes(guestTarget));
+    const offeredTargets =
+      offeredMove?.targetSets.find(targets => targets.includes(guestTarget))
+      ?? (offeredMove?.targetSets.length === 1 ? offeredMove.targetSets[0] : undefined);
     if (offeredMove == null || offeredTargets == null) {
       fail(
         "desync",
