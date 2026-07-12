@@ -5,14 +5,16 @@
 
 import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
+import { createServer } from "node:http";
 import { resolve } from "node:path";
 import process from "node:process";
 import puppeteer from "puppeteer";
 
 const root = resolve(import.meta.dirname, "..");
 const port = Number(process.env.COOP_BROWSER_PORT ?? 4173);
+const signalPort = Number(process.env.COOP_BROWSER_SIGNAL_PORT ?? port + 1);
 const origin = `http://127.0.0.1:${port}`;
-const signalOrigin = "http://coop-browser.test";
+const signalOrigin = `http://127.0.0.1:${signalPort}`;
 const artifactDir = resolve(root, "dev-logs", "coop-browser");
 const vite = resolve(root, "node_modules", ".bin", process.platform === "win32" ? "vite.cmd" : "vite");
 const server = spawn(vite, ["--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
@@ -46,49 +48,45 @@ async function waitForServer() {
   throw new Error("Timed out waiting for Vite");
 }
 
-function jsonResponse(body, status = 200) {
-  return {
-    status,
-    contentType: "application/json",
-    headers: { "Access-Control-Allow-Origin": "*" },
-    body: JSON.stringify(body),
-  };
-}
-
 const signals = { host: [], guest: [] };
+const signalServer = createServer((request, response) => {
+  void (async () => {
+    response.setHeader("Access-Control-Allow-Origin", "*");
+    response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    if (request.method === "OPTIONS") {
+      response.writeHead(204).end();
+      return;
+    }
+    const url = new URL(request.url ?? "/", signalOrigin);
+    if (url.pathname === "/coop/signal" && request.method === "POST") {
+      const chunks = [];
+      for await (const chunk of request) {
+        chunks.push(chunk);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+      if ((body.role !== "host" && body.role !== "guest") || typeof body.signal !== "string") {
+        response.writeHead(400, { "Content-Type": "application/json" }).end('{"error":"bad signal"}');
+        return;
+      }
+      signals[body.role].push(body.signal);
+      response.writeHead(200, { "Content-Type": "application/json" }).end('{"ok":true}');
+      return;
+    }
+    if (url.pathname === "/coop/signal" && request.method === "GET") {
+      const role = url.searchParams.get("role");
+      const peer = role === "host" ? "guest" : "host";
+      response
+        .writeHead(200, { "Content-Type": "application/json" })
+        .end(JSON.stringify({ signal: signals[peer].shift() ?? null }));
+      return;
+    }
+    response.writeHead(404, { "Content-Type": "application/json" }).end('{"error":"not found"}');
+  })().catch(error => {
+    response.writeHead(500, { "Content-Type": "application/json" }).end(JSON.stringify({ error: String(error) }));
+  });
+});
 
 async function configurePage(page, label, browserErrors) {
-  await page.setRequestInterception(true);
-  page.on("request", request => {
-    void (async () => {
-      const url = new URL(request.url());
-      if (url.origin !== signalOrigin) {
-        await request.continue();
-        return;
-      }
-      if (request.method() === "OPTIONS") {
-        await request.respond({ status: 204, headers: { "Access-Control-Allow-Origin": "*" } });
-        return;
-      }
-      if (url.pathname === "/coop/signal" && request.method() === "POST") {
-        const body = JSON.parse(request.postData() ?? "{}");
-        if ((body.role !== "host" && body.role !== "guest") || typeof body.signal !== "string") {
-          await request.respond(jsonResponse({ error: "bad signal" }, 400));
-          return;
-        }
-        signals[body.role].push(body.signal);
-        await request.respond(jsonResponse({ ok: true }));
-        return;
-      }
-      if (url.pathname === "/coop/signal" && request.method() === "GET") {
-        const role = url.searchParams.get("role");
-        const peer = role === "host" ? "guest" : "host";
-        await request.respond(jsonResponse({ signal: signals[peer].shift() ?? null }));
-        return;
-      }
-      await request.respond(jsonResponse({ error: "not found" }, 404));
-    })().catch(error => browserErrors.push(`[${label}:intercept] ${error.stack ?? error}`));
-  });
   page.on("pageerror", error => browserErrors.push(`[${label}:page] ${error.stack ?? error.message}`));
   page.on("console", message => {
     const text = message.text();
@@ -117,6 +115,10 @@ async function browserStatus(page) {
 let browser;
 try {
   await mkdir(artifactDir, { recursive: true });
+  await new Promise((resolveListen, rejectListen) => {
+    signalServer.once("error", rejectListen);
+    signalServer.listen(signalPort, "127.0.0.1", resolveListen);
+  });
   await waitForServer();
   browser = await puppeteer.launch({
     headless: true,
@@ -140,8 +142,7 @@ try {
         const { connectCoopWithCode } = await import("/src/data/elite-redux/coop/coop-webrtc-connect.ts");
         const runtime = await connectCoopWithCode("BROWSER", localRole, {
           username: localUsername,
-          // Host candidates are sufficient for two local browser contexts; avoid dependence on public STUN.
-          ice: { stunUrls: ["stun:127.0.0.1:9"] },
+          ice: { stunUrls: ["stun:stun.cloudflare.com:3478"] },
         });
         globalThis.__coopBrowserRuntime = runtime;
         const identity = await runtime.controller.awaitPartnerIdentity(15_000);
@@ -216,5 +217,6 @@ try {
   process.exitCode = 1;
 } finally {
   await browser?.close().catch(() => {});
+  signalServer.close();
   server.kill("SIGTERM");
 }
