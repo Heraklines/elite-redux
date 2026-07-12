@@ -492,6 +492,35 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("never downgrades a retained complete carrier to a party-only retry response", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host);
+      const guestStream = new CoopBattleStreamer(guest);
+      const party = [{ fieldIndex: 0, data: { speciesId: 307, level: 40 } }];
+      const encounter = {
+        battleType: 0,
+        mysteryEncounterType: -1,
+        formatId: "double",
+        enemyLevels: [40, 40],
+      };
+
+      hostStream.sendEnemyParty(2, party, -1, 0, undefined, encounter);
+      await new Promise(r => setTimeout(r, 0));
+      // Model the obsolete CommandPhase/re-request responder attempting to replace the same wave with
+      // a narrower carrier. The stream must retain and replay the complete EncounterPhase authority.
+      hostStream.sendEnemyParty(2, party, undefined, 0);
+      guestStream.consumeEnemyParty(2);
+      guestStream.consumeEnemyPartyEncounter(2);
+      guestStream.requestEnemyParty(2);
+      await new Promise(r => setTimeout(r, 0));
+
+      expect(guestStream.consumeEnemyParty(2)).toEqual(party);
+      expect(guestStream.consumeEnemyPartyEncounter(2)).toEqual(encounter);
+
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
     it("awaitEnemyPartyWithRetry resolves immediately from a party buffered BEFORE the await (no retry needed)", async () => {
       const { host, guest } = createLoopbackPair();
       const hostStream = new CoopBattleStreamer(host);

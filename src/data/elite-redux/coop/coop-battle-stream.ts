@@ -315,6 +315,14 @@ export class CoopBattleStreamer {
     authoritativeState?: CoopAuthoritativeBattleStateV1,
     encounter?: CoopEncounterAuthority,
   ): void {
+    const retained = this.sentEnemyParties.get(wave);
+    if (retained?.encounter !== undefined && encounter === undefined) {
+      // A complete encounter carrier is monotonic authority. A later legacy/turn-boundary sender must
+      // never overwrite or transmit a party-only version: the guest may consume that response first and
+      // then fail closed because its required descriptor is absent (live wave-1 -> wave-2 regression).
+      coopWarn("stream", `host IGNORE incomplete enemyPartySync downgrade wave=${wave} (complete carrier retained)`);
+      return;
+    }
     if (
       encounter !== undefined
       && ((meType !== undefined && encounter.mysteryEncounterType !== meType)

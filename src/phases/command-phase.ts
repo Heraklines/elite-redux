@@ -5,11 +5,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
-import {
-  applyCoopAuthoritativeBattleState,
-  captureCoopAuthoritativeBattleState,
-  captureCoopEnemies,
-} from "#data/elite-redux/coop/coop-battle-engine";
+import { applyCoopAuthoritativeBattleState } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
@@ -558,21 +554,7 @@ export class CommandPhase extends FieldPhase {
     // dead (a live co-op session is ALWAYS authoritative since M3) and is deleted. The per-turn
     // authoritative state (checkpoint + checksum) streams via emitTurn at TurnEnd (TRACK-2
     // Phase B) / CoopReplayTurnPhase; only the wave-start enemy-party belt-and-suspenders stays.
-    if (controller.role === "host") {
-      // Turn 1 of each wave (first command phase): broadcast the authoritative enemy
-      // party so the guest's enemies match exactly (ability/moveset/IVs/nature). The
-      // PER-TURN authoritative state (checkpoint + checksum) now streams via emitTurn at
-      // TurnEnd (#633, TRACK-2 Phase B), so it is NOT re-sent here.
-      if (this.fieldIndex === 0 && turn === 1) {
-        streamer.sendEnemyParty(
-          waveIndex,
-          captureCoopEnemies(),
-          undefined,
-          globalScene.currentBattle.battleType,
-          captureCoopAuthoritativeBattleState(turn) ?? undefined,
-        );
-      }
-    } else if (turn === 1) {
+    if (controller.role !== "host" && turn === 1) {
       // Guest: at the wave's first turn, adopt the host's exact enemy party (a belt-and-
       // suspenders for the encounter-phase adopt; one-shot). The per-turn checkpoint +
       // checksum verification is owned by CoopReplayTurnPhase now (Phase B), not here.

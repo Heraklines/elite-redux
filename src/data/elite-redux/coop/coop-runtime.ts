@@ -529,15 +529,11 @@ function wireCoopDurabilitySnapshotReceiver(runtime: CoopRuntime): void {
 }
 
 /**
- * Co-op enemy-party RE-REQUEST responder (#633/#698, handoff robustness): the HOST answers a
- * guest's `requestEnemyParty` by RE-broadcasting its enemy party for that wave - but ONLY when
- * the host has actually generated it (its live `currentBattle.waveIndex` matches AND the enemy
- * party is non-empty). Before that, the request is a harmless no-op: the host has not reached
- * its one-shot `broadcastCoopEnemyParty` in EncounterPhase yet, and when it does the guest's
- * parked waiter consumes it. This is the recovery arm for a LOST original `enemyPartySync` (or a
- * guest that reached its await first) so the guest pulls the party on demand instead of hard-
- * blocking the 120s ceiling. Gated on the live HOST role; a guest/solo client never answers.
- * Best-effort + guarded - a serialize/send failure never breaks the host's encounter.
+ * Co-op enemy-party RE-REQUEST fallback. The stream itself replays a retained carrier before this
+ * callback runs. Reaching this callback therefore means EncounterPhase has not published the complete
+ * carrier yet, so the only safe response is to wait for that publication. Re-serializing the live party
+ * here used to omit the encounter descriptor; that incomplete response could win the wave-2 race and
+ * permanently strand the guest even though the later complete carrier arrived.
  */
 function wireCoopEnemyPartyResponder(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
   battleStream.onEnemyPartyRequest(wave => {
@@ -546,32 +542,7 @@ function wireCoopEnemyPartyResponder(controller: CoopSessionController, battleSt
       coopLog("stream", `ignore requestEnemyParty wave=${wave} (not host, role=${controller.role})`);
       return;
     }
-    const battle = globalScene.currentBattle;
-    if (battle == null || battle.waveIndex !== wave) {
-      coopLog(
-        "stream",
-        `requestEnemyParty wave=${wave} no-op (host wave=${battle?.waveIndex ?? "none"} not yet at this encounter)`,
-      );
-      return;
-    }
-    try {
-      const enemies = captureCoopEnemies();
-      if (enemies.length === 0) {
-        coopLog("stream", `requestEnemyParty wave=${wave} no-op (host enemy party not generated yet)`);
-        return;
-      }
-      coopLog("stream", `re-broadcast enemyPartySync wave=${wave} count=${enemies.length} (host, on guest request)`);
-      battleStream.sendEnemyParty(
-        wave,
-        enemies,
-        undefined,
-        battle.battleType,
-        captureCoopAuthoritativeBattleState(battle.turn) ?? undefined,
-      );
-    } catch (e) {
-      /* a re-broadcast serialize/send failure must never break the host's encounter */
-      coopWarn("stream", `host re-broadcast enemyPartySync failed wave=${wave}`, e);
-    }
+    coopLog("stream", `requestEnemyParty wave=${wave} awaits complete EncounterPhase carrier (none retained yet)`);
   });
 }
 
