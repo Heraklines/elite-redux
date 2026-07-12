@@ -121,13 +121,24 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
 
   async function takeFirstRewardThroughPublicUi(
     rig: DuoRig,
+    ownerArgs: unknown[],
     expectedCallback: ModifierSelectCallback,
+    mirrorSeq: number,
   ): Promise<boolean> {
     resetCoopUiRelayTrace();
     const handler = rig.hostScene.ui.getHandler() as ModifierSelectUiHandler & {
       awaitingActionInput: boolean;
       onActionInput: ModifierSelectCallback | null;
     };
+    // A pending watcher projection may finish its async setMode after the owner's screen. Re-arm the
+    // exact owner arguments until that finite projection has settled, then make the public choice in
+    // the same turn without yielding. Separate browser processes never share this handler instance.
+    for (let i = 0; i < 500 && handler.onActionInput !== expectedCallback; i++) {
+      await rig.hostScene.ui.setMode(UiMode.MODIFIER_SELECT, ...ownerArgs);
+      if (handler.onActionInput !== expectedCallback) {
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+    }
     // The headless Phaser tween mock does not provide a reliable onUpdate/final cursor position. Use
     // the handler's public cursor surface to finish that cosmetic setup, then make the choice only
     // through UI.processInput. The carrier assertion below still proves the production callback and
@@ -137,6 +148,7 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     handler.tutorialActive = false;
     expect(handler.awaitingActionInput, "the reward handler is armed for the public action").toBe(true);
     expect(handler.onActionInput, "the installed callback belongs to the host owner phase").toBe(expectedCallback);
+    rig.hostRuntime.uiMirror.beginSession("owner", UiMode.MODIFIER_SELECT, mirrorSeq);
     rig.hostScene.ui.processInput(Button.ACTION);
     return getCoopUiRelayEdges().some(
       edge => edge.mode === UiMode.MODIFIER_SELECT && edge.carrier === "interactionChoice",
@@ -241,15 +253,15 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
       }
       expect(rig.hostScene.ui.getMode(), "the owner reached the real reward UI").toBe(UiMode.MODIFIER_SELECT);
       expect(ownerModifierArgs, "the production phase supplied the modifier UI callback").not.toBeNull();
-      await rig.hostScene.ui.setMode(UiMode.MODIFIER_SELECT, ...(ownerModifierArgs ?? []));
-      // The guest watcher's async continuation also runs in this one process and can overwrite the
-      // process-global active mirror after the host phase already began its OWNER session. Real clients
-      // have distinct runtimes/processes. Reassert that proven owner session on the host runtime so the
-      // public UI input is routed through its actual owner mirror, not blocked as a phantom watcher.
-      rig.hostRuntime.uiMirror.beginSession("owner", UiMode.MODIFIER_SELECT, counterBefore * 64);
       // Normalize the cursor state omitted by the headless tween mock, then cross the same public
       // UI input boundary as a player and require proof that the authoritative carrier was reached.
-      const reachedRelay = await takeFirstRewardThroughPublicUi(rig, ownerModifierArgs?.[2] as ModifierSelectCallback);
+      const ownerArgs = ownerModifierArgs ?? [];
+      const reachedRelay = await takeFirstRewardThroughPublicUi(
+        rig,
+        ownerArgs,
+        ownerArgs[2] as ModifierSelectCallback,
+        counterBefore * 64,
+      );
       expect(reachedRelay, "the public reward-shop UI input reached the production interaction relay").toBe(true);
       await drainLoopback();
     });
