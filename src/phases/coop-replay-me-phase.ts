@@ -17,7 +17,6 @@ import {
   commitMeOwnerIntent,
   coopMeTerminalSanctionedTails,
 } from "#data/elite-redux/coop/coop-me-operation";
-import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   coopMeHandoffBattleStarted,
   coopMeInteractionStartValue,
@@ -26,6 +25,7 @@ import {
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import { isCoopOperationJournalActive } from "#data/elite-redux/coop/coop-operation-journal";
+import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   getCoopBattleStreamer,
   getCoopController,
@@ -881,6 +881,10 @@ export class CoopReplayMePhase extends Phase {
     {
       const counter = this.interactionCounter;
       const relayRef = getCoopInteractionRelay();
+      // Bind the controller that owns this replay when the listener is armed. Besides making two-engine
+      // harnesses faithful, this prevents a late terminal from ever advancing a replacement session whose
+      // globals became active while the network promise was pending.
+      const controllerRef = getCoopController();
       // #829 co-op COLOSSEUM: before arming the default detached 9M-await, offer the terminal to a
       // registered between-rounds delegate (the Colosseum gauntlet loop, from coop-colosseum.ts). If it
       // CLAIMS the terminal (returns true) it drives every SUBSEQUENT round + the eventual leave/advance
@@ -902,7 +906,7 @@ export class CoopReplayMePhase extends Phase {
             }
           }
           try {
-            getCoopController()?.advanceInteraction(counter);
+            controllerRef?.advanceInteraction(counter);
           } catch {
             coopWarn("me", "advanceInteraction threw at detached handoff end (handled, idempotent)", { counter });
           }

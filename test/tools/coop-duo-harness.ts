@@ -133,6 +133,7 @@ import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { Stat } from "#enums/stat";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
@@ -778,6 +779,11 @@ export function mirrorHostBattleToGuest(
       enemy.setBoss(true, (hostEnemy as EnemyPokemon).bossSegments);
       enemy.bossSegmentIndex = (hostEnemy as EnemyPokemon).bossSegmentIndex;
     }
+    // A PokemonData constructor can recalculate a different HP ceiling under the guest's module context.
+    // The production wave carrier applies the serialized host ceiling in applyCoopEnemies; this direct
+    // two-engine mirror must model that same boundary rather than injecting harness-only pre-turn drift.
+    enemy.setStat(Stat.HP, hostEnemy.getMaxHp());
+    enemy.hp = Math.max(0, Math.min(hostEnemy.hp, hostEnemy.getMaxHp()));
     enemyParty.push(enemy);
   }
   guestScene.currentBattle.enemyParty = enemyParty;
