@@ -9,6 +9,7 @@ on:
       - ".github/workflows/coop-gate-sharded.yml"
       - "scripts/run-coop-gate.mjs"
       - "scripts/run-coop-static-gate.mjs"
+      - "scripts/run-coop-browser-transport.mjs"
       - "src/**"
       - "test/**"
 
@@ -17,6 +18,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  browser:
+    name: Browser-native WebRTC handshake and rejoin
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Install isolated Chrome runtime
+        run: pnpm exec puppeteer browsers install chrome
+
+      - name: Run two-context production transport checkpoint
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: node scripts/run-coop-browser-transport.mjs
+
+      - name: Upload browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-browser-transport
+          path: dev-logs/coop-browser/**
+          retention-days: 7
+          if-no-files-found: warn
+
   static:
     name: Co-op static type and format gate
     runs-on: ubuntu-latest
