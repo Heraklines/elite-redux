@@ -1310,10 +1310,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const { slot, moveId } = resolveChosenMove(guestMon, guestTargetMon, seed, wave, GUEST_SLOT_SALT);
     const offeredMove =
       offer?.moves.find(move => move.moveId === moveId) ?? offer?.moves.find(move => move.slot === slot);
-    const guestTargetOrdinal = commandScene
-      .getEnemyField()
-      .filter(mon => mon.isActive(true))
-      .findIndex(mon => mon.id === guestTargetMon.id);
+    // The renderer can hold a provisionally seated enemy whose internal battler index is still -1.
+    // Target UI order is the visible enemy-field order, not `isActive(true)` (which depends on that
+    // very index), so preserve the human's ordinal choice and map it onto the host's legal target sets.
+    const guestTargetOrdinal = commandScene.getEnemyField().findIndex(mon => mon.id === guestTargetMon.id);
     const offeredTargets =
       offeredMove?.targetSets.find(targets => targets.includes(guestTarget))
       ?? (offeredMove?.targetSets.length === 1 ? offeredMove.targetSets[0] : undefined)
