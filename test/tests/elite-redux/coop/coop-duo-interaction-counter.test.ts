@@ -46,7 +46,6 @@ import {
   type DuoRig,
   drainLoopback,
   driveGuestReplayTurn,
-  driveGuestRewardWatch,
   forceItemRewards,
   installDuoLogCapture,
   remirrorWave,
@@ -168,6 +167,12 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
       "#837 fix #2: the guest counter is unchanged (no asymmetric divergence)",
     ).toBe(guestCounterPre);
 
+    // Start the reciprocal real watcher BEFORE the owner can commit. This resolves the production shop
+    // arrival barrier and removes the old harness fiction where the owner selected before a watcher existed.
+    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    withClientSync(rig.guestCtx, () => guestShop.start());
+    await drainLoopback();
+
     // ===== Finish the shop through the SAME public UI boundary as a human. =====
     await withClient(rig.hostCtx, async () => {
       // coopOpenOwnerShopAfterBarrier opens asynchronously after its bounded arrival wait. Poll the real
@@ -193,8 +198,9 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
       ).toBe(true);
       await drainLoopback();
     });
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
-    await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+    for (let i = 0; i < 100 && rig.guestRuntime.controller.interactionCounter() === counterBefore; i++) {
+      await drainLoopback();
+    }
 
     // The interaction counter advanced EXACTLY ONCE and is IDENTICAL on both clients (the #837 invariant).
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter exactly once").toBe(
