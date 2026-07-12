@@ -21,10 +21,7 @@ import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { settleCoopFieldPresentation } from "#data/elite-redux/coop/coop-field-presentation";
-import {
-  clearCoopAuthoritativeGuestPlayerTrainer,
-  markCoopAuthoritativeSummonPresentationPending,
-} from "#data/elite-redux/coop/coop-presentation";
+import { clearCoopAuthoritativeGuestPlayerTrainer } from "#data/elite-redux/coop/coop-presentation";
 import {
   getCoopBattleStreamer,
   getCoopController,
@@ -890,7 +887,6 @@ export class EncounterPhase extends BattlePhase {
             enemyPokemon.tint(0, 0.5);
           } else if (battle.battleType === BattleType.TRAINER) {
             enemyPokemon.setVisible(false);
-            markCoopAuthoritativeSummonPresentationPending(enemyPokemon);
             globalScene.currentBattle.trainer?.tint(0, 0.5);
           }
           // Multi-format: position each on-field enemy by slot (LEFT/CENTER/RIGHT for 3).

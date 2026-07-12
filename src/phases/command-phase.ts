@@ -573,8 +573,8 @@ export class CommandPhase extends FieldPhase {
     super.start();
 
     // CommandPhase is the first stable boundary after the authoritative renderer gate may have
-    // neutralized structural SummonPhase. Restore only presentation state here; the helper never
-    // seats Pokemon or mutates battle mechanics.
+    // neutralized structural SummonPhase. Restore trainer chrome only; Pokémon visibility and field
+    // membership must come from an authoritative seat manifest, never a local presentation guess.
     ensureCoopAuthoritativeCommandPresentation();
 
     this.tryCoopCheckpointSync();
