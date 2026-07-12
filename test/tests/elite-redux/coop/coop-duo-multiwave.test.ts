@@ -72,6 +72,7 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -153,8 +154,12 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     // reward without driving a party-target menu - exercising the reward-grant + relay on purpose.
     forceItemRewards(game.override, [{ name: "LURE" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    // Boot handshakes with ordinary microtask delivery, then run the complete three-wave journey with
+    // explicit destination-client delivery. `drainLoopback` now pumps only the currently installed
+    // ClientCtx, so no transport continuation can resume against the other engine's globalScene.
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    pair.setAutomaticDelivery(false);
     wireGuestCommand(rig);
 
     const applyCheckpointSpy = vi.spyOn(coopEngine, "applyCoopCheckpoint");
