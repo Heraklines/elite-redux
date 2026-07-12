@@ -63,7 +63,7 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
-import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
+import { createScheduledCoopPair, type ScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import { generateStarters } from "#test/utils/game-manager-utils";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -100,6 +100,34 @@ const guestTeam = (): ShowdownMonManifest[] => [
 
 function toShowdown(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.SHOWDOWN);
+}
+
+/**
+ * Run host phase machinery while delivering each scheduled inbox under its owning client context. This is
+ * the one-process equivalent of two browser event loops: an EnemyCommandPhase may await the guest without
+ * either client's transport handlers ever observing the other client's process-global scene/runtime.
+ */
+async function driveScheduledHost<T>(rig: ShowdownDuoRig, pair: ScheduledCoopPair, work: () => Promise<T>): Promise<T> {
+  const pending = withClient(rig.hostCtx, work);
+  let settled = false;
+  pending.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    },
+  );
+  const deadline = Date.now() + 30_000;
+  while (!settled) {
+    withClientSync(rig.guestCtx, () => pair.flush("guest"));
+    withClientSync(rig.hostCtx, () => pair.flush("host"));
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    if (Date.now() >= deadline) {
+      throw new Error("scheduled Showdown host drive timed out while pumping both client inboxes");
+    }
+  }
+  return await pending;
 }
 
 /** Serialize the host's launch session EXACTLY as EncounterPhase.broadcastCoopLaunchSnapshot does. */
@@ -289,7 +317,7 @@ describe.skipIf(!RUN)("Showdown versus - turn-1 initial-summon ability desync (t
     const turn = rig.hostScene.currentBattle.turn;
 
     // HOST plays a turn (TACKLE into the guest's lead, no KO); its EnemyCommandPhase consumes the relayed SPLASH.
-    await withClient(rig.hostCtx, async () => {
+    await driveScheduledHost(rig, pair, async () => {
       game.move.select(MoveId.TACKLE, 0, BattlerIndex.ENEMY);
       await game.phaseInterceptor.to("TurnEndPhase");
     });

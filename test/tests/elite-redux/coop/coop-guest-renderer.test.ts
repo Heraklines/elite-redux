@@ -863,11 +863,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   it("POST-BATTLE SOFTLOCK (#633): a wave-resolved final turn renders then terminates without a phantom loop", async () => {
     await startCoopGuest();
     const finalTurn = globalScene.currentBattle.turn;
-    const wave = globalScene.currentBattle.waveIndex;
     const partner = getCoopRuntime()!.partnerTransport!;
 
     // The host resolves the wave immediately before its final addressed turn commit (the live wire order).
-    partner.send({ t: "waveResolved", wave, outcome: "win" });
+    sendWaveAdvance(partner, "win");
     await new Promise(r => setTimeout(r, 0));
     partner.send({
       t: "turnResolution",

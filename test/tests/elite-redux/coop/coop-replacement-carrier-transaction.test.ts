@@ -24,9 +24,9 @@ function state(tick: number): CoopAuthoritativeBattleStateV1 {
     tick,
     wave: 4,
     turn: 2,
-    playerParty: [],
-    enemyParty: [],
-    field: [],
+    playerParty: [{ id: 101 }],
+    enemyParty: [{ id: 202 }],
+    field: [{ side: "player", bi: 1, partyIndex: 0, pokemonId: 101, presented: true }],
     weather: 0,
     weatherTurnsLeft: 0,
     terrain: 0,
@@ -42,7 +42,18 @@ function state(tick: number): CoopAuthoritativeBattleStateV1 {
 function checkpoint(tick: number): CoopBattleCheckpoint {
   return {
     tick,
-    field: [],
+    field: [
+      {
+        bi: 1,
+        partyIndex: 0,
+        speciesId: 1,
+        hp: 1,
+        maxHp: 1,
+        status: 0,
+        statStages: [0, 0, 0, 0, 0, 0, 0],
+        fainted: false,
+      },
+    ],
     weather: 0,
     weatherTurnsLeft: 0,
     terrain: 0,
@@ -54,7 +65,7 @@ function fullField(): CoopFullMonSnapshot[] {
   return [
     {
       bi: 1,
-      partyIndex: 1,
+      partyIndex: 0,
       speciesId: 1,
       hp: 1,
       maxHp: 1,

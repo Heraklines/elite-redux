@@ -132,6 +132,9 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   // Guest-side dispatcher: its authoritative-role branch queues CoopReplayTurnPhase and returns
   // before any move/capture/enemy resolution is constructed.
   "TurnStartPhase",
+  // Guest-side input bootstrap: its authoritative-role branch resets input ephemera, queues only owned
+  // CommandPhase intents plus TurnStartPhase, and returns before any battle mechanics execute.
+  "TurnInitPhase",
   "RevivalBlessingPhase", // revival PICK intent (the APPLY half is host-authoritative)
   "CoopGuestCatchFullPhase", // guest-catcher CATCH_FULL intent driver
   "CoopGuestFaintSwitchPhase", // guest faint-switch intent driver

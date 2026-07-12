@@ -36,7 +36,11 @@ import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import type { CoopBattleCheckpoint, CoopFullMonSnapshot } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopBattleCheckpoint,
+  CoopFullMonSnapshot,
+} from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
@@ -158,7 +162,9 @@ describe.skipIf(!RUN)(
       const staleChecksum = call?.[5] as string;
       const stalePreimage = call?.[6] as string | undefined;
       const staleFullField = call?.[7] as CoopFullMonSnapshot[] | undefined;
+      const staleAuthoritativeState = call?.[8] as CoopAuthoritativeBattleStateV1 | undefined;
       expect(staleFullField, "the resolution carried the on-field fullField snapshot").toBeDefined();
+      expect(staleAuthoritativeState, "the resolution carried the protocol-32 authoritative state").toBeDefined();
 
       // GUEST renders turn 1: the faint presentation opens the guest's OWN picker; stub the ONE PARTY open to
       // pick CHARIZARD - the RELAY send + seq keying stay fully real. This applies the tick-N resolution.
@@ -250,6 +256,10 @@ describe.skipIf(!RUN)(
           staleChecksum,
           stalePreimage,
           staleFullField,
+          staleAuthoritativeState,
+          call?.[0] as number,
+          call?.[1] as number,
+          staleAuthoritativeState?.tick,
         );
         finalize.start();
       });

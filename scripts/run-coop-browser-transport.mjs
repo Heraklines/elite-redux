@@ -29,6 +29,36 @@ server.stderr.on("data", chunk => process.stderr.write(`[vite] ${chunk}`));
 
 const delay = ms => new Promise(resolveDelay => setTimeout(resolveDelay, ms));
 
+const sourceAssetRoots = ["/images/", "/audio/", "/battle-anims/", "/battle-anims-er/", "/fonts/"];
+const sourceAssetFiles = new Set([
+  "/starter-colors.json",
+  "/exp-sprites.json",
+  "/biome-bgm-loop-points.json",
+  "/logo128.png",
+  "/logo512.png",
+]);
+
+/**
+ * Source-mode Vite deliberately has no Cloudflare Pages redirect layer, so CDN-owned assets can 404 even
+ * though the same paths are served by the immutable er-assets pin in staging/production. The browser lane
+ * proves WebRTC/session behavior, not CDN completeness; keep these misses visible as diagnostics without
+ * allowing unrelated console errors to pass.
+ */
+function isExpectedSourceAssetMiss(text, locationUrl) {
+  if (!text.includes("Failed to load resource") || !locationUrl) {
+    return false;
+  }
+  try {
+    const url = new URL(locationUrl);
+    return (
+      url.origin === origin
+      && (sourceAssetRoots.some(prefix => url.pathname.startsWith(prefix)) || sourceAssetFiles.has(url.pathname))
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function waitForServer() {
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
@@ -86,7 +116,31 @@ const signalServer = createServer((request, response) => {
   });
 });
 
-async function configurePage(page, label, browserErrors) {
+async function configurePage(page, label, browserErrors, sourceAssetMisses) {
+  // Stub only services that the transport checkpoint does not own. This removes known source-mode noise
+  // without weakening page errors, co-op console errors, or arbitrary failed-resource diagnostics.
+  await page.setRequestInterception(true);
+  page.on("request", request => {
+    const requestUrl = request.url();
+    try {
+      const url = new URL(requestUrl);
+      if (url.pathname === "/manifest.json" && url.origin === origin) {
+        request
+          .respond({ status: 200, contentType: "application/json", body: '{"manifest":{}}' })
+          .catch(error => browserErrors.push(`[${label}:request] manifest stub failed: ${error}`));
+        return;
+      }
+      if (url.pathname === "/game/titlestats" && (url.hostname === "localhost" || url.hostname === "127.0.0.1")) {
+        request
+          .respond({ status: 200, contentType: "application/json", body: '{"playerCount":0,"battleCount":0}' })
+          .catch(error => browserErrors.push(`[${label}:request] title-stats stub failed: ${error}`));
+        return;
+      }
+    } catch {
+      // Let Chromium handle malformed/non-HTTP URLs; any resulting page/console error remains fatal below.
+    }
+    request.continue().catch(error => browserErrors.push(`[${label}:request] continue failed: ${error}`));
+  });
   page.on("pageerror", error => browserErrors.push(`[${label}:page] ${error.stack ?? error.message}`));
   page.on("console", message => {
     const text = message.text();
@@ -95,7 +149,11 @@ async function configurePage(page, label, browserErrors) {
       const source = location.url
         ? ` (${location.url}${location.lineNumber == null ? "" : `:${location.lineNumber}`})`
         : "";
-      browserErrors.push(`[${label}:console] ${text}${source}`);
+      if (isExpectedSourceAssetMiss(text, location.url)) {
+        sourceAssetMisses.push(`[${label}] ${location.url}`);
+      } else {
+        browserErrors.push(`[${label}:console] ${text}${source}`);
+      }
     }
     if (/\[coop:(?:launch|webrtc|session)\]/.test(text)) {
       process.stdout.write(`[${label}] ${text}\n`);
@@ -141,7 +199,11 @@ try {
   const hostPage = await hostContext.newPage();
   const guestPage = await guestContext.newPage();
   const browserErrors = [];
-  await Promise.all([configurePage(hostPage, "host", browserErrors), configurePage(guestPage, "guest", browserErrors)]);
+  const sourceAssetMisses = [];
+  await Promise.all([
+    configurePage(hostPage, "host", browserErrors, sourceAssetMisses),
+    configurePage(guestPage, "guest", browserErrors, sourceAssetMisses),
+  ]);
 
   const connect = (page, role, username) =>
     page.evaluate(
@@ -210,6 +272,13 @@ try {
   }
   if (browserErrors.length > 0) {
     throw new Error(`browser errors:\n${browserErrors.join("\n")}`);
+  }
+  if (sourceAssetMisses.length > 0) {
+    const uniqueMisses = [...new Set(sourceAssetMisses)];
+    process.stdout.write(
+      "[coop-browser] source-mode CDN misses (non-fatal; staging owns redirect/asset verification): "
+        + `${uniqueMisses.length} unique\n${uniqueMisses.join("\n")}\n`,
+    );
   }
   process.stdout.write(
     `[coop-browser] PASS native WebRTC handshake + protocol/fingerprint identity + hot rejoin ${JSON.stringify(rejoined)}\n`,

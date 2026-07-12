@@ -796,6 +796,7 @@ export abstract class PokemonSpeciesForm {
     variant: Variant,
     back = false,
     formIndex?: number,
+    scene = globalScene,
   ): Promise<void> {
     let baseSpriteKey = this.getBaseSpriteKey(female, formIndex);
     if (back) {
@@ -815,7 +816,7 @@ export abstract class PokemonSpeciesForm {
 
     await populateVariantColorCache(
       "pkmn__" + baseSpriteKey,
-      globalScene.experimentalSprites && hasExpSprite(spriteKey),
+      scene.experimentalSprites && hasExpSprite(spriteKey),
       baseSpriteKey.replace("__", "/"),
     );
   }
@@ -835,6 +836,11 @@ export abstract class PokemonSpeciesForm {
      */
     spriteOnly = false,
   ): Promise<void> {
+    // Asset loads belong to the scene that initiated them. In the two-engine harness (and during real
+    // navigation), process-global `globalScene` can point at a different scene before loader callbacks or
+    // the safety poll fire. Following that later scene leaks timers/listeners across clients and can read
+    // a torn-down texture manager. Pin every async continuation in this method to its initiating scene.
+    const scene = globalScene;
     const spriteKey = this.getSpriteKey(female, formIndex, shiny, variant, back);
     const atlasPath = this.getSpriteAtlasPath(female, formIndex, shiny, variant, back);
 
@@ -842,17 +848,17 @@ export abstract class PokemonSpeciesForm {
       const originalWarn = console.warn;
       // Ignore warnings for missing frames, because there will be a lot.
       console.warn = () => {};
-      const frameNames = globalScene.anims.generateFrameNames(spriteKey, {
+      const frameNames = scene.anims.generateFrameNames(spriteKey, {
         zeroPad: 4,
         suffix: ".png",
         start: 1,
         end: 400,
       });
       console.warn = originalWarn;
-      if (globalScene.anims.exists(spriteKey)) {
-        globalScene.anims.get(spriteKey).frameRate = 10;
+      if (scene.anims.exists(spriteKey)) {
+        scene.anims.get(spriteKey).frameRate = 10;
       } else {
-        globalScene.anims.create({
+        scene.anims.create({
           key: spriteKey,
           frames: frameNames,
           frameRate: 10,
@@ -862,17 +868,17 @@ export abstract class PokemonSpeciesForm {
     };
 
     const finalize = async (): Promise<void> => {
-      if (!globalScene.textures.exists(spriteKey)) {
+      if (!scene.textures.exists(spriteKey)) {
         return;
       }
       buildAnim();
       if (variant != null) {
         const spritePath = atlasPath.replace("variant/", "").replace(/_[1-3]$/, "");
-        await loadPokemonVariantAssets(spriteKey, spritePath, variant);
+        await loadPokemonVariantAssets(spriteKey, spritePath, variant, scene);
       }
     };
 
-    if (globalScene.textures.exists(spriteKey)) {
+    if (scene.textures.exists(spriteKey)) {
       await finalize();
       return;
     }
@@ -885,25 +891,25 @@ export abstract class PokemonSpeciesForm {
     const alreadyInFlight = inFlightAtlasLoads.has(spriteKey);
     if (!alreadyInFlight) {
       inFlightAtlasLoads.add(spriteKey);
-      globalScene.loadPokemonAtlas(spriteKey, atlasPath);
+      scene.loadPokemonAtlas(spriteKey, atlasPath);
     }
     if (!alreadyInFlight && !spriteOnly) {
-      globalScene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
+      scene.load.audio(this.getCryKey(formIndex), `audio/${this.getCryKey(formIndex)}.m4a`);
     }
     if (!alreadyInFlight && variant != null && !spriteOnly) {
       // Skipped in preview mode: this CPU-heavy variant-colour processing is
       // awaited BEFORE the atlas listener is attached, so a slow run delays the
       // atlas/anim and the sprite can't appear for seconds. In preview the tint
       // self-corrects once the colours land via the variant assets in finalize.
-      await this.loadVariantColors(spriteKey, female, variant, back, formIndex);
+      await this.loadVariantColors(spriteKey, female, variant, back, formIndex, scene);
     }
 
     return new Promise<void>(resolve => {
       let settled = false;
       let safetyTimer: Phaser.Time.TimerEvent | null = null;
       const cleanup = (): void => {
-        globalScene.load.off(`filecomplete-atlasjson-${spriteKey}`, onFileComplete);
-        globalScene.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onLoadError);
+        scene.load.off(`filecomplete-atlasjson-${spriteKey}`, onFileComplete);
+        scene.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onLoadError);
         safetyTimer?.remove();
         safetyTimer = null;
         // Release the dedupe slot so a future (post-failure) retry can re-issue
@@ -939,8 +945,8 @@ export abstract class PokemonSpeciesForm {
         }
       };
 
-      globalScene.load.on(`filecomplete-atlasjson-${spriteKey}`, onFileComplete);
-      globalScene.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onLoadError);
+      scene.load.on(`filecomplete-atlasjson-${spriteKey}`, onFileComplete);
+      scene.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onLoadError);
 
       // Authoritative completion detector: POLL for the texture rather than
       // relying solely on the `filecomplete-atlasjson` event. When the shared
@@ -952,14 +958,14 @@ export abstract class PokemonSpeciesForm {
       // actually lands (settle→finalize still builds the animation), and a
       // backstop UNBLOCKS the awaiter even if the load was silently dropped.
       let polls = 0;
-      safetyTimer = globalScene.time.addEvent({
+      safetyTimer = scene.time.addEvent({
         delay: 100,
         loop: true,
         callback: () => {
           if (settled) {
             return;
           }
-          if (globalScene.textures.exists(spriteKey)) {
+          if (scene.textures.exists(spriteKey)) {
             settle(); // texture landed (possibly via a missed event) — finalize + resolve
           } else if (++polls >= 100) {
             // ~10s with no texture: a genuine hang (very rare — the dev server
@@ -978,8 +984,8 @@ export abstract class PokemonSpeciesForm {
       });
 
       if (startLoad) {
-        if (!globalScene.load.isLoading()) {
-          globalScene.load.start();
+        if (!scene.load.isLoading()) {
+          scene.load.start();
         }
         // Race guard: when the loader was ALREADY running, `loadPokemonAtlas`
         // appends to it and the atlas can finish before this listener is
@@ -990,7 +996,7 @@ export abstract class PokemonSpeciesForm {
         // normal filecomplete listener will settle when it lands (no premature
         // timeout — settling before the texture exists would skip buildAnim and
         // leave the sprite permanently animation-less for slow loads).
-        if (globalScene.textures.exists(spriteKey)) {
+        if (scene.textures.exists(spriteKey)) {
           settle();
         }
       } else {
