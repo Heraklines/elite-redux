@@ -1262,9 +1262,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       const guestMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
       const explosionSlot = guestMon?.getMoveset().findIndex(move => move?.moveId === MoveId.EXPLOSION) ?? -1;
       if (explosionSlot >= 0 && moveSlots.includes(explosionSlot)) {
-        const offeredExplosion = offer?.moves.find(
-          move => move.slot === explosionSlot && move.moveId === MoveId.EXPLOSION,
-        );
+        const offeredExplosion =
+          offer?.moves.find(move => move.moveId === MoveId.EXPLOSION)
+          ?? offer?.moves.find(move => move.slot === explosionSlot);
         if (offeredExplosion == null || offeredExplosion.targetSets.length === 0) {
           fail("desync", wave, "host did not offer the guest's locally legal Explosion command");
         }
@@ -1308,7 +1308,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const guestMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
     const { guestTarget, guestTargetMon } = pickTargets(commandScene);
     const { slot, moveId } = resolveChosenMove(guestMon, guestTargetMon, seed, wave, GUEST_SLOT_SALT);
-    const offeredMove = offer?.moves.find(move => move.slot === slot && move.moveId === moveId);
+    const offeredMove =
+      offer?.moves.find(move => move.moveId === moveId) ?? offer?.moves.find(move => move.slot === slot);
     const offeredTargets =
       offeredMove?.targetSets.find(targets => targets.includes(guestTarget))
       ?? (offeredMove?.targetSets.length === 1 ? offeredMove.targetSets[0] : undefined);
@@ -1325,8 +1326,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     hitMode(UiMode.TARGET_SELECT);
     return {
       command: Command.FIGHT,
-      cursor: slot,
-      moveId,
+      cursor: offeredMove.slot,
+      moveId: offeredMove.moveId,
       targets: [...offeredTargets],
     };
   });
