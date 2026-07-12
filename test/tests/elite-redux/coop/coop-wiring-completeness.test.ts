@@ -153,4 +153,30 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
       "publication cannot depend on an interaction counter captured before reward commit",
     ).not.toContain("awaitPartnerInteraction(");
   });
+
+  it("finalizes encounter authority before dispatching any subtype-specific presentation", () => {
+    const phaseRoot = join(__dirname, "..", "..", "..", "..", "src", "phases");
+    const encounterSource = readFileSync(join(phaseRoot, "encounter-phase.ts"), "utf8");
+    const nextEncounterSource = readFileSync(join(phaseRoot, "next-encounter-phase.ts"), "utf8");
+    expect(nextEncounterSource, "the common next-wave phase overrides the presentation method").toContain(
+      "protected override doEncounter(): void",
+    );
+    expect(
+      encounterSource.match(/this\.doEncounter\(\)/g),
+      "all virtual presentation dispatches must pass through one mandatory authority chokepoint",
+    ).toHaveLength(1);
+    const boundaryStart = encounterSource.indexOf("private enterEncounterPresentation(): void");
+    const boundaryEnd = encounterSource.indexOf("private incrementMysteryEncounterChance", boundaryStart);
+    const boundary = encounterSource.slice(boundaryStart, boundaryEnd);
+    expect(boundary.indexOf("this.finalizeCoopEncounterAuthority()"), "authority is finalized first").toBeGreaterThan(
+      -1,
+    );
+    expect(boundary.indexOf("this.doEncounter()"), "subtype presentation is dispatched afterward").toBeGreaterThan(
+      boundary.indexOf("this.finalizeCoopEncounterAuthority()"),
+    );
+    expect(
+      encounterSource.match(/this\.enterEncounterPresentation\(\)/g),
+      "loaded, ephemeral, and persisted encounter branches all cross the chokepoint",
+    ).toHaveLength(3);
+  });
 });

@@ -533,6 +533,29 @@ export class EncounterPhase extends BattlePhase {
   }
 
   /**
+   * Mandatory authoritative boundary immediately before encounter presentation dispatch. This must live
+   * ABOVE the virtual {@linkcode doEncounter} call: NextEncounterPhase overrides that method, which let
+   * every wave after wave 1 generate enemies and reach CommandPhase without ever publishing its carrier.
+   */
+  private finalizeCoopEncounterAuthority(): void {
+    // This is the final stat-bearing encounter hook. Serialize only after it so held-item/stat recalculation
+    // cannot make the first visible frame differ from the retained carrier.
+    globalScene.updateModifiers(false);
+    if (this.coopAdoptedEnemyParty && this.coopEnemyAuthority != null) {
+      applyCoopEnemies(this.coopEnemyAuthority);
+    }
+    if (!this.loaded) {
+      this.broadcastCoopEnemyParty();
+    }
+  }
+
+  /** Finalize the shared authority, then dispatch the subtype-specific presentation. */
+  private enterEncounterPresentation(): void {
+    this.finalizeCoopEncounterAuthority();
+    this.doEncounter();
+  }
+
+  /**
    * Co-op HOST (#633 M4 push-snapshot launch): the instant the host's session is COHERENT at a
    * launch encounter (enemy party + arena + weather/terrain all set), serialize the FULL session
    * (`getSessionSaveData()` - the same complete serializer cloud-save + resume ride on) and PUSH it
@@ -876,7 +899,7 @@ export class EncounterPhase extends BattlePhase {
 
       globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
         if (this.loaded) {
-          this.doEncounter();
+          this.enterEncounterPresentation();
           globalScene.resetSeed();
         } else {
           // Set weather and terrain before session gets saved
@@ -906,7 +929,7 @@ export class EncounterPhase extends BattlePhase {
             // and boot the encounter directly. The guest already boots from the host's launch
             // snapshot (the `this.loaded` branch above), so only the host reaches here.
             globalScene.disableMenu = false;
-            this.doEncounter();
+            this.enterEncounterPresentation();
             globalScene.resetSeed();
           } else {
             globalScene.gameData
@@ -916,7 +939,7 @@ export class EncounterPhase extends BattlePhase {
                 if (!success) {
                   return globalScene.reset(true);
                 }
-                this.doEncounter();
+                this.enterEncounterPresentation();
                 globalScene.resetSeed();
               });
           }
@@ -939,18 +962,6 @@ export class EncounterPhase extends BattlePhase {
 
   protected doEncounter(): void {
     globalScene.playBgm(undefined, true);
-    globalScene.updateModifiers(false);
-
-    // updateModifiers is the LAST stat-bearing encounter hook. A guest must reassert the
-    // retained host manifest after it, and a host must serialize only after it, otherwise
-    // HP-Up/held-item recalculation makes the first visible frame divergent. Moving the
-    // carrier here also means its authoritativeState/checksum describe the completed setup.
-    if (this.coopAdoptedEnemyParty && this.coopEnemyAuthority != null) {
-      applyCoopEnemies(this.coopEnemyAuthority);
-    }
-    if (!this.loaded) {
-      this.broadcastCoopEnemyParty();
-    }
     globalScene.setFieldScale(1);
 
     for (const pokemon of globalScene.getPlayerParty()) {
