@@ -74,6 +74,15 @@ function completeTweensOf(target: object | object[]): void {
   }
 }
 
+/** Stop presentation motion without executing tween completion callbacks. */
+function killTweensOf(target: object | object[]): void {
+  try {
+    globalScene.tweens.killTweensOf(target);
+  } catch {
+    /* a torn-down/headless tween manager must not block the absolute visual settle */
+  }
+}
+
 function killPresentationTweens(pokemon: Pokemon): void {
   try {
     globalScene.tweens.killTweensOf(compactTargets(pokemon, pokemon.getSprite(), pokemon.getTintSprite()));
@@ -90,22 +99,13 @@ function hidePokemonPresentation(pokemon: Pokemon): void {
   try {
     const info = pokemon.getBattleInfo();
     info?.setVisible(false);
-    if (info != null) {
-      info.visible = false;
-    }
   } catch {
     /* headless battle-info stub */
   }
   const sprite = pokemon.getSprite();
   sprite?.setVisible(false);
-  if (sprite != null) {
-    sprite.visible = false;
-  }
   const tintSprite = pokemon.getTintSprite();
   tintSprite?.setVisible(false);
-  if (tintSprite != null) {
-    tintSprite.visible = false;
-  }
   pokemon.setVisible(false);
   pokemon.setAlpha(0);
   if (isActuallyInFieldContainer(pokemon)) {
@@ -117,14 +117,12 @@ function hidePokemonPresentation(pokemon: Pokemon): void {
 export function settleCoopTrainerPresentation(which: "player" | "enemy"): void {
   if (which === "player") {
     const trainer = globalScene.trainer;
-    completeTweensOf(trainer);
+    // ShowTrainerPhase owns a tween whose completion callback ends the gameplay phase. A renderer repair
+    // must never execute that callback: it can advance the queue while an authority frame is applying.
+    killTweensOf(trainer);
     // ShowTrainerPhase restores `visible`, but not alpha. Keep the persistent player trainer ready for
     // its next entrance while container visibility provides the absolute hidden postcondition.
     trainer.setVisible(false).setAlpha(1);
-    // Some reconstructed/headless trainer shells implement the setters as presentation stubs. Preserve the
-    // same absolute postcondition on the public Phaser properties so a stale overlay cannot survive either.
-    trainer.visible = false;
-    trainer.alpha = 1;
     return;
   }
 
@@ -174,9 +172,6 @@ function settleInfoImmediately(pokemon: Pokemon): void {
     const info = pokemon.getBattleInfo();
     completeTweensOf(compactTargets(info, info?.expMaskRect));
     info?.setVisible(true);
-    if (info != null) {
-      info.visible = true;
-    }
     void pokemon.updateInfo(true);
   } catch {
     /* headless battle-info stub */
@@ -233,18 +228,10 @@ function showPokemonPresentation(pokemon: Pokemon, slot: number, capacity: numbe
   sprite?.setVisible(true);
   sprite?.setAlpha(1);
   sprite?.clearTint();
-  if (sprite != null) {
-    sprite.visible = true;
-    sprite.alpha = 1;
-  }
   const tintSprite = pokemon.getTintSprite();
   tintSprite?.setVisible(false);
   tintSprite?.setAlpha(1);
   tintSprite?.clearTint();
-  if (tintSprite != null) {
-    tintSprite.visible = false;
-    tintSprite.alpha = 1;
-  }
   settleInfoImmediately(pokemon);
   try {
     pokemon.playAnim();
@@ -285,8 +272,15 @@ function settleFieldScaleImmediately(): void {
       return;
     }
     const fieldScale = Math.floor(Math.pow(1 / highestSpriteScale, 0.7) * 40) / 40;
-    void globalScene.setFieldScale(fieldScale, true);
-    completeTweensOf(globalScene.field);
+    // `setFieldScale(..., true)` still creates a zero-duration tween. Completing every tween targeting the
+    // shared field container can execute unrelated callbacks. Apply the same final transform directly.
+    const scale = fieldScale * 6;
+    const defaultWidth = globalScene.arenaBg.width * 6;
+    const defaultHeight = 132 * 6;
+    const scaledWidth = globalScene.arenaBg.width * scale;
+    const scaledHeight = 132 * scale;
+    killTweensOf(globalScene.field);
+    globalScene.field.setScale(scale).setPosition((defaultWidth - scaledWidth) / 2, defaultHeight - scaledHeight);
   } catch {
     /* a torn-down/headless field container must not block the remaining presentation settle */
   }

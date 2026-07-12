@@ -2803,6 +2803,30 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op/Showdown: later-wave field projection runs no local summon or recenter",
+    description:
+      "AUTHORITATIVE RENDERER regression - verify with TWO co-op clients across at least THREE waves, then\n"
+      + "start one fresh Showdown match as the guest. The partner previously entered the ordinary encounter\n"
+      + "tail on waves 2+, queued ToggleDoublePositionPhase locally, and relied on the renderer gate to turn it\n"
+      + "into a no-op; the fresh Showdown guest similarly queued a blocked SummonPhase for its own lead. EXPECT:\n"
+      + "both player Pokemon and their HP bars are visible in the correct slots before command input on every\n"
+      + "co-op wave; the Showdown guest sees its own lead on the player side; neither mode flashes/re-summons,\n"
+      + "re-runs an on-summon ability, collapses format, or logs a renderer-denied Summon/Return/Toggle phase.\n"
+      + "Use Send Logs at the first command boundary of wave 1, wave 2, and the Showdown match.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.CHIKORITA, {
+          moveset: [MoveId.RAZOR_LEAF, MoveId.BODY_SLAM, MoveId.SYNTHESIS, MoveId.REFLECT],
+        }),
+        makeStarter(SpeciesId.FENNEKIN, {
+          moveset: [MoveId.EMBER, MoveId.PSYBEAM, MoveId.QUICK_ATTACK, MoveId.HOWL],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: reciprocal pacing barriers + no counter drift (#839/#837)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle). Two related pacing/sync fixes:\n"
