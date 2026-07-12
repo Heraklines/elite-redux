@@ -119,15 +119,24 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     });
   }
 
-  async function takeFirstRewardThroughPublicUi(rig: DuoRig): Promise<boolean> {
+  async function takeFirstRewardThroughPublicUi(
+    rig: DuoRig,
+    expectedCallback: ModifierSelectCallback,
+  ): Promise<boolean> {
     resetCoopUiRelayTrace();
-    const handler = rig.hostScene.ui.getHandler() as ModifierSelectUiHandler;
+    const handler = rig.hostScene.ui.getHandler() as ModifierSelectUiHandler & {
+      awaitingActionInput: boolean;
+      onActionInput: ModifierSelectCallback | null;
+    };
     // The headless Phaser tween mock does not provide a reliable onUpdate/final cursor position. Use
     // the handler's public cursor surface to finish that cosmetic setup, then make the choice only
     // through UI.processInput. The carrier assertion below still proves the production callback and
     // interaction relay ran; no private SelectModifierPhase selection seam is invoked.
     handler.setRowCursor(1);
     handler.setCursor(0);
+    handler.tutorialActive = false;
+    expect(handler.awaitingActionInput, "the reward handler is armed for the public action").toBe(true);
+    expect(handler.onActionInput, "the installed callback belongs to the host owner phase").toBe(expectedCallback);
     rig.hostScene.ui.processInput(Button.ACTION);
     return getCoopUiRelayEdges().some(
       edge => edge.mode === UiMode.MODIFIER_SELECT && edge.carrier === "interactionChoice",
@@ -240,7 +249,7 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
       rig.hostRuntime.uiMirror.beginSession("owner", UiMode.MODIFIER_SELECT, counterBefore * 64);
       // Normalize the cursor state omitted by the headless tween mock, then cross the same public
       // UI input boundary as a player and require proof that the authoritative carrier was reached.
-      const reachedRelay = await takeFirstRewardThroughPublicUi(rig);
+      const reachedRelay = await takeFirstRewardThroughPublicUi(rig, ownerModifierArgs?.[2] as ModifierSelectCallback);
       expect(reachedRelay, "the public reward-shop UI input reached the production interaction relay").toBe(true);
       await drainLoopback();
     });
