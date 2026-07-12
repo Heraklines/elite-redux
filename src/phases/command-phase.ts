@@ -589,6 +589,15 @@ export class CommandPhase extends FieldPhase {
   public override start(): void {
     super.start();
 
+    // The authoritative guest intentionally neutralizes structural SummonPhase, including its
+    // player-trainer throw/tween cleanup. CommandPhase is the first invariant point at which the
+    // encounter is materialized and input can open, so enforce the presentation postcondition here:
+    // the trainer must no longer cover the field. This is guest-authoritative only; host/solo keep
+    // the normal SummonPhase animation and timing unchanged.
+    if (getCoopController()?.role === "guest" && getCoopNetcodeMode() === "authoritative") {
+      globalScene.trainer.setVisible(false);
+    }
+
     this.tryCoopCheckpointSync();
 
     globalScene.updateGameInfo();

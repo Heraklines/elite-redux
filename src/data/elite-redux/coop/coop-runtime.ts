@@ -1946,9 +1946,16 @@ export function broadcastCoopOwnSlotCommand(fieldIndex: number, command: Seriali
       `broadcast own-slot fi=${fieldIndex} turn=${globalScene.currentBattle.turn} role=${active.controller.role} cmd=${command.command}`,
     );
   }
-  // #851: stamp the resolved owner (== active.controller.role past the guard above) so the peer's
-  // partner-slot await matches by owner even when a post-half-wipe recenter skews the field index.
-  active.battleSync.broadcastLocalCommand(fieldIndex, globalScene.currentBattle.turn, command, owner);
+  // Target-prompt moves commit here (SelectTargetPhase), not through CommandPhase's direct
+  // broadcast helper. Keep the SAME full command address on both adapters: omitting it here made
+  // the real UI emit a legacy command while the host awaited an epoch/wave/Pokemon-addressed
+  // request. The low-level relay tests stayed green because they called broadcastLocalCommand
+  // directly with an address, but every human-picked single-target move parked forever.
+  active.battleSync.broadcastLocalCommand(fieldIndex, globalScene.currentBattle.turn, command, owner, {
+    epoch: active.controller.sessionEpoch,
+    wave: globalScene.currentBattle.waveIndex,
+    pokemonId: globalScene.getPlayerField()[fieldIndex].id,
+  });
   // #record-replay: capture the deferred-target FIGHT own-slot command (no-op unless recording).
   recordCoopOwnSlotCommand(fieldIndex, command);
 }

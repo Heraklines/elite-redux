@@ -255,6 +255,9 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   it("the guest's host-slot CommandPhase auto-resolves to an inert command (no menu, no await)", async () => {
     await startCoopGuest();
     globalScene.currentBattle.turnCommands = {};
+    // The renderer gate neutralizes SummonPhase, which normally owns this hide tween. Model the
+    // live launch residue and require the first command boundary to enforce the presentation result.
+    globalScene.trainer.setVisible(true);
     const setModeSpy = vi.spyOn(globalScene.ui, "setMode");
 
     // Field slot 0 is the HOST's mon from the guest's POV: the guest must NOT open a menu
@@ -266,6 +269,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(cmd?.skip).toBe(true);
     const openedCommandMenu = setModeSpy.mock.calls.some(([mode]) => mode === UiMode.COMMAND);
     expect(openedCommandMenu, "guest opens no menu for the host's slot").toBe(false);
+    expect(globalScene.trainer.visible, "authoritative guest clears the launch trainer before command UI").toBe(false);
   });
 
   it("the guest's TurnStartPhase DIVERTS to CoopReplayTurnPhase: no MovePhase, no resolution", async () => {

@@ -197,6 +197,15 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     const lastBroadcast = hostBroadcasts.at(-1);
     expect(lastBroadcast?.t === "command" ? lastBroadcast.command.targets : undefined).toBeDefined();
     expect(lastBroadcast?.t === "command" ? lastBroadcast.command.targets?.length : -1).toBe(1);
+    // UI -> relay CONTRACT: this command committed through the real SelectTargetPhase adapter.
+    // The adapter must carry the same full address as CommandPhase's host request. A relay-only
+    // test cannot catch an omitted wrapper argument (the live wave-1 softlock on 2026-07-12).
+    if (lastBroadcast?.t === "command") {
+      expect(lastBroadcast.owner).toBe("host");
+      expect(lastBroadcast.epoch).toBe(getCoopController()?.sessionEpoch);
+      expect(lastBroadcast.wave).toBe(globalScene.currentBattle.waveIndex);
+      expect(lastBroadcast.pokemonId).toBe(globalScene.getPlayerField()[COOP_HOST_FIELD_INDEX].id);
+    }
   });
 
   it("a SOLO (non-coop) FIGHT command is NOT broadcast (guard holds)", async () => {
