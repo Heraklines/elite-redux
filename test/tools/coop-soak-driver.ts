@@ -1835,11 +1835,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       if (waveWon) {
         return "win";
       }
-      if (
-        authoritativeTerminal === "win"
-        || authoritativeTerminal === "capture"
-        || authoritativeTerminal === "flee"
-      ) {
+      if (authoritativeTerminal === "win" || authoritativeTerminal === "capture" || authoritativeTerminal === "flee") {
         return authoritativeTerminal;
       }
       // TurnEndPhase is an EARLY interception point: the host still has to execute its own delayed
@@ -1852,8 +1848,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         game.phaseInterceptor.toFirst(["CommandPhase", "SelectModifierPhase", "GameOverPhase", "TitlePhase"]),
       );
       if (nextStructuralPhase !== "CommandPhase") {
-        return getCoopActiveWaveTransition(wave)?.outcome
-          ?? (nextStructuralPhase === "SelectModifierPhase" ? "win" : undefined);
+        return (
+          getCoopActiveWaveTransition(wave)?.outcome
+          ?? (nextStructuralPhase === "SelectModifierPhase" ? "win" : undefined)
+        );
       }
       // Not won yet: the host is parked immediately before the next turn's CommandPhase.
       // TurnInitPhase increments `currentBattle.turn` while crossing, so the point the guest must
