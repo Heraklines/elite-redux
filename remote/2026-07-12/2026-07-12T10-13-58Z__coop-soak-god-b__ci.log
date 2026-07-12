@@ -1,0 +1,60 @@
+===== COOP SOAK RESULT =====
+profile: god-b
+verdict: FAIL
+waves_requested: 200
+run: 29188721885 (feat/elite-redux-port)
+timestamp: 2026-07-12T10-13-58Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20365441 WAVES=200 - replay this run with:  SOAK_SEED=20365441 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=110 guest=0
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=650 guest=370
+[22m[39m[coop-soak] scalar-lag wave 14 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=850 guest=650
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1680 guest=850
+[coop-soak] scalar-lag wave 30 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=3700 guest=1680
+[22m[39m[coop-soak] scalar-lag wave 35 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=4620 guest=3700
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=42 where=wave-start fields=[field] :: field:host=[{"bi":0,"partyIndex":0,"speciesId":493,"hp":1865,"maxHp":1865,"status":0,"statStages":[-1,0,-2,0,0,0,0],"fainted":false,"abilityId":121,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":150,"hp":1725,"maxHp":1725,"status":0,"statStages":[-1,0,0,0,0,0,0],"fainted":false,"abilityId":227,"formIndex":0,"isTerastallized":false,"teraType":13,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":284,"hp":96,"maxHp":96,"status":0,"statStages":[0,0,1,0,0,0,0],"fainted":false,"abilityId":22,"formIndex":0,"isTerastallized":false,"teraType":10,"bossSegments":2,"bossSegmentIndex":1,"moves":[[318,0],[184,0],[346,0],[362,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":752,"hp":90,"maxHp":90,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":41,"formIndex":0,"isTerastallized":false,"teraType":6,"bossSegments":1,"bossSegmentIndex":0,"moves":[[127,0],[423,0],[471,0],[5002,0]],"tags":["AQUA_RING"],"transformSpeciesId":0,"transformFormIndex":0}]/guest=[{"bi":0,"partyIndex":0,"speciesId":493,"hp":1865,"maxHp":1865,"status":0,"statStages":[-1,0,-2,0,0,0,0],"fainted":false,"abilityId":121,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":150,"hp":1725,"maxHp":1725,"status":0,"statStages":[-1,0,0,0,0,0,0],"fainted":false,"abilityId":227,"formIndex":0,"isTerastallized":false,"teraType":13,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":284,"hp":96,"maxHp":96,"status":0,"statStages":[0,0,1,0,0,0,0],"fainted":false,"abilityId":22,"formIndex":0,"isTerastallized":false,"teraType":10,"bossSegments":2,"bossSegmentIndex":1,"moves":[[318,0],[184,0],[346,0],[362,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":752,"hp":93,"maxHp":93,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":41,"formIndex":0,"isTerastallized":false,"teraType":6,"bossSegments":1,"bossSegmentIndex":0,"moves":[[127,0],[423,0],[471,0],[5002,0]],"tags":["AQUA_RING"],"transformSpeciesId":0,"transformFormIndex":0}]
+[22m[39m[coop-soak] scalar-lag wave 43 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=6320 guest=4620
+[22m[39m[coop-soak] scalar-lag wave 54 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=9330 guest=7450
+
+----- vitest result tail -----
+[33m[coop:relay] cancelWaiters() sticky-cancel seqs=[11,37] (resync rescue) -> selected resolve null[39m
+[33m[coop:relay] AWAIT rewardOptions key=11:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:relay] AWAIT rewardOptions key=37:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:150:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > plays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m79052[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:150:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:150:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mError[22m: PhaseInterceptor.to("CommandPhase") did not reach its target (soft-lock / freeze?): stuck at phase "ErDexNavPhase", UI mode OPTION_SELECT (=15), interceptor state "running".
+Original: Timed out in waitUntil![39m
+[36m [2m❯[22m PhaseInterceptor.to test/framework/phase-interceptor.ts:[2m117:13[22m[39m
+    [90m115|[39m       [35mconst[39m stuckPhase [33m=[39m pm[33m.[39m[34mgetCurrentPhase[39m()[33m?.[39mphaseName [33m??[39m [32m"(none)"[39m[33m;[39m
+    [90m116|[39m       [35mconst[39m uiMode [33m=[39m [34mgetEnumStr[39m([33mUiMode[39m[33m,[39m [35mthis[39m[33m.[39mscene[33m.[39mui[33m.[39m[34mgetMode[39m())[33m;[39m
+    [90m117|[39m       [35mthrow[39m [35mnew[39m [33mError[39m(
+    [90m   |[39m             [31m^[39m
+    [90m118|[39m         `PhaseInterceptor.to("${this.target}") did not reach its targe…
+    [90m119|[39m           + `stuck at phase "${stuckPhase}", UI mode ${uiMode}, interc…
+[90m [2m❯[22m test/tools/coop-soak-driver.ts:[2m1733:7[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m449:12[22m[39m
+[90m [2m❯[22m crossCommandBoundaryWithReplayGuest test/tools/coop-soak-driver.ts:[2m1730:5[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m2948:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m169:22[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 10:12:15
+[2m   Duration [22m 102.94s[2m (transform 18.28s, setup 22.36s, import 171ms, tests 79.52s, environment 711ms)[22m
+
