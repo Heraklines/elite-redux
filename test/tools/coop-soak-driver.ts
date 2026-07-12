@@ -1690,6 +1690,51 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   };
 
   /**
+   * A move, item, or ability can force the host's active Pokemon out before TurnEndPhase (for example an
+   * Eject/Red-Card-style effect). That opens the same owner-only SwitchPhase PARTY UI as a faint, but the
+   * occupant is still healthy so the post-turn faint picker deliberately does not apply. Drive this distinct
+   * mid-turn choice and expire it at the authoritative turn terminal so an unused handler cannot leak forward.
+   */
+  const armHostMidTurnSwitchAutoPick = (turn: number): void => {
+    game.onNextPrompt(
+      "SwitchPhase",
+      UiMode.PARTY,
+      () => {
+        const phase = rig.hostScene.phaseManager.getCurrentPhase() as unknown as { fieldIndex?: number } | undefined;
+        const fieldIndex = phase?.fieldIndex;
+        const occupant = typeof fieldIndex === "number" ? rig.hostScene.getPlayerField()[fieldIndex] : undefined;
+        const drivesHostSlot =
+          occupant?.coopOwner === "host"
+          || (occupant == null && (typeof fieldIndex !== "number" || coopOwnerForPartySlot(fieldIndex) === "host"));
+        const benchSlot = firstLegalBenchSlot(rig.hostScene, "host");
+        if (!drivesHostSlot || benchSlot < 0) {
+          fail(
+            "no-park",
+            rig.hostScene.currentBattle.waveIndex,
+            `forced host switch had no legal owner pick (fieldIndex=${fieldIndex ?? "none"} owner=${occupant?.coopOwner ?? "none"} bench=${benchSlot})`,
+          );
+        }
+        const handler = rig.hostScene.ui.getHandler() as PartyUiHandler;
+        handler.setCursor(benchSlot);
+        handler.processInput(Button.ACTION);
+        handler.processInput(Button.ACTION);
+        hitMode(UiMode.PARTY);
+        actionScript.push(
+          `wave ${rig.hostScene.currentBattle.waveIndex} turn ${turn}: host FORCED SWITCH -> party[${benchSlot}]`,
+        );
+      },
+      () => {
+        if (rig.hostScene.currentBattle.turn !== turn) {
+          return true;
+        }
+        return ["TurnEndPhase", "VictoryPhase", "BattleEndPhase", "GameOverPhase"].includes(
+          rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
+        );
+      },
+    );
+  };
+
+  /**
    * Drive the two owner-only Dex Nav species picks when a taken reward queued ErDexNavPhase.
    * The watcher correctly skips this per-account picker; a host owner must answer it before the
    * next CommandPhase. Register prompts only when the phase is actually queued so they can never
@@ -1958,6 +2003,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         if (t === 0) {
           actionScript.push(`wave ${wave}: host slot move=${hostMoveId} guest slot move=${guestMoveId}`);
         }
+        armHostMidTurnSwitchAutoPick(turn);
         await game.phaseInterceptor.to("TurnEndPhase");
         // #849 per-turn SITUATION tap (sampled at TurnEndPhase, BEFORE the faint pickers drive so the
         // fainted mons are still visible on-field): faints / weather / terrain / enemy switch.
