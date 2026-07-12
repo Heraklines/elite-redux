@@ -24,6 +24,7 @@
 // plain-JSON `ErDataFingerprint` (#633 diagnostics), so the transport stays the lowest layer.
 import type { ErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import type { CoopMembershipSnapshotV1 } from "#data/elite-redux/coop/coop-membership";
 // TYPE-ONLY (erased at runtime, so this stays the lowest layer): the authoritative control-plane
 // envelope (Wave-2 run-state migration, §1.1). The envelope module in turn imports only the
 // CoopAuthoritativeBattleStateV1 TYPE from here, so the cycle is fully type-level (no runtime cycle).
@@ -64,7 +65,9 @@ export type CoopRole = "host" | "guest";
 // atomically replaces locally-derived battle type, format, mystery type, levels, and trainer presentation.
 // er-coop-22: full state-sync snapshots atomically bind the session epoch, host checksum, and every
 // control high-water mark; receivers advance control only after safe-boundary checksum convergence.
-export const COOP_PROTOCOL_VERSION = "er-coop-22";
+// er-coop-23: hot rejoin preserves active waits and reissues command/barrier control state; terminal
+// disconnect ends shared play instead of taking an uncommitted local fallback/AI/solo branch.
+export const COOP_PROTOCOL_VERSION = "er-coop-23";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -531,6 +534,10 @@ export interface CoopFullBattleSnapshot {
   sessionEpoch?: number | undefined;
   /** Host checksum captured with this snapshot; control marks advance only after it matches post-apply. */
   checksum?: string | undefined;
+  /** Revisioned authority membership atomically bound to this DATA snapshot. */
+  membership?: CoopMembershipSnapshotV1 | undefined;
+  /** Active control surface captured with the snapshot for rejoin validation and causal diagnostics. */
+  activeControl?: CoopActiveControlSnapshotV1 | undefined;
   /** Operation revisions whose effects this authoritative snapshot already subsumes (§4.4). */
   journalHighWater?: Record<string, number> | undefined;
   /** Every occupied field mon's full state, by battler index. */
@@ -633,6 +640,15 @@ export interface CoopFullBattleSnapshot {
    * for an older host / a field-less capture). Optional + additive.
    */
   authoritativeState?: CoopAuthoritativeBattleStateV1 | undefined;
+}
+
+export interface CoopActiveControlSnapshotV1 {
+  version: 1;
+  phaseName: string;
+  interactionCounter: number;
+  awaitedInteractions: { seq: number; expectedKinds: string[] }[];
+  barriers: { localArrived: string[]; partnerArrived: string[]; awaiting: string[] };
+  pendingCommands: { fieldIndex: number; turn: number; moveSlots: number[]; owner?: CoopRole }[];
 }
 
 /**
@@ -1433,6 +1449,8 @@ export interface CoopTransport {
    * the in-process loopback (which has no wire-level error to report).
    */
   disconnectReason?(): string | undefined;
+  /** Current connection generation; increments whenever a hot rejoin replaces the underlying channel. */
+  connectionGeneration?(): number;
   /**
    * #diagnostics (optional): age in ms of the last ANY inbound frame received on this transport -
    * INCLUDING transport-internal keepalive ping/pong - or `undefined` if nothing has been received

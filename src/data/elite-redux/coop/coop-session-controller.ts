@@ -729,6 +729,21 @@ export class CoopSessionController {
     this.emit();
   }
 
+  /** Hot-rejoin/full-snapshot control adoption: the authority's exact counter wins at the safe boundary. */
+  adoptAuthoritativeInteractionCounter(counter: number): boolean {
+    if (!Number.isSafeInteger(counter) || counter < 0) {
+      return false;
+    }
+    const before = this.interactionTurn.toJSON();
+    this.interactionTurn.restore(counter);
+    coopLog(
+      "interaction",
+      `adoptAuthoritativeInteractionCounter(${counter}) counter ${before}->${this.interactionTurn.toJSON()} role=${this.role}`,
+    );
+    this.emit();
+    return true;
+  }
+
   /**
    * HOST: publish the authoritative run config (ER difficulty + challenge set) so
    * the guest mirrors it and the run is coherent (#633, LIVE-C). Stores it locally

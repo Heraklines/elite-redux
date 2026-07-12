@@ -6,9 +6,19 @@ For co-op architecture or gameplay work, use the repository's calibrated gate in
 
 This smart-sharded workflow is the standing default for all future co-op checkpoints; agents do not need to ask whether to use it again. Keep quick, focused verification local, and move exhaustive checkpoint verification to independent external runners. A checkpoint is deployable only when the aggregate sharded gate is green.
 
-- During implementation, run the smallest relevant files locally with `ER_SCENARIO=1`, one worker, and the lane's isolation setting.
-- Keep heavyweight verification off the user's workstation. Never run `coop-soak*.test.ts`, Lane B/C/P shards, the full co-op gate, or multi-campaign production-fidelity tests locally; dispatch them to GitHub Actions and inspect their per-shard artifacts. Local verification is limited to small, focused non-soak files. If a supposedly focused local process grows unexpectedly or stops producing useful progress, terminate it promptly and move that reproduction to an isolated external runner.
+- Do not run co-op Vitest files locally on this workstation. Even focused engine-free files have been
+  observed importing the heavyweight Phaser graph, exceeding 500 MB, and surviving their command wrapper.
+  Keep local verification to Biome/formatting, `git diff --check`, deterministic `--list` inventory checks,
+  and other non-Vitest static inspection. Run the smallest relevant test files on an isolated GitHub-hosted
+  runner, then run the aggregate sharded gate before staging.
+- Keep all co-op verification off the user's workstation. Never run focused co-op Vitest files,
+  `coop-soak*.test.ts`, Lane B/C/P shards, the full co-op gate, or multi-campaign production-fidelity tests
+  locally; dispatch them to GitHub Actions and inspect their per-shard artifacts. If a co-op test process is
+  started accidentally, terminate its whole process tree promptly and move the reproduction to an isolated
+  external runner.
 - Before declaring a co-op checkpoint deployable, push `feat/elite-redux-port` and require the `Co-op Gate (Sharded)` workflow (`.github/workflows/coop-gate-sharded.yml`) to finish green.
+- The same external workflow must also pass its independent TypeScript and Biome static job. A green
+  13-shard test matrix with a red static job is not deployable.
 - The external gate is the default checkpoint gate: Lane A and Lane P each use one GitHub-hosted runner, Lane B uses eight shards, and Lane C uses three shards. Each shard stays sequential internally. Heavy B/C/P files run one at a time in fresh Vitest processes on that runner so Phaser heaps and leaked scene timers cannot accumulate across files; do not collapse them back into one long-lived worker. Treat this 13-shard layout as the baseline, not a permanent ceiling: rebalance or split shards when CI timing evidence shows a material critical-path improvement.
 - Run or inspect one deterministic shard with `node scripts/run-coop-gate.mjs --lane <A|B|C|P> --shard <index>/<total>`. Use `--list` to see its exact files.
 - Do not replace external sharding with many concurrent local Vitest processes. Separate runners provide the speedup without recreating CPU/memory contention.

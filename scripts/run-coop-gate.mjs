@@ -175,7 +175,14 @@ const LANE_ENV = {
  */
 function runLane(name, files) {
   if (files.length === 0) {
-    return { name, files: 0, ok: true, ms: 0, summary: "(no files)" };
+    const ok = name === "Q";
+    return {
+      name,
+      files: 0,
+      ok,
+      ms: 0,
+      summary: ok ? "(no quarantined files)" : "FAIL (required lane discovered zero files)",
+    };
   }
   const isolate = LANE_ISOLATE[name] ? "--isolate" : "--no-isolate";
   const extraEnv = Object.entries(LANE_ENV[name] ?? {})

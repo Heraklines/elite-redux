@@ -130,6 +130,7 @@ import {
   setCoopMeInteractionStart,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_BATTLE_HANDOFF, CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
+import { CoopMembershipController } from "#data/elite-redux/coop/coop-membership";
 import type {
   CoopAbilityPickPayload,
   CoopAuthoritativeEnvelopeV1,
@@ -197,6 +198,7 @@ import {
   setCoopStormglassOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-stormglass-operation";
 import type {
+  CoopActiveControlSnapshotV1,
   CoopAuthoritativeBattleStateV1,
   CoopCapturePresentation,
   CoopFullBattleSnapshot,
@@ -295,15 +297,31 @@ function wireCoopLiveEvents(controller: CoopSessionController, battleStream: Coo
  * HOST role so a guest/solo client never answers. Best-effort + guarded - a serialize
  * failure never breaks the host's turn.
  */
-function wireCoopResyncResponder(
-  controller: CoopSessionController,
-  battleStream: CoopBattleStreamer,
-  durability: CoopDurabilityManager | undefined,
-): void {
-  battleStream.onStateSyncRequest((_turn, seq) => {
-    coopLog("resync", `recv requestStateSync turn=${_turn} seq=${seq} role=${controller.role}`);
-    if (controller.role !== "host") {
-      coopLog("resync", `ignore requestStateSync seq=${seq} (not host, role=${controller.role})`);
+function captureCoopActiveControl(runtime: CoopRuntime): CoopActiveControlSnapshotV1 {
+  let phaseName = "unknown";
+  try {
+    phaseName = globalScene.phaseManager.getCurrentPhase()?.phaseName ?? "unknown";
+  } catch {
+    /* headless capture */
+  }
+  return {
+    version: 1,
+    phaseName,
+    interactionCounter: runtime.controller.interactionCounter(),
+    awaitedInteractions: runtime.interactionRelay.describeAwaitedInteractions().map(wait => ({
+      seq: wait.seq,
+      expectedKinds: [...wait.expectedKinds],
+    })),
+    barriers: runtime.rendezvous.describeArrivals(),
+    pendingCommands: runtime.battleSync.describePendingRequests(),
+  };
+}
+
+function wireCoopResyncResponder(runtime: CoopRuntime): void {
+  runtime.battleStream.onStateSyncRequest((_turn, seq) => {
+    coopLog("resync", `recv requestStateSync turn=${_turn} seq=${seq} role=${runtime.controller.role}`);
+    if (runtime.controller.role !== "host") {
+      coopLog("resync", `ignore requestStateSync seq=${seq} (not host, role=${runtime.controller.role})`);
       return;
     }
     try {
@@ -315,13 +333,15 @@ function wireCoopResyncResponder(
       const blob = compressToBase64(
         JSON.stringify({
           ...snapshot,
-          sessionEpoch: controller.sessionEpoch,
+          sessionEpoch: runtime.controller.sessionEpoch,
           checksum: captureCoopChecksum(),
-          journalHighWater: durability?.controlPlaneHighWater() ?? {},
+          membership: runtime.membership.snapshot(),
+          activeControl: captureCoopActiveControl(runtime),
+          journalHighWater: runtime.durability?.controlPlaneHighWater() ?? {},
         } satisfies CoopFullBattleSnapshot),
       );
       coopLog("resync", `send stateSync seq=${seq} blob=${blob.length}b`);
-      battleStream.sendStateSync(blob, seq);
+      runtime.battleStream.sendStateSync(blob, seq);
     } catch (e) {
       /* a resync serialize/send failure must never break the host's turn */
       coopWarn("resync", `host stateSync send failed seq=${seq}`, e);
@@ -346,21 +366,27 @@ export function adoptCoopSnapshotHighWater(
 
 /** Queue one DATA+CONTROL snapshot for safe-boundary apply; ACK control only after checksum convergence. */
 function queueCoopAtomicSnapshotApply(
-  controller: CoopSessionController,
-  durability: CoopDurabilityManager | undefined,
+  runtime: CoopRuntime,
   snapshot: CoopFullBattleSnapshot,
   label: string,
   onHealed?: (() => void) | undefined,
 ): boolean {
   if (
-    snapshot.sessionEpoch !== controller.sessionEpoch
+    snapshot.sessionEpoch !== runtime.controller.sessionEpoch
     || snapshot.checksum == null
     || snapshot.checksum === COOP_CHECKSUM_SENTINEL
+    || snapshot.membership == null
+    || snapshot.activeControl == null
+    || snapshot.activeControl.version !== 1
+    || snapshot.membership.state !== "active"
+    || !snapshot.membership.members.every(member => member.present)
+    || !runtime.membership.canAdopt(snapshot.membership)
   ) {
     coopWarn(
       "resync",
-      `${label} refused epoch=${snapshot.sessionEpoch ?? "legacy"}/${controller.sessionEpoch} `
-        + `checksum=${snapshot.checksum ?? "missing"}`,
+      `${label} refused epoch=${snapshot.sessionEpoch ?? "legacy"}/${runtime.controller.sessionEpoch} `
+        + `checksum=${snapshot.checksum ?? "missing"} membership=${snapshot.membership?.revision ?? "missing"} `
+        + `control=${snapshot.activeControl?.version ?? "missing"}`,
     );
     return false;
   }
@@ -376,7 +402,16 @@ function queueCoopAtomicSnapshotApply(
         coopWarn("resync", `${label} did not converge -> control marks withheld`);
         return;
       }
-      adoptCoopSnapshotHighWater(durability, snapshot);
+      if (
+        snapshot.membership == null
+        || snapshot.activeControl == null
+        || !runtime.membership.adopt(snapshot.membership)
+        || !runtime.controller.adoptAuthoritativeInteractionCounter(snapshot.activeControl.interactionCounter)
+      ) {
+        coopWarn("resync", `${label} material state healed but control adoption failed -> marks withheld`);
+        return;
+      }
+      adoptCoopSnapshotHighWater(runtime.durability, snapshot);
       onHealed?.();
       coopLog("resync", `${label} atomically applied`);
     },
@@ -386,13 +421,12 @@ function queueCoopAtomicSnapshotApply(
 
 /** Host-side deep-gap escalation: push a heavy snapshot stamped at the evicted class's journal head. */
 function sendCoopDurabilitySnapshot(
-  controller: CoopSessionController,
-  battleStream: CoopBattleStreamer,
+  runtime: CoopRuntime,
   cls: string,
   headRevision: number,
   controlHighWater: Record<string, number>,
 ): void {
-  if (controller.role !== "host") {
+  if (runtime.controller.role !== "host") {
     return;
   }
   try {
@@ -403,37 +437,30 @@ function sendCoopDurabilitySnapshot(
     }
     const stamped = {
       ...snapshot,
-      sessionEpoch: controller.sessionEpoch,
+      sessionEpoch: runtime.controller.sessionEpoch,
       checksum: captureCoopChecksum(),
+      membership: runtime.membership.snapshot(),
+      activeControl: captureCoopActiveControl(runtime),
       journalHighWater: {
         ...controlHighWater,
         [cls]: Math.max(controlHighWater[cls] ?? 0, headRevision),
       },
     } satisfies CoopFullBattleSnapshot;
-    battleStream.sendDurabilitySnapshot(compressToBase64(JSON.stringify(stamped)));
+    runtime.battleStream.sendDurabilitySnapshot(compressToBase64(JSON.stringify(stamped)));
   } catch (e) {
     coopWarn("resync", `durability snapshot send failed cls=${cls} head=${headRevision}`, e);
   }
 }
 
 /** Guest-side deep-gap application: mutate live state, then ACK exactly the revisions it subsumed. */
-function wireCoopDurabilitySnapshotReceiver(
-  controller: CoopSessionController,
-  battleStream: CoopBattleStreamer,
-  durability: CoopDurabilityManager | undefined,
-): void {
-  battleStream.onDurabilitySnapshot(blob => {
-    if (controller.role !== "guest") {
+function wireCoopDurabilitySnapshotReceiver(runtime: CoopRuntime): void {
+  runtime.battleStream.onDurabilitySnapshot(blob => {
+    if (runtime.controller.role !== "guest") {
       return;
     }
     try {
       const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
-      queueCoopAtomicSnapshotApply(
-        controller,
-        durability,
-        snapshot,
-        `durability deep-gap snapshot blob=${blob.length}b`,
-      );
+      queueCoopAtomicSnapshotApply(runtime, snapshot, `durability deep-gap snapshot blob=${blob.length}b`);
     } catch (e) {
       coopWarn("resync", "durability deep-gap snapshot apply failed", e);
     }
@@ -786,10 +813,7 @@ function wireCoopWaveEndState(controller: CoopSessionController, battleStream: C
  * turning the pump's silent "identical state" assumption into detect-and-heal (reusing the
  * Phase A machinery). Additive: on a match nothing changes, so the working pump is intact.
  */
-function wireCoopMeChecksumCheck(
-  battleStream: CoopBattleStreamer,
-  durability: CoopDurabilityManager | undefined,
-): void {
+function wireCoopMeChecksumCheck(battleStream: CoopBattleStreamer): void {
   battleStream.onMeChecksum((seq, ownerChecksum) => {
     const ours = captureCoopChecksum();
     if (ownerChecksum === COOP_CHECKSUM_SENTINEL || ours === COOP_CHECKSUM_SENTINEL || ownerChecksum === ours) {
@@ -821,24 +845,37 @@ function wireCoopMeChecksumCheck(
         // comprehensive meResync (applyCoopMeOutcome), which the guest still adopts. The still-diverged
         // path below is advisory by design (#839): it must never disrupt the encounter.
         const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
+        const liveRuntime = getCoopRuntime();
+        if (
+          liveRuntime == null
+          || snapshot.membership == null
+          || snapshot.activeControl == null
+          || snapshot.membership.state !== "active"
+          || !snapshot.membership.members.every(member => member.present)
+          || !liveRuntime.membership.canAdopt(snapshot.membership)
+        ) {
+          coopWarn("resync", `me-entry seq=${seq} snapshot missing/incompatible atomic control -> refused`);
+          return;
+        }
         applyCoopFullSnapshot(snapshot, isCoopAuthoritativeGuest(), /* suppressResummon */ true);
         const healed = captureCoopChecksum();
         const targetChecksum = snapshot.checksum ?? ownerChecksum;
         if (healed === targetChecksum) {
-          adoptCoopSnapshotHighWater(durability, snapshot);
+          if (
+            !liveRuntime.membership.adopt(snapshot.membership)
+            || !liveRuntime.controller.adoptAuthoritativeInteractionCounter(snapshot.activeControl.interactionCounter)
+          ) {
+            coopWarn("resync", `me-entry seq=${seq} material healed but control adoption failed`);
+            return;
+          }
+          adoptCoopSnapshotHighWater(liveRuntime.durability, snapshot);
           coopLog("resync", `me-entry seq=${seq} ok (healed=${healed})`);
         } else {
           coopWarn("resync", `me-entry seq=${seq} still-diverged owner=${targetChecksum} watcher=${healed}`);
           // The cheap mid-ME apply could not converge. Queue the comprehensive safe-boundary apply; its
           // phase holds play if convergence still fails and advances control marks only after success.
-          const liveController = getCoopController();
-          if (liveController == null) {
-            coopWarn("resync", `me-entry seq=${seq} cannot queue comprehensive snapshot (no live controller)`);
-            return;
-          }
           queueCoopAtomicSnapshotApply(
-            liveController,
-            durability,
+            liveRuntime,
             { ...snapshot, checksum: targetChecksum },
             `me-entry seq=${seq} comprehensive snapshot`,
           );
@@ -1155,8 +1192,7 @@ export function wireCoopStallWatchdog(
             try {
               const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
               queueCoopAtomicSnapshotApply(
-                runtime.controller,
-                runtime.durability,
+                runtime,
                 snapshot,
                 `stall-recovery snapshot seq=${seq} blob=${blob.length}b`,
               );
@@ -1217,24 +1253,46 @@ export function routeShowdownAbandon(runtime: CoopRuntime): void {
 
 function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInteractionRelay, runtime: CoopRuntime): void {
   let rejoining = false;
+  const terminateSharedSession = (isActiveRuntime: boolean): void => {
+    runtime.membership.terminate();
+    // Ordinary co-op has no committed membership-removal/AI-handoff operation. Pretending the survivor
+    // can continue leaves barriers and controller ownership binary and creates a later softlock/desync.
+    // Release retained waits only now that recovery is terminal and preserve the session save.
+    try {
+      relay.cancelWaiters(() => true);
+      runtime.battleSync.cancelPending();
+      getShowdownRelay()?.cancelPending();
+    } catch {
+      /* terminal teardown continues even if one waiter was already gone */
+    }
+    if (!isActiveRuntime) {
+      return;
+    }
+    try {
+      globalScene.ui.showText(
+        "Your partner didn't reconnect. Shared play was stopped safely; reconnect to resume.",
+        null,
+        undefined,
+        5000,
+      );
+    } catch {
+      /* cosmetic */
+    }
+    const interruptedPhase = globalScene.phaseManager.getCurrentPhase();
+    globalScene.phaseManager.clearPhaseQueue();
+    clearCoopRuntime();
+    globalScene.reset();
+    globalScene.phaseManager.unshiftNew("TitlePhase");
+    if (globalScene.phaseManager.getCurrentPhase() === interruptedPhase) {
+      interruptedPhase?.end();
+    }
+  };
   offDisconnectReaction = transport.onStateChange(state => {
     if (state !== "disconnected" && state !== "closed") {
       return;
     }
-    coopWarn("runtime", `partner channel ${state} -> cancelling pending co-op waits (no 20-minute strand)`);
-    try {
-      relay.cancelWaiters(() => true);
-    } catch {
-      /* cancel failure must not cascade */
-    }
-    // Showdown 1v1 (#5): a channel death must also unblock the host's in-flight requestEnemyCommand
-    // PROMPTLY (-> AI fallback) instead of stranding the turn on the 60s timer. cancelPending fails the
-    // waiters without tearing the relay down, so a within-grace rejoin can still use it.
-    try {
-      getShowdownRelay()?.cancelPending();
-    } catch {
-      /* cancel failure must not cascade */
-    }
+    coopWarn("runtime", `partner channel ${state} -> entering membership recovery (shared waits retained)`);
+    runtime.membership.peerDisconnected();
     // Only the ACTIVE runtime owns the screen (the duo harness assembles two in one process).
     const isActiveRuntime = getCoopRuntime() === runtime;
     // #857: a PROTOCOL-VERSION mismatch (one player on a stale cached build) can never be healed by
@@ -1260,6 +1318,7 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
     // channel into the live transport - the whole session survives in place. One loop at a time.
     if (runtime.rejoinDriver != null && !rejoining) {
       rejoining = true;
+      const recoveryGeneration = coopSessionGeneration();
       if (isActiveRuntime) {
         try {
           // #857: carry the DROP REASON (the raw channel error, e.g. the SCTP abort text) into the
@@ -1277,30 +1336,23 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
         .rejoinDriver()
         .then(ok => {
           rejoining = false;
+          if (recoveryGeneration !== coopSessionGeneration() || getCoopRuntime() !== runtime) {
+            return;
+          }
           if (!ok) {
-            coopWarn("runtime", "rejoin FAILED (grace expired) -> continuing without the partner");
+            coopWarn("runtime", "rejoin FAILED (grace expired) -> terminating shared session");
             // Showdown 1v1 (D4): a versus opponent that never reconnected ends the match - void (early)
-            // or a survivor win (mid-match), routed to the ephemeral result. Co-op keeps its own
-            // continue-solo behavior below.
+            // or a survivor win (mid-match), routed to the ephemeral result. Ordinary co-op terminates
+            // the shared session below because no authoritative membership-removal handoff exists yet.
             if (isActiveRuntime && isVersusSession()) {
               routeShowdownAbandon(runtime);
               return;
             }
-            if (isActiveRuntime) {
-              try {
-                globalScene.ui.showText(
-                  "Your partner didn't reconnect. Continuing without waiting...",
-                  null,
-                  undefined,
-                  4000,
-                );
-              } catch {
-                /* cosmetic */
-              }
-            }
+            terminateSharedSession(isActiveRuntime);
             return;
           }
           coopLog("runtime", "rejoin SUCCESS -> channel re-established in place");
+          runtime.membership.reconnected(transport.connectionGeneration?.());
           // B7 item 14b: the transport survived (replaceChannel), so the showdown pre-battle listeners
           // are still bound - but the frames sent while the channel was dark are LOST. In a versus session
           // fire every registered rejoin re-sender so the negotiation session + wager handler re-ship
@@ -1316,30 +1368,20 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
               /* cosmetic */
             }
           }
-          // The GUEST missed events while dark: pull the host's full authoritative snapshot.
-          if (isCoopAuthoritativeGuest()) {
-            // #861: the channel was dark - any relay/rendezvous message BUFFERED before the drop (or a
-            // pre-drop epoch's leftover) must not satisfy a post-rejoin await ahead of the authoritative
-            // snapshot. Purge the buffers first, then pull + apply the host's full state.
-            try {
-              relay.purgeBufferedArrivals("post-rejoin full-resync (#805)");
-              runtime.rendezvous.purgeBufferedArrivals("post-rejoin full-resync (#805)");
-            } catch {
-              /* purge must never break the resync path */
-            }
-            // W2b (contract doc §4.4): reconnect-from-revision. AFTER the buffer purge (so no stale pre-drop
-            // frame races the authoritative tail), replay the durability journal tail: the committer resends
-            // its committed-but-UNACKED ops and the receiver requests the tail after its last-applied
-            // revision. This recovers a committed-but-unacked message the buffer purge would otherwise drop -
-            // the exact hole review finding 3 named. Same epoch (Step 0 validated: the runtime + its op ids
-            // survive a hot rejoin in place), so pre-drop operationIds stay valid and are de-duped, not
-            // double-applied. A no-op until Wave-2a commits ops, and the full-snapshot pull below remains the
-            // deep-gap fallback (§4.4).
-            try {
-              runtime.durability?.reconnect();
-            } catch {
-              /* durability reconnect is best-effort; the full-snapshot pull below is the fallback */
-            }
+          // Reconnect the durability state machine on BOTH roles. The host proactively resends every
+          // committed/unacked tail; the guest requests every missing class. Active relay/rendezvous/battle
+          // waiters stay alive and their own connected handlers reissue the exact pending surface.
+          try {
+            runtime.durability?.reconnect();
+          } catch {
+            /* the atomic full snapshot below is the guest's deep fallback */
+          }
+          // The GUEST missed DATA while dark: pull the host's full authoritative snapshot. A hot rejoin
+          // keeps the SAME epoch and live surface, so do not purge its current arrivals/waiters; the WebRTC
+          // transport's connection generation already rejects delayed frames from the superseded channel.
+          if (runtime.controller.role === "guest") {
+            // Same epoch: pre-drop operation ids stay valid and de-dupe. The atomic full snapshot is the
+            // DATA backstop after retained surface waits and the durability control tail resume.
             const seq = COOP_REJOIN_SYNC_SEQ_BASE + (Date.now() % 100_000);
             coopLog("resync", `post-rejoin full resync request seq=${seq}`);
             const gen = coopSessionGeneration(); // #808
@@ -1353,12 +1395,7 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
               }
               try {
                 const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
-                queueCoopAtomicSnapshotApply(
-                  runtime.controller,
-                  runtime.durability,
-                  snapshot,
-                  `post-rejoin snapshot seq=${seq} blob=${blob.length}b`,
-                );
+                queueCoopAtomicSnapshotApply(runtime, snapshot, `post-rejoin snapshot seq=${seq} blob=${blob.length}b`);
               } catch {
                 coopWarn("resync", `post-rejoin snapshot apply FAILED seq=${seq} (checksum backstop heals next turn)`);
               }
@@ -1367,12 +1404,30 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
         })
         .catch(() => {
           rejoining = false;
+          if (recoveryGeneration !== coopSessionGeneration() || getCoopRuntime() !== runtime) {
+            return;
+          }
+          if (isActiveRuntime && isVersusSession()) {
+            routeShowdownAbandon(runtime);
+            return;
+          }
+          terminateSharedSession(isActiveRuntime);
         });
       return;
     }
+    // Loopback/dev transports have no redial driver. They still fail closed: release their waits so tests
+    // and local sessions do not strand, but never claim the binary shared run continued as a solo run.
+    try {
+      runtime.membership.terminate();
+      relay.cancelWaiters(() => true);
+      runtime.battleSync.cancelPending();
+      getShowdownRelay()?.cancelPending();
+    } catch {
+      /* best-effort terminal release */
+    }
     if (isActiveRuntime) {
       try {
-        globalScene.ui.showText("Your partner disconnected. Continuing without waiting...", null, undefined, 3000);
+        globalScene.ui.showText("Your partner disconnected. Shared play has stopped.", null, undefined, 3000);
       } catch {
         /* cosmetic */
       }
@@ -1515,6 +1570,8 @@ export function markCoopLearnMoveForwardInFlight(partySlot: number): boolean {
 export interface CoopRuntime {
   /** The local player's session brain (host authority in the spoof/dev path). */
   controller: CoopSessionController;
+  /** Revisioned two-seat membership and connection-generation state. */
+  membership: CoopMembershipController;
   /** Relays the partner's in-battle command over the transport (#633, LIVE-C). */
   battleSync: CoopBattleSync;
   /** Host-authoritative battle stream: host->guest enemy party + per-turn checkpoints (#633, LIVE-D). */
@@ -3005,24 +3062,27 @@ export function assembleCoopRuntime(
   const uiMirror = new CoopUiMirror(transport);
   const mePump = new CoopMePump(interactionRelay);
   const rendezvous = new CoopRendezvous(transport, { getEpoch: () => controller.sessionEpoch });
+  const membership = new CoopMembershipController(() => controller.role);
   // W2b/W2e (§4/§5): the application-level durability engine, flag-gated. Wave-2e plugs the operation
   // envelope in via the journal bridge's extractKey/apply hooks, so a committed op is journaled + ACKed +
   // resendable end-to-end (no longer a passive scaffold). Its reconnect() is wired into the #805 rejoin
   // below and its journal depth/unacked feed the health line. Absent when the flag is OFF (legacy behavior).
   const operationDurabilityHooks = coopOperationDurabilityHooks();
+  let runtime: CoopRuntime;
   const durability = isCoopDurabilityEnabled()
     ? new CoopDurabilityManager(transport, {
         ...operationDurabilityHooks,
         sendFullSnapshot: (cls, headRevision, controlHighWater) =>
-          sendCoopDurabilitySnapshot(controller, battleStream, cls, headRevision, controlHighWater),
+          sendCoopDurabilitySnapshot(runtime, cls, headRevision, controlHighWater),
       })
     : undefined;
   // Install the active manager so the migrated surface adapters' commit path journals into it (Wave-2e).
   // null when durability is OFF -> journalCoopCommittedEnvelope is a no-op (pure legacy dual-run).
   setCoopOperationDurability(durability ?? null);
   resetCoopOperationJournalLog();
-  const runtime: CoopRuntime = {
+  runtime = {
     controller,
+    membership,
     battleSync,
     battleStream,
     interactionRelay,
@@ -3054,12 +3114,12 @@ export function assembleCoopRuntime(
     );
   });
   wireCoopGhostPoolSync(controller, battleStream);
-  wireCoopResyncResponder(controller, battleStream, durability);
-  wireCoopDurabilitySnapshotReceiver(controller, battleStream, durability);
+  wireCoopResyncResponder(runtime);
+  wireCoopDurabilitySnapshotReceiver(runtime);
   wireCoopEnemyPartyResponder(controller, battleStream);
   wireCoopWaveResolved(controller, battleStream);
   wireCoopWaveEndState(controller, battleStream);
-  wireCoopMeChecksumCheck(battleStream, durability);
+  wireCoopMeChecksumCheck(battleStream);
   wireCoopLiveEvents(controller, battleStream);
   wireCoopLearnMoveForward(interactionRelay);
   wireCoopLearnMoveBatchForward(interactionRelay);

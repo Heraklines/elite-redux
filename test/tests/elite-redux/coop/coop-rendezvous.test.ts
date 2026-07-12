@@ -14,6 +14,7 @@ import { setCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
+import { CoopFlapTransport } from "#test/tools/coop-flap-transport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** Flush the loopback's queued microtask deliveries. */
@@ -148,6 +149,26 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     await flush();
     expect(host.partnerHasArrived("cmd:3:2")).toBe(true);
 
+    host.dispose();
+    guest.dispose();
+  });
+
+  it("hot rejoin automatically rehydrates an arrival sent while the channel was dark", async () => {
+    const pair = createLoopbackPair();
+    const guestWire = new CoopFlapTransport(pair.guest);
+    const host = new CoopRendezvous(pair.host);
+    const guest = new CoopRendezvous(guestWire);
+
+    guestWire.setConnected(false);
+    guest.arrive("shop:14:7");
+    const hostWait = host.rendezvous("shop:14:7");
+    await flush();
+    expect(host.partnerHasArrived("shop:14:7")).toBe(false);
+
+    guestWire.setConnected(true);
+    const result = await hostWait;
+    expect(result).toMatchObject({ point: "shop:14:7", timedOut: false });
+    expect(host.partnerHasArrived("shop:14:7")).toBe(true);
     host.dispose();
     guest.dispose();
   });

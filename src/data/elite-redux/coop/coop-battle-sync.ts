@@ -104,8 +104,17 @@ export class CoopBattleSync {
   private readonly transport: CoopTransport;
   private readonly timeoutMs: number;
   private readonly schedule: (cb: () => void, ms: number) => () => void;
-  /** `fieldIndex:turn` -> resolver for the in-flight request on that slot+turn. */
-  private readonly pending = new Map<string, (cmd: SerializedCommand | null) => void>();
+  /** Full request state retained until resolution so a replaced channel can reissue it verbatim. */
+  private readonly pending = new Map<
+    string,
+    {
+      finish: (cmd: SerializedCommand | null) => void;
+      fieldIndex: number;
+      turn: number;
+      moveSlots: number[];
+      owner?: CoopRole | undefined;
+    }
+  >();
   /**
    * `fieldIndex:turn` -> a `command` that arrived with NO pending request yet (#633,
    * LIVE-C). In lockstep the two clients are NOT time-locked: the peer may broadcast
@@ -124,12 +133,39 @@ export class CoopBattleSync {
   private readonly inbox = new Map<string, SerializedCommand>();
   private responder: CoopCommandResponder | null = null;
   private readonly offMessage: () => void;
+  private readonly offStateChange: () => void;
 
   constructor(transport: CoopTransport, opts: CoopBattleSyncOptions = {}) {
     this.transport = transport;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.schedule = opts.schedule ?? defaultSchedule;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
+    this.offStateChange = transport.onStateChange(state => {
+      if (state !== "connected") {
+        return;
+      }
+      // A command request is an active shared surface, not disposable wire traffic. Reissue every
+      // unresolved legal-action offer after a channel replacement so the same turn resumes rather
+      // than falling through to a local AI command when the original request/reply was lost.
+      for (const request of this.pending.values()) {
+        this.sendCommandRequest(request);
+      }
+    });
+  }
+
+  private sendCommandRequest(request: {
+    fieldIndex: number;
+    turn: number;
+    moveSlots: number[];
+    owner?: CoopRole | undefined;
+  }): void {
+    this.transport.send({
+      t: "commandRequest",
+      fieldIndex: request.fieldIndex,
+      turn: request.turn,
+      moveSlots: request.moveSlots,
+      ...(request.owner == null ? {} : { owner: request.owner }),
+    });
   }
 
   /**
@@ -155,9 +191,9 @@ export class CoopBattleSync {
     // Supersede any stale in-flight request on this SLOT (the turn has moved on, so an
     // older-turn await is moot) and prune any stale older-turn buffered command for it,
     // so a request for turn N can never resolve with a turn != N command (#633 desync fix).
-    for (const [k, finish] of [...this.pending]) {
+    for (const [k, request] of [...this.pending]) {
       if (k.startsWith(slotPrefix)) {
-        finish(null);
+        request.finish(null);
       }
     }
     for (const k of [...this.inbox.keys()]) {
@@ -185,18 +221,26 @@ export class CoopBattleSync {
     return new Promise<SerializedCommand | null>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
+      let request: {
+        finish: (cmd: SerializedCommand | null) => void;
+        fieldIndex: number;
+        turn: number;
+        moveSlots: number[];
+        owner?: CoopRole | undefined;
+      };
       const finish = (cmd: SerializedCommand | null) => {
         if (settled) {
           return;
         }
         settled = true;
         cancelTimer();
-        if (this.pending.get(key) === finish) {
+        if (this.pending.get(key) === request) {
           this.pending.delete(key);
         }
         resolve(cmd);
       };
-      this.pending.set(key, finish);
+      request = { finish, fieldIndex, turn, moveSlots: [...moveSlots], ...(owner == null ? {} : { owner }) };
+      this.pending.set(key, request);
       cancelTimer = this.schedule(() => {
         coopWarn(
           "relay",
@@ -212,7 +256,7 @@ export class CoopBattleSync {
       }
       // #851: stamp the resolved owner (when known) so the peer's answerRequest reply echoes it
       // and both sides key by owner; omitted when unknown so an older peer's fieldIndex key still matches.
-      this.transport.send({ t: "commandRequest", fieldIndex, turn, moveSlots, ...(owner == null ? {} : { owner }) });
+      this.sendCommandRequest(request);
     });
   }
 
@@ -304,13 +348,29 @@ export class CoopBattleSync {
   /** Stop listening to the transport and fail any in-flight requests. */
   dispose(): void {
     this.offMessage();
-    for (const finish of [...this.pending.values()]) {
-      finish(null);
-    }
-    this.pending.clear();
+    this.offStateChange();
+    this.cancelPending();
     this.inbox.clear();
     this.responder = null;
     this.bufferedRequests.length = 0;
+  }
+
+  /** Terminal membership loss: release every retained request only after recovery is no longer possible. */
+  cancelPending(): void {
+    for (const request of [...this.pending.values()]) {
+      request.finish(null);
+    }
+    this.pending.clear();
+  }
+
+  /** Read-only active command surfaces for recovery snapshots and causal diagnostics. */
+  describePendingRequests(): { fieldIndex: number; turn: number; moveSlots: number[]; owner?: CoopRole }[] {
+    return [...this.pending.values()].map(request => ({
+      fieldIndex: request.fieldIndex,
+      turn: request.turn,
+      moveSlots: [...request.moveSlots],
+      ...(request.owner == null ? {} : { owner: request.owner }),
+    }));
   }
 
   private handle(msg: CoopMessage): void {
@@ -365,23 +425,23 @@ export class CoopBattleSync {
       // #851: key by the sender's owner when present (stable across a post-half-wipe index skew),
       // else the field index (unchanged). Both the pending resolver and any buffer use this key.
       const key = commandKey(msg.fieldIndex, msg.turn, msg.owner);
-      const resolver = this.pending.get(key);
+      const request = this.pending.get(key);
       // #693: an explicit DECLINE resolves the awaiter with null -> the caller's AI
       // fallback commands the slot. Never treated as a real command.
-      if (msg.decline && resolver != null) {
+      if (msg.decline && request != null) {
         this.pending.delete(key);
         coopLog("relay", `recv command DECLINE fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> AI fallback`);
-        resolver(null);
+        request.finish(null);
         return;
       }
-      if (resolver) {
+      if (request) {
         if (isCoopDebug()) {
           coopLog(
             "relay",
             `recv command fieldIndex=${msg.fieldIndex} turn=${msg.turn} command=${msg.command.command} -> resolved awaiting request`,
           );
         }
-        resolver(msg.command);
+        request.finish(msg.command);
       } else {
         if (isCoopDebug()) {
           coopLog(

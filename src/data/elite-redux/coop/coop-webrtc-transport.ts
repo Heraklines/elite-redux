@@ -171,6 +171,10 @@ export class WebRtcTransport implements CoopTransport {
     return this.wire.lastError;
   }
 
+  connectionGeneration(): number {
+    return this.wireGeneration;
+  }
+
   /**
    * #857: begin periodic keepalive pings so an idle data channel never goes ~30s without a validated
    * packet (which would trip ICE consent freshness / a NAT-binding expiry and tear the channel down ->

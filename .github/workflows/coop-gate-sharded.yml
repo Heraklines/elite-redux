@@ -16,6 +16,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  static:
+    name: Co-op static type and format gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Typecheck TypeScript
+        run: pnpm typecheck
+
+      - name: Check formatting and lint
+        run: pnpm biome:ci
+
   gate:
     if: github.repository == 'Heraklines/elite-redux'
     name: Lane ${{ matrix.lane }} shard ${{ matrix.shard }}/${{ matrix.total }}

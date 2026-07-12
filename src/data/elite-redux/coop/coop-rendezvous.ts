@@ -120,6 +120,7 @@ export class CoopRendezvous {
   private readonly defaultTimeoutMs: number;
   private readonly schedule: (cb: () => void, ms: number) => () => void;
   private readonly offMessage: () => void;
+  private readonly offStateChange: () => void;
   private readonly getEpoch: () => number;
 
   /** Points THIS client has arrived at (idempotent local arrival; suppresses a duplicate send). */
@@ -143,6 +144,11 @@ export class CoopRendezvous {
     this.schedule = opts.schedule ?? defaultSchedule;
     this.getEpoch = opts.getEpoch ?? (() => 0);
     this.offMessage = transport.onMessage(msg => this.handle(msg));
+    this.offStateChange = transport.onStateChange(state => {
+      if (state === "connected") {
+        this.resendControlState();
+      }
+    });
   }
 
   /**
@@ -330,6 +336,25 @@ export class CoopRendezvous {
     }
   }
 
+  /** Rehydrate every live barrier/route after a connection-generation change. */
+  resendControlState(): void {
+    this.resendArrivals();
+    const epoch = this.getEpoch();
+    for (const [revision, route] of this.pendingRouteAcks) {
+      coopLog(
+        "rendezvous",
+        `RESEND phaseRoute rev=${revision} authoritative=${route.point} displaced=${route.displacedPoint} (rejoin)`,
+      );
+      this.transport.send({
+        t: "phaseRoute",
+        epoch,
+        revision,
+        point: route.point,
+        displacedPoint: route.displacedPoint,
+      });
+    }
+  }
+
   /**
    * Age (ms) of the OLDEST parked rendezvous wait, or -1 when none. Mirrors the interaction relay's
    * watchdog probe: a positive value means this client is BLOCKED at a barrier waiting for the partner.
@@ -349,6 +374,7 @@ export class CoopRendezvous {
   /** Stop listening and abort any in-flight waits; callers must remain closed on this result. */
   dispose(): void {
     this.offMessage();
+    this.offStateChange();
     for (const finish of [...this.pending.values()]) {
       finish({ point: "(disposed)", timedOut: true });
     }

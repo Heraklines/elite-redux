@@ -60,6 +60,13 @@ export function formatCoopControlPlane(): string {
     lines.push(
       `session:  role=${controller.role} seat=${safe(() => String(controller.seat))} gen=${coopSessionGeneration()}g netcode=${getCoopNetcodeMode()}${controller.versionMismatch ? " VERSION-MISMATCH" : ""}${controller.functionalFingerprintMismatch ? " FUNCTIONAL-FINGERPRINT-MISMATCH" : ""}${controller.presentationFingerprintMismatch ? " PRESENTATION-FINGERPRINT-MISMATCH" : ""}`,
     );
+    const membership = safe(() => runtime.membership.snapshot());
+    if (membership != null) {
+      lines.push(
+        `members:  rev=${membership.revision} state=${membership.state} connectionGen=${membership.connectionGeneration} `
+          + `present=[${membership.members.map(member => `${member.seatId}:${member.role}=${member.present}`).join(", ")}]`,
+      );
+    }
 
     // --- Phase manager (running + queued, in run order) ---
     const running = safe(() => globalScene.phaseManager?.getCurrentPhase?.()?.phaseName) ?? "-";
@@ -80,6 +87,13 @@ export function formatCoopControlPlane(): string {
             .join(", ");
     lines.push(`interact: counter=${counter ?? "-"} awaiting=${awaitedStr}`);
 
+    const commands = safe(() => runtime.battleSync.describePendingRequests()) ?? [];
+    lines.push(
+      `commands: pending=[${commands
+        .map(command => `${command.owner ?? command.fieldIndex}@t${command.turn}{${command.moveSlots.join("/")}}`)
+        .join(", ")}]`,
+    );
+
     // --- Rendezvous plane (arrivals + awaited barriers) ---
     const rv = safe(() => runtime.rendezvous.describeArrivals());
     if (rv != null) {
@@ -90,7 +104,9 @@ export function formatCoopControlPlane(): string {
 
     // --- Transport (state + last-received-frame per peer) ---
     const local = runtime.localTransport;
-    lines.push(`transport(local): state=${safe(() => local.state) ?? "-"} lastRx=${formatLastRx(local)}`);
+    lines.push(
+      `transport(local): state=${safe(() => local.state) ?? "-"} generation=${local.connectionGeneration?.() ?? "-"} lastRx=${formatLastRx(local)}`,
+    );
     if (runtime.partnerTransport != null) {
       const partner = runtime.partnerTransport;
       lines.push(`transport(partner): state=${safe(() => partner.state) ?? "-"} lastRx=${formatLastRx(partner)}`);

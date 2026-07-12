@@ -13,6 +13,7 @@ import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { Command } from "#enums/command";
+import { CoopFlapTransport } from "#test/tools/coop-flap-transport";
 import { describe, expect, it } from "vitest";
 
 describe("co-op battle command relay (#633, LIVE-C)", () => {
@@ -155,6 +156,29 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     const secondCmd = await second;
     expect(secondCmd).not.toBeNull();
     expect(secondCmd?.command).toBe(Command.FIGHT);
+  });
+
+  it("hot rejoin reissues the exact unresolved legal-action offer instead of AI-falling back", async () => {
+    const pair = createLoopbackPair();
+    const hostWire = new CoopFlapTransport(pair.host);
+    const hostSync = new CoopBattleSync(hostWire);
+    const guestSync = new CoopBattleSync(pair.guest);
+    guestSync.onCommandRequest(({ moveSlots }) => ({
+      command: Command.FIGHT,
+      cursor: moveSlots[1],
+      moveId: 777,
+    }));
+
+    hostWire.setConnected(false);
+    const awaited = hostSync.requestPartnerCommand(1, 9, [0, 3], "guest");
+    expect(hostSync.describePendingRequests()).toEqual([{ fieldIndex: 1, turn: 9, moveSlots: [0, 3], owner: "guest" }]);
+
+    hostWire.setConnected(true);
+    const command = await awaited;
+    expect(command).toMatchObject({ command: Command.FIGHT, cursor: 3, moveId: 777 });
+    expect(hostSync.describePendingRequests()).toEqual([]);
+    hostSync.dispose();
+    guestSync.dispose();
   });
 });
 

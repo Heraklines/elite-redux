@@ -1015,19 +1015,35 @@ export class CoopFinalizeTurnPhase extends Phase {
         // while a CoopHpDrainReplayPhase animates against it. Route it through a queued one-shot phase
         // so the heavy rebuild lands at a real inter-phase boundary, never mid-drain. The heal-check +
         // UNHEALED diagnostics moved INTO the phase (they must run AFTER the deferred apply).
-        const controller = getCoopController();
-        if (snapshot.sessionEpoch !== undefined && snapshot.sessionEpoch !== controller?.sessionEpoch) {
+        const runtime = getCoopRuntime();
+        const controller = runtime?.controller;
+        if (
+          runtime == null
+          || snapshot.sessionEpoch !== controller?.sessionEpoch
+          || snapshot.membership == null
+          || snapshot.activeControl == null
+          || snapshot.membership.state !== "active"
+          || !snapshot.membership.members.every(member => member.present)
+          || !runtime.membership.canAdopt(snapshot.membership)
+        ) {
           coopWarn(
             "resync",
-            `turn=${this.turn} snapshot epoch=${snapshot.sessionEpoch} does not match live=${controller?.sessionEpoch ?? "none"} -> refused`,
+            `turn=${this.turn} snapshot control incompatible epoch=${snapshot.sessionEpoch ?? "missing"}/`
+              + `${controller?.sessionEpoch ?? "none"} membership=${snapshot.membership?.revision ?? "missing"} -> refused`,
           );
           return;
         }
         const targetChecksum = snapshot.checksum ?? hostChecksum;
         globalScene.phaseManager.pushPhase(
           new CoopApplyResyncPhase(snapshot, this.turn, targetChecksum, hostObj, healed => {
-            if (healed) {
-              adoptCoopSnapshotHighWater(getCoopRuntime()?.durability, snapshot);
+            if (
+              healed
+              && snapshot.membership != null
+              && snapshot.activeControl != null
+              && runtime.membership.adopt(snapshot.membership)
+              && runtime.controller.adoptAuthoritativeInteractionCounter(snapshot.activeControl.interactionCounter)
+            ) {
+              adoptCoopSnapshotHighWater(runtime.durability, snapshot);
             }
           }),
         );
