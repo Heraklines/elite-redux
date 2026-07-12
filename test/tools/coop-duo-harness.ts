@@ -1224,7 +1224,15 @@ interface ReplayPumpScene {
  * harness exists to surface). Returns when the finalize has run (checkpoint applied, tail queued).
  */
 export async function driveGuestReplayTurn(guestScene: ReplayPumpScene, turn: number): Promise<void> {
-  const replay = guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
+  // Production-transition journeys arrive here through the guest's real TurnStartPhase, which has already
+  // queued and selected CoopReplayTurnPhase. Reuse that CURRENT object so its end() advances the same phase
+  // tree (Victory/reward/NewBattle tails cannot be stranded behind an unrelated constructor phase). Legacy
+  // focused repros that deliberately invoke the replay seam still get a detached freshly-created phase.
+  const current = guestScene.phaseManager.getCurrentPhase();
+  const replay =
+    current?.phaseName === "CoopReplayTurnPhase"
+      ? current
+      : guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
   replay.start();
   await drainLoopback();
   // Stall detection by phase IDENTITY (#827): the #782 instant-streaming continuation re-enters as a NEW

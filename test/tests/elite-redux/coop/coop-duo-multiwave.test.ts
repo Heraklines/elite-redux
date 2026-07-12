@@ -47,12 +47,14 @@ import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import { BattlerIndex } from "#enums/battler-index";
+import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { LearnMoveType } from "#enums/learn-move-type";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
 import { LearnMovePhase } from "#phases/learn-move-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
@@ -132,7 +134,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     // best-effort
   });
 
-  /** Wire the guest's OWN-slot command answer (the genuine production CoopBattleSync relay). */
+  /** Legacy focused regressions below inject the guest answer without driving the full two-client UI. */
   function wireGuestCommand(rig: DuoRig): void {
     rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
       command: Command.FIGHT,
@@ -142,13 +144,59 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     }));
   }
 
-  /** Drive ONE host wave to a win (both player slots FIGHT the frail enemies) under the host ctx. */
+  /** Drive ONE host wave to a win; the partner slot was supplied by the guest's real public UI intent. */
   async function hostPlayWave(rig: DuoRig): Promise<void> {
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-      game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
       await game.phaseInterceptor.to("TurnEndPhase");
     });
+  }
+
+  /**
+   * Bring both real clients to the same command point and submit the GUEST's move through public UI input.
+   * The guest first auto-resolves the host-owned slot, then parks its own CommandPhase at the reciprocal
+   * rendezvous. The host starts its own command phase, both barriers cross, and ACTION/ACTION/RIGHT/ACTION
+   * commits Tackle against enemy slot 2 through Command/Fight/TargetSelect—the production relay path.
+   */
+  async function driveGuestCommandUi(rig: DuoRig, restartAlreadyOpenHost: boolean): Promise<void> {
+    const guestOwnCommand = await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase", {
+        matches: phase =>
+          phase.phaseName === "CommandPhase"
+          && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+      }),
+    );
+    await withClient(rig.guestCtx, async () => {
+      guestOwnCommand.start();
+      await drainLoopback();
+    });
+
+    await withClient(rig.hostCtx, async () => {
+      await drainLoopback();
+      if (restartAlreadyOpenHost) {
+        // Wave 1's host CommandPhase opened before buildDuo installed the live runtime. Re-enter that same
+        // public phase once so it participates in the now-live reciprocal rendezvous; no state was committed.
+        rig.hostScene.phaseManager.getCurrentPhase().start();
+        await drainLoopback();
+      } else {
+        await game.phaseInterceptor.to("CommandPhase");
+      }
+    });
+
+    await withClient(rig.guestCtx, async () => {
+      await drainLoopback();
+      expect(rig.guestScene.ui.getMode(), "guest command UI opens only after both clients arrive").toBe(UiMode.COMMAND);
+      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Fight through COMMAND UI").toBe(true);
+      expect(rig.guestScene.ui.getMode(), "guest reaches the move picker").toBe(UiMode.FIGHT);
+      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Tackle through FIGHT UI").toBe(true);
+      if (rig.guestScene.ui.getMode() === UiMode.TARGET_SELECT) {
+        rig.guestScene.ui.processInput(Button.RIGHT);
+        expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms the second enemy target").toBe(true);
+      }
+      await drainLoopback();
+      await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase");
+    });
+    await withClient(rig.hostCtx, () => drainLoopback());
   }
 
   it("DUO 3-wave: host plays each wave, guest replays + converges, host drives the reward shop each wave", async () => {
@@ -161,7 +209,14 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     // installed ClientCtx, so those transition continuations cannot use the other engine's globalScene.
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    wireGuestCommand(rig);
+    // The direct guest BattleScene constructor begins at TitlePhase. Align only this initial harness boot
+    // to the real battle turn boundary; shiftPhase() on an empty queue selects production TurnInitPhase,
+    // which then builds the actual command/enemy/TurnStart queue under the guest renderer gate.
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.phaseManager.clearAllPhases();
+      rig.guestScene.phaseManager.shiftPhase();
+    });
+    pair.setAutomaticDelivery(false);
 
     const applyCheckpointSpy = vi.spyOn(coopEngine, "applyCoopCheckpoint");
     // Per-wave resync watch: count the guest's requestStateSync calls (an auto-resync on a checksum
@@ -176,14 +231,10 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
 
     const WAVES = 3;
     for (let w = 1; w <= WAVES; w++) {
+      await driveGuestCommandUi(rig, w === 1);
       // ===== Host plays this wave to a win (emits turnResolution + checkpoint + waveResolved). =====
       const turn = rig.hostScene.currentBattle.turn;
       await hostPlayWave(rig);
-      // The single-process command-phase helper above still awaits the guest response inside one host
-      // pump. Once the authoritative turn is complete, switch to strict per-client delivery for the
-      // replay + reward boundary this journey is intended to validate.
-      pair.setAutomaticDelivery(false);
-
       // ===== Guest replays the host's turn + applies the checkpoint (renders the host's outcome). =====
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn);
@@ -289,13 +340,6 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
           rig.guestRuntime.durability?.controlPlaneHighWater() ?? {},
           `wave ${w}: operation revisions converged at the carrier boundary`,
         ).toEqual(rig.hostRuntime.durability?.controlPlaneHighWater() ?? {});
-
-        // Leave the host's real command phase open for the next loop. The guest command response remains
-        // transport-driven by wireGuestCommand; starting the host target is the normal GameManager seam.
-        pair.setAutomaticDelivery(true);
-        await withClient(rig.hostCtx, async () => {
-          await game.phaseInterceptor.to("CommandPhase");
-        });
       }
     }
 

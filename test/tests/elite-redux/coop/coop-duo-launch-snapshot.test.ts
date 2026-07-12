@@ -34,7 +34,7 @@ import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { materializeCoopLoadedPlayerField } from "#phases/encounter-phase";
+import { materializeCoopAdoptedEnemyField, materializeCoopLoadedPlayerField } from "#phases/encounter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
@@ -129,6 +129,33 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
         expect(mon.visible, `${mon.name} container is visible`).toBe(true);
         expect(spriteVisible[index], `${mon.name} sprite was explicitly shown`).toHaveBeenCalledWith(true);
         expect(infoVisible[index], `${mon.name} battle UI was explicitly shown`).toHaveBeenCalledOnce();
+      }
+    });
+
+    // TRAINER-wave renderer regression: the real SummonPhase is correctly default-denied on the guest,
+    // but its already-adopted enemies still need the presentation half (seat/sprite/bar). Simulate the
+    // pre-summon trainer state and prove the narrow materializer makes every enemy seat visible without
+    // constructing a resolution phase.
+    await withClient(rig.guestCtx, () => {
+      const capacity = rig.guestScene.currentBattle.arrangement.enemyCapacity;
+      const enemies = rig.guestScene.getEnemyParty().slice(0, capacity);
+      for (const enemy of enemies) {
+        rig.guestScene.field.remove(enemy, false);
+        enemy.setVisible(false);
+        enemy.getSprite().setVisible(false);
+      }
+      const spriteVisible = enemies.map(enemy => vi.spyOn(enemy.getSprite(), "setVisible"));
+      const infoVisible = enemies.map(enemy => vi.spyOn(enemy, "showInfo"));
+      expect(materializeCoopAdoptedEnemyField(), "all adopted enemy seats are presentation-materialized").toBe(
+        capacity,
+      );
+      const field = rig.guestScene.getEnemyField(true);
+      expect(field, "guest renders every authoritative enemy seat").toHaveLength(capacity);
+      for (const [index, enemy] of field.entries()) {
+        expect(enemy.isOnField(), `${enemy.name} is seated`).toBe(true);
+        expect(enemy.visible, `${enemy.name} container is visible`).toBe(true);
+        expect(spriteVisible[index], `${enemy.name} sprite was explicitly shown`).toHaveBeenCalledWith(true);
+        expect(infoVisible[index], `${enemy.name} battle UI was explicitly shown`).toHaveBeenCalledOnce();
       }
     });
 

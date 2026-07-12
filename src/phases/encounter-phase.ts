@@ -126,6 +126,73 @@ export function materializeCoopLoadedPlayerField(): number {
 }
 
 /**
+ * Presentation-only materialization for the authoritative guest's adopted trainer party. Trainer
+ * encounters normally reveal enemies through SummonPhase, but that phase also runs fieldSetup and
+ * post-summon resolution and is therefore correctly blocked by the renderer allowlist. The old path
+ * still hid the trainer and queued those blocked phases, leaving the adopted enemy objects invisible
+ * (and sometimes leaving the trainer sprite covering the field).
+ *
+ * This performs only the visual half of summon: seat the already-authoritative objects, position them,
+ * show their sprites/bars, and mark them seen. It deliberately does not call fieldSetup, roll abilities,
+ * generate modifiers, or consume RNG. Exported as a narrow regression-test seam.
+ */
+export function materializeCoopAdoptedEnemyField(): number {
+  if (!isCoopAuthoritativeGuest()) {
+    return 0;
+  }
+  const battle = globalScene.currentBattle;
+  if (battle == null) {
+    return 0;
+  }
+  const capacity = battle.arrangement.enemyCapacity;
+  const party = globalScene.getEnemyParty();
+  let materialized = 0;
+  for (let i = 0; i < capacity && i < party.length; i++) {
+    const pokemon = party[i];
+    if (pokemon == null || pokemon.isFainted()) {
+      continue;
+    }
+    const wasOnField = pokemon.isOnField();
+    if (!wasOnField) {
+      globalScene.add.existing(pokemon);
+      globalScene.field.add(pokemon);
+      const playerPokemon = globalScene.getPlayerPokemon() as Pokemon | undefined;
+      if (playerPokemon?.isOnField()) {
+        globalScene.field.moveBelow(pokemon, playerPokemon);
+      }
+      battle.seenEnemyPartyMemberIds.add(pokemon.id);
+    }
+    pokemon.setFieldPosition(fieldPositionForSlot(i, capacity), 0);
+    pokemon.showInfo();
+    pokemon.setVisible(true);
+    pokemon.getSprite()?.setVisible(true);
+    pokemon.getSprite()?.clearTint();
+    pokemon.setAlpha(1);
+    pokemon.setScale(pokemon.getSpriteScale());
+    pokemon.playAnim();
+    if (!wasOnField) {
+      materialized++;
+    }
+  }
+  if (materialized > 0) {
+    globalScene.updateFieldScale();
+  }
+  return materialized;
+}
+
+/** End the authoritative guest's trainer intro at an absolute visual postcondition. */
+function hideCoopAdoptedTrainer(): void {
+  const trainer = globalScene.currentBattle?.trainer;
+  if (trainer == null) {
+    return;
+  }
+  trainer.setAlpha(0);
+  for (const sprite of [...trainer.getSprites(), ...trainer.getTintSprites()]) {
+    sprite.setVisible(false);
+  }
+}
+
+/**
  * Dev scenario builder (staging only): construct one staged enemy mon for slot
  * `e`. Mirrors the LLM director's wild-encounter override construction. Returns
  * null when the spec's species doesn't resolve (falls through to normal gen).
@@ -1086,6 +1153,15 @@ export class EncounterPhase extends BattlePhase {
         globalScene.pbTrayEnemy.showPbTray(globalScene.getEnemyParty());
         const doTrainerSummon = () => {
           this.hideEnemyTrainer();
+          if (isCoopAuthoritativeGuest()) {
+            // SummonPhase is intentionally default-denied on the pure renderer. Materialize the exact
+            // already-adopted enemy objects as presentation and end the intro with the trainer hidden;
+            // no fieldSetup/on-summon/RNG is run locally.
+            hideCoopAdoptedTrainer();
+            materializeCoopAdoptedEnemyField();
+            this.end();
+            return;
+          }
           const availablePartyMembers = globalScene.getEnemyParty().filter(p => !p.isFainted()).length;
           // Summon one enemy per on-field slot (1 single / 2 double / 3 triple), so EVERY fielded
           // trainer mon gets a real SummonPhase - its send-out animation/message + on-summon

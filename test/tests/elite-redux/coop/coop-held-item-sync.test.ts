@@ -38,13 +38,15 @@ import {
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import type { CoopFullBattleSnapshot, CoopFullMonSnapshot } from "#data/elite-redux/coop/coop-transport";
+import { applyErTrainerVitaminCatchup } from "#data/elite-redux/er-trainer-runtime-hook";
 import { BerryType } from "#enums/berry-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { Stat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
-import { BerryModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
-import { BerryModifierType } from "#modifiers/modifier-type";
+import { BaseStatModifier, BerryModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
+import { BaseStatBoosterModifierType, BerryModifierType } from "#modifiers/modifier-type";
 import { GameManager } from "#test/framework/game-manager";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import Phaser from "phaser";
@@ -286,6 +288,35 @@ describe.skipIf(!RUN)("co-op held-item + ball heal - real engine (#698, RISKY #1
       .filter(m => !(m instanceof PokemonHeldItemModifier))
       .map(m => m.type.id)
       .sort();
+
+  it("trainer vitamin catch-up emits a serializable BASE_STAT_BOOSTER (live faint-recovery regression)", async () => {
+    const field = await startCoopDouble();
+    const playerVitaminType = new BaseStatBoosterModifierType(Stat.HP);
+    playerVitaminType.id = "BASE_STAT_BOOSTER";
+    const playerVitamin = playerVitaminType.newModifier(field[COOP_HOST_FIELD_INDEX]);
+    expect(playerVitamin).toBeInstanceOf(BaseStatModifier);
+    if (playerVitamin != null) {
+      globalScene.addModifier(playerVitamin, true);
+    }
+
+    // applyErTrainerVitaminCatchup only needs trainer presence to select its trainer-only branch. The
+    // actual enemy party is the fully constructed live party from startBattle.
+    globalScene.currentBattle.trainer = {} as never;
+    applyErTrainerVitaminCatchup(globalScene.getEnemyParty());
+    const mirrored = globalScene.findModifiers(m => m instanceof BaseStatModifier, false);
+    expect(mirrored.length, "the trainer apex received at least one mirrored vitamin").toBeGreaterThan(0);
+    expect(
+      mirrored.every(modifier => modifier.type.id === "BASE_STAT_BOOSTER"),
+      "no trainer vitamin serializes as heldItems=[bi,null,stack]",
+    ).toBe(true);
+
+    const authoritative = captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
+    expect(authoritative, "the turn authority remains capturable with the trainer vitamin").not.toBeNull();
+    expect(
+      authoritative?.enemyModifiers.some(raw => raw.typeId === "BASE_STAT_BOOSTER"),
+      "the exact stable held-item id rides the authoritative carrier",
+    ).toBe(true);
+  });
 
   it("(#1/#2) a STALE extra item on a live mon is REMOVED by the gated heal (set to host exactly)", async () => {
     const field = await startCoopDouble();
