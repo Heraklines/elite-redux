@@ -2026,8 +2026,37 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         await game.phaseInterceptor.to("PostMysteryEncounterPhase");
       });
       await withClient(rig.guestCtx, async () => {
-        startGuestMeOutcomeRace(replay);
-        await drainGuestMeReplayToSettle(replay);
+        const scriptedSubPicks = [...(opts.meSubPicks?.get(wave) ?? [])];
+        const ui = rig.guestScene.ui as unknown as {
+          setMode: (...args: unknown[]) => Promise<unknown>;
+          setModeWithoutClear: (...args: unknown[]) => Promise<unknown>;
+        };
+        const realSetMode = ui.setMode.bind(ui);
+        const realSetModeWithoutClear = ui.setModeWithoutClear.bind(ui);
+        ui.setMode = (...args: unknown[]): Promise<unknown> => {
+          if (args[0] === UiMode.PARTY && typeof args[3] === "function") {
+            const value = scriptedSubPicks.shift() ?? 0;
+            queueMicrotask(() => (args[3] as (slot: number) => void)(value));
+            return Promise.resolve();
+          }
+          return realSetMode(...args);
+        };
+        ui.setModeWithoutClear = (...args: unknown[]): Promise<unknown> => {
+          if (args[0] === UiMode.OPTION_SELECT) {
+            const value = scriptedSubPicks.shift() ?? 0;
+            const config = args[1] as { options?: { handler?: () => unknown }[] } | undefined;
+            queueMicrotask(() => config?.options?.[value]?.handler?.());
+            return Promise.resolve();
+          }
+          return realSetModeWithoutClear(...args);
+        };
+        try {
+          startGuestMeOutcomeRace(replay);
+          await drainGuestMeReplayToSettle(replay);
+        } finally {
+          ui.setMode = realSetMode;
+          ui.setModeWithoutClear = realSetModeWithoutClear;
+        }
       });
       mePath = "guest-owned";
     }
