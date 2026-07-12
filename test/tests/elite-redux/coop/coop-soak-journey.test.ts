@@ -26,26 +26,40 @@ const LAST_WAVE = 45;
 /** Every wave is non-milestone and known wild-eligible under CONTENT_SEED. */
 const EVENT_SCHEDULE = new Map([
   [12, MysteryEncounterType.DEPARTMENT_STORE_SALE], // nested shop
+  [13, MysteryEncounterType.ER_HOT_SPRING], // consecutive-event teardown + empty healing-shop terminal
   [15, MysteryEncounterType.BERRIES_ABOUND], // explicit leave after a battle-capable offer
+  [16, MysteryEncounterType.ER_PICNIC], // account-local candy/affection surface; safe move-on branch
   [18, MysteryEncounterType.TRASH_TO_TREASURE], // direct held-item mutation
   [19, MysteryEncounterType.FIELD_TRIP], // guest-owned party + nested move sub-picks
+  [22, MysteryEncounterType.ER_TOWN_RAFFLE], // money spend + seeded generated reward identity
+  [23, MysteryEncounterType.ER_FORTUNE_TELLER], // queued future event + world-map reveal mutation
+  [27, MysteryEncounterType.ER_CLEANSING_FONT], // party-wide heal/status continuation
   [32, MysteryEncounterType.TELEPORTING_HIJINKS], // post-crossroads money + party transformation branch
   [34, MysteryEncounterType.WEIRD_DREAM], // legal-range transformation encounter, leave branch
+  [37, MysteryEncounterType.ER_STILL_WATERS], // full-party mirror battle handoff
+  [41, MysteryEncounterType.ER_DRAGONS_HOARD], // catch-capable boss surface; safe decline terminal
 ]);
 
 /** One-based safe non-battle option for each event; both ownership parities use the same semantic choice. */
 const EVENT_OPTIONS = new Map([
   [12, 1],
+  [13, 2],
   [15, 3],
+  [16, 4],
   [18, 2],
   [19, 1],
+  [22, 1],
+  [23, 1],
+  [27, 1],
   [32, 1],
   [34, 3],
+  [37, 1],
+  [41, 2],
 ]);
 
 /** Field Trip option 1: choose party slot 0, then that Pokemon's move slot 0. */
 const EVENT_SUB_PICKS = new Map<number, readonly number[]>([[19, [0, 0]]]);
-const EVENT_BATTLE_WAVES = new Set([32]);
+const EVENT_BATTLE_WAVES = new Set([32, 37]);
 
 describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome transitions", () => {
   let phaserGame: Phaser.Game;
@@ -81,7 +95,7 @@ describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome 
     initGlobalScene(game.scene);
   });
 
-  it("plays through six heterogeneous events, later battles, and repeated world-map boundaries without drift", async () => {
+  it("plays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift", async () => {
     const seed = 828_633;
     prepareCoopSoakContent(game, seed, CONTENT_SEED);
     await game.classicMode.startBattle(...SOAK_PROFILES.god.species);
