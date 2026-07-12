@@ -775,3 +775,24 @@ All fourteen prior gameplay/static jobs and the new browser job passed at exact 
 forced-event class coverage (especially quiz, repeated choice, bespoke shops, yes/no, and multi-round battle
 surfaces) plus long multi-seed campaigns; no claim that every one of the 91 registered event definitions has
 been played end-to-end is made yet.
+
+## 39. Thirteen-event continuous journey and terminal retry fence
+
+The production-fidelity journey now forces thirteen event definitions through one uninterrupted 45-wave run:
+nested reward and biome-affecting surfaces, host- and guest-owned choices, Field Trip's party/move sub-picks,
+generated rewards, queued future-event/map state, direct held-item mutation, full-party healing, safe catch and
+mirror-event terminals, and Teleporting Hijinks' biome-changing battle handoff. Non-scripted battles are pinned
+to wild for deterministic ME eligibility while fixed trainers, milestone bosses/rewards, ordinary battles, and
+real biome transitions remain in the same campaign. The driver now models both embedded-shop and direct
+no-reward ME terminals instead of treating a deliberately absent `SelectModifierPhase` as a softlock.
+
+That expansion found a real cross-event durability defect: after a guest-owned nested sub-pick completed, loss
+of its individual commit receipt could leave the proposal retry timer armed even though the authoritative ME
+terminal had already closed the encounter. The stale `meSub` frame then retransmitted into later waves. The
+accepted terminal is now a causal completion fence that retires every proposal retry from the completed ME;
+a focused fake-timer regression proves no retransmit can reach the next encounter.
+
+Exact SHA `8a9c8cd92` passed all thirteen gameplay shards, the static gate, and browser-native WebRTC handshake/
+hot-rejoin in run `29185661063`. The expanded C3 campaign completed all 45 waves and all thirteen scheduled MEs;
+staging-only deployment `29185797849` succeeded. External long campaigns were dispatched as run `29185834370`
+at that same SHA (200-wave god, faint-heavy level, ME/asymmetric, and expanded journey legs).

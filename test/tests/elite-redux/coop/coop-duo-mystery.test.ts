@@ -614,6 +614,43 @@ describe.skipIf(!RUN)(
       logs.flush();
     }, 300_000);
 
+    it("DUO ME: Still Waters streams the complete bounded mirror team and reaches battle handoff without identity drift", async () => {
+      const party = [SpeciesId.SNORLAX, SpeciesId.GENGAR];
+      await game.runToMysteryEncounter(MysteryEncounterType.ER_STILL_WATERS, party);
+      const hostScene = game.scene;
+      expect(hostScene.currentBattle.mysteryEncounter?.encounterType).toBe(MysteryEncounterType.ER_STILL_WATERS);
+
+      const pair = createLoopbackPair();
+      const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+      const counterBefore = rig.hostRuntime.controller.interactionCounter();
+
+      await withClient(rig.hostCtx, async () => {
+        await runSelectMysteryEncounterOption(game, 1);
+        await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
+      });
+      const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+
+      expect(guestReplay.settled).toBe(true);
+      expect(rig.hostRuntime.controller.interactionCounter()).toBe(counterBefore);
+      expect(rig.guestRuntime.controller.interactionCounter()).toBe(counterBefore);
+
+      const hostEnemies = hostScene.currentBattle.enemyParty;
+      const guestEnemies = rig.guestScene.currentBattle.enemyParty;
+      expect(hostEnemies, "the complete two-member player squad is mirrored as the enemy trainer team").toHaveLength(
+        party.length,
+      );
+      expect(hostEnemies.map(mon => mon.species.speciesId)).toEqual(party);
+      expect(new Set(hostEnemies.map(mon => mon.id)).size, "every mirror receives a unique authoritative id").toBe(
+        party.length,
+      );
+      expect(
+        guestEnemies.map(mon => ({ id: mon.id, species: mon.species.speciesId })),
+        "the guest adopts the exact host mirror identities and ordering",
+      ).toEqual(hostEnemies.map(mon => ({ id: mon.id, species: mon.species.speciesId })));
+
+      logs.flush();
+    }, 300_000);
+
     // ===========================================================================================
     // IT #4 - #818 CO-OP QUIZ MIRRORING (the leaf-glue PROOF). A quiz-bearing ME (ER_SEALED_DOOR, the
     // Unown CIPHER) runs its embedded ErQuizPhase on BOTH real engines. This is a DISTINCT authoritative

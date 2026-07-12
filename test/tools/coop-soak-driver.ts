@@ -887,10 +887,15 @@ export function registerHostFaintAutoPick(game: GameManager, rig: DuoRig): void 
       // A SwitchPhase that reached UiMode.PARTY on the host is - by switch-phase.ts construction - a
       // HOST-owned faint's OWNER picker (a GUEST-owned faint takes the watcher/relay path: it shows
       // MESSAGE and awaits the guest's relayed pick, NEVER opening PARTY on the host). Defensively gate by
-      // the SwitchPhase's own `fieldIndex` so a host bench mon can never be sent into a guest-owned slot.
+      // the fainted occupant's authoritative owner. Static field-index parity is invalid after asymmetric
+      // takeover, where the surviving host legitimately occupies both field slots.
       const phase = rig.hostScene.phaseManager.getCurrentPhase() as unknown as { fieldIndex?: number } | undefined;
       const fieldIndex = phase?.fieldIndex;
-      const drivesHostSlot = typeof fieldIndex !== "number" || coopOwnerForPartySlot(fieldIndex) === "host";
+      const faintedOccupant = typeof fieldIndex === "number" ? rig.hostScene.getPlayerField()[fieldIndex] : undefined;
+      const drivesHostSlot =
+        faintedOccupant?.coopOwner === "host"
+        || (faintedOccupant == null
+          && (typeof fieldIndex !== "number" || coopOwnerForPartySlot(fieldIndex) === "host"));
       const benchSlot = firstLegalBenchSlot(rig.hostScene, "host");
       if (drivesHostSlot && benchSlot >= 0) {
         const handler = rig.hostScene.ui.getHandler() as PartyUiHandler;

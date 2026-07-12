@@ -99,9 +99,10 @@ jobs:
           - profile: me-asym
             waves_default: "150"
             test_path: "test/tests/elite-redux/coop/coop-soak-me.test.ts test/tests/elite-redux/coop/coop-soak-asymmetric.test.ts"
-          # JOURNEY: six heterogeneous forced MEs in one continuous production-fidelity run, followed by
-          # enough normal waves to cross repeated biome boundaries. Detects event teardown poisoning later
-          # command/reward/map phases - a class isolated one-event repros cannot see.
+          # JOURNEY: thirteen heterogeneous forced MEs in one continuous production-fidelity run, followed by
+          # enough normal waves to cross repeated biome boundaries. Covers nested shops, guest-owned party/move
+          # sub-picks, no-reward terminals, generated rewards, map mutation, a biome-changing ME battle, and
+          # later event teardown. Detects poisoning of later command/reward/map phases that isolated repros miss.
           - profile: journey
             waves_default: "45"
             test_path: "test/tests/elite-redux/coop/coop-soak-journey.test.ts"
