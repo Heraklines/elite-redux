@@ -1365,6 +1365,41 @@ export async function driveHostRewardShopOwner(
 }
 
 /**
+ * Drive the ordinary reward-shop LEAVE path exclusively through the public UI adapter. This is the
+ * production-transition counterpart to the legacy seam driver above: phase start opens the real
+ * MODIFIER_SELECT handler, CANCEL opens its real confirmation, and ACTION commits the leave intent.
+ * No private selection/terminal method is invoked. MUST run inside the owner's ClientCtx.
+ */
+export async function driveRewardShopOwnerLeaveViaUi(hostPhase: ShopPhaseSeam): Promise<number> {
+  hostPhase.start();
+  await drainLoopback();
+  const pinned = hostPhase.coopInteractionStart;
+  if (globalScene.ui.getMode() !== UiMode.MODIFIER_SELECT) {
+    throw new Error(
+      `reward UI owner did not open MODIFIER_SELECT (mode=${UiMode[globalScene.ui.getMode()]}, pinned=${pinned})`,
+    );
+  }
+  if (!globalScene.ui.processInput(Button.CANCEL)) {
+    throw new Error(`reward UI owner rejected CANCEL at interaction ${pinned}`);
+  }
+  await drainLoopback();
+  if (globalScene.ui.getMode() !== UiMode.CONFIRM) {
+    throw new Error(
+      `reward UI owner did not open leave CONFIRM (mode=${UiMode[globalScene.ui.getMode()]}, pinned=${pinned})`,
+    );
+  }
+  if (!globalScene.ui.processInput(Button.ACTION)) {
+    throw new Error(`reward UI owner rejected leave confirmation at interaction ${pinned}`);
+  }
+  await drainLoopback();
+  const after = getCoopRuntime()?.controller.interactionCounter();
+  if (after == null || after <= pinned) {
+    throw new Error(`reward UI owner did not advance interaction ${pinned} (after=${after ?? "missing"})`);
+  }
+  return pinned;
+}
+
+/**
  * Drive the GUEST's REAL watcher reward shop: start the phase (it detects watcher from the pinned
  * counter+role, adopts the owner's streamed option list, and runs startCoopWatch's relay loop),
  * draining the loopback so the relayed owner picks + the terminal LEAVE arrive and are applied.

@@ -64,6 +64,7 @@ import {
   driveGuestRewardWatch,
   driveGuestTmCaseRegression,
   driveHostRewardShopOwner,
+  driveRewardShopOwnerLeaveViaUi,
   forceItemRewards,
   forceNextMysteryEncounter,
   installDuoLogCapture,
@@ -220,10 +221,14 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
       const guestModsBefore = rig.guestScene.modifiers.length;
       let ownerPinned: number;
       if (hostOwns) {
-        ownerPinned = await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward }));
+        ownerPinned = await withClient(rig.hostCtx, () =>
+          takeReward
+            ? driveHostRewardShopOwner(hostShop, { takeReward: true })
+            : driveRewardShopOwnerLeaveViaUi(hostShop),
+        );
         await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
       } else {
-        ownerPinned = await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward: false }));
+        ownerPinned = await withClient(rig.guestCtx, () => driveRewardShopOwnerLeaveViaUi(guestShop));
         await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
       }
       if (takeReward) {
