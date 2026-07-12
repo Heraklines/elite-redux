@@ -21,6 +21,8 @@ export interface ScheduledCoopPair {
   disconnect(): void;
   /** Reconnect the same endpoints; state listeners observe a production-like generation change. */
   reconnect(): void;
+  /** Use ordinary microtask delivery during reusable harness boot; switch off before a timed journey. */
+  setAutomaticDelivery(automatic: boolean): void;
 }
 
 interface DeliveryFault {
@@ -109,14 +111,19 @@ class ScheduledEndpoint implements CoopTransport {
  * versa). That makes real concurrent phase/UI journeys possible in the two-engine harness while preserving
  * FIFO ordering. Timing variations are expressed by choosing which role to flush and how many frames.
  */
-export function createScheduledCoopPair(): ScheduledCoopPair {
+export function createScheduledCoopPair(options: { automatic?: boolean } = {}): ScheduledCoopPair {
   const queues: Record<CoopRole, QueuedFrame[]> = { host: [], guest: [] };
   const drops: Record<CoopRole, DeliveryFault[]> = { host: [], guest: [] };
   const duplicates: Record<CoopRole, DeliveryFault[]> = { host: [], guest: [] };
   let generation = 1;
+  let automaticDelivery = options.automatic ?? false;
+  let flushRole: ((role: CoopRole, limit?: number) => number) | null = null;
 
   const enqueue = (role: CoopRole, message: CoopMessage): void => {
     queues[role].push({ message, generation });
+    if (automaticDelivery) {
+      queueMicrotask(() => flushRole?.(role));
+    }
   };
   const host = new ScheduledEndpoint("host", enqueue);
   const guest = new ScheduledEndpoint("guest", enqueue);
@@ -133,7 +140,7 @@ export function createScheduledCoopPair(): ScheduledCoopPair {
     return true;
   };
 
-  return {
+  const pair: ScheduledCoopPair = {
     host,
     guest,
     pending: role => queues[role].length,
@@ -169,5 +176,16 @@ export function createScheduledCoopPair(): ScheduledCoopPair {
       host.setState("connected");
       guest.setState("connected");
     },
+    setAutomaticDelivery(automatic: boolean): void {
+      automaticDelivery = automatic;
+      if (automatic) {
+        queueMicrotask(() => {
+          flushRole?.("host");
+          flushRole?.("guest");
+        });
+      }
+    },
   };
+  flushRole = pair.flush.bind(pair);
+  return pair;
 }

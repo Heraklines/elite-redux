@@ -65,4 +65,23 @@ describe("co-op production-transition scheduled transport", () => {
     pair.flush("guest");
     expect(guestRx.mock.calls.map(([message]) => message.ts)).toEqual([2, 2, 3, 5]);
   });
+
+  it("can boot with ordinary microtask delivery, then switch to explicit per-client scheduling", async () => {
+    const pair = createScheduledCoopPair({ automatic: true });
+    const guestRx = vi.fn();
+    pair.guest.onMessage(guestRx);
+    pair.host.send(ping(1));
+    await Promise.resolve();
+    expect(guestRx.mock.calls.map(([message]) => message.ts)).toEqual([1]);
+
+    pair.setAutomaticDelivery(false);
+    pair.host.send(ping(2));
+    await Promise.resolve();
+    expect(
+      guestRx.mock.calls.map(([message]) => message.ts),
+      "manual journey does not cross scene contexts",
+    ).toEqual([1]);
+    pair.flush("guest");
+    expect(guestRx.mock.calls.map(([message]) => message.ts)).toEqual([1, 2]);
+  });
 });
