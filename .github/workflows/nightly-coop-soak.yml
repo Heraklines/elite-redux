@@ -4,8 +4,8 @@ name: Nightly Co-op Soak
 # finds desyncs / strands / leaks BY MACHINE (the DIGEST / LOCKSTEP / NO-PARK / TEARDOWN
 # invariants) instead of by live players. Nightly at ~03:00 UTC. It runs THREE legs
 # (#832 profiles + #633/#828 coverage), serialized, each covering a different strand:
-#   - god   (SOAK_WAVES=150): the level-300 steamroller that reaches the deep endgame
-#            (waves 70-200) where the LATE-game desyncs live; faints only occasionally.
+#   - god   (SOAK_WAVES=200): the level-300 steamroller must clear the complete classic journey,
+#            including the late milestone/reward tails and final biome where deep desyncs live.
 #   - level (SOAK_WAVES=55):  the level-65 party that FAINTS reliably through its ~wave-40-48
 #            death spiral and WIPES cleanly (a legitimate terminal), staying below the ~60+
 #            ceiling - the faint/wipe/revive/switch channel (#834/#836/#845-#848), the
@@ -38,9 +38,9 @@ on:
   workflow_dispatch:
     inputs:
       soak_waves:
-        description: "Number of waves to soak (nightly default 150)"
+        description: "Number of waves to soak (nightly default 200)"
         type: string
-        default: "150"
+        default: "200"
       soak_seed:
         description: "Optional fixed SOAK_SEED to replay a run (empty = date-derived)"
         type: string
@@ -63,16 +63,15 @@ jobs:
     strategy:
       # Keep BOTH profiles running even if one fails (they cover DIFFERENT strands - see below).
       fail-fast: false
-      # SERIALIZE the two profiles. Both legs commit their result bundle to the `dev-logs` branch, and two
-      # concurrent pushes would non-fast-forward each other; max-parallel 1 keeps the pushes sequential. It
-      # fits the 90-min budget comfortably (god ~150 waves + level ~80 waves, the level party wiping ~68).
-      max-parallel: 1
+      # Independent GitHub runners execute the orthogonal campaigns concurrently. Result publication rebases
+      # and retries below, so dev-logs branch contention no longer serializes hours of simulation.
+      max-parallel: 4
       matrix:
         include:
           # GOD (audit priority: the DEEP-WAVE strand). The level-300 legendary steamroller reaches the
           # endgame (waves 70-200) where the LATE-game co-op desyncs live; it faints only occasionally.
           - profile: god
-            waves_default: "150"
+            waves_default: "200"
             # The default seeded soak (byte-identical to leaving SOAK_PROFILE unset for the god leg).
             test_path: "test/tests/elite-redux/coop/coop-soak.test.ts"
           # LEVEL (#832, audit priority #2: the FAINT/WIPE/REVIVE/SWITCH channel - historically the RICHEST
@@ -100,6 +99,12 @@ jobs:
           - profile: me-asym
             waves_default: "150"
             test_path: "test/tests/elite-redux/coop/coop-soak-me.test.ts test/tests/elite-redux/coop/coop-soak-asymmetric.test.ts"
+          # JOURNEY: six heterogeneous forced MEs in one continuous production-fidelity run, followed by
+          # enough normal waves to cross repeated biome boundaries. Detects event teardown poisoning later
+          # command/reward/map phases - a class isolated one-event repros cannot see.
+          - profile: journey
+            waves_default: "45"
+            test_path: "test/tests/elite-redux/coop/coop-soak-journey.test.ts"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -107,6 +112,7 @@ jobs:
           # the game + the soak test live on feat/elite-redux-port, so a scheduled run must check
           # THAT out. A manual dispatch keeps its explicitly-passed --ref.
           ref: ${{ github.event_name == 'schedule' && 'feat/elite-redux-port' || github.ref }}
+          submodules: recursive
 
       - uses: ./.github/actions/setup-deps
 
@@ -214,7 +220,17 @@ jobs:
           else
             git -C "$TMP" -c user.email="actions@github.com" -c user.name="nightly-coop-soak" \
               commit -m "coop-soak ${PROFILE} ${VERDICT} ${TS} (run ${GITHUB_RUN_ID})"
-            git -C "$TMP" push "$REPO_URL" HEAD:dev-logs
+            pushed=0
+            for attempt in 1 2 3 4 5; do
+              if git -C "$TMP" pull --rebase "$REPO_URL" dev-logs \
+                && git -C "$TMP" push "$REPO_URL" HEAD:dev-logs; then
+                pushed=1
+                break
+              fi
+              echo "dev-logs publish contention (attempt $attempt/5); retrying"
+              sleep $((attempt * 2))
+            done
+            test "$pushed" = "1" || { echo "could not publish soak result after retries"; exit 1; }
             echo "pushed soak results to dev-logs/remote/$DATE/"
           fi
 

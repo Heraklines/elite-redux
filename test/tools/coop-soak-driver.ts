@@ -422,6 +422,8 @@ export interface SoakResult {
    * fixed rival waves it crossed). Split into fixed vs random by whether the wave is a gameMode fixed battle.
    */
   trainerWaves: { total: number; fixed: number; random: number };
+  /** Number of actual arena-biome changes observed between surveyed waves. */
+  biomeTransitions: number;
   /**
    * #828 ASYMMETRIC CONTINUATION (BUILD 2): how many surveyed waves the run played with the HOST half
    * EXHAUSTED - a host-owned field slot fainted with no legal host-owned replacement, the guest half still
@@ -490,6 +492,12 @@ export interface SoakOptions {
    * EncounterPhase then resetting it, so ONLY the designated waves roll an ME. See {@linkcode processMeWave}.
    */
   meWaves?: ReadonlyMap<number, MysteryEncounterType>;
+  /**
+   * Optional one-based safe option per forced ME wave. This lets a campaign cover non-battle, party-mutation,
+   * travel, and multi-option event archetypes without pretending every encounter's option 1 is equivalent.
+   * The exact option is used by both ownership parities (guest wire indices are converted to zero-based).
+   */
+  meOptions?: ReadonlyMap<number, number>;
   /**
    * #843/#849 CATCH LEG (BUILD 1). A set of wave indices where the soak DRIVES a seeded ball throw ->
    * capture -> dexSync instead of an all-faint win. On each such wave the driver faints ONE wild enemy (the
@@ -1226,6 +1234,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   // Stand up the two-engine rig over one loopback pair (host owns EVEN interaction counters, guest ODD).
   const pair = createLoopbackPair();
   const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+  let previousBiome = rig.hostScene.arena.biomeId;
+  let biomeTransitions = 0;
   // #843: tag party-slot co-op ownership (host EVEN slots, guest ODD) so a player faint has a legal
   // same-owner bench to replace from and the #786 guest-chooses-its-own-replacement path is exercised.
   tagCoopPartyOwnership(rig);
@@ -1915,6 +1925,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     assertLockstep(wave, "me-start");
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
+    const option = Math.max(1, Math.trunc(opts.meOptions?.get(wave) ?? 1));
     // #849: the guest opens the real MYSTERY_ENCOUNTER screen (the mirrored mode); record it.
     hitMode(UiMode.MYSTERY_ENCOUNTER);
 
@@ -1924,7 +1935,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // option chain to the embedded end-of-ME reward shop (leave), then to the true terminal. The guest is a
       // pure renderer: its CoopReplayMePhase consumes the buffered present + meResync + LEAVE and advances once.
       await withClient(rig.hostCtx, async () => {
-        await runMysteryEncounterToEnd(game, 1);
+        await runMysteryEncounterToEnd(game, option);
         await game.phaseInterceptor.to("SelectModifierPhase", false);
         const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
         if (hostShop.phaseName === "SelectModifierPhase") {
@@ -1941,7 +1952,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // shop (host is the pick WATCHER on a guest-owned ME), to PostMysteryEncounterPhase; (D) start the guest's
       // deferred outcome/terminal race so it buffer-hits the meResync + LEAVE under the guest ctx and converges.
       const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
-      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
+      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, option - 1));
       await withClient(rig.hostCtx, async () => {
         await game.phaseInterceptor.to("SelectModifierPhase", false);
         const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
@@ -2000,7 +2011,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     assertLockstep(wave, "me-end");
     mysteryEncounters.push({ wave, type: MysteryEncounterType[type], path: mePath });
     actionScript.push(
-      `wave ${wave}: ME ${MysteryEncounterType[type]} driven (${mePath}, counter ${counterBefore}->${hostAfter})`,
+      `wave ${wave}: ME ${MysteryEncounterType[type]} option=${option} driven (${mePath}, counter ${counterBefore}->${hostAfter})`,
     );
     // eslint-disable-next-line no-console
     console.log(`[coop-soak] ME DRIVEN wave ${wave} (seed ${seed}): ${MysteryEncounterType[type]} [${mePath}]`);
@@ -2023,7 +2034,16 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // Boss reward tail: auto-grant, no shop, counter +0 (see doc above). Clear any guest phantom queue and
     // drive a host boss SelectModifierPhase SOLO only if one was actually queued.
     withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.clearPhaseQueue());
-    if (rig.hostScene.phaseManager.hasPhaseOfType("SelectModifierPhase")) {
+    // A deep milestone may queue MORE THAN ONE selectable reward surface (for example a normal milestone
+    // reward followed by a biome/relic continuation). The old one-shot `if` drained only the first and left
+    // the next MODIFIER_SELECT parked until the following wave, producing the documented ~wave-140 full-run
+    // strand. Drain the complete finite tail, but cap it so a genuinely recursive shop loop is a loud failure.
+    let milestoneShops = 0;
+    while (rig.hostScene.phaseManager.hasPhaseOfType("SelectModifierPhase")) {
+      milestoneShops++;
+      if (milestoneShops > 8) {
+        fail("no-park", wave, "milestone reward tail queued more than 8 SelectModifierPhase continuations");
+      }
       await withClient(rig.hostCtx, async () => {
         armHostFaintAutoPick(); // #845: drive a boss killing-turn host faint's PARTY picker on this crossing
         await game.phaseInterceptor.to("SelectModifierPhase", false);
@@ -2038,6 +2058,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           rig.guestRuntime.controller.advanceInteraction();
         }
       });
+    }
+    if (milestoneShops > 0) {
+      actionScript.push(`wave ${wave}: drained ${milestoneShops} milestone reward continuation(s)`);
     }
     assertLockstep(wave, "boss-wave-end");
     assertScalarConvergence(wave, "boss-post-shop"); // #843 pokeball-drift classifier on boss waves too
@@ -2457,6 +2480,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     if (crossedUndrivableWave(wave)) {
       break;
     }
+    const currentBiome = rig.hostScene.arena.biomeId;
+    if (currentBiome !== previousBiome) {
+      biomeTransitions++;
+      hitSituation(COOP_SOAK_SITUATIONS.biomeBoundary);
+      actionScript.push(`wave ${wave}: BIOME ${previousBiome}->${currentBiome}`);
+      previousBiome = currentBiome;
+    }
     // #849 GOD-PARTY: restore the host party's move PP at wave-start so a long god run never fully depletes
     // a fixed-slot move + strands on a no-PP command (seed 20260704 wave 90). The re-mirror + heal below
     // carry it to the guest; also applied to the guest directly (defensive). See restorePlayerPartyPp.
@@ -2700,6 +2730,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     findings,
     runEnded,
     trainerWaves,
+    biomeTransitions,
     guestSoloWaves,
     mysteryEncounters,
     hits,

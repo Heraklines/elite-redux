@@ -697,7 +697,31 @@ only after the sink succeeds. The static job fetches the real base SHA, refuses 
 checks shared entrypoints and the soak driver, and ratchets the repository diagnostic count.
 
 The gate canary uses one Vitest controller per shard with sequential isolated forks, historical Lane-B
-balancing, and no asset submodule checkout. `AGENTS.md` records that workflow only subject to the full canary
-returning equivalent coverage and green results. The lobby start-new release is also apply-ACK-gated: the
+balancing, recursive asset submodule checkout, and two measured fresh-process exceptions. `AGENTS.md` records
+the proven workflow as the standing default. The lobby start-new release is also apply-ACK-gated: the
 host cannot enter team selection until the guest's exact decision handler ran; duplicate/reconnect delivery
-re-ACKs without re-entering UI. Remote verification and staging promotion are pending.
+re-ACKs without re-entering UI.
+
+## 35. Protocol-27 collision containment and proven grouped gate
+
+The independent canary exposed a real global-order identity collision: wave advance and reward operations at
+the same epoch/owner/sequence could share an operation id, so the second class was deduped and its watcher
+parked forever. Protocol 27 namespaces ids by operation kind (`epoch:owner:kind:sequence`) and validates that
+the id's owner/kind match the untouched envelope before any sink runs. The authority now materializes a
+validated guest-owned operation immediately at its safe phase seam; the remote guest remains envelope-led.
+Reward envelopes also infer the canonical action label from their compact choice/data shape, and watcher
+cursors are role-scoped so two-client harnesses cannot contaminate one another.
+
+Full external run `29179820092` passed all 166 co-op files across thirteen gameplay shards plus the static
+gate at exact SHA `12b1a9465`; staging-only deployment `29179941191` completed successfully. The optimized
+grouped runner is therefore the standing default: Lane B finished in 158-270 seconds, Lane C in 106-129
+seconds, and Lane P in 90 seconds. Only `coop-duo-multiwave.test.ts` and
+`coop-duo-reward-subpickers.test.ts` retain measured fresh-process isolation.
+
+Protocol 28 is the next checkpoint in progress. Resume acceptance becomes a two-phase authoritative
+transaction: the guest retains/replays its reply until the host commits the exact decision and epoch, the
+host pushes the loaded snapshot while both remain at the lobby boundary, and the host advances only after
+the guest reports successful `applyCoopLaunchSession` materialization. Apply results are ACKed and replayed
+across channel replacement; timeout or parse/load failure remains fail-closed at the recoverable boundary.
+Canonical causal tracing and forced production-fidelity mystery-event/biome campaigns remain open after
+this transaction checkpoint.

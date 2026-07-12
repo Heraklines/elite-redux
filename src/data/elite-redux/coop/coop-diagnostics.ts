@@ -20,6 +20,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { formatCoopCausalTrace } from "#data/elite-redux/coop/coop-causal-trace";
 import { coopSessionGeneration, getCoopNetcodeMode, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
@@ -111,6 +112,9 @@ export function formatCoopControlPlane(): string {
       const partner = runtime.partnerTransport;
       lines.push(`transport(partner): state=${safe(() => partner.state) ?? "-"} lastRx=${formatLastRx(partner)}`);
     }
+
+    // --- Structured causality (commit -> materialize -> apply, lobby decisions, recovery edges) ---
+    lines.push(formatCoopCausalTrace());
 
     return lines.join("\n");
   } catch (err) {

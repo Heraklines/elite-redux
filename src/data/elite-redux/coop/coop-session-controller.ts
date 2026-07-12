@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { setNegotiatedCoopCapabilities } from "#data/elite-redux/coop/coop-capabilities";
+import { recordCoopCausalEvent } from "#data/elite-redux/coop/coop-causal-trace";
 import {
   computeErDataFingerprint,
   diffErDataFingerprint,
@@ -407,6 +408,14 @@ export class CoopSessionController {
   offerResume(wave: number): Promise<boolean> {
     const decisionId = `${Date.now().toString(36)}-${this.tiebreak.toString(36)}-${++this.resumeDecisionSeq}`;
     this.latestResumeDecision = { kind: "offer", decisionId, wave };
+    recordCoopCausalEvent({
+      domain: "lobby",
+      stage: "resume-offered",
+      causalId: decisionId,
+      role: "host",
+      epoch: this.sessionEpochValue,
+      wave,
+    });
     coopLog("launch", `SEND resumeOffer id=${decisionId} wave=${wave} (#810 durable)`);
     return new Promise<boolean>(resolve => {
       const finish = (accept: boolean) => {
@@ -453,6 +462,13 @@ export class CoopSessionController {
       finish = resolve;
     });
     this.pendingResumeReply = { decisionId, accept: true, promise, finish };
+    recordCoopCausalEvent({
+      domain: "lobby",
+      stage: "resume-accepted-proposed",
+      causalId: decisionId,
+      role: "guest",
+      epoch: this.sessionEpochValue,
+    });
     this.transport.send({ t: "resumeReply", decisionId, accept: true });
     setTimeout(() => {
       if (this.pendingResumeReply?.decisionId === decisionId) {
@@ -491,6 +507,14 @@ export class CoopSessionController {
       return;
     }
     this.latestResumeApplyResult = { decisionId, success };
+    recordCoopCausalEvent({
+      domain: "snapshot",
+      stage: success ? "resume-materialized" : "resume-materialize-failed",
+      causalId: `${decisionId}:snapshot`,
+      parentId: decisionId,
+      role: "guest",
+      epoch: this.sessionEpochValue,
+    });
     this.transport.send({ t: "resumeApplied", decisionId, success });
   }
 
@@ -529,6 +553,13 @@ export class CoopSessionController {
     this.beginNewOperationEpoch("start-new");
     const decisionId = `${Date.now().toString(36)}-${this.tiebreak.toString(36)}-${++this.resumeDecisionSeq}`;
     this.latestResumeDecision = { kind: "start-new", decisionId };
+    recordCoopCausalEvent({
+      domain: "lobby",
+      stage: "start-new-committed",
+      causalId: decisionId,
+      role: "host",
+      epoch: this.sessionEpochValue,
+    });
     coopLog("launch", `SEND resumeStartNew id=${decisionId} (#810 durable barrier release)`);
     let finish!: () => void;
     const promise = new Promise<void>(resolve => {
@@ -1188,6 +1219,14 @@ export class CoopSessionController {
           this.beginNewOperationEpoch("cold-resume");
           const wave = this.latestResumeDecision?.kind === "offer" ? this.latestResumeDecision.wave : -1;
           this.latestResumeDecision = { kind: "resume-accepted", decisionId: msg.decisionId, wave };
+          recordCoopCausalEvent({
+            domain: "lobby",
+            stage: "resume-accepted-committed",
+            causalId: msg.decisionId,
+            role: "host",
+            epoch: this.sessionEpochValue,
+            wave,
+          });
           let finish!: (success: boolean) => void;
           const promise = new Promise<boolean>(resolve => {
             finish = resolve;
@@ -1217,6 +1256,13 @@ export class CoopSessionController {
         }
         this.sessionEpochValue = msg.epoch;
         this.onEpochNegotiated?.(msg.epoch);
+        recordCoopCausalEvent({
+          domain: "lobby",
+          stage: "resume-accepted-adopted",
+          causalId: msg.decisionId,
+          role: "guest",
+          epoch: msg.epoch,
+        });
         this.pendingResumeReply = null;
         pending.finish(true);
         break;
@@ -1236,6 +1282,14 @@ export class CoopSessionController {
         }
         this.resumeApplyAckWaiter = null;
         waiter.finish(msg.success);
+        recordCoopCausalEvent({
+          domain: "snapshot",
+          stage: msg.success ? "resume-apply-observed" : "resume-apply-failed-observed",
+          causalId: `${msg.decisionId}:snapshot`,
+          parentId: msg.decisionId,
+          role: "host",
+          epoch: this.sessionEpochValue,
+        });
         this.transport.send({ t: "resumeAppliedAck", decisionId: msg.decisionId });
         break;
       }

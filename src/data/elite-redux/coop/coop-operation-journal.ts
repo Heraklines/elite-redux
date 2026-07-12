@@ -50,6 +50,7 @@
 // so there is no circular import.
 // =============================================================================
 
+import { recordCoopCausalEvent } from "#data/elite-redux/coop/coop-causal-trace";
 import type {
   CoopApplyOutcome,
   CoopDurabilityHooks,
@@ -203,6 +204,18 @@ export function journalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelope
   if (isCoopOperationSurfaceClass(cls)) {
     journalCommittedClasses.add(cls);
   }
+  const opId = envelope.pendingOperation?.id ?? `${envelope.sessionEpoch}:revision:${envelope.revision}`;
+  recordCoopCausalEvent({
+    domain: "operation",
+    stage: "committed",
+    causalId: opId,
+    role: "host",
+    epoch: envelope.sessionEpoch,
+    revision: envelope.revision,
+    wave: envelope.wave,
+    turn: envelope.turn,
+    detail: `class=${cls} kind=${envelope.pendingOperation?.kind ?? "none"}`,
+  });
   try {
     manager.commit("op:global", envelope.revision, { t: "envelope", envelope });
   } catch {
@@ -262,6 +275,17 @@ export function routeCoopOperationToLiveSink(cls: string, envelope: CoopAuthorit
     const materialized = sink(envelope);
     if (materialized) {
       liveMaterialized.add(key);
+      recordCoopCausalEvent({
+        domain: "operation",
+        stage: "materialized",
+        causalId: envelope.pendingOperation?.id ?? key,
+        role: "guest",
+        epoch: envelope.sessionEpoch,
+        revision: envelope.revision,
+        wave: envelope.wave,
+        turn: envelope.turn,
+        detail: `class=${cls}`,
+      });
     }
     return materialized;
   } catch {
@@ -327,6 +351,17 @@ export function coopOperationDurabilityHooks(): CoopDurabilityHooks {
       const outcome = applier(envelope);
       if (outcome === "applied") {
         journalApplied.push(envelope);
+        recordCoopCausalEvent({
+          domain: "operation",
+          stage: "applied",
+          causalId: envelope.pendingOperation?.id ?? `${envelope.sessionEpoch}:revision:${envelope.revision}`,
+          role: "guest",
+          epoch: envelope.sessionEpoch,
+          revision: envelope.revision,
+          wave: envelope.wave,
+          turn: envelope.turn,
+          detail: `class=${surfaceClass}`,
+        });
       }
       return outcome;
     },
