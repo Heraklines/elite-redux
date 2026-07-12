@@ -11,6 +11,7 @@ import type {
   CoopAuthoritativeBattleStateV1,
   CoopBattleCheckpoint,
   CoopFullBattleSnapshot,
+  CoopFullMonSnapshot,
 } from "#data/elite-redux/coop/coop-transport";
 import { CoopApplyResyncPhase } from "#phases/coop-replay-phases";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -44,6 +45,23 @@ const checkpoint = (tick: number): CoopBattleCheckpoint => ({
   terrain: 0,
   terrainTurnsLeft: 0,
 });
+
+const fullField = (): CoopFullMonSnapshot[] => [
+  {
+    bi: 1,
+    partyIndex: 1,
+    speciesId: 1,
+    hp: 1,
+    maxHp: 1,
+    status: 0,
+    statStages: [],
+    fainted: false,
+    abilityId: 0,
+    formIndex: 0,
+    moves: [],
+    tags: [],
+  },
+];
 
 describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
   let priorScene: BattleScene;
@@ -110,6 +128,7 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
       reason: "replacement",
       checkpoint: checkpoint(19),
       checksum: "deadbeefdeadbeef",
+      fullField: fullField(),
       authoritativeState: state(20),
     } as const;
     runtime.partnerTransport?.send(replacement);
@@ -163,6 +182,7 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
       reason: "replacement",
       checkpoint: checkpoint(19),
       checksum: "deadbeefdeadbeef",
+      fullField: fullField(),
       authoritativeState: { ...state(20), turn: 3 },
     });
     await new Promise(resolve => setTimeout(resolve, 0));

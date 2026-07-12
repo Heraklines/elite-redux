@@ -9,7 +9,12 @@
 // LoopbackTransport (the same "test via spoofing" path the rest of the suite uses).
 
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
-import type { CoopAuthoritativeBattleStateV1, CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopBattleCheckpoint,
+  CoopFullMonSnapshot,
+  CoopMessage,
+} from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { describe, expect, it } from "vitest";
@@ -40,6 +45,43 @@ const emptyAuthoritativeState = (wave: number): CoopAuthoritativeBattleStateV1 =
   playerModifiers: [],
   enemyModifiers: [],
 });
+
+const emptyFullField = (): CoopFullMonSnapshot[] => [
+  {
+    bi: 0,
+    partyIndex: 0,
+    speciesId: 1,
+    hp: 1,
+    maxHp: 1,
+    status: 0,
+    statStages: [0, 0, 0, 0, 0, 0, 0],
+    fainted: false,
+    abilityId: 0,
+    formIndex: 0,
+    moves: [],
+    tags: [],
+  },
+];
+
+function emitCompleteTurn(
+  stream: CoopBattleStreamer,
+  turn: number,
+  events: Parameters<CoopBattleStreamer["emitTurn"]>[1],
+  checkpoint: CoopBattleCheckpoint,
+  checksum: string,
+): void {
+  stream.emitTurn(turn, events, checkpoint, checksum, "{}", emptyFullField(), emptyAuthoritativeState(1));
+}
+
+function sendCompleteCheckpoint(
+  stream: CoopBattleStreamer,
+  reason: string,
+  checkpoint: CoopBattleCheckpoint,
+  checksum: string,
+  state = emptyAuthoritativeState(1),
+): void {
+  stream.sendCheckpoint(reason, checkpoint, checksum, emptyFullField(), state);
+}
 
 describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
   it("the guest adopts the host's exact enemy party", async () => {
@@ -142,7 +184,13 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     const guestStream = new CoopBattleStreamer(guest);
 
     const awaited = guestStream.awaitTurn(1);
-    hostStream.emitTurn(1, [{ k: "message", text: "Bulbasaur fainted!" }], emptyCheckpoint(), "deadbeefdeadbeef");
+    emitCompleteTurn(
+      hostStream,
+      1,
+      [{ k: "message", text: "Bulbasaur fainted!" }],
+      emptyCheckpoint(),
+      "deadbeefdeadbeef",
+    );
 
     const res = await awaited;
     expect(res).not.toBeNull();
@@ -156,7 +204,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     const guestStream = new CoopBattleStreamer(guest);
 
     // Host is faster: it sends turn 2 before the guest reaches its await.
-    hostStream.emitTurn(2, [{ k: "faint", bi: 2 }], emptyCheckpoint(), "deadbeefdeadbeef");
+    emitCompleteTurn(hostStream, 2, [{ k: "faint", bi: 2 }], emptyCheckpoint(), "deadbeefdeadbeef");
     await new Promise(r => setTimeout(r, 0)); // let it land in the guest buffer
 
     const res = await guestStream.awaitTurn(2);
@@ -179,6 +227,28 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(res).toBeNull();
   });
 
+  it("runtime-drops a malformed protocol-31 turn instead of buffering partial authority", async () => {
+    const { host, guest } = createLoopbackPair();
+    const timer: { fire?: () => void } = {};
+    const guestStream = new CoopBattleStreamer(guest, {
+      schedule: cb => {
+        timer.fire = cb;
+        return () => {};
+      },
+    });
+    const awaited = guestStream.awaitTurn(1);
+    host.send({
+      t: "turnResolution",
+      turn: 1,
+      events: [],
+      checkpoint: emptyCheckpoint(),
+      checksum: "deadbeefdeadbeef",
+    } as unknown as CoopMessage);
+    await new Promise(r => setTimeout(r, 0));
+    timer.fire?.();
+    expect(await awaited).toBeNull();
+  });
+
   it("a second await for the same turn supersedes the stale one (resolves it null)", async () => {
     const { host, guest } = createLoopbackPair();
     const hostStream = new CoopBattleStreamer(host);
@@ -186,7 +256,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
 
     const first = guestStream.awaitTurn(1);
     const second = guestStream.awaitTurn(1);
-    hostStream.emitTurn(1, [], emptyCheckpoint(), "deadbeefdeadbeef");
+    emitCompleteTurn(hostStream, 1, [], emptyCheckpoint(), "deadbeefdeadbeef");
 
     expect(await first).toBeNull();
     expect(await second).not.toBeNull();
@@ -218,9 +288,25 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     guestStream.onCheckpoint(r => {
       reason = r;
     });
-    hostStream.sendCheckpoint("switch", emptyCheckpoint(), "deadbeefdeadbeef");
+    sendCompleteCheckpoint(hostStream, "switch", emptyCheckpoint(), "deadbeefdeadbeef");
     await new Promise(r => setTimeout(r, 0));
     expect(reason).toBe("switch");
+  });
+
+  it("a replacement retransmit request with no retained host frame emits nothing", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+    let arrivals = 0;
+    guestStream.onCheckpointEnvelope(() => arrivals++);
+
+    guestStream.requestReplacementCheckpoint(19, 20);
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(arrivals).toBe(0);
+    expect(guestStream.peekCheckpoint()).toBeNull();
+    hostStream.dispose();
+    guestStream.dispose();
   });
 
   it("a held safe boundary can observe the complete replacement envelope without stealing the legacy observer", async () => {
@@ -245,7 +331,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     });
     const replayWake = guestStream.awaitTurnOrLiveEvent(2, 0);
 
-    hostStream.sendCheckpoint("replacement", checkpoint, "deadbeefdeadbeef", state);
+    sendCompleteCheckpoint(hostStream, "replacement", checkpoint, "deadbeefdeadbeef", state);
     await new Promise(r => setTimeout(r, 0));
 
     expect(await replayWake, "a throwing observer did not suppress the replay-pump waiter").toEqual({
@@ -257,14 +343,21 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(guestStream.consumeCheckpoint()?.reason).toBe("replacement");
     expect(guestStream.peekCheckpoint()).toBeNull();
 
+    // A failed safe-boundary apply requests the host's retained frame. This must create a SECOND real
+    // envelope notification (not merely re-read the guest's old object), enabling same-tick idempotent retry.
+    guestStream.requestReplacementCheckpoint(19, 20);
+    await new Promise(r => setTimeout(r, 0));
+    expect(envelopes).toHaveLength(2);
+    expect(guestStream.consumeCheckpoint()?.authoritativeState?.tick).toBe(20);
+
     unsubscribe();
     unsubscribeThrowingObserver();
-    hostStream.sendCheckpoint("later", { ...emptyCheckpoint(), tick: 21 }, "cafebabecafebabe", {
+    sendCompleteCheckpoint(hostStream, "later", { ...emptyCheckpoint(), tick: 21 }, "cafebabecafebabe", {
       ...state,
       tick: 22,
     });
     await new Promise(r => setTimeout(r, 0));
-    expect(envelopes, "the temporary recovery observer was removed").toHaveLength(1);
+    expect(envelopes, "the temporary recovery observer was removed").toHaveLength(2);
     expect(legacyReasons, "the independent legacy observer remains installed").toEqual(["replacement", "later"]);
     guestStream.dispose();
     hostStream.dispose();
@@ -284,7 +377,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     guestStream.onCheckpoint(() => {
       fired = true;
     });
-    hostStream.sendCheckpoint("post-dispose", emptyCheckpoint(), "deadbeefdeadbeef");
+    sendCompleteCheckpoint(hostStream, "post-dispose", emptyCheckpoint(), "deadbeefdeadbeef");
     await new Promise(r => setTimeout(r, 0));
     expect(fired).toBe(false);
   });
@@ -333,11 +426,11 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       const guestStream = new CoopBattleStreamer(guest);
 
       const awaited = guestStream.awaitTurn(1);
-      hostStream.emitTurn(1, [], emptyCheckpoint(), "feedface00000001");
+      emitCompleteTurn(hostStream, 1, [], emptyCheckpoint(), "feedface00000001");
       const res = await awaited;
       expect(res?.checksum).toBe("feedface00000001");
 
-      hostStream.sendCheckpoint("switch", emptyCheckpoint(), "feedface00000002");
+      sendCompleteCheckpoint(hostStream, "switch", emptyCheckpoint(), "feedface00000002");
       await new Promise(r => setTimeout(r, 0));
       const envelope = guestStream.consumeCheckpoint();
       expect(envelope?.checksum).toBe("feedface00000002");

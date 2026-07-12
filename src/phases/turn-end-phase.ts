@@ -2,14 +2,8 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { fieldPositionForSlot } from "#data/battle-format";
-import { canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
-import {
-  captureCoopAuthoritativeBattleState,
-  captureCoopCheckpoint,
-  captureCoopChecksum,
-  captureCoopChecksumState,
-  captureCoopFieldSnapshot,
-} from "#data/elite-redux/coop/coop-battle-engine";
+import { captureCoopAuthoritativeCarrier } from "#data/elite-redux/coop/coop-battle-engine";
+import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   getCoopBattleStreamer,
   getCoopController,
@@ -238,30 +232,25 @@ export class TurnEndPhase extends FieldPhase {
       return;
     }
     try {
-      const checkpoint = captureCoopCheckpoint();
-      if (checkpoint != null) {
-        // Send the canonical state PRE-IMAGE alongside the checksum (#633, diagnostics): the
-        // guest deep-diffs it against its own on a mismatch to pinpoint the divergent field.
-        // Small payload on the already-gated authoritative path, so always include it.
-        const preimage = canonicalize(captureCoopChecksumState());
-        // Complete on-field per-mon snapshot (#633 M2): heals the on-field state the numeric checkpoint
-        // omits (moveset+PP / tera / boss / held items / ability / form) IN-LINE on the guest this turn,
-        // instead of only via a checksum-mismatch resync round-trip. `?? undefined` keeps the wire field
-        // ABSENT (never explicit null) when the capture returned nothing (empty field / read failure).
-        const fullField = captureCoopFieldSnapshot() ?? undefined;
-        const authoritativeState = captureCoopAuthoritativeBattleState(recording.turn) ?? undefined;
-        streamer.emitTurn(
-          recording.turn,
-          recording.events,
-          checkpoint,
-          captureCoopChecksum(),
-          preimage,
-          fullField,
-          authoritativeState,
-        );
+      const carrier = captureCoopAuthoritativeCarrier(recording.turn, "turnResolution");
+      if (carrier == null) {
+        // Fail closed: a partial modern frame is not a recoverable compatibility payload. The missing
+        // durability ACK/resend for this withheld turn remains explicit control-plane debt.
+        coopWarn("checkpoint", `host withheld incomplete turnResolution turn=${recording.turn}`);
+        return;
       }
-    } catch {
-      /* a stream/capture failure must never break the host's turn */
+      streamer.emitTurn(
+        recording.turn,
+        recording.events,
+        carrier.checkpoint,
+        carrier.checksum,
+        carrier.preimage,
+        carrier.fullField,
+        carrier.authoritativeState,
+      );
+    } catch (error) {
+      // Keep the authoritative engine alive, but never disguise a failed send as a complete turn.
+      coopWarn("checkpoint", `host failed to emit turnResolution turn=${recording.turn}`, error);
     }
   }
 }

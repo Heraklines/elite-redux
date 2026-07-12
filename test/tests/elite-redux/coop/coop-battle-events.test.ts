@@ -59,6 +59,13 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 const RUN = process.env.ER_SCENARIO === "1";
 
+function completeTurnCarrier(_turn: number) {
+  // These legacy animation tests isolate the numeric checkpoint. Protocol 31 still requires the rich
+  // companions on the wire; a non-seated dummy fullField + unsupported state version exercise the existing
+  // guarded fallback without letting pre-checkpoint live PokemonData overwrite the synthetic checkpoint.
+  return { preimage: "{}", fullField: [{ bi: 99 } as never], authoritativeState: { version: 0 } as never };
+}
+
 describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, animation layer)", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
@@ -265,6 +272,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [
         { k: "message", text: "Snorlax used Tackle!" },
         { k: "moveUsed", bi: BattlerIndex.PLAYER, moveId: MoveId.TACKLE, targets: [enemy0.getBattlerIndex()] },
@@ -315,6 +323,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [
         { k: "moveUsed", bi: enemy0.getBattlerIndex(), moveId: MoveId.TACKLE, targets: [BattlerIndex.PLAYER] },
         { k: "hp", bi: BattlerIndex.PLAYER, hp: 5, maxHp: hostMon.getMaxHp() },
@@ -345,6 +354,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [
         { k: "moveUsed", bi: 99, moveId: MoveId.TACKLE, targets: [42] },
         { k: "hp", bi: 99, hp: 0, maxHp: 0 },
@@ -473,6 +483,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [
         { k: "moveUsed", bi: BattlerIndex.PLAYER, moveId: MoveId.TACKLE, targets: [koBi] },
         { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
@@ -579,6 +590,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [
         { k: "message", text: "The enemy is hurt by poison!" },
         { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
@@ -647,6 +659,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [
         { k: "message", text: "The enemy is hurt by poison!" },
         { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },

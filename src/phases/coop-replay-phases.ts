@@ -1458,6 +1458,9 @@ export class CoopApplyResyncPhase extends Phase {
       const authoritativeApplied = authoritativeAlreadyApplied
         ? reapplyAcceptedCoopAuthoritativeBattleState(candidateState, isCoopAuthoritativeGuest())
         : applyCoopAuthoritativeBattleState(candidateState, isCoopAuthoritativeGuest());
+      if (authoritativeApplied) {
+        applyCoopFieldSnapshot(envelope.fullField, isCoopAuthoritativeGuest());
+      }
       const failures = drainCoopApplyFailures();
       const postApplyChecksum = captureCoopChecksum();
       if (
@@ -1720,6 +1723,9 @@ export function coopCheckpointSupersedesResync(
     envelope.reason !== "replacement"
     || heldState == null
     || candidateState == null
+    || !Array.isArray(envelope.fullField)
+    || envelope.fullField.length === 0
+    || envelope.checksum === COOP_CHECKSUM_SENTINEL
     || !isCoopRecoveryTick(checkpointTick)
     || !isCoopRecoveryTick(candidateState.tick)
     || !Number.isSafeInteger(tickFloor)

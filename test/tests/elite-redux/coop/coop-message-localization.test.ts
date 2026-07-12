@@ -51,6 +51,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 const RUN = process.env.ER_SCENARIO === "1";
 
+function completeTurnCarrier(_turn: number) {
+  return { preimage: "{}", fullField: [{ bi: 99 } as never], authoritativeState: { version: 0 } as never };
+}
+
 describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant lines (#691)", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
@@ -284,6 +288,7 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [
         { k: "moveUsed", bi: BattlerIndex.PLAYER, moveId: MoveId.TACKLE, targets: [koBi] },
         { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
@@ -318,6 +323,7 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [
         { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
         { k: "faint", bi: koBi, narrate: false },
@@ -348,6 +354,7 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [
         // A garbled move (unknown user + moveId) and a garbled faint (out-of-range bi, narrate=true): the
         // regeneration helpers must swallow both and never throw into the pump.
@@ -395,6 +402,7 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [
         { k: "moveUsed", bi: BattlerIndex.PLAYER, moveId: MoveId.TACKLE, targets: [koBi] },
         { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },

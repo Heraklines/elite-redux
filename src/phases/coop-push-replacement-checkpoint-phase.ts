@@ -6,11 +6,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import {
-  captureCoopAuthoritativeBattleState,
-  captureCoopCheckpoint,
-  captureCoopChecksum,
-} from "#data/elite-redux/coop/coop-battle-engine";
+import { captureCoopAuthoritativeCarrier } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
 
@@ -33,21 +29,25 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
     try {
       const streamer = getCoopBattleStreamer();
       if (streamer != null && getCoopController()?.role === "host") {
-        const checkpoint = captureCoopCheckpoint();
-        if (checkpoint != null) {
+        const carrier = captureCoopAuthoritativeCarrier(globalScene.currentBattle?.turn ?? 0, "replacement");
+        if (carrier == null) {
+          // Fail closed: the guest must not command a replacement reconstructed from only the numeric half.
+          // A durable ACK/resend for this withheld boundary remains explicit protocol debt.
+          coopWarn("checkpoint", "host withheld incomplete replacement checkpoint");
+        } else {
           coopLog("checkpoint", "host push OUT-OF-BAND replacement checkpoint (partner-slot auto-summon)");
           streamer.sendCheckpoint(
             "replacement",
-            checkpoint,
-            captureCoopChecksum(),
-            captureCoopAuthoritativeBattleState(globalScene.currentBattle?.turn ?? 0) ?? undefined,
+            carrier.checkpoint,
+            carrier.checksum,
+            carrier.fullField,
+            carrier.authoritativeState,
           );
         }
       }
-    } catch {
-      // Best-effort: a capture/send failure must never hang the host's flow; the guest
-      // still heals on the next turn resolution's checkpoint.
-      coopWarn("checkpoint", "replacement checkpoint push failed (handled)");
+    } catch (error) {
+      // Keep the host engine alive, but do not emit a partial frame or claim the guest can proceed.
+      coopWarn("checkpoint", "replacement checkpoint push failed; carrier withheld", error);
     }
     this.end();
   }

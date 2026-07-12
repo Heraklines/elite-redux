@@ -7,13 +7,26 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
-import { applyCoopAuthoritativeBattleState, applyCoopCheckpoint } from "#data/elite-redux/coop/coop-battle-engine";
+import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
+import {
+  applyCoopAuthoritativeBattleState,
+  applyCoopCheckpoint,
+  applyCoopFieldSnapshot,
+  captureCoopChecksum,
+  coopAppliedStateTick,
+  drainCoopApplyFailures,
+  reapplyAcceptedCoopAuthoritativeBattleState,
+} from "#data/elite-redux/coop/coop-battle-engine";
+import type { CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
+  clearCoopRuntime,
   coopHasPendingWaveAdvance,
   coopLocalOwnedPlayerFieldSlot,
   coopMeHandoffBattleWon,
+  coopSessionGeneration,
   getCoopBattleStreamer,
+  getCoopRuntime,
   isCoopAuthoritativeGuest,
   queueCoopMeBattleVictoryTail,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -52,6 +65,8 @@ import { coopNarrateMoveUsed } from "#phases/coop-replay-phases";
  * the host plays the next wave alone - the maintainer's Delibird-gift wave-13/14 desync).
  */
 let activeCoopReplayTurnPhase: CoopReplayTurnPhase | null = null;
+const REPLACEMENT_RETRY_LIMIT = 3;
+const REPLACEMENT_RETRY_TIMEOUT_MS = 2_000;
 
 export function abortActiveCoopReplayTurnPhase(reason: string): boolean {
   return activeCoopReplayTurnPhase?.abortPhantom(reason) ?? false;
@@ -67,6 +82,11 @@ export class CoopReplayTurnPhase extends Phase {
   private readonly fromHpByBi: Map<number, number>;
   /** #859: set by {@linkcode abortPhantom} - the pump ends WITHOUT finalize/turn-advance. */
   private aborted = false;
+  /** One-shot wake while a failed replacement stays buffered awaiting a retransmission/newer frame. */
+  private replacementRetryUnsubscribe: (() => void) | null = null;
+  private replacementRetryCancelTimer: (() => void) | null = null;
+  private replacementRetryAttempts = 0;
+  private ended = false;
 
   constructor(turn: number, rendered = 0, hpChain?: [number, number][]) {
     super();
@@ -88,11 +108,18 @@ export class CoopReplayTurnPhase extends Phase {
     }
     this.aborted = true;
     coopWarn("replay", `guest replay turn=${this.turn}: ABORT phantom turn (${reason}) - dissolving parked pump`);
+    if (this.replacementRetryUnsubscribe != null) {
+      this.clearReplacementRetryWake();
+      this.end();
+      return true;
+    }
     getCoopBattleStreamer()?.abortTurnWait(this.turn);
     return true;
   }
 
   public override end(): void {
+    this.ended = true;
+    this.clearReplacementRetryWake();
     if (activeCoopReplayTurnPhase === this) {
       activeCoopReplayTurnPhase = null;
     }
@@ -179,7 +206,9 @@ export class CoopReplayTurnPhase extends Phase {
           // guest; then, if the refilled slot is OURS and it has no command yet this turn,
           // open our own CommandPhase for it - the host's turn resolution cannot arrive
           // until we send that command.
-          const envelope = streamer.consumeCheckpoint();
+          // Peek first. Consumption is the transaction COMMIT and is allowed only after every modern
+          // companion applies with zero structured failures and its exact checksum converges.
+          const envelope = streamer.peekCheckpoint();
           if (envelope != null) {
             const currentWave = globalScene.currentBattle?.waveIndex ?? 0;
             const checkpointWave = envelope.authoritativeState?.wave;
@@ -193,21 +222,29 @@ export class CoopReplayTurnPhase extends Phase {
                 `guest discard OUT-OF-BAND checkpoint reason=${envelope.reason} wave=${checkpointWave} `
                   + `while replaying wave=${currentWave} turn=${this.turn}`,
               );
+              if (streamer.peekCheckpoint() === envelope) {
+                streamer.consumeCheckpoint();
+              }
               continue;
             }
             coopLog(
               "checkpoint",
               `guest apply OUT-OF-BAND checkpoint mid-park reason=${envelope.reason} turn=${this.turn}`,
             );
-            if (applyCoopCheckpoint(envelope.checkpoint)) {
-              const authoritativeApplied = applyCoopAuthoritativeBattleState(
-                envelope.authoritativeState,
-                isCoopAuthoritativeGuest(),
-              );
-              if (authoritativeApplied) {
-                streamer.retainAppliedOutOfBandCheckpoint(envelope);
-              }
+            if (!this.applyReplacementTransaction(envelope)) {
+              this.parkForReplacementRetry(streamer, envelope);
+              return;
             }
+            if (streamer.peekCheckpoint() !== envelope) {
+              coopWarn(
+                "checkpoint",
+                `guest replacement converged but retained carrier changed before commit turn=${this.turn} -> remain held`,
+              );
+              this.parkForReplacementRetry(streamer, envelope);
+              return;
+            }
+            streamer.consumeCheckpoint();
+            streamer.retainAppliedOutOfBandCheckpoint(envelope);
             // Showdown versus (Task F1): the versus guest owns its ENTIRE player field (a 1v1 -> field
             // slot 0). The co-op seat map used by coopLocalOwnedPlayerFieldSlot() resolves the fixed
             // GUEST slot (COOP_GUEST_FIELD_INDEX = 1), which is EMPTY in a 1v1 single battle - so the
@@ -284,6 +321,193 @@ export class CoopReplayTurnPhase extends Phase {
       coopWarn("replay", `guest replay turn=${this.turn}: payload error -> finishTurnNoStream`, error);
       this.finishTurnNoStream();
     }
+  }
+
+  private clearReplacementRetryWake(): void {
+    this.replacementRetryUnsubscribe?.();
+    this.replacementRetryUnsubscribe = null;
+    this.replacementRetryCancelTimer?.();
+    this.replacementRetryCancelTimer = null;
+  }
+
+  /**
+   * Keep the failed frame retained and hold the current safe boundary without spinning. A transport
+   * retransmission (including the same tick pair) or a newer replacement frame wakes the exact production
+   * pump and retries transactionally. The stream scheduler bounds a lost response; exhaustion terminates
+   * shared play visibly. There is intentionally no auto-command fallback, and the protocol still needs a
+   * durable replacement ACK to clear host retention.
+   */
+  private parkForReplacementRetry(
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    failed: CoopCheckpointEnvelope,
+  ): void {
+    if (this.replacementRetryUnsubscribe != null) {
+      return;
+    }
+    if (this.replacementRetryAttempts >= REPLACEMENT_RETRY_LIMIT) {
+      this.terminateReplacementRecovery(
+        `replacement authority failed after ${this.replacementRetryAttempts} complete retransmit attempt(s)`,
+      );
+      return;
+    }
+    this.replacementRetryAttempts++;
+    coopWarn(
+      "checkpoint",
+      `guest retained unconverged replacement checkpointTick=${failed.checkpoint.tick ?? "legacy"} `
+        + `stateTick=${failed.authoritativeState?.tick ?? "missing"}; command remains closed `
+        + `requesting retransmission attempt=${this.replacementRetryAttempts}/${REPLACEMENT_RETRY_LIMIT}`,
+    );
+    this.replacementRetryUnsubscribe = streamer.onCheckpointEnvelope(next => {
+      if (this.aborted || next.reason !== "replacement") {
+        return;
+      }
+      this.clearReplacementRetryWake();
+      coopLog(
+        "checkpoint",
+        `guest retry replacement transaction checkpointTick=${next.checkpoint.tick ?? "legacy"} `
+          + `stateTick=${next.authoritativeState?.tick ?? "missing"}`,
+      );
+      void this.pump(streamer);
+    });
+    const generation = coopSessionGeneration();
+    const onRetryTimeout = (): void => {
+      // A timer created by an old session, or firing while the one-process duo harness has another client
+      // installed as the active runtime/globalScene, must not mutate or terminate that other client.
+      if (this.aborted || this.ended || generation !== coopSessionGeneration()) {
+        return;
+      }
+      if (getCoopBattleStreamer() !== streamer || globalScene.phaseManager.getCurrentPhase() !== this) {
+        this.replacementRetryCancelTimer = streamer.scheduleAuthorityRetry(onRetryTimeout, 25);
+        return;
+      }
+      this.clearReplacementRetryWake();
+      coopWarn(
+        "checkpoint",
+        `guest replacement retransmit attempt=${this.replacementRetryAttempts} timed out after `
+          + `${REPLACEMENT_RETRY_TIMEOUT_MS}ms`,
+      );
+      this.parkForReplacementRetry(streamer, failed);
+    };
+    this.replacementRetryCancelTimer = streamer.scheduleAuthorityRetry(onRetryTimeout, REPLACEMENT_RETRY_TIMEOUT_MS);
+    // Subscribe and arm the timeout before requesting: LoopbackTransport may deliver in the next microtask,
+    // and a response must be able to cancel every wake resource deterministically.
+    streamer.requestReplacementCheckpoint(failed.checkpoint.tick, failed.authoritativeState?.tick);
+  }
+
+  /** Bound an unreconstructible replacement with a visible terminal, never an indefinite parked phase. */
+  private terminateReplacementRecovery(reason: string): void {
+    this.clearReplacementRetryWake();
+    coopWarn("checkpoint", `TERMINAL replacement synchronization failure: ${reason}`);
+    try {
+      getCoopRuntime()?.membership.terminate();
+    } catch {
+      /* terminal cleanup continues */
+    }
+    try {
+      globalScene.ui.showText(
+        "The shared battle could not be synchronized safely. Reconnect to resume from your co-op save.",
+        null,
+        undefined,
+        6000,
+      );
+    } catch {
+      /* terminal cleanup continues */
+    }
+    try {
+      globalScene.phaseManager.clearPhaseQueue();
+      clearCoopRuntime();
+      globalScene.reset();
+      globalScene.phaseManager.unshiftNew("TitlePhase");
+    } catch (error) {
+      coopWarn("checkpoint", "replacement terminal routing partially failed", error);
+    }
+    this.end();
+  }
+
+  /**
+   * Apply one complete replacement frame and prove exact convergence before control can reopen. This is a
+   * control/consumption transaction, not a rollback-capable data transaction: lower-level appliers may have
+   * mutated state before reporting failure, so a same-frame retry explicitly reasserts the accepted state.
+   */
+  private applyReplacementTransaction(envelope: CoopCheckpointEnvelope): boolean {
+    const state = envelope.authoritativeState;
+    const fullField = envelope.fullField;
+    const checkpointTick = envelope.checkpoint.tick;
+    const stateTick = state?.tick;
+    if (
+      envelope.reason !== "replacement"
+      || !Number.isSafeInteger(checkpointTick)
+      || (checkpointTick as number) <= 0
+      || !Number.isSafeInteger(stateTick)
+      || (stateTick as number) <= (checkpointTick as number)
+      || !Array.isArray(fullField)
+      || fullField.length === 0
+      || envelope.checksum === COOP_CHECKSUM_SENTINEL
+    ) {
+      coopWarn(
+        "checkpoint",
+        `guest rejected incomplete replacement frame reason=${envelope.reason} `
+          + `checkpointTick=${checkpointTick ?? "missing"} stateTick=${stateTick ?? "missing"} `
+          + `fullField=${fullField?.length ?? 0} checksum=${envelope.checksum}`,
+      );
+      return false;
+    }
+
+    try {
+      const admittedBefore = coopAppliedStateTick();
+      if (
+        admittedBefore > (stateTick as number)
+        || (admittedBefore > (checkpointTick as number) && admittedBefore < (stateTick as number))
+      ) {
+        coopWarn(
+          "checkpoint",
+          `guest replacement ticks ${checkpointTick}/${stateTick} conflict with lastApplied=${admittedBefore}`,
+        );
+        return false;
+      }
+
+      // A failed first attempt may already have admitted one or both ticks. Retry the same pair
+      // idempotently, reasserting the authoritative state rather than treating it as permanently stale.
+      const checkpointAlreadyApplied =
+        admittedBefore === (checkpointTick as number) || admittedBefore === (stateTick as number);
+      const checkpointApplied = checkpointAlreadyApplied || applyCoopCheckpoint(envelope.checkpoint);
+      const admittedAfterCheckpoint = coopAppliedStateTick();
+      const authoritativeAlreadyApplied = admittedAfterCheckpoint === (stateTick as number);
+      const authoritativeApplied =
+        checkpointApplied
+        && (authoritativeAlreadyApplied
+          ? reapplyAcceptedCoopAuthoritativeBattleState(state, isCoopAuthoritativeGuest())
+          : applyCoopAuthoritativeBattleState(state, isCoopAuthoritativeGuest()));
+      if (authoritativeApplied) {
+        applyCoopFieldSnapshot(fullField, isCoopAuthoritativeGuest());
+      }
+      const failures = drainCoopApplyFailures();
+      const guestChecksum = captureCoopChecksum();
+      const converged =
+        checkpointApplied
+        && authoritativeApplied
+        && failures.length === 0
+        && guestChecksum !== COOP_CHECKSUM_SENTINEL
+        && guestChecksum === envelope.checksum;
+      if (converged) {
+        coopLog(
+          "checkpoint",
+          `guest replacement transaction COMMIT host=guest=${guestChecksum} `
+            + `checkpoint=${checkpointAlreadyApplied ? "reused" : "applied"} `
+            + `state=${authoritativeAlreadyApplied ? "reasserted" : "applied"}`,
+        );
+        return true;
+      }
+      coopWarn(
+        "checkpoint",
+        `guest replacement transaction NOT converged checkpointApplied=${checkpointApplied} `
+          + `authoritativeApplied=${authoritativeApplied} failures=${failures.length} `
+          + `host=${envelope.checksum} guest=${guestChecksum}`,
+      );
+    } catch (error) {
+      coopWarn("checkpoint", "guest replacement transaction threw; frame retained", error);
+    }
+    return false;
   }
 
   /**

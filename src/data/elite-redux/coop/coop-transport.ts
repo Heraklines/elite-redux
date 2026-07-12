@@ -70,7 +70,9 @@ export type CoopRole = "host" | "guest";
 // er-coop-30: authoritative field seats carry actual Phaser presentation membership and the guest settles
 // those seats through a pure no-RNG materializer. An older renderer would ignore the visibility boundary
 // and can reveal pre-intro/fainted seats, so cached mixed builds must refuse pairing instead of degrading.
-export const COOP_PROTOCOL_VERSION = "er-coop-30";
+// er-coop-31: turn/replacement authority requires checkpoint + fullField + state + non-sentinel checksum;
+// replacement frames are retained and explicitly re-requestable before the guest can reopen control.
+export const COOP_PROTOCOL_VERSION = "er-coop-31";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -1267,9 +1269,8 @@ export type CoopMessage =
    * and, on a mismatch, requests a `stateSync`. Required (the host always stamps it).
    *
    * `preimage` (#633, diagnostics) is the host's CANONICAL state string the `checksum` was
-   * hashed from. Optional + additive: the host always sends it on the authoritative path so
-   * that on a mismatch the guest can deep-DIFF the host's pre-image against its own and log
-   * the exact divergent field(s). Older clients omit it and ignore it on receipt.
+   * hashed from. Protocol 31 requires it so the guest can deep-DIFF the host pre-image against
+   * its own and log the exact divergent fields. Older clients are rejected during negotiation.
    */
   | {
       t: "turnResolution";
@@ -1277,18 +1278,18 @@ export type CoopMessage =
       events: CoopBattleEvent[];
       checkpoint: CoopBattleCheckpoint;
       checksum: string;
-      preimage?: string;
+      preimage: string;
       /**
        * The host's COMPLETE per-mon on-field snapshot (#633 M2): heals the on-field state the numeric
        * `checkpoint` omits (moveset+PP / tera / boss / held items / ability / form) IN-LINE each turn.
-       * Optional + additive - an older host omits it and the guest keeps its checksum-detect + resync heal.
+       * Required by protocol 31.
        */
-      fullField?: CoopFullMonSnapshot[];
+      fullField: CoopFullMonSnapshot[];
       /**
        * Full normal-turn authoritative state. Version 1 uses PokemonData.summonData
        * for live mon state and keeps field data seating-only.
        */
-      authoritativeState?: CoopAuthoritativeBattleStateV1;
+      authoritativeState: CoopAuthoritativeBattleStateV1;
     }
   /**
    * Host -> guest (#633, LIVE-D): an out-of-turn authoritative checkpoint (after a
@@ -1300,8 +1301,12 @@ export type CoopMessage =
       reason: string;
       checkpoint: CoopBattleCheckpoint;
       checksum: string;
-      authoritativeState?: CoopAuthoritativeBattleStateV1;
+      /** Complete per-mon field companion for modern out-of-band authority frames. */
+      fullField: CoopFullMonSnapshot[];
+      authoritativeState: CoopAuthoritativeBattleStateV1;
     }
+  /** Guest -> host: re-send the retained complete out-of-band replacement authority frame. */
+  | { t: "requestBattleCheckpoint"; reason: "replacement"; checkpointTick: number; stateTick: number }
   /**
    * Owner -> watcher (#633): the owner's pick on an ALTERNATING-control interaction
    * screen (reward shop / biome shop / mystery encounter). Same seed -> both clients
@@ -1601,6 +1606,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `turn=${msg.turn} events=${msg.events.length} checksum=${msg.checksum}`;
     case "battleCheckpoint":
       return `reason=${msg.reason} checksum=${msg.checksum}`;
+    case "requestBattleCheckpoint":
+      return `reason=${msg.reason} checkpointTick=${msg.checkpointTick} stateTick=${msg.stateTick}`;
     case "interactionChoice":
       return `seq=${msg.seq} kind=${msg.kind} choice=${msg.choice}`;
     case "interactionOutcome":

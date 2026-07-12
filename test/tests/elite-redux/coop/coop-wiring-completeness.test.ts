@@ -197,4 +197,37 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
       "loaded, ephemeral, and persisted encounter branches all cross the chokepoint",
     ).toHaveLength(3);
   });
+
+  it("routes turn and replacement publication through one all-or-nothing authority capture", () => {
+    const root = join(__dirname, "..", "..", "..", "..", "src");
+    const turnEnd = readFileSync(join(root, "phases", "turn-end-phase.ts"), "utf8");
+    const replacement = readFileSync(join(root, "phases", "coop-push-replacement-checkpoint-phase.ts"), "utf8");
+    for (const [label, source] of [
+      ["turnResolution", turnEnd],
+      ["replacement", replacement],
+    ] as const) {
+      expect(source, `${label} uses the coherent capture chokepoint`).toContain("captureCoopAuthoritativeCarrier(");
+      expect(source, `${label} never turns a missing rich companion into an optional wire field`).not.toContain(
+        "?? undefined",
+      );
+    }
+    expect(turnEnd, "turn publication passes the required full field companion").toContain("carrier.fullField");
+    expect(replacement, "replacement publication passes the required full field companion").toContain(
+      "carrier.fullField",
+    );
+    const replay = readFileSync(join(root, "phases", "coop-replay-turn-phase.ts"), "utf8");
+    expect(replay, "replacement retry uses the streamer's injectable scheduler").toContain(
+      "streamer.scheduleAuthorityRetry(",
+    );
+    expect(replay, "an ambient timer cannot fire under another duo client context").not.toContain("setTimeout(");
+    for (const terminalPostcondition of [
+      "membership.terminate()",
+      "globalScene.ui.showText(",
+      "globalScene.phaseManager.clearPhaseQueue()",
+      "globalScene.reset()",
+      'globalScene.phaseManager.unshiftNew("TitlePhase")',
+    ]) {
+      expect(replay, `terminal replacement failure retains ${terminalPostcondition}`).toContain(terminalPostcondition);
+    }
+  });
 });

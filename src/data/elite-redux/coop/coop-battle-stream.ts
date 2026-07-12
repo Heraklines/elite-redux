@@ -22,6 +22,7 @@
 // a checkpoint lives in `coop-battle-checkpoint.ts`; this file is just the wire.
 // =============================================================================
 
+import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import type {
@@ -47,16 +48,16 @@ export interface CoopTurnResolution {
   checkpoint: CoopBattleCheckpoint;
   /** The host's full-state checksum at this boundary (#633, TRACK-2). */
   checksum: string;
-  /** The host's canonical state pre-image the `checksum` hashed (#633, diagnostics); optional. */
-  preimage?: string;
+  /** The host's canonical state pre-image the `checksum` hashed (#633, diagnostics). */
+  preimage: string;
   /**
    * The host's COMPLETE per-mon on-field snapshot (#633 M2): heals the on-field state the numeric
    * `checkpoint` omits (moveset+PP / tera / boss / held items / ability / form) IN-LINE this turn.
-   * Optional + additive; an older host omits it and the guest keeps checksum-detect + resync heal.
+   * Required by protocol 31; mixed older hosts are rejected during hello negotiation.
    */
-  fullField?: CoopFullMonSnapshot[];
-  /** Full normal-turn authoritative state, additive rollout. */
-  authoritativeState?: CoopAuthoritativeBattleStateV1;
+  fullField: CoopFullMonSnapshot[];
+  /** Full normal-turn authoritative state. */
+  authoritativeState: CoopAuthoritativeBattleStateV1;
 }
 
 /** An out-of-turn authoritative checkpoint + the host's matching full-state checksum. */
@@ -65,8 +66,10 @@ export interface CoopCheckpointEnvelope {
   checkpoint: CoopBattleCheckpoint;
   /** The host's full-state checksum at this boundary (#633, TRACK-2). */
   checksum: string;
+  /** Complete per-mon field companion for a modern out-of-band authority frame. */
+  fullField: CoopFullMonSnapshot[];
   /** Full authoritative state for intra-turn boundaries such as replacement unblock. */
-  authoritativeState?: CoopAuthoritativeBattleStateV1;
+  authoritativeState: CoopAuthoritativeBattleStateV1;
 }
 
 /** Options for {@linkcode CoopBattleStreamer} (timer injection for tests). */
@@ -75,6 +78,18 @@ export interface CoopBattleStreamerOptions {
   timeoutMs?: number;
   /** Timer injection (tests). Returns a cancel fn. Defaults to setTimeout/clearTimeout. */
   schedule?: (cb: () => void, ms: number) => () => void;
+}
+
+function hasCompleteAuthorityCompanions(
+  msg: Pick<CoopCheckpointEnvelope, "checksum" | "fullField" | "authoritativeState">,
+): boolean {
+  return (
+    msg.checksum !== COOP_CHECKSUM_SENTINEL
+    && Array.isArray(msg.fullField)
+    && msg.fullField.length > 0
+    && msg.authoritativeState != null
+    && typeof msg.authoritativeState === "object"
+  );
 }
 
 // The host runs the WHOLE turn before it can send the resolution - and a turn does
@@ -197,6 +212,8 @@ export class CoopBattleStreamer {
   private readonly sentMeBattleParties = new Map<string, CoopSerializedEnemy[]>();
   /** Latest authoritative checkpoint (+ checksum) the guest has not yet applied. */
   private lastCheckpoint: CoopCheckpointEnvelope | null = null;
+  /** HOST: latest complete replacement frame, retained for explicit guest retransmit requests. */
+  private lastSentReplacementCheckpoint: CoopCheckpointEnvelope | null = null;
   /**
    * Latest out-of-band checkpoint the live replay pump already applied to unblock an
    * intra-turn interaction. Presentation phases can subsequently mutate that state
@@ -435,9 +452,9 @@ export class CoopBattleStreamer {
     events: CoopBattleEvent[],
     checkpoint: CoopBattleCheckpoint,
     checksum: string,
-    preimage?: string,
-    fullField?: CoopFullMonSnapshot[],
-    authoritativeState?: CoopAuthoritativeBattleStateV1,
+    preimage: string,
+    fullField: CoopFullMonSnapshot[],
+    authoritativeState: CoopAuthoritativeBattleStateV1,
   ): void {
     coopLog(
       "replay",
@@ -449,9 +466,9 @@ export class CoopBattleStreamer {
       events,
       checkpoint,
       checksum,
-      ...(preimage === undefined ? {} : { preimage }),
-      ...(fullField === undefined ? {} : { fullField }),
-      ...(authoritativeState === undefined ? {} : { authoritativeState }),
+      preimage,
+      fullField,
+      authoritativeState,
     });
   }
 
@@ -478,19 +495,42 @@ export class CoopBattleStreamer {
     reason: string,
     checkpoint: CoopBattleCheckpoint,
     checksum: string,
-    authoritativeState?: CoopAuthoritativeBattleStateV1,
+    fullField: CoopFullMonSnapshot[],
+    authoritativeState: CoopAuthoritativeBattleStateV1,
   ): void {
     coopLog(
       "checksum",
-      `host SEND battleCheckpoint reason=${reason} checksum=${checksum} authoritativeState=${authoritativeState === undefined ? 0 : 1}`,
+      `host SEND battleCheckpoint reason=${reason} checksum=${checksum} fullField=${fullField.length} authoritativeState=1`,
     );
+    const envelope: CoopCheckpointEnvelope = { reason, checkpoint, checksum, fullField, authoritativeState };
+    if (reason === "replacement") {
+      // One bounded frame closes loss/transient-apply retries without an unbounded journal. A durable ACK
+      // that clears this retention is still future protocol work; a later replacement safely supersedes it.
+      this.lastSentReplacementCheckpoint = envelope;
+    }
     this.transport.send({
       t: "battleCheckpoint",
-      reason,
-      checkpoint,
-      checksum,
-      ...(authoritativeState === undefined ? {} : { authoritativeState }),
+      ...envelope,
     });
+  }
+
+  /** GUEST: request the host's retained complete replacement frame after a failed transactional apply. */
+  requestReplacementCheckpoint(checkpointTick: number | undefined, stateTick: number | undefined): void {
+    this.transport.send({
+      t: "requestBattleCheckpoint",
+      reason: "replacement",
+      checkpointTick: Number.isSafeInteger(checkpointTick) ? (checkpointTick as number) : -1,
+      stateTick: Number.isSafeInteger(stateTick) ? (stateTick as number) : -1,
+    });
+  }
+
+  /**
+   * Schedule a replacement-recovery retry through this stream's injected scheduler. Callers still bind
+   * the callback to their session generation/runtime before touching engine state; tests can inject a
+   * deterministic per-client scheduler without allowing a raw ambient timer to run under another duo ctx.
+   */
+  scheduleAuthorityRetry(callback: () => void, ms: number): () => void {
+    return this.schedule(callback, ms);
   }
 
   /** HOST: send the authoritative full-state snapshot answering a guest's `requestStateSync`. */
@@ -1354,6 +1394,7 @@ export class CoopBattleStreamer {
     this.liveEventHandler = null;
     this.liveWaiter = null;
     this.lastCheckpoint = null;
+    this.lastSentReplacementCheckpoint = null;
     this.appliedOutOfBandCheckpoint = null;
     this.lastEnemyParty = null;
     this.sentEnemyParties.clear();
@@ -1476,14 +1517,23 @@ export class CoopBattleStreamer {
         return;
       }
       case "turnResolution": {
+        if (typeof msg.preimage !== "string" || !hasCompleteAuthorityCompanions(msg)) {
+          coopWarn(
+            "replay",
+            `guest DROP malformed turnResolution turn=${msg.turn} preimage=${typeof msg.preimage === "string"} `
+              + `fullField=${Array.isArray(msg.fullField) ? msg.fullField.length : 0} `
+              + `state=${msg.authoritativeState == null ? 0 : 1} checksum=${msg.checksum}`,
+          );
+          return;
+        }
         const res: CoopTurnResolution = {
           turn: msg.turn,
           events: msg.events,
           checkpoint: msg.checkpoint,
           checksum: msg.checksum,
-          ...(msg.preimage === undefined ? {} : { preimage: msg.preimage }),
-          ...(msg.fullField === undefined ? {} : { fullField: msg.fullField }),
-          ...(msg.authoritativeState === undefined ? {} : { authoritativeState: msg.authoritativeState }),
+          preimage: msg.preimage,
+          fullField: msg.fullField,
+          authoritativeState: msg.authoritativeState,
         };
         const resolver = this.pending.get(msg.turn);
         coopLog(
@@ -1522,6 +1572,15 @@ export class CoopBattleStreamer {
         return;
       }
       case "battleCheckpoint": {
+        if (!hasCompleteAuthorityCompanions(msg)) {
+          coopWarn(
+            "checkpoint",
+            `guest DROP malformed battleCheckpoint reason=${msg.reason} `
+              + `fullField=${Array.isArray(msg.fullField) ? msg.fullField.length : 0} `
+              + `state=${msg.authoritativeState == null ? 0 : 1} checksum=${msg.checksum}`,
+          );
+          return;
+        }
         // Buffer for the guest's next consumeCheckpoint() (applied at a turn boundary),
         // carrying the host's checksum so the guest can verify convergence after applying.
         coopLog("checksum", `guest RECV battleCheckpoint reason=${msg.reason} checksum=${msg.checksum}`);
@@ -1529,12 +1588,43 @@ export class CoopBattleStreamer {
           reason: msg.reason,
           checkpoint: msg.checkpoint,
           checksum: msg.checksum,
-          ...(msg.authoritativeState === undefined ? {} : { authoritativeState: msg.authoritativeState }),
+          fullField: msg.fullField,
+          authoritativeState: msg.authoritativeState,
         };
         this.lastCheckpoint = envelope;
         this.notifyCheckpointEnvelope(envelope);
         this.checkpointWaiter?.();
         this.checkpointHandler?.(msg.reason, msg.checkpoint);
+        return;
+      }
+      case "requestBattleCheckpoint": {
+        const retained = this.lastSentReplacementCheckpoint;
+        if (
+          msg.reason !== "replacement"
+          || retained == null
+          || retained.authoritativeState == null
+          || retained.fullField == null
+        ) {
+          coopWarn(
+            "checkpoint",
+            `host cannot satisfy replacement retransmit request checkpointTick=${msg.checkpointTick} `
+              + `stateTick=${msg.stateTick} retained=${retained == null ? 0 : 1}`,
+          );
+          return;
+        }
+        coopLog(
+          "checkpoint",
+          `host RE-SEND retained replacement checkpointTick=${retained.checkpoint.tick ?? "legacy"} `
+            + `stateTick=${retained.authoritativeState.tick} requested=${msg.checkpointTick}/${msg.stateTick}`,
+        );
+        this.transport.send({
+          t: "battleCheckpoint",
+          reason: "replacement",
+          checkpoint: retained.checkpoint,
+          checksum: retained.checksum,
+          fullField: retained.fullField,
+          authoritativeState: retained.authoritativeState,
+        });
         return;
       }
       case "requestEnemyParty": {

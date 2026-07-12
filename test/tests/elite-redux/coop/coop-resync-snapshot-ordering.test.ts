@@ -4,7 +4,11 @@
  */
 
 import type { CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
-import type { CoopAuthoritativeBattleStateV1, CoopFullBattleSnapshot } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopFullBattleSnapshot,
+  CoopFullMonSnapshot,
+} from "#data/elite-redux/coop/coop-transport";
 import { coopCheckpointSupersedesResync, coopResyncSnapshotIsStale } from "#phases/coop-replay-phases";
 import { describe, expect, it } from "vitest";
 
@@ -45,6 +49,22 @@ function replacementEnvelope(checkpointTick = 19, stateTick = 20): CoopCheckpoin
       terrainTurnsLeft: 0,
     },
     checksum: "deadbeefdeadbeef",
+    fullField: [
+      {
+        bi: 1,
+        partyIndex: 1,
+        speciesId: 1,
+        hp: 1,
+        maxHp: 1,
+        status: 0,
+        statStages: [],
+        fainted: false,
+        abilityId: 0,
+        formIndex: 0,
+        moves: [],
+        tags: [],
+      },
+    ] satisfies CoopFullMonSnapshot[],
     authoritativeState: state(stateTick),
   };
 }
@@ -70,8 +90,8 @@ describe("co-op resync snapshot ordering", () => {
   });
 
   it("keeps the recovery hold fail-closed for partial, stale, cross-boundary, or already-attempted frames", () => {
-    const noState = replacementEnvelope();
-    delete noState.authoritativeState;
+    const noState = { ...replacementEnvelope(), authoritativeState: undefined } as unknown as CoopCheckpointEnvelope;
+    const noFullField = { ...replacementEnvelope(), fullField: undefined } as unknown as CoopCheckpointEnvelope;
     const otherWave = replacementEnvelope();
     otherWave.authoritativeState = state(20, 5, 2);
     const otherTurn = replacementEnvelope();
@@ -82,6 +102,7 @@ describe("co-op resync snapshot ordering", () => {
     expect(coopCheckpointSupersedesResync(heldSnapshot(), replacementEnvelope(18, 20))).toBe(false);
     expect(coopCheckpointSupersedesResync(heldSnapshot(), replacementEnvelope(19, 18))).toBe(false);
     expect(coopCheckpointSupersedesResync(heldSnapshot(), noState)).toBe(false);
+    expect(coopCheckpointSupersedesResync(heldSnapshot(), noFullField)).toBe(false);
     expect(coopCheckpointSupersedesResync(heldSnapshot(), otherWave)).toBe(false);
     expect(coopCheckpointSupersedesResync(heldSnapshot(), otherTurn)).toBe(false);
     expect(coopCheckpointSupersedesResync(heldSnapshot(), unknownBoundary)).toBe(false);

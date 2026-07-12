@@ -75,6 +75,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 const RUN = process.env.ER_SCENARIO === "1";
 
+function completeTurnCarrier(_turn: number) {
+  return { preimage: "{}", fullField: [{ bi: 99 } as never], authoritativeState: { version: 0 } as never };
+}
+
 describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 Phase B)", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
@@ -407,6 +411,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [{ k: "message", text: "Magikarp used Splash!" }],
       checkpoint,
       checksum: coopEngine.captureCoopChecksum(),
@@ -831,6 +836,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [{ k: "message", text: "Foe fainted!" }],
       checkpoint: checkpointFromField(0),
       checksum: coopEngine.captureCoopChecksum(),
@@ -856,6 +862,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     partner.send({
       t: "turnResolution",
       turn: turn + 1,
+      ...completeTurnCarrier(turn + 1),
       events: [],
       checkpoint: checkpointFromField(0),
       checksum: coopEngine.captureCoopChecksum(),
@@ -893,6 +900,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     partner.send({
       t: "turnResolution",
       turn: earlierTurn,
+      ...completeTurnCarrier(earlierTurn),
       events: [{ k: "message", text: "Foe fainted!" }],
       checkpoint: checkpointFromField(0),
       checksum: coopEngine.captureCoopChecksum(),
@@ -904,6 +912,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     partner.send({
       t: "turnResolution",
       turn: finalTurn,
+      ...completeTurnCarrier(finalTurn),
       events: [{ k: "message", text: "Critical hit!" }],
       checkpoint: checkpointFromField(0),
       checksum: coopEngine.captureCoopChecksum(),
@@ -1096,6 +1105,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [{ k: "message", text: "Got away safely!" }],
       checkpoint: checkpointFromField(10),
       checksum: coopEngine.captureCoopChecksum(),
@@ -1134,6 +1144,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [{ k: "message", text: "The run ended." }],
       checkpoint: checkpointFromField(0),
       checksum: coopEngine.captureCoopChecksum(),

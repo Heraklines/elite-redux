@@ -3580,8 +3580,10 @@ function applyFullMon(
       }
     }
     void mon.updateInfo();
-  } catch {
-    /* one mon's heal failed; leave it and continue */
+  } catch (error) {
+    // A rich field companion is part of the modern authority transaction. Surface a per-mon failure to
+    // the finalize/replacement boundary so it cannot open control on a merely half-applied frame.
+    recordCoopApplyFailure("fullMon", error, mon.id);
   }
 }
 
@@ -4166,7 +4168,56 @@ export function captureCoopFieldSnapshot(): CoopFullMonSnapshot[] | null {
       .map(readFullMon)
       .sort((a, b) => a.bi - b.bi);
     return field.length === 0 ? null : field;
-  } catch {
+  } catch (error) {
+    coopWarn("checkpoint", "authoritative full-field capture failed; field withheld", error);
+    return null;
+  }
+}
+
+/**
+ * One coherent modern authority frame. Turn resolutions and out-of-band replacement checkpoints must
+ * never publish a numeric checkpoint while silently omitting the rich field/state companion or while
+ * carrying the checksum read-failure sentinel. Capturing the checksum preimage once also guarantees the
+ * transmitted checksum describes the exact diagnostic preimage beside it.
+ */
+export interface CoopAuthoritativeCarrierCapture {
+  checkpoint: CoopBattleCheckpoint;
+  checksum: string;
+  preimage: string;
+  fullField: CoopFullMonSnapshot[];
+  authoritativeState: CoopAuthoritativeBattleStateV1;
+}
+
+/** HOST: capture an all-or-nothing modern turn/replacement authority frame. */
+export function captureCoopAuthoritativeCarrier(
+  turn: number,
+  reason: "turnResolution" | "replacement",
+): CoopAuthoritativeCarrierCapture | null {
+  try {
+    const checkpoint = captureCoopCheckpoint();
+    if (checkpoint == null) {
+      throw new Error("numeric checkpoint was unavailable");
+    }
+    const fullField = captureCoopFieldSnapshot();
+    if (fullField == null || fullField.length === 0) {
+      throw new Error("full field snapshot was unavailable");
+    }
+    const authoritativeState = captureCoopAuthoritativeBattleState(turn);
+    if (authoritativeState == null) {
+      throw new Error("authoritative battle state was unavailable");
+    }
+    const checksumView = captureCoopChecksumState();
+    if (checksumView.saveDataDigest === COOP_CHECKSUM_SENTINEL) {
+      throw new Error("save-data digest capture returned the read-failure sentinel");
+    }
+    const preimage = canonicalize(checksumView);
+    const checksum = checksumState(checksumView);
+    if (checksum === COOP_CHECKSUM_SENTINEL) {
+      throw new Error("full-state checksum collided with the reserved read-failure sentinel");
+    }
+    return { checkpoint, checksum, preimage, fullField, authoritativeState };
+  } catch (error) {
+    coopWarn("checkpoint", `${reason} authority capture incomplete; entire carrier withheld`, error);
     return null;
   }
 }
@@ -4202,8 +4253,10 @@ export function applyCoopFieldSnapshot(field: CoopFullMonSnapshot[] | undefined,
       globalScene.updateModifiers(true);
       globalScene.updateModifiers(false);
     }
-  } catch {
-    /* a malformed field snapshot must never crash the guest's turn */
+  } catch (error) {
+    // The caller drains this structured failure and requests/awaits a complete retry. Swallowing it here
+    // made the numeric half appear successful while an unhashed rich field could remain stale.
+    recordCoopApplyFailure("fieldSnapshot", error);
   }
 }
 
