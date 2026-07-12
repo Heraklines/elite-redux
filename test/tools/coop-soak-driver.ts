@@ -1319,10 +1319,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // next command. The single-process soak crosses the host first, so consume the same queued
       // out-of-band replacement carrier here, under the guest context, before reading its command UI.
       const replacement = rig.guestRuntime.battleStream.consumeCheckpoint();
-      if (replacement != null && applyCoopCheckpoint(replacement.checkpoint)) {
-        if (applyCoopAuthoritativeBattleState(replacement.authoritativeState, true)) {
-          rig.guestRuntime.battleStream.retainAppliedOutOfBandCheckpoint(replacement);
-        }
+      if (
+        replacement != null
+        && applyCoopCheckpoint(replacement.checkpoint)
+        && applyCoopAuthoritativeBattleState(replacement.authoritativeState, true)
+      ) {
+        rig.guestRuntime.battleStream.retainAppliedOutOfBandCheckpoint(replacement);
       }
       const wave = rig.hostScene.currentBattle.waveIndex;
       const turn = rig.hostScene.currentBattle.turn;
