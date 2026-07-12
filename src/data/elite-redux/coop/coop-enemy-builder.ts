@@ -22,6 +22,7 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopSerializedEnemy, CoopSerializedPokemon } from "#data/elite-redux/coop/coop-transport";
 import type { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
+import type { BiomeId } from "#enums/biome-id";
 import type { Nature } from "#enums/nature";
 import { Stat } from "#enums/stat";
 import { TrainerSlot } from "#enums/trainer-slot";
@@ -172,6 +173,17 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
     const battle = globalScene.currentBattle;
     if (battle == null || enemies.length === 0) {
       return;
+    }
+    // Protocol 29: adopt an ME option's pre-battle biome transition before constructing/summoning the
+    // streamed enemies. Without this, combat state could stay synchronized while the guest rendered the
+    // previous arena and entered the next wave from a different biome.
+    const authoritativeBiome = coopNum(enemies[0].data, "coopArenaBiomeId");
+    if (authoritativeBiome !== undefined && globalScene.arena.biomeId !== authoritativeBiome) {
+      coopLog(
+        "me",
+        `ME battle arena authority biome ${globalScene.arena.biomeId} -> ${authoritativeBiome} before summon`,
+      );
+      globalScene.newArena(authoritativeBiome as BiomeId);
     }
     const isTrainer = battle.battleType === BattleType.TRAINER;
     const trainerSlot = isTrainer ? TrainerSlot.TRAINER : TrainerSlot.NONE;

@@ -1842,7 +1842,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   };
 
   /** Drive the reward shop (seeded owner take/leave across ALL reward types; watcher mirrors) + LOCKSTEP. */
-  const driveRewardShop = async (wave: number): Promise<void> => {
+  const driveRewardShop = async (wave: number, deferAdvanceToMeTerminal = false): Promise<void> => {
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
 
@@ -1873,11 +1873,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
 
     const hostAfter = rig.hostRuntime.controller.interactionCounter();
     const guestAfter = rig.guestRuntime.controller.interactionCounter();
-    if (hostAfter !== counterBefore + 1 || guestAfter !== counterBefore + 1) {
+    const expectedAfter = deferAdvanceToMeTerminal ? counterBefore : counterBefore + 1;
+    if (hostAfter !== expectedAfter || guestAfter !== expectedAfter) {
       fail(
         "lockstep",
         wave,
-        `reward shop did not advance both counters once (before=${counterBefore} host=${hostAfter} guest=${guestAfter})`,
+        deferAdvanceToMeTerminal
+          ? `ME battle reward shop advanced before the true ME terminal (before=${counterBefore} host=${hostAfter} guest=${guestAfter})`
+          : `reward shop did not advance both counters once (before=${counterBefore} host=${hostAfter} guest=${guestAfter})`,
       );
     }
   };
@@ -1973,10 +1976,29 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           `ME battle enemy manifest count diverged at handoff (host=${rig.hostScene.getEnemyParty().length} guest=${rig.guestScene.getEnemyParty().length})`,
         );
       }
+      if (rig.hostScene.arena.biomeId !== rig.guestScene.arena.biomeId) {
+        fail(
+          "desync",
+          wave,
+          `ME battle arena diverged at handoff (host=${rig.hostScene.arena.biomeId} guest=${rig.guestScene.arena.biomeId})`,
+        );
+      }
       await crossCommandBoundaryWithReplayGuest(wave, rig.hostScene.currentBattle.turn);
       await playWave(wave);
       await assertPostTurnConverged(wave);
-      await driveRewardShop(wave);
+      // An ME-battle reward screen deliberately suppresses its normal shop tick: the whole encounter owns
+      // exactly one alternation step, committed by PostMysteryEncounterPhase after the spawned battle. Drive
+      // that true terminal and flush the guest's detached 9M listener before checking the +1 lockstep.
+      await driveRewardShop(wave, true);
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
+      await withClient(rig.guestCtx, async () => {
+        for (let i = 0; i < 8; i++) {
+          await drainLoopback();
+          if (rig.guestRuntime.controller.interactionCounter() === counterBefore + 1) {
+            break;
+          }
+        }
+      });
       mePath = "battle-handoff";
     } else if (hostOwns) {
       // HOST-OWNED: park the host at its embedded shop, start the guest replay while the presentation is

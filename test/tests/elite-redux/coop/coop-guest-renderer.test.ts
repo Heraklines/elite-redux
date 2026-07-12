@@ -1405,6 +1405,23 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       "the wave-start carrier forces authoritative maxHp when local reconstruction differs",
     ).toBe(forcedMaxHp);
     expect(rebuiltWithForeignContext!.hp, "current hp clamps against the authoritative maxHp").toBe(forcedMaxHp);
+    // SAME-SPECIES correction is the more common wave-start path: structural adoption keeps the guest's
+    // existing object and applyCoopEnemies overwrites it in place. It must apply the same authoritative HP
+    // ceiling as a rebuild, otherwise equal species can still render different bars/checksums.
+    const sameSpecies = globalScene.getEnemyParty()[0];
+    const correctedMaxHp = sameSpecies.getMaxHp() + 11;
+    coopEngine.applyCoopEnemies([
+      {
+        fieldIndex: 0,
+        data: {
+          speciesId: sameSpecies.species.speciesId,
+          hp: correctedMaxHp,
+          maxHp: correctedMaxHp,
+        },
+      },
+    ]);
+    expect(sameSpecies.getMaxHp(), "same-species correction forces the host maxHp ceiling").toBe(correctedMaxHp);
+    expect(sameSpecies.hp, "same-species current hp clamps against the authoritative ceiling").toBe(correctedMaxHp);
     const rebuiltSegments = rebuiltNonBoss!.bossSegments;
     const rebuiltSegmentsIsPositive = typeof rebuiltSegments === "number" && rebuiltSegments > 0;
     expect(

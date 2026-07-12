@@ -1387,9 +1387,20 @@ export function applyCoopEnemies(enemies: CoopSerializedEnemy[]): void {
           }
           enemy.initBattleInfo();
         }
+        // The same-species corrector is just as authoritative as the structural rebuild. A guest can roll
+        // the host's species yet calculate a different HP stat under divergent ER constructor context; in
+        // that common path adoptCoopEnemiesStructural deliberately keeps the existing object and lands here.
+        // Apply the host ceiling before current hp so the first field/checksum frame is exact.
+        const maxHp = num(d, "maxHp");
+        if (maxHp !== undefined && maxHp > 0 && enemy.getMaxHp() !== Math.trunc(maxHp)) {
+          coopWarn(
+            "enemy",
+            `applyCoopEnemies maxHp authority host=${Math.trunc(maxHp)} guest=${enemy.getMaxHp()} -> applied`,
+          );
+          enemy.setStat(Stat.HP, Math.trunc(maxHp));
+        }
         const hp = num(d, "hp");
         if (hp !== undefined) {
-          const maxHp = num(d, "maxHp");
           const ceiling = maxHp !== undefined && maxHp > 0 ? maxHp : enemy.getMaxHp();
           enemy.hp = Math.max(0, Math.min(hp, ceiling));
         }

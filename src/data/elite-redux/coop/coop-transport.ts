@@ -67,7 +67,7 @@ export type CoopRole = "host" | "guest";
 // control high-water mark; receivers advance control only after safe-boundary checksum convergence.
 // er-coop-23: hot rejoin preserves active waits and reissues command/barrier control state; terminal
 // disconnect ends shared play instead of taking an uncommitted local fallback/AI/solo branch.
-export const COOP_PROTOCOL_VERSION = "er-coop-28";
+export const COOP_PROTOCOL_VERSION = "er-coop-29";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete

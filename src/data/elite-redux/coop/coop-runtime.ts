@@ -2771,6 +2771,16 @@ export function coopHostStreamMeBattleParty(): void {
   try {
     const key = meBattleHandoffKey(globalScene.currentBattle.waveIndex, coopMeBattleInteractionCounter);
     const enemies = captureCoopEnemies();
+    // Protocol 29: a battle-spawning ME can change biome BEFORE generating its enemy party (for example
+    // Teleporting Hijinks). The guest does not run the option callback, so carry the resulting arena on the
+    // same fail-closed handoff manifest. The serialized Pokemon blob is an extensible JSON record; attaching
+    // it to the first enemy keeps party delivery + arena adoption one atomic carrier and one replay key.
+    if (enemies[0] != null) {
+      enemies[0] = {
+        ...enemies[0],
+        data: { ...enemies[0].data, coopArenaBiomeId: globalScene.arena.biomeId },
+      };
+    }
     coopLog("me", `host stream ME-battle party key=${key} enemies=${enemies.length}`);
     active!.battleStream.sendMeBattleEnemyParty(key, enemies);
   } catch (e) {
