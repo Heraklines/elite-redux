@@ -14,6 +14,7 @@
 
 import {
   COOP_UI_AUTHORITATIVE_COMMIT_MODES,
+  COOP_UI_LOCAL_AUTHORITATIVE_COMMIT_MODES,
   COOP_UI_MIRRORED_MODES,
   COOP_UI_REGISTRY,
   COOP_UI_TRIPWIRE_EXEMPT,
@@ -73,19 +74,24 @@ describe("#840 co-op UI classification registry (unmirrored-screen tripwire)", (
     ]);
   });
 
-  it("every authoritative UI commit mode is mirrored and excludes navigation-only COMMAND/FIGHT", () => {
+  it("every authoritative UI commit mode is mirrored or reviewed local commit chrome", () => {
     for (const mode of COOP_UI_AUTHORITATIVE_COMMIT_MODES) {
-      expect(COOP_UI_REGISTRY[mode], `${UiMode[mode]} commits shared state so it must be mirrored`).toBe("mirrored");
+      expect(
+        COOP_UI_REGISTRY[mode] === "mirrored" || COOP_UI_LOCAL_AUTHORITATIVE_COMMIT_MODES.has(mode),
+        `${UiMode[mode]} commits shared state so it must be mirrored or explicitly reviewed local commit chrome`,
+      ).toBe(true);
     }
-    expect(COOP_UI_AUTHORITATIVE_COMMIT_MODES.has(UiMode.COMMAND)).toBe(false);
-    expect(COOP_UI_AUTHORITATIVE_COMMIT_MODES.has(UiMode.FIGHT)).toBe(false);
-    const expectedCommitModes = [...COOP_UI_MIRRORED_MODES]
-      .filter(mode => mode !== UiMode.COMMAND && mode !== UiMode.FIGHT)
-      .sort((a, b) => a - b);
+    expect([...COOP_UI_LOCAL_AUTHORITATIVE_COMMIT_MODES].sort((a, b) => a - b)).toEqual(
+      [UiMode.CONFIRM, UiMode.OPTION_SELECT].sort((a, b) => a - b),
+    );
+    const expectedCommitModes = new Set<UiMode>([
+      ...COOP_UI_MIRRORED_MODES,
+      ...COOP_UI_LOCAL_AUTHORITATIVE_COMMIT_MODES,
+    ]);
     expect(
       [...COOP_UI_AUTHORITATIVE_COMMIT_MODES].sort((a, b) => a - b),
-      "every mirrored semantic-commit screen must have a UI-to-relay contract",
-    ).toEqual(expectedCommitModes);
+      "every mirrored or reviewed local semantic-commit screen must have a UI-to-relay contract",
+    ).toEqual([...expectedCommitModes].sort((a, b) => a - b));
   });
 
   it("the exempt allowlist is small and only holds local-only chrome modes", () => {

@@ -237,12 +237,17 @@ export const COOP_UI_MIRRORED_MODES: ReadonlySet<UiMode> = new Set<UiMode>(
 );
 
 /**
- * Mirrored modes whose owner can commit shared run state. Each needs a real public-UI-input -> authoritative
- * carrier journey; merely opening the mode or calling its handler/relay from a harness does not cover it.
- * COMMAND and FIGHT intentionally are not here: they are navigation screens whose semantic commit occurs in
- * BALL, TARGET_SELECT, or PARTY. Adding a new shared interactive screen must update this reviewed set.
+ * Modes whose owner can commit shared run state. Each needs a real public-UI-input -> authoritative carrier
+ * journey; merely opening the mode or calling its handler/relay from a harness does not cover it.
+ *
+ * Most are mirrored semantic screens. CONFIRM and OPTION_SELECT are generic local chrome, but production
+ * flows use their callbacks as the final authoritative boundary (for example reward skip and Stormglass),
+ * so excluding them would leave real UI-to-relay call chains invisible. COMMAND and FIGHT also commit some
+ * battle choices directly; they are not merely navigation screens.
  */
 export const COOP_UI_AUTHORITATIVE_COMMIT_MODES: ReadonlySet<UiMode> = new Set<UiMode>([
+  UiMode.COMMAND,
+  UiMode.FIGHT,
   UiMode.BALL,
   UiMode.TARGET_SELECT,
   UiMode.MODIFIER_SELECT,
@@ -255,6 +260,14 @@ export const COOP_UI_AUTHORITATIVE_COMMIT_MODES: ReadonlySet<UiMode> = new Set<U
   UiMode.ER_BARGAIN,
   UiMode.LEARN_MOVE_BATCH,
   UiMode.ER_MAP,
+  UiMode.CONFIRM,
+  UiMode.OPTION_SELECT,
+]);
+
+/** Local-only chrome that can nevertheless be the final callback before an authoritative carrier send. */
+export const COOP_UI_LOCAL_AUTHORITATIVE_COMMIT_MODES: ReadonlySet<UiMode> = new Set<UiMode>([
+  UiMode.CONFIRM,
+  UiMode.OPTION_SELECT,
 ]);
 
 /** The classification of a mode, or `undefined` only if a runtime out-of-range mode is somehow passed. */

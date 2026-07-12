@@ -7,6 +7,7 @@ import {
   beginCoopUiRelayInput,
   endCoopUiRelayInput,
   formatCoopUiRelayTrace,
+  getCoopUiOperationHits,
   getCoopUiRelayEdges,
   recordCoopUiRelayCarrier,
   resetCoopUiRelayTrace,
@@ -45,5 +46,15 @@ describe("co-op UI-to-relay production-boundary trace", () => {
       [inner, UiMode.ER_QUIZ, "interactionChoice"],
       [outer, UiMode.MYSTERY_ENCOUNTER, "operation"],
     ]);
+  });
+
+  it("records the exact UI -> operation pair without counting out-of-scope commits", () => {
+    recordCoopUiRelayCarrier("operation", "async watcher commit", "op:reward");
+    const inputId = beginCoopUiRelayInput(UiMode.MODIFIER_SELECT);
+    recordCoopUiRelayCarrier("operation", "owner commit", "op:reward");
+    endCoopUiRelayInput(inputId);
+
+    expect([...getCoopUiOperationHits()]).toEqual(["MODIFIER_SELECT->op:reward"]);
+    expect(formatCoopUiRelayTrace()).toContain("operation=op:reward");
   });
 });

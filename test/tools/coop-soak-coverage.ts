@@ -17,6 +17,8 @@
 //   - kind:<relay kind>    - a relay `kind` string (from COOP_RELAY_KINDS)
 //   - band:<seq band key>  - a relay seq band (from COOP_SEQ_BANDS)
 //   - uiRelay:<UiMode>     - a real public UI input reached an authoritative production carrier
+//   - uiOperation:<mode->op> - that input synchronously reached a committed operation class; full
+//                              cross-client causality remains debt until a journey proves watcher apply
 //   - situation:<name>     - a battle-flow situation (from COOP_SOAK_SITUATIONS, the
 //                            ONLY hand-listed dimension - no registry exists for it)
 //
@@ -39,7 +41,10 @@
 // NOT import the coop runtime, so it stays a pure test-side classifier.
 // =============================================================================
 
-import { COOP_OPERATION_SURFACES } from "#data/elite-redux/coop/coop-operation-surface-registry";
+import {
+  COOP_OPERATION_SURFACES,
+  COOP_OPERATION_UI_CONTRACTS,
+} from "#data/elite-redux/coop/coop-operation-surface-registry";
 import { COOP_RELAY_KINDS, COOP_SEQ_BANDS, coopSeqBandRange } from "#data/elite-redux/coop/coop-seq-registry";
 import { COOP_UI_AUTHORITATIVE_COMMIT_MODES, COOP_UI_MIRRORED_MODES } from "#data/elite-redux/coop/coop-ui-registry";
 import { UiMode } from "#enums/ui-mode";
@@ -121,6 +126,8 @@ export interface SoakHitSet {
   operations: Set<string>;
   /** Modes where a real `Ui.processInput` synchronously reached an authoritative carrier. */
   uiRelays: Set<UiMode>;
+  /** Public UI mode -> committed operation-class edges observed at production choke points. */
+  uiOperations: Set<string>;
 }
 
 /** A fresh, empty hit-set. */
@@ -132,6 +139,7 @@ export function createSoakHitSet(): SoakHitSet {
     situations: new Set(),
     operations: new Set(),
     uiRelays: new Set(),
+    uiOperations: new Set(),
   };
 }
 
@@ -145,6 +153,7 @@ const bandKey = (b: string): string => `band:${b}`;
 const sitKey = (s: string): string => `situation:${s}`;
 const operationKey = (cls: string): string => `operation:${cls}`;
 const uiRelayKey = (m: UiMode): string => `uiRelay:${UiMode[m]}`;
+const uiOperationKey = (mode: UiMode, cls: string): string => `uiOperation:${UiMode[mode]}->${cls}`;
 
 /**
  * The EXPECTED surface set, derived AT RUNTIME from the registries (never hardcoded): every mirrored
@@ -171,6 +180,11 @@ export function expectedSurfaces(): Set<string> {
   for (const mode of COOP_UI_AUTHORITATIVE_COMMIT_MODES) {
     out.add(uiRelayKey(mode));
   }
+  for (const [cls, contract] of Object.entries(COOP_OPERATION_UI_CONTRACTS)) {
+    for (const mode of contract.uiModes) {
+      out.add(uiOperationKey(mode, cls));
+    }
+  }
   return out;
 }
 
@@ -194,6 +208,9 @@ export function hitSurfaces(hits: SoakHitSet): Set<string> {
   }
   for (const mode of hits.uiRelays) {
     out.add(uiRelayKey(mode));
+  }
+  for (const pair of hits.uiOperations) {
+    out.add(`uiOperation:${pair}`);
   }
   return out;
 }
@@ -313,6 +330,8 @@ const LEARN_MOVE_PERMOVE =
 export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<string, UndrivableEntry>([
   // ---- MODES ----
   ...[
+    UiMode.COMMAND,
+    UiMode.FIGHT,
     UiMode.BALL,
     UiMode.MODIFIER_SELECT,
     UiMode.PARTY,
@@ -324,6 +343,8 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
     UiMode.ER_BARGAIN,
     UiMode.LEARN_MOVE_BATCH,
     UiMode.ER_MAP,
+    UiMode.CONFIRM,
+    UiMode.OPTION_SELECT,
   ].map(
     mode =>
       [
@@ -335,6 +356,23 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
           followupTask: `replace the ${UiMode[mode]} headless shortcut with a real owner UI -> relay -> watcher journey`,
         },
       ] as const,
+  ),
+  ...Object.entries(COOP_OPERATION_UI_CONTRACTS).flatMap(([cls, contract]) =>
+    contract.uiModes.map(
+      mode =>
+        [
+          uiOperationKey(mode, cls),
+          {
+            reason:
+              `the soak does not yet prove the complete ${UiMode[mode]} owner-input -> ${cls} authority `
+              + "commit -> watcher-apply chain; a synchronous local carrier hit cannot prove the later "
+              + "cross-client commit/adoption for guest-owned input",
+            followupTask:
+              `add a continuous two-client ${UiMode[mode]} journey that carries one causal intent id through `
+              + `${cls} commit, apply, visual acknowledgement, and state convergence`,
+          },
+        ] as const,
+    ),
   ),
   [
     modeKey(UiMode.BALL),
@@ -995,6 +1033,7 @@ export function logSoakCoverage(hits: SoakHitSet, profile: SoakProfileName = "go
       .sort()
       .join(", ")}]`,
   );
+  log(`[coop-soak-coverage] HIT uiOperations=[${sorted(hits.uiOperations).join(", ")}]`);
 
   // GUARANTEED status.
   const guaranteedCold = sorted(guaranteed).filter(s => !hit.has(s));

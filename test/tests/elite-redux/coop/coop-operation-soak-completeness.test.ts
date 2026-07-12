@@ -3,7 +3,11 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { COOP_OPERATION_SURFACES } from "#data/elite-redux/coop/coop-operation-surface-registry";
+import {
+  COOP_OPERATION_SURFACES,
+  COOP_OPERATION_UI_CONTRACTS,
+} from "#data/elite-redux/coop/coop-operation-surface-registry";
+import { UiMode } from "#enums/ui-mode";
 import {
   expectedSurfaces,
   guaranteedSurfaces,
@@ -20,6 +24,14 @@ describe("co-op soak authoritative-operation completeness", () => {
     const expectedOperationKeys = COOP_OPERATION_SURFACES.map(cls => `operation:${cls}`).sort();
     const registeredOperationKeys = [...expectedSurfaces()].filter(key => key.startsWith("operation:")).sort();
     expect(registeredOperationKeys).toEqual(expectedOperationKeys);
+  });
+
+  it("requires every declared public-UI -> operation edge to be classified independently", () => {
+    const expectedUiOperationKeys = Object.entries(COOP_OPERATION_UI_CONTRACTS)
+      .flatMap(([cls, contract]) => contract.uiModes.map(mode => `uiOperation:${UiMode[mode]}->${cls}`))
+      .sort();
+    const registeredUiOperationKeys = [...expectedSurfaces()].filter(key => key.startsWith("uiOperation:")).sort();
+    expect(registeredUiOperationKeys).toEqual(expectedUiOperationKeys);
   });
 
   it.each(["god", "level"] as const)("totally and disjointly partitions every registered surface (%s)", profile => {
