@@ -1,0 +1,371 @@
+{
+  "invariant": "no-park",
+  "seed": 20260712,
+  "wave": 9,
+  "detail": "replay guest did not reciprocally cross cmd:9:1 (timedOut=true crossPoint=none)",
+  "replay": "SOAK_SEED=20260712",
+  "phaseState": {
+    "hostPhase": "EnemyCommandPhase",
+    "guestPhase": "TurnInitPhase",
+    "hostInteractionCounter": 8,
+    "guestInteractionCounter": 8,
+    "hostWave": 9,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 1544440000,
+        "battlerIndex": -1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 156,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 1
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      },
+      {
+        "id": 825266041,
+        "battlerIndex": -1,
+        "speciesId": 376,
+        "speciesName": "Metagross",
+        "hp": 0,
+        "maxHp": 199,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 1
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 2913122095,
+        "battlerIndex": -1,
+        "speciesId": 504,
+        "speciesName": "Patrat",
+        "hp": 25,
+        "maxHp": 25,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 158,
+            "ppUsed": 0
+          },
+          {
+            "id": 116,
+            "ppUsed": 0
+          },
+          {
+            "id": 43,
+            "ppUsed": 0
+          },
+          {
+            "id": 95,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 2897105808,
+        "battlerIndex": -1,
+        "speciesId": 661,
+        "speciesName": "Fletchling",
+        "hp": 23,
+        "maxHp": 23,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 314,
+            "ppUsed": 0
+          },
+          {
+            "id": 45,
+            "ppUsed": 0
+          },
+          {
+            "id": 64,
+            "ppUsed": 0
+          },
+          {
+            "id": 175,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 1544440000,
+        "battlerIndex": 0,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 156,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 1
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      },
+      {
+        "id": 825266041,
+        "battlerIndex": 1,
+        "speciesId": 376,
+        "speciesName": "Metagross",
+        "hp": 0,
+        "maxHp": 199,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 1
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 4144003840,
+        "battlerIndex": 2,
+        "speciesId": 906,
+        "speciesName": "Sprigatito",
+        "hp": 0,
+        "maxHp": 24,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 5029,
+            "ppUsed": 0
+          },
+          {
+            "id": 39,
+            "ppUsed": 0
+          },
+          {
+            "id": 468,
+            "ppUsed": 0
+          },
+          {
+            "id": 154,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 38734976,
+        "battlerIndex": 3,
+        "speciesId": 16,
+        "speciesName": "Pidgey",
+        "hp": 0,
+        "maxHp": 22,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 314,
+            "ppUsed": 0
+          },
+          {
+            "id": 211,
+            "ppUsed": 0
+          },
+          {
+            "id": 98,
+            "ppUsed": 0
+          },
+          {
+            "id": 28,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260712 preseeded=false",
+    "wave 1 turn 1: host SWITCH -> party[2]",
+    "wave 1: host slot move=85 guest slot move=85",
+    "wave 1 turn 1: progress enemyHp=[16:14/14,263:0/14] playerHp=[149:213/213,94:179/179]",
+    "wave 1 turn 2: replay guest reciprocally crossed cmd:1:2",
+    "wave 1 turn 2: host SWITCH -> party[2]",
+    "wave 1: reward shop owner=host take-nonparty",
+    "wave 2 turn 1: replay guest reciprocally crossed cmd:2:1",
+    "wave 2 turn 1: staged guest-owned lead at 1 HP on both engines",
+    "wave 2: host slot move=53 guest slot move=153",
+    "wave 2 turn 1: forced-faint guest EXPLOSION self-KO",
+    "wave 2 turn 1: progress enemyHp=[572:0/17,270:0/16] playerHp=[143:232/303,94:0/179]",
+    "wave 2: reward shop owner=guest take-nonparty",
+    "wave 3 turn 1: replay guest reciprocally crossed cmd:3:1",
+    "wave 3: host slot move=85 guest slot move=85",
+    "wave 3 turn 1: progress enemyHp=[187:0/16,504:0/16] playerHp=[143:232/303,248:225/225]",
+    "wave 3: DIGEST mismatch @post-turn class=unexpected fields=[field] -> one-heal resync",
+    "wave 3: reward shop owner=host take-nonparty",
+    "wave 4 turn 1: replay guest reciprocally crossed cmd:4:1",
+    "wave 4: host slot move=85 guest slot move=53",
+    "wave 4 turn 1: guest SWITCH -> party[5]",
+    "wave 4 turn 1: progress enemyHp=[831:0/18,265:18/18] playerHp=[143:232/303,445:233/235]",
+    "wave 4 turn 2: replay guest reciprocally crossed cmd:4:2",
+    "wave 4: reward shop owner=guest take-nonparty",
+    "wave 5 turn 1: replay guest reciprocally crossed cmd:5:1",
+    "wave 5: TRAINER (fixed)",
+    "wave 5: host slot move=247 guest slot move=85",
+    "wave 5 turn 1: progress enemyHp=[13:0/18,265:0/18] playerHp=[149:213/213,248:225/225]",
+    "wave 5: DIGEST mismatch @post-turn class=unexpected fields=[field] -> one-heal resync",
+    "wave 5: reward shop owner=host leave",
+    "wave 6 turn 1: replay guest reciprocally crossed cmd:6:1",
+    "wave 6: host slot move=153 guest slot move=85",
+    "wave 6 turn 1: progress enemyHp=[824:0/19,263:0/20] playerHp=[149:0/213,248:163/225]",
+    "wave 6: reward shop owner=guest leave",
+    "wave 7 turn 1: replay guest reciprocally crossed cmd:7:1",
+    "wave 7: host slot move=53 guest slot move=247",
+    "wave 7 turn 1: progress enemyHp=[293:0/23,509:0/22] playerHp=[376:199/199,248:219/225]",
+    "wave 7: DIGEST mismatch @post-turn class=unexpected fields=[field] -> one-heal resync",
+    "wave 7: reward shop owner=host take-nonparty",
+    "wave 8 turn 1: replay guest reciprocally crossed cmd:8:1",
+    "wave 8: TRAINER (fixed)",
+    "wave 8: host slot move=153 guest slot move=53",
+    "wave 8 turn 1: progress enemyHp=[906:0/24,16:0/22] playerHp=[248:156/225,376:0/199]",
+    "wave 8: reward shop owner=guest take-nonparty",
+    "ASYMMETRIC wave 8: host half exhausted -> guest solo continuation"
+  ]
+}
