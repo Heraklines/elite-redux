@@ -3141,6 +3141,13 @@ export function applyCoopAuthoritativeBattleState(
           mon.stats = [...hostData.stats];
           mon.hp = Math.max(0, Math.min(Math.trunc(hostData.hp), mon.getMaxHp()));
         }
+        // Seating a newly streamed ME enemy runs fieldSetup after the first PokemonData apply. That setup
+        // legitimately initializes a local entry, but it also clears post-move boosts already resolved by
+        // the host in this turn (Teleporting Hijinks exposed +1 DEF/SpAtk/SpDef becoming zero). Restore the
+        // host stages at the same final boundary as derived stats; the guest never derives entry effects.
+        if (hostData != null && Array.isArray(hostData.summonData?.statStages)) {
+          mon.summonData.statStages = [...hostData.summonData.statStages];
+        }
       }
     }
     // PHASE 3 (#838): reconcile the RENDER to the freshly-applied DATA over every on-field mon -
