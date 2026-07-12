@@ -199,6 +199,22 @@ describe("production replacement carrier transaction", () => {
   it("bounds a missing retained host frame and routes retry exhaustion to an explicit terminal", async () => {
     const runtime = startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
     runtime.controller.role = "guest";
+    let authorityFailures = 0;
+    runtime.partnerTransport?.onMessage(message => {
+      if (message.t !== "authorityFailure") {
+        return;
+      }
+      authorityFailures++;
+      runtime.partnerTransport?.send({
+        t: "authorityFailureAck",
+        failureId: message.failureId,
+        epoch: message.epoch,
+        wave: message.wave,
+        turn: message.turn,
+        revision: message.revision,
+        boundary: message.boundary,
+      });
+    });
     const scheduled: (() => void)[] = [];
     vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(callback => {
       scheduled.push(callback);
@@ -230,11 +246,13 @@ describe("production replacement carrier transaction", () => {
       fire?.();
       await flushWire();
     }
+    await flushWire();
 
     expect(
       checkpointApply,
       "the failed complete frame is attempted once but never re-applied without a retained host response",
     ).toHaveBeenCalledOnce();
+    expect(authorityFailures, "the peer receives the terminal failure before local teardown").toBe(1);
     expect(terminate).toHaveBeenCalledOnce();
     expect(clearPhaseQueue).toHaveBeenCalledOnce();
     expect(resetScene).toHaveBeenCalledOnce();
