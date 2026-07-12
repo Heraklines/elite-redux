@@ -162,6 +162,11 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     // mismatch). A converged run resyncs at most a handful of times (the spike's organic seed/ability
     // divergence heals via the per-turn checkpoint), NEVER a per-iteration storm.
     const resyncSpy = vi.spyOn(CoopBattleStreamer.prototype, "requestStateSync");
+    // Production wave-start carrier tap. The guest remirror below is a legacy harness convenience, so without
+    // this assertion it masked a live failure where NextEncounterPhase generated wave 2 but its doEncounter
+    // override bypassed the host publisher entirely. Require the REAL host phase crossing to publish a
+    // complete carrier (party + encounter descriptor) before CommandPhase for every subsequent wave.
+    const waveCarrierSpy = vi.spyOn(CoopBattleStreamer.prototype, "sendEnemyParty");
 
     const WAVES = 3;
     for (let w = 1; w <= WAVES; w++) {
@@ -240,6 +245,10 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
           await game.phaseInterceptor.to("CommandPhase");
         });
         expect(rig.hostScene.currentBattle.waveIndex, `wave ${w}: host advanced to wave ${w + 1}`).toBe(w + 1);
+        const nextCarrier = waveCarrierSpy.mock.calls.find(([wave]) => wave === w + 1);
+        expect(nextCarrier, `wave ${w}: NextEncounterPhase published the wave ${w + 1} carrier`).toBeDefined();
+        expect(nextCarrier?.[1].length, `wave ${w}: carrier includes the generated enemy party`).toBeGreaterThan(0);
+        expect(nextCarrier?.[5], `wave ${w}: carrier includes the authoritative encounter descriptor`).toBeDefined();
       }
     }
 
