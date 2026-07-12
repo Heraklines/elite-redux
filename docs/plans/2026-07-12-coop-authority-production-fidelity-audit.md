@@ -6,9 +6,9 @@ Audited branch: `heraklines/feat/elite-redux-port`
 
 Initial audited source SHA: `cf714363a15927e84521b69d1b00c5a186e88480`
 
-Latest remote re-audit SHA: `14d2bfcb7e3178d6a64fd690abbebfef6ec3eec7`
+Latest remote re-audit SHA: `4a0852c0c333c6c83d1558e6ae9ac977d42c5e4c`
 
-Latest staging source checkpoint: `9585dacdd`
+Latest staging source checkpoint: `4a0852c0c`
 
 Status: stop-ship architecture audit and remediation contract. This document records what is proven,
 what remains transitional, why long green soaks did not predict ordinary player failures, and the target
@@ -42,12 +42,16 @@ delivered the guest's counter acknowledgement back to the host. `CoopPartnerSync
 next-wave boundary closed. Both red failures are valuable evidence that earlier green results overstated
 lifecycle fidelity.
 
-The branch must not be called deployable at `14d2bfcb7`. Full gate run `29208695374` is red in Lane B
-shards 2 and 8. Static, browser transport, A, C, P, and the other B shards are green. B2 still records
-two renderer-denied `ToggleDoublePositionPhase` calls in the multi-wave journey. B8 still has two
-presentation assertions comparing `battleInfo.visible` to a boolean when the headless object exposes a
-no-op function. Directly assigning public mock properties did not turn the headless runner into a canvas
-oracle.
+The branch's current component gate is green at `4a0852c0c`, run `29209992715`. That commit removes the two
+later-wave renderer-denied position phases and makes the headless battle-info adapter stateful. This closes
+the exact red assertions at `14d2bfcb7`; it does not make the component harness a production bootstrap or a
+canvas oracle, and it does not close the transaction/recovery findings below.
+
+The evidence policy was already inconsistent at the deployed staging checkpoint. SHA `9585dacdd` passed the
+full gate in run `29202637115` and was deployed by `29202804876`, while the exact-SHA six-profile Nightly run
+`29202805388` failed both `god-a` and `level`. Both profiles stranded the guest at the same deterministic
+wave-51 replay boundary on `CoopInertPhase`, ahead of `CoopFinalizeTurnPhase`. A deploy decision that treats
+the short gate as authoritative while a same-SHA release campaign is red is not a valid release gate.
 The previous exact SHA `4f6e786ad` passed the full sharded gate and six-profile Nightly, but the newly
 strengthened journey proves those green results did not cover the production guest lifecycle or even all
 scheduled-transport acknowledgements.
@@ -58,6 +62,8 @@ scheduled-transport acknowledgements.
 
 | Evidence | Result | Meaning |
 | --- | --- | --- |
+| Staging deploy, `29210142166`, SHA `4a0852c0c` | GREEN deploy | Upstream auto-deployed this component-gate checkpoint while the audit was in progress. It has not run the new P32 transaction work or the expanded Showdown/triple/built-gameplay gates proposed here. |
+| Full gate, `29209992715`, SHA `4a0852c0c` | GREEN | Closes the two known B2/B8 component assertions. The suite still lacks a built-client gameplay journey and omits Showdown/triple suites from the classified lanes. |
 | Full gate, `29208695374`, SHA `14d2bfcb7` | RED | B2 retains two blocked double-position phases. B8 retains two false visual assertions against no-op headless properties; B6 is fixed. |
 | Full gate, `29208516430`, SHA `4ab6b5081` | RED | Static and most shards recover, but the three-wave guest still emits two blocked double-position phases; the ME boundary and three render assertions still lack concrete headless sprite visibility. |
 | Full gate, `29207508147`, SHA `00e1a64d2` | RED | Two trainer modifier type errors; launch/trainer assertion failure; one ME presentation failure; three render-differ failures; and the three-wave journey records eight renderer-blocked phase leaks. |
@@ -66,7 +72,8 @@ scheduled-transport acknowledgements.
 | Full gate, `29204456430`, SHA `cf714363a` | RED | Guest journey hangs on `TitlePhase`; latest source is not a green checkpoint. |
 | Full gate, `29204101398`, SHA `4f6e786ad` | GREEN | All then-classified tests passed, but before the real queue-crossing assertion. |
 | Six-profile Nightly, `29204108055`, SHA `4f6e786ad` | GREEN | Long harness campaigns passed; this did not prove production UI/phase lifecycle. |
-| Staging deploy, `29202804876`, SHA `9585dacdd` | GREEN deploy | This is the code testers exercised in the latest reports. |
+| Six-profile Nightly, `29202805388`, SHA `9585dacdd` | RED | `god-a` and `level` deterministically strand at wave 51 in `CoopInertPhase`, before finalize, even though the exact SHA's short gate was green and it was deployed to staging. |
+| Prior staging deploy, `29202804876`, SHA `9585dacdd` | GREEN deploy | This is the code testers exercised in the cited wave-4 reports. |
 
 The commits through `14d2bfcb7` add useful modifier identity work, canonicalize neutral boss fields,
 centralize several field/trainer presentation repairs, initialize reconstructed visual nodes, and keep guest
