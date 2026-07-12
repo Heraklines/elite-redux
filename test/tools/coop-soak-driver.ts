@@ -1664,6 +1664,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     beforeHostCross?: () => void,
   ): Promise<void> => {
     const point = `cmd:${wave}:${turn}`;
+    const hostHasCommandable = rig.hostScene
+      .getPlayerParty()
+      .some(mon => mon.coopOwner === "host" && !mon.isFainted() && mon.isAllowedInBattle());
     withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.reannounce(point));
     await drainLoopback();
     await withClient(rig.hostCtx, async () => {
@@ -1671,6 +1674,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       await game.phaseInterceptor.to("CommandPhase");
     });
     await drainLoopback();
+    if (!hostHasCommandable) {
+      actionScript.push(
+        `wave ${wave} turn ${turn}: host half exhausted; guest command proceeds without reciprocal await`,
+      );
+      return;
+    }
     const guestResult = await withClient(rig.guestCtx, () => rig.guestRuntime.rendezvous.awaitPartner(point));
     if (guestResult.timedOut || guestResult.crossPoint !== undefined) {
       fail(
