@@ -45,7 +45,7 @@ import {
   drainCoopApplyFailures,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { recordCoopChecksumAssertion } from "#data/elite-redux/coop/coop-checksum-assert";
-import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
+import { collectCanonicalDiff, logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { armCoopFaintSwitchIntentResend } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import { isCoopFaintSwitchSeq, sendCoopFaintSwitchChoice } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -967,6 +967,19 @@ export class CoopFinalizeTurnPhase extends Phase {
     const hostObj = this.parseCanonical(hostPreimage);
     const guestObj = hostObj === undefined ? undefined : this.parseCanonical(canonicalize(captureCoopChecksumState()));
     const assertionCount = recordCoopChecksumAssertion(`turn=${this.turn}`, hostObj, guestObj);
+    // The assertion emitter writes directly to console.error/warn, which embedded log collectors and some
+    // CI reporters can intercept. Mirror the canonical leaf diff through the durable co-op log channel so a
+    // tester's submitted host/guest logs always identify the exact nested field that caused the assertion.
+    if (hostObj !== undefined && guestObj !== undefined) {
+      const diff = collectCanonicalDiff(hostObj, guestObj);
+      coopWarn(
+        "checksum",
+        `turn=${this.turn} ASSERTION-DIFF ${diff.lines.length}${diff.truncated ? "+" : ""} field(s)`,
+      );
+      for (const line of diff.lines) {
+        coopWarn("checksum", line.trim());
+      }
+    }
     coopWarn(
       "checksum",
       `turn=${this.turn} MISMATCH host=${hostChecksum} guest=${guestChecksum} assertion#${assertionCount} `
