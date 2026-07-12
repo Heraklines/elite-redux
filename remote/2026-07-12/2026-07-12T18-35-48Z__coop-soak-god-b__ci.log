@@ -1,0 +1,61 @@
+===== COOP SOAK RESULT =====
+profile: god-b
+verdict: PASS
+waves_requested: 55
+run: 29204108055 (feat/elite-redux-port)
+timestamp: 2026-07-12T18-35-48Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20365441 WAVES=55 - replay this run with:  SOAK_SEED=20365441 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=110 guest=0
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=650 guest=370
+[22m[39m[coop-soak] scalar-lag wave 14 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=850 guest=650
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1680 guest=850
+[coop-soak] scalar-lag wave 30 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=3700 guest=1680
+[22m[39m[coop-soak] scalar-lag wave 35 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=4620 guest=3700
+[22m[39m[coop-soak] scalar-lag wave 43 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=6320 guest=4620
+[22m[39m[coop-soak] scalar-lag wave 54 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=9330 guest=7450
+[22m[39m[coop-soak] scalar-lag wave 55 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=11380 guest=9330
+[coop-soak] DONE seed=20365441 waves=55/55 resyncHeals=0 assertions=0 findings=0 trainerWaves=9 (fixed=5 random=4) skips={"mysteryEncounterDisabledV1":1} elapsedMs=61678
+
+----- vitest result tail -----
+[coop-soak-coverage]   SKIP situation:tera - the soak never terastallizes => FOLLOW-UP: drive a seeded terastallize (move.select tera flag)
+[coop-soak-coverage]   SKIP situation:transportFault - transport fault injection is covered by the dedicated fault test (coop-transport-fault), not the soak => FOLLOW-UP: none - covered by the Layer-A transport-fault test
+[coop-soak-coverage]   SKIP situation:trio - 3-player co-op (trio seating) is not stood up by the two-engine harness => FOLLOW-UP: extend the harness to a three-engine trio rig
+[coop-soak-coverage]   SKIP situation:triple - triple battles are not forced by the soak => FOLLOW-UP: run a triple-battle-style soak variant
+[coop-soak-coverage]   SKIP situation:willYouSwitch - the 'will you switch?' post-KO prompt is not driven => FOLLOW-UP: drive the will-you-switch prompt in the soak
+[coop-soak-coverage]   SKIP uiRelay:BALL - the soak does not yet prove BALL through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the BALL headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:BIOME_SHOP - the soak does not yet prove BIOME_SHOP through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the BIOME_SHOP headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:COLOSSEUM - the soak does not yet prove COLOSSEUM through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the COLOSSEUM headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:ER_BARGAIN - the soak does not yet prove ER_BARGAIN through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the ER_BARGAIN headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:ER_MAP - the soak does not yet prove ER_MAP through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the ER_MAP headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:ER_QUIZ - the soak does not yet prove ER_QUIZ through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the ER_QUIZ headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:LEARN_MOVE_BATCH - the soak does not yet prove LEARN_MOVE_BATCH through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the LEARN_MOVE_BATCH headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:MODIFIER_SELECT - the soak does not yet prove MODIFIER_SELECT through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the MODIFIER_SELECT headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:MYSTERY_ENCOUNTER - the soak does not yet prove MYSTERY_ENCOUNTER through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the MYSTERY_ENCOUNTER headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:PARTY - the soak does not yet prove PARTY through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the PARTY headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage]   SKIP uiRelay:SUMMARY - the soak does not yet prove SUMMARY through public Ui.processInput into an authoritative carrier; opening the mode, direct handler calls, and direct relay/commit injection do not count => FOLLOW-UP: replace the SUMMARY headless shortcut with a real owner UI -> relay -> watcher journey
+[coop-soak-coverage] ===========================================
+[coop-soak-coverage] REPORT-ONLY (profile=god, surveyed 55 < 60 waves): coverage logged, nothing enforced.
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:151:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[33m[coop:runtime] partner channel disconnected -> entering membership recovery (shared waits retained)[39m
+[33m[coop:relay] cancelWaiters() sticky-cancel seqs=[11,37] (resync rescue) -> selected resolve null[39m
+[33m[coop:relay] AWAIT rewardOptions key=11:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:relay] AWAIT rewardOptions key=37:0 RESOLVE null (TIMEOUT or supersede) -> caller must FAIL CLOSED[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+[33m[coop:reward] WATCHER got no owner options (timeout/null) -> FAIL CLOSED; local roll suppressed (count=0)[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:151:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > plays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[39m
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [33m62782[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:151:3[39m
+
+[33m[39m[32m·[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m   Start at [22m 18:34:18
+[2m   Duration [22m 88.98s[2m (transform 20.26s, setup 24.72s, import 201ms, tests 63.20s, environment 692ms)[22m
+
