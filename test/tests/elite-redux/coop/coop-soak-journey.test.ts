@@ -29,14 +29,14 @@ const EVENT_SCHEDULE = new Map([
   [14, MysteryEncounterType.ER_HOT_SPRING], // empty healing-shop terminal
   [16, MysteryEncounterType.BERRIES_ABOUND], // explicit leave after a battle-capable offer
   [18, MysteryEncounterType.ER_PICNIC], // account-local candy/affection surface; safe move-on branch
-  [22, MysteryEncounterType.TRASH_TO_TREASURE], // direct held-item mutation
+  [21, MysteryEncounterType.TRASH_TO_TREASURE], // direct held-item mutation
   [24, MysteryEncounterType.FIELD_TRIP], // guest-owned party + nested move sub-picks
   [26, MysteryEncounterType.ER_TOWN_RAFFLE], // money spend + seeded generated reward identity
   [28, MysteryEncounterType.ER_FORTUNE_TELLER], // queued future event + world-map reveal mutation
   [32, MysteryEncounterType.TELEPORTING_HIJINKS], // post-crossroads money + party transformation branch
-  [34, MysteryEncounterType.ER_CLEANSING_FONT], // party-wide heal/status continuation
+  [34, MysteryEncounterType.ER_STILL_WATERS], // full-party mirror battle handoff
   [36, MysteryEncounterType.WEIRD_DREAM], // legal-range transformation encounter, leave branch
-  [38, MysteryEncounterType.ER_STILL_WATERS], // full-party mirror battle handoff
+  [39, MysteryEncounterType.ER_CLEANSING_FONT], // party-wide heal/status continuation
   [42, MysteryEncounterType.ER_DRAGONS_HOARD], // catch-capable boss surface; safe decline terminal
 ]);
 
@@ -46,20 +46,20 @@ const EVENT_OPTIONS = new Map([
   [14, 2],
   [16, 3],
   [18, 4],
-  [22, 2],
+  [21, 2],
   [24, 1],
   [26, 1],
   [28, 1],
   [32, 1],
   [34, 1],
   [36, 3],
-  [38, 1],
+  [39, 1],
   [42, 2],
 ]);
 
 /** Field Trip option 1: choose party slot 0, then that Pokemon's move slot 0. */
 const EVENT_SUB_PICKS = new Map<number, readonly number[]>([[24, [0, 0]]]);
-const EVENT_BATTLE_WAVES = new Set([32, 38]);
+const EVENT_BATTLE_WAVES = new Set([32, 34]);
 
 describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome transitions", () => {
   let phaserGame: Phaser.Game;
