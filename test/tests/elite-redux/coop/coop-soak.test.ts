@@ -232,6 +232,17 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
           + result.findings.map(f => `[${f.fields}]@${f.firstWave}`).join(", "),
       ).toEqual([]);
 
+      // A successful recovery snapshot must never turn a causal replication defect into a green full run.
+      // The narrowly classified renderer-money lag remains visible but expected; every other pre-heal mismatch
+      // means the guest reached a boundary with state it did not derive from the host and blocks completion.
+      const unexpectedPreHeals = result.preHealMismatches.filter(m => m.classification === "unexpected");
+      expect(
+        unexpectedPreHeals,
+        `soak observed ${unexpectedPreHeals.length} unexpected pre-heal mismatch(es) `
+          + `(replay SOAK_SEED=${seed}): `
+          + unexpectedPreHeals.map(m => `wave${m.wave}@${m.where}[${m.fields.join(",")}]`).join("; "),
+      ).toEqual([]);
+
       // #838 Phase 5 GATE: the PRODUCTION per-turn checksum ASSERTION count must be ZERO. This is the
       // guest's REAL CoopFinalizeTurnPhase.verifyChecksum tally (independent of the driver's boundary
       // `resyncHeals` probe above): the full-state authoritative payload is supposed to converge every

@@ -11,6 +11,7 @@ import { fieldPositionForSlot, formatById } from "#data/battle-format";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import {
   applyCoopAuthoritativeBattleState,
+  applyCoopEnemies,
   captureCoopAuthoritativeBattleState,
   captureCoopDexBaseline,
   captureCoopEnemies,
@@ -27,7 +28,11 @@ import {
   isVersusSession,
   maybeBeginReplayRecording,
 } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopEncounterAuthority, CoopSerializedTrainer } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopEncounterAuthority,
+  CoopSerializedEnemy,
+  CoopSerializedTrainer,
+} from "#data/elite-redux/coop/coop-transport";
 import { erRecordAchievementShinyEncounter } from "#data/elite-redux/er-achievement-tracker";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
@@ -278,6 +283,13 @@ export class EncounterPhase extends BattlePhase {
    *  modifier generation - otherwise the held items would double / diverge. */
   private coopAdoptedEnemyParty = false;
 
+  /**
+   * The immutable host manifest retained until local field setup and pre-summon hooks finish. Those hooks can
+   * recalculate stats from guest-local context after {@linkcode buildCoopEnemy} initially applied `maxHp`, so
+   * the manifest must be reasserted at the final encounter seam before the first command/checksum is exposed.
+   */
+  private coopEnemyAuthority: CoopSerializedEnemy[] | null = null;
+
   constructor(loaded = false) {
     super();
 
@@ -430,6 +442,7 @@ export class EncounterPhase extends BattlePhase {
     battle.enemyParty = rebuilt;
     // The generation loop must not roll modifiers over the verbatim party; that would double held items.
     this.coopAdoptedEnemyParty = true;
+    this.coopEnemyAuthority = enemies;
     // The enemy handoff is also the first coherent boundary of the new wave. Apply the host's complete
     // state here so between-wave HP/modifier/party mutations are visible before the first command, rather
     // than relying on a later checksum mismatch to repair them after the player has already seen stale UI.
@@ -812,6 +825,13 @@ export class EncounterPhase extends BattlePhase {
         for (const enemy of globalScene.getEnemyField()) {
           overrideHeldItems(enemy, false);
         }
+      }
+
+      // Guest-local `fieldSetup`/PreSummon hooks above are allowed to prepare sprites and presentation, but
+      // they are not an authority source. Re-apply the retained manifest after every such hook so max HP,
+      // current HP, ability, IVs, nature, moves, and boss state are exactly the host's on the first frame.
+      if (this.coopAdoptedEnemyParty && this.coopEnemyAuthority != null) {
+        applyCoopEnemies(this.coopEnemyAuthority);
       }
 
       // Co-op HOST (#633): NOW that the enemy party's held items are attached (the sync
