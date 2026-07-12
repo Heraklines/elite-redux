@@ -255,6 +255,57 @@ function commandKey(fieldIndex: number, turn: number, owner?: CoopRole, address?
   return `${address?.epoch ?? 0}:${wave}:${slot}:${turn}`;
 }
 
+interface CommandRoute {
+  fieldIndex: number;
+  turn: number;
+  owner?: CoopRole | undefined;
+  address?: CoopCommandAddress | undefined;
+}
+
+interface BufferedCommand extends CommandRoute {
+  command: SerializedCommand;
+}
+
+function commandRoute(fieldIndex: number, turn: number, owner?: CoopRole, address?: CoopCommandAddress): CommandRoute {
+  return {
+    fieldIndex,
+    turn,
+    ...(owner == null ? {} : { owner }),
+    ...(address == null ? {} : { address }),
+  };
+}
+
+/**
+ * The live clients can briefly disagree on a copied player Pokemon's id even though they agree on the
+ * logical command slot. Recover ONLY the safe, observable case: same owner, same visible field slot, same
+ * epoch/wave/turn, and exactly one candidate. Field-index skew is already handled by an exact owner+Pokemon
+ * key; requiring the field index here means we never guess when one owner commands multiple active Pokemon.
+ */
+function findUnambiguousEntityIdSkew<T extends CommandRoute>(
+  entries: ReadonlyMap<string, T>,
+  expected: CommandRoute,
+): { key: string; value: T } | undefined {
+  if (expected.owner == null || expected.address == null) {
+    return;
+  }
+  const matches = [...entries].filter(
+    ([, candidate]) =>
+      candidate.owner === expected.owner
+      && candidate.fieldIndex === expected.fieldIndex
+      && candidate.turn === expected.turn
+      && candidate.address != null
+      && candidate.address.epoch === expected.address!.epoch
+      && candidate.address.wave === expected.address!.wave
+      && candidate.address.pokemonId !== expected.address!.pokemonId,
+  );
+  return matches.length === 1 ? { key: matches[0][0], value: matches[0][1] } : undefined;
+}
+
+function commandAddressLabel(route: CommandRoute): string {
+  const address = route.address;
+  return `owner=${route.owner ?? "-"} field=${route.fieldIndex} turn=${route.turn} address=${address == null ? "legacy" : `${address.epoch}/${address.wave}/${address.pokemonId}`}`;
+}
+
 function commandAddressOf(message: {
   epoch?: number;
   wave?: number;
@@ -305,7 +356,7 @@ export class CoopBattleSync {
    * move/switch/target desync). Turn-keying makes an await for turn N accept ONLY the
    * turn-N command; stale older-turn entries are pruned on request.
    */
-  private readonly inbox = new Map<string, SerializedCommand>();
+  private readonly inbox = new Map<string, BufferedCommand>();
   /** The local human's committed pick, retained so a replaced channel can request it again. */
   private readonly localOutbox = new Map<
     string,
@@ -383,6 +434,7 @@ export class CoopBattleSync {
     address?: CoopCommandAddress,
   ): Promise<SerializedCommand | null> {
     const key = commandKey(fieldIndex, turn, owner, address);
+    const requestedRoute = commandRoute(fieldIndex, turn, owner, address);
     const slotPrefix = key.slice(0, key.lastIndexOf(":") + 1); // `wave:fieldIndex:` (#819)
     // Supersede any stale in-flight request on this SLOT (the turn has moved on, so an
     // older-turn await is moot) and prune any stale older-turn buffered command for it,
@@ -403,19 +455,32 @@ export class CoopBattleSync {
     }
     // The peer may have already broadcast its move for THIS turn (lockstep, no
     // time-lock). If so, consume the buffered command immediately - no request, no wait.
-    const buffered = this.inbox.get(key);
+    let bufferedKey = key;
+    let buffered = this.inbox.get(key);
+    if (buffered === undefined) {
+      const skewed = findUnambiguousEntityIdSkew(this.inbox, requestedRoute);
+      if (skewed != null) {
+        bufferedKey = skewed.key;
+        buffered = skewed.value;
+        coopWarn(
+          "relay",
+          `host requestPartnerCommand recovered entity-id skew (${commandAddressLabel(buffered)} -> ${commandAddressLabel(requestedRoute)})`,
+        );
+      }
+    }
     if (buffered !== undefined) {
-      this.inbox.delete(key);
-      const validation = offer == null ? { valid: true } : validateCoopBattleCommand(buffered, offer);
+      this.inbox.delete(bufferedKey);
+      const validation = offer == null ? { valid: true } : validateCoopBattleCommand(buffered.command, offer);
       if (validation.valid) {
         this.settled.add(key);
+        this.settled.add(bufferedKey);
         if (isCoopDebug()) {
           coopLog(
             "relay",
-            `host requestPartnerCommand fieldIndex=${fieldIndex} turn=${turn} moveSlots=[${moveSlots.join(",")}] -> consumed BUFFERED command kind=${buffered.command}`,
+            `host requestPartnerCommand fieldIndex=${fieldIndex} turn=${turn} moveSlots=[${moveSlots.join(",")}] -> consumed BUFFERED command kind=${buffered.command.command}`,
           );
         }
-        return Promise.resolve(offer == null ? buffered : normalizeLocalCommand(buffered, offer));
+        return Promise.resolve(offer == null ? buffered.command : normalizeLocalCommand(buffered.command, offer));
       }
       coopWarn(
         "security",
@@ -662,14 +727,36 @@ export class CoopBattleSync {
       if (msg.offer != null) {
         this.peerOffers.set(key, msg.offer);
       }
-      const cached = this.localOutbox.get(key);
+      const requestedRoute = commandRoute(msg.fieldIndex, msg.turn, msg.owner, address);
+      let cachedKey = key;
+      let cached = this.localOutbox.get(key);
+      if (cached == null) {
+        const skewed = findUnambiguousEntityIdSkew(this.localOutbox, requestedRoute);
+        if (skewed != null) {
+          cachedKey = skewed.key;
+          cached = skewed.value;
+          coopWarn(
+            "relay",
+            `peer commandRequest recovered retained entity-id skew (${commandAddressLabel(cached)} -> ${commandAddressLabel(requestedRoute)})`,
+          );
+        }
+      }
       if (cached != null) {
         coopLog(
           "relay",
           `peer recv commandRequest fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> replay retained local command`,
         );
         const normalizedCommand = normalizeLocalCommand(cached.command, msg.offer);
-        this.localOutbox.set(key, { ...cached, command: normalizedCommand });
+        if (cachedKey !== key) {
+          this.localOutbox.delete(cachedKey);
+        }
+        this.localOutbox.set(key, {
+          fieldIndex: msg.fieldIndex,
+          turn: msg.turn,
+          command: normalizedCommand,
+          ...(msg.owner == null ? {} : { owner: msg.owner }),
+          ...(address == null ? {} : { address }),
+        });
         this.transport.send({
           t: "command",
           fieldIndex: msg.fieldIndex,
@@ -732,8 +819,14 @@ export class CoopBattleSync {
       return;
     }
     if (msg.t === "commandRejected") {
-      const key = commandKey(msg.fieldIndex, msg.turn, msg.owner, commandAddressOf(msg));
+      const address = commandAddressOf(msg);
+      const route = commandRoute(msg.fieldIndex, msg.turn, msg.owner, address);
+      const key = commandKey(msg.fieldIndex, msg.turn, msg.owner, address);
       this.localOutbox.delete(key);
+      const skewed = findUnambiguousEntityIdSkew(this.localOutbox, route);
+      if (skewed != null) {
+        this.localOutbox.delete(skewed.key);
+      }
       coopWarn(
         "relay",
         `host rejected local command fieldIndex=${msg.fieldIndex} turn=${msg.turn} reason=${msg.reason}; authoritative default applied`,
@@ -745,7 +838,20 @@ export class CoopBattleSync {
       // else the field index (unchanged). Both the pending resolver and any buffer use this key.
       const address = commandAddressOf(msg);
       const key = commandKey(msg.fieldIndex, msg.turn, msg.owner, address);
-      const request = this.pending.get(key);
+      const incomingRoute = commandRoute(msg.fieldIndex, msg.turn, msg.owner, address);
+      let requestKey = key;
+      let request = this.pending.get(key);
+      if (request == null) {
+        const skewed = findUnambiguousEntityIdSkew(this.pending, incomingRoute);
+        if (skewed != null) {
+          requestKey = skewed.key;
+          request = skewed.value;
+          coopWarn(
+            "relay",
+            `recv command recovered entity-id skew (${commandAddressLabel(incomingRoute)} -> ${commandAddressLabel(request)})`,
+          );
+        }
+      }
       if (this.settled.has(key)) {
         coopLog("relay", `recv command DUPLICATE fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> ignored`);
         return;
@@ -753,12 +859,15 @@ export class CoopBattleSync {
       // #693: an explicit DECLINE resolves the awaiter with null -> the caller's AI
       // fallback commands the slot. Never treated as a real command.
       if (msg.decline && request != null) {
-        this.pending.delete(key);
+        this.pending.delete(requestKey);
         coopLog("relay", `recv command DECLINE fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> AI fallback`);
         request.finish(null);
         return;
       }
       if (request) {
+        if (requestKey !== key) {
+          this.settled.add(key);
+        }
         if (request.offer != null) {
           const validation = validateCoopBattleCommand(msg.command, request.offer);
           if (!validation.valid) {
@@ -804,7 +913,7 @@ export class CoopBattleSync {
         // No one is awaiting this slot+turn yet - buffer it (keyed by turn, so a
         // later turn can't clobber an unconsumed earlier one) so the next request
         // for THIS turn resolves instantly (#633, LIVE-C race fix + desync fix).
-        this.inbox.set(key, msg.command);
+        this.inbox.set(key, { ...incomingRoute, command: msg.command });
       }
     }
   }

@@ -111,6 +111,105 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     expect(cmd?.moveId).toBe(42);
   });
 
+  it("recovers a wave-1 broadcast-before-request when copied player Pokemon ids differ", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    const guestAddress = { epoch: 17, wave: 1, pokemonId: 111 };
+    const hostAddress = { epoch: 17, wave: 1, pokemonId: 999 };
+
+    guestSync.broadcastLocalCommand(
+      1,
+      1,
+      { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] },
+      "guest",
+      guestAddress,
+    );
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    await expect(hostSync.requestPartnerCommand(1, 1, [1], "guest", legalOffer, hostAddress)).resolves.toMatchObject({
+      command: Command.FIGHT,
+      cursor: 1,
+      moveId: 55,
+      targets: [2],
+    });
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("replays a retained local command after a dropped first send despite copied Pokemon id skew", async () => {
+    const pair = createLoopbackPair();
+    const guestWire = new CoopFlapTransport(pair.guest);
+    const hostSync = new CoopBattleSync(pair.host);
+    const guestSync = new CoopBattleSync(guestWire);
+    const guestAddress = { epoch: 23, wave: 1, pokemonId: 321 };
+    const hostAddress = { epoch: 23, wave: 1, pokemonId: 654 };
+
+    guestWire.setConnected(false);
+    guestSync.broadcastLocalCommand(
+      1,
+      1,
+      { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] },
+      "guest",
+      guestAddress,
+    );
+    guestWire.setConnected(true);
+
+    await expect(hostSync.requestPartnerCommand(1, 1, [1], "guest", legalOffer, hostAddress)).resolves.toMatchObject({
+      command: Command.FIGHT,
+      cursor: 1,
+      moveId: 55,
+      targets: [2],
+    });
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("resolves an already-waiting request when the arriving command carries the copied Pokemon id", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    const awaited = hostSync.requestPartnerCommand(1, 1, [1], "guest", legalOffer, {
+      epoch: 31,
+      wave: 1,
+      pokemonId: 700,
+    });
+
+    guestSync.broadcastLocalCommand(1, 1, { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] }, "guest", {
+      epoch: 31,
+      wave: 1,
+      pokemonId: 701,
+    });
+
+    await expect(awaited).resolves.toMatchObject({ command: Command.FIGHT, moveId: 55, targets: [2] });
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("refuses to guess when multiple entity-id-skewed commands occupy the same logical slot", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host, {
+      timeoutMs: 5,
+      schedule: cb => {
+        const id = setTimeout(cb, 5);
+        return () => clearTimeout(id);
+      },
+    });
+    const guestSync = new CoopBattleSync(guest);
+    const first = { epoch: 41, wave: 1, pokemonId: 801 };
+    const second = { epoch: 41, wave: 1, pokemonId: 802 };
+
+    guestSync.broadcastLocalCommand(1, 1, { command: Command.FIGHT, cursor: 1, moveId: 55 }, "guest", first);
+    guestSync.broadcastLocalCommand(1, 1, { command: Command.POKEMON, cursor: 4 }, "guest", second);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    await expect(
+      hostSync.requestPartnerCommand(1, 1, [1], "guest", legalOffer, { epoch: 41, wave: 1, pokemonId: 999 }),
+    ).resolves.toBeNull();
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
   it("broadcastLocalCommand for a DIFFERENT slot does not resolve an await on another slot", async () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host, {
