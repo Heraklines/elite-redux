@@ -78,6 +78,11 @@ import {
   reconcileCoopPlayerModifiers,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import {
+  coopMeHandoffBattleStarted,
+  coopMeHandoffBattleWaveValue,
+  restoreCoopMeHandoffBattleState,
+} from "#data/elite-redux/coop/coop-me-pin-state";
+import {
   assembleCoopRuntime,
   type CoopRuntime,
   getCoopInteractionRelay,
@@ -174,9 +179,17 @@ interface MePins {
   start: number;
   battleCounter: number;
   presentation: ReturnType<typeof getCoopMeHostPresentation>;
+  handoffBattle: boolean;
+  handoffWave: number;
 }
 
-const IDLE_ME_PINS: MePins = { start: -1, battleCounter: -1, presentation: null };
+const IDLE_ME_PINS: MePins = {
+  start: -1,
+  battleCounter: -1,
+  presentation: null,
+  handoffBattle: false,
+  handoffWave: -1,
+};
 
 /** Capture the live process-global ME pins (for save-back / restore in the ClientCtx swap). */
 function readMePins(): MePins {
@@ -184,6 +197,8 @@ function readMePins(): MePins {
     start: coopMeInteractionStartValue(),
     battleCounter: getCoopMeBattleInteractionCounter(),
     presentation: getCoopMeHostPresentation(),
+    handoffBattle: coopMeHandoffBattleStarted(),
+    handoffWave: coopMeHandoffBattleWaveValue(),
   };
 }
 
@@ -196,6 +211,7 @@ function writeMePins(pins: MePins): void {
   }
   setCoopMeBattleInteractionCounter(pins.battleCounter);
   setCoopMeHostPresentation(pins.presentation);
+  restoreCoopMeHandoffBattleState(pins.handoffBattle, pins.handoffWave);
 }
 
 /**

@@ -2393,7 +2393,12 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
 }
 
 function pokemonDataForWire(mon: Pokemon): Record<string, unknown> {
-  return JSON.parse(JSON.stringify(new PokemonData(mon))) as Record<string, unknown>;
+  const data = JSON.parse(JSON.stringify(new PokemonData(mon))) as Record<string, unknown>;
+  // Save-format PokemonData normally omits derived stats because solo reload recalculates them. An
+  // authoritative renderer must not recalculate under its own ER modifier/context, so the live network
+  // carrier includes the host's exact array; applyAuthoritativeMonData already gives it precedence.
+  data.stats = [...mon.stats];
+  return data;
 }
 
 function captureCoopModifierBlobs(player: boolean): Record<string, unknown>[] {

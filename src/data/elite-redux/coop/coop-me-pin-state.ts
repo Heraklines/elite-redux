@@ -108,3 +108,12 @@ export function setCoopMeHandoffBattleStarted(wave = -1): void {
   coopMeHandoffBattle = true;
   coopMeHandoffBattleWave = wave;
 }
+
+/**
+ * Restore the complete handoff flag for a separately-pumped client context. Production has one module graph
+ * per browser; the two-engine harness swaps this process-global state alongside the ME interaction pins.
+ */
+export function restoreCoopMeHandoffBattleState(started: boolean, wave = -1): void {
+  coopMeHandoffBattle = started;
+  coopMeHandoffBattleWave = started ? wave : -1;
+}
