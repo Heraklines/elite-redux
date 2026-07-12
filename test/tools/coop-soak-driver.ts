@@ -1992,20 +1992,17 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       await driveRewardShop(wave, true);
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
       await withClient(rig.guestCtx, async () => {
-        // The detached terminal first performs the guest's defensive ME leave/UI teardown, which can span
-        // several animation-clock ticks before its idempotent controller advance. Keep the wait bounded but
-        // large enough for that real async tail; eight loopback drains raced it by ~10ms in CI.
-        for (let i = 0; i < 64; i++) {
-          await drainLoopback();
-          if (rig.guestRuntime.controller.interactionCounter() === counterBefore + 1) {
-            break;
-          }
-        }
+        await drainLoopback();
       });
-      // The two-engine harness persists the guest module context when the scoped pump returns; the detached
-      // promise continuation runs on the immediately following microtask. Give that captured-controller
-      // continuation one turn before the common lockstep assertion below.
-      await drainLoopback();
+      // The two-engine harness persists the guest module context when the scoped pump returns; only then can
+      // the detached promise continuation run against its captured controller. Wait outside the client scope
+      // (bounded) rather than starving that continuation with an inner polling loop.
+      for (let i = 0; i < 16; i++) {
+        await drainLoopback();
+        if (rig.guestRuntime.controller.interactionCounter() === counterBefore + 1) {
+          break;
+        }
+      }
       mePath = "battle-handoff";
     } else if (hostOwns) {
       // HOST-OWNED: park the host at its embedded shop, start the guest replay while the presentation is

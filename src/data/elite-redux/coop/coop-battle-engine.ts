@@ -981,17 +981,17 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
       }
       const state = normalizeMonState(raw);
       try {
+        if (state.maxHp > 0 && mon.getMaxHp() !== state.maxHp) {
+          coopWarn(
+            "checkpoint",
+            `mon bi=${mon.getBattlerIndex()} maxHp host=${state.maxHp} guest=${mon.getMaxHp()} -> applied`,
+          );
+          mon.setStat(Stat.HP, state.maxHp);
+        }
         // hp is pre-clamped to [0, maxHp]; only the surviving (still-active) mons are
         // corrected - a 0-hp host mon the guest hasn't fainted is left for the relayed
         // commands to resolve, not force-fainted here.
         if (!mon.isFainted()) {
-          if (state.maxHp > 0 && mon.getMaxHp() !== state.maxHp) {
-            coopWarn(
-              "checkpoint",
-              `mon bi=${mon.getBattlerIndex()} maxHp host=${state.maxHp} guest=${mon.getMaxHp()} -> applied`,
-            );
-            mon.setStat(Stat.HP, state.maxHp);
-          }
           if (isCoopDebug()) {
             const wantHp = Math.min(state.hp, mon.getMaxHp());
             const guestStatus = mon.status?.effect ?? 0;
@@ -2432,15 +2432,22 @@ function readAuthoritativeSeat(mon: Pokemon): CoopAuthoritativeFieldSeat {
 }
 
 function assertNoDuplicateAuthoritativeIds(parties: Record<string, unknown>[][]): boolean {
-  const seen = new Set<number>();
-  for (const party of parties) {
+  // IDs address Pokemon only inside their explicit side (`field[].side` selects the player/enemy map before
+  // `pokemonId` is read). The engine can legitimately reuse a numeric id across opposing parties; rejecting
+  // that collision dropped the entire authoritative state for a wave and left the renderer's stat stages
+  // stale. Duplicates remain forbidden within one side, where lookup would actually be ambiguous.
+  for (const [sideIndex, party] of parties.entries()) {
+    const seen = new Set<number>();
     for (const raw of party) {
       const id = raw.id;
       if (typeof id !== "number") {
         return false;
       }
       if (seen.has(id)) {
-        coopWarn("resync", `authoritativeState duplicate Pokemon.id=${id} -> capture/apply rejected`);
+        coopWarn(
+          "resync",
+          `authoritativeState duplicate Pokemon.id=${id} within side=${sideIndex} -> capture/apply rejected`,
+        );
         return false;
       }
       seen.add(id);
