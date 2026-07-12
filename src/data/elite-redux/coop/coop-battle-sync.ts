@@ -415,7 +415,7 @@ export class CoopBattleSync {
             `host requestPartnerCommand fieldIndex=${fieldIndex} turn=${turn} moveSlots=[${moveSlots.join(",")}] -> consumed BUFFERED command kind=${buffered.command}`,
           );
         }
-        return Promise.resolve(buffered);
+        return Promise.resolve(offer == null ? buffered : normalizeLocalCommand(buffered, offer));
       }
       coopWarn(
         "security",

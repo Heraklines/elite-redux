@@ -69,12 +69,6 @@ if (typecheck.status !== 0 && diagnostics.length === 0) {
   process.stderr.write(typeOutput);
   process.exit(1);
 }
-if (diagnostics.length > TYPE_DIAGNOSTIC_BASELINE) {
-  process.stderr.write(
-    `Repository TypeScript diagnostic ratchet regressed: ${diagnostics.length} > ${TYPE_DIAGNOSTIC_BASELINE}.\n`,
-  );
-  process.exit(1);
-}
 const changedDiagnostics = diagnostics.filter(
   diagnostic => changed.has(diagnostic.file) || isCoopStaticScope(diagnostic.file),
 );
@@ -84,6 +78,13 @@ if (changedDiagnostics.length > 0) {
   for (const diagnostic of changedDiagnostics) {
     process.stderr.write(`${diagnostic.file}(${diagnostic.line},${diagnostic.column}): error ${diagnostic.message}\n`);
   }
+  process.exit(1);
+}
+if (diagnostics.length > TYPE_DIAGNOSTIC_BASELINE) {
+  process.stderr.write(
+    `Repository TypeScript diagnostic ratchet regressed: ${diagnostics.length} > ${TYPE_DIAGNOSTIC_BASELINE}.\n`,
+  );
+  process.stderr.write(typeOutput);
   process.exit(1);
 }
 if (typecheck.status !== 0) {

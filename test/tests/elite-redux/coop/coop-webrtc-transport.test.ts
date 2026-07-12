@@ -592,7 +592,7 @@ describe("#810: resume offer/reply protocol + marker", () => {
     await expect(decline).resolves.toBe(false);
   });
 
-  it("barrier: host sendResumeStartNew releases the guest (buffered if armed late)", () => {
+  it("barrier: host sendResumeStartNew releases the guest, ACKs it, and remains idempotent", async () => {
     const a = new MockWire();
     const b = new MockWire();
     a.peer = b;
@@ -603,20 +603,22 @@ describe("#810: resume offer/reply protocol + marker", () => {
     guest.connect();
 
     // Host releases BEFORE the guest arms: the release must buffer, not vanish (or the guest hangs).
-    host.sendResumeStartNew();
+    const committed = host.sendResumeStartNew();
     let released = 0;
     guest.armResumeStartNewHandler(() => {
       released++;
     });
     expect(released, "buffered release fired on arm").toBe(1);
+    await expect(committed).resolves.toBeUndefined();
 
-    // Armed-first path: a fresh release fires immediately on the next send.
+    // Repeating the already-ACKed decision is idempotent: it neither invents a new
+    // operation epoch nor releases the guest UI a second time.
     let released2 = 0;
     guest.armResumeStartNewHandler(() => {
       released2++;
     });
-    host.sendResumeStartNew();
-    expect(released2).toBe(1);
+    await expect(host.sendResumeStartNew()).resolves.toBeUndefined();
+    expect(released2).toBe(0);
   });
 
   it("barrier: an unanswered resume offer times out to declined (host never hangs)", async () => {
