@@ -11,6 +11,7 @@
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { BattleType } from "#enums/battle-type";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
@@ -79,6 +80,7 @@ describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome 
     logs = installDuoLogCapture(`soak-journey-${Date.now()}`);
     game.override
       .battleStyle("double")
+      .battleType(BattleType.WILD)
       .startingWave(1)
       .startingLevel(SOAK_PROFILES.god.startingLevel)
       .moveset([...SOAK_PROFILES.god.moveset])
