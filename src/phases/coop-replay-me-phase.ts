@@ -16,6 +16,7 @@ import {
   adoptMeWatcherChoice,
   commitMeOwnerIntent,
   coopMeTerminalSanctionedTails,
+  settleCoopMeOwnerIntentRetries,
 } from "#data/elite-redux/coop/coop-me-operation";
 import {
   coopMeHandoffBattleStarted,
@@ -821,6 +822,9 @@ export class CoopReplayMePhase extends Phase {
         return;
       }
     }
+    // The authoritative terminal causally closes every proposal from this encounter. Retire any retry whose
+    // individual commit receipt was lost before it can leak stale picks into the next ME.
+    settleCoopMeOwnerIntentRetries();
     const isBattleTerminal = terminalDecision.adopt ? terminalDecision.terminal === "battle" : legacyIsBattle;
     if (terminalDecision.adopt && terminalDecision.terminal != null) {
       setCoopWaveTailSanction(coopMeTerminalSanctionedTails(terminalDecision.terminal));

@@ -473,6 +473,35 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
   // terminal is "leave" (it NEVER routes to finishWithoutLeaving / the phantom battle chain); and a stale
   // battle-handoff from an earlier ME is REJECTED so it can't build the phantom either.
   // =====================================================================================
+  it("an authoritative terminal retires unconfirmed sub-pick retries before the next encounter", () => {
+    vi.useFakeTimers();
+    try {
+      let retransmits = 0;
+      const pinned = 21;
+      const id = meOp.commitMeOwnerIntent({
+        kind: "ME_SUB",
+        seq: 8_000_000 + pinned,
+        pinned,
+        step: 0,
+        payload: { value: 0 },
+        localRole: "guest",
+        wave: 24,
+        turn: 0,
+        resend: () => retransmits++,
+      });
+      expect(id).not.toBeNull();
+
+      vi.advanceTimersByTime(1_000);
+      expect(retransmits, "the unconfirmed proposal retries while its encounter is open").toBe(1);
+
+      meOp.settleCoopMeOwnerIntentRetries();
+      vi.advanceTimersByTime(10_000);
+      expect(retransmits, "the completed encounter cannot retransmit into a later ME").toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("#859-SHAPE: a committed NON-battle terminal yields 'leave' (never a phantom battle chain); a stale battle-handoff is rejected", () => {
     resetCoopMeOperationState();
     const wave = 30;

@@ -207,6 +207,23 @@ function cancelOwnerIntentRetry(operationId: string): void {
   }
 }
 
+/**
+ * Retire every still-pending guest proposal after the host's authoritative ME terminal is accepted.
+ * A terminal causally proves that the sole host engine consumed every option/sub-pick needed to finish
+ * this encounter. Keeping an earlier proposal armed after that point can only inject stale `me`/`meSub`
+ * frames into a later encounter; there is never more than one live ME per client.
+ */
+export function settleCoopMeOwnerIntentRetries(): void {
+  if (pendingOwnerIntentRetries.size === 0) {
+    return;
+  }
+  for (const timer of pendingOwnerIntentRetries.values()) {
+    clearTimeout(timer);
+  }
+  coopLog("me", `ME terminal retires ${pendingOwnerIntentRetries.size} completed owner-intent retry timer(s)`);
+  pendingOwnerIntentRetries.clear();
+}
+
 function armOwnerIntentRetry(operationId: string, resend: () => void): void {
   cancelOwnerIntentRetry(operationId);
   const retry = (): void => {
