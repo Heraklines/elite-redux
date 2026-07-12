@@ -357,6 +357,18 @@ export function coopAcceptStateTick(tick: number | undefined, label: string): bo
   return true;
 }
 
+/**
+ * Read the guest's monotonic state high-water without changing it.
+ *
+ * Recovery uses this to distinguish a genuinely rejected carrier from an idempotent retry whose
+ * checkpoint/state tick was already admitted by an earlier attempt. The returned value is diagnostic
+ * admission state only; callers must still prove the complete payload with its exact checksum before
+ * treating an already-admitted tick as converged.
+ */
+export function coopAppliedStateTick(): number {
+  return coopLastAppliedStateTick;
+}
+
 /** Session reset (new run / new rig): both sides start from a clean tick line. */
 export function resetCoopStateTicks(): void {
   coopStateTickCounter = 0;

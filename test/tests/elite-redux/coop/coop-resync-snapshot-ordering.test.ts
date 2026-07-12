@@ -90,4 +90,21 @@ describe("co-op resync snapshot ordering", () => {
       "a frame at/below the latest attempted authority tick cannot wake the hold twice",
     ).toBe(false);
   });
+
+  it("rejects reversed, equal, fractional, non-finite, unsafe, and non-positive tick pairs", () => {
+    expect(coopCheckpointSupersedesResync(heldSnapshot(), replacementEnvelope(21, 20))).toBe(false);
+    expect(coopCheckpointSupersedesResync(heldSnapshot(), replacementEnvelope(20, 20))).toBe(false);
+    expect(coopCheckpointSupersedesResync(heldSnapshot(), replacementEnvelope(19.5, 20))).toBe(false);
+    expect(coopCheckpointSupersedesResync(heldSnapshot(), replacementEnvelope(19, Number.POSITIVE_INFINITY))).toBe(
+      false,
+    );
+    expect(coopCheckpointSupersedesResync(heldSnapshot(), replacementEnvelope(19, Number.MAX_SAFE_INTEGER + 1))).toBe(
+      false,
+    );
+    expect(coopCheckpointSupersedesResync(heldSnapshot(), replacementEnvelope(-1, 20))).toBe(false);
+    expect(
+      coopCheckpointSupersedesResync(heldSnapshot(), replacementEnvelope(19, 20), Number.NaN),
+      "an invalid running floor cannot be used to release a fail-closed hold",
+    ).toBe(false);
+  });
 });

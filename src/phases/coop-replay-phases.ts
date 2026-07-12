@@ -42,6 +42,7 @@ import {
   type CoopApplyFailure,
   captureCoopChecksum,
   captureCoopChecksumState,
+  coopAppliedStateTick,
   drainCoopApplyFailures,
   reapplyAcceptedCoopAuthoritativeBattleState,
 } from "#data/elite-redux/coop/coop-battle-engine";
@@ -1384,7 +1385,7 @@ export class CoopApplyResyncPhase extends Phase {
   private settled = false;
   /** Temporary wake subscription while this phase is deliberately holding a safe boundary. */
   private stopCheckpointWake: (() => void) | undefined;
-  /** Every attempted carrier must be newer than both the failed resync and any failed wake attempt. */
+  /** The last fully-verified recovery carrier; failed attempts never advance this floor. */
   private recoveryTickFloor: number;
 
   constructor(
@@ -1427,19 +1428,36 @@ export class CoopApplyResyncPhase extends Phase {
     if (!coopCheckpointSupersedesResync(this.snapshot, envelope, this.recoveryTickFloor)) {
       return false;
     }
-    const candidateTick = envelope.authoritativeState?.tick ?? -1;
-    this.recoveryTickFloor = Math.max(this.recoveryTickFloor, envelope.checkpoint.tick ?? -1, candidateTick);
+    const checkpointTick = envelope.checkpoint.tick as number;
+    const candidateState = envelope.authoritativeState as CoopAuthoritativeBattleStateV1;
+    const candidateTick = candidateState.tick;
     try {
       coopLog(
         "resync",
         `turn=${this.turn} held resync WAKE reason=${envelope.reason} `
           + `checkpointTick=${envelope.checkpoint.tick ?? "legacy"} stateTick=${candidateTick}`,
       );
-      const checkpointApplied = applyCoopCheckpoint(envelope.checkpoint);
-      const authoritativeApplied = applyCoopAuthoritativeBattleState(
-        envelope.authoritativeState,
-        isCoopAuthoritativeGuest(),
-      );
+      // A failed first attempt may already have admitted one or both component ticks before a later
+      // structured failure/checksum mismatch was discovered. Do not manufacture a permanent stale reject
+      // on the retry: an admitted checkpoint tick is subsumed by the complete authoritative state, while an
+      // admitted state tick is explicitly REASSERTED through the existing guarded idempotent path. Exact
+      // checksum + zero structured failures below remain the commit proof.
+      const admittedBefore = coopAppliedStateTick();
+      if (admittedBefore > candidateTick || (admittedBefore > checkpointTick && admittedBefore < candidateTick)) {
+        coopWarn(
+          "resync",
+          `turn=${this.turn} held resync wake ticks ${checkpointTick}/${candidateTick} are superseded by `
+            + `lastApplied=${admittedBefore} -> remain held`,
+        );
+        return false;
+      }
+      const checkpointAlreadyApplied = admittedBefore === checkpointTick || admittedBefore === candidateTick;
+      const checkpointApplied = checkpointAlreadyApplied || applyCoopCheckpoint(envelope.checkpoint);
+      const admittedAfterCheckpoint = coopAppliedStateTick();
+      const authoritativeAlreadyApplied = admittedAfterCheckpoint === candidateTick;
+      const authoritativeApplied = authoritativeAlreadyApplied
+        ? reapplyAcceptedCoopAuthoritativeBattleState(candidateState, isCoopAuthoritativeGuest())
+        : applyCoopAuthoritativeBattleState(candidateState, isCoopAuthoritativeGuest());
       const failures = drainCoopApplyFailures();
       const postApplyChecksum = captureCoopChecksum();
       if (
@@ -1450,37 +1468,47 @@ export class CoopApplyResyncPhase extends Phase {
         && postApplyChecksum !== COOP_CHECKSUM_SENTINEL
         && postApplyChecksum === envelope.checksum
       ) {
+        // Commit the recovery watermark only after the complete pair, structured-failure check, and exact
+        // checksum all succeed. A failed same-frame retry therefore remains eligible.
+        this.recoveryTickFloor = candidateTick;
         coopLog(
           "resync",
-          `turn=${this.turn} held resync RECOVERED from ${envelope.reason} host=guest=${envelope.checksum}`,
+          `turn=${this.turn} held resync RECOVERED from ${envelope.reason} host=guest=${envelope.checksum} `
+            + `checkpoint=${checkpointAlreadyApplied ? "already-applied" : "applied"} `
+            + `state=${authoritativeAlreadyApplied ? "already-applied/reasserted" : "applied"}`,
         );
-        coopResyncUnhealedChecksum = undefined;
-        coopResyncUnhealedCount = 0;
-        // Deliberately DO NOT change the earlier settle(false): this newer battle frame proves DATA
-        // convergence only. It does not carry the failed stateSync snapshot's membership/control/journal
-        // postconditions, so that snapshot's control marks must remain withheld and be recovered through
-        // their own durable protocol.
-        // If an older delayed finalizer is still queued, let it reassert this already-accepted frame
-        // after its presentation drains instead of clobbering the recovered replacement.
-        getCoopBattleStreamer()?.retainAppliedOutOfBandCheckpoint(envelope);
-        try {
-          globalScene.ui.clearText();
-        } catch {
-          // A headless/missing presentation layer cannot invalidate mechanical convergence.
-        }
-        this.end();
         return true;
       }
       coopWarn(
         "resync",
         `turn=${this.turn} held resync wake did NOT converge reason=${envelope.reason} `
-          + `checkpointApplied=${checkpointApplied} authoritativeApplied=${authoritativeApplied} `
+          + `checkpointApplied=${checkpointApplied}${checkpointAlreadyApplied ? "(already)" : ""} `
+          + `authoritativeApplied=${authoritativeApplied}${authoritativeAlreadyApplied ? "(reassert)" : ""} `
           + `failures=${failures.length} host=${envelope.checksum} guest=${postApplyChecksum} -> remain held`,
       );
     } catch (error) {
       coopWarn("resync", `turn=${this.turn} held resync wake threw reason=${envelope.reason} -> remain held`, error);
     }
     return false;
+  }
+
+  /** Finish a mechanically verified wake only after its retained carrier has been transactionally consumed. */
+  private finishSupersedingCheckpoint(envelope: CoopCheckpointEnvelope): void {
+    coopResyncUnhealedChecksum = undefined;
+    coopResyncUnhealedCount = 0;
+    // Deliberately DO NOT change the earlier settle(false): this newer battle frame proves DATA
+    // convergence only. It does not carry the failed stateSync snapshot's membership/control/journal
+    // postconditions, so that snapshot's control marks must remain withheld and be recovered through
+    // their own durable protocol.
+    // If an older delayed finalizer is still queued, let it reassert this already-accepted frame
+    // after its presentation drains instead of clobbering the recovered replacement.
+    getCoopBattleStreamer()?.retainAppliedOutOfBandCheckpoint(envelope);
+    try {
+      globalScene.ui.clearText();
+    } catch {
+      // A headless/missing presentation layer cannot invalidate mechanical convergence.
+    }
+    this.end();
   }
 
   /**
@@ -1512,10 +1540,18 @@ export class CoopApplyResyncPhase extends Phase {
       ) {
         return false;
       }
-      // Consume only after the strict ordering predicate succeeds. An old/legacy/different-wave frame
-      // stays buffered for the normal replay path and, crucially, can never release this fail-closed hold.
-      const consumed = streamer.consumeCheckpoint();
-      return consumed === latest && this.applySupersedingCheckpoint(consumed);
+      // Apply while the carrier remains retained. A structured failure, throw, or checksum mismatch leaves
+      // this exact frame buffered and its ticks below recoveryTickFloor, so an identical resend can retry it.
+      if (!this.applySupersedingCheckpoint(latest)) {
+        return false;
+      }
+      // Only clear THIS envelope after full verification. A synchronous re-entrant delivery may have
+      // installed a newer carrier during the apply; preserve that newer frame for the next replay boundary.
+      if (streamer.peekCheckpoint() === latest) {
+        streamer.consumeCheckpoint();
+      }
+      this.finishSupersedingCheckpoint(latest);
+      return true;
     };
 
     if (tryLatest()) {
@@ -1657,6 +1693,11 @@ export function coopResyncSnapshotIsStale(
   return capturedTurn > 0 && liveTurn > capturedTurn;
 }
 
+/** A modern wire state tick is a positive, finite, losslessly representable integer. */
+function isCoopRecoveryTick(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
 /**
  * Whether an out-of-band frame is safe to use to wake a held resync boundary.
  *
@@ -1675,7 +1716,16 @@ export function coopCheckpointSupersedesResync(
   const heldState = snapshot.authoritativeState;
   const candidateState = envelope.authoritativeState;
   const checkpointTick = envelope.checkpoint.tick;
-  if (envelope.reason !== "replacement" || heldState == null || candidateState == null || checkpointTick == null) {
+  if (
+    envelope.reason !== "replacement"
+    || heldState == null
+    || candidateState == null
+    || !isCoopRecoveryTick(checkpointTick)
+    || !isCoopRecoveryTick(candidateState.tick)
+    || !Number.isSafeInteger(tickFloor)
+    || candidateState.tick <= checkpointTick
+    || tickFloor < -1
+  ) {
     return false;
   }
   return (
