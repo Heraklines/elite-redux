@@ -241,6 +241,12 @@ export interface ClientCtx {
    * them as idle; an ME-driving ctx carries the live pins so the host's and guest's never bleed.
    */
   mePins?: MePins;
+  /**
+   * Optional explicitly scheduled transport inbox for production-transition journeys. The pump is
+   * invoked only while this client's complete process-global context is installed, so a network
+   * continuation can never resume against the other engine's `globalScene`.
+   */
+  pumpInbound?: () => number;
 }
 
 // ---------------------------------------------------------------------------
@@ -376,6 +382,7 @@ function captureLiveCtx(): {
  */
 /** The label of the client currently being pumped (so the log sink routes lines to its bucket). */
 export let activeClientLabel: "host" | "guest" | "none" = "none";
+let activeClientInboundPump: (() => number) | undefined;
 
 /**
  * SYNCHRONOUS sibling of {@linkcode withClient}: install `ctx`'s 4-part process-global context, run a
@@ -388,7 +395,9 @@ export let activeClientLabel: "host" | "guest" | "none" = "none";
 export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
   const prev = captureLiveCtx();
   const prevLabel = activeClientLabel;
+  const prevInboundPump = activeClientInboundPump;
   activeClientLabel = ctx.label;
+  activeClientInboundPump = ctx.pumpInbound;
   initGlobalScene(ctx.scene);
   setCoopRuntime(ctx.runtime);
   installCoopHooksForActive(ctx.runtime);
@@ -418,13 +427,16 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     }
     writeMePins(prev.mePins);
     activeClientLabel = prevLabel;
+    activeClientInboundPump = prevInboundPump;
   }
 }
 
 export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): Promise<T> {
   const prev = captureLiveCtx();
   const prevLabel = activeClientLabel;
+  const prevInboundPump = activeClientInboundPump;
   activeClientLabel = ctx.label;
+  activeClientInboundPump = ctx.pumpInbound;
   // 1. globalScene
   initGlobalScene(ctx.scene);
   // 2. coop active runtime (also installs the authoritative-guest predicate)
@@ -467,6 +479,7 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
     }
     writeMePins(prev.mePins);
     activeClientLabel = prevLabel;
+    activeClientInboundPump = prevInboundPump;
   }
 }
 
@@ -935,8 +948,11 @@ export function haltQueueAfterCurrent(): void {
 }
 
 export async function drainLoopback(): Promise<void> {
-  // A few macrotask hops flush nested microtask -> microtask deliveries deterministically.
+  // A few macrotask hops flush nested microtask -> microtask deliveries deterministically. When a
+  // production-transition rig uses ScheduledCoopPair, deliver only the ACTIVE client's inbox here;
+  // its withClient context is fully installed for every handler and await continuation.
   for (let i = 0; i < 4; i++) {
+    activeClientInboundPump?.();
     await new Promise<void>(r => setTimeout(r, 0));
   }
 }
@@ -985,6 +1001,7 @@ export async function buildDuo(
   neutralizeCoopCandyBar(hostScene);
   const hostRuntime = buildRuntime(pair.host, "Host", "authoritative");
   const guestRuntime = buildRuntime(pair.guest, "Guest", "authoritative");
+  const scheduledPair = pair as typeof pair & { flush?: (role: "host" | "guest", limit?: number) => number };
   hostRuntime.controller.role = "host";
   guestRuntime.controller.role = "guest";
 
@@ -1004,6 +1021,7 @@ export async function buildDuo(
     // starts identical and thereafter keeps its OWN money-streak / overstay / relic state.
     moduleLets: snapshotModuleLets(),
     mePins: { ...IDLE_ME_PINS },
+    ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("host") } : {}),
   };
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
@@ -1019,6 +1037,7 @@ export async function buildDuo(
     ghost: emptyGhostSnapshot(),
     moduleLets: structuredClone(hostCtx.moduleLets!),
     mePins: { ...IDLE_ME_PINS },
+    ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("guest") } : {}),
   };
   await withClient(guestCtx, () => {
     toCoopGameMode(guestScene);

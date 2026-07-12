@@ -133,9 +133,12 @@ transition driver rather than a separate shortcut path.
 
 1. Add an explicitly scheduled two-client transport so asynchronous continuations are pumped only while
    their owning client context is active. This removes the single-process `globalScene` concurrency excuse.
+   **Implemented foundation:** `ScheduledCoopPair` provides FIFO/fault/reconnect scheduling, and `buildDuo`
+   now binds each scheduled inbox to its owning `ClientCtx`; every harness drain delivers only while that
+   client's scene, runtime, RNG, ghost state, module state, and ME pins are installed. The first T1 journey
+   remains the acceptance test before this item is considered complete.
 2. Implement T1 battle -> public reward UI -> real next encounter first; it is the live wave-1 regression.
 3. Implement T2 boss -> biome shop -> crossroads -> biome carrier.
 4. Classify the complete Mystery Event registry and generate T3/T4 scenario tables with explicit options.
 5. Add T5 launch/resume/rejoin journeys and browser-backed versions of the highest-risk T1/T2/T3 paths.
 6. Route T1-T5 to five independent gate runners, then rebalance from green timing artifacts.
-
