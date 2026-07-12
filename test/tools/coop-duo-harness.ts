@@ -37,10 +37,10 @@
 //
 // -----------------------------------------------------------------------------
 // WHAT THE MULTI-WAVE HARNESS ADDS over the spike (coop-duo-multiwave.test.ts):
-//   - buildDuo + remirrorWave + driveGuestReplayTurn: a per-wave pump (host plays the wave to
-//     a win + emits its turnResolution/checkpoint; the guest replays it + applies the
-//     checkpoint), re-mirroring the host's freshly-rolled next-wave battle onto the guest each
-//     wave (the spike's mirror, applied per wave) so a >=3-wave run runs end-to-end.
+//   - buildDuo + driveGuestReplayTurn + driveClientPhaseQueueTo: a per-wave pump (host plays the
+//     wave to a win + emits its turnResolution/checkpoint; the guest replays it + applies the
+//     checkpoint), then drives the guest's OWN queued Victory -> reward -> NewBattle ->
+//     NextEncounter path so the production wave carrier, rather than a cloned battle, crosses waves.
 //   - driveHostRewardShopOwner (OWNER) + driveGuestRewardWatch (WATCHER): the host opens its
 //     REAL SelectModifierPhase, takes a reward, leaves; the guest runs its REAL startCoopWatch
 //     loop, adopts the owner's relayed picks over the loopback, and leaves - both ending on the
@@ -955,6 +955,63 @@ export async function drainLoopback(): Promise<void> {
     activeClientInboundPump?.();
     await new Promise<void>(r => setTimeout(r, 0));
   }
+}
+
+/**
+ * Drive one manually-pumped client's REAL phase queue until `target` is current, stopping BEFORE the
+ * target starts. This is the guest-side counterpart to {@linkcode PhaseInterceptor.to(..., false)}:
+ * the duo guest has no interceptor because its scene is constructed directly, but production-transition
+ * journeys still need to execute the phases that production queued rather than constructing replacement
+ * phase objects or cloning the host's state.
+ *
+ * Call inside {@linkcode withClient}. Scheduled transport delivery is pumped before and while every phase
+ * runs, so an awaited enemy-party carrier resumes only while the destination client's complete context is
+ * installed. A phase is started exactly once; failure to change phase within `perPhaseTimeoutMs` throws with
+ * the current queue shape instead of turning a missing carrier or unexpected UI prompt into a CI timeout.
+ */
+export async function driveClientPhaseQueueTo(
+  scene: BattleScene,
+  target: string,
+  options: {
+    matches?: (phase: Phase) => boolean;
+    maxPhases?: number;
+    perPhaseTimeoutMs?: number;
+  } = {},
+): Promise<Phase> {
+  const matches = options.matches ?? (phase => phase.phaseName === target);
+  const maxPhases = options.maxPhases ?? 128;
+  const perPhaseTimeoutMs = options.perPhaseTimeoutMs ?? 10_000;
+
+  for (let step = 0; step < maxPhases; step++) {
+    await drainLoopback();
+    const phase = scene.phaseManager.getCurrentPhase();
+    if (phase == null) {
+      throw new Error(`client phase drive to ${target} lost its current phase at step ${step}`);
+    }
+    if (matches(phase)) {
+      return phase;
+    }
+
+    phase.start();
+    const deadline = Date.now() + perPhaseTimeoutMs;
+    while (scene.phaseManager.getCurrentPhase() === phase) {
+      await drainLoopback();
+      if (Date.now() >= deadline) {
+        const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+        throw new Error(
+          `client phase drive to ${target} HANG on ${phase.phaseName}; queued=[${queued.join(",")}], `
+            + `ui=${UiMode[scene.ui.getMode()] ?? scene.ui.getMode()}`,
+        );
+      }
+    }
+  }
+
+  const current = scene.phaseManager.getCurrentPhase();
+  const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+  throw new Error(
+    `client phase drive to ${target} exceeded ${maxPhases} phases; `
+      + `current=${current?.phaseName ?? "(none)"}, queued=[${queued.join(",")}]`,
+  );
 }
 
 export type { Pokemon };

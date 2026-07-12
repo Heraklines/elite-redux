@@ -31,6 +31,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
+import { captureCoopChecksum, captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
@@ -56,11 +57,11 @@ import { LearnMovePhase } from "#phases/learn-move-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
-  arriveGuestCommandBoundary,
   beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   drainLoopback,
+  driveClientPhaseQueueTo,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveGuestTmCaseRegression,
@@ -69,7 +70,6 @@ import {
   forceItemRewards,
   forceNextMysteryEncounter,
   installDuoLogCapture,
-  remirrorWave,
   type ShopPhaseSeam,
   withClient,
   withClientSync,
@@ -176,11 +176,6 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
 
     const WAVES = 3;
     for (let w = 1; w <= WAVES; w++) {
-      // The guest's battle must mirror the host's CURRENT (this-wave) field before the host plays.
-      if (w > 1) {
-        await remirrorWave(rig);
-      }
-
       // ===== Host plays this wave to a win (emits turnResolution + checkpoint + waveResolved). =====
       const turn = rig.hostScene.currentBattle.turn;
       await hostPlayWave(rig);
@@ -207,8 +202,12 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
       });
       const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       expect(hostShop.phaseName, `wave ${w}: host reached SelectModifierPhase`).toBe("SelectModifierPhase");
-      // The guest's matching shop phase (real; detects owner/watcher from counter+role at start()).
-      const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+      // Drive the GUEST's ACTUAL victory tail to the reward phase production queued. Constructing a fresh
+      // SelectModifierPhase here used to hide a stranded Victory/NewBattle queue and let the test pass while
+      // a live guest remained on the defeated battle.
+      const guestShop = (await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "SelectModifierPhase"),
+      )) as unknown as ShopPhaseSeam;
 
       // Drive the OWNER to completion FIRST (it streams its rolled options + relays its picks + the
       // terminal LEAVE - all FIFO-BUFFERED in the watcher's relay inbox since no watcher is parked
@@ -259,19 +258,44 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
 
       // ===== Host crosses into the NEXT wave's battle (real EncounterPhase rolls wave w+1). =====
       if (w < WAVES) {
-        // The legacy next-command helper is one long host await (it cannot alternate contexts yet).
-        // Re-enable automatic delivery for that abbreviated crossing; the replay/shop segment above
-        // remains explicitly scheduled and is the foundation for replacing this helper in T1.
-        pair.setAutomaticDelivery(true);
-        await arriveGuestCommandBoundary(rig, w + 1);
+        // Cross BOTH real phase queues, stopping before either CommandPhase starts. The host generates +
+        // publishes the immutable wave carrier first; the guest then runs its own NewBattlePhase and
+        // NextEncounterPhase, consumes that carrier, and reconstructs the authoritative encounter. No
+        // remirror, no manual rendezvous arrival, and no private phase terminal is allowed in this path.
         await withClient(rig.hostCtx, async () => {
-          await game.phaseInterceptor.to("CommandPhase");
+          await game.phaseInterceptor.to("CommandPhase", false);
         });
+        await withClient(rig.guestCtx, () => driveClientPhaseQueueTo(rig.guestScene, "CommandPhase"));
         expect(rig.hostScene.currentBattle.waveIndex, `wave ${w}: host advanced to wave ${w + 1}`).toBe(w + 1);
+        expect(rig.guestScene.currentBattle.waveIndex, `wave ${w}: guest advanced to wave ${w + 1}`).toBe(w + 1);
         const nextCarrier = waveCarrierSpy.mock.calls.find(([wave]) => wave === w + 1);
         expect(nextCarrier, `wave ${w}: NextEncounterPhase published the wave ${w + 1} carrier`).toBeDefined();
         expect(nextCarrier?.[1].length, `wave ${w}: carrier includes the generated enemy party`).toBeGreaterThan(0);
         expect(nextCarrier?.[5], `wave ${w}: carrier includes the authoritative encounter descriptor`).toBeDefined();
+        const hostEnemies = withClientSync(rig.hostCtx, () => captureCoopEnemies());
+        const guestEnemies = withClientSync(rig.guestCtx, () => captureCoopEnemies());
+        expect(guestEnemies, `wave ${w}: guest consumed the exact wave ${w + 1} enemy carrier`).toEqual(hostEnemies);
+        expect(rig.guestScene.currentBattle.battleType, `wave ${w}: battle type converged before input`).toBe(
+          rig.hostScene.currentBattle.battleType,
+        );
+        expect(rig.guestScene.arena.biomeId, `wave ${w}: biome converged before input`).toBe(
+          rig.hostScene.arena.biomeId,
+        );
+        expect(
+          withClientSync(rig.guestCtx, () => captureCoopChecksum()),
+          `wave ${w}: complete checksum converged before the next command`,
+        ).toBe(withClientSync(rig.hostCtx, () => captureCoopChecksum()));
+        expect(
+          rig.guestRuntime.durability?.controlPlaneHighWater() ?? {},
+          `wave ${w}: operation revisions converged at the carrier boundary`,
+        ).toEqual(rig.hostRuntime.durability?.controlPlaneHighWater() ?? {});
+
+        // Leave the host's real command phase open for the next loop. The guest command response remains
+        // transport-driven by wireGuestCommand; starting the host target is the normal GameManager seam.
+        pair.setAutomaticDelivery(true);
+        await withClient(rig.hostCtx, async () => {
+          await game.phaseInterceptor.to("CommandPhase");
+        });
       }
     }
 
