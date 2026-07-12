@@ -2,9 +2,8 @@ name: Nightly Co-op Soak
 
 # Runs the seeded two-engine CO-OP SOAK (#841): a long randomized host+guest run that
 # finds desyncs / strands / leaks BY MACHINE (the DIGEST / LOCKSTEP / NO-PARK / TEARDOWN
-# invariants) instead of by live players. Nightly at ~03:00 UTC. It runs THREE legs
-# (#832 profiles + #633/#828 coverage), serialized, each covering a different strand:
-#   - god   (SOAK_WAVES=200): the level-500 steamroller must clear the complete classic journey,
+# invariants) instead of by live players. Nightly at ~03:00 UTC. Independent GitHub runners cover:
+#   - god x3 (SOAK_WAVES=200): three unrelated seeds must each clear the complete classic journey,
 #            including the late milestone/reward tails and final biome where deep desyncs live.
 #   - level (SOAK_WAVES=55):  the level-65 party that FAINTS reliably through its ~wave-40-48
 #            death spiral and WIPES cleanly (a legitimate terminal), staying below the ~60+
@@ -17,8 +16,8 @@ name: Nightly Co-op Soak
 #            run a DIFFERENT test path (coop-soak-me + coop-soak-asymmetric), not the default
 #            soak, so the ME / asymmetric surfaces get nightly coverage instead of orphaning
 #            behind a manual invocation. This leg NEVER touches the byte-identical default soak.
-# Manually dispatchable on demand with a custom wave count / seed (applies to BOTH profile legs;
-# the me-asym leg hardcodes its own wave counts, so the dispatch inputs do not affect it):
+# Manually dispatchable on demand with a custom wave count / base seed. The three god runners use
+# stable, widely separated offsets from that base; the me-asym/journey legs hardcode their own content:
 #
 #   gh workflow run nightly-coop-soak.yml --ref feat/elite-redux-port \
 #       -R Heraklines/elite-redux -f soak_waves=200
@@ -65,14 +64,26 @@ jobs:
       fail-fast: false
       # Independent GitHub runners execute the orthogonal campaigns concurrently. Result publication rebases
       # and retries below, so dev-logs branch contention no longer serializes hours of simulation.
-      max-parallel: 4
+      max-parallel: 6
       matrix:
         include:
-          # GOD (audit priority: the DEEP-WAVE strand). The level-500 legendary steamroller reaches the
-          # endgame (waves 70-200) where the LATE-game co-op desyncs live; it faints only occasionally.
-          - profile: god
+          # GOD (audit priority: the DEEP-WAVE strand). Three independent runners sample unrelated command,
+          # encounter, reward, and biome histories. Stable prime-sized offsets make a failing seed replayable
+          # while avoiding adjacent PRNG trajectories. Each runner must finish all 200 waves.
+          - profile: god-a
+            soak_profile: god
+            seed_offset: 0
             waves_default: "200"
-            # The default seeded soak (byte-identical to leaving SOAK_PROFILE unset for the god leg).
+            test_path: "test/tests/elite-redux/coop/coop-soak.test.ts"
+          - profile: god-b
+            soak_profile: god
+            seed_offset: 104729
+            waves_default: "200"
+            test_path: "test/tests/elite-redux/coop/coop-soak.test.ts"
+          - profile: god-c
+            soak_profile: god
+            seed_offset: 209759
+            waves_default: "200"
             test_path: "test/tests/elite-redux/coop/coop-soak.test.ts"
           # LEVEL (#832, audit priority #2: the FAINT/WIPE/REVIVE/SWITCH channel - historically the RICHEST
           # desync source, #834/#836/#845-#848). The level-65 party takes real damage and FAINTS reliably
@@ -82,6 +93,8 @@ jobs:
           # PR/report). The soak PROMOTES the single-faint/switch/replace surfaces to GUARANTEED for this
           # profile (the same-turn double faint stays probabilistic).
           - profile: level
+            soak_profile: level
+            seed_offset: 0
             waves_default: "55"
             test_path: "test/tests/elite-redux/coop/coop-soak.test.ts"
           # ME-ASYM (#633 BUILD 1 + #828 BUILD 2). These two tests are gated ER_SCENARIO=1 like every ER
@@ -97,6 +110,8 @@ jobs:
           # the shared env block uniform; it changes nothing for these tests. The distinct profile token scopes
           # this leg's committed result filenames so they never collide with the god / level bundles.
           - profile: me-asym
+            soak_profile: god
+            seed_offset: 0
             waves_default: "150"
             test_path: "test/tests/elite-redux/coop/coop-soak-me.test.ts test/tests/elite-redux/coop/coop-soak-asymmetric.test.ts"
           # JOURNEY: thirteen heterogeneous forced MEs in one continuous production-fidelity run, followed by
@@ -104,6 +119,8 @@ jobs:
           # sub-picks, no-reward terminals, generated rewards, map mutation, a biome-changing ME battle, and
           # later event teardown. Detects poisoning of later command/reward/map phases that isolated repros miss.
           - profile: journey
+            soak_profile: god
+            seed_offset: 0
             waves_default: "45"
             test_path: "test/tests/elite-redux/coop/coop-soak-journey.test.ts"
     steps:
@@ -117,6 +134,20 @@ jobs:
 
       - uses: ./.github/actions/setup-deps
 
+      - name: Derive independent deterministic campaign seed
+        env:
+          REQUESTED_SEED: ${{ github.event.inputs.soak_seed }}
+          SEED_OFFSET: ${{ matrix.seed_offset }}
+        run: |
+          base="${REQUESTED_SEED:-$(date -u +%Y%m%d)}"
+          if ! [[ "$base" =~ ^[0-9]+$ ]]; then
+            echo "soak_seed must be an unsigned integer, got: $base" >&2
+            exit 1
+          fi
+          seed=$((10#$base + SEED_OFFSET))
+          echo "SOAK_SEED=$seed" >> "$GITHUB_ENV"
+          echo "campaign seed: $seed (base=$base offset=$SEED_OFFSET)"
+
       - name: Run the co-op soak (${{ matrix.profile }})
         id: soak
         continue-on-error: true
@@ -124,11 +155,9 @@ jobs:
           ER_SCENARIO: "1"
           # #832: run each matrix leg under its own SOAK_PROFILE (god = today's deep-wave run; level = the
           # faint-heavy level-85 party). SOAK_PROFILE=god is byte-identical to leaving it unset.
-          SOAK_PROFILE: ${{ matrix.profile }}
+          SOAK_PROFILE: ${{ matrix.soak_profile }}
           # A manual-dispatch soak_waves (if given) overrides BOTH legs; otherwise each profile's default.
           SOAK_WAVES: ${{ github.event.inputs.soak_waves || matrix.waves_default }}
-          # Empty for a scheduled run / when not supplied -> the driver derives the seed from the date.
-          SOAK_SEED: ${{ github.event.inputs.soak_seed }}
           NODE_OPTIONS: "--max-old-space-size=8192"
         run: |
           mkdir -p dev-logs/coop-soak
