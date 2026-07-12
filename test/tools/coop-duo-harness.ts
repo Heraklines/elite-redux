@@ -1149,7 +1149,11 @@ export const REPLAY_DRAIN_PHASES = new Set([
 
 /** Minimal phase-manager surface the guest replay pump needs (the guest scene satisfies it). */
 interface ReplayPumpScene {
-  phaseManager: { create: (n: "CoopReplayTurnPhase", t: number) => Phase; getCurrentPhase(): Phase };
+  phaseManager: {
+    create: (n: "CoopReplayTurnPhase", t: number) => Phase;
+    getCurrentPhase(): Phase;
+    getQueuedPhaseNames?: () => string[];
+  };
 }
 
 /**
@@ -1173,6 +1177,12 @@ export async function driveGuestReplayTurn(guestScene: ReplayPumpScene, turn: nu
   for (let i = 0; i < 256; i++) {
     const cur = guestScene.phaseManager.getCurrentPhase();
     if (cur == null || !REPLAY_DRAIN_PHASES.has(cur.phaseName)) {
+      const queued = guestScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+      if (queued.includes("CoopFinalizeTurnPhase")) {
+        throw new Error(
+          `guest replay STRANDED before finalize on ${cur?.phaseName ?? "(none)"}; queued=[${queued.join(",")}]`,
+        );
+      }
       return;
     }
     if (cur === lastPhase) {
@@ -1371,6 +1381,13 @@ export async function driveHostRewardShopOwner(
  * No private selection/terminal method is invoked. MUST run inside the owner's ClientCtx.
  */
 export async function driveRewardShopOwnerLeaveViaUi(hostPhase: ShopPhaseSeam): Promise<number> {
+  // The legacy multiwave fixture constructs the non-current client's matching shop phase directly.
+  // Its previous watcher UI can therefore remain MODIFIER_SELECT even though production's real phase
+  // tail would have cleared it. Force a clean MESSAGE base only for that synthetic phase so setMode
+  // installs this phase's callback instead of reusing the prior interaction's callback.
+  if (globalScene.phaseManager.getCurrentPhase() !== (hostPhase as unknown as Phase)) {
+    await globalScene.ui.setModeForceTransition(UiMode.MESSAGE);
+  }
   hostPhase.start();
   await drainLoopback();
   const pinned = hostPhase.coopInteractionStart;
