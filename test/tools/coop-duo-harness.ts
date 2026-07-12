@@ -800,6 +800,18 @@ export function mirrorHostBattleToGuest(
     guestScene.field.add(mon);
   }
   applyCoopAuthoritativeBattleState(waveBoundaryState ?? undefined, true);
+  // setFormat/applyCoopAuthoritativeBattleState may recalculate enemy stats after construction. Re-assert
+  // the production carrier's authoritative max-HP rule at the completed mirror boundary.
+  if (!flip) {
+    const hostEnemies = hostScene.getEnemyParty();
+    for (const [index, enemy] of guestScene.getEnemyParty().entries()) {
+      const hostEnemy = hostEnemies[index];
+      if (hostEnemy != null) {
+        enemy.setStat(Stat.HP, hostEnemy.getMaxHp());
+        enemy.hp = Math.max(0, Math.min(hostEnemy.hp, hostEnemy.getMaxHp()));
+      }
+    }
+  }
   // The mons were cloned from the host's via a PokemonData round-trip, so their hp / status / stats /
   // moves already match the host exactly. The first replayed turn's CoopFinalizeTurnPhase checkpoint
   // re-asserts the host's authoritative end-of-turn state on top, so no pre-turn full resync is needed
