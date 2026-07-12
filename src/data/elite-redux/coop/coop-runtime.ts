@@ -85,6 +85,7 @@ import {
   resetCoopCatchFullOperationState,
   setCoopCatchFullOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-catch-full-operation";
+import { recordCoopCausalEvent } from "#data/elite-redux/coop/coop-causal-trace";
 import { getCoopChecksumAssertionCount } from "#data/elite-redux/coop/coop-checksum-assert";
 import {
   COOP_COLOSSEUM_ACTION_STRIDE,
@@ -380,6 +381,7 @@ function queueCoopAtomicSnapshotApply(
   label: string,
   onHealed?: (() => void) | undefined,
 ): boolean {
+  const snapshotId = `snapshot:e${snapshot.sessionEpoch ?? 0}:tick${snapshot.authoritativeState?.tick ?? snapshot.tick ?? 0}:${snapshot.checksum ?? "missing"}`;
   if (
     snapshot.sessionEpoch !== runtime.controller.sessionEpoch
     || snapshot.checksum == null
@@ -391,6 +393,16 @@ function queueCoopAtomicSnapshotApply(
     || !snapshot.membership.members.every(member => member.present)
     || !runtime.membership.canAdopt(snapshot.membership)
   ) {
+    recordCoopCausalEvent({
+      domain: "snapshot",
+      stage: "refused",
+      causalId: snapshotId,
+      role: runtime.controller.role,
+      epoch: snapshot.sessionEpoch,
+      wave: snapshot.authoritativeState?.wave,
+      turn: snapshot.authoritativeState?.turn,
+      detail: label,
+    });
     coopWarn(
       "resync",
       `${label} refused epoch=${snapshot.sessionEpoch ?? "legacy"}/${runtime.controller.sessionEpoch} `
@@ -400,6 +412,16 @@ function queueCoopAtomicSnapshotApply(
     return false;
   }
   const snapshotTurn = snapshot.authoritativeState?.turn ?? globalScene.currentBattle?.turn ?? 0;
+  recordCoopCausalEvent({
+    domain: "snapshot",
+    stage: "apply-queued",
+    causalId: snapshotId,
+    role: runtime.controller.role,
+    epoch: snapshot.sessionEpoch,
+    wave: snapshot.authoritativeState?.wave,
+    turn: snapshotTurn,
+    detail: label,
+  });
   globalScene.phaseManager.pushNew(
     "CoopApplyResyncPhase",
     snapshot,
@@ -408,6 +430,16 @@ function queueCoopAtomicSnapshotApply(
     undefined,
     healed => {
       if (!healed) {
+        recordCoopCausalEvent({
+          domain: "snapshot",
+          stage: "materialization-failed",
+          causalId: snapshotId,
+          role: runtime.controller.role,
+          epoch: snapshot.sessionEpoch,
+          wave: snapshot.authoritativeState?.wave,
+          turn: snapshotTurn,
+          detail: label,
+        });
         coopWarn("resync", `${label} did not converge -> control marks withheld`);
         return;
       }
@@ -417,11 +449,31 @@ function queueCoopAtomicSnapshotApply(
         || !runtime.membership.adopt(snapshot.membership)
         || !runtime.controller.adoptAuthoritativeInteractionCounter(snapshot.activeControl.interactionCounter)
       ) {
+        recordCoopCausalEvent({
+          domain: "snapshot",
+          stage: "control-adoption-failed",
+          causalId: snapshotId,
+          role: runtime.controller.role,
+          epoch: snapshot.sessionEpoch,
+          wave: snapshot.authoritativeState?.wave,
+          turn: snapshotTurn,
+          detail: label,
+        });
         coopWarn("resync", `${label} material state healed but control adoption failed -> marks withheld`);
         return;
       }
       adoptCoopSnapshotHighWater(runtime.durability, snapshot);
       onHealed?.();
+      recordCoopCausalEvent({
+        domain: "snapshot",
+        stage: "applied",
+        causalId: snapshotId,
+        role: runtime.controller.role,
+        epoch: snapshot.sessionEpoch,
+        wave: snapshot.authoritativeState?.wave,
+        turn: snapshotTurn,
+        detail: label,
+      });
       coopLog("resync", `${label} atomically applied`);
     },
   );
@@ -1164,6 +1216,17 @@ export function wireCoopStallWatchdog(
         && Date.now() - lastRecoveryAt > COOP_STALL_RECOVERY_COOLDOWN_MS
       ) {
         lastRecoveryAt = Date.now();
+        const recoveryId = `stall:e${runtime.controller.sessionEpoch ?? 0}:g${coopSessionGeneration()}:w${globalScene.currentBattle?.waveIndex ?? 0}:t${globalScene.currentBattle?.turn ?? 0}`;
+        recordCoopCausalEvent({
+          domain: "recovery",
+          stage: "stall-detected",
+          causalId: recoveryId,
+          ...(runtime.controller.role == null ? {} : { role: runtime.controller.role }),
+          epoch: runtime.controller.sessionEpoch ?? 0,
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: globalScene.currentBattle?.turn ?? 0,
+          detail: `local=${localMs}ms peer=${peerBeat?.ms ?? 0}ms`,
+        });
         coopWarn(
           "runtime",
           `STALL WATCHDOG: mutual network wait (local=${Math.round(localMs / 1000)}s peer=${Math.round((peerBeat?.ms ?? 0) / 1000)}s) -> recovering (cancel waits${isCoopAuthoritativeGuest() ? " + full resync" : ""})`,
@@ -1190,22 +1253,57 @@ export function wireCoopStallWatchdog(
         if (isCoopAuthoritativeGuest()) {
           const seq = COOP_REJOIN_SYNC_SEQ_BASE + (Date.now() % 100_000);
           const gen = coopSessionGeneration(); // #808
+          recordCoopCausalEvent({
+            domain: "snapshot",
+            stage: "requested",
+            causalId: `${recoveryId}:snapshot:${seq}`,
+            parentId: recoveryId,
+            role: "guest",
+            epoch: runtime.controller.sessionEpoch ?? 0,
+            wave: globalScene.currentBattle?.waveIndex ?? 0,
+            turn: globalScene.currentBattle?.turn ?? 0,
+          });
           void battleStream.requestStateSync(seq).then(blob => {
             if (gen !== coopSessionGeneration()) {
               return;
             }
             if (blob == null) {
+              recordCoopCausalEvent({
+                domain: "snapshot",
+                stage: "timed-out",
+                causalId: `${recoveryId}:snapshot:${seq}`,
+                parentId: recoveryId,
+                role: "guest",
+              });
               coopWarn("resync", `stall-recovery stateSync TIMEOUT/null seq=${seq}`);
               return;
             }
             try {
               const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
+              recordCoopCausalEvent({
+                domain: "snapshot",
+                stage: "queued",
+                causalId: `${recoveryId}:snapshot:${seq}`,
+                parentId: recoveryId,
+                role: "guest",
+                epoch: snapshot.sessionEpoch,
+                wave: globalScene.currentBattle?.waveIndex ?? 0,
+                turn: globalScene.currentBattle?.turn ?? 0,
+                detail: `${blob.length}b`,
+              });
               queueCoopAtomicSnapshotApply(
                 runtime,
                 snapshot,
                 `stall-recovery snapshot seq=${seq} blob=${blob.length}b`,
               );
             } catch {
+              recordCoopCausalEvent({
+                domain: "snapshot",
+                stage: "parse-failed",
+                causalId: `${recoveryId}:snapshot:${seq}`,
+                parentId: recoveryId,
+                role: "guest",
+              });
               coopWarn("resync", `stall-recovery snapshot apply FAILED seq=${seq}`);
             }
           });
@@ -1262,7 +1360,16 @@ export function routeShowdownAbandon(runtime: CoopRuntime): void {
 
 function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInteractionRelay, runtime: CoopRuntime): void {
   let rejoining = false;
-  const terminateSharedSession = (isActiveRuntime: boolean): void => {
+  const terminateSharedSession = (isActiveRuntime: boolean, recoveryId: string): void => {
+    recordCoopCausalEvent({
+      domain: "recovery",
+      stage: "terminated",
+      causalId: recoveryId,
+      role: runtime.controller.role,
+      epoch: runtime.controller.sessionEpoch,
+      wave: globalScene.currentBattle?.waveIndex ?? 0,
+      turn: globalScene.currentBattle?.turn ?? 0,
+    });
     runtime.membership.terminate();
     // Ordinary co-op has no committed membership-removal/AI-handoff operation. Pretending the survivor
     // can continue leaves barriers and controller ownership binary and creates a later softlock/desync.
@@ -1300,6 +1407,17 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
     if (state !== "disconnected" && state !== "closed") {
       return;
     }
+    const recoveryId = `rejoin:e${runtime.controller.sessionEpoch}:g${coopSessionGeneration()}:c${transport.connectionGeneration?.() ?? 0}`;
+    recordCoopCausalEvent({
+      domain: "recovery",
+      stage: "channel-lost",
+      causalId: recoveryId,
+      role: runtime.controller.role,
+      epoch: runtime.controller.sessionEpoch,
+      wave: globalScene.currentBattle?.waveIndex ?? 0,
+      turn: globalScene.currentBattle?.turn ?? 0,
+      detail: transport.disconnectReason?.() ?? state,
+    });
     coopWarn("runtime", `partner channel ${state} -> entering membership recovery (shared waits retained)`);
     runtime.membership.peerDisconnected();
     // Only the ACTIVE runtime owns the screen (the duo harness assembles two in one process).
@@ -1328,6 +1446,13 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
     if (runtime.rejoinDriver != null && !rejoining) {
       rejoining = true;
       const recoveryGeneration = coopSessionGeneration();
+      recordCoopCausalEvent({
+        domain: "recovery",
+        stage: "redial-started",
+        causalId: recoveryId,
+        role: runtime.controller.role,
+        epoch: runtime.controller.sessionEpoch,
+      });
       if (isActiveRuntime) {
         try {
           // #857: carry the DROP REASON (the raw channel error, e.g. the SCTP abort text) into the
@@ -1349,6 +1474,13 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
             return;
           }
           if (!ok) {
+            recordCoopCausalEvent({
+              domain: "recovery",
+              stage: "redial-failed",
+              causalId: recoveryId,
+              role: runtime.controller.role,
+              epoch: runtime.controller.sessionEpoch,
+            });
             coopWarn("runtime", "rejoin FAILED (grace expired) -> terminating shared session");
             // Showdown 1v1 (D4): a versus opponent that never reconnected ends the match - void (early)
             // or a survivor win (mid-match), routed to the ephemeral result. Ordinary co-op terminates
@@ -1357,9 +1489,17 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
               routeShowdownAbandon(runtime);
               return;
             }
-            terminateSharedSession(isActiveRuntime);
+            terminateSharedSession(isActiveRuntime, recoveryId);
             return;
           }
+          recordCoopCausalEvent({
+            domain: "recovery",
+            stage: "redial-succeeded",
+            causalId: recoveryId,
+            role: runtime.controller.role,
+            epoch: runtime.controller.sessionEpoch,
+            detail: `connectionGeneration=${transport.connectionGeneration?.() ?? 0}`,
+          });
           coopLog("runtime", "rejoin SUCCESS -> channel re-established in place");
           runtime.membership.reconnected(transport.connectionGeneration?.());
           // B7 item 14b: the transport survived (replaceChannel), so the showdown pre-battle listeners
@@ -1394,18 +1534,54 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
             const seq = COOP_REJOIN_SYNC_SEQ_BASE + (Date.now() % 100_000);
             coopLog("resync", `post-rejoin full resync request seq=${seq}`);
             const gen = coopSessionGeneration(); // #808
+            const snapshotId = `${recoveryId}:snapshot:${seq}`;
+            recordCoopCausalEvent({
+              domain: "snapshot",
+              stage: "requested",
+              causalId: snapshotId,
+              parentId: recoveryId,
+              role: "guest",
+              epoch: runtime.controller.sessionEpoch,
+              wave: globalScene.currentBattle?.waveIndex ?? 0,
+              turn: globalScene.currentBattle?.turn ?? 0,
+            });
             void runtime.battleStream.requestStateSync(seq).then(blob => {
               if (gen !== coopSessionGeneration()) {
                 return;
               }
               if (blob == null) {
+                recordCoopCausalEvent({
+                  domain: "snapshot",
+                  stage: "timed-out",
+                  causalId: snapshotId,
+                  parentId: recoveryId,
+                  role: "guest",
+                });
                 coopWarn("resync", `post-rejoin stateSync TIMEOUT/null seq=${seq} (checksum backstop heals next turn)`);
                 return;
               }
               try {
                 const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
+                recordCoopCausalEvent({
+                  domain: "snapshot",
+                  stage: "queued",
+                  causalId: snapshotId,
+                  parentId: recoveryId,
+                  role: "guest",
+                  epoch: snapshot.sessionEpoch,
+                  wave: globalScene.currentBattle?.waveIndex ?? 0,
+                  turn: globalScene.currentBattle?.turn ?? 0,
+                  detail: `${blob.length}b`,
+                });
                 queueCoopAtomicSnapshotApply(runtime, snapshot, `post-rejoin snapshot seq=${seq} blob=${blob.length}b`);
               } catch {
+                recordCoopCausalEvent({
+                  domain: "snapshot",
+                  stage: "parse-failed",
+                  causalId: snapshotId,
+                  parentId: recoveryId,
+                  role: "guest",
+                });
                 coopWarn("resync", `post-rejoin snapshot apply FAILED seq=${seq} (checksum backstop heals next turn)`);
               }
             });
@@ -1420,12 +1596,19 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
             routeShowdownAbandon(runtime);
             return;
           }
-          terminateSharedSession(isActiveRuntime);
+          terminateSharedSession(isActiveRuntime, recoveryId);
         });
       return;
     }
     // Loopback/dev transports have no redial driver. They still fail closed: release their waits so tests
     // and local sessions do not strand, but never claim the binary shared run continued as a solo run.
+    recordCoopCausalEvent({
+      domain: "recovery",
+      stage: "terminated-no-redial",
+      causalId: recoveryId,
+      role: runtime.controller.role,
+      epoch: runtime.controller.sessionEpoch,
+    });
     try {
       runtime.membership.terminate();
       relay.cancelWaiters(() => true);

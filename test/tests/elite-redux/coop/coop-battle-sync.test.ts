@@ -10,6 +10,7 @@
 // spoofing" path) - that runs unchanged over the real WebRTC transport.
 
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
+import { getCoopCausalTrace, resetCoopCausalTrace } from "#data/elite-redux/coop/coop-causal-trace";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import type { CoopBattleCommandOffer } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -47,6 +48,28 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     expect(cmd).not.toBeNull();
     expect(cmd?.command).toBe(Command.FIGHT);
     expect(cmd?.cursor).toBe(2); // moveSlots[1]
+  });
+
+  it("records one canonical command lifecycle from legal offer through authoritative apply", async () => {
+    resetCoopCausalTrace();
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    const address = { epoch: 42, wave: 7, pokemonId: 9001 };
+
+    const awaited = hostSync.requestPartnerCommand(1, 3, [1], "guest", legalOffer, address);
+    guestSync.broadcastLocalCommand(
+      1,
+      3,
+      { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] },
+      "guest",
+      address,
+    );
+    await expect(awaited).resolves.toMatchObject({ command: Command.FIGHT, moveId: 55 });
+
+    const commandEvents = getCoopCausalTrace().filter(event => event.domain === "command");
+    expect(new Set(commandEvents.map(event => event.causalId))).toEqual(new Set(["e42:w7:t3:guest:p9001"]));
+    expect(commandEvents.map(event => event.stage)).toEqual(["offer-sent", "offer-received", "intent-sent", "applied"]);
   });
 
   it("a request with no responding peer resolves null (caller -> AI fallback)", async () => {

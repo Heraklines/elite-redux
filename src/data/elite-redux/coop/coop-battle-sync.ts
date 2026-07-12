@@ -27,6 +27,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { validateCoopBattleCommand } from "#data/elite-redux/coop/coop-battle-command-offer";
+import { recordCoopCausalEvent } from "#data/elite-redux/coop/coop-causal-trace";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type {
   CoopBattleCommandOffer,
@@ -307,6 +308,33 @@ function commandAddressLabel(route: CommandRoute): string {
   return `owner=${route.owner ?? "-"} field=${route.fieldIndex} turn=${route.turn} address=${address == null ? "legacy" : `${address.epoch}/${address.wave}/${address.pokemonId}`}`;
 }
 
+/** Stable cross-peer command correlation used by submitted diagnostics. */
+function commandCausalId(fieldIndex: number, turn: number, owner?: CoopRole, address?: CoopCommandAddress): string {
+  if (address != null) {
+    return `e${address.epoch}:w${address.wave}:t${turn}:${owner ?? "unknown"}:p${address.pokemonId}`;
+  }
+  return `legacy:w${globalScene.currentBattle?.waveIndex ?? 0}:t${turn}:${owner ?? "slot"}:f${fieldIndex}`;
+}
+
+function traceCommand(
+  stage: string,
+  fieldIndex: number,
+  turn: number,
+  owner?: CoopRole,
+  address?: CoopCommandAddress,
+  detail?: string,
+): void {
+  recordCoopCausalEvent({
+    domain: "command",
+    stage,
+    causalId: commandCausalId(fieldIndex, turn, owner, address),
+    ...(owner == null ? {} : { role: owner }),
+    ...(address == null ? {} : { epoch: address.epoch, wave: address.wave }),
+    turn,
+    detail: detail ?? `field=${fieldIndex}`,
+  });
+}
+
 function commandAddressOf(message: {
   epoch?: number;
   wave?: number;
@@ -390,6 +418,14 @@ export class CoopBattleSync {
       // unresolved legal-action offer after a channel replacement so the same turn resumes rather
       // than falling through to a local AI command when the original request/reply was lost.
       for (const request of this.pending.values()) {
+        traceCommand(
+          "offer-replayed",
+          request.fieldIndex,
+          request.turn,
+          request.owner,
+          request.address,
+          "channel-replacement",
+        );
         this.sendCommandRequest(request);
       }
     });
@@ -403,6 +439,7 @@ export class CoopBattleSync {
     owner?: CoopRole | undefined;
     address?: CoopCommandAddress | undefined;
   }): void {
+    traceCommand("offer-sent", request.fieldIndex, request.turn, request.owner, request.address);
     this.transport.send({
       t: "commandRequest",
       fieldIndex: request.fieldIndex,
@@ -481,8 +518,10 @@ export class CoopBattleSync {
             `host requestPartnerCommand fieldIndex=${fieldIndex} turn=${turn} moveSlots=[${moveSlots.join(",")}] -> consumed BUFFERED command kind=${buffered.command.command}`,
           );
         }
+        traceCommand("applied", fieldIndex, turn, owner, address, "buffered-intent");
         return Promise.resolve(offer == null ? buffered.command : normalizeLocalCommand(buffered.command, offer));
       }
+      traceCommand("rejected", fieldIndex, turn, owner, address, validation.reason ?? "invalid-buffered-intent");
       coopWarn(
         "security",
         `rejected buffered peer command fieldIndex=${fieldIndex} turn=${turn} reason=${validation.reason ?? "invalid"}`,
@@ -529,6 +568,7 @@ export class CoopBattleSync {
           "relay",
           `host requestPartnerCommand TIMEOUT fieldIndex=${fieldIndex} turn=${turn} after=${this.timeoutMs}ms -> resolving null (caller falls back to AI)`,
         );
+        traceCommand("timed-out", fieldIndex, turn, owner, address);
         finish(null);
       }, this.timeoutMs);
       if (isCoopDebug()) {
@@ -587,6 +627,7 @@ export class CoopBattleSync {
       }),
       req.offer,
     );
+    traceCommand("intent-sent", req.fieldIndex, req.turn, req.owner, req.address, `command=${command.command}`);
     if (isCoopDebug()) {
       coopLog(
         "relay",
@@ -655,6 +696,7 @@ export class CoopBattleSync {
     // SAME owner) matches even when the survivor sits at a different field index across the two engines.
     const key = commandKey(fieldIndex, turn, owner, address);
     const normalizedCommand = normalizeLocalCommand(command, this.peerOffers.get(key));
+    traceCommand("intent-sent", fieldIndex, turn, owner, address, `command=${normalizedCommand.command}`);
     const prefix = key.slice(0, key.lastIndexOf(":") + 1);
     for (const cachedKey of [...this.localOutbox.keys()]) {
       if (cachedKey.startsWith(prefix) && Number(cachedKey.slice(prefix.length)) < turn) {
@@ -728,6 +770,7 @@ export class CoopBattleSync {
   private handle(msg: CoopMessage): void {
     if (msg.t === "commandRequest") {
       const address = commandAddressOf(msg);
+      traceCommand("offer-received", msg.fieldIndex, msg.turn, msg.owner, address);
       const key = commandKey(msg.fieldIndex, msg.turn, msg.owner, address);
       if (msg.offer != null) {
         this.peerOffers.set(key, msg.offer);
@@ -825,6 +868,7 @@ export class CoopBattleSync {
     }
     if (msg.t === "commandRejected") {
       const address = commandAddressOf(msg);
+      traceCommand("rejected", msg.fieldIndex, msg.turn, msg.owner, address, msg.reason);
       const route = commandRoute(msg.fieldIndex, msg.turn, msg.owner, address);
       const key = commandKey(msg.fieldIndex, msg.turn, msg.owner, address);
       this.localOutbox.delete(key);
@@ -858,12 +902,14 @@ export class CoopBattleSync {
         }
       }
       if (this.settled.has(key)) {
+        traceCommand("duplicate", msg.fieldIndex, msg.turn, msg.owner, address);
         coopLog("relay", `recv command DUPLICATE fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> ignored`);
         return;
       }
       // #693: an explicit DECLINE resolves the awaiter with null -> the caller's AI
       // fallback commands the slot. Never treated as a real command.
       if (msg.decline && request != null) {
+        traceCommand("declined", msg.fieldIndex, msg.turn, msg.owner, address);
         this.pending.delete(requestKey);
         coopLog("relay", `recv command DECLINE fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> AI fallback`);
         request.finish(null);
@@ -876,6 +922,7 @@ export class CoopBattleSync {
         if (request.offer != null) {
           const validation = validateCoopBattleCommand(msg.command, request.offer);
           if (!validation.valid) {
+            traceCommand("rejected", msg.fieldIndex, msg.turn, msg.owner, address, validation.reason ?? "invalid");
             coopWarn(
               "security",
               `rejected peer command fieldIndex=${msg.fieldIndex} turn=${msg.turn} reason=${validation.reason ?? "invalid"}`,
@@ -907,6 +954,7 @@ export class CoopBattleSync {
             `recv command fieldIndex=${msg.fieldIndex} turn=${msg.turn} command=${msg.command.command} -> resolved awaiting request`,
           );
         }
+        traceCommand("applied", msg.fieldIndex, msg.turn, msg.owner, address, `command=${msg.command.command}`);
         request.finish(request.offer == null ? msg.command : normalizeLocalCommand(msg.command, request.offer));
       } else {
         if (isCoopDebug()) {
@@ -918,6 +966,7 @@ export class CoopBattleSync {
         // No one is awaiting this slot+turn yet - buffer it (keyed by turn, so a
         // later turn can't clobber an unconsumed earlier one) so the next request
         // for THIS turn resolves instantly (#633, LIVE-C race fix + desync fix).
+        traceCommand("buffered", msg.fieldIndex, msg.turn, msg.owner, address, `command=${msg.command.command}`);
         this.inbox.set(key, { ...incomingRoute, command: msg.command });
       }
     }

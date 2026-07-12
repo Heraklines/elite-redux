@@ -11,6 +11,7 @@
 // =============================================================================
 
 import type { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
+import { getCoopCausalTrace, resetCoopCausalTrace } from "#data/elite-redux/coop/coop-causal-trace";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { wireCoopStallWatchdog } from "#data/elite-redux/coop/coop-runtime";
@@ -47,9 +48,11 @@ const idleStream = { oldestNetworkWaitMs: () => -1 } as unknown as CoopBattleStr
 describe("#806 stall watchdog end-to-end (keepalive + mutual-wait detection + recovery)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    resetCoopCausalTrace();
   });
   afterEach(() => {
     vi.useRealTimers();
+    resetCoopCausalTrace();
   });
 
   it("both peers parked 20s+ -> beats exchange -> recovery cancels the parked waits", async () => {
@@ -90,6 +93,14 @@ describe("#806 stall watchdog end-to-end (keepalive + mutual-wait detection + re
     await vi.advanceTimersByTimeAsync(0);
     expect(hostResolved, "host's parked wait was cancelled by recovery").toBe(true);
     expect(guestResolved, "guest's parked wait was cancelled by recovery").toBe(true);
+    const recoveries = getCoopCausalTrace().filter(event => event.domain === "recovery");
+    expect(
+      recoveries.some(event => event.stage === "stall-detected"),
+      "the deadlock has a structured causal edge",
+    ).toBe(true);
+    expect(new Set(recoveries.map(event => event.causalId)).size, "both peers correlate the same stall boundary").toBe(
+      1,
+    );
   });
 
   it("#857 R2: idle keepalive pings are NOT a deadlock signal (idle channel + pings -> watchdog never fires)", async () => {
