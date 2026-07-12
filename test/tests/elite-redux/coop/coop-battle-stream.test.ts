@@ -223,6 +223,53 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(reason).toBe("switch");
   });
 
+  it("a held safe boundary can observe the complete replacement envelope without stealing the legacy observer", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+    const checkpoint = { ...emptyCheckpoint(), tick: 19 };
+    const state = { ...emptyAuthoritativeState(4), tick: 20, turn: 2 };
+    const legacyReasons: string[] = [];
+    const envelopes: { reason: string; checkpointTick: number | undefined; stateTick: number | undefined }[] = [];
+
+    guestStream.onCheckpoint(reason => legacyReasons.push(reason));
+    const unsubscribeThrowingObserver = guestStream.onCheckpointEnvelope(() => {
+      throw new Error("observer failure must be isolated");
+    });
+    const unsubscribe = guestStream.onCheckpointEnvelope(envelope => {
+      envelopes.push({
+        reason: envelope.reason,
+        checkpointTick: envelope.checkpoint.tick,
+        stateTick: envelope.authoritativeState?.tick,
+      });
+    });
+    const replayWake = guestStream.awaitTurnOrLiveEvent(2, 0);
+
+    hostStream.sendCheckpoint("replacement", checkpoint, "deadbeefdeadbeef", state);
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(await replayWake, "a throwing observer did not suppress the replay-pump waiter").toEqual({
+      kind: "checkpoint",
+    });
+    expect(envelopes).toEqual([{ reason: "replacement", checkpointTick: 19, stateTick: 20 }]);
+    expect(legacyReasons, "a throwing envelope observer did not suppress the legacy fan-out").toEqual(["replacement"]);
+    expect(guestStream.peekCheckpoint()?.authoritativeState?.turn).toBe(2);
+    expect(guestStream.consumeCheckpoint()?.reason).toBe("replacement");
+    expect(guestStream.peekCheckpoint()).toBeNull();
+
+    unsubscribe();
+    unsubscribeThrowingObserver();
+    hostStream.sendCheckpoint("later", { ...emptyCheckpoint(), tick: 21 }, "cafebabecafebabe", {
+      ...state,
+      tick: 22,
+    });
+    await new Promise(r => setTimeout(r, 0));
+    expect(envelopes, "the temporary recovery observer was removed").toHaveLength(1);
+    expect(legacyReasons, "the independent legacy observer remains installed").toEqual(["replacement", "later"]);
+    guestStream.dispose();
+    hostStream.dispose();
+  });
+
   it("dispose fails an in-flight await and stops listening", async () => {
     const { host, guest } = createLoopbackPair();
     const hostStream = new CoopBattleStreamer(host);

@@ -45,6 +45,7 @@ import {
   drainCoopApplyFailures,
   reapplyAcceptedCoopAuthoritativeBattleState,
 } from "#data/elite-redux/coop/coop-battle-engine";
+import type { CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
 import { recordCoopChecksumAssertion } from "#data/elite-redux/coop/coop-checksum-assert";
 import { collectCanonicalDiff, logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
@@ -1381,6 +1382,10 @@ function parseCoopCanonical(canonical: string | undefined): unknown {
 export class CoopApplyResyncPhase extends Phase {
   public readonly phaseName = "CoopApplyResyncPhase";
   private settled = false;
+  /** Temporary wake subscription while this phase is deliberately holding a safe boundary. */
+  private stopCheckpointWake: (() => void) | undefined;
+  /** Every attempted carrier must be newer than both the failed resync and any failed wake attempt. */
+  private recoveryTickFloor: number;
 
   constructor(
     private readonly snapshot: CoopFullBattleSnapshot,
@@ -1390,6 +1395,13 @@ export class CoopApplyResyncPhase extends Phase {
     private readonly onSettled?: ((healed: boolean) => void) | undefined,
   ) {
     super();
+    this.recoveryTickFloor = Math.max(snapshot.tick ?? -1, snapshot.authoritativeState?.tick ?? -1);
+  }
+
+  public override end(): void {
+    this.stopCheckpointWake?.();
+    this.stopCheckpointWake = undefined;
+    super.end();
   }
 
   private settle(healed: boolean): void {
@@ -1402,6 +1414,119 @@ export class CoopApplyResyncPhase extends Phase {
     } catch (error) {
       coopWarn("resync", `turn=${this.turn} snapshot settle callback failed`, error);
     }
+  }
+
+  /**
+   * Apply one complete, strictly-newer out-of-band authority frame while this phase owns the safe
+   * boundary. This is deliberately stricter than ordinary replay consumption: both the numeric
+   * checkpoint and its id-keyed authoritative companion must apply, no structured apply failure may
+   * occur, and the resulting checksum must equal the checksum carried by THAT frame. Any failure keeps
+   * the queue held and waits for a later authority frame; it never resumes on a merely-newer tick.
+   */
+  private applySupersedingCheckpoint(envelope: CoopCheckpointEnvelope): boolean {
+    if (!coopCheckpointSupersedesResync(this.snapshot, envelope, this.recoveryTickFloor)) {
+      return false;
+    }
+    const candidateTick = envelope.authoritativeState?.tick ?? -1;
+    this.recoveryTickFloor = Math.max(this.recoveryTickFloor, envelope.checkpoint.tick ?? -1, candidateTick);
+    try {
+      coopLog(
+        "resync",
+        `turn=${this.turn} held resync WAKE reason=${envelope.reason} `
+          + `checkpointTick=${envelope.checkpoint.tick ?? "legacy"} stateTick=${candidateTick}`,
+      );
+      const checkpointApplied = applyCoopCheckpoint(envelope.checkpoint);
+      const authoritativeApplied = applyCoopAuthoritativeBattleState(
+        envelope.authoritativeState,
+        isCoopAuthoritativeGuest(),
+      );
+      const failures = drainCoopApplyFailures();
+      const postApplyChecksum = captureCoopChecksum();
+      if (
+        checkpointApplied
+        && authoritativeApplied
+        && failures.length === 0
+        && envelope.checksum !== COOP_CHECKSUM_SENTINEL
+        && postApplyChecksum !== COOP_CHECKSUM_SENTINEL
+        && postApplyChecksum === envelope.checksum
+      ) {
+        coopLog(
+          "resync",
+          `turn=${this.turn} held resync RECOVERED from ${envelope.reason} host=guest=${envelope.checksum}`,
+        );
+        coopResyncUnhealedChecksum = undefined;
+        coopResyncUnhealedCount = 0;
+        // Deliberately DO NOT change the earlier settle(false): this newer battle frame proves DATA
+        // convergence only. It does not carry the failed stateSync snapshot's membership/control/journal
+        // postconditions, so that snapshot's control marks must remain withheld and be recovered through
+        // their own durable protocol.
+        // If an older delayed finalizer is still queued, let it reassert this already-accepted frame
+        // after its presentation drains instead of clobbering the recovered replacement.
+        getCoopBattleStreamer()?.retainAppliedOutOfBandCheckpoint(envelope);
+        try {
+          globalScene.ui.clearText();
+        } catch {
+          // A headless/missing presentation layer cannot invalidate mechanical convergence.
+        }
+        this.end();
+        return true;
+      }
+      coopWarn(
+        "resync",
+        `turn=${this.turn} held resync wake did NOT converge reason=${envelope.reason} `
+          + `checkpointApplied=${checkpointApplied} authoritativeApplied=${authoritativeApplied} `
+          + `failures=${failures.length} host=${envelope.checksum} guest=${postApplyChecksum} -> remain held`,
+      );
+    } catch (error) {
+      coopWarn("resync", `turn=${this.turn} held resync wake threw reason=${envelope.reason} -> remain held`, error);
+    }
+    return false;
+  }
+
+  /**
+   * A held phase blocks the normal replay pump, so explicitly subscribe to the stream's latest-envelope
+   * observer. The callback is safe to apply synchronously because this phase is the CURRENT phase and is
+   * intentionally doing no animation/work while held. A pre-buffered replacement is handled first.
+   */
+  private armSupersedingCheckpointWake(): boolean {
+    const streamer = getCoopBattleStreamer();
+    if (streamer == null) {
+      coopWarn("resync", `turn=${this.turn} cannot arm held-resync wake (no streamer)`);
+      return false;
+    }
+    const tryLatest = (announced?: CoopCheckpointEnvelope): boolean => {
+      let isCurrent = false;
+      try {
+        isCurrent = globalScene.phaseManager.getCurrentPhase() === this;
+      } catch {
+        // No live phase manager means there is no safe boundary on which to mutate.
+      }
+      if (!isCurrent) {
+        return false;
+      }
+      const latest = streamer.peekCheckpoint();
+      if (
+        latest == null
+        || (announced !== undefined && latest !== announced)
+        || !coopCheckpointSupersedesResync(this.snapshot, latest, this.recoveryTickFloor)
+      ) {
+        return false;
+      }
+      // Consume only after the strict ordering predicate succeeds. An old/legacy/different-wave frame
+      // stays buffered for the normal replay path and, crucially, can never release this fail-closed hold.
+      const consumed = streamer.consumeCheckpoint();
+      return consumed === latest && this.applySupersedingCheckpoint(consumed);
+    };
+
+    if (tryLatest()) {
+      return true;
+    }
+    this.stopCheckpointWake = streamer.onCheckpointEnvelope(envelope => {
+      tryLatest(envelope);
+    });
+    // Defensive lost-wakeup close: transports are synchronous today, but a future delivery scheduler
+    // could place an envelope between the first peek and subscription.
+    return tryLatest();
   }
 
   public override start(): void {
@@ -1498,12 +1623,19 @@ export class CoopApplyResyncPhase extends Phase {
         } catch {
           // The phase remains held even if the presentation layer is unavailable.
         }
+        // The exact live failure: stateSync was captured after turn++ but before the guest-owned faint
+        // replacement materialized. Its apply failed, this phase held, then the strictly-newer replacement
+        // checkpoint sat behind the hold forever. Let that complete authority frame wake THIS safe boundary;
+        // resume only after its own checksum proves convergence.
+        this.armSupersedingCheckpointWake();
         return;
       }
     } catch {
-      // A malformed resync snapshot must never hang the guest's turn.
-      coopWarn("resync", `turn=${this.turn} CoopApplyResyncPhase: apply/verify threw (handled)`);
+      // Stay fail-closed, but do not become an un-wakeable queue tombstone: a later complete authority
+      // frame can still recover this safe boundary under the same strict checksum proof as above.
+      coopWarn("resync", `turn=${this.turn} CoopApplyResyncPhase: apply/verify threw -> awaiting newer checkpoint`);
       this.settle(false);
+      this.armSupersedingCheckpointWake();
       return;
     }
     this.end();
@@ -1523,4 +1655,33 @@ export function coopResyncSnapshotIsStale(
 ): boolean {
   const capturedTurn = snapshotTurn ?? requestTurn;
   return capturedTurn > 0 && liveTurn > capturedTurn;
+}
+
+/**
+ * Whether an out-of-band frame is safe to use to wake a held resync boundary.
+ *
+ * This intentionally accepts only a `reason=replacement` modern, complete pair. Other checkpoint reasons
+ * need their own explicit control-plane postcondition before they may release a recovery hold. Tick-newer
+ * alone is insufficient: a checkpoint from another wave/turn can carry data that hashes equal while the
+ * guest's un-hashed control plane is still behind. Requiring the same wave + logical turn, both component
+ * ticks strictly above the failed frame, and the caller's running floor makes the wake monotonic and
+ * fail-closed. The apply site additionally requires both appliers + structured-failure drain + checksum.
+ */
+export function coopCheckpointSupersedesResync(
+  snapshot: Pick<CoopFullBattleSnapshot, "tick" | "authoritativeState">,
+  envelope: CoopCheckpointEnvelope,
+  tickFloor = Math.max(snapshot.tick ?? -1, snapshot.authoritativeState?.tick ?? -1),
+): boolean {
+  const heldState = snapshot.authoritativeState;
+  const candidateState = envelope.authoritativeState;
+  const checkpointTick = envelope.checkpoint.tick;
+  if (envelope.reason !== "replacement" || heldState == null || candidateState == null || checkpointTick == null) {
+    return false;
+  }
+  return (
+    checkpointTick > tickFloor
+    && candidateState.tick > tickFloor
+    && candidateState.wave === heldState.wave
+    && candidateState.turn === heldState.turn
+  );
 }

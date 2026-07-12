@@ -180,6 +180,13 @@ export class CoopBattleStreamer {
 
   private enemyPartyHandler: ((wave: number, enemies: CoopSerializedEnemy[]) => void) | null = null;
   private checkpointHandler: ((reason: string, checkpoint: CoopBattleCheckpoint) => void) | null = null;
+  /**
+   * GUEST: safe-boundary observers for the complete checkpoint envelope. Unlike
+   * {@linkcode checkpointHandler}, these are subscriptions rather than a singleton because a held
+   * recovery phase may temporarily listen for a strictly-newer authority frame without replacing a
+   * presentation observer. The receiver still only retains ONE latest envelope.
+   */
+  private readonly checkpointEnvelopeHandlers = new Set<(envelope: CoopCheckpointEnvelope) => void>();
   /** wave -> resolver for an in-flight {@linkcode awaitEnemyParty}. */
   private readonly enemyPartyWaiters = new Map<number, (res: CoopSerializedEnemy[] | null) => void>();
   /** ME-battle key -> resolver for an in-flight {@linkcode awaitMeBattleEnemyParty} (#633 ME handoff). */
@@ -961,6 +968,35 @@ export class CoopBattleStreamer {
   }
 
   /**
+   * GUEST: observe complete out-of-band checkpoint arrivals. Used by a recovery phase that is
+   * deliberately holding the phase queue: the normal replay pump cannot consume the checkpoint while
+   * that hold is current, so the arrival must be able to wake the safe boundary itself. The observer
+   * never consumes or applies the payload; callers must explicitly consume the retained envelope after
+   * proving it supersedes the state they are holding on.
+   */
+  onCheckpointEnvelope(handler: (envelope: CoopCheckpointEnvelope) => void): () => void {
+    this.checkpointEnvelopeHandlers.add(handler);
+    return () => {
+      this.checkpointEnvelopeHandlers.delete(handler);
+    };
+  }
+
+  /** Deliver an envelope to independent temporary observers without breaking the primary fan-out. */
+  private notifyCheckpointEnvelope(envelope: CoopCheckpointEnvelope): void {
+    // Copy before invoking: an observer may unsubscribe itself (or end its recovery phase), which
+    // must not skip another independent observer in the same delivery.
+    for (const handler of [...this.checkpointEnvelopeHandlers]) {
+      try {
+        handler(envelope);
+      } catch (error) {
+        // A diagnostic/recovery observer is never allowed to suppress the replay pump wake or the
+        // legacy presentation observer for this same authority frame.
+        coopWarn("stream", `checkpoint envelope observer threw reason=${envelope.reason} (isolated)`, error);
+      }
+    }
+  }
+
+  /**
    * GUEST: subscribe to the host's wave-resolved signal (#633, authoritative wave-advance).
    * The handler runs the guest's normal post-battle tail so it reaches the next wave's
    * encounter (the pure renderer never queues that tail itself).
@@ -988,6 +1024,11 @@ export class CoopBattleStreamer {
     const cp = this.lastCheckpoint;
     this.lastCheckpoint = null;
     return cp;
+  }
+
+  /** Inspect, but do not consume, the latest authoritative checkpoint envelope. */
+  peekCheckpoint(): CoopCheckpointEnvelope | null {
+    return this.lastCheckpoint;
   }
 
   /** Record an out-of-band envelope only after its numeric/full state applied successfully. */
@@ -1325,6 +1366,7 @@ export class CoopBattleStreamer {
     this.consumedLaunchSnapshotWaves.clear();
     this.enemyPartyHandler = null;
     this.checkpointHandler = null;
+    this.checkpointEnvelopeHandlers.clear();
     this.ghostPoolHandler = null;
     this.lastGhostPool = null;
     this.stateSyncRequestHandler = null;
@@ -1479,19 +1521,22 @@ export class CoopBattleStreamer {
         this.liveWaiter?.(msg.turn, msg.seq);
         return;
       }
-      case "battleCheckpoint":
+      case "battleCheckpoint": {
         // Buffer for the guest's next consumeCheckpoint() (applied at a turn boundary),
         // carrying the host's checksum so the guest can verify convergence after applying.
         coopLog("checksum", `guest RECV battleCheckpoint reason=${msg.reason} checksum=${msg.checksum}`);
-        this.lastCheckpoint = {
+        const envelope: CoopCheckpointEnvelope = {
           reason: msg.reason,
           checkpoint: msg.checkpoint,
           checksum: msg.checksum,
           ...(msg.authoritativeState === undefined ? {} : { authoritativeState: msg.authoritativeState }),
         };
+        this.lastCheckpoint = envelope;
+        this.notifyCheckpointEnvelope(envelope);
         this.checkpointWaiter?.();
         this.checkpointHandler?.(msg.reason, msg.checkpoint);
         return;
+      }
       case "requestEnemyParty": {
         // HOST: the guest re-requested its enemy party (its original sync was lost, or it
         // reached the await before the host generated). Hand it to the host's re-broadcaster
