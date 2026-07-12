@@ -2111,17 +2111,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * would read undefined). Gated to "level" so the god profile is byte-identical (reviveSlot stays undefined).
    * MUST be called inside withClient(ownerCtx) with the OWNER's scene.
    */
-  const driveOwnerReward = async (
-    shop: ShopPhaseSeam,
-    ownerScene: BattleScene,
-    phaseStarted = false,
-  ): Promise<string> => {
+  const driveOwnerReward = async (shop: ShopPhaseSeam, ownerScene: BattleScene): Promise<string> => {
     const reviveSlot = profile === "level" ? firstFaintedPartySlot(ownerScene) : -1;
     const take = rewardPolicy === "seeded" && rng() < 0.5;
-    await driveHostRewardShopOwner(
-      shop,
-      reviveSlot >= 0 ? { takeReward: take, reviveSlot, phaseStarted } : { takeReward: take, phaseStarted },
-    );
+    await driveHostRewardShopOwner(shop, reviveSlot >= 0 ? { takeReward: take, reviveSlot } : { takeReward: take });
     // reviveSlot>=0 means a Revive was TAKEN iff the pool rolled one (the shop path decides post-start); a
     // non-fainted party or no-Revive pool falls through to seeded take/leave. The label reflects the intent.
     if (reviveSlot >= 0 && !ownerScene.getPlayerParty()[reviveSlot]?.isFainted()) {
@@ -2148,13 +2141,21 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     }
     // Make the synthetic second-engine shop the guest's ACTUAL current phase. Calling super.end() on a
     // detached phase shifts whatever unrelated phase happened to be current; in long campaigns that could
-    // execute a queued auto-reward and manufacture a guest-only ball grant. PhaseManager.overridePhase keeps
-    // the prior phase on standby, exactly containing this interaction until the shop terminal restores it.
+    // execute a queued auto-reward and manufacture a guest-only ball grant. Install it on the same internal
+    // standby seam used by PhaseManager.overridePhase, but DO NOT start it here: the two-engine harness must
+    // start/finish each async phase wholly inside its own client context so a continuation cannot resume
+    // against the other process-global scene.
     const guestShop = withClientSync(rig.guestCtx, () => {
       const phase = new SelectModifierPhase();
-      if (!rig.guestScene.phaseManager.overridePhase(phase)) {
+      const manager = rig.guestScene.phaseManager as unknown as {
+        currentPhase: unknown;
+        standbyPhase: unknown | null;
+      };
+      if (manager.standbyPhase != null) {
         throw new Error("co-op soak could not install the guest reward shop as the current phase");
       }
+      manager.standbyPhase = manager.currentPhase;
+      manager.currentPhase = phase;
       return phase;
     }) as unknown as ShopPhaseSeam;
     // #849: the reward shop is the real MODIFIER_SELECT surface (owner drives, watcher mirrors over the relay).
@@ -2163,9 +2164,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     let action: string;
     if (hostOwns) {
       action = await withClient(rig.hostCtx, () => driveOwnerReward(hostShop, rig.hostScene));
-      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { phaseStarted: true }));
+      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
     } else {
-      action = await withClient(rig.guestCtx, () => driveOwnerReward(guestShop, rig.guestScene, true));
+      action = await withClient(rig.guestCtx, () => driveOwnerReward(guestShop, rig.guestScene));
       await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
     }
     actionScript.push(`wave ${wave}: reward shop owner=${hostOwns ? "host" : "guest"} ${action}`);

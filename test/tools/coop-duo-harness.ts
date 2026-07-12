@@ -1247,13 +1247,11 @@ export interface ShopPhaseSeam {
  */
 export async function driveHostRewardShopOwner(
   hostPhase: ShopPhaseSeam,
-  opts: { takeReward?: boolean; reviveSlot?: number; phaseStarted?: boolean } = {},
+  opts: { takeReward?: boolean; reviveSlot?: number } = {},
 ): Promise<number> {
   // start() resolves owner/watcher from the pinned counter, streams the rolled options to the watcher,
   // and opens the owner screen (the prompt handler would drive the UI; here we drive the logic directly).
-  if (!opts.phaseStarted) {
-    hostPhase.start();
-  }
+  hostPhase.start();
   await drainLoopback();
   const pinned = hostPhase.coopInteractionStart;
   const noop = () => false;
@@ -1328,10 +1326,7 @@ export async function driveHostRewardShopOwner(
  */
 const REWARD_WATCH_MAX_IDLE = 32;
 
-export async function driveGuestRewardWatch(
-  guestPhase: ShopPhaseSeam,
-  opts: { phaseStarted?: boolean } = {},
-): Promise<void> {
+export async function driveGuestRewardWatch(guestPhase: ShopPhaseSeam): Promise<void> {
   // start() (watcher branch) is async-ish: it awaits the owner's options, opens the cosmetic screen,
   // then loops on awaitInteractionChoice. We kick it off, then drain the loopback repeatedly so each
   // buffered/relayed owner pick is delivered + applied until the LEAVE/terminal ADVANCES the interaction.
@@ -1350,9 +1345,7 @@ export async function driveGuestRewardWatch(
       return terminal;
     };
   }
-  if (!opts.phaseStarted) {
-    guestPhase.start();
-  }
+  guestPhase.start();
   // The interaction counter the watcher pinned to at start() - it ADVANCES past this exactly once when the
   // owner's terminal (LEAVE or a terminal reward) is mirrored, which is the authoritative "this interaction
   // completed" signal (the phase's own `coopWatcher` flag can lag past that advance, so it alone is not a
