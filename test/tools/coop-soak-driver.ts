@@ -1313,7 +1313,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const offeredTargets =
       offeredMove?.targetSets.find(targets => targets.includes(guestTarget))
       ?? (offeredMove?.targetSets.length === 1 ? offeredMove.targetSets[0] : undefined);
-    if (offeredMove == null || offeredTargets == null) {
+    if (offeredMove != null && offeredTargets == null) {
       fail(
         "desync",
         wave,
@@ -1326,9 +1326,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     hitMode(UiMode.TARGET_SELECT);
     return {
       command: Command.FIGHT,
-      cursor: offeredMove.slot,
-      moveId: offeredMove.moveId,
-      targets: [...offeredTargets],
+      cursor: offeredMove?.slot ?? slot,
+      moveId: offeredMove?.moveId ?? moveId,
+      targets: [...(offeredTargets ?? [guestTarget])],
     };
   });
 
