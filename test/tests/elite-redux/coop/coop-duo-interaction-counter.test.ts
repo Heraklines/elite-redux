@@ -258,11 +258,12 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
         counterBefore * 64,
       );
       expect(reachedRelay, "the public reward-shop UI input reached the production interaction relay").toBe(true);
-      await drainLoopback();
     });
-    for (let i = 0; i < 100 && rig.guestRuntime.controller.interactionCounter() === counterBefore; i++) {
-      await drainLoopback();
-    }
+    await withClient(rig.guestCtx, async () => {
+      for (let i = 0; i < 100 && rig.guestRuntime.controller.interactionCounter() === counterBefore; i++) {
+        await drainLoopback();
+      }
+    });
 
     // The interaction counter advanced EXACTLY ONCE and is IDENTICAL on both clients (the #837 invariant).
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter exactly once").toBe(
