@@ -34,6 +34,7 @@ import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { materializeCoopLoadedPlayerField } from "#phases/encounter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
@@ -110,6 +111,23 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
       guestAfter,
       "guest full-state checksum EQUALS the host's after booting from the snapshot (converged, generated nothing)",
     ).toBe(hostChecksum);
+
+    // LIVE regression (2026-07-12): the launch snapshot is captured before the host's summon chain.
+    // Restore therefore loads the party assets but leaves both co-op leads invisible and off-field. The
+    // guest cannot run Summon/PostSummon (those derive shared effects), so its loaded EncounterPhase uses
+    // the presentation-only materializer. Exercise that exact seam and require BOTH seats + UI bars.
+    await withClient(rig.guestCtx, () => {
+      const capacity = rig.guestScene.currentBattle.arrangement.playerCapacity;
+      expect(materializeCoopLoadedPlayerField(), "both launch leads are materialized").toBe(capacity);
+      const field = rig.guestScene.getPlayerField(true);
+      expect(field, "guest renders every active co-op player seat").toHaveLength(capacity);
+      for (const mon of field) {
+        expect(mon.isOnField(), `${mon.name} is seated`).toBe(true);
+        expect(mon.visible, `${mon.name} container is visible`).toBe(true);
+        expect(mon.getSprite().visible, `${mon.name} sprite is visible`).toBe(true);
+        expect(mon.getBattleInfo().visible, `${mon.name} battle UI is visible`).toBe(true);
+      }
+    });
 
     logs.flush();
   }, 300_000);

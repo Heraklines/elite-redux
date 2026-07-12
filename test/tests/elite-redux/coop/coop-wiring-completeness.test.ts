@@ -136,4 +136,21 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
       "the one-shot await is forbidden at the production wave boundary because its null path locally rerolls enemies",
     ).not.toContain("enemies = await streamer.awaitEnemyParty(");
   });
+
+  it("publishes each complete wave carrier without waiting on a pre-commit interaction generation", () => {
+    const encounterSource = readFileSync(
+      join(__dirname, "..", "..", "..", "..", "src", "phases", "encounter-phase.ts"),
+      "utf8",
+    );
+    const start = encounterSource.indexOf("private broadcastCoopEnemyParty(): void");
+    const end = encounterSource.indexOf("private broadcastCoopLaunchSnapshot(): void", start);
+    expect(start, "ordinary-wave authority publisher exists").toBeGreaterThanOrEqual(0);
+    expect(end, "publisher has a bounded source section").toBeGreaterThan(start);
+    const publisher = encounterSource.slice(start, end);
+    expect(publisher, "the coherent carrier is actually published").toContain("streamer.sendEnemyParty(");
+    expect(
+      publisher,
+      "publication cannot depend on an interaction counter captured before reward commit",
+    ).not.toContain("awaitPartnerInteraction(");
+  });
 });

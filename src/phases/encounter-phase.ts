@@ -19,12 +19,12 @@ import {
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
-import { getCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   getCoopBattleStreamer,
   getCoopController,
   getCoopNetcodeMode,
   isAuthoritativeBattleSession,
+  isCoopAuthoritativeGuest,
   isVersusSession,
   maybeBeginReplayRecording,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -86,6 +86,43 @@ import { trainerConfigs } from "#trainers/trainer-config";
 import { randSeedInt, randSeedItem } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
+
+/**
+ * Presentation-only launch materialization for an authoritative co-op guest. The host's launch
+ * snapshot is captured before its summon chain, so session restore leaves every player mon loaded
+ * but invisible/off-field. Running SummonPhase here is forbidden because its tail derives shared
+ * PostSummon effects; this helper only seats and renders the already-authoritative party objects.
+ * Exported as a narrow test seam for the two-engine launch regression.
+ */
+export function materializeCoopLoadedPlayerField(): number {
+  const battle = globalScene.currentBattle;
+  if (battle == null) {
+    return 0;
+  }
+  const capacity = battle.arrangement.playerCapacity;
+  const party = globalScene.getPlayerParty();
+  let materialized = 0;
+  for (let i = 0; i < capacity && i < party.length; i++) {
+    const pokemon = party[i];
+    if (!pokemon || pokemon.isFainted() || pokemon.isOnField()) {
+      continue;
+    }
+    globalScene.add.existing(pokemon);
+    globalScene.field.add(pokemon);
+    pokemon.fieldSetup();
+    pokemon.setFieldPosition(fieldPositionForSlot(i, capacity));
+    pokemon.setVisible(true);
+    pokemon.getSprite()?.setVisible(true);
+    pokemon.showInfo();
+    pokemon.playAnim();
+    materialized++;
+  }
+  if (materialized > 0) {
+    globalScene.updateModifiers(true);
+    globalScene.updateFieldScale();
+  }
+  return materialized;
+}
 
 /**
  * Dev scenario builder (staging only): construct one staged enemy mon for slot
@@ -470,31 +507,24 @@ export class EncounterPhase extends BattlePhase {
       const enemies = captureCoopEnemies();
       const authoritativeState = captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
       const encounter = captureCoopEncounterAuthority(globalScene.currentBattle);
-      // #788 (live "I could pick a reward and continue without my partner"): the HOST reaches
-      // the next wave SECONDS before the guest finishes replaying the between-wave menu, and
-      // handing the guest the NEXT wave's party mid-menu is the desync window. BARRIER: defer
-      // the party sync until the partner's broadcast interaction counter catches up to ours
-      // (its menu watcher advanced = menu done). The host itself keeps playing - its first
-      // turn cannot resolve without the guest's command anyway, so nothing user-visible waits.
-      // Timeout requests replay of the partner counter and stays closed; the host never exposes a future
-      // wave party while the peer is still completing the prior shared interaction.
-      void controller.awaitPartnerInteraction(getCoopWaveBarrierMs()).then(() => {
-        // #862: the wave-start sync ALWAYS states the ME verdict - the encounter type when the
-        // host rolled an ME, the explicit NO-ME sentinel otherwise. The guest's own presence
-        // roll runs off per-client pity state that diverges after any one-sided ME anomaly
-        // (live: host wild vs guest ME at the same wave 9, same seed), so the guest adopts
-        // this verdict in both directions instead of trusting its local roll.
-        streamer.sendEnemyParty(
-          wave,
-          enemies,
-          globalScene.currentBattle?.mysteryEncounter?.encounterType ?? COOP_WAVE_NO_ME,
-          // #867: state the host-authoritative WILD-vs-TRAINER verdict so the guest adopts it in
-          // newBattle instead of re-deriving via isWaveTrainer (the wave-42 saveDataDigest split).
-          globalScene.currentBattle?.battleType,
-          authoritativeState ?? undefined,
-          encounter,
-        );
-      });
+      // The complete carrier is immutable, wave-keyed and retained for replay. Publish it as soon as
+      // encounter construction is coherent: an early guest only buffers it and cannot apply it until its
+      // own NextEncounterPhase reaches this wave. Do NOT wait on the interaction counter here. Reward
+      // selection starts NewBattlePhase synchronously before its terminal interaction increment; capturing
+      // that old generation made this sole publication wait forever while the host reached CommandPhase
+      // (live wave-1 -> wave-2 deadlock). Command rendezvous remains the gameplay barrier.
+      // #862: the wave-start sync ALWAYS states the ME verdict - the encounter type when the host rolled
+      // an ME, the explicit NO-ME sentinel otherwise.
+      streamer.sendEnemyParty(
+        wave,
+        enemies,
+        globalScene.currentBattle?.mysteryEncounter?.encounterType ?? COOP_WAVE_NO_ME,
+        // #867: state the host-authoritative WILD-vs-TRAINER verdict so the guest adopts it in
+        // newBattle instead of re-deriving via isWaveTrainer (the wave-42 saveDataDigest split).
+        globalScene.currentBattle?.battleType,
+        authoritativeState ?? undefined,
+        encounter,
+      );
     } catch (error) {
       // Keep the host playable, but make the failed authoritative boundary explicit in diagnostics; the
       // guest stays closed and re-requests rather than constructing a different encounter.
@@ -1209,16 +1239,26 @@ export class EncounterPhase extends BattlePhase {
           globalScene.phaseManager.pushNew("ToggleDoublePositionPhase", false);
         }
       }
-      for (let i = 1; i < playerCapacity && i < party.length; i++) {
-        const pokemon = party[i];
-        if (!pokemon || pokemon.isFainted() || pokemon.isOnField()) {
-          continue;
+      // A co-op guest's launch snapshot is captured before the host's SummonPhase chain. Session restore
+      // therefore reconstructs both player Pokemon but deliberately leaves them invisible/off-field. The
+      // renderer cannot run SummonPhase/PostSummonPhase (they derive abilities, hazards and battle RNG), so
+      // materialize every active player slot directly as presentation. Previously this loop started at 1,
+      // assuming a save-resume lead was already on-field: on a fresh co-op launch neither slot was, producing
+      // the live "guest cannot see either partner Pokemon or its UI bar" regression.
+      if (isCoopAuthoritativeGuest() && !isVersusSession()) {
+        materializeCoopLoadedPlayerField();
+      } else {
+        for (let i = 1; i < playerCapacity && i < party.length; i++) {
+          const pokemon = party[i];
+          if (!pokemon || pokemon.isFainted() || pokemon.isOnField()) {
+            continue;
+          }
+          globalScene.field.add(pokemon);
+          pokemon.fieldSetup();
+          pokemon.setFieldPosition(fieldPositionForSlot(i, playerCapacity));
+          pokemon.setVisible(true);
+          pokemon.showInfo();
         }
-        globalScene.field.add(pokemon);
-        pokemon.fieldSetup();
-        pokemon.setFieldPosition(fieldPositionForSlot(i, playerCapacity));
-        pokemon.setVisible(true);
-        pokemon.showInfo();
       }
     } else {
       const availablePartyMembers = globalScene.getPokemonAllowedInBattle();
@@ -1273,7 +1313,11 @@ export class EncounterPhase extends BattlePhase {
     }
     handleTutorial(Tutorial.ACCESS_MENU).then(() => super.end());
 
-    globalScene.phaseManager.pushNew("InitEncounterPhase");
+    // InitEncounterPhase derives PostSummon effects. The authoritative guest rendered the adopted launch
+    // above and must wait for host state instead; constructing it only trips the default-deny renderer gate.
+    if (!isCoopAuthoritativeGuest()) {
+      globalScene.phaseManager.pushNew("InitEncounterPhase");
+    }
   }
 
   protected displayFinalBossDialogue(): void {
