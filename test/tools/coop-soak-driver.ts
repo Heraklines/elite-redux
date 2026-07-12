@@ -648,6 +648,7 @@ function resolveChosenMove(
   seed: number,
   wave: number,
   salt: number,
+  avoidSelfKo = false,
 ): { slot: number; moveId: number } {
   const moveset = mon.getMoveset().filter((m): m is NonNullable<typeof m> => m != null);
   // #843 RESTRICTION-AWARE: the real command menu only accepts a move that is SELECTABLE this turn - PP
@@ -657,15 +658,23 @@ function resolveChosenMove(
   // ONE slot per wave, so real combat both drains PP and can Encore/Disable the fixed pick; filtering by the
   // selectable set means we never hand the FIGHT menu an illegal move (which soft-locks it open).
   const selectable = moveset.filter(m => m.isUsable(mon, false, true)[0]);
+  // The level profile owns one dedicated wave-2 Explosion leg. Outside that leg, repeatedly rolling
+  // Explosion is not representative combat: a seed can make the last surviving mon self-KO on an early
+  // trash wave and collapse the intended wave-30..50 faint/replacement survey. Prefer every other legal
+  // move, but retain Explosion as the honest last resort when it is the only selectable command.
+  const survivableSelectable = avoidSelfKo ? selectable.filter(m => m.moveId !== MoveId.EXPLOSION) : selectable;
+  const preferredSelectable = survivableSelectable.length > 0 ? survivableSelectable : selectable;
   // #843 EFFECTIVENESS-AWARE: with REAL enemies a fixed-slot move can be TYPE-IMMUNE against the wave's real
   // species (e.g. SHADOW_BALL/Ghost vs a Normal-type = 0x), which deals ZERO damage forever and NO-PARK
   // stalls the wave. Prefer selectable moves that deal NON-ZERO damage to the target; both engines evaluate
   // the SAME host-authoritative target (pickTargets reads rig.hostScene), so the seeded pick still agrees.
   const effective =
-    target == null ? selectable : selectable.filter(m => target.getMoveEffectiveness(mon, m.getMove()) > 0);
+    target == null
+      ? preferredSelectable
+      : preferredSelectable.filter(m => target.getMoveEffectiveness(mon, m.getMove()) > 0);
   // Fall back progressively so a pick always exists (all-immune or all-spent are degenerate; the wave then
   // NO-PARKs loudly rather than silently narrowing).
-  const pool = effective.length > 0 ? effective : selectable.length > 0 ? selectable : moveset;
+  const pool = effective.length > 0 ? effective : preferredSelectable.length > 0 ? preferredSelectable : moveset;
   const pick = pool[chosenMoveSlot(seed, wave, salt, pool.length)] ?? pool[0];
   return { slot: moveset.indexOf(pick), moveId: pick.moveId };
 }
@@ -1342,7 +1351,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     }
     const guestMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
     const { guestTarget, guestTargetMon } = pickTargets(commandScene);
-    const { slot, moveId } = resolveChosenMove(guestMon, guestTargetMon, seed, wave, GUEST_SLOT_SALT);
+    const { slot, moveId } = resolveChosenMove(
+      guestMon,
+      guestTargetMon,
+      seed,
+      wave,
+      GUEST_SLOT_SALT,
+      profile === "level",
+    );
     const offeredMove =
       offer?.moves.find(move => move.moveId === moveId) ?? offer?.moves.find(move => move.slot === slot);
     // The renderer can hold a provisionally seated enemy whose internal battler index is still -1.
@@ -1730,7 +1746,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           const isHostSlot = fi === COOP_HOST_FIELD_INDEX;
           const targetIndex = isHostSlot ? targets.hostTarget : targets.guestTarget;
           const targetMon = isHostSlot ? targets.hostTargetMon : targets.guestTargetMon;
-          const moveId = resolveChosenMove(mon, targetMon, seed, wave, salt).moveId;
+          const moveId = resolveChosenMove(mon, targetMon, seed, wave, salt, profile === "level").moveId;
           if (isHostSlot) {
             hostMoveId = moveId;
           } else {
