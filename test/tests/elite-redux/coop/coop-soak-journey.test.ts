@@ -28,7 +28,7 @@ const EVENT_SCHEDULE = new Map([
   [12, MysteryEncounterType.DEPARTMENT_STORE_SALE], // nested shop
   [15, MysteryEncounterType.BERRIES_ABOUND], // explicit leave after a battle-capable offer
   [18, MysteryEncounterType.TRASH_TO_TREASURE], // direct held-item mutation
-  [25, MysteryEncounterType.FIELD_TRIP], // party + nested move sub-picks on the host-authoritative engine
+  [19, MysteryEncounterType.FIELD_TRIP], // guest-owned party + nested move sub-picks
   [32, MysteryEncounterType.TELEPORTING_HIJINKS], // post-crossroads money + party transformation branch
   [34, MysteryEncounterType.WEIRD_DREAM], // legal-range transformation encounter, leave branch
 ]);
@@ -38,10 +38,13 @@ const EVENT_OPTIONS = new Map([
   [12, 1],
   [15, 3],
   [18, 2],
-  [25, 1],
+  [19, 1],
   [32, 1],
   [34, 3],
 ]);
+
+/** Field Trip option 1: choose party slot 0, then that Pokemon's move slot 0. */
+const EVENT_SUB_PICKS = new Map<number, readonly number[]>([[19, [0, 0]]]);
 
 describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome transitions", () => {
   let phaserGame: Phaser.Game;
@@ -90,6 +93,7 @@ describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome 
       pinSeed: CONTENT_SEED,
       meWaves: EVENT_SCHEDULE,
       meOptions: EVENT_OPTIONS,
+      meSubPicks: EVENT_SUB_PICKS,
     });
 
     expect(result.wavesCompleted, "the campaign continued after the final forced event").toBe(LAST_WAVE);

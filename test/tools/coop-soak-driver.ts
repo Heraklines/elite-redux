@@ -498,6 +498,13 @@ export interface SoakOptions {
    */
   meOptions?: ReadonlyMap<number, number>;
   /**
+   * Optional ordered guest-owned nested picks for a forced ME: party slot, secondary option, catch-full
+   * replacement, etc. Values ride the real ME_SUB relay FIFO before the sole host engine advances. This
+   * makes continuous campaigns capable of driving events such as Field Trip instead of cancelling their
+   * nested selector and mistaking a test-driver omission for an engine softlock.
+   */
+  meSubPicks?: ReadonlyMap<number, readonly number[]>;
+  /**
    * #843/#849 CATCH LEG (BUILD 1). A set of wave indices where the soak DRIVES a seeded ball throw ->
    * capture -> dexSync instead of an all-faint win. On each such wave the driver faints ONE wild enemy (the
    * host attacks it while the guest SWITCHES, so no move redirect KOs the survivor), then HOST-throws a
@@ -1998,8 +2005,18 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // ctx; (C) drain under the host ctx so coopHostAwaitGuestIndex resolves, apply the pick, drive the embedded
       // shop (host is the pick WATCHER on a guest-owned ME), to PostMysteryEncounterPhase; (D) start the guest's
       // deferred outcome/terminal race so it buffer-hits the meResync + LEAVE under the guest ctx and converges.
+      // Start the host ME first so its authoritative presentation is buffered before the guest divert
+      // resolves ownership. This is the production order and prevents a pending guest continuation from
+      // resuming under the harness's later host context.
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase"));
       const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
-      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, option - 1));
+      withClientSync(rig.guestCtx, () => {
+        relayGuestMeOptionIndexOnly(replay, option - 1);
+        const seam = replay as unknown as { relayGuestSubPick(value: number): void };
+        for (const value of opts.meSubPicks?.get(wave) ?? []) {
+          seam.relayGuestSubPick(value);
+        }
+      });
       await withClient(rig.hostCtx, async () => {
         await game.phaseInterceptor.to("SelectModifierPhase", false);
         const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
