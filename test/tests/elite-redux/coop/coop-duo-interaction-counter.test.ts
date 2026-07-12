@@ -53,6 +53,7 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import type { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
 import Phaser from "phaser";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -119,21 +120,17 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
 
   async function takeFirstRewardThroughPublicUi(rig: DuoRig): Promise<boolean> {
     resetCoopUiRelayTrace();
-    const reachedInteractionRelay = () =>
-      getCoopUiRelayEdges().some(edge => edge.mode === UiMode.MODIFIER_SELECT && edge.carrier === "interactionChoice");
-    for (let i = 0; i < 500; i++) {
-      rig.hostScene.ui.processInput(Button.ACTION);
-      if (reachedInteractionRelay()) {
-        return true;
-      }
-      expect(rig.hostScene.ui.processInput(Button.UP), "the public UI navigates toward the reward row").toBe(true);
-      rig.hostScene.ui.processInput(Button.ACTION);
-      if (reachedInteractionRelay()) {
-        return true;
-      }
-      await new Promise(resolve => setTimeout(resolve, 5));
-    }
-    return false;
+    const handler = rig.hostScene.ui.getHandler() as ModifierSelectUiHandler;
+    // The headless Phaser tween mock does not provide a reliable onUpdate/final cursor position. Use
+    // the handler's public cursor surface to finish that cosmetic setup, then make the choice only
+    // through UI.processInput. The carrier assertion below still proves the production callback and
+    // interaction relay ran; no private SelectModifierPhase selection seam is invoked.
+    handler.setRowCursor(1);
+    handler.setCursor(0);
+    rig.hostScene.ui.processInput(Button.ACTION);
+    return getCoopUiRelayEdges().some(
+      edge => edge.mode === UiMode.MODIFIER_SELECT && edge.carrier === "interactionChoice",
+    );
   }
 
   it("copy() carries the pin, an unpinned advance is refused, counters stay lockstep, wave 2 resolves", async () => {
@@ -227,12 +224,8 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
       // have distinct runtimes/processes. Reassert that proven owner session on the host runtime so the
       // public UI input is routed through its actual owner mirror, not blocked as a phantom watcher.
       rig.hostRuntime.uiMirror.beginSession("owner", UiMode.MODIFIER_SELECT, counterBefore * 64);
-      // Depending on whether the lightweight tween mock settled its Promise.all chain before this
-      // continuation, the public handler can legitimately be on either the bottom controls (row 0)
-      // or the first reward (row 1). ACTION is harmless on the zero-money reroll control; if it did
-      // not produce the authoritative reward carrier, navigate UP through the public handler and
-      // ACTION the reward. This covers both real scheduling orders without reading a private cursor
-      // or invoking the phase callback directly.
+      // Normalize the cursor state omitted by the headless tween mock, then cross the same public
+      // UI input boundary as a player and require proof that the authoritative carrier was reached.
       const reachedRelay = await takeFirstRewardThroughPublicUi(rig);
       expect(reachedRelay, "the public reward-shop UI input reached the production interaction relay").toBe(true);
       await drainLoopback();
