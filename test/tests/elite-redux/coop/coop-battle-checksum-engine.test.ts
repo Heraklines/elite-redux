@@ -36,6 +36,7 @@ import {
   captureCoopAuthoritativeBattleState,
   captureCoopCheckpoint,
   captureCoopChecksum,
+  captureCoopChecksumState,
   captureCoopFullSnapshot,
   resetCoopStateTicks,
 } from "#data/elite-redux/coop/coop-battle-engine";
@@ -118,6 +119,14 @@ describe.skipIf(!RUN)("co-op battle checksum + resync - real engine (#633, TRACK
   it("authority boundary clamps impossible hp before checkpoint and checksum capture", async () => {
     const field = await startCoopDouble();
     const mon = field[COOP_HOST_FIELD_INDEX];
+    mon.hp = mon.getMaxHp() + 2;
+
+    const checksumState = captureCoopChecksumState();
+
+    expect(mon.hp).toBe(mon.getMaxHp());
+    expect(checksumState.field.find(entry => entry.bi === mon.getBattlerIndex())?.hp).toBe(mon.getMaxHp());
+
+    // Recreate the impossible state to prove checkpoint capture independently enforces the same boundary.
     mon.hp = mon.getMaxHp() + 2;
 
     const checkpoint = captureCoopCheckpoint();

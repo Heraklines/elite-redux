@@ -2151,6 +2151,12 @@ function readEnemyBenchMovesDigest(): [number, string][] {
  * both clients hash the same logical instant. Field mons are sorted by battler index.
  */
 export function captureCoopChecksumState(): CoopChecksumState {
+  // The checksum is the final stable authority boundary even when no numeric checkpoint was needed
+  // (for example, immediately after encounter construction). A late max-HP recalculation can otherwise
+  // leave the authority with hp > maxHp while PokemonData necessarily clamps the renderer, guaranteeing
+  // a checksum split that no replay can converge. Canonicalize the live state before either orientation
+  // is read so every published/compared boundary obeys the same invariant.
+  normalizeCoopHpBoundsAtAuthorityBoundary();
   // SHOWDOWN egress (Task F1): the versus guest holds its live scene in LOCAL orientation (its own
   // team = player side). Map it BACK to the host's AUTHORITATIVE orientation before hashing so the two
   // clients compare the SAME world. All three guest checksum call sites route through here.
