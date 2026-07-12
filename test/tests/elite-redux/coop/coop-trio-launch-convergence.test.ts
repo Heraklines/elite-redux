@@ -127,7 +127,6 @@ describe.skipIf(!RUN)("co-op TRIO M5: 1 authority + 2 renderers converge from on
       rndState: Phaser.Math.RND.state(),
       ghost: emptyGhostSnapshot(),
       moduleLets: structuredClone(rig.hostCtx.moduleLets!),
-      mePins: undefined,
     };
     await withClient(guest2Ctx, () => {
       toCoop(guest2Scene);

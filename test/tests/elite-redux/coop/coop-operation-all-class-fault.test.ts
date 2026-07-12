@@ -62,7 +62,7 @@ function envelopeFor(cls: CoopOperationSurfaceClass, revision: number): CoopAuth
   const [kind, logicalPhase] = KIND_PHASE[cls];
   return {
     version: 1,
-    epoch: 1,
+    sessionEpoch: 1,
     revision,
     wave: 10,
     turn: 1,
@@ -75,7 +75,7 @@ function envelopeFor(cls: CoopOperationSurfaceClass, revision: number): CoopAuth
       payload: { marker: cls },
     },
     authoritativeState: STATE,
-  } as CoopAuthoritativeEnvelopeV1;
+  } satisfies CoopAuthoritativeEnvelopeV1;
 }
 
 async function flush(): Promise<void> {

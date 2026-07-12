@@ -91,7 +91,7 @@ export async function findCoopResumeCandidate(
 ): Promise<CoopResumeMarker | null> {
   const marker = readCoopResumeMarker(self, partner);
   if (marker != null) {
-    const saved = await loadSession(marker.slot).catch(error => {
+    const saved = await loadSession(marker.slot).catch<CoopResumeSessionSummary | undefined>(error => {
       coopWarn("launch", `resume marker slot=${marker.slot} load failed -> scanning saves`, error);
       return;
     });
@@ -104,7 +104,7 @@ export async function findCoopResumeCandidate(
   const sessions = await Promise.all(
     [0, 1, 2, 3, 4].map(async slot => ({
       slot,
-      session: await loadSession(slot).catch(error => {
+      session: await loadSession(slot).catch<CoopResumeSessionSummary | undefined>(error => {
         coopWarn("launch", `resume scan slot=${slot} load failed (ignored)`, error);
         return;
       }),

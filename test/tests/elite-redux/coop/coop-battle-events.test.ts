@@ -666,6 +666,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       checkpointAppliedAfterUnshifts = unshiftSpy.mock.calls.filter(([name]) =>
         ["CoopHpDrainReplayPhase", "CoopFaintReplayPhase", "CoopMoveAnimReplayPhase"].includes(name as string),
       ).length;
+      return true;
     });
 
     await driveReplayTurn(turn);

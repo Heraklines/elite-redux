@@ -444,8 +444,8 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
       });
     }) as never);
     for (let round = 0; round < 5; round++) {
-      await attr.apply(enemy, field[0], roar);
-      await attr.apply(enemy, field[1], roar);
+      await attr.apply(enemy, field[0], roar, []);
+      await attr.apply(enemy, field[1], roar, []);
     }
     spy.mockRestore();
     expect(picks.length, "every roar produced a forced-switch pick").toBe(10);
