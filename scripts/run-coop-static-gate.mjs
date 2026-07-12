@@ -97,7 +97,10 @@ if (typecheck.status !== 0) {
 // Enforce it on every file introduced or changed by this checkpoint; applying it to all
 // historical files would make unrelated legacy style debt block every architecture fix.
 // TypeScript remains stricter above: every co-op diagnostic blocks, changed or not.
-const biomeFiles = [...changed].filter(file => /\.(?:[cm]?[jt]sx?|jsonc?|ya?ml|md)$/.test(file));
+// Markdown is intentionally ignored by this repository's Biome configuration. Passing a docs-only
+// checkpoint to `biome check` makes Biome exit non-zero with "No files were processed", even though the
+// non-vacuous diff and full TypeScript ratchet above both ran. Restrict this list to formats Biome owns.
+const biomeFiles = [...changed].filter(file => /\.(?:[cm]?[jt]sx?|jsonc?|ya?ml)$/.test(file));
 if (biomeFiles.length > 0) {
   const biome = run(command, ["exec", "biome", "check", ...biomeFiles], { stdio: "inherit", encoding: undefined });
   if (biome.status !== 0) {
@@ -106,5 +109,5 @@ if (biomeFiles.length > 0) {
 }
 
 process.stdout.write(
-  `Co-op static gate passed: zero TypeScript diagnostics in the full co-op scope and Biome-clean ${changed.size} changed files.\n`,
+  `Co-op static gate passed: zero TypeScript diagnostics in the full co-op scope and Biome-clean ${biomeFiles.length}/${changed.size} changed files.\n`,
 );
