@@ -1308,6 +1308,11 @@ export class EncounterPhase extends BattlePhase {
           pokemon.showInfo();
         }
       }
+    } else if (isCoopAuthoritativeGuest() && !isVersusSession()) {
+      // A fresh authoritative checkpoint already contains the host-selected active field. Reconstruct that
+      // presentation directly: queuing local Summon/Return/Toggle/CheckSwitch phases would let the renderer
+      // derive a second encounter transition and can strand it behind the default-deny authority gate.
+      materializeCoopLoadedPlayerField();
     } else {
       const availablePartyMembers = globalScene.getPokemonAllowedInBattle();
       // Multi-format: the local player side's capacity drives how many leads summon /

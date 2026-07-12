@@ -912,14 +912,28 @@ function neutralizeCoopCandyBar(scene: BattleScene): void {
  */
 export function stubBattleInfo(mon: Pokemon): void {
   // The real PlayerBattleInfo/EnemyBattleInfo was never built (we skipped init()); a tiny async-resolving
-  // stub satisfies updateInfo / setHpNumbers / initInfo / setMini etc. on the headless render path.
+  // stub satisfies updateInfo / setHpNumbers / initInfo / setMini etc. on the headless render path. Keep the
+  // presentation contract observable: unlike the other no-op methods, setVisible must update the same public
+  // `visible` state a real Phaser container exposes so semantic renderer assertions can detect stale HP bars.
   const noop = () => Promise.resolve();
+  const target = { visible: false };
+  let proxy: object;
   const handler = {
-    get(_t: object, _p: string | symbol) {
+    get(_t: object, property: string | symbol) {
+      if (property === "visible") {
+        return target.visible;
+      }
+      if (property === "setVisible") {
+        return (visible: boolean) => {
+          target.visible = visible;
+          return proxy;
+        };
+      }
       return noop;
     },
   };
-  (mon as unknown as { battleInfo: unknown }).battleInfo = new Proxy({}, handler);
+  proxy = new Proxy(target, handler);
+  (mon as unknown as { battleInfo: unknown }).battleInfo = proxy;
 }
 
 /**
