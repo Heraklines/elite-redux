@@ -28,9 +28,9 @@ const EVENT_SCHEDULE = new Map([
   [12, MysteryEncounterType.DEPARTMENT_STORE_SALE], // nested shop
   [15, MysteryEncounterType.BERRIES_ABOUND], // explicit leave after a battle-capable offer
   [18, MysteryEncounterType.TRASH_TO_TREASURE], // direct held-item mutation
-  [19, MysteryEncounterType.FIELD_TRIP], // party/move requirement branch
   [22, MysteryEncounterType.TELEPORTING_HIJINKS], // money + party transformation branch
   [23, MysteryEncounterType.WEIRD_DREAM], // transformation encounter, leave branch
+  [24, MysteryEncounterType.FIELD_TRIP], // party + nested move sub-picks on the host-authoritative engine
 ]);
 
 /** One-based safe non-battle option for each event; both ownership parities use the same semantic choice. */
@@ -38,9 +38,9 @@ const EVENT_OPTIONS = new Map([
   [12, 1],
   [15, 3],
   [18, 2],
-  [19, 1],
   [22, 1],
   [23, 3],
+  [24, 1],
 ]);
 
 describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome transitions", () => {

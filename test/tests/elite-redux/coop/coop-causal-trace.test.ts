@@ -9,9 +9,10 @@ import {
   recordCoopCausalEvent,
   resetCoopCausalTrace,
 } from "#data/elite-redux/coop/coop-causal-trace";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("co-op canonical causal trace", () => {
+  beforeEach(() => resetCoopCausalTrace());
   afterEach(() => resetCoopCausalTrace());
 
   it("correlates commit, materialization, and apply by one immutable operation id", () => {
