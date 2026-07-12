@@ -1392,11 +1392,16 @@ export async function driveRewardShopOwnerLeaveViaUi(hostPhase: ShopPhaseSeam): 
     throw new Error(`reward UI owner rejected leave confirmation at interaction ${pinned}`);
   }
   await drainLoopback();
-  const after = getCoopRuntime()?.controller.interactionCounter();
-  if (after == null || after <= pinned) {
-    throw new Error(`reward UI owner did not advance interaction ${pinned} (after=${after ?? "missing"})`);
-  }
+  // The production terminal is a reciprocal barrier: the owner may remain pinned until the watcher
+  // consumes this choice and arrives. The caller alternates client pumps and asserts both counters.
   return pinned;
+}
+
+/** Start (and park) a reward watcher before the owner commits through public UI. */
+export async function beginRewardShopWatch(guestPhase: ShopPhaseSeam): Promise<number> {
+  guestPhase.start();
+  await drainLoopback();
+  return guestPhase.coopInteractionStart;
 }
 
 /**
@@ -1408,7 +1413,10 @@ export async function driveRewardShopOwnerLeaveViaUi(hostPhase: ShopPhaseSeam): 
  */
 const REWARD_WATCH_MAX_IDLE = 32;
 
-export async function driveGuestRewardWatch(guestPhase: ShopPhaseSeam): Promise<void> {
+export async function driveGuestRewardWatch(
+  guestPhase: ShopPhaseSeam,
+  opts: { alreadyStarted?: boolean } = {},
+): Promise<void> {
   // start() (watcher branch) is async-ish: it awaits the owner's options, opens the cosmetic screen,
   // then loops on awaitInteractionChoice. We kick it off, then drain the loopback repeatedly so each
   // buffered/relayed owner pick is delivered + applied until the LEAVE/terminal ADVANCES the interaction.
@@ -1427,7 +1435,9 @@ export async function driveGuestRewardWatch(guestPhase: ShopPhaseSeam): Promise<
       return terminal;
     };
   }
-  guestPhase.start();
+  if (!opts.alreadyStarted) {
+    guestPhase.start();
+  }
   // The interaction counter the watcher pinned to at start() - it ADVANCES past this exactly once when the
   // owner's terminal (LEAVE or a terminal reward) is mirrored, which is the authoritative "this interaction
   // completed" signal (the phase's own `coopWatcher` flag can lag past that advance, so it alone is not a

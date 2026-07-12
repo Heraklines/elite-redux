@@ -57,6 +57,7 @@ import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   drainLoopback,
@@ -220,16 +221,21 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
       const hostModsBefore = rig.hostScene.modifiers.length;
       const guestModsBefore = rig.guestScene.modifiers.length;
       let ownerPinned: number;
-      if (hostOwns) {
-        ownerPinned = await withClient(rig.hostCtx, () =>
-          takeReward
-            ? driveHostRewardShopOwner(hostShop, { takeReward: true })
-            : driveRewardShopOwnerLeaveViaUi(hostShop),
-        );
+      if (takeReward) {
+        ownerPinned = await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: true }));
         await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+      } else if (hostOwns) {
+        const watcherPinned = await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
+        expect(watcherPinned, `wave ${w}: watcher parked on the owner's interaction`).toBe(counterBefore);
+        ownerPinned = await withClient(rig.hostCtx, () => driveRewardShopOwnerLeaveViaUi(hostShop));
+        await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
+        await withClient(rig.hostCtx, () => drainLoopback());
       } else {
+        const watcherPinned = await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
+        expect(watcherPinned, `wave ${w}: watcher parked on the owner's interaction`).toBe(counterBefore);
         ownerPinned = await withClient(rig.guestCtx, () => driveRewardShopOwnerLeaveViaUi(guestShop));
-        await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+        await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
+        await withClient(rig.guestCtx, () => drainLoopback());
       }
       if (takeReward) {
         // The owner granted the reward on the host AND the watcher mirrored the SAME grant on the guest
