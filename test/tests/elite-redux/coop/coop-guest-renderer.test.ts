@@ -487,6 +487,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   it("an already-rendered faint still adopts the host's FAINT status and move PP", async () => {
     await startCoopGuest();
     const enemy = globalScene.getEnemyField(false)[0];
+    // This file normally pins enemies through ENEMY_MOVESET_OVERRIDE. Its test-only getter rebuilds an
+    // enemy's base moveset on every read and therefore resets PP before checkpoint capture; production
+    // encounters do not run with that override. Disable it here so this exercises persistent live PP.
+    game.override.enemyMoveset([]);
     enemy.hp = 0;
     enemy.doSetStatus(StatusEffect.FAINT);
     enemy.getMoveset()[0].ppUsed = 3;
