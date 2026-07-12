@@ -33,7 +33,7 @@ const EVENT_SCHEDULE = new Map([
   [24, MysteryEncounterType.FIELD_TRIP], // guest-owned party + nested move sub-picks
   [26, MysteryEncounterType.ER_TOWN_RAFFLE], // money spend + seeded generated reward identity
   [28, MysteryEncounterType.ER_FORTUNE_TELLER], // queued future event + world-map reveal mutation
-  [32, MysteryEncounterType.TELEPORTING_HIJINKS], // post-crossroads money + party transformation branch
+  [32, MysteryEncounterType.TELEPORTING_HIJINKS], // post-crossroads biome transition + boss battle
   [34, MysteryEncounterType.ER_STILL_WATERS], // full-party mirror battle handoff
   [36, MysteryEncounterType.WEIRD_DREAM], // legal-range transformation encounter, leave branch
   [39, MysteryEncounterType.ER_CLEANSING_FONT], // party-wide heal/status continuation
@@ -50,7 +50,7 @@ const EVENT_OPTIONS = new Map([
   [24, 1],
   [26, 1],
   [28, 1],
-  [32, 1],
+  [32, 3],
   [34, 1],
   [36, 3],
   [39, 1],
