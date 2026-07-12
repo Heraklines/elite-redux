@@ -1397,7 +1397,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   // reconstruct path: captureCoopEnemies (HOST) carries the explicit segment COUNT + INDEX + maxHp, and
   // buildCoopEnemy (GUEST) re-asserts them via setBoss(count) + the host's bossSegmentIndex - so the
   // adopted boss has isBoss()===true and the EXACT host segments/index (no diverged-RNG re-roll), and
-  // a NON-boss enemy round-trips with bossSegments===0 (the additive path: solo/normal mons unaffected).
+  // a NON-boss enemy round-trips with the canonical numeric neutral state 0/0.
   it("BOSS-SEGMENT ROUND-TRIP (#633): captureCoopEnemies -> buildCoopEnemy re-asserts the host's bossSegments + index + isBoss", async () => {
     await startCoopGuest();
     // HOST authoritative truth: promote the bi2 enemy to a boss with an EXPLICIT segment count, then
@@ -1413,12 +1413,16 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     hostBoss.bossSegmentIndex = 1;
     expect(hostBoss.isBoss(), "the host's bi2 enemy is a boss").toBe(true);
     expect(hostNonBoss.isBoss(), "the host's bi3 enemy is NOT a boss").toBe(false);
+    expect(hostNonBoss.bossSegments, "the live host initializes a non-boss before capture").toBe(0);
+    expect(hostNonBoss.bossSegmentIndex, "the live host initializes a non-boss index before capture").toBe(0);
     const hostBossMaxHp = hostBoss.getMaxHp();
 
     // --- SERIALIZE (host): captureCoopEnemies streams the per-enemy identity, now including the boss
     // fields. Match the enemies by speciesId+index is ambiguous (both Magikarp), so key by fieldIndex:
     // the enemy party is [bi2-lead, bi3] in order, so fieldIndex 0 is the boss, 1 is the non-boss.
     const serialized = coopEngine.captureCoopEnemies();
+    expect(hostNonBoss.bossSegments, "capture is observational for the host's non-boss segment count").toBe(0);
+    expect(hostNonBoss.bossSegmentIndex, "capture is observational for the host's non-boss segment index").toBe(0);
     expect(serialized.length, "both enemies serialized").toBeGreaterThanOrEqual(2);
     const bossBlob = serialized.find(e => e.fieldIndex === 0)!.data;
     const nonBossBlob = serialized.find(e => e.fieldIndex === 1)!.data;
@@ -1429,16 +1433,12 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(bossBlob.bossSegmentIndex, "the serialized boss carries the host's decremented INDEX").toBe(1);
     expect(bossBlob.maxHp, "the serialized boss carries the host's maxHp ceiling").toBe(hostBossMaxHp);
     expect(bossBlob.stats, "the serialized boss carries every completed authoritative stat").toEqual(hostBoss.stats);
-    // The non-boss enemy serializes isBoss=false and a NON-POSITIVE bossSegments (0 or, for a
-    // never-promoted mon in this harness, undefined) - either way the guest's self-gating reconstruct
-    // (bossSegments !== undefined && > 0) skips setBoss, so a normal enemy is never spuriously promoted.
+    // The non-boss enemy serializes isBoss=false and the engine's canonical 0/0 neutral state.  Keeping
+    // these declared-number fields concrete on the authoritative host means JSON/WebRTC cannot erase a
+    // meaningful shape distinction, and guest adoption stays byte-for-byte exact without mutating capture.
     expect(nonBossBlob.isBoss, "the non-boss enemy serializes isBoss=false").toBe(false);
-    const nonBossSegments = nonBossBlob.bossSegments;
-    const nonBossSegmentsIsPositive = typeof nonBossSegments === "number" && nonBossSegments > 0;
-    expect(
-      nonBossSegmentsIsPositive,
-      "the non-boss enemy serializes a non-positive bossSegments (self-gating skips setBoss)",
-    ).toBe(false);
+    expect(nonBossBlob.bossSegments, "the non-boss carrier preserves canonical segment count").toBe(0);
+    expect(nonBossBlob.bossSegmentIndex, "the non-boss carrier preserves canonical segment index").toBe(0);
 
     // --- RECONSTRUCT (guest): buildCoopEnemy rebuilds a fresh EnemyPokemon from the blob. Without the
     // fix the rebuilt boss would have bossSegments=0 (addEnemyPokemon hardcodes boss `false`); WITH it,
@@ -1456,9 +1456,19 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // boss block is self-gating on bossSegments>0, so solo / normal enemies are byte-identical.
     const rebuiltNonBoss = buildCoopEnemy(nonBossBlob, hostNonBoss.level, TrainerSlot.TRAINER);
     expect(rebuiltNonBoss, "the non-boss reconstructed").not.toBeNull();
-    // isBoss() is `!!this.bossSegments`, so it reads false for both 0 and the never-promoted undefined -
-    // the load-bearing guarantee: a normal enemy round-trips as a normal mon, no spurious boss bars.
+    // isBoss() is `!!this.bossSegments`; the load-bearing guarantee is a normal enemy round-trips as a
+    // normal mon with the exact same concrete neutral values, not merely equivalent truthiness.
     expect(rebuiltNonBoss!.isBoss(), "a non-boss enemy round-trips as a normal mon (no spurious boss)").toBe(false);
+    expect(rebuiltNonBoss!.bossSegments, "the rebuilt non-boss preserves exact segment count").toBe(0);
+    expect(rebuiltNonBoss!.bossSegmentIndex, "the rebuilt non-boss preserves exact segment index").toBe(0);
+    // The same-species fast path keeps a guest object instead of rebuilding it.  Prove an explicitly
+    // non-boss carrier also clears stale positive state there, rather than only constructing new 0/0 mons.
+    hostNonBoss.setBoss(true, 3);
+    hostNonBoss.bossSegmentIndex = 1;
+    coopEngine.applyCoopEnemies([{ fieldIndex: 1, data: nonBossBlob }]);
+    expect(hostNonBoss.isBoss(), "same-species carrier clears a stale local boss").toBe(false);
+    expect(hostNonBoss.bossSegments, "same-species non-boss adoption canonicalizes segment count").toBe(0);
+    expect(hostNonBoss.bossSegmentIndex, "same-species non-boss adoption canonicalizes segment index").toBe(0);
     const forcedMaxHp = rebuiltNonBoss!.getMaxHp() + 7;
     const rebuiltWithForeignContext = buildCoopEnemy(
       { ...nonBossBlob, hp: forcedMaxHp, maxHp: forcedMaxHp },
@@ -1490,11 +1500,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(sameSpecies.getMaxHp(), "same-species correction forces the host maxHp ceiling").toBe(correctedMaxHp);
     expect(sameSpecies.hp, "same-species current hp clamps against the authoritative ceiling").toBe(correctedMaxHp);
     expect(sameSpecies.stats, "same-species correction adopts all six authoritative stats").toEqual(correctedStats);
-    const rebuiltSegments = rebuiltNonBoss!.bossSegments;
-    const rebuiltSegmentsIsPositive = typeof rebuiltSegments === "number" && rebuiltSegments > 0;
-    expect(
-      rebuiltSegmentsIsPositive,
-      "a non-boss enemy round-trips with no positive bossSegments (the self-gating reconstruct skipped setBoss)",
-    ).toBe(false);
+    expect(rebuiltNonBoss!.bossSegments, "a non-boss remains at canonical zero segments after correction").toBe(0);
+    expect(rebuiltNonBoss!.bossSegmentIndex, "a non-boss remains at canonical zero index after correction").toBe(0);
   });
 });

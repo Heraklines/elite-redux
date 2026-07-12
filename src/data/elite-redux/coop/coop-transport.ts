@@ -67,7 +67,10 @@ export type CoopRole = "host" | "guest";
 // control high-water mark; receivers advance control only after safe-boundary checksum convergence.
 // er-coop-23: hot rejoin preserves active waits and reissues command/barrier control state; terminal
 // disconnect ends shared play instead of taking an uncommitted local fallback/AI/solo branch.
-export const COOP_PROTOCOL_VERSION = "er-coop-29";
+// er-coop-30: authoritative field seats carry actual Phaser presentation membership and the guest settles
+// those seats through a pure no-RNG materializer. An older renderer would ignore the visibility boundary
+// and can reveal pre-intro/fainted seats, so cached mixed builds must refuse pairing instead of degrading.
+export const COOP_PROTOCOL_VERSION = "er-coop-30";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -697,6 +700,12 @@ export interface CoopAuthoritativeFieldSeat {
   partyIndex: number;
   /** Host-stable Pokemon identity copied through PokemonData. */
   pokemonId: number;
+  /**
+   * Whether this logical active-slot Pokemon is actually presented in the host's Phaser field container at
+   * this boundary. `field` deliberately includes just-fainted and pre-intro slot occupants for data
+   * convergence; presentation must not infer visibility from that logical list.
+   */
+  presented: boolean;
   owner?: CoopRole;
   /** Enemy boss active segment index, if not covered by PokemonData. */
   bossSegmentIndex?: number;

@@ -5,6 +5,7 @@ import { getCharVariantFromDialogue } from "#data/dialogue";
 import { captureCoopChecksum, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { settleCoopFieldPresentation } from "#data/elite-redux/coop/coop-field-presentation";
 import { COOP_INTERACTION_LEAVE } from "#data/elite-redux/coop/coop-interaction-relay";
 import { commitMeOwnerIntent, nextCoopMePresentationStep } from "#data/elite-redux/coop/coop-me-operation";
 import {
@@ -817,6 +818,10 @@ export class MysteryEncounterBattlePhase extends Phase {
    * Queue {@linkcode SummonPhase}s for the new battle and handle trainer animations/dialogue for Trainer battles
    */
   private doMysteryEncounterBattle() {
+    if (isCoopAuthoritativeGuest()) {
+      this.materializeAuthoritativeGuestBattle();
+      return;
+    }
     const encounterMode = globalScene.currentBattle.mysteryEncounter!.encounterMode;
     if (encounterMode === MysteryEncounterMode.WILD_BATTLE || encounterMode === MysteryEncounterMode.BOSS_BATTLE) {
       // Summons the wild/boss Pokemon
@@ -887,6 +892,52 @@ export class MysteryEncounterBattlePhase extends Phase {
         }
       }
     }
+  }
+
+  /**
+   * The authoritative guest already adopted the host's complete ME battle party and state before this
+   * phase was queued. Its normal Summon/Return/InitEncounter tail is deliberately renderer-blocked because
+   * those phases run fieldSetup, abilities, hazards and RNG. Settle only the visual postcondition, then let
+   * the empty phase queue enter the ordinary TurnInit -> local-command/replay loop.
+   */
+  private materializeAuthoritativeGuestBattle(): void {
+    const battle = globalScene.currentBattle;
+    const playerCapacity = battle.arrangement.playerCapacity;
+    const enemyCapacity = battle.arrangement.enemyCapacity;
+    settleCoopFieldPresentation({
+      side: "player",
+      seats: globalScene
+        .getPlayerParty()
+        .slice(0, playerCapacity)
+        .map((pokemon, slot) => ({ pokemon, slot })),
+      capacity: playerCapacity,
+      boundary: "me-battle-summon",
+      desired: "visible",
+      hideStale: true,
+      trainerDisposition: "hide-player",
+    });
+    settleCoopFieldPresentation({
+      side: "enemy",
+      seats: globalScene
+        .getEnemyParty()
+        .slice(0, enemyCapacity)
+        .map((pokemon, slot) => ({ pokemon, slot })),
+      capacity: enemyCapacity,
+      boundary: "me-battle-summon",
+      desired: "visible",
+      hideStale: true,
+      trainerDisposition: "hide-enemy",
+    });
+    battle.started = true;
+    globalScene.pbTray.showPbTray(globalScene.getPlayerParty());
+    globalScene.pbTrayEnemy.showPbTray(globalScene.getEnemyParty());
+    globalScene.playBgm();
+    coopLog(
+      "me",
+      `authoritative guest materialized ME battle players=${Math.min(playerCapacity, globalScene.getPlayerParty().length)} `
+        + `enemies=${Math.min(enemyCapacity, globalScene.getEnemyParty().length)}`,
+    );
+    this.end();
   }
 
   /**

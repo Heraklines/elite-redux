@@ -35,6 +35,7 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { materializeCoopAdoptedEnemyField, materializeCoopLoadedPlayerField } from "#phases/encounter-phase";
+import { ShowTrainerPhase } from "#phases/show-trainer-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
@@ -119,9 +120,24 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
     await withClient(rig.guestCtx, () => {
       const capacity = rig.guestScene.currentBattle.arrangement.playerCapacity;
       const seats = rig.guestScene.getPlayerParty().slice(0, capacity);
+      // A killed Return/ShowTrainer transition can leave this persistent sprite visible or alpha-zero.
+      // The presentation seam must hide it now while leaving alpha ready for the next ShowTrainerPhase.
+      rig.guestScene.trainer.setVisible(true).setAlpha(0.25);
       const spriteVisible = seats.map(mon => vi.spyOn(mon.getSprite(), "setVisible"));
       const infoVisible = seats.map(mon => vi.spyOn(mon, "showInfo"));
       expect(materializeCoopLoadedPlayerField(), "both launch leads are materialized").toBe(capacity);
+      expect(rig.guestScene.trainer.visible, "the stale player-trainer overlay is cleared").toBe(false);
+      expect(rig.guestScene.trainer.alpha, "the next ShowTrainerPhase will not inherit alpha zero").toBe(1);
+      // Production post-battle regression: ReturnPhase is renderer-blocked, but ShowTrainerPhase is a
+      // presentation phase and used to reveal the trainer over those still-fielded Pokemon. Drive the real
+      // phase branch and require it to remain an immediate hidden no-op on the authoritative guest.
+      rig.guestScene.trainer.setVisible(true).setAlpha(0.25);
+      const showTrainer = new ShowTrainerPhase();
+      const showTrainerEnd = vi.spyOn(showTrainer, "end").mockImplementation(() => {});
+      showTrainer.start();
+      expect(showTrainerEnd, "renderer ShowTrainerPhase terminates immediately").toHaveBeenCalledOnce();
+      expect(rig.guestScene.trainer.visible, "renderer ShowTrainerPhase cannot restore the stale overlay").toBe(false);
+      expect(rig.guestScene.trainer.alpha, "renderer trainer remains ready for a later legitimate entrance").toBe(1);
       const field = rig.guestScene.getPlayerField(true);
       expect(field, "guest renders every active co-op player seat").toHaveLength(capacity);
       for (const [index, mon] of field.entries()) {
@@ -131,6 +147,11 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
         expect(infoVisible[index], `${mon.name} battle UI was explicitly shown`).toHaveBeenCalledOnce();
       }
     });
+    const guestAfterPlayerMaterialization = await withClient(rig.guestCtx, () => captureCoopChecksum());
+    expect(
+      guestAfterPlayerMaterialization,
+      "presentation-only launch materialization leaves the authoritative checksum unchanged",
+    ).toBe(hostChecksum);
 
     // TRAINER-wave renderer regression: the real SummonPhase is correctly default-denied on the guest,
     // but its already-adopted enemies still need the presentation half (seat/sprite/bar). Simulate the

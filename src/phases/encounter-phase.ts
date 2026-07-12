@@ -20,6 +20,7 @@ import {
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
+import { settleCoopFieldPresentation } from "#data/elite-redux/coop/coop-field-presentation";
 import {
   getCoopBattleStreamer,
   getCoopController,
@@ -101,28 +102,19 @@ export function materializeCoopLoadedPlayerField(): number {
     return 0;
   }
   const capacity = battle.arrangement.playerCapacity;
-  const party = globalScene.getPlayerParty();
-  let materialized = 0;
-  for (let i = 0; i < capacity && i < party.length; i++) {
-    const pokemon = party[i];
-    if (!pokemon || pokemon.isFainted() || pokemon.isOnField()) {
-      continue;
-    }
-    globalScene.add.existing(pokemon);
-    globalScene.field.add(pokemon);
-    pokemon.fieldSetup();
-    pokemon.setFieldPosition(fieldPositionForSlot(i, capacity));
-    pokemon.setVisible(true);
-    pokemon.getSprite()?.setVisible(true);
-    pokemon.showInfo();
-    pokemon.playAnim();
-    materialized++;
-  }
-  if (materialized > 0) {
-    globalScene.updateModifiers(true);
-    globalScene.updateFieldScale();
-  }
-  return materialized;
+  const seats = globalScene
+    .getPlayerParty()
+    .slice(0, capacity)
+    .map((pokemon, slot) => ({ pokemon, slot }));
+  return settleCoopFieldPresentation({
+    side: "player",
+    seats,
+    capacity,
+    boundary: "launch-ready",
+    desired: "visible",
+    hideStale: true,
+    trainerDisposition: "hide-player",
+  });
 }
 
 /**
@@ -145,51 +137,19 @@ export function materializeCoopAdoptedEnemyField(): number {
     return 0;
   }
   const capacity = battle.arrangement.enemyCapacity;
-  const party = globalScene.getEnemyParty();
-  let materialized = 0;
-  for (let i = 0; i < capacity && i < party.length; i++) {
-    const pokemon = party[i];
-    if (pokemon == null || pokemon.isFainted()) {
-      continue;
-    }
-    const wasOnField = pokemon.isOnField();
-    if (!wasOnField) {
-      globalScene.add.existing(pokemon);
-      globalScene.field.add(pokemon);
-      const playerPokemon = globalScene.getPlayerPokemon() as Pokemon | undefined;
-      if (playerPokemon?.isOnField()) {
-        globalScene.field.moveBelow(pokemon, playerPokemon);
-      }
-      battle.seenEnemyPartyMemberIds.add(pokemon.id);
-    }
-    pokemon.setFieldPosition(fieldPositionForSlot(i, capacity), 0);
-    pokemon.showInfo();
-    pokemon.setVisible(true);
-    pokemon.getSprite()?.setVisible(true);
-    pokemon.getSprite()?.clearTint();
-    pokemon.setAlpha(1);
-    pokemon.setScale(pokemon.getSpriteScale());
-    pokemon.playAnim();
-    if (!wasOnField) {
-      materialized++;
-    }
-  }
-  if (materialized > 0) {
-    globalScene.updateFieldScale();
-  }
-  return materialized;
-}
-
-/** End the authoritative guest's trainer intro at an absolute visual postcondition. */
-function hideCoopAdoptedTrainer(): void {
-  const trainer = globalScene.currentBattle?.trainer;
-  if (trainer == null) {
-    return;
-  }
-  trainer.setAlpha(0);
-  for (const sprite of [...trainer.getSprites(), ...trainer.getTintSprites()]) {
-    sprite.setVisible(false);
-  }
+  const seats = globalScene
+    .getEnemyParty()
+    .slice(0, capacity)
+    .map((pokemon, slot) => ({ pokemon, slot }));
+  return settleCoopFieldPresentation({
+    side: "enemy",
+    seats,
+    capacity,
+    boundary: "encounter-summon",
+    desired: "visible",
+    hideStale: true,
+    trainerDisposition: "hide-enemy",
+  });
 }
 
 /**
@@ -1157,7 +1117,6 @@ export class EncounterPhase extends BattlePhase {
             // SummonPhase is intentionally default-denied on the pure renderer. Materialize the exact
             // already-adopted enemy objects as presentation and end the intro with the trainer hidden;
             // no fieldSetup/on-summon/RNG is run locally.
-            hideCoopAdoptedTrainer();
             materializeCoopAdoptedEnemyField();
             this.end();
             return;

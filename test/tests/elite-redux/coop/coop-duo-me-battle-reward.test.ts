@@ -150,6 +150,29 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
       expect(coopMeInProgress(), "guest ME pin still set through the spawned battle").toBe(true);
       expect(coopMeHandoffBattleStarted(), "guest marked the ME handoff battle STARTED (#817)").toBe(true);
 
+      // Production presentation handoff: drive the ACTUAL guest MysteryEncounterBattlePhase that
+      // finishWithoutLeaving queued. Its authoritative branch must materialize the already-adopted objects
+      // without constructing the blocked Summon/Return/InitEncounter resolution tail.
+      const guestBattleBoot = rig.guestScene.phaseManager.getCurrentPhase();
+      expect(guestBattleBoot?.phaseName, "guest reached its real ME battle boot").toBe("MysteryEncounterBattlePhase");
+      guestBattleBoot.start();
+      const playerSeats = rig.guestScene
+        .getPlayerParty()
+        .slice(0, rig.guestScene.currentBattle.arrangement.playerCapacity);
+      const enemySeats = rig.guestScene
+        .getEnemyParty()
+        .slice(0, rig.guestScene.currentBattle.arrangement.enemyCapacity);
+      for (const mon of [...playerSeats, ...enemySeats]) {
+        expect(mon.isOnField(), `${mon.name} is seated by the ME presentation handoff`).toBe(true);
+        expect(mon.visible, `${mon.name} container is visible at the ME command boundary`).toBe(true);
+        expect(mon.getSprite().visible, `${mon.name} sprite is visible at the ME command boundary`).toBe(true);
+        expect(mon.getBattleInfo().visible, `${mon.name} info bar is visible at the ME command boundary`).toBe(true);
+      }
+      expect(
+        rig.guestScene.phaseManager.getCurrentPhase()?.phaseName,
+        "ME presentation boot falls into the normal turn loop without a blocked structural tail",
+      ).toBe("TurnInitPhase");
+
       // DEFECT (2): the guest adopted the host's ME-battle enemies. While they are ALIVE the ME battle is
       // NOT won (a legit turn would play - no premature victory, the BUG1 hazard the normal path guards).
       const enemies = rig.guestScene.getEnemyParty();

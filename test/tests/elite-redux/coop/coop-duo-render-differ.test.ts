@@ -10,9 +10,9 @@
 //   - CHEAP REFRESH runs UNCONDITIONALLY on every on-field mon (battle-info bars: hp / the ER status
 //     badge / name / gender / level / stat-stage text / shiny+tera icons) + boss segment dividers +
 //     BOTH held-item indicator bars.
-//   - The EXPENSIVE RE-SUMMON (reload the atlas + replay the sprite) is gated on the getBattleSpriteKey
-//     INPUTS (species / form / shiny / variant / fusion / gender), so it fires ONLY on a real
-//     visual-identity change (form change / transform) and never on a routine hp/status turn.
+//   - The EXPENSIVE RE-SUMMON (load the atlas + replay the sprite) fires for a newly presented object or
+//     when getBattleSpriteKey INPUTS (species / form / shiny / variant / fusion / gender) change. It stays
+//     off on routine hp/status turns while ensuring a new authoritative replacement leaves its placeholder.
 //
 // These tests drive TWO real engines (buildDuo): the HOST captures its authoritative state, the GUEST
 // applies it through the REAL apply path (applyCoopAuthoritativeBattleState -> runCoopRenderDiffer), and
@@ -38,6 +38,7 @@ import { initGlobalScene } from "#app/global-scene";
 import {
   applyCoopAuthoritativeBattleState,
   captureCoopAuthoritativeBattleState,
+  captureCoopChecksum,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -179,6 +180,102 @@ describe.skipIf(!RUN)(
       const heldAfter = await withClient(rig.guestCtx, () => enemyHeldIds(rig.guestScene));
       expect(heldAfter, "guest enemy DROPPED the item - DATA converged").not.toContain("LEFTOVERS");
       expect(modSpy, "guest enemy held-item bar was redrawn - RENDER refreshed").toHaveBeenCalledWith(false, true);
+    }, 300_000);
+
+    it("repairs hidden-but-correct field objects absolutely without changing authoritative state", async () => {
+      const rig = await setup();
+      await applyOnce(rig);
+      const hostChecksum = await withClient(rig.hostCtx, () => captureCoopChecksum());
+      const hidden = await withClient(rig.guestCtx, () => {
+        const player = rig.guestScene.getPlayerParty()[0];
+        const enemy = rig.guestScene.getEnemyParty()[0];
+        for (const mon of [player, enemy]) {
+          // Keep actual field membership intact while corrupting presentation only: this is the live class
+          // a logical checksum cannot detect. Also retain the interrupted-Return transition flag: it makes
+          // isOnField() lie even while the object remains in the Phaser container.
+          mon.switchOutStatus = true;
+          mon.setVisible(false);
+          mon.setAlpha(0);
+          mon.setScale(0.25);
+          mon.getSprite().setVisible(false);
+          mon.getSprite().setTint(0xff00ff);
+          mon.getBattleInfo().setVisible(false);
+        }
+        return [player, enemy];
+      });
+
+      await applyOnce(rig);
+
+      await withClient(rig.guestCtx, () => {
+        for (const mon of hidden) {
+          expect(mon.isOnField(), `${mon.name} remains seated`).toBe(true);
+          expect(mon.visible, `${mon.name} container visibility is repaired`).toBe(true);
+          expect(mon.alpha, `${mon.name} alpha is repaired`).toBe(1);
+          expect(mon.scaleX, `${mon.name} scale is repaired`).toBe(mon.getSpriteScale());
+          expect(mon.getSprite().visible, `${mon.name} sprite visibility is repaired`).toBe(true);
+          expect(mon.getBattleInfo().visible, `${mon.name} info visibility is repaired`).toBe(true);
+        }
+      });
+      const guestChecksum = await withClient(rig.guestCtx, () => captureCoopChecksum());
+      expect(guestChecksum, "pure render repair leaves the guest logically identical to the host").toBe(hostChecksum);
+    }, 300_000);
+
+    it("loads the atlas when authority seats an object that had no pre-apply presentation key", async () => {
+      const rig = await setup();
+      await applyOnce(rig);
+      const enemy = await withClient(rig.guestCtx, () => rig.guestScene.getEnemyParty()[0]);
+      const loadSpy = await withClient(rig.guestCtx, () => {
+        rig.guestScene.field.remove(enemy, false);
+        enemy.setVisible(false);
+        enemy.getSprite().setVisible(false);
+        enemy.getBattleInfo().setVisible(false);
+        return vi.spyOn(enemy, "loadAssets").mockResolvedValue();
+      });
+
+      await applyOnce(rig);
+
+      await withClient(rig.guestCtx, () => {
+        expect(enemy.isOnField(), "the host-presented replacement is seated").toBe(true);
+        expect(enemy.visible, "the host-presented replacement container is visible").toBe(true);
+        expect(enemy.getSprite().visible, "the host-presented replacement sprite is visible").toBe(true);
+      });
+      expect(
+        loadSpy,
+        "a newly presented object loads its real atlas even though no pre-apply sprite key existed",
+      ).toHaveBeenCalled();
+    }, 300_000);
+
+    it("does not reveal logical active slots when the host carrier says they are pre-intro/off-field", async () => {
+      const rig = await setup();
+      await applyOnce(rig);
+      const state = await withClient(rig.hostCtx, () => {
+        for (const mon of [...rig.hostScene.getPlayerParty(), ...rig.hostScene.getEnemyParty()]) {
+          if (mon.isOnField()) {
+            rig.hostScene.field.remove(mon, false);
+          }
+          mon.setVisible(false);
+          mon.getSprite().setVisible(false);
+          mon.getBattleInfo().setVisible(false);
+        }
+        const captured = captureCoopAuthoritativeBattleState(rig.hostScene.currentBattle.turn);
+        return captured == null ? null : (JSON.parse(JSON.stringify(captured)) as NonNullable<typeof captured>);
+      });
+      expect(
+        state?.field.every(seat => seat.presented === false),
+        "host states the pre-intro visual boundary",
+      ).toBe(true);
+      const applied = await withClient(rig.guestCtx, () => applyCoopAuthoritativeBattleState(state ?? undefined, true));
+      expect(applied, "guest accepted the pre-intro carrier").toBe(true);
+      await withClient(rig.guestCtx, () => {
+        for (const mon of [...rig.guestScene.getPlayerParty(), ...rig.guestScene.getEnemyParty()]) {
+          if (state?.field.some(seat => seat.pokemonId === mon.id)) {
+            expect(mon.isOnField(), `${mon.name} is not seated before its presentation seam`).toBe(false);
+            expect(mon.visible, `${mon.name} is not revealed before its presentation seam`).toBe(false);
+            expect(mon.getSprite().visible, `${mon.name} sprite stays hidden before intro`).toBe(false);
+            expect(mon.getBattleInfo().visible, `${mon.name} info stays hidden before intro`).toBe(false);
+          }
+        }
+      });
     }, 300_000);
 
     it("re-summon is KEY-GATED: a stable apply never reloads the atlas; a sprite-key (species/form) change does", async () => {

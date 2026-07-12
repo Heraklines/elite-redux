@@ -22,7 +22,6 @@
 
 import { globalScene } from "#app/global-scene";
 import { EntryHazardTag } from "#data/arena-tag";
-import { fieldPositionForSlot } from "#data/battle-format";
 import { SerializableBattlerTag } from "#data/battler-tags";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import {
@@ -45,6 +44,10 @@ import {
   fnv1a64,
 } from "#data/elite-redux/coop/coop-battle-checksum";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import {
+  getActuallyFieldedCoopPokemon,
+  settleCoopFieldPresentation,
+} from "#data/elite-redux/coop/coop-field-presentation";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopAuthoritativeFieldSeat,
@@ -1500,6 +1503,13 @@ export function applyCoopEnemies(enemies: CoopSerializedEnemy[]): void {
             enemy.bossSegmentIndex = bsi;
           }
           enemy.initBattleInfo();
+        } else if (d.isBoss === false || bossSegments === 0) {
+          // The modern manifest carries the canonical non-boss state.  Clear a stale local boss just as
+          // authoritatively as the positive branch promotes one; setBoss(false) is an RNG-free 0/0 write.
+          enemy.setBoss(false);
+          if (enemy.getBattleInfo() != null) {
+            enemy.initBattleInfo();
+          }
         }
         // The same-species corrector is just as authoritative as the structural rebuild. A guest can roll
         // the host's species yet calculate a different HP stat under divergent ER constructor context; in
@@ -2539,6 +2549,7 @@ function readAuthoritativeSeat(mon: Pokemon): CoopAuthoritativeFieldSeat {
     bi: mon.getBattlerIndex(),
     partyIndex: readPartyIndex(mon),
     pokemonId: mon.id,
+    presented: mon.isOnField(),
     ...((mon as { coopOwner?: CoopRole }).coopOwner === undefined
       ? {}
       : { owner: (mon as { coopOwner?: CoopRole }).coopOwner }),
@@ -2816,95 +2827,6 @@ function activeFieldIndexForSeat(seat: CoopAuthoritativeFieldSeat): number {
   return seat.bi;
 }
 
-function ensureAuthoritativeFieldVisible(
-  mon: Pokemon,
-  seat: CoopAuthoritativeFieldSeat,
-  hostData: PokemonData | undefined,
-): void {
-  try {
-    if (hostData?.hp !== undefined && hostData.hp <= 0) {
-      if (mon.isOnField()) {
-        coopRemoveFromField(mon);
-      }
-      return;
-    }
-    const arrangement = globalScene.currentBattle?.arrangement;
-    const fieldIndex = activeFieldIndexForSeat(seat);
-    const capacity =
-      seat.side === "player"
-        ? (arrangement?.playerCapacity ?? (globalScene.currentBattle?.double ? 2 : 1))
-        : (arrangement?.enemyCapacity ?? (globalScene.currentBattle?.double ? 2 : 1));
-    const position = capacity <= 1 ? FieldPosition.CENTER : fieldPositionForSlot(fieldIndex, capacity);
-    if (mon.isOnField()) {
-      // Already rendered at this slot: re-assert the slot position only (the no-flicker gate - never
-      // re-summon a mon that is already on the field).
-      void mon.setFieldPosition(position, 0);
-    } else {
-      // #845: this battler slot has NO live rendered occupant of this id yet - a NEW id seated into the
-      // field (the trainer's faint-replacement, or a caught/ME-granted mon entering play). A bare data
-      // seat (add-to-field + a RELATIVE setFieldPosition, which only nudges by the slot-offset DELTA from
-      // the mon's current x/y) leaves a freshly reconstructed mon at its ctor-default base - which is NOT
-      // the LIVE enemy/player platform once updateFieldScale / a fusion / the biome layout has moved it -
-      // so the sprite lands off-platform: the guest's "empty slot" (2v2 on the host, 1v2 on the guest).
-      // Run the SAME field-summon presentation the checkpoint reconcile uses (summonCoopEnemyField /
-      // summonCoopPlayerField): remove the fainted predecessor at this slot FIRST, derive the ABSOLUTE
-      // platform base from a LIVE ally, then seat + show + (enemy) boss-shield redraw.
-      const liveSideField =
-        seat.side === "enemy"
-          ? (globalScene.getEnemyField(true) as Pokemon[])
-          : (globalScene.getPlayerField(true) as Pokemon[]);
-      // Predecessor-first: drop any live on-field mon still holding this battler slot (a KOd foe the host
-      // no longer seats here) so the incoming is never co-resident with it - mirrors the outgoing
-      // `leaveField` in summonCoopEnemyField. The post-seat orphan sweep stays as an idempotent backstop.
-      for (const stale of liveSideField) {
-        if (stale != null && stale !== mon && stale.id !== mon.id && stale.getBattlerIndex() === seat.bi) {
-          coopRemoveFromField(stale);
-        }
-      }
-      // Absolute base from a LIVE ally (its x/y minus its own slot offset = the shared platform base);
-      // pre-set CENTER so the following setFieldPosition ALWAYS applies the slot offset from that base
-      // (never early-returns on an already-matching fieldPosition, which would strand x/y at the default).
-      const liveAlly = liveSideField.find(p => p != null && p !== mon && p.isActive() && p.isOnField());
-      if (liveAlly != null) {
-        const allyOffset = liveAlly.getFieldPositionOffset();
-        mon.fieldPosition = FieldPosition.CENTER;
-        mon.setPosition(liveAlly.x - allyOffset[0], liveAlly.y - allyOffset[1]);
-      }
-      void mon.setFieldPosition(position, 0);
-      globalScene.add.existing(mon);
-      globalScene.field.add(mon);
-      if (seat.side === "enemy") {
-        const playerPokemon: Pokemon | undefined = globalScene.getPlayerPokemon();
-        if (playerPokemon?.isOnField()) {
-          globalScene.field.moveBelow(mon, playerPokemon);
-        }
-        globalScene.currentBattle?.seenEnemyPartyMemberIds.add(mon.id);
-      }
-      mon.showInfo();
-      mon.setVisible(true);
-      mon.getSprite()?.setVisible(true);
-      void mon.loadAssets(true);
-      try {
-        mon.playAnim();
-      } catch {
-        /* headless */
-      }
-      mon.fieldSetup(true);
-      // Redraw the boss-shield dividers now (showInfo only makes the bar visible); a boss replacement
-      // otherwise shows no segments until the next numeric apply. Mirrors summonCoopEnemyField.
-      if (seat.side === "enemy") {
-        const info = mon.getBattleInfo();
-        if (info instanceof EnemyBattleInfo) {
-          info.updateBossSegments(mon as EnemyPokemon);
-        }
-      }
-    }
-    void mon.updateInfo(true);
-  } catch {
-    /* one field seating repair failed; keep the rest */
-  }
-}
-
 function reconcileAuthoritativeField(
   state: CoopAuthoritativeBattleStateV1,
   playerParty: PokemonData[],
@@ -2916,7 +2838,8 @@ function reconcileAuthoritativeField(
   for (const mon of [...(globalScene.getPlayerParty() as Pokemon[]), ...(globalScene.getEnemyParty() as Pokemon[])]) {
     liveById.set(mon.id, mon);
   }
-  const seatedIds = new Set<number>();
+  const visiblePlayerSeats: { pokemon: Pokemon; slot: number }[] = [];
+  const visibleEnemySeats: { pokemon: Pokemon; slot: number }[] = [];
   for (const seat of state.field) {
     const party =
       seat.side === "player" ? (globalScene.getPlayerParty() as Pokemon[]) : (globalScene.getEnemyParty() as Pokemon[]);
@@ -2934,15 +2857,30 @@ function reconcileAuthoritativeField(
     if (seat.side === "enemy" && mon instanceof EnemyPokemon && seat.bossSegmentIndex !== undefined) {
       mon.bossSegmentIndex = seat.bossSegmentIndex;
     }
-    seatedIds.add(mon.id);
-    ensureAuthoritativeFieldVisible(mon, seat, data);
-  }
-  for (const mon of globalScene.getField(true)) {
-    if (mon != null && !seatedIds.has(mon.id)) {
-      coopRemoveFromField(mon);
+    // `field` is logical slot data and intentionally contains pre-intro/just-fainted occupants. Only an
+    // explicit host presentation statement may reveal a seat; protocol 30 rejects cached peers that do
+    // not carry this required bit, and a malformed missing value therefore fails closed to hidden.
+    if (seat.presented === true && (data?.hp ?? mon.hp) > 0) {
+      (seat.side === "player" ? visiblePlayerSeats : visibleEnemySeats).push({ pokemon: mon, slot: fieldIndex });
     }
   }
-  globalScene.updateFieldScale();
+  const arrangement = globalScene.currentBattle?.arrangement;
+  settleCoopFieldPresentation({
+    side: "player",
+    seats: visiblePlayerSeats,
+    capacity: arrangement?.playerCapacity ?? 1,
+    boundary: visiblePlayerSeats.length > 0 ? "resync-stable" : "wave-start-pre-intro",
+    desired: "visible",
+    hideStale: true,
+  });
+  settleCoopFieldPresentation({
+    side: "enemy",
+    seats: visibleEnemySeats,
+    capacity: arrangement?.enemyCapacity ?? 1,
+    boundary: visibleEnemySeats.length > 0 ? "resync-stable" : "wave-start-pre-intro",
+    desired: "visible",
+    hideStale: true,
+  });
 }
 
 /**
@@ -3063,7 +3001,7 @@ function reconcileAuthoritativeModifiers(rawBlobs: Record<string, unknown>[] | u
 function captureCoopOnFieldSpriteKeys(): Map<number, string> {
   const keys = new Map<number, string>();
   try {
-    for (const mon of globalScene.getField(true)) {
+    for (const mon of getActuallyFieldedCoopPokemon()) {
       if (mon != null) {
         keys.set(mon.id, battleSpriteKey(mon));
       }
@@ -3089,16 +3027,17 @@ function captureCoopOnFieldSpriteKeys(): Map<number, string> {
  *         authoritative modifier reconcile only redraws on a detected change; re-running the canonical
  *         bar rebuild here closes the "enemy items don't refresh on the guest" render gap (data
  *         converged, bar stale) regardless of that gate.
- *  2. EXPENSIVE RE-SUMMON - reload the atlas + replay the sprite, gated on the `getBattleSpriteKey`
- *     INPUTS (species/form/shiny/variant/fusion/gender where it affects the sprite) via a before/after
- *     key compare. So it only fires on a real visual-identity change (form change / transform), and a
- *     coopLog line marks each one for diagnosability. The #845 absolute-positioning fix stays intact:
- *     the field reconcile already seated the mon at the live platform base; this only swaps its atlas.
+ *  2. EXPENSIVE RE-SUMMON - load the atlas + replay the sprite for a newly presented authoritative object,
+ *     or when the `getBattleSpriteKey` INPUTS (species/form/shiny/variant/fusion/gender where it affects
+ *     the sprite) changed across the data apply. Routine stable turns remain cheap, while a replacement
+ *     constructed from PokemonData cannot remain on the placeholder just because it had no pre-apply key.
+ *     The #845 absolute-positioning fix stays intact: field reconcile already seated the mon at the live
+ *     platform base; this only loads/swaps its atlas.
  *
  * Fully guarded per mon: one failed refresh never aborts the rest.
  */
 function runCoopRenderDiffer(preSpriteKeys: Map<number, string>): void {
-  for (const mon of globalScene.getField(true)) {
+  for (const mon of getActuallyFieldedCoopPokemon()) {
     if (mon == null) {
       continue;
     }
@@ -3111,11 +3050,19 @@ function runCoopRenderDiffer(preSpriteKeys: Map<number, string>): void {
           info.updateBossSegments(mon);
         }
       }
-      // (2) EXPENSIVE RE-SUMMON - only when the sprite-key INPUTS changed for a mon already on field.
+      // (2) EXPENSIVE RE-SUMMON - when the sprite-key INPUTS changed for a mon already on field, OR
+      // when authoritative reconciliation just seated a brand-new object. The old seating helper loaded
+      // assets unconditionally for a new seat; dropping that while centralizing presentation left a newly
+      // reconstructed replacement on the substitute placeholder because it has no pre-apply key to diff.
       const before = preSpriteKeys.get(mon.id) ?? "";
       const after = battleSpriteKey(mon);
-      if (before !== "" && after !== "" && before !== after) {
-        coopLog("resync", `render differ: sprite-key change id=${mon.id} ${before} -> ${after} -> re-summon`);
+      if (after !== "" && (before === "" || before !== after)) {
+        coopLog(
+          "resync",
+          before === ""
+            ? `render differ: newly presented id=${mon.id} key=${after} -> load atlas`
+            : `render differ: sprite-key change id=${mon.id} ${before} -> ${after} -> re-summon`,
+        );
         void mon
           .loadAssets(false)
           .then(() => {

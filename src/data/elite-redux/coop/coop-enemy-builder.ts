@@ -137,6 +137,11 @@ export function buildCoopEnemy(
       "replay",
       `guest adopt enemy bi=${trainerSlot} isBoss segments=${bossSegments} index=${enemy.bossSegmentIndex}`,
     );
+  } else if (data.isBoss === false || bossSegments === 0) {
+    // Modern host manifests state the neutral boss value explicitly.  Re-assert it just as deliberately
+    // as the positive branch so a same-object/future constructor path can never retain stale boss bars.
+    // This is RNG-free: setBoss(false) only writes the canonical numeric neutral state (0/0).
+    enemy.setBoss(false);
   }
   // The serialized maxHp is authoritative state, not merely an hp clamp. ER modifiers and per-client
   // constructor context can make an otherwise identical species/level/IV reconstruction calculate a

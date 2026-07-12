@@ -8521,9 +8521,12 @@ export class EnemyPokemon extends Pokemon {
     this.trainerSlot = trainerSlot;
     this.initialTeamIndex = globalScene.currentBattle?.enemyParty.length ?? 0;
     this.isPopulatedFromDataSource = !!dataSource; // if a dataSource is provided, then it was populated from dataSource
-    if (boss) {
-      this.setBoss(boss, dataSource?.bossSegments);
-    }
+    // Keep the neutral boss state concrete on every EnemyPokemon.  The save/network PokemonData
+    // representation already canonicalizes a non-boss to `bossSegments: 0`, while this constructor
+    // previously left both numeric fields absent when `boss === false`.  That made an authoritative
+    // round-trip change only the guest from `undefined/undefined` to `0/0`, despite identical gameplay
+    // semantics.  `setBoss(false)` is the class's own neutral-state initializer and consumes no RNG.
+    this.setBoss(boss, dataSource?.bossSegments);
 
     if (Overrides.ENEMY_STATUS_OVERRIDE) {
       this.status = new Status(Overrides.ENEMY_STATUS_OVERRIDE, 0, 4);
