@@ -27,6 +27,7 @@ import { modifierTypes } from "#data/data-lists";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { adoptCoopEnemiesStructural, buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { CoopInteractionRelay, setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   isCoopRendererGateEnforced,
   setCoopRendererGateEnforced,
@@ -40,7 +41,12 @@ import {
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import type { CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopBattleCheckpoint,
+  CoopTransport,
+  CoopWaveOutcome,
+} from "#data/elite-redux/coop/coop-transport";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
@@ -84,6 +90,64 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     setCoopWaveTailSanction(null);
     clearCoopRuntime();
   });
+
+  /** Production wave completion is the legacy cue plus one committed authoritative envelope. */
+  function sendWaveAdvance(partner: CoopTransport, outcome: CoopWaveOutcome): void {
+    const controller = getCoopController();
+    if (controller == null) {
+      throw new Error("missing co-op controller");
+    }
+    const wave = globalScene.currentBattle.waveIndex;
+    const turn = globalScene.currentBattle.turn;
+    const logicalPhase = outcome === "gameOver" ? "GAME_OVER" : outcome === "flee" ? "WAVE_FLEE" : "WAVE_VICTORY";
+    const authoritativeState: CoopAuthoritativeBattleStateV1 = {
+      version: 1,
+      tick: 0,
+      wave,
+      turn,
+      playerParty: [],
+      enemyParty: [],
+      field: [],
+      weather: 0,
+      weatherTurnsLeft: 0,
+      terrain: 0,
+      terrainTurnsLeft: 0,
+      arenaTags: [],
+      money: globalScene.money,
+      pokeballCounts: [],
+      playerModifiers: [],
+      enemyModifiers: [],
+    };
+    partner.send({ t: "waveResolved", wave, outcome });
+    partner.send({
+      t: "envelope",
+      envelope: {
+        version: 1,
+        sessionEpoch: controller.sessionEpoch,
+        revision: 1,
+        wave,
+        turn,
+        logicalPhase,
+        pendingOperation: {
+          id: makeCoopOperationId(controller.sessionEpoch, 0, wave, "WAVE_ADVANCE"),
+          kind: "WAVE_ADVANCE",
+          owner: 0,
+          status: "applied",
+          payload: {
+            wave,
+            outcome,
+            nextLogicalPhase: logicalPhase,
+            nextWave: outcome === "gameOver" ? wave : wave + 1,
+            biomeChange: false,
+            eggLapse: false,
+            meBoundary: "none",
+            ...(outcome === "win" || outcome === "capture" ? { victoryKind: "wild" as const } : {}),
+          },
+        },
+        authoritativeState,
+      },
+    });
+  }
 
   /** Start a co-op double, then flip the LOCAL engine into the GUEST role. */
   const startCoopGuest = async () => {
@@ -642,7 +706,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
 
     // The host RESOLVED this wave (a WIN). Deliver the signal over the loopback peer - the runtime's
     // waveResolved handler records it as a one-shot pending flag (NOT applied mid-message).
-    partner.send({ t: "waveResolved", wave: globalScene.currentBattle.waveIndex, outcome: "win" });
+    sendWaveAdvance(partner, "win");
     await new Promise(r => setTimeout(r, 0));
 
     // Inject the turn's resolution so the replay phase's awaitTurn resolves and reaches finishTurn,
@@ -910,7 +974,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
 
     // The host RESOLVED this wave as a FLEE. Deliver the signal, then the turn resolution so the
     // replay phase reaches finishTurn (which consumes the pending wave-advance).
-    partner.send({ t: "waveResolved", wave: globalScene.currentBattle.waveIndex, outcome: "flee" });
+    sendWaveAdvance(partner, "flee");
     await new Promise(r => setTimeout(r, 0));
     partner.send({
       t: "turnResolution",
@@ -948,7 +1012,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const turn = globalScene.currentBattle.turn;
     const partner = getCoopRuntime()!.partnerTransport!;
 
-    partner.send({ t: "waveResolved", wave: globalScene.currentBattle.waveIndex, outcome: "gameOver" });
+    sendWaveAdvance(partner, "gameOver");
     await new Promise(r => setTimeout(r, 0));
     partner.send({
       t: "turnResolution",

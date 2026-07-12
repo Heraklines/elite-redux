@@ -151,6 +151,12 @@ function categorize() {
 const LANE_ISOLATE = { A: false, B: true, C: true, P: true, Q: false };
 
 /**
+ * Files proven by aggregate canary to retain process-global Phaser state despite Vitest module isolation.
+ * Keep only measured exceptions here: the shard still uses one fast controller for every compatible file.
+ */
+const FRESH_PROCESS_FILES = new Set([`${COOP_DIR_REL}/coop-duo-engine.test.ts`]);
+
+/**
  * Per-lane EXTRA env (merged over ER_SCENARIO=1). Only LANE P (#897) needs any: it forces the soak driver
  * into production-fidelity mode (no harness heals) and bounds the wave count so the gate stays wall-clock
  * -bounded. Every other lane runs with the plain ER_SCENARIO=1 env (empty here).
@@ -180,6 +186,8 @@ function runLane(name, files) {
     };
   }
   const isolate = LANE_ISOLATE[name] ? "--isolate" : "--no-isolate";
+  const groupedFiles = files.filter(file => !FRESH_PROCESS_FILES.has(file));
+  const freshFiles = files.filter(file => FRESH_PROCESS_FILES.has(file));
   const extraEnv = Object.entries(LANE_ENV[name] ?? {})
     .map(([k, v]) => `${k}=${v}`)
     .join(" ");
@@ -188,16 +196,28 @@ function runLane(name, files) {
     `\n=== LANE ${name}: ${files.length} files (one controller, sequential fork pool, ${isolate}${extraEnv ? `, ${extraEnv}` : ""}) ===`,
   );
   const started = Date.now();
-  const cmd = `npx vitest run ${files.join(" ")} --pool=forks --no-file-parallelism ${isolate}`;
-  const res = spawnSync(cmd, {
-    cwd: REPO_ROOT,
-    env: { ...process.env, ER_SCENARIO: "1", ...(LANE_ENV[name] ?? {}) },
-    stdio: ["ignore", "inherit", "inherit"],
-    encoding: "utf8",
-    shell: true,
-  });
+  const runFiles = selected => {
+    if (selected.length === 0) {
+      return true;
+    }
+    const cmd = `npx vitest run ${selected.join(" ")} --pool=forks --no-file-parallelism ${isolate}`;
+    return (
+      spawnSync(cmd, {
+        cwd: REPO_ROOT,
+        env: { ...process.env, ER_SCENARIO: "1", ...(LANE_ENV[name] ?? {}) },
+        stdio: ["ignore", "inherit", "inherit"],
+        encoding: "utf8",
+        shell: true,
+      }).status === 0
+    );
+  };
+  let ok = runFiles(groupedFiles);
+  for (const file of freshFiles) {
+    // eslint-disable-next-line no-console
+    console.log(`\n--- fresh-process exception: ${file} ---`);
+    ok = runFiles([file]) && ok;
+  }
   const ms = Date.now() - started;
-  const ok = res.status === 0;
   return { name, files: files.length, ok, ms, summary: ok ? "PASS" : "FAIL" };
 }
 

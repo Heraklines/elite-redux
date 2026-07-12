@@ -47,6 +47,7 @@ import {
   setCoopOrphanGraceMs,
   setCoopWaveBarrierMs,
 } from "#data/elite-redux/coop/coop-interaction-relay";
+import { setCoopOperationDurability } from "#data/elite-redux/coop/coop-operation-journal";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
@@ -238,6 +239,9 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
     // and a duplicate re-delivery is a no-op (invariant 5). With the flag OFF every one of these would adopt
     // verbatim (legacy pass-through), so the rejections are proof the primitive is gating adoption. =====
     resetCoopBiomeOperationState();
+    // This sub-proof exercises the pure adapter directly, outside a transport/journal delivery. The
+    // production legs above/below separately prove envelope gating and durable materialization.
+    setCoopOperationDurability(null);
     const HOST_OWNED_LATER = 4; // even counter -> host owns, guest watches
     const HOST_OWNED_EARLIER = 2; // an EARLIER interaction (also host-owned)
 

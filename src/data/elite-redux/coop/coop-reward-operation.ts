@@ -61,6 +61,7 @@
 import { COOP_CAP_OP_REWARD, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
+import { COOP_INTERACTION_LEAVE, COOP_INTERACTION_REROLL } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   type CoopAuthoritativeEnvelopeV1,
   type CoopOperationKind,
@@ -82,10 +83,6 @@ import {
   CoopOperationHost,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
-import {
-  COOP_INTERACTION_LEAVE,
-  COOP_INTERACTION_REROLL,
-} from "#data/elite-redux/coop/coop-interaction-relay";
 import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 /** The two shop surfaces this adapter serves: the reward screen (#1) and the biome market (#5). */
