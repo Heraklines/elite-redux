@@ -1,0 +1,60 @@
+===== COOP SOAK RESULT =====
+profile: level
+verdict: FAIL
+waves_requested: 55
+run: 29203995517 (feat/elite-redux-port)
+timestamp: 2026-07-12T18-32-25Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260712 WAVES=55 - replay this run with:  SOAK_SEED=20260712 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=110 guest=0
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=390 guest=110
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1650 guest=840
+[22m[39m[coop-soak] scalar-lag wave 26 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=2650 guest=1650
+[coop-soak] scalar-lag wave 30 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=4620 guest=2650
+[22m[39m[coop-soak] scalar-lag wave 35 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=5530 guest=4620
+[22m[39m[coop-soak] scalar-lag wave 42 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=7200 guest=5530
+[22m[39m[coop-soak] scalar-lag wave 43 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=8300 guest=7200
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 51 (seed 20260712): wave driving threw (strand/stall): guest replay STRANDED before finalize on CoopInertPhase; queued=[HideAbilityPhase,CoopInertPhase,MessagePhase,MessagePhase,MessagePhase,CoopMoveAnimReplayPhase,MessagePhase,DynamicPhaseMarker,CoopFinalizeTurnPhase]. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-12T18-32-24-961Z__seed-20260712__wave-51. Replay: SOAK_SEED=20260712[39m
+
+----- vitest result tail -----
+[coop:pump] end session { seq: -1, termSeq: -1, wasOwner: false }
+[coop:transport] state guest connected -> closed
+[coop:transport] state host connected -> disconnected
+[coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=true)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:151:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[33m[coop:runtime] partner channel disconnected -> entering membership recovery (shared waits retained)[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:151:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > plays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m60833[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:151:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:151:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 51 (seed 20260712): wave driving threw (strand/stall): guest replay STRANDED before finalize on CoopInertPhase; queued=[HideAbilityPhase,CoopInertPhase,MessagePhase,MessagePhase,MessagePhase,CoopMoveAnimReplayPhase,MessagePhase,DynamicPhaseMarker,CoopFinalizeTurnPhase]. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-12T18-32-24-961Z__seed-20260712__wave-51. Replay: SOAK_SEED=20260712[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1465:11[22m[39m
+    [90m1463|[39m       phaseState: phaseStateDump(rig),
+    [90m1464|[39m     });
+    [90m1465|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1466|[39m   };
+    [90m1467|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m3099:7[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m170:22[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 18:31:00
+[2m   Duration [22m 84.67s[2m (transform 18.38s, setup 22.34s, import 223ms, tests 61.25s, environment 695ms)[22m
+
