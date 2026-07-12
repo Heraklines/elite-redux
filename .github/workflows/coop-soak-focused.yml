@@ -1,0 +1,75 @@
+name: Focused Co-op Soak Replay
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Campaign profile to replay"
+        required: true
+        type: choice
+        options: [god-a, god-b, god-c, level, me-asym, journey]
+      waves:
+        description: "Override wave count (empty uses the profile default)"
+        required: false
+        type: string
+        default: ""
+      seed:
+        description: "Base deterministic seed"
+        required: true
+        type: string
+        default: "20260712"
+
+concurrency:
+  group: focused-coop-soak-${{ inputs.profile }}
+  cancel-in-progress: true
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Resolve profile
+        shell: bash
+        run: |
+          case "${{ inputs.profile }}" in
+            god-a) offset=0; default_waves=200; soak_profile=god; tests="test/tests/elite-redux/coop/coop-soak.test.ts" ;;
+            god-b) offset=104729; default_waves=200; soak_profile=god; tests="test/tests/elite-redux/coop/coop-soak.test.ts" ;;
+            god-c) offset=209759; default_waves=200; soak_profile=god; tests="test/tests/elite-redux/coop/coop-soak.test.ts" ;;
+            level) offset=0; default_waves=55; soak_profile=level; tests="test/tests/elite-redux/coop/coop-soak.test.ts" ;;
+            me-asym) offset=0; default_waves=150; soak_profile=god; tests="test/tests/elite-redux/coop/coop-soak-me.test.ts test/tests/elite-redux/coop/coop-soak-asymmetric.test.ts" ;;
+            journey) offset=0; default_waves=45; soak_profile=god; tests="test/tests/elite-redux/coop/coop-soak-journey.test.ts" ;;
+          esac
+          base="${{ inputs.seed }}"
+          if ! [[ "$base" =~ ^[0-9]+$ ]]; then echo "seed must be unsigned" >&2; exit 1; fi
+          echo "SOAK_SEED=$((10#$base + offset))" >> "$GITHUB_ENV"
+          echo "SOAK_WAVES=${{ inputs.waves || '' }}" >> "$GITHUB_ENV"
+          echo "DEFAULT_WAVES=$default_waves" >> "$GITHUB_ENV"
+          echo "SOAK_PROFILE=$soak_profile" >> "$GITHUB_ENV"
+          echo "SOAK_TESTS=$tests" >> "$GITHUB_ENV"
+
+      - name: Run isolated campaign replay
+        env:
+          ER_SCENARIO: "1"
+          SOAK_FIDELITY: production
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        shell: bash
+        run: |
+          export SOAK_WAVES="${SOAK_WAVES:-$DEFAULT_WAVES}"
+          mkdir -p dev-logs/coop-soak
+          set -o pipefail
+          npx vitest run $SOAK_TESTS --reporter=dot 2>&1 | tee dev-logs/coop-soak/soak-output.txt
+
+      - name: Upload replay evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: focused-coop-soak-${{ inputs.profile }}
+          path: dev-logs/coop-soak/**
+          retention-days: 7
+          if-no-files-found: warn

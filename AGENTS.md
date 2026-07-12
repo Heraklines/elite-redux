@@ -25,6 +25,10 @@ This smart-sharded workflow is the standing default for all future co-op checkpo
 - Do not replace external sharding with many concurrent local Vitest processes. Separate runners provide the speedup without recreating CPU/memory contention.
 - Keep `fail-fast: false` so every shard returns evidence. Download the per-shard log artifact, fix all reproducible failures in one batch, and let the next pushed checkpoint rerun the matrix.
 - A red shard blocks staging promotion. A green focused test is useful during development but does not replace the checkpoint gate.
+- For a deterministic long-campaign regression, dispatch `Focused Co-op Soak Replay` once per affected
+  profile so unrelated 200-wave campaigns do not delay diagnosis. Different profiles may run concurrently
+  on independent GitHub-hosted runners. A focused green replay does not replace the six-profile Nightly
+  Co-op Soak release milestone.
 - For an architecture-completion or release-confidence milestone, also require the external `Nightly Co-op
   Soak` matrix to pass at the checkpoint SHA. Its standing matrix uses six independent runners: three
   deterministic 200-wave god campaigns with widely separated seeds, the faint-heavy level campaign, the
