@@ -940,11 +940,11 @@ export function applyErTrainerVitaminCatchup(party: readonly EnemyPokemon[]): vo
       if (want[stat] <= 0) {
         continue;
       }
-      // Co-op authority / save serialization keys every held item by ModifierType.id. Constructing the
-      // concrete generated vitamin type directly left that id undefined (`heldItems=[bi,null,stack]`), so
-      // the guest could detect the trainer item but neither per-turn state nor stateSync could rebuild it.
+      // Keep the registry id on this hand-built generated type. ModifierData (save/load and co-op wire
+      // replication) reconstructs a modifier by type id before it uses the class/args; an unkeyed vitamin
+      // therefore works on the host but is impossible for a renderer or resumed session to rebuild.
       const vitaminType = new BaseStatBoosterModifierType(stat);
-      vitaminType.id = "BASE_STAT_BOOSTER";
+      vitaminType.withIdFromFunc(modifierTypes.BASE_STAT_BOOSTER);
       const mod = vitaminType.newModifier(boss) as PokemonHeldItemModifier | null;
       if (mod) {
         mod.stackCount = want[stat];

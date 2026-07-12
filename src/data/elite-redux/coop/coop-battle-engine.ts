@@ -1250,7 +1250,7 @@ function captureCoopHeldItems(mon: Pokemon): Record<string, unknown>[] {
       .map(m => {
         const data = new ModifierData(m, false);
         return {
-          typeId: data.typeId,
+          typeId: coopModifierTypeId(m),
           className: data.className,
           args: data.args,
           stackCount: data.stackCount,
@@ -1260,6 +1260,25 @@ function captureCoopHeldItems(mon: Pokemon): Record<string, unknown>[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Return the stable registry key used by ModifierData/wire reconstruction. A few older ER paths built a
+ * generated vitamin type directly, leaving `type.id` undefined at runtime even though its static type is
+ * `string`. Canonicalize that known legacy shape at the authority boundary as well as fixing its producers:
+ * an in-progress trainer fight from an older save can then still converge instead of serializing JSON null
+ * in the checksum and an unreconstructible modifier blob. Unknown unkeyed classes remain an explicit empty
+ * key (and therefore cannot masquerade as a valid item).
+ */
+function coopModifierTypeId(modifier: PersistentModifier): string {
+  const raw = modifier.type?.id as unknown;
+  if (typeof raw === "string" && raw.length > 0) {
+    return raw;
+  }
+  if (modifier instanceof Modifier.BaseStatModifier) {
+    return "BASE_STAT_BOOSTER";
+  }
+  return "";
 }
 
 /**
@@ -1641,7 +1660,7 @@ function readArenaTags(): [number, number][] {
 function readModifiers(): [string, number][] {
   try {
     return globalScene.modifiers
-      .map(m => [m.type.id, m.stackCount] as [string, number])
+      .map(m => [coopModifierTypeId(m), m.stackCount] as [string, number])
       .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]));
   } catch {
     return [];
@@ -1700,7 +1719,7 @@ function readHeldItemDigest(): [number, string, number][] {
         x => x instanceof PokemonHeldItemModifier && x.pokemonId === mon.id,
         mon.isPlayer(),
       )) {
-        out.push([bi, m.type.id, m.stackCount]);
+        out.push([bi, coopModifierTypeId(m), m.stackCount]);
       }
     }
     return out.sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : a[2] - b[2]));
@@ -2534,7 +2553,7 @@ function captureCoopModifierBlobs(player: boolean): Record<string, unknown>[] {
         const data = new ModifierData(m, player);
         return {
           player: data.player,
-          typeId: data.typeId,
+          typeId: coopModifierTypeId(m),
           className: data.className,
           args: data.args,
           stackCount: data.stackCount,
