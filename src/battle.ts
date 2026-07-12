@@ -133,6 +133,13 @@ export class Battle {
     // Multi-format: the resolver may hand us an explicit format (e.g. triple); otherwise
     // fall back to the legacy single/double derived from `double`. Binary is unchanged.
     this.setFormat(format ?? legacyFormat(double));
+    // The classic finale's first stage is structurally a single boss. Its phase-two transition
+    // deliberately calls setDouble(true) after the shield breaks. Co-op normally resolves every
+    // battle as double; carrying that format into wave 200 generated two unrelated bosses and the
+    // finale's survive-at-1HP machinery made both immortal. Normalize only the finale's stage one.
+    if (this.isClassicFinalBoss) {
+      this.setDouble(false);
+    }
 
     this.enemyLevels =
       battleType === BattleType.TRAINER

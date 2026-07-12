@@ -624,10 +624,9 @@ export class EncounterPhase extends BattlePhase {
           // Elite Redux: on Elite/Hell the classic final boss (Eternatus) is
           // replaced by a two-phase Cascoon → Primal Cascoon encounter.
           if (battle.isClassicFinalBoss) {
-            const erFinalBoss = getErFinalBossSpecies();
-            if (erFinalBoss) {
-              enemySpecies = erFinalBoss;
-            }
+            // Ace keeps the canonical Eternatus finale. Do not fall through to randomSpecies:
+            // co-op's double format exposed that fallback as random segmented enemies at wave 200.
+            enemySpecies = getErFinalBossSpecies() ?? getPokemonSpecies(SpeciesId.ETERNATUS);
           }
           // If player has golden bug net, rolls 10% chance to replace non-boss wave wild species from the golden bug net bug pool
           if (

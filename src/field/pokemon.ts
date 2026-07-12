@@ -9379,8 +9379,11 @@ export class EnemyPokemon extends Pokemon {
       && isErFinalBossSpecies(this.species.speciesId)
       && !this.customPokemonData?.erBlackShiny
       && getErDifficulty() === "hell";
+    const isFinaleSpecies =
+      this.species.speciesId === SpeciesId.ETERNATUS || isErFinalBossSpecies(this.species.speciesId);
     if (
       globalScene.currentBattle.isClassicFinalBoss
+      && isFinaleSpecies
       && (this.formIndex === 0 || erHellFinaleStageOne)
       && this.bossSegmentIndex < 1
     ) {
@@ -9405,7 +9408,9 @@ export class EnemyPokemon extends Pokemon {
   }
 
   private getMinimumSegmentIndex(): number {
-    if (globalScene.currentBattle.isClassicFinalBoss && !this.formIndex) {
+    const isFinaleSpecies =
+      this.species.speciesId === SpeciesId.ETERNATUS || isErFinalBossSpecies(this.species.speciesId);
+    if (globalScene.currentBattle.isClassicFinalBoss && isFinaleSpecies && !this.formIndex) {
       return 1;
     }
 
