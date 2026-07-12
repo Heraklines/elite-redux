@@ -76,6 +76,7 @@ import {
 import { getCoopOperationJournalCommittedClasses } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   clearCoopRuntime,
+  getCoopActiveWaveTransition,
   getCoopInteractionRelay,
   getCoopMeBattleInteractionCounter,
   getCoopRuntime,
@@ -1830,7 +1831,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // toxic terrain). Sampling before replay made the driver announce cmd:<wave>:<nextTurn> and wait for a
       // CommandPhase while production correctly entered SelectModifierPhase, a false softlock report.
       const waveWon = rig.hostScene.currentBattle.enemyParty.every(e => e.isFainted());
-      if (waveWon) {
+      const authoritativeTerminal = getCoopActiveWaveTransition(wave)?.outcome;
+      if (
+        waveWon
+        || authoritativeTerminal === "win"
+        || authoritativeTerminal === "capture"
+        || authoritativeTerminal === "flee"
+      ) {
         return;
       }
       // Not won yet: advance the host to the next turn's CommandPhase for another round.
