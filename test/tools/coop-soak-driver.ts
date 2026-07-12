@@ -1267,7 +1267,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           ?? offer?.moves.find(move => move.slot === explosionSlot);
         const explosionTargets = offeredExplosion?.targetSets[0];
         if (explosionTargets == null) {
-          fail("desync", wave, "host did not offer the guest's locally legal Explosion command");
+          return fail("desync", wave, "host did not offer the guest's locally legal Explosion command");
         }
         actionScript.push(`wave ${wave} turn ${turn}: forced-faint guest EXPLOSION self-KO`);
         hitMode(UiMode.COMMAND);

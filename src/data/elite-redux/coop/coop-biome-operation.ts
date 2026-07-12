@@ -387,7 +387,12 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
         // COMMIT -> JOURNAL (Wave-2e): the host is the sole committer of a GUEST-owned pick; journal the
         // authoritative envelope it just produced so a cut is healed by the journal, not a bespoke self-heal.
         journalCoopCommittedEnvelope(res.envelope);
+        // The host is the authority and has just validated+committed this guest-owned intent. Its live
+        // phase may apply immediately; only the remote guest must wait for the committed envelope.
+        lastAppliedPinned = params.pinned;
+        return { adopt: true, choice: params.res.choice, data: params.res.data };
       }
+      return { adopt: false, reason: "host-duplicate" };
     }
 
     // Stale / duplicate rejection (invariant 6, the #861 shape): a pick pinned STRICTLY BELOW one we already

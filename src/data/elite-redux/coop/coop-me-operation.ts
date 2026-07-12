@@ -544,7 +544,17 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
         // COMMIT -> JOURNAL (Wave-2e): the host is the sole committer of a GUEST-owned ME step; journal the
         // authoritative envelope so a cut is healed by the journal, not a bespoke self-heal.
         journalCoopCommittedEnvelope(res.envelope);
+        // The sole authority may apply the intent it just validated at this safe phase seam. The
+        // non-authoritative peer remains strictly gated on the committed envelope.
+        lastAppliedPinned = params.pinned;
+        return {
+          adopt: true,
+          kind: params.kind,
+          terminal: params.terminal,
+          hostTurn: params.hostTurn,
+        };
       }
+      return { adopt: false, reason: "host-duplicate" };
     }
 
     // Stale / duplicate rejection (invariant 6, the #861 shape): a decision pinned STRICTLY BELOW one we

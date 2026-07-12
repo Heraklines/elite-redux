@@ -82,6 +82,10 @@ import {
   CoopOperationHost,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
+import {
+  COOP_INTERACTION_LEAVE,
+  COOP_INTERACTION_REROLL,
+} from "#data/elite-redux/coop/coop-interaction-relay";
 import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 /** The two shop surfaces this adapter serves: the reward screen (#1) and the biome market (#5). */
@@ -89,6 +93,8 @@ export type CoopShopSurface = "reward" | "market";
 
 /** The awaited relay action the watcher gates (a subset of CoopInteractionChoice - choice/data). */
 export interface CoopRewardRelayAction {
+  /** Exact validated legacy action kind; becomes the authoritative REWARD payload label. */
+  readonly label?: string | undefined;
   readonly choice: number;
   readonly data?: number[] | undefined;
   /** Present only when the durability live sink supplied this action. */
@@ -140,14 +146,22 @@ const pendingJournalMaterializations = new Set<string>();
  * pinned STRICTLY BELOW it is a leftover from a strictly-earlier interaction a later one superseded (the
  * #861 cross-interaction stale shape). Advanced ONLY on a watcher adoption. -1 = none yet.
  */
-let lastAdoptedStart = -1;
+interface RewardWatcherState {
+  ordinal: number;
+  ordinalStart: number;
+  lastAdoptedStart: number;
+  lastLeftStart: number;
+}
 
-/**
- * The highest pinned interaction start the local client has adopted a TERMINAL (skip/leave) for AS A
- * WATCHER. A pick pinned AT OR BELOW it is a late choice for an interaction already LEFT (the
- * late-after-leave shape). -1 = none yet.
- */
-let lastLeftStart = -1;
+function freshWatcherState(): RewardWatcherState {
+  return { ordinal: 0, ordinalStart: -1, lastAdoptedStart: -1, lastLeftStart: -1 };
+}
+
+/** Per-peer state. Dual-engine tests share one JS realm; real peers do not share these cursors either. */
+const watcherStateByRole: Record<CoopRole, RewardWatcherState> = {
+  host: freshWatcherState(),
+  guest: freshWatcherState(),
+};
 
 /** ACTION ORDINAL stride: pin * STRIDE + ordinal must not overflow into the next pin's op-id space. */
 export const COOP_REWARD_ACTION_STRIDE = 100_000;
@@ -163,8 +177,6 @@ let ownerOrdinal = 0;
 let ownerOrdinalStart = -1;
 
 /** The watcher's per-interaction monotonic action ordinal (for the applied op-id). Reset when the pin changes. */
-let watcherOrdinal = 0;
-let watcherOrdinalStart = -1;
 
 /**
  * The surface-local revision FLOOR (W2e-R P0-3): seeded from the persisted per-class high-water on a COLD
@@ -218,12 +230,10 @@ export function resetCoopRewardOperationState(): void {
   watchGuest = null;
   journalLeadingStarts.clear();
   pendingJournalMaterializations.clear();
-  lastAdoptedStart = -1;
-  lastLeftStart = -1;
+  watcherStateByRole.host = freshWatcherState();
+  watcherStateByRole.guest = freshWatcherState();
   ownerOrdinal = 0;
   ownerOrdinalStart = -1;
-  watcherOrdinal = 0;
-  watcherOrdinalStart = -1;
   revisionFloor = 0;
 }
 
@@ -262,6 +272,23 @@ function guest(): CoopOperationGuest {
 /** The operation kind for a surface (the §2 successor of the reward / biomeShop relay kinds). */
 function kindFor(surface: CoopShopSurface): Extract<CoopOperationKind, "REWARD" | "SHOP_BUY"> {
   return surface === "reward" ? "REWARD" : "SHOP_BUY";
+}
+
+/** Recover the validated relay kind from its canonical action encoding when the phase passed the compact shape. */
+function relayedLabel(surface: CoopShopSurface, action: CoopRewardRelayAction): string {
+  if (action.label != null) {
+    return action.label;
+  }
+  if (surface === "market") {
+    return "biomeShop";
+  }
+  if (action.choice === COOP_INTERACTION_LEAVE) {
+    return "skip";
+  }
+  if (action.choice === COOP_INTERACTION_REROLL) {
+    return "reroll";
+  }
+  return ["reward", "shop", "transfer", "lock", "check"][action.data?.[0] ?? -1] ?? "relay";
 }
 
 /**
@@ -315,12 +342,13 @@ function nextOwnerOrdinal(pinned: number): number {
 }
 
 /** Peek the watcher's current per-interaction action ordinal for `pinned` (resets when the pin changes). */
-function peekWatcherOrdinal(pinned: number): number {
-  if (watcherOrdinalStart !== pinned) {
-    watcherOrdinal = 0;
-    watcherOrdinalStart = pinned;
+function watcherState(role: CoopRole, pinned: number): RewardWatcherState {
+  const state = watcherStateByRole[role];
+  if (state.ordinalStart !== pinned) {
+    state.ordinal = 0;
+    state.ordinalStart = pinned;
   }
-  return watcherOrdinal;
+  return state;
 }
 
 // -----------------------------------------------------------------------------
@@ -440,29 +468,36 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
     return { adopt: true };
   }
   try {
+    const state = watcherState(params.localRole, params.pinned);
     // Stale / late rejection (invariant 6, the #861 shape). The pinned interaction counter is monotonic, so:
     //  - a pick STRICTLY BELOW the highest interaction we have adopted at is a leftover from an interaction a
     //    later one already superseded (the cross-interaction stale buffer);
     //  - a pick AT OR BELOW the highest interaction we have LEFT is a late choice for an interaction we
     //    already terminated (the late-after-leave shape).
     // Within a live interaction (pin > both) every action passes, so a legitimate stream of buys is adopted.
-    if (params.pinned < lastAdoptedStart || params.pinned <= lastLeftStart) {
+    if (params.pinned < state.lastAdoptedStart || params.pinned <= state.lastLeftStart) {
       coopWarn(
         "reward",
-        `${params.surface} op WATCHER REJECT stale/late pin=${params.pinned} adoptedStart=${lastAdoptedStart} leftStart=${lastLeftStart} (Wave-2d)`,
+        `${params.surface} op WATCHER REJECT stale/late pin=${params.pinned} adoptedStart=${state.lastAdoptedStart} leftStart=${state.lastLeftStart} role=${params.localRole} (Wave-2d)`,
       );
       return { adopt: false, reason: "stale-or-late" };
     }
 
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
-    const ordinal = peekWatcherOrdinal(params.pinned);
+    const ordinal = state.ordinal;
     const opId = makeCoopOperationId(
       epoch,
       ownerSeat,
       params.pinned * COOP_REWARD_ACTION_STRIDE + ordinal,
       kindFor(params.surface),
     );
-    const payload = buildPayload(params.surface, "relay", params.action.choice, params.action.data, params.terminal);
+    const payload = buildPayload(
+      params.surface,
+      relayedLabel(params.surface, params.action),
+      params.action.choice,
+      params.action.data,
+      params.terminal,
+    );
     const intent: CoopPendingOperation = {
       id: opId,
       kind: kindFor(params.surface),
@@ -487,7 +522,16 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
         // COMMIT -> JOURNAL (Wave-2e): the host is the sole committer of a GUEST-owned action; journal the
         // authoritative envelope so a cut is healed by the journal, not a bespoke self-heal.
         journalCoopCommittedEnvelope(res.envelope);
+        // The authoritative host applies its validated guest-owned action at this safe phase seam.
+        // The remote guest remains envelope-gated and merely ACKs/dedupes its already-proposed action.
+        state.ordinal += 1;
+        state.lastAdoptedStart = Math.max(state.lastAdoptedStart, params.pinned);
+        if (params.terminal) {
+          state.lastLeftStart = Math.max(state.lastLeftStart, params.pinned);
+        }
+        return { adopt: true };
       }
+      return { adopt: false, reason: "host-duplicate" };
     }
 
     // Once the durability journal wins one action in this pinned FIFO, it leads the remainder of the
@@ -501,10 +545,10 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
     // with the matching one-shot marker is therefore legitimate materialization, not a duplicate.
     if (guest().hasApplied(opId)) {
       if (params.action.operationId === opId && pendingJournalMaterializations.delete(opId)) {
-        watcherOrdinal += 1;
-        lastAdoptedStart = Math.max(lastAdoptedStart, params.pinned);
+        state.ordinal += 1;
+        state.lastAdoptedStart = Math.max(state.lastAdoptedStart, params.pinned);
         if (params.terminal) {
-          lastLeftStart = Math.max(lastLeftStart, params.pinned);
+          state.lastLeftStart = Math.max(state.lastLeftStart, params.pinned);
         }
         coopLog(
           "reward",
@@ -539,10 +583,10 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
     }
 
     // Advance the watcher order + ordinal ONLY on a successful adoption (§8.2: never on the owner's commit).
-    watcherOrdinal += 1;
-    lastAdoptedStart = Math.max(lastAdoptedStart, params.pinned);
+    state.ordinal += 1;
+    state.lastAdoptedStart = Math.max(state.lastAdoptedStart, params.pinned);
     if (params.terminal) {
-      lastLeftStart = Math.max(lastLeftStart, params.pinned);
+      state.lastLeftStart = Math.max(state.lastLeftStart, params.pinned);
     }
     coopLog(
       "reward",

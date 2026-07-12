@@ -33,7 +33,8 @@ import {
   getCoopController,
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
+import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import type { CoopAuthoritativeBattleStateV1, CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
 import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
 import { CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -109,8 +110,56 @@ async function startGuestWithPendingWin(): Promise<CoopRuntime> {
   if (runtime.partnerTransport == null) {
     throw new Error("expected a spoof partner transport in a local session");
   }
-  // The spoof (host end) tells the guest the wave resolved with a win - the real receive path.
+  // The spoof (host end) sends both the compatibility cue and the authoritative committed envelope.
+  // Under durability the raw cue alone must not advance; the envelope is the one mutation authority.
   runtime.partnerTransport.send({ t: "waveResolved", wave: WAVE, outcome: "win" });
+  const epoch = controller.sessionEpoch;
+  const authoritativeState: CoopAuthoritativeBattleStateV1 = {
+    version: 1,
+    tick: 0,
+    wave: WAVE,
+    turn: 1,
+    playerParty: [],
+    enemyParty: [],
+    field: [],
+    weather: 0,
+    weatherTurnsLeft: 0,
+    terrain: 0,
+    terrainTurnsLeft: 0,
+    arenaTags: [],
+    money: 0,
+    pokeballCounts: [],
+    playerModifiers: [],
+    enemyModifiers: [],
+  };
+  runtime.partnerTransport.send({
+    t: "envelope",
+    envelope: {
+      version: 1,
+      sessionEpoch: epoch,
+      revision: 1,
+      wave: WAVE,
+      turn: 1,
+      logicalPhase: "WAVE_VICTORY",
+      pendingOperation: {
+        id: makeCoopOperationId(epoch, 0, WAVE, "WAVE_ADVANCE"),
+        kind: "WAVE_ADVANCE",
+        owner: 0,
+        status: "applied",
+        payload: {
+          wave: WAVE,
+          outcome: "win",
+          nextLogicalPhase: "WAVE_VICTORY",
+          nextWave: WAVE + 1,
+          biomeChange: false,
+          eggLapse: false,
+          meBoundary: "none",
+          victoryKind: "wild",
+        },
+      },
+      authoritativeState,
+    },
+  });
   await flush();
   return runtime;
 }
