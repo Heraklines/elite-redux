@@ -88,12 +88,24 @@ function killPresentationTweens(pokemon: Pokemon): void {
 function hidePokemonPresentation(pokemon: Pokemon): void {
   killPresentationTweens(pokemon);
   try {
-    pokemon.getBattleInfo()?.setVisible(false);
+    const info = pokemon.getBattleInfo();
+    info?.setVisible(false);
+    if (info != null) {
+      info.visible = false;
+    }
   } catch {
     /* headless battle-info stub */
   }
-  pokemon.getSprite()?.setVisible(false);
-  pokemon.getTintSprite()?.setVisible(false);
+  const sprite = pokemon.getSprite();
+  sprite?.setVisible(false);
+  if (sprite != null) {
+    sprite.visible = false;
+  }
+  const tintSprite = pokemon.getTintSprite();
+  tintSprite?.setVisible(false);
+  if (tintSprite != null) {
+    tintSprite.visible = false;
+  }
   pokemon.setVisible(false);
   pokemon.setAlpha(0);
   if (isActuallyInFieldContainer(pokemon)) {
@@ -159,8 +171,12 @@ function positionAtAuthoritativeSlot(pokemon: Pokemon, slot: number, capacity: n
 function settleInfoImmediately(pokemon: Pokemon): void {
   try {
     pokemon.showInfo();
-    completeTweensOf(compactTargets(pokemon.getBattleInfo(), pokemon.getBattleInfo()?.expMaskRect));
-    pokemon.getBattleInfo()?.setVisible(true);
+    const info = pokemon.getBattleInfo();
+    completeTweensOf(compactTargets(info, info?.expMaskRect));
+    info?.setVisible(true);
+    if (info != null) {
+      info.visible = true;
+    }
     void pokemon.updateInfo(true);
   } catch {
     /* headless battle-info stub */
@@ -173,7 +189,7 @@ function settleInfoImmediately(pokemon: Pokemon): void {
  * info children.  Presentation recovery must materialize those children itself; merely toggling the container
  * leaves the exact live symptom this adapter exists to repair (the mon and its UI bar are both absent).
  */
-function ensurePokemonPresentationNodes(pokemon: Pokemon): boolean {
+export function ensureCoopPokemonPresentationNodes(pokemon: Pokemon): boolean {
   if (pokemon.getSprite() != null && pokemon.getBattleInfo() != null) {
     return false;
   }
@@ -186,7 +202,7 @@ function showPokemonPresentation(pokemon: Pokemon, slot: number, capacity: numbe
     hidePokemonPresentation(pokemon);
     return false;
   }
-  const newlyInitialized = ensurePokemonPresentationNodes(pokemon);
+  const newlyInitialized = ensureCoopPokemonPresentationNodes(pokemon);
   killPresentationTweens(pokemon);
   const newlySeated = !isActuallyInFieldContainer(pokemon);
   if (newlySeated) {
@@ -217,10 +233,18 @@ function showPokemonPresentation(pokemon: Pokemon, slot: number, capacity: numbe
   sprite?.setVisible(true);
   sprite?.setAlpha(1);
   sprite?.clearTint();
+  if (sprite != null) {
+    sprite.visible = true;
+    sprite.alpha = 1;
+  }
   const tintSprite = pokemon.getTintSprite();
   tintSprite?.setVisible(false);
   tintSprite?.setAlpha(1);
   tintSprite?.clearTint();
+  if (tintSprite != null) {
+    tintSprite.visible = false;
+    tintSprite.alpha = 1;
+  }
   settleInfoImmediately(pokemon);
   try {
     pokemon.playAnim();

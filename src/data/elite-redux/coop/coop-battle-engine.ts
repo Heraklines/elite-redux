@@ -45,6 +45,7 @@ import {
 } from "#data/elite-redux/coop/coop-battle-checksum";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
+  ensureCoopPokemonPresentationNodes,
   getActuallyFieldedCoopPokemon,
   settleCoopFieldPresentation,
 } from "#data/elite-redux/coop/coop-field-presentation";
@@ -1002,6 +1003,10 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
       }
       const state = normalizeMonState(raw);
       try {
+        // A reconstructed authoritative mon can enter the logical field before any summon phase creates its
+        // sprite/battle-info children. Numeric correction calls updateInfo/loadAssets below, so initialize
+        // those presentation nodes first instead of silently abandoning the rest of this mon's checkpoint.
+        ensureCoopPokemonPresentationNodes(mon);
         if (state.maxHp > 0 && mon.getMaxHp() !== state.maxHp) {
           coopWarn(
             "checkpoint",
