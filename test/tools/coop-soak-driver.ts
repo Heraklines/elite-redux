@@ -1673,6 +1673,27 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   };
 
   /**
+   * Drive the two owner-only Dex Nav species picks when a taken reward queued ErDexNavPhase.
+   * The watcher correctly skips this per-account picker; a host owner must answer it before the
+   * next CommandPhase. Register prompts only when the phase is actually queued so they can never
+   * sit ahead of an unrelated command prompt and poison a later wave.
+   */
+  const armHostDexNavAutoPicks = (): void => {
+    if (!rig.hostScene.phaseManager.hasPhaseOfType("ErDexNavPhase")) {
+      return;
+    }
+    for (let pick = 0; pick < 2; pick++) {
+      game.onNextPrompt(
+        "ErDexNavPhase",
+        UiMode.OPTION_SELECT,
+        () => rig.hostScene.ui.processInput(Button.ACTION),
+        () => !rig.hostScene.phaseManager.hasPhaseOfType("ErDexNavPhase"),
+      );
+    }
+    actionScript.push(`wave ${rig.hostScene.currentBattle.waveIndex}: armed owner Dex Nav picks`);
+  };
+
+  /**
    * The soak drives the host's real phase queue while the guest is a replay renderer, so the guest does not
    * naturally execute its own CommandPhase. Materialize both halves of the guest's command rendezvous around
    * the host crossing: arrive before the host reaches the boundary, then verify the host's reciprocal arrival
@@ -1692,6 +1713,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     await drainLoopback();
     await withClient(rig.hostCtx, async () => {
       beforeHostCross?.();
+      armHostDexNavAutoPicks();
       await game.phaseInterceptor.to("CommandPhase");
     });
     await drainLoopback();
