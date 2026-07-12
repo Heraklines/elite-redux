@@ -1360,15 +1360,28 @@ export function routeShowdownAbandon(runtime: CoopRuntime): void {
 
 function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInteractionRelay, runtime: CoopRuntime): void {
   let rejoining = false;
+  // Transport-only tests and teardown paths can outlive the scene binding. Recovery diagnostics must
+  // never turn a harmless channel close into an exception that prevents waiter cancellation.
+  const causalBattlePoint = (): { wave: number; turn: number } => {
+    try {
+      return {
+        wave: globalScene.currentBattle?.waveIndex ?? 0,
+        turn: globalScene.currentBattle?.turn ?? 0,
+      };
+    } catch {
+      return { wave: 0, turn: 0 };
+    }
+  };
   const terminateSharedSession = (isActiveRuntime: boolean, recoveryId: string): void => {
+    const point = causalBattlePoint();
     recordCoopCausalEvent({
       domain: "recovery",
       stage: "terminated",
       causalId: recoveryId,
       role: runtime.controller.role,
       epoch: runtime.controller.sessionEpoch,
-      wave: globalScene.currentBattle?.waveIndex ?? 0,
-      turn: globalScene.currentBattle?.turn ?? 0,
+      wave: point.wave,
+      turn: point.turn,
     });
     runtime.membership.terminate();
     // Ordinary co-op has no committed membership-removal/AI-handoff operation. Pretending the survivor
@@ -1408,14 +1421,15 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
       return;
     }
     const recoveryId = `rejoin:e${runtime.controller.sessionEpoch}:g${coopSessionGeneration()}:c${transport.connectionGeneration?.() ?? 0}`;
+    const point = causalBattlePoint();
     recordCoopCausalEvent({
       domain: "recovery",
       stage: "channel-lost",
       causalId: recoveryId,
       role: runtime.controller.role,
       epoch: runtime.controller.sessionEpoch,
-      wave: globalScene.currentBattle?.waveIndex ?? 0,
-      turn: globalScene.currentBattle?.turn ?? 0,
+      wave: point.wave,
+      turn: point.turn,
       detail: transport.disconnectReason?.() ?? state,
     });
     coopWarn("runtime", `partner channel ${state} -> entering membership recovery (shared waits retained)`);
