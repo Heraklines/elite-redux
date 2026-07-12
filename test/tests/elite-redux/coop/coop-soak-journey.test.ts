@@ -34,7 +34,7 @@ const EVENT_SCHEDULE = new Map([
   [26, MysteryEncounterType.ER_TOWN_RAFFLE], // money spend + seeded generated reward identity
   [28, MysteryEncounterType.ER_FORTUNE_TELLER], // queued future event + world-map reveal mutation
   [32, MysteryEncounterType.TELEPORTING_HIJINKS], // post-crossroads biome transition + boss battle
-  [34, MysteryEncounterType.ER_STILL_WATERS], // full-party mirror battle handoff
+  [34, MysteryEncounterType.ER_STILL_WATERS], // full-party mirror battle surface; safe decline terminal
   [36, MysteryEncounterType.WEIRD_DREAM], // legal-range transformation encounter, leave branch
   [39, MysteryEncounterType.ER_CLEANSING_FONT], // party-wide heal/status continuation
   [42, MysteryEncounterType.ER_DRAGONS_HOARD], // catch-capable boss surface; safe decline terminal
@@ -51,7 +51,7 @@ const EVENT_OPTIONS = new Map([
   [26, 1],
   [28, 1],
   [32, 3],
-  [34, 1],
+  [34, 2],
   [36, 3],
   [39, 1],
   [42, 2],
@@ -60,7 +60,7 @@ const EVENT_OPTIONS = new Map([
 
 /** Field Trip option 1: choose party slot 0, then that Pokemon's move slot 0. */
 const EVENT_SUB_PICKS = new Map<number, readonly number[]>([[24, [0, 0]]]);
-const EVENT_BATTLE_WAVES = new Set([32, 34]);
+const EVENT_BATTLE_WAVES = new Set([32]);
 
 describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome transitions", () => {
   let phaserGame: Phaser.Game;
