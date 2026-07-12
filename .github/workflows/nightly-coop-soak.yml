@@ -157,10 +157,16 @@ jobs:
           # faint-heavy level-85 party). SOAK_PROFILE=god is byte-identical to leaving it unset.
           SOAK_PROFILE: ${{ matrix.soak_profile }}
           # A manual-dispatch soak_waves (if given) overrides BOTH legs; otherwise each profile's default.
-          SOAK_WAVES: ${{ github.event.inputs.soak_waves || matrix.waves_default }}
+          REQUESTED_SOAK_WAVES: ${{ github.event.inputs.soak_waves }}
+          PROFILE_SOAK_WAVES: ${{ matrix.waves_default }}
+          # The long campaigns must exercise the same no-harness-heal path as a live renderer.
+          # Specialized ME/journey tests either set their own fidelity or ignore this value.
+          SOAK_FIDELITY: "production"
           NODE_OPTIONS: "--max-old-space-size=8192"
         run: |
           mkdir -p dev-logs/coop-soak
+          export SOAK_WAVES="${REQUESTED_SOAK_WAVES:-$PROFILE_SOAK_WAVES}"
+          echo "campaign waves: ${SOAK_WAVES} (requested=${REQUESTED_SOAK_WAVES:-none} profile=${PROFILE_SOAK_WAVES})"
           # Tee the run output so the results bundle can carry the seed / verdict / skip counters even
           # on a green run (the driver prints the seed FIRST THING + a DONE line with the skip counters).
           # GitHub runs this step under `bash -e`: without the set +e window a FAILING vitest aborts the

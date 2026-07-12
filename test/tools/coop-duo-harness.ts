@@ -1040,8 +1040,15 @@ export async function remirrorWave(rig: DuoRig, opts?: { preserveGuestPlayerPart
   await withClient(rig.guestCtx, () => {
     mirrorHostBattleToGuest(rig.hostScene, rig.guestScene, opts);
     const gf = rig.guestScene.getPlayerField();
-    gf[0].coopOwner = "host";
-    gf[1].coopOwner = "guest";
+    // Classic wave 200 deliberately starts with one field slot; phase two enables doubles and
+    // summons the partner. Preserve ownership for every slot that exists instead of manufacturing
+    // a stage-one partner or crashing while trying to tag it.
+    if (gf[0] != null) {
+      gf[0].coopOwner = "host";
+    }
+    if (gf[1] != null) {
+      gf[1].coopOwner = "guest";
+    }
   });
 }
 

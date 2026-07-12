@@ -31,6 +31,7 @@ import { assertSoakCompleteness, logSoakCoverage } from "#test/tools/coop-soak-c
 import {
   announceSoakSeed,
   prepareCoopSoakContent,
+  resolveSoakFidelity,
   resolveSoakLevel,
   resolveSoakProfile,
   resolveSoakSeed,
@@ -166,7 +167,7 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
       // ~wave-40-48 death spiral so the single-faint/switch/replace channel is GUARANTEED. Mega/primal FORMS
       // are not force-spawned (fragile through the headless duo mirror); the level EDGE does the work.
       await game.classicMode.startBattle(...SOAK_PROFILES[profile].species);
-      const result = await runCoopSoak(game, { seed, waves, logs, profile });
+      const result = await runCoopSoak(game, { seed, waves, logs, profile, fidelity: resolveSoakFidelity() });
       const elapsedMs = Date.now() - started;
 
       // Report coverage + runtime (visible in the CI/console output; the nightly reads skip-counters here).
