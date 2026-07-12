@@ -117,6 +117,25 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     });
   }
 
+  async function takeFirstRewardThroughPublicUi(rig: DuoRig): Promise<boolean> {
+    resetCoopUiRelayTrace();
+    const reachedInteractionRelay = () =>
+      getCoopUiRelayEdges().some(edge => edge.mode === UiMode.MODIFIER_SELECT && edge.carrier === "interactionChoice");
+    for (let i = 0; i < 500; i++) {
+      rig.hostScene.ui.processInput(Button.ACTION);
+      if (reachedInteractionRelay()) {
+        return true;
+      }
+      expect(rig.hostScene.ui.processInput(Button.UP), "the public UI navigates toward the reward row").toBe(true);
+      rig.hostScene.ui.processInput(Button.ACTION);
+      if (reachedInteractionRelay()) {
+        return true;
+      }
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    return false;
+  }
+
   it("copy() carries the pin, an unpinned advance is refused, counters stay lockstep, wave 2 resolves", async () => {
     forceItemRewards(game.override, [{ name: "LURE" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
@@ -208,24 +227,14 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
       // have distinct runtimes/processes. Reassert that proven owner session on the host runtime so the
       // public UI input is routed through its actual owner mirror, not blocked as a phantom watcher.
       rig.hostRuntime.uiMirror.beginSession("owner", UiMode.MODIFIER_SELECT, counterBefore * 64);
-      // The same incomplete tween mock skips updateCursorTarget(), leaving the active cursor on the
-      // bottom control row. Navigate through the public handler to reward row 1 / option 0.
-      expect(rig.hostScene.ui.processInput(Button.UP), "the public UI selects the reward row").toBe(true);
-      resetCoopUiRelayTrace();
-      let accepted = false;
-      for (let i = 0; i < 500 && !accepted; i++) {
-        accepted = rig.hostScene.ui.processInput(Button.ACTION);
-        if (!accepted) {
-          await new Promise(resolve => setTimeout(resolve, 5));
-        }
-      }
-      expect(accepted, "the owner takes the deterministic LURE via UI after its intro animation").toBe(true);
-      expect(
-        getCoopUiRelayEdges().some(
-          edge => edge.mode === UiMode.MODIFIER_SELECT && edge.carrier === "interactionChoice",
-        ),
-        "the public reward-shop UI input reached the production interaction relay",
-      ).toBe(true);
+      // Depending on whether the lightweight tween mock settled its Promise.all chain before this
+      // continuation, the public handler can legitimately be on either the bottom controls (row 0)
+      // or the first reward (row 1). ACTION is harmless on the zero-money reroll control; if it did
+      // not produce the authoritative reward carrier, navigate UP through the public handler and
+      // ACTION the reward. This covers both real scheduling orders without reading a private cursor
+      // or invoking the phase callback directly.
+      const reachedRelay = await takeFirstRewardThroughPublicUi(rig);
+      expect(reachedRelay, "the public reward-shop UI input reached the production interaction relay").toBe(true);
       await drainLoopback();
     });
     for (let i = 0; i < 100 && rig.guestRuntime.controller.interactionCounter() === counterBefore; i++) {
