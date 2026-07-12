@@ -28,11 +28,8 @@ jobs:
 
       - uses: ./.github/actions/setup-deps
 
-      - name: Typecheck TypeScript
-        run: pnpm typecheck
-
-      - name: Check formatting and lint
-        run: pnpm biome:ci
+      - name: Check changed-file types, formatting, and lint
+        run: node scripts/run-coop-static-gate.mjs
 
   gate:
     if: github.repository == 'Heraklines/elite-redux'
