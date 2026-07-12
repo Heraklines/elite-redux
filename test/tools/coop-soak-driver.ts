@@ -106,6 +106,7 @@ import type { ModifierOverride } from "#modifiers/modifier-type";
 import { getCoopMeHostPresentation } from "#phases/coop-replay-me-phase";
 import { coopClearMePinForGuest, coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
+import { TheBargainPhase } from "#phases/the-bargain-phase";
 import type { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
@@ -1709,6 +1710,110 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     actionScript.push(`wave ${rig.hostScene.currentBattle.waveIndex}: armed owner Dex Nav picks`);
   };
 
+  /** Drive the Abyss milestone bargain across both real engines, choosing the safe Leave terminal. */
+  const driveBargainContinuation = async (): Promise<void> => {
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+    const hostOwns = counterBefore % 2 === 0;
+    const hostPhase = rig.hostScene.phaseManager.getCurrentPhase() as TheBargainPhase;
+    // The guest replay queues its own copy. Drive an explicit instance under the guest context and remove
+    // the queued duplicate so it cannot reopen after the authoritative outcome has already converged.
+    rig.guestScene.phaseManager.removeAllPhasesOfType("TheBargainPhase");
+    const guestPhase = new TheBargainPhase();
+    const ownerCtx = hostOwns ? rig.hostCtx : rig.guestCtx;
+    const watcherCtx = hostOwns ? rig.guestCtx : rig.hostCtx;
+    const ownerPhase = hostOwns ? hostPhase : guestPhase;
+    const watcherPhase = hostOwns ? guestPhase : hostPhase;
+
+    const driveOwnerLeave = async (): Promise<void> => {
+      await withClient(ownerCtx, async () => {
+        let ended = false;
+        const seam = ownerPhase as unknown as { end(): void };
+        const realEnd = seam.end.bind(ownerPhase);
+        seam.end = () => {
+          ended = true;
+          // Only the host instance is the real current queue head. The explicit guest instance exists to
+          // materialize the reciprocal owner/watcher behavior and must not shift an unrelated guest phase.
+          if (ownerPhase === hostPhase) {
+            realEnd();
+          }
+        };
+        const ui = ownerCtx.scene.ui as unknown as {
+          setMode: (...args: unknown[]) => unknown;
+          showDialogue: (...args: unknown[]) => unknown;
+          showText: (...args: unknown[]) => unknown;
+        };
+        const savedSetMode = ui.setMode.bind(ownerCtx.scene.ui);
+        const savedShowDialogue = ui.showDialogue?.bind(ownerCtx.scene.ui);
+        const savedShowText = ui.showText.bind(ownerCtx.scene.ui);
+        try {
+          ui.setMode = (...args: unknown[]): unknown => {
+            if (args[0] === UiMode.ER_BARGAIN) {
+              const onLeave = args[6] as () => void;
+              queueMicrotask(onLeave);
+            }
+            return Promise.resolve(true);
+          };
+          ui.showDialogue = (...args: unknown[]): unknown => {
+            (args[3] as (() => void) | undefined)?.();
+          };
+          ui.showText = (...args: unknown[]): unknown => {
+            (args[2] as (() => void) | undefined)?.();
+          };
+          ownerPhase.start();
+          for (let i = 0; i < 24 && !ended; i++) {
+            await drainLoopback();
+          }
+          if (!ended) {
+            fail("no-park", rig.hostScene.currentBattle.waveIndex, "bargain owner Leave terminal did not end");
+          }
+        } finally {
+          ui.setMode = savedSetMode;
+          ui.showDialogue = savedShowDialogue as typeof ui.showDialogue;
+          ui.showText = savedShowText;
+        }
+      });
+    };
+
+    const driveWatcher = async (): Promise<void> => {
+      await withClient(watcherCtx, async () => {
+        let ended = false;
+        const seam = watcherPhase as unknown as { end(): void };
+        const realEnd = seam.end.bind(watcherPhase);
+        seam.end = () => {
+          ended = true;
+          if (watcherPhase === hostPhase) {
+            realEnd();
+          }
+        };
+        watcherPhase.start();
+        for (let i = 0; i < 20 && !ended; i++) {
+          await drainLoopback();
+        }
+        if (!ended) {
+          fail("no-park", rig.hostScene.currentBattle.waveIndex, "bargain watcher did not adopt the owner terminal");
+        }
+      });
+    };
+
+    // Owner first buffers the durable outcome; the watcher then buffer-hits and materializes it.
+    await driveOwnerLeave();
+    await driveWatcher();
+    hitMode(UiMode.ER_BARGAIN);
+    if (
+      rig.hostRuntime.controller.interactionCounter() !== counterBefore + 1
+      || rig.guestRuntime.controller.interactionCounter() !== counterBefore + 1
+    ) {
+      fail(
+        "lockstep",
+        rig.hostScene.currentBattle.waveIndex,
+        `bargain did not advance once (before=${counterBefore} host=${rig.hostRuntime.controller.interactionCounter()} guest=${rig.guestRuntime.controller.interactionCounter()})`,
+      );
+    }
+    actionScript.push(
+      `wave ${rig.hostScene.currentBattle.waveIndex}: BARGAIN Leave driven (${hostOwns ? "host" : "guest"}-owned)`,
+    );
+  };
+
   /**
    * The soak drives the host's real phase queue while the guest is a replay renderer, so the guest does not
    * naturally execute its own CommandPhase. Materialize both halves of the guest's command rendezvous around
@@ -1733,9 +1838,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // so inspecting the queue before advancing is too early. Stop at either structural branch, then arm
       // Dex Nav only after it actually exists. This also guarantees no Dex Nav prompt can leak into an
       // ordinary CommandPhase crossing.
-      const boundary = await game.phaseInterceptor.toFirst(["CommandPhase", "ErDexNavPhase"]);
+      const boundary = await game.phaseInterceptor.toFirst(["CommandPhase", "ErDexNavPhase", "TheBargainPhase"]);
       if (boundary === "ErDexNavPhase") {
         armHostDexNavAutoPicks();
+      } else if (boundary === "TheBargainPhase") {
+        await driveBargainContinuation();
       }
       await game.phaseInterceptor.to("CommandPhase");
     });
