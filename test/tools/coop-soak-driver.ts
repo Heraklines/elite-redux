@@ -1811,14 +1811,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // are far tougher, and DO KO the host) - the SwitchPhase parked forever.
         armHostFaintAutoPick();
       });
-      const waveWon = rig.hostScene.currentBattle.enemyParty.every(e => e.isFainted());
-      if (!waveWon) {
-        // The authoritative queue can leave TurnEndPhase and reach the next CommandPhase while the
-        // guest is still rendering this turn. Announce the replay guest's independent readiness
-        // before that presentation work so the strict reciprocal barrier cannot become one-sided.
-        withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.reannounce(`cmd:${wave}:${turn + 1}`));
-        await drainLoopback();
-      }
       await withClient(rig.guestCtx, () => driveGuestReplayTurnWithFaint(rig, turn));
 
       if (t === 0 || (t + 1) % 10 === 0) {
@@ -1833,12 +1825,19 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         );
       }
 
+      // Re-evaluate only after the complete end-of-turn tail. Weather, terrain, poison, recoil, and similar
+      // delayed effects can KO the final enemy after the intercepted TurnEndPhase (seed 20260712 wave 63:
+      // toxic terrain). Sampling before replay made the driver announce cmd:<wave>:<nextTurn> and wait for a
+      // CommandPhase while production correctly entered SelectModifierPhase, a false softlock report.
+      const waveWon = rig.hostScene.currentBattle.enemyParty.every(e => e.isFainted());
       if (waveWon) {
         return;
       }
       // Not won yet: advance the host to the next turn's CommandPhase for another round.
       // TurnInitPhase increments `currentBattle.turn` while crossing, so the point the guest must
       // pre-arrive is the NEXT turn, not the just-completed turn still visible at TurnEndPhase.
+      withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.reannounce(`cmd:${wave}:${turn + 1}`));
+      await drainLoopback();
       await crossCommandBoundaryWithReplayGuest(wave, turn + 1);
     }
     fail("no-park", wave, `wave did not complete within ${MAX_TURNS_PER_WAVE} turns (enemies never all fainted)`);

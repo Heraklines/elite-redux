@@ -219,11 +219,16 @@ jobs:
           if git -C "$TMP" diff --cached --quiet; then
             echo "no results to commit"
           else
-            git -C "$TMP" -c user.email="actions@github.com" -c user.name="nightly-coop-soak" \
-              commit -m "coop-soak ${PROFILE} ${VERDICT} ${TS} (run ${GITHUB_RUN_ID})"
-            pushed=0
-            for attempt in 1 2 3 4 5; do
-              if git -C "$TMP" pull --rebase "$REPO_URL" dev-logs \
+          git -C "$TMP" config user.email "actions@github.com"
+          git -C "$TMP" config user.name "nightly-coop-soak"
+          git -C "$TMP" commit -m "coop-soak ${PROFILE} ${VERDICT} ${TS} (run ${GITHUB_RUN_ID})"
+          pushed=0
+          for attempt in 1 2 3 4 5; do
+            # A concurrent matrix leg can advance dev-logs between clone and push. Rebase needs the
+            # configured identity above; abort any interrupted attempt before retrying so the index never
+            # remains dirty and poisons all later attempts.
+            git -C "$TMP" rebase --abort >/dev/null 2>&1 || true
+            if git -C "$TMP" pull --rebase "$REPO_URL" dev-logs \
                 && git -C "$TMP" push "$REPO_URL" HEAD:dev-logs; then
                 pushed=1
                 break
