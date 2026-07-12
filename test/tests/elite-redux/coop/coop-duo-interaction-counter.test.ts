@@ -30,20 +30,23 @@ import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { BattlerIndex } from "#enums/battler-index";
+import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
+  drainLoopback,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
-  driveHostRewardShopOwner,
   forceItemRewards,
   installDuoLogCapture,
   remirrorWave,
@@ -165,8 +168,31 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
       "#837 fix #2: the guest counter is unchanged (no asymmetric divergence)",
     ).toBe(guestCounterPre);
 
-    // ===== Finish the shop the NORMAL way (owner takes the LURE + advances; watcher mirrors). =====
-    await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: true }));
+    // ===== Finish the shop through the SAME public UI boundary as a human. =====
+    await withClient(rig.hostCtx, async () => {
+      // coopOpenOwnerShopAfterBarrier opens asynchronously after its bounded arrival wait. Poll the real
+      // screen instead of calling the phase's private selection seam (which was the old false coverage).
+      for (let i = 0; i < 50 && rig.hostScene.ui.getMode() !== UiMode.MODIFIER_SELECT; i++) {
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+      expect(rig.hostScene.ui.getMode(), "the owner reached the real reward UI").toBe(UiMode.MODIFIER_SELECT);
+      resetCoopUiRelayTrace();
+      let accepted = false;
+      for (let i = 0; i < 500 && !accepted; i++) {
+        accepted = rig.hostScene.ui.processInput(Button.ACTION);
+        if (!accepted) {
+          await new Promise(resolve => setTimeout(resolve, 5));
+        }
+      }
+      expect(accepted, "the owner takes the deterministic LURE via UI after its intro animation").toBe(true);
+      expect(
+        getCoopUiRelayEdges().some(
+          edge => edge.mode === UiMode.MODIFIER_SELECT && edge.carrier === "interactionChoice",
+        ),
+        "the public reward-shop UI input reached the production interaction relay",
+      ).toBe(true);
+      await drainLoopback();
+    });
     const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
     await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
 

@@ -6,6 +6,7 @@
 import {
   beginCoopUiRelayInput,
   endCoopUiRelayInput,
+  formatCoopUiRelayTrace,
   getCoopUiRelayEdges,
   recordCoopUiRelayCarrier,
   resetCoopUiRelayTrace,
@@ -29,6 +30,7 @@ describe("co-op UI-to-relay production-boundary trace", () => {
     expect(getCoopUiRelayEdges()).toEqual([
       { inputId, mode: UiMode.TARGET_SELECT, carrier: "battleCommand", detail: "field=0 turn=1" },
     ]);
+    expect(formatCoopUiRelayTrace()).toContain("mode=TARGET_SELECT carrier=battleCommand");
   });
 
   it("keeps nested/replayed input attribution scoped and restores the outer input", () => {

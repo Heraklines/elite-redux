@@ -23,6 +23,7 @@ import { globalScene } from "#app/global-scene";
 import { formatCoopCausalTrace } from "#data/elite-redux/coop/coop-causal-trace";
 import { coopSessionGeneration, getCoopNetcodeMode, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import { formatCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 
 /** The fenced header that opens the control-plane block (kept stable so a triage tool can key off it). */
 export const COOP_CONTROL_PLANE_MARKER = "----- CO-OP CONTROL PLANE -----";
@@ -115,6 +116,7 @@ export function formatCoopControlPlane(): string {
 
     // --- Structured causality (commit -> materialize -> apply, lobby decisions, recovery edges) ---
     lines.push(formatCoopCausalTrace());
+    lines.push(formatCoopUiRelayTrace());
 
     return lines.join("\n");
   } catch (err) {
