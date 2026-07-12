@@ -203,6 +203,11 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
       expect(rig.hostScene.ui.getMode(), "the owner reached the real reward UI").toBe(UiMode.MODIFIER_SELECT);
       expect(ownerModifierArgs, "the production phase supplied the modifier UI callback").not.toBeNull();
       await rig.hostScene.ui.setMode(UiMode.MODIFIER_SELECT, ...(ownerModifierArgs ?? []));
+      // The guest watcher's async continuation also runs in this one process and can overwrite the
+      // process-global active mirror after the host phase already began its OWNER session. Real clients
+      // have distinct runtimes/processes. Reassert that proven owner session on the host runtime so the
+      // public UI input is routed through its actual owner mirror, not blocked as a phantom watcher.
+      rig.hostRuntime.uiMirror.beginSession("owner", UiMode.MODIFIER_SELECT, counterBefore * 64);
       resetCoopUiRelayTrace();
       let accepted = false;
       for (let i = 0; i < 500 && !accepted; i++) {
