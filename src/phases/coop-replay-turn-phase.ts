@@ -186,7 +186,13 @@ export class CoopReplayTurnPhase extends Phase {
               `guest apply OUT-OF-BAND checkpoint mid-park reason=${envelope.reason} turn=${this.turn}`,
             );
             if (applyCoopCheckpoint(envelope.checkpoint)) {
-              applyCoopAuthoritativeBattleState(envelope.authoritativeState, isCoopAuthoritativeGuest());
+              const authoritativeApplied = applyCoopAuthoritativeBattleState(
+                envelope.authoritativeState,
+                isCoopAuthoritativeGuest(),
+              );
+              if (authoritativeApplied) {
+                streamer.retainAppliedOutOfBandCheckpoint(envelope);
+              }
             }
             // Showdown versus (Task F1): the versus guest owns its ENTIRE player field (a 1v1 -> field
             // slot 0). The co-op seat map used by coopLocalOwnedPlayerFieldSlot() resolves the fixed

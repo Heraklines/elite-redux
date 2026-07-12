@@ -827,21 +827,6 @@ export class EncounterPhase extends BattlePhase {
         }
       }
 
-      // Guest-local `fieldSetup`/PreSummon hooks above are allowed to prepare sprites and presentation, but
-      // they are not an authority source. Re-apply the retained manifest after every such hook so max HP,
-      // current HP, ability, IVs, nature, moves, and boss state are exactly the host's on the first frame.
-      if (this.coopAdoptedEnemyParty && this.coopEnemyAuthority != null) {
-        applyCoopEnemies(this.coopEnemyAuthority);
-      }
-
-      // Co-op HOST (#633): NOW that the enemy party's held items are attached (the sync
-      // generateEnemyModifiers above), stream the full party - identity + held items - so
-      // the waiting guest adopts these exact mons and SUPPRESSES its own modifier roll
-      // (no double / divergent items). No-op for solo / guest / loaded.
-      if (!this.loaded) {
-        this.broadcastCoopEnemyParty();
-      }
-
       if (battle.battleType === BattleType.TRAINER && globalScene.currentBattle.trainer) {
         globalScene.currentBattle.trainer.genAI(globalScene.getEnemyParty());
       }
@@ -926,6 +911,17 @@ export class EncounterPhase extends BattlePhase {
   protected doEncounter(): void {
     globalScene.playBgm(undefined, true);
     globalScene.updateModifiers(false);
+
+    // updateModifiers is the LAST stat-bearing encounter hook. A guest must reassert the
+    // retained host manifest after it, and a host must serialize only after it, otherwise
+    // HP-Up/held-item recalculation makes the first visible frame divergent. Moving the
+    // carrier here also means its authoritativeState/checksum describe the completed setup.
+    if (this.coopAdoptedEnemyParty && this.coopEnemyAuthority != null) {
+      applyCoopEnemies(this.coopEnemyAuthority);
+    }
+    if (!this.loaded) {
+      this.broadcastCoopEnemyParty();
+    }
     globalScene.setFieldScale(1);
 
     for (const pokemon of globalScene.getPlayerParty()) {

@@ -43,6 +43,7 @@ import {
   captureCoopChecksum,
   captureCoopChecksumState,
   drainCoopApplyFailures,
+  reapplyAcceptedCoopAuthoritativeBattleState,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { recordCoopChecksumAssertion } from "#data/elite-redux/coop/coop-checksum-assert";
 import { collectCanonicalDiff, logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
@@ -888,6 +889,8 @@ export class CoopFinalizeTurnPhase extends Phase {
       // never clobber the newer field composition, and comparing the guest's already-newer state against the
       // stale host checksum would only manufacture a spurious forced resync.
       const applied = applyCoopCheckpoint(this.checkpoint);
+      const streamer = getCoopBattleStreamer();
+      const superseding = streamer?.consumeAppliedOutOfBandCheckpoint() ?? null;
       if (applied) {
         // New authoritative state wins when present: PokemonData.summonData carries the live battler
         // state losslessly, while the legacy fullField tag-type list is only a fallback for older hosts.
@@ -908,12 +911,30 @@ export class CoopFinalizeTurnPhase extends Phase {
           applyCoopFieldSnapshot(this.fullField, isCoopAuthoritativeGuest());
         }
         this.verifyChecksum(this.checksum, this.preimage, applyFailures);
-      } else {
+      } else if (superseding == null) {
         coopWarn(
           "checksum",
           `guest finalize turn=${this.turn}: checkpoint STALE (superseded by a newer out-of-band replacement) `
             + "-> skip fullField + checksum (would re-KO the summoned replacement / spurious resync)",
         );
+      } else {
+        // The newer replacement state was applied mid-park to make its owner commandable,
+        // then the older resolution's delayed animations mutated HP/PP/field state. Reassert
+        // that exact already-accepted payload NOW, after presentation drained, and verify its
+        // own checksum. This preserves the replacement while closing every post-animation seam.
+        const authoritativeApplied = reapplyAcceptedCoopAuthoritativeBattleState(
+          superseding.authoritativeState,
+          isCoopAuthoritativeGuest(),
+        );
+        const applyFailures = drainCoopApplyFailures();
+        if (authoritativeApplied) {
+          this.verifyChecksum(superseding.checksum, undefined, applyFailures);
+        } else {
+          coopWarn(
+            "checksum",
+            `guest finalize turn=${this.turn}: superseding ${superseding.reason} state could not be reasserted`,
+          );
+        }
       }
     } catch {
       // A bad stream payload must never hang the guest's turn.

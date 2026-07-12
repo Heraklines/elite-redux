@@ -3052,6 +3052,35 @@ export function applyCoopAuthoritativeBattleState(
   state: CoopAuthoritativeBattleStateV1 | undefined,
   authoritativeGuest = false,
 ): boolean {
+  return applyCoopAuthoritativeBattleStateInternal(state, authoritativeGuest, false);
+}
+
+/**
+ * Reassert a full state that this client already accepted at an earlier safe boundary.
+ * This deliberately bypasses only the monotonic-tick admission check: the live replay
+ * pump may need a replacement immediately to collect its owner's next command, while
+ * delayed animations then mutate HP/PP/field presentation before finalization. Callers
+ * must retain this exact payload only after the first apply succeeded.
+ */
+export function reapplyAcceptedCoopAuthoritativeBattleState(
+  state: CoopAuthoritativeBattleStateV1 | undefined,
+  authoritativeGuest = false,
+): boolean {
+  if (state === undefined || state.tick !== coopLastAppliedStateTick) {
+    coopWarn(
+      "resync",
+      `authoritativeState reassert tick=${state?.tick ?? "absent"} rejected (latest accepted=${coopLastAppliedStateTick})`,
+    );
+    return false;
+  }
+  return applyCoopAuthoritativeBattleStateInternal(state, authoritativeGuest, true);
+}
+
+function applyCoopAuthoritativeBattleStateInternal(
+  state: CoopAuthoritativeBattleStateV1 | undefined,
+  authoritativeGuest: boolean,
+  reassertAccepted: boolean,
+): boolean {
   // Reset the structured-failure accumulator FIRST (item 4): a prior apply's failures must never leak into
   // this one's drain, and an early reject below leaves it empty (no apply attempted -> nothing to heal).
   beginCoopApplyFailureCapture();
@@ -3079,7 +3108,7 @@ export function applyCoopAuthoritativeBattleState(
     if (!assertNoDuplicateAuthoritativeIds([state.playerParty, state.enemyParty])) {
       return false;
     }
-    if (!coopAcceptStateTick(state.tick, "authoritativeState")) {
+    if (!reassertAccepted && !coopAcceptStateTick(state.tick, "authoritativeState")) {
       return false;
     }
     // PHASE 3 (#838): snapshot the on-field sprite keys BEFORE the data apply mutates species/form/
@@ -3156,7 +3185,7 @@ export function applyCoopAuthoritativeBattleState(
     runCoopRenderDiffer(preSpriteKeys);
     coopLog(
       "resync",
-      `guest apply authoritativeState tick=${state.tick} wave=${state.wave} turn=${state.turn} party=${state.playerParty.length}/${state.enemyParty.length} field=${state.field.length}`,
+      `guest ${reassertAccepted ? "reassert" : "apply"} authoritativeState tick=${state.tick} wave=${state.wave} turn=${state.turn} party=${state.playerParty.length}/${state.enemyParty.length} field=${state.field.length}`,
     );
     return true;
   } catch (e) {

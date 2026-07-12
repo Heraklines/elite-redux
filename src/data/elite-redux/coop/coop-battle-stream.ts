@@ -190,6 +190,13 @@ export class CoopBattleStreamer {
   private readonly sentMeBattleParties = new Map<string, CoopSerializedEnemy[]>();
   /** Latest authoritative checkpoint (+ checksum) the guest has not yet applied. */
   private lastCheckpoint: CoopCheckpointEnvelope | null = null;
+  /**
+   * Latest out-of-band checkpoint the live replay pump already applied to unblock an
+   * intra-turn interaction. Presentation phases can subsequently mutate that state
+   * before the older turn-resolution finalizer runs, so the finalizer consumes this
+   * envelope and reasserts its newer full state at the safe post-animation boundary.
+   */
+  private appliedOutOfBandCheckpoint: CoopCheckpointEnvelope | null = null;
   /** Latest enemy party the guest has not yet adopted (consumed at the wave's first turn). */
   private lastEnemyParty: { wave: number; enemies: CoopSerializedEnemy[] } | null = null;
   /** HOST: exact wave-boundary carriers retained for loss/reconnect replay. */
@@ -975,6 +982,21 @@ export class CoopBattleStreamer {
     return cp;
   }
 
+  /** Record an out-of-band envelope only after its numeric/full state applied successfully. */
+  retainAppliedOutOfBandCheckpoint(checkpoint: CoopCheckpointEnvelope): void {
+    this.appliedOutOfBandCheckpoint = checkpoint;
+  }
+
+  /**
+   * Take the newer envelope that must be reasserted after delayed turn presentation.
+   * One-shot: a completed finalizer is the only consumer for that interaction boundary.
+   */
+  consumeAppliedOutOfBandCheckpoint(): CoopCheckpointEnvelope | null {
+    const checkpoint = this.appliedOutOfBandCheckpoint;
+    this.appliedOutOfBandCheckpoint = null;
+    return checkpoint;
+  }
+
   /**
    * GUEST: subscribe to LIVE battle events as they arrive (#633, animation layer). The handler fires
    * the instant a `battleEvent` lands (already de-duped + buffered by `(turn, seq)`), so a live pump
@@ -1283,6 +1305,7 @@ export class CoopBattleStreamer {
     this.liveEventHandler = null;
     this.liveWaiter = null;
     this.lastCheckpoint = null;
+    this.appliedOutOfBandCheckpoint = null;
     this.lastEnemyParty = null;
     this.sentEnemyParties.clear();
     this.enemyPartyStateByWave.clear();

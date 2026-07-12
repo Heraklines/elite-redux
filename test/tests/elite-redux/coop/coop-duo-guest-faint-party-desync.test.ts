@@ -31,7 +31,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { applyCoopCheckpoint } from "#data/elite-redux/coop/coop-battle-engine";
+import { applyCoopAuthoritativeBattleState, applyCoopCheckpoint } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
@@ -200,7 +200,12 @@ describe.skipIf(!RUN)(
         const envelope = rig.guestRuntime.battleStream.consumeCheckpoint();
         expect(envelope?.reason, "the guest received the out-of-band replacement checkpoint").toBe("replacement");
         if (envelope != null) {
-          applyCoopCheckpoint(envelope.checkpoint);
+          const checkpointApplied = applyCoopCheckpoint(envelope.checkpoint);
+          const authoritativeApplied =
+            checkpointApplied && applyCoopAuthoritativeBattleState(envelope.authoritativeState, true);
+          if (authoritativeApplied) {
+            rig.guestRuntime.battleStream.retainAppliedOutOfBandCheckpoint(envelope);
+          }
         }
       });
 
@@ -216,6 +221,17 @@ describe.skipIf(!RUN)(
       });
 
       const resyncsBeforeStaleFinalize = resyncProbe.count();
+
+      // Model a delayed presentation write after the replacement's full state was applied.
+      // Production HP/faint/move phases drain in this window; PP is intentionally perturbed
+      // because it exposed the same missing post-animation reassertion in the long-run matrix.
+      withClientSync(rig.guestCtx, () => {
+        const replacement = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+        const move = replacement?.getMoveset()[0];
+        if (move != null) {
+          move.ppUsed += 1;
+        }
+      });
 
       // Now the PARKED turn-1 resolution finalizes (the live tick race: it applies AFTER the newer replacement
       // checkpoint). applyCoopCheckpoint rejects the stale tick-N checkpoint; the fix must ALSO skip the
@@ -245,6 +261,9 @@ describe.skipIf(!RUN)(
           rep != null && rep.hp > 0 && !rep.fainted,
           "the guest's summoned replacement is STILL alive after the stale resolution finalized (no instant re-KO)",
         ).toBe(true);
+        const hostPp = hostReplacement?.getMoveset()[0]?.ppUsed;
+        const guestPp = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX]?.getMoveset()[0]?.ppUsed;
+        expect(guestPp, "the newer replacement state is reasserted after delayed presentation writes").toBe(hostPp);
       });
 
       // ZERO forced resyncs on the faint-replacement turn: a resync means a divergence the chooser could see.
