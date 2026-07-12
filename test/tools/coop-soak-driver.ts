@@ -1729,7 +1729,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     await drainLoopback();
     await withClient(rig.hostCtx, async () => {
       beforeHostCross?.();
-      armHostDexNavAutoPicks();
+      // A reward continuation can be created DURING this crossing (ModifierRewardPhase applies the item),
+      // so inspecting the queue before advancing is too early. Stop at either structural branch, then arm
+      // Dex Nav only after it actually exists. This also guarantees no Dex Nav prompt can leak into an
+      // ordinary CommandPhase crossing.
+      const boundary = await game.phaseInterceptor.toFirst(["CommandPhase", "ErDexNavPhase"]);
+      if (boundary === "ErDexNavPhase") {
+        armHostDexNavAutoPicks();
+      }
       await game.phaseInterceptor.to("CommandPhase");
     });
     await drainLoopback();
