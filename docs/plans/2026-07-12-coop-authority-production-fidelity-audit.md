@@ -6,7 +6,7 @@ Audited branch: `heraklines/feat/elite-redux-port`
 
 Initial audited source SHA: `cf714363a15927e84521b69d1b00c5a186e88480`
 
-Latest remote re-audit SHA: `4ab6b5081b776a8563cd44cea5fb8f0c3a5b4dd1`
+Latest remote re-audit SHA: `14d2bfcb7e3178d6a64fd690abbebfef6ec3eec7`
 
 Latest staging source checkpoint: `9585dacdd`
 
@@ -42,8 +42,12 @@ delivered the guest's counter acknowledgement back to the host. `CoopPartnerSync
 next-wave boundary closed. Both red failures are valuable evidence that earlier green results overstated
 lifecycle fidelity.
 
-The branch must not be called deployable at `4ab6b5081`. Full gate run `29208516430` is red in Lane B
-shards 2, 6, and 8. Static, browser transport, A, C, P, and the other B shards are green.
+The branch must not be called deployable at `14d2bfcb7`. Full gate run `29208695374` is red in Lane B
+shards 2 and 8. Static, browser transport, A, C, P, and the other B shards are green. B2 still records
+two renderer-denied `ToggleDoublePositionPhase` calls in the multi-wave journey. B8 still has two
+presentation assertions comparing `battleInfo.visible` to a boolean when the headless object exposes a
+no-op function. Directly assigning public mock properties did not turn the headless runner into a canvas
+oracle.
 The previous exact SHA `4f6e786ad` passed the full sharded gate and six-profile Nightly, but the newly
 strengthened journey proves those green results did not cover the production guest lifecycle or even all
 scheduled-transport acknowledgements.
@@ -54,6 +58,7 @@ scheduled-transport acknowledgements.
 
 | Evidence | Result | Meaning |
 | --- | --- | --- |
+| Full gate, `29208695374`, SHA `14d2bfcb7` | RED | B2 retains two blocked double-position phases. B8 retains two false visual assertions against no-op headless properties; B6 is fixed. |
 | Full gate, `29208516430`, SHA `4ab6b5081` | RED | Static and most shards recover, but the three-wave guest still emits two blocked double-position phases; the ME boundary and three render assertions still lack concrete headless sprite visibility. |
 | Full gate, `29207508147`, SHA `00e1a64d2` | RED | Two trainer modifier type errors; launch/trainer assertion failure; one ME presentation failure; three render-differ failures; and the three-wave journey records eight renderer-blocked phase leaks. |
 | Full gate, `29206719629`, SHA `869ddce36` | RED | Reciprocal reward delivery now progresses; the exact enemy carrier is not JSON-canonical (`bossSegments`/`bossSegmentIndex` are absent on the host capture and become `0` after guest reconstruction). |
@@ -63,14 +68,14 @@ scheduled-transport acknowledgements.
 | Six-profile Nightly, `29204108055`, SHA `4f6e786ad` | GREEN | Long harness campaigns passed; this did not prove production UI/phase lifecycle. |
 | Staging deploy, `29202804876`, SHA `9585dacdd` | GREEN deploy | This is the code testers exercised in the latest reports. |
 
-The commits through `4ab6b5081` add useful modifier identity work, canonicalize neutral boss fields,
+The commits through `14d2bfcb7` add useful modifier identity work, canonicalize neutral boss fields,
 centralize several field/trainer presentation repairs, initialize reconstructed visual nodes, and keep guest
 TurnInit away from enemy AI/mechanical hooks. They do not remove the recovery/transaction defects demonstrated
 by the newest tester logs. The newest changes are themselves gate-red, and none is present on staging.
 
 ### Remote advancement during this audit
 
-Eight remote commits landed while the audit was in progress:
+Nine remote commits landed while the audit was in progress:
 
 - `828733495` assigns a stable trainer-vitamin type ID and materializes an authoritative guest's trainer
   field without running structural summon hooks.
@@ -85,6 +90,8 @@ Eight remote commits landed while the audit was in progress:
   field objects before attempting presentation.
 - `4ab6b5081` makes an authoritative guest's TurnInit queue only player command-intent phases and replay,
   rather than challenge/ME hooks, enemy AI, and structural recentering.
+- `14d2bfcb7` initializes reconstructed Pokemon presentation nodes during numeric checkpoint application and
+  tries to force headless `visible`/`alpha` properties after invoking the Phaser setters.
 
 Those are directionally correct. They do not constitute a production client bootstrap: the fixture still
 constructs a second scene, mirrors host state into it, clears its phase queue, and shifts directly to
@@ -101,10 +108,11 @@ but their exact gate is red:
 - the multi-wave journey records six `EnemyCommandPhase` and two `ToggleDoublePositionPhase` renderer leaks.
 
 `cea6e741b`/`4ab6b5081` make real progress: static is green, launch trainer setup passes, and six prior
-`EnemyCommandPhase` leaks disappear. The exact gate still reports two blocked `ToggleDoublePositionPhase`
-calls when the guest adopts the wave-2/3 encounter. The ME and three render assertions still observe
-`sprite.visible === undefined`: constructing a headless presentation node does not make the stub a rendered
-canvas oracle. The presentation helper also catches/defers animation and asset failures. Swallowing or
+`EnemyCommandPhase` leaks disappear. `14d2bfcb7` also fixes the prior ME assertion, but its exact gate still
+reports two blocked `ToggleDoublePositionPhase` calls when the guest adopts the wave-2/3 encounter. Two render
+assertions now observe `battleInfo.visible === [Function noop]` instead of a boolean. Assigning a property on a
+proxy-like headless stub is neither a reliable semantic assertion nor proof that a real Phaser canvas reached
+its postcondition. The presentation helper also catches/defers animation and asset failures. Swallowing or
 fire-and-forgetting those operations keeps mechanics moving but is not proof that a real canvas reaches its
 postcondition. The journey should therefore be described as a two-engine component integration test, not an
 end-to-end production game.
