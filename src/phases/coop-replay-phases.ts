@@ -1066,12 +1066,17 @@ export class CoopFinalizeTurnPhase extends Phase {
       if (admittedBefore > stateTick) {
         this.supersedingCheckpoint ??= streamer.consumeAppliedOutOfBandCheckpoint();
         const superseding = this.supersedingCheckpoint;
+        // A faint replacement is captured after TurnEnd has opened N+1, while the delayed resolution it
+        // supersedes is addressed to N. Same-turn replacements also exist on recovery/replay paths. Admit
+        // only those two causal shapes; a later turn cannot bless an unrelated stale commit.
+        const causalReplacementTurn =
+          superseding != null && (superseding.turn === resolution.turn || superseding.turn === resolution.turn + 1);
         if (
           superseding == null
           || superseding.reason !== "replacement"
           || superseding.epoch !== resolution.epoch
           || superseding.wave !== resolution.wave
-          || superseding.turn !== resolution.turn
+          || !causalReplacementTurn
           || superseding.revision <= resolution.revision
           || superseding.authoritativeState.tick !== admittedBefore
         ) {

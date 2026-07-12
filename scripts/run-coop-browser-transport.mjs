@@ -122,6 +122,11 @@ async function configurePage(page, label, browserErrors, sourceAssetMisses) {
   await page.setRequestInterception(true);
   page.on("request", request => {
     const requestUrl = request.url();
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "*",
+      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    };
     try {
       const url = new URL(requestUrl);
       if (url.pathname === "/manifest.json" && url.origin === origin) {
@@ -130,10 +135,28 @@ async function configurePage(page, label, browserErrors, sourceAssetMisses) {
           .catch(error => browserErrors.push(`[${label}:request] manifest stub failed: ${error}`));
         return;
       }
-      if (url.pathname === "/game/titlestats" && (url.hostname === "localhost" || url.hostname === "127.0.0.1")) {
+      const localApi = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+      if (localApi && url.pathname === "/game/titlestats") {
         request
-          .respond({ status: 200, contentType: "application/json", body: '{"playerCount":0,"battleCount":0}' })
+          .respond({
+            status: 200,
+            contentType: "application/json",
+            headers: corsHeaders,
+            body: '{"playerCount":0,"battleCount":0}',
+          })
           .catch(error => browserErrors.push(`[${label}:request] title-stats stub failed: ${error}`));
+        return;
+      }
+      if (localApi && url.pathname === "/devtest/progress") {
+        request
+          .respond({ status: 200, contentType: "application/json", headers: corsHeaders, body: '{"passed":[]}' })
+          .catch(error => browserErrors.push(`[${label}:request] devtest-progress stub failed: ${error}`));
+        return;
+      }
+      if (localApi && url.pathname === "/devtest/event") {
+        request
+          .respond({ status: 200, contentType: "application/json", headers: corsHeaders, body: '{"ok":true}' })
+          .catch(error => browserErrors.push(`[${label}:request] devtest-event stub failed: ${error}`));
         return;
       }
     } catch {

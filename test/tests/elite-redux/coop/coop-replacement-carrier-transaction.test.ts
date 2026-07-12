@@ -231,7 +231,10 @@ describe("production replacement carrier transaction", () => {
       await flushWire();
     }
 
-    expect(checkpointApply, "an incomplete retained frame never reaches destructive apply").not.toHaveBeenCalled();
+    expect(
+      checkpointApply,
+      "the failed complete frame is attempted once but never re-applied without a retained host response",
+    ).toHaveBeenCalledOnce();
     expect(terminate).toHaveBeenCalledOnce();
     expect(clearPhaseQueue).toHaveBeenCalledOnce();
     expect(resetScene).toHaveBeenCalledOnce();

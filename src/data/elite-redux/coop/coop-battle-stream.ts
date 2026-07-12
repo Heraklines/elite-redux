@@ -2294,10 +2294,13 @@ export class CoopBattleStreamer {
         const supersedingAck =
           msg.status === "superseded"
             ? [...this.hostAppliedReplacementAcks.values()].find(
+                // Replacement authority is normally captured after TurnEnd opens N+1, so its exact
+                // converged ACK may prove a delayed N commit superseded. Same-turn recovery is also valid;
+                // anything beyond the immediate successor is unrelated and cannot clear it.
                 ack =>
                   ack.epoch === msg.epoch
                   && ack.wave === msg.wave
-                  && ack.turn === msg.turn
+                  && (ack.turn === msg.turn || ack.turn === msg.turn + 1)
                   && ack.revision === msg.supersededByRevision
                   && ack.checksum === msg.supersededByChecksum
                   && ack.revision > msg.revision,

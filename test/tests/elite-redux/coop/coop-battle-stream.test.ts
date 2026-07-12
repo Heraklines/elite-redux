@@ -644,6 +644,64 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("accepts an exactly ACKed N+1 replacement as proof that a delayed turn-N commit was superseded", async () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 4, turn: 1 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+      const turnPromise = guestStream.awaitTurn(1);
+      hostStream.emitTurn(
+        7,
+        4,
+        1,
+        [],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        emptyAuthoritativeState(4, 1),
+      );
+      const resolution = await turnPromise;
+      expect(resolution).not.toBeNull();
+
+      current.turn = 2;
+      const replacementCheckpoint = { ...emptyCheckpoint(), tick: 21 };
+      const replacement = checkpointEnvelope(
+        "replacement",
+        replacementCheckpoint,
+        "cafebabecafebabe",
+        emptyAuthoritativeState(4, 2, 22),
+      );
+      hostStream.sendCheckpoint(
+        "replacement",
+        replacement.epoch,
+        replacement.wave,
+        replacement.turn,
+        replacement.checkpoint,
+        replacement.checksum,
+        replacement.fullField,
+        replacement.authoritativeState,
+      );
+      await flushWire();
+      expect(guestStream.consumeCheckpoint()?.turn).toBe(2);
+      guestStream.acknowledgeReplacement(replacement);
+      await flushWire();
+      guestStream.acknowledgeTurnCommit(resolution!, replacement);
+      await flushWire();
+
+      let pending = 0;
+      guest.onMessage(message => {
+        if (message.t === "turnCommitPending" && message.turn === 1) {
+          pending++;
+        }
+      });
+      guestStream.requestTurnCommit(7, 4, 1, resolution!.revision);
+      await flushWire();
+      expect(pending, "the exact superseded ACK cleared the retained turn-N commit").toBe(1);
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
     it("retries a lost fatal frame, re-ACKs duplicates exactly once, and honors its absolute deadline", async () => {
       const pair = wrapCoopFaultPair(createLoopbackPair(), COOP_NO_FAULT_PROFILE, { seed: 0x50333246 });
       const scheduled: (() => void)[] = [];

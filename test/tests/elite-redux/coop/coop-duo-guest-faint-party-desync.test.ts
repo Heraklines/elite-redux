@@ -211,6 +211,7 @@ describe.skipIf(!RUN)(
             checkpointApplied && applyCoopAuthoritativeBattleState(envelope.authoritativeState, true);
           if (authoritativeApplied) {
             rig.guestRuntime.battleStream.retainAppliedOutOfBandCheckpoint(envelope);
+            rig.guestRuntime.battleStream.acknowledgeReplacement(envelope);
           }
         }
       });
