@@ -154,9 +154,10 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
     ).toBe(hostChecksum);
 
     // TRAINER-wave renderer regression: the real SummonPhase is correctly default-denied on the guest,
-    // but its already-adopted enemies still need the presentation half (seat/sprite/bar). Simulate the
-    // pre-summon trainer state and prove the narrow materializer makes every enemy seat visible without
-    // constructing a resolution phase.
+    // but its already-adopted enemies still need transitional field containment (seat/sprite/bar). Simulate
+    // the pre-summon trainer state and prove the narrow materializer makes every enemy seat visible without
+    // constructing a resolution phase. This is not proof of a presentation-only architecture: the helper
+    // changes field membership until launch snapshots carry an explicit authoritative seat manifest.
     await withClient(rig.guestCtx, () => {
       const capacity = rig.guestScene.currentBattle.arrangement.enemyCapacity;
       const enemies = rig.guestScene.getEnemyParty().slice(0, capacity);

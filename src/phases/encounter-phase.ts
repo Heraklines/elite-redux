@@ -91,10 +91,11 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
 
 /**
- * Presentation-only launch materialization for an authoritative co-op guest. The host's launch
+ * Transitional launch containment for an authoritative co-op guest. The host's launch
  * snapshot is captured before its summon chain, so session restore leaves every player mon loaded
  * but invisible/off-field. Running SummonPhase here is forbidden because its tail derives shared
- * PostSummon effects; this helper only seats and renders the already-authoritative party objects.
+ * PostSummon effects. This helper still changes structural field membership and runs fieldSetup; it
+ * must be replaced by applying an explicit host field-seat manifest at an immutable launch boundary.
  * Exported as a narrow test seam for the two-engine launch regression.
  */
 export function materializeCoopLoadedPlayerField(): number {
@@ -119,15 +120,15 @@ export function materializeCoopLoadedPlayerField(): number {
 }
 
 /**
- * Presentation-only materialization for the authoritative guest's adopted trainer party. Trainer
+ * Transitional field containment for the authoritative guest's adopted trainer party. Trainer
  * encounters normally reveal enemies through SummonPhase, but that phase also runs fieldSetup and
  * post-summon resolution and is therefore correctly blocked by the renderer allowlist. The old path
  * still hid the trainer and queued those blocked phases, leaving the adopted enemy objects invisible
  * (and sometimes leaving the trainer sprite covering the field).
  *
- * This performs only the visual half of summon: seat the already-authoritative objects, position them,
- * show their sprites/bars, and mark them seen. It deliberately does not call fieldSetup, roll abilities,
- * generate modifiers, or consume RNG. Exported as a narrow regression-test seam.
+ * This avoids fieldSetup, ability rolls, modifier generation, and RNG, but seating the objects and marking
+ * them seen is still structural state. The durable replacement is an authoritative field-seat manifest
+ * followed by a checksum-neutral render projection. Exported as a narrow regression-test seam.
  */
 export function materializeCoopAdoptedEnemyField(): number {
   if (!isCoopAuthoritativeGuest()) {
@@ -1121,9 +1122,11 @@ export class EncounterPhase extends BattlePhase {
         const doTrainerSummon = () => {
           this.hideEnemyTrainer();
           if (isCoopAuthoritativeGuest()) {
-            // SummonPhase is intentionally default-denied on the pure renderer. Materialize the exact
-            // already-adopted enemy objects as presentation and end the intro with the trainer hidden;
-            // no fieldSetup/on-summon/RNG is run locally.
+            // SummonPhase is intentionally default-denied on the pure renderer. Transitional containment
+            // materializes the already-adopted enemy objects and ends the intro with the trainer hidden;
+            // no fieldSetup/on-summon/RNG is run locally. The current presenter can still change field
+            // membership, so replace this local seat derivation with an explicit host field manifest before
+            // calling launch authority complete.
             materializeCoopAdoptedEnemyField();
             this.end();
             return;

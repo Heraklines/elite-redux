@@ -6,7 +6,7 @@ Audited branch: `heraklines/feat/elite-redux-port`
 
 Initial audited source SHA: `cf714363a15927e84521b69d1b00c5a186e88480`
 
-Latest remote re-audit SHA: `efc009aa180c289155b63f02201dc48acdad900c`
+Latest remote re-audit SHA: `4ab6b5081b776a8563cd44cea5fb8f0c3a5b4dd1`
 
 Latest staging source checkpoint: `9585dacdd`
 
@@ -42,7 +42,8 @@ delivered the guest's counter acknowledgement back to the host. `CoopPartnerSync
 next-wave boundary closed. Both red failures are valuable evidence that earlier green results overstated
 lifecycle fidelity.
 
-The branch must not be called deployable at `efc009aa1`. Full gate run `29206057813` is red in Lane B2.
+The branch must not be called deployable at `4ab6b5081`. Full gate run `29208516430` is red in Lane B
+shards 2, 6, and 8. Static, browser transport, A, C, P, and the other B shards are green.
 The previous exact SHA `4f6e786ad` passed the full sharded gate and six-profile Nightly, but the newly
 strengthened journey proves those green results did not cover the production guest lifecycle or even all
 scheduled-transport acknowledgements.
@@ -53,30 +54,60 @@ scheduled-transport acknowledgements.
 
 | Evidence | Result | Meaning |
 | --- | --- | --- |
+| Full gate, `29208516430`, SHA `4ab6b5081` | RED | Static and most shards recover, but the three-wave guest still emits two blocked double-position phases; the ME boundary and three render assertions still lack concrete headless sprite visibility. |
+| Full gate, `29207508147`, SHA `00e1a64d2` | RED | Two trainer modifier type errors; launch/trainer assertion failure; one ME presentation failure; three render-differ failures; and the three-wave journey records eight renderer-blocked phase leaks. |
+| Full gate, `29206719629`, SHA `869ddce36` | RED | Reciprocal reward delivery now progresses; the exact enemy carrier is not JSON-canonical (`bossSegments`/`bossSegmentIndex` are absent on the host capture and become `0` after guest reconstruction). |
 | Full gate, `29206057813`, SHA `efc009aa1` | RED | Three-wave journey parks in `CoopPartnerSyncPhase`; the test did not deliver the reciprocal reward/counter acknowledgement after disabling automatic transport. |
 | Full gate, `29204456430`, SHA `cf714363a` | RED | Guest journey hangs on `TitlePhase`; latest source is not a green checkpoint. |
 | Full gate, `29204101398`, SHA `4f6e786ad` | GREEN | All then-classified tests passed, but before the real queue-crossing assertion. |
 | Six-profile Nightly, `29204108055`, SHA `4f6e786ad` | GREEN | Long harness campaigns passed; this did not prove production UI/phase lifecycle. |
 | Staging deploy, `29202804876`, SHA `9585dacdd` | GREEN deploy | This is the code testers exercised in the latest reports. |
 
-The commits through `efc009aa1` add useful production fixes for the unkeyed trainer vitamin and trainer
-presentation, and make the journey use public command/target UI. They do not remove the recovery/transaction
-defects demonstrated by the newest tester logs, and none of them is present on the staging SHA above.
+The commits through `4ab6b5081` add useful modifier identity work, canonicalize neutral boss fields,
+centralize several field/trainer presentation repairs, initialize reconstructed visual nodes, and keep guest
+TurnInit away from enemy AI/mechanical hooks. They do not remove the recovery/transaction defects demonstrated
+by the newest tester logs. The newest changes are themselves gate-red, and none is present on staging.
 
 ### Remote advancement during this audit
 
-Three remote commits landed while the audit was in progress:
+Eight remote commits landed while the audit was in progress:
 
 - `828733495` assigns a stable trainer-vitamin type ID and materializes an authoritative guest's trainer
   field without running structural summon hooks.
 - `f2e9808a9` initializes mirrored command substrate needed by the second engine.
 - `efc009aa1` drives the guest's public command, fight, and target handlers in the multi-wave journey.
+- `869ddce36` delivers the reward watcher's return frames to the host in scheduled transport.
+- `1dd7a7092` attempts to give trainer items, generated booster types, fight tokens, Resist Berries, and
+  Ward Stones stable persistence identities and reconstruction factories.
+- `00e1a64d2` adds an explicit field-seat `presented` bit, a centralized field/trainer presentation adapter,
+  and neutral boss canonicalization.
+- `cea6e741b` fixes the nullable trainer factories and initializes sprite/battle-info nodes for reconstructed
+  field objects before attempting presentation.
+- `4ab6b5081` makes an authoritative guest's TurnInit queue only player command-intent phases and replay,
+  rather than challenge/ME hooks, enemy AI, and structural recentering.
 
 Those are directionally correct. They do not constitute a production client bootstrap: the fixture still
 constructs a second scene, mirrors host state into it, clears its phase queue, and shifts directly to
 `TurnInitPhase`. The latest gate failure also shows that the scheduled test transport remains manual enough
-to omit a message that production transport would normally deliver. The journey should therefore be
-described as a two-engine component integration test, not an end-to-end production game.
+to omit a message that production transport would normally deliver. At `869ddce36` it reaches the next
+encounter and then correctly detects a JSON roundtrip asymmetry (`undefined` host boss fields become `0`
+after reconstruction). The next two commits fix that asymmetry and broaden modifier/presentation coverage,
+but their exact gate is red:
+
+- static TypeScript rejects `(Modifier | null)[]` from the two new stable-ID trainer callbacks at
+  `trainer-config.ts:4902` and `:4959`;
+- the launch test expects a concrete hidden trainer but observes an uninitialized headless property;
+- the mystery-event and render-differ tests dereference missing headless sprites;
+- the multi-wave journey records six `EnemyCommandPhase` and two `ToggleDoublePositionPhase` renderer leaks.
+
+`cea6e741b`/`4ab6b5081` make real progress: static is green, launch trainer setup passes, and six prior
+`EnemyCommandPhase` leaks disappear. The exact gate still reports two blocked `ToggleDoublePositionPhase`
+calls when the guest adopts the wave-2/3 encounter. The ME and three render assertions still observe
+`sprite.visible === undefined`: constructing a headless presentation node does not make the stub a rendered
+canvas oracle. The presentation helper also catches/defers animation and asset failures. Swallowing or
+fire-and-forgetting those operations keeps mechanics moving but is not proof that a real canvas reaches its
+postcondition. The journey should therefore be described as a two-engine component integration test, not an
+end-to-end production game.
 
 ### Live wave-4 transaction timeline
 
@@ -120,6 +151,23 @@ The producer and authority-boundary canonicalization must both be fixed:
   an in-progress older fight/save can still converge.
 - Unknown unkeyed modifiers must remain invalid and loud rather than being guessed.
 
+The vitamin is not the whole producer class. The trainer item map also returns raw registry factories for
+standard items and directly constructs generated Attack Type/Species booster types. Resist Berries and Ward
+Stones have neither stable registered IDs nor reconstruction classes, yet trainers and Buried City attach
+them to enemies. Guardian fight tokens similarly create enemy modifiers from raw registry factories. The
+current authority canonicalizer repairs only BaseStat modifiers and otherwise permits an empty ID; broad
+capture `catch` blocks can then turn serialization corruption into an apparently valid empty item/modifier
+array. Every authority producer must use a registry-pinning constructor, custom persistent types must have a
+versioned reconstruction codec, and checkpoint capture must fail incomplete/loud on any unknown type rather
+than silently dropping it.
+
+`1dd7a7092` addresses most named families and is directionally correct, but it is not a verified closure. It
+adds a global `PersistentModifier` constructor throw for every blank type ID, so every rare/event/trainer
+producer must be exhaustively inventoried rather than assumed migrated. The exact gate already found two
+nullable trainer factories that no longer satisfy `GenModifiersFunc`. Keep the invariant, but make producer
+classification/static construction tests exhaustive and fix callers before treating runtime throws caught by
+"must never break generation" blocks as coverage.
+
 ### Earlier same-day player pattern
 
 The July 12 reports show successive first-minute failures moving one boundary at a time:
@@ -157,6 +205,20 @@ The following changes are worth keeping:
 
 ## Stop-ship architecture findings
 
+### P0. Authoritative apply is destructive before it is valid
+
+The guest accepts the authoritative state tick before the complete apply succeeds. Modifier reconciliation
+then removes unmatched live modifiers and held items before reconstructing the host list; an unknown type ID
+or constructor error returns `null` and is silently skipped. The overall apply can therefore consume the tick,
+delete a valid local item, partially mutate parties/modifiers, omit the malformed host item, and still appear
+successful. An identical complete retry is rejected as stale.
+
+This is the general form of the wave-4 vitamin failure. Retrying one checkpoint phase does not make lower
+layers transactional. Build a shadow apply plan first: decode and validate the entire runtime schema,
+reconstruct every modifier/Pokemon/seat into detached objects, verify IDs/classes/references and the expected
+checksum, then commit once. Accept the tick only after commit. On any error, preserve the prior state and keep
+the retained authoritative frame recoverable; never interpret a missing reconstruction as “remove it.”
+
 ### P0. Recovery snapshots are not stable transactions
 
 `wireCoopResyncResponder` calls `captureCoopFullSnapshot()` immediately inside the inbound request handler.
@@ -184,6 +246,19 @@ Immediate safety correction: while held at a safe boundary, observe a strictly n
 consume it only when it matches the same epoch/wave/logical turn, apply both numeric and id-keyed state,
 require zero structured apply failures and an exact checksum, then release the hold. This is a live rescue,
 not the final architecture. The final architecture needs a recovery supervisor outside the gameplay queue.
+
+The first rescue implementation is still non-transactional: it raises its recovery tick floor and consumes
+the sole retained envelope before the paired apply/checksum succeeds, while lower-level apply high-water can
+also advance before the whole pair commits. A throw, structured apply failure, reversed tick pair, or checksum
+mismatch therefore burns the only retry; an identical retransmission is stale even if the authoritative half
+never landed. Validate finite safe-integer ordered ticks, retain the envelope until success, and advance every
+admission/high-water marker only on atomic commit (or define explicit idempotent already-applied semantics).
+
+Even a transactional wake does not recover a lost replacement frame: replacement checkpoints are sent once,
+not host-retained/ACKed/re-requestable, and a hot-rejoin full snapshot queues behind the phase that is already
+holding. Nor does the wake prove control-plane convergence: the failed resync has already settled false, so
+its membership, interaction counter, pending surface, and journal adoption callback is not rerun after the
+later mechanical checkpoint. These are still stop-ship items for the session-level supervisor.
 
 ### P0. Turn resolution is one-shot and under-addressed
 
@@ -239,11 +314,12 @@ the committed projection/state, never the original gameplay handler.
 
 ### P0 release gate. The continuous journey is not yet a production client
 
-The newest B2 failure is:
+The B2 failures have progressed as the fixture became stricter:
 
 ```text
-client phase drive to SelectModifierPhase HANG on TitlePhase;
-queued=[VictoryPhase], ui=TITLE
+cf714363a: guest remained on TitlePhase instead of crossing the retained production queue
+efc009aa1: host remained in CoopPartnerSyncPhase because scheduled transport omitted the watcher return frame
+869ddce36: enemy carrier recaptured undefined boss fields as 0 after JSON/adoption
 ```
 
 `buildGuestScene` constructs `BattleScene` directly. `buildDuo` mirrors battle data but never boots the
@@ -254,9 +330,83 @@ The correct fix is not to skip `TitlePhase` in `driveClientPhaseQueueTo`. A prod
 boot the guest with the same launch snapshot, phase queue, UI, and transport callbacks as a browser client,
 then preserve that one queue for the entire journey.
 
-Even after the Title issue, the current multiwave test still uses test-only `onCommandRequest`, directly
-selects both moves through the host manager, and starts detached replay logic. Those shortcuts must leave
-the production-transition lane.
+The main three-wave path now drives the guest's real command/fight/target UI, parks the reciprocal reward
+watcher before the owner, and preserves more of the real queue. That is genuine progress. It still bypasses
+production bootstrap, starts from mirrored battle substrate, clears/forces phases during setup, and invokes
+the private reward selection helper rather than public reward UI. Legacy focused tests still use
+`onCommandRequest`, detached replay phases, and host-side selection for both moves. Those shortcuts may remain
+component fixtures, but they must be forbidden from the production-transition lane.
+
+### P0 release gate. UI-operation coverage is currently a debt ledger, not causal proof
+
+The new UI-operation registry declares 24 `UiMode -> operation` edges, but the soak layer automatically adds
+every declared edge to `KNOWN_UNDRIVABLE` from the same source. The completeness test therefore proves only
+that metadata was auto-exempted. It does not prove one UI callback reaches relay, host validation, commit,
+renderer apply, ACK, continuation, or visual postcondition. Observed-but-undeclared pairs are also collected
+without checking `observed - expected`, so a new real callback route can be silently ignored.
+
+The inventory omits the most important battle semantics entirely: move, target, switch, ball, run, and Tera
+collapse into a broad `battleCommand` trace. `op:reward` similarly collapses take, leave, reroll, lock,
+transfer, check-team, party target, and market actions. Finally, the trace scope is synchronous to one
+`Ui.processInput` stack; a guest intent and its later host commit occur in different clients/event-loop turns
+and cannot share that scope.
+
+Keep this instrumentation as a diagnostic/debt ledger, but make exemptions explicit, fail on unexpected
+observed pairs, and never count an edge covered until a causal `intentId` proves the full distributed chain
+at semantic action granularity.
+
+### P0. Showdown's authoritative guest launch is still contradictory
+
+The versus guest path queues a real `SummonPhase(0)` for its own lead and explicitly excludes versus from
+`materializeCoopLoadedPlayerField`. Production renderer enforcement default-denies `SummonPhase` and replaces
+it with `CoopInertPhase`. The adopted enemy is materialized, but the versus guest's own lead can remain
+off-field. The single-capacity fallback also starts at party index 1, so it does not rescue the missing lead.
+
+The two Showdown tests described as a real boot serialize only after the host has already reached
+`CommandPhase`; production sends its launch payload before encounter presentation/summoning. They then
+clear/push/shift the guest queue, and `buildShowdownDuo` mirrors field/modifier state directly. The serializer
+may be real, but the temporal boundary and bootstrap are not.
+
+Required target: capture the exact payload at production `sendLaunchSnapshot`, boot through public
+SelectStarter/transport/Encounter, apply an explicit authoritative seat manifest to both sides, enforce the
+renderer gate, and prove both leads plus the first public command without queue surgery.
+
+### P0. Triple and future six-seat topology is misclassified and truncated
+
+Authoritative co-op cannot support triples correctly today:
+
+- legacy checkpoint reconciliation treats `BattlerIndex.ENEMY === 2` as the player/enemy boundary;
+- replay rejects every battler index above `ENEMY_2`/3, silently dropping triple enemy indices 4 and 5;
+- replay's identity fallback treats `bi >= 2` as enemy, so triple player slot 2 resolves on the wrong side;
+- per-turn state carries only `double?: boolean`; single and triple both serialize as false;
+- Mystery Event summon logic uses `double` and summons at most two slots, while the enemy builder collapses
+  every streamed party of size at least two to double.
+
+These are not layout-only defects. They drop move/stat/status/faint/capture replay, misapply checkpoint data,
+and can resolve duplicate species to the opposing side. Replace fixed index arithmetic with a topology API
+whose `locate(battlerIndex)` returns explicit side, slot, controller/seat, and Pokemon ID. Carry `formatId`,
+side capacities, and immutable seat/vacancy identities in every commit and recovery payload.
+
+There is currently zero triple-format coverage under the co-op tests or duo harness. Before triple/six-player
+co-op is allowed, exercise every battler index 0-5 through move, stat, status, faint, and replacement replay,
+including duplicate species across sides and a triple ME/colosseum handoff.
+
+### P0 release gate. Showdown, triple regressions, and active visual baselines are omitted
+
+`run-coop-gate.mjs` discovers only top-level `test/tests/elite-redux/coop/*.test.ts`. The Showdown co-op tests
+and `test/tools/repro-triple-battle-bugs-3.test.ts` never enter the sharded co-op gate, and the general test
+workflow does not run for ordinary feature-branch pushes. This directly permits a green co-op SHA with a
+known broken versus launch or 3v2 regression.
+
+The reported 3v2 faint/switch fix is logically correct for the exact repro, but its test is non-gating and
+the implementation still uses the heuristic “do not auto-transpose while any reserve exists” instead of an
+immutable vacancy/replacement transaction. Triple ally wing Y offsets are correctly moved upward, but the
+standalone renderer duplicates the positioning math and real active-scene pages are excluded from golden
+comparison.
+
+Add recursively classified Lane S (Showdown), Lane T (topology/triples), and Lane V (real active render)
+coverage. Promote the exact 3v2 test with seat-ID assertions, add one-reserve/two-faint variants, and require
+a real `battle-field-triples` golden or semantic scene-coordinate assertion.
 
 ## P1 correctness and completeness findings
 
@@ -332,10 +482,46 @@ remain visible while the guest waits in `NextEncounterPhase` because its matchin
 was neutralized.
 
 A blanket `setVisible(true)` is not safe: Substitute, Fly/Dig-style semi-invulnerability, Commander, and
-other mechanics can intentionally hide a battler. The immediate repair therefore needs an explicit marker
-for Pokemon hidden by trainer encounter setup whose SummonPhase was blocked. The durable design must carry
-or purely derive presentation state for those mechanics; `isOnField()` cannot distinguish a missed summon
-from legitimate invisibility.
+other mechanics can intentionally hide a battler. The first marker fallback was also unsafe: the encounter
+marked every trainer enemy, immediate materialization left the marker pending until CommandPhase, and a
+legitimate hide between those points could be overwritten. Trainer-chrome cleanup may be a narrow
+presentation-only fallback; Pokemon visibility must come from a committed presentation projection that
+includes the reason/state, not a delayed marker or `isOnField()` guess.
+
+The upstream `materializeCoopAdoptedEnemyField` and adjacent loaded-player helper are described as
+presentation-only but call `field.add`, alter `isOnField()`/battler indices and seen-enemy membership, and in
+the player case run `fieldSetup()` and `updateModifiers(true)`. Their test removes real field members and then
+expects the helper to reseat the first non-fainted party entries, institutionalizing a local mechanical
+derivation. The launch snapshot should instead be captured at an immutable host boundary with an explicit
+field-seat manifest; its apply owns structural seating once, and a checksum-neutral render projection owns
+sprites/bars/trainer chrome afterward.
+
+`00e1a64d2` centralizes those calls but does not remove the contradiction. Its new
+`settleCoopFieldPresentation` adds/removes Phaser field members, clears `switchOutStatus`, changes field
+positions and seen IDs, then calls itself visual-only. Those writes directly change `isOnField`, `isActive`,
+ability predicates, and battler identity. The new `presented` bit is captured from `isOnField()` and therefore
+describes transient container membership, not semantic visibility: an on-field Pokemon intentionally hidden
+by Substitute/Commander/semi-invulnerability still has `presented=true` and can be forcibly revealed.
+Checksum neutrality does not prove this safe because the checksum omits actual field-container membership.
+
+The same adapter advances tweens to completion in order to obtain final pixels. Trainer tween callbacks can
+call `Phase.end()`, so a checkpoint/presentation projection can mechanically advance the live queue while it
+is supposedly only clearing chrome. Kill presentation tweens without invoking callbacks; structural field
+membership belongs to the atomic material apply, while a separate renderer projection assigns only canonical
+visual properties from an explicit semantic view state.
+
+`14d2bfcb7` then initializes presentation nodes inside the numeric checkpoint loop and directly assigns
+`sprite.visible`/`battleInfo.visible` because the headless setters do not expose those properties. This can
+make the current assertions green, but it further couples mechanical checkpoint application to Phaser object
+construction and proves the stub property was assigned, not that assets loaded or the canvas rendered. Keep
+component assertions, but require an awaited presentation-ready result and a real renderer/browser oracle;
+do not use headless-stub accommodation as visual release evidence.
+
+Showdown exposes the same contradiction. A loaded versus guest queues a real `SummonPhase` for its own lead,
+but production renderer enforcement default-denies `SummonPhase`; the enemy materializer handles only the
+opposing side. A component test/comment says the summon is real while the production capability gate makes
+it inert. Add a two-browser Showdown launch assertion and fix this at the authoritative seat-manifest
+boundary rather than allowlisting a gameplay SummonPhase on the renderer.
 
 Target: every committed logical surface defines presentation postconditions, for example:
 
@@ -351,15 +537,20 @@ Presentation repair may never seat/change mechanics. It should only project comm
 
 ### They do not use the production entry points
 
-The current soak/harness still uses several forbidden shortcuts:
+Across the soak/harness suite, component and campaign paths still use several shortcuts that must be
+forbidden specifically in the production-fidelity lane:
 
 - `remirrorWave` or direct party/field copying between clients;
 - `healGuestFromHost` at setup;
-- test-only `onCommandRequest` instead of guest public command UI;
-- host-side selection of both player moves;
+- test-only `onCommandRequest` instead of guest public command UI (legacy focused paths; removed from the
+  main three-wave path);
+- host-side selection of both player moves (legacy focused paths; the main path now drives guest UI);
 - direct phase creation/start outside the real phase manager queue;
 - direct reward/ME/shop handler calls;
 - queue clearing for special legs;
+- manual `advanceInteraction` after an ME transition, which can manufacture the acknowledgement whose
+  missing production carrier would have softlocked a player;
+- per-wave PP resets/remirroring and detached shop/reward phases;
 - restored PP/healed state that a browser player never receives.
 
 `SOAK_FIDELITY=production` removes some healing, but does not change these control-path substitutions into
@@ -373,6 +564,11 @@ citizenship. Lane A even runs `--no-isolate` because tests chain a shared scene 
 race between two browser event loops cannot be faithfully represented by synchronous object delivery and
 shared globals alone.
 
+The default duo harness additionally disables live-event streaming and per-client module isolation, then
+swaps the process-global scene/runtime/RNG context around callbacks. That is useful deterministic component
+testing, but it can both hide leaked globals and create delivery semantics a pair of browser event loops
+never has.
+
 ### Random depth is not transition coverage
 
 Two hundred waves can repeatedly exercise the same shallow battle/reward loop and miss one guest-owned faint
@@ -385,11 +581,19 @@ public UI action reached:
 Most authoritative UI modes are explicitly `KNOWN_UNDRIVABLE`. That honesty is good, but a green soak must not
 be presented as covering those chains.
 
+Lane P exercises only 12 waves; the deeper coverage thresholds are enforced only for the 30/60-wave
+campaign profiles. Coverage taps count a UI mode being opened or manually marked, while the command provider
+explicitly bypasses public UI. A hit therefore does not prove the relay/commit/apply chain.
+
 ### Existing evidence can accept recovery or timeout as success
 
 Some tests manually heal the guest, accept a long loud timeout as the expected terminal, fail to assert that
 their intended packet drop fired, or scope a known divergence report-only. A green result can therefore mean
 "the safety net eventually continued" rather than "the protocol was correct and no recovery occurred."
+
+The campaign driver also treats some field-collapse stalls as an acceptable `runEnded` terminal. A human
+would call the same unexpected collapse a softlock or broken run; production-fidelity scenarios must require
+the declared semantic destination, not merely any terminal state.
 
 For production journeys, the default must be:
 
@@ -440,6 +644,18 @@ interface CoopCommitV2 {
     logicalState: string;
     formatId: string;
   };
+  topology: {
+    playerCapacity: number;
+    enemyCapacity: number;
+    seats: ReadonlyArray<{
+      side: "player" | "enemy";
+      slot: number;
+      battlerIndex: number;
+      controllerSeat: number | null;
+      pokemonId: number | null;
+      materialPresence: "vacant" | "active" | "fainted" | "pending-replacement";
+    }>;
+  };
   cause: {
     intentId: string | null;
     surfaceId: string;
@@ -475,6 +691,9 @@ The exact schema may differ, but these invariants may not:
 8. Cosmetic cues can drop without changing material/control correctness.
 9. Recovery serves the last immutable committed boundary plus journal tail.
 10. Unknown schema/surface/phase fails closed at a recoverable supervisor, not inside the gameplay queue.
+11. No consumer infers side, owner, or vacancy from battler-index thresholds, party prefixes, or `double`.
+12. Decode/validate/reconstruct happens into a shadow apply plan; material state and revision become visible
+    together only after the full plan is valid.
 
 ### Shared-surface contract registry
 
@@ -556,6 +775,10 @@ Boot two independent clients through the production launch path and retain one r
 whole scenario. No remirror, direct handler, detached phase, test responder, or manual heal is allowed after
 the declared setup milestone.
 
+Make those prohibitions executable: the production-journey build must throw if test code invokes queue
+clearing, phase `.start()`, direct mirror/heal/snapshot application, manual interaction advancement, raw relay
+send, or private picker seams. A convention in test prose is not a fidelity boundary.
+
 The first deploy-blocking journeys should be:
 
 1. fresh lobby -> wave-1 command from each public UI -> turn -> public reward leave -> real wave-2 encounter;
@@ -564,21 +787,29 @@ The first deploy-blocking journeys should be:
 4. wild -> trainer transition with sprite/trainer presentation assertions;
 5. save resume -> same four boundaries;
 6. boss -> biome shop -> crossroads/map -> next biome;
-7. representative battle ME and nested-UI ME.
+7. representative battle ME and nested-UI ME;
+8. Showdown production launch -> both leads presented -> first command -> faint replacement;
+9. triple format -> all six battler indices replay -> trainer switch plus different-slot faint -> replacement;
+10. triple ME/colosseum handoff preserving topology and all occupied seats.
 
 Run each under balanced, owner-fast, watcher-fast, deterministic burst delay, reconnect-before-apply, and
 duplicate-retained-commit schedules.
 
 ### Layer 3: browser gameplay gate
 
-Use two isolated browser contexts, production connector/RTCDataChannel, real lobby/start UI, and public key
-inputs. The gate must cross at least wave 1 -> reward -> wave 2 and one guest faint replacement. Inspect:
+Build the candidate artifact once, serve that exact output, and use two isolated browser contexts with
+separate storage/JS globals, production connector/RTCDataChannel, real lobby/start UI, and public key inputs.
+The gate must cross at least wave 1 -> reward -> wave 2 and one guest faint replacement. Inspect:
 
 - UI mode/phase milestone sequence;
 - applied revision/checksum;
 - console invariant counters;
 - DOM/canvas presentation probe;
 - screenshots at command, reward, transition, and post-replacement boundaries.
+
+At least one deploy-blocking browser scenario must use Showdown and one must render a real triple active
+scene. A duplicated coordinate calculator or a payload captured after manually reaching CommandPhase is not
+equivalent evidence.
 
 Keep a smaller transport-only browser smoke for fast feedback. Do not call it gameplay coverage.
 
@@ -678,9 +909,12 @@ interaction, reconnect of seat 2, and convergence. Then parameterize to six. Do 
 4. Replace stale manual B weights with p90 timings generated from merged reports. Only 15 of 88 B files are
    measured; the rest receive a guessed 27 seconds.
 5. Discover tracked co-op tests recursively and fail when any test lacks explicit classification. The current
-   top-level `readdirSync` silently omits future `ui/`, `minigames/`, or six-player subtrees.
+   top-level `readdirSync` silently omits future `ui/`, `minigames/`, or six-player subtrees. Add explicit
+   deploy-blocking Showdown, topology/triple, and active-render lanes; today all Showdown tests and the exact
+   3v2 repro sit outside the co-op gate.
 6. Replace filename/source heuristics with a committed test manifest: layer, setup project, isolation,
-   estimated weight, affected surfaces, and required environment.
+   estimated weight, affected surfaces/formats, and required environment. A new shared mode, phase, format,
+   or minigame must fail static classification until its causal journey and fault schedules are named.
 7. Expand workflow triggers to package/lock files, TS/Vite/Vitest config, setup action, asset submodule pointer,
    patches, and relevant workflows. Prefer broad triggers with safe `paths-ignore`.
 8. Static validation must cover `last successful full gate SHA..HEAD`, not only `github.event.before..HEAD`.
@@ -711,11 +945,18 @@ Recommended feedback tiers:
 
 ### Checkpoint A: live wave-4 containment
 
-- Fix/canonicalize unkeyed BaseStat vitamins at producers and authority serialization.
+- Fix/canonicalize every trainer/fight-token modifier producer, register reconstructible Resist Berry/Ward
+  Stone codecs, and make authority serialization reject unknown/unkeyed types instead of emitting empty
+  IDs or silently returning empty arrays.
 - Let a held resync recover only from a strictly newer complete same-boundary checkpoint whose own checksum
-  applies exactly.
-- Restore presentation-only visibility/info/trainer postconditions after neutralized structural phases.
-- Add regressions for malformed vitamin JSON roundtrip, held-resync wake, and hidden already-seated enemies.
+  applies exactly; retain/retry the carrier and advance tick floors only after atomic success.
+- Keep the immediate fallback presentation-only: clear stale trainer chrome without touching battler
+  visibility/membership. Move Pokemon seating to an authoritative field manifest.
+- Canonicalize optional wire fields across JSON (`undefined` versus `0` is currently gate-red).
+- Close `4ab6b5081`'s remaining two encounter-time double-position leaks and build an honest render oracle for
+  the ME/render assertions; do not assign fake headless visibility merely to make them green.
+- Add regressions for every trainer item JSON roundtrip, failed-then-retried resync wake, invalid/reversed
+  ticks, Showdown launch seating, and checksum-neutral trainer cleanup.
 - Run focused remote tests, then the full exact-SHA gate. Do not stage or deploy production from a red SHA.
 
 ### Checkpoint B: close the three transaction P0s
@@ -747,7 +988,9 @@ Recommended feedback tiers:
 - Browser gameplay gate and visual baselines.
 - Replay v3 schedule capture/loader.
 - Coverage-guided registry campaigns and mutation testing.
-- Protocol v2 seats/topology/ACK sets, followed by a real three-client journey.
+- Protocol v2 seats/topology/ACK sets; remove all fixed `bi >= 2`, `bi <= 3`, and `double` topology gates.
+- Gate Showdown launch and triple indices 0-5, then run a real three-client journey before parameterizing
+  one-Pokemon-per-player play to six seats.
 
 ## Definition of done
 
@@ -762,6 +1005,8 @@ Co-op may be called bulletproof only when all of the following are true at the s
 - every semantic surface/action has generated owner/authority/watcher/reconnect/fault coverage;
 - browser gameplay proves the first-minute flow and high-risk faint/transition visuals;
 - screenshots/render probes confirm active Pokemon, trainers, UI, and triple layout postconditions;
+- Showdown and every supported battle format enter through production launch and have explicit topology
+  coverage for every valid battler index;
 - unsolicited checksum assertions, resync heals, timeouts, AI substitutions, blocked phases, and parked waits
   are all zero in ordinary journeys/campaigns;
 - mutation tests demonstrate that removing any send/apply/ACK/restore/visual wire makes a gate red;
@@ -786,3 +1031,13 @@ Co-op may be called bulletproof only when all of the following are true at the s
 9. Do not claim N-ready from the current trio snapshot test. Build protocol v2 identities/topology first.
 10. Do not deploy production. Staging is allowed only after the exact-SHA full gate, and architecture/release
     claims additionally require the exact-SHA expanded campaign matrix.
+11. Do not count auto-exempted `UiMode -> op` metadata as coverage. Use action-level causal IDs and make every
+    new, unexpected, or observed-but-exempt path red until a public two-client journey proves it.
+12. Do not call code presentation-only if it changes field membership, battler indices, seen membership,
+    `fieldSetup`, modifiers, RNG, or checksummed state. Assert checksum/seat identity before and after every
+    renderer projection.
+13. Do not claim triple/six-seat compatibility while replay truncates battler indices above 3 or classifies
+    player slot 2 as enemy. Introduce topology first and promote Showdown/triple/active-render tests into the
+    co-op gate.
+14. A failed authoritative apply may hold input only if a session-level resend/recovery/explicit termination
+    path can wake it. Replacing a desync with an indefinite fail-closed park is still a player softlock.
