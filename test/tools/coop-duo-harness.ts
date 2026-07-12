@@ -832,6 +832,15 @@ export function mirrorHostBattleToGuest(
   }
   guestScene.currentBattle.enemyParty = enemyParty;
   guestScene.currentBattle.setFormat(hostBattle.format);
+  // Production's encounter-authority ingress initializes a fresh command substrate immediately after
+  // adopting the host's format (see applyCoopEncounterAuthority). A bare Battle constructor intentionally
+  // leaves these maps unset until the normal new-battle increment, so this direct launch mirror must model
+  // that ingress invariant explicitly. Without it, the first REAL guest CommandPhase reaches
+  // `turnCommands[fieldIndex]` with an undefined map; the old detached replay helper accidentally hid this
+  // because it never drove the production TurnInit -> Command queue.
+  const commandSlots = guestScene.currentBattle.arrangement.activeIndices();
+  guestScene.currentBattle.turnCommands = Object.fromEntries(commandSlots.map(index => [index, null]));
+  guestScene.currentBattle.preTurnCommands = Object.fromEntries(commandSlots.map(index => [index, null]));
 
   // 4. Put both leads of each side ON the guest field (isActive() reads field membership via
   //    globalScene.field.getIndex). The Pokemon is itself a Phaser Container, so field.add works.
