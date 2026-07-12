@@ -218,7 +218,9 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     );
     const guestMgr = new CoopDurabilityManager(pair.guest);
 
-    hostMgr.commit("reward", 1, waveMsg(1));
+    // Use a non-wave carrier so the assertion below can distinguish an unrelated retained class resend
+    // from an illegal partial replay of the overflowed wave class.
+    hostMgr.commit("reward", 1, { t: "coopAck", cls: "synthetic", seq: 1 });
     for (let w = 1; w <= 6; w++) {
       hostMgr.commit("wave", w, waveMsg(w));
     }
