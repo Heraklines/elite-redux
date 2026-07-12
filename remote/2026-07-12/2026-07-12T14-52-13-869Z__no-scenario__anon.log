@@ -1,0 +1,495 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrhwrpfq-3oj4
+mode:     6  wave:2
+seed:     5KxqFsIF2PyDftSr0HIImRCn
+party:    Vulpix(L5 20hp f0), Kangama(L5 27hp f0), Bluzuk(L5 22hp f0), Goldini(L5 21hp f0), Ponita(L5 21hp f0)
+enemy:    Hoothoot(L3), Wolly(L2)
+
+----- CO-OP CONTROL PLANE -----
+session:  role=host seat=0 gen=0g netcode=authoritative PRESENTATION-FINGERPRINT-MISMATCH
+members:  rev=1 state=active connectionGen=0 present=[0:host=true, 1:guest=true]
+phase:    running=CommandPhase queue=[CommandPhase, EnemyCommandPhase, EnemyCommandPhase, TurnStartPhase]
+interact: counter=1 awaiting=none
+commands: pending=[]
+rendez:   awaiting=[cmd:2:1] localArrived=[cmd:1:1, shop:1:0, cmd:2:1] partnerArrived=[cmd:1:1, shop:1:0]
+transport(local): state=connected generation=0 lastRx=1s
+causal:   6/6 most-recent edges
+  #1 lobby:start-new-committed id=mrhwvci7-0.kyk8dri4ez-1 role=host @e1826680697274127
+  #2 command:buffered id=e1826680697274127:w1:t1:guest:p2756294604 role=guest @e1826680697274127/w1/t1 command=0
+  #3 command:intent-sent id=e1826680697274127:w1:t1:host:p191124185 role=host @e1826680697274127/w1/t1 command=0
+  #4 command:applied id=e1826680697274127:w1:t1:guest:p2756294604 role=guest @e1826680697274127/w1/t1 buffered-intent
+  #5 operation:committed id=1826680697274127:0:WAVE_ADVANCE:1 role=host @e1826680697274127/r1/w1/t1 class=op:wave kind=WAVE_ADVANCE
+  #6 operation:committed id=1826680697274127:0:REWARD:0 role=host @e1826680697274127/r2/w1/t0 class=op:reward kind=REWARD
+uiRelay:  4/4 recent carrier edges
+  input#46 mode=TARGET_SELECT carrier=battleCommand field=0 turn=1 owner=host command=0
+  input#55 mode=MESSAGE carrier=operation class=op:wave kind=WAVE_ADVANCE revision=1
+  input#64 mode=MODIFIER_SELECT carrier=interactionChoice seq=0 kind=reward choice=0
+  input#64 mode=MODIFIER_SELECT carrier=operation class=op:reward kind=REWARD revision=2
+
+----- CONSOLE -----
+[14:49:50.168] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[14:49:51.601] LOG: [ER] build mrhwrpfq-3oj4
+[14:49:51.654] LOG: [dev-tools] loaded — 526 scenarios + Send Logs button
+[14:50:32.341] DEBUG: Destroying loading scene
+[14:50:32.342] DEBUG: Destroyed loading scene
+[14:50:32.413] LOG: Seed: 5KxqFsIF2PyDftSr0HIImRCn
+[14:50:32.413] LOG: Wave Seed: 5KxqFsIF2PyDftSr0HIImRCn 0
+[14:50:36.935] LOG: %cStart Phase LoginPhase color:green;
+[14:50:37.160] LOG: Client Session: A2gK3U74QQ6BmrJ8r1RuqE85dkLYM4WF
+[14:50:38.009] LOG: %cStart Phase TitlePhase color:green;
+[14:50:38.011] LOG: Getting Session Slot id: %d 1
+[14:50:38.027] LOG: use seasonal splash messages true
+[14:50:56.735] LOG: [coop:lobby] start announce name=test4
+[14:50:57.486] LOG: [coop:lobby] announced id=6f03a7dd-637d-4e9b-9147-648a6ef13891 -> begin polling
+[14:50:57.734] LOG: [coop:lobby] poll players=0
+[14:50:59.503] LOG: [coop:lobby] poll players=1
+[14:51:01.336] LOG: [coop:lobby] poll: incoming request from=0ab413fe-1bcb-435b-bff0-0fcb38909ec2 name=Heraklines1
+[14:51:01.337] LOG: [coop:lobby] poll players=1
+[14:51:01.828] LOG: [coop:lobby] respond accept=true from=0ab413fe-1bcb-435b-bff0-0fcb38909ec2 (self=6f03a7dd-637d-4e9b-9147-648a6ef13891)
+[14:51:02.262] LOG: [coop:launch] lobby connect code=AGSSKR role=host name=test4
+[14:51:02.264] LOG: [coop:launch] connectCoopWithCode code=AGSSKR role=host username=test4
+[14:51:02.264] LOG: [coop:launch] exchange SDP start code=AGSSKR role=host (ice=fetched)
+[14:51:02.615] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[14:51:03.028] LOG: [coop:launch] host pushing offer code=AGSSKR (ICE gathered)
+[14:51:03.028] LOG: [coop:launch] pushSignal code=AGSSKR role=host sdpBytes=2097
+[14:51:03.252] LOG: [coop:launch] await peer signal start code=AGSSKR role=host timeout=60000ms
+[14:51:04.477] LOG: [coop:launch] iceConnectionState=checking code=AGSSKR role=host
+[14:51:04.478] LOG: [coop:launch] pcConnectionState=connecting code=AGSSKR role=host
+[14:51:05.934] LOG: [coop:launch] await peer signal resolve code=AGSSKR role=host (778b)
+[14:51:05.934] LOG: [coop:launch] host received answer code=AGSSKR -> setRemoteDescription
+[14:51:05.935] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[14:51:05.951] LOG: [coop:launch] iceConnectionState=connected code=AGSSKR role=host
+[14:51:05.953] LOG: [coop:launch] pcConnectionState=connected code=AGSSKR role=host
+[14:51:05.955] LOG: [coop:launch] data channel OPEN
+[14:51:05.955] LOG: [coop:webrtc] ctor role=host readyState=open state=connected
+[14:51:05.955] LOG: [coop:launch] connectCoopSession role=host state=connected username=test4 netcode=authoritative
+[14:51:05.956] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[14:51:05.957] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[14:51:05.958] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[14:51:05.958] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[14:51:05.958] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[14:51:05.958] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[14:51:05.958] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[14:51:05.958] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[14:51:05.959] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[14:51:05.959] LOG: [coop:launch] peer session ready role=host netcode=authoritative -> connecting
+[14:51:05.959] LOG: [coop:launch] session connect role=host partnerRole=guest netcode=authoritative username=test4 version=er-coop-29 tiebreak=0.5822237834915099
+[14:51:05.959] LOG: [coop:webrtc] raw tx role=host t=hello bytes=438
+[14:51:06.001] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=6ba757f0b644976c(1107) movesName=30e2bf626b99790e(1107) movesets=573b3b198f518a35(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=281d407936f2197b(1047)
+[14:51:06.001] LOG: [coop:webrtc] raw tx role=host t=dataFingerprint bytes=329
+[14:51:06.001] LOG: [coop:launch] lobby connected code=AGSSKR role=host -> onConnected
+[14:51:06.003] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:06.003] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:06.003] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:06.003] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:06.004] LOG: [coop:webrtc] raw rx role=host t=hello bytes=430 handlers=10
+[14:51:06.004] LOG: [coop:launch] hello recv partner=Heraklines1 partnerRole=guest (local role=host; no conflict)
+[14:51:06.004] LOG: [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[14:51:06.004] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:06.004] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:06.006] LOG: Getting Session Slot id: %d 0
+[14:51:06.006] LOG: Getting Session Slot id: %d 1
+[14:51:06.012] LOG: Getting Session Slot id: %d 2
+[14:51:06.013] LOG: Getting Session Slot id: %d 3
+[14:51:06.013] LOG: Getting Session Slot id: %d 4
+[14:51:06.014] LOG: [coop:webrtc] raw rx role=host t=dataFingerprint bytes=329 handlers=10
+[14:51:06.015] WARN: [coop:checksum] PRESENTATION MISMATCH sections=movesName,abilitiesName - simulation compatible - movesName local=30e2bf626b99790e(1107) peer=fad7fe8932ec09a1(1107) abilitiesName local=281d407936f2197b(1047) peer=d96ec4d9a76806d2(1047)
+[14:51:06.015] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:06.015] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:06.015] LOG: [coop:webrtc] raw rx role=host t=hello bytes=445 handlers=10
+[14:51:06.015] LOG: [coop:launch] hello recv partner=Heraklines1 partnerRole=guest (local role=host; no conflict)
+[14:51:06.015] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:06.015] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:08.431] LOG: [coop:launch] EPOCH MINT epoch=1826680697274127 reason=start-new
+[14:51:08.431] LOG: [coop:webrtc] raw tx role=host t=hello bytes=438
+[14:51:08.431] LOG: [coop:launch] SEND resumeStartNew id=mrhwvci7-0.kyk8dri4ez-1 (#810 durable barrier release)
+[14:51:08.431] LOG: [coop:webrtc] raw tx role=host t=resumeStartNew bytes=61
+[14:51:08.439] LOG: [coop:webrtc] raw rx role=host t=hello bytes=445 handlers=10
+[14:51:08.440] LOG: [coop:launch] hello recv partner=Heraklines1 partnerRole=guest (local role=host; no conflict)
+[14:51:08.440] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:08.440] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:08.442] LOG: [coop:webrtc] raw rx role=host t=resumeDecisionAck bytes=64 handlers=10
+[14:51:08.442] LOG: [coop:launch] RECV resumeDecisionAck id=mrhwvci7-0.kyk8dri4ez-1 -> start-new committed on both peers
+[14:51:08.446] LOG: [coop-launch] title challenge-gate: role=host isCoopGuest=false -> SelectChallengePhase
+[14:51:08.447] LOG: %cStart Phase SelectChallengePhase color:green;
+[14:51:10.963] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[14:51:10.963] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- lastRx=3s transport=connected journal=0/0 queue=0
+[14:51:12.055] LOG: %cStart Phase SelectStarterPhase color:green;
+[14:51:12.055] LOG: [coop-launch] startCoopSelect role=host partnerConnected=true partnerReady=false
+[14:51:12.117] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:12.117] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:15.106] WARN: cry/37 not found
+[14:51:15.109] WARN: cry/48 not found
+[14:51:21.132] LOG: [coop:webrtc] raw rx role=host t=requestRunConfig bytes=24 handlers=10
+[14:51:23.273] LOG: [coop:webrtc] raw rx role=host t=requestRunConfig bytes=24 handlers=10
+[14:51:24.704] LOG: [coop-runconfig] startRun role=host willBroadcast=true difficulty=elite
+[14:51:24.705] LOG: [coop:runtime] host broadcast difficulty=elite netcode=authoritative kind=coop (role=host)
+[14:51:24.705] LOG: [coop:webrtc] raw tx role=host t=runConfig bytes=585
+[14:51:24.705] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.705] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.706] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=host partnerReady=false
+[14:51:24.706] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.706] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.707] LOG: [coop-launch] local team locked in: 2 mons, role=host
+[14:51:24.707] LOG: [coop:session] roster carry shinyLab speciesId=37 -> none
+[14:51:24.707] LOG: [coop:session] roster carry shinyLab speciesId=48 -> none
+[14:51:24.707] LOG: [coop:roster] add ACCEPT role=host speciesId=37 cost=3 hasStarter=true -> count=1 spent=3 remaining=2
+[14:51:24.707] LOG: [coop:roster] add ACCEPT role=host speciesId=48 cost=2 hasStarter=true -> count=2 spent=5 remaining=0
+[14:51:24.707] LOG: [coop:roster] replace role=host requested=2 accepted=2 spent=5 species=[37,48]
+[14:51:24.708] LOG: [coop:roster] rosterSync SEND role=host entries=2 ready=false spent=5 species=[37,48]
+[14:51:24.708] LOG: [coop:webrtc] raw tx role=host t=rosterSync bytes=963
+[14:51:24.708] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.708] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.708] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=host partnerReady=false
+[14:51:24.708] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.708] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.708] LOG: [coop:roster] setLocalReady role=host localReady=true localCount=2 partnerReady=false -> bothReady=false
+[14:51:24.708] LOG: [coop:roster] rosterSync SEND role=host entries=2 ready=true spent=5 species=[37,48]
+[14:51:24.708] LOG: [coop:webrtc] raw tx role=host t=rosterSync bytes=962
+[14:51:24.708] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.708] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.708] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=host partnerReady=false
+[14:51:24.708] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.708] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.708] LOG: [coop-launch] local ready, partner NOT ready -> waiting screen
+[14:51:24.783] LOG: [coop:webrtc] raw rx role=host t=rosterSync bytes=1458 handlers=10
+[14:51:24.783] LOG: [coop:roster] add ACCEPT role=guest speciesId=115 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[14:51:24.783] LOG: [coop:roster] add ACCEPT role=guest speciesId=118 cost=0.5 hasStarter=true -> count=2 spent=2.5 remaining=2.5
+[14:51:24.783] LOG: [coop:roster] add ACCEPT role=guest speciesId=77 cost=2 hasStarter=true -> count=3 spent=4.5 remaining=0.5
+[14:51:24.783] LOG: [coop:roster] replace role=guest requested=3 accepted=3 spent=4.5 species=[115,118,77]
+[14:51:24.783] LOG: [coop:roster] rosterSync RECV partner=guest entries=3 partnerReady=false partnerCount=3 -> bothReady=false (local role=host)
+[14:51:24.783] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.783] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.783] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=host partnerReady=false
+[14:51:24.783] LOG: [coop:webrtc] raw rx role=host t=rosterSync bytes=1457 handlers=10
+[14:51:24.783] LOG: [coop:roster] add ACCEPT role=guest speciesId=115 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[14:51:24.784] LOG: [coop:roster] add ACCEPT role=guest speciesId=118 cost=0.5 hasStarter=true -> count=2 spent=2.5 remaining=2.5
+[14:51:24.784] LOG: [coop:roster] add ACCEPT role=guest speciesId=77 cost=2 hasStarter=true -> count=3 spent=4.5 remaining=0.5
+[14:51:24.784] LOG: [coop:roster] replace role=guest requested=3 accepted=3 spent=4.5 species=[115,118,77]
+[14:51:24.784] LOG: [coop:roster] rosterSync RECV partner=guest entries=3 partnerReady=true partnerCount=3 -> bothReady=true (local role=host)
+[14:51:24.784] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.784] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:24.784] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=true role=host partnerReady=true
+[14:51:24.784] LOG: [coop-launch] launchCoopMergedParty role=host merged=5 slot=1
+[14:51:24.784] WARN: [coop-launch] host: all 5 save slots full, falling back to current slot 1 (will overwrite)
+[14:51:24.784] LOG: [coop-launch] host: auto-picked slot 1 (no picker), clearing STARTER_SELECT -> MESSAGE
+[14:51:24.894] LOG: [coop:webrtc] raw rx role=host t=requestLaunchSnapshot bytes=38 handlers=10
+[14:51:24.894] WARN: [coop:stream] host RECV requestLaunchSnapshot wave=1 -> no matching cache (cached=none)
+[14:51:26.393] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 1/2 with cache-buster
+[14:51:26.555] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 2/2 via fastly mirror + cache-buster
+[14:51:27.282] ERROR: [asset-retry] PERMANENT load failure key=PRAS-Dragon Dance BG url=images/battle_anims/PRAS-Dragon Dance BG.png
+[14:51:27.340] LOG: Wave Seed: 6LyrGtJG3QzEguTs1IJJnSDo 1
+[14:51:27.343] LOG: %cStart Phase EncounterPhase color:green;
+[14:51:27.345] LOG: [coop:shop] dex baseline captured (species=1913 starters=913) - deltas are run-scoped
+[14:51:27.351] LOG: Starting species pool tier: COMMON
+[14:51:27.362] LOG: Pokemon: Felilou (wild) | Species ID: 509 | Level: 2 | Nature: Frech (+Ang/-SpVert)
+[14:51:27.363] LOG: Stats (IVs): HP: 14 (27), Atk: 9 (12), Def: 6 (22), Spatk: 7 (2), Spdef: 5 (16), Spd: 8 (8)
+[14:51:27.363] LOG: Ability: Entlastung | Passive Ability: Strolch 
+[14:51:27.363] LOG: Moveset: ["Klauenwetzer","Mogelhieb","Ruckzuckhieb","Galanterie"]
+[14:51:27.363] LOG: Starting species pool tier: UNCOMMON
+[14:51:27.370] LOG: Pokemon: Bluzuk (wild) | Species ID: 48 | Level: 2 | Nature: Hart (+Ang/-SpAng)
+[14:51:27.370] LOG: Stats (IVs): HP: 14 (18), Atk: 8 (28), Def: 7 (9), Spatk: 6 (5), Spdef: 7 (8), Spd: 7 (21)
+[14:51:27.370] LOG: Ability: Giftbelag | Passive Ability: Facettenauge 
+[14:51:27.370] LOG: Moveset: ["Ampelleuchte","Giftpuder","Konfusion","Tackle"]
+[14:51:30.157] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[14:51:30.157] LOG: [coop:replay] host SEND launchSnapshot wave=1 sessionLen=15444
+[14:51:30.158] LOG: [coop:webrtc] raw tx role=host t=launchSnapshot bytes=17244
+[14:51:30.159] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[14:51:30.161] LOG: [coop:launch] resume marker recorded slot=1 self=test4 partner=Heraklines1 wave=1 (#810)
+[14:51:30.432] DEBUG: Session data saved to slot 1!
+[14:51:32.577] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=36 handlers=10
+[14:51:32.577] LOG: [coop:rendezvous] RECV arrival point=cmd:1:1 -> BUFFER (no waiter yet) role=host
+[14:51:34.686] LOG: Wave Seed: 6LyrGtJG3QzEguTs1IJJnSDo 1
+[14:51:34.687] LOG: [coop:replay] host SEND enemyPartySync wave=1 count=2 meType=-1 battleType=0
+[14:51:34.687] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=15713
+[14:51:35.336] LOG: %cStart Phase SummonPhase color:green;
+[14:51:35.917] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:51:36.069] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:51:36.070] LOG: %cStart Phase SummonPhase color:green;
+[14:51:36.482] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:51:36.618] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:51:36.618] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:51:36.618] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:51:36.621] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:36.622] LOG: Ran PSP for: Kangama
+[14:51:36.625] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:36.629] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:36.632] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:36.632] LOG: Ran PSP for: Vulpix
+[14:51:36.636] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:36.642] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:36.643] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:36.643] LOG: Ran PSP for: Felilou
+[14:51:36.645] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:36.646] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:36.646] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:36.646] LOG: Ran PSP for: Bluzuk
+[14:51:36.647] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:36.647] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:36.647] LOG: %cStart Phase TurnInitPhase color:green;
+[14:51:36.649] LOG: %cStart Phase CommandPhase color:green;
+[14:51:36.650] LOG: [coop:battle] CommandPhase slot=0 turn=1 owner=host role=host -> LOCAL UI
+[14:51:36.650] LOG: [coop:rendezvous] ARRIVE point=cmd:1:1 (send) role=host
+[14:51:36.650] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=36
+[14:51:36.650] LOG: [coop:rendezvous] next-command barrier cmd:1:1 SYNC pass (partner already arrived)
+[14:51:36.658] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=36 handlers=10
+[14:51:36.658] LOG: [coop:rendezvous] RECV arrival point=cmd:1:1 -> DUPLICATE (already seen) role=host
+[14:51:38.664] LOG: [coop:webrtc] raw rx role=host t=command bytes=186 handlers=10
+[14:51:38.665] LOG: [coop:relay] recv command fieldIndex=1 turn=1 command=0 -> BUFFERED (no awaiter yet)
+[14:51:40.807] LOG: Move: MYSTICAL_FIRE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Vulpix
+[14:51:40.809] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:51:40.965] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[14:51:40.965] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- lastRx=0s transport=connected journal=0/0 queue=0
+[14:51:41.284] LOG: [coop:owner] broadcast own-slot fi=0 turn=1 role=host cmd=0
+[14:51:41.284] LOG: [coop:relay] broadcastLocalCommand SEND fieldIndex=0 owner=host turn=1 command=0 cursor=1 moveId=595 targets=[3]
+[14:51:41.284] LOG: [coop:webrtc] raw tx role=host t=command bytes=184
+[14:51:41.284] LOG: %cStart Phase CommandPhase color:green;
+[14:51:41.285] LOG: [coop:battle] CommandPhase slot=1 turn=1 owner=guest role=host -> partner path
+[14:51:41.288] LOG: [coop:relay] host requestPartnerCommand fieldIndex=1 turn=1 moveSlots=[0,1,2,3] -> consumed BUFFERED command kind=0
+[14:51:41.289] LOG: [coop:ai] applyWiredPartnerCommand partner=115 wiredMoveId=252 cursor=1 -> moveId=252 moveIndex=1 tera=false targets=[2] targetsFrom=wire-verbatim useMode=1
+[14:51:41.289] LOG: Move: FAKE_OUT Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Kangama
+[14:51:41.289] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:51:41.295] LOG: Battle Seed: YzbanvvC73eTcGDi
+[14:51:41.304] LOG: Move Pool: ["Klauenwetzer","Mogelhieb","Ruckzuckhieb","Galanterie"]
+[14:51:41.304] LOG: Move Scores: [4,13,8,0]
+[14:51:41.305] LOG: Sorted Move Pool: ["Mogelhieb","Ruckzuckhieb","Klauenwetzer","Galanterie"]
+[14:51:41.305] LOG: Chosen Move: Mogelhieb
+[14:51:41.305] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:51:41.320] LOG: Move Pool: ["Ampelleuchte","Giftpuder","Konfusion","Tackle"]
+[14:51:41.320] LOG: Move Scores: [24,10,15,8]
+[14:51:41.320] LOG: Sorted Move Pool: ["Ampelleuchte","Konfusion","Giftpuder","Tackle"]
+[14:51:41.320] LOG: Chosen Move: Konfusion
+[14:51:41.320] LOG: %cStart Phase TurnStartPhase color:green;
+[14:51:41.320] LOG: [coop:turn] host recorder: begin turn=1 (no prior open recording)
+[14:51:41.328] LOG: %cStart Phase MovePhase color:green;
+[14:51:41.328] LOG: %cUser: Kangama
+Move: FAKE_OUT
+Use Mode: NORMAL color:orchid
+[14:51:41.331] LOG: [coop:turn] host recorder: append turn=1 seq=0 k=moveUsed total=1 live=true
+[14:51:41.331] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=0 k=moveUsed
+[14:51:41.331] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=0 k=moveUsed
+[14:51:41.331] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=95
+[14:51:41.334] LOG: %cStart Phase MessagePhase color:green;
+[14:51:41.463] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:51:41.751] LOG: crit stage: +0
+[14:51:41.754] LOG: Move: Mogelhieb | Base damage: 10.533333333333333 | Power: 40 | Source attack: 16 | Target defense: 6
+[14:51:41.755] LOG: Move: Mogelhieb | Attack damage: 15
+[14:51:41.756] LOG: [coop:turn] host recorder: append turn=1 seq=1 k=hp total=2 live=true
+[14:51:41.756] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=1 k=hp
+[14:51:41.756] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=1 k=hp
+[14:51:41.756] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=89
+[14:51:41.756] LOG: [coop:turn] host recorder: append turn=1 seq=2 k=faint total=3 live=true
+[14:51:41.756] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=2 k=faint
+[14:51:41.756] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=2 k=faint
+[14:51:41.756] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=89
+[14:51:41.760] LOG: [coop:turn] host recorder: append turn=1 seq=3 k=message total=4 live=true
+[14:51:41.761] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=3 k=message
+[14:51:41.761] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=3 k=message
+[14:51:41.761] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=86
+[14:51:41.761] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:51:41.972] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:51:42.013] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:51:42.032] LOG: %cStart Phase MessagePhase color:green;
+[14:51:42.301] LOG: %cStart Phase FaintPhase color:green;
+[14:51:42.385] LOG: %cStart Phase MessagePhase color:green;
+[14:51:45.525] LOG: %cStart Phase VictoryPhase color:green;
+[14:51:45.526] LOG: [coop:progression] HOST applyPartyExp COMPUTE wave=1 expValue=23.4 koMon=Felilou
+[14:51:45.526] LOG: %cStart Phase ExpPhase color:green;
+[14:51:45.743] LOG: %cStart Phase ExpPhase color:green;
+[14:51:45.909] LOG: %cStart Phase MoveEndPhase color:green;
+[14:51:45.911] LOG: %cStart Phase MovePhase color:green;
+[14:51:45.911] LOG: %cStart Phase MoveEndPhase color:green;
+[14:51:45.912] LOG: %cStart Phase MovePhase color:green;
+[14:51:45.912] LOG: %cUser: Vulpix
+Move: MYSTICAL_FIRE
+Use Mode: NORMAL color:orchid
+[14:51:45.914] LOG: [coop:turn] host recorder: append turn=1 seq=4 k=moveUsed total=5 live=true
+[14:51:45.914] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=4 k=moveUsed
+[14:51:45.914] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=4 k=moveUsed
+[14:51:45.914] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=95
+[14:51:45.916] LOG: %cStart Phase MessagePhase color:green;
+[14:51:46.096] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:51:46.490] LOG: crit stage: +0
+[14:51:46.491] LOG: Move: Magieflamme | Base damage: 12.971428571428572 | Power: 80 | Source attack: 12 | Target defense: 7
+[14:51:46.492] LOG: Move: Magieflamme | Attack damage: 34
+[14:51:46.493] LOG: [coop:turn] host recorder: append turn=1 seq=5 k=hp total=6 live=true
+[14:51:46.493] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=5 k=hp
+[14:51:46.493] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=5 k=hp
+[14:51:46.493] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=88
+[14:51:46.493] LOG: [coop:turn] host recorder: append turn=1 seq=6 k=faint total=7 live=true
+[14:51:46.493] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=6 k=faint
+[14:51:46.493] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=6 k=faint
+[14:51:46.493] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=88
+[14:51:46.494] LOG: [coop:turn] host recorder: append turn=1 seq=7 k=message total=8 live=true
+[14:51:46.494] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=7 k=message
+[14:51:46.494] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=7 k=message
+[14:51:46.494] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=92
+[14:51:46.495] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:51:46.510] LOG: %cStart Phase MessagePhase color:green;
+[14:51:46.802] LOG: %cStart Phase FaintPhase color:green;
+[14:51:46.888] LOG: %cStart Phase MessagePhase color:green;
+[14:51:46.966] LOG: %cStart Phase VictoryPhase color:green;
+[14:51:46.966] LOG: [coop:progression] HOST applyPartyExp COMPUTE wave=1 expValue=25.4 koMon=Bluzuk
+[14:51:46.982] LOG: [coop:runtime] send waveResolved wave=1 outcome=win (host)
+[14:51:46.982] LOG: [coop:replay] host SEND waveResolved wave=1 outcome=win transition=WAVE_VICTORY/next2/biome0/egg1/wild
+[14:51:46.982] LOG: [coop:webrtc] raw tx role=host t=waveResolved bytes=209
+[14:51:46.983] LOG: [coop:webrtc] raw tx role=host t=envelope bytes=666
+[14:51:46.983] LOG: [coop:runtime] wave-advance op HOST commit wave=1 outcome=win next=WAVE_VICTORY rev=1 id=1826680697274127:0:WAVE_ADVANCE:1 (Wave-2f)
+[14:51:46.983] LOG: %cStart Phase ExpPhase color:green;
+[14:51:46.995] LOG: [coop:webrtc] raw rx role=host t=coopAck bytes=41 handlers=10
+[14:51:47.194] LOG: %cStart Phase ExpPhase color:green;
+[14:51:47.364] LOG: %cStart Phase MoveEndPhase color:green;
+[14:51:47.364] LOG: %cStart Phase MovePhase color:green;
+[14:51:47.364] LOG: %cStart Phase MoveEndPhase color:green;
+[14:51:47.365] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:51:47.365] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:51:47.365] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:51:47.365] LOG: %cStart Phase BerryPhase color:green;
+[14:51:47.366] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:51:47.367] LOG: %cStart Phase TurnEndPhase color:green;
+[14:51:47.368] LOG: [coop:turn] host recorder: finalize turn=1 events=8 seq=8
+[14:51:47.369] LOG: [coop:checkpoint] build field=4 weather=0/0 terrain=0/0 arenaTags=0 money=1000 mons=[bi0:sp37/hp20-20/st0/fnt0 bi1:sp115/hp27-27/st0/fnt0 bi2:sp509/hp0-14/st7/fnt1 bi3:sp48/hp0-14/st7/fnt1]
+[14:51:47.370] LOG: [coop:checkpoint] host capture field=4 weather=0 terrain=0 money=1000 arenaTags=0 mons=[bi0:sp37/hp20-20/st0/fnt0 bi1:sp115/hp27-27/st0/fnt0 bi2:sp509/hp0-14/st7/fnt1 bi3:sp48/hp0-14/st7/fnt1]
+[14:51:47.371] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[14:51:47.372] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[14:51:47.372] LOG: [coop:checksum] capture digest=34edea59d1a459ab field=4 biome=0 seed=5KxqFsIF2PyDftSr0HIImRCn weather=0 terrain=0 money=1000 party=[37,115,48,118,77] partyLevels=[5,5,5,5,5] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp37/hp20-20/st0/ab18/form0/tera0:9/boss0:0 bi1:sp115/hp27-27/st0/ab89/form0/tera0:0/boss0:0 bi2:sp509/hp0-14/st7/ab84/form0/tera0:16/boss0:0 bi3:sp48/hp0-14/st7/ab295/form0/tera0:3/boss0:0]
+[14:51:47.372] LOG: [coop:replay] host SEND turnResolution turn=1 events=8 checksum=34edea59d1a459ab preimage=true fullField=4 authoritativeState=1
+[14:51:47.373] LOG: [coop:webrtc] raw tx role=host t=turnResolution bytes=20080
+[14:51:47.373] LOG: %cStart Phase BattleEndPhase color:green;
+[14:51:47.374] LOG: [coop:progression] waveEndState BROADCAST wave=1 (host streams authoritative snapshot)
+[14:51:47.374] LOG: [coop:runtime] send waveEndState wave=1 tick=4 (host)
+[14:51:47.374] LOG: [coop:replay] host SEND waveEndState wave=1 tick=4 party=5
+[14:51:47.374] LOG: [coop:webrtc] raw tx role=host t=waveEndState bytes=15280
+[14:51:47.375] LOG: Battle Score: 25 (1 Turns x1)
+[14:51:47.375] LOG: Total Score: 25
+[14:51:47.384] LOG: %cStart Phase EggLapsePhase color:green;
+[14:51:47.385] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:51:47.385] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[14:51:47.385] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:47.385] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[14:51:47.385] LOG: Wave Seed: 6LyrGtJG3QzEguTs1IJJnSDo 1
+[14:51:47.392] LOG: 13 10 [2,3,4,5,6,7,8,9,10,12,22]
+[14:51:47.392] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[14:51:47.392] LOG: 0 0 [2,3,4,5,6]
+[14:51:47.392] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[14:51:47.392] LOG: 8 5 [2,3,4,5,6]
+[14:51:47.392] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[14:51:47.392] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:47.392] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[14:51:47.392] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[14:51:47.392] LOG: [coop:reward] owner/watcher decision: pinnedStart=0 liveCounter=0 parity=0 role=host pick=OWNER option=ROLL spoof=false
+[14:51:47.393] LOG: [coop:shop] serializeRewardOptions count=3 ids=[NUGGET,POKEBALL,BERRY] tiers=[1,0,0]
+[14:51:47.393] LOG: [coop:reward] OWNER streams reward options (start=0 reroll=0 count=3 ids=[NUGGET,POKEBALL,BERRY])
+[14:51:47.393] LOG: [coop:relay] SEND rewardOptions seq=0 reroll=0 count=3 ids=[NUGGET,POKEBALL,BERRY]
+[14:51:47.393] LOG: [coop:webrtc] raw tx role=host t=rewardOptions bytes=223
+[14:51:47.393] LOG: [coop:rendezvous] ARRIVE point=shop:1:0 (send) role=host
+[14:51:47.393] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=37
+[14:51:47.393] LOG: [coop:reward] OWNER drives reward screen (start=0 role=host spoof=false adoptsOptions=false wave=1)
+[14:51:47.393] LOG: [coop:rendezvous] shop-pick-commit barrier AWAIT shop:1:0
+[14:51:47.393] LOG: [coop:rendezvous] AWAIT point=shop:1:0 timeoutMs=60000 -> network-wait role=host
+[14:51:49.157] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=37 handlers=10
+[14:51:49.157] LOG: [coop:rendezvous] RECV arrival point=shop:1:0 -> deliver-to-waiter role=host
+[14:51:49.157] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=37
+[14:51:49.157] LOG: [coop:rendezvous] AWAIT point=shop:1:0 RESOLVE both-arrived role=host
+[14:51:49.173] LOG: [coop:interaction] mirror begin role=owner mirrorSeq=0 interactionStart=0 reroll=0
+[14:51:49.174] LOG: [coop:interaction] uiMirror beginSession role=owner mode=6 seq=0 early=0
+[14:51:51.374] LOG: [coop:interaction] uiMirror OWNER send seq=0 n=0 button=3 modeBefore=6
+[14:51:51.374] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=49
+[14:51:52.034] LOG: [coop:interaction] uiMirror OWNER send seq=0 n=1 button=3 modeBefore=6
+[14:51:52.034] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=49
+[14:51:52.263] LOG: [coop:interaction] uiMirror OWNER send seq=0 n=2 button=2 modeBefore=6
+[14:51:52.263] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=49
+[14:51:52.409] LOG: [coop:interaction] uiMirror OWNER send seq=0 n=3 button=2 modeBefore=6
+[14:51:52.410] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=49
+[14:51:52.638] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:52.639] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[14:51:52.639] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:51:52.639] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[14:51:52.639] LOG: [coop:relay] OWNER send seq=0 kind=reward choice=0 data=[0] role=host
+[14:51:52.640] LOG: [coop:relay] SEND interactionChoice seq=0 kind=reward kind=? choice=0 data=[0]
+[14:51:52.640] LOG: [coop:webrtc] raw tx role=host t=interactionChoice bytes=71
+[14:51:52.640] LOG: [coop:webrtc] raw tx role=host t=envelope bytes=562
+[14:51:52.640] LOG: [coop:reward] reward op OWNER commit label=reward rev=2 id=1826680697274127:0:REWARD:0 (Wave-2d)
+[14:51:52.642] LOG: [coop:reward] APPLY_RESULT pin=0 side=owner type=NUGGET class=MoneyRewardModifier pregen=[] holderSlot=-1 holderId=-1 stack=-1 accepted=true cost=-1
+[14:51:52.644] LOG: %cStart Phase NewBattlePhase color:green;
+[14:51:52.645] LOG: Wave Seed: 7MzsHuKH4R{FhvUt2JKKoTEp 2
+[14:51:52.645] LOG: %cStart Phase NextEncounterPhase color:green;
+[14:51:52.646] LOG: Starting species pool tier: COMMON
+[14:51:52.661] LOG: Pokemon: Hoothoot (wild) | Species ID: 163 | Level: 3 | Nature: Lasch (+Vert/-SpVert)
+[14:51:52.661] LOG: Stats (IVs): HP: 17 (28), Atk: 7 (31), Def: 8 (27), Spatk: 7 (20), Spdef: 7 (14), Spd: 8 (14)
+[14:51:52.661] LOG: Ability: Aufwertung | Passive Ability: Flock 
+[14:51:52.662] LOG: Moveset: ["Pikser","Horrorblick","Heuler","Hypnose"]
+[14:51:52.662] LOG: Starting species pool tier: COMMON
+[14:51:52.678] LOG: Pokemon: Wolly (wild) | Species ID: 831 | Level: 2 | Nature: Robust (-)
+[14:51:52.679] LOG: Stats (IVs): HP: 13 (5), Atk: 7 (3), Def: 7 (29), Spatk: 7 (21), Spdef: 6 (3), Spd: 7 (16)
+[14:51:52.679] LOG: Ability: Vegetarier | Passive Ability: Let's Roll 
+[14:51:52.679] LOG: Moveset: ["Heuler","Gähner","Tackle","Walzer (P)"]
+[14:51:52.680] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[14:51:52.680] LOG: [coop:interaction] CoopInteractionTurn.advance INCREMENT (fromCounter=0) counter 0 -> 1
+[14:51:52.680] LOG: [coop:interaction] advanceInteraction ADVANCED+BROADCAST (fromCounter=0) counter 0 -> 1 role=host; send interaction screen=__turn__ choice=1
+[14:51:52.680] LOG: [coop:interaction] SEND counter snapshot reason=advance choice=1 role=host
+[14:51:52.681] LOG: [coop:webrtc] raw tx role=host t=interaction bytes=50
+[14:51:52.681] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[14:51:52.681] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[14:51:52.681] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=host partnerReady=true
+[14:51:52.681] LOG: [coop:interaction] interactionCounter() read -> 1 (role=host)
+[14:51:52.681] LOG: [coop:reward] advance interaction (role=host from=0 counter 0 -> 1)
+[14:51:52.687] LOG: [coop:webrtc] raw rx role=host t=coopAck bytes=41 handlers=10
+[14:51:52.687] LOG: [coop:webrtc] raw rx role=host t=requestEnemyParty bytes=34 handlers=10
+[14:51:52.687] LOG: [coop:stream] host RECV requestEnemyParty wave=2
+[14:51:52.687] LOG: [coop:stream] recv requestEnemyParty wave=2 role=host
+[14:51:52.687] LOG: [coop:stream] requestEnemyParty wave=2 awaits complete EncounterPhase carrier (none retained yet)
+[14:51:52.687] LOG: [coop:webrtc] raw rx role=host t=interaction bytes=50 handlers=10
+[14:51:52.687] LOG: [coop:interaction] RECV interaction broadcast (deferred catch-up net) received=1 localBefore=1 role=host -> no defer (local >= received)
+[14:51:52.687] WARN: [coop:interaction] CoopInteractionTurn.mergeRemote DEFER (remote=1, counter=1, pendingRemote=1) live counter UNCHANGED (folds in at next advance if still ahead)
+[14:51:52.687] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[14:51:52.687] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[14:51:52.687] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=host partnerReady=true
+[14:51:53.322] LOG: [coop:interaction] interactionCounter() read -> 1 (role=host)
+[14:51:53.323] LOG: [coop:launch] resume marker recorded slot=1 self=test4 partner=Heraklines1 wave=2 (#810)
+[14:51:53.615] DEBUG: Session data saved to slot 1!
+[14:51:53.616] LOG: Wave Seed: 7MzsHuKH4R{FhvUt2JKKoTEp 2
+[14:51:54.302] LOG: %cStart Phase CoopPartnerSyncPhase color:green;
+[14:51:54.308] LOG: [coop:interaction] interactionCounter() read -> 1 (role=host)
+[14:51:54.308] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:51:54.308] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:51:54.308] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:51:54.308] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:51:54.309] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:54.309] LOG: Ran PSP for: Hoothoot
+[14:51:54.312] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:54.312] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:54.313] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:54.313] LOG: Ran PSP for: Wolly
+[14:51:54.313] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:54.313] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:54.314] LOG: %cStart Phase MovePhase color:green;
+[14:51:54.314] LOG: %cUser: Wolly
+Move: DEFENSE_CURL
+Use Mode: FOLLOW_UP color:orchid
+[14:51:54.321] LOG: %cStart Phase MessagePhase color:green;
+[14:51:54.459] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:51:54.469] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:51:54.737] LOG: %cStart Phase MessagePhase color:green;
+[14:51:55.046] LOG: %cStart Phase MoveEndPhase color:green;
+[14:51:55.046] LOG: %cStart Phase TurnInitPhase color:green;
+[14:51:55.046] LOG: %cStart Phase CommandPhase color:green;
+[14:51:55.046] LOG: [coop:battle] CommandPhase slot=0 turn=1 owner=host role=host -> LOCAL UI
+[14:51:55.046] LOG: [coop:rendezvous] next-command barrier ARRIVE+AWAIT cmd:2:1 slot=0
+[14:51:55.047] LOG: [coop:rendezvous] ARRIVE point=cmd:2:1 (send) role=host
+[14:51:55.047] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=36
+[14:51:55.047] LOG: [coop:rendezvous] AWAIT point=cmd:2:1 timeoutMs=60000 -> network-wait role=host
+[14:51:57.660] LOG: [coop:webrtc] raw rx role=host t=requestEnemyParty bytes=34 handlers=10
+[14:51:57.660] LOG: [coop:stream] host RECV requestEnemyParty wave=2
+[14:51:57.660] LOG: [coop:stream] recv requestEnemyParty wave=2 role=host
+[14:51:57.660] LOG: [coop:stream] requestEnemyParty wave=2 awaits complete EncounterPhase carrier (none retained yet)
+[14:52:07.757] LOG: [coop:webrtc] raw rx role=host t=requestEnemyParty bytes=34 handlers=10
+[14:52:07.757] LOG: [coop:stream] host RECV requestEnemyParty wave=2
+[14:52:07.757] LOG: [coop:stream] recv requestEnemyParty wave=2 role=host
+[14:52:07.757] LOG: [coop:stream] requestEnemyParty wave=2 awaits complete EncounterPhase carrier (none retained yet)
+[14:52:12.160] LOG: [coop:interaction] interactionCounter() read -> 1 (role=host)
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"5KxqFsIF2PyDftSr0HIImRCn","gameModeId":6,"difficulty":"elite","challenges":[{"id":4,"value":0,"severity":0},{"id":9,"value":0,"severity":0},{"id":7,"value":0,"severity":0},{"id":8,"value":0,"severity":0},{"id":0,"value":0,"severity":0},{"id":1,"value":0,"severity":0},{"id":13,"value":0,"severity":0},{"id":10,"value":1,"severity":0},{"id":5,"value":0,"severity":0},{"id":6,"value":0,"severity":0},{"id":11,"value":0,"severity":0},{"id":15,"value":0,"severity":0},{"id":14,"value":0,"severity":0},{"id":12,"value":0,"severity":0}],"roster":[{"id":191124185,"player":true,"species":37,"formIndex":0,"abilityIndex":0,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":20,"stats":[20,10,10,12,13,13],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":481,"ppUsed":0,"ppUp":0},{"moveId":595,"ppUsed":0,"ppUp":0},{"moveId":585,"ppUsed":0,"ppUp":0},{"moveId":844,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":37,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":9,"isTerastallized":false,"stellarTypesBoosted":[9],"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"coopOwner":"host","summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":595,"targets":[3],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"coopPassiveAttr":[63,63,63],"coopLuck":3},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2756294604,"player":true,"species":115,"formIndex":0,"abilityIndex":0,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":1,"hp":27,"stats":[27,16,14,10,14,15],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":69,"ppUsed":0,"ppUp":0},{"moveId":252,"ppUsed":0,"ppUp":0},{"moveId":612,"ppUsed":0,"ppUp":0},{"moveId":885,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":115,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[0],"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"coopOwner":"guest","summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":252,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLab":[135,0,0,255,255,255,96,0,0,0,0,0,70,85],"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"coopPassiveAttr":[63,63,63],"coopLuck":1},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1221245928,"player":true,"species":48,"formIndex":0,"abilityIndex":0,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":22,"stats":[22,12,11,12,12,12],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":93,"ppUsed":0,"ppUp":0},{"moveId":77,"ppUsed":0,"ppUp":0},{"moveId":324,"ppUsed":0,"ppUp":0},{"moveId":33,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":48,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"coopOwner":"host","summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"coopPassiveAttr":[63,63,63],"coopLuck":1},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2821848663,"player":true,"species":118,"formIndex":0,"abilityIndex":0,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":21,"stats":[21,16,12,9,11,14],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":755,"ppUsed":0,"ppUp":0},{"moveId":349,"ppUsed":0,"ppUp":0},{"moveId":916,"ppUsed":0,"ppUp":0},{"moveId":824,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":118,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[],"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"coopOwner":"guest","summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLab":[50,30,0,255,255,255,96,0,1,0,0,0,70,85],"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"coopPassiveAttr":[63,63,63],"coopLuck":3},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1370291883,"player":true,"species":77,"formIndex":0,"abilityIndex":0,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":21,"stats":[21,15,12,13,13,15],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":838,"ppUsed":0,"ppUp":0},{"moveId":344,"ppUsed":0,"ppUp":0},{"moveId":136,"ppUsed":0,"ppUp":0},{"moveId":14,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":77,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":9,"isTerastallized":false,"stellarTypesBoosted":[],"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"coopOwner":"guest","summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLab":[0,3,0,255,255,255,96,0,0,0,0,1,70,85],"erShinyLabName":"Drug Fiend","erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"coopPassiveAttr":[63,63,63],"coopLuck":3},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":1,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":1,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":0,"kind":"reward","choice":0,"data":[0]}],"coop":{"runConfig":{"difficulty":"elite","challenges":[{"id":4,"value":0,"severity":0},{"id":9,"value":0,"severity":0},{"id":7,"value":0,"severity":0},{"id":8,"value":0,"severity":0},{"id":0,"value":0,"severity":0},{"id":1,"value":0,"severity":0},{"id":13,"value":0,"severity":0},{"id":10,"value":1,"severity":0},{"id":5,"value":0,"severity":0},{"id":6,"value":0,"severity":0},{"id":11,"value":0,"severity":0},{"id":15,"value":0,"severity":0},{"id":14,"value":0,"severity":0},{"id":12,"value":0,"severity":0}],"seed":"5KxqFsIF2PyDftSr0HIImRCn","netcodeMode":"authoritative","kind":"coop"}},"checkpoint":{"wave":1,"seed":"5KxqFsIF2PyDftSr0HIImRCn","party":[{"id":191124185,"player":true,"species":37,"formIndex":0,"abilityIndex":0,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":20,"stats":[20,10,10,12,13,13],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":481,"ppUsed":0,"ppUp":0},{"moveId":595,"ppUsed":0,"ppUp":0},{"moveId":585,"ppUsed":0,"ppUp":0},{"moveId":844,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":37,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":9,"isTerastallized":false,"stellarTypesBoosted":[9],"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"coopOwner":"host","summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":595,"targets":[3],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"coopPassiveAttr":[63,63,63],"coopLuck":3},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2756294604,"player":true,"species":115,"formIndex":0,"abilityIndex":0,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":1,"hp":27,"stats":[27,16,14,10,14,15],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":69,"ppUsed":0,"ppUp":0},{"moveId":252,"ppUsed":0,"ppUp":0},{"moveId":612,"ppUsed":0,"ppUp":0},{"moveId":885,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":115,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[0],"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"coopOwner":"guest","summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":252,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLab":[135,0,0,255,255,255,96,0,0,0,0,0,70,85],"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"coopPassiveAttr":[63,63,63],"coopLuck":1},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1221245928,"player":true,"species":48,"formIndex":0,"abilityIndex":0,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":22,"stats":[22,12,11,12,12,12],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":93,"ppUsed":0,"ppUp":0},{"moveId":77,"ppUsed":0,"ppUp":0},{"moveId":324,"ppUsed":0,"ppUp":0},{"moveId":33,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":48,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"coopOwner":"host","summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"coopPassiveAttr":[63,63,63],"coopLuck":1},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2821848663,"player":true,"species":118,"formIndex":0,"abilityIndex":0,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":21,"stats":[21,16,12,9,11,14],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":755,"ppUsed":0,"ppUp":0},{"moveId":349,"ppUsed":0,"ppUp":0},{"moveId":916,"ppUsed":0,"ppUp":0},{"moveId":824,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":118,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[],"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"coopOwner":"guest","summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLab":[50,30,0,255,255,255,96,0,1,0,0,0,70,85],"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"coopPassiveAttr":[63,63,63],"coopLuck":3},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1370291883,"player":true,"species":77,"formIndex":0,"abilityIndex":0,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":21,"stats":[21,15,12,13,13,15],"ivs":[31,31,31,31,31,31],"nature":0,"moveset":[{"moveId":838,"ppUsed":0,"ppUp":0},{"moveId":344,"ppUsed":0,"ppUp":0},{"moveId":136,"ppUsed":0,"ppUp":0},{"moveId":14,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":77,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":9,"isTerastallized":false,"stellarTypesBoosted":[],"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"coopOwner":"guest","summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLab":[0,3,0,255,255,255,96,0,0,0,0,1,70,85],"erShinyLabName":"Drug Fiend","erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"coopPassiveAttr":[63,63,63],"coopLuck":3},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":1,"className":"MapModifier"}],"money":1000,"pokeballCounts":{"0":5,"1":0,"2":0,"3":0,"4":0}}}
