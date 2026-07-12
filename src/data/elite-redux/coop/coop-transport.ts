@@ -708,6 +708,8 @@ export interface CoopAuthoritativeBattleStateV1 {
   tick: number;
   wave: number;
   turn: number;
+  /** Host battle geometry; changes during the classic finale's single -> double transition. */
+  double?: boolean;
   /** Plain JSON `PokemonData[]`, authoritative order. */
   playerParty: Record<string, unknown>[];
   /** Plain JSON `PokemonData[]`, authoritative order. */

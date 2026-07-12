@@ -101,6 +101,11 @@ export const COOP_AUTHORITATIVE_WIRE_FIELDS: readonly CoopWireFieldDescriptor[] 
     hash: { kind: "excluded", reason: "per-client turn counter; the checksum excludes all counters" },
   },
   {
+    name: "double",
+    applied: true,
+    hash: { kind: "derived", into: ["field"] },
+  },
+  {
     name: "playerParty",
     applied: true, // reconcileAuthoritativeParty("player", ...): full PokemonData round-trip, id-keyed.
     hash: {

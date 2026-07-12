@@ -229,6 +229,34 @@ describe.skipIf(!RUN)(
       logs.flush();
     }, 300_000);
 
+    it("FINALE STAGE TWO: authoritative single-to-double geometry exposes and seats the partner slot", async () => {
+      await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+      const pair = createLoopbackPair();
+      const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+      resetCoopStateTicks();
+
+      const wire = withClientSync(rig.hostCtx, () => {
+        expect(globalScene.currentBattle.double).toBe(true);
+        expect(globalScene.getPlayerField()).toHaveLength(2);
+        return JSON.parse(JSON.stringify(captureCoopAuthoritativeBattleState(2)));
+      });
+
+      withClientSync(rig.guestCtx, () => {
+        // This is the finale renderer immediately before the phase-two carrier: the partner
+        // remains in the party, but stage one's single arrangement cannot address field slot 1.
+        globalScene.currentBattle.setDouble(false);
+        expect(globalScene.getPlayerField()).toHaveLength(1);
+
+        expect(applyCoopAuthoritativeBattleState(wire, true)).toBe(true);
+        expect(globalScene.currentBattle.double, "the host's phase-two format is authoritative").toBe(true);
+        const field = globalScene.getPlayerField();
+        expect(field).toHaveLength(2);
+        expect(field[1]?.coopOwner, "slot 1 is locally commandable by the guest").toBe("guest");
+        expect(field[1]?.isActive(), "the partner is seated, not merely present on the bench").toBe(true);
+      });
+      logs.flush();
+    }, 300_000);
+
     it("#876 IMMUNITY: a non-serializable FLINCHED tag LIVE on the host does NOT move the checksum", async () => {
       await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
       const pair = createLoopbackPair();

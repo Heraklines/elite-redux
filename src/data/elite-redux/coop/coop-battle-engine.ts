@@ -2527,6 +2527,7 @@ export function captureCoopAuthoritativeBattleState(turn: number): CoopAuthorita
       tick: coopNextStateTick(),
       wave: globalScene.currentBattle?.waveIndex ?? 0,
       turn,
+      double: globalScene.currentBattle?.double === true,
       playerParty,
       enemyParty,
       field: getCoopSerializableField()
@@ -3122,6 +3123,13 @@ function applyCoopAuthoritativeBattleStateInternal(
     // PHASE 3 (#838): snapshot the on-field sprite keys BEFORE the data apply mutates species/form/
     // shiny/etc., so the render differ below re-summons ONLY on an actual visual-identity change.
     const preSpriteKeys = captureCoopOnFieldSpriteKeys();
+    // The classic finale starts single and expands to double in phase two. Party/field
+    // reconciliation cannot seat slot 1 while the renderer still has a one-slot arrangement,
+    // leaving the host permanently waiting for the guest-owned command. Geometry must land first.
+    // Optional preserves additive compatibility with already-buffered older frames.
+    if (typeof state.double === "boolean" && globalScene.currentBattle?.double !== state.double) {
+      globalScene.currentBattle?.setDouble(state.double);
+    }
     if (typeof state.biomeId === "number" && (globalScene.arena?.biomeId ?? -1) !== state.biomeId) {
       globalScene.newArena(state.biomeId as BiomeId);
     }
