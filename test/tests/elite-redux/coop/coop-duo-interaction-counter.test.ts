@@ -171,7 +171,10 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     // arrival barrier and removes the old harness fiction where the owner selected before a watcher existed.
     const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
     withClientSync(rig.guestCtx, () => guestShop.start());
-    await drainLoopback();
+    // Deliver the guest's arrival while the HOST context is installed. Production has one scene per
+    // process; the two-engine harness shares a process-global scene binding, so draining outside a client
+    // context would resume the host's async barrier continuation against the guest UI object.
+    await withClient(rig.hostCtx, () => drainLoopback());
 
     // ===== Finish the shop through the SAME public UI boundary as a human. =====
     await withClient(rig.hostCtx, async () => {
