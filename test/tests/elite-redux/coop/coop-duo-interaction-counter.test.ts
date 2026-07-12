@@ -165,7 +165,9 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     let ownerModifierArgs: unknown[] | null = null;
     const originalSetMode = rig.hostScene.ui.setMode.bind(rig.hostScene.ui);
     vi.spyOn(rig.hostScene.ui, "setMode").mockImplementation((mode, ...args) => {
-      if (mode === UiMode.MODIFIER_SELECT) {
+      // The two-engine harness can issue a later cosmetic MODIFIER_SELECT reopen with no callback.
+      // Retain only the production phase transition that actually carries the selection callback.
+      if (mode === UiMode.MODIFIER_SELECT && args.length >= 3 && typeof args[2] === "function") {
         ownerModifierArgs = args;
       }
       return originalSetMode(mode, ...args);
