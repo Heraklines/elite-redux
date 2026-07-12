@@ -867,14 +867,29 @@ export class TitlePhase extends Phase {
                       UiMode.CONFIRM,
                       () => {
                         if (claim()) {
-                          controller.replyResume(true);
-                          stage.destroy();
-                          void this.coopGuestResumeBoot(wave);
+                          globalScene.ui.setMode(UiMode.MESSAGE);
+                          globalScene.ui.showText(`Waiting for ${partner} to commit the resume...`, null);
+                          void controller.replyResume(true).then(committed => {
+                            if (!committed) {
+                              globalScene.ui.showText(
+                                "The resume decision could not be committed. Reconnect and try again.",
+                                null,
+                                backToTitle,
+                                null,
+                                true,
+                              );
+                              return;
+                            }
+                            stage.destroy();
+                            void this.coopGuestResumeBoot(wave);
+                          });
                         }
                       },
                       () => {
                         if (!settled) {
-                          controller.replyResume(false);
+                          controller
+                            .replyResume(false)
+                            .catch(error => console.warn("[coop-resume] failed to relay decline", error));
                           // Stay behind the barrier until the host commits and durably broadcasts
                           // resumeStartNew. Advancing here put the guest in team select while the
                           // host was still showing a message/confirmation screen.
@@ -931,7 +946,7 @@ export class TitlePhase extends Phase {
                     void controller.offerResume(marker.wave).then(accepted => {
                       if (accepted) {
                         stage.destroy();
-                        void this.loadSaveSlot(marker.slot);
+                        void this.loadCoopResumeSlot(marker.slot, marker.wave, controller, backToTitle);
                       } else {
                         // The guest remains behind the barrier after declining; this single durable
                         // release moves both clients into team select together.
@@ -984,14 +999,72 @@ export class TitlePhase extends Phase {
     globalScene.gameMode = getGameMode(GameModes.COOP);
     const streamer = getCoopBattleStreamer();
     const json = streamer == null ? null : await streamer.awaitLaunchSnapshot(wave);
-    if (json == null || !(await globalScene.gameData.applyCoopLaunchSession(json))) {
-      console.warn(`[coop-resume] guest: no/unusable resume snapshot for wave=${wave} -> new run instead`);
-      globalScene.ui.showText("Could not resume the run. Starting a new one.", null, () => this.end(), null, true);
+    const booted = json != null && (await globalScene.gameData.applyCoopLaunchSession(json));
+    const controller = getCoopController();
+    controller?.reportResumeApplied(booted);
+    if (!booted) {
+      console.warn(`[coop-resume] guest: no/unusable resume snapshot for wave=${wave} -> fail closed`);
+      globalScene.ui.showText(
+        "Could not apply the shared co-op save. Reconnect and try again.",
+        null,
+        () => {
+          globalScene.phaseManager.toTitleScreen();
+          super.end();
+        },
+        null,
+        true,
+      );
       return;
     }
     console.log(`[coop-resume] guest: booted from resume snapshot wave=${wave} -> LOADED EncounterPhase`);
     this.loaded = true;
     this.end();
+  }
+
+  /**
+   * HOST half of the two-phase resume transaction. Load the save, push its coherent snapshot immediately,
+   * then remain at the lobby boundary until the guest reports successful materialization. This removes the
+   * former split where a reply meant "accepted" but either client could enter gameplay before the other had
+   * actually loaded the same state.
+   */
+  private async loadCoopResumeSlot(
+    slotId: number,
+    wave: number,
+    controller: NonNullable<ReturnType<typeof getCoopController>>,
+    backToTitle: () => void,
+  ): Promise<void> {
+    globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.ui.resetModeChain();
+    globalScene.sessionSlotId = slotId;
+    try {
+      const success = await globalScene.gameData.loadSession(slotId);
+      const streamer = getCoopBattleStreamer();
+      if (!success || streamer == null) {
+        globalScene.ui.showText("Could not load the shared co-op save. Reconnect and try again.", null, backToTitle);
+        return;
+      }
+      const session = globalScene.gameData.getSessionSaveData();
+      const json = JSON.stringify(session, (_key, value: unknown) =>
+        typeof value === "bigint" ? value.toString() : value,
+      );
+      streamer.sendLaunchSnapshot(wave, json);
+      globalScene.ui.showText("Waiting for your partner to apply the shared save...", null);
+      if (!(await controller.awaitResumeApplied())) {
+        globalScene.ui.showText(
+          "Your partner could not apply the shared co-op save. Reconnect and try again.",
+          null,
+          backToTitle,
+          null,
+          true,
+        );
+        return;
+      }
+      this.loaded = true;
+      globalScene.ui.showText(i18next.t("menu:sessionSuccess"), null, () => this.end());
+    } catch (err) {
+      console.error(err);
+      globalScene.ui.showText(i18next.t("menu:failedToLoadSession"), null, backToTitle);
+    }
   }
 
   // TODO: Make callers actually wait for the save slot to load

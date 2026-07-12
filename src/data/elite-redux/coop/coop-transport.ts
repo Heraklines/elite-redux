@@ -67,7 +67,7 @@ export type CoopRole = "host" | "guest";
 // control high-water mark; receivers advance control only after safe-boundary checksum convergence.
 // er-coop-23: hot rejoin preserves active waits and reissues command/barrier control state; terminal
 // disconnect ends shared play instead of taking an uncommitted local fallback/AI/solo branch.
-export const COOP_PROTOCOL_VERSION = "er-coop-27";
+export const COOP_PROTOCOL_VERSION = "er-coop-28";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -1066,6 +1066,12 @@ export type CoopMessage =
   | { t: "resumeOffer"; decisionId: string; wave: number }
   /** #810 resume flow: guest's answer to the offer. */
   | { t: "resumeReply"; decisionId: string; accept: boolean }
+  /** Host -> guest: the exact ACCEPT reply was committed and the cold-resume epoch is authoritative. */
+  | { t: "resumeAccepted"; decisionId: string; epoch: number }
+  /** Guest -> host: the committed resume snapshot finished materializing (or failed closed). */
+  | { t: "resumeApplied"; decisionId: string; success: boolean }
+  /** Host -> guest: the apply result is durably observed; guest may clear its reconnect outbox. */
+  | { t: "resumeAppliedAck"; decisionId: string }
   /**
    * #810 resume flow (barrier): host tells the guest "no resume - proceed to a NEW game".
    * Sent whenever the host will NOT resume (no matching save, host picked New Game, guest

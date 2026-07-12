@@ -189,6 +189,21 @@ export class CoopSessionController {
   private resumeOfferHandler: ((wave: number) => void) | null = null;
   private pendingResumeOfferWave: number | null = null;
   private resumeReplyWaiter: { decisionId: string; finish: (accept: boolean) => void } | null = null;
+  /** Guest reply outbox: retained until the host commits ACCEPT, so a flap cannot lose the decision. */
+  private pendingResumeReply: {
+    readonly decisionId: string;
+    readonly accept: boolean;
+    readonly promise: Promise<boolean>;
+    readonly finish: (committed: boolean) => void;
+  } | null = null;
+  /** Host waits for actual guest snapshot materialization, not mere receipt/acceptance. */
+  private resumeApplyAckWaiter: {
+    readonly decisionId: string;
+    readonly promise: Promise<boolean>;
+    readonly finish: (success: boolean) => void;
+  } | null = null;
+  /** Guest-side durable apply result, replayed after reconnect if its ACK was lost. */
+  private latestResumeApplyResult: { readonly decisionId: string; readonly success: boolean } | null = null;
   /** #810 barrier: guest-side "start new" handler + buffered flag (host's release signal). */
   private resumeStartNewHandler: (() => void) | null = null;
   private pendingResumeStartNewId: string | null = null;
@@ -202,6 +217,7 @@ export class CoopSessionController {
   /** Durable, host-authored lobby decision. Re-announced after a channel replacement. */
   private latestResumeDecision:
     | { readonly kind: "offer"; readonly decisionId: string; readonly wave: number }
+    | { readonly kind: "resume-accepted"; readonly decisionId: string; readonly wave: number }
     | { readonly kind: "start-new"; readonly decisionId: string }
     | null = null;
   /** Guest-side identity of the latest offer; replies are structurally tied to it. */
@@ -411,15 +427,71 @@ export class CoopSessionController {
     });
   }
 
-  /** #810 GUEST: answer the host's resume offer. */
-  replyResume(accept: boolean): void {
+  /**
+   * GUEST: answer the exact offer. ACCEPT is a two-phase transaction: this promise resolves true only after
+   * the host commits it and returns the authoritative cold-resume epoch. The reply remains in an outbox and
+   * is re-sent after reconnect, so a dropped reply can never split guest=resume / host=lobby.
+   */
+  replyResume(accept: boolean): Promise<boolean> {
     const decisionId = this.activeResumeOfferId;
     if (decisionId == null) {
       coopWarn("launch", `DROP resumeReply accept=${accept}: no active host offer`);
-      return;
+      return Promise.resolve(false);
+    }
+    if (!accept) {
+      coopLog("launch", `SEND resumeReply id=${decisionId} accept=false (#810 durable)`);
+      this.transport.send({ t: "resumeReply", decisionId, accept: false });
+      return Promise.resolve(false);
+    }
+    if (this.pendingResumeReply?.decisionId === decisionId && this.pendingResumeReply.accept) {
+      this.transport.send({ t: "resumeReply", decisionId, accept: true });
+      return this.pendingResumeReply.promise;
     }
     coopLog("launch", `SEND resumeReply id=${decisionId} accept=${accept} (#810 durable)`);
-    this.transport.send({ t: "resumeReply", decisionId, accept });
+    let finish!: (committed: boolean) => void;
+    const promise = new Promise<boolean>(resolve => {
+      finish = resolve;
+    });
+    this.pendingResumeReply = { decisionId, accept: true, promise, finish };
+    this.transport.send({ t: "resumeReply", decisionId, accept: true });
+    setTimeout(() => {
+      if (this.pendingResumeReply?.decisionId === decisionId) {
+        this.pendingResumeReply = null;
+        coopWarn("launch", `resumeAccepted TIMEOUT id=${decisionId} -> fail closed`);
+        finish(false);
+      }
+    }, 120_000);
+    return promise;
+  }
+
+  /** HOST: wait until the guest actually applied the accepted resume snapshot. */
+  awaitResumeApplied(timeoutMs = 120_000): Promise<boolean> {
+    const waiter = this.resumeApplyAckWaiter;
+    if (waiter == null) {
+      return Promise.resolve(false);
+    }
+    setTimeout(
+      () => {
+        if (this.resumeApplyAckWaiter === waiter) {
+          coopWarn("launch", `resumeApplied TIMEOUT id=${waiter.decisionId} -> fail closed`);
+          this.resumeApplyAckWaiter = null;
+          waiter.finish(false);
+        }
+      },
+      Math.max(0, timeoutMs),
+    );
+    return waiter.promise;
+  }
+
+  /** GUEST: ACK only after applyCoopLaunchSession completed (success or explicit failure). */
+  reportResumeApplied(success: boolean): void {
+    const decisionId = this.activeResumeOfferId;
+    if (decisionId == null) {
+      coopWarn("launch", `DROP resumeApplied success=${success}: no active committed offer`);
+      return;
+    }
+    this.latestResumeApplyResult = { decisionId, success };
+    this.transport.send({ t: "resumeApplied", decisionId, success });
   }
 
   /**
@@ -865,10 +937,23 @@ export class CoopSessionController {
       if (decision.kind === "offer") {
         coopLog("launch", `RESEND resumeOffer id=${decision.decisionId} wave=${decision.wave} after reconnect`);
         this.transport.send({ t: "resumeOffer", decisionId: decision.decisionId, wave: decision.wave });
+      } else if (decision.kind === "resume-accepted") {
+        coopLog("launch", `RESEND resumeAccepted id=${decision.decisionId} after reconnect`);
+        this.transport.send({ t: "resumeAccepted", decisionId: decision.decisionId, epoch: this.sessionEpochValue });
       } else {
         coopLog("launch", `RESEND resumeStartNew id=${decision.decisionId} after reconnect`);
         this.transport.send({ t: "resumeStartNew", decisionId: decision.decisionId });
       }
+    }
+    if (this.role === "guest" && this.pendingResumeReply != null) {
+      this.transport.send({
+        t: "resumeReply",
+        decisionId: this.pendingResumeReply.decisionId,
+        accept: this.pendingResumeReply.accept,
+      });
+    }
+    if (this.role === "guest" && this.latestResumeApplyResult != null) {
+      this.transport.send({ t: "resumeApplied", ...this.latestResumeApplyResult });
     }
     // Pull the peer's lobby state (heals a loss in the direction we don't own).
     if (this.role === "guest") {
@@ -1086,6 +1171,14 @@ export class CoopSessionController {
       case "resumeReply": {
         coopLog("launch", `RECV resumeReply id=${msg.decisionId} accept=${msg.accept} (#810 durable)`);
         const waiter = this.resumeReplyWaiter;
+        if (
+          msg.accept
+          && this.latestResumeDecision?.kind === "resume-accepted"
+          && this.latestResumeDecision.decisionId === msg.decisionId
+        ) {
+          this.transport.send({ t: "resumeAccepted", decisionId: msg.decisionId, epoch: this.sessionEpochValue });
+          break;
+        }
         if (waiter == null || waiter.decisionId !== msg.decisionId) {
           coopWarn("launch", `DROP stale resumeReply id=${msg.decisionId} active=${waiter?.decisionId ?? "none"}`);
           break;
@@ -1093,8 +1186,63 @@ export class CoopSessionController {
         this.resumeReplyWaiter = null;
         if (msg.accept) {
           this.beginNewOperationEpoch("cold-resume");
+          const wave = this.latestResumeDecision?.kind === "offer" ? this.latestResumeDecision.wave : -1;
+          this.latestResumeDecision = { kind: "resume-accepted", decisionId: msg.decisionId, wave };
+          let finish!: (success: boolean) => void;
+          const promise = new Promise<boolean>(resolve => {
+            finish = resolve;
+          });
+          this.resumeApplyAckWaiter = { decisionId: msg.decisionId, promise, finish };
+          this.transport.send({ t: "resumeAccepted", decisionId: msg.decisionId, epoch: this.sessionEpochValue });
         }
         waiter.finish(msg.accept);
+        break;
+      }
+      case "resumeAccepted": {
+        const pending = this.pendingResumeReply;
+        if (pending == null && this.activeResumeOfferId === msg.decisionId) {
+          coopLog("launch", `IGNORE duplicate resumeAccepted id=${msg.decisionId}`);
+          if (this.latestResumeApplyResult?.decisionId === msg.decisionId) {
+            this.transport.send({ t: "resumeApplied", ...this.latestResumeApplyResult });
+          }
+          break;
+        }
+        if (pending == null || !pending.accept || pending.decisionId !== msg.decisionId) {
+          coopWarn("launch", `DROP stale resumeAccepted id=${msg.decisionId} pending=${pending?.decisionId ?? "none"}`);
+          break;
+        }
+        if (!Number.isSafeInteger(msg.epoch) || msg.epoch <= 0) {
+          coopWarn("launch", `DROP malformed resumeAccepted epoch=${msg.epoch}`);
+          break;
+        }
+        this.sessionEpochValue = msg.epoch;
+        this.onEpochNegotiated?.(msg.epoch);
+        this.pendingResumeReply = null;
+        pending.finish(true);
+        break;
+      }
+      case "resumeApplied": {
+        const waiter = this.resumeApplyAckWaiter;
+        if (waiter == null || waiter.decisionId !== msg.decisionId) {
+          if (
+            this.latestResumeDecision?.kind === "resume-accepted"
+            && this.latestResumeDecision.decisionId === msg.decisionId
+          ) {
+            this.transport.send({ t: "resumeAppliedAck", decisionId: msg.decisionId });
+            break;
+          }
+          coopWarn("launch", `DROP stale resumeApplied id=${msg.decisionId} active=${waiter?.decisionId ?? "none"}`);
+          break;
+        }
+        this.resumeApplyAckWaiter = null;
+        waiter.finish(msg.success);
+        this.transport.send({ t: "resumeAppliedAck", decisionId: msg.decisionId });
+        break;
+      }
+      case "resumeAppliedAck": {
+        if (this.latestResumeApplyResult?.decisionId === msg.decisionId) {
+          this.latestResumeApplyResult = null;
+        }
         break;
       }
       case "resumeStartNew": {

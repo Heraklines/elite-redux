@@ -578,8 +578,9 @@ describe("#810: resume offer/reply protocol + marker", () => {
     expect(offeredWave, "buffered offer fired on arm").toBe(42);
 
     // Guest accepts: the host's promise resolves true.
-    guest.replyResume(true);
+    const guestCommit = guest.replyResume(true);
     await expect(replyPromise).resolves.toBe(true);
+    await expect(guestCommit).resolves.toBe(true);
 
     // Second round, armed-first + decline path.
     let secondWave = -1;
@@ -588,7 +589,7 @@ describe("#810: resume offer/reply protocol + marker", () => {
     });
     const decline = host.offerResume(77);
     expect(secondWave).toBe(77);
-    guest.replyResume(false);
+    await guest.replyResume(false);
     await expect(decline).resolves.toBe(false);
   });
 

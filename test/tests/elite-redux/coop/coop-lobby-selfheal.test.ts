@@ -179,7 +179,7 @@ describe("co-op lobby self-healing handshake (#868)", () => {
       (msg): msg is Extract<CoopMessage, { t: "resumeOffer" }> => msg.t === "resumeOffer" && msg.wave === 10,
     );
     expect(firstFrame).toBeDefined();
-    g.replyResume(false);
+    await g.replyResume(false);
     await expect(first).resolves.toBe(false);
 
     const second = h.offerResume(20);
@@ -193,8 +193,55 @@ describe("co-op lobby self-healing handshake (#868)", () => {
     await flush();
     expect(secondSettled, "stale reply was rejected by transaction id").toBe(false);
 
-    g.replyResume(true);
+    const committed = g.replyResume(true);
     await expect(second).resolves.toBe(true);
+    await expect(committed, "guest receives the host's durable ACCEPT commit").resolves.toBe(true);
+  });
+
+  it("replays a lost ACCEPT reply after reconnect and waits for applied-state ACK", async () => {
+    const { host, guest } = makeFlapPair();
+    const h = new CoopSessionController(host, { username: "Host", tiebreak: 1 });
+    const g = new CoopSessionController(guest, { username: "Guest", tiebreak: 2 });
+    h.connect();
+    g.connect();
+    await flush();
+
+    g.armResumeOfferHandler(() => {});
+    const offered = h.offerResume(20);
+    await flush();
+
+    host.setConnected(false);
+    guest.setConnected(false);
+    const committed = g.replyResume(true);
+    let guestCommitted = false;
+    void committed.then(value => {
+      guestCommitted = value;
+    });
+    await flush();
+    expect(guestCommitted, "a locally-sent reply is not mistaken for a host commit").toBe(false);
+
+    guest.setConnected(true);
+    host.setConnected(true);
+    await flush();
+    await expect(offered, "the retained reply heals after reconnect").resolves.toBe(true);
+    await expect(committed, "the guest receives the matching resumeAccepted commit").resolves.toBe(true);
+
+    const applied = h.awaitResumeApplied(1_000);
+    g.reportResumeApplied(true);
+    await flush();
+    await expect(applied, "host observes actual snapshot materialization").resolves.toBe(true);
+
+    const appliedFrames = guest.sent.filter(msg => msg.t === "resumeApplied").length;
+    host.setConnected(false);
+    guest.setConnected(false);
+    guest.setConnected(true);
+    host.setConnected(true);
+    await flush();
+    await flush();
+    expect(
+      guest.sent.filter(msg => msg.t === "resumeApplied").length,
+      "host ACK clears the guest apply-result outbox before a later reconnect",
+    ).toBe(appliedFrames);
   });
 
   it("a resumeStartNew release lost during a flap is re-sent on reconnect", async () => {

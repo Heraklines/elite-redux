@@ -146,15 +146,22 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const offer = host.offerResume(7);
     await flush();
     expect(offeredWave, "the guest's resume offer surfaced on ACCEPT").toBe(7);
-    guest.replyResume(true);
+    const guestCommit = guest.replyResume(true);
     await flush();
     await expect(offer, "host sees the guest ACCEPT").resolves.toBe(true);
+    await expect(guestCommit, "guest starts boot only after host commits the exact ACCEPT").resolves.toBe(true);
     expect(host.sessionEpoch, "cold resume minted a fresh host epoch").toBeGreaterThan(preResumeEpoch);
     expect(guest.sessionEpoch, "guest adopted the cold-resume epoch before snapshot boot").toBe(host.sessionEpoch);
 
     // RESUME BOOT: the guest boots from the host's saved snapshot (the coopGuestResumeBoot core)...
     const booted = await withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(hostJson));
     expect(booted, "the guest booted from the resumed session snapshot").toBe(true);
+    const hostApplyBarrier = host.awaitResumeApplied(1_000);
+    guest.reportResumeApplied(booted);
+    await flush();
+    await expect(hostApplyBarrier, "host leaves the lobby only after guest snapshot materialization").resolves.toBe(
+      true,
+    );
 
     // ...and CONVERGES byte-equal to the host (the resumed run cannot diverge at boot).
     const guestAfter = await withClient(rig.guestCtx, () => captureCoopChecksum());
