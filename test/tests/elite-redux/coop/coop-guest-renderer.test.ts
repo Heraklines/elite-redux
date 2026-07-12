@@ -499,9 +499,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(enemy.isFainted()).toBe(true);
 
     expect(coopEngine.applyCoopCheckpoint(checkpoint!)).toBe(true);
-    expect(enemy.status?.effect, "FAINT status converges even after the animation made hp zero").toBe(
-      StatusEffect.FAINT,
-    );
+    expect(
+      (enemy.status as { effect: StatusEffect } | null)?.effect,
+      "FAINT status converges even after the animation made hp zero",
+    ).toBe(StatusEffect.FAINT);
     expect(enemy.getMoveset()[0].ppUsed, "move PP converges on an already-fainted slot").toBe(3);
   });
 

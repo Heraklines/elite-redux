@@ -231,14 +231,17 @@ function readMonView(mon: ReturnType<typeof globalScene.getField>[number]): Coop
     speciesId: mon.species?.speciesId ?? 0,
     hp: mon.hp,
     maxHp: mon.getMaxHp(),
-    status: mon.status?.effect ?? 0,
+    // A zero-HP mon may not have run its local FaintPhase yet. The authority must still publish one
+    // self-consistent terminal state; otherwise field reconciliation stamps FAINT and this scalar pass
+    // immediately clears it back to NONE.
+    status: mon.isFainted() ? StatusEffect.FAINT : (mon.status?.effect ?? 0),
     // getStatStages() returns the live 7-length array; clone so the checkpoint never aliases it.
     statStages: [...mon.getStatStages()],
     fainted: mon.isFainted(),
     ...(erTags.length > 0 ? { erTags } : {}),
     // #798 PP sync: carry each slot's [moveId, ppUsed] so the guest's PP converges via the
     // checkpoint (it never runs MovePhase) instead of via a forced FULL resync every turn.
-    moves: (mon.moveset ?? []).map(m => ({ id: m?.moveId ?? 0, ppUsed: m?.ppUsed ?? 0 })),
+    moves: mon.getMoveset().map(m => ({ id: m?.moveId ?? 0, ppUsed: m?.ppUsed ?? 0 })),
     // #809: form + tera converge per turn (a mega/tera no longer costs a forced full resync).
     formIndex: mon.formIndex,
     isTerastallized: mon.isTerastallized === true,
@@ -1063,9 +1066,10 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
               (mon as { coopOwner?: "host" | "guest" }).coopOwner = state.coopOwner;
             }
           }
-          if (state.moves !== undefined && Array.isArray(mon.moveset)) {
+          if (state.moves !== undefined) {
+            const activeMoveset = mon.getMoveset();
             for (const wire of state.moves) {
-              const slot = mon.moveset.find(m => m?.moveId === wire.id);
+              const slot = activeMoveset.find(m => m?.moveId === wire.id);
               if (slot != null && slot.ppUsed !== wire.ppUsed) {
                 slot.ppUsed = Math.max(0, Math.trunc(wire.ppUsed));
               }

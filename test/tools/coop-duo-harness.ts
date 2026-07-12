@@ -665,7 +665,9 @@ export function mirrorHostBattleToGuest(
   const hostEnemyScalars = hostScene
     .getEnemyParty()
     .map(enemy => ({ stats: [...enemy.stats], maxHp: enemy.getMaxHp(), hp: enemy.hp }));
-  const hostPlayerScalars = hostScene.getPlayerParty().map(player => ({ maxHp: player.getMaxHp(), hp: player.hp }));
+  const hostPlayerScalars = hostScene
+    .getPlayerParty()
+    .map(player => ({ stats: [...player.stats], maxHp: player.getMaxHp(), hp: player.hp }));
   initGlobalScene(previousScene);
   // 0. Adopt the host's SEED + run-config-derived scene state (#658 seed-pin). See adoptCoopHostRunConfig:
   //    this is the launch-handshake step the plain mirror skipped, and WHY a benign per-wave checksum
