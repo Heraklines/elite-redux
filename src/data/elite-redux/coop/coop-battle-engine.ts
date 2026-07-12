@@ -1067,11 +1067,19 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
             }
           }
           if (state.moves !== undefined) {
-            const activeMoveset = mon.getMoveset();
+            // Faint/reconcile can switch getMoveset() between the summon override and base moveset during
+            // this same apply. Align every distinct backing list so the authoritative PP survives either
+            // representation becoming active after the mon leaves the field.
+            const movesets = [mon.moveset, mon.summonData?.moveset, mon.getMoveset()].filter(
+              (moveset, index, all): moveset is PokemonMove[] =>
+                Array.isArray(moveset) && all.indexOf(moveset) === index,
+            );
             for (const wire of state.moves) {
-              const slot = activeMoveset.find(m => m?.moveId === wire.id);
-              if (slot != null && slot.ppUsed !== wire.ppUsed) {
-                slot.ppUsed = Math.max(0, Math.trunc(wire.ppUsed));
+              for (const moveset of movesets) {
+                const slot = moveset.find(m => m?.moveId === wire.id);
+                if (slot != null && slot.ppUsed !== wire.ppUsed) {
+                  slot.ppUsed = Math.max(0, Math.trunc(wire.ppUsed));
+                }
               }
             }
           }
