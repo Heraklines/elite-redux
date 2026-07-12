@@ -279,11 +279,16 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
       const guestModsBefore = rig.guestScene.modifiers.length;
       let ownerPinned: number;
       if (takeReward) {
+        // The shop rendezvous is reciprocal in production: both clients enter the screen before the
+        // owner may commit. This fixture disables automatic delivery, so park the watcher first and
+        // explicitly pump its terminal counter acknowledgement back to the owner. Driving the owner
+        // first left `shop:1:0` open and then made the next CoopPartnerSyncPhase correctly wait forever.
+        const watcherPinned = await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
+        expect(watcherPinned, `wave ${w}: watcher parked on the owner's interaction`).toBe(counterBefore);
         ownerPinned = await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: true }));
-        await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
-        // Explicit-delivery mode queues the watcher's shop rendezvous + interaction-counter snapshot for
-        // the owner. Pump the HOST destination before its NewBattlePhase reaches CoopPartnerSyncPhase;
-        // this is the same reciprocal network delivery exercised by the skip/leave branches below.
+        await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
+        // Explicit-delivery mode queues the watcher's interaction-counter snapshot for the owner. Pump
+        // the HOST destination before its NewBattlePhase reaches CoopPartnerSyncPhase.
         await withClient(rig.hostCtx, () => drainLoopback());
       } else if (hostOwns) {
         const watcherPinned = await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
