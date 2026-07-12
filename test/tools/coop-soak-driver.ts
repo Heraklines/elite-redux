@@ -112,7 +112,6 @@ import {
   type DuoRig,
   drainGuestMeReplayToSettle,
   drainLoopback,
-  driveGuestMeReplay,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
@@ -1931,19 +1930,67 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
 
     let mePath: "host-owned" | "guest-owned" | "battle-handoff";
     if (hostOwns) {
-      // HOST-OWNED: the host drives its OWN pick off local input (the real MysteryEncounterUiHandler), runs the
-      // option chain to the embedded end-of-ME reward shop (leave), then to the true terminal. The guest is a
-      // pure renderer: its CoopReplayMePhase consumes the buffered present + meResync + LEAVE and advances once.
+      // HOST-OWNED: park the host at its embedded shop, start the guest replay while the presentation is
+      // buffered, then let BOTH real shop phases rendezvous before the owner commits LEAVE. The previous
+      // owner-only shortcut called the shop's private terminal while its async shop-pick barrier was still
+      // waiting for the guest. That stale waiter survived the ME and could resolve several waves later,
+      // shifting the host into the next battle early (the wave-22 nondeterministic freeze caught by the
+      // continuous journey). This ordering mirrors production: owner reaches shop -> watcher handoff reaches
+      // shop -> barrier opens -> owner terminal -> watcher terminal -> ME terminal.
+      let hostShop!: ShopPhaseSeam;
       await withClient(rig.hostCtx, async () => {
         await runMysteryEncounterToEnd(game, option);
         await game.phaseInterceptor.to("SelectModifierPhase", false);
-        const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-        if (hostShop.phaseName === "SelectModifierPhase") {
-          await driveHostRewardShopOwner(hostShop, { takeReward: false });
-        }
-        await game.phaseInterceptor.to("PostMysteryEncounterPhase");
+        hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       });
-      await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+      const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+
+      // Start the owner shop synchronously so its option stream + arrival are queued, then flush them under
+      // the guest context. CoopReplayMePhase's reward-options handoff ends detached and automatically starts
+      // the guest's own SelectModifierPhase watcher, whose arrival releases the host barrier.
+      withClientSync(rig.hostCtx, () => hostShop.start());
+      let guestShop!: ShopPhaseSeam;
+      await withClient(rig.guestCtx, async () => {
+        for (let i = 0; i < 8; i++) {
+          await drainLoopback();
+          const current = rig.guestScene.phaseManager.getCurrentPhase();
+          if (current?.phaseName === "SelectModifierPhase") {
+            guestShop = current as unknown as ShopPhaseSeam;
+            break;
+          }
+        }
+      });
+      if (guestShop == null) {
+        fail("no-park", wave, "guest never reached the host-owned ME embedded reward shop");
+      }
+
+      // Flush the guest arrival under the host context, then commit the already-started owner shop exactly
+      // once (do not call driveHostRewardShopOwner: it would start the phase/barrier a second time).
+      await withClient(rig.hostCtx, async () => {
+        await drainLoopback();
+        hostShop.coopEndMirror();
+        hostShop.coopRelaySend(-1, undefined, "skip");
+        hostShop.end();
+        hostShop.coopAdvanceInteraction();
+        await drainLoopback();
+      });
+      await withClient(rig.guestCtx, async () => {
+        for (let i = 0; i < 8; i++) {
+          await drainLoopback();
+          if (rig.guestScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase") {
+            break;
+          }
+        }
+      });
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
+      await withClient(rig.guestCtx, async () => {
+        // The shop handoff marks the replay detached/settled before the true 9M terminal. Drain first so
+        // meResync + LEAVE apply and advance the guest, then assert the replay's terminal guard.
+        for (let i = 0; i < 8; i++) {
+          await drainLoopback();
+        }
+        await drainGuestMeReplayToSettle(replay);
+      });
       mePath = "host-owned";
     } else {
       // GUEST-OWNED (odd counter): the host CANNOT take the human pick - it awaits the guest's relayed option
