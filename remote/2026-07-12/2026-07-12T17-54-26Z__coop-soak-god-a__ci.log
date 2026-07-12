@@ -1,0 +1,63 @@
+===== COOP SOAK RESULT =====
+profile: god-a
+verdict: FAIL
+waves_requested: 55
+run: 29202805388 (feat/elite-redux-port)
+timestamp: 2026-07-12T17-54-26Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260712 WAVES=55 - replay this run with:  SOAK_SEED=20260712 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=110 guest=0
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=390 guest=110
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1220 guest=390
+[22m[39m[coop-soak] scalar-lag wave 26 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=2240 guest=1220
+[coop-soak] scalar-lag wave 30 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=4260 guest=2240
+[22m[39m[coop-soak] scalar-lag wave 35 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=5180 guest=4260
+[22m[39m[coop-soak] scalar-lag wave 42 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=6850 guest=5180
+[22m[39m[coop-soak] scalar-lag wave 43 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=7950 guest=6850
+[22m[39m[coop-soak] scalar-lag wave 52 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=9970 guest=7950
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=53 where=post-turn fields=[field] :: field:host=[{"bi":0,"partyIndex":0,"speciesId":493,"hp":1863,"maxHp":1865,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":121,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,1],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1705,"maxHp":1715,"status":0,"statStages":[-1,0,0,0,0,0,0],"fainted":false,"abilityId":5144,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,1]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":109,"hp":0,"maxHp":81,"status":7,"statStages":[0,0,0,0,0,0,0],"fainted":true,"abilityId":256,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[482,0],[120,0],[256,1],[5078,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":67,"hp":0,"maxHp":114,"status":7,"statStages":[0,0,0,0,0,0,0],"fainted":true,"abilityId":5011,"formIndex":0,"isTerastallized":false,"teraType":1,"bossSegments":0,"bossSegmentIndex":0,"moves":[[66,0],[811,0],[146,0],[667,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]/guest=[{"bi":0,"partyIndex":0,"speciesId":493,"hp":1863,"maxHp":1865,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":121,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1705,"maxHp":1715,"status":0,"statStages":[-1,0,0,0,0,0,0],"fainted":false,"abilityId":5144,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,1]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":109,"hp":0,"maxHp":81,"status":7,"statStages":[0,0,0,0,0,0,0],"fainted":true,"abilityId":256,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[482,0],[120,0],[256,1],[5078,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":67,"hp":0,"maxHp":114,"status":7,"statStages":[0,0,0,0,0,0,0],"fainted":true,"abilityId":5011,"formIndex":0,"isTerastallized":false,"teraType":1,"bossSegments":0,"bossSegmentIndex":0,"moves":[[66,0],[811,0],[146,0],[667,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]
+[22m[39m[coop-soak] scalar-lag wave 55 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=12020 guest=9970
+[coop-soak] DONE seed=20260712 waves=55/55 resyncHeals=1 assertions=0 findings=0 trainerWaves=10 (fixed=5 random=5) skips={"mysteryEncounterDisabledV1":1} elapsedMs=61436
+
+----- vitest result tail -----
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:151:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mAssertionError[22m: soak observed 1 unexpected pre-heal mismatch(es) (replay SOAK_SEED=20260712): wave53@post-turn[field]: expected [ { wave: 53, …(4) } ] to deeply equal [][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [][39m
+[31m+ [[39m
+[31m+   {[39m
+[31m+     "classification": "unexpected",[39m
+[31m+     "fields": [[39m
+[31m+       "field",[39m
+[31m+     ],[39m
+[31m+     "sample": "field:host=[{\"bi\":0,\"partyIndex\":0,\"speciesId\":493,\"hp\":1863,\"maxHp\":1865,\"status\":0,\"statStages\":[0,0,0,0,0,0,0],\"fainted\":false,\"abilityId\":121,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":0,\"bossSegments\":0,\"bossSegmentIndex\":0,\"moves\":[[34,0],[247,1],[53,0],[85,0]],\"tags\":[],\"transformSpeciesId\":0,\"transformFormIndex\":0},{\"bi\":1,\"partyIndex\":1,\"speciesId\":384,\"hp\":1705,\"maxHp\":1715,\"status\":0,\"statStages\":[-1,0,0,0,0,0,0],\"fainted\":false,\"abilityId\":5144,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":15,\"bossSegments\":0,\"bossSegmentIndex\":0,\"moves\":[[34,0],[247,0],[53,0],[85,1]],\"tags\":[],\"transformSpeciesId\":0,\"transformFormIndex\":0},{\"bi\":2,\"partyIndex\":0,\"speciesId\":109,\"hp\":0,\"maxHp\":81,\"status\":7,\"statStages\":[0,0,0,0,0,0,0],\"fainted\":true,\"abilityId\":256,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":3,\"bossSegments\":0,\"bossSegmentIndex\":0,\"moves\":[[482,0],[120,0],[256,1],[5078,0]],\"tags\":[],\"transformSpeciesId\":0,\"transformFormIndex\":0},{\"bi\":3,\"partyIndex\":1,\"speciesId\":67,\"hp\":0,\"maxHp\":114,\"status\":7,\"statStages\":[0,0,0,0,0,0,0],\"fainted\":true,\"abilityId\":5011,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":1,\"bossSegments\":0,\"bossSegmentIndex\":0,\"moves\":[[66,0],[811,0],[146,0],[667,0]],\"tags\":[],\"transformSpeciesId\":0,\"transformFormIndex\":0}]/guest=[{\"bi\":0,\"partyIndex\":0,\"speciesId\":493,\"hp\":1863,\"maxHp\":1865,\"status\":0,\"statStages\":[0,0,0,0,0,0,0],\"fainted\":false,\"abilityId\":121,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":0,\"bossSegments\":0,\"bossSegmentIndex\":0,\"moves\":[[34,0],[247,0],[53,0],[85,0]],\"tags\":[],\"transformSpeciesId\":0,\"transformFormIndex\":0},{\"bi\":1,\"partyIndex\":1,\"speciesId\":384,\"hp\":1705,\"maxHp\":1715,\"status\":0,\"statStages\":[-1,0,0,0,0,0,0],\"fainted\":false,\"abilityId\":5144,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":15,\"bossSegments\":0,\"bossSegmentIndex\":0,\"moves\":[[34,0],[247,0],[53,0],[85,1]],\"tags\":[],\"transformSpeciesId\":0,\"transformFormIndex\":0},{\"bi\":2,\"partyIndex\":0,\"speciesId\":109,\"hp\":0,\"maxHp\":81,\"status\":7,\"statStages\":[0,0,0,0,0,0,0],\"fainted\":true,\"abilityId\":256,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":3,\"bossSegments\":0,\"bossSegmentIndex\":0,\"moves\":[[482,0],[120,0],[256,1],[5078,0]],\"tags\":[],\"transformSpeciesId\":0,\"transformFormIndex\":0},{\"bi\":3,\"partyIndex\":1,\"speciesId\":67,\"hp\":0,\"maxHp\":114,\"status\":7,\"statStages\":[0,0,0,0,0,0,0],\"fainted\":true,\"abilityId\":5011,\"formIndex\":0,\"isTerastallized\":false,\"teraType\":1,\"bossSegments\":0,\"bossSegmentIndex\":0,\"moves\":[[66,0],[811,0],[146,0],[667,0]],\"tags\":[],\"transformSpeciesId\":0,\"transformFormIndex\":0}]",[39m
+[31m+     "wave": 53,[39m
+[31m+     "where": "post-turn",[39m
+[31m+   },[39m
+[31m+ ][39m
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m245:9[22m[39m
+    [90m243|[39m           [33m+[39m [32m`(replay SOAK_SEED=[39m[36m${[39mseed[36m}[39m[32m): `[39m
+    [90m244|[39m           + unexpectedPreHeals.map(m => `wave${m.wave}@${m.where}[${m.…
+    [90m245|[39m       )[33m.[39m[34mtoEqual[39m([])[33m;[39m
+    [90m   |[39m         [31m^[39m
+    [90m246|[39m
+    [90m247|[39m       // #838 Phase 5 GATE: the PRODUCTION per-turn checksum ASSERTION…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 17:52:59
+[2m   Duration [22m 86.60s[2m (transform 18.46s, setup 22.55s, import 185ms, tests 62.96s, environment 733ms)[22m
+
