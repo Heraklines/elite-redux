@@ -69,7 +69,9 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
 
     const commandEvents = getCoopCausalTrace().filter(event => event.domain === "command");
     expect(new Set(commandEvents.map(event => event.causalId))).toEqual(new Set(["e42:w7:t3:guest:p9001"]));
-    expect(commandEvents.map(event => event.stage)).toEqual(["offer-sent", "offer-received", "intent-sent", "applied"]);
+    // The local human may commit before the queued offer frame arrives; that eager intent is retained and
+    // applied once the offer is observed. Preserve the real transport ordering in the causal trace.
+    expect(commandEvents.map(event => event.stage)).toEqual(["offer-sent", "intent-sent", "offer-received", "applied"]);
   });
 
   it("a request with no responding peer resolves null (caller -> AI fallback)", async () => {

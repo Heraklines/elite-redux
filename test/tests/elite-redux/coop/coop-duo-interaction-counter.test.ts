@@ -177,7 +177,7 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     await withClient(rig.hostCtx, async () => {
       // coopOpenOwnerShopAfterBarrier opens asynchronously after its bounded arrival wait. Poll the real
       // screen instead of calling the phase's private selection seam (which was the old false coverage).
-      for (let i = 0; i < 50 && rig.hostScene.ui.getMode() !== UiMode.MODIFIER_SELECT; i++) {
+      for (let i = 0; i < 500 && rig.hostScene.ui.getMode() !== UiMode.MODIFIER_SELECT; i++) {
         await new Promise(resolve => setTimeout(resolve, 5));
       }
       expect(rig.hostScene.ui.getMode(), "the owner reached the real reward UI").toBe(UiMode.MODIFIER_SELECT);

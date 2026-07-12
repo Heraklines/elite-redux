@@ -1135,6 +1135,18 @@ function formatLastRx(transport: CoopTransport): string {
   return ms == null ? "-" : `${Math.round(ms / 1000)}s`;
 }
 
+/** Scene-independent coordinates for diagnostics that also run in transport-only tests/teardown. */
+function readCoopBattlePoint(): { wave: number; turn: number } {
+  try {
+    return {
+      wave: globalScene.currentBattle?.waveIndex ?? 0,
+      turn: globalScene.currentBattle?.turn ?? 0,
+    };
+  } catch {
+    return { wave: 0, turn: 0 };
+  }
+}
+
 /**
  * W2b (contract doc §4): compact durability tokens for the health line + control-plane block -
  * `journal=<depth>/<unacked>` (committed ops retained / committed-but-unacked) and `queue=<n>[!]`
@@ -1166,6 +1178,7 @@ export function wireCoopStallWatchdog(
   });
   const timer = setInterval(() => {
     try {
+      const point = readCoopBattlePoint();
       // #807 C one-shot: a protocol-version mismatch means a stale cached bundle - tell BOTH
       // players plainly (the top source of unreproducible ghost bugs in live sessions).
       if (
@@ -1194,7 +1207,7 @@ export function wireCoopStallWatchdog(
         lastHealthAt = Date.now();
         coopLog(
           "health",
-          `tick=${coopSessionGeneration()}g turn=${globalScene.currentBattle?.turn ?? "-"} wave=${globalScene.currentBattle?.waveIndex ?? "-"} counter=${runtime.controller.interactionCounter?.() ?? "-"} assertions=${getCoopChecksumAssertionCount()} wait=${localMs}ms peerBeat=${peerBeat ? `${Math.round((Date.now() - peerBeat.at) / 1000)}s` : "-"} lastRx=${formatLastRx(transport)} transport=${transport.state} ${formatCoopDurabilityHealth(runtime, transport)}`,
+          `tick=${coopSessionGeneration()}g turn=${point.turn || "-"} wave=${point.wave || "-"} counter=${runtime.controller.interactionCounter?.() ?? "-"} assertions=${getCoopChecksumAssertionCount()} wait=${localMs}ms peerBeat=${peerBeat ? `${Math.round((Date.now() - peerBeat.at) / 1000)}s` : "-"} lastRx=${formatLastRx(transport)} transport=${transport.state} ${formatCoopDurabilityHealth(runtime, transport)}`,
         );
       }
       // #806 faint-replacement suppression: a live human choosing (or the host awaiting) a faint
@@ -1216,15 +1229,15 @@ export function wireCoopStallWatchdog(
         && Date.now() - lastRecoveryAt > COOP_STALL_RECOVERY_COOLDOWN_MS
       ) {
         lastRecoveryAt = Date.now();
-        const recoveryId = `stall:e${runtime.controller.sessionEpoch ?? 0}:g${coopSessionGeneration()}:w${globalScene.currentBattle?.waveIndex ?? 0}:t${globalScene.currentBattle?.turn ?? 0}`;
+        const recoveryId = `stall:e${runtime.controller.sessionEpoch ?? 0}:g${coopSessionGeneration()}:w${point.wave}:t${point.turn}`;
         recordCoopCausalEvent({
           domain: "recovery",
           stage: "stall-detected",
           causalId: recoveryId,
           ...(runtime.controller.role == null ? {} : { role: runtime.controller.role }),
           epoch: runtime.controller.sessionEpoch ?? 0,
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
+          wave: point.wave,
+          turn: point.turn,
           detail: `local=${localMs}ms peer=${peerBeat?.ms ?? 0}ms`,
         });
         coopWarn(
@@ -1287,8 +1300,8 @@ export function wireCoopStallWatchdog(
                 parentId: recoveryId,
                 role: "guest",
                 epoch: snapshot.sessionEpoch,
-                wave: globalScene.currentBattle?.waveIndex ?? 0,
-                turn: globalScene.currentBattle?.turn ?? 0,
+                wave: readCoopBattlePoint().wave,
+                turn: readCoopBattlePoint().turn,
                 detail: `${blob.length}b`,
               });
               queueCoopAtomicSnapshotApply(
@@ -1360,20 +1373,8 @@ export function routeShowdownAbandon(runtime: CoopRuntime): void {
 
 function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInteractionRelay, runtime: CoopRuntime): void {
   let rejoining = false;
-  // Transport-only tests and teardown paths can outlive the scene binding. Recovery diagnostics must
-  // never turn a harmless channel close into an exception that prevents waiter cancellation.
-  const causalBattlePoint = (): { wave: number; turn: number } => {
-    try {
-      return {
-        wave: globalScene.currentBattle?.waveIndex ?? 0,
-        turn: globalScene.currentBattle?.turn ?? 0,
-      };
-    } catch {
-      return { wave: 0, turn: 0 };
-    }
-  };
   const terminateSharedSession = (isActiveRuntime: boolean, recoveryId: string): void => {
-    const point = causalBattlePoint();
+    const point = readCoopBattlePoint();
     recordCoopCausalEvent({
       domain: "recovery",
       stage: "terminated",
@@ -1421,7 +1422,7 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
       return;
     }
     const recoveryId = `rejoin:e${runtime.controller.sessionEpoch}:g${coopSessionGeneration()}:c${transport.connectionGeneration?.() ?? 0}`;
-    const point = causalBattlePoint();
+    const point = readCoopBattlePoint();
     recordCoopCausalEvent({
       domain: "recovery",
       stage: "channel-lost",
