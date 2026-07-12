@@ -11,12 +11,21 @@
 
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
+import type { CoopBattleCommandOffer } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { Command } from "#enums/command";
 import { CoopFlapTransport } from "#test/tools/coop-flap-transport";
 import { describe, expect, it } from "vitest";
 
 describe("co-op battle command relay (#633, LIVE-C)", () => {
+  const legalOffer: CoopBattleCommandOffer = {
+    moves: [{ slot: 1, moveId: 55, targetSets: [[2], [3]], canTera: false }],
+    switches: [{ slot: 4, canNormal: true, canBaton: false }],
+    ballTypes: [0],
+    ballTargets: [2],
+    canRun: false,
+  };
+
   it("host requests a command; the peer's chosen slot comes back over the transport", async () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host);
@@ -177,6 +186,55 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     const command = await awaited;
     expect(command).toMatchObject({ command: Command.FIGHT, cursor: 3, moveId: 777 });
     expect(hostSync.describePendingRequests()).toEqual([]);
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("rejects a live illegal reply without resolving, then accepts an exact offered command", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    const awaited = hostSync.requestPartnerCommand(1, 4, [1], "guest", legalOffer);
+
+    guestSync.broadcastLocalCommand(1, 4, { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [99] }, "guest");
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(hostSync.describePendingRequests()).toHaveLength(1);
+
+    guestSync.broadcastLocalCommand(1, 4, { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] }, "guest");
+    expect(await awaited).toMatchObject({ moveId: 55, targets: [2] });
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("rejects an illegal pre-wait buffer instead of consuming it", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.broadcastLocalCommand(1, 5, { command: Command.POKEMON, cursor: 0 }, "guest");
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const awaited = hostSync.requestPartnerCommand(1, 5, [1], "guest", legalOffer);
+    guestSync.broadcastLocalCommand(1, 5, { command: Command.POKEMON, cursor: 4 }, "guest");
+    expect(await awaited).toMatchObject({ command: Command.POKEMON, cursor: 4 });
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("retains the local committed pick and replays it when both sides reconnect", async () => {
+    const pair = createLoopbackPair();
+    const hostWire = new CoopFlapTransport(pair.host);
+    const guestWire = new CoopFlapTransport(pair.guest);
+    const hostSync = new CoopBattleSync(hostWire);
+    const guestSync = new CoopBattleSync(guestWire);
+    hostWire.setConnected(false);
+    guestWire.setConnected(false);
+
+    guestSync.broadcastLocalCommand(1, 6, { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [3] }, "guest");
+    const awaited = hostSync.requestPartnerCommand(1, 6, [1], "guest", legalOffer);
+    guestWire.setConnected(true);
+    hostWire.setConnected(true);
+
+    expect(await awaited).toMatchObject({ moveId: 55, targets: [3] });
     hostSync.dispose();
     guestSync.dispose();
   });

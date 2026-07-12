@@ -634,3 +634,25 @@ The aggregate 13-shard checkpoint and staging promotion are still required. The 
 control-atomic snapshots, stop-play divergence policy, membership-aware reconnect, full battle-command
 validation, a single global commit sequence, lobby/resume operations, causal traces, and undriven/browser
 fault campaigns have not been claimed complete.
+
+## 31. Atomic recovery and membership-aware active-surface rejoin
+
+The next containment checkpoint makes a recovery snapshot one atomic DATA+CONTROL statement. Every full
+snapshot now carries the authority epoch, checksum, journal frontier, revisioned two-seat membership, and
+active control surface. The guest applies material state at a safe phase boundary and advances membership,
+interaction, and durability frontiers only after the advertised checksum converges. A malformed, stale,
+wrong-epoch, incomplete-membership, or non-healing snapshot is refused; the old “received means healed”
+path no longer exists.
+
+Membership is explicit (`active` / `recovering` / `terminated`) with per-seat presence and connection
+generation. A channel replacement preserves unresolved battle-command offers, rendezvous arrivals,
+interaction waits, durability tails, and current same-epoch relays. Command requests and rendezvous state
+are re-announced after reconnect. Grace expiry terminates shared play, cancels retained control waits, and
+returns both clients to a recoverable title/save boundary; it never silently continues one simulation.
+Async rejoin completion is guarded by session generation so a stale completion cannot mutate a newer run.
+
+Evidence: full external `Co-op Gate (Sharded)` run `29175515718` passed all thirteen gameplay shards plus
+the static co-op gate at SHA `652e8b22e`. Staging-only deployment `29175723689` completed successfully.
+This is the current tester-ready intermediate checkpoint. Host validation of every guest battle command,
+global commit ordering, lobby decision operations, causal traces, and browser/forced-surface campaigns
+remain open.

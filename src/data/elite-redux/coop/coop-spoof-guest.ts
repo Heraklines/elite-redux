@@ -70,8 +70,9 @@ export class SpoofGuest {
     // empty offer means only Struggle is legal - cursor 0 + the host's own
     // no-usable-move fallback resolves it to Struggle.
     this.battleSync = new CoopBattleSync(transport);
-    this.battleSync.onCommandRequest(({ moveSlots }) => {
-      const cursor = moveSlots.length > 0 ? moveSlots[0] : 0;
+    this.battleSync.onCommandRequest(({ moveSlots, offer }) => {
+      const offeredMove = offer?.moves[0];
+      const cursor = offeredMove?.slot ?? (moveSlots.length > 0 ? moveSlots[0] : 0);
       if (isCoopDebug()) {
         coopLog(
           "ai",
@@ -81,6 +82,7 @@ export class SpoofGuest {
       return {
         command: Command.FIGHT,
         cursor,
+        ...(offeredMove == null ? {} : { moveId: offeredMove.moveId, targets: [...(offeredMove.targetSets[0] ?? [])] }),
       };
     });
   }

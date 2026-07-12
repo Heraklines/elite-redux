@@ -1,4 +1,5 @@
 import type { TurnCommand } from "#app/battle";
+import { MAX_TERAS_PER_ARENA } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
@@ -18,10 +19,10 @@ import {
 } from "#data/elite-redux/coop/coop-partner-ai";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
+  coopHasPendingWaveAdvance,
   coopOwnerOfPlayerFieldSlot,
   getCoopBattleStreamer,
   getCoopBattleSync,
-  coopHasPendingWaveAdvance,
   getCoopController,
   getCoopNetcodeMode,
   getCoopRendezvous,
@@ -30,7 +31,7 @@ import {
   recordCoopOwnSlotCommand,
   recordCoopPartnerSlotCommand,
 } from "#data/elite-redux/coop/coop-runtime";
-import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import type { CoopBattleCommandOffer, SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { reloadCurrentWave } from "#data/elite-redux/er-reset-wave";
 import { recordSinglePlayerCommand } from "#data/elite-redux/replay-single-recording";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
@@ -55,10 +56,11 @@ import { PokeballType } from "#enums/pokeball";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { getMoveTargets } from "#moves/move-utils";
-import { FieldPhase } from "#phases/field-phase";
 import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
+import { FieldPhase } from "#phases/field-phase";
 import type { MoveTargetSet } from "#types/move-target-set";
 import type { TurnMove } from "#types/turn-move";
+import { canTerastallize } from "#utils/pokemon-utils";
 import i18next from "i18next";
 
 export class CommandPhase extends FieldPhase {
@@ -267,6 +269,133 @@ export class CommandPhase extends FieldPhase {
    * timeout, it falls back to the self-contained AI picker
    * ({@linkcode resolvePartnerCommand}) so the turn never hangs.
    */
+  private canOfferPartnerRun(partner: PlayerPokemon): boolean {
+    const { currentBattle, arena } = globalScene;
+    return (
+      arena.biomeId !== BiomeId.END
+      && (currentBattle.mysteryEncounter?.fleeAllowed ?? true)
+      && currentBattle.battleType !== BattleType.TRAINER
+      && currentBattle.mysteryEncounter?.encounterMode !== MysteryEncounterMode.TRAINER_BATTLE
+      && !partner.isTrapped([], true)
+    );
+  }
+
+  /** Side-effect-free host legality check used only to construct the wire offer. */
+  private canOfferPartnerBall(cursor: number): boolean {
+    const { arena, currentBattle, gameData, gameMode, pokeballCounts } = globalScene;
+    if (
+      !Number.isSafeInteger(cursor)
+      || cursor < 0
+      || cursor > PokeballType.MASTER_BALL
+      || !pokeballCounts[cursor as PokeballType]
+    ) {
+      return false;
+    }
+    if (globalScene.getEnemyField().filter(p => p.isActive(true)).length !== 1) {
+      return false;
+    }
+    const { battleType } = currentBattle;
+    const { isClassic, isEndless, isDaily } = gameMode;
+    const isClassicFinalBoss = gameMode.isBattleClassicFinalBoss(currentBattle.waveIndex);
+    const isEndlessMinorBoss = gameMode.isEndlessMinorBoss(currentBattle.waveIndex);
+    const isFullFreshStart = gameMode.isFullFreshStartChallenge();
+    const isCatchableDailyBoss = isDailyFinalBoss() && (getDailyEventSeedBoss()?.catchable ?? false);
+    if (battleType === BattleType.TRAINER) {
+      return false;
+    }
+    if (currentBattle.isBattleMysteryEncounter() && !currentBattle.mysteryEncounter?.catchAllowed) {
+      return false;
+    }
+    if (arena.biomeId === BiomeId.END && battleType === BattleType.WILD) {
+      const hasUncaughtFieldSpecies = globalScene
+        .getEnemyField()
+        .some(p => p.isActive() && !gameData.dexData[p.species.speciesId].caughtAttr);
+      if (
+        (isClassic && !isClassicFinalBoss && hasUncaughtFieldSpecies)
+        || (isFullFreshStart && !isClassicFinalBoss)
+        || (isEndless && !isEndlessMinorBoss)
+        || (isClassic && isClassicFinalBoss)
+        || (isFullFreshStart && isClassicFinalBoss)
+        || (isEndless && isEndlessMinorBoss)
+        || (isDaily && !isCatchableDailyBoss)
+      ) {
+        return false;
+      }
+    }
+    const target = globalScene.getEnemyPokemon(false);
+    if (target?.isBoss() && target.bossSegmentIndex >= 1 && !target.hasAbility(AbilityId.WONDER_GUARD, false, true)) {
+      const challengedFinalBoss = isClassicFinalBoss && gameMode.hasAnyChallenges();
+      if (
+        (isClassicFinalBoss && (cursor < PokeballType.MASTER_BALL || challengedFinalBoss))
+        || isCatchableDailyBoss
+        || cursor < PokeballType.MASTER_BALL
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** Build the complete action set from host state; no peer-derived legality enters this object. */
+  private buildCoopPartnerCommandOffer(partner: PlayerPokemon, slotOwner: "host" | "guest"): CoopBattleCommandOffer {
+    const moves = partner
+      .getMoveset()
+      .map((move, slot) => ({ move, slot }))
+      .filter(({ move }) => move.isUsable(partner, false, true)[0])
+      .map(({ move, slot }) => {
+        const targetSet = getMoveTargets(partner, move.moveId);
+        const targetSets = targetSet.multiple ? [targetSet.targets] : targetSet.targets.map(target => [target]);
+        const currentTeras = globalScene.arena.playerTerasUsed;
+        const plannedTera = +(
+          globalScene.currentBattle.preTurnCommands[0]?.command === Command.TERA && this.fieldIndex > 0
+        );
+        return {
+          slot,
+          moveId: move.moveId,
+          targetSets: targetSets.length > 0 ? targetSets : [[]],
+          canTera: canTerastallize(partner) && currentTeras + plannedTera < MAX_TERAS_PER_ARENA,
+        };
+      });
+    if (moves.length === 0) {
+      const struggleTargets = getMoveTargets(partner, MoveId.STRUGGLE);
+      moves.push({
+        slot: -1,
+        moveId: MoveId.STRUGGLE,
+        targetSets: struggleTargets.multiple
+          ? [struggleTargets.targets]
+          : struggleTargets.targets.map(target => [target]),
+        canTera: false,
+      });
+    }
+    const canBaton = !!globalScene.findModifier(
+      modifier => modifier.is("SwitchEffectTransferModifier") && modifier.pokemonId === partner.id,
+    );
+    const canNormalSwitch = !partner.isTrapped([], true);
+    const switches = globalScene
+      .getPlayerParty()
+      .map((pokemon, slot) => ({ pokemon, slot }))
+      .filter(
+        ({ pokemon }) =>
+          pokemon.id !== partner.id
+          && pokemon.coopOwner === slotOwner
+          && pokemon.isAllowedInBattle()
+          && !pokemon.isActive(true),
+      )
+      .map(({ slot }) => ({ slot, canNormal: canNormalSwitch, canBaton }));
+    return {
+      moves,
+      switches,
+      ballTypes: Object.keys(globalScene.pokeballCounts)
+        .map(Number)
+        .filter(ballType => this.canOfferPartnerBall(ballType)),
+      ballTargets: globalScene
+        .getEnemyField()
+        .filter(pokemon => pokemon.isActive(true))
+        .map(pokemon => pokemon.getBattlerIndex()),
+      canRun: this.canOfferPartnerRun(partner),
+    };
+  }
+
   private tryCoopAutoResolve(): boolean {
     if (!globalScene.gameMode.isCoop) {
       return false;
@@ -341,33 +470,36 @@ export class CommandPhase extends FieldPhase {
     );
     const moveset = partner.getMoveset();
     const moveSlots = moveset.map((m, i) => (m.isUsable(partner, false, true)[0] ? i : -1)).filter(i => i >= 0);
+    const offer = this.buildCoopPartnerCommandOffer(partner, slotOwner);
     // #851: key the request by the awaited slot's RESOLVED owner (computed above as `slotOwner`),
     // so the guest's independent broadcast matches even after a host-half-wipe recenter reseats the
     // survivor at a different field index than the guest has reconciled to (the 20-min-stall class).
-    void sync.requestPartnerCommand(this.fieldIndex, globalScene.currentBattle.turn, moveSlots, slotOwner).then(cmd => {
-      // A relayed BALL / RUN (the partner threw a Poke Ball or fled) is applied
-      // verbatim, NOT routed through the move path: its `cursor` is a ball type,
-      // not a move slot, so applyWiredPartnerCommand would mis-read it as a move.
-      if (
-        cmd != null
-        && (cmd.command === Command.BALL || cmd.command === Command.RUN || cmd.command === Command.POKEMON)
-      ) {
-        this.applyRelayedActionCommand(cmd);
-        // #record-replay: capture the partner slot's relayed action command (no-op unless recording).
-        recordCoopPartnerSlotCommand(this.fieldIndex, cmd);
-        return;
-      }
-      // FIGHT: the RELAYED partner command, else the AI fallback (a null guest reply still produces a
-      // real RNG-derived command that is part of the authoritative run - capture what was COMMITTED).
-      const resolved = (cmd && applyWiredPartnerCommand(partner, cmd)) || fallback();
-      apply(resolved);
-      // #record-replay: capture the partner slot's resolved FIGHT command (no-op unless recording).
-      recordCoopPartnerSlotCommand(this.fieldIndex, {
-        command: resolved.command,
-        cursor: resolved.moveIndex,
-        targets: resolved.turnMove.targets,
+    void sync
+      .requestPartnerCommand(this.fieldIndex, globalScene.currentBattle.turn, moveSlots, slotOwner, offer)
+      .then(cmd => {
+        // A relayed BALL / RUN (the partner threw a Poke Ball or fled) is applied
+        // verbatim, NOT routed through the move path: its `cursor` is a ball type,
+        // not a move slot, so applyWiredPartnerCommand would mis-read it as a move.
+        if (
+          cmd != null
+          && (cmd.command === Command.BALL || cmd.command === Command.RUN || cmd.command === Command.POKEMON)
+        ) {
+          this.applyRelayedActionCommand(cmd);
+          // #record-replay: capture the partner slot's relayed action command (no-op unless recording).
+          recordCoopPartnerSlotCommand(this.fieldIndex, cmd);
+          return;
+        }
+        // FIGHT: the RELAYED partner command, else the AI fallback (a null guest reply still produces a
+        // real RNG-derived command that is part of the authoritative run - capture what was COMMITTED).
+        const resolved = (cmd && applyWiredPartnerCommand(partner, cmd)) || fallback();
+        apply(resolved);
+        // #record-replay: capture the partner slot's resolved FIGHT command (no-op unless recording).
+        recordCoopPartnerSlotCommand(this.fieldIndex, {
+          command: resolved.command,
+          cursor: resolved.moveIndex,
+          targets: resolved.turnMove.targets,
+        });
       });
-    });
     return true;
   }
 
@@ -631,7 +763,8 @@ export class CommandPhase extends FieldPhase {
               `next-command barrier ${point} ABORTED during teardown/recovery - command UI remains closed`,
             );
             return false;
-          } else if (result.authoritativePoint !== undefined && result.authoritativePoint !== point) {
+          }
+          if (result.authoritativePoint !== undefined && result.authoritativePoint !== point) {
             coopWarn(
               "rendezvous",
               `next-command barrier ${point} ROUTED AWAY to host-authoritative ${result.authoritativePoint}; closing phantom command phase`,
@@ -645,7 +778,8 @@ export class CommandPhase extends FieldPhase {
             }
             this.end();
             return false;
-          } else if (result.crossPoint !== undefined) {
+          }
+          if (result.crossPoint !== undefined) {
             // #847 CROSS-POINT: the partner is already at another sync point (e.g. the reward shop) and
             // will never reach this command point. Open the UI immediately - the downstream catch-up
             // machinery reconciles. INFO, not the anti-hang WARN (no dead partner, no 60s wait).

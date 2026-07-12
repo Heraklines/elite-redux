@@ -67,7 +67,7 @@ export type CoopRole = "host" | "guest";
 // control high-water mark; receivers advance control only after safe-boundary checksum convergence.
 // er-coop-23: hot rejoin preserves active waits and reissues command/barrier control state; terminal
 // disconnect ends shared play instead of taking an uncommitted local fallback/AI/solo branch.
-export const COOP_PROTOCOL_VERSION = "er-coop-23";
+export const COOP_PROTOCOL_VERSION = "er-coop-24";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -118,6 +118,23 @@ export interface SerializedCommand {
   baton?: boolean;
   /** For FIGHT: whether the mon Terastallizes this turn (Command.TERA) (#633 Fix #4a). */
   tera?: boolean;
+}
+
+/** One exact host-legal move choice, including every legal resolved target set. */
+export interface CoopBattleMoveOffer {
+  slot: number;
+  moveId: number;
+  targetSets: number[][];
+  canTera: boolean;
+}
+
+/** Complete host-authored legal action set for one player field slot and turn. */
+export interface CoopBattleCommandOffer {
+  moves: CoopBattleMoveOffer[];
+  switches: { slot: number; canNormal: boolean; canBaton: boolean }[];
+  ballTypes: number[];
+  ballTargets: number[];
+  canRun: boolean;
 }
 
 /**
@@ -648,7 +665,13 @@ export interface CoopActiveControlSnapshotV1 {
   interactionCounter: number;
   awaitedInteractions: { seq: number; expectedKinds: string[] }[];
   barriers: { localArrived: string[]; partnerArrived: string[]; awaiting: string[] };
-  pendingCommands: { fieldIndex: number; turn: number; moveSlots: number[]; owner?: CoopRole }[];
+  pendingCommands: {
+    fieldIndex: number;
+    turn: number;
+    moveSlots: number[];
+    offer?: CoopBattleCommandOffer | undefined;
+    owner?: CoopRole;
+  }[];
 }
 
 /**
@@ -965,7 +988,14 @@ export type CoopMessage =
    * key (version-handshake safe: paired clients share COOP_PROTOCOL_VERSION, so it is present
    * on both or neither).
    */
-  | { t: "commandRequest"; fieldIndex: number; turn: number; moveSlots: number[]; owner?: CoopRole }
+  | {
+      t: "commandRequest";
+      fieldIndex: number;
+      turn: number;
+      moveSlots: number[];
+      offer?: CoopBattleCommandOffer | undefined;
+      owner?: CoopRole;
+    }
   /**
    * A player's battle command for their own field slot (phase P2 / LIVE-C reply). `owner`
    * (#851, additive optional) mirrors {@linkcode commandRequest}'s owner: the sender's resolved

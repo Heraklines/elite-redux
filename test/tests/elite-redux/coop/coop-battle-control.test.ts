@@ -144,10 +144,16 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     await new Promise(resolve => setTimeout(resolve, 0));
 
     // The host requested the partner's command for the guest slot over the wire...
-    const sentRequest = sendSpy.mock.calls.some(
-      ([msg]) => msg.t === "commandRequest" && msg.fieldIndex === COOP_GUEST_FIELD_INDEX,
-    );
-    expect(sentRequest).toBe(true);
+    const sentRequest = sendSpy.mock.calls
+      .map(([msg]) => msg)
+      .find(msg => msg.t === "commandRequest" && msg.fieldIndex === COOP_GUEST_FIELD_INDEX);
+    expect(sentRequest).toBeDefined();
+    if (sentRequest?.t === "commandRequest") {
+      expect(sentRequest.offer, "protocol 24 request carries the complete host-authored legal set").toBeDefined();
+      expect(sentRequest.offer?.moves.length).toBeGreaterThan(0);
+      expect(sentRequest.offer?.moves.every(move => move.targetSets.length > 0)).toBe(true);
+      expect(sentRequest.offer?.switches.every(switchOffer => switchOffer.slot >= 0)).toBe(true);
+    }
 
     // ...the spoof's reply was applied as a populated FIGHT command...
     const cmd = globalScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX];
