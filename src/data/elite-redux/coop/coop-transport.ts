@@ -23,7 +23,7 @@
 // TYPE-ONLY import (erased at runtime): the data-fingerprint diagnostic message carries a
 // plain-JSON `ErDataFingerprint` (#633 diagnostics), so the transport stays the lowest layer.
 import type { ErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
-import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopMembershipSnapshotV1 } from "#data/elite-redux/coop/coop-membership";
 // TYPE-ONLY (erased at runtime, so this stays the lowest layer): the authoritative control-plane
 // envelope (Wave-2 run-state migration, §1.1). The envelope module in turn imports only the
@@ -1726,7 +1726,16 @@ class LoopbackTransport implements CoopTransport {
         );
       }
       for (const h of [...peer.msgHandlers]) {
-        h(msg);
+        try {
+          h(msg);
+        } catch (error) {
+          // A transport is a fan-out bus: one optional observer failing must not starve the
+          // command/recovery handlers registered after it. Keep the fault loud and continue.
+          coopWarn(
+            "transport",
+            `recv ${peer.role} t=${msg.t} handler threw (isolated): ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
       }
     });
   }

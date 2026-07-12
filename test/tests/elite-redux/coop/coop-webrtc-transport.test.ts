@@ -12,7 +12,7 @@ import { setCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import type { CoopConnectionState, CoopMessage } from "#data/elite-redux/coop/coop-transport";
-import { COOP_PROTOCOL_VERSION } from "#data/elite-redux/coop/coop-transport";
+import { COOP_PROTOCOL_VERSION, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import {
   COOP_KEEPALIVE_MS,
   type CoopWireChannel,
@@ -93,6 +93,30 @@ describe("co-op WebRTC transport (#633, P6) - framing", () => {
     expect(a.sent).toEqual([JSON.stringify(msg)]);
     // ...and decoded back into the same message on the peer.
     expect(received).toEqual([msg]);
+  });
+
+  it("isolates a throwing subscriber so later WebRTC and loopback protocol consumers still receive the frame", async () => {
+    const msg: CoopMessage = { t: "stallBeat", waitingMs: 7 };
+
+    const wire = new MockWire();
+    const rtc = new WebRtcTransport("guest", wire);
+    const rtcReceived: CoopMessage[] = [];
+    rtc.onMessage(() => {
+      throw new Error("diagnostic observer failed");
+    });
+    rtc.onMessage(frame => rtcReceived.push(frame));
+    expect(() => wire.injectRaw(JSON.stringify(msg))).not.toThrow();
+    expect(rtcReceived).toEqual([msg]);
+
+    const loopback = createLoopbackPair();
+    const loopbackReceived: CoopMessage[] = [];
+    loopback.guest.onMessage(() => {
+      throw new Error("UI observer failed");
+    });
+    loopback.guest.onMessage(frame => loopbackReceived.push(frame));
+    loopback.host.send(msg);
+    await Promise.resolve();
+    expect(loopbackReceived).toEqual([msg]);
   });
 
   it("reports connected when the channel is already open, and maps open/close events", () => {

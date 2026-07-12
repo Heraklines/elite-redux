@@ -1736,6 +1736,34 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     );
   };
 
+  /** Drive the healthy-player optional switch offered when a trainer sends its next bench mon. */
+  const armHostOptionalTrainerSwitchCancel = (turn: number): void => {
+    if (hostOwnedFaintPending(rig)) {
+      return;
+    }
+    game.onNextPrompt(
+      "SwitchPhase",
+      UiMode.PARTY,
+      () => {
+        const phase = rig.hostScene.phaseManager.getCurrentPhase() as unknown as { isModal?: boolean };
+        if (phase.isModal === true) {
+          fail("no-park", rig.hostScene.currentBattle.waveIndex, "unexpected forced switch reached optional picker");
+        }
+        // Use the real public UI path: this is the same Cancel a player presses to keep the lead in.
+        rig.hostScene.ui.processInput(Button.CANCEL);
+        hitMode(UiMode.PARTY);
+        actionScript.push(
+          `wave ${rig.hostScene.currentBattle.waveIndex} turn ${turn}: host declined optional trainer switch`,
+        );
+      },
+      () =>
+        rig.hostScene.currentBattle.turn !== turn
+        || ["VictoryPhase", "BattleEndPhase", "GameOverPhase"].includes(
+          rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
+        ),
+    );
+  };
+
   /**
    * Drive the two owner-only Dex Nav species picks when a taken reward queued ErDexNavPhase.
    * The watcher correctly skips this per-account picker; a host owner must answer it before the
@@ -2018,6 +2046,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // finally happened - a leaked FIXED trainer wave (rival / evil-grunt bypass .disableTrainerWaves(),
         // are far tougher, and DO KO the host) - the SwitchPhase parked forever.
         armHostFaintAutoPick();
+        armHostOptionalTrainerSwitchCancel(turn);
       });
       await withClient(rig.guestCtx, () => driveGuestReplayTurnWithFaint(rig, turn));
       if (profile === "god") {

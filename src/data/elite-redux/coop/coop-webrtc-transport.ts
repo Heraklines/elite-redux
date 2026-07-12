@@ -345,7 +345,16 @@ export class WebRtcTransport implements CoopTransport {
         coopLog("webrtc", `raw rx role=${this.role} t=${msg.t} bytes=${data.length} handlers=${this.msgHandlers.size}`);
       }
       for (const h of [...this.msgHandlers]) {
-        h(msg);
+        try {
+          h(msg);
+        } catch (error) {
+          // Fan-out isolation is load-bearing: a diagnostics/UI observer must never prevent a
+          // later command or recovery consumer from receiving this already-validated frame.
+          coopWarn(
+            "webrtc",
+            `raw rx role=${this.role} t=${msg.t} handler threw (isolated): ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
       }
     } else {
       coopWarn(
