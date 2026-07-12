@@ -281,6 +281,10 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
       if (takeReward) {
         ownerPinned = await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: true }));
         await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+        // Explicit-delivery mode queues the watcher's shop rendezvous + interaction-counter snapshot for
+        // the owner. Pump the HOST destination before its NewBattlePhase reaches CoopPartnerSyncPhase;
+        // this is the same reciprocal network delivery exercised by the skip/leave branches below.
+        await withClient(rig.hostCtx, () => drainLoopback());
       } else if (hostOwns) {
         const watcherPinned = await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
         expect(watcherPinned, `wave ${w}: watcher parked on the owner's interaction`).toBe(counterBefore);
