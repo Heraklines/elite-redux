@@ -154,12 +154,11 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     // reward without driving a party-target menu - exercising the reward-grant + relay on purpose.
     forceItemRewards(game.override, [{ name: "LURE" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    // Boot handshakes with ordinary microtask delivery, then run the complete three-wave journey with
-    // explicit destination-client delivery. `drainLoopback` now pumps only the currently installed
-    // ClientCtx, so no transport continuation can resume against the other engine's globalScene.
+    // Boot handshakes/command awaits with ordinary microtask delivery, then switch each turn's replay +
+    // reward boundary to explicit destination-client delivery. `drainLoopback` pumps only the currently
+    // installed ClientCtx, so those transition continuations cannot use the other engine's globalScene.
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    pair.setAutomaticDelivery(false);
     wireGuestCommand(rig);
 
     const applyCheckpointSpy = vi.spyOn(coopEngine, "applyCoopCheckpoint");
@@ -183,6 +182,10 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
       // ===== Host plays this wave to a win (emits turnResolution + checkpoint + waveResolved). =====
       const turn = rig.hostScene.currentBattle.turn;
       await hostPlayWave(rig);
+      // The single-process command-phase helper above still awaits the guest response inside one host
+      // pump. Once the authoritative turn is complete, switch to strict per-client delivery for the
+      // replay + reward boundary this journey is intended to validate.
+      pair.setAutomaticDelivery(false);
 
       // ===== Guest replays the host's turn + applies the checkpoint (renders the host's outcome). =====
       await withClient(rig.guestCtx, async () => {
@@ -245,6 +248,10 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
 
       // ===== Host crosses into the NEXT wave's battle (real EncounterPhase rolls wave w+1). =====
       if (w < WAVES) {
+        // The legacy next-command helper is one long host await (it cannot alternate contexts yet).
+        // Re-enable automatic delivery for that abbreviated crossing; the replay/shop segment above
+        // remains explicitly scheduled and is the foundation for replacing this helper in T1.
+        pair.setAutomaticDelivery(true);
         await arriveGuestCommandBoundary(rig, w + 1);
         await withClient(rig.hostCtx, async () => {
           await game.phaseInterceptor.to("CommandPhase");

@@ -1112,7 +1112,25 @@ export async function arriveGuestCommandBoundary(rig: DuoRig, wave: number, turn
  * presence is a no-op for the ~30 non-faulted callers.
  */
 export const REPLAY_DRAIN_PHASES = new Set([
+  // Pure presentation phases can be inserted ahead of the deferred finalize by a replayed ability/
+  // animation. They are part of the renderer allowlist and must finish before a caller is allowed to
+  // label the state "post-turn". Missing Show/HideAbility here produced a false wave-53 pre-heal PP
+  // mismatch: the driver returned at the flyout, then the checkpoint finalized milliseconds later.
   "MessagePhase",
+  "CommonAnimPhase",
+  "DamageAnimPhase",
+  "MoveAnimPhase",
+  "LoadMoveAnimPhase",
+  "MoveHeaderPhase",
+  "MoveChargePhase",
+  "PokemonAnimPhase",
+  "ShinySparklePhase",
+  "ShowAbilityPhase",
+  "HideAbilityPhase",
+  "ShowPartyExpBarPhase",
+  "HidePartyExpBarPhase",
+  "ShowTrainerPhase",
+  "ScanIvsPhase",
   // #788 v2: the lockstep gate self-ends when the partner's advance broadcast is already seen
   // (or after the injectable barrier) - drive it like any replay phase or wave-2 never replays.
   "CoopPartnerSyncPhase",
