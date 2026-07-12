@@ -313,7 +313,13 @@ function commandCausalId(fieldIndex: number, turn: number, owner?: CoopRole, add
   if (address != null) {
     return `e${address.epoch}:w${address.wave}:t${turn}:${owner ?? "unknown"}:p${address.pokemonId}`;
   }
-  return `legacy:w${globalScene.currentBattle?.waveIndex ?? 0}:t${turn}:${owner ?? "slot"}:f${fieldIndex}`;
+  let wave = 0;
+  try {
+    wave = globalScene.currentBattle?.waveIndex ?? 0;
+  } catch {
+    /* engine-free tests have no scene; the commandKey fallback uses the same zero wave */
+  }
+  return `legacy:w${wave}:t${turn}:${owner ?? "slot"}:f${fieldIndex}`;
 }
 
 function traceCommand(

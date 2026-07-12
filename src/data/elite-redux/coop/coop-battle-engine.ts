@@ -1752,6 +1752,14 @@ const COOP_SAVEDATA_DIGEST_EXCLUDED_KEYS: ReadonlySet<string> = new Set<string>(
   // host-authoritative and already synced through the ME terminal path.
   "mysteryEncounterSaveData",
   "mysteryEncounterType",
+  // Run-local ACHIEVEMENT bookkeeping, not shared battle simulation state. The authoritative host runs
+  // the lethal-hit tracker while the pure-renderer guest replays presentation events, so fields such as
+  // `parallelPlayKoIds` legitimately advance on the host first (live wave-1 repro, build mrhpa314-147u).
+  // Hashing this account/progression metadata manufactured an unhealable saveDataDigest mismatch: the
+  // full battle snapshot correctly carries no achievement state, so every retry produced the same hash
+  // and paused an otherwise-converged game. Achievement/account writes have their own co-op ownership
+  // rail; they must never participate in the simulation convergence comparator.
+  "erAchievementRunState",
   // Host-authoritative TrainerData for a trainer wave: mirrored to the guest via the enemy builder, but
   // its full serialized form (party template index / gen seed) can differ benignly; the on-field enemy
   // species the checksum already hashes is the sync-relevant part.

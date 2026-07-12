@@ -43,6 +43,7 @@ import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { erAchvRun } from "#data/elite-redux/er-achievement-run-state";
 import { type ErRouteNode, getErPendingNodes, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import {
   erBiomeOverstayAnchor,
@@ -198,6 +199,19 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       expect(captureCoopSaveDataDigest(), "a money-streak change moves the save-data digest").not.toBe(before);
       restoreErMoneyStreaks(saved);
       expect(captureCoopSaveDataDigest(), "restoring the money-streak restores the digest").toBe(before);
+
+      // LIVE wave-1 regression (build mrhpa314-147u): only the authoritative engine executes the
+      // lethal-hit achievement tracker, so its PARALLEL_PLAY KO set advances while the renderer's does
+      // not. This is account/progression bookkeeping, not battle state, and the battle snapshot cannot
+      // (nor should it) overwrite it. It must therefore be excluded from the convergence comparator.
+      const beforeAchievement = captureCoopSaveDataDigest();
+      erAchvRun().parallelPlayKoIds.add(globalScene.getPlayerParty()[0].id);
+      expect(
+        captureCoopSaveDataDigest(),
+        "host-only achievement bookkeeping does not manufacture an unhealable battle desync",
+      ).toBe(beforeAchievement);
+      erAchvRun().parallelPlayKoIds.clear();
+      expect(Object.hasOwn(captureCoopSaveDataNormalized(), "erAchievementRunState")).toBe(false);
     });
     logs.flush();
   }, 300_000);
