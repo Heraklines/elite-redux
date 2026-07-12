@@ -183,8 +183,8 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     setCoopOperationDurability(hostMgr);
 
     // Simulate a cold resume at high-water N for op:wave: restore both managers' marks + floor the surface.
-    hostMgr.restore({ "op:wave": N }, { "op:wave": N });
-    guestMgr.restore({ "op:wave": N }, { "op:wave": N });
+    hostMgr.restore({ "op:global": N }, { "op:global": N });
+    guestMgr.restore({ "op:global": N }, { "op:global": N });
     setCoopWaveAdvanceOperationRevisionFloor(N);
 
     commitHostWave(30);

@@ -93,6 +93,7 @@ export function resetCoopColosseumOperationFlag(): void {
 }
 
 export function resetCoopColosseumOperationState(): void {
+  CoopOperationHost.resetGlobalOrder();
   for (const timer of decisionRetryTimers.values()) {
     clearTimeout(timer);
   }
@@ -122,12 +123,12 @@ export function setCoopColosseumOperationEpoch(next: number): void {
 }
 
 function host(): CoopOperationHost {
-  authorityHost ??= new CoopOperationHost({ epoch, initialRevision: revisionFloor });
+  authorityHost ??= CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
   return authorityHost;
 }
 
 function guest(): CoopOperationGuest {
-  receiverGuest ??= new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
+  receiverGuest ??= CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
   return receiverGuest;
 }
 

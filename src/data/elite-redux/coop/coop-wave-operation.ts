@@ -175,6 +175,7 @@ export function setCoopWaveAdvanceOperationEpoch(next: number): void {
 
 /** Tear down all per-session operation state (called from assembleCoopRuntime + clearCoopRuntime + tests). Keeps the flag. */
 export function resetCoopWaveAdvanceOperationState(): void {
+  CoopOperationHost.resetGlobalOrder();
   authorityHost = null;
   watchGuest = null;
   lastAppliedWave = -1;
@@ -203,7 +204,7 @@ export function setCoopWaveAdvanceOperationRevisionFloor(hw: number): void {
 
 function host(): CoopOperationHost {
   if (authorityHost == null) {
-    authorityHost = new CoopOperationHost({ epoch, initialRevision: revisionFloor });
+    authorityHost = CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
   }
   return authorityHost;
 }
@@ -220,7 +221,7 @@ function host(): CoopOperationHost {
  */
 function guest(): CoopOperationGuest {
   if (watchGuest == null) {
-    watchGuest = new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
+    watchGuest = CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
   }
   return watchGuest;
 }

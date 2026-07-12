@@ -47,6 +47,7 @@ export function resetCoopBargainOperationFlag(): void {
 }
 
 export function resetCoopBargainOperationState(): void {
+  CoopOperationHost.resetGlobalOrder();
   authorityHost = null;
   watcherGuest = null;
   pendingJournalMaterializations.clear();
@@ -71,12 +72,12 @@ export function setCoopBargainOperationEpoch(next: number): void {
 }
 
 function host(): CoopOperationHost {
-  authorityHost ??= new CoopOperationHost({ epoch, initialRevision: revisionFloor });
+  authorityHost ??= CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
   return authorityHost;
 }
 
 function guest(): CoopOperationGuest {
-  watcherGuest ??= new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
+  watcherGuest ??= CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
   return watcherGuest;
 }
 

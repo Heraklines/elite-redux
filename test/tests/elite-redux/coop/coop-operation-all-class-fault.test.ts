@@ -117,6 +117,7 @@ describe("authoritative operation fault campaign: every registered class", () =>
     const guest = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
 
     try {
+      let globalRevision = 0;
       for (const cls of COOP_OPERATION_SURFACES) {
         registerCoopOperationLiveSink(cls, envelope => {
           liveState.set(cls, (envelope.pendingOperation?.payload as { marker: string }).marker);
@@ -129,13 +130,13 @@ describe("authoritative operation fault campaign: every registered class", () =>
           }),
         );
 
-        // Revisions are dense PER CLASS, so the first operation for every surface is revision 1.
-        const envelope = envelopeFor(cls, 1);
-        expect(coopOperationDurabilityHooks().extractKey?.({ t: "envelope", envelope })).toEqual({
-          cls,
-          seq: 1,
+        // Every surface participates in one dense global commit stream.
+        const committedEnvelope = envelopeFor(cls, ++globalRevision);
+        expect(coopOperationDurabilityHooks().extractKey?.({ t: "envelope", envelope: committedEnvelope })).toEqual({
+          cls: "op:global",
+          seq: globalRevision,
         });
-        host.commit(cls, 1, { t: "envelope", envelope });
+        host.commit("op:global", globalRevision, { t: "envelope", envelope: committedEnvelope });
       }
       await flush();
       expect(pair.faultsInjected(), "the campaign must really drop every first delivery").toBe(

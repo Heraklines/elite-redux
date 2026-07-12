@@ -1260,6 +1260,21 @@ can drive real guest mutation (the reviewer's central demand). What it establish
   EITHER carrier. Guest-only + authoritative-only + wave-deduped; a normal (relay-present) run never
   double-builds. This is the pattern a later surface's live sink copies: route into the surface's existing
   safe-boundary applier, never mutate from the durability handler directly.
+
+### 8.8 All-surfaces global commit order (protocol 25)
+
+The surface-local revision described in the historical Wave-2a/Wave-2e notes above is retired now that all
+twelve authoritative operation surfaces are migrated. Every production `CoopOperationHost` draws from one
+session/epoch clock, and every production `CoopOperationGuest` advances one shared receive cursor. Durability
+journals every envelope as `(cls: "op:global", seq: envelope.revision)`; phase/kind still derives the concrete
+surface applier and live sink. An envelope from any surface at `R+2` is therefore parked until the missing
+cross-surface commit at `R+1` is applied. Raw and journal duplicate carriers share the same cursor and cannot
+create a second mutation.
+
+Cold saves persist `op:global`. A protocol-24 save is migrated deterministically by summing its disjoint
+per-surface high-waters, seeding both global clocks and the durability ledger before the first resumed commit.
+Atomic snapshots fast-forward the global receive cursor only after DATA checksum convergence. Protocol 25
+prevents a mixed build from interpreting the same envelope revision under the former per-surface contract.
 - **STRICT-TAILS observe mode (§3 unlock).** With `logicalPhase` now host-authoritative for the between-wave
   transition, `coop-renderer-gate.ts` gains a SEPARATE `strictTails` sub-flag (default OFF, never enforcing —
   §6.3 evidence-only). When ON, a §3.3 boundary-tail phase the guest builds that the CURRENT adopted

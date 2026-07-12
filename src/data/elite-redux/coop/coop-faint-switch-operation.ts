@@ -55,6 +55,7 @@ export function resetCoopFaintSwitchRetryMs(): void {
 }
 
 export function resetCoopFaintSwitchOperationState(): void {
+  CoopOperationHost.resetGlobalOrder();
   for (const timer of retries.values()) {
     clearTimeout(timer);
   }
@@ -99,12 +100,12 @@ export function coopFaintSwitchOperationAddress(
 }
 
 function host(): CoopOperationHost {
-  authorityHost ??= new CoopOperationHost({ epoch, initialRevision: revisionFloor });
+  authorityHost ??= CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
   return authorityHost;
 }
 
 function guest(): CoopOperationGuest {
-  receiverGuest ??= new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
+  receiverGuest ??= CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
   return receiverGuest;
 }
 

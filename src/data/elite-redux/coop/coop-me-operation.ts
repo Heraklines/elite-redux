@@ -264,6 +264,7 @@ export function setCoopMeOperationEpoch(next: number): void {
 
 /** Tear down all per-session operation state (called from assembleCoopRuntime + clearCoopRuntime + tests). Keeps the flag. */
 export function resetCoopMeOperationState(): void {
+  CoopOperationHost.resetGlobalOrder();
   for (const timer of pendingOwnerIntentRetries.values()) {
     clearTimeout(timer);
   }
@@ -298,14 +299,14 @@ export function setCoopMeOperationRevisionFloor(hw: number): void {
 
 function host(): CoopOperationHost {
   if (authorityHost == null) {
-    authorityHost = new CoopOperationHost({ epoch, initialRevision: revisionFloor });
+    authorityHost = CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
   }
   return authorityHost;
 }
 
 function guest(): CoopOperationGuest {
   if (watchGuest == null) {
-    watchGuest = new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
+    watchGuest = CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
   }
   return watchGuest;
 }

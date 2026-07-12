@@ -162,6 +162,11 @@ import {
   resetCoopOperationJournalLog,
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
+import {
+  adoptCoopGlobalGuestRevision,
+  resetCoopGlobalOperationOrder,
+  setCoopGlobalOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-operation-runtime";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   isCoopRevivalOperationEnabled,
@@ -352,7 +357,7 @@ function wireCoopResyncResponder(runtime: CoopRuntime): void {
 /** Fast-forward the durability receiver through every operation revision a full DATA snapshot subsumes. */
 export function adoptCoopSnapshotHighWater(
   durability: CoopDurabilityManager | undefined,
-  snapshot: Pick<CoopFullBattleSnapshot, "journalHighWater">,
+  snapshot: Pick<CoopFullBattleSnapshot, "journalHighWater" | "sessionEpoch">,
 ): void {
   if (durability == null) {
     return;
@@ -361,6 +366,10 @@ export function adoptCoopSnapshotHighWater(
     if (Number.isFinite(revision) && revision > 0) {
       durability.adoptSnapshot(cls, revision);
     }
+  }
+  const globalRevision = snapshot.journalHighWater?.["op:global"] ?? 0;
+  if (globalRevision > 0 && snapshot.sessionEpoch != null) {
+    adoptCoopGlobalGuestRevision(snapshot.sessionEpoch, globalRevision);
   }
 }
 
@@ -1704,7 +1713,13 @@ export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | u
     // ledger, so a resumed guest neither re-applies an already-applied op nor diverges from the host on the
     // post-resume digest (both peers restore the identical value, §4.6).
     const marks = data.journalHighWater ?? {};
-    runtime.durability?.restore(marks, marks);
+    const legacyGlobalFloor = Object.entries(marks)
+      .filter(([cls]) => cls.startsWith("op:") && cls !== "op:global")
+      .reduce((sum, [, revision]) => sum + (Number.isSafeInteger(revision) && revision > 0 ? revision : 0), 0);
+    const globalFloor = marks["op:global"] ?? legacyGlobalFloor;
+    setCoopGlobalOperationRevisionFloor(runtime.controller.sessionEpoch, globalFloor);
+    const normalizedMarks = globalFloor > 0 ? { ...marks, "op:global": globalFloor } : marks;
+    runtime.durability?.restore(normalizedMarks, normalizedMarks);
     // W2e-R P0-3: the durability RECEIVER ledger is restored to N above, but each surface's producer host is
     // recreated at revision 0 - so without this it would emit revision 1 and the restored receiver would drop
     // it as a stale duplicate (isDuplicate: 1 <= N). Floor each surface's producer + guests to its persisted
@@ -3010,6 +3025,7 @@ export function assembleCoopRuntime(
     kind?: CoopSessionKind | undefined;
   } = {},
 ): CoopRuntime {
+  resetCoopGlobalOperationOrder();
   // Wave-2a: a fresh session assembly is a fresh control plane (§1.4) - clear any leftover biome-travel
   // operation state so a new run's interaction counter (re-init from base 0, so it reuses the same seq
   // addresses) can never collide with a prior run's already-applied operationIds. NOT a hot rejoin (that

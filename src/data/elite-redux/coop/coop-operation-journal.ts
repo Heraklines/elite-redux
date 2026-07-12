@@ -84,7 +84,7 @@ export function coopOperationClassForPhase(phase: CoopLogicalPhase): string | nu
 }
 
 /** Resolve classes that share the generic INTERACTION logical phase by their closed operation kind. */
-function coopOperationClassForEnvelope(envelope: CoopAuthoritativeEnvelopeV1): string | null {
+export function coopOperationClassForEnvelope(envelope: CoopAuthoritativeEnvelopeV1): string | null {
   if (envelope.pendingOperation?.kind === "FAINT_SWITCH" && envelope.logicalPhase === "TURN_RESOLVE") {
     return "op:faintSwitch";
   }
@@ -203,7 +203,7 @@ export function journalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelope
     journalCommittedClasses.add(cls);
   }
   try {
-    manager.commit(cls, envelope.revision, { t: "envelope", envelope });
+    manager.commit("op:global", envelope.revision, { t: "envelope", envelope });
   } catch {
     // Journaling is a durability BACKSTOP over the legacy relay carrier (still firing in dual-run); a
     // failure here must never break the live commit. The relay + the deep-gap snapshot remain the fallback.
@@ -281,7 +281,7 @@ export function coopOperationDurabilityHooks(): CoopDurabilityHooks {
     extractKey: msg => {
       if (msg.t === "envelope") {
         const cls = coopOperationClassForEnvelope(msg.envelope);
-        return cls == null ? null : { cls, seq: msg.envelope.revision };
+        return cls == null ? null : { cls: "op:global", seq: msg.envelope.revision };
       }
       return null;
     },
@@ -291,7 +291,11 @@ export function coopOperationDurabilityHooks(): CoopDurabilityHooks {
         return "duplicate";
       }
       const envelope = entry.msg.envelope;
-      const applier = appliers.get(entry.cls);
+      const surfaceClass = coopOperationClassForEnvelope(envelope);
+      if (surfaceClass == null) {
+        return "rejected";
+      }
+      const applier = appliers.get(surfaceClass);
       if (applier == null) {
         // Unknown classes fail closed. ACK-dropping would permanently discard a committed mutation.
         return "rejected";

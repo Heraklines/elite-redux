@@ -59,6 +59,7 @@ export function resetCoopLearnMoveRetryMs(): void {
   retryMs = 1_000;
 }
 export function resetCoopLearnMoveOperationState(): void {
+  CoopOperationHost.resetGlobalOrder();
   for (const timer of retries.values()) {
     clearTimeout(timer);
   }
@@ -85,11 +86,11 @@ export function setCoopLearnMoveOperationEpoch(value: number): void {
 }
 
 function host(): CoopOperationHost {
-  authorityHost ??= new CoopOperationHost({ epoch, initialRevision: revisionFloor });
+  authorityHost ??= CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
   return authorityHost;
 }
 function guest(): CoopOperationGuest {
-  receiverGuest ??= new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
+  receiverGuest ??= CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
   return receiverGuest;
 }
 function nextAddress(): number {

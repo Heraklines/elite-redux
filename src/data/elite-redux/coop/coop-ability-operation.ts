@@ -66,6 +66,7 @@ export function resetCoopAbilityOutcomeRetryMs(): void {
 }
 
 export function resetCoopAbilityOperationState(): void {
+  CoopOperationHost.resetGlobalOrder();
   for (const timer of retries.values()) {
     clearTimeout(timer);
   }
@@ -90,12 +91,12 @@ export function setCoopAbilityOperationRevisionFloor(highWater: number): void {
 }
 
 function host(): CoopOperationHost {
-  authorityHost ??= new CoopOperationHost({ epoch, initialRevision: revisionFloor });
+  authorityHost ??= CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
   return authorityHost;
 }
 
 function guest(): CoopOperationGuest {
-  receiverGuest ??= new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
+  receiverGuest ??= CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
   return receiverGuest;
 }
 

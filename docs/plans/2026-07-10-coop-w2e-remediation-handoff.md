@@ -656,3 +656,27 @@ the static co-op gate at SHA `652e8b22e`. Staging-only deployment `29175723689` 
 This is the current tester-ready intermediate checkpoint. Host validation of every guest battle command,
 global commit ordering, lobby decision operations, causal traces, and browser/forced-surface campaigns
 remain open.
+
+## 32. Host-validated battle command offers
+
+Protocol 24 makes every human battle command a response to a host-built legal offer. The offer enumerates
+the exact move slots and move IDs, legal target sets, switch modes, ball types/targets, run permission, and
+Tera permission from host state. Live and buffered replies pass the same validator; malformed fields,
+wrong move IDs, impossible targets, illegal switches/items/run/Tera, and non-human use modes remain parked
+without mutating or advancing the battle. Reconnect retains and replays the local command outbox, while
+settled addresses dedupe repeat carriers. Target normalization is limited to unambiguous field-seat drift.
+
+The exact checkpoint SHA `5490babcb` passed the full 13-shard gate in run `29176964353` (the same-SHA failed
+job rerun passed) and staging-only deployment `29177285683` completed successfully.
+
+## 33. One global authoritative operation sequence (in progress)
+
+Protocol 25 retires independent per-surface revisions. All twelve operation hosts share one epoch clock;
+all receiver appliers share one cursor; and durability carries one dense `op:global` stream while routing
+each envelope to its phase/kind-derived live sink. This closes the cross-class race where a mystery-event
+terminal, wave advance, biome map, or reward action could each be locally dense but materialize in opposite
+orders. Cold-resume migration derives a deterministic global floor from legacy disjoint class marks, and an
+atomic snapshot advances the shared cursor only after material convergence.
+
+Static checks pass locally. Remote sharded verification and staging promotion are intentionally pending
+until the implementation/test chunk is complete.

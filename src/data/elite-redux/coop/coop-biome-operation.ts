@@ -183,6 +183,7 @@ export function setCoopBiomeOperationEpoch(next: number): void {
 
 /** Tear down all per-session operation state (called from clearCoopRuntime + tests). Keeps the flag. */
 export function resetCoopBiomeOperationState(): void {
+  CoopOperationHost.resetGlobalOrder();
   authorityHost = null;
   watchGuest = null;
   pendingJournalMaterializations.clear();
@@ -212,14 +213,14 @@ export function setCoopBiomeOperationRevisionFloor(hw: number): void {
 
 function host(): CoopOperationHost {
   if (authorityHost == null) {
-    authorityHost = new CoopOperationHost({ epoch, initialRevision: revisionFloor });
+    authorityHost = CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
   }
   return authorityHost;
 }
 
 function guest(): CoopOperationGuest {
   if (watchGuest == null) {
-    watchGuest = new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
+    watchGuest = CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
   }
   return watchGuest;
 }

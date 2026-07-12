@@ -412,6 +412,32 @@ describe("CoopOperationGuest: idempotent applier (§1.6, §1.7)", () => {
 
 // =============================================================================
 describe("host + guest end-to-end: revision totally orders the run (§1.5, §1.6)", () => {
+  it("shares one dense revision across different operation surfaces and parks cross-class reordering", () => {
+    const hostClock = { epoch: 1, revision: 0 };
+    const guestClock = { epoch: 1, revision: 0 };
+    const biomeHost = new CoopOperationHost({ epoch: 1, revisionClock: hostClock });
+    const mysteryHost = new CoopOperationHost({ epoch: 1, revisionClock: hostClock });
+    const biomeGuest = new CoopOperationGuest({ epoch: 1, revisionClock: guestClock });
+    const mysteryGuest = new CoopOperationGuest({ epoch: 1, revisionClock: guestClock });
+
+    const biome = biomeHost.submit(makeIntent(1, 0, 10, "BIOME_PICK"), makeCtx("BIOME_SELECT"), ACCEPT);
+    const mystery = mysteryHost.submit(
+      makeIntent(1, 1, 11, "ME_PICK", { optionIndex: 0 }),
+      makeCtx("MYSTERY_ENCOUNTER"),
+      ACCEPT,
+    );
+    if (biome.kind !== "committed" || mystery.kind !== "committed") {
+      throw new Error("fixture");
+    }
+
+    expect(biome.envelope.revision).toBe(1);
+    expect(mystery.envelope.revision).toBe(2);
+    expect(mysteryGuest.applyEnvelope(mystery.envelope)).toEqual({ kind: "gap", missingFrom: 1 });
+    expect(biomeGuest.applyEnvelope(biome.envelope).kind).toBe("applied");
+    expect(mysteryGuest.applyEnvelope(mystery.envelope).kind).toBe("applied");
+    expect(guestClock.revision).toBe(2);
+  });
+
   it("host commits, guest applies in order; a re-broadcast is a no-op; a gap is requested", () => {
     const host = new CoopOperationHost({ epoch: 1 });
     const guest = new CoopOperationGuest({ epoch: 1 });

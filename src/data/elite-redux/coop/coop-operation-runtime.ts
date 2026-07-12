@@ -78,6 +78,8 @@ export interface CoopOperationHostConfig {
   readonly epoch: CoopSessionEpoch;
   /** Revision the log starts at; the first committed op lands at initialRevision + 1. Default 0. */
   readonly initialRevision?: CoopRevision;
+  /** Shared session-wide clock. Production surfaces pass the same clock to form one commit order. */
+  readonly revisionClock?: CoopOperationRevisionClock;
   /**
    * §1.8 dual-run: advance the legacy interaction counter in LOCKSTEP with `revision` on every applied
    * commit, so any still-legacy surface downstream sees the counter it expects. Removing the counter is
@@ -86,13 +88,78 @@ export interface CoopOperationHostConfig {
   readonly onApplied?: (op: CoopPendingOperation, revision: CoopRevision) => void;
 }
 
+/** Mutable revision cell shared by all authoritative operation surfaces on one peer/session. */
+export interface CoopOperationRevisionClock {
+  readonly epoch: CoopSessionEpoch;
+  revision: CoopRevision;
+}
+
+let globalHostClock: CoopOperationRevisionClock | null = null;
+let globalGuestClock: CoopOperationRevisionClock | null = null;
+
+function globalClock(
+  side: "host" | "guest",
+  epoch: CoopSessionEpoch,
+  initialRevision: CoopRevision,
+): CoopOperationRevisionClock {
+  let clock = side === "host" ? globalHostClock : globalGuestClock;
+  if (clock == null || clock.epoch !== epoch) {
+    clock = { epoch, revision: initialRevision };
+    if (side === "host") {
+      globalHostClock = clock;
+    } else {
+      globalGuestClock = clock;
+    }
+  } else if (initialRevision > clock.revision) {
+    clock.revision = initialRevision;
+  }
+  return clock;
+}
+
+export function getCoopGlobalHostRevisionClock(
+  epoch: CoopSessionEpoch,
+  initialRevision: CoopRevision = 0,
+): CoopOperationRevisionClock {
+  return globalClock("host", epoch, initialRevision);
+}
+
+export function getCoopGlobalGuestRevisionClock(
+  epoch: CoopSessionEpoch,
+  initialRevision: CoopRevision = 0,
+): CoopOperationRevisionClock {
+  return globalClock("guest", epoch, initialRevision);
+}
+
+/** Seed both sides from a persisted global high-water before any resumed surface is constructed. */
+export function setCoopGlobalOperationRevisionFloor(epoch: CoopSessionEpoch, revision: CoopRevision): void {
+  if (!Number.isSafeInteger(revision) || revision < 0) {
+    return;
+  }
+  globalClock("host", epoch, revision);
+  globalClock("guest", epoch, revision);
+}
+
+/** A full authoritative snapshot subsumes every global commit through this revision. */
+export function adoptCoopGlobalGuestRevision(epoch: CoopSessionEpoch, revision: CoopRevision): void {
+  if (!Number.isSafeInteger(revision) || revision < 0) {
+    return;
+  }
+  globalClock("guest", epoch, revision);
+}
+
+/** Clear session-wide ordering state at a real session boundary (and in isolated tests). */
+export function resetCoopGlobalOperationOrder(): void {
+  globalHostClock = null;
+  globalGuestClock = null;
+}
+
 /**
  * The sole-authority commit log. The host receives proposed intents (its own or the guest's relayed one),
  * validates + commits each EXACTLY ONCE, applies (revision++), and produces the envelope to broadcast.
  */
 export class CoopOperationHost {
   private readonly epoch: CoopSessionEpoch;
-  private revision: CoopRevision;
+  private readonly revisionClock: CoopOperationRevisionClock;
   private readonly onApplied: ((op: CoopPendingOperation, revision: CoopRevision) => void) | undefined;
   /** The ONE in-flight op the host is driving/awaiting (status proposed/committed), or null when quiescent. */
   private pending: CoopPendingOperation | null = null;
@@ -101,9 +168,28 @@ export class CoopOperationHost {
   /** The last applied op per id, returned on an idempotent re-ACK (§1.3). */
   private readonly appliedById = new Map<CoopOperationId, CoopPendingOperation>();
 
+  /** Construct a production surface host on the one session-wide authoritative commit clock. */
+  public static global(config: Omit<CoopOperationHostConfig, "revisionClock">): CoopOperationHost {
+    return new CoopOperationHost({
+      ...config,
+      revisionClock: getCoopGlobalHostRevisionClock(config.epoch, config.initialRevision ?? 0),
+    });
+  }
+
+  /** Test/session teardown hook kept on the imported class so surface modules need no extra dependency. */
+  public static resetGlobalOrder(): void {
+    resetCoopGlobalOperationOrder();
+  }
+
   public constructor(config: CoopOperationHostConfig) {
     this.epoch = config.epoch;
-    this.revision = config.initialRevision ?? 0;
+    this.revisionClock = config.revisionClock ?? { epoch: config.epoch, revision: config.initialRevision ?? 0 };
+    if (this.revisionClock.epoch !== config.epoch) {
+      throw new Error("CoopOperationHost revision clock epoch mismatch");
+    }
+    if ((config.initialRevision ?? 0) > this.revisionClock.revision) {
+      this.revisionClock.revision = config.initialRevision ?? 0;
+    }
     this.onApplied = config.onApplied;
   }
 
@@ -112,7 +198,7 @@ export class CoopOperationHost {
   }
 
   public getRevision(): CoopRevision {
-    return this.revision;
+    return this.revisionClock.revision;
   }
 
   public getPendingOperation(): CoopPendingOperation | null {
@@ -175,17 +261,21 @@ export class CoopOperationHost {
       this.statusById.set(intent.id, "rejected");
       this.pending = null;
       const rejectedOp: CoopPendingOperation = { ...intent, status: "rejected", rejectReason: verdict.reason };
-      return { kind: "rejected", reason: verdict.reason, envelope: this.buildEnvelope(ctx, rejectedOp, this.revision) };
+      return {
+        kind: "rejected",
+        reason: verdict.reason,
+        envelope: this.buildEnvelope(ctx, rejectedOp, this.revisionClock.revision),
+      };
     }
 
     // 5. Commit + apply (committed -> applied, §1.5): revision++, broadcast, mark terminal-applied.
-    this.revision += 1;
+    this.revisionClock.revision += 1;
     const appliedOp: CoopPendingOperation = { ...intent, status: "applied" };
     this.statusById.set(intent.id, "applied");
     this.appliedById.set(intent.id, appliedOp);
     this.pending = null;
-    this.onApplied?.(appliedOp, this.revision); // §1.8 dual-run: advance the legacy counter in lockstep.
-    return { kind: "committed", envelope: this.buildEnvelope(ctx, appliedOp, this.revision) };
+    this.onApplied?.(appliedOp, this.revisionClock.revision); // §1.8 dual-run: advance the legacy counter in lockstep.
+    return { kind: "committed", envelope: this.buildEnvelope(ctx, appliedOp, this.revisionClock.revision) };
   }
 
   private buildEnvelope(
@@ -237,6 +327,8 @@ export interface CoopOperationGuestConfig {
   readonly epoch: CoopSessionEpoch;
   /** The revision the guest has already applied through (0 = nothing yet; on reconnect, the resync's lastAppliedRevision). Default 0. */
   readonly initialRevision?: CoopRevision;
+  /** Shared session-wide receive cursor. Production surfaces use one cursor to reject cross-class reordering. */
+  readonly revisionClock?: CoopOperationRevisionClock;
   /** Recognizer for the closed logical-phase union; default the envelope module's guard. Injectable for tests. */
   readonly isKnownPhase?: (phase: string) => boolean;
   /** Recognizer for the closed operation-kind union; default the envelope module's guard. Injectable for tests. */
@@ -250,7 +342,7 @@ export interface CoopOperationGuestConfig {
  */
 export class CoopOperationGuest {
   private readonly epoch: CoopSessionEpoch;
-  private lastAppliedRevision: CoopRevision;
+  private readonly revisionClock: CoopOperationRevisionClock;
   private readonly isKnownPhase: (phase: string) => boolean;
   private readonly isKnownKind: (kind: string) => boolean;
   /** Ids the guest has already applied, so a re-delivered applied envelope is a no-op (invariant 5, §1.6). */
@@ -258,9 +350,23 @@ export class CoopOperationGuest {
   /** The last envelope whose phase + kind the guest recognized (the fail-closed "hold at last known-good", §1.7). */
   private lastGoodEnvelope: CoopAuthoritativeEnvelopeV1 | null = null;
 
+  /** Construct a production surface receiver on the one session-wide authoritative receive cursor. */
+  public static global(config: Omit<CoopOperationGuestConfig, "revisionClock">): CoopOperationGuest {
+    return new CoopOperationGuest({
+      ...config,
+      revisionClock: getCoopGlobalGuestRevisionClock(config.epoch, config.initialRevision ?? 0),
+    });
+  }
+
   public constructor(config: CoopOperationGuestConfig) {
     this.epoch = config.epoch;
-    this.lastAppliedRevision = config.initialRevision ?? 0;
+    this.revisionClock = config.revisionClock ?? { epoch: config.epoch, revision: config.initialRevision ?? 0 };
+    if (this.revisionClock.epoch !== config.epoch) {
+      throw new Error("CoopOperationGuest revision clock epoch mismatch");
+    }
+    if ((config.initialRevision ?? 0) > this.revisionClock.revision) {
+      this.revisionClock.revision = config.initialRevision ?? 0;
+    }
     this.isKnownPhase = config.isKnownPhase ?? isKnownCoopLogicalPhase;
     this.isKnownKind = config.isKnownKind ?? isKnownCoopOperationKind;
   }
@@ -270,7 +376,7 @@ export class CoopOperationGuest {
   }
 
   public getLastAppliedRevision(): CoopRevision {
-    return this.lastAppliedRevision;
+    return this.revisionClock.revision;
   }
 
   public hasApplied(id: CoopOperationId): boolean {
@@ -313,15 +419,15 @@ export class CoopOperationGuest {
     if (op != null && op.status === "applied" && this.appliedIds.has(op.id)) {
       return { kind: "duplicate" }; // id-dedupe (§1.6 rule 3): applied at most once per id.
     }
-    if (env.revision <= this.lastAppliedRevision) {
+    if (env.revision <= this.revisionClock.revision) {
       return { kind: "duplicate" }; // revision monotonicity (§1.6 rule 2): a late/duplicate broadcast is a no-op.
     }
-    if (env.revision > this.lastAppliedRevision + 1) {
-      return { kind: "gap", missingFrom: this.lastAppliedRevision + 1 }; // a hole: request the tail (§4.4).
+    if (env.revision > this.revisionClock.revision + 1) {
+      return { kind: "gap", missingFrom: this.revisionClock.revision + 1 }; // a hole: request the tail (§4.4).
     }
 
     // 5. Apply (revision === last + 1). The caller adopts the embedded authoritativeState now.
-    this.lastAppliedRevision = env.revision;
+    this.revisionClock.revision = env.revision;
     if (op != null) {
       this.appliedIds.add(op.id);
     }

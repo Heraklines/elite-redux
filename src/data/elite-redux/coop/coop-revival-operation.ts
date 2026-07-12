@@ -56,6 +56,7 @@ export function resetCoopRevivalRetryMs(): void {
 }
 
 export function resetCoopRevivalOperationState(): void {
+  CoopOperationHost.resetGlobalOrder();
   for (const timer of retries.values()) {
     clearTimeout(timer);
   }
@@ -96,12 +97,12 @@ function actionAddress(payload: CoopRevivalPayload, wave: number, turn: number):
 }
 
 function host(): CoopOperationHost {
-  authorityHost ??= new CoopOperationHost({ epoch, initialRevision: revisionFloor });
+  authorityHost ??= CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
   return authorityHost;
 }
 
 function guest(): CoopOperationGuest {
-  receiverGuest ??= new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
+  receiverGuest ??= CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
   return receiverGuest;
 }
 

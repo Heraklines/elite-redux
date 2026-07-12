@@ -190,7 +190,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     hostMgr.reconnect();
     await flush();
     expect(hostMgr.unackedCount(), "the retained op ACKs once materialization recovers").toBe(0);
-    expect(guestMgr.appliedMarks()).toEqual({ "op:biome": 1 });
+    expect(guestMgr.appliedMarks()).toEqual({ "op:global": 1 });
     hostMgr.dispose();
     guestMgr.dispose();
   });
@@ -302,8 +302,8 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     registerCoopOperationLiveSink("op:biome", () => true);
 
     // Simulate a COLD resume at high-water N for op:biome: restore BOTH managers' marks and floor the surface.
-    hostMgr.restore({ "op:biome": N }, { "op:biome": N });
-    guestMgr.restore({ "op:biome": N }, { "op:biome": N });
+    hostMgr.restore({ "op:global": N }, { "op:global": N });
+    guestMgr.restore({ "op:global": N }, { "op:global": N });
     setCoopBiomeOperationRevisionFloor(N);
 
     // The FIRST post-resume producer op must emit revision N+1 (not 1) so the restored receiver ACCEPTS it

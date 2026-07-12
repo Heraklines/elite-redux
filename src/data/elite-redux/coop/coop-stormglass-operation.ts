@@ -45,6 +45,7 @@ export function resetCoopStormglassOperationFlag(): void {
 }
 
 export function resetCoopStormglassOperationState(): void {
+  CoopOperationHost.resetGlobalOrder();
   authorityHost = null;
   receiverGuest = null;
   revisionFloor = 0;
@@ -70,12 +71,12 @@ export function setCoopStormglassOperationEpoch(value: number): void {
 }
 
 function host(): CoopOperationHost {
-  authorityHost ??= new CoopOperationHost({ epoch, initialRevision: revisionFloor });
+  authorityHost ??= CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
   return authorityHost;
 }
 
 function guest(): CoopOperationGuest {
-  receiverGuest ??= new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
+  receiverGuest ??= CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
   return receiverGuest;
 }
 
