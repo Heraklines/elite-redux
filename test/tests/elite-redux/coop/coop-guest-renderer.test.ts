@@ -320,11 +320,15 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // phase's awaitTurn resolves with it. The checkpoint snaps every mon to hp=7 - a value
     // the live engine never produces on its own, so reading 7 PROVES the guest applied it.
     const partner = getCoopRuntime()!.partnerTransport!;
+    const checkpoint = checkpointFromField(7);
+    const authoritativeMaxHp = field[0].getMaxHp() + 9;
+    const hostSlot = checkpoint.field.find(state => state.bi === field[0].getBattlerIndex())!;
+    hostSlot.maxHp = authoritativeMaxHp;
     partner.send({
       t: "turnResolution",
       turn,
       events: [{ k: "message", text: "Magikarp used Splash!" }],
-      checkpoint: checkpointFromField(7),
+      checkpoint,
       checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
@@ -337,6 +341,9 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     for (const mon of field) {
       expect(mon.hp, "guest field snaps to the host's streamed checkpoint hp").toBe(7);
     }
+    expect(field[0].getMaxHp(), "guest adopts the checkpoint's authoritative maxHp every turn").toBe(
+      authoritativeMaxHp,
+    );
     // BUG1 (deadlock fix): the authoritative-guest finalize does NOT run the real (damaging) turn-end
     // phases - those let the guest locally chip a host-surviving mon to a premature faint/victory. It
     // advances the turn MINIMALLY (incrementTurn), so the drained queue auto-runs the next turn's

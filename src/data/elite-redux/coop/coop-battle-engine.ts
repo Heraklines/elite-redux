@@ -985,6 +985,13 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
         // corrected - a 0-hp host mon the guest hasn't fainted is left for the relayed
         // commands to resolve, not force-fainted here.
         if (!mon.isFainted()) {
+          if (state.maxHp > 0 && mon.getMaxHp() !== state.maxHp) {
+            coopWarn(
+              "checkpoint",
+              `mon bi=${mon.getBattlerIndex()} maxHp host=${state.maxHp} guest=${mon.getMaxHp()} -> applied`,
+            );
+            mon.setStat(Stat.HP, state.maxHp);
+          }
           if (isCoopDebug()) {
             const wantHp = Math.min(state.hp, mon.getMaxHp());
             const guestStatus = mon.status?.effect ?? 0;

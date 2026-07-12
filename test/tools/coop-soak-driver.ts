@@ -2002,6 +2002,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           }
         }
       });
+      // The two-engine harness persists the guest module context when the scoped pump returns; the detached
+      // promise continuation runs on the immediately following microtask. Give that captured-controller
+      // continuation one turn before the common lockstep assertion below.
+      await drainLoopback();
       mePath = "battle-handoff";
     } else if (hostOwns) {
       // HOST-OWNED: park the host at its embedded shop, start the guest replay while the presentation is
