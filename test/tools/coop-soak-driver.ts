@@ -1755,9 +1755,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           };
           ui.showDialogue = (...args: unknown[]): unknown => {
             (args[3] as (() => void) | undefined)?.();
+            return undefined;
           };
           ui.showText = (...args: unknown[]): unknown => {
             (args[2] as (() => void) | undefined)?.();
+            return undefined;
           };
           ownerPhase.start();
           for (let i = 0; i < 24 && !ended; i++) {
