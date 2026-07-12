@@ -38,7 +38,7 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
+import { type ModifierSelectCallback, SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
@@ -66,6 +66,7 @@ function toCoop(scene: BattleScene): void {
 /** The copy() + advance seam of a real SelectModifierPhase (extends the shop seam). */
 interface CounterPhaseSeam extends ShopPhaseSeam {
   copy(): { coopInteractionStart: number };
+  resetModifierSelect(callback: ModifierSelectCallback): void;
 }
 
 describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmetric unpinned advance", () => {
@@ -163,17 +164,22 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     // ModifierSelectUiHandler in this headless scene; re-showing an already-active handler below is the
     // framework-faithful way to bypass only that mock limitation while retaining UI -> phase -> relay.
     let ownerModifierArgs: unknown[] | null = null;
+    let insideOwnerReset = false;
+    const originalOwnerReset = hostShop.resetModifierSelect.bind(hostShop);
+    vi.spyOn(hostShop, "resetModifierSelect").mockImplementation(callback => {
+      insideOwnerReset = true;
+      try {
+        originalOwnerReset(callback);
+      } finally {
+        insideOwnerReset = false;
+      }
+    });
     const originalSetMode = rig.hostScene.ui.setMode.bind(rig.hostScene.ui);
     vi.spyOn(rig.hostScene.ui, "setMode").mockImplementation((mode, ...args) => {
-      // The two-engine harness later opens the watcher's read-only projection against this shared UI,
-      // carrying its deliberate `() => false` callback. Retain the first callback-bearing transition:
-      // that is the owner's production selection callback opened by the barrier continuation.
-      if (
-        ownerModifierArgs == null
-        && mode === UiMode.MODIFIER_SELECT
-        && args.length >= 3
-        && typeof args[2] === "function"
-      ) {
+      // The two-engine harness later opens the watcher's read-only projection against this shared UI
+      // with a deliberate no-op callback. Bind capture to THIS host phase's production reset call so
+      // callback identity is determined by its owning object, never async scheduling order.
+      if (insideOwnerReset && mode === UiMode.MODIFIER_SELECT && args.length >= 3 && typeof args[2] === "function") {
         ownerModifierArgs = args;
       }
       return originalSetMode(mode, ...args);
