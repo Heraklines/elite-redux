@@ -137,6 +137,24 @@ describe("Utils - Phase Interceptor - Unit", () => {
     });
   });
 
+  describe("toFirst", () => {
+    it("stops before the first matching branch target without starting it", async () => {
+      const reached = await game.phaseInterceptor.toFirst([
+        "BananaPhase" as PhaseString,
+        "CoconutPhase" as PhaseString,
+      ]);
+
+      expect(reached).toBe("BananaPhase");
+      expectAtPhase("BananaPhase");
+      expect(getQueuedPhases()).toEqual(["CoconutPhase", "ApplePhase", "CoconutPhase"]);
+      expect(game.phaseInterceptor.log).toEqual(["ApplePhase"]);
+    });
+
+    it("rejects an empty branch target set", async () => {
+      await expect(game.phaseInterceptor.toFirst([])).rejects.toThrow("requires at least one target phase");
+    });
+  });
+
   describe("shift", () => {
     it("should skip the next phase in line without starting it", async () => {
       const startSpy = vi.spyOn(ApplePhase.prototype, "start");

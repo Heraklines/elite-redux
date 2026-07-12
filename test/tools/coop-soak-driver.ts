@@ -1712,8 +1712,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     actionScript.push(`wave ${wave} turn ${turn}: replay guest reciprocally crossed ${point}`);
   };
 
-  /** Play ONE host wave to a win (bounded by the NO-PARK turn budget); the guest replays each turn. */
-  const playWave = async (wave: number): Promise<void> => {
+  /** Play ONE host wave to a terminal (bounded by the NO-PARK turn budget); the guest replays each turn. */
+  const playWave = async (wave: number): Promise<"win" | "capture" | "flee" | undefined> => {
     for (let t = 0; t < MAX_TURNS_PER_WAVE; t++) {
       const turn = rig.hostScene.currentBattle.turn;
       if (profile === "level" && wave === LEVEL_FORCED_FAINT_WAVE && t === 0) {
@@ -1832,15 +1832,30 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // CommandPhase while production correctly entered SelectModifierPhase, a false softlock report.
       const waveWon = rig.hostScene.currentBattle.enemyParty.every(e => e.isFainted());
       const authoritativeTerminal = getCoopActiveWaveTransition(wave)?.outcome;
+      if (waveWon) {
+        return "win";
+      }
       if (
-        waveWon
-        || authoritativeTerminal === "win"
+        authoritativeTerminal === "win"
         || authoritativeTerminal === "capture"
         || authoritativeTerminal === "flee"
       ) {
-        return;
+        return authoritativeTerminal;
       }
-      // Not won yet: advance the host to the next turn's CommandPhase for another round.
+      // TurnEndPhase is an EARLY interception point: the host still has to execute its own delayed
+      // weather/terrain/status tail. The guest replay can already have rendered that tail while the host
+      // enemy remains provisionally alive. Let the authoritative host choose the next structural phase,
+      // stopping before either the next command or a terminal surface. Seed 20260712 wave 63 reaches the
+      // reward shop here because toxic terrain KOs the final enemy; guessing CommandPhase created a false
+      // softlock even though production correctly won the wave.
+      const nextStructuralPhase = await withClient(rig.hostCtx, () =>
+        game.phaseInterceptor.toFirst(["CommandPhase", "SelectModifierPhase", "GameOverPhase", "TitlePhase"]),
+      );
+      if (nextStructuralPhase !== "CommandPhase") {
+        return getCoopActiveWaveTransition(wave)?.outcome
+          ?? (nextStructuralPhase === "SelectModifierPhase" ? "win" : undefined);
+      }
+      // Not won yet: the host is parked immediately before the next turn's CommandPhase.
       // TurnInitPhase increments `currentBattle.turn` while crossing, so the point the guest must
       // pre-arrive is the NEXT turn, not the just-completed turn still visible at TurnEndPhase.
       withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.reannounce(`cmd:${wave}:${turn + 1}`));
@@ -2283,9 +2298,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   /** A normal battle wave: wave-start clean-start parity, play, POST-TURN real-desync check, reward shop. */
   const processNormalWave = async (wave: number): Promise<void> => {
     await assertWaveBoundary(wave); // (a)+(b) wave-start clean-start parity
-    await playWave(wave); // (c) NO-PARK
+    const outcome = await playWave(wave); // (c) NO-PARK
     await assertPostTurnConverged(wave); // (a) POST-TURN real replay-desync detector
-    await driveRewardShop(wave);
+    // A flee terminal advances through BattleEnd/NewBattle and has no reward screen. The authoritative
+    // runtime can produce it through encounter behavior even though this driver never presses RUN. Treating
+    // every terminal as a victory made the harness wait for a nonexistent SelectModifierPhase at wave 176.
+    if (outcome !== "flee") {
+      await driveRewardShop(wave);
+    }
     assertScalarConvergence(wave, "post-shop"); // #843 pokeball-drift classifier (money + ball inventory)
   };
 

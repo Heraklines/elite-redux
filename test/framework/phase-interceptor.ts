@@ -134,6 +134,51 @@ export class PhaseInterceptor {
   }
 
   /**
+   * Advance until the first phase in `targets` is reached, without starting that phase.
+   *
+   * This is useful at authoritative branch points where the phase queue, rather than the
+   * test driver, decides whether play continues (for example CommandPhase versus a
+   * post-victory SelectModifierPhase). Requiring one guessed target at such a branch turns
+   * a correct alternate route into a misleading timeout.
+   */
+  public async toFirst(targets: readonly PhaseString[]): Promise<PhaseString> {
+    if (targets.length === 0) {
+      throw new Error("PhaseInterceptor.toFirst requires at least one target phase");
+    }
+    const targetSet = new Set(targets);
+    // PromptHandler only needs a single target while intermediate phases run. The selected
+    // terminal is deliberately not started, so it cannot itself interrupt on a UI prompt.
+    this.target = targets[0];
+    const pm = this.scene.phaseManager;
+    let currentPhase = pm.getCurrentPhase();
+    try {
+      await vi.waitUntil(
+        async () => {
+          if (this.state === "interrupted") {
+            return false;
+          }
+          currentPhase = pm.getCurrentPhase();
+          if (targetSet.has(currentPhase.phaseName)) {
+            return true;
+          }
+          await this.run(currentPhase);
+          return false;
+        },
+        { interval: 0, timeout: TEST_TIMEOUT },
+      );
+    } catch (err) {
+      const stuckPhase = pm.getCurrentPhase()?.phaseName ?? "(none)";
+      const uiMode = getEnumStr(UiMode, this.scene.ui.getMode());
+      throw new Error(
+        `PhaseInterceptor.toFirst([${targets.join(", ")}]) did not reach a target (soft-lock / freeze?): `
+          + `stuck at phase "${stuckPhase}", UI mode ${uiMode}, interceptor state "${this.state}".`
+          + `\nOriginal: ${err instanceof Error ? err.message : inspect(err)}`,
+      );
+    }
+    return currentPhase.phaseName;
+  }
+
+  /**
    * Internal wrapper method to start a phase and wait until it finishes.
    * @param currentPhase - The {@linkcode Phase} to run
    * @returns A Promise that resolves when the phase has completed running.
