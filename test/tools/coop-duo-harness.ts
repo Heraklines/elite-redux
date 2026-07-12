@@ -807,8 +807,10 @@ export function mirrorHostBattleToGuest(
     for (const [index, enemy] of guestScene.getEnemyParty().entries()) {
       const hostEnemy = hostEnemies[index];
       if (hostEnemy != null) {
-        enemy.setStat(Stat.HP, hostEnemy.getMaxHp());
-        enemy.hp = Math.max(0, Math.min(hostEnemy.hp, hostEnemy.getMaxHp()));
+        const maxHp = hostEnemy.getMaxHp();
+        hostEnemy.hp = Math.max(0, Math.min(hostEnemy.hp, maxHp));
+        enemy.setStat(Stat.HP, maxHp);
+        enemy.hp = hostEnemy.hp;
       }
     }
   }

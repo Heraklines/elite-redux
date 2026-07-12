@@ -1995,7 +1995,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // The detached terminal first performs the guest's defensive ME leave/UI teardown, which can span
         // several animation-clock ticks before its idempotent controller advance. Keep the wait bounded but
         // large enough for that real async tail; eight loopback drains raced it by ~10ms in CI.
-        for (let i = 0; i < 32; i++) {
+        for (let i = 0; i < 64; i++) {
           await drainLoopback();
           if (rig.guestRuntime.controller.interactionCounter() === counterBefore + 1) {
             break;

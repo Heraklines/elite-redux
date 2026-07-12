@@ -1095,44 +1095,55 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
  */
 export function captureCoopEnemies(): CoopSerializedEnemy[] {
   try {
-    return globalScene.getEnemyParty().map((enemy, index) => ({
-      fieldIndex: index,
-      data: {
-        speciesId: enemy.species.speciesId,
-        formIndex: enemy.formIndex,
-        level: enemy.level,
-        abilityIndex: enemy.abilityIndex,
-        nature: enemy.nature,
-        gender: enemy.gender,
-        ivs: [...enemy.ivs],
-        moveset: enemy.getMoveset().map(m => m.moveId),
-        hp: enemy.hp,
-        // Boss adopt (#633, A/BLOCKING-2): boss state lives ONLY on EnemyPokemon and is hardcoded
-        // `false` on the guest's `addEnemyPokemon` reconstruct, so an adopted boss renders normal
-        // bars. Carry the host's authoritative segment count + current index + maxHp ceiling so the
-        // guest can `setBoss` with the EXPLICIT count (never re-rolling from its diverged wave RNG)
-        // and render the right shield dividers. Additive: solo never streams this.
-        isBoss: enemy.isBoss(),
-        bossSegments: enemy.bossSegments,
-        bossSegmentIndex: enemy.bossSegmentIndex,
-        maxHp: enemy.getMaxHp(),
-        // Shiny + variant are rolled in the Pokemon constructor from the wave RNG,
-        // but the guest's adopt path (buildCoopEnemy) consumes the RNG in a different
-        // order than the host's normal generation, so its independent roll diverged -
-        // one client saw a shiny wild mon, the other a normal one (and a caught mon
-        // then carried the wrong shininess into that player's save). Carry the host's
-        // authoritative roll so the guest renders + catches the EXACT same mon.
-        shiny: enemy.shiny,
-        variant: enemy.variant,
-        // Held items (#633): for TRAINER waves the host's `trainer.genModifiers` (and the
-        // wild held-item roll) attach held modifiers the guest would otherwise regenerate
-        // from its own RNG (double/divergent items). Serialize each as a `ModifierData`
-        // (plain-JSON, the same shape the save system round-trips) so the guest rebuilds
-        // the EXACT same items and suppresses its own roll. `pokemonId` is the host's
-        // runtime id - the guest remaps it to its own enemy id on reconstruction.
-        heldItems: captureEnemyHeldItems(enemy),
-      },
-    }));
+    return globalScene.getEnemyParty().map((enemy, index) => {
+      // Stat-affecting generation hooks can lower max HP after the constructor initialized current HP,
+      // briefly leaving an invalid 42/40-style host state. Every checkpoint serializer already clamps this;
+      // normalize the sole authority at the earlier enemy-manifest boundary too so host UI, guest adoption,
+      // and the first checksum all describe one valid state.
+      const maxHp = enemy.getMaxHp();
+      if (enemy.hp > maxHp) {
+        coopWarn("enemy", `host enemy hp exceeded max at manifest bi=${index}: ${enemy.hp}/${maxHp} -> clamped`);
+        enemy.hp = maxHp;
+      }
+      return {
+        fieldIndex: index,
+        data: {
+          speciesId: enemy.species.speciesId,
+          formIndex: enemy.formIndex,
+          level: enemy.level,
+          abilityIndex: enemy.abilityIndex,
+          nature: enemy.nature,
+          gender: enemy.gender,
+          ivs: [...enemy.ivs],
+          moveset: enemy.getMoveset().map(m => m.moveId),
+          hp: enemy.hp,
+          // Boss adopt (#633, A/BLOCKING-2): boss state lives ONLY on EnemyPokemon and is hardcoded
+          // `false` on the guest's `addEnemyPokemon` reconstruct, so an adopted boss renders normal
+          // bars. Carry the host's authoritative segment count + current index + maxHp ceiling so the
+          // guest can `setBoss` with the EXPLICIT count (never re-rolling from its diverged wave RNG)
+          // and render the right shield dividers. Additive: solo never streams this.
+          isBoss: enemy.isBoss(),
+          bossSegments: enemy.bossSegments,
+          bossSegmentIndex: enemy.bossSegmentIndex,
+          maxHp,
+          // Shiny + variant are rolled in the Pokemon constructor from the wave RNG,
+          // but the guest's adopt path (buildCoopEnemy) consumes the RNG in a different
+          // order than the host's normal generation, so its independent roll diverged -
+          // one client saw a shiny wild mon, the other a normal one (and a caught mon
+          // then carried the wrong shininess into that player's save). Carry the host's
+          // authoritative roll so the guest renders + catches the EXACT same mon.
+          shiny: enemy.shiny,
+          variant: enemy.variant,
+          // Held items (#633): for TRAINER waves the host's `trainer.genModifiers` (and the
+          // wild held-item roll) attach held modifiers the guest would otherwise regenerate
+          // from its own RNG (double/divergent items). Serialize each as a `ModifierData`
+          // (plain-JSON, the same shape the save system round-trips) so the guest rebuilds
+          // the EXACT same items and suppresses its own roll. `pokemonId` is the host's
+          // runtime id - the guest remaps it to its own enemy id on reconstruction.
+          heldItems: captureEnemyHeldItems(enemy),
+        },
+      };
+    });
   } catch {
     return [];
   }
