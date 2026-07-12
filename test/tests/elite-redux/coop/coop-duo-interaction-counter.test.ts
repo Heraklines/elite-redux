@@ -130,15 +130,10 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
       awaitingActionInput: boolean;
       onActionInput: ModifierSelectCallback | null;
     };
-    // A pending watcher projection may finish its async setMode after the owner's screen. Re-arm the
-    // exact owner arguments until that finite projection has settled, then make the public choice in
-    // the same turn without yielding. Separate browser processes never share this handler instance.
-    for (let i = 0; i < 500 && handler.onActionInput !== expectedCallback; i++) {
-      await rig.hostScene.ui.setMode(UiMode.MODIFIER_SELECT, ...ownerArgs);
-      if (handler.onActionInput !== expectedCallback) {
-        await new Promise(resolve => setTimeout(resolve, 5));
-      }
-    }
+    // UI.setMode intentionally no-ops when this mode is already active. Call the handler's public
+    // active-show lifecycle directly so it re-arms the exact owner callback after the shared-process
+    // watcher projection. The actual choice still crosses UI.processInput below.
+    handler.show(ownerArgs);
     // The headless Phaser tween mock does not provide a reliable onUpdate/final cursor position. Use
     // the handler's public cursor surface to finish that cosmetic setup, then make the choice only
     // through UI.processInput. The carrier assertion below still proves the production callback and
