@@ -259,6 +259,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // live launch residue and require the first command boundary to enforce the presentation result.
     const trainerVisibilitySpy = vi.spyOn(globalScene.trainer, "setVisible");
     globalScene.trainer.setVisible(true);
+    trainerVisibilitySpy.mockClear();
     const setModeSpy = vi.spyOn(globalScene.ui, "setMode");
 
     // Field slot 0 is the HOST's mon from the guest's POV: the guest must NOT open a menu
