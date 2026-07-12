@@ -1696,7 +1696,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * sit ahead of an unrelated command prompt and poison a later wave.
    */
   const armHostDexNavAutoPicks = (): void => {
-    if (!rig.hostScene.phaseManager.hasPhaseOfType("ErDexNavPhase")) {
+    // `hasPhaseOfType` deliberately searches only the pending queues. `toFirst` stops with Dex Nav
+    // installed as the current phase, after it has already been shifted out of those queues, so the
+    // current phase must be included explicitly or the valid owner prompt is left unanswered.
+    const dexNavPresent = (): boolean =>
+      rig.hostScene.phaseManager.getCurrentPhase()?.phaseName === "ErDexNavPhase"
+      || rig.hostScene.phaseManager.hasPhaseOfType("ErDexNavPhase");
+    if (!dexNavPresent()) {
       return;
     }
     for (let pick = 0; pick < 2; pick++) {
@@ -1704,7 +1710,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         "ErDexNavPhase",
         UiMode.OPTION_SELECT,
         () => rig.hostScene.ui.processInput(Button.ACTION),
-        () => !rig.hostScene.phaseManager.hasPhaseOfType("ErDexNavPhase"),
+        () => !dexNavPresent(),
       );
     }
     actionScript.push(`wave ${rig.hostScene.currentBattle.waveIndex}: armed owner Dex Nav picks`);
