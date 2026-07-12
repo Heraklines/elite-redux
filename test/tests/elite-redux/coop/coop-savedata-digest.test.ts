@@ -684,6 +684,10 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
   }, 300_000);
 
   it("TRANSFORM (#836): a host Ditto/Imposter transform converges on the pure-renderer guest through the field-snapshot heal", async () => {
+    // Re-state this scenario's required moves at its launch boundary. Grouped external shards deliberately
+    // reuse one controller, and another scenario can leave a Splash-only override behind despite module
+    // isolation; this proof must never depend on file order to give Ditto Transform.
+    game.override.moveset([MoveId.TRANSFORM, MoveId.TACKLE, MoveId.SPLASH]);
     await game.classicMode.startBattle(SpeciesId.DITTO, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);

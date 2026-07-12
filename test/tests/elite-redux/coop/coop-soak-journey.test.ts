@@ -28,7 +28,7 @@ const EVENT_SCHEDULE = new Map([
   [12, MysteryEncounterType.DEPARTMENT_STORE_SALE], // nested shop
   [15, MysteryEncounterType.BERRIES_ABOUND], // explicit leave after a battle-capable offer
   [18, MysteryEncounterType.TRASH_TO_TREASURE], // direct held-item mutation
-  [24, MysteryEncounterType.FIELD_TRIP], // party + nested move sub-picks on the host-authoritative engine
+  [25, MysteryEncounterType.FIELD_TRIP], // party + nested move sub-picks on the host-authoritative engine
   [32, MysteryEncounterType.TELEPORTING_HIJINKS], // post-crossroads money + party transformation branch
   [34, MysteryEncounterType.WEIRD_DREAM], // legal-range transformation encounter, leave branch
 ]);
@@ -38,7 +38,7 @@ const EVENT_OPTIONS = new Map([
   [12, 1],
   [15, 3],
   [18, 2],
-  [24, 1],
+  [25, 1],
   [32, 1],
   [34, 3],
 ]);
