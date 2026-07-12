@@ -6,7 +6,7 @@ Audited branch: `heraklines/feat/elite-redux-port`
 
 Initial audited source SHA: `cf714363a15927e84521b69d1b00c5a186e88480`
 
-Latest remote re-audit SHA: `4a0852c0c333c6c83d1558e6ae9ac977d42c5e4c`
+Latest remote re-audit SHA: `50531b460278218c9e25c2fcef387a677c4ad27e`
 
 Latest staging source checkpoint: `4a0852c0c`
 
@@ -20,32 +20,33 @@ The recent work is meaningful and directionally correct, but co-op is not yet a 
 state machine. It currently combines:
 
 1. a host-authoritative battle data snapshot,
-2. raw one-shot battle/wave carriers,
-3. a durable operation journal,
+2. P32 addressed/retained combat commits plus older raw wave/boundary carriers,
+3. a separate durable operation journal,
 4. legacy dual-run UI relays that still mutate both clients,
 5. a guest-local phase queue that derives important transitions, and
 6. recovery snapshots captured from whatever mutable host phase happens to be running.
 
 Those mechanisms can each be locally correct while disagreeing about which transaction is current. The
-live wave-4 report proves that this is still happening. A guest accepted a snapshot captured after the
-host incremented to turn 2 but before the faint replacement had materialized, failed to reconstruct a
-malformed trainer vitamin, and then held its phase queue forever while the completed replacement
-checkpoint waited behind it.
+live wave-4 report proves the deployed staging checkpoint did exactly that. A guest accepted a snapshot
+captured after the host incremented to turn 2 but before the faint replacement had materialized, failed to
+reconstruct a malformed trainer vitamin, and then held its phase queue forever while the completed
+replacement checkpoint waited behind it. Current head contains a narrow retained replacement wake for that
+exact ordering, but the mutable live-snapshot source and split material/control transactions remain.
 
 The green soaks did not contradict the player. They exercised a materially different system. They copied
 or repaired wave state, installed a test-only command responder, directly invoked phases/handlers, and
-often ran host and guest under one process-global scene. The latest three test commits now drive public
-guest command/fight/target input, but still clear the guest queue and force `TurnInitPhase` instead of
-booting through the production lobby/load lifecycle. The newest exact-SHA gate is also red: its scheduled
-transport disabled automatic delivery, drove a reward owner before the reciprocal watcher, and never
-delivered the guest's counter acknowledgement back to the host. `CoopPartnerSyncPhase` correctly kept the
-next-wave boundary closed. Both red failures are valuable evidence that earlier green results overstated
-lifecycle fidelity.
+often ran host and guest under one process-global scene. The main three-wave B journey now drives more public
+guest command/fight/target input and has repeatedly kept the gate red on missing lifecycle wiring, but Lane P's
+12-wave “production fidelity” command provider still serializes commands directly and manually reannounces
+the rendezvous. Both start from a constructed/mirrored second scene and do not boot two built clients through
+the production lobby/load lifecycle. The explicit coverage registry now also admits that all 24 human
+UI-to-operation edges remain undrivable debt.
 
-The branch's current component gate is green at `4a0852c0c`, run `29209992715`. That commit removes the two
-later-wave renderer-denied position phases and makes the headless battle-info adapter stateful. This closes
-the exact red assertions at `14d2bfcb7`; it does not make the component harness a production bootstrap or a
-canvas oracle, and it does not close the transaction/recovery findings below.
+Run `29213259047` is fully green at exact SHA `50531b460`: static, browser transport/rejoin, A, all eight B,
+all three C, P, all three S, T, and the required aggregate passed. The final change was test-only: Lane A now
+models the peer receiving and ACKing terminal retry exhaustion before local teardown. This is a valid green
+expanded component/transport checkpoint. It still does not prove a production bootstrap, canvas oracle,
+atomic recovery model, UI-to-commit causality, or six-seat architecture.
 
 The evidence policy was already inconsistent at the deployed staging checkpoint. SHA `9585dacdd` passed the
 full gate in run `29202637115` and was deployed by `29202804876`, while the exact-SHA six-profile Nightly run
@@ -62,6 +63,11 @@ scheduled-transport acknowledgements.
 
 | Evidence | Result | Meaning |
 | --- | --- | --- |
+| Expanded full gate, `29213259047`, SHA `50531b460` | GREEN | Static, browser handshake/hot rejoin, A, all 8 B, all 3 C, P, all 3 S, T, and aggregate passed. This proves the current classified component/transport checkpoint at the exact SHA, not production gameplay or release architecture. |
+| Expanded full gate, `29213111325`, SHA `d8445eed8` | RED, one stale test | Static, browser transport/rejoin, P, all C/S/T shards, and all eight B shards passed. Lane A's only failure expected immediate termination after retry exhaustion, but the production protocol now waits for the peer's exact terminal-failure ACK or deadline. |
+| Expanded full gate, `29212850959`, SHA `2c296ef23` | RED, narrowly | Static, P, C (all), S (all), T, and seven of eight B shards passed. A had one stale “never applied” assertion after its fixture became a valid complete frame. B4 exposed a real P32 address defect: a replacement captured after TurnEnd is addressed to N+1 but the delayed turn commit is N, while supersession required equal turns. Browser completed native handshake/hot rejoin, then failed on unstubbed local API CORS/progress noise. |
+| Expanded full gate, `29212321674`, SHA `03b588702` | RED | P, T, and all C shards passed. Static found two triple target typing errors; A found four semantically invalid strict fixtures; B4/B7 found legacy-finalizer and legacy-wave test paths; S found the renderer-gated TurnInit contradiction, a scheduled-delivery gap, and an async asset timer following the wrong process-global scene; browser completed transport but treated raw-Vite CDN misses as transport failures. |
+| First expanded full gate, `29211363036`, SHA `1dce3b2ad` | RED | Correctly rejected the combined P32 stack: 15 static errors, 11 A failures plus three unhandled errors, four B shard failures, all three S shards, P, T, and the browser 404 check. C passed all three shards. The most important live-path failure was a reproducible Showdown guest checksum loop caused by an unswapped `fullField` carrier. |
 | Staging deploy, `29210142166`, SHA `4a0852c0c` | GREEN deploy | Upstream auto-deployed this component-gate checkpoint while the audit was in progress. It has not run the new P32 transaction work or the expanded Showdown/triple/built-gameplay gates proposed here. |
 | Full gate, `29209992715`, SHA `4a0852c0c` | GREEN | Closes the two known B2/B8 component assertions. The suite still lacks a built-client gameplay journey and omits Showdown/triple suites from the classified lanes. |
 | Full gate, `29208695374`, SHA `14d2bfcb7` | RED | B2 retains two blocked double-position phases. B8 retains two false visual assertions against no-op headless properties; B6 is fixed. |
@@ -75,14 +81,81 @@ scheduled-transport acknowledgements.
 | Six-profile Nightly, `29202805388`, SHA `9585dacdd` | RED | `god-a` and `level` deterministically strand at wave 51 in `CoopInertPhase`, before finalize, even though the exact SHA's short gate was green and it was deployed to staging. |
 | Prior staging deploy, `29202804876`, SHA `9585dacdd` | GREEN deploy | This is the code testers exercised in the cited wave-4 reports. |
 
-The commits through `14d2bfcb7` add useful modifier identity work, canonicalize neutral boss fields,
+### Protocol-32 review candidate
+
+Candidate `1dce3b2ad` reached `feat/elite-redux-port`; full gate run `29211363036` was the first exact-SHA
+evaluation of the combined audit stack and rejected it. Two evidence-driven remediation rounds followed;
+candidate `50531b460` passed run `29213259047`. No production or staging deployment was requested or
+performed. The P32 stack:
+
+- addresses battle events, turn commits, replacement commits, and fatal authority failures by
+  `{epoch,wave,turn,revision}`;
+- retains complete turn/replacement carriers until an exact checkpoint-tick/state-tick/checksum ACK;
+- retries from the host as well as from the guest, so a lost ACK heals without a reconnect or a test-only
+  manual re-request;
+- applies and checksum-verifies before ACK/turn advancement, re-ACKs duplicates without reopening material
+  work, and routes unrecoverable capture/apply failure to an acknowledged shared terminal;
+- rejects incomplete modern authority instead of falling back to local turn progression; and
+- upgrades animation/renderer scenario fixtures from fake `version:0`/`bi:99` companions to carriers made
+  by the production capture chokepoint.
+
+The review caught two defects in the initial P32 agent patch before push. First, the strict full-field
+validator required numeric battler tags even though `BattlerTagType` is a string enum at runtime. A real
+`SEEDED`/`ENCORE` turn would therefore disappear as malformed while empty-tag tests stayed green. Second,
+the lost-ACK test manually issued a guest re-request that production stops issuing after sending its ACK;
+the host would retain the commit indefinitely until reconnect. Both are now covered by production-path
+tests and host retry timers.
+
+The first expanded gate then found a deeper production defect that the earlier component suites had never
+modeled. Showdown has three independently applied authority carriers: the numeric checkpoint, the id-keyed
+authoritative state, and the rich `fullField` companion (HP/max HP, PP, status, tags, held items). The guest
+perspective swap covered the first two but not the third. In the real two-engine versus test, the guest wrote
+the host's rich snapshots onto its opposite local side, held a stable checksum mismatch, and requested the
+same retained turn commit forever. `03b588702` moves the rich-field swap into the same pure involutive
+Showdown transform module, uses it for both per-turn and full-snapshot ingress, and adds a rich-carrier
+involution test. This is a concrete explanation for why isolated swap tests and prior short soaks could be
+green while a real versus journey softlocked.
+
+The first run exposed several coverage-quality failures rather than independent game regressions: raw
+loopback delivery ran under whichever process-global scene happened to be active; stale spies decoded old
+P32 argument positions; A fixtures exercised the deliberately removed `finishTurnNoStream` gameplay
+fallback or omitted the new address; a triple test allowed automatic ally targeting; and the headless sprite
+wrapper hid real `visible`/`alpha` state. The Showdown team screen also had a genuine async lifecycle race:
+an asset seed could resolve after clear/reopen and mutate the next screen. The remediation uses scheduled
+per-client delivery for the affected Showdown duo, updates semantically valid addressed fixtures, makes
+targets explicit, delegates render properties through the wrapper, and generation-gates the async seed.
+Run `29212850959` then proved the repaired Showdown, triple, production-fidelity, and soak lanes, while
+exposing one further protocol fact: the replacement captured after a faint is normally addressed to N+1,
+but it can causally supersede a delayed resolution for N. Requiring equal turn numbers retained the stale
+turn and skipped rich-state reassertion. `d8445eed8` permits only same-turn or immediate-successor
+supersession under the same epoch/wave, a higher revision, exact checksum, and a prior exact replacement
+ACK. This is a bounded transitional inference; the target protocol should carry an explicit parent commit
+address rather than infer causality from adjacency.
+
+P32 is containment, not the bulletproof end state. Turn waiters/live-event buffers/finalized marks still
+have turn-centric internal keys behind an ingress address check; the authority context still reads the
+process-global scene (unsafe as an architectural N-client harness API); apply remains mutate-then-reassert,
+not a shadow-state atomic swap; ACK proves mechanical checksum convergence but not asynchronous sprite/UI
+readiness; and one ACK represents one watcher rather than a quorum over active membership. Wave, reward,
+shop, biome, mystery-event, and minigame surfaces have not yet all been migrated to the same transaction.
+
+The browser lane is also not a human gameplay substitute. `run-coop-browser-transport.mjs` starts a Vite
+development server, waits for `window.dev`, dynamically imports the connector, and exercises only the
+signaling/transport handshake and rejoin. It does not use the built artifact or traverse Title -> lobby ->
+save/load -> Encounter -> Fight/Target -> turn -> reward with two public UIs. A built-client journey will
+need an explicit test bootstrap (`VITE_COOP_E2E`; the current build strips `window.dev/globalScene`) and
+must not depend on dev-tools-only title entry.
+
+The commits through `50531b460` add useful modifier identity work, canonicalize neutral boss fields,
 centralize several field/trainer presentation repairs, initialize reconstructed visual nodes, and keep guest
-TurnInit away from enemy AI/mechanical hooks. They do not remove the recovery/transaction defects demonstrated
-by the newest tester logs. The newest changes are themselves gate-red, and none is present on staging.
+TurnInit away from enemy AI/mechanical hooks. They also add addressed/retained/ACKed turn, replacement, and
+fatal authority carriers. They do not remove the shadow-apply, committed-recovery, distributed-UI,
+presentation-readiness, or N-seat transaction defects below. The newest exact gate is green, and none of
+this audit's P32 work is present on staging.
 
-### Remote advancement during this audit
+### Early remote advancement during this audit
 
-Nine remote commits landed while the audit was in progress:
+The first nine implementation commits landed while the audit was in progress:
 
 - `828733495` assigns a stable trainer-vitamin type ID and materializes an authoritative guest's trainer
   field without running structural summon hooks.
@@ -251,61 +324,85 @@ The live report proves the result can mix:
 Required target: recovery may serve only an immutable committed boundary snapshot plus the journal tail
 after that boundary. Never serialize the mutable live scene as the recovery source of truth.
 
-### P0. A failed recovery phase can starve newer authority
+### P0. Held-recovery starvation is narrowly contained, not eliminated architecturally
 
 `CoopApplyResyncPhase` intentionally holds when its snapshot does not converge. That is safer than
 continuing divergent simulation, but the normal replacement checkpoint is only buffered for a later replay
 pump. The pump cannot run because the held recovery phase owns the queue.
 
-Immediate safety correction: while held at a safe boundary, observe a strictly newer complete checkpoint,
-consume it only when it matches the same epoch/wave/logical turn, apply both numeric and id-keyed state,
-require zero structured apply failures and an exact checksum, then release the hold. This is a live rescue,
-not the final architecture. The final architecture needs a recovery supervisor outside the gameplay queue.
+P32 implements the immediate containment: while held at a safe boundary, the phase observes only a complete
+`reason=replacement` carrier with an exact positive `{epoch,wave,turn,revision}`, the same epoch/wave/logical
+turn as the failed snapshot, ordered checkpoint/state ticks, zero structured failures, and an exact checksum.
+The host retains/retries the carrier; the guest re-requests it; failed attempts leave it buffered; and only a
+verified attempt consumes and ACKs it. Exhaustion is bounded and becomes an acknowledged shared terminal
+instead of an indefinite park.
 
-The first rescue implementation is still non-transactional: it raises its recovery tick floor and consumes
-the sole retained envelope before the paired apply/checksum succeeds, while lower-level apply high-water can
-also advance before the whole pair commits. A throw, structured apply failure, reversed tick pair, or checksum
-mismatch therefore burns the only retry; an identical retransmission is stale even if the authoritative half
-never landed. Validate finite safe-integer ordered ticks, retain the envelope until success, and advance every
-admission/high-water marker only on atomic commit (or define explicit idempotent already-applied semantics).
+This closes the reported un-wakeable queue tombstone, but it does not make recovery atomic. The first failed
+attempt may already mutate live parties/modifiers and advance the lower-level state-tick admission marker.
+The retry works by recognizing those admitted component ticks and explicitly reasserting the same state, not
+by rolling back a failed transaction. A crash, reload, or unrelated callback between partial mutation and
+reassertion can still observe a state that was never committed as a whole.
 
-Even a transactional wake does not recover a lost replacement frame: replacement checkpoints are sent once,
-not host-retained/ACKed/re-requestable, and a hot-rejoin full snapshot queues behind the phase that is already
-holding. Nor does the wake prove control-plane convergence: the failed resync has already settled false, so
-its membership, interaction counter, pending surface, and journal adoption callback is not rerun after the
-later mechanical checkpoint. These are still stop-ship items for the session-level supervisor.
+The wake also proves only the newer battle material. The failed stateSync callback has already settled false,
+so its membership, interaction counter, awaited surface, barriers, pending commands, and journal high-water
+are deliberately withheld and are not restored by the replacement ACK. A hot-rejoin/full snapshot still
+queues through `CoopApplyResyncPhase`, and recovery remains inside the gameplay phase queue. Build the final
+recovery supervisor from an immutable committed snapshot plus journal tail and an executable pending-surface
+projection; do not generalize this narrow replacement rescue into the recovery architecture.
 
-### P0. Turn resolution is one-shot and under-addressed
+### P0. Turn resolution is wire-addressed but internally turn-keyed
 
-`CoopTurnResolution`, live events, waits, and inboxes are keyed by `turn` alone. They do not use
-`{epoch,wave,turn}`. The host sends the result once without an application ACK/retention contract. Reconnect
-re-requests launch/enemy/ME parties but not the unresolved turn. The guest can wait for the 20-minute default
-and eventually take a local fallback path.
+P32 closes the former one-shot wire defect: turn commits now carry `{epoch,wave,turn,revision}`, the host
+retains and retries them, the guest re-requests them, and only an exact post-apply checksum ACK clears host
+retention. Missing modern authority routes to an acknowledged shared terminal rather than a local gameplay
+fallback.
+
+The internal control structures remain weaker than the wire. `pending`, `inbox`, and `liveEvents` are maps
+keyed only by `turn`; `finalizedMark` carries wave/turn but not epoch/revision; `lastCheckpoint` and
+`appliedOutOfBandCheckpoint` are singleton slots. Ingress checks the current process-global authority
+address, but a frame accepted under one boundary can remain buffered after that boundary changes and later
+be consumed by a same-numbered turn. The N/N+1 replacement defect also proves that adjacency is being used
+as implicit causality because replacement frames do not carry their parent turn-commit address.
 
 Required target:
 
-- address every turn transaction by `{epoch,wave,turn,revision}`;
+- key every waiter, inbox, event buffer, finalize marker, and retained control object by the complete
+  `{epoch,wave,turn,revision}` address, not just the external message;
+- carry an explicit causal parent address for replacement and transition commits;
 - retain until every active renderer ACKs successful material application;
 - re-request/replay on reconnect and bounded stall;
 - never advance mechanics through local AI or timeout when authority is missing.
 
 Presentation cues may be lossy. The authoritative turn commit may not be lossy.
 
-### P0. Wave advancement and post-battle progression are split across racy carriers
+### P0. Post-battle material state remains a raw one-shot carrier
 
-The host sends raw `waveResolved` before committing the durable `WAVE_ADVANCE` operation. The guest can
-consume the raw frame and advance `lastResolvedWave`; operation adoption can then wait for the envelope, but
-the late envelope sees the wave as already resolved and becomes a no-op. The victory/new-battle tail can be
-lost permanently under that interleaving.
+Current peers include the full transition in `waveResolved`, and the durable `WAVE_ADVANCE` live sink can
+recreate the pending transition when that raw signal is lost. A late durable operation after
+`lastResolvedWave` is intentionally idempotent, so the earlier raw-vs-journal interleaving is contained.
 
-`waveEndState` is also raw, one-shot, and non-blocking on the guest. A fast guest skips local EXP and can
+`waveEndState` remains raw, one-shot, and non-blocking on the guest. A fast guest skips local EXP and can
 reach `BattleEndPhase` before the host's EXP/level/evolution chain produces the payload. It proceeds when the
-payload is absent. In addition, the host captures that state at the start of `BattleEndPhase`, before later
+payload is absent; a receiver installed late simply drops the frame, and there is no exact request, retention,
+or apply ACK. In addition, the host captures that state at the start of `BattleEndPhase`, before later
 post-battle money/charge/ability/lapse mutations complete.
 
 Required target: one retained `WaveCommit` after all host BattleEnd mutations, containing final material
 state, final checksum, transition, next logical surface, and revision. The guest parks until that exact
 commit applies and ACKs.
+
+### P0. Mystery Event terminal durability excludes the state that the next screen consumes
+
+The host's comprehensive ME outcome still travels as the raw `meResync` interaction outcome. The durable
+`ME_TERMINAL` operation carries only the terminal kind and optional host turn. The guest explicitly allows
+the durable terminal to win when `meResync` is absent and continues on the assumption that a later checksum
+will repair material state.
+
+This is not safe for an event that changes party, money, map/biome, RNG, or save-backed state and immediately
+constructs another screen from those values. The durable control decision can therefore advance while the
+state it names was dropped. Put the complete immutable outcome, or an exact committed snapshot reference,
+inside the retained terminal transaction. ACK it only after state apply and the declared next surface are
+ready. Mystery Events, shops, reward subpickers, and future minigames should all use this same contract.
 
 ### P0. The interaction migration is still dual-run
 
@@ -323,6 +420,11 @@ The live reward, biome, market, and Mystery Event code is explicitly marked `DUA
 The operation gate currently improves identity/order, but it does not make the host the sole mutator. A
 guest-owned choice can mutate the guest first, then be independently validated/applied on the host. That is
 still lockstep with repair, not authoritative replication.
+
+The typed reward, biome, and ME envelopes reinforce this distinction: their `authoritativeState` member is
+currently an empty placeholder, and journal materialization reconstructs a legacy interaction choice. The
+watcher then executes that choice against its own live pool/menu/party. The journal has made the decision
+durable, but the mechanical result and next UI are still independently derived on each client.
 
 Required target: guest UI emits a typed intent only. The host validates/reduces once. Every renderer applies
 the committed projection/state, never the original gameplay handler.
@@ -354,11 +456,12 @@ component fixtures, but they must be forbidden from the production-transition la
 
 ### P0 release gate. UI-operation coverage is currently a debt ledger, not causal proof
 
-The new UI-operation registry declares 24 `UiMode -> operation` edges, but the soak layer automatically adds
-every declared edge to `KNOWN_UNDRIVABLE` from the same source. The completeness test therefore proves only
-that metadata was auto-exempted. It does not prove one UI callback reaches relay, host validation, commit,
-renderer apply, ACK, continuation, or visual postcondition. Observed-but-undeclared pairs are also collected
-without checking `observed - expected`, so a new real callback route can be silently ignored.
+The UI-operation registry declares 24 `UiMode -> operation` edges. The latest coverage work improves the
+anti-tautology check: the 24 undrivable exemptions are now an explicit independent list; an observed
+undeclared edge fails, and an observed edge still marked undrivable also fails. This is good debt control.
+It still means all 24 human operation edges are declared debt, not covered behavior. No soak currently proves
+one of those callbacks through relay, host validation, commit, renderer apply, ACK, continuation, and visual
+postcondition.
 
 The inventory omits the most important battle semantics entirely: move, target, switch, ball, run, and Tera
 collapse into a broad `battleCommand` trace. `op:reward` similarly collapses take, leave, reroll, lock,
@@ -366,27 +469,30 @@ transfer, check-team, party target, and market actions. Finally, the trace scope
 `Ui.processInput` stack; a guest intent and its later host commit occur in different clients/event-loop turns
 and cannot share that scope.
 
-Keep this instrumentation as a diagnostic/debt ledger, but make exemptions explicit, fail on unexpected
-observed pairs, and never count an edge covered until a causal `intentId` proves the full distributed chain
-at semantic action granularity.
+Keep this instrumentation as a diagnostic/debt ledger and retain its new explicit/undeclared checks. Promote
+an edge out of debt only when a causal `intentId` proves the full distributed chain at semantic action
+granularity; a synchronous carrier hit is not promotion evidence.
 
-### P0. Showdown's authoritative guest launch is still contradictory
+### P0 release gate. Showdown launch containment is repaired, but its “real boot” is constructed
 
-The versus guest path queues a real `SummonPhase(0)` for its own lead and explicitly excludes versus from
-`materializeCoopLoadedPlayerField`. Production renderer enforcement default-denies `SummonPhase` and replaces
-it with `CoopInertPhase`. The adopted enemy is materialized, but the versus guest's own lead can remain
-off-field. The single-capacity fallback also starts at party index 1, so it does not rescue the missing lead.
+The direct contradiction found during this audit is repaired. Loaded authoritative guests now materialize
+their adopted player seats for both classic co-op and Showdown without running `SummonPhase`, `TurnInitPhase`
+is explicitly renderer-allowed only through its authoritative input-only branch, and a host-faint defers the
+guest command until the separately committed replacement is present. The S lane proves those component paths,
+including rich-state perspective inversion and both host/guest faint orderings.
 
-The two Showdown tests described as a real boot serialize only after the host has already reached
-`CommandPhase`; production sends its launch payload before encounter presentation/summoning. They then
-clear/push/shift the guest queue, and `buildShowdownDuo` mirrors field/modifier state directly. The serializer
-may be real, but the temporal boundary and bootstrap are not.
+The test named `showdown-guest-real-boot` still is not a production bootstrap. It starts the host to
+`CommandPhase`, constructs a second scene with `buildShowdownDuo`, serializes the host session manually,
+calls `applyCoopLaunchSession` directly, clears the guest queue, pushes `EncounterPhase(true)`, shifts it, and
+manually invokes each current phase. It proves the loaded encounter chain from a valid carrier, not the live
+lobby/connect/launch timing or two independent browser event loops. Its header also still describes the old
+`SummonPhase(0)` repair even though production now uses field materialization, which is a documentation smell.
 
-Required target: capture the exact payload at production `sendLaunchSnapshot`, boot through public
-SelectStarter/transport/Encounter, apply an explicit authoritative seat manifest to both sides, enforce the
-renderer gate, and prove both leads plus the first public command without queue surgery.
+Required target: intercept the actual production `sendLaunchSnapshot`, boot both clients through public
+SelectStarter/transport/Encounter with no mirrored scene or queue surgery, apply an explicit authoritative
+seat manifest, and prove both leads plus the first public command and a faint replacement in the built client.
 
-### P0. Triple and future six-seat topology is misclassified and truncated
+### P0. Triple and future six-seat topology remains hard-coded and truncated
 
 Authoritative co-op cannot support triples correctly today:
 
@@ -402,26 +508,34 @@ and can resolve duplicate species to the opposing side. Replace fixed index arit
 whose `locate(battlerIndex)` returns explicit side, slot, controller/seat, and Pokemon ID. Carry `formatId`,
 side capacities, and immutable seat/vacancy identities in every commit and recovery payload.
 
-There is currently zero triple-format coverage under the co-op tests or duo harness. Before triple/six-player
-co-op is allowed, exercise every battler index 0-5 through move, stat, status, faint, and replacement replay,
-including duplicate species across sides and a triple ME/colosseum handoff.
+Lane T now classifies 15 format/triple/probe tests, but these are normal-format engine/component regressions,
+not a three-seat co-op authority journey. They do not make the replay helpers accept all indices or prove one
+commit across three renderers. Before triple/six-player co-op is allowed, exercise every battler index 0-5
+through move, stat, status, faint, and replacement replay, including duplicate species across sides and a
+triple ME/colosseum handoff over the authoritative stream.
 
-### P0 release gate. Showdown, triple regressions, and active visual baselines are omitted
+### P0 release gate. Showdown/triple are now classified; active gameplay visuals are still omitted
 
-`run-coop-gate.mjs` discovers only top-level `test/tests/elite-redux/coop/*.test.ts`. The Showdown co-op tests
-and `test/tools/repro-triple-battle-bugs-3.test.ts` never enter the sharded co-op gate, and the general test
-workflow does not run for ordinary feature-branch pushes. This directly permits a green co-op SHA with a
-known broken versus launch or 3v2 regression.
+The expanded gate now has mandatory classified S (Showdown) and T (topology/triple) lanes. At
+`2c296ef23`, all three S shards and T passed, catching and then proving repairs for the rich-field side swap,
+host-faint command ordering, scheduled two-client delivery, async asset lifetime, explicit triple targets,
+and the 3v2/triple regression set. This is a meaningful closure of the former discovery omission.
 
-The reported 3v2 faint/switch fix is logically correct for the exact repro, but its test is non-gating and
-the implementation still uses the heuristic “do not auto-transpose while any reserve exists” instead of an
-immutable vacancy/replacement transaction. Triple ally wing Y offsets are correctly moved upward, but the
-standalone renderer duplicates the positioning math and real active-scene pages are excluded from golden
+It is still not an active built-client visual baseline. The S/T tests use headless scenes/adapters, the
+browser lane stops after transport/rejoin, and the general feature-branch workflow still does not prove a
+real canvas through lobby -> load -> triples/versus -> faint/switch -> next command. A green S/T result
+therefore proves engine/component behavior, not that sprites, trainer chrome, menus, and camera positions
+reached the production postcondition.
+
+The reported 3v2 faint/switch fix is logically correct for the exact repro and its test is now in gating
+Lane T. The implementation still uses the heuristic “do not auto-transpose while any reserve exists” instead
+of an immutable vacancy/replacement transaction. Triple ally wing Y offsets are correctly moved upward, but
+the standalone renderer duplicates the positioning math and real active-scene pages are excluded from golden
 comparison.
 
-Add recursively classified Lane S (Showdown), Lane T (topology/triples), and Lane V (real active render)
-coverage. Promote the exact 3v2 test with seat-ID assertions, add one-reserve/two-faint variants, and require
-a real `battle-field-triples` golden or semantic scene-coordinate assertion.
+Keep S/T mandatory, add Lane V (real active render), promote immutable seat-ID assertions and the
+one-reserve/two-faint variants, and require a built-client `battle-field-triples` golden or semantic
+scene-coordinate assertion.
 
 ## P1 correctness and completeness findings
 
@@ -470,14 +584,18 @@ while the guest still sees it at field 1. The probe can decline a legitimate gue
 
 Target: validate owner seat and stable Pokemon ID from the command address, never remote field geometry.
 
-### A turn is marked finalized before finalization applies
+### P32 fixes early finalization, but ACK does not prove continuation readiness
 
-Replay marks a turn finalized when `CoopFinalizeTurnPhase` is queued, not after its checkpoint/checksum
-successfully applies. If queue replacement removes the finalizer, the recovery replay is rejected as a
-duplicate even though no commit landed.
+The modern path now calls `markTurnFinalized` only after checkpoint/state/full-field apply and exact checksum
+convergence. That closes the earlier “queued finalizer equals committed” bug. The remaining ordering gap is
+that `completeModernTurnCommit` sends the mechanical ACK and marks the turn committed before `finishTurn`
+has proved the next control state. `finishTurn` catches queue/wave-tail errors and ends the phase; the host
+can therefore discard its retained commit while the guest fails to open the next command/reward/terminal
+surface. Likewise, replacement ACK is mechanical and does not prove command UI or sprite readiness.
 
-Target state machine: `unseen -> replaying -> finalizeQueued -> materialApplied -> committed`. Duplicate
-rejection may use only the final committed state.
+Target state machine: `unseen -> replaying -> finalizeQueued -> materialApplied -> presentationReady ->
+continuationReady -> committed`. ACK fields should state which postconditions were proven, and an ordinary
+journey must fail if any continuation/presentation postcondition is absent.
 
 ### Wire decoding is structurally permissive
 
@@ -532,11 +650,11 @@ construction and proves the stub property was assigned, not that assets loaded o
 component assertions, but require an awaited presentation-ready result and a real renderer/browser oracle;
 do not use headless-stub accommodation as visual release evidence.
 
-Showdown exposes the same contradiction. A loaded versus guest queues a real `SummonPhase` for its own lead,
-but production renderer enforcement default-denies `SummonPhase`; the enemy materializer handles only the
-opposing side. A component test/comment says the summon is real while the production capability gate makes
-it inert. Add a two-browser Showdown launch assertion and fix this at the authoritative seat-manifest
-boundary rather than allowlisting a gameplay SummonPhase on the renderer.
+Showdown's empty-own-field hole is now contained by calling `materializeCoopLoadedPlayerField()` for every
+loaded authoritative guest while `SummonPhase` remains renderer-denied. That is the correct immediate
+direction, but the helper itself changes structural membership and `fieldSetup`; it is not a purely visual
+projection. Replace it with an explicit authoritative seat manifest and prove the launch in two built browser
+clients rather than reintroducing a gameplay `SummonPhase` on the renderer.
 
 Target: every committed logical surface defines presentation postconditions, for example:
 
@@ -569,7 +687,9 @@ forbidden specifically in the production-fidelity lane:
 - restored PP/healed state that a browser player never receives.
 
 `SOAK_FIDELITY=production` removes some healing, but does not change these control-path substitutions into
-public client behavior.
+public client behavior. Its resync helper also captures directly on the host and applies directly on the
+guest, bypassing the request/retry/ACK/continuation lifecycle. Treat this lane as authoritative-state
+fidelity; reserve “production journey” for two continuous built clients driven only through public input.
 
 ### One process is not two browsers
 
@@ -910,43 +1030,47 @@ interaction, reconnect of seat 2, and convergence. Then parameterize to six. Do 
 ### Good current results
 
 - Grouped Vitest controllers reduced full gate wall time from about 441 seconds to 272-280 seconds.
+- Exact expanded run `29213259047` completed all 19 parallel evidence jobs plus aggregate in 4 minutes
+  19 seconds wall-clock; its slowest test job was Lane T at about 3 minutes 14 seconds after setup.
 - Six Nightly profiles complete concurrently in about 143 seconds on the last green run.
 - Lane P is genuinely gating rather than evidence-only.
+- The local deterministic inventory now assigns 246 tracked files: A=77, B=88, C=10, P=1, S=55, T=15,
+  Q=0. Nested co-op tests fail classification instead of disappearing, and Showdown/triple are mandatory.
+- Every Vitest invocation now writes a unique lane/invocation blob, and the `if: always()` aggregate requires
+  browser, static, and every matrix shard.
+- Workflow triggers now include package/lock/config/setup/assets/patches/workers, and static comparison uses
+  the last successful full-gate SHA rather than only the immediately preceding push.
 
 ### Required CI corrections
 
 1. Split `coop-duo-multiwave` and `coop-duo-reward-subpickers` into independent parallel jobs. They currently
    serialize behind B2 and dominate the critical path.
-2. Give every Vitest invocation a unique blob path. A later green fresh-process test currently overwrites an
-   earlier failed grouped/multiwave `.vitest-reports/blob.json`.
-3. Add one `if: always()` aggregate job that validates every expected shard/artifact and exposes one stable
-   exact-SHA status for staging.
-4. Replace stale manual B weights with p90 timings generated from merged reports. Only 15 of 88 B files are
+2. Replace stale manual B weights with p90 timings generated from merged reports. Only 15 of 88 B files are
    measured; the rest receive a guessed 27 seconds.
-5. Discover tracked co-op tests recursively and fail when any test lacks explicit classification. The current
-   top-level `readdirSync` silently omits future `ui/`, `minigames/`, or six-player subtrees. Add explicit
-   deploy-blocking Showdown, topology/triple, and active-render lanes; today all Showdown tests and the exact
-   3v2 repro sit outside the co-op gate.
-6. Replace filename/source heuristics with a committed test manifest: layer, setup project, isolation,
+3. The current nested-co-op guard is fail-closed, but Showdown discovery is top-level-only and the lanes do
+   not classify through one recursive manifest. Replace filename/source
+   heuristics with a committed recursive test manifest: layer, setup project, isolation,
    estimated weight, affected surfaces/formats, and required environment. A new shared mode, phase, format,
    or minigame must fail static classification until its causal journey and fault schedules are named.
-7. Expand workflow triggers to package/lock files, TS/Vite/Vitest config, setup action, asset submodule pointer,
-   patches, and relevant workflows. Prefer broad triggers with safe `paths-ignore`.
-8. Static validation must cover `last successful full gate SHA..HEAD`, not only `github.event.before..HEAD`.
-   Cancelled/red intermediate commits otherwise escape the eventual green check.
-9. Replace the TypeScript count ratchet with a normalized diagnostic fingerprint/multiset. Current baseline
+4. Add a deploy-blocking active-render/built-gameplay lane. S/T are mandatory component lanes now, but no
+   current lane makes a real canvas traverse versus/triples through faint/replacement and the next command.
+5. Replace the TypeScript count ratchet with a normalized diagnostic fingerprint/multiset. Current baseline
    299 while green output reports 292 leaves seven errors of slack and permits same-count swaps.
-10. Shallow checkout and fetch only the last-green/base commit. The static job currently spends substantial
-    time on full history and recursive assets it does not use.
-11. Cache Vite dependency optimization for the browser job. Current full-app prebundle costs roughly 125
+6. Shallow checkout and fetch only the last-green/base commit. The static job currently spends substantial
+   time on full history and recursive assets it does not use.
+7. Cache Vite dependency optimization for the browser job. Current full-app prebundle costs roughly 125
     seconds before a transport-only test begins.
-12. Fix remote workflow wiring. The focused workflow cannot dispatch because it is not registered on the
+8. Fix remote workflow wiring. The focused workflow cannot dispatch because it is not registered on the
     default branch. Scheduled workflows load their definition from the default branch, so feat's six-profile
     YAML does not automatically control cron. Resolve this explicitly without changing production code.
-13. Move pure protocol/model/registry tests into a minimal Node project. Remove Lane A's cross-file
+9. Move pure protocol/model/registry tests into a minimal Node project. Remove Lane A's cross-file
     `globalScene` dependence and run those tests in seconds.
-14. Build the staging artifact once after the exact-SHA aggregate gate and deploy that immutable artifact;
+10. Build the staging artifact once after the exact-SHA aggregate gate and deploy that immutable artifact;
     do not rebuild source into an unverified artifact.
+11. Add a pull-request trigger for changes targeting `feat/elite-redux-port` and include focused/nightly
+    workflow definitions, staging build scripts, and the triple renderer in path ownership.
+12. Include `github.run_attempt` in artifact names, write a positive browser evidence record on success, and
+    publish every Nightly failure directory instead of only the newest one.
 
 Recommended feedback tiers:
 
@@ -960,25 +1084,23 @@ Recommended feedback tiers:
 
 ### Checkpoint A: live wave-4 containment
 
-- Fix/canonicalize every trainer/fight-token modifier producer, register reconstructible Resist Berry/Ward
-  Stone codecs, and make authority serialization reject unknown/unkeyed types instead of emitting empty
-  IDs or silently returning empty arrays.
-- Let a held resync recover only from a strictly newer complete same-boundary checkpoint whose own checksum
-  applies exactly; retain/retry the carrier and advance tick floors only after atomic success.
-- Keep the immediate fallback presentation-only: clear stale trainer chrome without touching battler
-  visibility/membership. Move Pokemon seating to an authoritative field manifest.
-- Canonicalize optional wire fields across JSON (`undefined` versus `0` is currently gate-red).
-- Close `4ab6b5081`'s remaining two encounter-time double-position leaks and build an honest render oracle for
-  the ME/render assertions; do not assign fake headless visibility merely to make them green.
-- Add regressions for every trainer item JSON roundtrip, failed-then-retried resync wake, invalid/reversed
-  ticks, Showdown launch seating, and checksum-neutral trainer cleanup.
-- Run focused remote tests, then the full exact-SHA gate. Do not stage or deploy production from a red SHA.
+- Completed containment at `50531b460`: stable modifier identities/strict serialization, retained exact
+  replacement and turn commits, failed-then-retried held-resync wake, bounded acknowledged fatal exit,
+  Showdown rich-state perspective swap/host-faint ordering, renderer-gated TurnInit, encounter presentation
+  repairs, and mandatory S/T classification.
+- Exact full gate `29213259047` is green. No deployment was performed.
+- Remaining before architecture closure: replace mutate/reassert apply with a shadow transaction; move
+  structural Pokemon seating into an authoritative seat manifest; separate material/presentation/control
+  readiness; and prove trainer chrome, sprites, menus, and triple coordinates in a built render oracle.
 
 ### Checkpoint B: close the three transaction P0s
 
-- Replace turn resolution with retained `{epoch,wave,turn,revision}` commit + apply ACK/re-request.
+- Finish P32: key every receiver buffer/finalized mark by full address, carry explicit replacement parent
+  causality, and retain the turn/replacement commit until `continuationReady`, not only checksum apply.
 - Replace `waveResolved` + `WAVE_ADVANCE` + `waveEndState` with one final post-BattleEnd `WaveCommit`.
-- Serve recovery from immutable committed boundaries only.
+- Put comprehensive ME/shop/reward results inside their retained terminal/operation commit instead of raw
+  companion outcomes or empty authoritative-state placeholders.
+- Serve recovery from immutable committed boundaries only and make its control projection executable.
 - Move recovery outside the gameplay phase queue.
 
 ### Checkpoint C: prove one real journey
