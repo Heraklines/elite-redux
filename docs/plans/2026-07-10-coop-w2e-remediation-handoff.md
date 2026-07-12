@@ -725,3 +725,53 @@ the guest reports successful `applyCoopLaunchSession` materialization. Apply res
 across channel replacement; timeout or parse/load failure remains fail-closed at the recoverable boundary.
 Canonical causal tracing and forced production-fidelity mystery-event/biome campaigns remain open after
 this transaction checkpoint.
+
+## 36. Protocol-28 resume transaction closure
+
+`8fffe6388` completes the two-phase resume transaction described above. A pair-matched save is offered only
+after stable peer identity, the guest's reply is retained across channel replacement, and the host does not
+release either client from the lobby until the exact loaded launch snapshot has materialized and been ACKed by
+the guest. Start-new uses the same apply-ACK discipline. Missing, stale, malformed, or failed snapshots remain
+at the recoverable lobby boundary instead of letting either peer build a different run.
+
+The exact SHA passed all thirteen gameplay shards plus static in run `29180083295`; staging-only deployment
+`29180202936` completed successfully. This restored tester access to both new-run and pair-matched continue
+flows without weakening the fail-closed boundary.
+
+## 37. Canonical causality, model fuzzing, and complete mystery/biome journey
+
+`2f0fb0977` adds a bounded structured causal ledger keyed by operation, lobby decision, command, snapshot, and
+recovery ids; the diagnostics report now preserves commit -> carrier -> materialize -> apply/ACK ancestry.
+`db52ea976` derives model-based operation/fault sequences from the canonical operation registry and rejects
+illegal cursor, duplicate-apply, and ACK-before-materialize histories. The production-fidelity journey then
+drives one continuous two-engine run through wave 45 with normal battles, both interaction owners, six distinct
+mystery-event archetypes, nested party/move prompts, an ME-spawned battle, and repeated biome/map crossings.
+
+That journey exposed real residuals rather than accepting recovery as success: mystery-battle biome identity,
+detached terminal ownership, enemy HP authority, duplicate same-side Pokemon ids, fainted-slot derived stats,
+and post-move stat stages cleared by guest field setup. Protocol 29 carries the ME battle arena statement and
+enemy identities; the host deterministically repairs ambiguous same-side ids at the authority boundary; and
+the renderer reasserts host stats/stages only after every local field/modifier setup has finished. Checksum
+assertions now persist their canonical leaf diff into submitted co-op logs, so a future mismatch names the exact
+nested field even when the browser/test runner intercepts console errors.
+
+Final evidence at `eb493aeba`: the 45-wave journey completed with `findings=[]`, `assertions=0`, and
+`resyncHeals=0`; all thirteen gameplay shards plus static passed in run `29183838947`; staging deployment
+`29183989543` succeeded. This is the current gameplay checkpoint and includes the live mystery-battle/biome
+softlock fixes rather than only a test expansion.
+
+## 38. Browser-native transport gate
+
+`3146f63ae`/`cffd9ed06` add an independent Chrome job to the standing sharded workflow. Two isolated browser
+contexts load the real Vite client and production connector, exchange SDP through a local HTTP signaling relay,
+open an ordered RTCDataChannel, complete protocol/functional-fingerprint/identity/epoch negotiation, then lose
+the first raw channel deliberately. Both live runtimes must replace it through the production hot-rejoin driver
+without reassembly, identity loss, epoch drift, or compatibility fallback. Browser screenshots/logs upload as
+artifacts on failure. `AGENTS.md` makes this external browser job part of every future deployability decision;
+it remains separate from the engine shards so it adds transport fidelity without recreating workstation load.
+
+All fourteen prior gameplay/static jobs and the new browser job passed at exact SHA `cffd9ed06` in run
+`29184227672`; staging-only deployment `29184359194` completed successfully. The next expansion is broader
+forced-event class coverage (especially quiz, repeated choice, bespoke shops, yes/no, and multi-round battle
+surfaces) plus long multi-seed campaigns; no claim that every one of the 91 registered event definitions has
+been played end-to-end is made yet.
