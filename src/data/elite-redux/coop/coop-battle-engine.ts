@@ -3058,6 +3058,22 @@ export function applyCoopAuthoritativeBattleState(
     reconcileAuthoritativeParty("player", playerParty, authoritativeGuest);
     reconcileAuthoritativeParty("enemy", enemyParty, authoritativeGuest);
     reconcileAuthoritativeField(state, playerParty, enemyParty);
+    // Field reconciliation can call leaveField on fainted/unseated mons, which resets summon data and may
+    // recalculate derived stats after the party-data apply above. Reassert the host's explicit stat arrays at
+    // the completed boundary so fainted slots remain checksum-identical too.
+    for (const [liveParty, hostParty] of [
+      [globalScene.getPlayerParty() as Pokemon[], playerParty],
+      [globalScene.getEnemyParty() as Pokemon[], enemyParty],
+    ] as const) {
+      const hostById = new Map(hostParty.map(data => [data.id, data]));
+      for (const mon of liveParty) {
+        const hostData = hostById.get(mon.id);
+        if (hostData != null && Array.isArray(hostData.stats) && hostData.stats.length > 0) {
+          mon.stats = [...hostData.stats];
+          mon.hp = Math.max(0, Math.min(Math.trunc(hostData.hp), mon.getMaxHp()));
+        }
+      }
+    }
     const arena = globalScene.arena;
     if ((arena.weather?.weatherType ?? 0) !== state.weather) {
       arena.trySetWeather(state.weather as WeatherType);
