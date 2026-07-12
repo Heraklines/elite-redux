@@ -209,6 +209,11 @@ describe.skipIf(!RUN)(
         }
       });
 
+      expect(
+        rig.guestScene.getPlayerParty().map(mon => mon.id),
+        "replacement materialization preserves the host-authoritative party order",
+      ).toEqual(rig.hostScene.getPlayerParty().map(mon => mon.id));
+
       // PRE-HEAL assertion #1 (the chooser's PRESENTED state, before the parked resolution finalizes): the
       // summoned replacement MUST be the CHOSEN species and ALIVE. A replacement that presents fainted here is
       // the live "it instantly dies" symptom - a FAILURE even though a later heal would converge it.

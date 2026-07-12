@@ -358,6 +358,16 @@ export function resetCoopStateTicks(): void {
 
 export function captureCoopCheckpoint(): CoopBattleCheckpoint | null {
   try {
+    // A late stat/modifier recalculation can lower max HP after the previous numeric HP write.
+    // Never publish the impossible `hp > maxHp` state: the receiver necessarily clamps PokemonData,
+    // which otherwise creates a permanent host/guest checksum split (long-run seed 20470471 wave 26).
+    for (const mon of [...globalScene.getPlayerParty(), ...globalScene.getEnemyParty()]) {
+      const maxHp = mon.getMaxHp();
+      if (mon.hp > maxHp) {
+        coopWarn("checkpoint", `authority clamps impossible hp id=${mon.id} ${mon.hp}->${maxHp}`);
+        mon.hp = maxHp;
+      }
+    }
     // Serialize player ACTIVE mons + enemy SLOT-PRESENT mons (incl. just-fainted ones) so a
     // foe the host KOd this turn still rides the payload with fainted:true (#633 enemy-field
     // reconcile) - that entry drives the guest's removal of the dead enemy.
@@ -2884,6 +2894,26 @@ function reconcileAuthoritativeField(
   globalScene.updateFieldScale();
 }
 
+/**
+ * Field materialization calls engine seating helpers that may swap the shared party array. Reassert
+ * the host's id order at the completed boundary so the next local command menu cannot present a
+ * host-active replacement as a legal bench switch on the guest.
+ */
+function reassertAuthoritativePartyOrder(side: "player" | "enemy", hostParty: PokemonData[]): void {
+  const liveParty =
+    side === "player" ? (globalScene.getPlayerParty() as Pokemon[]) : (globalScene.getEnemyParty() as Pokemon[]);
+  const byId = new Map(liveParty.map(mon => [mon.id, mon]));
+  const ordered = hostParty.map(data => byId.get(data.id)).filter((mon): mon is Pokemon => mon != null);
+  if (ordered.length !== hostParty.length) {
+    recordCoopApplyFailure(`${side}PartyOrder`, new Error("authoritative party member missing after field apply"));
+    return;
+  }
+  if (ordered.some((mon, index) => liveParty[index] !== mon)) {
+    coopWarn("resync", `${side} party order changed during field materialization -> authoritative order reasserted`);
+    liveParty.splice(0, liveParty.length, ...ordered);
+  }
+}
+
 function modifierInstanceKey(data: ModifierData): string {
   return `${data.typeId}|${data.className}|${JSON.stringify(data.args ?? [])}|${JSON.stringify(data.typePregenArgs ?? [])}`;
 }
@@ -3136,6 +3166,8 @@ function applyCoopAuthoritativeBattleStateInternal(
     reconcileAuthoritativeParty("player", playerParty, authoritativeGuest);
     reconcileAuthoritativeParty("enemy", enemyParty, authoritativeGuest);
     reconcileAuthoritativeField(state, playerParty, enemyParty);
+    reassertAuthoritativePartyOrder("player", playerParty);
+    reassertAuthoritativePartyOrder("enemy", enemyParty);
     const arena = globalScene.arena;
     if ((arena.weather?.weatherType ?? 0) !== state.weather) {
       arena.trySetWeather(state.weather as WeatherType);

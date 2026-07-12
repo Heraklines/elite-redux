@@ -34,6 +34,7 @@ import {
   applyCoopAuthoritativeBattleState,
   applyCoopFullSnapshot,
   captureCoopAuthoritativeBattleState,
+  captureCoopCheckpoint,
   captureCoopChecksum,
   captureCoopFullSnapshot,
   resetCoopStateTicks,
@@ -112,6 +113,17 @@ describe.skipIf(!RUN)("co-op battle checksum + resync - real engine (#633, TRACK
     field[COOP_HOST_FIELD_INDEX].hp -= 1;
     const after = captureCoopChecksum();
     expect(after).not.toBe(before);
+  });
+
+  it("authority boundary clamps impossible hp before checkpoint and checksum capture", async () => {
+    const field = await startCoopDouble();
+    const mon = field[COOP_HOST_FIELD_INDEX];
+    mon.hp = mon.getMaxHp() + 2;
+
+    const checkpoint = captureCoopCheckpoint();
+
+    expect(mon.hp).toBe(mon.getMaxHp());
+    expect(checkpoint?.field.find(entry => entry.bi === mon.getBattlerIndex())?.hp).toBe(mon.getMaxHp());
   });
 
   it("(A) a just-fainted enemy's stat stages remain checksum-visible at wave win (#878)", async () => {

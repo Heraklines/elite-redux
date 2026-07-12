@@ -1695,7 +1695,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * A move, item, or ability can force the host's active Pokemon out before TurnEndPhase (for example an
    * Eject/Red-Card-style effect). That opens the same owner-only SwitchPhase PARTY UI as a faint, but the
    * occupant is still healthy so the post-turn faint picker deliberately does not apply. Drive this distinct
-   * mid-turn choice and expire it at the authoritative turn terminal so an unused handler cannot leak forward.
+   * mid-turn choice. Keep it armed through TurnEnd: a trainer replacement can offer the same healthy-player
+   * PARTY switch immediately after TurnEnd, before the interceptor ever observes that phase.
    */
   const armHostMidTurnSwitchAutoPick = (turn: number): void => {
     game.onNextPrompt(
@@ -1729,38 +1730,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         if (rig.hostScene.currentBattle.turn !== turn) {
           return true;
         }
-        return ["TurnEndPhase", "VictoryPhase", "BattleEndPhase", "GameOverPhase"].includes(
+        return ["VictoryPhase", "BattleEndPhase", "GameOverPhase"].includes(
           rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
         );
       },
-    );
-  };
-
-  /** Drive the healthy-player optional switch offered when a trainer sends its next bench mon. */
-  const armHostOptionalTrainerSwitchCancel = (turn: number): void => {
-    if (hostOwnedFaintPending(rig)) {
-      return;
-    }
-    game.onNextPrompt(
-      "SwitchPhase",
-      UiMode.PARTY,
-      () => {
-        const phase = rig.hostScene.phaseManager.getCurrentPhase() as unknown as { isModal?: boolean };
-        if (phase.isModal === true) {
-          fail("no-park", rig.hostScene.currentBattle.waveIndex, "unexpected forced switch reached optional picker");
-        }
-        // Use the real public UI path: this is the same Cancel a player presses to keep the lead in.
-        rig.hostScene.ui.processInput(Button.CANCEL);
-        hitMode(UiMode.PARTY);
-        actionScript.push(
-          `wave ${rig.hostScene.currentBattle.waveIndex} turn ${turn}: host declined optional trainer switch`,
-        );
-      },
-      () =>
-        rig.hostScene.currentBattle.turn !== turn
-        || ["VictoryPhase", "BattleEndPhase", "GameOverPhase"].includes(
-          rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
-        ),
     );
   };
 
@@ -2046,7 +2019,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // finally happened - a leaked FIXED trainer wave (rival / evil-grunt bypass .disableTrainerWaves(),
         // are far tougher, and DO KO the host) - the SwitchPhase parked forever.
         armHostFaintAutoPick();
-        armHostOptionalTrainerSwitchCancel(turn);
       });
       await withClient(rig.guestCtx, () => driveGuestReplayTurnWithFaint(rig, turn));
       if (profile === "god") {
