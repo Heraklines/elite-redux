@@ -62,6 +62,7 @@ import {
   type CoopOperationSurfaceClass,
   isCoopOperationSurfaceClass,
 } from "#data/elite-redux/coop/coop-operation-surface-registry";
+import { recordCoopUiRelayCarrier } from "#data/elite-redux/coop/coop-ui-relay-trace";
 
 /** The journaled durability class for a committed op, DERIVED from its logical phase (§4.1). */
 export function coopOperationClassForPhase(phase: CoopLogicalPhase): string | null {
@@ -204,6 +205,10 @@ export function journalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelope
   if (isCoopOperationSurfaceClass(cls)) {
     journalCommittedClasses.add(cls);
   }
+  recordCoopUiRelayCarrier(
+    "operation",
+    `class=${cls} kind=${envelope.pendingOperation?.kind ?? "none"} revision=${envelope.revision}`,
+  );
   const opId = envelope.pendingOperation?.id ?? `${envelope.sessionEpoch}:revision:${envelope.revision}`;
   recordCoopCausalEvent({
     domain: "operation",

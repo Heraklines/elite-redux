@@ -46,6 +46,7 @@ import type {
   CoopSerializedRewardOption,
   CoopTransport,
 } from "#data/elite-redux/coop/coop-transport";
+import { recordCoopUiRelayCarrier } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { recordReplayInteraction } from "#data/elite-redux/replay-recorder";
 
 export {
@@ -381,6 +382,7 @@ export class CoopInteractionRelay {
 
   /** OWNER: send one pick for interaction `seq` (`kind` is routing/logging only). */
   sendInteractionChoice(seq: number, kind: string, choice: number, data?: number[]): void {
+    recordCoopUiRelayCarrier("interactionChoice", `seq=${seq} kind=${kind} choice=${choice}`);
     if (isCoopDebug()) {
       coopLog("relay", `SEND interactionChoice seq=${seq} kind=${kind} ${summarizeChoice({ choice, data })}`);
     }
@@ -526,6 +528,7 @@ export class CoopInteractionRelay {
    * change the result. Same FIFO-per-seq semantics as the choice relay.
    */
   sendInteractionOutcome(seq: number, kind: string, outcome: CoopInteractionOutcome): void {
+    recordCoopUiRelayCarrier("interactionOutcome", `seq=${seq} kind=${kind} outcome=${outcome.k}`);
     if (isCoopDebug()) {
       coopLog("relay", `SEND interactionOutcome seq=${seq} kind=${kind} ${summarizeOutcome(outcome)}`);
     }

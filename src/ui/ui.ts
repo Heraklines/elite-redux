@@ -18,6 +18,7 @@ import {
 import type { CoopUiMirrorEngine } from "#data/elite-redux/coop/coop-ui-mirror";
 // #840: the total UiMode co-op classification + the unmirrored-screen tripwire decision.
 import { coopUiClassOf, coopUnmirroredTripwireReason } from "#data/elite-redux/coop/coop-ui-registry";
+import { beginCoopUiRelayInput, endCoopUiRelayInput } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import type { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
 import { PlayerGender } from "#enums/player-gender";
@@ -337,6 +338,16 @@ export class UI extends Phaser.GameObjects.Container {
    * @returns true if the input attempt succeeds
    */
   processInput(button: Button): boolean {
+    const coopUiInputId = beginCoopUiRelayInput(this.mode);
+    try {
+      return this.processInputCoopAware(button);
+    } finally {
+      endCoopUiRelayInput(coopUiInputId);
+    }
+  }
+
+  /** Co-op-aware dispatch body, wrapped by {@linkcode processInput}'s UI-to-relay evidence scope. */
+  private processInputCoopAware(button: Button): boolean {
     // Co-op (#633): on a SHARED interaction screen the live-cursor mirror governs input -
     // the WATCHER's local presses are blocked, and the OWNER's presses are relayed for the
     // partner to replay so the cursor mirrors live. HARD no-op everywhere else: `isCoop`

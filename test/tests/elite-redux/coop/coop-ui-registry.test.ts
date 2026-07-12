@@ -13,6 +13,7 @@
 // =============================================================================
 
 import {
+  COOP_UI_AUTHORITATIVE_COMMIT_MODES,
   COOP_UI_MIRRORED_MODES,
   COOP_UI_REGISTRY,
   COOP_UI_TRIPWIRE_EXEMPT,
@@ -70,6 +71,21 @@ describe("#840 co-op UI classification registry (unmirrored-screen tripwire)", (
       "SUMMARY",
       "TARGET_SELECT",
     ]);
+  });
+
+  it("every authoritative UI commit mode is mirrored and excludes navigation-only COMMAND/FIGHT", () => {
+    for (const mode of COOP_UI_AUTHORITATIVE_COMMIT_MODES) {
+      expect(COOP_UI_REGISTRY[mode], `${UiMode[mode]} commits shared state so it must be mirrored`).toBe("mirrored");
+    }
+    expect(COOP_UI_AUTHORITATIVE_COMMIT_MODES.has(UiMode.COMMAND)).toBe(false);
+    expect(COOP_UI_AUTHORITATIVE_COMMIT_MODES.has(UiMode.FIGHT)).toBe(false);
+    const expectedCommitModes = [...COOP_UI_MIRRORED_MODES]
+      .filter(mode => mode !== UiMode.COMMAND && mode !== UiMode.FIGHT)
+      .sort((a, b) => a - b);
+    expect(
+      [...COOP_UI_AUTHORITATIVE_COMMIT_MODES].sort((a, b) => a - b),
+      "every mirrored semantic-commit screen must have a UI-to-relay contract",
+    ).toEqual(expectedCommitModes);
   });
 
   it("the exempt allowlist is small and only holds local-only chrome modes", () => {

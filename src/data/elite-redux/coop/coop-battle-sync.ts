@@ -35,6 +35,7 @@ import type {
   CoopTransport,
   SerializedCommand,
 } from "#data/elite-redux/coop/coop-transport";
+import { recordCoopUiRelayCarrier } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { Command } from "#enums/command";
 import { MoveUseMode } from "#enums/move-use-mode";
 
@@ -640,6 +641,10 @@ export class CoopBattleSync {
     owner?: CoopRole,
     address?: CoopCommandAddress,
   ): void {
+    recordCoopUiRelayCarrier(
+      "battleCommand",
+      `field=${fieldIndex} turn=${turn} owner=${owner ?? "-"} command=${command.command}`,
+    );
     if (isCoopDebug()) {
       coopLog(
         "relay",

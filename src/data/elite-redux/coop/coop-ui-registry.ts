@@ -236,6 +236,27 @@ export const COOP_UI_MIRRORED_MODES: ReadonlySet<UiMode> = new Set<UiMode>(
     .filter(m => COOP_UI_REGISTRY[m] === "mirrored"),
 );
 
+/**
+ * Mirrored modes whose owner can commit shared run state. Each needs a real public-UI-input -> authoritative
+ * carrier journey; merely opening the mode or calling its handler/relay from a harness does not cover it.
+ * COMMAND and FIGHT intentionally are not here: they are navigation screens whose semantic commit occurs in
+ * BALL, TARGET_SELECT, or PARTY. Adding a new shared interactive screen must update this reviewed set.
+ */
+export const COOP_UI_AUTHORITATIVE_COMMIT_MODES: ReadonlySet<UiMode> = new Set<UiMode>([
+  UiMode.BALL,
+  UiMode.TARGET_SELECT,
+  UiMode.MODIFIER_SELECT,
+  UiMode.PARTY,
+  UiMode.SUMMARY,
+  UiMode.MYSTERY_ENCOUNTER,
+  UiMode.BIOME_SHOP,
+  UiMode.COLOSSEUM,
+  UiMode.ER_QUIZ,
+  UiMode.ER_BARGAIN,
+  UiMode.LEARN_MOVE_BATCH,
+  UiMode.ER_MAP,
+]);
+
 /** The classification of a mode, or `undefined` only if a runtime out-of-range mode is somehow passed. */
 export function coopUiClassOf(mode: UiMode): CoopUiClass | undefined {
   return COOP_UI_REGISTRY[mode];

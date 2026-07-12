@@ -302,7 +302,10 @@ export class GameManager {
         } else {
           handler.setCursor(targetIndex ?? BattlerIndex.ENEMY);
         }
-        handler.processInput(Button.ACTION);
+        // Drive the same public UI boundary as a human. Calling the handler directly bypasses Ui.processInput's
+        // co-op owner gates, ME pump, cursor mirror, and UI-to-relay contract trace, which previously let the
+        // headless harness claim TARGET_SELECT coverage while skipping the production adapter entirely.
+        this.scene.ui.processInput(Button.ACTION);
       },
       () =>
         this.isCurrentPhase("CommandPhase")

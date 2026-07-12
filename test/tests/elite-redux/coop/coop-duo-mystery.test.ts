@@ -39,6 +39,7 @@ import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { BattleType } from "#enums/battle-type";
 import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
@@ -98,9 +99,9 @@ async function pickHostMeOption(game: GameManager, hostScene: BattleScene, curso
   const uiHandler = hostScene.ui.getHandler() as unknown as { unblockInput(): void; processInput(b: number): boolean };
   uiHandler.unblockInput(); // ME handler blocks input for 1s on show; tests clear it
   for (const move of cursorMoves) {
-    uiHandler.processInput(move);
+    hostScene.ui.processInput(move);
   }
-  uiHandler.processInput(Button.ACTION);
+  hostScene.ui.processInput(Button.ACTION);
 }
 
 describe.skipIf(!RUN)(
@@ -280,6 +281,7 @@ describe.skipIf(!RUN)(
         // Exact live path: RIGHT selects "Move on", ACTION commits it through UI.processInput so
         // the ME pump observes and relays both inputs. Existing ME helpers call the handler directly
         // and therefore could not reproduce a pump/input-routing softlock here.
+        resetCoopUiRelayTrace();
         expect(hostScene.ui.processInput(Button.RIGHT), "owner can move the live Hot Spring cursor").toBe(true);
         const realSetMode = hostScene.ui.setMode.bind(hostScene.ui);
         const realShowText = hostScene.ui.showText.bind(hostScene.ui);
@@ -300,6 +302,12 @@ describe.skipIf(!RUN)(
           return realShowText(text, ...args);
         });
         expect(hostScene.ui.processInput(Button.ACTION), "owner can commit Move on through the ME pump").toBe(true);
+        expect(
+          getCoopUiRelayEdges().some(
+            edge => edge.mode === UiMode.MYSTERY_ENCOUNTER && edge.carrier === "interactionChoice",
+          ),
+          "the public mystery-event UI input reached the production interaction relay",
+        ).toBe(true);
         expect(hostScene.ui.getMode(), "the selected line switched to the message handler").toBe(UiMode.MESSAGE);
 
         // Hot Spring's move-on option queues an empty healing shop. Drive the real boundary and then

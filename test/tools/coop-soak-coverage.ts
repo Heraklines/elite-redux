@@ -16,6 +16,7 @@
 //   - mode:<UiMode name>   - a co-op-MIRRORED UiMode (from COOP_UI_MIRRORED_MODES)
 //   - kind:<relay kind>    - a relay `kind` string (from COOP_RELAY_KINDS)
 //   - band:<seq band key>  - a relay seq band (from COOP_SEQ_BANDS)
+//   - uiRelay:<UiMode>     - a real public UI input reached an authoritative production carrier
 //   - situation:<name>     - a battle-flow situation (from COOP_SOAK_SITUATIONS, the
 //                            ONLY hand-listed dimension - no registry exists for it)
 //
@@ -40,7 +41,7 @@
 
 import { COOP_OPERATION_SURFACES } from "#data/elite-redux/coop/coop-operation-surface-registry";
 import { COOP_RELAY_KINDS, COOP_SEQ_BANDS, coopSeqBandRange } from "#data/elite-redux/coop/coop-seq-registry";
-import { COOP_UI_MIRRORED_MODES } from "#data/elite-redux/coop/coop-ui-registry";
+import { COOP_UI_AUTHORITATIVE_COMMIT_MODES, COOP_UI_MIRRORED_MODES } from "#data/elite-redux/coop/coop-ui-registry";
 import { UiMode } from "#enums/ui-mode";
 import fs from "node:fs";
 import path from "node:path";
@@ -118,11 +119,20 @@ export interface SoakHitSet {
   situations: Set<string>;
   /** Authoritative operation classes committed by the host during the run. */
   operations: Set<string>;
+  /** Modes where a real `Ui.processInput` synchronously reached an authoritative carrier. */
+  uiRelays: Set<UiMode>;
 }
 
 /** A fresh, empty hit-set. */
 export function createSoakHitSet(): SoakHitSet {
-  return { modes: new Set(), kinds: new Set(), bands: new Set(), situations: new Set(), operations: new Set() };
+  return {
+    modes: new Set(),
+    kinds: new Set(),
+    bands: new Set(),
+    situations: new Set(),
+    operations: new Set(),
+    uiRelays: new Set(),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -134,6 +144,7 @@ const kindKey = (k: string): string => `kind:${k}`;
 const bandKey = (b: string): string => `band:${b}`;
 const sitKey = (s: string): string => `situation:${s}`;
 const operationKey = (cls: string): string => `operation:${cls}`;
+const uiRelayKey = (m: UiMode): string => `uiRelay:${UiMode[m]}`;
 
 /**
  * The EXPECTED surface set, derived AT RUNTIME from the registries (never hardcoded): every mirrored
@@ -157,6 +168,9 @@ export function expectedSurfaces(): Set<string> {
   for (const cls of COOP_OPERATION_SURFACES) {
     out.add(operationKey(cls));
   }
+  for (const mode of COOP_UI_AUTHORITATIVE_COMMIT_MODES) {
+    out.add(uiRelayKey(mode));
+  }
   return out;
 }
 
@@ -177,6 +191,9 @@ export function hitSurfaces(hits: SoakHitSet): Set<string> {
   }
   for (const cls of hits.operations) {
     out.add(operationKey(cls));
+  }
+  for (const mode of hits.uiRelays) {
+    out.add(uiRelayKey(mode));
   }
   return out;
 }
@@ -295,6 +312,30 @@ const LEARN_MOVE_PERMOVE =
  */
 export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<string, UndrivableEntry>([
   // ---- MODES ----
+  ...[
+    UiMode.BALL,
+    UiMode.MODIFIER_SELECT,
+    UiMode.PARTY,
+    UiMode.SUMMARY,
+    UiMode.MYSTERY_ENCOUNTER,
+    UiMode.BIOME_SHOP,
+    UiMode.COLOSSEUM,
+    UiMode.ER_QUIZ,
+    UiMode.ER_BARGAIN,
+    UiMode.LEARN_MOVE_BATCH,
+    UiMode.ER_MAP,
+  ].map(
+    mode =>
+      [
+        uiRelayKey(mode),
+        {
+          reason:
+            `the soak does not yet prove ${UiMode[mode]} through public Ui.processInput into an authoritative carrier; `
+            + "opening the mode, direct handler calls, and direct relay/commit injection do not count",
+          followupTask: `replace the ${UiMode[mode]} headless shortcut with a real owner UI -> relay -> watcher journey`,
+        },
+      ] as const,
+  ),
   [
     modeKey(UiMode.BALL),
     {
@@ -736,13 +777,16 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
     "op:me",
     "op:revival",
     "op:stormglass",
-  ].map(cls => [
-    operationKey(cls),
-    {
-      reason: `the default wave/shop soak does not stage ${cls}; its dedicated two-engine operation suite does`,
-      followupTask: `add a forced ${cls} leg to the continuous soak/fault campaign`,
-    },
-  ] as [string, UndrivableEntry]),
+  ].map(
+    cls =>
+      [
+        operationKey(cls),
+        {
+          reason: `the default wave/shop soak does not stage ${cls}; its dedicated two-engine operation suite does`,
+          followupTask: `add a forced ${cls} leg to the continuous soak/fault campaign`,
+        },
+      ] as [string, UndrivableEntry],
+  ),
 ]);
 
 // ---------------------------------------------------------------------------
@@ -789,6 +833,8 @@ const GUARANTEED_BASE: readonly string[] = [
   modeKey(UiMode.COMMAND),
   modeKey(UiMode.FIGHT),
   modeKey(UiMode.TARGET_SELECT),
+  // Unlike the legacy mode tap above, this can only be earned by public Ui.processInput reaching the command carrier.
+  uiRelayKey(UiMode.TARGET_SELECT),
   modeKey(UiMode.PARTY),
   modeKey(UiMode.MODIFIER_SELECT),
   // Kinds: the reward shop take -> "reward", leave -> "skip". (The "switch" kind rides the FAINT-replacement
@@ -943,6 +989,12 @@ export function logSoakCoverage(hits: SoakHitSet, profile: SoakProfileName = "go
   log(`[coop-soak-coverage] HIT bands=[${sorted(hits.bands).join(", ")}]`);
   log(`[coop-soak-coverage] HIT situations=[${sorted(hits.situations).join(", ")}]`);
   log(`[coop-soak-coverage] HIT operations=[${sorted(hits.operations).join(", ")}]`);
+  log(
+    `[coop-soak-coverage] HIT uiRelays=[${[...hits.uiRelays]
+      .map(mode => UiMode[mode])
+      .sort()
+      .join(", ")}]`,
+  );
 
   // GUARANTEED status.
   const guaranteedCold = sorted(guaranteed).filter(s => !hit.has(s));

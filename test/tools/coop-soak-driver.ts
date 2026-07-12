@@ -87,6 +87,7 @@ import {
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { COOP_UI_MIRRORED_MODES } from "#data/elite-redux/coop/coop-ui-registry";
+import { getCoopUiRelayHitModes, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
 import { TerrainType } from "#data/terrain";
 import { BattleType } from "#enums/battle-type";
@@ -1225,6 +1226,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   const trainerWaves = { total: 0, fixed: 0, random: 0 };
   // COMPLETENESS BACKSTOP (#849): the surfaces this run observes, populated by the taps installed below.
   const hits = createSoakHitSet();
+  resetCoopUiRelayTrace();
 
   /** Record a battle-flow situation hit (idempotent; a Set). */
   const hitSituation = (s: CoopSoakSituation): void => {
@@ -1398,10 +1400,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         `guest command slot=${slot} move=${moveId} target=${guestTarget} is outside the host legal offer`,
       );
     }
-    // #849 COMMAND-issue tap: a guest FIGHT command drives COMMAND + FIGHT (+ TARGET_SELECT for the target).
+    // Legacy screen-open evidence only: the provider bypasses the guest UI, so it may claim COMMAND/FIGHT
+    // navigation but deliberately earns no TARGET_SELECT or uiRelay coverage.
     hitMode(UiMode.COMMAND);
     hitMode(UiMode.FIGHT);
-    hitMode(UiMode.TARGET_SELECT);
     return {
       command: Command.FIGHT,
       cursor: offeredMove?.slot ?? slot,
@@ -1992,11 +1994,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
                   ?.getMove()
                   .isMultiTarget() ?? false;
               game.move.select(moveId, fi, isSpread ? undefined : targetIndex);
-              // #849 COMMAND-issue tap: a host FIGHT command drives COMMAND + FIGHT (+ TARGET_SELECT for the
-              // target). The headless host bypasses the real UI, so the tap synthesizes the mode hits here.
+              // Legacy screen-open evidence only. GameManager's target prompt now uses public Ui.processInput,
+              // so a targeted move earns TARGET_SELECT only through the separate production uiRelay trace.
               hitMode(UiMode.COMMAND);
               hitMode(UiMode.FIGHT);
-              hitMode(UiMode.TARGET_SELECT);
             }
           }
         }
@@ -2921,6 +2922,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   const captureOperationHits = (): void => {
     for (const cls of getCoopOperationJournalCommittedClasses()) {
       hits.operations.add(cls);
+    }
+    for (const mode of getCoopUiRelayHitModes()) {
+      hits.uiRelays.add(mode);
+      hits.modes.add(mode);
     }
   };
   for (let wave = 1; wave <= waves; wave++) {

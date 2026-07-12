@@ -40,6 +40,7 @@ import {
   coopOwnerOfFieldIndex,
   coopSwitchBlocksMon,
 } from "#data/elite-redux/coop/coop-session";
+import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { captureGhostTeam } from "#data/elite-redux/er-ghost-teams";
 import { Challenges } from "#enums/challenges";
 import { Command } from "#enums/command";
@@ -87,6 +88,7 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
   });
 
   beforeEach(() => {
+    resetCoopUiRelayTrace();
     // #788 v2 partner-sync gate: tiny wait so the harness's manually-driven shop flows
     // (spoof / out-of-order duo drives never broadcast in time) proceed fast via the
     // gate's own timeout fallback instead of sitting through the 60s live default.
@@ -206,6 +208,10 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
       expect(lastBroadcast.wave).toBe(globalScene.currentBattle.waveIndex);
       expect(lastBroadcast.pokemonId).toBe(globalScene.getPlayerField()[COOP_HOST_FIELD_INDEX].id);
     }
+    expect(
+      getCoopUiRelayEdges().some(edge => edge.mode === UiMode.TARGET_SELECT && edge.carrier === "battleCommand"),
+      "a public TARGET_SELECT UI input reached the production battle-command carrier",
+    ).toBe(true);
   });
 
   it("a SOLO (non-coop) FIGHT command is NOT broadcast (guard holds)", async () => {
