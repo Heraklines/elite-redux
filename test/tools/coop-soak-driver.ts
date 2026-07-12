@@ -750,6 +750,22 @@ function restorePlayerPartyPp(scene: BattleScene): void {
   }
 }
 
+/**
+ * Keep the god profile a start-to-finish architecture carrier without making active combat immortal.
+ * Only benched mons are revived between turns; active mons still take real damage, faint, and exercise
+ * replacement paths. The faint-heavy level profile remains untouched and owns attrition/wipe coverage.
+ */
+function restoreGodProfileBench(scene: BattleScene): void {
+  const activeIds = new Set(scene.getPlayerField().map(mon => mon.id));
+  for (const mon of scene.getPlayerParty()) {
+    if (activeIds.has(mon.id)) {
+      continue;
+    }
+    mon.hp = mon.getMaxHp();
+    mon.resetStatus(true, false, false, false);
+  }
+}
+
 /** Tag co-op party-slot ownership on BOTH scenes (host owns EVEN slots, guest ODD) so a faint has a legal
  * same-owner bench. The per-wave mirror copies host `coopOwner` onto the guest, so tagging the host party
  * propagates on every re-mirror; wave 1 (pre-mirror) also tags the guest party directly. */
@@ -1835,6 +1851,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         armHostFaintAutoPick();
       });
       await withClient(rig.guestCtx, () => driveGuestReplayTurnWithFaint(rig, turn));
+      if (profile === "god") {
+        restoreGodProfileBench(rig.hostScene);
+        withClientSync(rig.guestCtx, () => restoreGodProfileBench(rig.guestScene));
+      }
 
       if (t === 0 || (t + 1) % 10 === 0) {
         actionScript.push(
