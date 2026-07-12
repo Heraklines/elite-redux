@@ -1385,10 +1385,12 @@ export function applyCoopEnemies(enemies: CoopSerializedEnemy[]): void {
           // modifiers. Move those bindings with the object before adopting the host id; otherwise the mon
           // becomes visually correct while its items remain orphaned under the discarded local id.
           for (const modifier of globalScene.findModifiers(
-            (m): m is PokemonHeldItemModifier => m instanceof PokemonHeldItemModifier && m.pokemonId === previousId,
+            m => m instanceof PokemonHeldItemModifier && m.pokemonId === previousId,
             false,
           )) {
-            modifier.pokemonId = authoritativeId;
+            if (modifier instanceof PokemonHeldItemModifier) {
+              modifier.pokemonId = authoritativeId;
+            }
           }
           enemy.id = authoritativeId;
         }
@@ -3006,14 +3008,6 @@ function captureCoopOnFieldSpriteKeys(): Map<number, string> {
  * Fully guarded per mon: one failed refresh never aborts the rest.
  */
 function runCoopRenderDiffer(preSpriteKeys: Map<number, string>): void {
-  // Item indicators (both bars) - UNCONDITIONAL cheap refresh (the maintainer's "enemy items don't
-  // sync" render gap: the data converges but the bar never redraws when the reconcile sees no change).
-  try {
-    globalScene.updateModifiers(true, true);
-    globalScene.updateModifiers(false, true);
-  } catch {
-    /* held-item bar refresh is best-effort */
-  }
   for (const mon of globalScene.getField(true)) {
     if (mon == null) {
       continue;
@@ -3124,6 +3118,15 @@ export function applyCoopAuthoritativeBattleState(
       Phaser.Math.RND.sow([state.waveSeed]);
     }
     restoreCoopModuleLetSubstrates(state);
+    // Refresh both held-item bars before the final stat authority. Despite being a render entrypoint,
+    // updateModifiers also reapplies stat-bearing modifiers (HP Up included), so running it afterward would
+    // silently overwrite the explicit host stats on fainted slots and recreate a 40/42 checksum split.
+    try {
+      globalScene.updateModifiers(true, true);
+      globalScene.updateModifiers(false, true);
+    } catch {
+      /* held-item bar refresh is best-effort */
+    }
     // Field reconciliation, modifier reconciliation, and ER substrate restoration can all recalculate
     // derived stats after the party-data apply. Reassert the host's explicit arrays at the TRUE completed
     // data boundary so fainted/off-field slots remain checksum-identical too. Party reconciliation has made
