@@ -1,6 +1,9 @@
 import { consumePendingDevBattleSetup } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
-import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
+import {
+  isCoopAuthoritativeGuestGated,
+  isShowdownGuestFlipGated,
+} from "#data/elite-redux/coop/coop-authoritative-gate";
 import { erRecordAchievementTurnStart } from "#data/elite-redux/er-achievement-tracker";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { BattleType } from "#enums/battle-type";
@@ -20,8 +23,36 @@ import i18next from "i18next";
 
 export class TurnInitPhase extends FieldPhase {
   public readonly phaseName = "TurnInitPhase";
+
+  /**
+   * The authoritative guest owns input and presentation only.  Its locally-created TurnInitPhase must not
+   * execute challenge cleanup, Mystery Encounter hooks, biome ambush RNG, enemy AI, or structural recentering.
+   * Queue only the player command-intent phases and the renderer dispatcher; the host's turn stream supplies
+   * every resolution and the ensuing checkpoint supplies canonical state.
+   */
+  private startAuthoritativeGuestInputTurn(): boolean {
+    if (!isCoopAuthoritativeGuestGated()) {
+      return false;
+    }
+    globalScene.getField().forEach((pokemon, fieldIndex) => {
+      if (pokemon?.isPlayer() && pokemon.isActive()) {
+        // Clear prior-turn input ephemera so the local command UI cannot inherit a stale queued/skip state.
+        // This does not resolve an action; the host validates and commits the resulting command intent.
+        pokemon.resetTurnData();
+        globalScene.phaseManager.pushNew("CommandPhase", fieldIndex);
+      }
+    });
+    globalScene.phaseManager.pushNew("TurnStartPhase");
+    this.end();
+    return true;
+  }
+
   start() {
     super.start();
+
+    if (this.startAuthoritativeGuestInputTurn()) {
+      return;
+    }
 
     // catalog-v2 (#900): a turn is starting - init KO stints, arm LAST_MON_STANDING / IDENTITY_THEFT.
     erRecordAchievementTurnStart();
