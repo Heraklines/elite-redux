@@ -34,7 +34,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          # The planner ranks the exact tip delta ahead of the long-lived branch diff, so a newly changed
+          # test can never be crowded out by the five-shard development cap.
+          fetch-depth: 2
           submodules: false
 
       - uses: actions/setup-node@v6
@@ -56,7 +58,7 @@ jobs:
           set +e
           set -o pipefail
           node scripts/run-coop-gate.mjs --focused-matrix \
-            --base "$COOP_INTEGRATION_BASE" --max-shards 5 \
+            --base "$COOP_INTEGRATION_BASE" --priority-base HEAD^ --max-shards 5 \
             2>&1 | tee coop-ci-focused-plan.log
           status=${PIPESTATUS[0]}
           echo "exit_code=$status" >> "$GITHUB_OUTPUT"
