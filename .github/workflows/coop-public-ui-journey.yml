@@ -1,0 +1,94 @@
+name: Co-op Public UI Journey
+
+on:
+  workflow_dispatch:
+    inputs:
+      journey:
+        description: Public player journey to drive
+        required: true
+        type: choice
+        default: probe
+        options:
+          - probe
+          - fresh-wave2
+          - fresh-resume
+          - reverse-resume
+          - faint-replacement
+      requester_seat:
+        description: Seat that sends the first lobby invitation
+        required: true
+        type: choice
+        default: guest-seat
+        options:
+          - guest-seat
+          - host-seat
+      faint_owner_seat:
+        description: Prepared fainted battler owner
+        required: true
+        type: choice
+        default: guest-seat
+        options:
+          - guest-seat
+          - host-seat
+      host_title_keys:
+        description: JSON keys before host selects New Game; use ["ArrowDown"] for an existing save
+        required: true
+        type: string
+        default: "[]"
+      guest_title_keys:
+        description: JSON keys before guest selects New Game; use ["ArrowDown"] for an existing save
+        required: true
+        type: string
+        default: "[]"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coop-public-ui-${{ inputs.journey }}
+  cancel-in-progress: false
+
+jobs:
+  journey:
+    name: ${{ inputs.journey }} through public UI
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Install isolated Chrome runtime
+        run: pnpm exec puppeteer browsers install chrome
+
+      - name: Enforce public browser boundary
+        run: node test/browser/coop-public-ui/check-public-boundary.mjs
+
+      - name: Drive two built clients
+        env:
+          # A dispatcher cannot redirect credential entry to an arbitrary origin.
+          # Override only through the maintainer-owned repository variable.
+          COOP_UI_BASE_URL: ${{ vars.COOP_UI_STAGING_URL || 'https://elite-redux-staging.pages.dev' }}
+          COOP_UI_JOURNEY: ${{ inputs.journey }}
+          COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat }}
+          COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.faint_owner_seat }}
+          COOP_UI_HOST_TITLE_NEW_GAME_KEYS: ${{ inputs.host_title_keys }}
+          COOP_UI_GUEST_TITLE_NEW_GAME_KEYS: ${{ inputs.guest_title_keys }}
+          COOP_UI_HOST_USERNAME: ${{ secrets.COOP_UI_HOST_USERNAME }}
+          COOP_UI_HOST_PASSWORD: ${{ secrets.COOP_UI_HOST_PASSWORD }}
+          COOP_UI_GUEST_USERNAME: ${{ secrets.COOP_UI_GUEST_USERNAME }}
+          COOP_UI_GUEST_PASSWORD: ${{ secrets.COOP_UI_GUEST_PASSWORD }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: node test/browser/coop-public-ui/run.mjs
+
+      - name: Upload public-UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-${{ inputs.journey }}-${{ github.run_attempt }}
+          path: dev-logs/coop-public-ui/**
+          retention-days: 14
+          if-no-files-found: warn
