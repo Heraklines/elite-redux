@@ -89,6 +89,8 @@ export const COOP_AUTHORITATIVE_TYPES: ReadonlySet<CoopMessageType> = new Set<Co
   "launchSnapshot",
   "meBattleEnemyPartySync",
   "rendezvous",
+  "sharedTerminal",
+  "sharedTerminalAck",
 ]);
 
 /**

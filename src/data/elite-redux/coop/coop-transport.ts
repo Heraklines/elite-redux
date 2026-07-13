@@ -24,7 +24,7 @@
 // plain-JSON `ErDataFingerprint` (#633 diagnostics), so the transport stays the lowest layer.
 import type { ErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import type { CoopMembershipSnapshotV1 } from "#data/elite-redux/coop/coop-membership";
+import type { CoopFrozenAckQuorumV1, CoopMembershipSnapshotV1 } from "#data/elite-redux/coop/coop-membership";
 // TYPE-ONLY (erased at runtime, so this stays the lowest layer): the authoritative control-plane
 // envelope (Wave-2 run-state migration, §1.1). The envelope module in turn imports only the
 // CoopAuthoritativeBattleStateV1 TYPE from here, so the cycle is fully type-level (no runtime cycle).
@@ -32,6 +32,7 @@ import type {
   CoopAuthoritativeEnvelopeV1,
   CoopWaveAdvancePayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
+import type { CoopFrameContextV1 } from "#data/elite-redux/coop/coop-session-binding";
 import type { ErRouteNode } from "#data/elite-redux/er-biome-routing";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
@@ -112,6 +113,45 @@ export type CoopSessionKind = "coop" | "versus";
 
 /** Connection lifecycle of a transport. */
 export type CoopConnectionState = "connecting" | "connected" | "disconnected" | "closed";
+
+/** The control boundary whose failure forced every member out of shared gameplay. */
+export type CoopSharedTerminalBoundary =
+  | "authority"
+  | "recovery"
+  | "protocol"
+  | "persistence"
+  | "surface"
+  | "disconnect";
+
+/** Stable machine-readable causes; the bounded human detail is diagnostic only. */
+export type CoopSharedTerminalReasonCode =
+  | "capture-failed"
+  | "apply-failed"
+  | "recovery-exhausted"
+  | "peer-lost"
+  | "binding-mismatch"
+  | "persistence-failed"
+  | "continuation-failed"
+  | "invalid-authority";
+
+/**
+ * Immutable P33 shared-terminal transaction. The surrounding frame context is refreshed on retransmit
+ * after hot rejoin, while this addressed statement and its frozen ACK quorum remain byte-stable.
+ */
+export interface CoopSharedTerminalCommitV1 {
+  version: 1;
+  terminalId: string;
+  terminalRevision: number;
+  originSeatId: number;
+  epoch: number;
+  wave: number;
+  turn: number;
+  boundaryRevision: number;
+  boundary: CoopSharedTerminalBoundary;
+  reasonCode: CoopSharedTerminalReasonCode;
+  reason: string;
+  quorum: CoopFrozenAckQuorumV1;
+}
 
 export type CoopLaunchSnapshotAbortReason =
   | "no-safe-slot"
@@ -1500,6 +1540,21 @@ export type CoopMessage =
       boundary: "turnResolution" | "replacement";
     }
   /**
+   * P33 retained terminal transaction. Receipt alone is insufficient: the receiver first freezes its
+   * gameplay/control plane in the addressed terminal state, then returns `sharedTerminalAck`. The immutable
+   * commit survives connection replacement; only `ctx` is refreshed for the authenticated live channel.
+   */
+  | { t: "sharedTerminal"; ctx: CoopFrameContextV1; commit: CoopSharedTerminalCommitV1 }
+  /** Exact evidence that one required seat entered the retained shared terminal transaction. */
+  | {
+      t: "sharedTerminalAck";
+      ctx: CoopFrameContextV1;
+      terminalId: string;
+      terminalRevision: number;
+      targetMembershipRevision: number;
+      stage: "terminalEntered";
+    }
+  /**
    * Owner -> watcher (#633): the owner's pick on an ALTERNATING-control interaction
    * screen (reward shop / biome shop / mystery encounter). Same seed -> both clients
    * generate the IDENTICAL option pool, so only the CHOICE crosses the wire: the
@@ -1814,6 +1869,10 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `id=${msg.failureId} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} boundary=${msg.boundary}`;
     case "authorityFailureAck":
       return `id=${msg.failureId} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} boundary=${msg.boundary}`;
+    case "sharedTerminal":
+      return `id=${msg.commit.terminalId} e=${msg.commit.epoch} wave=${msg.commit.wave} turn=${msg.commit.turn} rev=${msg.commit.terminalRevision} boundary=${msg.commit.boundary}`;
+    case "sharedTerminalAck":
+      return `id=${msg.terminalId} rev=${msg.terminalRevision} seat=${msg.ctx.fromSeatId} generation=${msg.ctx.connectionGeneration}`;
     case "interactionChoice":
       return `seq=${msg.seq} kind=${msg.kind} choice=${msg.choice}`;
     case "interactionOutcome":

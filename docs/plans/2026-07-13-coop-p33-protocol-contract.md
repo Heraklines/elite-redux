@@ -212,6 +212,54 @@ surface is open with the correct owner seat and operation address. The authority
 every frozen required seat ACKs `continuationReady`. A material-only ACK may suppress redundant reconstruction
 but cannot clear retention or let the authority cross the next shared boundary.
 
+### Shared terminal transaction
+
+Every unrecoverable control boundary uses the same retained terminal transaction; surface code must not
+clear a local runtime directly. The immutable commit is:
+
+```ts
+interface CoopSharedTerminalCommitV1 {
+  version: 1;
+  terminalId: string;
+  terminalRevision: number;
+  originSeatId: CoopSeatId;
+  epoch: number;
+  wave: number;
+  turn: number;
+  boundaryRevision: number;
+  boundary: "authority" | "recovery" | "protocol" | "persistence" | "surface" | "disconnect";
+  reasonCode:
+    | "capture-failed"
+    | "apply-failed"
+    | "recovery-exhausted"
+    | "peer-lost"
+    | "binding-mismatch"
+    | "persistence-failed"
+    | "continuation-failed"
+    | "invalid-authority";
+  reason: string;
+  quorum: CoopFrozenAckQuorumV1;
+}
+
+type CoopSharedTerminalWire =
+  | { t: "sharedTerminal"; ctx: CoopFrameContextV1; commit: CoopSharedTerminalCommitV1 }
+  | {
+      t: "sharedTerminalAck";
+      ctx: CoopFrameContextV1;
+      terminalId: string;
+      terminalRevision: number;
+      targetMembershipRevision: number;
+      stage: "terminalEntered";
+    };
+```
+
+The receiver freezes gameplay and enters terminal membership before sending `terminalEntered`. The sender
+retains and retries until the frozen seat quorum ACKs with each seat's current connection generation, or an
+absolute deadline expires. A hot-rejoin retransmit refreshes only `ctx`; the commit and target membership
+revision remain immutable. Simultaneous terminal origins deterministically select the lower origin seat,
+then revision and terminal ID. Both sides finalize after quorum/receiver grace or their bounded deadline;
+duplicates are re-ACKed without running preparation or finalization twice.
+
 ## Resume and persistence
 
 ```ts
