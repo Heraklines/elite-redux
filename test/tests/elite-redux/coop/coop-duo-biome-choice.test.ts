@@ -109,13 +109,21 @@ interface UiCapture {
 function installUiCapture(scene: BattleScene): UiCapture {
   const ui = scene.ui as unknown as {
     setMode: (mode: number, ...args: unknown[]) => Promise<void>;
+    setModeBoundedWhen: (
+      mode: number,
+      timeoutMs: number,
+      isCurrent: (() => boolean) | undefined,
+      ...args: unknown[]
+    ) => Promise<"completed" | "forced" | "superseded">;
     showText: (text: string, delay?: number | null, cb?: (() => void) | null, ...rest: unknown[]) => void;
   };
   const realSetMode = ui.setMode.bind(ui);
+  const realSetModeBoundedWhen = ui.setModeBoundedWhen;
   const realShowText = ui.showText.bind(ui);
   const cap: UiCapture = {
     restore: () => {
       ui.setMode = realSetMode;
+      ui.setModeBoundedWhen = realSetModeBoundedWhen;
       ui.showText = realShowText;
     },
   };
@@ -126,6 +134,22 @@ function installUiCapture(scene: BattleScene): UiCapture {
       cap.optionConfig = args[0] as OptionCfg;
     }
     return Promise.resolve();
+  };
+  ui.setModeBoundedWhen = (
+    mode: number,
+    _timeoutMs: number,
+    isCurrent: (() => boolean) | undefined,
+    ...args: unknown[]
+  ): Promise<"completed" | "forced" | "superseded"> => {
+    if (!(isCurrent?.() ?? true)) {
+      return Promise.resolve("superseded");
+    }
+    if (mode === UiMode.ER_MAP) {
+      cap.erMapConfig = args[0] as ErMapCfg;
+    } else if (mode === UiMode.OPTION_SELECT) {
+      cap.optionConfig = args[0] as OptionCfg;
+    }
+    return Promise.resolve("completed");
   };
   ui.showText = (_text: string, _delay?: number | null, cb?: (() => void) | null): void => {
     if (typeof cb === "function") {
@@ -143,15 +167,33 @@ function installUiCapture(scene: BattleScene): UiCapture {
 function installUiModeTracker(scene: BattleScene): { mode: () => number; restore: () => void } {
   const ui = scene.ui as unknown as {
     setMode: (mode: number, ...args: unknown[]) => Promise<void>;
+    setModeBoundedWhen: (
+      mode: number,
+      timeoutMs: number,
+      isCurrent: (() => boolean) | undefined,
+      ...args: unknown[]
+    ) => Promise<"completed" | "forced" | "superseded">;
     showText: (text: string, delay?: number | null, cb?: (() => void) | null, ...rest: unknown[]) => void;
     getMode: () => number;
   };
   const realSetMode = ui.setMode.bind(ui);
+  const realSetModeBoundedWhen = ui.setModeBoundedWhen;
   const realShowText = ui.showText.bind(ui);
   let cur = ui.getMode();
   ui.setMode = (mode: number): Promise<void> => {
     cur = mode;
     return Promise.resolve();
+  };
+  ui.setModeBoundedWhen = (
+    mode: number,
+    _timeoutMs: number,
+    isCurrent: (() => boolean) | undefined,
+  ): Promise<"completed" | "forced" | "superseded"> => {
+    if (!(isCurrent?.() ?? true)) {
+      return Promise.resolve("superseded");
+    }
+    cur = mode;
+    return Promise.resolve("completed");
   };
   ui.showText = (_text: string, _delay?: number | null, cb?: (() => void) | null): void => {
     if (typeof cb === "function") {
@@ -162,6 +204,7 @@ function installUiModeTracker(scene: BattleScene): { mode: () => number; restore
     mode: () => cur,
     restore: () => {
       ui.setMode = realSetMode;
+      ui.setModeBoundedWhen = realSetModeBoundedWhen;
       ui.showText = realShowText;
     },
   };
