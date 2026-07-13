@@ -27,6 +27,13 @@ import {
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import {
+  beginCoopUiRelayInput,
+  endCoopUiRelayInput,
+  getCoopUiRelayEdges,
+  recordCoopUiRelayCarrier,
+} from "#data/elite-redux/coop/coop-ui-relay-trace";
+import { UiMode } from "#enums/ui-mode";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -99,6 +106,17 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     // The dev extras on TOP of the shared factory, never instead of it.
     expect(runtime.spoof, "dev path attaches the spoof partner").toBeDefined();
     expect(runtime.partnerTransport, "dev path exposes the partner transport").toBeDefined();
+  });
+
+  it("clearCoopRuntime scopes UI-relay diagnostics to one session even when no runtime is active", () => {
+    clearCoopRuntime();
+    const inputId = beginCoopUiRelayInput(UiMode.MODIFIER_SELECT);
+    recordCoopUiRelayCarrier("operation", "prior session reward", "op:reward");
+    endCoopUiRelayInput(inputId);
+    expect(getCoopUiRelayEdges()).toHaveLength(1);
+
+    clearCoopRuntime();
+    expect(getCoopUiRelayEdges()).toEqual([]);
   });
 
   it("every CoopMessage wire type has at least one RECEIVER in src (no sender-only channels)", () => {
@@ -202,5 +220,42 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
       encounterSource.match(/this\.enterEncounterPresentation\(\)/g),
       "loaded, ephemeral, and persisted encounter branches all cross the chokepoint",
     ).toHaveLength(3);
+  });
+
+  it("routes turn and replacement publication through one all-or-nothing authority capture", () => {
+    const root = join(__dirname, "..", "..", "..", "..", "src");
+    const turnEnd = readFileSync(join(root, "phases", "turn-end-phase.ts"), "utf8");
+    const replacement = readFileSync(join(root, "phases", "coop-push-replacement-checkpoint-phase.ts"), "utf8");
+    for (const [label, source] of [
+      ["turnResolution", turnEnd],
+      ["replacement", replacement],
+    ] as const) {
+      expect(source, `${label} uses the coherent capture chokepoint`).toContain("captureCoopAuthoritativeCarrier(");
+      expect(source, `${label} never turns a missing rich companion into an optional wire field`).not.toContain(
+        "?? undefined",
+      );
+    }
+    expect(turnEnd, "turn publication passes the required full field companion").toContain("carrier.fullField");
+    expect(replacement, "replacement publication passes the required full field companion").toContain(
+      "carrier.fullField",
+    );
+    const replay = readFileSync(join(root, "phases", "coop-replay-turn-phase.ts"), "utf8");
+    expect(replay, "replacement retry uses the streamer's injectable scheduler").toContain(
+      "streamer.scheduleAuthorityRetry(",
+    );
+    expect(replay, "an ambient timer cannot fire under another duo client context").not.toContain("setTimeout(");
+    const terminal = readFileSync(join(root, "data", "elite-redux", "coop", "coop-authority-terminal.ts"), "utf8");
+    for (const terminalPostcondition of [
+      "membership.terminate()",
+      "scene.ui.showText(",
+      "scene.phaseManager.clearPhaseQueue()",
+      "scene.reset()",
+      'scene.phaseManager.unshiftNew("TitlePhase")',
+    ]) {
+      expect(terminal, `shared authority terminal retains ${terminalPostcondition}`).toContain(terminalPostcondition);
+    }
+    expect(replay, "turn and replacement failures route through the shared terminal helper").toContain(
+      "terminateCoopAuthoritySession(",
+    );
   });
 });

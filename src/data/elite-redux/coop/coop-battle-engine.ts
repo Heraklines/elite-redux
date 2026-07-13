@@ -86,6 +86,7 @@ import {
   swapAuthoritativeState,
   swapBi,
   swapCheckpoint,
+  swapFullField,
 } from "#data/elite-redux/showdown/showdown-side-swap";
 import type { Gender } from "#data/gender";
 import { CustomPokemonData, PokemonBattleData, PokemonSummonData } from "#data/pokemon-data";
@@ -359,6 +360,18 @@ export function coopAcceptStateTick(tick: number | undefined, label: string): bo
   }
   coopLastAppliedStateTick = tick;
   return true;
+}
+
+/**
+ * Read the guest's monotonic state high-water without changing it.
+ *
+ * Recovery uses this to distinguish a genuinely rejected carrier from an idempotent retry whose
+ * checkpoint/state tick was already admitted by an earlier attempt. The returned value is diagnostic
+ * admission state only; callers must still prove the complete payload with its exact checksum before
+ * treating an already-admitted tick as converged.
+ */
+export function coopAppliedStateTick(): number {
+  return coopLastAppliedStateTick;
 }
 
 /** Session reset (new run / new rig): both sides start from a clean tick line. */
@@ -1254,7 +1267,7 @@ function captureCoopHeldItems(mon: Pokemon): Record<string, unknown>[] {
       .map(m => {
         const data = new ModifierData(m, false);
         return {
-          typeId: data.typeId,
+          typeId: coopModifierTypeId(m),
           className: data.className,
           args: data.args,
           stackCount: data.stackCount,
@@ -1264,6 +1277,25 @@ function captureCoopHeldItems(mon: Pokemon): Record<string, unknown>[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Return the stable registry key used by ModifierData/wire reconstruction. A few older ER paths built a
+ * generated vitamin type directly, leaving `type.id` undefined at runtime even though its static type is
+ * `string`. Canonicalize that known legacy shape at the authority boundary as well as fixing its producers:
+ * an in-progress trainer fight from an older save can then still converge instead of serializing JSON null
+ * in the checksum and an unreconstructible modifier blob. Unknown unkeyed classes remain an explicit empty
+ * key (and therefore cannot masquerade as a valid item).
+ */
+function coopModifierTypeId(modifier: PersistentModifier): string {
+  const raw = modifier.type?.id as unknown;
+  if (typeof raw === "string" && raw.length > 0) {
+    return raw;
+  }
+  if (modifier instanceof Modifier.BaseStatModifier) {
+    return "BASE_STAT_BOOSTER";
+  }
+  return "";
 }
 
 /**
@@ -1645,7 +1677,7 @@ function readArenaTags(): [number, number][] {
 function readModifiers(): [string, number][] {
   try {
     return globalScene.modifiers
-      .map(m => [m.type.id, m.stackCount] as [string, number])
+      .map(m => [coopModifierTypeId(m), m.stackCount] as [string, number])
       .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]));
   } catch {
     return [];
@@ -1704,7 +1736,7 @@ function readHeldItemDigest(): [number, string, number][] {
         x => x instanceof PokemonHeldItemModifier && x.pokemonId === mon.id,
         mon.isPlayer(),
       )) {
-        out.push([bi, m.type.id, m.stackCount]);
+        out.push([bi, coopModifierTypeId(m), m.stackCount]);
       }
     }
     return out.sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : a[2] - b[2]));
@@ -2538,7 +2570,7 @@ function captureCoopModifierBlobs(player: boolean): Record<string, unknown>[] {
         const data = new ModifierData(m, player);
         return {
           player: data.player,
-          typeId: data.typeId,
+          typeId: coopModifierTypeId(m),
           className: data.className,
           args: data.args,
           stackCount: data.stackCount,
@@ -3553,8 +3585,10 @@ function applyFullMon(
       }
     }
     void mon.updateInfo();
-  } catch {
-    /* one mon's heal failed; leave it and continue */
+  } catch (error) {
+    // A rich field companion is part of the modern authority transaction. Surface a per-mon failure to
+    // the finalize/replacement boundary so it cannot open control on a merely half-applied frame.
+    recordCoopApplyFailure("fullMon", error, mon.id);
   }
 }
 
@@ -4143,7 +4177,56 @@ export function captureCoopFieldSnapshot(): CoopFullMonSnapshot[] | null {
       .map(readFullMon)
       .sort((a, b) => a.bi - b.bi);
     return field.length === 0 ? null : field;
-  } catch {
+  } catch (error) {
+    coopWarn("checkpoint", "authoritative full-field capture failed; field withheld", error);
+    return null;
+  }
+}
+
+/**
+ * One coherent modern authority frame. Turn resolutions and out-of-band replacement checkpoints must
+ * never publish a numeric checkpoint while silently omitting the rich field/state companion or while
+ * carrying the checksum read-failure sentinel. Capturing the checksum preimage once also guarantees the
+ * transmitted checksum describes the exact diagnostic preimage beside it.
+ */
+export interface CoopAuthoritativeCarrierCapture {
+  checkpoint: CoopBattleCheckpoint;
+  checksum: string;
+  preimage: string;
+  fullField: CoopFullMonSnapshot[];
+  authoritativeState: CoopAuthoritativeBattleStateV1;
+}
+
+/** HOST: capture an all-or-nothing modern turn/replacement authority frame. */
+export function captureCoopAuthoritativeCarrier(
+  turn: number,
+  reason: "turnResolution" | "replacement",
+): CoopAuthoritativeCarrierCapture | null {
+  try {
+    const checkpoint = captureCoopCheckpoint();
+    if (checkpoint == null) {
+      throw new Error("numeric checkpoint was unavailable");
+    }
+    const fullField = captureCoopFieldSnapshot();
+    if (fullField == null || fullField.length === 0) {
+      throw new Error("full field snapshot was unavailable");
+    }
+    const authoritativeState = captureCoopAuthoritativeBattleState(turn);
+    if (authoritativeState == null) {
+      throw new Error("authoritative battle state was unavailable");
+    }
+    const checksumView = captureCoopChecksumState();
+    if (checksumView.saveDataDigest === COOP_CHECKSUM_SENTINEL) {
+      throw new Error("save-data digest capture returned the read-failure sentinel");
+    }
+    const preimage = canonicalize(checksumView);
+    const checksum = checksumState(checksumView);
+    if (checksum === COOP_CHECKSUM_SENTINEL) {
+      throw new Error("full-state checksum collided with the reserved read-failure sentinel");
+    }
+    return { checkpoint, checksum, preimage, fullField, authoritativeState };
+  } catch (error) {
+    coopWarn("checkpoint", `${reason} authority capture incomplete; entire carrier withheld`, error);
     return null;
   }
 }
@@ -4163,11 +4246,16 @@ export function applyCoopFieldSnapshot(field: CoopFullMonSnapshot[] | undefined,
     return;
   }
   try {
+    // SHOWDOWN ingress: `fullField` is battler-index keyed just like the numeric checkpoint. The versus
+    // guest owns the reflected local field, so map every rich mon companion into that same coordinate
+    // space before matching it. Leaving this carrier unswapped made checkpoint/state converge while
+    // maxHp, HP, held items, tags, and PP were repeatedly written onto the opposite mon forever.
+    const localField = isShowdownGuestFlipGated() ? swapFullField(field) : field;
     // The numeric checkpoint immediately before this can remove a just-fainted mon from the ACTIVE
     // field and reset its summonData. Retain the slot-present object so the rich companion restores
     // every authoritative terminal field (notably ability/form/tags/held items) at the same boundary.
     const byIndex = new Map(getCoopSerializableField().map(m => [m.getBattlerIndex(), m]));
-    for (const snap of field) {
+    for (const snap of localField) {
       const mon = byIndex.get(snap.bi);
       if (mon != null) {
         applyFullMon(mon, snap, authoritativeGuest);
@@ -4175,12 +4263,14 @@ export function applyCoopFieldSnapshot(field: CoopFullMonSnapshot[] | undefined,
     }
     // Deferred single bar refresh (mirrors applyCoopFullSnapshot C4): applyFullMon healed held items
     // with ignoreUpdate; refresh both modifier bars ONCE here when the gated held-item heal could run.
-    if (authoritativeGuest && field.some(s => s.heldItems !== undefined)) {
+    if (authoritativeGuest && localField.some(s => s.heldItems !== undefined)) {
       globalScene.updateModifiers(true);
       globalScene.updateModifiers(false);
     }
-  } catch {
-    /* a malformed field snapshot must never crash the guest's turn */
+  } catch (error) {
+    // The caller drains this structured failure and requests/awaits a complete retry. Swallowing it here
+    // made the numeric half appear successful while an unhashed rich field could remain stale.
+    recordCoopApplyFailure("fieldSnapshot", error);
   }
 }
 

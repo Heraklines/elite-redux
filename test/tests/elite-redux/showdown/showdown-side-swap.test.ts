@@ -4,6 +4,7 @@ import type {
   CoopBattleCheckpoint,
   CoopBattleEvent,
   CoopFullBattleSnapshot,
+  CoopFullMonSnapshot,
 } from "#app/data/elite-redux/coop/coop-transport";
 import {
   swapArenaTagSide,
@@ -11,6 +12,7 @@ import {
   swapBattleEvent,
   swapBi,
   swapCheckpoint,
+  swapFullField,
   swapFullSnapshot,
   swapSessionData,
 } from "#app/data/elite-redux/showdown/showdown-side-swap";
@@ -70,10 +72,10 @@ function sampleAuthoritativeState(): CoopAuthoritativeBattleStateV1 {
       { id: 222, species: 4 },
     ],
     field: [
-      { side: "player", bi: BattlerIndex.PLAYER, partyIndex: 0, pokemonId: 111, owner: "host" },
-      { side: "player", bi: BattlerIndex.PLAYER_2, partyIndex: 1, pokemonId: 112 },
-      { side: "enemy", bi: BattlerIndex.ENEMY, partyIndex: 0, pokemonId: 221 },
-      { side: "enemy", bi: BattlerIndex.ENEMY_2, partyIndex: 1, pokemonId: 222 },
+      { side: "player", bi: BattlerIndex.PLAYER, partyIndex: 0, pokemonId: 111, owner: "host", presented: true },
+      { side: "player", bi: BattlerIndex.PLAYER_2, partyIndex: 1, pokemonId: 112, presented: true },
+      { side: "enemy", bi: BattlerIndex.ENEMY, partyIndex: 0, pokemonId: 221, presented: true },
+      { side: "enemy", bi: BattlerIndex.ENEMY_2, partyIndex: 1, pokemonId: 222, presented: true },
     ],
     weather: 3,
     weatherTurnsLeft: 4,
@@ -224,6 +226,45 @@ describe("showdown-side-swap: checkpoint + full snapshot safety net", () => {
 
   it("swapCheckpoint is an involution", () => {
     expect(swapCheckpoint(swapCheckpoint(checkpoint))).toEqual(checkpoint);
+  });
+
+  it("swapFullField mirrors every rich mon carrier and is an involution", () => {
+    const field: CoopFullMonSnapshot[] = [
+      {
+        bi: BattlerIndex.PLAYER,
+        partyIndex: 0,
+        speciesId: 1,
+        hp: 91,
+        maxHp: 100,
+        status: 0,
+        statStages: [],
+        fainted: false,
+        abilityId: 12,
+        formIndex: 0,
+        moves: [[33, 2]],
+        tags: [],
+        heldItems: [{ typeId: "LEFTOVERS", player: true }],
+      },
+      {
+        bi: BattlerIndex.ENEMY,
+        partyIndex: 0,
+        speciesId: 3,
+        hp: 47,
+        maxHp: 80,
+        status: 1,
+        statStages: [],
+        fainted: false,
+        abilityId: 34,
+        formIndex: 1,
+        moves: [[45, 1]],
+        tags: [],
+      },
+    ];
+
+    const swapped = swapFullField(field);
+    expect(swapped.map(mon => mon.bi)).toEqual([BattlerIndex.ENEMY, BattlerIndex.PLAYER]);
+    expect(swapped[0].heldItems).toEqual(field[0].heldItems);
+    expect(swapFullField(swapped)).toEqual(field);
   });
 
   it("swapFullSnapshot recurses the embedded authoritative state and mirrors legacy seating", () => {

@@ -377,6 +377,42 @@ describe.skipIf(!RUN)("co-op held-item + ball heal - real engine (#698, RISKY #1
     expect(heldOf(lead.id)).toEqual([["LEFTOVERS", 1]]);
   });
 
+  it("canonicalizes a legacy unkeyed enemy vitamin and heals it through the modern authoritative-state path", async () => {
+    await startCoopDouble();
+    const enemy = globalScene.getEnemyField()[0];
+    expect(enemy).toBeDefined();
+
+    // Exact shape produced by the live ER trainer vitamin catch-up before the producer fix: the concrete
+    // generated type had no registry id. It worked on the host, but JSON wrote a null checksum id and
+    // ModifierData.toModifier() could not rebuild it on the guest.
+    const legacy = new BaseStatBoosterModifierType(Stat.SPATK).newModifier(enemy) as PokemonHeldItemModifier;
+    legacy.type.id = undefined as unknown as string;
+    expect(legacy.type.id).toBeFalsy();
+    await globalScene.addEnemyModifier(legacy, true, true);
+
+    const hostChecksum = captureCoopChecksum();
+    expect(captureCoopChecksumState().heldItems).toContainEqual([enemy.getBattlerIndex(), "BASE_STAT_BOOSTER", 1]);
+    const captured = captureCoopFullSnapshot();
+    expect(captured).not.toBeNull();
+    const wire = JSON.parse(JSON.stringify(captured)) as CoopFullBattleSnapshot;
+    expect(wire.authoritativeState?.enemyModifiers).toContainEqual(
+      expect.objectContaining({ typeId: "BASE_STAT_BOOSTER", className: "BaseStatModifier" }),
+    );
+    expect(wire.field.flatMap(mon => mon.heldItems ?? [])).toContainEqual(
+      expect.objectContaining({ typeId: "BASE_STAT_BOOSTER", className: "BaseStatModifier" }),
+    );
+
+    globalScene.removeModifier(legacy, true);
+    globalScene.updateModifiers(false);
+    expect(captureCoopChecksum()).not.toBe(hostChecksum);
+
+    // applyCoopFullSnapshot takes its modern early-return path when authoritativeState is present. The
+    // canonical modifier key makes that path sufficient; the companion fullField need not be (and is not)
+    // applied as a second, potentially stale whole-field overlay.
+    applyCoopFullSnapshot(wire, true);
+    expect(captureCoopChecksum()).toBe(hostChecksum);
+  });
+
   it("(#3) an on-field REBIND heals: item lands on host's holder, gone from the wrong mon", async () => {
     const field = await startCoopDouble();
     const a = field[COOP_HOST_FIELD_INDEX];

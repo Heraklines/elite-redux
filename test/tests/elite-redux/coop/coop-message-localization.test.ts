@@ -36,7 +36,7 @@ import {
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import type { CoopBattleCheckpoint, CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
+import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -50,6 +50,23 @@ import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+
+function completeTurnCarrier(turn: number) {
+  const carrier = coopEngine.captureCoopAuthoritativeCarrier(turn, "turnResolution");
+  if (carrier == null) {
+    throw new Error(`test could not capture a production turn carrier for turn ${turn}`);
+  }
+  const epoch = getCoopController()?.sessionEpoch;
+  if (epoch == null || epoch <= 0) {
+    throw new Error("test has no negotiated co-op session epoch");
+  }
+  return {
+    epoch,
+    wave: carrier.authoritativeState.wave,
+    revision: carrier.authoritativeState.tick,
+    ...carrier,
+  };
+}
 
 describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant lines (#691)", () => {
   let phaserGame: Phaser.Game;
@@ -91,59 +108,32 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     return field;
   };
 
-  /** Build a checkpoint that snaps every field mon to an exact, recognizable hp. */
-  const checkpointFromField = (hp: number): CoopBattleCheckpoint => {
-    const field = globalScene.getField(true).filter((m): m is Pokemon => m != null);
-    return {
-      field: field.map(m => ({
-        bi: m.getBattlerIndex(),
-        partyIndex: (m.isPlayer() ? globalScene.getPlayerParty() : (globalScene.getEnemyParty() as Pokemon[])).indexOf(
-          m,
-        ),
-        speciesId: m.species.speciesId,
-        hp,
-        maxHp: m.getMaxHp(),
-        status: 0,
-        statStages: [0, 0, 0, 0, 0, 0, 0],
-        fainted: false,
-      })),
-      weather: 0,
-      weatherTurnsLeft: 0,
-      terrain: 0,
-      terrainTurnsLeft: 0,
+  const carrierWithKo = (turn: number, mon: Pokemon) => {
+    const before = {
+      hp: mon.hp,
+      status: mon.status,
+      summonData: mon.summonData,
+      tempSummonData: mon.tempSummonData,
+      switchOutStatus: mon.switchOutStatus,
+      onField: mon.isOnField(),
     };
-  };
-
-  /**
-   * Build a checkpoint that marks `koBi` fainted (hp 0) and snaps every OTHER field mon to its CURRENT
-   * live hp / stages (a no-op for them), so the host checksum captured with `koBi` fainted matches the
-   * guest's post-finalize checksum exactly (the guest's faint phase leaveField's the same mon).
-   */
-  const checkpointKO = (koBi: number): CoopBattleCheckpoint => {
-    const live = globalScene.getField(true).filter((m): m is Pokemon => m != null);
-    return {
-      field: live.map(m => {
-        const bi = m.getBattlerIndex();
-        const ko = bi === koBi;
-        return {
-          bi,
-          partyIndex: (m.isPlayer()
-            ? globalScene.getPlayerParty()
-            : (globalScene.getEnemyParty() as Pokemon[])
-          ).indexOf(m),
-          speciesId: m.species.speciesId,
-          hp: ko ? 0 : m.hp,
-          maxHp: m.getMaxHp(),
-          status: m.status?.effect ?? 0,
-          statStages: [...m.getStatStages()],
-          fainted: ko,
-        };
-      }),
-      weather: 0,
-      weatherTurnsLeft: 0,
-      terrain: 0,
-      terrainTurnsLeft: 0,
-    };
+    try {
+      mon.hp = 0;
+      mon.doSetStatus(StatusEffect.FAINT);
+      mon.resetSummonData();
+      mon.switchOutStatus = true;
+      globalScene.field.remove(mon);
+      return completeTurnCarrier(turn);
+    } finally {
+      mon.summonData = before.summonData;
+      mon.tempSummonData = before.tempSummonData;
+      mon.switchOutStatus = before.switchOutStatus;
+      if (before.onField) {
+        globalScene.field.add(mon);
+      }
+      mon.hp = before.hp;
+      mon.status = before.status;
+    }
   };
 
   const REPLAY_DRAIN_PHASES = [
@@ -281,16 +271,16 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
 
     // The host's stream carries the STRUCTURED events with NO host-language message line for them.
     const partner = getCoopRuntime()!.partnerTransport!;
+    const carrier = carrierWithKo(turn, enemy0);
     partner.send({
       t: "turnResolution",
       turn,
+      ...carrier,
       events: [
         { k: "moveUsed", bi: BattlerIndex.PLAYER, moveId: MoveId.TACKLE, targets: [koBi] },
         { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
         { k: "faint", bi: koBi, narrate: true },
       ],
-      checkpoint: checkpointKO(koBi),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -315,15 +305,15 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
       .mockImplementation((message: string) => queued.push(message));
 
     const partner = getCoopRuntime()!.partnerTransport!;
+    const carrier = carrierWithKo(turn, enemy0);
     partner.send({
       t: "turnResolution",
       turn,
+      ...carrier,
       events: [
         { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
         { k: "faint", bi: koBi, narrate: false },
       ],
-      checkpoint: checkpointKO(koBi),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -340,30 +330,33 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
   // (e) the post-turn checksum still CONVERGES (the regenerated lines are cosmetic).
   // ===========================================================================
 
-  it("(d) a bad moveId / bi never throws; the checkpoint still applies", async () => {
+  it("(d) a bad moveId / battler makes the complete frame fail closed", async () => {
     const field = await startCoopGuest();
     const turn = globalScene.currentBattle.turn;
+    const beforeHp = field.map(mon => mon.hp);
+    let accepted = 0;
+    const offCommit = getCoopRuntime()!.battleStream.onTurnCommit(() => accepted++);
 
     const partner = getCoopRuntime()!.partnerTransport!;
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [
         // A garbled move (unknown user + moveId) and a garbled faint (out-of-range bi, narrate=true): the
         // regeneration helpers must swallow both and never throw into the pump.
         { k: "moveUsed", bi: 99, moveId: -7, targets: [42] },
         { k: "faint", bi: 99, narrate: true },
-      ],
-      checkpoint: checkpointFromField(8),
-      checksum: coopEngine.captureCoopChecksum(),
+      ] as never,
     });
     await new Promise(r => setTimeout(r, 0));
+    offCommit();
 
-    await expect(driveReplayTurn(turn), "a bad moveId / bi never throws").resolves.not.toThrow();
-    // The checkpoint still applied: every mon snaps to the host's hp (8) despite the garbage.
-    for (const mon of field) {
-      expect(mon.hp, "the checkpoint still corrects the field after a garbled stream").toBe(8);
-    }
+    expect(accepted, "malformed presentation data never enters the replay transaction").toBe(0);
+    expect(
+      field.map(mon => mon.hp),
+      "rejection leaves the live field untouched",
+    ).toEqual(beforeHp);
   });
 
   it("(e) CONVERGENCE: after the guest regenerates the lines, the post-turn checksum matches the host's", async () => {
@@ -375,34 +368,22 @@ describe.skipIf(!RUN)("co-op host-language leak: guest regenerates the dominant 
     // HOST authoritative checksum: model the host's end-of-turn state with enemy0 KOd. Mark it fainted so
     // getField(true) excludes it, capture the checksum + checkpoint, then RESTORE enemy0 alive so the
     // guest must animate + regenerate the line itself and re-converge.
-    const koOrigHp = enemy0.hp;
-    // Build while the target is still field-visible. checkpointKO writes its authoritative hp/status as
-    // fainted itself; building after doSetStatus(FAINT) made getField(true) omit the KO entry entirely,
-    // so the guest lost its host-side stat stages even though checksum capture intentionally retains a
-    // just-fainted battler through this boundary.
-    const hostCheckpoint = checkpointKO(koBi);
-    enemy0.hp = 0;
-    enemy0.doSetStatus(StatusEffect.FAINT);
-    const hostChecksum = coopEngine.captureCoopChecksum();
-    const hostChecksumState = structuredClone(coopEngine.captureCoopChecksumState());
-    const hostFullField = coopEngine.captureCoopFieldSnapshot();
-    expect(hostFullField, "production companion full-field snapshot captured the just-fainted mon").not.toBeNull();
-    enemy0.hp = koOrigHp;
-    enemy0.status = null;
+    const carrier = carrierWithKo(turn, enemy0);
+    const hostChecksum = carrier.checksum;
+    const hostChecksumState = JSON.parse(carrier.preimage);
+    expect(carrier.fullField, "production carrier captured the just-fainted mon").not.toBeNull();
     expect(enemy0.isOnField(), "enemy0 is alive on the guest's pre-turn field").toBe(true);
 
     const partner = getCoopRuntime()!.partnerTransport!;
     partner.send({
       t: "turnResolution",
       turn,
+      ...carrier,
       events: [
         { k: "moveUsed", bi: BattlerIndex.PLAYER, moveId: MoveId.TACKLE, targets: [koBi] },
         { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
         { k: "faint", bi: koBi, narrate: true },
       ],
-      checkpoint: hostCheckpoint,
-      fullField: hostFullField!,
-      checksum: hostChecksum,
     });
     await new Promise(r => setTimeout(r, 0));
 

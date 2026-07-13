@@ -21,6 +21,7 @@ import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { settleCoopFieldPresentation } from "#data/elite-redux/coop/coop-field-presentation";
+import { clearCoopAuthoritativeGuestPlayerTrainer } from "#data/elite-redux/coop/coop-presentation";
 import {
   coopSessionGeneration,
   getCoopBattleStreamer,
@@ -91,10 +92,11 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
 
 /**
- * Presentation-only launch materialization for an authoritative co-op guest. The host's launch
+ * Transitional launch containment for an authoritative co-op guest. The host's launch
  * snapshot is captured before its summon chain, so session restore leaves every player mon loaded
  * but invisible/off-field. Running SummonPhase here is forbidden because its tail derives shared
- * PostSummon effects; this helper only seats and renders the already-authoritative party objects.
+ * PostSummon effects. This helper still changes structural field membership and runs fieldSetup; it
+ * must be replaced by applying an explicit host field-seat manifest at an immutable launch boundary.
  * Exported as a narrow test seam for the two-engine launch regression.
  */
 export function materializeCoopLoadedPlayerField(): number {
@@ -119,15 +121,15 @@ export function materializeCoopLoadedPlayerField(): number {
 }
 
 /**
- * Presentation-only materialization for the authoritative guest's adopted trainer party. Trainer
+ * Transitional field containment for the authoritative guest's adopted trainer party. Trainer
  * encounters normally reveal enemies through SummonPhase, but that phase also runs fieldSetup and
  * post-summon resolution and is therefore correctly blocked by the renderer allowlist. The old path
  * still hid the trainer and queued those blocked phases, leaving the adopted enemy objects invisible
  * (and sometimes leaving the trainer sprite covering the field).
  *
- * This performs only the visual half of summon: seat the already-authoritative objects, position them,
- * show their sprites/bars, and mark them seen. It deliberately does not call fieldSetup, roll abilities,
- * generate modifiers, or consume RNG. Exported as a narrow regression-test seam.
+ * This avoids fieldSetup, ability rolls, modifier generation, and RNG, but seating the objects and marking
+ * them seen is still structural state. The durable replacement is an authoritative field-seat manifest
+ * followed by a checksum-neutral render projection. Exported as a narrow regression-test seam.
  */
 export function materializeCoopAdoptedEnemyField(): number {
   if (!isCoopAuthoritativeGuest()) {
@@ -364,6 +366,12 @@ export class EncounterPhase extends BattlePhase {
 
   start() {
     super.start();
+
+    // ReturnPhase is structural and therefore neutralized on the authoritative guest.
+    // Its subsequent player SummonPhase never owns ShowTrainerPhase's exit there, so clear
+    // the unmatched throw sprite before any async enemy-authority wait. This base seam covers
+    // ordinary, next-wave, and new-biome encounters.
+    clearCoopAuthoritativeGuestPlayerTrainer();
 
     // #record-replay (Phase 2): begin recording this run's replay trace at the first EncounterPhase
     // (seed + the starting party are both established here). Two mutually-exclusive, idempotent enables:
@@ -1214,9 +1222,11 @@ export class EncounterPhase extends BattlePhase {
         const doTrainerSummon = () => {
           this.hideEnemyTrainer();
           if (isCoopAuthoritativeGuest()) {
-            // SummonPhase is intentionally default-denied on the pure renderer. Materialize the exact
-            // already-adopted enemy objects as presentation and end the intro with the trainer hidden;
-            // no fieldSetup/on-summon/RNG is run locally.
+            // SummonPhase is intentionally default-denied on the pure renderer. Transitional containment
+            // materializes the already-adopted enemy objects and ends the intro with the trainer hidden;
+            // no fieldSetup/on-summon/RNG is run locally. The current presenter can still change field
+            // membership, so replace this local seat derivation with an explicit host field manifest before
+            // calling launch authority complete.
             materializeCoopAdoptedEnemyField();
             this.end();
             return;
@@ -1366,34 +1376,12 @@ export class EncounterPhase extends BattlePhase {
       // `isOnField` guard keeps it idempotent for any slot already present (e.g. a restored double).
       const playerCapacity = globalScene.currentBattle.arrangement.playerCapacity;
       const party = globalScene.getPlayerParty();
-      // Showdown versus GUEST (F1 root fix 2026-07-08): the "lead is already restored" assumption
-      // holds for a mid-run save RESUME, but the versus launch snapshot is taken PRE-SUMMON -
-      // nobody is on field in the session, so the guest's own lead was NEVER summoned. Every
-      // downstream crash of the launch chain (speed-order sort, sparkle, the post-summon ability
-      // queue's getField()[bi] round-trip) was this one hole: an empty player side. Give the lead
-      // a REAL SummonPhase - pushed BEFORE the InitEncounterPhase push below, so the order matches
-      // the host exactly (enemy trainer sends out first, then the player, then post-summons).
-      if (
-        isVersusSession()
-        && getCoopController()?.role === "guest"
-        && party[0] != null
-        && !party[0].isFainted()
-        && !party[0].isOnField()
-      ) {
-        globalScene.phaseManager.pushNew("SummonPhase", 0);
-        // Mirror the fresh-launch path: a singles lead is re-centered by the position toggle
-        // (without it the summoned mon sits at the doubles-left slot - the "wrong spot").
-        if (playerCapacity === 1) {
-          globalScene.phaseManager.pushNew("ToggleDoublePositionPhase", false);
-        }
-      }
-      // A co-op guest's launch snapshot is captured before the host's SummonPhase chain. Session restore
-      // therefore reconstructs both player Pokemon but deliberately leaves them invisible/off-field. The
-      // renderer cannot run SummonPhase/PostSummonPhase (they derive abilities, hazards and battle RNG), so
-      // materialize every active player slot directly as presentation. Previously this loop started at 1,
-      // assuming a save-resume lead was already on-field: on a fresh co-op launch neither slot was, producing
-      // the live "guest cannot see either partner Pokemon or its UI bar" regression.
-      if (isCoopAuthoritativeGuest() && !isVersusSession()) {
+      // Launch/resume snapshots are captured before the host's summon chain. That is true for classic co-op
+      // and Showdown: a versus guest also starts with no local lead in the field container. An authoritative
+      // renderer must never repair this by running SummonPhase/ToggleDoublePositionPhase because their tails
+      // derive abilities, hazards and battle RNG. Materialize the already-adopted active seats for every
+      // authoritative guest; the versus launch ingress has already flipped the parties into local orientation.
+      if (isCoopAuthoritativeGuest()) {
         materializeCoopLoadedPlayerField();
       } else {
         for (let i = 1; i < playerCapacity && i < party.length; i++) {
@@ -1409,9 +1397,11 @@ export class EncounterPhase extends BattlePhase {
         }
       }
     } else if (isCoopAuthoritativeGuest() && !isVersusSession()) {
-      // A fresh authoritative checkpoint already contains the host-selected active field. Reconstruct that
-      // presentation directly: queuing local Summon/Return/Toggle/CheckSwitch phases would let the renderer
-      // derive a second encounter transition and can strand it behind the default-deny authority gate.
+      // Later waves enter with `loaded=false`, but the replayable encounter carrier has already installed the
+      // host's party/topology. Re-running the ordinary summon/recenter/return/check-switch branch creates
+      // renderer-denied structural phases (the exact two ToggleDoublePositionPhase leaks in the three-wave
+      // journey) and can derive local mechanics. Reassert only the adopted co-op field projection. Showdown
+      // keeps its fresh-versus intro path; its loaded launch still uses the presentation-only branch above.
       materializeCoopLoadedPlayerField();
     } else {
       const availablePartyMembers = globalScene.getPokemonAllowedInBattle();

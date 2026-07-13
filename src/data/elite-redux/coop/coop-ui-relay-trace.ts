@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { CoopOperationSurfaceClass } from "#data/elite-redux/coop/coop-operation-surface-registry";
 import { UiMode } from "#enums/ui-mode";
 
 /** Authoritative carriers that can prove a real UI input escaped onto the co-op data plane. */
@@ -13,6 +14,7 @@ export interface CoopUiRelayEdge {
   readonly mode: UiMode;
   readonly carrier: CoopUiRelayCarrier;
   readonly detail: string;
+  readonly operationClass?: CoopOperationSurfaceClass;
 }
 
 interface ActiveUiInput {
@@ -22,6 +24,7 @@ interface ActiveUiInput {
 
 const edges: CoopUiRelayEdge[] = [];
 const hitModes = new Set<UiMode>();
+const hitUiOperations = new Set<string>();
 const inputStack: ActiveUiInput[] = [];
 let nextInputId = 1;
 const EDGE_CAPACITY = 2_048;
@@ -50,13 +53,26 @@ export function endCoopUiRelayInput(id: number): void {
  * Called only at production carrier choke points. A send outside a real `Ui.processInput` scope is valid
  * gameplay, but it is not evidence that the UI adapter is wired and deliberately earns no contract hit.
  */
-export function recordCoopUiRelayCarrier(carrier: CoopUiRelayCarrier, detail: string): void {
+export function recordCoopUiRelayCarrier(
+  carrier: CoopUiRelayCarrier,
+  detail: string,
+  operationClass?: CoopOperationSurfaceClass,
+): void {
   const input = inputStack.at(-1);
   if (input == null) {
     return;
   }
   hitModes.add(input.mode);
-  edges.push({ inputId: input.id, mode: input.mode, carrier, detail });
+  if (operationClass != null) {
+    hitUiOperations.add(coopUiOperationHitKey(input.mode, operationClass));
+  }
+  edges.push({
+    inputId: input.id,
+    mode: input.mode,
+    carrier,
+    detail,
+    ...(operationClass == null ? {} : { operationClass }),
+  });
   while (edges.length > EDGE_CAPACITY) {
     edges.shift();
   }
@@ -72,6 +88,16 @@ export function getCoopUiRelayHitModes(): ReadonlySet<UiMode> {
   return new Set(hitModes);
 }
 
+/** Stable key for a proven public UI input -> committed operation-class edge. */
+export function coopUiOperationHitKey(mode: UiMode, operationClass: CoopOperationSurfaceClass): string {
+  return `${UiMode[mode]}->${operationClass}`;
+}
+
+/** Operation/UI pairs proven synchronously at production choke points (not limited by the diagnostic ring). */
+export function getCoopUiOperationHits(): ReadonlySet<string> {
+  return new Set(hitUiOperations);
+}
+
 /** Compact report block showing whether recent human-facing inputs actually escaped onto a carrier. */
 export function formatCoopUiRelayTrace(limit = 16): string {
   const selected = edges.slice(-Math.max(0, Math.trunc(limit)));
@@ -80,7 +106,11 @@ export function formatCoopUiRelayTrace(limit = 16): string {
   }
   return [
     `uiRelay:  ${selected.length}/${edges.length} recent carrier edges`,
-    ...selected.map(edge => `  input#${edge.inputId} mode=${UiMode[edge.mode]} carrier=${edge.carrier} ${edge.detail}`),
+    ...selected.map(
+      edge =>
+        `  input#${edge.inputId} mode=${UiMode[edge.mode]} carrier=${edge.carrier}`
+        + `${edge.operationClass == null ? "" : ` operation=${edge.operationClass}`} ${edge.detail}`,
+    ),
   ].join("\n");
 }
 
@@ -88,6 +118,7 @@ export function formatCoopUiRelayTrace(limit = 16): string {
 export function resetCoopUiRelayTrace(): void {
   edges.length = 0;
   hitModes.clear();
+  hitUiOperations.clear();
   inputStack.length = 0;
   nextInputId = 1;
 }

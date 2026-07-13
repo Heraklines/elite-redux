@@ -319,7 +319,14 @@ describe("W2b durability (§4.3): the outbound queue replaces drop-on-not-open f
     wire.readyState = "connecting";
     const t = new WebRtcTransport("host", wire);
 
-    t.send({ t: "battleEvent", turn: 1, seq: 0, event: { k: "msg", text: "x" } as never }); // cosmetic
+    t.send({
+      t: "battleEvent",
+      epoch: 7,
+      wave: 1,
+      turn: 1,
+      seq: 0,
+      event: { k: "msg", text: "x" } as never,
+    }); // cosmetic
     t.send({ t: "ping", ts: 1 }); // internal
     expect(t.outboundQueueDepth()).toBe(0);
     wire.fireOpen();

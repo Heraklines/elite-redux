@@ -89,7 +89,11 @@ import {
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { COOP_UI_MIRRORED_MODES } from "#data/elite-redux/coop/coop-ui-registry";
-import { getCoopUiRelayHitModes, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
+import {
+  getCoopUiOperationHits,
+  getCoopUiRelayHitModes,
+  resetCoopUiRelayTrace,
+} from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
 import { TerrainType } from "#data/terrain";
 import { BattleType } from "#enums/battle-type";
@@ -2938,6 +2942,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     for (const mode of getCoopUiRelayHitModes()) {
       hits.uiRelays.add(mode);
       hits.modes.add(mode);
+    }
+    for (const uiOperationPair of getCoopUiOperationHits()) {
+      hits.uiOperations.add(uiOperationPair);
     }
   };
   for (let wave = 1; wave <= waves; wave++) {

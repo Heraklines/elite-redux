@@ -31,7 +31,7 @@ function durableMsg(wave: number): CoopMessage {
 }
 /** A cosmetic frame (render tick) - sheddable, never journaled. */
 function cosmeticMsg(seq: number): CoopMessage {
-  return { t: "battleEvent", turn: 1, seq, event: { k: "msg", text: "x" } as never };
+  return { t: "battleEvent", epoch: 7, wave: 1, turn: 1, seq, event: { k: "msg", text: "x" } as never };
 }
 
 describe("durability §4.1: message classification (authoritative vs cosmetic vs internal)", () => {
@@ -39,8 +39,84 @@ describe("durability §4.1: message classification (authoritative vs cosmetic vs
     const durable: CoopMessage[] = [
       { t: "waveResolved", wave: 1, outcome: "win" },
       { t: "waveEndState", wave: 1, state: {} as never },
-      { t: "turnResolution", turn: 1, events: [], checkpoint: {} as never, checksum: "0" },
-      { t: "battleCheckpoint", reason: "r", checkpoint: {} as never, checksum: "0" },
+      {
+        t: "turnResolution",
+        epoch: 7,
+        wave: 1,
+        turn: 1,
+        revision: 2,
+        events: [],
+        checkpoint: {} as never,
+        checksum: "1",
+        preimage: "{}",
+        fullField: [{} as never],
+        authoritativeState: {} as never,
+      },
+      {
+        t: "battleCheckpoint",
+        reason: "r",
+        epoch: 7,
+        wave: 1,
+        turn: 1,
+        revision: 2,
+        checkpoint: {} as never,
+        checksum: "1",
+        fullField: [{} as never],
+        authoritativeState: {} as never,
+      },
+      { t: "requestTurnCommit", epoch: 7, wave: 1, turn: 1, revision: 2 },
+      { t: "turnCommitPending", epoch: 7, wave: 1, turn: 1 },
+      {
+        t: "turnCommitAck",
+        epoch: 7,
+        wave: 1,
+        turn: 1,
+        revision: 2,
+        checkpointTick: 1,
+        stateTick: 2,
+        checksum: "deadbeefdeadbeef",
+        status: "applied",
+      },
+      {
+        t: "requestBattleCheckpoint",
+        reason: "replacement",
+        epoch: 7,
+        wave: 1,
+        turn: 1,
+        revision: 2,
+        checkpointTick: 1,
+        stateTick: 2,
+      },
+      {
+        t: "battleCheckpointAck",
+        reason: "replacement",
+        epoch: 7,
+        wave: 1,
+        turn: 1,
+        revision: 2,
+        checkpointTick: 1,
+        stateTick: 2,
+        checksum: "deadbeefdeadbeef",
+      },
+      {
+        t: "authorityFailure",
+        failureId: "fatal-1",
+        epoch: 7,
+        wave: 1,
+        turn: 1,
+        revision: 3,
+        boundary: "turnResolution",
+        reason: "capture failed",
+      },
+      {
+        t: "authorityFailureAck",
+        failureId: "fatal-1",
+        epoch: 7,
+        wave: 1,
+        turn: 1,
+        revision: 3,
+        boundary: "turnResolution",
+      },
       { t: "interactionChoice", seq: 1, kind: "reward", choice: 0 },
       { t: "interactionOutcome", seq: 1, kind: "reward", outcome: { k: "reward" } as never },
       { t: "stateSync", blob: "b", seq: 1 },
@@ -59,7 +135,7 @@ describe("durability §4.1: message classification (authoritative vs cosmetic vs
 
   it("classifies presentation-only cue streams as cosmetic (sheddable, never journaled)", () => {
     const cosmetic: CoopMessage[] = [
-      { t: "battleEvent", turn: 1, seq: 0, event: { k: "msg", text: "x" } as never },
+      { t: "battleEvent", epoch: 7, wave: 1, turn: 1, seq: 0, event: { k: "msg", text: "x" } as never },
       { t: "uiInput", seq: 1, n: 0, button: 0, mode: 0 },
       { t: "meCursor", index: 0 },
       { t: "meMessage", text: "hi" },

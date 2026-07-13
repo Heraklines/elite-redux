@@ -45,9 +45,18 @@ if (changed.size === 0) {
 function isCoopStaticScope(file) {
   return (
     file.startsWith("src/data/elite-redux/coop/")
+    || file.startsWith("src/data/elite-redux/showdown/")
     || file.startsWith("src/phases/coop-")
+    || file.startsWith("src/phases/showdown-")
+    || file.startsWith("src/ui/coop-")
+    || file.startsWith("src/ui/handlers/showdown-")
     || file.startsWith("test/tests/elite-redux/coop/")
+    || file.startsWith("test/tests/elite-redux/showdown/")
     || file.startsWith("test/tools/coop-")
+    || file === "src/data/battle-format.ts"
+    || file === "test/data/battle-format.test.ts"
+    || /(?:^|\/)er-triple[^/]*\.test\.ts$/.test(file)
+    || /(?:^|\/)(?:probe|repro)-triple[^/]*\.test\.ts$/.test(file)
     || file === "src/phases/command-phase.ts"
     || file === "src/phases/title-phase.ts"
   );

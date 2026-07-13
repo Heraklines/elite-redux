@@ -6,13 +6,10 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import {
-  captureCoopAuthoritativeBattleState,
-  captureCoopCheckpoint,
-  captureCoopChecksum,
-} from "#data/elite-redux/coop/coop-battle-engine";
+import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
+import { captureCoopAuthoritativeCarrier } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { coopSessionGeneration, getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
 
 /**
  * Co-op (#633, the guest-faint deadlock): pushed by the HOST right after it auto-summons a
@@ -30,24 +27,54 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
 
   public override start(): void {
     super.start();
-    try {
-      const streamer = getCoopBattleStreamer();
-      if (streamer != null && getCoopController()?.role === "host") {
-        const checkpoint = captureCoopCheckpoint();
-        if (checkpoint != null) {
-          coopLog("checkpoint", "host push OUT-OF-BAND replacement checkpoint (partner-slot auto-summon)");
-          streamer.sendCheckpoint(
-            "replacement",
-            checkpoint,
-            captureCoopChecksum(),
-            captureCoopAuthoritativeBattleState(globalScene.currentBattle?.turn ?? 0) ?? undefined,
-          );
-        }
+    const streamer = getCoopBattleStreamer();
+    const controller = getCoopController();
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    const turn = globalScene.currentBattle?.turn ?? 0;
+    const fatal = (reason: string): void => {
+      if (streamer == null || controller == null) {
+        terminateCoopAuthoritySession(reason);
+        return;
       }
-    } catch {
-      // Best-effort: a capture/send failure must never hang the host's flow; the guest
-      // still heals on the next turn resolution's checkpoint.
-      coopWarn("checkpoint", "replacement checkpoint push failed (handled)");
+      const generation = coopSessionGeneration();
+      void streamer
+        .broadcastAuthorityFailure({
+          epoch: controller.sessionEpoch,
+          wave,
+          turn,
+          boundary: "replacement",
+          reason,
+        })
+        .then(() => {
+          if (generation === coopSessionGeneration()) {
+            terminateCoopAuthoritySession(reason);
+          }
+        });
+    };
+    try {
+      if (streamer != null && controller?.role === "host") {
+        const carrier = captureCoopAuthoritativeCarrier(turn, "replacement");
+        if (carrier == null) {
+          coopWarn("checkpoint", "host could not capture complete replacement checkpoint");
+          fatal(`Host could not capture replacement authority for wave ${wave}, turn ${turn}.`);
+          return;
+        }
+        coopLog("checkpoint", "host push OUT-OF-BAND replacement checkpoint (partner-slot auto-summon)");
+        streamer.sendCheckpoint(
+          "replacement",
+          controller.sessionEpoch,
+          carrier.authoritativeState.wave,
+          carrier.authoritativeState.turn,
+          carrier.checkpoint,
+          carrier.checksum,
+          carrier.fullField,
+          carrier.authoritativeState,
+        );
+      }
+    } catch (error) {
+      coopWarn("checkpoint", "replacement checkpoint push failed; carrier withheld", error);
+      fatal(`Host could not publish replacement authority for wave ${wave}, turn ${turn}.`);
+      return;
     }
     this.end();
   }

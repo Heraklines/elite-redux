@@ -2776,6 +2776,57 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: trainer faint recovery keeps mechanics and visuals in one transaction",
+    description:
+      "CO-OP regression - verify with TWO clients from a FRESH run and again after RESUME. Reach a DOUBLE\n"
+      + "trainer battle, let the guest-owned active Pokemon faint, and choose a bench replacement while the\n"
+      + "opponent also switches or sends a reserve. This reproduced the July 12 live failure: the host sent\n"
+      + "a mid-switch state snapshot containing a trainer-held vitamin with no registry id, the guest held\n"
+      + "inside recovery, and the newer completed replacement waited behind it. The same transition also\n"
+      + "left Pokemon sprites/bars missing and the trainer sprite covering the field. EXPECT on BOTH clients:\n"
+      + "the selected replacement appears in the correct owned slot exactly once; the battle remains the\n"
+      + "declared double format (never 3v2 or collapsed single); all active Pokemon sprites and HP bars agree;\n"
+      + "both trainer sprites are gone before command input; both players can select the next turn; no repeated\n"
+      + "resync, AI substitution, checksum mismatch, or 'player choosing a move' after both submitted. Also use\n"
+      + "Send Logs at the command boundary so the paired causal/control trace is captured.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.CHIKORITA, {
+          moveset: [MoveId.RAZOR_LEAF, MoveId.BODY_SLAM, MoveId.SYNTHESIS, MoveId.REFLECT],
+        }),
+        makeStarter(SpeciesId.FENNEKIN, {
+          moveset: [MoveId.EMBER, MoveId.PSYBEAM, MoveId.QUICK_ATTACK, MoveId.HOWL],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Co-op/Showdown: later-wave field projection runs no local summon or recenter",
+    description:
+      "AUTHORITATIVE RENDERER regression - verify with TWO co-op clients across at least THREE waves, then\n"
+      + "start one fresh Showdown match as the guest. The partner previously entered the ordinary encounter\n"
+      + "tail on waves 2+, queued ToggleDoublePositionPhase locally, and relied on the renderer gate to turn it\n"
+      + "into a no-op; the fresh Showdown guest similarly queued a blocked SummonPhase for its own lead. EXPECT:\n"
+      + "both player Pokemon and their HP bars are visible in the correct slots before command input on every\n"
+      + "co-op wave; the Showdown guest sees its own lead on the player side; neither mode flashes/re-summons,\n"
+      + "re-runs an on-summon ability, collapses format, or logs a renderer-denied Summon/Return/Toggle phase.\n"
+      + "Use Send Logs at the first command boundary of wave 1, wave 2, and the Showdown match.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.CHIKORITA, {
+          moveset: [MoveId.RAZOR_LEAF, MoveId.BODY_SLAM, MoveId.SYNTHESIS, MoveId.REFLECT],
+        }),
+        makeStarter(SpeciesId.FENNEKIN, {
+          moveset: [MoveId.EMBER, MoveId.PSYBEAM, MoveId.QUICK_ATTACK, MoveId.HOWL],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: reciprocal pacing barriers + no counter drift (#839/#837)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle). Two related pacing/sync fixes:\n"

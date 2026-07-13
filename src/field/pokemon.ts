@@ -7146,15 +7146,23 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (anim) {
       anim.frameRate = frameRate;
     }
-    try {
-      this.getSprite().play(this.getBattleSpriteKey());
-    } catch (err: unknown) {
-      console.error(`Failed to play animation for ${this.getBattleSpriteKey()}`, err);
+    // Bench and freshly reconstructed authoritative mons may not have presentation children yet.
+    // A status/frame-rate update is still mechanically valid there; animation begins after init/load.
+    const sprite = this.getSprite();
+    if (sprite != null) {
+      try {
+        sprite.play(this.getBattleSpriteKey());
+      } catch (err: unknown) {
+        console.error(`Failed to play animation for ${this.getBattleSpriteKey()}`, err);
+      }
     }
-    try {
-      this.getTintSprite()?.play(this.getBattleSpriteKey());
-    } catch (err: unknown) {
-      console.error(`Failed to play animation for ${this.getBattleSpriteKey()}`, err);
+    const tintSprite = this.getTintSprite();
+    if (tintSprite != null) {
+      try {
+        tintSprite.play(this.getBattleSpriteKey());
+      } catch (err: unknown) {
+        console.error(`Failed to play animation for ${this.getBattleSpriteKey()}`, err);
+      }
     }
   }
 

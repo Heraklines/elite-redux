@@ -240,6 +240,7 @@ import {
 } from "#data/elite-redux/coop/coop-transport";
 import { setCoopLiveEmitter } from "#data/elite-redux/coop/coop-turn-recorder";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
+import { resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import {
   commitWaveAdvanceOwnerIntent,
   isCoopWaveAdvanceOperationEnabled,
@@ -309,7 +310,7 @@ function wireCoopLiveEvents(controller: CoopSessionController, battleStream: Coo
     if (isCoopDebug()) {
       coopLog("runtime", `ME-stream live-event host turn=${turn} seq=${seq} k=${event.k}`);
     }
-    battleStream.emitEvent(turn, seq, event);
+    battleStream.emitEvent(controller.sessionEpoch, globalScene.currentBattle?.waveIndex ?? 0, turn, seq, event);
   });
 }
 
@@ -3689,7 +3690,13 @@ export function assembleCoopRuntime(
   // value overwrites it on receipt). Default "coop" so co-op stays byte-identical.
   controller.setSessionKind(opts.kind ?? "coop");
   const battleSync = new CoopBattleSync(transport);
-  const battleStream = new CoopBattleStreamer(transport);
+  const battleStream = new CoopBattleStreamer(transport, {
+    authorityContext: () => ({
+      epoch: controller.sessionEpoch,
+      wave: globalScene.currentBattle?.waveIndex ?? 0,
+      turn: globalScene.currentBattle?.turn ?? 0,
+    }),
+  });
   // Showdown 1v1: the interaction relay disables its #829 seat-map forged-switch check in versus (the
   // guest legitimately relays faint-replacement picks for the host's enemy side). Live predicate so the
   // guest - whose kind flips "coop" -> "versus" only on runConfig receipt - is correct after adoption.
@@ -3870,6 +3877,9 @@ export function installCoopRuntimeLiveEmitter(runtime: CoopRuntime): void {
 
 /** Tear down and forget the live co-op session (closing its transport). */
 export function clearCoopRuntime(): void {
+  // UI -> relay -> operation diagnostics are SESSION evidence. Reset even when there is no active runtime:
+  // every production start/connect path clears first, so a fresh pairing must never inherit prior-run edges.
+  resetCoopUiRelayTrace();
   if (active == null) {
     return;
   }

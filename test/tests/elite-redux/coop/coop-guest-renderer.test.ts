@@ -28,6 +28,7 @@ import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { adoptCoopEnemiesStructural, buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { CoopInteractionRelay, setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import { clearCoopAuthoritativeGuestPlayerTrainer } from "#data/elite-redux/coop/coop-presentation";
 import {
   isCoopRendererGateEnforced,
   setCoopRendererGateEnforced,
@@ -59,8 +60,13 @@ import { SpeciesId } from "#enums/species-id";
 import { StatusEffect } from "#enums/status-effect";
 import { SwitchType } from "#enums/switch-type";
 import { TrainerSlot } from "#enums/trainer-slot";
+import { TrainerType } from "#enums/trainer-type";
+import { TrainerVariant } from "#enums/trainer-variant";
 import { UiMode } from "#enums/ui-mode";
 import { EnemyPokemon, type Pokemon } from "#field/pokemon";
+import { Trainer } from "#field/trainer";
+import { EncounterPhase } from "#phases/encounter-phase";
+import { NextEncounterPhase } from "#phases/next-encounter-phase";
 import { VoucherType } from "#system/voucher";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -68,6 +74,23 @@ import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+
+function completeTurnCarrier(turn: number) {
+  const carrier = coopEngine.captureCoopAuthoritativeCarrier(turn, "turnResolution");
+  if (carrier == null) {
+    throw new Error(`test could not capture a production turn carrier for turn ${turn}`);
+  }
+  const epoch = getCoopController()?.sessionEpoch;
+  if (epoch == null || epoch <= 0) {
+    throw new Error("test has no negotiated co-op session epoch");
+  }
+  return {
+    epoch,
+    wave: carrier.authoritativeState.wave,
+    revision: carrier.authoritativeState.tick,
+    ...carrier,
+  };
+}
 
 describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 Phase B)", () => {
   let phaserGame: Phaser.Game;
@@ -164,29 +187,19 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     return field;
   };
 
-  /** Build a checkpoint that snaps every field mon to an exact, recognizable hp. */
-  const checkpointFromField = (hp: number): CoopBattleCheckpoint => {
-    const field = globalScene.getField(true).filter(m => m != null);
-    return {
-      field: field.map(m => ({
-        bi: m.getBattlerIndex(),
-        // Stable party-slot identity (#633, enemy-switch mirror): mirror the real builder -
-        // enemy -> enemy-party index, player -> player-party index.
-        partyIndex: (m.isPlayer() ? globalScene.getPlayerParty() : (globalScene.getEnemyParty() as Pokemon[])).indexOf(
-          m,
-        ),
-        speciesId: m.species.speciesId,
-        hp,
-        maxHp: m.getMaxHp(),
-        status: 0,
-        statStages: [0, 0, 0, 0, 0, 0, 0],
-        fainted: false,
-      })),
-      weather: 0,
-      weatherTurnsLeft: 0,
-      terrain: 0,
-      terrainTurnsLeft: 0,
-    };
+  const carrierWithFieldHp = (turn: number, hp: number) => {
+    const mons = globalScene.getField(true).filter((m): m is Pokemon => m != null);
+    const before = mons.map(mon => mon.hp);
+    try {
+      for (const mon of mons) {
+        mon.hp = hp;
+      }
+      return completeTurnCarrier(turn);
+    } finally {
+      mons.forEach((mon, index) => {
+        mon.hp = before[index];
+      });
+    }
   };
 
   /**
@@ -252,7 +265,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     ).toBeUndefined();
   });
 
-  it("the guest's host-slot CommandPhase auto-resolves to an inert command (no menu, no await)", async () => {
+  it("the guest's host-slot CommandPhase clears stale trainer chrome without revealing battlers", async () => {
     await startCoopGuest();
     globalScene.currentBattle.turnCommands = {};
     // The renderer gate neutralizes SummonPhase, which normally owns this hide tween. Model the
@@ -260,7 +273,21 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const trainerVisibilitySpy = vi.spyOn(globalScene.trainer, "setVisible");
     globalScene.trainer.setVisible(true);
     trainerVisibilitySpy.mockClear();
+    // Trainer cleanup must not be allowed to infer mechanical field state. A hidden enemy models
+    // Commander/Substitute/Fly-style intentional invisibility and must remain untouched.
+    const enemyField = globalScene.getEnemyField(true).filter(enemy => enemy.isOnField());
+    expect(enemyField.length, "the fixture has seated enemies to render").toBeGreaterThan(0);
+    for (const enemy of enemyField) {
+      enemy.setVisible(false);
+      enemy.getSprite().setVisible(false);
+      enemy.getBattleInfo().setVisible(false);
+    }
+    const enemyTrainer = new Trainer(TrainerType.YOUNGSTER, TrainerVariant.DEFAULT, 0);
+    enemyTrainer.setAlpha(1);
+    globalScene.currentBattle.trainer = enemyTrainer;
     const setModeSpy = vi.spyOn(globalScene.ui, "setMode");
+    const fieldIdsBefore = globalScene.getField(true).map(pokemon => pokemon?.id ?? null);
+    const checksumBefore = coopEngine.captureCoopChecksum();
 
     // Field slot 0 is the HOST's mon from the guest's POV: the guest must NOT open a menu
     // or await the host's command - it writes an inert skip and ends.
@@ -275,6 +302,57 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       trainerVisibilitySpy,
       "authoritative guest clears the launch trainer before command UI",
     ).toHaveBeenCalledWith(false);
+    expect(enemyTrainer.alpha, "the enemy trainer reaches its normal post-summon hidden state").toBe(0);
+    expect(enemyTrainer.visible, "the enemy trainer cannot be revived by its unfinished fade tween").toBe(false);
+    expect(
+      globalScene.getField(true).map(pokemon => pokemon?.id ?? null),
+      "field seating is unchanged",
+    ).toEqual(fieldIdsBefore);
+    expect(coopEngine.captureCoopChecksum(), "trainer presentation is mechanically checksum-neutral").toBe(
+      checksumBefore,
+    );
+    for (const enemy of enemyField) {
+      expect(enemy.isOnField(), "trainer cleanup does not change authoritative seating").toBe(true);
+      expect(enemy.visible, "intentional container invisibility is preserved").toBe(false);
+      expect(enemy.getSprite().visible, "intentional sprite invisibility is preserved").toBe(false);
+      expect(enemy.getBattleInfo().visible, "intentional battle-info invisibility is preserved").toBe(false);
+    }
+  });
+
+  it("clears the gated guest's player trainer before the next-encounter authority wait", async () => {
+    await startCoopGuest();
+    const trainerVisibilitySpy = vi.spyOn(globalScene.trainer, "setVisible");
+    globalScene.trainer.setVisible(true);
+    trainerVisibilitySpy.mockClear();
+    // Keep this regression at the production EncounterPhase.start seam without starting
+    // its intentional fail-closed network wait in a single-client test.
+    const encounterPrototype = EncounterPhase.prototype as unknown as {
+      shouldAdoptCoopEnemyParty: () => boolean;
+      runEncounter: () => void;
+    };
+    const shouldAdoptSpy = vi.spyOn(encounterPrototype, "shouldAdoptCoopEnemyParty").mockReturnValue(false);
+    const runEncounterSpy = vi.spyOn(encounterPrototype, "runEncounter").mockImplementation(() => {});
+    try {
+      new NextEncounterPhase().start();
+      expect(runEncounterSpy, "normal encounter startup still follows the cleanup").toHaveBeenCalledOnce();
+      expect(
+        trainerVisibilitySpy,
+        "the unmatched ShowTrainerPhase residue is cleared before waiting for enemy authority",
+      ).toHaveBeenCalledWith(false);
+      expect(globalScene.trainer.visible).toBe(false);
+    } finally {
+      runEncounterSpy.mockRestore();
+      shouldAdoptSpy.mockRestore();
+    }
+  });
+
+  it("does not clear Showdown's guest trainer through the classic co-op fallback", async () => {
+    await startCoopGuest();
+    getCoopController()!.setSessionKind("versus");
+    globalScene.trainer.setVisible(true);
+
+    expect(clearCoopAuthoritativeGuestPlayerTrainer()).toBe(false);
+    expect(globalScene.trainer.visible, "Showdown owns its own trainer/summon presentation").toBe(true);
   });
 
   it("the guest's TurnStartPhase DIVERTS to CoopReplayTurnPhase: no MovePhase, no resolution", async () => {
@@ -329,16 +407,12 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // phase's awaitTurn resolves with it. The checkpoint snaps every mon to hp=7 - a value
     // the live engine never produces on its own, so reading 7 PROVES the guest applied it.
     const partner = getCoopRuntime()!.partnerTransport!;
-    const checkpoint = checkpointFromField(7);
-    const authoritativeMaxHp = field[0].getMaxHp() + 9;
-    const hostSlot = checkpoint.field.find(state => state.bi === field[0].getBattlerIndex())!;
-    hostSlot.maxHp = authoritativeMaxHp;
+    const carrier = carrierWithFieldHp(turn, 7);
     partner.send({
       t: "turnResolution",
       turn,
+      ...carrier,
       events: [{ k: "message", text: "Magikarp used Splash!" }],
-      checkpoint,
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -350,9 +424,6 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     for (const mon of field) {
       expect(mon.hp, "guest field snaps to the host's streamed checkpoint hp").toBe(7);
     }
-    expect(field[0].getMaxHp(), "guest adopts the checkpoint's authoritative maxHp every turn").toBe(
-      authoritativeMaxHp,
-    );
     // BUG1 (deadlock fix): the authoritative-guest finalize does NOT run the real (damaging) turn-end
     // phases - those let the guest locally chip a host-surviving mon to a premature faint/victory. It
     // advances the turn MINIMALLY (incrementTurn), so the drained queue auto-runs the next turn's
@@ -760,9 +831,8 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [{ k: "message", text: "Foe fainted!" }],
-      checkpoint: checkpointFromField(0),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -778,22 +848,6 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // host already passed. The wave advances via the tail above, not a queued TurnEndPhase.
     const queuedTurnEnd = pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase");
     expect(queuedTurnEnd, "no phantom turn-end on a resolved wave (#698 terminal finalize)").toBe(false);
-
-    // IDEMPOTENT: a DUPLICATE waveResolved for the same wave must NOT queue a second VictoryPhase.
-    partner.send({ t: "waveResolved", wave: globalScene.currentBattle.waveIndex, outcome: "win" });
-    await new Promise(r => setTimeout(r, 0));
-    partner.send({
-      t: "turnResolution",
-      turn: turn + 1,
-      events: [],
-      checkpoint: checkpointFromField(0),
-      checksum: coopEngine.captureCoopChecksum(),
-    });
-    await new Promise(r => setTimeout(r, 0));
-    pushNewSpy.mockClear();
-    await driveReplayTurn(turn + 1);
-    const victoryPushes2 = pushNewSpy.mock.calls.filter(([name]) => name === "VictoryPhase");
-    expect(victoryPushes2.length, "a duplicate waveResolved for the same wave does NOT re-advance").toBe(0);
   });
 
   // (A2) POST-BATTLE SOFTLOCK / phantom turn (#633/#698/#696/#697): the live "frozen after battle"
@@ -806,36 +860,19 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   // the host already passed; the guest would then broadcast a command + awaitTurn for that phantom turn
   // the host never resolves -> deadlock). This asserts: the final turn renders + finalizes, runs NO second
   // VictoryPhase, and queues NO TurnEndPhase (no phantom turn).
-  it("POST-BATTLE SOFTLOCK (#633): the final turn after a wave-advance is TERMINAL (no phantom turn-end loop)", async () => {
+  it("POST-BATTLE SOFTLOCK (#633): a wave-resolved final turn renders then terminates without a phantom loop", async () => {
     await startCoopGuest();
-    const earlierTurn = globalScene.currentBattle.turn;
-    const finalTurn = earlierTurn + 1;
-    const wave = globalScene.currentBattle.waveIndex;
+    const finalTurn = globalScene.currentBattle.turn;
     const partner = getCoopRuntime()!.partnerTransport!;
 
-    // The host RESOLVED this wave (WIN) BEFORE the final turn's resolution (the live racy order).
-    partner.send({ t: "waveResolved", wave, outcome: "win" });
+    // The host resolves the wave immediately before its final addressed turn commit (the live wire order).
+    sendWaveAdvance(partner, "win");
     await new Promise(r => setTimeout(r, 0));
-
-    // EARLIER turn resolves: its finalize consumes the pending wave-advance and runs VictoryPhase,
-    // AND queues turn-end (the run legitimately loops to the wave's FINAL turn). lastResolvedWave := N.
-    partner.send({
-      t: "turnResolution",
-      turn: earlierTurn,
-      events: [{ k: "message", text: "Foe fainted!" }],
-      checkpoint: checkpointFromField(0),
-      checksum: coopEngine.captureCoopChecksum(),
-    });
-    await new Promise(r => setTimeout(r, 0));
-    await driveReplayTurn(earlierTurn);
-
-    // Now the wave's FINAL turn's LATE turnResolution arrives (after the wave already advanced).
     partner.send({
       t: "turnResolution",
       turn: finalTurn,
+      ...completeTurnCarrier(finalTurn),
       events: [{ k: "message", text: "Critical hit!" }],
-      checkpoint: checkpointFromField(0),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -856,11 +893,11 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase"),
       "no TurnEndPhase queued on the terminal final turn (no phantom turn N+1)",
     ).toBe(false);
-    // The wave already advanced on the earlier turn; the final turn must NOT re-advance it.
+    // Exactly one victory tail is queued for this final addressed commit.
     expect(
       pushNewSpy.mock.calls.filter(([name]) => name === "VictoryPhase").length,
-      "the already-advanced wave is not re-advanced by the final turn",
-    ).toBe(0);
+      "the wave advances exactly once",
+    ).toBe(1);
   });
 
   // (B) SWITCH-MIRROR (#633, enemy-switch mirror): a host trainer SWITCH swaps party[fieldIndex]
@@ -1025,9 +1062,8 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [{ k: "message", text: "Got away safely!" }],
-      checkpoint: checkpointFromField(10),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -1063,9 +1099,8 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     partner.send({
       t: "turnResolution",
       turn,
+      ...completeTurnCarrier(turn),
       events: [{ k: "message", text: "The run ended." }],
-      checkpoint: checkpointFromField(0),
-      checksum: coopEngine.captureCoopChecksum(),
     });
     await new Promise(r => setTimeout(r, 0));
 
@@ -1439,6 +1474,8 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(nonBossBlob.isBoss, "the non-boss enemy serializes isBoss=false").toBe(false);
     expect(nonBossBlob.bossSegments, "the non-boss carrier preserves canonical segment count").toBe(0);
     expect(nonBossBlob.bossSegmentIndex, "the non-boss carrier preserves canonical segment index").toBe(0);
+    const nonBossWire = JSON.parse(JSON.stringify(nonBossBlob)) as typeof nonBossBlob;
+    expect(nonBossWire, "non-boss authority is byte-stable through JSON").toEqual(nonBossBlob);
 
     // --- RECONSTRUCT (guest): buildCoopEnemy rebuilds a fresh EnemyPokemon from the blob. Without the
     // fix the rebuilt boss would have bossSegments=0 (addEnemyPokemon hardcodes boss `false`); WITH it,

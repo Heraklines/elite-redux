@@ -15,6 +15,7 @@
 import { globalScene } from "#app/global-scene";
 import { TRIPLE_FORMAT } from "#data/battle-format";
 import { AbilityId } from "#enums/ability-id";
+import type { BattlerIndex } from "#enums/battler-index";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
@@ -78,9 +79,9 @@ describe.skipIf(!RUN)("ER multi-format - a TRIPLE WILD battle spawns 3v3 headles
     // attack, not vanilla's no-op). The turn loop must build 3 player CommandPhases + roll
     // 3 enemy AI commands and resolve every move. A wrong slot index / gappy turnCommands /
     // a 3rd slot with no command would soft-lock here.
-    game.move.select(MoveId.SPLASH, 0);
-    game.move.select(MoveId.SPLASH, 1);
-    game.move.select(MoveId.SPLASH, 2);
+    game.move.select(MoveId.SPLASH, 0, 3);
+    game.move.select(MoveId.SPLASH, 1, 4 as BattlerIndex);
+    game.move.select(MoveId.SPLASH, 2, 5 as BattlerIndex);
 
     await game.phaseInterceptor.to("TurnInitPhase");
 

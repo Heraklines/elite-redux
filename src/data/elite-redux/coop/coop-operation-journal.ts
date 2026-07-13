@@ -65,7 +65,7 @@ import {
 import { recordCoopUiRelayCarrier } from "#data/elite-redux/coop/coop-ui-relay-trace";
 
 /** The journaled durability class for a committed op, DERIVED from its logical phase (§4.1). */
-export function coopOperationClassForPhase(phase: CoopLogicalPhase): string | null {
+export function coopOperationClassForPhase(phase: CoopLogicalPhase): CoopOperationSurfaceClass | null {
   switch (phase) {
     case "BIOME_SELECT":
       return "op:biome";
@@ -87,7 +87,7 @@ export function coopOperationClassForPhase(phase: CoopLogicalPhase): string | nu
 }
 
 /** Resolve classes that share the generic INTERACTION logical phase by their closed operation kind. */
-export function coopOperationClassForEnvelope(envelope: CoopAuthoritativeEnvelopeV1): string | null {
+export function coopOperationClassForEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopOperationSurfaceClass | null {
   if (envelope.pendingOperation?.kind === "FAINT_SWITCH" && envelope.logicalPhase === "TURN_RESOLVE") {
     return "op:faintSwitch";
   }
@@ -218,6 +218,7 @@ export function tryJournalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvel
   recordCoopUiRelayCarrier(
     "operation",
     `class=${cls} kind=${envelope.pendingOperation?.kind ?? "none"} revision=${envelope.revision}`,
+    cls,
   );
   const opId = envelope.pendingOperation?.id ?? `${envelope.sessionEpoch}:revision:${envelope.revision}`;
   recordCoopCausalEvent({

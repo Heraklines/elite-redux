@@ -8,6 +8,7 @@
 // (vitamins) randomly distributed, where N = the MOST vitamins on any one player
 // mon. Kills the "dump every vitamin on one lead" strategy. ER_SCENARIO=1 gated.
 
+import { modifierTypes } from "#data/data-lists";
 import { applyErTrainerVitaminCatchup } from "#data/elite-redux/er-trainer-runtime-hook";
 import { AbilityId } from "#enums/ability-id";
 import { SpeciesId } from "#enums/species-id";
@@ -46,7 +47,9 @@ describe.skipIf(!RUN)("ER trainer vitamin mirror (anti-stacking)", () => {
 
     // Stack 12 ATK vitamins on the player lead - the strategy we want to punish.
     const lead = game.scene.getPlayerParty()[0];
-    const vit = new BaseStatBoosterModifierType(Stat.ATK).newModifier(lead) as PokemonHeldItemModifier;
+    const vitaminType = new BaseStatBoosterModifierType(Stat.ATK);
+    vitaminType.withIdFromFunc(modifierTypes.BASE_STAT_BOOSTER);
+    const vit = vitaminType.newModifier(lead) as PokemonHeldItemModifier;
     vit.stackCount = 12;
     game.scene.addModifier(vit, true);
 
@@ -69,6 +72,12 @@ describe.skipIf(!RUN)("ER trainer vitamin mirror (anti-stacking)", () => {
 
     // The apex mirrors the player's 12 vitamins (spread across stats, capped per stat).
     expect(vitaminTotalOn(game, apex.id, false)).toBe(12);
+    expect(
+      game.scene
+        .findModifiers(m => m instanceof BaseStatModifier && m.pokemonId === apex.id, false)
+        .every(m => m.type.id === "BASE_STAT_BOOSTER"),
+      "hand-built enemy vitamins retain the registry id required by ModifierData",
+    ).toBe(true);
 
     // A non-apex enemy mon gets none.
     const nonApex = enemyParty.find(e => e !== apex);

@@ -34,20 +34,24 @@
 //     gate test does NOT swallow a hard LOCKSTEP/NO-PARK/TEARDOWN breach (unlike the non-gating evidence test
 //     coop-soak-fidelity.test.ts), so any hard-invariant failure = nonzero exit = GATE RED. Bounded to
 //     PROD_FIDELITY_GATE_WAVES waves so the gate stays wall-clock-bounded (the long god soak stays nightly).
+//   - Lane S (Showdown): every tracked Showdown test. Versus rides the same authority transport and cannot
+//     remain outside the deploy gate merely because its files live beside, rather than under, coop/.
+//   - Lane T (topology/triples): the format model plus every tracked ER triple/probe/repro test, including
+//     the 3v2 faint/switch regressions and the six-battler presentation offsets.
 //
 // USAGE:
 //   node scripts/run-coop-gate.mjs                 # run all lanes, aggregate (exit 0 = all green)
-//   node scripts/run-coop-gate.mjs --lane A        # run one lane (A|B|C|P)
+//   node scripts/run-coop-gate.mjs --lane A        # run one lane (A|B|C|P|S|T)
 //   node scripts/run-coop-gate.mjs --lane B --shard 1/8  # one deterministic external-compute shard
 //   node scripts/run-coop-gate.mjs --list          # print the calibrated lane composition + counts, run nothing
 //   pnpm coop:gate                                 # the package.json alias
 //
-// EXIT: 0 iff EVERY gating lane (A,B,C,P) passed. Per-lane summaries (file count / pass-fail / duration) print at the end.
+// EXIT: 0 iff EVERY gating lane (A,B,C,P,S,T) passed. Per-lane summaries (file count / pass-fail / duration) print at the end.
 // =============================================================================
 
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -109,17 +113,36 @@ function trackedTestBasenames() {
   );
 }
 
+/** Deterministically list tracked tests for additional co-op-owned formats/surfaces. */
+function trackedTests(...pathspecs) {
+  const res = spawnSync(process.platform === "win32" ? "git.exe" : "git", ["ls-files", ...pathspecs], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+  });
+  if (res.status !== 0 || typeof res.stdout !== "string") {
+    throw new Error(`git ls-files failed for ${pathspecs.join(", ")}`);
+  }
+  return [...new Set(res.stdout.split(/\r?\n/).filter(Boolean))].sort();
+}
+
 /**
  * Categorize every TRACKED coop test file into lane A (engine-free), B (heavy engine), C (soak),
- * P (gating production-fidelity soak, #897), or Q (quarantine).
+ * P (gating production-fidelity soak, #897), S (Showdown authoritative mode),
+ * T (triple/topology), or Q (quarantine).
  */
 function categorize() {
   const tracked = trackedTestBasenames();
+  const nestedCoop = trackedTests("test/tests/elite-redux/coop/**/*.test.ts");
+  if (nestedCoop.length > 0) {
+    throw new Error(
+      `nested co-op tests require an explicit lane classification before they can ship:\n${nestedCoop.join("\n")}`,
+    );
+  }
   const files = readdirSync(COOP_DIR)
     .filter(f => f.endsWith(".test.ts"))
     .filter(f => tracked == null || tracked.has(f))
     .sort();
-  const lanes = { A: [], B: [], C: [], P: [], Q: [] };
+  const lanes = { A: [], B: [], C: [], P: [], S: [], T: [], Q: [] };
   for (const f of files) {
     const rel = `${COOP_DIR_REL}/${f}`;
     if (QUARANTINE.has(f)) {
@@ -140,6 +163,15 @@ function categorize() {
       lanes.A.push(rel);
     }
   }
+  lanes.S.push(...trackedTests("test/tests/elite-redux/showdown/*.test.ts"));
+  lanes.T.push(
+    ...trackedTests(
+      "test/data/battle-format.test.ts",
+      "test/tests/elite-redux/*triple*.test.ts",
+      "test/tests/elite-redux/**/*triple*.test.ts",
+      "test/tools/*triple*.test.ts",
+    ),
+  );
   return lanes;
 }
 
@@ -149,7 +181,7 @@ function categorize() {
  * those files intentionally CHAIN a real `globalScene` across the dir (capture prevGlobalScene -> restore),
  * so isolating them would strand a stub with no real scene to chain; Lane A is already reliably green as-is.
  */
-const LANE_ISOLATE = { A: false, B: true, C: true, P: true, Q: false };
+const LANE_ISOLATE = { A: false, B: true, C: true, P: true, S: true, T: true, Q: false };
 
 /**
  * Files proven by aggregate canary to retain process-global Phaser state despite Vitest module isolation.
@@ -170,6 +202,8 @@ const LANE_ENV = {
   B: {},
   C: {},
   P: { SOAK_FIDELITY: "production", SOAK_WAVES: String(PROD_FIDELITY_GATE_WAVES) },
+  S: {},
+  T: {},
   Q: {},
 };
 
@@ -200,11 +234,14 @@ function runLane(name, files) {
     `\n=== LANE ${name}: ${files.length} files (one controller, sequential fork pool, ${isolate}${extraEnv ? `, ${extraEnv}` : ""}) ===`,
   );
   const started = Date.now();
+  let invocation = 0;
   const runFiles = selected => {
     if (selected.length === 0) {
       return true;
     }
-    const cmd = `npx vitest run ${selected.join(" ")} --pool=forks --no-file-parallelism ${isolate}`;
+    invocation++;
+    const reportArg = process.env.GITHUB_ACTIONS ? ` --outputFile=.vitest-reports/blob-${name}-${invocation}.json` : "";
+    const cmd = `npx vitest run ${selected.join(" ")} --pool=forks --no-file-parallelism ${isolate}${reportArg}`;
     return (
       spawnSync(cmd, {
         cwd: REPO_ROOT,
@@ -284,7 +321,7 @@ const LANE_B_SECONDS = new Map([
 function selectWeightedShard(files, shard) {
   const bins = Array.from({ length: shard.total }, () => ({ seconds: 0, files: [] }));
   const weighted = files
-    .map(file => ({ file, seconds: LANE_B_SECONDS.get(file) ?? 27 }))
+    .map(file => ({ file, seconds: LANE_B_SECONDS.get(basename(file)) ?? 27 }))
     .sort((a, b) => b.seconds - a.seconds || a.file.localeCompare(b.file));
   for (const item of weighted) {
     let target = 0;
@@ -317,7 +354,7 @@ function main() {
   const only = laneArgIdx >= 0 ? args[laneArgIdx + 1]?.toUpperCase() : undefined;
   if (only != null && !lanes[only]) {
     // eslint-disable-next-line no-console
-    console.error(`unknown lane "${only}" (expected A, B, C, P, or Q)`);
+    console.error(`unknown lane "${only}" (expected A, B, C, P, S, T, or Q)`);
     process.exit(2);
   }
   let shard;
@@ -348,8 +385,8 @@ function main() {
     return;
   }
 
-  // Gating lanes = A, B, C, P (#897). Q (quarantine) is run non-gating (its result never changes the exit code).
-  const gatingOrder = only ? [only] : ["A", "B", "C", "P"];
+  // All classified product surfaces gate. Q (quarantine) is run non-gating and never changes the exit code.
+  const gatingOrder = only === "Q" ? [] : only ? [only] : ["A", "B", "C", "P", "S", "T"];
   const runQuarantine = !only || only === "Q";
 
   const results = [];
@@ -364,7 +401,7 @@ function main() {
   // NON-GATING quarantine pass (pre-existing solo failures - see QUARANTINE). Reported LOUDLY but never
   // affects the gate exit code, so the gate reflects the SHIPPABLE surface, not a defect that predates it.
   let quarantine;
-  if (runQuarantine && lanes.Q.length > 0 && only !== "A" && only !== "B" && only !== "C" && only !== "P") {
+  if (runQuarantine && lanes.Q.length > 0) {
     // eslint-disable-next-line no-console
     console.log(`\n=== QUARANTINE (${lanes.Q.length} files, NON-GATING - pre-existing solo failures) ===`);
     for (const [name, reason] of QUARANTINE) {

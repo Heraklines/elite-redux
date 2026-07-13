@@ -566,6 +566,8 @@ export interface DuoLogs {
   dir: string;
   host: string[];
   guest: string[];
+  /** Unexpected console.error calls, always captured even when they lack a co-op prefix. */
+  errors: string[];
   /** Where the currently-pumping client's console lines are routed. */
   active: "host" | "guest" | "none";
   flush(): void;
@@ -589,19 +591,23 @@ export function installDuoLogCapture(runName: string): DuoLogs {
   const liveConsole = globalThis.console;
   const origLog = liveConsole.log.bind(liveConsole);
   const origWarn = liveConsole.warn.bind(liveConsole);
+  const origError = liveConsole.error.bind(liveConsole);
   const logs: DuoLogs = {
     dir,
     host: [],
     guest: [],
+    errors: [],
     active: "none",
     flush() {
       fs.writeFileSync(path.join(dir, "host.log"), this.host.join("\n"), "utf8");
       fs.writeFileSync(path.join(dir, "guest.log"), this.guest.join("\n"), "utf8");
+      fs.writeFileSync(path.join(dir, "errors.log"), this.errors.join("\n"), "utf8");
     },
     dispose() {
       this.flush();
       liveConsole.log = origLog;
       liveConsole.warn = origWarn;
+      liveConsole.error = origError;
     },
   };
   const sink = (level: string, args: unknown[]) => {
@@ -623,6 +629,12 @@ export function installDuoLogCapture(runName: string): DuoLogs {
   liveConsole.warn = (...args: unknown[]) => {
     sink("warn", args);
     return origWarn(...args);
+  };
+  liveConsole.error = (...args: unknown[]) => {
+    const client = activeClientLabel === "guest" ? "guest" : "host";
+    logs.errors.push(`[${client}] ${args.map(a => (typeof a === "string" ? a : safeStr(a))).join(" ")}`);
+    sink("error", args);
+    return origError(...args);
   };
   return logs;
 }
@@ -972,7 +984,8 @@ function neutralizeCoopCandyBar(scene: BattleScene): void {
 }
 
 /**
- * Minimal no-op battleInfo so the headless guest mon's updateInfo/initBattleInfo calls don't crash.
+ * Minimal stateful battleInfo contract so the headless guest mon's updateInfo/initBattleInfo calls do not
+ * crash and semantic visibility assertions observe the same `setVisible` contract Phaser exposes.
  *
  * DOCUMENTED RESIDUAL (#633 bounded-scope, "guest mons skip Pokemon.init()"): the guest mons are built by
  * ctor + calculateStats() but NEVER run the full {@linkcode Pokemon.init} - which builds the real
@@ -980,34 +993,44 @@ function neutralizeCoopCandyBar(scene: BattleScene): void {
  * init() headless is DISPROPORTIONATE: it constructs Phaser UI/sprite objects the mock texture manager does
  * not back (the full-page render harness exists precisely because the GameManager scene rasterizes nothing),
  * so it would crash or need a second wave of UI stubs for zero fidelity gain - the co-op SYNC layer the duo
- * harness tests never reads the battle-info UI, only the checkpoint/checksum LOGICAL state (hp/status/moves/
- * stat-stages), which the ctor already builds faithfully. So we keep the tiny proxy stub and leave the real
- * init() out by design. (If a future co-op UI-mirror test needs real HP bars, wire it via the render harness's
- * repointGlobalScene, not by running init() here.)
+ * harness tests do not rasterize battle-info pixels. The tiny proxy therefore models only public state and
+ * chainable setters; it is a semantic adapter oracle, never evidence that a browser canvas rendered. Pixel
+ * postconditions belong in the built-client two-browser lane.
  */
 export function stubBattleInfo(mon: Pokemon): void {
-  // The real PlayerBattleInfo/EnemyBattleInfo was never built (we skipped init()); a tiny async-resolving
-  // stub satisfies updateInfo / setHpNumbers / initInfo / setMini etc. on the headless render path. Keep the
-  // presentation contract observable: unlike the other no-op methods, setVisible must update the same public
-  // `visible` state a real Phaser container exposes so semantic renderer assertions can detect stale HP bars.
+  // The real PlayerBattleInfo/EnemyBattleInfo was never built (we skipped init()). Keep the small async
+  // fallback for data-refresh methods, but model the stateful Phaser setters explicitly. The old proxy
+  // returned the same function for `.visible`, so tests compared `[Function noop]` with booleans and could
+  // be "fixed" only by production code assigning mock properties directly.
   const noop = () => Promise.resolve();
-  const target = { visible: false };
-  let proxy: object;
+  const target: Record<PropertyKey, unknown> = {
+    visible: false,
+    alpha: 1,
+    x: 0,
+    expMaskRect: { x: 0 },
+  };
+  let proxy: Record<PropertyKey, unknown>;
   const handler = {
-    get(_t: object, property: string | symbol) {
-      if (property === "visible") {
-        return target.visible;
-      }
-      if (property === "setVisible") {
-        return (visible: boolean) => {
-          target.visible = visible;
-          return proxy;
-        };
+    get(t: Record<PropertyKey, unknown>, p: string | symbol) {
+      if (Reflect.has(t, p)) {
+        return Reflect.get(t, p);
       }
       return noop;
     },
   };
   proxy = new Proxy(target, handler);
+  target.setVisible = (visible: boolean) => {
+    target.visible = visible;
+    return proxy;
+  };
+  target.setAlpha = (alpha: number) => {
+    target.alpha = alpha;
+    return proxy;
+  };
+  target.setX = (x: number) => {
+    target.x = x;
+    return proxy;
+  };
   (mon as unknown as { battleInfo: unknown }).battleInfo = proxy;
 }
 
@@ -2673,6 +2696,7 @@ export async function buildShowdownDuo(
     netcodeMode: "authoritative",
     kind: "versus",
   });
+  const scheduledPair = pair as typeof pair & { flush?: (role: "host" | "guest", limit?: number) => number };
   hostRuntime.controller.role = "host";
   guestRuntime.controller.role = "guest";
 
@@ -2703,6 +2727,7 @@ export async function buildShowdownDuo(
     ghost: snapshotGhostState(),
     moduleLets: snapshotModuleLets(),
     mePins: { ...IDLE_ME_PINS },
+    ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("host") } : {}),
   };
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
@@ -2715,6 +2740,7 @@ export async function buildShowdownDuo(
     ghost: emptyGhostSnapshot(),
     moduleLets: snapshotModuleLets(),
     mePins: { ...IDLE_ME_PINS },
+    ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("guest") } : {}),
   };
   await withClient(guestCtx, () => {
     toShowdownGameMode(guestScene);

@@ -630,6 +630,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * the sprites resolve; exposed so the render harness can await a fully-seeded grid before snapshotting.
    */
   private showdownSeedInFlight: Promise<void> | null = null;
+  /** Invalidates an async Showdown team seed when the grid is hidden or reopened before assets finish. */
+  private showdownSeedGeneration = 0;
   private startCursorObj: Phaser.GameObjects.NineSlice;
   private randomCursorObj: Phaser.GameObjects.NineSlice;
   /** ER: cursor for the "Use Last Team" action (sits above the Random button). */
@@ -1738,6 +1740,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       // Reset every show so a stale build callback / seed never leaks into a later normal open.
       this.showdownBuildOnCancel = null;
       this.showdownSeedInFlight = null;
+      this.showdownSeedGeneration++;
       const showdownBuild = (args.length > 2 ? args[2] : null) as ShowdownPresetBuildEntry | null;
       if (globalScene.gameMode.isShowdown && showdownBuild != null) {
         this.showdownBuildOnCancel = showdownBuild.onCancel ?? null;
@@ -7194,35 +7197,47 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         true,
       );
     });
-    this.showdownSeedInFlight = Promise.all(loads).then(() => {
-      for (const e of entries) {
-        const cost = globalScene.gameData.getSpeciesStarterValue(e.species.speciesId);
-        if (!this.tryUpdateValue(cost, true)) {
-          break; // remaining starters would exceed the value limit
+    const seedGeneration = ++this.showdownSeedGeneration;
+    this.showdownSeedInFlight = Promise.all(loads)
+      .then(() => {
+        // Cancel/back/reopen can happen before sprite assets resolve. An obsolete seed belongs to the
+        // screen visit that started it and must never mutate the newly active grid or its cursor state.
+        if (seedGeneration !== this.showdownSeedGeneration || !this.starterSelectContainer.visible) {
+          return;
         }
-        // Showdown (B7 item 15): re-seed this line's saved Field Stage / held item into
-        // `showdownSelections` BEFORE the add so `applyShowdownSelection` re-stamps the fielded
-        // stage AND the party mini-icon (rendered inside addToParty) follows it. The saved Starter
-        // persists these fields (saveLastTeam), so a restored evolved/mega team comes back as saved.
-        if (globalScene.gameMode.isShowdown && e.saved.showdownSpeciesId !== undefined) {
-          this.showdownSelections.set(e.species.speciesId, {
-            speciesId: e.saved.showdownSpeciesId,
-            formIndex: e.saved.showdownFormIndex ?? 0,
-            item: e.saved.showdownItem,
-          });
+        for (const e of entries) {
+          const cost = globalScene.gameData.getSpeciesStarterValue(e.species.speciesId);
+          if (!this.tryUpdateValue(cost, true)) {
+            break; // remaining starters would exceed the value limit
+          }
+          // Showdown (B7 item 15): re-seed this line's saved Field Stage / held item into
+          // `showdownSelections` BEFORE the add so `applyShowdownSelection` re-stamps the fielded
+          // stage AND the party mini-icon (rendered inside addToParty) follows it. The saved Starter
+          // persists these fields (saveLastTeam), so a restored evolved/mega team comes back as saved.
+          if (globalScene.gameMode.isShowdown && e.saved.showdownSpeciesId !== undefined) {
+            this.showdownSelections.set(e.species.speciesId, {
+              speciesId: e.saved.showdownSpeciesId,
+              formIndex: e.saved.showdownFormIndex ?? 0,
+              item: e.saved.showdownItem,
+            });
+          }
+          this.addToParty(
+            e.species,
+            e.dexAttr,
+            e.saved.abilityIndex,
+            e.saved.nature,
+            e.saved.moveset?.slice(0) as StarterMoveset,
+            e.saved.teraType ?? e.species.type1,
+            true,
+          );
         }
-        this.addToParty(
-          e.species,
-          e.dexAttr,
-          e.saved.abilityIndex,
-          e.saved.nature,
-          e.saved.moveset?.slice(0) as StarterMoveset,
-          e.saved.teraType ?? e.species.type1,
-          true,
-        );
-      }
-      this.getUi().playSelect();
-    });
+        this.getUi().playSelect();
+      })
+      .catch(error => {
+        if (seedGeneration === this.showdownSeedGeneration) {
+          console.warn("Showdown team seed assets failed to load", error);
+        }
+      });
     return true;
   }
 
@@ -7614,6 +7629,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
   clear(): void {
     super.clear();
+    this.showdownSeedGeneration++;
+    this.showdownSeedInFlight = null;
     this.setErLinksVisible(false); // hide the Discord/GitHub corner links off the starter screen
 
     saveStarterPreferences(this.originalStarterPreferences);

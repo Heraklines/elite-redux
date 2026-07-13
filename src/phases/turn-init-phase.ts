@@ -25,6 +25,15 @@ export class TurnInitPhase extends FieldPhase {
   public readonly phaseName = "TurnInitPhase";
 
   /**
+   * A versus guest must not expose its next command while the host's fainted lead is still on its
+   * renderer. The replacement is a separately addressed authority commit; CoopReplayTurnPhase consumes
+   * it at the safe replay boundary and opens the command only after the new enemy is materialized.
+   */
+  private shouldDeferVersusGuestCommandForEnemyReplacement(): boolean {
+    return isShowdownGuestFlipGated() && !globalScene.getEnemyField().some(enemy => enemy?.isActive());
+  }
+
+  /**
    * The authoritative guest owns input and presentation only.  Its locally-created TurnInitPhase must not
    * execute challenge cleanup, Mystery Encounter hooks, biome ambush RNG, enemy AI, or structural recentering.
    * Queue only the player command-intent phases and the renderer dispatcher; the host's turn stream supplies
@@ -34,12 +43,15 @@ export class TurnInitPhase extends FieldPhase {
     if (!isCoopAuthoritativeGuestGated()) {
       return false;
     }
+    const deferCommand = this.shouldDeferVersusGuestCommandForEnemyReplacement();
     globalScene.getField().forEach((pokemon, fieldIndex) => {
       if (pokemon?.isPlayer() && pokemon.isActive()) {
         // Clear prior-turn input ephemera so the local command UI cannot inherit a stale queued/skip state.
         // This does not resolve an action; the host validates and commits the resulting command intent.
         pokemon.resetTurnData();
-        globalScene.phaseManager.pushNew("CommandPhase", fieldIndex);
+        if (!deferCommand) {
+          globalScene.phaseManager.pushNew("CommandPhase", fieldIndex);
+        }
       }
     });
     globalScene.phaseManager.pushNew("TurnStartPhase");
@@ -135,8 +147,7 @@ export class TurnInitPhase extends FieldPhase {
     // the enemy slot instead of the own slot). Deterministic - the pump PARKS on the specific
     // replacement checkpoint (host-stall fallback bounds it), no spin, no timeout. If the replacement
     // already rendered by now (the non-racy timing) this is false and the command opens normally.
-    const deferVersusGuestCommandForEnemyReplacement =
-      isShowdownGuestFlipGated() && !globalScene.getEnemyField().some(e => e?.isActive());
+    const deferVersusGuestCommandForEnemyReplacement = this.shouldDeferVersusGuestCommandForEnemyReplacement();
 
     globalScene.getField().forEach((pokemon, i) => {
       if (pokemon?.isActive()) {

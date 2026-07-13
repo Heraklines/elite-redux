@@ -118,7 +118,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
       }
       if (msg.t === "turnResolution") {
         emittedTurnResolution = true;
-        emittedAuthoritativeState = msg.authoritativeState as Record<string, unknown> | undefined;
+        emittedAuthoritativeState = msg.authoritativeState as unknown as Record<string, unknown> | undefined;
       }
     });
 

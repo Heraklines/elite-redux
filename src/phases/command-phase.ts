@@ -13,6 +13,7 @@ import {
   type ResolvedPartnerCommand,
   resolvePartnerCommand,
 } from "#data/elite-redux/coop/coop-partner-ai";
+import { ensureCoopAuthoritativeCommandPresentation } from "#data/elite-redux/coop/coop-presentation";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   coopHasPendingWaveAdvance,
@@ -571,14 +572,10 @@ export class CommandPhase extends FieldPhase {
   public override start(): void {
     super.start();
 
-    // The authoritative guest intentionally neutralizes structural SummonPhase, including its
-    // player-trainer throw/tween cleanup. CommandPhase is the first invariant point at which the
-    // encounter is materialized and input can open, so enforce the presentation postcondition here:
-    // the trainer must no longer cover the field. This is guest-authoritative only; host/solo keep
-    // the normal SummonPhase animation and timing unchanged.
-    if (getCoopController()?.role === "guest" && getCoopNetcodeMode() === "authoritative") {
-      globalScene.trainer.setVisible(false);
-    }
+    // CommandPhase is the first stable boundary after the authoritative renderer gate may have
+    // neutralized structural SummonPhase. Restore trainer chrome only; Pokémon visibility and field
+    // membership must come from an authoritative seat manifest, never a local presentation guess.
+    ensureCoopAuthoritativeCommandPresentation();
 
     this.tryCoopCheckpointSync();
 

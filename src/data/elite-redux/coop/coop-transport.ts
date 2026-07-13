@@ -78,7 +78,14 @@ export type CoopRole = "host" | "guest";
 // er-coop-32: every persisted checkpoint is bound to a stable runId plus a host-monotonic checkpoint
 // revision; large logical frames use backpressured restartable chunk delivery and resume crosses a
 // symmetric final release barrier.
-export const COOP_PROTOCOL_VERSION = "er-coop-32";
+// The parallel protocol-31 authority line additionally requires checkpoint + fullField + state + a
+// non-sentinel checksum; replacement frames are retained and re-requestable before control reopens.
+// The parallel protocol-32 authority line addresses battle events and commits by epoch/wave/turn and
+// retains complete turn/replacement commits until an exact apply+checksum ACK. Fatal capture failures
+// use an acknowledged terminal handshake instead of leaving either peer in a local fallback.
+// er-coop-33 is the first compatibility stamp containing BOTH histories. A cached protocol-32 peer is
+// therefore rejected even when it implemented one of the two incompatible protocol-32 branches.
+export const COOP_PROTOCOL_VERSION = "er-coop-33";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -1375,7 +1382,7 @@ export type CoopMessage =
    * still the source of truth, so a dropped / reordered / late `battleEvent` only stutters the
    * animation; it can never desync the guest (the checkpoint reconciles all state).
    */
-  | { t: "battleEvent"; turn: number; seq: number; event: CoopBattleEvent }
+  | { t: "battleEvent"; epoch: number; wave: number; turn: number; seq: number; event: CoopBattleEvent }
   /**
    * Host -> guest (#633, LIVE-D): a fully-resolved turn. `events` is the ordered visible
    * log the guest narrates/animates; `checkpoint` is the AUTHORITATIVE post-turn state the
@@ -1386,28 +1393,31 @@ export type CoopMessage =
    * and, on a mismatch, requests a `stateSync`. Required (the host always stamps it).
    *
    * `preimage` (#633, diagnostics) is the host's CANONICAL state string the `checksum` was
-   * hashed from. Optional + additive: the host always sends it on the authoritative path so
-   * that on a mismatch the guest can deep-DIFF the host's pre-image against its own and log
-   * the exact divergent field(s). Older clients omit it and ignore it on receipt.
+   * hashed from. Protocol 31 requires it so the guest can deep-DIFF the host pre-image against
+   * its own and log the exact divergent fields. Older clients are rejected during negotiation.
    */
   | {
       t: "turnResolution";
+      epoch: number;
+      wave: number;
       turn: number;
+      /** Commit identity; equal to authoritativeState.tick for protocol 32. */
+      revision: number;
       events: CoopBattleEvent[];
       checkpoint: CoopBattleCheckpoint;
       checksum: string;
-      preimage?: string;
+      preimage: string;
       /**
        * The host's COMPLETE per-mon on-field snapshot (#633 M2): heals the on-field state the numeric
        * `checkpoint` omits (moveset+PP / tera / boss / held items / ability / form) IN-LINE each turn.
-       * Optional + additive - an older host omits it and the guest keeps its checksum-detect + resync heal.
+       * Required by protocol 31.
        */
-      fullField?: CoopFullMonSnapshot[];
+      fullField: CoopFullMonSnapshot[];
       /**
        * Full normal-turn authoritative state. Version 1 uses PokemonData.summonData
        * for live mon state and keeps field data seating-only.
        */
-      authoritativeState?: CoopAuthoritativeBattleStateV1;
+      authoritativeState: CoopAuthoritativeBattleStateV1;
     }
   /**
    * Host -> guest (#633, LIVE-D): an out-of-turn authoritative checkpoint (after a
@@ -1417,9 +1427,77 @@ export type CoopMessage =
   | {
       t: "battleCheckpoint";
       reason: string;
+      epoch: number;
+      wave: number;
+      turn: number;
+      /** Commit identity; equal to authoritativeState.tick for protocol 32. */
+      revision: number;
       checkpoint: CoopBattleCheckpoint;
       checksum: string;
-      authoritativeState?: CoopAuthoritativeBattleStateV1;
+      /** Complete per-mon field companion for modern out-of-band authority frames. */
+      fullField: CoopFullMonSnapshot[];
+      authoritativeState: CoopAuthoritativeBattleStateV1;
+    }
+  /** Guest -> host: request the exact retained turn commit, or learn that the host is still resolving it. */
+  | { t: "requestTurnCommit"; epoch: number; wave: number; turn: number; revision?: number }
+  | { t: "turnCommitPending"; epoch: number; wave: number; turn: number }
+  /** Guest -> host: ACK only after the complete turn commit applied and checksum-converged. */
+  | {
+      t: "turnCommitAck";
+      epoch: number;
+      wave: number;
+      turn: number;
+      revision: number;
+      checkpointTick: number;
+      stateTick: number;
+      checksum: string;
+      status: "applied" | "superseded";
+      supersededByRevision?: number;
+      supersededByChecksum?: string;
+    }
+  /** Guest -> host: re-send one exact retained replacement authority frame. */
+  | {
+      t: "requestBattleCheckpoint";
+      reason: "replacement";
+      epoch: number;
+      wave: number;
+      turn: number;
+      revision: number;
+      checkpointTick: number;
+      stateTick: number;
+    }
+  /** Guest -> host: ACK only after the complete replacement applied and checksum-converged. */
+  | {
+      t: "battleCheckpointAck";
+      reason: "replacement";
+      epoch: number;
+      wave: number;
+      turn: number;
+      revision: number;
+      checkpointTick: number;
+      stateTick: number;
+      checksum: string;
+    }
+  /** Either peer -> peer: a control-critical authority boundary could not be produced/applied safely. */
+  | {
+      t: "authorityFailure";
+      failureId: string;
+      epoch: number;
+      wave: number;
+      turn: number;
+      /** Stream-local terminal revision; positive even when no state carrier could be captured. */
+      revision: number;
+      boundary: "turnResolution" | "replacement";
+      reason: string;
+    }
+  | {
+      t: "authorityFailureAck";
+      failureId: string;
+      epoch: number;
+      wave: number;
+      turn: number;
+      revision: number;
+      boundary: "turnResolution" | "replacement";
     }
   /**
    * Owner -> watcher (#633): the owner's pick on an ALTERNATING-control interaction
@@ -1717,11 +1795,25 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "ghostPool":
       return `pool=${msg.pool.length}`;
     case "battleEvent":
-      return `turn=${msg.turn} seq=${msg.seq} k=${msg.event.k}`;
+      return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} seq=${msg.seq} k=${msg.event.k}`;
     case "turnResolution":
-      return `turn=${msg.turn} events=${msg.events.length} checksum=${msg.checksum}`;
+      return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} events=${msg.events.length} checksum=${msg.checksum}`;
     case "battleCheckpoint":
-      return `reason=${msg.reason} checksum=${msg.checksum}`;
+      return `reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} checksum=${msg.checksum}`;
+    case "requestTurnCommit":
+      return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision ?? "pending"}`;
+    case "turnCommitPending":
+      return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn}`;
+    case "turnCommitAck":
+      return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} checksum=${msg.checksum}`;
+    case "requestBattleCheckpoint":
+      return `reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} checkpointTick=${msg.checkpointTick} stateTick=${msg.stateTick}`;
+    case "battleCheckpointAck":
+      return `reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} checksum=${msg.checksum}`;
+    case "authorityFailure":
+      return `id=${msg.failureId} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} boundary=${msg.boundary}`;
+    case "authorityFailureAck":
+      return `id=${msg.failureId} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} boundary=${msg.boundary}`;
     case "interactionChoice":
       return `seq=${msg.seq} kind=${msg.kind} choice=${msg.choice}`;
     case "interactionOutcome":

@@ -26,7 +26,7 @@ const flush = () => new Promise<void>(resolve => queueMicrotask(resolve));
 
 describe("co-op session controller (#633, P1)", () => {
   describe("functional compatibility launch barrier", () => {
-    it("refuses protocol-31 launch when biome operations or durability do not survive negotiation", async () => {
+    it("refuses protocol-33 launch when biome operations or durability do not survive negotiation", async () => {
       clearNegotiatedCoopCapabilities();
       const { host, guest } = createLoopbackPair();
       const required = [COOP_CAP_OP_BIOME, COOP_CAP_DURABILITY_JOURNAL];
@@ -48,6 +48,23 @@ describe("co-op session controller (#633, P1)", () => {
       h.dispose();
       g.dispose();
       clearNegotiatedCoopCapabilities();
+    });
+
+    it("rejects an er-coop-32 peer that contains only one side of the merged protocol-33 contract", async () => {
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-33");
+      const { host, guest } = createLoopbackPair();
+      const controller = new CoopSessionController(host, {
+        username: "Host",
+        version: COOP_PROTOCOL_VERSION,
+      });
+      controller.connect();
+      guest.send({ t: "hello", version: "er-coop-32", username: "Cached", role: "guest", epoch: 0 });
+      await flush();
+
+      expect(controller.versionMismatch).toBe(true);
+      expect(controller.compatibilityAccepted).toBe(false);
+      expect(controller.bothReady()).toBe(false);
+      controller.dispose();
     });
 
     async function readyAgainstFingerprint(kind: "functional" | "presentation"): Promise<CoopSessionController> {

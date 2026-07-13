@@ -36,7 +36,6 @@ import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { PokemonMove } from "#data/moves/pokemon-move";
@@ -64,6 +63,7 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair, type ScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import { generateStarters } from "#test/utils/game-manager-utils";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -100,6 +100,34 @@ const guestTeam = (): ShowdownMonManifest[] => [
 
 function toShowdown(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.SHOWDOWN);
+}
+
+/**
+ * Run host phase machinery while delivering each scheduled inbox under its owning client context. This is
+ * the one-process equivalent of two browser event loops: an EnemyCommandPhase may await the guest without
+ * either client's transport handlers ever observing the other client's process-global scene/runtime.
+ */
+async function driveScheduledHost<T>(rig: ShowdownDuoRig, pair: ScheduledCoopPair, work: () => Promise<T>): Promise<T> {
+  const pending = withClient(rig.hostCtx, work);
+  let settled = false;
+  pending.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    },
+  );
+  const deadline = Date.now() + 30_000;
+  while (!settled) {
+    withClientSync(rig.guestCtx, () => pair.flush("guest"));
+    withClientSync(rig.hostCtx, () => pair.flush("host"));
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    if (Date.now() >= deadline) {
+      throw new Error("scheduled Showdown host drive timed out while pumping both client inboxes");
+    }
+  }
+  return await pending;
 }
 
 /** Serialize the host's launch session EXACTLY as EncounterPhase.broadcastCoopLaunchSnapshot does. */
@@ -209,8 +237,9 @@ describe.skipIf(!RUN)("Showdown versus - turn-1 initial-summon ability desync (t
   it("guest renders the host's turn-1 entry ability, does not DERIVE it locally (weather parity)", async () => {
     await startHostShowdown(guestTeam());
 
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig: ShowdownDuoRig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown);
+    pair.setAutomaticDelivery(false);
 
     // Plant a DROUGHT INNATE on the host's OWN lead (its local PLAYER). The slot override rides the
     // snapshot into the guest, where the SAME mon is the local ENEMY. On the host (player) the innate is
@@ -263,8 +292,9 @@ describe.skipIf(!RUN)("Showdown versus - turn-1 initial-summon ability desync (t
     // A forced resync (requestStateSync) here would be the laggy "paper over it" behavior we must avoid.
     await startHostShowdown(guestTeam());
 
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig: ShowdownDuoRig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown);
+    pair.setAutomaticDelivery(false);
 
     // The guest commands its own team with a harmless SPLASH each turn (the host's EnemyCommandPhase await).
     rig.guestPeer.onCommandRequest(() => ({
@@ -287,7 +317,7 @@ describe.skipIf(!RUN)("Showdown versus - turn-1 initial-summon ability desync (t
     const turn = rig.hostScene.currentBattle.turn;
 
     // HOST plays a turn (TACKLE into the guest's lead, no KO); its EnemyCommandPhase consumes the relayed SPLASH.
-    await withClient(rig.hostCtx, async () => {
+    await driveScheduledHost(rig, pair, async () => {
       game.move.select(MoveId.TACKLE, 0, BattlerIndex.ENEMY);
       await game.phaseInterceptor.to("TurnEndPhase");
     });
