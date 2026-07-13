@@ -495,6 +495,7 @@ export class DuoPublicUiRig {
     this.replacementCount = 0;
     this.lastSharedSurfaceAddress = new Map();
     this.activeBattleWave = null;
+    this.pairRoleCursors = null;
   }
 
   static async launch(config) {
@@ -579,6 +580,43 @@ export class DuoPublicUiRig {
     );
     await requester.requestPlayer(acceptor.credentials.username);
     await acceptor.acceptRequest(requester.credentials.username);
+    // The co-op HOST binds from the WebRTC session connect (sessionEpoch>0). The co-op GUEST
+    // only binds AFTER the host fires its LAUNCH DECISION ("Press to start co-op" ->
+    // sendResumeStartNew / resume offer), which the journey (startFreshRun/resumeRun) drives
+    // next. Identify the host here; the guest binding + full role/seat verification is deferred
+    // to completePairingBinding() AFTER that human launch press - otherwise we deadlock waiting
+    // for a binding that only the launch action produces.
+    this.pairRoleCursors = roleCursors;
+    await this.waitForCoopHost(roleCursors);
+    await Promise.all(Object.values(this.clients).map(client => client.checkpoint("paired-awaiting-launch")));
+    return { requester, acceptor };
+  }
+
+  /** Wait for the co-op HOST to publish its stable-seat binding (it connects before the launch). */
+  async waitForCoopHost(roleCursors) {
+    const deadline = Date.now() + this.config.timeoutMs;
+    while (Date.now() < deadline) {
+      for (const client of Object.values(this.clients)) {
+        const binding = client.evidence.findBinding(roleCursors[client.label]);
+        if (binding) {
+          client.publicRole = binding.observation.role;
+          client.publicSeat = binding.observation.seat;
+          if (binding.observation.role === "host") {
+            return client;
+          }
+        }
+      }
+      await delay(100);
+    }
+    throw new Error("Co-op host never reached a stable-seat session binding after lobby pairing");
+  }
+
+  /** After the host's launch decision, wait for BOTH bindings and verify the stable-seat assignment. */
+  async completePairingBinding() {
+    const roleCursors = this.pairRoleCursors;
+    if (!roleCursors) {
+      throw new Error("completePairingBinding called before pair()");
+    }
     await Promise.all(Object.values(this.clients).map(client => client.waitForPublicRole(roleCursors[client.label])));
     const roles = Object.values(this.clients)
       .map(client => client.publicRole)
@@ -588,11 +626,10 @@ export class DuoPublicUiRig {
       .sort();
     if (JSON.stringify(roles) !== JSON.stringify(["guest", "host"]) || JSON.stringify(seats) !== "[0,1]") {
       throw new Error(
-        `Stable-seat binding invalid after lobby pairing: roles=${JSON.stringify(roles)} seats=${JSON.stringify(seats)}`,
+        `Stable-seat binding invalid after launch decision: roles=${JSON.stringify(roles)} seats=${JSON.stringify(seats)}`,
       );
     }
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("paired-and-verifying-save")));
-    return { requester, acceptor };
   }
 
   async assertSharedSurface(surface, cursors, proofName, { allowAddressRepeat = false, expectedWave = null } = {}) {
@@ -666,13 +703,16 @@ export class DuoPublicUiRig {
   }
 
   async startFreshRun() {
-    if (!this.host || !this.guest) {
-      throw new Error("startFreshRun requires a paired public host and guest");
+    if (!this.host) {
+      throw new Error("startFreshRun requires a paired public host (call pair() first)");
     }
     const phaseCursors = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
     );
+    // Drive the host's "Press to start co-op" launch decision, then confirm BOTH clients now
+    // hold their stable-seat binding (the guest binds only in response to this press).
     await this.host.pulseActionUntil(/SEND resumeStartNew/u, "host-confirm-fresh-run");
+    await this.completePairingBinding();
     const hostEntrySurface = await this.host.evidence.waitForCondition(
       sink =>
         sink.find(CHALLENGE_PHASE, phaseCursors[this.host.label])
@@ -731,21 +771,25 @@ export class DuoPublicUiRig {
   }
 
   async resumeRun({ expectedWave = null } = {}) {
-    if (!this.host || !this.guest) {
-      throw new Error("resumeRun requires a paired public host and guest");
+    if (!this.host) {
+      throw new Error("resumeRun requires a paired public host (call pair() first)");
     }
+    // The guest client is the non-host seat; its stable-seat binding is only produced once it
+    // accepts the host's resume offer below, so reference it directly until completePairingBinding.
+    const guestClient = Object.values(this.clients).find(client => client !== this.host);
     const resumeCursors = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
     );
     await this.host.pulseActionUntil(/SEND resumeOffer/u, "host-open-and-confirm-resume");
-    await this.guest.evidence.waitFor(/RECV resumeOffer/u, {
-      from: resumeCursors[this.guest.label],
+    await guestClient.evidence.waitFor(/RECV resumeOffer/u, {
+      from: resumeCursors[guestClient.label],
       timeoutMs: this.config.timeoutMs,
       description: "guest receives public resume offer",
     });
-    await this.guest.press("Space", "guest-open-resume-offer");
+    await guestClient.press("Space", "guest-open-resume-offer");
     await delay(this.config.settleDelayMs);
-    await this.guest.press("Space", "guest-accept-resume-offer");
+    await guestClient.press("Space", "guest-accept-resume-offer");
+    await this.completePairingBinding();
     await Promise.all(
       Object.values(this.clients).map(client => client.waitForLocalCommand(resumeCursors[client.label])),
     );
