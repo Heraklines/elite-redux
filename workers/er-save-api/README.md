@@ -99,9 +99,9 @@ wrangler deploy
 
 ### Staging co-op route parity
 
-The Pages `Deploy Staging` workflow deploys the browser bundle only. It does **not** update
-`er-save-api-staging`. When a client checkpoint begins using a new authenticated save route, deploy this
-Worker from the same checkpoint before launching the public-UI journey:
+The `Deploy Staging` workflow deploys `er-save-api-staging` first and the Pages browser bundle second from
+the same checkout. This ordering prevents staging from publishing a newer client against an older save
+contract. For a Worker-only recovery deployment, use:
 
 ```bash
 cd workers/er-save-api

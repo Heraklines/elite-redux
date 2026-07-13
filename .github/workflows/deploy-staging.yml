@@ -6,7 +6,7 @@ name: Deploy Staging
 # (the er-editor-api Worker fires a workflow_dispatch after committing).
 #
 # Required GitHub repo config (Settings → Secrets and variables → Actions):
-#   secrets.CLOUDFLARE_API_TOKEN   — token with Pages:Edit on the account
+#   secrets.CLOUDFLARE_API_TOKEN   — token with Pages:Edit and Workers Scripts:Edit on the account
 #   secrets.CLOUDFLARE_ACCOUNT_ID  — Cloudflare account id
 #   vars.STAGING_SERVER_URL        — save API base, e.g. https://er-save-api-staging.<sub>.workers.dev
 
@@ -32,6 +32,16 @@ jobs:
           # always fetchable, so we vendor those files in deploy/standalone-assets.
 
       - uses: ./.github/actions/setup-deps
+
+      # The save contract must be live before a newly built client can call it. Keep this in the same
+      # exact-SHA promotion job and before Pages so staging can never publish a newer client against an
+      # older save Worker.
+      - name: Deploy cloud-save API (staging)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config workers/er-save-api/wrangler.staging.toml
 
       - name: Stage standalone asset metadata
         run: |
