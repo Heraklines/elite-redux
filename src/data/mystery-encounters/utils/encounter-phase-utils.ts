@@ -761,7 +761,12 @@ export async function initBattleWithEnemyConfig(partyConfig: EnemyPartyConfig): 
     battle.setDouble(false);
   }
   coopHostStreamMeBattleParty();
-  if (!coopMeOwnerRelayBattleHandoff()) {
+  if (
+    !(await coopMeOwnerRelayBattleHandoff({
+      encounterMode: battle.mysteryEncounter?.encounterMode,
+      disableSwitch: partyConfig.disableSwitch ?? false,
+    }))
+  ) {
     return;
   }
   if (coopGuestShouldAdoptMeBattleParty()) {

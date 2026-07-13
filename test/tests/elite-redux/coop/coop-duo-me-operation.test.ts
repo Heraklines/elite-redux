@@ -138,8 +138,8 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     expect(counterBefore, "the ME opens on interaction counter 0 (host owns even)").toBe(0);
 
-    // Spy the watcher-adopt gate (calls through - vi.spyOn preserves the original impl in vitest).
-    const adoptSpy = vi.spyOn(meOp, "adoptMeWatcherChoice");
+    const submitSpy = vi.spyOn(CoopOperationHost.prototype, "submit");
+    const applyOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
 
     // Drive the HOST through the whole ME (buffers present + meResync + LEAVE), then the guest replays.
     await withClient(rig.hostCtx, async () => {
@@ -154,19 +154,17 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
     expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once)").toBe(true);
 
-    // THE MIGRATED BEHAVIOR: the guest gated its terminal THROUGH the operation primitive, which STATED
-    // the ME resolved as a non-battle "leave" - the watcher routed off the OPERATION, not a leftover chain.
-    const terminalAdopts = adoptSpy.mock.results
-      .map(r => (r.type === "return" ? r.value : null))
-      .filter((v): v is Extract<meOp.CoopMeAdoptDecision, { adopt: true }> => v != null && v.adopt === true);
-    expect(
-      terminalAdopts.some(v => v.kind === "ME_TERMINAL" && v.terminal === "leave"),
-      "the guest adopted a host-stated NON-BATTLE terminal ('leave') through the operation primitive",
-    ).toBe(true);
-    expect(
-      terminalAdopts.some(v => v.kind === "ME_TERMINAL" && v.terminal === "battle"),
-      "a host-owned non-battle ME NEVER states a battle terminal",
-    ).toBe(false);
+    const terminal = submitSpy.mock.calls
+      .map(call => call[0])
+      .find(intent => intent.kind === "ME_TERMINAL")?.payload;
+    expect(meOp.isCompleteCoopMeTerminalPayload(terminal), "the leave is one complete retained transaction").toBe(
+      true,
+    );
+    if (meOp.isCompleteCoopMeTerminalPayload(terminal)) {
+      expect(terminal.terminal).toBe("leave");
+      expect(terminal.destination.kind).toBe("continue");
+    }
+    expect(applyOutcomeSpy, "the guest materializes the comprehensive state exactly once").toHaveBeenCalledTimes(1);
 
     // Lockstep, same as the legacy suite: both advanced once for the whole ME.
     expect(rig.hostRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
@@ -174,7 +172,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     logs.flush();
   }, 300_000);
 
-  it("DURABILITY: dropping only the 9M leave sentinel still materializes the host-stated terminal", async () => {
+  it("DURABILITY: dropping the first retained leave transaction redelivers and executes it exactly once", async () => {
     await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
     const hostScene = game.scene;
     const pair = wrapCoopFaultPair(
@@ -183,14 +181,13 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
         drop: 1,
         reorder: 0,
         delay: 0,
-        faultable: msg =>
-          msg.t === "interactionChoice" && msg.kind === "meBtn" && msg.seq >= 9_000_000 && msg.choice === -1,
+        faultable: msg => msg.t === "envelope" && msg.envelope.pendingOperation?.kind === "ME_TERMINAL",
       },
       { seed: 0x6d3e },
     );
     const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
-    const adoptSpy = vi.spyOn(meOp, "adoptMeWatcherChoice");
+    const applyOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
 
     await withClient(rig.hostCtx, async () => {
       await runMysteryEncounterToEnd(game, 1);
@@ -199,17 +196,13 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       await driveHostRewardShopOwner(hostShop, { takeReward: false });
       await game.phaseInterceptor.to("PostMysteryEncounterPhase");
     });
-    expect(pair.faultsInjected(), "the legacy 9M ME leave sentinel must actually be dropped").toBeGreaterThan(0);
+    expect(pair.faultsInjected(), "the first retained ME terminal delivery must actually be dropped").toBeGreaterThan(
+      0,
+    );
 
     const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
     expect(guestReplay.settled, "the durable ME_TERMINAL must settle the real guest replay phase").toBe(true);
-    const terminalAdopts = adoptSpy.mock.results
-      .map(result => (result.type === "return" ? result.value : null))
-      .filter((value): value is Extract<meOp.CoopMeAdoptDecision, { adopt: true }> => value?.adopt === true);
-    expect(
-      terminalAdopts.some(value => value.kind === "ME_TERMINAL" && value.terminal === "leave"),
-      "the journal-delivered terminal states leave before the guest exits the encounter",
-    ).toBe(true);
+    expect(applyOutcomeSpy, "redelivery applies the retained state image once").toHaveBeenCalledTimes(1);
     expect(rig.guestRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
     logs.flush();
   }, 300_000);
@@ -323,11 +316,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
         drop: 1,
         reorder: 0,
         delay: 0,
-        faultable: msg =>
-          msg.t === "interactionOutcome"
-          && msg.kind === "mePresent"
-          && msg.outcome.k === "mePresent"
-          && msg.outcome.subPrompt == null,
+        faultable: msg => msg.t === "envelope" && msg.envelope.pendingOperation?.kind === "ME_PRESENT",
       },
       { seed: 0x6d3f },
     );
@@ -347,7 +336,9 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       await driveHostRewardShopOwner(hostShop, { takeReward: false });
       await game.phaseInterceptor.to("PostMysteryEncounterPhase");
     });
-    expect(pair.faultsInjected(), "the legacy top-level mePresent must actually be dropped").toBeGreaterThan(0);
+    expect(pair.faultsInjected(), "the first retained top-level presentation must actually be dropped").toBeGreaterThan(
+      0,
+    );
 
     const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
     expect(guestReplay.settled, "the guest replay still reaches its terminal").toBe(true);
@@ -458,7 +449,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     expect(counterBefore, "the ME opens on interaction counter 0 (host owns even)").toBe(0);
 
     const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
-    const adoptSpy = vi.spyOn(meOp, "adoptMeWatcherChoice");
+    const submitSpy = vi.spyOn(CoopOperationHost.prototype, "submit");
 
     // Drive the HOST through the BATTLE option (relays COOP_ME_BATTLE_HANDOFF on 9M, NO meResync on 8M).
     await withClient(rig.hostCtx, async () => {
@@ -473,19 +464,27 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
     expect(guestReplay.settled, "guest CoopReplayMePhase settled at the battle-handoff").toBe(true);
 
-    // THE #859 STRUCTURAL CURE: the operation STATED a "battle" terminal, and the guest adopted THAT (not an
-    // inferred battle turn from a leftover chain). A non-battle ME would have stated "leave" -> leaveDefensive.
-    const terminalAdopts = adoptSpy.mock.results
-      .map(r => (r.type === "return" ? r.value : null))
-      .filter((v): v is Extract<meOp.CoopMeAdoptDecision, { adopt: true }> => v != null && v.adopt === true);
-    expect(
-      terminalAdopts.some(v => v.kind === "ME_TERMINAL" && v.terminal === "battle"),
-      "the committed op STATED a battle terminal BEFORE the watcher built its ME-battle phases (#859)",
-    ).toBe(true);
+    const terminal = submitSpy.mock.calls
+      .map(call => call[0])
+      .find(intent => intent.kind === "ME_TERMINAL")?.payload;
+    expect(meOp.isCompleteCoopMeTerminalPayload(terminal), "battle handoff is a complete retained transaction").toBe(
+      true,
+    );
+    if (meOp.isCompleteCoopMeTerminalPayload(terminal)) {
+      expect(terminal.terminal).toBe("battle");
+      expect(terminal.destination.kind).toBe("battle");
+      expect(terminal.outcome.authoritativeState?.enemyParty.length).toBeGreaterThan(0);
+      expect(terminal.outcome.authoritativeState?.double, "the post-degrade battle shape is in the transaction").toBe(
+        hostScene.currentBattle.double,
+      );
+      if (terminal.destination.kind === "battle") {
+        expect(terminal.destination.encounterMode).toBe(hostScene.currentBattle.mysteryEncounter?.encounterMode);
+        expect(terminal.destination.disableSwitch).toBe(false);
+      }
+    }
 
-    // The signatures of the handoff class (unchanged from legacy): NO meResync, counter NOT advanced, the
-    // encounter NOT left (the spawned battle now runs host-authoritatively on both engines).
-    expect(applyMeOutcomeSpy.mock.calls.length, "guest applied NO meResync at a battle-handoff").toBe(0);
+    // The battle state/party is now causally bound to the terminal and applies before its exact boot.
+    expect(applyMeOutcomeSpy, "guest applies the battle terminal state exactly once").toHaveBeenCalledTimes(1);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest did NOT advance at the battle-handoff").toBe(
       counterBefore,
     );
@@ -494,86 +493,8 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     logs.flush();
   }, 300_000);
 
-  // =====================================================================================
-  // ADVERSARIAL (engine-free): a STALE decision from a PREVIOUS ME is rejected; a DUPLICATE re-delivery
-  // is a no-op; a LATE terminal after the ME already terminal-adopted is dropped. With the flag OFF every
-  // one of these would adopt verbatim (legacy pass-through), so the rejections prove the primitive gates.
-  // =====================================================================================
-  it("ADVERSARIAL: a stale previous-ME pick is REJECTED; a duplicate is a no-op; a late terminal after terminal is dropped (#861 shape)", () => {
-    resetCoopMeOperationState();
-    const EARLIER = 2; // an EARLIER ME (host-owned even counter)
-    const LATER = 4; // a NEWER ME (host-owned even counter)
-    const wave = 20;
-
-    // A NEWER ME resolves its terminal on the watcher first (advances the cross-ME stale order to LATER).
-    const freshTerminal = meOp.adoptMeWatcherChoice({
-      kind: "ME_TERMINAL",
-      seq: 9_000_000 + LATER,
-      pinned: LATER,
-      res: { choice: -1000 }, // battle-handoff sentinel
-      terminal: "battle",
-      hostTurn: 3,
-      localRole: "guest",
-      wave,
-      turn: 0,
-    });
-    expect(freshTerminal.adopt, "the newer ME's terminal is adopted").toBe(true);
-    if (freshTerminal.adopt) {
-      expect(freshTerminal.terminal, "the newer terminal states 'battle'").toBe("battle");
-    }
-
-    // A STALE pick from the EARLIER ME arrives late - it must be REJECTED (its pinned is below the last
-    // adopted terminal's pinned), never applied. A leftover pick can NEVER overwrite a resolved later ME.
-    const stalePick = meOp.adoptMeWatcherChoice({
-      kind: "ME_PICK",
-      seq: 8_000_000 + EARLIER,
-      pinned: EARLIER,
-      res: { choice: 1 },
-      localRole: "guest",
-      wave,
-      turn: 0,
-    });
-    expect(stalePick.adopt, "the stale previous-ME pick is REJECTED (invariant 6, #861 shape)").toBe(false);
-    if (!stalePick.adopt) {
-      expect(stalePick.reason).toBe("stale-or-duplicate");
-    }
-
-    // A DUPLICATE re-delivery of the already-applied newer terminal is also a no-op (idempotency).
-    const dupTerminal = meOp.adoptMeWatcherChoice({
-      kind: "ME_TERMINAL",
-      seq: 9_000_000 + LATER,
-      pinned: LATER,
-      res: { choice: -1000 },
-      terminal: "battle",
-      hostTurn: 3,
-      localRole: "guest",
-      wave,
-      turn: 0,
-    });
-    expect(dupTerminal.adopt, "a duplicate re-delivery of an already-applied terminal is a no-op (invariant 5)").toBe(
-      false,
-    );
-
-    // A LATE trailing meResync-equivalent (a leave terminal for the SAME already-resolved ME on the same
-    // seq/step) is ALSO dropped by the id dedupe - the ME is already terminal, so nothing re-runs.
-    const lateLeave = meOp.adoptMeWatcherChoice({
-      kind: "ME_TERMINAL",
-      seq: 9_000_000 + LATER,
-      pinned: LATER,
-      res: { choice: -2 }, // leave sentinel
-      terminal: "leave",
-      localRole: "guest",
-      wave,
-      turn: 0,
-    });
-    expect(lateLeave.adopt, "a late terminal for an already-terminal ME is dropped (no double-leave)").toBe(false);
-  });
-
-  // =====================================================================================
-  // #859-SHAPE (engine-free): when the committed op states a NON-battle terminal, the watcher's derived
-  // terminal is "leave" (it NEVER routes to finishWithoutLeaving / the phantom battle chain); and a stale
-  // battle-handoff from an earlier ME is REJECTED so it can't build the phantom either.
-  // =====================================================================================
+  // Raw-terminal stale/duplicate tests moved to coop-me-terminal-transaction.test.ts: the retained
+  // transaction receiver, not adoptMeWatcherChoice, now owns terminal identity/order/idempotence.
   it("an authoritative terminal retires unconfirmed sub-pick retries before the next encounter", () => {
     vi.useFakeTimers();
     try {
@@ -603,54 +524,4 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     }
   });
 
-  it("#859-SHAPE: a committed NON-battle terminal yields 'leave' (never a phantom battle chain); a stale battle-handoff is rejected", () => {
-    resetCoopMeOperationState();
-    const wave = 30;
-
-    // A committed NON-battle terminal: the operation STATES "leave", so the watcher routes to the leave
-    // path - it can NEVER construct the ME-battle phase chain for this ME (the #859/#860 phantom is
-    // structurally impossible: the type is stated by the op BEFORE any phase is built).
-    const nonBattle = meOp.adoptMeWatcherChoice({
-      kind: "ME_TERMINAL",
-      seq: 9_000_000 + 6,
-      pinned: 6,
-      res: { choice: -2 }, // leave sentinel
-      terminal: "leave",
-      localRole: "guest",
-      wave,
-      turn: 0,
-    });
-    expect(nonBattle.adopt, "the non-battle terminal is adopted").toBe(true);
-    if (nonBattle.adopt) {
-      expect(nonBattle.terminal, "the op states a NON-battle 'leave' terminal").toBe("leave");
-      // The watcher's routing predicate (handleTerminalAction) is `terminal === "battle"` - here false, so
-      // finishWithoutLeaving (which builds the phantom battle chain) is NEVER reached for this ME.
-      const isBattleTerminal = nonBattle.terminal === "battle";
-      expect(isBattleTerminal, "the watcher NEVER routes a stated-leave terminal to the battle chain (#859)").toBe(
-        false,
-      );
-    }
-
-    // A STALE battle-handoff from an EARLIER ME (a leftover 9M sentinel, the exact #859/#860 wire shape)
-    // arriving after ME 6 resolved is REJECTED: it can NEVER re-open a phantom battle chain, because the
-    // committed later terminal already advanced the cross-ME stale order past it.
-    const staleHandoff = meOp.adoptMeWatcherChoice({
-      kind: "ME_TERMINAL",
-      seq: 9_000_000 + 4,
-      pinned: 4, // an EARLIER ME than the just-resolved 6
-      res: { choice: -1000 }, // battle-handoff sentinel
-      terminal: "battle",
-      hostTurn: 9,
-      localRole: "guest",
-      wave,
-      turn: 0,
-    });
-    expect(
-      staleHandoff.adopt,
-      "a stale battle-handoff from an earlier ME is REJECTED - it can never build the phantom chain (#859/#860)",
-    ).toBe(false);
-    if (!staleHandoff.adopt) {
-      expect(staleHandoff.reason).toBe("stale-or-duplicate");
-    }
-  });
 });
