@@ -224,29 +224,29 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
   return null;
 }
 
+/** The most recent `Start Phase <Name>` across both clients, by monotonic time (comparable in-process). */
 function latestStartPhase(clients) {
   let best = null;
   for (const client of clients) {
     const event = client.evidence.findLast(START_PHASE);
-    if (event && (best == null || event.index > best.index || best.client !== client)) {
-      const match = START_PHASE.exec(event.text ?? "");
-      if (match) {
-        best = { name: match[1], index: event.index, client };
-      }
+    if (!event) {
+      continue;
+    }
+    const match = START_PHASE.exec(event.text ?? "");
+    if (match && (best == null || (event.monotonicMs ?? 0) >= best.monotonicMs)) {
+      best = { name: match[1], monotonicMs: event.monotonicMs ?? 0, client };
     }
   }
   return best;
 }
 
-function maxStartPhaseIndex(clients) {
-  let max = -1;
-  for (const client of clients) {
-    const event = client.evidence.findLast(START_PHASE);
-    if (event && event.index > max) {
-      max = event.index;
-    }
-  }
-  return max;
+/**
+ * A signature that changes whenever EITHER client emits a new Start Phase line. Evidence
+ * indices are per-client, so progress is the pair of per-client last-phase indices, not a
+ * single cross-client max.
+ */
+function phaseProgressSignature(clients) {
+  return clients.map(client => client.evidence.findLast(START_PHASE)?.index ?? -1).join(",");
 }
 
 /**
@@ -259,45 +259,48 @@ function maxStartPhaseIndex(clients) {
  * (COOP_UI_AUTO_FIRST=1) presses through logging `[auto-first] <phase>` - the exact
  * loud-fail / auto-first contract the headless autopilot enforces.
  */
-async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats) {
+async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surfaceCursors) {
   const clients = Object.values(rig.clients);
   const dispatch = buildDispatchTable(policy);
   const handledIndex = new Map();
-  const betweenCursors = fromEach(clients, client => client.evidence.cursor());
+  // Owner markers for reward/biome/crossroads/etc. are searched from the wave start
+  // (surfaceCursors); the next command and terminal are searched from the post-battle
+  // cursor so this wave's own commands never read as the next wave.
+  const commandCursors = fromEach(clients, client => client.evidence.cursor());
   const deadline = Date.now() + rig.config.timeoutMs * 3;
   let stallSince = 0;
-  let lastPhaseProgress = maxStartPhaseIndex(clients);
+  let lastPhaseProgress = phaseProgressSignature(clients);
 
   while (Date.now() < deadline) {
     if (
       clients.some(
         client =>
-          client.evidence.find(SHARED_SESSION_TERMINAL, betweenCursors[client.label])
-          || client.evidence.find(GAME_OVER_PHASE, betweenCursors[client.label]),
+          client.evidence.find(SHARED_SESSION_TERMINAL, commandCursors[client.label])
+          || client.evidence.find(GAME_OVER_PHASE, commandCursors[client.label]),
       )
     ) {
       return { status: "terminal" };
     }
 
-    if (clients.every(client => client.evidence.find(LOCAL_COMMAND, betweenCursors[client.label]))) {
-      await Promise.all(clients.map(client => client.waitForLocalCommand(betweenCursors[client.label])));
-      const boundary = await rig.assertSharedSurface("command", betweenCursors, `wave-${waveOrdinal}-advance`, {
+    if (clients.every(client => client.evidence.find(LOCAL_COMMAND, commandCursors[client.label]))) {
+      await Promise.all(clients.map(client => client.waitForLocalCommand(commandCursors[client.label])));
+      const boundary = await rig.assertSharedSurface("command", commandCursors, `wave-${waveOrdinal}-advance`, {
         allowAddressRepeat: true,
       });
       rig.activeBattleWave = boundary.wave;
       return { status: "continue" };
     }
 
-    const drove = await driveOnePendingSurface(rig, dispatch, betweenCursors, handledIndex, stats);
+    const drove = await driveOnePendingSurface(rig, dispatch, surfaceCursors, handledIndex, stats);
     if (drove) {
       stallSince = 0;
-      lastPhaseProgress = maxStartPhaseIndex(clients);
+      lastPhaseProgress = phaseProgressSignature(clients);
       continue;
     }
 
-    const phaseIndex = maxStartPhaseIndex(clients);
-    if (phaseIndex > lastPhaseProgress) {
-      lastPhaseProgress = phaseIndex;
+    const phaseSignature = phaseProgressSignature(clients);
+    if (phaseSignature !== lastPhaseProgress) {
+      lastPhaseProgress = phaseSignature;
       stallSince = 0;
     } else if (stallSince === 0) {
       stallSince = Date.now();
@@ -351,8 +354,13 @@ export async function runCampaign(rig) {
       const waveNo = rig.activeBattleWave;
       const stats = { wave: waveNo, ordinal, turns: 0, faints: 0, fallbackTurns: 0, surfaces: [], autoFirst: [] };
       const startMs = Date.now();
+      // Capture the wave-start cursor BEFORE the battle: the reward shop's OWNER marker is
+      // logged when the shop opens (mid-wave), so the between-wave surface search must
+      // begin here, not after the battle. Next-command/terminal detection uses the
+      // post-battle cursor the advancer captures internally.
+      const surfaceCursors = fromEach(clients, client => client.evidence.cursor());
       await driveBattleWave(rig, policy, stats);
-      const advanced = await advanceToNextWaveCommand(rig, policy, ordinal, stats);
+      const advanced = await advanceToNextWaveCommand(rig, policy, ordinal, stats, surfaceCursors);
       status = advanced.status;
       wavesCleared += 1;
       await Promise.all(clients.map(client => client.checkpoint(`wave-${waveNo}-cleared`)));
