@@ -1675,6 +1675,18 @@ export interface ShopPhaseSeam {
  * Call inside the destination client's {@linkcode withClient} context.
  */
 export async function reachQueuedRewardShop(scene: BattleScene): Promise<ShopPhaseSeam> {
+  const current = scene.phaseManager.getCurrentPhase();
+  const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+
+  // Detached replay fixtures can finish with the real post-battle Victory tail queued behind the
+  // scene's inert boot TitlePhase. Production reaches the same tail by ending the replay phase. Admit
+  // only that exact stranded shape, then continue through the real phase manager; do not clear the
+  // queue or construct/apply a reward surface out of order.
+  if (current?.phaseName === "TitlePhase" && queued[0] === "VictoryPhase") {
+    scene.phaseManager.shiftPhase();
+    await drainLoopback();
+  }
+
   return (await driveClientPhaseQueueTo(scene, "SelectModifierPhase")) as unknown as ShopPhaseSeam;
 }
 
