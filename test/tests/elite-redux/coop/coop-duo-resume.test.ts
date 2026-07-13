@@ -188,6 +188,8 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
 
     // HOST: serialize the saved session it would load on RESUME + capture its wave-start checksum.
     const hostJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
+    // Parse these exact frozen bytes: asking GameData for a second snapshot may mint a different timestamp and
+    // would make the fixture test a commitment that was never paired with the payload sent to the guest.
     const hostSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(hostJson));
     const commitment = await deriveCoopResumeCommitment(hostJson, hostSession);
     expect(commitment, "the frozen save produces an immutable resume discriminator").not.toBeNull();
