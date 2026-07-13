@@ -67,7 +67,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: coop-public-ui-${{ github.ref }}-${{ inputs.journey || 'fresh-resume' }}
+  group: coop-public-ui-${{ github.ref }}-${{ inputs.journey || 'probe' }}
   cancel-in-progress: false
 
 env:
@@ -162,7 +162,7 @@ jobs:
           if-no-files-found: error
 
   primary-journey:
-    name: ${{ inputs.journey || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / primary accounts
+    name: ${{ inputs.journey || 'probe' }} / ${{ inputs.cadence || 'normal' }} / primary accounts
     needs: browser-build
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -193,7 +193,7 @@ jobs:
           COOP_UI_ASSET_DIR: assets
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          COOP_UI_JOURNEY: ${{ inputs.journey || 'fresh-resume' }}
+          COOP_UI_JOURNEY: ${{ inputs.journey || 'probe' }}
           COOP_UI_ACCOUNT_MODE: register
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
           COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.faint_owner_seat || 'guest-seat' }}
