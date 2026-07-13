@@ -6,7 +6,14 @@
 
 import { readFile } from "node:fs/promises";
 
-const files = ["public-ui-harness.mjs", "journeys.mjs", "run.mjs", "evidence.mjs", "preview-server.mjs"];
+const files = [
+  "public-ui-harness.mjs",
+  "journeys.mjs",
+  "run.mjs",
+  "evidence.mjs",
+  "preview-server.mjs",
+  "vite.config.mjs",
+];
 const forbidden = [
   /(?:^|["'])\.\.\/\.\.\/\.\.\/src\//mu,
   /applyResync/u,
@@ -48,11 +55,15 @@ if (evaluateCalls !== 1 || !harness?.includes("document.activeElement.blur()")) 
 
 const run = sources.get("run.mjs");
 const preview = sources.get("preview-server.mjs");
+const viteConfig = sources.get("vite.config.mjs");
 if (!run?.includes("startSealedPreview(config)")) {
   failures.push("run.mjs: every gameplay journey must start from a verified sealed browser artifact");
 }
 if (!preview?.includes('"--verify"') || /safeStaticFile\([^,]+,\s*["']src/gu.test(preview)) {
   failures.push("preview-server.mjs: preview must verify the immutable manifest and never mount game source");
+}
+if (!viteConfig?.includes("SOURCE_ENTRY") || !viteConfig.includes("sourceEntryReplaced")) {
+  failures.push("vite.config.mjs: exact-SHA browser build entry replacement must stay explicit and idempotent");
 }
 
 const browserEntry = await readFile(new URL("../../../scripts/coop-browser-entry.ts", import.meta.url), "utf8");
