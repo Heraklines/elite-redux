@@ -302,7 +302,11 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
         expect(watcherPinned, `wave ${w}: watcher parked on the owner's interaction`).toBe(counterBefore);
         ownerPinned = await withClient(rig.guestCtx, () => driveRewardShopOwnerLeaveViaUi(guestShop));
         await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
-        await withClient(rig.guestCtx, () => drainLoopback());
+        // The guest owner broadcasts its completed counter to the HOST. Explicit scheduled delivery must
+        // therefore pump the host destination before the host's NewBattlePhase reaches CoopPartnerSyncPhase.
+        // Pumping the guest again strands the already-emitted snapshot in the host inbox and makes the real
+        // boundary correctly remain closed at peerSeen=N-1.
+        await withClient(rig.hostCtx, () => drainLoopback());
       }
       if (takeReward) {
         // The owner granted the reward on the host AND the watcher mirrored the SAME grant on the guest
