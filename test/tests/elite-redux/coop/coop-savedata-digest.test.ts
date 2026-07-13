@@ -40,7 +40,7 @@ import {
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import { CoopInteractionRelay, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, getCoopBattleStreamer, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { erAchvRun } from "#data/elite-redux/er-achievement-run-state";
@@ -247,6 +247,14 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
         await driveGuestReplayTurn(rig.guestScene, turn);
       });
 
+      const guestAuthorityTerminated = await withClient(
+        rig.guestCtx,
+        () => getCoopBattleStreamer()?.debugAuthorityState().terminal,
+      );
+      expect(
+        guestAuthorityTerminated,
+        `wave ${w}: renderer mutation never invalidates the immutable admitted authority ACK`,
+      ).toBe(false);
       const hostPost = await withClient(rig.hostCtx, () => captureCoopSaveDataDigest());
       const guestPost = await withClient(rig.guestCtx, () => captureCoopSaveDataDigest());
       expect(guestPost, `wave ${w}: save-data digest matches host post-turn`).toBe(hostPost);
