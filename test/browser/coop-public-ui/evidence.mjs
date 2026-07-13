@@ -41,6 +41,28 @@ function parsedUrl(value) {
   }
 }
 
+// Diagnostic request/response body capture is scoped to the co-op save + signal workers ONLY
+// (never game assets/CDN/localhost), to keep artifacts sane and never touch unrelated traffic.
+const CAPTURED_API_HOST = /(?:er-save-api|er-coop-api)/u;
+const MAX_BODY_BYTES = 256 * 1024;
+
+function isCapturedApiHost(hostname) {
+  return CAPTURED_API_HOST.test(hostname);
+}
+
+// NEVER capture request bodies for the auth routes: /account/register and /account/login carry
+// the account password. Diagnostics only need the savedata + coop protocol bodies.
+function isCredentialPath(pathname) {
+  return pathname.startsWith("/account/");
+}
+
+function truncateBody(body) {
+  if (typeof body !== "string") {
+    return null;
+  }
+  return body.length > MAX_BODY_BYTES ? `${body.slice(0, MAX_BODY_BYTES)}…[truncated ${body.length} bytes]` : body;
+}
+
 function isExpectedMissingSystemSaveError(type, text, source, registerMode) {
   if (type !== "error" || !registerMode) {
     return false;
@@ -339,6 +361,29 @@ export class EvidenceSink {
       const event = this.record("pageerror", { text: error.stack ?? error.message });
       this.failures.push(event);
     });
+    page.on("request", request => {
+      const url = parsedUrl(request.url());
+      const method = request.method();
+      if (
+        url == null
+        || !isCapturedApiHost(url.hostname)
+        || isCredentialPath(url.pathname)
+        || !["POST", "PUT", "PATCH"].includes(method)
+      ) {
+        return;
+      }
+      const body = request.postData();
+      if (body == null) {
+        return;
+      }
+      // Diagnostic-only: the exact bytes the client submitted (e.g. the first-save CAS payload).
+      this.record("request-body", {
+        method,
+        url: safeUrl(request.url()),
+        bytes: body.length,
+        body: truncateBody(body),
+      });
+    });
     page.on("requestfailed", request => {
       const errorText = request.failure()?.errorText ?? "request failed";
       const event = this.record("requestfailed", {
@@ -354,8 +399,9 @@ export class EvidenceSink {
       }
     });
     page.on("response", response => {
+      const status = response.status();
       this.record("response", {
-        status: response.status(),
+        status,
         method: response.request().method(),
         url: safeUrl(response.url()),
       });
@@ -365,6 +411,23 @@ export class EvidenceSink {
           url: safeUrl(response.url()),
         });
       });
+      // Capture the response BODY for a non-2xx status on the co-op workers only, so the exact
+      // error text (e.g. the first-save CAS 409 message) is in the artifact. Bodies carry no
+      // credentials on these routes; auth error bodies are advisory, so this is safe.
+      const url = parsedUrl(response.url());
+      if (url != null && isCapturedApiHost(url.hostname) && (status < 200 || status >= 300)) {
+        response
+          .text()
+          .then(text => {
+            this.record("response-body", {
+              status,
+              url: safeUrl(response.url()),
+              bytes: text.length,
+              body: truncateBody(text),
+            });
+          })
+          .catch(() => {});
+      }
     });
   }
 
