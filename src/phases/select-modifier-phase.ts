@@ -1371,6 +1371,15 @@ export class SelectModifierPhase extends BattlePhase {
     })();
   }
 
+  /** Return a guest action owner from the bounded result wait to the same still-live shop. */
+  private coopResumeOwnerShopAfterProjection(): void {
+    if (this.coopWatcher) {
+      return;
+    }
+    this.resetModifierSelect(this.coopModifierSelectCallback ?? (() => false));
+    this.coopBeginMirror("owner");
+  }
+
   /** OWNER (#633 Fix #2): stream the rolled reward-option list for THIS reroll round so the
    *  watcher rebuilds it instead of re-rolling (luck-divergent pool / RNG-cursor poisoning).
    *  Keyed by the pinned interaction counter + this reroll round (matches the watcher await). */
@@ -1902,6 +1911,7 @@ export class SelectModifierPhase extends BattlePhase {
         // lockModifierTiers is a shop-control projection outside the battle-state schema. The retained,
         // operation-id-deduped result authorizes this one toggle; no modifier/money simulation runs.
         globalScene.lockModifierTiers = !globalScene.lockModifierTiers;
+        this.coopResumeOwnerShopAfterProjection();
       } else {
         this.toggleRerollLock();
       }
@@ -1912,6 +1922,8 @@ export class SelectModifierPhase extends BattlePhase {
       if (!projectionOnly) {
         this.applyTransfer(data[1], data[2], data[3], data[4]);
         this.coopCommitPendingAuthorityResult(decision?.operationId);
+      } else {
+        this.coopResumeOwnerShopAfterProjection();
       }
       return false;
     }
@@ -1985,10 +1997,7 @@ export class SelectModifierPhase extends BattlePhase {
           );
         }
         this.coopRelayedMoney = -1;
-        if (!this.coopWatcher) {
-          this.resetModifierSelect(this.coopModifierSelectCallback ?? noop);
-          this.coopBeginMirror("owner");
-        }
+        this.coopResumeOwnerShopAfterProjection();
         return false;
       }
       // coopRelayedMoney (set above) drives applyModifier's set-verbatim for the buy (#698).
@@ -2003,6 +2012,8 @@ export class SelectModifierPhase extends BattlePhase {
       if (!projectionOnly) {
         this.applyRelayedCheckOp(data[1], data.slice(2));
         this.coopCommitPendingAuthorityResult(decision?.operationId);
+      } else {
+        this.coopResumeOwnerShopAfterProjection();
       }
       return false;
     }
