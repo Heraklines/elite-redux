@@ -274,7 +274,7 @@ describe("authenticated P33 browser client", () => {
       peerConnectionGeneration: 0,
     });
     expect(context).not.toBeNull();
-    const [local, remote] = createLoopbackPair();
+    const { host: local, guest: remote } = createLoopbackPair();
     const received: CoopMessage[] = [];
     remote.onMessage(message => received.push(message));
     const controller = new CoopSessionController(local, {
