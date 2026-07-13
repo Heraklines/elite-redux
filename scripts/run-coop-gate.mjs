@@ -473,7 +473,7 @@ function impactLanes(changedFiles) {
 
 /** Select 1-5 directly affected or deterministic representative shards against an explicit integration base. */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: bounded planner keeps selection/proof in one auditable function.
-export function createFocusedMatrix(base, maxShards = 5, lanes = categorize(), priorityBase = undefined) {
+export function createFocusedMatrix(base, maxShards = 5, lanes = categorize(), priorityBase = null) {
   if (!Number.isSafeInteger(maxShards) || maxShards < 1 || maxShards > 5) {
     throw new Error("focused max-shards must be between 1 and 5");
   }
@@ -485,9 +485,7 @@ export function createFocusedMatrix(base, maxShards = 5, lanes = categorize(), p
     throw new Error(`focused planner resolved zero changed files for ${base}..HEAD`);
   }
   const priorityChangedFiles =
-    priorityBase == null
-      ? []
-      : gitLines(["diff", "--name-only", "--diff-filter=ACMR", priorityBase, "HEAD"]);
+    priorityBase == null ? [] : gitLines(["diff", "--name-only", "--diff-filter=ACMR", priorityBase, "HEAD"]);
   const full = createCiMatrix(lanes).include;
   const assignment = new Map();
   for (const entry of full) {
@@ -548,10 +546,7 @@ export function createFocusedMatrix(base, maxShards = 5, lanes = categorize(), p
       const rightLane = chosen.get(rightKey).lane;
       const laneDelta = FOCUSED_LANE_PRIORITY[leftLane] - FOCUSED_LANE_PRIORITY[rightLane];
       return (
-        priorityDelta
-        || directDelta
-        || laneDelta
-        || stableRank(seed, leftKey).localeCompare(stableRank(seed, rightKey))
+        priorityDelta || directDelta || laneDelta || stableRank(seed, leftKey).localeCompare(stableRank(seed, rightKey))
       );
     })
     .slice(0, maxShards)
