@@ -2093,7 +2093,15 @@ export class GameData {
           result.set(slot, undefined);
           continue;
         }
-        const json = decrypt(raw, bypassLogin);
+        // A malformed / wrong-codec local blob makes decrypt() throw a raw URIError; surface it as an explicit
+        // unreadable-replica failure (mirrors reconcileCoopResumeSlot's guard) instead of leaking a bare
+        // "URI malformed" that no resume caller can classify.
+        let json: string;
+        try {
+          json = decrypt(raw, bypassLogin);
+        } catch (error) {
+          throw new CoopResumeReplicaUnavailableError(`local slot ${slot} is unreadable: ${String(error)}`);
+        }
         const replica = await this.classifyCoopReplica(slot, json);
         if (replica.session == null) {
           throw new CoopResumeReplicaUnavailableError(`local slot ${slot} could not be classified`);

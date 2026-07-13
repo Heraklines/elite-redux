@@ -4471,28 +4471,6 @@ export function assembleCoopRuntime(
   const durability = durabilityEnabled
     ? new CoopDurabilityManager(transport, {
         ...operationDurabilityHooks,
-        // Mirror ui.ts's coopAuthoritySurfaceReady chokepoint: the LIVE shared continuation surface, read at
-        // material-apply so a reward whose shop opened before its terminal op committed still proves its
-        // continuation. Guest-only (hosts have no guest continuation ledger); still address-matched inside notify.
-        currentContinuationSurface: () => {
-          try {
-            if (!isCoopAuthoritativeGuest() || globalScene.ui.getHandler()?.active !== true) {
-              return null;
-            }
-            const surface = coopAuthorityContinuationSurface(globalScene.ui.getMode());
-            const controller = getCoopController();
-            const battle = globalScene.currentBattle;
-            if (surface == null || controller == null || battle == null) {
-              return null;
-            }
-            return {
-              surface,
-              address: { epoch: controller.sessionEpoch, wave: battle.waveIndex, turn: battle.turn },
-            };
-          } catch {
-            return null;
-          }
-        },
         sendFullSnapshot: (cls, headRevision, controlHighWater) =>
           sendCoopDurabilitySnapshot(runtime, cls, headRevision, controlHighWater),
         onRecoveryExhausted: failure =>

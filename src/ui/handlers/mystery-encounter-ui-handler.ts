@@ -10,6 +10,7 @@ import { UiMode } from "#enums/ui-mode";
 import { getEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
 import type { OptionSelectSettings } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounterOption } from "#mystery-encounters/mystery-encounter-option";
+import { allMysteryEncounters } from "#mystery-encounters/mystery-encounters";
 // Co-op authoritative non-battle ME (#633 BLOCK-2 / P0 / ADD-1b / ADD-4): on the guest path the
 // current phase is CoopReplayMePhase (a guest-owned ME forwards the pick to it), and the host streams
 // its authoritative presentation so the handler reads per-option enablement / labels from there
@@ -49,7 +50,10 @@ export class MysteryEncounterUiHandler extends UiHandler {
 
   private overrideSettings?: OptionSelectSettings | undefined;
   private encounterOptions: MysteryEncounterOption[] = [];
-  private optionsMeetsReqs: boolean[];
+  // Initialized empty (not left undefined) so a processInput that races a not-yet-rendered selector - e.g. a
+  // co-op guest whose ME opened before displayEncounterOptions populated it - reads [] rather than crashing on
+  // `optionsMeetsReqs[cursor]` of undefined.
+  private optionsMeetsReqs: boolean[] = [];
 
   protected viewPartyIndex = 0;
   protected viewPartyXPosition = 0;
@@ -388,7 +392,25 @@ export class MysteryEncounterUiHandler extends UiHandler {
 
   displayEncounterOptions(slideInDescription = true): void {
     this.getUi().clearText();
-    const mysteryEncounter = globalScene.currentBattle.mysteryEncounter!;
+    // A co-op authoritative guest renders the host's ME with NO local event engine of its own (its own
+    // option.meetsRequirements() / dialogue re-derivation would read its DIVERGED party - the exact reason
+    // the host streams its authoritative presentation). currentBattle.mysteryEncounter is therefore undefined
+    // on the guest BY DESIGN; source the option STRUCTURE + dialogue read-only from the adopted-type registry
+    // template so the selector renders instead of crashing on the absent local encounter. The dynamic
+    // per-option enablement (`meetsReqs`) + labels still come from the host presentation below, so no
+    // requirement is re-derived against the guest's party.
+    const mysteryEncounter =
+      globalScene.currentBattle.mysteryEncounter
+      ?? (globalScene.currentBattle.mysteryEncounterType == null
+        ? undefined
+        : allMysteryEncounters[globalScene.currentBattle.mysteryEncounterType]);
+    if (mysteryEncounter == null) {
+      // Neither a live local encounter nor an adopted descriptor: render an empty, non-crashing selector
+      // rather than dereferencing an absent encounter (guards processInput's optionsMeetsReqs[cursor] read).
+      this.encounterOptions = [];
+      this.optionsMeetsReqs = [];
+      return;
+    }
     this.encounterOptions = this.overrideSettings?.overrideOptions ?? mysteryEncounter.options;
     this.optionsMeetsReqs = [];
 

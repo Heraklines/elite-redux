@@ -686,17 +686,6 @@ function operationAuthorityFor(
   if (typeof operationId !== "string" || operationId.length === 0) {
     return null;
   }
-  // A between-wave shared-boundary continuation (reward shop / biome market / ME) is NOT turn-scoped: its
-  // proof is "the owning shared surface is open on this wave", not a specific mid-battle turn. Binding its
-  // authority address to envelope.turn (the HOST's post-battle turn) strands it whenever the pure-renderer
-  // guest's currentBattle.turn lags the host's - Lane-P production fidelity never heals the guest, so
-  // operationContinuationMatches then fails `current.turn >= authority.turn` and the terminal never releases.
-  // Stamp turn 0 for the shared boundary so the SAME-WAVE surface always proves it; the GAME_OVER terminal
-  // address stays turn-exact. Both clients derive this identically from the one envelope (ACK/keying stay
-  // symmetric), and the reward AUTHORITATIVE STATE (envelope.authoritativeState.turn) is untouched - this is
-  // only the continuation ADDRESS, not a predicate relaxation.
-  const expectedSurface: "sharedBoundary" | "terminal" =
-    envelope.logicalPhase === "GAME_OVER" ? "terminal" : "sharedBoundary";
   return {
     authority: {
       cls,
@@ -704,9 +693,9 @@ function operationAuthorityFor(
       operationId,
       epoch: envelope.sessionEpoch,
       wave: envelope.wave,
-      turn: expectedSurface === "terminal" ? envelope.turn : 0,
+      turn: envelope.turn,
     },
-    expectedSurface,
+    expectedSurface: envelope.logicalPhase === "GAME_OVER" ? "terminal" : "sharedBoundary",
   };
 }
 
@@ -823,18 +812,6 @@ export interface CoopDurabilityHooks {
   scheduleOperationContinuationDeadline?: (callback: () => void, ms: number) => () => void;
   /** Runtime bridge into the peer-coherent terminal supervisor after one class exhausts its retry budget. */
   onRecoveryExhausted?: (failure: CoopDurabilityRecoveryFailure) => void;
-  /**
-   * Guest: the LIVE public continuation surface currently open (same chokepoint ui.ts publishes on), or null
-   * when the UI is not on a shared continuation surface. Consulted at material-apply because a surface can
-   * open BEFORE its operation commits (the reward shop is open while the owner picks; the terminal LEAVE op
-   * arrives only after, so the enter-time notify already fired-and-missed). Reads LIVE UI (never stale) and
-   * is still gated by operationContinuationMatches inside notify, so a non-matching/closed surface cannot
-   * retire the authority.
-   */
-  currentContinuationSurface?: () => {
-    surface: CoopOperationContinuationSurface;
-    address: CoopOperationContinuationAddress;
-  } | null;
 }
 
 /**
@@ -1080,17 +1057,7 @@ export class CoopDurabilityManager {
     const pending = this.pendingOperationContinuations.get(operationAuthorityKey(operation.authority));
     if (pending != null) {
       pending.lastAck = material;
-      if (pending.observed == null) {
-        // The continuation surface can already be open BEFORE the operation commits (the reward shop is open
-        // while the owner picks; its terminal LEAVE op arrives only after, so the enter-time notify fired and
-        // missed with nothing yet registered). Consult the LIVE surface now. Still gated by
-        // operationContinuationMatches inside notify, so a non-matching / closed surface cannot retire the
-        // authority.
-        const live = this.hooks.currentContinuationSurface?.();
-        if (live != null) {
-          this.notifyOperationContinuationSurface(live.surface, live.address);
-        }
-      } else {
+      if (pending.observed != null) {
         this.notifyOperationContinuationSurface(pending.observed.surface, pending.observed.address);
       }
     }
