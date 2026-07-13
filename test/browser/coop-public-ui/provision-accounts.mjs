@@ -21,7 +21,11 @@ const attempt = (process.env.GITHUB_RUN_ATTEMPT?.replaceAll(/\D/gu, "") || "1").
 const suffix = `${runId.slice(-8)}${attempt}`;
 
 function prepare(prefix) {
-  const username = `cui${prefix}${suffix}`;
+  // Include a per-invocation random tag so two JOBS in the same workflow run (same
+  // GITHUB_RUN_ID) - e.g. the solo-nav and campaign gameplay jobs - never register the
+  // SAME username and collide (409, mismatched passwords, auth timeout). The run-id
+  // prefix stays for traceability; the random tag guarantees uniqueness.
+  const username = `cui${prefix}${suffix}${randomBytes(3).toString("hex")}`;
   const password = `${randomBytes(18).toString("base64url")}A1!`;
   // The browser creates these accounts through the visible registration form. Mask both fields first.
   process.stdout.write(`::add-mask::${username}\n::add-mask::${password}\n`);
