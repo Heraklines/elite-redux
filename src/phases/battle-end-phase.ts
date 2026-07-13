@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { applyCoopAuthoritativeBattleState } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import {
+  awaitCoopSettledWaveAdvanceAtBattleEnd,
   broadcastCoopWaveEndState,
   consumeCoopPendingWaveEndState,
   isCoopAuthoritativeGuest,
@@ -17,6 +18,8 @@ export class BattleEndPhase extends BattlePhase {
   public readonly phaseName = "BattleEndPhase";
   /** If true, will increment battles won */
   isVictory: boolean;
+  private retainedBoundaryReleased = false;
+  private retainedLocalStatsRecorded = false;
 
   constructor(isVictory: boolean) {
     super();
@@ -27,8 +30,6 @@ export class BattleEndPhase extends BattlePhase {
   start() {
     super.start();
 
-    this.syncCoopWaveEndProgression();
-
     // cull any extra `BattleEnd` phases from the queue.
     this.isVictory ||= globalScene.phaseManager.hasPhaseOfType(
       "BattleEndPhase",
@@ -36,20 +37,20 @@ export class BattleEndPhase extends BattlePhase {
     );
     globalScene.phaseManager.removeAllPhasesOfType("BattleEndPhase");
 
-    globalScene.gameData.gameStats.battles++;
-    if (
-      globalScene.gameMode.isEndless
-      && globalScene.currentBattle.waveIndex + 1 > globalScene.gameData.gameStats.highestEndlessWave
-    ) {
-      globalScene.gameData.gameStats.highestEndlessWave = globalScene.currentBattle.waveIndex + 1;
+    // P33 guest: the host's post-BattleEnd image already contains every mutation below. Hold this phase
+    // until that exact retained DATA applies, then release the existing host-stated tail without dual-run.
+    if (awaitCoopSettledWaveAdvanceAtBattleEnd(() => this.releaseRetainedBoundary())) {
+      return;
     }
+
+    // Legacy/no-journal guest compatibility. Retained peers ignore raw waveEndState entirely.
+    this.applyLegacyCoopWaveEndProgression();
+
+    this.recordLocalBattleStats();
 
     if (this.isVictory) {
       globalScene.currentBattle.addBattleScore();
 
-      if (globalScene.currentBattle.trainer) {
-        globalScene.gameData.gameStats.trainersDefeated++;
-      }
       // ER money streak (#348): a won wave extends every non-fainted party
       // mon's faint-free streak (+1% money per 3 waves, capped +10%/mon).
       advanceErMoneyStreaks();
@@ -73,13 +74,6 @@ export class BattleEndPhase extends BattlePhase {
     }
 
     globalScene.clearEnemyHeldItemModifiers();
-    for (const p of globalScene.getEnemyParty()) {
-      try {
-        p.destroy();
-      } catch {
-        console.warn("Unable to destroy stale pokemon object in BattleEndPhase:", p);
-      }
-    }
 
     const lapsingModifiers = globalScene.findModifiers(
       m => m instanceof LapsingPersistentModifier || m instanceof LapsingPokemonHeldItemModifier,
@@ -95,7 +89,47 @@ export class BattleEndPhase extends BattlePhase {
     }
 
     globalScene.updateModifiers();
+    // HOST: capture only after every BattleEnd stat/modifier/material mutation above has settled. This
+    // seals DATA + destination in the retained WAVE_ADVANCE envelope, then emits raw compatibility state.
+    broadcastCoopWaveEndState(this.isVictory);
+    // Keep the enemy objects serializable through the settled capture, then tear down presentation exactly
+    // as before. The retained post-battle image explicitly marks enemy seats hidden on the guest.
+    for (const p of globalScene.getEnemyParty()) {
+      try {
+        p.destroy();
+      } catch {
+        console.warn("Unable to destroy stale pokemon object in BattleEndPhase:", p);
+      }
+    }
     this.end();
+  }
+
+  private releaseRetainedBoundary(): void {
+    if (this.retainedBoundaryReleased) {
+      return;
+    }
+    // Account progression belongs to each local player and is intentionally absent from shared-run DATA.
+    // Preserve it once on the guest while every shared mechanical mutation remains host-authoritative.
+    if (!this.retainedLocalStatsRecorded) {
+      this.recordLocalBattleStats();
+      this.retainedLocalStatsRecorded = true;
+    }
+    coopLog("progression", `GUEST retained WAVE_ADVANCE BattleEnd release wave=${globalScene.currentBattle.waveIndex}`);
+    this.end();
+    this.retainedBoundaryReleased = true;
+  }
+
+  private recordLocalBattleStats(): void {
+    globalScene.gameData.gameStats.battles++;
+    if (
+      globalScene.gameMode.isEndless
+      && globalScene.currentBattle.waveIndex + 1 > globalScene.gameData.gameStats.highestEndlessWave
+    ) {
+      globalScene.gameData.gameStats.highestEndlessWave = globalScene.currentBattle.waveIndex + 1;
+    }
+    if (this.isVictory && globalScene.currentBattle.trainer) {
+      globalScene.gameData.gameStats.trainersDefeated++;
+    }
   }
 
   /**
@@ -108,14 +142,7 @@ export class BattleEndPhase extends BattlePhase {
    * Both arms are hard no-ops off the authoritative path (host gates internal; guest gate explicit), so
    * solo / host-owner / lockstep are byte-for-byte unchanged.
    */
-  private syncCoopWaveEndProgression(): void {
-    if (globalScene.gameMode.isCoop) {
-      coopLog(
-        "progression",
-        `waveEndState BROADCAST wave=${globalScene.currentBattle.waveIndex} (host streams authoritative snapshot)`,
-      );
-    }
-    broadcastCoopWaveEndState();
+  private applyLegacyCoopWaveEndProgression(): void {
     if (!isCoopAuthoritativeGuest()) {
       return;
     }

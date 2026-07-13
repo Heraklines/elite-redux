@@ -553,26 +553,29 @@ export class CoopReceiveLedger {
 /**
  * The result of the receiver's apply hook (W2e-R P0-1). The receiver's ACK + ledger advance are GATED on
  * this so the manager can never claim an op applied when the applier did NOT consume it (the review's
- * ACK-without-mutation P0). The three cases are load-bearing (the Oracle-validated tri-state):
+ * ACK-without-mutation P0). The four cases are load-bearing:
  *  - `applied`   - the op was NEWLY consumed by the receiver (recorded in its idempotency ledger, and its
  *    live-mutation seam invoked). ACK it + advance.
- *  - `duplicate` - the op was ALREADY consumed (cross-carrier / resend re-delivery), or is a
- *    non-applicable/malformed frame the receiver will never apply. ACK it + advance anyway (idempotent), so
- *    a re-delivered-but-already-satisfied op can never spin the committer's resend loop forever.
- *  - `rejected`  - the apply threw or hit a transient non-applicable state (a redelivery may succeed). Do
- *    NOT ACK, do NOT advance the ledger - the op stays retriable. Never a permanent condition (a permanently
- *    un-appliable frame is a `duplicate`, not a `rejected`), so it cannot wedge convergence.
+ *  - `duplicate` - the op was ALREADY consumed (cross-carrier / resend re-delivery). ACK it + advance anyway
+ *    (idempotent), so a re-delivered-but-already-satisfied op can never spin the resend loop forever.
+ *  - `deferred`  - the op is valid and retained, but its addressed engine/UI boundary has not opened yet.
+ *    Do NOT ACK, advance, or enter recovery. The exact entry is retried on a cheap timer and may be retried
+ *    immediately by {@linkcode CoopDurabilityManager.retryDeferred} when the continuation surface opens;
+ *    a separate generous deadline routes a missing surface to the peer-coherent terminal supervisor.
+ *  - `rejected`  - the apply threw, failed validation, or hit an erroneous non-applicable state. Do NOT ACK
+ *    or advance. Bounded recovery retries it and then enters the peer-coherent terminal path if it cannot
+ *    heal, so corrupt/conflicting input cannot silently advance or wait forever.
  * A `void`/`undefined` return is treated as `applied` (back-compat for the pre-W2e-R generic synthetic
  * appliers that mutated unconditionally).
  */
-export type CoopApplyOutcome = "applied" | "duplicate" | "rejected";
+export type CoopApplyOutcome = "applied" | "duplicate" | "deferred" | "rejected";
 
 export interface CoopDurabilityRecoveryFailure {
   cls: string;
   from: number;
   blockedSeq: number;
   attempts: number;
-  reason: "apply-rejected" | "gap";
+  reason: "apply-rejected" | "gap" | "deferred-timeout";
 }
 
 interface PendingDurabilityRecovery extends CoopDurabilityRecoveryFailure {
@@ -580,10 +583,19 @@ interface PendingDurabilityRecovery extends CoopDurabilityRecoveryFailure {
   cancel: () => void;
 }
 
+interface PendingDeferredApply {
+  entry: CoopJournalEntry;
+  startedAt: number;
+  attempts: number;
+  cancel: () => void;
+}
+
 const DURABILITY_RECOVERY_INITIAL_MS = 100;
 const DURABILITY_RECOVERY_MAX_MS = 2_000;
 const DURABILITY_RECOVERY_MAX_ATTEMPTS = 8;
 const DURABILITY_RECOVERY_DEADLINE_MS = 12_000;
+const DURABILITY_DEFERRED_RETRY_MS = 100;
+const DURABILITY_DEFERRED_DEADLINE_MS = 60_000;
 
 function defaultDurabilitySchedule(callback: () => void, ms: number): () => void {
   const timer = setTimeout(callback, ms);
@@ -606,8 +618,9 @@ export interface CoopDurabilityHooks {
   /**
    * Apply an in-order committed op to shared state (the receiver's ONE mutation site). Returns a
    * {@linkcode CoopApplyOutcome} that GATES the ACK + ledger advance (W2e-R P0-1): only an `applied` or
-   * `duplicate` result ACKs; a `rejected` result (or a thrown apply) leaves the op retriable. A `void`
-   * return is treated as `applied` (back-compat).
+   * `duplicate` result ACKs; `deferred` retains the exact entry without entering error recovery; a
+   * `rejected` result (or a thrown apply) leaves the op retriable through bounded recovery. A `void` return
+   * is treated as `applied` (back-compat).
    */
   apply?: (entry: CoopJournalEntry) => CoopApplyOutcome | void;
   /**
@@ -623,6 +636,10 @@ export interface CoopDurabilityHooks {
   recoveryMaxMs?: number;
   recoveryMaxAttempts?: number;
   recoveryDeadlineMs?: number;
+  /** Low-cost valid-boundary polling, separate from bounded error recovery. */
+  deferredRetryMs?: number;
+  /** Maximum valid-boundary wait before the same peer-coherent terminal supervisor is invoked. */
+  deferredDeadlineMs?: number;
   /** Runtime bridge into the peer-coherent terminal supervisor after one class exhausts its retry budget. */
   onRecoveryExhausted?: (failure: CoopDurabilityRecoveryFailure) => void;
 }
@@ -644,12 +661,18 @@ export class CoopDurabilityManager {
   private readonly off: () => void;
   private readonly pendingRecovery = new Map<string, PendingDurabilityRecovery>();
   private readonly exhaustedRecovery = new Map<string, number>();
+  private readonly pendingDeferred = new Map<string, PendingDeferredApply>();
+  /** Later global revisions that arrived while the exact next revision was validly deferred. */
+  private readonly deferredFollowers = new Map<string, Map<number, CoopMessage>>();
   private readonly scheduleRecovery: (callback: () => void, ms: number) => () => void;
   private readonly recoveryNow: () => number;
   private readonly recoveryInitialMs: number;
   private readonly recoveryMaxMs: number;
   private readonly recoveryMaxAttempts: number;
   private readonly recoveryDeadlineMs: number;
+  private readonly deferredRetryMs: number;
+  private readonly deferredDeadlineMs: number;
+  private readonly deferredFollowerLimit: number;
   private disposed = false;
 
   constructor(
@@ -664,6 +687,9 @@ export class CoopDurabilityManager {
     this.recoveryMaxMs = hooks.recoveryMaxMs ?? DURABILITY_RECOVERY_MAX_MS;
     this.recoveryMaxAttempts = hooks.recoveryMaxAttempts ?? DURABILITY_RECOVERY_MAX_ATTEMPTS;
     this.recoveryDeadlineMs = hooks.recoveryDeadlineMs ?? DURABILITY_RECOVERY_DEADLINE_MS;
+    this.deferredRetryMs = hooks.deferredRetryMs ?? DURABILITY_DEFERRED_RETRY_MS;
+    this.deferredDeadlineMs = hooks.deferredDeadlineMs ?? DURABILITY_DEFERRED_DEADLINE_MS;
+    this.deferredFollowerLimit = journalCapacity;
     if (
       !Number.isSafeInteger(this.recoveryInitialMs)
       || this.recoveryInitialMs <= 0
@@ -673,6 +699,12 @@ export class CoopDurabilityManager {
       || this.recoveryMaxAttempts <= 0
       || !Number.isSafeInteger(this.recoveryDeadlineMs)
       || this.recoveryDeadlineMs < this.recoveryInitialMs
+      || !Number.isSafeInteger(this.deferredRetryMs)
+      || this.deferredRetryMs <= 0
+      || !Number.isSafeInteger(this.deferredDeadlineMs)
+      || this.deferredDeadlineMs < this.deferredRetryMs
+      || !Number.isSafeInteger(this.deferredFollowerLimit)
+      || this.deferredFollowerLimit <= 0
     ) {
       throw new Error("invalid durability recovery timing configuration");
     }
@@ -732,12 +764,31 @@ export class CoopDurabilityManager {
   /** Receiver: apply an inbound committed op idempotently by `(cls, seq)` (§1.6), then ACK / request tail. */
   private receiveOp(cls: string, seq: number, msg: CoopMessage): void {
     if (this.ledger.isDuplicate(cls, seq)) {
+      this.clearDeferred(cls);
       this.clearRecoveryAfterProgress(cls);
       // Already applied (a safe resend, §4.2): re-ACK so the committer stops resending, do NOT re-apply.
       this.transport.send({ t: "coopAck", cls, seq: this.ledger.appliedThrough(cls) });
+      this.drainDeferredFollowers(cls);
       return;
     }
     if (this.ledger.hasGap(cls, seq)) {
+      const deferred = this.pendingDeferred.get(cls);
+      if (deferred != null && seq > deferred.entry.seq) {
+        const followers = this.deferredFollowers.get(cls) ?? new Map<number, CoopMessage>();
+        if (followers.size >= this.deferredFollowerLimit && !followers.has(seq)) {
+          coopWarn(
+            "durability",
+            `deferred follower overflow cls=${cls} waiting=${deferred.entry.seq} got=${seq} `
+              + `limit=${this.deferredFollowerLimit} -> bounded recovery`,
+          );
+          this.requestBoundedRecovery(cls, seq, "gap");
+          return;
+        }
+        followers.set(seq, msg);
+        this.deferredFollowers.set(cls, followers);
+        coopLog("durability", `buffer after deferred cls=${cls} waiting=${deferred.entry.seq} got=${seq}`);
+        return;
+      }
       // A revision was missed: do NOT apply out of order - request the tail after our last-applied (§4.4).
       coopWarn("durability", `gap cls=${cls} got=${seq} have=${this.ledger.appliedThrough(cls)} -> request tail`);
       this.requestBoundedRecovery(cls, seq, "gap");
@@ -751,6 +802,11 @@ export class CoopDurabilityManager {
     //  - `rejected` (or a thrown apply) -> do NOT ACK, do NOT advance: the op stays retriable (a later
     //    resend / reconnect tail re-delivers it), which is the honest close of the ACK-without-mutation P0.
     const outcome = this.safeApply({ cls, seq, msg });
+    if (outcome === "deferred") {
+      this.deferApply({ cls, seq, msg });
+      return;
+    }
+    this.clearDeferred(cls);
     if (outcome === "rejected") {
       coopWarn("durability", `apply REJECTED cls=${cls} seq=${seq} -> no ack (retriable)`);
       this.requestBoundedRecovery(cls, seq, "apply-rejected");
@@ -759,6 +815,140 @@ export class CoopDurabilityManager {
     this.ledger.markApplied(cls, seq);
     this.clearRecoveryAfterProgress(cls);
     this.transport.send({ t: "coopAck", cls, seq });
+    this.drainDeferredFollowers(cls);
+  }
+
+  /**
+   * Retry one or all valid-but-not-ready entries immediately. Public so a concrete UI/phase wake can avoid
+   * waiting for the polling interval. Returns the number of exact entries reattempted.
+   */
+  retryDeferred(cls?: string): number {
+    if (this.disposed) {
+      return 0;
+    }
+    const targets = cls == null ? [...this.pendingDeferred.keys()] : this.pendingDeferred.has(cls) ? [cls] : [];
+    let retried = 0;
+    for (const target of targets) {
+      const pending = this.pendingDeferred.get(target);
+      if (pending == null) {
+        continue;
+      }
+      pending.cancel();
+      pending.cancel = () => {};
+      retried++;
+      this.receiveOp(pending.entry.cls, pending.entry.seq, pending.entry.msg);
+    }
+    return retried;
+  }
+
+  private deferApply(entry: CoopJournalEntry): void {
+    if (this.disposed) {
+      return;
+    }
+    // A now-valid entry supersedes any earlier apply-rejected recovery at the same receive cursor. Its
+    // remaining wait is normal engine latency, not a reason to exhaust into a shared terminal.
+    const recovery = this.pendingRecovery.get(entry.cls);
+    recovery?.cancel();
+    this.pendingRecovery.delete(entry.cls);
+    this.exhaustedRecovery.delete(entry.cls);
+    const current = this.pendingDeferred.get(entry.cls);
+    if (current?.entry.seq === entry.seq) {
+      current.entry = entry;
+      current.attempts++;
+      this.scheduleDeferredRetry(current);
+      return;
+    }
+    current?.cancel();
+    const pending: PendingDeferredApply = {
+      entry,
+      startedAt: this.recoveryNow(),
+      attempts: 1,
+      cancel: () => {},
+    };
+    this.pendingDeferred.set(entry.cls, pending);
+    this.scheduleDeferredRetry(pending);
+    coopLog("durability", `apply DEFERRED cls=${entry.cls} seq=${entry.seq} -> no ack (boundary pending)`);
+  }
+
+  private scheduleDeferredRetry(pending: PendingDeferredApply): void {
+    pending.cancel();
+    const elapsed = this.recoveryNow() - pending.startedAt;
+    if (elapsed >= this.deferredDeadlineMs) {
+      this.exhaustDeferred(pending);
+      return;
+    }
+    const delay = Math.min(this.deferredRetryMs, this.deferredDeadlineMs - elapsed);
+    pending.cancel = this.scheduleRecovery(() => {
+      if (this.pendingDeferred.get(pending.entry.cls) !== pending) {
+        return;
+      }
+      if (this.recoveryNow() - pending.startedAt >= this.deferredDeadlineMs) {
+        this.exhaustDeferred(pending);
+        return;
+      }
+      this.receiveOp(pending.entry.cls, pending.entry.seq, pending.entry.msg);
+    }, delay);
+  }
+
+  private exhaustDeferred(pending: PendingDeferredApply): void {
+    if (this.pendingDeferred.get(pending.entry.cls) !== pending) {
+      return;
+    }
+    pending.cancel();
+    this.pendingDeferred.delete(pending.entry.cls);
+    this.deferredFollowers.delete(pending.entry.cls);
+    const failure: CoopDurabilityRecoveryFailure = {
+      cls: pending.entry.cls,
+      from: this.ledger.appliedThrough(pending.entry.cls),
+      blockedSeq: pending.entry.seq,
+      attempts: pending.attempts,
+      reason: "deferred-timeout",
+    };
+    coopWarn(
+      "durability",
+      `deferred continuation EXHAUSTED cls=${failure.cls} from=${failure.from} blocked=${failure.blockedSeq} `
+        + `attempts=${failure.attempts} deadlineMs=${this.deferredDeadlineMs}`,
+    );
+    try {
+      this.hooks.onRecoveryExhausted?.(failure);
+    } catch (error) {
+      coopWarn("durability", `deferred terminal hook threw cls=${failure.cls} (isolated)`, error);
+    }
+  }
+
+  private clearDeferred(cls: string): void {
+    const pending = this.pendingDeferred.get(cls);
+    pending?.cancel();
+    this.pendingDeferred.delete(cls);
+  }
+
+  private drainDeferredFollowers(cls: string): void {
+    const followers = this.deferredFollowers.get(cls);
+    if (followers == null) {
+      return;
+    }
+    for (const seq of [...followers.keys()]) {
+      if (seq <= this.ledger.appliedThrough(cls)) {
+        followers.delete(seq);
+      }
+    }
+    const nextSeq = this.ledger.appliedThrough(cls) + 1;
+    const next = followers.get(nextSeq);
+    if (next != null) {
+      followers.delete(nextSeq);
+      if (followers.size === 0) {
+        this.deferredFollowers.delete(cls);
+      }
+      this.receiveOp(cls, nextSeq, next);
+      return;
+    }
+    if (followers.size === 0) {
+      this.deferredFollowers.delete(cls);
+      return;
+    }
+    // The deferred head completed but a later buffered revision proves an intermediate frame is missing.
+    // Only now is this a genuine gap; enter the existing bounded resync path from the advanced cursor.
+    this.requestBoundedRecovery(cls, Math.min(...followers.keys()), "gap");
   }
 
   /**
@@ -938,6 +1128,8 @@ export class CoopDurabilityManager {
    * nothing). Idempotent + monotonic: a lower `headRevision` than already applied is ignored.
    */
   adoptSnapshot(cls: string, headRevision: number): void {
+    this.clearDeferred(cls);
+    this.deferredFollowers.delete(cls);
     this.ledger.adoptSnapshot(cls, headRevision);
     this.clearRecoveryAfterProgress(cls);
     this.transport.send({ t: "coopAck", cls, seq: this.ledger.appliedThrough(cls) });
@@ -1041,6 +1233,11 @@ export class CoopDurabilityManager {
 
   /** Restore persisted high-water + applied marks on a cold resume (§4), so revisions continue monotonically. */
   restore(highWater: Record<string, number>, applied: Record<string, number>): void {
+    for (const pending of this.pendingDeferred.values()) {
+      pending.cancel();
+    }
+    this.pendingDeferred.clear();
+    this.deferredFollowers.clear();
     this.journal.restoreHighWater(highWater);
     // Restore the committer's peer-ACK view too: a converged save has the peer applied through the high-water,
     // so without this the committer's acked=0 makes a post-resume reconnect resync spuriously escalate to a
@@ -1059,6 +1256,11 @@ export class CoopDurabilityManager {
       pending.cancel();
     }
     this.pendingRecovery.clear();
+    for (const pending of this.pendingDeferred.values()) {
+      pending.cancel();
+    }
+    this.pendingDeferred.clear();
+    this.deferredFollowers.clear();
     this.off();
   }
 }

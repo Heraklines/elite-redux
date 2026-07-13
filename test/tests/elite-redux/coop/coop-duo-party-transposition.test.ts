@@ -52,6 +52,10 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import {
+  resetCoopWaveAdvanceOperationFlag,
+  setCoopWaveAdvanceOperationEnabled,
+} from "#data/elite-redux/coop/coop-wave-operation";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -96,6 +100,8 @@ describe.skipIf(!RUN)(
     });
 
     beforeEach(() => {
+      // This test's direct waveEndState section is the negotiated legacy compatibility path.
+      setCoopWaveAdvanceOperationEnabled(false);
       // Force-hit so the foe's spread ROCK_SLIDE reliably KOs the 1-HP host lead. A determinism knob.
       accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
       setCoopFaintSwitchWaitMs(4000);
@@ -119,6 +125,7 @@ describe.skipIf(!RUN)(
     });
 
     afterEach(() => {
+      resetCoopWaveAdvanceOperationFlag();
       setCoopFaintSwitchWaitMs(60_000);
       setCoopWaveBarrierMs(60_000);
       resetCoopRendezvousWaitMs();

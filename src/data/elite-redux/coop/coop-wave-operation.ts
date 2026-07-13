@@ -47,6 +47,7 @@
 // duplicate rejection is a legitimate skip (the wave already advanced), not a fail-loud.
 // =============================================================================
 
+import { canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import { COOP_CAP_OP_WAVE, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
@@ -56,12 +57,13 @@ import {
   type CoopPendingOperation,
   type CoopWaveAdvancePayload,
   makeCoopOperationId,
+  parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
-  applyCoopOperationEnvelope,
   isCoopOperationJournalActive,
-  journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
+  routeCoopOperationToLiveSink,
+  tryJournalCoopCommittedEnvelope,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
@@ -137,6 +139,35 @@ let lastAppliedWave = -1;
 let revisionFloor = 0;
 
 /**
+ * Receiver-side copy of one complete retained wave transaction. The durability envelope is cloned before
+ * storage because the engine's authoritative-state applier is allowed to normalize/mutate its input. DATA
+ * and continuation readiness are separate latches: the operation cursor (and therefore coopAck) advances
+ * only after both become true.
+ */
+export interface CoopStagedWaveAdvanceTransaction {
+  readonly envelope: CoopAuthoritativeEnvelopeV1;
+  readonly operationId: string;
+  readonly canonicalEnvelope: string;
+  readonly bootstrapProjected: boolean;
+  readonly dataApplied: boolean;
+  readonly continuationReady: boolean;
+}
+
+type MutableStagedWaveAdvanceTransaction = {
+  envelope: CoopAuthoritativeEnvelopeV1;
+  operationId: string;
+  canonicalEnvelope: string;
+  bootstrapProjected: boolean;
+  dataApplied: boolean;
+  continuationReady: boolean;
+};
+
+/** Exact immutable identity retained for every operation id seen this session (conflicting retry fence). */
+const stagedWaveTransactions = new Map<string, MutableStagedWaveAdvanceTransaction>();
+/** The one deterministic WAVE_ADVANCE id for each resolved wave. */
+const stagedWaveOperationIdByWave = new Map<number, string>();
+
+/**
  * True iff the migrated (envelope-gated) wave-advance path is active; else pure legacy derivation (§5.1).
  * The local rollback flag (`enabled`) is the OUTER gate; the NEGOTIATED capability set is the inner one
  * (#896 W2e-R2): if the peer did not advertise "opSurface.wave" it is not in the intersection and the surface
@@ -181,6 +212,8 @@ export function resetCoopWaveAdvanceOperationState(): void {
   watchGuest = null;
   lastAppliedWave = -1;
   revisionFloor = 0;
+  stagedWaveTransactions.clear();
+  stagedWaveOperationIdByWave.clear();
 }
 
 /**
@@ -238,15 +271,24 @@ function hostSeatValidator(): CoopIntentValidator {
 }
 
 /**
- * A minimal control-plane commit context. Wave-2f's wave decision carries no NEW data-plane payload over the
- * wire (the party/field/money/progression travels on the existing per-turn checkpoint + waveEndState,
- * dual-run), so the embedded authoritativeState is a lightweight placeholder the applier never reads (it
- * classifies on the CONTROL fields only). The real adopt-by-id state apply is UNCHANGED (§1.2). The
- * logicalPhase is the host-stated NEXT phase the transition enters (WAVE_VICTORY / WAVE_FLEE / GAME_OVER),
- * so the envelope makes logicalPhase host-authoritative - the keystone.
+ * The complete post-BattleEnd commit context. P33 binds the host-stated destination and the settled DATA
+ * image in one retained envelope; a receiver rejects any wave/turn/tick mismatch before staging either.
  */
-function controlContext(payload: CoopWaveAdvancePayload, wave: number, turn: number): CoopCommitContext {
-  const placeholder: CoopAuthoritativeBattleStateV1 = {
+function controlContext(
+  payload: CoopWaveAdvancePayload,
+  authoritativeState: CoopAuthoritativeBattleStateV1,
+): CoopCommitContext {
+  return {
+    wave: payload.wave,
+    turn: authoritativeState.turn,
+    logicalPhase: payload.nextLogicalPhase,
+    authoritativeState,
+  };
+}
+
+/** Compatibility-only DATA placeholder for a negotiated no-journal session. Never admitted by P33 preflight. */
+function legacyControlState(wave: number, turn: number): CoopAuthoritativeBattleStateV1 {
+  return {
     version: 1,
     tick: 0,
     wave,
@@ -264,7 +306,6 @@ function controlContext(payload: CoopWaveAdvancePayload, wave: number, turn: num
     playerModifiers: [],
     enemyModifiers: [],
   };
-  return { wave, turn, logicalPhase: payload.nextLogicalPhase, authoritativeState: placeholder };
 }
 
 /**
@@ -279,12 +320,18 @@ export function coopWaveAdvanceSanctionedTails(payload: CoopWaveAdvancePayload):
   switch (payload.outcome) {
     case "win":
     case "capture": {
-      // The win/capture VictoryPhase cascade: Victory -> (Trainer) -> BattleEnd -> reward -> NewBattle -> next encounter.
+      // The win/capture VictoryPhase cascade. A terminal victory stays on this wave and hands off to
+      // GameOver; a continuing victory is the only form allowed to construct NewBattle/NextEncounter.
       tails.push("VictoryPhase");
       if (payload.victoryKind === "trainer") {
         tails.push("TrainerVictoryPhase");
       }
-      tails.push("BattleEndPhase", "NewBattlePhase", "NextEncounterPhase");
+      tails.push("BattleEndPhase");
+      if (payload.nextWave === payload.wave) {
+        tails.push("GameOverPhase");
+      } else {
+        tails.push("NewBattlePhase", "NextEncounterPhase");
+      }
       break;
     }
     case "flee": {
@@ -329,23 +376,67 @@ export function isValidCoopWaveAdvancePayload(value: unknown): value is CoopWave
     || typeof payload.biomeChange !== "boolean"
     || typeof payload.eggLapse !== "boolean"
     || (payload.meBoundary !== "none" && payload.meBoundary !== "battle-victory")
+    || (payload.settledStateTick !== undefined
+      && (!Number.isSafeInteger(payload.settledStateTick) || payload.settledStateTick < 0))
   ) {
     return false;
   }
   if (payload.outcome === "win" || payload.outcome === "capture") {
+    const continues = payload.nextWave === payload.wave + 1;
     return (
       payload.nextLogicalPhase === "WAVE_VICTORY"
-      && payload.nextWave === payload.wave + 1
+      && (payload.nextWave === payload.wave || payload.nextWave === payload.wave + 1)
       && (payload.victoryKind === "wild" || payload.victoryKind === "trainer")
+      && (continues || (!payload.eggLapse && !payload.biomeChange))
     );
   }
   if (payload.outcome === "flee") {
-    return payload.nextLogicalPhase === "WAVE_FLEE" && payload.nextWave === payload.wave + 1;
+    return (
+      payload.nextLogicalPhase === "WAVE_FLEE"
+      && payload.nextWave === payload.wave + 1
+      && !payload.eggLapse
+      && payload.victoryKind === undefined
+    );
   }
   if (payload.outcome === "gameOver") {
-    return payload.nextLogicalPhase === "GAME_OVER" && payload.nextWave === payload.wave;
+    return (
+      payload.nextLogicalPhase === "GAME_OVER"
+      && payload.nextWave === payload.wave
+      && !payload.biomeChange
+      && !payload.eggLapse
+      && payload.victoryKind === undefined
+    );
   }
   return false;
+}
+
+/**
+ * Validate the complete P33 control+DATA binding before the receiver stores anything. The looser payload
+ * guard above intentionally still accepts an early legacy waveResolved hint with no settled tick; this
+ * guard never does.
+ */
+export function isValidCoopSettledWaveAdvance(
+  payload: CoopWaveAdvancePayload,
+  authoritativeState: CoopAuthoritativeBattleStateV1,
+): boolean {
+  return (
+    isValidCoopWaveAdvancePayload(payload)
+    && Number.isSafeInteger(payload.settledStateTick)
+    && payload.settledStateTick === authoritativeState.tick
+    && authoritativeState.version === 1
+    && Number.isSafeInteger(authoritativeState.tick)
+    && authoritativeState.tick >= 0
+    && authoritativeState.wave === payload.wave
+    && Number.isSafeInteger(authoritativeState.turn)
+    && authoritativeState.turn >= 0
+    && Array.isArray(authoritativeState.playerParty)
+    && Array.isArray(authoritativeState.enemyParty)
+    && Array.isArray(authoritativeState.field)
+    && Array.isArray(authoritativeState.arenaTags)
+    && Array.isArray(authoritativeState.pokeballCounts)
+    && Array.isArray(authoritativeState.playerModifiers)
+    && Array.isArray(authoritativeState.enemyModifiers)
+  );
 }
 
 /**
@@ -383,9 +474,153 @@ export function resolveCoopVictoryTailControl(
 // Owner (HOST) seam (§1.3 propose -> commit). Called at the host's wave-end.
 // -----------------------------------------------------------------------------
 
+// -----------------------------------------------------------------------------
+// Retained P33 transaction receiver (immutable DATA + exact continuation release).
+// -----------------------------------------------------------------------------
+
+export interface CoopWaveAdvanceEnvelopePreflight {
+  readonly operationId: string;
+  readonly payload: CoopWaveAdvancePayload;
+  readonly authoritativeState: CoopAuthoritativeBattleStateV1;
+}
+
+/** Full-address and full-DATA validation for one retained WAVE_ADVANCE envelope. */
+export function preflightCoopWaveAdvanceEnvelope(
+  envelope: CoopAuthoritativeEnvelopeV1,
+): CoopWaveAdvanceEnvelopePreflight | null {
+  const op = envelope.pendingOperation;
+  const authoritativeState = envelope.authoritativeState as CoopAuthoritativeBattleStateV1 | null | undefined;
+  if (
+    envelope.version !== 1
+    || !Number.isSafeInteger(envelope.sessionEpoch)
+    || envelope.sessionEpoch !== epoch
+    || !Number.isSafeInteger(envelope.revision)
+    || envelope.revision <= 0
+    || authoritativeState == null
+    || typeof authoritativeState !== "object"
+    || op == null
+    || op.status !== "applied"
+    || op.kind !== "WAVE_ADVANCE"
+    || op.owner !== HOST_SEAT
+    || !isValidCoopWaveAdvancePayload(op.payload)
+  ) {
+    return null;
+  }
+  const parsed = parseCoopOperationId(op.id);
+  const payload = op.payload as CoopWaveAdvancePayload;
+  if (
+    parsed == null
+    || parsed.epoch !== envelope.sessionEpoch
+    || parsed.owner !== HOST_SEAT
+    || parsed.kind !== "WAVE_ADVANCE"
+    || parsed.pinnedSeq !== payload.wave
+    || envelope.wave !== payload.wave
+    || envelope.turn !== authoritativeState.turn
+    || envelope.logicalPhase !== payload.nextLogicalPhase
+    || !isValidCoopSettledWaveAdvance(payload, authoritativeState)
+  ) {
+    return null;
+  }
+  return { operationId: op.id, payload, authoritativeState };
+}
+
+export type CoopWaveAdvanceStageResult = "staged" | "duplicate" | "conflict" | "rejected";
+
+/**
+ * Store an immutable transaction only after the shared guest cursor has classified its address as the next
+ * admissible envelope. Same-id/same-wave payload changes are conflicts, including after the first copy has
+ * already completed; a forged retry can never borrow the original ACK.
+ */
+function stageCoopWaveAdvanceEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopWaveAdvanceStageResult {
+  const preflight = preflightCoopWaveAdvanceEnvelope(envelope);
+  if (preflight == null || preflight.payload.wave < lastAppliedWave) {
+    return "rejected";
+  }
+  const canonicalEnvelope = canonicalize(envelope);
+  const existing = stagedWaveTransactions.get(preflight.operationId);
+  if (existing != null) {
+    return existing.canonicalEnvelope === canonicalEnvelope ? "duplicate" : "conflict";
+  }
+  const existingWaveId = stagedWaveOperationIdByWave.get(preflight.payload.wave);
+  if (existingWaveId != null && existingWaveId !== preflight.operationId) {
+    return "conflict";
+  }
+  const immutableEnvelope = structuredClone(envelope);
+  stagedWaveTransactions.set(preflight.operationId, {
+    envelope: immutableEnvelope,
+    operationId: preflight.operationId,
+    canonicalEnvelope,
+    bootstrapProjected: false,
+    dataApplied: false,
+    continuationReady: false,
+  });
+  stagedWaveOperationIdByWave.set(preflight.payload.wave, preflight.operationId);
+  return "staged";
+}
+
+/** Read a defensive copy of the retained transaction for a resolved wave. */
+export function getCoopStagedWaveAdvanceTransaction(wave: number): CoopStagedWaveAdvanceTransaction | null {
+  const id = stagedWaveOperationIdByWave.get(wave);
+  const staged = id == null ? undefined : stagedWaveTransactions.get(id);
+  return staged == null ? null : structuredClone(staged);
+}
+
+/** True only for the exact payload that came from the staged authoritative envelope. */
+function isExactStagedWavePayload(payload: CoopWaveAdvancePayload): boolean {
+  const staged = getCoopStagedWaveAdvanceTransaction(payload.wave);
+  const stagedPayload = staged?.envelope.pendingOperation?.payload;
+  return stagedPayload != null && canonicalize(stagedPayload) === canonicalize(payload);
+}
+
+function mutateStagedWaveTransaction(
+  wave: number,
+  mutate: (stage: MutableStagedWaveAdvanceTransaction) => void,
+): boolean {
+  const id = stagedWaveOperationIdByWave.get(wave);
+  const staged = id == null ? undefined : stagedWaveTransactions.get(id);
+  if (staged == null) {
+    return false;
+  }
+  mutate(staged);
+  return true;
+}
+
+/** The durable op has made only its deterministic boundary bootstrap available (never a public UI yet). */
+export function markCoopWaveAdvanceBootstrapProjected(wave: number): boolean {
+  return mutateStagedWaveTransaction(wave, stage => {
+    stage.bootstrapProjected = true;
+  });
+}
+
+/** The exact embedded authoritative state has applied successfully at the wave's safe boundary. */
+export function markCoopWaveAdvanceDataApplied(wave: number): boolean {
+  return mutateStagedWaveTransaction(wave, stage => {
+    stage.dataApplied = true;
+  });
+}
+
+/** A real destination UI/terminal/next-command surface is now active after DATA application. */
+export function markCoopWaveAdvanceContinuationReady(wave: number): boolean {
+  const id = stagedWaveOperationIdByWave.get(wave);
+  const staged = id == null ? undefined : stagedWaveTransactions.get(id);
+  if (staged == null || !staged.dataApplied) {
+    return false;
+  }
+  staged.continuationReady = true;
+  return true;
+}
+
+/** ACK eligibility for the retained transaction. No earlier state is sufficient. */
+export function isCoopWaveAdvanceTransactionComplete(wave: number): boolean {
+  const staged = getCoopStagedWaveAdvanceTransaction(wave);
+  return staged?.dataApplied === true && staged.continuationReady === true;
+}
+
 export interface CoopWaveAdvanceOwnerCommitParams {
   /** The host-stated complete transition (§1.1). The host builds it from its own resolving battle state. */
   readonly payload: CoopWaveAdvancePayload;
+  /** Settled post-BattleEnd DATA image causally bound by payload.settledStateTick. */
+  readonly authoritativeState: CoopAuthoritativeBattleStateV1;
   /** The local client's coop role - determines whether it is the authority that COMMITS (always host here). */
   readonly localRole: CoopRole;
   readonly wave: number;
@@ -398,13 +633,19 @@ export interface CoopWaveAdvanceOwnerCommitParams {
  * advances a surface-local revision (§1.5). No-op when the flag is OFF or the local client is not the host.
  * Never throws (the legacy derivation is the fallback).
  */
-export function commitWaveAdvanceOwnerIntent(params: CoopWaveAdvanceOwnerCommitParams): void {
+export function commitWaveAdvanceOwnerIntent(
+  params: CoopWaveAdvanceOwnerCommitParams,
+): CoopAuthoritativeEnvelopeV1 | null {
   if (!isCoopWaveAdvanceOperationEnabled() || params.localRole !== "host") {
-    return;
+    return null;
   }
-  if (!isValidCoopWaveAdvancePayload(params.payload)) {
-    coopWarn("runtime", "wave-advance op HOST rejected malformed transition before commit", params.payload);
-    return;
+  if (
+    params.wave !== params.payload.wave
+    || params.turn !== params.authoritativeState.turn
+    || !isValidCoopSettledWaveAdvance(params.payload, params.authoritativeState)
+  ) {
+    coopWarn("runtime", "wave-advance op HOST rejected incomplete/mismatched settled transaction", params);
+    return null;
   }
   try {
     const intent: CoopPendingOperation = {
@@ -415,26 +656,34 @@ export function commitWaveAdvanceOwnerIntent(params: CoopWaveAdvanceOwnerCommitP
       status: "proposed",
       payload: params.payload,
     };
-    const res = host().submit(intent, controlContext(params.payload, params.wave, params.turn), hostSeatValidator());
-    if (res.kind === "committed") {
+    const immutableState = structuredClone(params.authoritativeState);
+    const res = host().submit(intent, controlContext(params.payload, immutableState), hostSeatValidator());
+    if (res.kind === "committed" || res.kind === "reack") {
       // COMMIT -> JOURNAL (Wave-2e/W2e-R): register the committed op with the durability journal so a lost
       // waveResolved is healed by the journal resend / reconnect tail -> the guest's live-sink materializer
       // (the FIRST production sink) rebuilds the tail. Rides ALONGSIDE the legacy waveResolved (dual-run);
-      // no-op when durability is OFF. The DATA still travels on waveResolved/waveEndState (§1.2).
-      journalCoopCommittedEnvelope(res.envelope);
+      // no-op when durability is OFF. Under P33 the DATA is embedded in this exact retained envelope.
+      if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
+        coopWarn(
+          "runtime",
+          `wave-advance op HOST could not retain complete transaction wave=${params.payload.wave} id=${intent.id}`,
+        );
+        return null;
+      }
       coopLog(
         "runtime",
         `wave-advance op HOST commit wave=${params.payload.wave} outcome=${params.payload.outcome} next=${params.payload.nextLogicalPhase} rev=${res.envelope.revision} id=${intent.id} (Wave-2f)`,
       );
-    } else {
-      coopLog(
-        "runtime",
-        `wave-advance op HOST commit non-committed (${res.kind}) wave=${params.payload.wave} id=${intent.id} - legacy carries it (Wave-2f)`,
-      );
+      return res.envelope;
     }
+    coopLog(
+      "runtime",
+      `wave-advance op HOST commit non-committed (${res.kind}) wave=${params.payload.wave} id=${intent.id} - legacy carries it (Wave-2f)`,
+    );
   } catch (e) {
     coopWarn("runtime", "wave-advance op HOST commit threw (handled - legacy derivation is the fallback) (Wave-2f)", e);
   }
+  return null;
 }
 
 // -----------------------------------------------------------------------------
@@ -493,7 +742,16 @@ export function adoptWaveAdvanceWatcherChoice(params: CoopWaveAdvanceWatcherAdop
     }
 
     if (isCoopOperationJournalActive()) {
-      return { adopt: false, reason: "await-authoritative-envelope", stale: false };
+      if (!isExactStagedWavePayload(params.payload)) {
+        return { adopt: false, reason: "await-authoritative-envelope", stale: false };
+      }
+      // The exact retained envelope may bootstrap only the deterministic Victory/BattleEnd tail. It is NOT
+      // applied/ACKed here: DATA application and the public continuation surface remain mandatory latches.
+      return {
+        adopt: true,
+        payload: params.payload,
+        sanctionedTails: coopWaveAdvanceSanctionedTails(params.payload),
+      };
     }
 
     // Apply through the guest applier (surface-local dense revision; classifies + records the op). A fail-
@@ -515,7 +773,7 @@ export function adoptWaveAdvanceWatcherChoice(params: CoopWaveAdvanceWatcherAdop
       turn: params.turn,
       logicalPhase: params.payload.nextLogicalPhase,
       pendingOperation: appliedOp,
-      authoritativeState: controlContext(params.payload, params.wave, params.turn).authoritativeState,
+      authoritativeState: legacyControlState(params.wave, params.turn),
     });
     if (applyRes.kind !== "applied") {
       coopWarn(
@@ -551,8 +809,9 @@ export function adoptWaveAdvanceWatcherChoice(params: CoopWaveAdvanceWatcherAdop
  * envelope's host revision) so the one shared applier stays on a single monotonic stream. When it NEWLY
  * consumes an op it routes into the live-mutation sink (materialize the tail on the guest). Returns a
  * {@linkcode CoopApplyOutcome} that GATES the durability ACK (W2e-R P0-1): `applied` (newly consumed - ACK +
- * advance), `duplicate` (already consumed / non-applicable / flag-off - ACK so a resend cannot spin), or
- * `rejected` (transient - do NOT ACK, retriable). Never throws.
+ * advance), `duplicate` (already consumed - ACK so a resend cannot spin), `deferred` (valid DATA or exact
+ * continuation surface is not ready yet - retain without error recovery), or `rejected` (invalid/conflicting
+ * transaction - bounded recovery). Never throws.
  */
 function applyJournaledWaveEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
   // A consistent peer cannot send this while the surface is disabled. Refuse without ACKing instead of
@@ -560,28 +819,45 @@ function applyJournaledWaveEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coop
   if (!isCoopWaveAdvanceOperationEnabled()) {
     return "rejected";
   }
-  const op = envelope.pendingOperation;
-  if (op == null || op.status !== "applied" || op.kind !== "WAVE_ADVANCE") {
+  const preflight = preflightCoopWaveAdvanceEnvelope(envelope);
+  if (preflight == null) {
     return "rejected";
   }
-  if (!isValidCoopWaveAdvancePayload(op.payload)) {
+  const existing = stagedWaveTransactions.get(preflight.operationId);
+  if (existing != null && existing.canonicalEnvelope !== canonicalize(envelope)) {
+    coopWarn("runtime", `wave-advance op JOURNAL conflicting same-id envelope id=${preflight.operationId}`);
     return "rejected";
   }
   const g = guest();
-  if (g.hasApplied(op.id)) {
-    return "duplicate"; // the relay-adopt path or a prior journal delivery already consumed it - ACK, no re-apply.
+  const inspected = g.inspectEnvelope(envelope);
+  if (inspected.kind === "duplicate") {
+    return "duplicate";
   }
-  if (applyCoopOperationEnvelope(g, "op:wave", envelope) !== "applied") {
-    // A transient non-applicable result (fail-closed / gap): leave it retriable (do NOT ACK). Never a
-    // permanent condition (a permanent one is the duplicate above).
+  if (inspected.kind !== "applied") {
     return "rejected";
   }
-  const payload = op.payload as CoopWaveAdvancePayload;
-  if (typeof payload?.wave === "number" && payload.wave > lastAppliedWave) {
-    lastAppliedWave = payload.wave;
+  const staged = stageCoopWaveAdvanceEnvelope(envelope);
+  if (staged === "conflict" || staged === "rejected") {
+    return "rejected";
   }
-  // W2e-R P0-1: the production sink already accepted this operation above, before the sidecar ledger moved.
-  coopLog("runtime", `wave-advance op JOURNAL apply id=${op.id} rev=${envelope.revision} (Wave-2f/W2e-R)`);
+  // The sink returns true only after the embedded DATA has applied at BattleEnd and a real destination
+  // surface has opened. Until then the durability manager retains/retries this exact immutable envelope.
+  if (!routeCoopOperationToLiveSink("op:wave", envelope)) {
+    return "deferred";
+  }
+  if (!isCoopWaveAdvanceTransactionComplete(preflight.payload.wave)) {
+    return "deferred";
+  }
+  if (g.applyEnvelope(envelope).kind !== "applied") {
+    return "rejected";
+  }
+  if (preflight.payload.wave > lastAppliedWave) {
+    lastAppliedWave = preflight.payload.wave;
+  }
+  coopLog(
+    "runtime",
+    `wave-advance op JOURNAL apply+continuationReady id=${preflight.operationId} rev=${envelope.revision}`,
+  );
   return "applied";
 }
 

@@ -34,6 +34,10 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import {
+  resetCoopWaveAdvanceOperationFlag,
+  setCoopWaveAdvanceOperationEnabled,
+} from "#data/elite-redux/coop/coop-wave-operation";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -68,6 +72,9 @@ describe.skipIf(!RUN)("co-op WAVE-END authoritative capture (#838) - guest conve
   });
 
   beforeEach(() => {
+    // This file pins the explicitly negotiated legacy raw compatibility arm. P33 production correctness is
+    // covered by the retained wave-transaction suites and deliberately ignores waveEndState.
+    setCoopWaveAdvanceOperationEnabled(false);
     setCoopWaveBarrierMs(50);
     setCoopRendezvousWaitMs(50);
     game = new GameManager(phaserGame);
@@ -84,6 +91,7 @@ describe.skipIf(!RUN)("co-op WAVE-END authoritative capture (#838) - guest conve
   });
 
   afterEach(() => {
+    resetCoopWaveAdvanceOperationFlag();
     setCoopWaveBarrierMs(60_000);
     resetCoopRendezvousWaitMs();
     logs.dispose();

@@ -1684,7 +1684,7 @@ export class CoopFinalizeTurnPhase extends Phase {
           // select -> NewBattle. NewBattlePhase ends the wave and drives the next EncounterPhase
           // (-> adoptCoopHostEnemyParty for the next wave), so the guest advances past the fled wave.
           globalScene.phaseManager.pushNew("BattleEndPhase", false);
-          if (globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome()) {
+          if (tail.biomeChange) {
             globalScene.phaseManager.pushNew("SelectBiomePhase");
           }
           globalScene.phaseManager.pushNew("NewBattlePhase");
