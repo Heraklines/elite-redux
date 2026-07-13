@@ -73,6 +73,7 @@ import {
   arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
+  disposeDuoRig,
   drainLoopback,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
@@ -97,12 +98,14 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
   let phaserGame: Phaser.Game;
   let game: GameManager;
   let logs: ReturnType<typeof installDuoLogCapture>;
+  let activeRig: DuoRig | null;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
   });
 
   beforeEach(() => {
+    activeRig = null;
     setCoopWaveBarrierMs(50);
     // #858: the biome-pick tests below drive one side at a time, so the boundary barrier resolves via the
     // fast anti-hang timeout - keep it tiny + explicit (do not lean on the module-global vitest default).
@@ -129,7 +132,12 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     resetErBiomeStructure();
     resetCoopBiomePickerDrivenByTest();
     logs.dispose();
-    clearCoopRuntime();
+    if (activeRig == null) {
+      clearCoopRuntime();
+    } else {
+      disposeDuoRig(activeRig);
+      activeRig = null;
+    }
     vi.restoreAllMocks();
     initGlobalScene(game.scene);
   });
@@ -152,6 +160,12 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       moveId: MoveId.TACKLE,
       targets: [BattlerIndex.ENEMY_2],
     }));
+  }
+
+  async function buildSavedataDuo(pair: ReturnType<typeof createLoopbackPair>): Promise<DuoRig> {
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    activeRig = rig;
+    return rig;
   }
 
   async function hostPlayWave(rig: DuoRig): Promise<void> {
@@ -182,7 +196,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
   it("GUARD: the digest is DERIVED FROM getSessionSaveData (new substrate auto-covered) + detects a substrate change", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     await withClient(rig.hostCtx, () => {
@@ -226,7 +240,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
   it("NO FALSE DESYNC: two real engines produce the SAME save-data digest at each wave boundary", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     const WAVES = 3;
@@ -249,7 +263,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
 
       const guestAuthorityTerminated = await withClient(
         rig.guestCtx,
-        () => getCoopBattleStreamer()?.debugAuthorityState().terminal,
+        () => getCoopBattleStreamer()?.retainedAuthorityDiagnostics().terminal,
       );
       expect(
         guestAuthorityTerminated,
@@ -273,7 +287,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
   it("DIVERGE + HEAL: a deliberately diverged money-streak / overstay / relic MISMATCHES then heals to convergence via the resync", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     // Turn ON faithful per-client module-let isolation so the two engines can hold DIFFERENT module state
@@ -339,7 +353,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     // no heal path. This proves the extent now rides the full-snapshot resync + heals to convergence.
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     // Biome-structure is process-global (er-biome-structure module state), so we set the divergent extents
@@ -395,7 +409,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     // full-snapshot resync (erMapState + the routing erPendingNodes) and heals to convergence.
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     // The revealed-node set + pending nodes are process-global (er-map-nodes / er-biome-routing module
@@ -479,7 +493,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     setCoopBiomePickerDrivenByTest();
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     // The guest is seed-pinned to the host (adoptCoopHostRunConfig, #658 - proven in coop-duo-launch-sync).
@@ -584,7 +598,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     // the fallback decision on both engines + asserts they converge, guarding the seed pin it relies on.
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     expect(rig.guestScene.seed, "the guest is seed-pinned to the host").toBe(rig.hostScene.seed);
@@ -653,7 +667,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     // bi-keyed `heldItems` field), and mon-keyed ER substrates map the id to their stable party SLOT.
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
     // Per-client module-let isolation so the two engines can hold DIFFERENT money-streak maps (production
     // is one process per client; the shared-state default would collapse them onto one map).
@@ -719,7 +733,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     game.override.moveset([MoveId.TRANSFORM, MoveId.TACKLE, MoveId.SPLASH]);
     await game.classicMode.startBattle(SpeciesId.DITTO, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
-    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
 
     // Host lead (Ditto) TRANSFORMs into the enemy Magikarp; partner TACKLEs the other enemy.

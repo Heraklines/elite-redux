@@ -99,6 +99,7 @@ import {
 import {
   assembleCoopRuntime,
   type CoopRuntime,
+  clearCoopRuntime,
   getCoopInteractionRelay,
   getCoopMeBattleInteractionCounter,
   getCoopRuntime,
@@ -1227,6 +1228,21 @@ export interface DuoRig {
   guestCtx: ClientCtx;
   /** The loopback pair both runtimes ride (raw endpoints exposed for assertion taps). */
   pair: { host: CoopTransport; guest: CoopTransport };
+}
+
+/**
+ * Dispose both independently assembled runtimes owned by a duo rig.
+ *
+ * `clearCoopRuntime()` can only see the process-global active runtime. Most duo tests leave the guest
+ * active after their final context swap, which used to dispose only that side and leave the host's
+ * retransmit/watchdog timers alive in the next test. Select each side explicitly so test isolation matches
+ * two real browser processes and no retained commit from a completed rig can bleed into another session.
+ */
+export function disposeDuoRig(rig: DuoRig): void {
+  for (const runtime of [rig.guestRuntime, rig.hostRuntime]) {
+    setCoopRuntime(runtime);
+    clearCoopRuntime();
+  }
 }
 
 interface RetainedWaveBoundaryBridge {
