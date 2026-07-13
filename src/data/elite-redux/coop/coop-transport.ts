@@ -32,7 +32,14 @@ import type {
   CoopAuthoritativeEnvelopeV1,
   CoopWaveAdvancePayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
-import type { CoopFrameContextV1 } from "#data/elite-redux/coop/coop-session-binding";
+import type {
+  CoopAccountIdentityV1,
+  CoopAuthorityRole,
+  CoopFrameContextV1,
+  CoopSeatId,
+  CoopSessionBindingV1,
+  CoopTransportRole,
+} from "#data/elite-redux/coop/coop-session-binding";
 import type { ErRouteNode } from "#data/elite-redux/er-biome-routing";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
@@ -1139,6 +1146,34 @@ export type CoopMessage =
       runId?: string;
       checkpointRevision?: number;
     }
+  /** Authenticated public P33 hello. The signaling bearer is intentionally never peer-visible. */
+  | {
+      t: "hello";
+      version: "er-coop-33";
+      pairingId: string;
+      account: CoopAccountIdentityV1;
+      transportRole: CoopTransportRole;
+      authorityClaim: CoopAuthorityRole;
+      capabilities: string[];
+      existingBinding?: {
+        sessionId: string;
+        runId?: string;
+        sessionEpoch: number;
+        seatMapId: string;
+        authoritySeatId: CoopSeatId;
+        membershipRevision: number;
+      };
+    }
+  /** Authority-authored immutable session binding. Retained and replayed until the exact peer ACKs. */
+  | { t: "sessionBinding"; binding: CoopSessionBindingV1 }
+  | {
+      t: "sessionBindingAck";
+      bindingId: string;
+      seatId: CoopSeatId;
+      accountId: string;
+      accepted: boolean;
+      reason?: "identity" | "seat-map" | "authority" | "stale" | "unsupported";
+    }
   /** Keepalive / latency probe. */
   | { t: "ping"; ts: number }
   | { t: "pong"; ts: number }
@@ -1901,7 +1936,13 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "lifecycle":
       return `event=${msg.event}`;
     case "hello":
-      return `role=${msg.role} v=${msg.version} epoch=${msg.epoch} tiebreak=${msg.tiebreak ?? "(none)"}`;
+      return "pairingId" in msg
+        ? `pairing=${msg.pairingId} transport=${msg.transportRole} authority=${msg.authorityClaim} account=${msg.account.accountId}`
+        : `role=${msg.role} v=${msg.version} epoch=${msg.epoch} tiebreak=${msg.tiebreak ?? "(none)"}`;
+    case "sessionBinding":
+      return `id=${msg.binding.bindingId} session=${msg.binding.sessionId} epoch=${msg.binding.sessionEpoch} seatMap=${msg.binding.seatMap.seatMapId}`;
+    case "sessionBindingAck":
+      return `id=${msg.bindingId} seat=${msg.seatId} accepted=${msg.accepted}`;
     case "ping":
     case "pong":
       return `ts=${msg.ts}`;
