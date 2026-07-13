@@ -64,6 +64,8 @@ Relevant options:
 - `COOP_UI_STARTER_KEYS`, `COOP_UI_BATTLE_KEYS`, `COOP_UI_REWARD_LEAVE_KEYS`, and
   `COOP_UI_REPLACEMENT_KEYS` override the default public keyboard sequences.
 - `COOP_UI_ACTION_DELAY_MS` and `COOP_UI_SETTLE_DELAY_MS` permit timing variation without bypassing UI.
+- `COOP_UI_BOOT_TIMEOUT_MS` budgets the first immutable full-asset load only (default five minutes);
+  gameplay and synchronization waits keep the shorter `COOP_UI_TIMEOUT_MS` budget.
 - `COOP_UI_CHROME_TRACE=0` disables the optional Chrome performance trace; JSONL event traces and
   screenshots remain mandatory.
 
