@@ -9,12 +9,14 @@ import {
   type CoopBiomeCommitReceipt,
   type CoopBiomeRelayResult,
   commitAuthoritativeBiomeTransition,
+  commitBiomeAuthoritativeResult,
   commitBiomeOwnerIntent,
   coopAuthoritativeBiomeTransitionOperationId,
   coopBiomeCommitRequired,
   coopBiomeOperationId,
   getCoopBiomeTransitionCommitReceipt,
   isCoopBiomeOperationEnabled,
+  isCoopBiomeRetainedResultMode,
   releaseCoopBiomeCommitReceipt,
 } from "#data/elite-redux/coop/coop-biome-operation";
 import {
@@ -149,6 +151,13 @@ export class SelectBiomePhase extends BattlePhase {
   private coopDeterministicDestination: BiomeId | null = null;
   /** Prevent a double UI terminal while this guest is parked on the host-committed BIOME_PICK envelope. */
   private coopCommitPending = false;
+  /**
+   * P33 retained-result: the reserved host operation this phase must result-commit at its terminal (after the
+   * REAL mutation runs), or null. Set by every host authoritative path (owner relay, host-watch adoption, and
+   * the deterministic transition); consumed once in {@linkcode applyNextBiomeAndEnd} to capture + retain the
+   * COMPLETE post-mutation state. -> {@linkcode commitBiomeAuthoritativeResult}.
+   */
+  private coopPendingAuthorityOperationId: string | null = null;
   private coopRouteRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private coopRouteRetryAttempts = 0;
   private coopRouteRecoveryShown = false;
@@ -205,10 +214,7 @@ export class SelectBiomePhase extends BattlePhase {
     // either the interactive BIOME_PICK address or the wave-scoped deterministic address, so a renderer
     // with a late/missing travel-classification carrier must still enter that bounded receipt path. The
     // exact commit (never local target/RNG) resolves any host-vs-renderer route-classification difference.
-    if (
-      authoritativeGuest
-      && getCoopBiomeTransitionCommitReceipt({ sourceWave: currentWaveIndex }) != null
-    ) {
+    if (authoritativeGuest && getCoopBiomeTransitionCommitReceipt({ sourceWave: currentWaveIndex }) != null) {
       this.awaitAuthoritativeDeterministicBiome();
       return;
     }
@@ -637,7 +643,15 @@ export class SelectBiomePhase extends BattlePhase {
       return;
     }
     if (deterministic && receipt != null) {
-      await this.applyDeterministicBiomeWatcherReceipt(receipt, payload, generation, wave, revealed, operationId, pinned);
+      await this.applyDeterministicBiomeWatcherReceipt(
+        receipt,
+        payload,
+        generation,
+        wave,
+        revealed,
+        operationId,
+        pinned,
+      );
       return;
     }
     await this.applyBiomeWatcherDecision(
@@ -744,6 +758,11 @@ export class SelectBiomePhase extends BattlePhase {
         );
       });
       return;
+    }
+    // P33: the HOST watching a guest-owned pick reserved the intent; retain it so applyNextBiomeAndEnd
+    // result-commits the complete post-mutation state at the terminal.
+    if (decision.adopt && decision.requiresAuthorityCommit && decision.operationId != null) {
+      this.coopPendingAuthorityOperationId = decision.operationId;
     }
     const adopted = decision.adopt ? { choice: decision.choice, data: decision.data } : null;
     let biome: BiomeId;
@@ -875,6 +894,10 @@ export class SelectBiomePhase extends BattlePhase {
       ) {
         this.parkBiomeCommitRecovery(() => this.setDeterministicNextBiomeAndEnd(nextBiome));
         return;
+      }
+      // P33: retain the reserved deterministic op so applyNextBiomeAndEnd result-commits its complete state.
+      if (commit != null && isCoopBiomeRetainedResultMode()) {
+        this.coopPendingAuthorityOperationId = commit.operationId;
       }
       this.coopDeterministicDestination = canonical.biomeId as BiomeId;
       this.applyNextBiomeAndEnd(canonical.biomeId as BiomeId);
@@ -1215,6 +1238,25 @@ export class SelectBiomePhase extends BattlePhase {
           }
         }
       }
+      // P33 (design points 2, 3): the REAL host substrate mutation (money interest + heal) has now run
+      // exactly once at wave N. Capture the COMPLETE post-mutation state and retain it in the reserved
+      // operation's envelope BEFORE the transition tail runs, so the guest installs it atomically and never
+      // reruns the substrate. Fail closed if the retained result cannot be committed (the session stops
+      // rather than diverging). A retry reasserts the same tick (design point 5), never re-mutating.
+      if (this.coopPendingAuthorityOperationId != null && isCoopBiomeRetainedResultMode()) {
+        const committed = commitBiomeAuthoritativeResult(this.coopPendingAuthorityOperationId);
+        if (committed == null) {
+          coopWarn(
+            "reward",
+            `biome authoritative result ${this.coopPendingAuthorityOperationId} could not be retained wave=${currentWaveIndex} destination=${BiomeId[nextBiome] ?? nextBiome}`,
+          );
+          failCoopSharedSession(
+            `Biome transition result ${this.coopPendingAuthorityOperationId} could not be retained`,
+          );
+          return false;
+        }
+        this.coopPendingAuthorityOperationId = null;
+      }
       // Co-op (#864): the SINGLE owner-relay funnel. If the LOCAL client owns this biome interaction, relay
       // the biome it is travelling to - WHATEVER terminal produced it (the World-Map pick, a deterministic
       // single-node / travel-target / random resolution, or an anti-hang fallback). The watcher applies this
@@ -1311,6 +1353,11 @@ export class SelectBiomePhase extends BattlePhase {
     });
     if (isCoopBiomeOperationEnabled() && commit == null) {
       return { operationId: null, destination: nextBiome, rejected: true };
+    }
+    // P33: the HOST owner reserved this op; retain it so applyNextBiomeAndEnd result-commits the complete
+    // post-mutation state at the terminal (the guest owner instead parks on the host's committed receipt).
+    if (role === "host" && commit != null && isCoopBiomeRetainedResultMode()) {
+      this.coopPendingAuthorityOperationId = commit.operationId;
     }
     if (coopBiomeCommitRequired(role)) {
       const generation = coopSessionGeneration();

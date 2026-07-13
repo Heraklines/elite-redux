@@ -43,6 +43,11 @@
 // interaction counter, which the counter advances in lockstep (§1.8).
 // =============================================================================
 
+import {
+  applyCoopAuthoritativeBattleState,
+  captureCoopAuthoritativeBattleState,
+  reapplyAcceptedCoopAuthoritativeBattleState,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_CAP_OP_BIOME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
@@ -96,8 +101,19 @@ export interface CoopBiomeRelayResult {
 
 /** The watcher's adoption verdict for a relayed biome/crossroads pick. */
 export type CoopBiomeAdoptDecision =
-  /** Adopt the relayed pick verbatim (its choice index + biome data). */
-  | { readonly adopt: true; readonly choice: number; readonly data: number[] | undefined }
+  /**
+   * Adopt the relayed pick verbatim (its choice index + biome data). In retained-result mode a host
+   * watching a guest-owned pick RESERVES the intent only (`requiresAuthorityCommit`): the phase runs the
+   * real mutation, then calls {@linkcode commitBiomeAuthoritativeResult} at its safe seam to capture + retain
+   * the complete post-mutation state. `operationId` is the reserved op the phase must result-commit.
+   */
+  | {
+      readonly adopt: true;
+      readonly choice: number;
+      readonly data: number[] | undefined;
+      readonly operationId?: string;
+      readonly requiresAuthorityCommit?: boolean;
+    }
   /** Do NOT adopt (stale / duplicate / rejected / cross-epoch / fail-closed): fall to the deterministic backstop. */
   | { readonly adopt: false; readonly reason: string };
 
@@ -159,6 +175,96 @@ export interface CoopBiomeTransitionReceiptAddress {
 
 const committedReceipts = new Map<string, CoopBiomeCommitReceipt>();
 const receiptWaiters = new Map<string, Set<(receipt: CoopBiomeCommitReceipt | null) => void>>();
+
+/**
+ * P33 retained-result state. A host RESERVES a typed intent privately (design point 1); the phase runs the
+ * REAL mutation exactly once (point 2), then {@linkcode commitBiomeAuthoritativeResult} captures the COMPLETE
+ * post-mutation state and journals ONE immutable envelope (point 3). A guest installs that state atomically
+ * through the shared transactional applier BEFORE its transition UI is released (point 4); a retry reasserts
+ * the same immutable result and never runs the mutation a second time (point 5). Mirrors the reward surface.
+ */
+interface PreparedBiomeIntent {
+  readonly intent: CoopPendingOperation;
+  readonly kind: CoopBiomeOperationKind;
+  readonly pinned: number;
+  readonly seq: number;
+  readonly wave: number;
+  readonly turn: number;
+  readonly boundarySourceBiomeId: number;
+  readonly boundaryNextWave: number;
+  readonly allowedRoutes: readonly number[];
+  readonly deterministicDestination: number | null;
+  readonly authorityOwned: boolean;
+  readonly armLocalTail: boolean;
+  readonly localRole: CoopRole;
+}
+
+/** Reserved host intents awaiting their safe-seam result commit (keyed role:operationId, per the reward map). */
+const preparedIntents = new Map<string, PreparedBiomeIntent>();
+/** Exact immutable host result envelopes survive a journal failure/retry without recapturing a later tick. */
+const committedResultEnvelopes = new Map<string, CoopAuthoritativeEnvelopeV1>();
+/** Complete result state already installed on this receiver, so a retry reasserts (never re-executes) it. */
+const stateAppliedOperations = new Set<string>();
+
+function preparedKey(role: CoopRole, operationId: string): string {
+  return `${role}:${operationId}`;
+}
+
+function sameBiomePayload(left: CoopPendingOperation["payload"], right: CoopPendingOperation["payload"]): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+/**
+ * Engine state seam. Production uses the normal atomic battle-state transaction (the SAME capture/apply the
+ * per-turn checkpoint and the ME terminal use). A focused operation test can replace it with a plain-state
+ * model without importing a second Phaser scene into the same process.
+ */
+export interface CoopBiomeAuthorityStateHooks {
+  readonly capture: (turn: number) => CoopAuthoritativeBattleStateV1 | null;
+  readonly apply: (state: CoopAuthoritativeBattleStateV1) => boolean;
+  readonly reapply: (state: CoopAuthoritativeBattleStateV1) => boolean;
+}
+
+const productionBiomeAuthorityStateHooks: CoopBiomeAuthorityStateHooks = {
+  capture: turn => captureCoopAuthoritativeBattleState(turn),
+  apply: state => applyCoopAuthoritativeBattleState(state, true),
+  reapply: state => reapplyAcceptedCoopAuthoritativeBattleState(state, true),
+};
+
+let biomeAuthorityStateHooks: CoopBiomeAuthorityStateHooks = productionBiomeAuthorityStateHooks;
+
+/** Focused-test seam; passing null restores the production atomic capture/apply implementation. */
+export function setCoopBiomeAuthorityStateHooksForTest(hooks: CoopBiomeAuthorityStateHooks | null): void {
+  biomeAuthorityStateHooks = hooks ?? productionBiomeAuthorityStateHooks;
+}
+
+/**
+ * Reject the old empty control placeholder on every live retained result (both BIOME_PICK and CROSSROADS_PICK
+ * carry a complete state now). The fail-closed twin of the reward surface's isCompleteRewardAuthorityState:
+ * a live envelope MUST carry a real post-mutation tick, the exact boundary wave/turn, and non-empty parties.
+ */
+function isCompleteBiomeAuthorityState(
+  state: CoopAuthoritativeBattleStateV1 | null | undefined,
+  wave: number,
+  turn: number,
+): state is CoopAuthoritativeBattleStateV1 {
+  return (
+    state?.version === 1
+    && Number.isSafeInteger(state.tick)
+    && state.tick > 0
+    && state.wave === wave
+    && state.turn === turn
+    && Array.isArray(state.playerParty)
+    && state.playerParty.length > 0
+    && Array.isArray(state.enemyParty)
+    && Array.isArray(state.field)
+    && Array.isArray(state.arenaTags)
+    && Array.isArray(state.pokeballCounts)
+    && Array.isArray(state.playerModifiers)
+    && Array.isArray(state.enemyModifiers)
+    && Number.isFinite(state.money)
+  );
+}
 let biomeCommitWaitMs = 60_000;
 let biomeIntentRetryMs = 1_000;
 interface CoopBiomeIntentRetry {
@@ -618,6 +724,16 @@ export function isCoopBiomeOperationEnabled(): boolean {
   return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_BIOME);
 }
 
+/**
+ * Live P33 retained-result mode: choices are RESERVED intents and only a retained COMPLETE host result may
+ * author state (the two-stage successor of the control-only placeholder). When the durability journal is
+ * inactive the surface falls back to the legacy control-only submit (dual-run), exactly like the reward
+ * surface's {@linkcode isCoopRewardRetainedResultMode}.
+ */
+export function isCoopBiomeRetainedResultMode(): boolean {
+  return isCoopBiomeOperationEnabled() && isCoopOperationJournalActive();
+}
+
 /** Select the migrated path (true) or the legacy relay fallback (false). The one-line per-surface rollback (§5.4). */
 export function setCoopBiomeOperationEnabled(value: boolean): void {
   enabled = value;
@@ -655,6 +771,9 @@ export function resetCoopBiomeOperationState(): void {
   authorityHost = null;
   watchGuest = null;
   pendingJournalMaterializations.clear();
+  preparedIntents.clear();
+  committedResultEnvelopes.clear();
+  stateAppliedOperations.clear();
   committedReceipts.clear();
   for (const waiters of receiptWaiters.values()) {
     for (const resolve of waiters) {
@@ -727,6 +846,35 @@ function controlContext(wave: number, turn: number): CoopCommitContext {
     enemyModifiers: [],
   };
   return { wave, turn, logicalPhase: "BIOME_SELECT", authoritativeState: placeholder };
+}
+
+/** The live retained-result commit context: the envelope carries the COMPLETE post-mutation state (point 3). */
+function authoritativeResultContext(
+  wave: number,
+  turn: number,
+  authoritativeState: CoopAuthoritativeBattleStateV1,
+): CoopCommitContext {
+  return { wave, turn, logicalPhase: "BIOME_SELECT", authoritativeState };
+}
+
+/**
+ * Retain a reserved host intent (design point 1). Idempotent: a re-reservation of the SAME operation with the
+ * same address + payload succeeds; a conflicting payload for a live operation id is refused (returns false).
+ */
+function retainPreparedBiomeIntent(prepared: PreparedBiomeIntent): boolean {
+  const key = preparedKey(prepared.localRole, prepared.intent.id);
+  const existing = preparedIntents.get(key);
+  if (existing != null) {
+    return (
+      existing.kind === prepared.kind
+      && existing.pinned === prepared.pinned
+      && existing.seq === prepared.seq
+      && existing.wave === prepared.wave
+      && sameBiomePayload(existing.intent.payload, prepared.intent.payload)
+    );
+  }
+  preparedIntents.set(key, prepared);
+  return true;
 }
 
 // -----------------------------------------------------------------------------
@@ -898,6 +1046,38 @@ export function commitBiomeOwnerIntent(params: CoopBiomeOwnerCommitParams): Coop
       ) {
         return null;
       }
+      // RETAINED-RESULT (design points 1-3): reserve the typed intent PRIVATELY. The phase runs the REAL
+      // mutation once, then commitBiomeAuthoritativeResult captures the COMPLETE post-mutation state and
+      // journals it - so no live envelope can carry the historical empty control placeholder. When the
+      // journal is inactive, keep the legacy control-only submit (dual-run fallback, below).
+      if (isCoopOperationJournalActive()) {
+        if (committedResultEnvelopes.has(operationId)) {
+          return { operationId, payload: params.payload, revision: 0, wave: params.wave };
+        }
+        if (!validate(intent).ok) {
+          return null;
+        }
+        const prepared: PreparedBiomeIntent = {
+          intent,
+          kind: params.kind,
+          pinned: params.pinned,
+          seq: params.seq,
+          wave: params.wave,
+          turn: params.turn,
+          boundarySourceBiomeId: params.boundarySourceBiomeId,
+          boundaryNextWave: params.boundaryNextWave,
+          allowedRoutes: params.allowedRoutes,
+          deterministicDestination: params.deterministicDestination,
+          authorityOwned: params.authorityOwned === true,
+          armLocalTail: params.armLocalTail === true,
+          localRole: "host",
+        };
+        if (!retainPreparedBiomeIntent(prepared)) {
+          return null;
+        }
+        coopLog("reward", `biome op INTENT reserved kind=${params.kind} id=${operationId} (Wave-2a/P33)`);
+        return { operationId, payload: params.payload, revision: 0, wave: params.wave };
+      }
       const res = host().submit(intent, controlContext(params.wave, params.turn), validate);
       if (res.kind === "committed") {
         // COMMIT -> JOURNAL (Wave-2e, §4.1/§4.2): register the committed op with the durability journal so
@@ -976,6 +1156,122 @@ export function commitBiomeOwnerIntent(params: CoopBiomeOwnerCommitParams): Coop
     return { operationId, payload: params.payload, revision: 0, wave: params.wave };
   } catch (e) {
     coopWarn("reward", "biome op OWNER commit threw (handled - legacy relay is the fallback) (Wave-2a)", e);
+    return null;
+  }
+}
+
+/**
+ * HOST safe seam (design points 2, 3, 5): commit one previously RESERVED intent with the COMPLETE
+ * post-mutation engine state. Called by the phase AFTER it ran the real biome/crossroads mutation exactly
+ * once, at the terminal where the wave is still the source wave. The exact envelope is cached before journal
+ * publication, so a failed publication (or a callback retry) re-asserts the SAME state tick + operation id
+ * instead of executing or recapturing the mutation a second time. No-op outside retained-result mode.
+ */
+export function commitBiomeAuthoritativeResult(
+  operationId: string,
+  authoritativeState?: CoopAuthoritativeBattleStateV1 | null,
+): CoopBiomeOwnerCommitResult | null {
+  if (!isCoopBiomeRetainedResultMode()) {
+    return null;
+  }
+  const prepared = preparedIntents.get(preparedKey("host", operationId));
+  if (prepared == null) {
+    coopWarn("reward", `authoritative biome result has no reserved host intent id=${operationId}`);
+    return null;
+  }
+  const validate = biomeBoundaryValidator({
+    pinned: prepared.pinned,
+    seq: prepared.seq,
+    kind: prepared.kind,
+    wave: prepared.wave,
+    sourceBiomeId: prepared.boundarySourceBiomeId,
+    nextWave: prepared.boundaryNextWave,
+    allowedRoutes: prepared.allowedRoutes,
+    deterministicDestination: prepared.deterministicDestination,
+    expectedOwner: prepared.intent.owner,
+    authorityOwned: prepared.authorityOwned,
+  });
+  const armTailPermit = (envelope: CoopAuthoritativeEnvelopeV1, payload: CoopBiomePickPayload): boolean =>
+    prepared.kind !== "BIOME_PICK"
+    || !prepared.armLocalTail
+    || armCoopBiomeTransitionTailPermit({
+      operationId,
+      sessionEpoch: epoch,
+      revision: envelope.revision,
+      wave: envelope.wave,
+      sourceBiomeId: payload.sourceBiomeId,
+      destinationBiomeId: payload.biomeId,
+      nextWave: payload.nextWave,
+    });
+
+  try {
+    // Retained exact result: a journal failure / callback retry reasserts the same tick + op id (point 5).
+    const retained = committedResultEnvelopes.get(operationId);
+    if (retained != null) {
+      if (!tryJournalCoopCommittedEnvelope(retained)) {
+        return null;
+      }
+      if (!armTailPermit(retained, retained.pendingOperation?.payload as CoopBiomePickPayload)) {
+        return null;
+      }
+      return {
+        operationId,
+        payload: retained.pendingOperation?.payload as CoopBiomePickPayload | CoopCrossroadsPickPayload,
+        revision: retained.revision,
+        wave: retained.wave,
+      };
+    }
+
+    const state = authoritativeState ?? biomeAuthorityStateHooks.capture(prepared.turn);
+    if (!isCompleteBiomeAuthorityState(state, prepared.wave, prepared.turn)) {
+      coopWarn(
+        "reward",
+        `authoritative biome result refused incomplete state id=${operationId} wave=${prepared.wave} turn=${prepared.turn}`,
+      );
+      return null;
+    }
+    if (
+      prepared.kind === "BIOME_PICK"
+      && prepared.armLocalTail
+      && !hostBiomeTailSlotAvailable(operationId, prepared.intent.payload as CoopBiomePickPayload, prepared.wave)
+    ) {
+      return null;
+    }
+    const res = host().submit(
+      prepared.intent,
+      authoritativeResultContext(prepared.wave, prepared.turn, state),
+      validate,
+    );
+    if (res.kind !== "committed" && res.kind !== "reack") {
+      coopWarn("reward", `authoritative biome result rejected (${res.kind}) id=${operationId} (Wave-2a/P33)`);
+      return null;
+    }
+    if (res.kind === "reack" && !validate(res.op).ok) {
+      return null;
+    }
+    const canonicalPayload = res.kind === "reack" ? res.op.payload : res.envelope.pendingOperation?.payload;
+    if (!sameBiomePayload(canonicalPayload, prepared.intent.payload)) {
+      return null;
+    }
+    committedResultEnvelopes.set(operationId, res.envelope);
+    if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
+      return null;
+    }
+    if (!armTailPermit(res.envelope, canonicalPayload as CoopBiomePickPayload)) {
+      return null;
+    }
+    coopLog(
+      "reward",
+      `biome authoritative RESULT retained kind=${prepared.kind} rev=${res.envelope.revision} tick=${state.tick} id=${operationId}`,
+    );
+    return {
+      operationId,
+      payload: canonicalPayload as CoopBiomePickPayload | CoopCrossroadsPickPayload,
+      revision: res.envelope.revision,
+      wave: res.envelope.wave,
+    };
+  } catch (e) {
+    coopWarn("reward", `authoritative biome result threw id=${operationId} (Wave-2a/P33)`, e);
     return null;
   }
 }
@@ -1100,6 +1396,51 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
         && !hostBiomeTailSlotAvailable(opId, payload as CoopBiomePickPayload, params.wave)
       ) {
         return { adopt: false, reason: "host-permit-slot-busy" };
+      }
+      // RETAINED-RESULT (design point 1): the host validates + RESERVES the guest-owned intent, then the
+      // phase runs the real mutation once and calls commitBiomeAuthoritativeResult at its safe seam. When the
+      // journal is inactive, keep the legacy control-only commit (dual-run fallback, below).
+      if (isCoopOperationJournalActive()) {
+        if (committedResultEnvelopes.has(opId)) {
+          return { adopt: false, reason: "host-intent-complete" };
+        }
+        if (!validate(intent).ok) {
+          return { adopt: false, reason: "host-wrong-owner-or-boundary" };
+        }
+        const prepared: PreparedBiomeIntent = {
+          intent,
+          kind: params.kind,
+          pinned: params.pinned,
+          seq: params.seq,
+          wave: params.wave,
+          turn: params.turn,
+          boundarySourceBiomeId: params.sourceBiomeId,
+          boundaryNextWave: params.nextWave,
+          allowedRoutes: params.allowedRoutes,
+          deterministicDestination: params.deterministicDestination,
+          authorityOwned: false,
+          armLocalTail: params.armLocalTail === true,
+          localRole: "host",
+        };
+        if (!retainPreparedBiomeIntent(prepared)) {
+          return { adopt: false, reason: "host-intent-payload-conflict" };
+        }
+        lastAppliedPinned = params.pinned;
+        return params.kind === "BIOME_PICK"
+          ? {
+              adopt: true,
+              choice: (payload as CoopBiomePickPayload).nodeIndex,
+              data: [(payload as CoopBiomePickPayload).biomeId],
+              operationId: opId,
+              requiresAuthorityCommit: true,
+            }
+          : {
+              adopt: true,
+              choice: (payload as CoopCrossroadsPickPayload).optionIndex,
+              data: undefined,
+              operationId: opId,
+              requiresAuthorityCommit: true,
+            };
       }
       const res = host().submit(intent, controlContext(params.wave, params.turn), validate);
       if (res.kind === "rejected" || res.kind === "rejected-late") {
@@ -1260,6 +1601,24 @@ function applyJournaledBiomeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coo
   const g = guest();
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
+  }
+  // RETAINED-RESULT (design points 4, 5, 6): install the COMPLETE authoritative state ATOMICALLY through the
+  // shared transactional applier BEFORE the live sink publishes the receipt the phase awaits - so the guest
+  // adopts the host's exact post-mutation run-state (money/notoriety/overstay-anchor/map/party) rather than
+  // rerunning the Stay/Leave substrate locally. Fail closed on an empty/incomplete state (never author state
+  // from the historical placeholder). A retry after the state seam succeeded REASSERTS the same immutable
+  // result and never re-executes the mutation (stateAppliedOperations).
+  if (!isCompleteBiomeAuthorityState(envelope.authoritativeState, envelope.wave, envelope.turn)) {
+    coopWarn("reward", `biome op rejected empty/incomplete authoritative state id=${op.id} rev=${envelope.revision}`);
+    return "rejected";
+  }
+  if (!stateAppliedOperations.has(op.id)) {
+    if (!biomeAuthorityStateHooks.apply(envelope.authoritativeState)) {
+      return "rejected";
+    }
+    stateAppliedOperations.add(op.id);
+  } else if (!biomeAuthorityStateHooks.reapply(envelope.authoritativeState)) {
+    return "rejected";
   }
   if (applyCoopOperationEnvelope(g, "op:biome", envelope) !== "applied") {
     // A transient non-applicable result (a gap the manager already guards against, or a fail-closed):

@@ -36,16 +36,19 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import {
   adoptBiomeWatcherChoice,
   armCoopBiomeIntentResend,
   awaitCoopBiomeCommitReceipt,
   type CoopBiomeCommitReceipt,
   type CoopBiomeRelayResult,
+  commitBiomeAuthoritativeResult,
   commitBiomeOwnerIntent,
   coopBiomeCommitRequired,
   coopBiomeOperationId,
   isCoopBiomeOperationEnabled,
+  isCoopBiomeRetainedResultMode,
   releaseCoopBiomeCommitReceipt,
 } from "#data/elite-redux/coop/coop-biome-operation";
 import {
@@ -139,6 +142,12 @@ export class ErCrossroadsPhase extends Phase {
   /** True while a guest-owned choice is parked on the host-committed envelope. */
   private coopCommitPending = false;
   private coopOwnerPromptState: "idle" | "opening" | "open" = "idle";
+  /**
+   * P33 retained-result: the reserved host CROSSROADS_PICK operation this phase must result-commit at its
+   * terminal (after the REAL Stay/Leave substrate mutation runs), or null. Set by the host owner + host-watch
+   * paths; consumed once in {@linkcode coopApply} to capture + retain the COMPLETE post-mutation state.
+   */
+  private coopPendingAuthorityOperationId: string | null = null;
 
   /** Co-op (#848): interaction counter pinned at open (-1 = solo / not pinned). */
   private coopStartCounter = -1;
@@ -407,6 +416,11 @@ export class ErCrossroadsPhase extends Phase {
       this.parkCrossroadsCommitRecovery(() => this.coopOwnerCommit(pinned, moveOn));
       return;
     }
+    // P33: the HOST owner reserved this op; retain it so coopApply result-commits the complete post-mutation
+    // state at the terminal (the guest owner instead parks on the host's committed receipt).
+    if (role === "host" && commit != null && isCoopBiomeRetainedResultMode()) {
+      this.coopPendingAuthorityOperationId = operationId;
+    }
     const committedMoveOn =
       commit?.payload != null && "optionIndex" in commit.payload ? commit.payload.optionIndex === 1 : moveOn;
     if (coopBiomeCommitRequired(role)) {
@@ -576,6 +590,11 @@ export class ErCrossroadsPhase extends Phase {
         );
       });
       return;
+    }
+    // P33: the HOST watching a guest-owned pick reserved the intent; retain it so coopApply result-commits
+    // the complete post-mutation state at the terminal.
+    if (decision.adopt && decision.requiresAuthorityCommit && decision.operationId != null) {
+      this.coopPendingAuthorityOperationId = decision.operationId;
     }
     let moveOn: boolean;
     if (decision.adopt) {
@@ -788,18 +807,43 @@ export class ErCrossroadsPhase extends Phase {
       if (moveOn) {
         // End the biome now; open the World Map picker ahead of the queued NewBattlePhase. The
         // chained SelectBiomePhase owns the single terminal advance for the whole decision.
+        // setErLeaveBiomeNow is CONTROL/ROUTING (the transient leave flag is not carried in the authoritative
+        // state), so BOTH clients keep it to route into SelectBiomePhase.
         setErLeaveBiomeNow();
         setCoopBiomeInteractionStart(pinned);
         globalScene.phaseManager.unshiftNew("SelectBiomePhase");
       } else {
         // STAY: arm the overstay anchor (a no-op inside the free window) and terminate the
         // interaction here with the single from-pinned advance.
-        erMarkBiomeStay(globalScene.currentBattle?.waveIndex ?? 0);
+        // P33 (design point 6): erMarkBiomeStay is SUBSTRATE - it mutates the overstay anchor, which the
+        // authoritative guest installs from the host's captured state (never reruns locally). The host (the
+        // authority performing the real mutation) still runs it; the guest gets it via the state applier.
+        if (!isCoopAuthoritativeGuestGated()) {
+          erMarkBiomeStay(globalScene.currentBattle?.waveIndex ?? 0);
+        }
         const controller = getCoopController();
         advanceCoopInteractionForContinuation(pinned);
         if (controller != null && controller.interactionCounter() <= pinned) {
           throw new Error(`Crossroads interaction ${pinned} did not advance`);
         }
+      }
+      // P33 (design points 2, 3): the REAL host Stay/Leave substrate mutation has now run exactly once at
+      // wave N. Capture the COMPLETE post-mutation state into the reserved op BEFORE the terminal releases,
+      // so the guest installs it atomically and never reruns the substrate. Fail closed if it cannot be
+      // retained; a retry reasserts the same tick (design point 5), never re-mutating.
+      if (this.coopPendingAuthorityOperationId != null && isCoopBiomeRetainedResultMode()) {
+        const committed = commitBiomeAuthoritativeResult(this.coopPendingAuthorityOperationId);
+        if (committed == null) {
+          coopWarn(
+            "reward",
+            `crossroads authoritative result ${this.coopPendingAuthorityOperationId} could not be retained pinned=${pinned} moveOn=${moveOn}`,
+          );
+          failCoopSharedSession(
+            `Crossroads result ${this.coopPendingAuthorityOperationId} could not be retained for ${pinned}`,
+          );
+          return false;
+        }
+        this.coopPendingAuthorityOperationId = null;
       }
       this.end();
       return true;
