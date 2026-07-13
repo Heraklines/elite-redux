@@ -7,15 +7,26 @@
 # feature branch; the main-branch launcher workflow only checks out a ref and runs this
 # script, so nothing but a thin scheduler ever lands on main.
 #
-# Expects a GitHub Actions environment (GITHUB_ENV, GITHUB_RUN_ID, GH_TOKEN) plus:
-#   COOP_UI_API_ORIGIN, COOP_UI_SIGNAL_ORIGIN  (staging save + signaling origins)
+# Expects a GitHub Actions environment (GITHUB_ENV, GITHUB_RUN_ID, GH_TOKEN).
 #   COOP_UI_CAMPAIGN_WAVES (optional, default 30)
 # Node + pnpm (via corepack) must already be on PATH.
 set -euo pipefail
 
-: "${COOP_UI_API_ORIGIN:?COOP_UI_API_ORIGIN is required}"
-: "${COOP_UI_SIGNAL_ORIGIN:?COOP_UI_SIGNAL_ORIGIN is required}"
+# The nightly is a STAGING soak: target the isolated P33 staging workers authoritatively so a
+# cron run always hits the right workers, regardless of how the main-branch launcher wired vars.
+export COOP_UI_API_ORIGIN="https://er-save-api-staging.heraklines.workers.dev"
+export COOP_UI_SIGNAL_ORIGIN="https://er-coop-api-staging.heraklines.workers.dev"
 : "${GITHUB_ENV:?GITHUB_ENV is required (run under GitHub Actions)}"
+
+echo "::group::Staging health precheck"
+SIG=$(curl -s -m 20 -o /dev/null -w "%{http_code}" "$COOP_UI_SIGNAL_ORIGIN/coop/health" || echo 000)
+API=$(curl -s -m 20 -o /dev/null -w "%{http_code}" "$COOP_UI_API_ORIGIN/account/info" || echo 000)
+echo "signal /coop/health -> $SIG ; save /account/info -> $API"
+if ! { [ "$SIG" = "200" ] && [ "$API" != "000" ] && [ "$API" != "404" ] && [ "$API" -lt 500 ]; }; then
+  echo "::warning title=Staging unhealthy::signal=$SIG save=$API - skipping the nightly campaign (no doomed run)."
+  exit 0
+fi
+echo "::endgroup::"
 
 echo "::group::Install dependencies"
 corepack enable
