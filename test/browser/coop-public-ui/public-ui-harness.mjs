@@ -9,6 +9,7 @@ import { delay, EvidenceSink } from "./evidence.mjs";
 const TITLE_PHASE = /Start Phase TitlePhase/u;
 const LOGIN_PHASE = /Start Phase LoginPhase/u;
 const SELECT_GENDER_PHASE = /Start Phase SelectGenderPhase/u;
+const CHALLENGE_PHASE = /Start Phase SelectChallengePhase/u;
 const STARTER_PHASE = /Start Phase SelectStarterPhase/u;
 const LOCAL_COMMAND = /CommandPhase .*-> LOCAL UI/u;
 const REWARD_PHASE = /Start Phase SelectModifierPhase/u;
@@ -642,6 +643,19 @@ export class DuoPublicUiRig {
       Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
     );
     await this.host.pulseActionUntil(/SEND resumeStartNew/u, "host-confirm-fresh-run");
+    const hostEntrySurface = await this.host.evidence.waitForCondition(
+      sink =>
+        sink.find(CHALLENGE_PHASE, phaseCursors[this.host.label])
+        ?? sink.find(STARTER_PHASE, phaseCursors[this.host.label]),
+      {
+        timeoutMs: this.config.timeoutMs,
+        description: "host challenge or starter surface after committed New Game",
+      },
+    );
+    if (CHALLENGE_PHASE.test(hostEntrySurface.text ?? "")) {
+      await this.host.checkpoint("challenge-select-open");
+      await this.host.sequence(this.config.keys.challenge, "select-redundant-doubles-only-challenge");
+    }
     await Promise.all(
       Object.values(this.clients).map(client =>
         client.evidence.waitFor(STARTER_PHASE, {

@@ -17,7 +17,7 @@ the same address, digest, and continuation surface. Every battle turn also corre
 | Journey | Public actions and required result | Account precondition |
 | --- | --- | --- |
 | `probe` | Open both clients, log in through the visible form, complete first-login gender selection, reach Title | Workflow provisions isolated staging accounts; manual runs supply accounts |
-| `fresh-wave2` | Lobby invite/accept, New Run, starter selection, wave 1 commands, reward leave, wave 2 command UI | Isolated accounts have no title-menu Continue entry unless title keys are configured |
+| `fresh-wave2` | Lobby invite/accept, New Run, host-only challenge selection, starter selection, wave 1 commands, reward leave, wave 2 command UI | Isolated accounts have no title-menu Continue entry unless title keys are configured |
 | `fresh-resume` | `fresh-wave2`, close both pages, reopen/login, pair in the same direction, accept Resume, reach command UI | Same as `fresh-wave2` |
 | `reverse-resume` | Same, but reverse which player sends the lobby request after reopening | Same as `fresh-wave2`; this is the invitation-direction regression |
 | `faint-replacement` | Pair, Resume, submit battle commands, select a legal replacement through the public picker, observe summon/continued battle | A shared save at a deterministic low-HP boundary |
@@ -61,7 +61,7 @@ Relevant options:
 - `COOP_UI_FAINT_OWNER_SEAT=guest-seat|host-seat` identifies the prepared replacement owner.
 - `COOP_UI_HOST_TITLE_NEW_GAME_KEYS` and `COOP_UI_GUEST_TITLE_NEW_GAME_KEYS` are JSON key arrays. Use
   `["ArrowDown"]` when a prepared account already shows Continue above New Game.
-- `COOP_UI_STARTER_KEYS`, `COOP_UI_BATTLE_KEYS`, `COOP_UI_REWARD_LEAVE_KEYS`, and
+- `COOP_UI_CHALLENGE_KEYS`, `COOP_UI_STARTER_KEYS`, `COOP_UI_BATTLE_KEYS`, `COOP_UI_REWARD_LEAVE_KEYS`, and
   `COOP_UI_REPLACEMENT_KEYS` override the default public keyboard sequences.
 - `COOP_UI_ACTION_DELAY_MS` and `COOP_UI_SETTLE_DELAY_MS` permit timing variation without bypassing UI.
 - `COOP_UI_BOOT_TIMEOUT_MS` budgets the first immutable full-asset load only (default five minutes);
