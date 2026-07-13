@@ -133,10 +133,7 @@ export class PublicUiClient {
     } else {
       // LOGIN_OR_REGISTER selects Login by default. This is a real keyboard action against the canvas UI.
       await this.press("Space", "open-login-form");
-      await this.page.waitForFunction(
-        () => document.querySelectorAll('input[type="text"], input[type="password"]').length >= 2,
-        { timeout: this.config.timeoutMs },
-      );
+      await this.waitForVisibleInputs({ text: 1, password: 1, purpose: "public login form" });
       await this.fillLoginForm();
     }
     const entered = await this.evidence.waitForCondition(
@@ -207,8 +204,8 @@ export class PublicUiClient {
   }
 
   async fillRegistrationForm() {
-    const usernameInput = await this.page.$('input[type="text"]');
-    const passwordInputs = await this.page.$$('input[type="password"]');
+    const [usernameInput] = await this.visibleInputHandles('input[type="text"]');
+    const passwordInputs = await this.visibleInputHandles('input[type="password"]');
     if (!usernameInput || passwordInputs.length < 2) {
       throw new Error(`${this.label}: visible registration inputs were not present`);
     }
@@ -226,8 +223,8 @@ export class PublicUiClient {
   }
 
   async fillLoginForm() {
-    const usernameInput = await this.page.$('input[type="text"]');
-    const passwordInput = await this.page.$('input[type="password"]');
+    const [usernameInput] = await this.visibleInputHandles('input[type="text"]');
+    const [passwordInput] = await this.visibleInputHandles('input[type="password"]');
     if (!usernameInput || !passwordInput) {
       throw new Error(`${this.label}: visible login inputs were not present`);
     }
@@ -239,6 +236,32 @@ export class PublicUiClient {
     await this.page.keyboard.press("Control+A");
     await this.page.keyboard.type(this.credentials.password, { delay: 20 });
     await this.press("Enter", "submit-login-form", { blurInputs: false });
+  }
+
+  async visibleInputHandles(selector) {
+    const handles = await this.page.$$(selector);
+    const visible = [];
+    for (const handle of handles) {
+      if (await handle.isVisible()) {
+        visible.push(handle);
+      }
+    }
+    return visible;
+  }
+
+  async waitForVisibleInputs({ text, password, purpose }) {
+    const deadline = Date.now() + this.config.timeoutMs;
+    while (Date.now() < deadline) {
+      const textInputs = await this.visibleInputHandles('input[type="text"]');
+      const passwordInputs = await this.visibleInputHandles('input[type="password"]');
+      if (textInputs.length >= text && passwordInputs.length >= password) {
+        return { textInputs, passwordInputs };
+      }
+      await delay(50);
+    }
+    throw new Error(
+      `${this.label}: ${purpose} did not expose ${text} visible text and ${password} visible password inputs`,
+    );
   }
 
   async press(key, purpose, { blurInputs = true } = {}) {
