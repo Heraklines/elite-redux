@@ -146,6 +146,17 @@ export interface CoopBiomeCommitReceipt {
   readonly payload: CoopBiomePickPayload | CoopCrossroadsPickPayload;
 }
 
+/**
+ * One SelectBiome boundary can terminate through either the interactive World-Map address or the
+ * host-owned deterministic address. The renderer may not know which terminal the authority selected
+ * until the retained envelope arrives (for example, its pending-node graph can be stale while a travel
+ * target is active on the host), so both exact addresses belong to one bounded receipt wait.
+ */
+export interface CoopBiomeTransitionReceiptAddress {
+  readonly sourceWave: number;
+  readonly interactivePinned?: number | undefined;
+}
+
 const committedReceipts = new Map<string, CoopBiomeCommitReceipt>();
 const receiptWaiters = new Map<string, Set<(receipt: CoopBiomeCommitReceipt | null) => void>>();
 let biomeCommitWaitMs = 60_000;
@@ -163,6 +174,13 @@ const biomeIntentRetries = new Map<string, CoopBiomeIntentRetry>();
 const VALID_BIOME_IDS: ReadonlySet<number> = new Set(
   Object.values(BiomeId).filter((value): value is number => typeof value === "number"),
 );
+
+function cloneBiomeCommitReceipt(receipt: CoopBiomeCommitReceipt): CoopBiomeCommitReceipt {
+  return {
+    ...receipt,
+    payload: { ...receipt.payload },
+  };
+}
 
 /** Production wait ceiling; tests may shorten it without weakening the fail-closed behavior. */
 export function setCoopBiomeCommitWaitMs(ms: number): void {
@@ -441,6 +459,125 @@ export async function awaitCoopBiomeCommitReceipt(operationId: string): Promise<
       }
       resolve(null);
     }, biomeCommitWaitMs);
+  });
+}
+
+function biomeTransitionReceiptOperationIds(address: CoopBiomeTransitionReceiptAddress): string[] {
+  const deterministic = coopAuthoritativeBiomeTransitionOperationId(address.sourceWave);
+  if (deterministic == null) {
+    return [];
+  }
+  const ids = [deterministic];
+  if (
+    address.interactivePinned != null
+    && Number.isSafeInteger(address.interactivePinned)
+    && address.interactivePinned >= 0
+    && address.interactivePinned <= COOP_MAX_REACHABLE_COUNTER
+  ) {
+    ids.push(
+      coopBiomeOperationId(
+        "BIOME_PICK",
+        COOP_BIOME_PICK_SEQ_BASE + address.interactivePinned,
+        address.interactivePinned,
+      ),
+    );
+  }
+  return ids;
+}
+
+function existingBiomeTransitionReceipts(operationIds: readonly string[]): CoopBiomeCommitReceipt[] {
+  return operationIds.flatMap(operationId => {
+    const receipt = committedReceipts.get(operationId);
+    return receipt == null ? [] : [receipt];
+  });
+}
+
+/**
+ * Synchronous retained-receipt read for a phase that starts after the journal delivery. Keeping this path
+ * synchronous matters for both real browser re-entry and the two-engine harness: an already-applied exact
+ * terminal should be projected under the currently installed scene/runtime, without another ambient-global
+ * async hop. Two receipts at the same boundary are a protocol conflict and therefore fail closed.
+ */
+export function getCoopBiomeTransitionCommitReceipt(
+  address: CoopBiomeTransitionReceiptAddress,
+): CoopBiomeCommitReceipt | null {
+  const operationIds = biomeTransitionReceiptOperationIds(address);
+  const receipts = existingBiomeTransitionReceipts(operationIds);
+  if (receipts.length > 1) {
+    coopWarn(
+      "reward",
+      `biome transition has conflicting retained terminals wave=${address.sourceWave} ids=${receipts.map(r => r.operationId).join(",")}`,
+    );
+    return null;
+  }
+  return receipts.length === 1 ? cloneBiomeCommitReceipt(receipts[0]) : null;
+}
+
+/**
+ * Await whichever exact terminal the authority retained for one SelectBiome boundary. A chained renderer
+ * can therefore recover when its local route graph classified the surface differently from the host, while
+ * still accepting no unaddressed relay, local RNG fallback, or interaction-counter-only orphan.
+ */
+export function awaitCoopBiomeTransitionCommitReceipt(
+  address: CoopBiomeTransitionReceiptAddress,
+): Promise<CoopBiomeCommitReceipt | null> {
+  const operationIds = biomeTransitionReceiptOperationIds(address);
+  if (operationIds.length === 0) {
+    return Promise.resolve(null);
+  }
+  const existing = existingBiomeTransitionReceipts(operationIds);
+  if (existing.length > 1) {
+    coopWarn(
+      "reward",
+      `biome transition refused conflicting retained terminals wave=${address.sourceWave} ids=${existing.map(r => r.operationId).join(",")}`,
+    );
+    return Promise.resolve(null);
+  }
+  if (existing.length === 1) {
+    return Promise.resolve(cloneBiomeCommitReceipt(existing[0]));
+  }
+  return new Promise(resolve => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const listeners = new Map<string, (receipt: CoopBiomeCommitReceipt | null) => void>();
+    const finish = (receipt: CoopBiomeCommitReceipt | null): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      for (const [operationId, listener] of listeners) {
+        const waiters = receiptWaiters.get(operationId);
+        waiters?.delete(listener);
+        if (waiters?.size === 0) {
+          receiptWaiters.delete(operationId);
+        }
+      }
+      resolve(receipt == null ? null : cloneBiomeCommitReceipt(receipt));
+    };
+    for (const operationId of operationIds) {
+      const listener = (receipt: CoopBiomeCommitReceipt | null): void => {
+        if (receipt == null) {
+          finish(null);
+          return;
+        }
+        const now = existingBiomeTransitionReceipts(operationIds);
+        if (now.length !== 1 || now[0].operationId !== receipt.operationId) {
+          coopWarn(
+            "reward",
+            `biome transition receipt race conflicted wave=${address.sourceWave} ids=${now.map(r => r.operationId).join(",")}`,
+          );
+          finish(null);
+          return;
+        }
+        finish(receipt);
+      };
+      listeners.set(operationId, listener);
+      const waiters = receiptWaiters.get(operationId) ?? new Set<(receipt: CoopBiomeCommitReceipt | null) => void>();
+      waiters.add(listener);
+      receiptWaiters.set(operationId, waiters);
+    }
+    timer = setTimeout(() => finish(null), biomeCommitWaitMs);
   });
 }
 

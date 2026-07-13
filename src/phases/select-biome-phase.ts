@@ -5,6 +5,7 @@ import {
   adoptBiomeWatcherChoice,
   armCoopBiomeIntentResend,
   awaitCoopBiomeCommitReceipt,
+  awaitCoopBiomeTransitionCommitReceipt,
   type CoopBiomeCommitReceipt,
   type CoopBiomeRelayResult,
   commitAuthoritativeBiomeTransition,
@@ -12,6 +13,7 @@ import {
   coopAuthoritativeBiomeTransitionOperationId,
   coopBiomeCommitRequired,
   coopBiomeOperationId,
+  getCoopBiomeTransitionCommitReceipt,
   isCoopBiomeOperationEnabled,
   releaseCoopBiomeCommitReceipt,
 } from "#data/elite-redux/coop/coop-biome-operation";
@@ -199,7 +201,11 @@ export class SelectBiomePhase extends BattlePhase {
     // transition, ahead of the normal biome links - but never over the run finale
     // (handled above, which returns before we consume the target).
     const travelClassification = authoritativeGuest ? getAuthoritativeMapTravelClassification(currentWaveIndex) : null;
-    if (authoritativeGuest && travelClassification?.ready !== true) {
+    // A chained Crossroads Leave already pins one exact biome boundary. Its retained terminal can be
+    // either the interactive BIOME_PICK address or the wave-scoped deterministic address, so a renderer
+    // with a late/missing travel-classification carrier must still enter that bounded receipt path. The
+    // exact commit (never local target/RNG) resolves any host-vs-renderer route-classification difference.
+    if (authoritativeGuest && travelClassification?.ready !== true && !this.coopChained) {
       this.parkForAuthoritativeRoutes(currentWaveIndex);
       return;
     }
@@ -604,17 +610,27 @@ export class SelectBiomePhase extends BattlePhase {
   ): Promise<void> {
     const generation = coopSessionGeneration();
     const wave = globalScene.currentBattle?.waveIndex ?? -1;
-    const receipt = await awaitCoopBiomeCommitReceipt(operationId);
+    const address = { sourceWave: wave, interactivePinned: pinned } as const;
+    const receipt =
+      getCoopBiomeTransitionCommitReceipt(address) ?? (await awaitCoopBiomeTransitionCommitReceipt(address));
     if (!this.boundaryStillLive(generation, wave)) {
       return;
     }
-    const payload = this.committedBiomePayload(receipt, operationId);
-    if (payload == null) {
+    const deterministicOperationId = coopAuthoritativeBiomeTransitionOperationId(wave);
+    const exactOperationId = receipt?.operationId ?? "";
+    const payload = this.committedBiomePayload(receipt, exactOperationId);
+    const interactive = exactOperationId === operationId && payload?.nodeIndex !== -1;
+    const deterministic = exactOperationId === deterministicOperationId && payload?.nodeIndex === -1;
+    if (payload == null || (!interactive && !deterministic)) {
       this.parkBiomeCommitRecovery(() => {
         this.finishCommittedBiomeWatcher(revealed, operationId, pinned).catch(e =>
           coopWarn("reward", "biome pick WATCHER receipt retry threw - remaining closed", e),
         );
       });
+      return;
+    }
+    if (deterministic && receipt != null) {
+      await this.applyDeterministicBiomeWatcherReceipt(receipt, payload, generation, wave, revealed, operationId, pinned);
       return;
     }
     await this.applyBiomeWatcherDecision(
@@ -625,6 +641,45 @@ export class SelectBiomePhase extends BattlePhase {
       { choice: payload.nodeIndex, data: [payload.biomeId] },
       true,
     );
+  }
+
+  /**
+   * A host travel target or a one-node route can resolve deterministically while the renderer had already
+   * opened the mirrored map from stale route metadata. The retained wave-addressed receipt wins: close the
+   * cosmetic map and project only its exact destination, without synthesizing a picker action or advancing
+   * a different interaction.
+   */
+  private async applyDeterministicBiomeWatcherReceipt(
+    receipt: CoopBiomeCommitReceipt,
+    payload: CoopBiomePickPayload,
+    generation: number,
+    wave: number,
+    revealed: ErRouteNode[],
+    interactiveOperationId: string,
+    pinned: number,
+  ): Promise<void> {
+    try {
+      const mode = await globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, () =>
+        this.boundaryStillLive(generation, wave),
+      );
+      if (!this.boundaryStillLive(generation, wave)) {
+        return;
+      }
+      if (mode === "superseded") {
+        this.parkBiomeCommitRecovery(() => {
+          this.finishCommittedBiomeWatcher(revealed, interactiveOperationId, pinned).catch(error =>
+            coopWarn("reward", "deterministic biome watcher teardown retry threw - remaining closed", error),
+          );
+        });
+        return;
+      }
+    } catch (error) {
+      coopWarn("reward", "deterministic biome watcher map teardown failed (continuing exact commit)", error);
+    }
+    this.coopDeterministicDestination = payload.biomeId as BiomeId;
+    if (this.applyNextBiomeAndEnd(payload.biomeId as BiomeId)) {
+      releaseCoopBiomeCommitReceipt(receipt.operationId);
+    }
   }
 
   private async applyBiomeWatcherDecision(
@@ -814,7 +869,7 @@ export class SelectBiomePhase extends BattlePhase {
     this.setNextBiomeAndEnd(nextBiome);
   }
 
-  /** Renderer half of a deterministic transition: wait for the host's exact, journaled destination. */
+  /** Renderer half of a host-owned transition: consume the exact retained terminal for this boundary. */
   private awaitAuthoritativeDeterministicBiome(): void {
     if (this.coopCommitPending) {
       return;
@@ -823,35 +878,23 @@ export class SelectBiomePhase extends BattlePhase {
     const generation = coopSessionGeneration();
     const wave = globalScene.currentBattle?.waveIndex ?? -1;
     const sourceBiome = globalScene.arena.biomeId;
-    const operationId = coopAuthoritativeBiomeTransitionOperationId(wave);
-    if (operationId == null) {
+    const address = {
+      sourceWave: wave,
+      interactivePinned: this.coopAdvancePinned >= 0 ? this.coopAdvancePinned : undefined,
+    } as const;
+    if (coopAuthoritativeBiomeTransitionOperationId(wave) == null) {
       this.coopCommitPending = false;
       this.parkBiomeCommitRecovery(() => this.awaitAuthoritativeDeterministicBiome());
       return;
     }
-    void awaitCoopBiomeCommitReceipt(operationId)
+    const existing = getCoopBiomeTransitionCommitReceipt(address);
+    if (existing != null) {
+      this.consumeAuthoritativeBiomeReceipt(existing, generation, wave, sourceBiome);
+      return;
+    }
+    void awaitCoopBiomeTransitionCommitReceipt(address)
       .then(receipt => {
-        if (!this.boundaryStillLive(generation, wave)) {
-          return;
-        }
-        const payload = receipt?.payload as CoopBiomePickPayload | undefined;
-        if (
-          receipt?.operationId !== operationId
-          || receipt.kind !== "BIOME_PICK"
-          || receipt.wave !== wave
-          || payload?.nodeIndex !== -1
-          || payload.sourceBiomeId !== sourceBiome
-          || payload.nextWave !== wave + 1
-        ) {
-          this.coopCommitPending = false;
-          this.parkBiomeCommitRecovery(() => this.awaitAuthoritativeDeterministicBiome());
-          return;
-        }
-        this.coopCommitPending = false;
-        this.coopDeterministicDestination = payload.biomeId as BiomeId;
-        if (this.applyNextBiomeAndEnd(payload.biomeId as BiomeId)) {
-          releaseCoopBiomeCommitReceipt(operationId);
-        }
+        this.consumeAuthoritativeBiomeReceipt(receipt, generation, wave, sourceBiome);
       })
       .catch(error => {
         if (!this.boundaryStillLive(generation, wave)) {
@@ -861,6 +904,53 @@ export class SelectBiomePhase extends BattlePhase {
         coopWarn("reward", "deterministic biome authority wait threw - remaining closed", error);
         this.parkBiomeCommitRecovery(() => this.awaitAuthoritativeDeterministicBiome());
       });
+  }
+
+  private consumeAuthoritativeBiomeReceipt(
+    receipt: CoopBiomeCommitReceipt | null,
+    generation: number,
+    wave: number,
+    sourceBiome: BiomeId,
+  ): void {
+    if (!this.boundaryStillLive(generation, wave)) {
+      return;
+    }
+    const payload = receipt?.payload as CoopBiomePickPayload | undefined;
+    const deterministicOperationId = coopAuthoritativeBiomeTransitionOperationId(wave);
+    const interactiveOperationId =
+      this.coopAdvancePinned >= 0
+        ? coopBiomeOperationId("BIOME_PICK", COOP_BIOME_PICK_SEQ_BASE + this.coopAdvancePinned, this.coopAdvancePinned)
+        : null;
+    const deterministic = receipt?.operationId === deterministicOperationId && payload?.nodeIndex === -1;
+    const interactive = receipt?.operationId === interactiveOperationId && payload != null && payload.nodeIndex >= 0;
+    if (
+      receipt?.kind !== "BIOME_PICK"
+      || receipt.wave !== wave
+      || payload?.sourceBiomeId !== sourceBiome
+      || payload.nextWave !== wave + 1
+      || (!deterministic && !interactive)
+    ) {
+      this.coopCommitPending = false;
+      this.parkBiomeCommitRecovery(() => this.awaitAuthoritativeDeterministicBiome());
+      return;
+    }
+    this.coopCommitPending = false;
+    if (interactive && this.coopAdvancePinned >= 0) {
+      const revealed = getErPendingNodes().filter(node => node.revealed);
+      void this.applyBiomeWatcherDecision(
+        revealed,
+        receipt.operationId,
+        this.coopAdvancePinned,
+        "guest",
+        { choice: payload.nodeIndex, data: [payload.biomeId] },
+        true,
+      );
+      return;
+    }
+    this.coopDeterministicDestination = payload.biomeId as BiomeId;
+    if (this.applyNextBiomeAndEnd(payload.biomeId as BiomeId)) {
+      releaseCoopBiomeCommitReceipt(receipt.operationId);
+    }
   }
 
   private setNextBiomeAndEnd(nextBiome: BiomeId): boolean {

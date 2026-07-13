@@ -37,6 +37,7 @@ import { initGlobalScene } from "#app/global-scene";
 import { applyCoopFullSnapshot, captureCoopFullSnapshot } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   coopBiomeOperationId,
+  getCoopBiomeTransitionCommitReceipt,
   resetCoopBiomeCommitWaitMs,
   setCoopBiomeCommitWaitMs,
 } from "#data/elite-redux/coop/coop-biome-operation";
@@ -629,6 +630,13 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         ).toBe(true);
         await drainLoopback();
       });
+      expect(
+        getCoopBiomeTransitionCommitReceipt({
+          sourceWave: 11,
+          interactivePinned: pinAfterLeave,
+        })?.payload,
+        "the retained interactive terminal names the owner's exact non-default route",
+      ).toMatchObject({ biomeId: chosen, nodeIndex: 1, nextWave: 12 });
       setCoopBiomeInteractionStart(pinAfterLeave); // the watcher engine's own chained pin
       await withClient(watcherCtx, async () => {
         const phase = liveSelectBiome();
@@ -784,6 +792,10 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     // broadcast it. The watcher receives ONLY this advance (never a pick) - the exact one-sided orphan.
     withClientSync(ownerCtx, () => ownerCtx.runtime.controller.advanceInteraction(counterBefore));
     await drainLoopback();
+    expect(
+      getCoopBiomeTransitionCommitReceipt({ sourceWave: 11, interactivePinned: counterBefore }),
+      "a counter-only orphan is not biome authority",
+    ).toBeNull();
 
     const phase = liveSelectBiome();
     try {
@@ -918,6 +930,10 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       liveSelectBiome().start();
       await drainLoopback();
     });
+    expect(
+      getCoopBiomeTransitionCommitReceipt({ sourceWave: 11, interactivePinned: counterBefore })?.payload,
+      "the host retained the exact deterministic boundary terminal",
+    ).toMatchObject({ biomeId: destination, nodeIndex: -1, nextWave: 12 });
     await withClient(rig.guestCtx, async () => {
       setErPendingNodes([{ biome: destination, revealed: true }]);
       setCoopBiomeInteractionStart(counterBefore);
@@ -1024,6 +1040,10 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         liveSelectBiome().start();
         await drainLoopback();
       });
+      expect(
+        getCoopBiomeTransitionCommitReceipt({ sourceWave: 13 })?.payload,
+        "the host retained the natural single-node terminal before renderer projection",
+      ).toMatchObject({ biomeId: hostBiome, nodeIndex: -1, nextWave: 14 });
       await withClient(rig.guestCtx, async () => {
         // NOT chained (no setCoopBiomeInteractionStart): the natural single-node deterministic terminal.
         liveSelectBiome().start();
