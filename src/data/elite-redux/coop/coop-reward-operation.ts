@@ -5,57 +5,19 @@
  */
 
 // =============================================================================
-// Co-op REWARD-SHOP + biome-MARKET operation surface (Wave-2d authoritative run-state
-// migration; see docs/plans/2026-07-10-coop-authoritative-run-state-migration.md, §2.5
-// item 3 + §5.1). SURFACE 3 - the highest-traffic interaction (where #861 lived).
+// P33 authoritative REWARD-SHOP + biome-MARKET transaction surface.
 //
-// This migrates the owner-alternated REWARD shop (SelectModifierPhase, #1 reward/shop/
-// skip/reroll/check/transfer/lock) AND its sibling biome MARKET (BiomeShopPhase +
-// Exotic/BlackMarket/ImportBazaar subclasses, #5) onto the authoritative operation model
-// (coop-operation-runtime.ts). It is the Wave-2a biome adapter (coop-biome-operation.ts)
-// cloned structurally, with the design deltas the multi-action nature of a shop forces.
+// Every click is first retained as a typed, addressed intent. The host validates and executes that
+// intent exactly once, captures the complete post-action battle state, and journals one immutable
+// result envelope. A guest applies that state atomically before the existing phase loop receives a
+// tagged action for presentation/continuation. Retries reassert the same state tick and operation id;
+// they never rerun the purchase or reward mutation.
 //
-// WHAT IT DOES (control plane only - the DATA plane is untouched, §1.2):
-//   - OWNER: every relayed reward/market action mints a TYPED intent (invariant 2) and, on
-//     the AUTHORITY (coop host), COMMITS it EXACTLY ONCE through CoopOperationHost
-//     (invariant 3), advancing a surface-local revision (§1.5).
-//   - WATCHER: gates its adoption of each relayed action through CoopOperationGuest -
-//     idempotent by operationId (invariant 5), and REJECTS a stale/late choice (invariant 6,
-//     the #861 shape) via the interaction-start watermarks below.
-//
-// DESIGN DELTAS vs Wave-2a (multi-action stream; recorded in §8.2 for later surfaces):
-//   - MULTI-ACTION STREAM. Biome travel relays ONE pick per pinned interaction; a shop relays
-//     a STREAM (buy, buy, lock, reroll, ... leave) on the SAME pinned counter. So each action is
-//     ONE operation, and the operationId cannot be the raw pin alone (that would dedupe every
-//     action after the first). We suffix the pin with a per-interaction monotonic ACTION ORDINAL
-//     (`pin * ACTION_STRIDE + ordinal`) so each action is a distinct op, tracked SEPARATELY for
-//     the owner (commit) and the watcher (adopt) so they never contaminate in the single-process
-//     duo harness (§8.2 pitfall).
-//   - TWO WATERMARKS for stale/late rejection (the biome adapter's single `lastAppliedPinned`
-//     generalized for a stream). `lastAdoptedStart` rejects a pick from a STRICTLY EARLIER
-//     interaction (`pin < lastAdoptedStart`, the #861 cross-interaction leftover). `lastLeftStart`
-//     rejects a pick for an interaction the watcher already LEFT (`pin <= lastLeftStart`, the
-//     late-choice-after-leave shape). Within a live interaction (`pin > both`) every action passes.
-//   - CONTINUATION IDENTITY (#866). A move-learn continuation copy (BiomeShopPhase.copy / the base
-//     SelectModifierPhase copy) inherits the pinned interaction counter, so its actions continue the
-//     SAME operationId space + the SAME watermark tier - the operation identity survives the copy
-//     rather than orphaning on a raw counter pin (which was exactly the #866 unpinned-orphan class).
-//
-// SUB-PICKER MODEL (party target / TM / ability / fusion): a nested sub-pick is folded into the
-// single terminal action's payload `data` (a multi-step op payload, §8.2), NOT a separate
-// sub-operation - the reward shop already collapses the party-target menu into the ONE relay this
-// operation carries (coopFlushPending([slot, option])). Separate sub-SURFACES that fire their own
-// relay channels (the ability-capsule phase #4, learn-move-forward #11) are migrated in later waves.
-//
-// DUAL-RUN (§1.8, §5.1): rides ALONGSIDE the legacy reward/biomeShop relay + the interaction counter,
-// which the phases keep firing unchanged (removing them is FORBIDDEN until every surface is migrated).
-// This layer is ADDITIVE control-plane bookkeeping + a watcher adoption GATE. When the flag is OFF the
-// surface behaves EXACTLY as before (pure legacy pass-through).
-//
-// FLAG (§5.4): `isCoopRewardOperationEnabled()`. Default ON, version-gated by the existing
-// COOP_PROTOCOL_VERSION (er-coop-13; NO new wire arms this wave - the control fields ride the existing
-// relay carrier, the Wave-2a "carrier" delta). `COOP_REWARD_OP=off` forces legacy for CI/soak/rollback.
-// State is per-session and reset on session boundaries (assembleCoopRuntime / clearCoopRuntime).
+// A shop is a multi-action stream (buy, lock, reroll, ... leave), so operation identity combines the
+// pinned interaction with a monotonic action ordinal. Separate role-scoped cursors preserve the same
+// behavior in real peers and in the two-engine single-process harness. Raw relay messages remain only
+// as compatibility/presentation carriers; once the journal leads a stream, an untagged raw echo cannot
+// author state or advance its ordinal.
 // =============================================================================
 
 import { COOP_CAP_OP_REWARD, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";

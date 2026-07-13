@@ -48,6 +48,7 @@ import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-r
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { BattleType } from "#enums/battle-type";
 import { FormChangeItem } from "#enums/form-change-item";
+import { LearnMoveType } from "#enums/learn-move-type";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import type { ModifierTier } from "#enums/modifier-tier";
 import { SpeciesId } from "#enums/species-id";
@@ -64,6 +65,8 @@ import {
 import type { CustomModifierSettings, ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
 import {
   ErAbilityCapsuleModifierType,
+  ErGreaterAbilityCapsuleModifierType,
+  ErGreaterAbilityRandomizerModifierType,
   ErLearnersShroomModifierType,
   ErTmCaseModifierType,
   FusePokemonModifierType,
@@ -103,6 +106,9 @@ const COOP_ACT_LOCK = 3;
  *  0x4d4f ('MO'); only stripped when it sits at data[len-2], and every producer appends exactly
  *  the [TAG, money] pair, so it cannot collide with a legitimate trailing positional value. */
 const COOP_MONEY_TAG = 0x4d4f;
+
+/** Trailing marker for the host-validated price used by a paid continuation picker. */
+const COOP_COST_TAG = 0x434f;
 
 /** Co-op (#633): decode a relayed CHECK-team op code to a greppable name for the watcher-apply
  *  diagnostic log in {@linkcode SelectModifierPhase.applyRelayedCheckOp}. Logging-only / pure. */
@@ -209,6 +215,8 @@ export class SelectModifierPhase extends BattlePhase {
   /** Watcher-side: the owner's relayed party-target slot + sub-option for the pick being replayed. */
   private coopRelayedSlot = -1;
   private coopRelayedOption = 0;
+  /** Most recently resolved nested option; subclasses use it in their own typed market payload. */
+  protected coopResolvedModifierOption = 0;
   /** Watcher-side (#698): the host's authoritative money AFTER this relayed spend, streamed on the
    *  relay message. -1 = none streamed (older host / non-spend action) -> the watcher keeps its own
    *  deduction (current behavior, no regression). Reset to -1 after each apply so it cannot bleed. */
@@ -220,6 +228,8 @@ export class SelectModifierPhase extends BattlePhase {
   private coopPendingAuthorityOperationId: string | null = null;
   /** Prevents duplicate durable-result wait loops when a retained intent is re-clicked/replayed. */
   private readonly coopAwaitingAuthorityResults = new Set<string>();
+  /** Live owner callback reused after a retained paid result temporarily parks the interactive shop. */
+  private coopModifierSelectCallback: ModifierSelectCallback | null = null;
   /** The interaction-turn counter observed when THIS shop opened (#633). Makes the
    *  alternation advance idempotent: the advance only fires while the counter is still
    *  at this value, so the owner's terminal + the watcher's terminal + a reconcile
@@ -372,6 +382,7 @@ export class SelectModifierPhase extends BattlePhase {
         }
       }
     };
+    this.coopModifierSelectCallback = modifierSelectCallback;
 
     // Co-op (#633): only the player whose alternating turn it is drives the reward
     // screen; the partner watches and mirrors the relayed picks. Solo / non-coop falls
@@ -721,6 +732,86 @@ export class SelectModifierPhase extends BattlePhase {
     return false;
   }
 
+  /** Whether applying this item deliberately leaves a back-out-safe copy of the current shop. */
+  protected modifierQueuesContinuation(modifierType: ModifierType): boolean {
+    return (
+      modifierType instanceof RememberMoveModifierType
+      || modifierType instanceof TmModifierType
+      || modifierType instanceof ErLearnersShroomModifierType
+      || modifierType instanceof ErTmCaseModifierType
+      || modifierType instanceof ErAbilityCapsuleModifierType
+      || modifierType instanceof ErGreaterAbilityCapsuleModifierType
+      || modifierType instanceof ErGreaterAbilityRandomizerModifierType
+    );
+  }
+
+  /**
+   * Renderer-only counterpart of the modifier's queued phase effect. The complete host result has already
+   * installed every gameplay mutation before this runs, so the guest must never call addModifier/apply a
+   * second time. It recreates only the follow-up surface that the authoritative modifier queued.
+   *
+   * @returns true when the projected follow-up owns a back-out-safe shop continuation.
+   */
+  protected queueCoopProjectedModifierFollowUp(
+    modifierType: ModifierType,
+    slotIndex: number,
+    option: number,
+    cost: number,
+  ): boolean {
+    const target = globalScene.getPlayerParty()[slotIndex];
+    if (target == null) {
+      return false;
+    }
+
+    let queued = true;
+    if (modifierType instanceof TmModifierType) {
+      globalScene.phaseManager.unshiftNew("LearnMovePhase", slotIndex, modifierType.moveId, LearnMoveType.TM);
+    } else if (modifierType instanceof RememberMoveModifierType) {
+      const moveId = target.getLearnableLevelMoves()[option];
+      if (moveId == null) {
+        return false;
+      }
+      globalScene.phaseManager.unshiftNew("LearnMovePhase", slotIndex, moveId, LearnMoveType.MEMORY, cost);
+    } else if (modifierType instanceof ErLearnersShroomModifierType) {
+      const moveId = target.getErLearnableShroomMoves()[option];
+      if (moveId == null) {
+        return false;
+      }
+      globalScene.phaseManager.unshiftNew("LearnMovePhase", slotIndex, moveId, LearnMoveType.MEMORY, cost);
+    } else if (modifierType instanceof ErTmCaseModifierType) {
+      const moveId = target.getErTmCaseMoves()[option];
+      if (moveId == null) {
+        return false;
+      }
+      globalScene.phaseManager.unshiftNew("LearnMovePhase", slotIndex, moveId, LearnMoveType.TM);
+    } else if (modifierType instanceof PokemonAddMoveSlotModifierType) {
+      const moveId = target.getLearnableLevelMoves()[option];
+      if (moveId == null) {
+        return false;
+      }
+      // The host result already contains the raised move cap. This is only the deterministic learn UI tail;
+      // unlike the interactive items below it does not keep a back-out continuation copy.
+      globalScene.phaseManager.unshiftNew("LearnMovePhase", slotIndex, moveId, LearnMoveType.MEMORY);
+    } else if (modifierType instanceof ErAbilityCapsuleModifierType) {
+      const { seq, watcher } = this.coopAbilityContext();
+      globalScene.phaseManager.unshiftNew("ErAbilityCapsulePhase", slotIndex, seq, watcher);
+    } else if (modifierType instanceof ErGreaterAbilityCapsuleModifierType) {
+      const { seq, watcher } = this.coopAbilityContext();
+      globalScene.phaseManager.unshiftNew("ErGreaterAbilityCapsulePhase", slotIndex, seq, watcher);
+    } else if (modifierType instanceof ErGreaterAbilityRandomizerModifierType) {
+      const { seq, watcher } = this.coopAbilityContext();
+      globalScene.phaseManager.unshiftNew("ErGreaterAbilityRandomizerPhase", slotIndex, seq, watcher);
+    } else {
+      queued = false;
+    }
+
+    const continuation = queued && this.modifierQueuesContinuation(modifierType);
+    if (continuation) {
+      globalScene.phaseManager.unshiftPhase(this.copy());
+    }
+    return continuation;
+  }
+
   /**
    * Apply the effects of the chosen modifier
    * @param modifier - The modifier to apply
@@ -761,12 +852,7 @@ export class SelectModifierPhase extends BattlePhase {
     // (the option-select + run-unlock innate sub-picker), which runs BEFORE this copy and
     // removes it (tryRemovePhase) only once a choice is committed - so backing out of the
     // capsule's choice / sub-picker re-offers the capsule, identical to #25.
-    const queuesContinuation =
-      modifier.type instanceof RememberMoveModifierType
-      || modifier.type instanceof TmModifierType
-      || modifier.type instanceof ErLearnersShroomModifierType
-      || modifier.type instanceof ErTmCaseModifierType
-      || modifier.type instanceof ErAbilityCapsuleModifierType;
+    const queuesContinuation = this.modifierQueuesContinuation(modifier.type);
     if (queuesContinuation) {
       globalScene.phaseManager.unshiftPhase(this.copy());
     }
@@ -851,6 +937,7 @@ export class SelectModifierPhase extends BattlePhase {
           && fromSlotIndex !== spliceSlotIndex
         ) {
           globalScene.ui.setMode(this.getModifierSelectMode(), this.isPlayer()).then(() => {
+            this.coopResolvedModifierOption = spliceSlotIndex;
             // Co-op (#633): relay the resolved fusion pair so the watcher mirrors it.
             if (this.coopFlushPending([fromSlotIndex, spliceSlotIndex], cost)) {
               return;
@@ -905,6 +992,7 @@ export class SelectModifierPhase extends BattlePhase {
     // Co-op (#633) WATCHER: apply the owner's relayed target slot + sub-option directly,
     // never opening the party UI on a mon it does not drive.
     if (this.coopWatcher) {
+      this.coopResolvedModifierOption = this.coopRelayedOption;
       const modifier = this.buildPokemonModifier(modifierType, this.coopRelayedSlot, this.coopRelayedOption);
       if (modifier != null) {
         this.applyModifier(modifier, cost, true);
@@ -918,6 +1006,7 @@ export class SelectModifierPhase extends BattlePhase {
       (slotIndex: number, option: PartyOption) => {
         if (slotIndex < 6) {
           globalScene.ui.setMode(this.getModifierSelectMode(), this.isPlayer()).then(() => {
+            this.coopResolvedModifierOption = option;
             // Co-op (#633): relay the resolved target slot + sub-option to the watcher.
             if (this.coopFlushPending([slotIndex, option], cost)) {
               return;
@@ -1126,13 +1215,21 @@ export class SelectModifierPhase extends BattlePhase {
 
   /** Build the modifier for a resolved party-target pick (shared by the owner's menu
    *  callback and the watcher's direct replay) - mirrors the openModifierMenu dispatch. */
-  private buildPokemonModifier(modifierType: PokemonModifierType, slotIndex: number, option: number): Modifier | null {
+  protected buildPokemonModifier(
+    modifierType: PokemonModifierType,
+    slotIndex: number,
+    option: number,
+  ): Modifier | null {
     const target = globalScene.getPlayerParty()[slotIndex];
     if (target == null) {
       return null;
     }
     if (modifierType instanceof PokemonMoveModifierType) {
       return modifierType.newModifier(target, option - PartyOption.MOVE_1);
+    }
+    if (modifierType instanceof FusePokemonModifierType) {
+      const partner = globalScene.getPlayerParty()[option];
+      return partner == null ? null : modifierType.newModifier(target, partner);
     }
     if (modifierType instanceof PokemonAbilityModifierType) {
       return modifierType.newModifier(target, option - PartyOption.ABILITY_SLOT_0);
@@ -1559,7 +1656,9 @@ export class SelectModifierPhase extends BattlePhase {
       return false;
     }
     const data =
-      this.coopPendingKind === "shop" ? [COOP_ACT_SHOP, this.coopPendingRow, ...extra] : [COOP_ACT_REWARD, ...extra];
+      this.coopPendingKind === "shop"
+        ? [COOP_ACT_SHOP, this.coopPendingRow, ...extra, COOP_COST_TAG, Math.trunc(cost)]
+        : [COOP_ACT_REWARD, ...extra];
     // Stream post-spend money only for an actual paid pick (cost > 0). Free rewards (cost -1/0)
     // and WAIVE_ROLL_FEE_OVERRIDE deduct nothing, so leave coopOwnerPostMoney at -1 -> no tag ->
     // the watcher keeps its own (also-nothing) deduction.
@@ -1730,15 +1829,17 @@ export class SelectModifierPhase extends BattlePhase {
     }
     const projectionOnly = decision?.authoritativeProjection === true;
     const noop: ModifierSelectCallback = () => false;
-    // Co-op (#698): peel the trailing [COOP_MONEY_TAG, hostMoney] pair (if the owner appended it)
-    // off the data BEFORE the positional decode below, so the existing slot/opt indices are read
-    // exactly as today. An older host that does not append it leaves coopRelayedMoney at -1, so the
-    // watcher falls back to its own deduction (current behavior, no regression). Consumed by
-    // rerollModifiers / applyModifier set-verbatim; reset to -1 at every return so it can't bleed.
+    // Peel the tagged post-money and validated price before positional decoding. The retained payload keeps
+    // both so a renderer can recreate a paid continuation without recalculating a potentially divergent cost.
     let relayedMoney = -1;
+    let relayedCost = -1;
     let data = action.data ?? [];
     if (data.length >= 2 && data.at(-2) === COOP_MONEY_TAG) {
       relayedMoney = data.at(-1) ?? -1;
+      data = data.slice(0, -2);
+    }
+    if (data.length >= 2 && data.at(-2) === COOP_COST_TAG) {
+      relayedCost = data.at(-1) ?? -1;
       data = data.slice(0, -2);
     }
     this.coopRelayedMoney = relayedMoney;
@@ -1837,10 +1938,21 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopRelayedSlot = data[1] ?? -1;
       this.coopRelayedOption = data[2] ?? 0;
       if (projectionOnly) {
+        const modifierType = this.typeOptions[action.choice]?.type;
+        const continuation =
+          modifierType != null
+          && this.queueCoopProjectedModifierFollowUp(
+            modifierType,
+            this.coopRelayedSlot,
+            this.coopRelayedOption,
+            -1,
+          );
         this.coopRelayedMoney = -1;
         this.coopEndMirror();
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
-        this.coopAdvanceInteraction();
+        if (!continuation) {
+          this.coopAdvanceInteraction();
+        }
         return true;
       }
       // coopRelayedMoney (set above) drives applyModifier's set-verbatim for a PAID reward (#698);
@@ -1853,7 +1965,30 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopRelayedSlot = data[2] ?? -1;
       this.coopRelayedOption = data[3] ?? 0;
       if (projectionOnly) {
+        const shopOptions = getPlayerShopModifierTypeOptionsForWave(
+          globalScene.currentBattle.waveIndex,
+          globalScene.getWaveMoneyAmount(1),
+        );
+        const row = data[1] ?? -1;
+        const shopOption =
+          shopOptions[
+            row > 2 || shopOptions.length <= SHOP_OPTIONS_ROW_LIMIT
+              ? action.choice
+              : action.choice + SHOP_OPTIONS_ROW_LIMIT
+          ];
+        if (shopOption?.type != null) {
+          this.queueCoopProjectedModifierFollowUp(
+            shopOption.type,
+            this.coopRelayedSlot,
+            this.coopRelayedOption,
+            relayedCost,
+          );
+        }
         this.coopRelayedMoney = -1;
+        if (!this.coopWatcher) {
+          this.resetModifierSelect(this.coopModifierSelectCallback ?? noop);
+          this.coopBeginMirror("owner");
+        }
         return false;
       }
       // coopRelayedMoney (set above) drives applyModifier's set-verbatim for the buy (#698).

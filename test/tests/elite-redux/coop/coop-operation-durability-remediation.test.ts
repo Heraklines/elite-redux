@@ -49,13 +49,21 @@ import {
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
+  commitRewardAuthoritativeResult,
   commitRewardOwnerIntent,
   resetCoopRewardOperationFlag,
   resetCoopRewardOperationState,
+  setCoopRewardAuthorityStateHooksForTest,
   setCoopRewardOperationEnabled,
 } from "#data/elite-redux/coop/coop-reward-operation";
 import { COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
-import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopConnectionState,
+  CoopMessage,
+  CoopRole,
+  CoopTransport,
+} from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BiomeId } from "#enums/biome-id";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -116,6 +124,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
 
   afterEach(() => {
     setCoopOperationDurability(null);
+    setCoopRewardAuthorityStateHooksForTest(null);
     registerCoopOperationLiveSink("op:biome", null);
     registerCoopOperationLiveSink("op:reward", null);
     resetCoopOperationJournalLog();
@@ -401,10 +410,33 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     const hostMgr = new CoopDurabilityManager(hostGate);
     const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
     setCoopOperationDurability(hostMgr);
+    setCoopRewardAuthorityStateHooksForTest({
+      capture: () => null,
+      apply: () => true,
+      reapply: () => true,
+    });
 
     const pinned = 4; // even -> host seat (host-owned reward stream)
+    const authoritativeState = (tick: number): CoopAuthoritativeBattleStateV1 => ({
+      version: 1,
+      tick,
+      wave: 11,
+      turn: 0,
+      playerParty: [{ id: 1 }],
+      enemyParty: [],
+      field: [],
+      weather: 0,
+      weatherTurnsLeft: 0,
+      terrain: 0,
+      terrainTurnsLeft: 0,
+      arenaTags: [],
+      money: 1_000 - tick,
+      pokeballCounts: [],
+      playerModifiers: [{ typeId: `reward-${tick}` }],
+      enemyModifiers: [],
+    });
     function commitAction(label: string, choice: number, terminal: boolean): void {
-      commitRewardOwnerIntent({
+      const prepared = commitRewardOwnerIntent({
         surface: "reward",
         pinned,
         label,
@@ -414,6 +446,21 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
         localRole: "host",
         wave: 11,
       } satisfies Parameters<typeof commitRewardOwnerIntent>[0]);
+      expect(prepared, "the typed intent must be retained before host execution").not.toBeNull();
+      if (choice === 0) {
+        expect(
+          commitRewardAuthoritativeResult(prepared!.operationId, {
+            ...authoritativeState(1),
+            tick: 0,
+            playerParty: [],
+          }),
+          "an empty control placeholder must never be journaled as a completed reward",
+        ).toBeNull();
+      }
+      expect(
+        commitRewardAuthoritativeResult(prepared!.operationId, authoritativeState(choice + 1)),
+        "only the complete post-action result may enter the durability journal",
+      ).not.toBeNull();
     }
 
     commitAction("reward", 0, false); // ordinal 0 -> revision 1
