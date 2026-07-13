@@ -61,6 +61,7 @@ try {
           apiOrigin: preview.manifest.apiOrigin,
           signalOrigin: preview.manifest.signalOrigin,
           entryContract: preview.manifest.entryContract,
+          assetSha: preview.manifest.assetSha,
         }
       : null,
     error: failure

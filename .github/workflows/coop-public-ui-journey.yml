@@ -89,6 +89,16 @@ jobs:
 
       - uses: ./.github/actions/setup-deps
 
+      - name: Resolve exact production asset SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          SHA="$(gh api repos/Heraklines/er-assets/commits/main --jq .sha)"
+          echo "$SHA" | grep -Eq '^[0-9a-f]{40}$' || { echo "Invalid er-assets SHA: $SHA"; exit 1; }
+          echo "COOP_BROWSER_ASSET_SHA=$SHA" >> "$GITHUB_ENV"
+          echo "Sealing er-assets pin $SHA into the public-UI bundle"
+
       - name: Run owned-file type and format gate externally
         shell: bash
         run: |

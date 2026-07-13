@@ -63,7 +63,7 @@ if (!run?.includes("startSealedPreview(config)")) {
 }
 if (
   !preview?.includes('"--verify"')
-  || !preview.includes('"deploy", "cloudflare", "_redirects"')
+  || !preview.includes('config.browserDist, "_redirects"')
   || !preview.includes("Location: redirected")
   || /safeStaticFile\([^,]+,\s*["']src/gu.test(preview)
 ) {

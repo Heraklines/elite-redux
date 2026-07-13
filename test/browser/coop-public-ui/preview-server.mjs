@@ -72,7 +72,7 @@ function verifyArtifact(config) {
 }
 
 function productionAssetRedirects(config) {
-  const redirectsPath = resolve(config.root, "deploy", "cloudflare", "_redirects");
+  const redirectsPath = resolve(config.browserDist, "_redirects");
   const redirects = [];
   for (const rawLine of readFileSync(redirectsPath, "utf8").split(/\r?\n/gu)) {
     const line = rawLine.trim();
