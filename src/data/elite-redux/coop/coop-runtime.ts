@@ -121,19 +121,22 @@ import {
 import { COOP_DISCONNECT_GRACE_MS } from "#data/elite-redux/coop/coop-lifecycle";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import {
-  armCoopMeJournalTerminal,
+  CoopMeTerminalTransactionReceiver,
   commitMeOwnerIntent,
+  isCompleteCoopMeTerminalPayload,
   isCoopMeOperationEnabled,
   resetCoopMeOperationState,
   setCoopMeOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-me-operation";
 import {
   canRestoreCoopActiveMysteryControl,
+  canMaterializeCoopMeCommittedTerminal,
   captureCoopActiveMysteryControl,
   captureCoopMeControlTransactionState,
   coopMeHandoffBattleStarted,
   coopMeHandoffBattleWaveValue,
   coopMeInteractionStartValue,
+  materializeCoopMeCommittedTerminal,
   rebindCoopActiveMysteryControl,
   resetCoopActiveMysteryControl,
   restoreCoopActiveMysteryControl,
@@ -3056,10 +3059,10 @@ function materializeCoopColosseumActionFromOp(runtime: CoopRuntime, envelope: Co
   return false;
 }
 
-/** ME terminal DATA stage retained across an exact redelivery when the later control wake fails. */
-const materializedMeTerminalOutcomes = new Map<string, string>();
+/** Per-session two-stage terminal receiver: retain DATA success until the exact destination executes. */
+const coopMeTerminalTransactions = new CoopMeTerminalTransactionReceiver();
 
-/** Feed journal-delivered ME presentation/terminal operations into the receiver's existing safe waiters. */
+/** Materialize journal ME presentation and complete terminal transactions on the authoritative guest. */
 function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
   if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
     return false;
@@ -3130,64 +3133,75 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
   }
   const pinned = seq - COOP_ME_TERM_SEQ_BASE;
   const payload = op.payload as CoopMeTerminalPayload;
+  const step = parsed.pinnedSeq % 1000;
   if (
     op.owner !== 0
     || kindTag !== 4
     || !Number.isSafeInteger(pinned)
     || pinned < 0
     || pinned >= 100_000
-    || (payload?.terminal !== "leave" && payload?.terminal !== "battle")
-    || (payload.hostTurn !== undefined && !Number.isFinite(payload.hostTurn))
-    || (payload.terminal === "leave" && payload.outcome?.k !== "meResync")
-    || (payload.terminal === "battle" && payload.outcome != null)
+    || !isCompleteCoopMeTerminalPayload(payload)
+    || payload.outcome.authoritativeState?.wave !== envelope.wave
+    || (payload.destination.kind === "continue" && payload.destination.nextWave !== envelope.wave + 1)
+    || (payload.terminal === "battle" && step !== 0)
+    || (payload.terminal === "leave" && step > 1)
+    || coopMeInteractionStartValue() !== pinned
   ) {
     return false;
   }
-  // A leave terminal is a complete retained transaction: apply the exact authoritative Mystery DATA
-  // first. A false result withholds live materialization and the durability ACK, so no 9M waiter can
-  // advance from a terminal whose party/save/RNG/dex image did not converge.
-  if (payload.terminal === "leave") {
-    const payloadIdentity = fnv1a64(canonicalize(payload.outcome));
-    const priorIdentity = materializedMeTerminalOutcomes.get(op.id);
-    if (priorIdentity != null && priorIdentity !== payloadIdentity) {
-      return false;
-    }
-    if (priorIdentity == null) {
-      if (!applyCoopMeOutcome(payload.outcome!)) {
-        coopWarn("me", `journaled Mystery outcome failed before terminal wake id=${op.id}`);
+  const transaction = { operationId: op.id, pinned, step, payload };
+  // Besides making a late replay phase retriable, this fences the two-engine harness's shared module
+  // graph: an envelope delivered while the other client's scene is installed must not apply to it.
+  if (!canMaterializeCoopMeCommittedTerminal(transaction)) {
+    return false;
+  }
+  const receive = coopMeTerminalTransactions.receive(
+    transaction,
+    {
+      applyMaterial: () => {
+        if (applyCoopMeOutcome(payload.outcome)) {
+          return true;
+        }
+        coopWarn("me", `journaled Mystery transaction DATA apply failed id=${op.id}`);
         if (consumeCoopMeOutcomeRollbackFatal()) {
           failCoopSharedSession(`Mystery outcome rollback failed for ${op.id}`);
         }
         return false;
-      }
-      materializedMeTerminalOutcomes.set(op.id, payloadIdentity);
-    }
-  }
-  // Journal delivery is itself the authenticated host statement. Persist + arm it BEFORE waking the
-  // live 9M waiter (delivery may resolve synchronously), so the phase observes a coherent terminal and
-  // a subsequent snapshot never regresses to `pending`.
-  setCoopMeTerminalControl(payload.terminal, payload.hostTurn, {
-    operationId: op.id,
-    step: parsed.pinnedSeq % 1000,
-    choice: payload.terminal === "battle" ? COOP_ME_BATTLE_HANDOFF : COOP_INTERACTION_LEAVE,
-  });
-  const retainedControl = captureCoopActiveMysteryControl();
-  if (
-    retainedControl?.terminalOperationId !== op.id
-    || retainedControl.terminal !== payload.terminal
-    || retainedControl.terminalStep !== parsed.pinnedSeq % 1000
-  ) {
+      },
+      executeDestination: () => {
+        const hostTurn = payload.destination.kind === "battle" ? payload.destination.hostTurn : undefined;
+        setCoopMeTerminalControl(payload.terminal, hostTurn, {
+          operationId: op.id,
+          step,
+          choice: payload.terminal === "battle" ? COOP_ME_BATTLE_HANDOFF : COOP_INTERACTION_LEAVE,
+        });
+        const retainedControl = captureCoopActiveMysteryControl();
+        if (
+          retainedControl?.terminalOperationId !== op.id
+          || retainedControl.terminal !== payload.terminal
+          || retainedControl.terminalStep !== step
+        ) {
+          return false;
+        }
+        return materializeCoopMeCommittedTerminal({ operationId: op.id, pinned, step, payload });
+      },
+    },
+  );
+  if (receive !== "executed" && receive !== "duplicate") {
     return false;
   }
-  armCoopMeJournalTerminal(op.id, pinned);
-  runtime.interactionRelay.materializeCommittedInteractionChoice(
-    seq,
-    "meBtn",
-    payload.terminal === "battle" ? COOP_ME_BATTLE_HANDOFF : COOP_INTERACTION_LEAVE,
-    payload.hostTurn === undefined ? undefined : [payload.hostTurn],
-    op.id,
-  );
-  materializedMeTerminalOutcomes.delete(op.id);
+  // Compatibility waiters (notably the detached Colosseum lease) may still be blocked on 9M. Wake them
+  // only AFTER a leave transaction cleared its pin; their boundary fence then exits without mutating.
+  // Battle control is never mirrored here because the live replay would otherwise execute it twice.
+  if (payload.terminal === "leave") {
+    runtime.interactionRelay.materializeCommittedInteractionChoice(
+      seq,
+      "meBtn",
+      COOP_INTERACTION_LEAVE,
+      undefined,
+      op.id,
+    );
+  }
   return true;
 }
 
@@ -3360,6 +3374,11 @@ export function coopHostStreamMeBattleParty(): void {
   if (!coopMeHandoffActive() || active!.controller.role !== "host") {
     return;
   }
+  if (isCoopMeOperationEnabled() && isCoopOperationJournalActive()) {
+    // P33 binds this party into the complete ME_TERMINAL outcome. Leaving a second unconsumed party
+    // carrier buffered would be both redundant and a future stale-fallback hazard.
+    return;
+  }
   try {
     const key = meBattleHandoffKey(globalScene.currentBattle.waveIndex, coopMeBattleInteractionCounter);
     const enemies = captureCoopEnemies();
@@ -3443,11 +3462,18 @@ export function coopHostStreamMeMessage(text: string): void {
  * watcher / not in an ME pump session. Solo / lockstep keep their own pump behavior untouched
  * (this is only invoked on the authoritative handoff path). Best-effort + guarded.
  */
-export function coopMeOwnerRelayBattleHandoff(): boolean {
+export async function coopMeOwnerRelayBattleHandoff(options?: {
+  readonly encounterMode?: number;
+  readonly disableSwitch?: boolean;
+}): Promise<boolean> {
   if (active == null) {
-    return !globalScene.gameMode?.isCoop;
+    // Format/unit probes may flip the GameMode to co-op without assembling a network session. No pinned
+    // ME means there is no peer boundary to commit; preserve ordinary battle setup. A pinned live ME with
+    // no runtime remains fail-closed.
+    return coopMeInteractionStartValue() < 0;
   }
-  const pump = active.mePump;
+  const runtime = active;
+  const pump = runtime.mePump;
   // Only an active pump session relays the sentinel. Co-op is authoritative-only (#633 M6): the
   // pump is always OWNER-side (the host); the retired watcher never held a session.
   if (!pump.isSessionActive()) {
@@ -3456,28 +3482,67 @@ export function coopMeOwnerRelayBattleHandoff(): boolean {
   }
   try {
     coopLog("me", "owner-relay battle-handoff sentinel (end pump, run spawned battle)");
-    const hostTurn = globalScene.currentBattle?.turn;
-    // Commit first. When durability is live, the journal materializer is the only waiter wake-up;
-    // a raw 9M frame is not allowed to outrun the committed envelope during a channel replacement.
-    // Wave-2c: commit the typed ME_TERMINAL {battle} op. The host STATES that this ME resolved
-    // as a battle spawn BEFORE the guest builds its ME-battle phases, so the guest routes off the operation
-    // (finishWithoutLeaving) rather than inferring a battle turn from a leftover chain (#859/#860). Step 0
-    // (the TRUE post-battle leave later uses step 1). No-op when the flag is OFF; the 9M sentinel is the
-    // dual-run fallback. Host-authoritative handoff path only.
-    const operationId = commitMeOwnerIntent({
-      kind: "ME_TERMINAL",
-      seq: COOP_ME_TERM_SEQ_BASE + coopMeInteractionStartValue(),
-      pinned: coopMeInteractionStartValue(),
-      step: 0,
-      payload: hostTurn === undefined ? { terminal: "battle" } : { terminal: "battle", hostTurn },
-      localRole: active.controller.role,
-      wave: globalScene.currentBattle?.waveIndex ?? -1,
-      turn: 0,
-    });
+    const scene = globalScene;
+    const controller = runtime.controller;
+    const generation = coopSessionGeneration();
+    const pinned = coopMeInteractionStartValue();
+    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const hostTurn = globalScene.currentBattle?.turn ?? -1;
+    const encounterMode = options?.encounterMode ?? globalScene.currentBattle?.mysteryEncounter?.encounterMode;
+    const disableSwitch = options?.disableSwitch ?? false;
+    if (
+      controller.role !== "host"
+      || pinned < 0
+      || wave < 0
+      || !Number.isSafeInteger(hostTurn)
+      || hostTurn < 0
+      || typeof encounterMode !== "number"
+      || !Number.isSafeInteger(encounterMode)
+      || encounterMode < 0
+    ) {
+      failCoopSharedSession("Mystery battle handoff had no complete host boundary");
+      return false;
+    }
+    const payload = {
+      terminal: "battle",
+      outcome: captureCoopMeOutcome(),
+      destination: {
+        kind: "battle",
+        hostTurn,
+        encounterMode,
+        disableSwitch,
+      },
+    } satisfies CoopMeTerminalPayload;
+    const commit = (): string | null =>
+      commitMeOwnerIntent({
+        kind: "ME_TERMINAL",
+        seq: COOP_ME_TERM_SEQ_BASE + pinned,
+        pinned,
+        step: 0,
+        payload,
+        localRole: "host",
+        wave,
+        turn: hostTurn,
+      });
+    let operationId = commit();
     if (operationId == null && isCoopMeOperationEnabled()) {
-      coopWarn("me", "owner-relay battle-handoff refused: authoritative terminal did not commit");
-      active.durability?.reconnect();
-      failCoopSharedSession("Mystery battle handoff terminal could not commit");
+      coopWarn("me", "owner-relay battle-handoff retention failed; retrying exact transaction after reconnect");
+      runtime.durability?.reconnect();
+      await new Promise<void>(resolve => setTimeout(resolve, 250));
+      if (
+        globalScene !== scene
+        || active !== runtime
+        || getCoopController() !== controller
+        || coopSessionGeneration() !== generation
+        || coopMeInteractionStartValue() !== pinned
+        || (globalScene.currentBattle?.waveIndex ?? -1) !== wave
+      ) {
+        return false;
+      }
+      operationId = commit();
+    }
+    if (operationId == null && isCoopMeOperationEnabled()) {
+      failCoopSharedSession("Mystery battle handoff terminal could not commit after exact retry");
       return false;
     }
     if (operationId != null) {
@@ -3670,7 +3735,7 @@ export function assembleCoopRuntime(
   // collide with a prior run's already-applied ME operationIds.
   resetCoopMeOperationState();
   resetCoopActiveMysteryControl();
-  materializedMeTerminalOutcomes.clear();
+  coopMeTerminalTransactions.reset();
   // Wave-2f: same fresh-control-plane reset for the post-battle wave-advance operation state (THE KEYSTONE) -
   // a new run's wave index restarts, so drop any leftover host/guest applier + last-applied wave pin.
   resetCoopWaveAdvanceOperationState();
@@ -3950,7 +4015,7 @@ export function clearCoopRuntime(): void {
   resetCoopRewardOperationState();
   // Wave-2c: same teardown for the mystery-encounter operation surface.
   resetCoopMeOperationState();
-  materializedMeTerminalOutcomes.clear();
+  coopMeTerminalTransactions.reset();
   // Wave-2f: same teardown for the post-battle wave-advance operation surface (THE KEYSTONE).
   resetCoopWaveAdvanceOperationState();
   learnMoveForwardInFlight.clear();

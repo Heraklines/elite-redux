@@ -1,0 +1,204 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+import {
+  CoopMeTerminalTransactionReceiver,
+  isCompleteCoopMeTerminalPayload,
+} from "#data/elite-redux/coop/coop-me-operation";
+import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopInteractionOutcome,
+} from "#data/elite-redux/coop/coop-transport";
+import { describe, expect, it } from "vitest";
+
+type MeOutcome = Extract<CoopInteractionOutcome, { k: "meResync" }>;
+
+function authoritativeState(wave: number, enemies = 0): CoopAuthoritativeBattleStateV1 {
+  return {
+    version: 1,
+    tick: wave * 100,
+    wave,
+    turn: 3,
+    playerParty: [],
+    enemyParty:
+      enemies === 0
+        ? []
+        : ([{ id: 9001 }] as unknown as CoopAuthoritativeBattleStateV1["enemyParty"]),
+    field: [],
+    weather: 0,
+    weatherTurnsLeft: 0,
+    terrain: 0,
+    terrainTurnsLeft: 0,
+    arenaTags: [],
+    money: 500,
+    pokeballCounts: [],
+    playerModifiers: [],
+    enemyModifiers: [],
+  };
+}
+
+function outcome(wave: number, enemies = 0): MeOutcome {
+  return {
+    k: "meResync",
+    base: null,
+    party: [],
+    meSaveData: "[]",
+    seed: `seed-${wave}`,
+    waveSeed: `wave-${wave}`,
+    dex: "dex",
+    authoritativeState: authoritativeState(wave, enemies),
+  };
+}
+
+function leavePayload(wave: number, selectBiome = false): CoopMeTerminalPayload {
+  return {
+    terminal: "leave",
+    outcome: outcome(wave),
+    destination: { kind: "continue", nextWave: wave + 1, selectBiome },
+  };
+}
+
+function battlePayload(
+  wave: number,
+  options: { encounterMode?: number; disableSwitch?: boolean } = {},
+): CoopMeTerminalPayload {
+  return {
+    terminal: "battle",
+    outcome: outcome(wave, 1),
+    destination: {
+      kind: "battle",
+      hostTurn: 3,
+      encounterMode: options.encounterMode ?? 2,
+      disableSwitch: options.disableSwitch ?? false,
+    },
+  };
+}
+
+describe("complete retained Mystery terminal transaction", () => {
+  it("rejects every old split terminal shape and accepts complete leave/battle destinations", () => {
+    expect(isCompleteCoopMeTerminalPayload({ terminal: "leave" })).toBe(false);
+    expect(isCompleteCoopMeTerminalPayload({ terminal: "battle", hostTurn: 3 })).toBe(false);
+    expect(
+      isCompleteCoopMeTerminalPayload({
+        terminal: "battle",
+        outcome: outcome(12, 1),
+        destination: { kind: "continue", nextWave: 13, selectBiome: false },
+      }),
+    ).toBe(false);
+    expect(isCompleteCoopMeTerminalPayload(leavePayload(12, true))).toBe(true);
+    expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 3, disableSwitch: true }))).toBe(
+      true,
+    );
+  });
+
+  it("applies DATA once, withholds completion for a late destination receiver, then executes once after reconnect", () => {
+    const receiver = new CoopMeTerminalTransactionReceiver();
+    const receipt = { operationId: "1:0:ME_TERMINAL:1", pinned: 7, step: 0, payload: leavePayload(12) };
+    let materialApplies = 0;
+    let destinationAttempts = 0;
+    let destinationReady = false;
+    const hooks = {
+      applyMaterial: () => {
+        materialApplies++;
+        return true;
+      },
+      executeDestination: () => {
+        destinationAttempts++;
+        return destinationReady;
+      },
+    };
+
+    // A dropped frame is represented by no receive call: neither stage can move.
+    expect(materialApplies).toBe(0);
+    expect(destinationAttempts).toBe(0);
+    expect(receiver.receive(receipt, hooks), "late replay phase withholds ACK after the one DATA apply").toBe("retry");
+    expect(materialApplies).toBe(1);
+    expect(destinationAttempts).toBe(1);
+
+    destinationReady = true; // same receiver survives the channel reconnect
+    expect(receiver.receive(receipt, hooks), "exact redelivery executes only the pending control stage").toBe("executed");
+    expect(materialApplies).toBe(1);
+    expect(destinationAttempts).toBe(2);
+    expect(receiver.receive(receipt, hooks), "duplicate delivery is an exact no-op").toBe("duplicate");
+    expect(materialApplies).toBe(1);
+    expect(destinationAttempts).toBe(2);
+  });
+
+  it("rejects reordered post-battle leave, then admits battle step 0 and its exact step 1 leave", () => {
+    const receiver = new CoopMeTerminalTransactionReceiver();
+    const hooks = { applyMaterial: () => true, executeDestination: () => true };
+    const pinned = 11;
+
+    expect(
+      receiver.receive(
+        { operationId: "leave-early", pinned, step: 1, payload: leavePayload(20, true) },
+        hooks,
+      ),
+      "step 1 cannot overtake its battle handoff",
+    ).toBe("rejected");
+    expect(
+      receiver.receive(
+        {
+          operationId: "battle",
+          pinned,
+          step: 0,
+          payload: battlePayload(20, { encounterMode: 1, disableSwitch: true }),
+        },
+        hooks,
+      ),
+    ).toBe("executed");
+    expect(
+      receiver.receive({ operationId: "leave", pinned, step: 1, payload: leavePayload(20, true) }, hooks),
+    ).toBe("executed");
+  });
+
+  it("rejects same-id payload conflicts and a second terminal for the same pinned stage", () => {
+    const receiver = new CoopMeTerminalTransactionReceiver();
+    let ready = false;
+    const hooks = { applyMaterial: () => true, executeDestination: () => ready };
+    const first = { operationId: "terminal", pinned: 13, step: 0, payload: leavePayload(30) };
+    expect(receiver.receive(first, hooks)).toBe("retry");
+    expect(receiver.receive({ ...first, payload: leavePayload(30, true) }, hooks)).toBe("rejected");
+    expect(
+      receiver.receive({ operationId: "other", pinned: 13, step: 0, payload: leavePayload(30) }, hooks),
+    ).toBe("rejected");
+    ready = true;
+    expect(receiver.receive(first, hooks)).toBe("executed");
+  });
+
+  it.each([
+    "quiz result",
+    "delve/repeated selector",
+    "nested party picker",
+    "secondary picker",
+    "catch-full picker",
+    "embedded shop handoff",
+  ])("executes independently of prior presentation family: %s", presentationFamily => {
+    const receiver = new CoopMeTerminalTransactionReceiver();
+    const stages: string[] = [];
+    const result = receiver.receive(
+      {
+        operationId: `terminal-${presentationFamily}`,
+        pinned: 40,
+        step: 0,
+        payload: leavePayload(40, presentationFamily === "embedded shop handoff"),
+      },
+      {
+        applyMaterial: () => {
+          stages.push("material");
+          return true;
+        },
+        executeDestination: () => {
+          stages.push("destination");
+          return true;
+        },
+      },
+    );
+    expect(result).toBe("executed");
+    expect(stages).toEqual(["material", "destination"]);
+  });
+});

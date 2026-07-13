@@ -14,7 +14,10 @@
 // existing consumers.
 // =============================================================================
 
-import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  parseCoopOperationId,
+  type CoopMeTerminalPayload,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type {
   CoopActiveMysteryEncounterSnapshotV1,
@@ -29,6 +32,21 @@ let coopMeActiveControl: CoopActiveMysteryEncounterSnapshotV1 | null = null;
 
 /** Presentation/terminal rebound hook registered by the guest replay phase (keeps this leaf cycle-free). */
 let onMeSnapshotRebind: ((snapshot: CoopActiveMysteryEncounterSnapshotV1) => void) | null = null;
+
+/** Complete journal terminal routed into the retained replay without a runtime -> phase import cycle. */
+export interface CoopMeCommittedTerminalTransaction {
+  readonly operationId: string;
+  readonly pinned: number;
+  readonly step: number;
+  readonly payload: CoopMeTerminalPayload;
+}
+
+let onMeCommittedTerminal:
+  | ((transaction: CoopMeCommittedTerminalTransaction) => boolean)
+  | null = null;
+let onMeCommittedTerminalReady:
+  | ((transaction: CoopMeCommittedTerminalTransaction) => boolean)
+  | null = null;
 
 type CoopMePresentation = Extract<CoopInteractionOutcome, { k: "mePresent" }>;
 
@@ -610,6 +628,40 @@ export function setOnMeSnapshotRebind(
       onMeSnapshotRebind = previous;
     }
   };
+}
+
+/**
+ * Register the only executable ME-terminal projection. The durability sink returns false when no replay
+ * boundary is retained yet, keeping the operation unacknowledged for late-phase/rejoin redelivery.
+ */
+export function setOnMeCommittedTerminal(
+  fn: ((transaction: CoopMeCommittedTerminalTransaction) => boolean) | null,
+  ready: ((transaction: CoopMeCommittedTerminalTransaction) => boolean) | null = null,
+): () => void {
+  const previous = onMeCommittedTerminal;
+  const previousReady = onMeCommittedTerminalReady;
+  onMeCommittedTerminal = fn;
+  onMeCommittedTerminalReady = ready;
+  return () => {
+    if (onMeCommittedTerminal === fn) {
+      onMeCommittedTerminal = previous;
+      onMeCommittedTerminalReady = previousReady;
+    }
+  };
+}
+
+/** Preflight the live replay/scene boundary before a comprehensive state image is applied. */
+export function canMaterializeCoopMeCommittedTerminal(
+  transaction: CoopMeCommittedTerminalTransaction,
+): boolean {
+  return onMeCommittedTerminalReady?.(transaction) === true;
+}
+
+/** Synchronously materialize terminal control; true means the exact destination is now executable. */
+export function materializeCoopMeCommittedTerminal(
+  transaction: CoopMeCommittedTerminalTransaction,
+): boolean {
+  return onMeCommittedTerminal?.(transaction) === true;
 }
 
 /** Session-boundary purge; unlike a normal ME terminal, no prior terminal may survive a new epoch. */
