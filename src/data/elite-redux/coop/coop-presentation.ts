@@ -79,7 +79,8 @@ function resolveProjectionSeats(
     const data = (seat.side === "player" ? state.playerParty : state.enemyParty).find(
       candidate => candidate.id === seat.pokemonId,
     );
-    if (seat.presented && (data?.hp ?? pokemon.hp) > 0) {
+    const projectedHp = typeof data?.hp === "number" ? data.hp : pokemon.hp;
+    if (seat.presented && projectedHp > 0) {
       result[seat.side].push({ pokemon, slot: projectionSlot(seat) });
     }
   }

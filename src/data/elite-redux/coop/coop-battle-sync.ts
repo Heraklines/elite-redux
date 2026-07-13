@@ -662,8 +662,8 @@ export class CoopBattleSync {
     turn: number;
     moveSlots: number[];
     offer?: CoopBattleCommandOffer | undefined;
-    owner?: CoopRole;
-    address?: CoopCommandAddress;
+    owner?: CoopRole | undefined;
+    address?: CoopCommandAddress | undefined;
   }): void {
     const responder = this.responder;
     if (responder == null) {

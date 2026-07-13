@@ -63,10 +63,7 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import { COOP_INTERACTION_LEAVE } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
-import {
-  adoptMeWatcherChoice,
-  isCoopMeOperationEnabled,
-} from "#data/elite-redux/coop/coop-me-operation";
+import { adoptMeWatcherChoice, isCoopMeOperationEnabled } from "#data/elite-redux/coop/coop-me-operation";
 import {
   coopMeInProgress,
   coopMeInteractionStartValue,
@@ -881,15 +878,18 @@ function rebindColosseumGuestLoop(snapshot: CoopActiveMysteryEncounterSnapshotV1
   if (relay == null || coopMeInteractionStartValue() !== snapshot.interactionCounter) {
     return;
   }
+  const colosseum = snapshot.colosseum;
+  if (colosseum == null) {
+    return;
+  }
   const presentation =
-    snapshot.colosseum.boardRound === snapshot.colosseum.expectedRound
-    && snapshot.presentation?.subPrompt?.kind === "secondary"
+    colosseum.boardRound === colosseum.expectedRound && snapshot.presentation?.subPrompt?.kind === "secondary"
       ? snapshot.presentation
       : undefined;
   startColosseumGuestLoop(snapshot.interactionCounter, COOP_ME_TERM_SEQ_BASE + snapshot.interactionCounter, relay, {
-    expectedRound: snapshot.colosseum.expectedRound,
+    expectedRound: colosseum.expectedRound,
     presentation,
-    decision: snapshot.colosseum.decision,
+    decision: colosseum.decision,
   });
 }
 

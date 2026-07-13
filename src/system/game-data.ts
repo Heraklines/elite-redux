@@ -3624,7 +3624,9 @@ export class GameData {
             cloudCas,
           };
         };
-        const exactRunSlot = (inspection: ResumeSlotInspection): boolean =>
+        const exactRunSlot = (
+          inspection: ResumeSlotInspection,
+        ): inspection is Extract<ResumeSlotInspection, { kind: "occupied" }> =>
           inspection.kind === "occupied"
           && inspection.stored.commitment.runId === commitment.runId
           && coopSeatMapMatches(
@@ -3633,7 +3635,9 @@ export class GameData {
             partner,
             controller.role,
           );
-        const cloudBackedExactRunSlot = (inspection: ResumeSlotInspection): boolean =>
+        const cloudBackedExactRunSlot = (
+          inspection: ResumeSlotInspection,
+        ): inspection is Extract<ResumeSlotInspection, { kind: "occupied" }> =>
           exactRunSlot(inspection)
           && (bypassLogin
             || (inspection.cloudCas?.mode === "existing" && inspection.cloudCas.runId === commitment.runId));
@@ -5450,6 +5454,7 @@ export class GameData {
         } else {
           let rollbackConverged = false;
           if (coopCasResult.rollbackSafe && coopEvidenceBeforeSave != null && coopEvidenceAfterSave != null) {
+            const coopEvidenceAfterSaveSnapshot = coopEvidenceAfterSave;
             try {
               rollbackConverged =
                 (await this.withCoopResumePersistenceLease(async () => {
@@ -5470,7 +5475,8 @@ export class GameData {
                     coopWarn("launch", "authority checkpoint local rollback threw", error);
                   }
                   return (
-                    localRestored && restoreCoopResumeEvidenceIfUnchanged(coopEvidenceAfterSave, coopEvidenceBeforeSave)
+                    localRestored
+                    && restoreCoopResumeEvidenceIfUnchanged(coopEvidenceAfterSaveSnapshot, coopEvidenceBeforeSave)
                   );
                 }, saveAccountIdentity)) === true;
             } catch (error) {
@@ -5942,6 +5948,8 @@ export class GameData {
                               ok: false as const,
                               error: "Import account changed while queued.",
                               failureKind: "unauthorized" as const,
+                              continuationSafe: false as const,
+                              rollbackSafe: false as const,
                             }),
                       );
                       error = mutation.ok ? null : mutation.error;

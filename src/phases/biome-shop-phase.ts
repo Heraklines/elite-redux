@@ -99,8 +99,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
   /** Invalidates callbacks retained by an older CONFIRM handler on this same phase instance. */
   private coopConfirmAttempt = 0;
   private coopTerminalPromise: Promise<boolean> | null = null;
-  /** Exact prepared market action awaiting its complete host result capture. */
-  private coopPendingAuthorityOperationId: string | null = null;
+  // coopPendingAuthorityOperationId is inherited (now `protected`) from SelectModifierPhase - the same
+  // runtime slot the base's applyModifier commits; a same-name private redeclaration here was TS2415.
   /**
    * Co-op (#866): true when THIS phase is a move-learn CONTINUATION copy (queued by
    * {@linkcode SelectModifierPhase.applyModifier} when a TM / Memory Mushroom / Learner's Shroom /
@@ -120,9 +120,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
   /** Ability sub-pickers inherit the biome market's real pin/owner axis, not the unused base reward pin. */
   public override coopAbilityContext(): { seq: number; watcher: boolean } {
     const inCoop = globalScene.gameMode.isCoop && getCoopController() != null;
-    return inCoop
-      ? { seq: this.coopBiomeStart, watcher: !this.coopBiomeOwner }
-      : { seq: -1, watcher: false };
+    return inCoop ? { seq: this.coopBiomeStart, watcher: !this.coopBiomeOwner } : { seq: -1, watcher: false };
   }
 
   /**
@@ -185,7 +183,11 @@ export class BiomeShopPhase extends SelectModifierPhase {
       // stream. Outside an ME the option owner == the pick owner (wave market, byte-identical to before).
       const optionOwner =
         spoofed
-        || (isCoopRewardRetainedResultMode() ? coopController.role === "host" : inMe ? coopController.role === "host" : pickOwner);
+        || (isCoopRewardRetainedResultMode()
+          ? coopController.role === "host"
+          : inMe
+            ? coopController.role === "host"
+            : pickOwner);
       this.coopBiomeOwner = pickOwner;
       this.coopBiomeOptionOwner = optionOwner;
       coopLog(
@@ -528,11 +530,13 @@ export class BiomeShopPhase extends SelectModifierPhase {
               continue;
             }
           }
-          if (role === "host" && isCoopRewardRetainedResultMode()) {
-            if (commit == null || commitRewardAuthoritativeResult(commit.operationId) == null) {
-              getCoopRuntime()?.durability?.reconnect();
-              continue;
-            }
+          if (
+            role === "host"
+            && isCoopRewardRetainedResultMode()
+            && (commit == null || commitRewardAuthoritativeResult(commit.operationId) == null)
+          ) {
+            getCoopRuntime()?.durability?.reconnect();
+            continue;
           }
           return this.advanceCoopBiomeTerminal(pinned);
         }
@@ -846,11 +850,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         coopBoughtSlot,
         [partySlot, resultingMoney, this.coopResolvedModifierOption, cost],
       );
-      if (
-        getCoopController()?.role === "guest"
-        && isCoopRewardRetainedResultMode()
-        && preparedOperationId != null
-      ) {
+      if (getCoopController()?.role === "guest" && isCoopRewardRetainedResultMode() && preparedOperationId != null) {
         this.coopPendingAuthorityOperationId = preparedOperationId;
         this.hideShopForOverlay();
         void globalScene.ui.setMode(UiMode.MESSAGE);

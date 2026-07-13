@@ -160,8 +160,14 @@ function bearer(request: Request): string | null {
 }
 
 export async function ensureP33SignalingSchema(env: P33SignalingEnv): Promise<void> {
-  await env.DB.exec(`
-    CREATE TABLE IF NOT EXISTS coop_ticket_bindings_p33 (
+  // Real Cloudflare D1 `exec()` splits its input on NEWLINES and rejects a statement that spans multiple
+  // lines, so a pretty-printed multi-statement DDL template throws at schema-ensure and 500s EVERY
+  // /coop/v3/* request before auth ever runs (miniflare tolerates it, so no vitest catches it - this was
+  // the live lobby-pairing blocker). Run each DDL statement as its OWN prepared statement instead: a
+  // single multi-line CREATE is fine through prepare(); the batch is one round-trip and atomic, and
+  // CREATE ... IF NOT EXISTS keeps it idempotent (same as pruneP33Signaling's own DELETE batch below).
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS coop_ticket_bindings_p33 (
       ticket_nonce TEXT PRIMARY KEY,
       account_id TEXT NOT NULL,
       client_nonce TEXT NOT NULL,
@@ -169,8 +175,8 @@ export async function ensureP33SignalingSchema(env: P33SignalingEnv): Promise<vo
       bearer_hash TEXT NOT NULL,
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS coop_lobby_p33 (
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS coop_lobby_p33 (
       presence_id TEXT PRIMARY KEY,
       account_id TEXT NOT NULL UNIQUE,
       display_name TEXT NOT NULL,
@@ -185,9 +191,9 @@ export async function ensureP33SignalingSchema(env: P33SignalingEnv): Promise<vo
       req_from TEXT,
       req_at INTEGER,
       declined_name TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_coop_lobby_p33_seen ON coop_lobby_p33(seen_at);
-    CREATE TABLE IF NOT EXISTS coop_runs_p33 (
+    )`),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_coop_lobby_p33_seen ON coop_lobby_p33(seen_at)"),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS coop_runs_p33 (
       code TEXT PRIMARY KEY,
       offerer_presence_id TEXT NOT NULL,
       answerer_presence_id TEXT NOT NULL,
@@ -206,22 +212,22 @@ export async function ensureP33SignalingSchema(env: P33SignalingEnv): Promise<vo
       state TEXT NOT NULL DEFAULT 'active',
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_coop_runs_p33_updated ON coop_runs_p33(updated_at);
-    CREATE TABLE IF NOT EXISTS coop_pair_members_p33 (
+    )`),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_coop_runs_p33_updated ON coop_runs_p33(updated_at)"),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS coop_pair_members_p33 (
       presence_id TEXT PRIMARY KEY,
       account_id TEXT NOT NULL UNIQUE,
       code TEXT NOT NULL,
       transport_role TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS coop_signals_p33 (
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS coop_signals_p33 (
       code TEXT NOT NULL,
       from_role TEXT NOT NULL,
       signal TEXT NOT NULL,
       updated_at INTEGER NOT NULL,
       PRIMARY KEY (code, from_role)
-    );
-  `);
+    )`),
+  ]);
 }
 
 /** Hourly cleanup for credentials, abandoned lobby entries, signals, and expired P33 runs. */

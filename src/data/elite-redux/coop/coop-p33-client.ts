@@ -333,7 +333,7 @@ async function authenticatedJson(
   const response = await deps.fetch(`${deps.serverBase()}${path}`, {
     method,
     headers: bearerHeaders(credential.pairingToken, body != null),
-    body: body == null ? undefined : JSON.stringify(body),
+    body: body == null ? null : JSON.stringify(body),
   });
   return readJson(response, path);
 }

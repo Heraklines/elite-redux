@@ -190,11 +190,11 @@ function commit(params: {
 
 export function commitColosseumBoard(params: {
   pinned: number;
-  round?: number;
+  round?: number | undefined;
   labels: string[];
   localRole: CoopRole;
   wave: number;
-  turn?: number;
+  turn?: number | undefined;
 }): { operationId: string | null; round: number } | null {
   if (params.localRole !== "host" || params.pinned < 0) {
     return null;

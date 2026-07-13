@@ -172,7 +172,7 @@ interface CoopBiomeIntentRetry {
 }
 const biomeIntentRetries = new Map<string, CoopBiomeIntentRetry>();
 const VALID_BIOME_IDS: ReadonlySet<number> = new Set(
-  Object.values(BiomeId).filter((value): value is number => typeof value === "number"),
+  Object.values(BiomeId).filter((value): value is BiomeId => typeof value === "number"),
 );
 
 function cloneBiomeCommitReceipt(receipt: CoopBiomeCommitReceipt): CoopBiomeCommitReceipt {

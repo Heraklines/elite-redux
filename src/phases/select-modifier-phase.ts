@@ -224,8 +224,11 @@ export class SelectModifierPhase extends BattlePhase {
   /** Owner-side (#698): the post-spend money to stream with the next relay send, or -1 to append
    *  nothing. Transient: set just before the spend's relay send, consumed + reset inside it. */
   private coopOwnerPostMoney = -1;
-  /** Prepared action whose complete host result must be committed after the safe state mutation seam. */
-  private coopPendingAuthorityOperationId: string | null = null;
+  /** Prepared action whose complete host result must be committed after the safe state mutation seam.
+   * `protected` (not `private`) so the BiomeShopPhase subclass shares this exact field instead of
+   * redeclaring a same-name private (TS2415) - it is the SAME runtime slot the base reads via
+   * applyModifier -> coopCommitPendingAuthorityResult, so sharing it is behavior-identical. */
+  protected coopPendingAuthorityOperationId: string | null = null;
   /** Prevents duplicate durable-result wait loops when a retained intent is re-clicked/replayed. */
   private readonly coopAwaitingAuthorityResults = new Set<string>();
   /** Live owner callback reused after a retained paid result temporarily parks the interactive shop. */
