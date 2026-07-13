@@ -198,9 +198,15 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     expect(cmd?.moveId).toBe(42);
   });
 
-  it("recovers a wave-1 broadcast-before-request when copied player Pokemon ids differ", async () => {
+  it("never lets a same-turn buffered command for another Pokemon satisfy the exact waiter", async () => {
     const { host, guest } = createLoopbackPair();
-    const hostSync = new CoopBattleSync(host);
+    const hostSync = new CoopBattleSync(host, {
+      timeoutMs: 5,
+      schedule: cb => {
+        const id = setTimeout(cb, 5);
+        return () => clearTimeout(id);
+      },
+    });
     const guestSync = new CoopBattleSync(guest);
     const guestAddress = { epoch: 17, wave: 1, pokemonId: 111 };
     const hostAddress = { epoch: 17, wave: 1, pokemonId: 999 };
@@ -214,23 +220,18 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     );
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    await expect(hostSync.requestPartnerCommand(1, 1, [1], "guest", legalOffer, hostAddress)).resolves.toMatchObject({
-      command: Command.FIGHT,
-      cursor: 1,
-      moveId: 55,
-      targets: [2],
-    });
+    await expect(hostSync.requestPartnerCommand(1, 1, [1], "guest", legalOffer, hostAddress)).resolves.toBeNull();
+    expect(hostSync.isTerminalFrozen(), "an actor-id mismatch exhausts the bounded exact wait fail-closed").toBe(true);
     hostSync.dispose();
     guestSync.dispose();
   });
 
-  it("replays a retained local command after a dropped first send despite copied Pokemon id skew", async () => {
+  it("replays a retained local command only for an exact actor address after a dropped first send", async () => {
     const pair = createLoopbackPair();
     const guestWire = new CoopFlapTransport(pair.guest);
-    const hostSync = new CoopBattleSync(pair.host);
     const guestSync = new CoopBattleSync(guestWire);
     const guestAddress = { epoch: 23, wave: 1, pokemonId: 321 };
-    const hostAddress = { epoch: 23, wave: 1, pokemonId: 654 };
+    const staleAddress = { epoch: 23, wave: 1, pokemonId: 654 };
 
     guestWire.setConnected(false);
     guestSync.broadcastLocalCommand(
@@ -242,19 +243,54 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     );
     guestWire.setConnected(true);
 
-    await expect(hostSync.requestPartnerCommand(1, 1, [1], "guest", legalOffer, hostAddress)).resolves.toMatchObject({
-      command: Command.FIGHT,
-      cursor: 1,
-      moveId: 55,
-      targets: [2],
+    const replies: Extract<Parameters<typeof pair.host.send>[0], { t: "command" }>[] = [];
+    const off = pair.host.onMessage(message => {
+      if (message.t === "command") {
+        replies.push(message);
+      }
     });
-    hostSync.dispose();
+    pair.host.send({
+      t: "commandRequest",
+      fieldIndex: 1,
+      turn: 1,
+      moveSlots: [1],
+      offer: legalOffer,
+      owner: "guest",
+      ...staleAddress,
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(replies, "a stale actor address cannot consume or replay the retained intent").toEqual([]);
+
+    pair.host.send({
+      t: "commandRequest",
+      fieldIndex: 1,
+      turn: 1,
+      moveSlots: [1],
+      offer: legalOffer,
+      owner: "guest",
+      ...guestAddress,
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(replies).toHaveLength(1);
+    expect(replies[0]).toMatchObject({
+      epoch: 23,
+      wave: 1,
+      pokemonId: 321,
+      command: { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] },
+    });
+    off();
     guestSync.dispose();
   });
 
-  it("resolves an already-waiting request when the arriving command carries the copied Pokemon id", async () => {
+  it("never lets a live command for another Pokemon resolve an already-waiting exact request", async () => {
     const { host, guest } = createLoopbackPair();
-    const hostSync = new CoopBattleSync(host);
+    const hostSync = new CoopBattleSync(host, {
+      timeoutMs: 5,
+      schedule: cb => {
+        const id = setTimeout(cb, 5);
+        return () => clearTimeout(id);
+      },
+    });
     const guestSync = new CoopBattleSync(guest);
     const awaited = hostSync.requestPartnerCommand(1, 1, [1], "guest", legalOffer, {
       epoch: 31,
@@ -268,8 +304,58 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
       pokemonId: 701,
     });
 
-    await expect(awaited).resolves.toMatchObject({ command: Command.FIGHT, moveId: 55, targets: [2] });
+    await expect(awaited).resolves.toBeNull();
+    expect(hostSync.isTerminalFrozen(), "wrong-actor live traffic cannot advance the current command surface").toBe(
+      true,
+    );
     hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("keeps an exact retained intent after a stale actor-address rejection", async () => {
+    const pair = createLoopbackPair();
+    const guestSync = new CoopBattleSync(pair.guest);
+    const currentAddress = { epoch: 37, wave: 4, pokemonId: 700 };
+    guestSync.broadcastLocalCommand(
+      1,
+      3,
+      { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] },
+      "guest",
+      currentAddress,
+    );
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const replies: Extract<Parameters<typeof pair.host.send>[0], { t: "command" }>[] = [];
+    const off = pair.host.onMessage(message => {
+      if (message.t === "command") {
+        replies.push(message);
+      }
+    });
+    pair.host.send({
+      t: "commandRejected",
+      fieldIndex: 1,
+      turn: 3,
+      reason: "stale actor mutation",
+      owner: "guest",
+      epoch: 37,
+      wave: 4,
+      pokemonId: 701,
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    pair.host.send({
+      t: "commandRequest",
+      fieldIndex: 1,
+      turn: 3,
+      moveSlots: [1],
+      offer: legalOffer,
+      owner: "guest",
+      ...currentAddress,
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(replies, "wrong-address rejection cannot delete the current actor's retained commit").toHaveLength(1);
+    expect(replies[0]).toMatchObject({ pokemonId: 700, command: { moveId: 55, targets: [2] } });
+    off();
     guestSync.dispose();
   });
 
