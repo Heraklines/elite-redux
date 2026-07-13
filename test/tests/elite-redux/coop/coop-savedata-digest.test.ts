@@ -53,7 +53,12 @@ import {
   restoreErBiomeStructure,
   setErBiomeOverstayAnchor,
 } from "#data/elite-redux/er-biome-structure";
-import { getRevealedMapNodes, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
+import {
+  getRevealedMapNodes,
+  resetErMapNodes,
+  revealMapNodes,
+  setAuthoritativeMapTravelClassification,
+} from "#data/elite-redux/er-map-nodes";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
 import { BattlerIndex } from "#enums/battler-index";
@@ -589,6 +594,10 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       });
       // WATCHER opens the mirrored copy + adopts the owner's relayed biome.
       await withClient(watcherCtx, async () => {
+        // The harness alternates two engines in one JS process, so the owner's transition just consumed the
+        // process-global classification that remains isolated in two real browsers. Re-materialize the exact
+        // guest carrier field before driving its phase; the retained BIOME_PICK receipt remains untouched.
+        setAuthoritativeMapTravelClassification(WAVE, null);
         const phase = liveSelectBiome();
         phase.start();
         for (let i = 0; i < 40; i++) {
@@ -646,6 +655,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     const hostCounter = rig.hostRuntime.controller.interactionCounter();
     const guestCounter = rig.guestRuntime.controller.interactionCounter();
     await withClient(watcherCtx, async () => {
+      setAuthoritativeMapTravelClassification(WAVE, null);
       const spy = vi.spyOn(watcherCtx.scene.phaseManager, "unshiftNew");
       const phase = liveSelectBiome();
       phase.start();
