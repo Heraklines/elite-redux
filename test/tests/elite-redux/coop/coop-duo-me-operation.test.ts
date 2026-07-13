@@ -44,7 +44,7 @@ import {
   setCoopMeOperationEnabled,
 } from "#data/elite-redux/coop/coop-me-operation";
 import { CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, getCoopInteractionRelay, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -58,7 +58,6 @@ import {
   driveGuestMeReplay,
   driveHostRewardShopOwner,
   installDuoLogCapture,
-  relayGuestMeOptionIndexOnly,
   relayGuestMeShopLeaveSync,
   type ShopPhaseSeam,
   startGuestMeOutcomeRace,
@@ -154,12 +153,8 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
     expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once)").toBe(true);
 
-    const terminal = submitSpy.mock.calls
-      .map(call => call[0])
-      .find(intent => intent.kind === "ME_TERMINAL")?.payload;
-    expect(meOp.isCompleteCoopMeTerminalPayload(terminal), "the leave is one complete retained transaction").toBe(
-      true,
-    );
+    const terminal = submitSpy.mock.calls.map(call => call[0]).find(intent => intent.kind === "ME_TERMINAL")?.payload;
+    expect(meOp.isCompleteCoopMeTerminalPayload(terminal), "the leave is one complete retained transaction").toBe(true);
     if (meOp.isCompleteCoopMeTerminalPayload(terminal)) {
       expect(terminal.terminal).toBe("leave");
       expect(terminal.destination.kind).toBe("continue");
@@ -178,10 +173,9 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const pair = wrapCoopFaultPair(
       createLoopbackPair(),
       {
-        drop: 1,
+        drop: 0,
         reorder: 0,
         delay: 0,
-        faultable: msg => msg.t === "envelope" && msg.envelope.pendingOperation?.kind === "ME_TERMINAL",
       },
       { seed: 0x6d3e },
     );
@@ -194,6 +188,10 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       await game.phaseInterceptor.to("SelectModifierPhase", false);
       const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       await driveHostRewardShopOwner(hostShop, { takeReward: false });
+      // Lose exactly the first retained terminal frame. A permanent `drop: 1` profile would discard every
+      // retransmission too and therefore model an unrecoverable partition, not the one-frame loss named by
+      // this test. The journal must heal this one-shot loss from the same immutable transaction.
+      pair.armNextDrop("envelope", "host");
       await game.phaseInterceptor.to("PostMysteryEncounterPhase");
     });
     expect(pair.faultsInjected(), "the first retained ME terminal delivery must actually be dropped").toBeGreaterThan(
@@ -313,14 +311,16 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const pair = wrapCoopFaultPair(
       createLoopbackPair(),
       {
-        drop: 1,
+        drop: 0,
         reorder: 0,
         delay: 0,
-        faultable: msg => msg.t === "envelope" && msg.envelope.pendingOperation?.kind === "ME_PRESENT",
       },
       { seed: 0x6d3f },
     );
     const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+    // The first host envelope on ME entry is the retained ME_PRESENT. Drop it once, while leaving every
+    // resync replay deliverable, so this is a recovery proof rather than an endless partition.
+    pair.armNextDrop("envelope", "host");
     const hostEncounter = hostScene.currentBattle.mysteryEncounter!;
     const populateHostTokens = hostEncounter.populateDialogueTokensFromRequirements.bind(hostEncounter);
     vi.spyOn(hostEncounter, "populateDialogueTokensFromRequirements").mockImplementation(() => {
@@ -375,12 +375,30 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     });
     await drainLoopback();
 
-    // STEP B (guest): start the divert, relay option index 0 synchronously (send-only). NOTE: the harness's
-    // relayGuestMeOptionIndexOnly sends the raw "me" wire directly (bypassing handleGuestOptionSelect, for
-    // cross-ctx control), so the guest-side mint isn't exercised here - the host-side COMMIT below is the
-    // load-bearing guest-owned proof (the production guest mint is exercised by coop-duo-mystery IT #2).
+    // STEP B (guest): start the divert, mint the exact typed/ordinal intent that the public selector mints,
+    // then relay option index 0 synchronously (send-only). The race remains deferred until STEP D solely
+    // because this two-engine harness shares one module graph; production browsers do not share globals.
     const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
-    withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
+    withClientSync(rig.guestCtx, () => {
+      const relay = getCoopInteractionRelay();
+      const seq = (replay as unknown as { seq: number }).seq;
+      if (relay == null) {
+        throw new Error("guest-owned ME test lost its production interaction relay");
+      }
+      const operationId = meOp.commitMeOwnerIntent({
+        kind: "ME_PICK",
+        seq,
+        pinned: counterBefore,
+        step: 0,
+        payload: { optionIndex: 0 },
+        localRole: "guest",
+        wave: rig.guestScene.currentBattle.waveIndex,
+        turn: rig.guestScene.currentBattle.turn,
+        resend: () => relay.sendInteractionChoice(seq, "me", 0, [0]),
+      });
+      expect(operationId, "the public guest intent enters retained control before its raw proposal").not.toBeNull();
+      relay.sendInteractionChoice(seq, "me", 0, [0]);
+    });
 
     // STEP C (host): flush the relayed index; the host commits the guest's ME_PICK (invariant 3) + applies it,
     // then reaches the embedded reward shop (the #828 pick-watcher on a guest-owned ME - rolls + streams).
@@ -464,9 +482,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
     expect(guestReplay.settled, "guest CoopReplayMePhase settled at the battle-handoff").toBe(true);
 
-    const terminal = submitSpy.mock.calls
-      .map(call => call[0])
-      .find(intent => intent.kind === "ME_TERMINAL")?.payload;
+    const terminal = submitSpy.mock.calls.map(call => call[0]).find(intent => intent.kind === "ME_TERMINAL")?.payload;
     expect(meOp.isCompleteCoopMeTerminalPayload(terminal), "battle handoff is a complete retained transaction").toBe(
       true,
     );
@@ -523,5 +539,4 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       vi.useRealTimers();
     }
   });
-
 });
