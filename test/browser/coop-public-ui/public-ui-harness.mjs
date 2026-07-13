@@ -17,6 +17,8 @@ const REWARD_OWNER = /OWNER drives reward screen/u;
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
 const GUEST_CONTINUATION_ACK = /guest ACK turn stage=continuationReady e=(\d+) wave=(\d+) turn=(\d+) rev=(\d+)/u;
+const SHARED_SESSION_TERMINAL = /\[coop:runtime\] shared session stopped safely: /u;
+const LAUNCH_SNAPSHOT_ABORT = /launchSnapshotAbort wave=\d+ reason=/u;
 
 let publicKeyInputTail = Promise.resolve();
 
@@ -443,11 +445,20 @@ export class PublicUiClient {
   }
 
   async waitForLocalCommand(from = 0) {
-    return this.evidence.waitFor(LOCAL_COMMAND, {
-      from,
-      timeoutMs: this.config.timeoutMs,
-      description: "owned CommandPhase public UI",
-    });
+    const event = await this.evidence.waitForCondition(
+      sink =>
+        sink.find(LOCAL_COMMAND, from)
+        ?? sink.find(SHARED_SESSION_TERMINAL, from)
+        ?? sink.find(LAUNCH_SNAPSHOT_ABORT, from),
+      {
+        timeoutMs: this.config.timeoutMs,
+        description: "owned CommandPhase public UI or bounded shared terminal",
+      },
+    );
+    if (!LOCAL_COMMAND.test(event.text ?? "")) {
+      throw new Error(`${this.label}: shared session terminated before owned CommandPhase: ${event.text}`);
+    }
+    return event;
   }
 
   async waitForObservedSurface(surface, from = 0) {
