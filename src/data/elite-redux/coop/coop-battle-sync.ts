@@ -268,6 +268,11 @@ interface BufferedCommand extends CommandRoute {
   command: SerializedCommand;
 }
 
+interface BufferedCommandRequest extends CommandRoute {
+  moveSlots: number[];
+  offer?: CoopBattleCommandOffer | undefined;
+}
+
 function commandRoute(fieldIndex: number, turn: number, owner?: CoopRole, address?: CoopCommandAddress): CommandRoute {
   return {
     fieldIndex,
@@ -275,6 +280,25 @@ function commandRoute(fieldIndex: number, turn: number, owner?: CoopRole, addres
     ...(owner == null ? {} : { owner }),
     ...(address == null ? {} : { address }),
   };
+}
+
+/** Compare immutable command boundaries without treating a reused numeric turn as the same surface. */
+function compareCommandBoundary(left: CommandRoute, right: CommandRoute): number {
+  for (const [leftPart, rightPart] of [
+    [left.address?.epoch ?? 0, right.address?.epoch ?? 0],
+    [left.address?.wave ?? 0, right.address?.wave ?? 0],
+    [left.turn, right.turn],
+  ]) {
+    if (leftPart !== rightPart) {
+      return leftPart - rightPart;
+    }
+  }
+  return 0;
+}
+
+/** One active public command surface per resolved owner/visible field slot. */
+function sameCommandSurface(left: CommandRoute, right: CommandRoute): boolean {
+  return left.fieldIndex === right.fieldIndex;
 }
 
 /**
@@ -589,15 +613,8 @@ export class CoopBattleSync {
     });
   }
 
-  /** #812: requests that arrived before the responder installed (guest mid-replay). */
-  private readonly bufferedRequests: {
-    fieldIndex: number;
-    turn: number;
-    moveSlots: number[];
-    offer?: CoopBattleCommandOffer | undefined;
-    owner?: CoopRole;
-    address?: CoopCommandAddress;
-  }[] = [];
+  /** #812/P33: exact addressed requests that arrived before the responder installed (guest mid-replay). */
+  private readonly bufferedRequests = new Map<string, BufferedCommandRequest>();
   /** #812: injected by the runtime (cycle-free); true = this client owns the field slot. */
   private slotOwnershipProbe: ((fieldIndex: number) => boolean) | null = null;
 
@@ -664,8 +681,10 @@ export class CoopBattleSync {
   onCommandRequest(responder: CoopCommandResponder): void {
     this.responder = responder;
     // #812: drain requests that arrived while the responder was not yet installed (the
-    // guest was still replaying the previous turn). Stale turns are ignored host-side.
-    const buffered = this.bufferedRequests.splice(0);
+    // guest was still replaying the previous turn). P33 retains only the newest immutable
+    // boundary for each surface, so a delayed prior-wave request can never be answered here.
+    const buffered = [...this.bufferedRequests.values()];
+    this.bufferedRequests.clear();
     for (const req of buffered) {
       coopLog("relay", `answering BUFFERED commandRequest fieldIndex=${req.fieldIndex} turn=${req.turn} (#812)`);
       this.answerRequest(req);
@@ -743,7 +762,7 @@ export class CoopBattleSync {
     this.peerOffers.clear();
     this.settled.clear();
     this.responder = null;
-    this.bufferedRequests.length = 0;
+    this.bufferedRequests.clear();
   }
 
   /** Terminal membership loss: release every retained request only after recovery is no longer possible. */
@@ -836,14 +855,48 @@ export class CoopBattleSync {
             "relay",
             `peer recv commandRequest fieldIndex=${msg.fieldIndex} owner=${msg.owner ?? "-"} turn=${msg.turn} before responder install -> BUFFERED (own slot, #812)`,
           );
-          this.bufferedRequests.push({
+          const bufferedRequest: BufferedCommandRequest = {
             fieldIndex: msg.fieldIndex,
             turn: msg.turn,
             moveSlots: msg.moveSlots,
             ...(msg.offer == null ? {} : { offer: msg.offer }),
             ...(msg.owner == null ? {} : { owner: msg.owner }),
             ...(address == null ? {} : { address }),
-          });
+          };
+          let stale = false;
+          for (const [bufferedKey, prior] of [...this.bufferedRequests]) {
+            const order = compareCommandBoundary(prior, bufferedRequest);
+            if (order > 0) {
+              stale = true;
+              coopWarn(
+                "relay",
+                `drop stale pre-responder commandRequest (${commandAddressLabel(bufferedRequest)}); `
+                  + `newer buffered boundary is ${commandAddressLabel(prior)}`,
+              );
+              break;
+            }
+            if (order < 0) {
+              this.bufferedRequests.delete(bufferedKey);
+              continue;
+            }
+            if (!sameCommandSurface(prior, bufferedRequest)) {
+              continue;
+            }
+            // The same complete address is an idempotent retransmission. A different entity at the same
+            // epoch/wave/turn/slot is conflicting authority; first writer stays canonical and is answered.
+            stale = true;
+            if (bufferedKey !== key) {
+              coopWarn(
+                "security",
+                `conflicting pre-responder commandRequest at ${commandAddressLabel(bufferedRequest)}; `
+                  + `retaining canonical ${commandAddressLabel(prior)}`,
+              );
+            }
+            break;
+          }
+          if (!stale) {
+            this.bufferedRequests.set(key, bufferedRequest);
+          }
           return;
         }
         coopWarn(

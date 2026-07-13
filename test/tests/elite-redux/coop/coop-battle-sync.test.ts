@@ -513,6 +513,79 @@ describe("#812: pre-responder commandRequest buffering (the 'wrong move / didn't
     hostSync.dispose();
     guestSync.dispose();
   });
+
+  it("answers only the newest full-address request when a delayed prior-wave frame arrives before the UI", async () => {
+    const { host, guest } = createLoopbackPair();
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.setSlotOwnershipProbe(() => true);
+    const replies: Extract<Parameters<typeof host.send>[0], { t: "command" }>[] = [];
+    const off = host.onMessage(message => {
+      if (message.t === "command") {
+        replies.push(message);
+      }
+    });
+    const oldRequest = {
+      t: "commandRequest" as const,
+      fieldIndex: 1,
+      turn: 1,
+      moveSlots: [0],
+      owner: "guest" as const,
+      epoch: 17,
+      wave: 9,
+      pokemonId: 101,
+    };
+    const currentRequest = { ...oldRequest, wave: 10, pokemonId: 202 };
+
+    host.send(oldRequest);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    host.send(currentRequest);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    host.send(oldRequest); // reordered retransmission from the obsolete wave
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    guestSync.onCommandRequest(() => ({ command: Command.FIGHT, cursor: 0, moveId: 55 }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(replies, "the reopened command UI must never answer the obsolete buffered boundary").toHaveLength(1);
+    expect(replies[0]).toMatchObject({ epoch: 17, wave: 10, turn: 1, pokemonId: 202, owner: "guest" });
+    off();
+    guestSync.dispose();
+  });
+
+  it("retains distinct same-boundary active slots while pruning obsolete command boundaries", async () => {
+    const { host, guest } = createLoopbackPair();
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.setSlotOwnershipProbe(() => true);
+    const replyFields: number[] = [];
+    const off = host.onMessage(message => {
+      if (message.t === "command") {
+        replyFields.push(message.fieldIndex);
+      }
+    });
+
+    for (const [fieldIndex, pokemonId] of [
+      [0, 301],
+      [2, 302],
+    ] as const) {
+      host.send({
+        t: "commandRequest",
+        fieldIndex,
+        turn: 4,
+        moveSlots: [0],
+        owner: "guest",
+        epoch: 19,
+        wave: 20,
+        pokemonId,
+      });
+    }
+    await new Promise(resolve => setTimeout(resolve, 0));
+    guestSync.onCommandRequest(() => ({ command: Command.FIGHT, cursor: 0, moveId: 55 }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(replyFields.sort((left, right) => left - right)).toEqual([0, 2]);
+    off();
+    guestSync.dispose();
+  });
 });
 
 describe("#851: OWNER-keyed relay survives a post-half-wipe field-index skew", () => {
