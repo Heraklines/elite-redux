@@ -23,16 +23,39 @@ import {
 
 const saveApiSchema = readFileSync(resolve(process.cwd(), "workers/er-save-api/schema.sql"), "utf8");
 
-function session(runId: string, checkpointRevision: number, wave = 1): string {
+function session(
+  runId: string,
+  checkpointRevision: number,
+  wave = 1,
+  players: [string, string] = ["Alice", "Bob"],
+  seats: { host: string; guest: string } = { host: players[0], guest: players[1] },
+): string {
   return JSON.stringify({
+    seed: "production-shaped-seed",
+    playTime: 120,
     gameMode: 6,
+    party: [],
+    enemyParty: [],
+    modifiers: [],
+    enemyModifiers: [],
+    arena: { biome: 1, weather: null, terrain: null, tags: [], positionalTags: [], playerTerasUsed: 0 },
+    pokeballCounts: { 0: 5 },
+    money: 1000,
+    score: 50,
     waveIndex: wave,
+    battleType: 0,
+    trainer: null,
+    gameVersion: "test-production",
     timestamp: 1,
+    challenges: [],
+    mysteryEncounterType: -1,
+    mysteryEncounterSaveData: { encounteredEvents: [], encounterSpawnChance: 0.1, queuedEncounters: [] },
+    playerFaints: 0,
     coopRun: { version: 1, runId, checkpointRevision },
     coopParticipants: {
       version: 1,
-      players: ["Alice", "Bob"],
-      seats: { host: "Alice", guest: "Bob" },
+      players,
+      seats,
     },
   });
 }
@@ -267,6 +290,59 @@ describe("co-op cloud CAS SQL on SQLite", () => {
     ).toBeNull();
     expect(
       parseValidResumableCoopSession(JSON.stringify({ ...JSON.parse(valid), timestamp: undefined }), "Alice"),
+    ).toBeNull();
+    expect(
+      parseValidResumableCoopSession(
+        JSON.stringify({
+          gameMode: 6,
+          waveIndex: 1,
+          timestamp: 1,
+          coopRun: { version: 1, runId: "run-truncated-123456789", checkpointRevision: 0 },
+          coopParticipants: {
+            version: 1,
+            players: ["Alice", "Bob"],
+            seats: { host: "Alice", guest: "Bob" },
+          },
+        }),
+        "Alice",
+      ),
+      "metadata without the mandatory browser materialization surface is not resumable",
+    ).toBeNull();
+    expect(
+      classifySessionProtection(
+        JSON.stringify({
+          gameMode: 6,
+          waveIndex: 1,
+          timestamp: 1,
+          coopRun: { version: 1, runId: "run-truncated-123456789", checkpointRevision: 0 },
+          coopParticipants: {
+            version: 1,
+            players: ["Alice", "Bob"],
+            seats: { host: "Alice", guest: "Bob" },
+          },
+        }),
+      ),
+      "a truncated checkpoint remains eligible for exact legacy recovery",
+    ).toBe("coop-invalid");
+    expect(
+      parseValidResumableCoopSession(
+        session("run-empty-identity-123456789", 0, 1, ["", "Alice"], { host: "", guest: "Alice" }),
+        "Alice",
+      ),
+    ).toBeNull();
+    expect(
+      parseValidResumableCoopSession(
+        session("run-nfkc-collision-123456789", 0, 1, ["Alice", "Ａlice"], { host: "Alice", guest: "Ａlice" }),
+        "Alice",
+      ),
+      "two distinct account keys may not collapse onto one co-op wire identity",
+    ).toBeNull();
+    expect(
+      parseValidResumableCoopSession(
+        session("run-seat-alias-123456789", 0, 1, ["Alice", "Bob"], { host: "Ａlice", guest: "Bob" }),
+        "Alice",
+      ),
+      "seat identities must use the same account keys as the participant pair",
     ).toBeNull();
   });
 });

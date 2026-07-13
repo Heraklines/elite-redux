@@ -712,8 +712,89 @@ function normalizeCoopIdentity(identity: string): string {
   return identity.normalize("NFKC").toLowerCase();
 }
 
+/** Match the uniqueness key actually used by account registration/login. */
+function accountIdentityKey(identity: string): string {
+  return identity.toLowerCase();
+}
+
 function sameCoopIdentity(left: string, right: string): boolean {
   return normalizeCoopIdentity(left) === normalizeCoopIdentity(right);
+}
+
+function sameCoopAccountIdentity(left: string, right: string): boolean {
+  return accountIdentityKey(left) === accountIdentityKey(right);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isFiniteNonNegative(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isObjectArray(value: unknown): value is Record<string, unknown>[] {
+  return Array.isArray(value) && value.every(isRecord);
+}
+
+/**
+ * Top-level fields dereferenced by `GameData.parseSessionData()` / `initSessionFromData()` when a
+ * checkpoint is materialized. The Worker deliberately does not reproduce every gameplay schema,
+ * but it must reject a metadata-only/truncated object that the browser cannot even construct.
+ */
+function hasCoopSessionMaterializationShape(record: Record<string, unknown>): boolean {
+  const arena = record.arena;
+  const pokeballCounts = record.pokeballCounts;
+  const trainer = record.trainer;
+  const mystery = record.mysteryEncounterSaveData;
+  return (
+    typeof record.seed === "string"
+    && record.seed.length > 0
+    && isFiniteNonNegative(record.playTime)
+    && isObjectArray(record.party)
+    && isObjectArray(record.enemyParty)
+    && isObjectArray(record.modifiers)
+    && isObjectArray(record.enemyModifiers)
+    && isRecord(arena)
+    && typeof arena.biome === "number"
+    && Number.isSafeInteger(arena.biome)
+    && arena.biome >= 0
+    && (arena.weather == null || isRecord(arena.weather))
+    && (arena.terrain == null || isRecord(arena.terrain))
+    && (arena.tags === undefined || isObjectArray(arena.tags))
+    && Array.isArray(arena.positionalTags)
+    && isRecord(pokeballCounts)
+    && Object.values(pokeballCounts).every(
+      value => typeof value === "number" && Number.isSafeInteger(value) && value >= 0,
+    )
+    && isFiniteNonNegative(record.money)
+    && isFiniteNonNegative(record.score)
+    && typeof record.battleType === "number"
+    && Number.isSafeInteger(record.battleType)
+    && (record.battleType === 0 || record.battleType === 1 || record.battleType === 3)
+    && (trainer == null || isRecord(trainer))
+    && typeof record.gameVersion === "string"
+    && record.gameVersion.length > 0
+    && Array.isArray(record.challenges)
+    && typeof record.mysteryEncounterType === "number"
+    && Number.isSafeInteger(record.mysteryEncounterType)
+    && isRecord(mystery)
+    && Array.isArray(mystery.encounteredEvents)
+    && isFiniteNonNegative(mystery.encounterSpawnChance)
+    && Array.isArray(mystery.queuedEncounters)
+    && typeof record.playerFaints === "number"
+    && Number.isSafeInteger(record.playerFaints)
+    && record.playerFaints >= 0
+  );
+}
+
+function sameCoopSessionIdentity(left: CoopSessionRef, right: CoopSessionRef): boolean {
+  return (
+    sameCoopAccountIdentity(left.players[0], right.players[0])
+    && sameCoopAccountIdentity(left.players[1], right.players[1])
+    && sameCoopAccountIdentity(left.seats.host, right.seats.host)
+    && sameCoopAccountIdentity(left.seats.guest, right.seats.guest)
+  );
 }
 
 /**
@@ -753,20 +834,31 @@ function coopSessionFromParsed(parsed: unknown, authenticatedAccount?: string): 
     || players.length !== 2
     || typeof players[0] !== "string"
     || typeof players[1] !== "string"
+    || players[0].length === 0
+    || players[1].length === 0
     || typeof host !== "string"
     || typeof guest !== "string"
+    || host.length === 0
+    || guest.length === 0
+    || !hasCoopSessionMaterializationShape(record)
   ) {
     return null;
   }
   const first = normalizeCoopIdentity(players[0]);
   const second = normalizeCoopIdentity(players[1]);
+  const playerAccountKeys = players.map(accountIdentityKey);
+  const hostAccountKey = accountIdentityKey(host);
+  const guestAccountKey = accountIdentityKey(guest);
   if (
     first === second
     || first > second
     || sameCoopIdentity(host, guest)
     || ![first, second].includes(normalizeCoopIdentity(host))
     || ![first, second].includes(normalizeCoopIdentity(guest))
-    || (authenticatedAccount != null && ![first, second].includes(normalizeCoopIdentity(authenticatedAccount)))
+    || hostAccountKey === guestAccountKey
+    || !playerAccountKeys.includes(hostAccountKey)
+    || !playerAccountKeys.includes(guestAccountKey)
+    || (authenticatedAccount != null && !players.some(player => sameCoopAccountIdentity(player, authenticatedAccount)))
   ) {
     return null;
   }
@@ -775,6 +867,56 @@ function coopSessionFromParsed(parsed: unknown, authenticatedAccount?: string): 
     players: [players[0], players[1]],
     seats: { host, guest },
   };
+}
+
+interface CoopAccountRow {
+  id: number;
+  username: string;
+  username_lower: string;
+}
+
+function isUnambiguousCoopAccount(row: CoopAccountRow): boolean {
+  return (
+    accountIdentityKey(row.username) === row.username_lower
+    && normalizeCoopIdentity(row.username) === row.username_lower
+  );
+}
+
+/**
+ * Bind username-shaped wire identities back to the authenticated D1 account rows. NFKC is retained
+ * for deterministic pair ordering, but is intentionally insufficient for authorization because the
+ * account table's uniqueness key is case-insensitive only.
+ */
+async function validateCoopSessionAccounts(env: Env, auth: TokenPayload, session: CoopSessionRef): Promise<boolean> {
+  const actual = await env.DB.prepare("SELECT id, username, username_lower FROM users WHERE id = ?")
+    .bind(auth.uid)
+    .first<CoopAccountRow>();
+  if (actual == null || !isUnambiguousCoopAccount(actual)) {
+    return false;
+  }
+  const firstKey = accountIdentityKey(session.players[0]);
+  const secondKey = accountIdentityKey(session.players[1]);
+  if (firstKey === secondKey || (actual.username_lower !== firstKey && actual.username_lower !== secondKey)) {
+    return false;
+  }
+  const [first, second] = await Promise.all([
+    env.DB.prepare("SELECT id, username, username_lower FROM users WHERE username_lower = ?")
+      .bind(firstKey)
+      .first<CoopAccountRow>(),
+    env.DB.prepare("SELECT id, username, username_lower FROM users WHERE username_lower = ?")
+      .bind(secondKey)
+      .first<CoopAccountRow>(),
+  ]);
+  return (
+    first != null
+    && second != null
+    && first.id !== second.id
+    && (first.id === actual.id || second.id === actual.id)
+    && isUnambiguousCoopAccount(first)
+    && isUnambiguousCoopAccount(second)
+    && first.username_lower === firstKey
+    && second.username_lower === secondKey
+  );
 }
 
 /** Complete resumability validation shared by Worker handlers and contract tests. */
@@ -1060,10 +1202,10 @@ async function handleSessionUpdate(
   if (!allowCoopCas && casMode != null) {
     return text("Co-op session CAS requires the dedicated endpoint.", 409, cors);
   }
-  let incomingCoopRun: CoopRunRef | null = null;
+  let incomingCoopRun: CoopSessionRef | null = null;
   if (casMode === "empty" || casMode === "existing") {
-    incomingCoopRun = parseValidResumableCoopSession(data, auth.u);
-    if (incomingCoopRun == null) {
+    incomingCoopRun = parseValidResumableCoopSession(data);
+    if (incomingCoopRun == null || !(await validateCoopSessionAccounts(env, auth, incomingCoopRun))) {
       return text("Session CAS conflict: incoming resumable co-op checkpoint is invalid.", 409, cors);
     }
     await ensureCoopRunTombstones(env);
@@ -1110,10 +1252,12 @@ async function handleSessionUpdate(
         ? text("", 200, cors)
         : text("Session CAS conflict: exact checkpoint is deleted or duplicated.", 409, cors);
     }
-    const existing = parseValidResumableCoopSession(row.data, auth.u);
+    const existing = parseValidResumableCoopSession(row.data);
     if (
       existing?.runId !== expectedRunId
       || existing.checkpointRevision !== expectedRevision
+      || !sameCoopSessionIdentity(existing, incomingCoopRun!)
+      || !(await validateCoopSessionAccounts(env, auth, existing))
       || !/^[0-9a-f]{64}$/u.test(expectedDigest)
       || (await sha256Hex(row.data)) !== expectedDigest
     ) {
@@ -1203,7 +1347,10 @@ async function handleCoopSessionCasDelete(
   const row = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
     .bind(auth.uid, slot)
     .first<{ data: string }>();
-  const run = parseValidResumableCoopSession(row?.data ?? null, auth.u);
+  // Deletion is deliberately scoped by `auth.uid` + exact slot/revision/digest, rather than requiring
+  // the peer account to remain resolvable. This is the fail-closed escape hatch for an already-stored
+  // structurally valid checkpoint whose peer was missing or whose legacy identity was ambiguous.
+  const run = parseValidResumableCoopSession(row?.data ?? null);
   if (row == null) {
     return text("Session CAS conflict: checkpoint missing without exact tombstone.", 409, cors);
   }
@@ -1272,12 +1419,15 @@ async function handleCoopDuplicateExactDelete(
   const survivor = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
     .bind(auth.uid, survivorSlot)
     .first<{ data: string }>();
-  const survivorRun = parseValidResumableCoopSession(survivor?.data ?? null, auth.u);
+  const survivorRun = parseValidResumableCoopSession(survivor?.data ?? null);
   if (
     survivor == null
     || survivorRun?.runId !== runId
     || survivorRun.checkpointRevision !== survivorRevision
     || (await sha256Hex(survivor.data)) !== survivorDigest
+    || !(await validateCoopSessionAccounts(env, auth, survivorRun))
+    || survivorRevision < revision
+    || (survivorRevision === revision && survivorDigest !== digest)
   ) {
     return text("Session CAS conflict: exact duplicate survivor changed.", 409, cors);
   }
@@ -1295,12 +1445,14 @@ async function handleCoopDuplicateExactDelete(
   const duplicate = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
     .bind(auth.uid, slot)
     .first<{ data: string }>();
-  const duplicateRun = parseValidResumableCoopSession(duplicate?.data ?? null, auth.u);
+  const duplicateRun = parseValidResumableCoopSession(duplicate?.data ?? null);
   if (
     duplicate == null
     || duplicateRun?.runId !== runId
     || duplicateRun.checkpointRevision !== revision
     || (await sha256Hex(duplicate.data)) !== digest
+    || !sameCoopSessionIdentity(duplicateRun, survivorRun)
+    || !(await validateCoopSessionAccounts(env, auth, duplicateRun))
   ) {
     return text("Session CAS conflict: exact duplicate row changed.", 409, cors);
   }
@@ -1353,8 +1505,8 @@ async function handleCoopRunStatus(
   if (tombstone != null || live.length !== 1) {
     return text("Session CAS conflict: co-op run has contradictory account state.", 409, cors);
   }
-  const active = parseValidResumableCoopSession(live[0].data, auth.u);
-  if (active?.runId !== runId) {
+  const active = parseValidResumableCoopSession(live[0].data);
+  if (active?.runId !== runId || !(await validateCoopSessionAccounts(env, auth, active))) {
     return text("Session CAS conflict: active co-op run identity is invalid.", 409, cors);
   }
   return json(

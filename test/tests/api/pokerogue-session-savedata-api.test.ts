@@ -361,6 +361,26 @@ describe("Pokerogue Session Savedata API", () => {
       });
     });
 
+    it("rejects a missing proof carrying contradictory active/tombstone metadata", async () => {
+      server.use(
+        http.get(`${apiBase}/savedata/session/coop-run-status`, () =>
+          HttpResponse.json({
+            state: "missing",
+            runId: params.coopRunId,
+            slot: 3,
+            checkpointRevision: 7,
+            digest: "a".repeat(64),
+          }),
+        ),
+      );
+
+      await expect(sessionSavedataApi.getCoopRunStatus(params)).resolves.toMatchObject({
+        ok: false,
+        status: 200,
+        failureKind: "invalid",
+      });
+    });
+
     it("rejects status metadata for another run or an invalid commitment", async () => {
       server.use(
         http.get(`${apiBase}/savedata/session/coop-run-status`, () =>

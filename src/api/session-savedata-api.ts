@@ -85,7 +85,9 @@ function isCoopRunStatus(value: unknown, expectedRunId: string): value is CoopRu
     return false;
   }
   if (status.state === "missing") {
-    return true;
+    return (
+      !Object.hasOwn(status, "slot") && !Object.hasOwn(status, "checkpointRevision") && !Object.hasOwn(status, "digest")
+    );
   }
   return (
     (status.state === "active" || status.state === "tombstoned")
