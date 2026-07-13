@@ -62,6 +62,59 @@ import { applyChallenges } from "#utils/challenge-utils";
 import { BooleanHolder, getBiomeName, randSeedInt, randSeedItem } from "#utils/common";
 import { enumValueToKey } from "#utils/enums";
 
+interface CoopBiomeContinuationRecoveryPolicy {
+  readonly retryDelayMs: number;
+  readonly maxAutomaticRetries: number;
+  readonly deadlineMs: number;
+}
+
+const DEFAULT_COOP_BIOME_CONTINUATION_RECOVERY_POLICY: CoopBiomeContinuationRecoveryPolicy = {
+  retryDelayMs: 250,
+  maxAutomaticRetries: 2,
+  // Each exact receipt wait is already capped at 60s. Two automatic re-awaits leave a full reconnect
+  // window while this independent ceiling guarantees that a callback which never settles cannot park forever.
+  deadlineMs: 125_000,
+};
+
+let coopBiomeContinuationRecoveryPolicy = DEFAULT_COOP_BIOME_CONTINUATION_RECOVERY_POLICY;
+
+/** Keep production recovery generous while allowing production-shaped tests to prove exhaustion quickly. */
+export function setCoopBiomeContinuationRecoveryPolicyForTest(
+  policy: Partial<CoopBiomeContinuationRecoveryPolicy>,
+): void {
+  coopBiomeContinuationRecoveryPolicy = {
+    retryDelayMs: Math.max(
+      1,
+      Math.trunc(policy.retryDelayMs ?? DEFAULT_COOP_BIOME_CONTINUATION_RECOVERY_POLICY.retryDelayMs),
+    ),
+    maxAutomaticRetries: Math.max(
+      0,
+      Math.trunc(policy.maxAutomaticRetries ?? DEFAULT_COOP_BIOME_CONTINUATION_RECOVERY_POLICY.maxAutomaticRetries),
+    ),
+    deadlineMs: Math.max(
+      1,
+      Math.trunc(policy.deadlineMs ?? DEFAULT_COOP_BIOME_CONTINUATION_RECOVERY_POLICY.deadlineMs),
+    ),
+  };
+}
+
+export function resetCoopBiomeContinuationRecoveryPolicyForTest(): void {
+  coopBiomeContinuationRecoveryPolicy = DEFAULT_COOP_BIOME_CONTINUATION_RECOVERY_POLICY;
+}
+
+interface CoopBiomeContinuationRecovery {
+  readonly generation: number;
+  readonly wave: number;
+  readonly turn: number;
+  readonly boundaryRevision: number;
+  readonly token: number;
+  retry: () => void;
+  retries: number;
+  retryTimer: ReturnType<typeof setTimeout> | null;
+  deadlineTimer: ReturnType<typeof setTimeout> | null;
+  terminalRequested: boolean;
+}
+
 export class SelectBiomePhase extends BattlePhase {
   public readonly phaseName = "SelectBiomePhase";
 
@@ -97,6 +150,8 @@ export class SelectBiomePhase extends BattlePhase {
   private coopRouteRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private coopRouteRetryAttempts = 0;
   private coopRouteRecoveryShown = false;
+  private coopCommitRecovery: CoopBiomeContinuationRecovery | null = null;
+  private coopCommitRecoveryToken = 0;
 
   start() {
     super.start();
@@ -431,6 +486,7 @@ export class SelectBiomePhase extends BattlePhase {
           return;
         }
         // Relay the owner's live cursor only after the bounded map transition is genuinely active.
+        this.clearBiomeCommitRecovery();
         getCoopUiMirror()?.beginSession("owner", UiMode.ER_MAP, mirrorSeq);
       });
   }
@@ -475,6 +531,7 @@ export class SelectBiomePhase extends BattlePhase {
         });
         return;
       }
+      this.clearBiomeCommitRecovery();
       getCoopUiMirror()?.beginSession("watcher", UiMode.ER_MAP, mirrorSeq);
     } catch {
       coopWarn("reward", "biome pick WATCHER map failed to open (still awaiting relay) (#848)");
@@ -695,6 +752,8 @@ export class SelectBiomePhase extends BattlePhase {
         !isCoopAuthoritativeGuestGated() || getAuthoritativeMapTravelClassification(wave).ready;
       if (classificationReady && erPendingNodesReady() && getErPendingNodes().length > 0) {
         this.coopRouteRetryAttempts = 0;
+        this.coopRouteRecoveryShown = false;
+        this.clearBiomeCommitRecovery();
         this.start();
         return;
       }
@@ -704,20 +763,11 @@ export class SelectBiomePhase extends BattlePhase {
         return;
       }
       this.coopRouteRecoveryShown = true;
-      globalScene.ui.showText(
-        "Could not recover the shared World Map routes. Reconnect, then confirm to retry.",
-        null,
-        () => {
-          if (!this.boundaryStillLive(generation, wave)) {
-            return;
-          }
-          this.coopRouteRecoveryShown = false;
-          this.coopRouteRetryAttempts = 0;
-          this.parkForAuthoritativeRoutes(wave);
-        },
-        null,
-        true,
-      );
+      this.parkBiomeCommitRecovery(() => {
+        this.coopRouteRecoveryShown = false;
+        this.coopRouteRetryAttempts = 0;
+        this.parkForAuthoritativeRoutes(wave);
+      });
     };
     this.coopRouteRetryTimer = setTimeout(retry, 500);
   }
@@ -727,6 +777,7 @@ export class SelectBiomePhase extends BattlePhase {
       clearTimeout(this.coopRouteRetryTimer);
       this.coopRouteRetryTimer = null;
     }
+    this.clearBiomeCommitRecovery();
     super.end();
   }
 
@@ -866,28 +917,137 @@ export class SelectBiomePhase extends BattlePhase {
     getCoopUiMirror()?.endSession();
     const generation = coopSessionGeneration();
     const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    if (!this.boundaryStillLive(generation, wave)) {
+      return;
+    }
+
+    const turn = globalScene.currentBattle?.turn ?? 0;
+    const boundaryRevision =
+      this.coopAdvancePinned >= 0
+        ? this.coopAdvancePinned
+        : Math.max(0, getCoopController()?.interactionCounter() ?? 0);
+    let recovery = this.coopCommitRecovery;
+    if (
+      recovery == null
+      || recovery.generation !== generation
+      || recovery.wave !== wave
+      || recovery.turn !== turn
+      || recovery.boundaryRevision !== boundaryRevision
+    ) {
+      this.clearBiomeCommitRecovery();
+      recovery = {
+        generation,
+        wave,
+        turn,
+        boundaryRevision,
+        token: ++this.coopCommitRecoveryToken,
+        retry,
+        retries: 0,
+        retryTimer: null,
+        deadlineTimer: null,
+        terminalRequested: false,
+      };
+      this.coopCommitRecovery = recovery;
+      const token = recovery.token;
+      recovery.deadlineTimer = setTimeout(() => {
+        const current = this.coopCommitRecovery;
+        if (current?.token !== token) {
+          return;
+        }
+        if (this.biomeCommitRecoveryStillLive(current)) {
+          this.exhaustBiomeCommitRecovery(current, "absolute deadline");
+        } else {
+          this.clearBiomeCommitRecovery();
+        }
+      }, coopBiomeContinuationRecoveryPolicy.deadlineMs);
+    } else {
+      // A later exact-receipt failure may provide a more specific re-await closure. Keep one supervisor and
+      // one timer, but always retry the newest fenced continuation rather than an obsolete callback.
+      recovery.retry = retry;
+    }
+
+    if (recovery.terminalRequested || recovery.retryTimer != null) {
+      return;
+    }
+    if (recovery.retries >= coopBiomeContinuationRecoveryPolicy.maxAutomaticRetries) {
+      this.exhaustBiomeCommitRecovery(recovery, "exact receipt retries exhausted");
+      return;
+    }
+
+    // MESSAGE is presentation only. A superseded/failed UI transition neither consumes another attempt nor
+    // blocks the exact receipt retry, so a cosmetic callback can never become a continuation softlock.
     globalScene.ui
-      .setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.boundaryStillLive(generation, wave))
-      .then(result => {
-        if (!this.boundaryStillLive(generation, wave)) {
-          return;
-        }
-        if (result === "superseded") {
-          this.parkBiomeCommitRecovery(retry);
-          return;
-        }
-        globalScene.ui.showText(
-          "Could not confirm the shared map transition. Reconnect, then confirm to retry.",
-          null,
-          () => {
-            if (this.boundaryStillLive(generation, wave)) {
-              retry();
-            }
-          },
-          null,
-          true,
-        );
-      });
+      .setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.biomeCommitRecoveryStillLive(recovery))
+      .catch(error => coopWarn("reward", "biome continuation recovery UI failed (retry remains armed)", error));
+    globalScene.ui.showText("Recovering the shared World Map transition…");
+
+    const token = recovery.token;
+    const delay = coopBiomeContinuationRecoveryPolicy.retryDelayMs * (recovery.retries + 1);
+    recovery.retryTimer = setTimeout(() => {
+      const current = this.coopCommitRecovery;
+      if (current?.token !== token) {
+        return;
+      }
+      if (!this.biomeCommitRecoveryStillLive(current)) {
+        this.clearBiomeCommitRecovery();
+        return;
+      }
+      current.retryTimer = null;
+      current.retries++;
+      const exactRetry = current.retry;
+      try {
+        exactRetry();
+      } catch (error) {
+        coopWarn("reward", "biome continuation exact retry threw - remaining closed", error);
+        this.parkBiomeCommitRecovery(exactRetry);
+      }
+    }, delay);
+  }
+
+  private biomeCommitRecoveryStillLive(recovery: CoopBiomeContinuationRecovery): boolean {
+    return (
+      this.coopCommitRecovery === recovery
+      && !recovery.terminalRequested
+      && this.boundaryStillLive(recovery.generation, recovery.wave)
+    );
+  }
+
+  private exhaustBiomeCommitRecovery(recovery: CoopBiomeContinuationRecovery, detail: string): void {
+    if (!this.biomeCommitRecoveryStillLive(recovery)) {
+      return;
+    }
+    recovery.terminalRequested = true;
+    if (recovery.retryTimer != null) {
+      clearTimeout(recovery.retryTimer);
+      recovery.retryTimer = null;
+    }
+    if (recovery.deadlineTimer != null) {
+      clearTimeout(recovery.deadlineTimer);
+      recovery.deadlineTimer = null;
+    }
+    coopWarn(
+      "reward",
+      `biome continuation recovery exhausted (${detail}) wave=${recovery.wave} turn=${recovery.turn} revision=${recovery.boundaryRevision}`,
+    );
+    failCoopSharedSession("The shared World Map transition could not recover.", {
+      boundary: "surface",
+      reasonCode: "continuation-failed",
+      wave: recovery.wave,
+      turn: recovery.turn,
+      boundaryRevision: recovery.boundaryRevision,
+    });
+  }
+
+  private clearBiomeCommitRecovery(): void {
+    const recovery = this.coopCommitRecovery;
+    this.coopCommitRecovery = null;
+    this.coopCommitRecoveryToken++;
+    if (recovery?.retryTimer != null) {
+      clearTimeout(recovery.retryTimer);
+    }
+    if (recovery?.deadlineTimer != null) {
+      clearTimeout(recovery.deadlineTimer);
+    }
   }
 
   /** Apply the transition only after authority is established (or immediately for host/solo/legacy). */

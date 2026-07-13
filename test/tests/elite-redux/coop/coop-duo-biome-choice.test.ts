@@ -35,7 +35,11 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { applyCoopFullSnapshot, captureCoopFullSnapshot } from "#data/elite-redux/coop/coop-battle-engine";
-import { resetCoopBiomeCommitWaitMs, setCoopBiomeCommitWaitMs } from "#data/elite-redux/coop/coop-biome-operation";
+import {
+  coopBiomeOperationId,
+  resetCoopBiomeCommitWaitMs,
+  setCoopBiomeCommitWaitMs,
+} from "#data/elite-redux/coop/coop-biome-operation";
 import {
   coopBiomeInteractionStartValue,
   resetCoopBiomePickerDrivenByTest,
@@ -50,6 +54,7 @@ import {
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_BIOME_PICK_SEQ_BASE, COOP_CROSSROADS_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
@@ -62,8 +67,16 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
-import { ErCrossroadsPhase } from "#phases/er-crossroads-phase";
-import { SelectBiomePhase } from "#phases/select-biome-phase";
+import {
+  ErCrossroadsPhase,
+  resetCoopCrossroadsContinuationRecoveryPolicyForTest,
+  setCoopCrossroadsContinuationRecoveryPolicyForTest,
+} from "#phases/er-crossroads-phase";
+import {
+  resetCoopBiomeContinuationRecoveryPolicyForTest,
+  SelectBiomePhase,
+  setCoopBiomeContinuationRecoveryPolicyForTest,
+} from "#phases/select-biome-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
@@ -189,6 +202,8 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     resetCoopRendezvousWaitMs();
     resetCoopOrphanGraceMs();
     resetCoopBiomeCommitWaitMs();
+    resetCoopBiomeContinuationRecoveryPolicyForTest();
+    resetCoopCrossroadsContinuationRecoveryPolicyForTest();
     resetCoopBiomePickerDrivenByTest();
     resetErBiomeStructure();
     setErPendingNodes([]);
@@ -242,6 +257,182 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       true;
     return phase;
   }
+
+  it("bounded map recovery retries automatically, deduplicates timers, and fences a replaced boundary", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    setCoopBiomeContinuationRecoveryPolicyForTest({
+      retryDelayMs: 5,
+      maxAutomaticRetries: 2,
+      deadlineMs: 100,
+    });
+
+    await withClient(rig.hostCtx, async () => {
+      rig.hostScene.currentBattle.waveIndex = 11;
+      rig.hostScene.currentBattle.turn = 4;
+      const pinned = rig.hostRuntime.controller.interactionCounter();
+      let live = true;
+      const phase = new SelectBiomePhase() as unknown as {
+        coopAdvancePinned: number;
+        boundaryStillLive(generation: number, wave: number): boolean;
+        parkBiomeCommitRecovery(retry: () => void): void;
+      };
+      phase.coopAdvancePinned = pinned;
+      phase.boundaryStillLive = () => live;
+      vi.spyOn(rig.hostScene.ui, "setModeBoundedWhen").mockResolvedValue("completed");
+      vi.spyOn(rig.hostScene.ui, "showText").mockImplementation(() => {});
+      const queue = vi.spyOn(rig.hostScene.phaseManager, "unshiftNew");
+      const firstRetry = vi.fn();
+
+      // Duplicate failure callbacks share one supervisor/timer. No confirm input is supplied.
+      phase.parkBiomeCommitRecovery(firstRetry);
+      phase.parkBiomeCommitRecovery(firstRetry);
+      await new Promise(resolve => setTimeout(resolve, 8));
+      expect(firstRetry, "the first exact retry is automatic and deduplicated").toHaveBeenCalledOnce();
+
+      const lateRetry = vi.fn();
+      phase.parkBiomeCommitRecovery(lateRetry);
+      live = false;
+      await new Promise(resolve => setTimeout(resolve, 25));
+      expect(lateRetry, "a callback from the replaced boundary is fenced").not.toHaveBeenCalled();
+      expect(
+        queue.mock.calls.some(call => call[0] === "SwitchBiomePhase"),
+        "recovery alone cannot authorize biome mutation",
+      ).toBe(false);
+      expect(rig.hostRuntime.controller.interactionCounter(), "recovery cannot advance ownership").toBe(pinned);
+    });
+  });
+
+  it("invalid map authority exhausts into the host shared terminal without RNG, mutation, or counter advance", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    setCoopBiomeCommitWaitMs(10);
+    setCoopBiomeContinuationRecoveryPolicyForTest({
+      retryDelayMs: 5,
+      maxAutomaticRetries: 1,
+      deadlineMs: 100,
+    });
+
+    await withClient(rig.hostCtx, async () => {
+      rig.hostScene.currentBattle.waveIndex = 11;
+      rig.hostScene.currentBattle.turn = 6;
+      const pinned = rig.hostRuntime.controller.interactionCounter();
+      const revealed: ErRouteNode[] = [
+        { biome: BiomeId.FOREST, revealed: true },
+        { biome: BiomeId.VOLCANO, revealed: true },
+      ];
+      const phase = new SelectBiomePhase() as unknown as {
+        coopAdvancePinned: number;
+        boundaryStillLive(generation: number, wave: number): boolean;
+        applyBiomeWatcherDecision(
+          nodes: ErRouteNode[],
+          operationId: string,
+          expectedPinned: number,
+          role: "host" | "guest",
+          result: { choice: number; data?: number[] },
+          committed: boolean,
+        ): Promise<void>;
+        applyNextBiomeAndEnd(nextBiome: BiomeId): boolean;
+        coopCommitRecovery: {
+          wave: number;
+          turn: number;
+          boundaryRevision: number;
+          terminalRequested: boolean;
+        } | null;
+      };
+      phase.coopAdvancePinned = pinned;
+      phase.boundaryStillLive = () => true;
+      vi.spyOn(rig.hostScene.ui, "setModeBoundedWhen").mockResolvedValue("completed");
+      vi.spyOn(rig.hostScene.ui, "showText").mockImplementation(() => {});
+      const apply = vi.spyOn(phase, "applyNextBiomeAndEnd");
+      const randomBiome = vi.spyOn(rig.hostScene, "generateRandomBiome");
+      const queue = vi.spyOn(rig.hostScene.phaseManager, "unshiftNew");
+      const operationId = coopBiomeOperationId("BIOME_PICK", COOP_BIOME_PICK_SEQ_BASE + pinned, pinned);
+
+      await phase.applyBiomeWatcherDecision(revealed, operationId, pinned, "host", { choice: 99 }, true);
+      for (let i = 0; i < 30 && rig.hostRuntime.localTransport.state !== "closed"; i++) {
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+
+      expect(apply, "invalid/missing authority cannot reach the biome terminal").not.toHaveBeenCalled();
+      expect(randomBiome, "the renderer never derives a fallback biome").not.toHaveBeenCalled();
+      expect(
+        queue.mock.calls.some(call => call[0] === "SwitchBiomePhase"),
+        "no uncommitted switch is queued",
+      ).toBe(false);
+      expect(rig.hostRuntime.controller.interactionCounter(), "missing authority cannot advance ownership").toBe(
+        pinned,
+      );
+      expect(phase.coopCommitRecovery, "the terminal is addressed to the exact failed map boundary").toMatchObject({
+        wave: 11,
+        turn: 6,
+        boundaryRevision: pinned,
+        terminalRequested: true,
+      });
+      expect(rig.hostRuntime.localTransport.state, "host exhaustion clears its shared runtime").toBe("closed");
+    });
+  });
+
+  it("invalid crossroads authority exhausts into the guest shared terminal without applying or advancing", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    setCoopBiomeCommitWaitMs(10);
+    setCoopCrossroadsContinuationRecoveryPolicyForTest({
+      retryDelayMs: 5,
+      maxAutomaticRetries: 1,
+      deadlineMs: 100,
+    });
+
+    await withClient(rig.guestCtx, async () => {
+      rig.guestScene.currentBattle.waveIndex = 11;
+      rig.guestScene.currentBattle.turn = 7;
+      const pinned = rig.guestRuntime.controller.interactionCounter();
+      const phase = new ErCrossroadsPhase() as unknown as {
+        coopStartCounter: number;
+        boundaryStillLive(generation: number, wave: number): boolean;
+        applyCrossroadsWatcherDecision(
+          expectedPinned: number,
+          operationId: string,
+          role: "host" | "guest",
+          result: { choice: number },
+          committed: boolean,
+        ): void;
+        coopApply(expectedPinned: number, moveOn: boolean): boolean;
+        coopCommitRecovery: {
+          wave: number;
+          turn: number;
+          boundaryRevision: number;
+          terminalRequested: boolean;
+        } | null;
+      };
+      phase.coopStartCounter = pinned;
+      phase.boundaryStillLive = () => true;
+      vi.spyOn(rig.guestScene.ui, "setModeBoundedWhen").mockResolvedValue("completed");
+      vi.spyOn(rig.guestScene.ui, "showText").mockImplementation(() => {});
+      const apply = vi.spyOn(phase, "coopApply");
+      const operationId = coopBiomeOperationId("CROSSROADS_PICK", COOP_CROSSROADS_SEQ_BASE + pinned, pinned);
+
+      phase.applyCrossroadsWatcherDecision(pinned, operationId, "guest", { choice: 99 }, true);
+      for (let i = 0; i < 30 && rig.guestRuntime.localTransport.state !== "closed"; i++) {
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+
+      expect(apply, "invalid/missing authority cannot execute Stay or Leave").not.toHaveBeenCalled();
+      expect(rig.guestRuntime.controller.interactionCounter(), "missing authority cannot advance ownership").toBe(
+        pinned,
+      );
+      expect(
+        phase.coopCommitRecovery,
+        "the terminal is addressed to the exact failed crossroads boundary",
+      ).toMatchObject({
+        wave: 11,
+        turn: 7,
+        boundaryRevision: pinned,
+        terminalRequested: true,
+      });
+      expect(rig.guestRuntime.localTransport.state, "guest exhaustion clears its shared runtime").toBe("closed");
+    });
+  });
 
   /** Drive the OWNER crossroads: start (opens mocked OPTION_SELECT after the #858 boundary barrier), then
    *  press Stay(0)/Leave(1). The owner drives alone here, so its reciprocal boundary barrier resolves via
@@ -471,15 +662,17 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     ui.showText = () => {
       // Hold the explicit recovery action: authority loss must park rather than self-select.
     };
+    const phase = liveSelectBiome();
     try {
       await withClient(watcherCtx, async () => {
-        liveSelectBiome().start();
+        phase.start();
         for (let i = 0; i < 40; i++) {
           await drainLoopback();
           await new Promise(resolve => setTimeout(resolve, 2));
         }
       });
     } finally {
+      (phase as unknown as { clearBiomeCommitRecovery(): void }).clearBiomeCommitRecovery();
       cap.restore();
     }
 
@@ -549,10 +742,10 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     withClientSync(ownerCtx, () => ownerCtx.runtime.controller.advanceInteraction(counterBefore));
     await drainLoopback();
 
+    const phase = liveSelectBiome();
     try {
       await withClient(watcherCtx, async () => {
         setCoopBiomeInteractionStart(counterBefore); // chained pin -> the watcher takes coopBiomePickWatch
-        const phase = liveSelectBiome();
         phase.start();
         for (let i = 0; i < 200; i++) {
           await drainLoopback();
@@ -566,6 +759,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         );
       });
     } finally {
+      (phase as unknown as { clearBiomeCommitRecovery(): void }).clearBiomeCommitRecovery();
       watcherTracker.restore();
     }
 
