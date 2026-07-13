@@ -181,7 +181,14 @@ import { WeatherType } from "#enums/weather-type";
 import { EnemyPokemon, PlayerPokemon, type Pokemon } from "#field/pokemon";
 import { Modifier, PersistentModifier } from "#modifiers/modifier";
 import type { ModifierOverride } from "#modifiers/modifier-type";
-import { PokemonModifierType, PokemonReviveModifierType } from "#modifiers/modifier-type";
+import {
+  ErLearnersShroomModifierType,
+  ErTmCaseModifierType,
+  PokemonModifierType,
+  PokemonReviveModifierType,
+  RememberMoveModifierType,
+  TmModifierType,
+} from "#modifiers/modifier-type";
 import { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import {
   getActiveCoopReplayMePhaseForHarness,
@@ -1895,8 +1902,12 @@ export async function driveHostTeachMoveRewardOwner(
   hostPhase.start();
   await drainLoopback();
   const pinned = hostPhase.coopInteractionStart;
-  const rewardIndex = (hostPhase.typeOptions as { type?: { id?: string } }[]).findIndex(option =>
-    ["TM", "MEMORY_MUSHROOM", "ER_LEARNERS_SHROOM", "TM_CASE"].includes(option.type?.id ?? ""),
+  const rewardIndex = (hostPhase.typeOptions as { type?: unknown }[]).findIndex(
+    option =>
+      option.type instanceof TmModifierType
+      || option.type instanceof RememberMoveModifierType
+      || option.type instanceof ErLearnersShroomModifierType
+      || option.type instanceof ErTmCaseModifierType,
   );
   if (rewardIndex < 0) {
     throw new Error(`teach-move reward owner found no compatible reward at interaction ${pinned}`);
