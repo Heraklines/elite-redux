@@ -208,7 +208,28 @@ const systemShortKeys = {
 const CLOUD_SYNC_MIN_INTERVAL_MS = 20 * 60 * 1000;
 const CLOUD_SYNC_BACKOFF_BASE_MS = 20 * 60 * 1000;
 const CLOUD_SYNC_BACKOFF_MAX_MS = 6 * 60 * 60 * 1000;
-const COOP_RESUME_SLOT_LOOKUP_TIMEOUT_MS = 2_000;
+const COOP_PERSISTENCE_LOCK_ACQUIRE_TIMEOUT_MS = 2_000;
+const COOP_PERSISTENCE_NETWORK_TIMEOUT_MS = 5_000;
+
+export interface CoopPersistenceClock {
+  lockAcquireTimeoutMs: number;
+  networkTimeoutMs: number;
+  schedule(callback: () => void, delayMs: number): unknown;
+  cancel(handle: unknown): void;
+}
+
+const defaultCoopPersistenceClock: CoopPersistenceClock = {
+  lockAcquireTimeoutMs: COOP_PERSISTENCE_LOCK_ACQUIRE_TIMEOUT_MS,
+  networkTimeoutMs: COOP_PERSISTENCE_NETWORK_TIMEOUT_MS,
+  schedule: (callback, delayMs) => setTimeout(callback, delayMs),
+  cancel: handle => clearTimeout(handle as ReturnType<typeof setTimeout>),
+};
+let coopPersistenceClock = defaultCoopPersistenceClock;
+
+/** Inject a deterministic clock for production-path persistence tests without wall-clock sleeps. */
+export function setCoopPersistenceClockForTesting(clock: CoopPersistenceClock | null): void {
+  coopPersistenceClock = clock ?? defaultCoopPersistenceClock;
+}
 
 interface CoopResumeCloudCas {
   mode: "empty" | "existing";
@@ -222,6 +243,21 @@ interface CoopKnownCloudHead {
   runId: string;
   checkpointRevision: number;
   digest: string;
+}
+
+interface CoopDuplicateConvergenceDebt {
+  version: 1;
+  loserSlot: number;
+  loser: CoopKnownCloudHead;
+  survivorSlot: number;
+  survivor: CoopKnownCloudHead;
+}
+
+interface CoopDuplicateLocalFence {
+  storageKey: string;
+  localRaw: string | null;
+  head: CoopKnownCloudHeadState;
+  removeLocal: boolean;
 }
 
 type CoopKnownCloudHeadState =
@@ -253,6 +289,10 @@ type CoopCloudCasClientResult =
       ok: false;
       error: string;
       failureKind: "conflict" | "invalid" | "unauthorized" | "unsupported" | "too-large" | "transient";
+      /** Only the exact frozen parent permits a local-only checkpoint to continue as durable debt. */
+      continuationSafe: boolean;
+      /** Rollback is permitted only when readback proves the exact frozen parent still owns the slot. */
+      rollbackSafe: boolean;
     };
 
 interface CoopFreshSessionSlotClaim {
@@ -955,7 +995,7 @@ export class GameData {
           const mutation = await this.updateCoopCloudCas(session.slot, session.data, parsedSession, importDisposition);
           return mutation.ok ? "" : mutation.error;
         }
-        return pokerogueApi.savedata.session.update(
+        return this.updateSessionBounded(
           {
             slot: session.slot,
             trainerId: this.trainerId,
@@ -1837,7 +1877,7 @@ export class GameData {
       if (lineageHeadBeforeStatus.kind === "invalid") {
         throw new CoopResumeReplicaUnavailableError(`cloud head for run ${localCommitment.runId} is malformed`);
       }
-      const localStatus = await pokerogueApi.savedata.session.getCoopRunStatus({
+      const localStatus = await this.readCoopRunStatus({
         clientSessionId,
         coopRunId: localCommitment.runId,
         slot: slotId,
@@ -1934,7 +1974,7 @@ export class GameData {
     if (lineageHeadBeforeStatus.kind === "invalid") {
       throw new CoopResumeReplicaUnavailableError(`cloud head for run ${commitment.runId} is malformed`);
     }
-    const status = await pokerogueApi.savedata.session.getCoopRunStatus({
+    const status = await this.readCoopRunStatus({
       clientSessionId,
       coopRunId: commitment.runId,
       slot: slotId,
@@ -2116,10 +2156,7 @@ export class GameData {
         const mutation = await this.updateCoopCloudCas(slotId, updatedDataStr, sessionData);
         return mutation.ok ? "" : mutation.error;
       }
-      return pokerogueApi.savedata.session.update(
-        { slot: slotId, trainerId, secretId, clientSessionId },
-        updatedDataStr,
-      );
+      return this.updateSessionBounded({ slot: slotId, trainerId, secretId, clientSessionId }, updatedDataStr);
     });
 
     if (response) {
@@ -2429,23 +2466,234 @@ export class GameData {
     }
   }
 
-  private async readCoopCas(
-    slot: number,
-  ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.getCoopCas>>> {
-    let lookupTimer: ReturnType<typeof setTimeout> | undefined;
+  private coopDuplicateConvergenceDebtKey(accountIdentity: string, loserSlot: number): string {
+    return `er-coop-duplicate-debt:${accountIdentity.normalize("NFKC").toLowerCase()}:${loserSlot}`;
+  }
+
+  private coopKnownHeadFromCommitment(
+    commitment: Pick<CoopResumeCommitment, "runId" | "checkpointRevision" | "digest">,
+  ): CoopKnownCloudHead {
+    return {
+      version: 1,
+      runId: commitment.runId,
+      checkpointRevision: commitment.checkpointRevision,
+      digest: commitment.digest,
+    };
+  }
+
+  private isValidCoopKnownHead(value: unknown): value is CoopKnownCloudHead {
+    if (value == null || typeof value !== "object" || Array.isArray(value)) {
+      return false;
+    }
+    const head = value as Partial<CoopKnownCloudHead>;
+    return (
+      head.version === 1
+      && isCoopRunId(head.runId)
+      && Number.isSafeInteger(head.checkpointRevision)
+      && (head.checkpointRevision ?? -1) >= 0
+      && typeof head.digest === "string"
+      && /^[0-9a-f]{64}$/u.test(head.digest)
+    );
+  }
+
+  private readCoopDuplicateConvergenceDebt(
+    accountIdentity: string,
+    loserSlot: number,
+  ):
+    | { kind: "absent" }
+    | { kind: "invalid"; raw: string }
+    | { kind: "valid"; raw: string; debt: CoopDuplicateConvergenceDebt } {
+    const raw = localStorage.getItem(this.coopDuplicateConvergenceDebtKey(accountIdentity, loserSlot));
+    if (raw == null) {
+      return { kind: "absent" };
+    }
+    try {
+      const debt = JSON.parse(raw) as Partial<CoopDuplicateConvergenceDebt>;
+      return debt.version === 1
+        && debt.loserSlot === loserSlot
+        && Number.isSafeInteger(debt.survivorSlot)
+        && (debt.survivorSlot ?? -1) >= 0
+        && (debt.survivorSlot ?? 5) < 5
+        && debt.survivorSlot !== loserSlot
+        && this.isValidCoopKnownHead(debt.loser)
+        && this.isValidCoopKnownHead(debt.survivor)
+        && debt.loser.runId === debt.survivor.runId
+        ? { kind: "valid", raw, debt: debt as CoopDuplicateConvergenceDebt }
+        : { kind: "invalid", raw };
+    } catch {
+      return { kind: "invalid", raw };
+    }
+  }
+
+  private recordCoopDuplicateConvergenceDebt(
+    accountIdentity: string,
+    loserSlot: number,
+    loser: CoopResumeCommitment,
+    survivorSlot: number,
+    survivor: CoopResumeCommitment,
+  ): boolean {
+    if (!this.persistenceAccountIsCurrent(accountIdentity)) {
+      return false;
+    }
+    const key = this.coopDuplicateConvergenceDebtKey(accountIdentity, loserSlot);
+    const current = this.readCoopDuplicateConvergenceDebt(accountIdentity, loserSlot);
+    const debt: CoopDuplicateConvergenceDebt = {
+      version: 1,
+      loserSlot,
+      loser: this.coopKnownHeadFromCommitment(loser),
+      survivorSlot,
+      survivor: this.coopKnownHeadFromCommitment(survivor),
+    };
+    const raw = JSON.stringify(debt);
+    if (current.kind === "invalid") {
+      return false;
+    }
+    if (current.kind === "valid") {
+      return current.raw === raw;
+    }
+    return trySetLocalStorageItem(key, raw) && localStorage.getItem(key) === raw;
+  }
+
+  private clearCoopDuplicateConvergenceDebt(accountIdentity: string, loserSlot: number, expectedRaw: string): boolean {
+    const key = this.coopDuplicateConvergenceDebtKey(accountIdentity, loserSlot);
+    try {
+      if (localStorage.getItem(key) !== expectedRaw) {
+        return false;
+      }
+      localStorage.removeItem(key);
+      return localStorage.getItem(key) == null;
+    } catch (error) {
+      coopWarn("launch", `duplicate convergence debt cleanup failed slot=${loserSlot}`, error);
+      return false;
+    }
+  }
+
+  private async withCoopPersistenceNetworkTimeout<T>(operation: Promise<T>, timeoutValue: T): Promise<T> {
+    let timer: unknown;
     return Promise.race([
-      pokerogueApi.savedata.session.getCoopCas({ slot, clientSessionId }),
-      new Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.getCoopCas>>>(resolve => {
-        lookupTimer = setTimeout(
-          () => resolve({ ok: false, status: null, error: "Co-op session read timed out.", failureKind: "transient" }),
-          COOP_RESUME_SLOT_LOOKUP_TIMEOUT_MS,
-        );
+      operation,
+      new Promise<T>(resolve => {
+        timer = coopPersistenceClock.schedule(() => resolve(timeoutValue), coopPersistenceClock.networkTimeoutMs);
       }),
     ]).finally(() => {
-      if (lookupTimer != null) {
-        clearTimeout(lookupTimer);
+      if (timer != null) {
+        coopPersistenceClock.cancel(timer);
       }
     });
+  }
+
+  private readCoopCas(slot: number): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.getCoopCas>>> {
+    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.getCoopCas({ slot, clientSessionId }), {
+      ok: false,
+      status: null,
+      error: "Co-op session read timed out.",
+      failureKind: "transient",
+    });
+  }
+
+  private readCoopRunStatus(
+    request: Parameters<typeof pokerogueApi.savedata.session.getCoopRunStatus>[0],
+  ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.getCoopRunStatus>>> {
+    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.getCoopRunStatus(request), {
+      ok: false,
+      status: null,
+      error: "Co-op run status timed out.",
+      failureKind: "transient",
+    });
+  }
+
+  private updateCoopCasBounded(
+    request: Parameters<typeof pokerogueApi.savedata.session.updateCoopCas>[0],
+    raw: string,
+  ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.updateCoopCas>>> {
+    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.updateCoopCas(request, raw), {
+      ok: false,
+      status: null,
+      error: "Co-op cloud CAS timed out.",
+      failureKind: "transient",
+    });
+  }
+
+  private deleteCoopDuplicateExactBounded(
+    request: Parameters<typeof pokerogueApi.savedata.session.deleteCoopDuplicateExact>[0],
+  ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.deleteCoopDuplicateExact>>> {
+    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.deleteCoopDuplicateExact(request), {
+      ok: false,
+      status: null,
+      error: "Co-op duplicate delete timed out.",
+      failureKind: "transient",
+    });
+  }
+
+  private deleteCoopCasBounded(
+    request: Parameters<typeof pokerogueApi.savedata.session.deleteCoopCas>[0],
+  ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.deleteCoopCas>>> {
+    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.deleteCoopCas(request), {
+      ok: false,
+      status: null,
+      error: "Co-op checkpoint delete timed out.",
+      failureKind: "transient",
+    });
+  }
+
+  private deleteLegacyCoopExactBounded(
+    request: Parameters<typeof pokerogueApi.savedata.session.deleteLegacyCoopExact>[0],
+  ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.deleteLegacyCoopExact>>> {
+    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.deleteLegacyCoopExact(request), {
+      ok: false,
+      status: null,
+      error: "Legacy co-op checkpoint delete timed out.",
+      failureKind: "transient",
+    });
+  }
+
+  private deleteOpaqueExactBounded(
+    request: Parameters<typeof pokerogueApi.savedata.session.deleteOpaqueExact>[0],
+  ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.deleteOpaqueExact>>> {
+    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.deleteOpaqueExact(request), {
+      ok: false,
+      status: null,
+      error: "Opaque checkpoint delete timed out.",
+      failureKind: "transient",
+    });
+  }
+
+  private deleteSessionBounded(
+    request: Parameters<typeof pokerogueApi.savedata.session.delete>[0],
+  ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.delete>>> {
+    return this.withCoopPersistenceNetworkTimeout(
+      pokerogueApi.savedata.session.delete(request),
+      "Session delete timed out.",
+    );
+  }
+
+  private updateSessionBounded(
+    request: Parameters<typeof pokerogueApi.savedata.session.update>[0],
+    raw: string,
+  ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.update>>> {
+    return this.withCoopPersistenceNetworkTimeout(
+      pokerogueApi.savedata.session.update(request, raw),
+      "Session update timed out.",
+    );
+  }
+
+  private clearSessionBounded(
+    request: Parameters<typeof pokerogueApi.savedata.session.clear>[0],
+    session: Parameters<typeof pokerogueApi.savedata.session.clear>[1],
+  ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.session.clear>>> {
+    return this.withCoopPersistenceNetworkTimeout(pokerogueApi.savedata.session.clear(request, session), {
+      success: false,
+      error: "Session clear timed out.",
+    });
+  }
+
+  private updateAllBounded(
+    request: Parameters<typeof pokerogueApi.savedata.updateAll>[0],
+  ): Promise<Awaited<ReturnType<typeof pokerogueApi.savedata.updateAll>>> {
+    return this.withCoopPersistenceNetworkTimeout(
+      pokerogueApi.savedata.updateAll(request),
+      "Combined cloud save timed out.",
+    );
   }
 
   private async classifyCoopReplica(slot: number, raw: string): Promise<CoopClassifiedReplica> {
@@ -2486,6 +2734,93 @@ export class GameData {
     );
   }
 
+  private coopHeadMatchesCommitment(
+    head: Pick<CoopKnownCloudHead, "runId" | "checkpointRevision" | "digest">,
+    commitment: Pick<CoopResumeCommitment, "runId" | "checkpointRevision" | "digest">,
+  ): boolean {
+    return (
+      head.runId === commitment.runId
+      && head.checkpointRevision === commitment.checkpointRevision
+      && head.digest === commitment.digest
+    );
+  }
+
+  private async captureCoopDuplicateLocalFence(
+    loserSlot: number,
+    loser: Pick<CoopResumeCommitment, "runId" | "checkpointRevision" | "digest">,
+    survivor: CoopClassifiedReplica,
+    accountIdentity: string,
+  ): Promise<CoopDuplicateLocalFence | null> {
+    if (survivor.commitment == null || loser.runId !== survivor.commitment.runId) {
+      return null;
+    }
+    const head = this.readKnownCoopCloudHead(loserSlot, accountIdentity);
+    if (head.kind === "invalid" || (head.kind === "valid" && !this.coopHeadMatchesCommitment(head.head, loser))) {
+      return null;
+    }
+    const storageKey = this.sessionStorageKeyForAccount(loserSlot, accountIdentity);
+    const localRaw = localStorage.getItem(storageKey);
+    if (localRaw == null) {
+      return { storageKey, localRaw, head, removeLocal: false };
+    }
+    try {
+      const local = await this.classifyCoopReplica(loserSlot, decrypt(localRaw, bypassLogin));
+      const localCommitment = local.commitment;
+      if (
+        localCommitment == null
+        || !this.sameCoopReplicaLineage(localCommitment, survivor.commitment)
+        || localCommitment.checkpointRevision > survivor.commitment.checkpointRevision
+        || (localCommitment.checkpointRevision === survivor.commitment.checkpointRevision
+          && localCommitment.digest !== survivor.commitment.digest)
+      ) {
+        return null;
+      }
+      return { storageKey, localRaw, head, removeLocal: true };
+    } catch {
+      return null;
+    }
+  }
+
+  private async finishCoopDuplicateLocalCleanup(
+    accountIdentity: string,
+    loserSlot: number,
+    loserRunId: string,
+    expectedDebtRaw: string,
+    fence: CoopDuplicateLocalFence,
+    contextIsCurrent: () => boolean,
+  ): Promise<boolean> {
+    const cleaned = await this.withCoopResumePersistenceLease(async () => {
+      const debt = this.readCoopDuplicateConvergenceDebt(accountIdentity, loserSlot);
+      if (
+        !contextIsCurrent()
+        || debt.kind !== "valid"
+        || debt.raw !== expectedDebtRaw
+        || localStorage.getItem(fence.storageKey) !== fence.localRaw
+        || !this.coopCloudHeadStateMatches(this.readKnownCoopCloudHead(loserSlot, accountIdentity), fence.head)
+      ) {
+        return false;
+      }
+      if (fence.removeLocal && fence.localRaw != null) {
+        try {
+          localStorage.removeItem(fence.storageKey);
+        } catch (error) {
+          coopWarn("launch", `duplicate local cleanup failed slot=${loserSlot}`, error);
+          return false;
+        }
+        if (localStorage.getItem(fence.storageKey) != null) {
+          return false;
+        }
+      }
+      if (fence.head.kind === "valid" && !this.clearKnownCoopCloudHead(loserSlot, accountIdentity, loserRunId)) {
+        return false;
+      }
+      // Clear the intent last. A crash at any earlier instruction leaves enough exact evidence for
+      // the next discovery scan to finish the same deletion idempotently.
+      return this.clearCoopDuplicateConvergenceDebt(accountIdentity, loserSlot, expectedDebtRaw);
+    }, accountIdentity);
+    return cleaned === true;
+  }
+
   /**
    * Read every cloud slot with typed status and converge pre-existing same-run duplicates. The
    * documented survivor policy is highest checkpoint revision; byte-identical equal revisions use
@@ -2523,6 +2858,98 @@ export class GameData {
       replicas.set(slot, await this.classifyCoopReplica(slot, read.rawSavedata));
     }
 
+    // Resume any exact duplicate-deletion intent that survived a tab/browser crash. The debt is
+    // recorded before the destructive request and removed only after cloud proofs plus local/head
+    // cleanup, so every crash cut converges on the next complete scan.
+    for (let loserSlot = 0; loserSlot < 5; loserSlot++) {
+      const debtState = this.readCoopDuplicateConvergenceDebt(accountIdentity, loserSlot);
+      if (debtState.kind === "invalid") {
+        throw new CoopResumeReplicaUnavailableError(`duplicate convergence debt is malformed for slot ${loserSlot}`);
+      }
+      if (debtState.kind === "absent") {
+        continue;
+      }
+      const { debt } = debtState;
+      const loser = replicas.get(loserSlot) ?? null;
+      const survivor = replicas.get(debt.survivorSlot) ?? null;
+      if (
+        survivor?.commitment == null
+        || !this.coopHeadMatchesCommitment(debt.survivor, survivor.commitment)
+        || (loser?.commitment != null && !this.coopHeadMatchesCommitment(debt.loser, loser.commitment))
+        || (loser != null && loser.commitment == null)
+      ) {
+        throw new CoopResumeReplicaUnavailableError(
+          `duplicate convergence debt no longer matches its exact cloud pair for slot ${loserSlot}`,
+        );
+      }
+      const fence = await this.captureCoopDuplicateLocalFence(loserSlot, debt.loser, survivor, accountIdentity);
+      if (fence == null) {
+        throw new CoopResumeReplicaUnavailableError(
+          `duplicate convergence debt has conflicting local lineage for slot ${loserSlot}`,
+        );
+      }
+      const convergence = await enqueueSessionCloudMutation(accountIdentity, async () => {
+        const currentDebt = this.readCoopDuplicateConvergenceDebt(accountIdentity, loserSlot);
+        if (
+          !scanContextIsCurrent()
+          || currentDebt.kind !== "valid"
+          || currentDebt.raw !== debtState.raw
+          || localStorage.getItem(fence.storageKey) !== fence.localRaw
+          || !this.coopCloudHeadStateMatches(this.readKnownCoopCloudHead(loserSlot, accountIdentity), fence.head)
+        ) {
+          return null;
+        }
+        let mutationOutcome = "already-absent";
+        if (loser != null) {
+          const mutation = await this.deleteCoopDuplicateExactBounded({
+            slot: loserSlot,
+            clientSessionId,
+            coopCasRunId: debt.loser.runId,
+            coopCasCheckpointRevision: debt.loser.checkpointRevision,
+            coopCasDigest: debt.loser.digest,
+            survivorSlot: debt.survivorSlot,
+            survivorCheckpointRevision: debt.survivor.checkpointRevision,
+            survivorDigest: debt.survivor.digest,
+          });
+          mutationOutcome = mutation.ok ? "ok" : mutation.failureKind;
+        }
+        if (!scanContextIsCurrent()) {
+          return null;
+        }
+        const [loserProof, survivorProof] = await Promise.all([
+          this.readCoopCas(loserSlot),
+          this.readCoopCas(debt.survivorSlot),
+        ]);
+        return scanContextIsCurrent() ? { mutationOutcome, loserProof, survivorProof } : null;
+      });
+      if (
+        convergence == null
+        || convergence.loserProof.ok
+        || convergence.loserProof.failureKind !== "missing"
+        || !convergence.survivorProof.ok
+        || convergence.survivorProof.rawSavedata !== survivor.raw
+      ) {
+        throw new CoopResumeReplicaUnavailableError(
+          `recorded duplicate convergence could not prove its terminal cloud state for slot ${loserSlot}`,
+        );
+      }
+      if (
+        !(await this.finishCoopDuplicateLocalCleanup(
+          accountIdentity,
+          loserSlot,
+          debt.loser.runId,
+          debtState.raw,
+          fence,
+          scanContextIsCurrent,
+        ))
+      ) {
+        throw new CoopResumeReplicaUnavailableError(
+          `recorded duplicate convergence could not finish local cleanup for slot ${loserSlot}`,
+        );
+      }
+      replicas.set(loserSlot, null);
+    }
+
     const byRun = new Map<string, CoopClassifiedReplica[]>();
     for (const replica of replicas.values()) {
       if (replica?.commitment != null) {
@@ -2551,60 +2978,49 @@ export class GameData {
         throw new CoopResumeReplicaUnavailableError(`duplicate run ${runId} has an equal-revision fork`);
       }
       for (const duplicate of ordered.slice(1)) {
-        const duplicateHead = this.readKnownCoopCloudHead(duplicate.slot, accountIdentity);
-        if (
-          duplicateHead.kind === "invalid"
-          || (duplicateHead.kind === "valid" && duplicateHead.head.runId !== runId)
-        ) {
+        const fence = await this.captureCoopDuplicateLocalFence(
+          duplicate.slot,
+          duplicate.commitment!,
+          survivor,
+          accountIdentity,
+        );
+        if (fence == null) {
           throw new CoopResumeReplicaUnavailableError(`duplicate slot ${duplicate.slot} has conflicting local lineage`);
         }
-        const duplicateStorageKey = this.sessionStorageKeyForAccount(duplicate.slot, accountIdentity);
-        const duplicateLocalBeforeMutation = localStorage.getItem(duplicateStorageKey);
-        let removeCapturedLocalDuplicate = false;
-        if (duplicateLocalBeforeMutation != null) {
-          try {
-            const localReplica = await this.classifyCoopReplica(
-              duplicate.slot,
-              decrypt(duplicateLocalBeforeMutation, bypassLogin),
-            );
-            if (localReplica.commitment?.runId === runId) {
-              if (
-                !this.sameCoopReplicaLineage(localReplica.commitment, survivor.commitment!)
-                || localReplica.commitment.checkpointRevision > survivor.commitment!.checkpointRevision
-                || (localReplica.commitment.checkpointRevision === survivor.commitment!.checkpointRevision
-                  && localReplica.commitment.digest !== survivor.commitment!.digest)
-              ) {
-                throw new CoopResumeReplicaUnavailableError(
-                  `duplicate slot ${duplicate.slot} local same-run bytes are not dominated by the exact survivor`,
-                );
-              }
-              removeCapturedLocalDuplicate = true;
-            } else if (localReplica.protection === "unknown") {
-              throw new CoopResumeReplicaUnavailableError(
-                `duplicate slot ${duplicate.slot} local bytes could not be classified before exact repair`,
-              );
-            }
-          } catch (error) {
-            if (error instanceof CoopResumeReplicaUnavailableError) {
-              throw error;
-            }
-            throw new CoopResumeReplicaUnavailableError(
-              `duplicate slot ${duplicate.slot} local bytes could not be authenticated`,
-            );
-          }
-        }
-        const convergence = await enqueueSessionCloudMutation(accountIdentity, async () => {
+        const debtRecorded = await this.withCoopResumePersistenceLease(async () => {
           if (
             !scanContextIsCurrent()
-            || localStorage.getItem(duplicateStorageKey) !== duplicateLocalBeforeMutation
-            || !this.coopCloudHeadStateMatches(
-              this.readKnownCoopCloudHead(duplicate.slot, accountIdentity),
-              duplicateHead,
-            )
+            || localStorage.getItem(fence.storageKey) !== fence.localRaw
+            || !this.coopCloudHeadStateMatches(this.readKnownCoopCloudHead(duplicate.slot, accountIdentity), fence.head)
+          ) {
+            return false;
+          }
+          return this.recordCoopDuplicateConvergenceDebt(
+            accountIdentity,
+            duplicate.slot,
+            duplicate.commitment!,
+            survivor.slot,
+            survivor.commitment!,
+          );
+        }, accountIdentity);
+        const debtState = this.readCoopDuplicateConvergenceDebt(accountIdentity, duplicate.slot);
+        if (debtRecorded !== true || debtState.kind !== "valid") {
+          throw new CoopResumeReplicaUnavailableError(
+            `duplicate slot ${duplicate.slot} could not durably record convergence intent`,
+          );
+        }
+        const convergence = await enqueueSessionCloudMutation(accountIdentity, async () => {
+          const currentDebt = this.readCoopDuplicateConvergenceDebt(accountIdentity, duplicate.slot);
+          if (
+            !scanContextIsCurrent()
+            || currentDebt.kind !== "valid"
+            || currentDebt.raw !== debtState.raw
+            || localStorage.getItem(fence.storageKey) !== fence.localRaw
+            || !this.coopCloudHeadStateMatches(this.readKnownCoopCloudHead(duplicate.slot, accountIdentity), fence.head)
           ) {
             return null;
           }
-          const mutation = await pokerogueApi.savedata.session.deleteCoopDuplicateExact({
+          const mutation = await this.deleteCoopDuplicateExactBounded({
             slot: duplicate.slot,
             clientSessionId,
             coopCasRunId: runId,
@@ -2624,7 +3040,9 @@ export class GameData {
           return scanContextIsCurrent() ? { mutation, loserProof, survivorProof } : null;
         });
         if (convergence == null) {
-          throw new CoopResumeReplicaUnavailableError("account/runtime/local lineage changed during duplicate convergence");
+          throw new CoopResumeReplicaUnavailableError(
+            "account/runtime/local lineage changed during duplicate convergence",
+          );
         }
         const { mutation, loserProof, survivorProof } = convergence;
         const survivorExact = survivorProof.ok && survivorProof.rawSavedata === survivor.raw;
@@ -2634,33 +3052,16 @@ export class GameData {
             `duplicate convergence failed (${mutation.ok ? "unproved" : mutation.failureKind}) for run ${runId}`,
           );
         }
-        const lineageCleaned = await this.withCoopResumePersistenceLease(async () => {
-          if (
-            !scanContextIsCurrent()
-            || localStorage.getItem(duplicateStorageKey) !== duplicateLocalBeforeMutation
-            || !this.coopCloudHeadStateMatches(
-              this.readKnownCoopCloudHead(duplicate.slot, accountIdentity),
-              duplicateHead,
-            )
-          ) {
-            return false;
-          }
-          if (duplicateLocalBeforeMutation != null && removeCapturedLocalDuplicate) {
-            try {
-              localStorage.removeItem(duplicateStorageKey);
-            } catch (error) {
-              coopWarn("launch", `duplicate local cleanup failed slot=${duplicate.slot}`, error);
-              return false;
-            }
-            if (localStorage.getItem(duplicateStorageKey) != null) {
-              return false;
-            }
-          }
-          return (
-            duplicateHead.kind === "absent" || this.clearKnownCoopCloudHead(duplicate.slot, accountIdentity, runId)
-          );
-        }, accountIdentity);
-        if (lineageCleaned !== true) {
+        if (
+          !(await this.finishCoopDuplicateLocalCleanup(
+            accountIdentity,
+            duplicate.slot,
+            runId,
+            debtState.raw,
+            fence,
+            scanContextIsCurrent,
+          ))
+        ) {
           throw new CoopResumeReplicaUnavailableError(
             `duplicate slot ${duplicate.slot} local lineage could not converge`,
           );
@@ -2719,13 +3120,61 @@ export class GameData {
     const lockName = `er-coop-resume:${accountIdentity?.normalize("NFKC").toLowerCase() ?? "guest"}`;
     const lockManager = (
       globalThis.navigator as Navigator & {
-        locks?: { request<R>(name: string, options: { mode: "exclusive" }, callback: () => Promise<R>): Promise<R> };
+        locks?: {
+          request<R>(
+            name: string,
+            options: { mode: "exclusive"; signal?: AbortSignal },
+            callback: () => Promise<R>,
+          ): Promise<R>;
+        };
       }
     )?.locks;
     if (lockManager != null) {
-      return lockManager.request(lockName, { mode: "exclusive" }, async () =>
-        this.persistenceAccountIsCurrent(accountIdentity) ? operation() : null,
-      );
+      const abortController = new AbortController();
+      let acquired = false;
+      let expired = false;
+      let acquisitionTimer: unknown;
+      const timedOut = new Promise<null>(resolve => {
+        acquisitionTimer = coopPersistenceClock.schedule(() => {
+          if (acquired) {
+            return;
+          }
+          expired = true;
+          abortController.abort("co-op persistence lock acquisition timed out");
+          resolve(null);
+        }, coopPersistenceClock.lockAcquireTimeoutMs);
+      });
+      let requested: Promise<T | null>;
+      try {
+        requested = lockManager
+          .request(lockName, { mode: "exclusive", signal: abortController.signal }, async () => {
+            acquired = true;
+            if (acquisitionTimer != null) {
+              coopPersistenceClock.cancel(acquisitionTimer);
+            }
+            return !expired && this.persistenceAccountIsCurrent(accountIdentity) ? operation() : null;
+          })
+          .catch(error => {
+            if (!expired) {
+              coopWarn("launch", "co-op persistence lock request failed", error);
+            }
+            return null;
+          });
+      } catch (error) {
+        if (acquisitionTimer != null) {
+          coopPersistenceClock.cancel(acquisitionTimer);
+        }
+        coopWarn("launch", "co-op persistence lock request threw", error);
+        return null;
+      }
+      const result = await Promise.race([requested, timedOut]);
+      if (acquisitionTimer != null) {
+        coopPersistenceClock.cancel(acquisitionTimer);
+      }
+      if (expired) {
+        coopWarn("launch", "co-op persistence lock acquisition timed out; failing closed");
+      }
+      return result;
     }
     if (!requireLocks) {
       return this.persistenceAccountIsCurrent(accountIdentity) ? operation() : null;
@@ -2775,7 +3224,7 @@ export class GameData {
   }
 
   private async hasTombstoneProof(slot: number, accountIdentity: string, runId: string): Promise<boolean> {
-    const status = await pokerogueApi.savedata.session.getCoopRunStatus({ clientSessionId, coopRunId: runId, slot });
+    const status = await this.readCoopRunStatus({ clientSessionId, coopRunId: runId, slot });
     if (
       !this.persistenceAccountIsCurrent(accountIdentity)
       || !status.ok
@@ -2888,7 +3337,7 @@ export class GameData {
         coopWarn("launch", "fresh co-op cloud scan failed closed", error);
         return null;
       }
-      const runStatus = await pokerogueApi.savedata.session.getCoopRunStatus({
+      const runStatus = await this.readCoopRunStatus({
         clientSessionId,
         coopRunId: runId,
       });
@@ -3176,31 +3625,43 @@ export class GameData {
             partner,
             controller.role,
           );
+        const cloudBackedExactRunSlot = (inspection: ResumeSlotInspection): boolean =>
+          exactRunSlot(inspection)
+          && (bypassLogin
+            || (inspection.cloudCas?.mode === "existing" && inspection.cloudCas.runId === commitment.runId));
 
         for (let attempt = 0; attempt < 2; attempt++) {
           const marker = readCoopResumeMarker(controller.localName(), partner);
           const markerMatchesRun = marker?.runId === commitment.runId;
           const markerInspection = markerMatchesRun && marker?.slot != null ? await inspectSlot(marker.slot) : null;
-          const markerIsExactRun = markerInspection != null && exactRunSlot(markerInspection);
-          // A stale marker can point at a now-empty slot while the exact run survived elsewhere.
-          // Scan the remaining slots before treating physical emptiness as ownership; otherwise a
-          // local-only checkpoint could create a second replica that the server must later reject.
-          const remainingInspections = markerIsExactRun
+          const markerIsCloudBackedExactRun = markerInspection != null && cloudBackedExactRunSlot(markerInspection);
+          // A marker-local same-run row with a missing cloud parent is not authority. Scan for an
+          // exact cloud-backed survivor elsewhere; if none exists, fail closed instead of ACKing an
+          // orphan or manufacturing a fresh empty-slot lineage.
+          const remainingInspections = markerIsCloudBackedExactRun
             ? []
             : await Promise.all(
                 [0, 1, 2, 3, 4].filter(slot => slot !== (markerMatchesRun ? marker?.slot : undefined)).map(inspectSlot),
               );
-          const selected = markerIsExactRun
+          const allInspections =
+            markerInspection == null ? remainingInspections : [markerInspection, ...remainingInspections];
+          const cloudBackedSurvivor = allInspections
+            .filter(cloudBackedExactRunSlot)
+            .sort((left, right) =>
+              left.kind === "occupied" && right.kind === "occupied"
+                ? right.stored.commitment.checkpointRevision - left.stored.commitment.checkpointRevision
+                : 0,
+            )[0];
+          const orphanedSameRunExists = allInspections.some(
+            inspection => exactRunSlot(inspection) && !cloudBackedExactRunSlot(inspection),
+          );
+          const selected = markerIsCloudBackedExactRun
             ? markerInspection
-            : (remainingInspections
-                .filter(exactRunSlot)
-                .sort((left, right) =>
-                  left.kind === "occupied" && right.kind === "occupied"
-                    ? right.stored.commitment.checkpointRevision - left.stored.commitment.checkpointRevision
-                    : 0,
-                )[0]
-              ?? (markerInspection?.kind === "empty" ? markerInspection : null)
-              ?? remainingInspections.find(inspection => inspection.kind === "empty"));
+            : (cloudBackedSurvivor
+              ?? (orphanedSameRunExists
+                ? null
+                : ((markerInspection?.kind === "empty" ? markerInspection : null)
+                  ?? remainingInspections.find(inspection => inspection.kind === "empty"))));
           if (selected == null || !exactRuntimeIsCurrent()) {
             if (exactRuntimeIsCurrent()) {
               recordCoopResumeUnavailableEvidence(
@@ -3231,13 +3692,34 @@ export class GameData {
             if (selectedHead.kind === "invalid") {
               return { success: false, reason: "cloud-conflict" };
             }
+            if (!bypassLogin && selected.cloudCas?.mode === "empty") {
+              // Empty CAS is valid only for the initial cloud-mirrored checkpoint. A non-cloud
+              // cadence message may advance an established exact parent, but may never ACK a
+              // physically empty/orphan slot as durable state.
+              if (!mirrorCloud || accountIdentity == null || selectedHead.kind !== "absent") {
+                return { success: false, reason: "cloud-conflict" };
+              }
+              const incomingStatus = await this.readCoopRunStatus({
+                clientSessionId,
+                coopRunId: commitment.runId,
+                slot: selected.slot,
+              });
+              if (
+                !exactRuntimeIsCurrent()
+                || localStorage.getItem(storageKey) !== selected.localRaw
+                || !incomingStatus.ok
+                || incomingStatus.value.state !== "missing"
+              ) {
+                return { success: false, reason: "cloud-conflict" };
+              }
+            }
             if (
               selectedHead.kind === "valid"
               && selectedHead.head.runId !== commitment.runId
               && accountIdentity != null
             ) {
               const displacedHead = selectedHead;
-              const displacedStatus = await pokerogueApi.savedata.session.getCoopRunStatus({
+              const displacedStatus = await this.readCoopRunStatus({
                 clientSessionId,
                 coopRunId: displacedHead.head.runId,
                 slot: selected.slot,
@@ -3520,7 +4002,7 @@ export class GameData {
         return { success: false, reason: "cloud-conflict", rollbackSafe: true } as const;
       }
       if (cas.mode === "empty") {
-        const status = await pokerogueApi.savedata.session.getCoopRunStatus({
+        const status = await this.readCoopRunStatus({
           clientSessionId,
           coopRunId: incoming.runId,
           slot,
@@ -3529,7 +4011,7 @@ export class GameData {
           return { success: false, reason: "cloud-conflict", rollbackSafe: true } as const;
         }
       }
-      const mutation = await pokerogueApi.savedata.session.updateCoopCas(request, sessionJson);
+      const mutation = await this.updateCoopCasBounded(request, sessionJson);
       if (!contextIsCurrent()) {
         return { success: false, reason: "cloud-conflict", rollbackSafe: false } as const;
       }
@@ -3628,7 +4110,7 @@ export class GameData {
         ? { kind: "same-run" }
         : null;
     }
-    const status = await pokerogueApi.savedata.session.getCoopRunStatus({
+    const status = await this.readCoopRunStatus({
       clientSessionId,
       coopRunId: existing.runId,
       slot,
@@ -3672,7 +4154,14 @@ export class GameData {
     const failure = (
       error: string,
       failureKind: Exclude<CoopCloudCasClientResult, { ok: true }>["failureKind"] = "invalid",
-    ): CoopCloudCasClientResult => ({ ok: false, error, failureKind });
+      options: { continuationSafe?: boolean; rollbackSafe?: boolean } = {},
+    ): CoopCloudCasClientResult => ({
+      ok: false,
+      error,
+      failureKind,
+      continuationSafe: options.continuationSafe === true,
+      rollbackSafe: options.rollbackSafe === true,
+    });
     if (accountIdentity == null || !this.persistenceAccountIsCurrent(accountIdentity)) {
       return failure("Co-op cloud CAS account changed.", "unauthorized");
     }
@@ -3715,7 +4204,7 @@ export class GameData {
       if (observed.ok || observed.failureKind !== "missing") {
         return failure("Import expected an empty cloud slot.", "conflict");
       }
-      const incomingStatus = await pokerogueApi.savedata.session.getCoopRunStatus({
+      const incomingStatus = await this.readCoopRunStatus({
         clientSessionId,
         coopRunId: incoming.runId,
         slot,
@@ -3758,16 +4247,56 @@ export class GameData {
           coopCasCheckpointRevision: known.kind === "valid" ? known.head.checkpointRevision : -1,
           coopCasDigest: known.kind === "valid" ? known.head.digest : "",
         };
-    const mutation = await pokerogueApi.savedata.session.updateCoopCas(request, sessionJson);
+    const mutation = await this.updateCoopCasBounded(request, sessionJson);
     if (!accountIsCurrent()) {
       return failure("Co-op cloud CAS account changed.", "unauthorized");
     }
     if (!mutation.ok) {
-      // Only exact requested bytes resolve an ambiguous response. A different freshly observed row
-      // is never adopted as this branch's parent.
+      // A lost response has exactly two non-terminal resolutions. Exact incoming bytes prove the
+      // write committed. Otherwise only the exact frozen parent, corroborated account-wide as the
+      // unique active row, proves a transport failure happened before the write. Missing, malformed,
+      // tombstoned, moved/duplicate, third, or newer state is divergence and must terminate rather
+      // than being mislabeled as local mirrored debt.
       const readback = await this.readCoopCas(slot);
-      if (!accountIsCurrent() || !readback.ok || readback.rawSavedata !== sessionJson) {
-        return failure(mutation.error, mutation.failureKind);
+      if (!accountIsCurrent()) {
+        return failure("Co-op cloud CAS account changed during readback.", "unauthorized");
+      }
+      if (readback.ok && readback.rawSavedata === sessionJson) {
+        // Continue below and advance the locally frozen head to the exact committed bytes.
+      } else if (readback.ok && known.kind === "valid") {
+        const observedParent = await this.classifyCoopReplica(slot, readback.rawSavedata);
+        const exactKnownParent =
+          observedParent.commitment != null
+          && observedParent.commitment.runId === known.head.runId
+          && observedParent.commitment.checkpointRevision === known.head.checkpointRevision
+          && observedParent.commitment.digest === known.head.digest;
+        if (exactKnownParent) {
+          const status = await this.readCoopRunStatus({
+            clientSessionId,
+            coopRunId: known.head.runId,
+            slot,
+          });
+          const exactUniqueParent =
+            accountIsCurrent()
+            && status.ok
+            && status.value.state === "active"
+            && status.value.slot === slot
+            && status.value.checkpointRevision === known.head.checkpointRevision
+            && status.value.digest === known.head.digest;
+          if (exactUniqueParent) {
+            return mutation.failureKind === "transient"
+              ? failure(mutation.error, "transient", { continuationSafe: true, rollbackSafe: true })
+              : failure(mutation.error, mutation.failureKind, { rollbackSafe: true });
+          }
+          if (!status.ok && status.failureKind === "transient" && mutation.failureKind === "transient") {
+            return failure(mutation.error, "transient");
+          }
+        }
+        return failure("Co-op cloud CAS readback no longer proves the exact unique parent.", "conflict");
+      } else if (!readback.ok && readback.failureKind === "transient" && mutation.failureKind === "transient") {
+        return failure(mutation.error, "transient");
+      } else {
+        return failure("Co-op cloud CAS readback diverged from both the request and its exact parent.", "conflict");
       }
     }
     if (!this.recordKnownCoopCloudHead(slot, accountIdentity, incoming, known)) {
@@ -3788,7 +4317,7 @@ export class GameData {
     if (commitment == null || !accountIsCurrent()) {
       return "Co-op delete checkpoint is invalid or the account changed.";
     }
-    const mutation = await pokerogueApi.savedata.session.deleteCoopCas({
+    const mutation = await this.deleteCoopCasBounded({
       slot,
       clientSessionId,
       coopCasRunId: commitment.runId,
@@ -3799,7 +4328,7 @@ export class GameData {
       return "Co-op delete account changed.";
     }
     const status = accountIsCurrent()
-      ? await pokerogueApi.savedata.session.getCoopRunStatus({
+      ? await this.readCoopRunStatus({
           clientSessionId,
           coopRunId: commitment.runId,
           slot,
@@ -3881,7 +4410,7 @@ export class GameData {
       if (localCommitment == null) {
         return { error: null };
       }
-      const status = await pokerogueApi.savedata.session.getCoopRunStatus({
+      const status = await this.readCoopRunStatus({
         clientSessionId,
         coopRunId: localCommitment.runId,
         slot,
@@ -3920,7 +4449,7 @@ export class GameData {
     }
     if (cloudKind === "legacy-coop") {
       const exactDigest = await digestCoopResumeSession(observed);
-      const mutation = await pokerogueApi.savedata.session.deleteLegacyCoopExact({
+      const mutation = await this.deleteLegacyCoopExactBounded({
         slot,
         clientSessionId,
         exactDigest,
@@ -3929,13 +4458,13 @@ export class GameData {
     }
     if (cloudKind === "opaque") {
       const exactDigest = await digestCoopResumeSession(observed);
-      const mutation = await pokerogueApi.savedata.session.deleteOpaqueExact({ slot, clientSessionId, exactDigest });
+      const mutation = await this.deleteOpaqueExactBounded({ slot, clientSessionId, exactDigest });
       return mutation.ok ? { error: null } : { error: mutation.error };
     }
     if (localKind === "legacy-coop" || localKind === "opaque") {
       return { error: "Local/cloud checkpoint classification conflict must be resolved before delete." };
     }
-    return { error: await pokerogueApi.savedata.session.delete({ slot, clientSessionId }) };
+    return { error: await this.deleteSessionBounded({ slot, clientSessionId }) };
   }
 
   // TODO: This needs a giant refactor and overhaul
@@ -4367,7 +4896,7 @@ export class GameData {
           })
         : await enqueueSessionCloudMutation(accountIdentity, () =>
             this.persistenceAccountIsCurrent(accountIdentity)
-              ? pokerogueApi.savedata.session.clear({ slot: slotId, trainerId, clientSessionId }, sessionData)
+              ? this.clearSessionBounded({ slot: slotId, trainerId, clientSessionId }, sessionData)
               : Promise.resolve({ success: false, error: "Clear account changed while queued." }),
           );
 
@@ -4740,7 +5269,7 @@ export class GameData {
               failureKind: "unauthorized" as const,
             };
           }
-          return pokerogueApi.savedata.session.updateCoopCas(reservationRequest, sessionJson);
+          return this.updateCoopCasBounded(reservationRequest, sessionJson);
         });
         if (reservation.ok) {
           freshSlotCommitted = true;
@@ -4878,8 +5407,9 @@ export class GameData {
     }
 
     // At cloud cadence, the authority's CAS resolves before the checkpoint is offered to the guest.
-    // A deterministic conflict terminates before the peer can persist a fork. A transient failure
-    // leaves the exact local checkpoint as mirrored debt and sends the guest a local-only replica.
+    // A deterministic conflict terminates before the peer can persist a fork. A transport failure
+    // continues only when readback + account-wide status still prove the exact unique frozen parent;
+    // every missing/moved/newer/opaque outcome terminates instead of being mislabeled local debt.
     let authorityCloudCommitted = freshSlotCommitted;
     let authorityCloudDebt = false;
     if (
@@ -4897,6 +5427,8 @@ export class GameData {
               ok: false as const,
               error: "Co-op cloud CAS account/runtime changed.",
               failureKind: "unauthorized" as const,
+              continuationSafe: false,
+              rollbackSafe: false,
             }),
       );
       if (coopCasResult.ok) {
@@ -4904,12 +5436,12 @@ export class GameData {
       } else {
         this.markCloudSyncFailure();
         this.lastCloudSyncFailed = true;
-        if (coopCasResult.failureKind === "transient") {
+        if (coopCasResult.continuationSafe) {
           authorityCloudDebt = true;
-          coopWarn("launch", "authority cloud checkpoint deferred as local mirrored debt");
+          coopWarn("launch", "authority cloud checkpoint deferred from its exact unique parent as local mirrored debt");
         } else {
           let rollbackConverged = false;
-          if (coopEvidenceBeforeSave != null && coopEvidenceAfterSave != null) {
+          if (coopCasResult.rollbackSafe && coopEvidenceBeforeSave != null && coopEvidenceAfterSave != null) {
             try {
               rollbackConverged =
                 (await this.withCoopResumePersistenceLease(async () => {
@@ -4930,8 +5462,7 @@ export class GameData {
                     coopWarn("launch", "authority checkpoint local rollback threw", error);
                   }
                   return (
-                    localRestored
-                    && restoreCoopResumeEvidenceIfUnchanged(coopEvidenceAfterSave, coopEvidenceBeforeSave)
+                    localRestored && restoreCoopResumeEvidenceIfUnchanged(coopEvidenceAfterSave, coopEvidenceBeforeSave)
                   );
                 }, saveAccountIdentity)) === true;
             } catch (error) {
@@ -5079,14 +5610,21 @@ export class GameData {
       && checkpointLocalStillExact
       && (entryCoopContext == null || this.coopPersistenceContextIsCurrent(entryCoopContext, "host"));
     if (!freshSlotCommitted && checkpointPersistenceRequired && (!checkpointPersisted || !checkpointPostAckCurrent)) {
-      checkpointRuntime?.battleStream.sendLaunchSnapshotAbort(
-        globalScene.currentBattle?.waveIndex ?? 1,
-        "guest-persistence-failed",
-      );
+      const capturedCheckpointStillOwnsScene = (): boolean =>
+        checkpointRuntime != null
+        && getCoopRuntime() === checkpointRuntime
+        && checkpointRuntime.controller === checkpointController
+        && coopSessionGeneration() === checkpointGeneration;
+      checkpointRuntime?.battleStream.sendLaunchSnapshotAbort(sessionData.waveIndex, "guest-persistence-failed");
+      // Always retire the captured transport. It may already be stale, but allowing it to survive
+      // lets a late ACK/NACK keep emitting into the replacement session. Scene/runtime teardown is
+      // separately generation-guarded so the stale callback cannot destroy that replacement.
       checkpointRuntime?.localTransport.close();
-      clearCoopRuntime();
-      globalScene.ui.savingIcon.hide();
-      globalScene.reset(true);
+      if (capturedCheckpointStillOwnsScene()) {
+        clearCoopRuntime();
+        globalScene.ui.savingIcon.hide();
+        globalScene.reset(true);
+      }
       return false;
     }
     if (freshSlotCommitted && freshClaim != null) {
@@ -5123,7 +5661,7 @@ export class GameData {
     const cloudRequest = (sessionData.gameMode as number) === GameModes.COOP ? { ...request, session: null } : request;
     const saveError = await enqueueSessionCloudMutation(saveAccountIdentity, () =>
       this.persistenceAccountIsCurrent(saveAccountIdentity)
-        ? pokerogueApi.savedata.updateAll(cloudRequest)
+        ? this.updateAllBounded(cloudRequest)
         : Promise.resolve("Save account changed before queued cloud mutation."),
     );
     globalScene.ui.savingIcon.hide();
@@ -5402,7 +5940,7 @@ export class GameData {
                     } else {
                       error = await enqueueSessionCloudMutation(accountIdentity, () =>
                         this.persistenceAccountIsCurrent(accountIdentity)
-                          ? pokerogueApi.savedata.session.update(
+                          ? this.updateSessionBounded(
                               {
                                 slot: slotId,
                                 trainerId,
@@ -5415,7 +5953,10 @@ export class GameData {
                       );
                     }
                   } else {
-                    localStorage.setItem(dataKey, encrypt(dataStr, bypassLogin));
+                    const encrypted = encrypt(dataStr, bypassLogin);
+                    if (!trySetLocalStorageItem(dataKey, encrypted) || localStorage.getItem(dataKey) !== encrypted) {
+                      return displayError(i18next.t("menuUiHandler:importError", { dataName }));
+                    }
                     error = await pokerogueApi.savedata.system.update(
                       { trainerId, secretId, clientSessionId },
                       dataStr,
@@ -5432,8 +5973,9 @@ export class GameData {
                         if (localStorage.getItem(dataKey) !== localBeforeCloud) {
                           return false;
                         }
-                        localStorage.setItem(dataKey, encrypted);
-                        return localStorage.getItem(dataKey) === encrypted;
+                        return (
+                          trySetLocalStorageItem(dataKey, encrypted) && localStorage.getItem(dataKey) === encrypted
+                        );
                       },
                       protectedCoopImport,
                       accountIdentity,
@@ -5449,7 +5991,10 @@ export class GameData {
                   // An authenticated CAS/tombstone authority is required for durable co-op rows.
                   return displayError(i18next.t("menuUiHandler:importNoServer", { dataName }));
                 }
-                localStorage.setItem(dataKey, encrypt(dataStr, bypassLogin));
+                const encrypted = encrypt(dataStr, bypassLogin);
+                if (!trySetLocalStorageItem(dataKey, encrypted) || localStorage.getItem(dataKey) !== encrypted) {
+                  return displayError(i18next.t("menuUiHandler:importError", { dataName }));
+                }
                 window.location.reload();
               },
               () => {
