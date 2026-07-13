@@ -197,15 +197,29 @@ export class PublicUiClient {
         description: "exact fresh-account missing-save modal precursor",
       });
       await delay(this.config.settleDelayMs);
-      for (let message = 1; message <= 3; message++) {
+      const onboardingDeadline = Date.now() + this.config.bootTimeoutMs;
+      let attempt = 0;
+      while (Date.now() < onboardingDeadline) {
         const phase =
           this.evidence.find(TITLE_PHASE, this.pageCursor) ?? this.evidence.find(SELECT_GENDER_PHASE, this.pageCursor);
         if (phase) {
           return phase;
         }
-        await this.press("Space", `dismiss-new-account-message:${message}/3`);
-        await delay(this.config.settleDelayMs);
+        attempt += 1;
+        // A cold production bundle can render the missing-save MessagePhase before its font/input surface
+        // is ready. Keep retrying the same public A-button at a human cadence until the phase itself proves
+        // it advanced; a fixed number of early presses turns asset latency into a false onboarding hang.
+        await this.press("Space", `dismiss-new-account-message:attempt-${attempt}`);
+        await delay(Math.max(this.config.settleDelayMs, 5_000));
       }
+      const phase =
+        this.evidence.find(TITLE_PHASE, this.pageCursor) ?? this.evidence.find(SELECT_GENDER_PHASE, this.pageCursor);
+      if (phase) {
+        return phase;
+      }
+      throw new Error(
+        `${this.label}: fresh-account MessagePhase did not open TitlePhase or SelectGenderPhase after ${attempt} public retries`,
+      );
     }
     return this.evidence.waitForCondition(
       sink => sink.find(TITLE_PHASE, this.pageCursor) ?? sink.find(SELECT_GENDER_PHASE, this.pageCursor),
