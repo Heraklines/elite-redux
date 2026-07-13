@@ -1,0 +1,55 @@
+# Generic nightly launcher for the co-op public-UI browser campaign.
+# Lives on the DEFAULT branch only because GitHub schedules workflows from it.
+# All campaign logic stays on the feature ref it checks out
+# (test/browser/coop-public-ui/nightly-run.sh) - this file is a thin trampoline.
+name: Co-op Public UI Nightly Launcher
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Feature ref to run
+        required: true
+        type: string
+        default: ci/coop/p33-campaign-30w
+      campaign_waves:
+        description: Waves
+        required: false
+        type: string
+        default: "30"
+  schedule:
+    - cron: "0 4 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coop-nightly-launcher
+  cancel-in-progress: false
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      GH_TOKEN: ${{ github.token }}
+      COOP_UI_API_ORIGIN: ${{ vars.COOP_UI_API_URL || vars.STAGING_SERVER_URL || 'https://er-save-api-staging.heraklines.workers.dev' }}
+      COOP_UI_SIGNAL_ORIGIN: ${{ vars.COOP_UI_SIGNAL_URL || 'https://er-coop-api.heraklines.workers.dev' }}
+      COOP_UI_CAMPAIGN_WAVES: ${{ inputs.campaign_waves || '30' }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || 'ci/coop/p33-campaign-30w' }}
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Run nightly campaign (all logic lives on the feature ref)
+        run: bash test/browser/coop-public-ui/nightly-run.sh
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-nightly-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dev-logs/coop-public-ui/**
+          retention-days: 14
+          if-no-files-found: warn
