@@ -3134,7 +3134,7 @@ export function applyCoopAuthoritativeBattleState(
   state: CoopAuthoritativeBattleStateV1 | undefined,
   authoritativeGuest = false,
 ): boolean {
-  return applyCoopAuthoritativeBattleStateInternal(state, authoritativeGuest, false);
+  return applyCoopAuthoritativeBattleStateTransaction(state, authoritativeGuest, false);
 }
 
 /**
@@ -3155,13 +3155,72 @@ export function reapplyAcceptedCoopAuthoritativeBattleState(
     );
     return false;
   }
-  return applyCoopAuthoritativeBattleStateInternal(state, authoritativeGuest, true);
+  return applyCoopAuthoritativeBattleStateTransaction(state, authoritativeGuest, true);
+}
+
+/**
+ * Apply one immutable wire image as a DATA transaction. The receiver first captures its current
+ * material state without advancing the producer tick, then either commits the complete candidate or
+ * restores that image and the prior admission high-water. Structured per-section failures count as a
+ * failed transaction too: a checksum cannot make a partly-applied un-hashed field safe.
+ */
+function applyCoopAuthoritativeBattleStateTransaction(
+  state: CoopAuthoritativeBattleStateV1 | undefined,
+  authoritativeGuest: boolean,
+  reassertAccepted: boolean,
+): boolean {
+  beginCoopApplyFailureCapture();
+  if (state === undefined || state.version !== 1) {
+    return false;
+  }
+
+  const priorStateTickCounter = coopStateTickCounter;
+  const priorLastAppliedTick = coopLastAppliedStateTick;
+  const rollback = captureCoopAuthoritativeBattleState(globalScene.currentBattle?.turn ?? 0);
+  // Capturing a receiver rollback image is observational; it must not consume a host-authority tick.
+  coopStateTickCounter = priorStateTickCounter;
+  if (rollback == null) {
+    recordCoopApplyFailure("rollbackCapture", new Error("could not capture the pre-apply material state"));
+    return false;
+  }
+
+  const applied = applyCoopAuthoritativeBattleStateInternal(state, authoritativeGuest, reassertAccepted);
+  const candidateFailures = [...coopApplyFailures];
+  if (applied && candidateFailures.length === 0) {
+    coopStateTickCounter = priorStateTickCounter;
+    return true;
+  }
+
+  // Structural/stale rejection occurs before any scene mutation. Avoid a needless render/material
+  // reassert in that case; a moved high-water or a structured failure proves mutation was attempted.
+  if (coopLastAppliedStateTick === priorLastAppliedTick && candidateFailures.length === 0) {
+    coopStateTickCounter = priorStateTickCounter;
+    return false;
+  }
+
+  const rollbackApplied = applyCoopAuthoritativeBattleStateInternal(rollback, authoritativeGuest, true, true);
+  const rollbackFailures = [...coopApplyFailures];
+  coopStateTickCounter = priorStateTickCounter;
+  coopLastAppliedStateTick = priorLastAppliedTick;
+  coopApplyFailures = candidateFailures;
+  if (!rollbackApplied || rollbackFailures.length > 0) {
+    recordCoopApplyFailure(
+      "rollback",
+      new Error(
+        rollbackApplied
+          ? `rollback reported ${rollbackFailures.length} structured failure(s)`
+          : "rollback materialization refused",
+      ),
+    );
+  }
+  return false;
 }
 
 function applyCoopAuthoritativeBattleStateInternal(
   state: CoopAuthoritativeBattleStateV1 | undefined,
   authoritativeGuest: boolean,
   reassertAccepted: boolean,
+  stateAlreadyLocal = false,
 ): boolean {
   // Reset the structured-failure accumulator FIRST (item 4): a prior apply's failures must never leak into
   // this one's drain, and an early reject below leaves it empty (no apply attempted -> nothing to heal).
@@ -3178,7 +3237,7 @@ function applyCoopAuthoritativeBattleStateInternal(
   // through, so the swap fires exactly ONCE per payload regardless of the carrier. The swap runs at APPLY
   // time (always the guest's own context), not at wire-receive (which, in the shared-process duo harness,
   // can be the host's context). No-op for solo/co-op/host (versus-guest-only gate).
-  if (isShowdownGuestFlipGated()) {
+  if (!stateAlreadyLocal && isShowdownGuestFlipGated()) {
     state = swapAuthoritativeState(state);
   }
   try {
@@ -4800,7 +4859,7 @@ function applyCoopMeOutcomeUnchecked(
     applyCoopMePartyFromData(o.party);
   } else {
     const applied = rollbackReassert
-      ? applyCoopAuthoritativeBattleStateInternal(o.authoritativeState, true, true)
+      ? applyCoopAuthoritativeBattleStateInternal(o.authoritativeState, true, true, true)
       : applyCoopAuthoritativeBattleState(o.authoritativeState, true);
     const structuredFailures = drainCoopApplyFailures();
     if (!applied || structuredFailures.length > 0) {

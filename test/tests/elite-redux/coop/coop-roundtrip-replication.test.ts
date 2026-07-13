@@ -39,6 +39,7 @@ import {
   captureCoopAuthoritativeBattleState,
   captureCoopChecksum,
   captureCoopChecksumState,
+  coopAppliedStateTick,
   drainCoopApplyFailures,
   resetCoopStateTicks,
 } from "#data/elite-redux/coop/coop-battle-engine";
@@ -334,27 +335,37 @@ describe.skipIf(!RUN)(
       // Corrupt ONE off-field BENCH mon's `ivs` to a non-iterable value. PokemonData's ctor copies `ivs`
       // verbatim (so parseAuthoritativeParty succeeds), but applyAuthoritativeMonData spreads it
       // (`[...data.ivs]`), which throws for that mon ALONE. A BENCH mon is off-field, so the failure does NOT
-      // cascade into the field reconcile / render differ - the outer apply still returns TRUE (the exact
-      // silent-success hazard), and the failure is CAPTURED structurally instead of being swallowed with an
-      // "assume the checksum catches it" comment.
+      // cascade into the field reconcile / render differ. The transaction must nevertheless reject the
+      // WHOLE image, restore the pre-apply guest state, and preserve tick admission so the exact repaired
+      // carrier remains retryable.
       resetCoopStateTicks();
       const corruptId = wire.playerParty[2].id as number;
       const corrupt = JSON.parse(JSON.stringify(wire)) as typeof wire;
       (corrupt.playerParty[2] as Record<string, unknown>).ivs = 5;
 
-      const { applyOk, failures } = withClientSync(rig.guestCtx, () => {
-        const ok = applyCoopAuthoritativeBattleState(corrupt, true);
-        return { applyOk: ok, failures: drainCoopApplyFailures() };
-      });
-      // The outer apply still reports success (other mons/sections applied) - which is EXACTLY why the silent
-      // swallow was dangerous. The structured drain is what now surfaces the failure to the loud heal path.
-      expect(applyOk, "the outer apply returns true despite one mon failing (the old silent-success hazard)").toBe(
-        true,
+      const { applyOk, failures, before, after, admittedTick, retryOk, retryFailures } = withClientSync(
+        rig.guestCtx,
+        () => {
+          const before = captureCoopChecksumState();
+          const ok = applyCoopAuthoritativeBattleState(corrupt, true);
+          const failures = drainCoopApplyFailures();
+          const after = captureCoopChecksumState();
+          const admittedTick = coopAppliedStateTick();
+          (corrupt.playerParty[2] as Record<string, unknown>).ivs = wire.playerParty[2].ivs;
+          const retryOk = applyCoopAuthoritativeBattleState(corrupt, true);
+          const retryFailures = drainCoopApplyFailures();
+          return { applyOk: ok, failures, before, after, admittedTick, retryOk, retryFailures };
+        },
       );
+      expect(applyOk, "one failed section rejects the complete authoritative transaction").toBe(false);
       expect(failures.length, "the per-mon failure is captured, not swallowed").toBeGreaterThan(0);
       const monFailure = failures.find(f => f.section === "monData");
       expect(monFailure, "the failure names the monData section").toBeDefined();
       expect(monFailure?.monId, "the failure carries the failing mon's id").toBe(corruptId);
+      expect(after, "a rejected carrier leaves no partial material mutation").toEqual(before);
+      expect(admittedTick, "a rejected carrier does not consume its immutable tick").toBe(-1);
+      expect(retryOk, "the repaired exact-tick carrier remains admissible").toBe(true);
+      expect(retryFailures).toEqual([]);
       logs.flush();
     }, 300_000);
   },
