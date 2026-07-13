@@ -408,6 +408,19 @@ interface PendingTurnWaiter {
   finish: (res: CoopTurnResolution | null) => void;
 }
 
+interface PendingStateSyncWaiter {
+  seq: number;
+  requestTurn: number;
+  address: CoopTurnAddress | null;
+  finish: (blob: string | null) => void;
+}
+
+interface BufferedStateSync {
+  seq: number;
+  address: CoopTurnAddress | null;
+  blob: string;
+}
+
 interface LiveTurnBuffer {
   address: CoopTurnAddress;
   events: Map<number, CoopBattleEvent>;
@@ -519,6 +532,10 @@ function legacyTurnKey(turn: number): string {
 
 function invalidAuthorityTurnKey(turn: number): string {
   return `invalid:${turn}`;
+}
+
+function stateSyncKey(seq: number, address: CoopTurnAddress | null): string {
+  return address == null ? `legacy:${seq}` : `${pendingTurnKey(address)}:${seq}`;
 }
 
 function sameTurnAddress(left: CoopTurnAddress, right: CoopTurnAddress): boolean {
@@ -740,10 +757,10 @@ export class CoopBattleStreamer {
   private stateSyncRequestHandler: ((turn: number, seq: number) => void) | null = null;
   /** HOST: handler answering the guest's `requestEnemyParty` re-request (#633/#698 handoff robustness). */
   private enemyPartyRequestHandler: ((wave: number) => void) | null = null;
-  /** GUEST: seq -> resolver for an in-flight {@linkcode awaitStateSync}. */
-  private readonly stateSyncWaiters = new Map<number, (blob: string | null) => void>();
-  /** GUEST: a `stateSync` blob that arrived before its waiter (race buffer), keyed by seq. */
-  private readonly stateSyncInbox = new Map<number, string>();
+  /** GUEST: complete authority address + echoed seq -> one in-flight recovery waiter. */
+  private readonly stateSyncWaiters = new Map<string, PendingStateSyncWaiter>();
+  /** GUEST: legacy-only race buffer. Addressed recovery never adopts an unsolicited snapshot. */
+  private readonly stateSyncInbox = new Map<string, BufferedStateSync>();
   /** GUEST: monotonic resync request counter (each desync request bumps it). */
   private stateSyncSeq = 0;
   /** GUEST: live apply callback for an unsolicited deep-gap durability snapshot. */
@@ -850,6 +867,15 @@ export class CoopBattleStreamer {
         coopLog("stream", `guest RE-SEND requestMeBattleEnemyParty key=${key} after reconnect`);
         this.transport.send({ t: "requestMeBattleEnemyParty", key });
       }
+      for (const waiter of [...this.stateSyncWaiters.values()]) {
+        if (!this.stateSyncAddressIsCurrent(waiter.address)) {
+          coopWarn("resync", `guest cancel stale stateSync seq=${waiter.seq} after reconnect`);
+          waiter.finish(null);
+          continue;
+        }
+        coopLog("resync", `guest RE-SEND requestStateSync turn=${waiter.requestTurn} seq=${waiter.seq} after reconnect`);
+        this.transport.send({ t: "requestStateSync", turn: waiter.requestTurn, seq: waiter.seq });
+      }
     });
     coopLog("stream", `streamer CONSTRUCT timeout=${this.timeoutMs}ms onMessage registered`);
   }
@@ -877,6 +903,26 @@ export class CoopBattleStreamer {
     }
   }
 
+  private currentStateSyncAddress(): CoopTurnAddress | null {
+    if (this.authorityContext == null) {
+      return null;
+    }
+    try {
+      const current = this.authorityContext();
+      if (
+        current == null
+        || !isSafeAddressPart(current.epoch, false)
+        || !isSafeAddressPart(current.wave)
+        || !isSafeAddressPart(current.turn)
+      ) {
+        return null;
+      }
+      return { epoch: current.epoch, wave: current.wave, turn: current.turn };
+    } catch {
+      return null;
+    }
+  }
+
   private acceptsCurrentAddress(address: { epoch: number; wave: number; turn: number }, exactTurn = true): boolean {
     if (this.authorityContext == null) {
       return true;
@@ -888,6 +934,18 @@ export class CoopBattleStreamer {
     return (
       address.epoch === current.epoch && address.wave === current.wave && (!exactTurn || address.turn === current.turn)
     );
+  }
+
+  private stateSyncAddressIsCurrent(address: CoopTurnAddress | null): boolean {
+    if (address == null) {
+      return this.authorityContext == null;
+    }
+    const current = this.currentStateSyncAddress();
+    return current != null && sameTurnAddress(current, address);
+  }
+
+  private stateSyncWaiterForSeq(seq: number): [string, PendingStateSyncWaiter] | undefined {
+    return [...this.stateSyncWaiters].find(([, waiter]) => waiter.seq === seq);
   }
 
   private acceptsAwaitedTurnAddress(address: CoopTurnAddress): boolean {
@@ -1092,8 +1150,8 @@ export class CoopBattleStreamer {
     for (const finish of [...this.launchSnapshotWaiters.values()]) {
       finish(null);
     }
-    for (const finish of [...this.stateSyncWaiters.values()]) {
-      finish(null);
+    for (const waiter of [...this.stateSyncWaiters.values()]) {
+      waiter.finish(null);
     }
     this.pending.clear();
     this.pendingSince.clear();
@@ -2927,8 +2985,8 @@ export class CoopBattleStreamer {
     if (inFlight > 0) {
       coopWarn("resync", `guest requestStateSync turn=${turn} superseding ${inFlight} older in-flight resync(s)`);
     }
-    for (const finish of [...this.stateSyncWaiters.values()]) {
-      finish(null);
+    for (const waiter of [...this.stateSyncWaiters.values()]) {
+      waiter.finish(null);
     }
     for (const finish of [...this.launchSnapshotWaiters.values()]) {
       finish(null);
@@ -2936,16 +2994,25 @@ export class CoopBattleStreamer {
     this.stateSyncWaiters.clear();
     this.launchSnapshotWaiters.clear();
     const seq = ++this.stateSyncSeq;
+    // `requestStateSync.turn` predates the authority address and several legacy callers use it as an
+    // interaction/recovery correlation number. Bind the recovery snapshot to the actual current battle
+    // boundary instead of mistaking that legacy request label for the battle turn.
+    const address = this.currentStateSyncAddress();
+    if (this.authorityContext != null && address == null) {
+      coopWarn("resync", `guest requestStateSync turn=${turn} seq=${seq} refused without a valid authority address`);
+      return Promise.resolve(null);
+    }
+    const key = stateSyncKey(seq, address);
     // The host may have already answered this exact seq (race) - consume it if so.
-    const buffered = this.stateSyncInbox.get(seq);
+    const buffered = this.stateSyncInbox.get(key);
     if (buffered !== undefined) {
-      this.stateSyncInbox.delete(seq);
+      this.stateSyncInbox.delete(key);
       coopLog(
         "resync",
-        `guest requestStateSync turn=${turn} seq=${seq} RESOLVE (buffered race) blobLen=${buffered.length}`,
+        `guest requestStateSync turn=${turn} seq=${seq} RESOLVE (buffered race) blobLen=${buffered.blob.length}`,
       );
       this.transport.send({ t: "requestStateSync", turn, seq });
-      return Promise.resolve(buffered);
+      return Promise.resolve(buffered.blob);
     }
     coopLog("resync", `guest requestStateSync turn=${turn} seq=${seq} START timeout=${this.timeoutMs}ms`);
     return new Promise<string | null>(resolve => {
@@ -2957,8 +3024,8 @@ export class CoopBattleStreamer {
         }
         settled = true;
         cancelTimer();
-        if (this.stateSyncWaiters.get(seq) === finish) {
-          this.stateSyncWaiters.delete(seq);
+        if (this.stateSyncWaiters.get(key)?.finish === finish) {
+          this.stateSyncWaiters.delete(key);
         }
         if (blob == null) {
           coopWarn("resync", `guest requestStateSync turn=${turn} seq=${seq} -> null (timeout/superseded)`);
@@ -2967,7 +3034,7 @@ export class CoopBattleStreamer {
         }
         resolve(blob);
       };
-      this.stateSyncWaiters.set(seq, finish);
+      this.stateSyncWaiters.set(key, { seq, requestTurn: turn, address, finish });
       cancelTimer = this.schedule(() => finish(null), this.timeoutMs);
       this.transport.send({ t: "requestStateSync", turn, seq });
     });
@@ -2994,8 +3061,8 @@ export class CoopBattleStreamer {
     for (const finish of [...this.meBattlePartyWaiters.values()]) {
       finish(null);
     }
-    for (const finish of [...this.stateSyncWaiters.values()]) {
-      finish(null);
+    for (const waiter of [...this.stateSyncWaiters.values()]) {
+      waiter.finish(null);
     }
     this.pending.clear();
     this.pendingSince.clear();
@@ -3750,17 +3817,32 @@ export class CoopBattleStreamer {
           this.durabilitySnapshotHandler?.(msg.blob);
           return;
         }
-        // GUEST: deliver to a parked awaiter for this seq, else buffer it (race).
-        const waiter = this.stateSyncWaiters.get(msg.seq);
-        coopLog(
-          "resync",
-          `guest RECV stateSync seq=${msg.seq} blobLen=${msg.blob.length} ${waiter ? "-> parked waiter" : "-> buffered (no waiter)"}`,
-        );
-        if (waiter) {
-          waiter(msg.blob);
-        } else {
-          this.stateSyncInbox.set(msg.seq, msg.blob);
+        // The legacy reply echoes only `seq`, so the live waiter supplies the immutable authority address.
+        // Never let a delayed old-wave/old-epoch reply apply after the scene moved to a reused numeric turn.
+        const waiterEntry = this.stateSyncWaiterForSeq(msg.seq);
+        if (waiterEntry != null) {
+          const [, waiter] = waiterEntry;
+          if (!this.stateSyncAddressIsCurrent(waiter.address)) {
+            coopWarn(
+              "resync",
+              `guest DROP stale stateSync seq=${msg.seq}; addressed recovery boundary is no longer current`,
+            );
+            waiter.finish(null);
+            return;
+          }
+          coopLog("resync", `guest RECV stateSync seq=${msg.seq} blobLen=${msg.blob.length} -> parked waiter`);
+          waiter.finish(msg.blob);
+          return;
         }
+        if (this.authorityContext != null) {
+          // Production sends the request only after installing its waiter. An unsolicited reply cannot be
+          // authenticated to an epoch/wave/turn because the historical wire frame contains only `seq`.
+          coopWarn("resync", `guest DROP unbound stateSync seq=${msg.seq} (no addressed waiter)`);
+          return;
+        }
+        const key = stateSyncKey(msg.seq, null);
+        coopLog("resync", `guest RECV legacy stateSync seq=${msg.seq} blobLen=${msg.blob.length} -> buffered`);
+        rememberBounded(this.stateSyncInbox, key, { seq: msg.seq, address: null, blob: msg.blob });
         return;
       }
       case "meChecksum":
