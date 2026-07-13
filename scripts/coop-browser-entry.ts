@@ -10,21 +10,14 @@ import type { Pokemon } from "../src/field/pokemon";
 // or production deployment imports it.
 await import("../src/main");
 
-const [
-  { globalScene },
-  { captureCoopSaveDataDigest },
-  { canonicalize, fnv1a64 },
-  { getCoopRuntime },
-  { connectCoopWithCode },
-  { UiMode },
-] = await Promise.all([
-  import("../src/global-scene"),
-  import("../src/data/elite-redux/coop/coop-battle-engine"),
-  import("../src/data/elite-redux/coop/coop-battle-checksum"),
-  import("../src/data/elite-redux/coop/coop-runtime"),
-  import("../src/data/elite-redux/coop/coop-webrtc-connect"),
-  import("../src/enums/ui-mode"),
-]);
+const [{ globalScene }, { captureCoopSaveDataDigest }, { canonicalize, fnv1a64 }, { getCoopRuntime }, { UiMode }] =
+  await Promise.all([
+    import("../src/global-scene"),
+    import("../src/data/elite-redux/coop/coop-battle-engine"),
+    import("../src/data/elite-redux/coop/coop-battle-checksum"),
+    import("../src/data/elite-redux/coop/coop-runtime"),
+    import("../src/enums/ui-mode"),
+  ]);
 
 type BrowserContinuationSurface = "command" | "replacement" | "reward" | "starter";
 
@@ -45,6 +38,7 @@ interface CoopBrowserSurfaceObservationV1 {
 }
 
 const SURFACE_PREFIX = "[coop-browser:surface] ";
+const SURFACE2_PREFIX = "[coop-browser:surface2] ";
 const BINDING_PREFIX = "[coop-browser:binding] ";
 const CHECKSUM_SENTINEL = "0000000000000000";
 
@@ -230,18 +224,282 @@ function observeContinuationSurface(): void {
   }
 }
 
+// --- Semantic surface mirror (v2): a read-only projection of EVERY active interactive
+// surface, so a state-aware driver can read the visible options, pick by stable id, and
+// verify convergence instead of pulsing blind keys. STRICTLY READ-ONLY: it only reads the
+// same public UI/runtime accessors the v1 marker uses and never mutates a scene, phase,
+// handler, or protocol. Gaps (fields the game exposes no observable signal for) are
+// recorded in test/browser/coop-public-ui/blocked-instrumentation.md rather than faked.
+
+type SemanticOwnerModel = "interaction" | "local";
+
+interface SemanticSurface {
+  readonly surfaceId: string;
+  readonly operationClass: string;
+  readonly ownerModel: SemanticOwnerModel;
+}
+
+/** Map (phase, uiMode) to a stable semantic surfaceId + operation class + ownership model. */
+function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface | null {
+  const inMe =
+    phase.startsWith("MysteryEncounter") || phase === "PostMysteryEncounterPhase" || phase === "CoopReplayMePhase";
+  switch (uiMode) {
+    case "COMMAND":
+    case "FIGHT":
+    case "BALL":
+    case "TARGET_SELECT":
+      return phase === "CommandPhase"
+        ? { surfaceId: `command:${uiMode.toLowerCase()}`, operationClass: "command", ownerModel: "local" }
+        : null;
+    case "STARTER_SELECT":
+      return { surfaceId: "starter-select", operationClass: "starter", ownerModel: "local" };
+    case "CHALLENGE_SELECT":
+      return { surfaceId: "challenge-select", operationClass: "setup", ownerModel: "local" };
+    case "MODIFIER_SELECT":
+      return { surfaceId: "reward-shop", operationClass: "reward", ownerModel: "interaction" };
+    case "BIOME_SHOP":
+      return { surfaceId: "biome-market", operationClass: "shop", ownerModel: "interaction" };
+    case "ER_MAP":
+      return { surfaceId: "world-map", operationClass: "navigation", ownerModel: "interaction" };
+    case "ER_MAP_PICKER":
+      return { surfaceId: "map-picker", operationClass: "navigation", ownerModel: "interaction" };
+    case "MYSTERY_ENCOUNTER":
+      return { surfaceId: "mystery-encounter", operationClass: "encounter", ownerModel: "interaction" };
+    case "COLOSSEUM":
+      return { surfaceId: "colosseum", operationClass: "encounter", ownerModel: "interaction" };
+    case "ER_QUIZ":
+      return { surfaceId: "quiz", operationClass: "encounter", ownerModel: "interaction" };
+    case "ER_BARGAIN":
+      return { surfaceId: "bargain", operationClass: "encounter", ownerModel: "interaction" };
+    case "ER_SHINY_LAB":
+      return { surfaceId: "shiny-lab", operationClass: "cosmetic", ownerModel: "local" };
+    case "SHOWDOWN_WAGER":
+      return { surfaceId: "wager", operationClass: "encounter", ownerModel: "interaction" };
+    case "LEARN_MOVE_BATCH":
+      return { surfaceId: "learn-move-batch", operationClass: "learn-move", ownerModel: "interaction" };
+    case "SAVE_SLOT":
+      return { surfaceId: "save-slot", operationClass: "save", ownerModel: "local" };
+    case "PARTY":
+      if (phase === "SwitchPhase") {
+        return { surfaceId: "party:replacement", operationClass: "replacement", ownerModel: "interaction" };
+      }
+      if (phase === "AttemptCapturePhase") {
+        return { surfaceId: "party:catch-full", operationClass: "catch", ownerModel: "interaction" };
+      }
+      if (phase === "SelectModifierPhase") {
+        return { surfaceId: "party:reward-target", operationClass: "reward", ownerModel: "interaction" };
+      }
+      return { surfaceId: "party", operationClass: "party", ownerModel: "local" };
+    case "SUMMARY":
+      if (phase === "LearnMovePhase") {
+        return { surfaceId: "learn-move:summary", operationClass: "learn-move", ownerModel: "interaction" };
+      }
+      if (phase === "AttemptCapturePhase") {
+        return { surfaceId: "catch:summary", operationClass: "catch", ownerModel: "interaction" };
+      }
+      return { surfaceId: "summary", operationClass: "info", ownerModel: "local" };
+    case "OPTION_SELECT":
+      if (phase === "ErCrossroadsPhase") {
+        return { surfaceId: "crossroads", operationClass: "navigation", ownerModel: "interaction" };
+      }
+      if (phase === "SelectBiomePhase") {
+        return { surfaceId: "biome-select", operationClass: "navigation", ownerModel: "interaction" };
+      }
+      if (inMe) {
+        return { surfaceId: "mystery-encounter:prompt", operationClass: "encounter-prompt", ownerModel: "interaction" };
+      }
+      return { surfaceId: `option-select:${phase}`, operationClass: "confirm", ownerModel: "interaction" };
+    case "CONFIRM":
+      if (phase === "EggLapsePhase") {
+        return { surfaceId: "egg:lapse", operationClass: "egg", ownerModel: "interaction" };
+      }
+      if (phase === "AttemptCapturePhase") {
+        return { surfaceId: "catch-full:confirm", operationClass: "catch", ownerModel: "interaction" };
+      }
+      if (phase === "LearnMovePhase") {
+        return { surfaceId: "learn-move:confirm", operationClass: "learn-move", ownerModel: "interaction" };
+      }
+      if (phase === "CheckSwitchPhase") {
+        return { surfaceId: "check-switch", operationClass: "confirm", ownerModel: "interaction" };
+      }
+      if (phase === "SelectModifierPhase") {
+        return { surfaceId: "reward:confirm", operationClass: "reward", ownerModel: "interaction" };
+      }
+      return { surfaceId: `confirm:${phase}`, operationClass: "confirm", ownerModel: "interaction" };
+    case "MESSAGE":
+      return inMe
+        ? { surfaceId: "mystery-encounter:message", operationClass: "encounter-prompt", ownerModel: "interaction" }
+        : null;
+    case "EGG_HATCH_SUMMARY":
+      return { surfaceId: "egg:hatch-summary", operationClass: "egg", ownerModel: "local" };
+    case "EGG_HATCH_SCENE":
+      return { surfaceId: "egg:hatch-scene", operationClass: "egg", ownerModel: "local" };
+    default:
+      return null;
+  }
+}
+
+function normalizeOptionId(label: string): string {
+  return label
+    .replace(/\[[^\]]*\]/gu, "")
+    .replace(/[^a-zA-Z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .toLowerCase()
+    .slice(0, 40);
+}
+
+interface SelectionReadout {
+  readonly selectedOptionId: string | null;
+  readonly optionIds: readonly string[] | null;
+  readonly optionCount: number | null;
+}
+
+/**
+ * The visible options + selected id, where the handler exposes them publicly. Reward
+ * options carry a stable modifier-type id; option-select menus expose only visible labels
+ * (no native stable id - normalized label is the best-observable id, see the gap note).
+ */
+function readSelection(handler: { getCursor(): number }, uiMode: string): SelectionReadout {
+  let selectedIndex: number | null = null;
+  try {
+    selectedIndex = handler.getCursor();
+  } catch {
+    selectedIndex = null;
+  }
+  if (uiMode === "MODIFIER_SELECT") {
+    const modOptions = (handler as unknown as { options?: Array<{ modifierTypeOption?: { type?: { id?: string } } }> })
+      .options;
+    if (Array.isArray(modOptions)) {
+      const optionIds = modOptions.map((option, index) => option?.modifierTypeOption?.type?.id ?? `slot:${index}`);
+      return {
+        selectedOptionId: selectedIndex == null ? null : (optionIds[selectedIndex] ?? `cursor:${selectedIndex}`),
+        optionIds,
+        optionCount: optionIds.length,
+      };
+    }
+  }
+  const listOptions = (handler as unknown as { options?: Array<{ label?: unknown }> }).options;
+  if (Array.isArray(listOptions) && listOptions.length > 0 && typeof listOptions[0]?.label === "string") {
+    const optionIds = listOptions.map((option, index) =>
+      typeof option?.label === "string" ? normalizeOptionId(option.label) || `slot:${index}` : `slot:${index}`,
+    );
+    return {
+      selectedOptionId: selectedIndex == null ? null : (optionIds[selectedIndex] ?? `cursor:${selectedIndex}`),
+      optionIds,
+      optionCount: optionIds.length,
+    };
+  }
+  return {
+    selectedOptionId: selectedIndex == null ? null : `cursor:${selectedIndex}`,
+    optionIds: null,
+    optionCount: null,
+  };
+}
+
+let lastSemanticObservation = "";
+let lastSemanticProbe = "";
+let lastSemanticProbeAt = 0;
+
+function observeSemanticSurface(): void {
+  try {
+    const runtime = getCoopRuntime();
+    const battle = globalScene?.currentBattle;
+    const phase = globalScene?.phaseManager?.getCurrentPhase()?.phaseName;
+    const ui = globalScene?.ui;
+    if (runtime == null || battle == null || phase == null || ui == null) {
+      return;
+    }
+    const handler = ui.getHandler();
+    if (!handler?.active) {
+      return;
+    }
+    const uiMode = UiMode[ui.getMode()];
+    const semantic = classifySemanticSurface(phase, uiMode);
+    if (semantic == null) {
+      return;
+    }
+    const membership = runtime.membership.snapshot();
+    if (membership.state !== "active") {
+      return;
+    }
+    const localSeat = runtime.controller.seat;
+    const partnerSeat = localSeat === 0 ? 1 : 0;
+    let isLocalOwner: boolean | null = null;
+    try {
+      isLocalOwner = runtime.controller.isLocalOwnerAtCounter(runtime.controller.interactionCounter());
+    } catch {
+      isLocalOwner = null;
+    }
+    const ownerSeat =
+      semantic.ownerModel === "interaction" && isLocalOwner != null ? (isLocalOwner ? localSeat : partnerSeat) : null;
+    // This client's view of who may input: a local surface = this seat drives its own; an
+    // interaction surface = only the owner. A driver unions both clients' markers.
+    const seatsWithInput = semantic.ownerModel === "local" ? [localSeat] : ownerSeat == null ? [] : [ownerSeat];
+    const selection = readSelection(handler, uiMode);
+    const awaitingRaw = (handler as unknown as { awaitingActionInput?: unknown }).awaitingActionInput;
+    const awaitingActionInput = typeof awaitingRaw === "boolean" ? awaitingRaw : null;
+
+    const epoch = runtime.controller.sessionEpoch;
+    const probeKey = [
+      semantic.surfaceId,
+      uiMode,
+      `${epoch}:${battle.waveIndex}:${battle.turn}`,
+      selection.selectedOptionId ?? "",
+      ownerSeat ?? "?",
+      awaitingActionInput,
+    ].join("|");
+    const now = Date.now();
+    if (probeKey === lastSemanticProbe && now - lastSemanticProbeAt < 300) {
+      return;
+    }
+    lastSemanticProbe = probeKey;
+    lastSemanticProbeAt = now;
+
+    const observation = {
+      version: 2,
+      surfaceId: semantic.surfaceId,
+      operationClass: semantic.operationClass,
+      ownerModel: semantic.ownerModel,
+      address: { epoch, wave: battle.waveIndex, turn: battle.turn },
+      membershipRevision: membership.revision,
+      connectionGeneration: membership.connectionGeneration,
+      localSeat,
+      localRole: runtime.controller.role,
+      ownerSeat,
+      seatsWithInput,
+      selectedOptionId: selection.selectedOptionId,
+      optionIds: selection.optionIds,
+      optionCount: selection.optionCount,
+      ready: { handlerActive: true, awaitingActionInput },
+      phase,
+      uiMode,
+    };
+    const canonical = JSON.stringify(observation);
+    if (canonical === lastSemanticObservation) {
+      return;
+    }
+    lastSemanticObservation = canonical;
+    console.info(`${SURFACE2_PREFIX}${canonical}`);
+  } catch {
+    // Scene init/teardown race; gameplay throws are still surfaced by the v1 observer-error path.
+  }
+}
+
 setInterval(() => {
   observeBoundSession();
   observeContinuationSurface();
+  observeSemanticSurface();
 }, 100);
 
+// Strictly read-only observer bridge. `ready` is a non-mutating probe; the former
+// `connect: connectCoopWithCode` seam was removed so no code path can drive pairing from
+// the page - the gameplay journeys pair exclusively through visible lobby keyboard input.
 Object.defineProperty(globalThis, "__coopBrowserBridge", {
   configurable: false,
   enumerable: false,
   writable: false,
   value: Object.freeze({
     ready: () => globalScene?.gameData != null,
-    connect: connectCoopWithCode,
     surfaceObserverVersion: 1,
   }),
 });

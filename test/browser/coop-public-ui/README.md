@@ -103,3 +103,23 @@ node test/browser/coop-public-ui/check-public-boundary.mjs
 This harness remains opt-in until the blocked observability and account-fixture items in
 [`blocked-instrumentation.md`](./blocked-instrumentation.md) are resolved and the journeys are green on
 prepared dedicated accounts. It does not replace the calibrated co-op gate or milestone soak matrix.
+
+## Campaign + semantic surface mirror
+
+`campaign.mjs` / `run-campaign.mjs` drive a longer co-op run (default 30 waves,
+`COOP_UI_CAMPAIGN_WAVES`) using the read-only **v2 semantic surface mirror** the sealed observer emits
+(`[coop-browser:surface2]`, parsed by `evidence.mjs` as `browser-surface2`). The mirror reports, per
+active interactive surface: a stable `surfaceId`, `operationClass`, authoritative `address`
+`{epoch,wave,turn}`, `ownerSeat`/`ownerModel`, this client's `seatsWithInput`, `optionIds` +
+`selectedOptionId` where the handler exposes them, and readiness bits. `COOP_UI_CAMPAIGN_MODE` gates the
+loud-fail contract: only `shakedown` may press through an UNKNOWN surface (`COOP_UI_AUTO_FIRST`);
+`gating` and `nightly` runs fail loudly and immediately on any surface with no registered driver.
+`check-campaign-boundary.mjs` re-applies the private-state prohibitions to the campaign files.
+
+## Known future-proofing TODO (do not do now)
+
+The rig hard-codes a two-seat topology: `pair()` asserts the sorted seat set is exactly `[0,1]` and
+`assertSharedSurface` (see the `host=0/guest=1` seat assertion, `public-ui-harness.mjs` ~L623) pins host
+to seat 0 and guest to seat 1. An **NClientRig** refactor (arbitrary seat count, seat-indexed client map,
+per-seat owner resolution) is the path to >2-player co-op journeys. Deferred - the two-seat assertion is
+correct for every current journey.

@@ -9,6 +9,7 @@ import { resolve } from "node:path";
 export const delay = ms => new Promise(resolveDelay => setTimeout(resolveDelay, ms));
 
 const SURFACE_PREFIX = "[coop-browser:surface] ";
+const SURFACE2_PREFIX = "[coop-browser:surface2] ";
 const BINDING_PREFIX = "[coop-browser:binding] ";
 const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
 const CHECKSUM_SENTINEL = "0000000000000000";
@@ -144,6 +145,39 @@ function bindingView(text) {
   return Object.freeze({ ...value });
 }
 
+/**
+ * Parse the read-only v2 semantic surface mirror. Lenient by design: an unrecognized or
+ * malformed line returns null and is dropped (v2 drives navigation; it is not a hard proof
+ * like v1, whose parser fails closed). Only the fields a driver needs are validated.
+ */
+function semanticSurfaceView(text) {
+  if (!text.startsWith(SURFACE2_PREFIX)) {
+    return null;
+  }
+  let value;
+  try {
+    value = JSON.parse(text.slice(SURFACE2_PREFIX.length));
+  } catch {
+    return null;
+  }
+  if (
+    !value
+    || typeof value !== "object"
+    || value.version !== 2
+    || typeof value.surfaceId !== "string"
+    || value.surfaceId.length === 0
+    || typeof value.operationClass !== "string"
+    || !value.address
+    || typeof value.address !== "object"
+    || !Number.isSafeInteger(value.address.epoch)
+    || !Number.isSafeInteger(value.address.wave)
+    || !Number.isSafeInteger(value.address.turn)
+  ) {
+    return null;
+  }
+  return Object.freeze({ ...value, address: Object.freeze({ ...value.address }) });
+}
+
 export class EvidenceSink {
   constructor(label, artifactDir, allowedConsoleErrors = [], expectedMissingSystemSaveErrors = 0) {
     this.label = label;
@@ -206,6 +240,16 @@ export class EvidenceSink {
 
   findBinding(from = 0) {
     return this.events.slice(from).find(event => event.kind === "browser-binding");
+  }
+
+  /** The latest v2 semantic surface observation (optionally matching a surfaceId) from `from`. */
+  findLastSemanticSurface(from = 0, surfaceId = null) {
+    return this.events
+      .slice(from)
+      .toReversed()
+      .find(
+        event => event.kind === "browser-surface2" && (surfaceId == null || event.observation.surfaceId === surfaceId),
+      );
   }
 
   async waitForSurface(surface, { from = 0, timeoutMs = 120_000 } = {}) {
@@ -274,6 +318,12 @@ export class EvidenceSink {
           text: error instanceof Error ? error.message : String(error),
         });
         this.failures.push(invalid);
+      }
+      // The v2 semantic mirror is advisory (it drives state-aware navigation, it is not a
+      // hard convergence proof like v1), so a malformed line is ignored, never fatal.
+      const semantic = semanticSurfaceView(text);
+      if (semantic != null) {
+        this.record("browser-surface2", { observation: semantic });
       }
     });
     page.on("pageerror", error => {

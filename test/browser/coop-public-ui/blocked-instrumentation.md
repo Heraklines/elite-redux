@@ -24,3 +24,17 @@ must never let the driver mutate a scene, inject protocol messages, choose on be
 or directly apply recovered state. Fixture creation belongs outside the game browser and must produce the
 same signed persistence format that staging normally loads.
 
+## Semantic surface mirror (v2) gaps
+
+The v2 mirror (`[coop-browser:surface2]`, `scripts/coop-browser-entry.ts`) emits every field that is
+observable read-only today. The following are emitted best-effort or omitted; each is a gap, not faked:
+
+| Gap | Current observable emission | Required production instrumentation |
+| --- | --- | --- |
+| No native stable option identity for `AbstractOptionSelectUiHandler` menus (crossroads, ME prompts, confirms) | The normalized visible `label` is emitted as the option id; `selectedOptionId` is the label at the cursor (else `cursor:<n>`) | A read-only stable option-id per rendered option, independent of localized label text |
+| Per-surface interaction OWNER counter is private to each phase | `ownerSeat` is derived from `isLocalOwnerAtCounter(interactionCounter())` (the LIVE counter) - accurate for a freshly pinned surface, imprecise if the counter advanced after the pin | Each interactive phase exposes the counter it pinned, so owner is read exactly per surface |
+| `seatsWithInput` is this client's local view (own seat for local surfaces, owner seat for interaction surfaces) | Emitted from `ownerModel`; a driver must union both clients' markers to see the full input set | A read-only per-surface "input-enabled seats" set on the shared surface contract |
+| True presentation-ready / animation-idle / sprite-ready state | `ready.handlerActive` + `ready.awaitingActionInput` (where the handler is awaitable) only | A render-idle / presentation-complete marker per surface (same request as the v1 sprite-readiness gap above) |
+| Reward-shop row axis (rewards vs. reroll/lock/continue) | `selectedOptionId` reads `options[getCursor()]` with the modifier type id; the private `rowCursor` axis is not read | A read-only current-row + row-option enumeration on the modifier-select contract |
+| Exotic surfaces (bargain, colosseum, quiz, wager, shiny-lab) | Classified with `surfaceId` + address + readiness; their option lists are only emitted when the handler exposes a public `options`/`getCursor` | Per-handler read-only option/selection enumeration for the bespoke ER screens |
+
