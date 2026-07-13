@@ -84,7 +84,11 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
     coopEngine.resetCoopStateTicks();
     vi.spyOn(coopPresentation, "settleCoopAuthoritativeProjection").mockResolvedValue(true);
     initGlobalScene({
-      currentBattle: { waveIndex: 4, turn: 2 },
+      currentBattle: { waveIndex: 4, turn: 2, turnCommands: [null, null] },
+      getPlayerField: () => [
+        { id: 100, coopOwner: "host", isActive: () => true },
+        { id: 101, coopOwner: "guest", isActive: () => true },
+      ],
       phaseManager: {
         getCurrentPhase: () => currentPhase,
         shiftPhase: () => {},

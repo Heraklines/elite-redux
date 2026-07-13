@@ -185,7 +185,7 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
       "utf8",
     );
     const start = encounterSource.indexOf("private broadcastCoopEnemyParty(): void");
-    const end = encounterSource.indexOf("private broadcastCoopLaunchSnapshot(): void", start);
+    const end = encounterSource.indexOf("private broadcastCoopLaunchSnapshot(", start);
     expect(start, "ordinary-wave authority publisher exists").toBeGreaterThanOrEqual(0);
     expect(end, "publisher has a bounded source section").toBeGreaterThan(start);
     const publisher = encounterSource.slice(start, end);

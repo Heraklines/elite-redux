@@ -72,6 +72,9 @@ describe("co-op bespoke yes/no ME sub-prompt relay (#827)", () => {
    * test can watch what the guest receives and reply as the guest owner would.
    */
   const rig = (start: number) => {
+    // This file proves the negotiated raw compatibility carrier over a bare peer relay. Retained ME
+    // presentation/intent materialization is covered separately with a durability-backed runtime.
+    setCoopMeOperationEnabled(false);
     const { host, guest } = createLoopbackPair();
     const runtime = assembleCoopRuntime(host, { username: "Host", netcodeMode: "authoritative" });
     setCoopRuntime(runtime);

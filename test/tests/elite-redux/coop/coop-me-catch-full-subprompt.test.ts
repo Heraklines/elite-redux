@@ -78,7 +78,10 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
    * party (the helper range-checks the relayed slot against it), and pair a bare GUEST relay on the other
    * loopback end so the test can watch what the guest receives and reply as the guest owner would.
    */
-  const hostRig = (start: number, partySize = 6) => {
+  const hostRig = (start: number, partySize = 6, journal = false) => {
+    // Most cases below prove the negotiated raw compatibility carrier with a bare peer relay. The two
+    // operation assertions opt into the retained journal explicitly and drive the known seq directly.
+    setCoopMeOperationEnabled(journal);
     const { host, guest } = createLoopbackPair();
     const runtime = assembleCoopRuntime(host, { username: "Host", netcodeMode: "authoritative" });
     setCoopRuntime(runtime);
@@ -117,10 +120,11 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
 
   it("HOST commits the exact catch-full sub-prompt as a durable ME_PRESENT step", async () => {
     const commitSpy = vi.spyOn(meOp, "commitMeOwnerIntent");
-    const { seqMe, guestRelay } = hostRig(3);
+    const { seqMe, guestRelay } = hostRig(3, 6, true);
 
     const hostAwait = coopHostStreamCatchFullAwaitSlot("Rattata");
-    await guestRelay.awaitInteractionOutcome(seqMe);
+    // Journal mode intentionally emits no raw mePresent. The committed presentation is the carrier;
+    // drive its addressed response directly, as a real durability-backed guest materializer would.
     guestRelay.sendInteractionChoice(seqMe, "meSub", 2, [0]);
     expect(await hostAwait).toBe(2);
 
@@ -137,10 +141,9 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
 
   it("HOST commits the guest-owned catch-full slot as a durable ME_SUB step", async () => {
     const commitSpy = vi.spyOn(meOp, "commitMeOwnerIntent");
-    const { seqMe, guestRelay } = hostRig(3);
+    const { seqMe, guestRelay } = hostRig(3, 6, true);
 
     const hostAwait = coopHostStreamCatchFullAwaitSlot("Rattata");
-    await guestRelay.awaitInteractionOutcome(seqMe);
     guestRelay.sendInteractionChoice(seqMe, "meSub", 2, [0]);
     expect(await hostAwait).toBe(2);
 
