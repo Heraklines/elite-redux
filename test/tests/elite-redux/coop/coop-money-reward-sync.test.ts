@@ -33,20 +33,25 @@
 // field resets to -1 after each apply, and the OWNER coopRelaySend appends the tag ONLY for the
 // money-moving picks.
 
+import { getGameMode } from "#app/game-mode";
 import {
   COOP_INTERACTION_LEAVE,
   COOP_INTERACTION_REROLL,
   CoopInteractionRelay,
 } from "#data/elite-redux/coop/coop-interaction-relay";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { GameModes } from "#enums/game-modes";
-import { SpeciesId } from "#enums/species-id";
-import { getGameMode } from "#app/game-mode";
+import {
+  resetCoopRewardOperationFlag,
+  setCoopRewardOperationEnabled,
+} from "#data/elite-redux/coop/coop-reward-operation";
 import {
   clearCoopRuntime,
   getCoopInteractionRelay,
+  getCoopRuntime,
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { GameModes } from "#enums/game-modes";
+import { SpeciesId } from "#enums/species-id";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
@@ -73,8 +78,8 @@ function appendMoneyTag(data: number[] | undefined, money: number): number[] {
 function stripMoneyTag(data: number[] | undefined): { data: number[]; money: number } {
   let money = -1;
   let out = data ?? [];
-  if (out.length >= 2 && out[out.length - 2] === COOP_MONEY_TAG) {
-    money = out[out.length - 1];
+  if (out.length >= 2 && out.at(-2) === COOP_MONEY_TAG) {
+    money = out.at(-1) ?? -1;
     out = out.slice(0, -2);
   }
   return { data: out, money };
@@ -165,7 +170,9 @@ type WatcherSeam = {
   rerollModifiers(): boolean;
   selectShopModifierOption(rowCursor: number, cursor: number, cb: () => boolean): boolean;
   selectRewardModifierOption(cursor: number, cb: () => boolean): boolean;
-  coopRelaySend(choice: number, data: number[] | undefined, label: string): void;
+  coopRelaySend(choice: number, data: number[] | undefined, label: string): boolean;
+  coopCommitPendingAuthorityResult(): boolean;
+  coopPendingAuthorityOperationId: string | null;
 };
 
 describe.skipIf(!RUN)("co-op reward-shop money sync (#698) - watcher threading + owner append", () => {
@@ -182,6 +189,7 @@ describe.skipIf(!RUN)("co-op reward-shop money sync (#698) - watcher threading +
 
   afterEach(() => {
     clearCoopRuntime();
+    resetCoopRewardOperationFlag();
   });
 
   /** A watcher phase with the heavy reward sub-applies stubbed to CAPTURE coopRelayedMoney at
@@ -285,8 +293,11 @@ describe.skipIf(!RUN)("co-op reward-shop money sync (#698) - watcher threading +
     expect(game.scene.money).toBe(750);
   });
 
-  it("the OWNER appends [COOP_MONEY_TAG, money] for a REROLL relay and nothing for LEAVE/LOCK", async () => {
+  it("the rollback relay appends [COOP_MONEY_TAG, money] for REROLL and nothing for LEAVE/LOCK", async () => {
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    // This assertion is specifically the legacy/raw compatibility wire. In retained-result mode a
+    // host-owned terminal is carried by its immutable result envelope and deliberately emits no raw LEAVE.
+    setCoopRewardOperationEnabled(false);
     startLocalCoopSession({ username: "Host" }); // role=host -> owner at EVEN counters
     game.scene.gameMode = getGameMode(GameModes.COOP);
 
@@ -322,5 +333,63 @@ describe.skipIf(!RUN)("co-op reward-shop money sync (#698) - watcher threading +
     expect(seam.coopOwnerPostMoney).toBe(-1);
 
     spy.mockRestore();
+  });
+
+  it("a host-owned LEAVE retains exactly one complete result at the relay seam before continuation", async () => {
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    startLocalCoopSession({ username: "Host" });
+    game.scene.gameMode = getGameMode(GameModes.COOP);
+
+    const runtime = getCoopRuntime();
+    const relay = getCoopInteractionRelay();
+    expect(runtime?.durability).not.toBeNull();
+    expect(relay).not.toBeNull();
+    const rawChoices: number[] = [];
+    const rawSpy = vi
+      .spyOn(relay as CoopInteractionRelay, "sendInteractionChoice")
+      .mockImplementation((_seq, _kind, choice) => {
+        rawChoices.push(choice);
+      });
+
+    const phase = new SelectModifierPhase();
+    const seam = phase as unknown as WatcherSeam;
+    seam.coopInteractionStart = 0;
+    const before = runtime!.durability!.unackedCount();
+
+    expect(seam.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip")).toBe(false);
+    expect(runtime!.durability!.unackedCount()).toBe(before + 1);
+    expect(seam.coopPendingAuthorityOperationId).toBeNull();
+    expect(rawChoices, "the retained envelope is the only host terminal carrier").toEqual([]);
+
+    // Confirmation callbacks and production-fidelity drivers may both observe the terminal seam. The
+    // retained terminal identity makes this an exact reassertion, never a second operation/result.
+    expect(seam.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip")).toBe(false);
+    expect(runtime!.durability!.unackedCount()).toBe(before + 1);
+    expect(rawChoices).toEqual([]);
+
+    rawSpy.mockRestore();
+  });
+
+  it("a selected reward remains intent-only until the post-mutation safe seam commits its result", async () => {
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    startLocalCoopSession({ username: "Host" });
+    game.scene.gameMode = getGameMode(GameModes.COOP);
+
+    const runtime = getCoopRuntime();
+    expect(runtime?.durability).not.toBeNull();
+    const phase = new SelectModifierPhase();
+    const seam = phase as unknown as WatcherSeam;
+    seam.coopInteractionStart = 0;
+    const before = runtime!.durability!.unackedCount();
+
+    expect(seam.coopRelaySend(0, [COOP_ACT_REWARD], "reward")).toBe(false);
+    expect(seam.coopPendingAuthorityOperationId).not.toBeNull();
+    expect(runtime!.durability!.unackedCount(), "intent alone is not an authoritative result").toBe(before);
+
+    // Model the selected item's authoritative mutation; the real applyModifier path invokes this same seam.
+    game.scene.money += 1;
+    expect(seam.coopCommitPendingAuthorityResult()).toBe(true);
+    expect(runtime!.durability!.unackedCount()).toBe(before + 1);
+    expect(seam.coopPendingAuthorityOperationId).toBeNull();
   });
 });
