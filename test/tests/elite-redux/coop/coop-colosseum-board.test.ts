@@ -257,6 +257,7 @@ describe("co-op Colosseum guest between-rounds ROUND LOOP (#829)", () => {
     clearCoopRuntime();
     setCoopMeInteractionStart(-1);
     resetCoopMeOperationFlag();
+    resetCoopColosseumOperationFlag();
   });
 
   /**

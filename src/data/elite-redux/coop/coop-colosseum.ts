@@ -281,8 +281,12 @@ export function coopColosseumSendDecision(index: number, roundOverride?: number)
  * board's streamed pick. Resolves to the index, or `null` on a genuinely disconnected partner (the
  * caller then falls back so neither client hangs). No relay (not in a session) resolves `null`.
  */
-export async function coopColosseumAwaitDecision(timeoutMs?: number, expectedRound?: number): Promise<number | null> {
-  const relay = getCoopInteractionRelay();
+export async function coopColosseumAwaitDecision(
+  timeoutMs?: number,
+  expectedRound?: number,
+  relayOverride?: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
+): Promise<number | null> {
+  const relay = relayOverride ?? getCoopInteractionRelay();
   if (relay == null) {
     return null;
   }
@@ -497,24 +501,26 @@ export async function runColosseumGuestRoundLoop(
     }
     resumedPresentation = undefined;
     if (winner.tag === "term") {
+      const rollbackCarrierAllowed = !isCoopMeOperationEnabled() || !isCoopOperationJournalActive();
       const exactLeave =
         winner.action?.choice === COOP_INTERACTION_LEAVE
-        && winner.action.operationId != null
-        && adoptMeWatcherChoice({
-          kind: "ME_TERMINAL",
-          seq: seqTerm,
-          pinned: counter,
-          step: 1,
-          res: {
-            choice: winner.action.choice,
-            data: winner.action.data,
-            operationId: winner.action.operationId,
-          },
-          terminal: "leave",
-          localRole: "guest",
-          wave: globalScene.currentBattle?.waveIndex ?? -1,
-          turn: 0,
-        }).adopt;
+        && (rollbackCarrierAllowed
+          || (winner.action.operationId != null
+            && adoptMeWatcherChoice({
+              kind: "ME_TERMINAL",
+              seq: seqTerm,
+              pinned: counter,
+              step: 1,
+              res: {
+                choice: winner.action.choice,
+                data: winner.action.data,
+                operationId: winner.action.operationId,
+              },
+              terminal: "leave",
+              localRole: "guest",
+              wave: globalScene.currentBattle?.waveIndex ?? -1,
+              turn: 0,
+            }).adopt));
       if (!exactLeave) {
         getCoopRuntime()?.durability?.reconnect();
         failCoopSharedSession(`Colosseum terminal ${seqTerm} was null, malformed, or not journal-led`);
@@ -562,7 +568,7 @@ export async function runColosseumGuestRoundLoop(
       decision = await ops.driveBoard(labels, round);
     } else {
       ops.showTag(false);
-      decision = await coopColosseumAwaitDecision(COOP_COLOSSEUM_WAIT_MS, round);
+      decision = await coopColosseumAwaitDecision(COOP_COLOSSEUM_WAIT_MS, round, relay);
     }
     if (!boundaryLive()) {
       return;
@@ -588,24 +594,26 @@ export async function runColosseumGuestRoundLoop(
       if (!boundaryLive()) {
         return;
       }
+      const rollbackCarrierAllowed = !isCoopMeOperationEnabled() || !isCoopOperationJournalActive();
       const exactLeave =
         terminal.action?.choice === COOP_INTERACTION_LEAVE
-        && terminal.action.operationId != null
-        && adoptMeWatcherChoice({
-          kind: "ME_TERMINAL",
-          seq: seqTerm,
-          pinned: counter,
-          step: 1,
-          res: {
-            choice: terminal.action.choice,
-            data: terminal.action.data,
-            operationId: terminal.action.operationId,
-          },
-          terminal: "leave",
-          localRole: "guest",
-          wave: globalScene.currentBattle?.waveIndex ?? -1,
-          turn: 0,
-        }).adopt;
+        && (rollbackCarrierAllowed
+          || (terminal.action.operationId != null
+            && adoptMeWatcherChoice({
+              kind: "ME_TERMINAL",
+              seq: seqTerm,
+              pinned: counter,
+              step: 1,
+              res: {
+                choice: terminal.action.choice,
+                data: terminal.action.data,
+                operationId: terminal.action.operationId,
+              },
+              terminal: "leave",
+              localRole: "guest",
+              wave: globalScene.currentBattle?.waveIndex ?? -1,
+              turn: 0,
+            }).adopt));
       if (exactLeave) {
         if (!ops.leaveAndAdvance()) {
           failCoopSharedSession(`Colosseum cash-out could not leave/advance for ${counter}`);
