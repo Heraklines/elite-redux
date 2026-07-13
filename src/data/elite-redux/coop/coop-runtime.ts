@@ -1821,6 +1821,40 @@ function terminalReason(reason: string): string {
   return normalized || "Shared co-op control could not continue safely.";
 }
 
+interface CoopTerminalPhaseManagerBridge {
+  freezeForCoopTerminal?: (() => void) | undefined;
+  releaseCoopTerminalFreeze?: (() => void) | undefined;
+  clearAllPhases?: (() => void) | undefined;
+  clearPhaseQueue?: (() => void) | undefined;
+}
+
+/**
+ * Production owns the explicit PhaseManager fence. Engine-free harnesses intentionally inject a narrow
+ * scene stub, so retain the historical queue-clear fallback there instead of treating a missing optional
+ * test surface as a failed terminal preparation.
+ */
+function freezeCoopTerminalPhaseProgression(): boolean {
+  const phaseManager = globalScene.phaseManager as unknown as CoopTerminalPhaseManagerBridge;
+  if (typeof phaseManager.freezeForCoopTerminal === "function") {
+    phaseManager.freezeForCoopTerminal();
+    return true;
+  }
+  if (typeof phaseManager.clearAllPhases === "function") {
+    phaseManager.clearAllPhases();
+    return true;
+  }
+  if (typeof phaseManager.clearPhaseQueue === "function") {
+    phaseManager.clearPhaseQueue();
+    return true;
+  }
+  return false;
+}
+
+function releaseCoopTerminalPhaseProgression(): void {
+  const phaseManager = globalScene.phaseManager as unknown as CoopTerminalPhaseManagerBridge;
+  phaseManager.releaseCoopTerminalFreeze?.();
+}
+
 /**
  * Synchronously fence every gameplay continuation while preserving the transport listener used by the
  * retained terminal handshake. The flag and battle-command fence are installed before any null waiter is
@@ -1857,17 +1891,19 @@ function prepareCoopSharedTerminal(runtime: CoopRuntime, reason: string): boolea
     try {
       // Keep the current phase parked even if a released async waiter calls Phase.end(): the manager's
       // terminal fence blocks shiftPhase/turnStart until exactly-once finalization releases it.
-      globalScene.phaseManager.freezeForCoopTerminal();
+      if (!freezeCoopTerminalPhaseProgression()) {
+        throw new Error("phase manager has no terminal-freeze or queue-clear surface");
+      }
     } catch (error) {
       prepared = false;
       coopWarn("runtime", "shared terminal could not freeze phase progression", error);
     }
     try {
       globalScene.ui.showText(
-        "Co-op control recovery could not converge. Both players are leaving shared play safely.",
+        "The shared battle could not be synchronized safely. Both players are leaving shared play safely.",
         null,
         undefined,
-        5000,
+        6000,
       );
     } catch {
       /* cosmetic */
@@ -1900,9 +1936,8 @@ function finalizeCoopSharedTerminal(runtime: CoopRuntime, endAuthenticatedRun: b
     return;
   }
   try {
-    globalScene.phaseManager.releaseCoopTerminalFreeze();
+    releaseCoopTerminalPhaseProgression();
     const interruptedPhase = globalScene.phaseManager.getCurrentPhase();
-    globalScene.phaseManager.clearPhaseQueue();
     clearCoopRuntime();
     globalScene.reset();
     globalScene.phaseManager.unshiftNew("TitlePhase");
@@ -4472,7 +4507,7 @@ export function clearCoopRuntime(): void {
   try {
     // Normal title/save teardown may supersede an in-flight terminal. Never leak its phase-manager fence
     // into the next solo or co-op runtime.
-    globalScene.phaseManager.releaseCoopTerminalFreeze();
+    releaseCoopTerminalPhaseProgression();
   } catch {
     /* engine-free/pre-scene teardown */
   }
