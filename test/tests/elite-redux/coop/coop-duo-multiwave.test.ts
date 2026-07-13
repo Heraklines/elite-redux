@@ -225,6 +225,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     });
     pair.setAutomaticDelivery(false);
 
+    const guestResetSpy = vi.spyOn(rig.guestScene, "reset");
     const applyCheckpointSpy = vi.spyOn(coopEngine, "applyCoopCheckpoint");
     // Per-wave resync watch: count the guest's requestStateSync calls (an auto-resync on a checksum
     // mismatch). A converged run resyncs at most a handful of times (the spike's organic seed/ability
@@ -322,6 +323,10 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
         rig.guestRuntime.controller.interactionCounter(),
         `wave ${w}: guest advanced the interaction counter once (lockstep with host)`,
       ).toBe(counterBefore + 1);
+      expect(
+        rig.guestRuntime.durability?.appliedMarks()["op:global"] ?? 0,
+        `wave ${w}: retained WAVE then reward RESULT drained in order after the real reward UI opened`,
+      ).toBe(rig.hostRuntime.durability?.controlPlaneHighWater()["op:global"] ?? 0);
 
       // ===== Host crosses into the NEXT wave's battle (real EncounterPhase rolls wave w+1). =====
       if (w < WAVES) {
@@ -332,7 +337,16 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
         await withClient(rig.hostCtx, async () => {
           await game.phaseInterceptor.to("CommandPhase", false);
         });
-        await withClient(rig.guestCtx, () => driveClientPhaseQueueTo(rig.guestScene, "CommandPhase"));
+        const guestCommand = await withClient(rig.guestCtx, () =>
+          driveClientPhaseQueueTo(rig.guestScene, "CommandPhase"),
+        );
+        expect(guestCommand.phaseName, `wave ${w}: guest opened the real wave ${w + 1} command surface`).toBe(
+          "CommandPhase",
+        );
+        expect(
+          guestResetSpy,
+          `wave ${w}: guest never treats the host-only persistence transaction as a fatal local save failure`,
+        ).not.toHaveBeenCalled();
         expect(rig.hostScene.currentBattle.waveIndex, `wave ${w}: host advanced to wave ${w + 1}`).toBe(w + 1);
         expect(rig.guestScene.currentBattle.waveIndex, `wave ${w}: guest advanced to wave ${w + 1}`).toBe(w + 1);
         const nextCarrier = waveCarrierSpy.mock.calls.find(([wave]) => wave === w + 1);

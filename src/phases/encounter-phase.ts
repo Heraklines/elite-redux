@@ -1019,7 +1019,15 @@ export class EncounterPhase extends BattlePhase {
           } else {
             erStormglassApplyChosenWeather();
           }
-          if (globalScene.gameMode.isShowdown) {
+          if (isCoopAuthoritativeGuest()) {
+            // The host is the sole persistence owner for a shared run. An authoritative guest deliberately
+            // has no host persistence context, so saveAll() would correctly return false; treating that as
+            // an account-save failure below resets the guest to Login/SelectGender/Title between waves.
+            // Continue the already-adopted encounter locally without writing or broadcasting a launch save.
+            globalScene.disableMenu = false;
+            this.enterEncounterPresentation();
+            globalScene.resetSeed();
+          } else if (globalScene.gameMode.isShowdown) {
             // Showdown 1v1 (B7 item 5): a versus match is EPHEMERAL - it NEVER writes a session
             // (no localStorage slot, no cloud `updateAll` push). Skip the per-wave saveAll entirely
             // and boot the encounter directly. The guest already boots from the host's launch
