@@ -6,6 +6,7 @@ import type {
   ClearSessionSavedataResponse,
   CoopCasDeleteSessionSavedataRequest,
   CoopCasSessionSavedataRequest,
+  CoopDuplicateExactDeleteSessionSavedataRequest,
   CoopRunStatusRequest,
   DeleteSessionSavedataRequest,
   GetSessionSavedataRequest,
@@ -212,6 +213,41 @@ describe("Pokerogue Session Savedata API", () => {
     });
   });
 
+  describe("Typed co-op CAS read", () => {
+    const params: GetSessionSavedataRequest = { clientSessionId: "test-session-id", slot: 3 };
+
+    it("returns successful bytes without discarding the HTTP status", async () => {
+      server.use(http.get(`${apiBase}/savedata/session/get`, () => HttpResponse.text('{"waveIndex":10}')));
+      await expect(sessionSavedataApi.getCoopCas(params)).resolves.toEqual({
+        ok: true,
+        status: 200,
+        rawSavedata: '{"waveIndex":10}',
+      });
+    });
+
+    it("classifies a missing row without exposing its error body as savedata", async () => {
+      server.use(
+        http.get(`${apiBase}/savedata/session/get`, () => new HttpResponse("Session not found.", { status: 404 })),
+      );
+      await expect(sessionSavedataApi.getCoopCas(params)).resolves.toEqual({
+        ok: false,
+        status: 404,
+        error: "Session not found.",
+        failureKind: "missing",
+      });
+    });
+
+    it("preserves a non-missing backend failure as a typed status", async () => {
+      server.use(http.get(`${apiBase}/savedata/session/get`, () => new HttpResponse(null, { status: 503 })));
+      await expect(sessionSavedataApi.getCoopCas(params)).resolves.toEqual({
+        ok: false,
+        status: 503,
+        error: "Co-op session read failed with HTTP 503.",
+        failureKind: "transient",
+      });
+    });
+  });
+
   describe("Co-op CAS delete", () => {
     const params: CoopCasDeleteSessionSavedataRequest = {
       clientSessionId: "test-session-id",
@@ -254,6 +290,34 @@ describe("Pokerogue Session Savedata API", () => {
         error: "Session CAS conflict",
         failureKind: "conflict",
       });
+    });
+  });
+
+  describe("Co-op duplicate exact delete", () => {
+    const params: CoopDuplicateExactDeleteSessionSavedataRequest = {
+      clientSessionId: "test-session-id",
+      slot: 1,
+      coopCasRunId: "run-duplicate-123456789",
+      coopCasCheckpointRevision: 4,
+      coopCasDigest: "a".repeat(64),
+      survivorSlot: 3,
+      survivorCheckpointRevision: 5,
+      survivorDigest: "b".repeat(64),
+    };
+
+    it("sends both exact row commitments to the dedicated recovery endpoint", async () => {
+      let requestedUrl = "";
+      server.use(
+        http.post(`${apiBase}/savedata/session/coop-duplicate-exact-delete`, ({ request }) => {
+          requestedUrl = request.url;
+          return HttpResponse.text(null);
+        }),
+      );
+      await expect(sessionSavedataApi.deleteCoopDuplicateExact(params)).resolves.toMatchObject({ ok: true });
+      expect(requestedUrl).toContain("slot=1");
+      expect(requestedUrl).toContain("survivorSlot=3");
+      expect(requestedUrl).toContain("survivorCheckpointRevision=5");
+      expect(requestedUrl).toContain(`survivorDigest=${"b".repeat(64)}`);
     });
   });
 

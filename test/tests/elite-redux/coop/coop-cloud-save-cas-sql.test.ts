@@ -9,12 +9,15 @@ import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  COOP_DUPLICATE_DELETE_REPLAY_SQL,
+  COOP_DUPLICATE_EXACT_DELETE_SQL,
   COOP_EMPTY_SESSION_INSERT_SQL,
   COOP_EXACT_SESSION_REPLAY_SQL,
   COOP_EXISTING_SESSION_UPDATE_SQL,
   COOP_TOMBSTONE_INSERT_SQL,
   COOP_TOMBSTONED_SESSION_DELETE_SQL,
   classifySessionProtection,
+  parseValidResumableCoopSession,
   UPDATE_ALL_CONDITIONAL_SYSTEM_SQL,
 } from "../../../../workers/er-save-api/src/index";
 
@@ -24,7 +27,13 @@ function session(runId: string, checkpointRevision: number, wave = 1): string {
   return JSON.stringify({
     gameMode: 6,
     waveIndex: wave,
+    timestamp: 1,
     coopRun: { version: 1, runId, checkpointRevision },
+    coopParticipants: {
+      version: 1,
+      players: ["Alice", "Bob"],
+      seats: { host: "Alice", guest: "Bob" },
+    },
   });
 }
 
@@ -85,6 +94,60 @@ describe("co-op cloud CAS SQL on SQLite", () => {
     expect(Number(db.prepare(COOP_EMPTY_SESSION_INSERT_SQL).run(1, 0, data, 1, runId).changes)).toBe(1);
     expect(Number(db.prepare(COOP_EMPTY_SESSION_INSERT_SQL).run(1, 4, data, 2, runId).changes)).toBe(0);
     expect(Number(db.prepare(COOP_EXACT_SESSION_REPLAY_SQL).run(1, 0, data, runId).changes)).toBe(1);
+  });
+
+  it("atomically removes one exact duplicate only while its exact survivor remains", () => {
+    const runId = "run-duplicate-123456789";
+    const duplicate = session(runId, 2, 10);
+    const survivor = session(runId, 3, 11);
+    db.prepare("INSERT INTO session_saves (user_id, slot, data, updated_at) VALUES (?, ?, ?, ?)").run(
+      1,
+      0,
+      duplicate,
+      1,
+    );
+    db.prepare("INSERT INTO session_saves (user_id, slot, data, updated_at) VALUES (?, ?, ?, ?)").run(
+      1,
+      4,
+      survivor,
+      1,
+    );
+
+    expect(Number(db.prepare(COOP_DUPLICATE_EXACT_DELETE_SQL).run(1, 0, duplicate, runId, 4, survivor).changes)).toBe(
+      1,
+    );
+    expect(Number(db.prepare(COOP_DUPLICATE_DELETE_REPLAY_SQL).run(1, 0, "", runId, 4, survivor).changes)).toBe(1);
+    expect(
+      Number(db.prepare(COOP_EMPTY_SESSION_INSERT_SQL).run(1, 0, duplicate, 2, runId).changes),
+      "the surviving run identity fences delayed recreation of the removed duplicate",
+    ).toBe(0);
+    expect(db.prepare("SELECT data FROM session_saves WHERE user_id = 1 AND slot = 4").get()).toEqual({
+      data: survivor,
+    });
+    expect(db.prepare("SELECT COUNT(*) AS count FROM coop_run_tombstones_v2").get()).toEqual({ count: 0 });
+  });
+
+  it("does not remove a duplicate after the exact survivor changed", () => {
+    const runId = "run-duplicate-race-123456789";
+    const duplicate = session(runId, 2, 10);
+    const observedSurvivor = session(runId, 3, 11);
+    const advancedSurvivor = session(runId, 4, 12);
+    db.prepare("INSERT INTO session_saves (user_id, slot, data, updated_at) VALUES (?, ?, ?, ?)").run(
+      1,
+      0,
+      duplicate,
+      1,
+    );
+    db.prepare("INSERT INTO session_saves (user_id, slot, data, updated_at) VALUES (?, ?, ?, ?)").run(
+      1,
+      4,
+      advancedSurvivor,
+      2,
+    );
+    expect(
+      Number(db.prepare(COOP_DUPLICATE_EXACT_DELETE_SQL).run(1, 0, duplicate, runId, 4, observedSurvivor).changes),
+    ).toBe(0);
+    expect(db.prepare("SELECT COUNT(*) AS count FROM session_saves WHERE user_id = 1").get()).toEqual({ count: 2 });
   });
 
   it("keeps tombstones immutable and makes deletion conditional on the exact tombstone", () => {
@@ -158,6 +221,53 @@ describe("co-op cloud CAS SQL on SQLite", () => {
     expect(classifySessionProtection("{truncated")).toBe("unknown");
     expect(classifySessionProtection(JSON.stringify("not-a-session"))).toBe("unknown");
     expect(classifySessionProtection(JSON.stringify({ gameMode: 0, waveIndex: 3 }))).toBe("solo");
+    expect(
+      classifySessionProtection(
+        JSON.stringify({ coopRun: { version: 1, runId: "run-incomplete-123456789", checkpointRevision: 0 } }),
+      ),
+      "a valid-looking run id without the complete resume surface remains recoverable as legacy co-op",
+    ).toBe("coop-invalid");
+  });
+
+  it("accepts only the complete canonical resume commitment for the authenticated participant", () => {
+    const valid = session("run-structural-123456789", 0);
+    expect(parseValidResumableCoopSession(valid, "alice")).toMatchObject({
+      runId: "run-structural-123456789",
+      checkpointRevision: 0,
+      players: ["Alice", "Bob"],
+    });
+    expect(parseValidResumableCoopSession(valid, "Mallory"), "the account must own one participant seat").toBeNull();
+    expect(
+      parseValidResumableCoopSession(
+        JSON.stringify({
+          ...JSON.parse(valid),
+          coopParticipants: {
+            version: 1,
+            players: ["Bob", "Alice"],
+            seats: { host: "Alice", guest: "Bob" },
+          },
+        }),
+        "Alice",
+      ),
+      "participants must use the deterministic canonical order",
+    ).toBeNull();
+    expect(
+      parseValidResumableCoopSession(
+        JSON.stringify({
+          ...JSON.parse(valid),
+          coopParticipants: {
+            version: 1,
+            players: ["Alice", "Bob"],
+            seats: { host: "Alice", guest: "Mallory" },
+          },
+        }),
+        "Alice",
+      ),
+      "both stable seats must map exactly onto the participant pair",
+    ).toBeNull();
+    expect(
+      parseValidResumableCoopSession(JSON.stringify({ ...JSON.parse(valid), timestamp: undefined }), "Alice"),
+    ).toBeNull();
   });
 });
 
@@ -188,6 +298,37 @@ describe("co-op cloud CAS HTTP contract", () => {
       error: "Co-op session mutation failed with HTTP 503.",
       failureKind: "transient",
     });
+  });
+
+  it("keeps a missing CAS read distinct from savedata and preserves its HTTP status", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("Session not found.", { status: 404 })));
+    await expect(api.getCoopCas({ clientSessionId: "client", slot: 0 })).resolves.toEqual({
+      ok: false,
+      status: 404,
+      error: "Session not found.",
+      failureKind: "missing",
+    });
+  });
+
+  it("sends exact duplicate and survivor commitments only to the recovery endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      api.deleteCoopDuplicateExact({
+        clientSessionId: "client",
+        slot: 0,
+        coopCasRunId: "run-duplicate-http-123456789",
+        coopCasCheckpointRevision: 2,
+        coopCasDigest: "a".repeat(64),
+        survivorSlot: 4,
+        survivorCheckpointRevision: 3,
+        survivorDigest: "b".repeat(64),
+      }),
+    ).resolves.toMatchObject({ ok: true, status: 200 });
+    const requested = String(fetchMock.mock.calls[0][0]);
+    expect(requested).toContain("/savedata/session/coop-duplicate-exact-delete?");
+    expect(requested).toContain("slot=0");
+    expect(requested).toContain("survivorSlot=4");
   });
 
   it("rejects a run-status proof for a different run", async () => {

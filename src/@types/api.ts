@@ -144,6 +144,22 @@ export interface CoopCasDeleteSessionSavedataRequest extends DeleteSessionSaveda
   coopCasDigest: string;
 }
 
+/** Exact convergence of a pre-existing duplicate while retaining one exact live copy. */
+export interface CoopDuplicateExactDeleteSessionSavedataRequest extends CoopCasDeleteSessionSavedataRequest {
+  survivorSlot: number;
+  survivorCheckpointRevision: number;
+  survivorDigest: string;
+}
+
+export type CoopCasSessionGetResult =
+  | { ok: true; status: number; rawSavedata: string }
+  | {
+      ok: false;
+      status: number | null;
+      error: string;
+      failureKind: CoopCasFailureKind | "missing";
+    };
+
 /** Recovery-only exact deletion commitment for an unparsable/non-object session row. */
 export interface OpaqueExactDeleteSessionSavedataRequest extends DeleteSessionSavedataRequest {
   exactDigest: string;

@@ -5,7 +5,9 @@ import type {
   CoopCasDeleteSessionSavedataRequest,
   CoopCasFailureKind,
   CoopCasMutationResult,
+  CoopCasSessionGetResult,
   CoopCasSessionSavedataRequest,
+  CoopDuplicateExactDeleteSessionSavedataRequest,
   CoopRunStatus,
   CoopRunStatusRequest,
   CoopRunStatusResult,
@@ -38,9 +40,19 @@ function classifyCoopCasFailure(status: number): CoopCasFailureKind {
 }
 
 async function coopCasResult(response: Response): Promise<CoopCasMutationResult> {
-  const body = await response.text();
   if (response.ok) {
     return { ok: true, status: response.status, error: "", failureKind: null };
+  }
+  let body = "";
+  try {
+    body = await response.text();
+  } catch {
+    return {
+      ok: false,
+      status: response.status,
+      error: `Co-op session mutation response body failed with HTTP ${response.status}.`,
+      failureKind: "transient",
+    };
   }
   return {
     ok: false,
@@ -131,6 +143,49 @@ export class PokerogueSessionSavedataApi extends ApiBase {
   }
 
   /**
+   * Status-preserving session read for co-op CAS reconciliation. Unlike the legacy `get`, an HTTP
+   * error body can never be mistaken for savedata and a missing row is a machine-readable state.
+   */
+  public async getCoopCas(params: GetSessionSavedataRequest): Promise<CoopCasSessionGetResult> {
+    try {
+      const urlSearchParams = this.toUrlSearchParams(params);
+      const response = await this.doGet(`/savedata/session/get?${urlSearchParams}`);
+      if (!response.ok) {
+        let body = "";
+        try {
+          body = await response.text();
+        } catch {
+          return {
+            ok: false,
+            status: response.status,
+            error: `Co-op session read response body failed with HTTP ${response.status}.`,
+            failureKind: "transient",
+          };
+        }
+        return {
+          ok: false,
+          status: response.status,
+          error: body || `Co-op session read failed with HTTP ${response.status}.`,
+          failureKind: response.status === 404 ? "missing" : classifyCoopCasFailure(response.status),
+        };
+      }
+      try {
+        return { ok: true, status: response.status, rawSavedata: await response.text() };
+      } catch {
+        return {
+          ok: false,
+          status: response.status,
+          error: `Co-op session read response body failed with HTTP ${response.status}.`,
+          failureKind: "transient",
+        };
+      }
+    } catch (err) {
+      console.warn("Could not read co-op session savedata!", err);
+      return { ok: false, status: null, error: "Unknown Error!", failureKind: "transient" };
+    }
+  }
+
+  /**
    * Update a session savedata.
    * @param params - The request to send
    * @param rawSavedata - The raw, unencrypted savedata
@@ -175,6 +230,20 @@ export class PokerogueSessionSavedataApi extends ApiBase {
       return await coopCasResult(response);
     } catch (err) {
       console.warn("Could not conditionally delete co-op session savedata!", err);
+      return coopCasTransportFailure();
+    }
+  }
+
+  /** Remove one exact duplicate only while the exact same-run survivor is still live. */
+  public async deleteCoopDuplicateExact(
+    params: CoopDuplicateExactDeleteSessionSavedataRequest,
+  ): Promise<CoopCasMutationResult> {
+    try {
+      const urlSearchParams = this.toUrlSearchParams(params);
+      const response = await this.doPost(`/savedata/session/coop-duplicate-exact-delete?${urlSearchParams}`, "");
+      return await coopCasResult(response);
+    } catch (err) {
+      console.warn("Could not converge duplicate co-op session savedata!", err);
       return coopCasTransportFailure();
     }
   }
