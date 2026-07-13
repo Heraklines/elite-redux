@@ -218,7 +218,7 @@ function resolveSurfaceOwner(rig, driver, cursors, handledIndex) {
     if (guest) {
       const guestEvent = guest.evidence.find(driver.owner.guestMarker, cursors[guest.label]);
       if (notYetHandled(guest, guestEvent)) {
-        return { client: guest, markerEvent: presence.markerEvent, ownerClient: guest };
+        return { client: guest, markerEvent: presence.markerEvent };
       }
     }
   }
@@ -236,16 +236,21 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
     if (!resolved) {
       continue;
     }
-    const { client, markerEvent } = resolved;
+    const { client } = resolved;
     await client.checkpoint(`wave-${stats.wave}-${driver.name}-owner`);
     await client.sequence(driver.keys, `campaign-${driver.name}`);
     client.evidence.record("campaign-surface", { surface: driver.name, ownerSeat: client.label });
     stats.surfaces.push({ surface: driver.name, ownerSeat: client.label });
-    // Mark this appearance handled on every client so the same marker index cannot re-fire.
+    // Suppress THIS appearance on every client that shows it, keyed by each client's OWN
+    // event index (evidence indices are per-client and not cross-comparable). Both clients
+    // log the phase marker for role-owned surfaces, so mark both to avoid a double drive.
+    const suppress = driver.owner.marker ?? driver.present;
     for (const c of Object.values(rig.clients)) {
-      handledIndex.set(`${driver.name}:${c.label}`, markerEvent.index);
+      const seen = c.evidence.findLast(suppress, cursors[c.label]);
+      if (seen) {
+        handledIndex.set(`${driver.name}:${c.label}`, seen.index);
+      }
     }
-    handledIndex.set(`${driver.name}:${client.label}`, markerEvent.index);
     return driver.name;
   }
   return null;
