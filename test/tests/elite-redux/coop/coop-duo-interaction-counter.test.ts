@@ -29,7 +29,6 @@ import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-re
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
@@ -40,6 +39,7 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { type ModifierSelectCallback, SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import {
   arriveGuestCommandBoundary,
   beginRewardShopWatch,
@@ -155,7 +155,7 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
   it("copy() carries the pin, an unpinned advance is refused, counters stay lockstep, wave 2 resolves", async () => {
     forceItemRewards(game.override, [{ name: "LURE" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
     // This scenario verifies reward relay/counter symmetry for returning players. The first-time item
@@ -168,6 +168,11 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     const turn = rig.hostScene.currentBattle.turn;
     await hostPlayWave(rig);
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+    // From this point onward, deliver each retained continuation under its addressed client's
+    // process-global context. The ordinary loopback resumes both sides in whichever context happened
+    // to send last, which is impossible in production (one client per process) and can project the
+    // owner's asynchronous reward continuation into the guest UI.
+    pair.setAutomaticDelivery(false);
 
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     expect(counterBefore % 2, "wave 1: host owns the shop (even counter)").toBe(0);
