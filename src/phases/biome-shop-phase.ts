@@ -55,8 +55,8 @@ import { ModifierTier } from "#enums/modifier-tier";
 import { UiMode } from "#enums/ui-mode";
 import type { Modifier } from "#modifiers/modifier";
 import { HealShopCostModifier } from "#modifiers/modifier";
-import type { ModifierTypeOption, PokemonModifierType } from "#modifiers/modifier-type";
-import { getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-type";
+import type { ModifierTypeOption } from "#modifiers/modifier-type";
+import { getPlayerShopModifierTypeOptionsForWave, PokemonModifierType } from "#modifiers/modifier-type";
 import type { ModifierSelectCallback } from "#phases/select-modifier-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { SHOP_TYPE_BY_BIOME } from "#ui/handlers/biome-shop-ui-handler";
@@ -115,6 +115,14 @@ export class BiomeShopPhase extends SelectModifierPhase {
    * party-target menu closes on a held-item / TM purchase. */
   protected override getModifierSelectMode(): UiMode {
     return UiMode.BIOME_SHOP;
+  }
+
+  /** Ability sub-pickers inherit the biome market's real pin/owner axis, not the unused base reward pin. */
+  public override coopAbilityContext(): { seq: number; watcher: boolean } {
+    const inCoop = globalScene.gameMode.isCoop && getCoopController() != null;
+    return inCoop
+      ? { seq: this.coopBiomeStart, watcher: !this.coopBiomeOwner }
+      : { seq: -1, watcher: false };
   }
 
   /**
@@ -320,6 +328,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
     // BIOME_SHOP mode (via getModifierSelectMode) and the shop stays open.
     // Remember the slot so applyModifier can decrement its stock on success.
     this.pendingIndex = index;
+    this.coopResolvedModifierOption = 0;
     const noop: ModifierSelectCallback = () => false;
     return this.applyChosenModifier(option.type, cost, noop);
   }
@@ -726,22 +735,28 @@ export class BiomeShopPhase extends SelectModifierPhase {
       const data = action.data ?? [];
       const partySlot = data[0] ?? -1;
       const money = data[1] ?? -1;
+      const nestedOption = data[2] ?? 0;
+      const validatedCost = data[3] ?? -1;
       const opt = this.shopOptions[slot];
       coopLog(
         "reward",
-        `biome market watcher applies buy slot=${slot} id=${opt?.type?.id ?? "?"} partySlot=${partySlot} money=${money}`,
+        `biome market watcher applies buy slot=${slot} id=${opt?.type?.id ?? "?"} partySlot=${partySlot} option=${nestedOption} money=${money}`,
       );
       try {
         if (decision.authoritativeProjection === true) {
           if (slot >= 0 && slot < this.qtys.length) {
             this.qtys[slot] = Math.max(0, this.qtys[slot] - 1);
           }
+          if (opt?.type != null) {
+            this.queueCoopProjectedModifierFollowUp(opt.type, partySlot, nestedOption, validatedCost);
+          }
           continue;
         }
         if (opt?.type != null) {
-          const party = globalScene.getPlayerParty();
-          const mon = partySlot >= 0 ? party[partySlot] : undefined;
-          const modifier = mon == null ? opt.type.newModifier() : opt.type.newModifier(mon);
+          const modifier =
+            opt.type instanceof PokemonModifierType
+              ? this.buildPokemonModifier(opt.type, partySlot, nestedOption)
+              : opt.type.newModifier();
           if (modifier != null) {
             this.pendingIndex = slot;
             // Free apply (cost -1): the money is set VERBATIM from the owner below, never re-deducted.
@@ -804,7 +819,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
 
   protected override applyModifier(modifier: Modifier, cost = -1, playSound = false): void {
     // Co-op (#673) OWNER: capture the buy BEFORE the stock decrement resets pendingIndex,
-    // then relay it self-describing: [slotIntoStreamedStock] + data [targetPartySlot, moneyAfter].
+    // then relay it self-describing: [slotIntoStreamedStock] +
+    // [targetPartySlot, moneyAfter, nestedOption, validatedCost].
     const coopBoughtSlot = this.coopBiomeOwner && cost !== -1 ? this.pendingIndex : -1;
     let preparedOperationId: string | null = null;
     if (coopBoughtSlot >= 0) {
@@ -817,7 +833,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         pinned: this.coopBiomeStart,
         label: "biomeShop",
         choice: coopBoughtSlot,
-        data: [partySlot, resultingMoney],
+        data: [partySlot, resultingMoney, this.coopResolvedModifierOption, cost],
         terminal: false,
         localRole: getCoopController()?.role ?? "guest",
         wave: globalScene.currentBattle?.waveIndex ?? -1,
@@ -828,7 +844,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         coopBiomeShopSeq(this.coopBiomeStart),
         "biomeShop",
         coopBoughtSlot,
-        [partySlot, resultingMoney],
+        [partySlot, resultingMoney, this.coopResolvedModifierOption, cost],
       );
       if (
         getCoopController()?.role === "guest"
@@ -836,7 +852,14 @@ export class BiomeShopPhase extends SelectModifierPhase {
         && preparedOperationId != null
       ) {
         this.coopPendingAuthorityOperationId = preparedOperationId;
-        void this.coopAwaitAuthoritativeMarketBuy(preparedOperationId, coopBoughtSlot);
+        this.hideShopForOverlay();
+        void globalScene.ui.setMode(UiMode.MESSAGE);
+        void this.coopAwaitAuthoritativeMarketBuy(
+          preparedOperationId,
+          coopBoughtSlot,
+          partySlot,
+          this.coopResolvedModifierOption,
+        );
         return;
       }
     }
@@ -876,7 +899,12 @@ export class BiomeShopPhase extends SelectModifierPhase {
   }
 
   /** Guest market owner: project the committed result only after its complete state was atomically applied. */
-  private async coopAwaitAuthoritativeMarketBuy(operationId: string, slot: number): Promise<void> {
+  private async coopAwaitAuthoritativeMarketBuy(
+    operationId: string,
+    slot: number,
+    proposedPartySlot: number,
+    proposedNestedOption: number,
+  ): Promise<void> {
     const generation = coopSessionGeneration();
     const wave = globalScene.currentBattle?.waveIndex ?? -1;
     const pinned = this.coopBiomeStart;
@@ -912,15 +940,24 @@ export class BiomeShopPhase extends SelectModifierPhase {
       if (
         !decision.adopt
         || decision.operationId !== operationId
+        || action.choice !== slot
         || decision.authoritativeProjection !== true
       ) {
         continue;
+      }
+      const partySlot = action.data?.[0] ?? proposedPartySlot;
+      const nestedOption = action.data?.[2] ?? proposedNestedOption;
+      const validatedCost = action.data?.[3] ?? -1;
+      const modifierType = this.shopOptions[slot]?.type;
+      if (modifierType != null) {
+        this.queueCoopProjectedModifierFollowUp(modifierType, partySlot, nestedOption, validatedCost);
       }
       this.qtys[slot] = Math.max(0, (this.qtys[slot] ?? 0) - 1);
       const handler = globalScene.ui.getHandler() as { setStock?: (index: number, remaining: number) => void };
       handler.setStock?.(slot, this.qtys[slot]);
       this.pendingIndex = -1;
       this.coopPendingAuthorityOperationId = null;
+      this.openBiomeShop();
       return;
     }
   }

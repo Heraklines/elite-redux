@@ -161,13 +161,14 @@ describe("P33 retained reward/shop authoritative results", () => {
     registerCoopOperationLiveSink("op:reward", () => true);
     let hostExecutions = 0;
     let guestExecutions = 0;
+    const marketData = [0, 700, 2, 250];
 
     const guestProposal = commitRewardOwnerIntent({
       surface: "market",
       pinned: 1,
       label: "biomeShop",
       choice: 4,
-      data: [0, 700],
+      data: marketData,
       terminal: false,
       localRole: "guest",
       wave: 7,
@@ -179,7 +180,7 @@ describe("P33 retained reward/shop authoritative results", () => {
     const first = adoptRewardWatcherChoice({
       surface: "market",
       pinned: 1,
-      action: { choice: 4, data: [0, 700] },
+      action: { choice: 4, data: marketData },
       terminal: false,
       localRole: "host",
       wave: 7,
@@ -192,7 +193,7 @@ describe("P33 retained reward/shop authoritative results", () => {
     const duplicateBeforeResult = adoptRewardWatcherChoice({
       surface: "market",
       pinned: 1,
-      action: { choice: 4, data: [0, 700] },
+      action: { choice: 4, data: marketData },
       terminal: false,
       localRole: "host",
       wave: 7,
@@ -207,6 +208,10 @@ describe("P33 retained reward/shop authoritative results", () => {
     expect(guestExecutions, "guest applies state/result but never runs the buy implementation").toBe(0);
     expect(applyCalls, "the complete host state is the guest mutation seam").toBe(1);
     expect(appliedStates[0].money).toBe(700);
+    expect(
+      (getCoopOperationJournalApplied().at(-1)?.pendingOperation?.payload as CoopShopBuyPayload).data,
+      "the result preserves the exact nested option and host-validated price used for UI continuation",
+    ).toEqual(marketData);
     hostManager.dispose();
     guestManager.dispose();
   });
