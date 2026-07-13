@@ -55,6 +55,7 @@ import type {
   CoopApplyOutcome,
   CoopDurabilityHooks,
   CoopDurabilityManager,
+  CoopOperationContinuationAddress,
 } from "#data/elite-redux/coop/coop-durability";
 import type { CoopAuthoritativeEnvelopeV1, CoopLogicalPhase } from "#data/elite-redux/coop/coop-operation-envelope";
 import type { CoopOperationGuest } from "#data/elite-redux/coop/coop-operation-runtime";
@@ -62,6 +63,7 @@ import {
   type CoopOperationSurfaceClass,
   isCoopOperationSurfaceClass,
 } from "#data/elite-redux/coop/coop-operation-surface-registry";
+import type { CoopOperationContinuationSurface } from "#data/elite-redux/coop/coop-transport";
 import { recordCoopUiRelayCarrier } from "#data/elite-redux/coop/coop-ui-relay-trace";
 
 /** The journaled durability class for a committed op, DERIVED from its logical phase (§4.1). */
@@ -185,6 +187,17 @@ export function setCoopOperationDurability(manager: CoopDurabilityManager | null
 /** Whether the operation commit path currently journals (durability manager installed). */
 export function isCoopOperationJournalActive(): boolean {
   return activeDurability != null;
+}
+
+/**
+ * Publish final operation-continuation evidence from the same public-UI chokepoint as battle authority.
+ * Material application alone never reaches this function and therefore cannot retire host retention.
+ */
+export function notifyCoopOperationContinuationSurface(
+  surface: CoopOperationContinuationSurface,
+  address: CoopOperationContinuationAddress,
+): number {
+  return activeDurability?.notifyOperationContinuationSurface(surface, address) ?? 0;
 }
 
 /**

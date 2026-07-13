@@ -8,6 +8,7 @@ import {
   coopMeInProgress,
   coopMeInteractionStartValue,
 } from "#data/elite-redux/coop/coop-me-pin-state";
+import { notifyCoopOperationContinuationSurface } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   coopHostStreamMeMessage,
   getCoopBattleStreamer,
@@ -915,6 +916,15 @@ export class UI extends Phaser.GameObjects.Container {
     const surface = coopAuthorityContinuationSurface(mode);
     if (surface != null) {
       getCoopBattleStreamer()?.notifyContinuationSurface(surface);
+      const controller = getCoopController();
+      const battle = globalScene.currentBattle;
+      if (controller != null && battle != null) {
+        notifyCoopOperationContinuationSurface(surface, {
+          epoch: controller.sessionEpoch,
+          wave: battle.waveIndex,
+          turn: battle.turn,
+        });
+      }
     }
   }
 
