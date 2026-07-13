@@ -61,6 +61,7 @@ function keySequence(name, fallback) {
 const allowedJourneys = new Set(["probe", "fresh-wave2", "fresh-resume", "reverse-resume", "faint-replacement"]);
 const allowedSeats = new Set(["host-seat", "guest-seat"]);
 const allowedAccountModes = new Set(["login", "register"]);
+const defaultCoopChallengeKeys = [...Array.from({ length: 10 }, () => "ArrowDown"), "ArrowRight", "Space", "Space"];
 
 export function loadConfig() {
   const journey = process.env.COOP_UI_JOURNEY?.trim() || "probe";
@@ -127,6 +128,10 @@ export function loadConfig() {
         hostSeat: keySequence("COOP_UI_HOST_TITLE_NEW_GAME_KEYS", []),
         guestSeat: keySequence("COOP_UI_GUEST_TITLE_NEW_GAME_KEYS", []),
       },
+      // The co-op host alone visits challenge selection. Doubles Only is the eleventh row and is
+      // mechanically redundant with co-op's mandatory double battles, so selecting it unlocks the
+      // public Start bar without turning this baseline journey into a materially different campaign.
+      challenge: keySequence("COOP_UI_CHALLENGE_KEYS", defaultCoopChallengeKeys),
       starter: keySequence("COOP_UI_STARTER_KEYS", ["Space", "Space", "Enter", "Space"]),
       battle: keySequence("COOP_UI_BATTLE_KEYS", ["Space", "Space", "Space"]),
       rewardLeave: keySequence("COOP_UI_REWARD_LEAVE_KEYS", ["Backspace", "Space"]),
