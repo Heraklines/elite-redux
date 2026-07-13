@@ -515,6 +515,10 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       emitCompleteTurn(hostStream, 1, [], emptyCheckpoint(), "deadbeefdeadbeef");
       const resolution = await awaited;
       expect(resolution).not.toBeNull();
+      // Drain the initial revisionless rendezvous request and the exact request issued when awaitTurn
+      // resolves. The probe below then measures one deliberate retained replay, independent of queued
+      // transport microtasks.
+      await flushWire();
       const baseline = rawTurnDeliveries;
 
       expect(guestStream.acknowledgeTurnCommit(resolution!, "materialApplied")).toBe(true);
@@ -575,9 +579,10 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       expect(guestStream.acknowledgeTurnCommit(resolution!, "materialApplied")).toBe(true);
       expect(guestStream.acknowledgeTurnCommit(resolution!, "presentationReady")).toBe(true);
       expect(guestStream.acknowledgeTurnCommit(resolution!, "continuationReady")).toBe(true);
-      expect(guestStream.debugAuthorityState().terminal, "a valid applied commit never enters fatal recovery").toBe(
-        false,
-      );
+      expect(
+        guestStream.retainedAuthorityDiagnostics().terminal,
+        "a valid applied commit never enters fatal recovery",
+      ).toBe(false);
 
       hostStream.dispose();
       guestStream.dispose();
@@ -595,9 +600,9 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       expect(guestStream.acknowledgeTurnCommit(resolution!, "continuationReady")).toBe(false);
       await flushWire();
       await flushWire();
-      expect(guestStream.debugAuthorityState().terminal).toBe(true);
+      expect(guestStream.retainedAuthorityDiagnostics().terminal).toBe(true);
       expect(
-        hostStream.debugAuthorityState().terminal,
+        hostStream.retainedAuthorityDiagnostics().terminal,
         "the local progression failure uses the shared fatal contract",
       ).toBe(true);
 
@@ -631,10 +636,11 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       } as unknown as CoopMessage);
       await flushWire();
       await flushWire();
-      expect(hostStream.debugAuthorityState().terminal).toBe(true);
-      expect(guestStream.debugAuthorityState().terminal, "invalid host evidence converges through shared fatal").toBe(
-        true,
-      );
+      expect(hostStream.retainedAuthorityDiagnostics().terminal).toBe(true);
+      expect(
+        guestStream.retainedAuthorityDiagnostics().terminal,
+        "invalid host evidence converges through shared fatal",
+      ).toBe(true);
 
       hostStream.dispose();
       guestStream.dispose();
@@ -1167,7 +1173,16 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       const replacement = checkpointEnvelope();
       const sendRaw = (envelope: CoopCheckpointEnvelope) => host.send({ t: "battleCheckpoint", ...envelope });
 
-      sendRaw(replacement);
+      hostStream.sendCheckpoint(
+        replacement.reason,
+        replacement.epoch,
+        replacement.wave,
+        replacement.turn,
+        replacement.checkpoint,
+        replacement.checksum,
+        replacement.fullField,
+        replacement.authoritativeState,
+      );
       await flushWire();
       const handedOff = guestStream.consumeCheckpoint();
       expect(handedOff).toEqual(replacement);

@@ -1249,8 +1249,9 @@ export class CoopBattleStreamer {
       return false;
     }
     const key = authorityKey(commit);
+    const retainedCommit = structuredClone(commit);
     this.issuedTurnAuthority.add(key);
-    this.sentTurnCommits.set(key, commit);
+    this.sentTurnCommits.set(key, retainedCommit);
     const deadline = this.sentTurnCommitDeadlines.get(key) ?? this.now() + this.authorityRetentionMs;
     this.sentTurnCommitDeadlines.set(key, deadline);
     this.sentTurnCommitTimers.get(key)?.();
@@ -1283,8 +1284,9 @@ export class CoopBattleStreamer {
       return false;
     }
     const key = authorityKey(envelope);
+    const retainedEnvelope = structuredClone(envelope);
     this.issuedReplacementAuthority.add(key);
-    this.sentReplacementCheckpoints.set(key, envelope);
+    this.sentReplacementCheckpoints.set(key, retainedEnvelope);
     const deadline = this.sentReplacementDeadlines.get(key) ?? this.now() + this.authorityRetentionMs;
     this.sentReplacementDeadlines.set(key, deadline);
     this.sentReplacementTimers.get(key)?.();
@@ -3410,6 +3412,12 @@ export class CoopBattleStreamer {
               "checkpoint",
               `guest REDELIVER explicitly retried replacement e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
             );
+            // Re-open the same safe-boundary consumer as a first delivery. Observers wake the replay
+            // pump, but consumeCheckpoint() is the transaction handoff; omitting this buffer made a
+            // requested retry observable yet impossible to apply.
+            const key = pendingTurnKey(retained);
+            this.pendingCheckpoints.delete(key);
+            rememberBounded(this.pendingCheckpoints, key, copyAdmittedAuthority(retained));
             this.notifyCheckpointEnvelope(retained);
             this.checkpointWaiter?.(retained);
             this.checkpointHandler?.(retained.reason, retained.checkpoint);

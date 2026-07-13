@@ -2043,10 +2043,19 @@ class LoopbackTransport implements CoopTransport {
     if (isCoopDebug()) {
       coopLog("transport", `send ${this.role} t=${msg.t} ${summarizeCoopMessage(msg)}`);
     }
+    // A real RTC transport serializes the frame before the remote peer observes it. Mirror that
+    // ownership boundary here: the two in-process clients must never share nested message objects.
+    // Without this copy, a guest renderer normalizing its disposable working state could mutate the
+    // host's retained authority frame and make a later retry differ from the originally admitted wire
+    // commit -- a test-only alias that hid production-fidelity bugs and could create false conflicts.
+    const frame = structuredClone(msg);
     queueMicrotask(() => {
       if (peer._state !== "connected") {
         if (isCoopDebug()) {
-          coopLog("transport", `deliver DROP (peer not connected) ->${peer.role} t=${msg.t} peerState=${peer._state}`);
+          coopLog(
+            "transport",
+            `deliver DROP (peer not connected) ->${peer.role} t=${frame.t} peerState=${peer._state}`,
+          );
         }
         return;
       }
@@ -2055,18 +2064,18 @@ class LoopbackTransport implements CoopTransport {
       if (isCoopDebug()) {
         coopLog(
           "transport",
-          `recv ${peer.role} t=${msg.t} ${summarizeCoopMessage(msg)} handlers=${peer.msgHandlers.size}`,
+          `recv ${peer.role} t=${frame.t} ${summarizeCoopMessage(frame)} handlers=${peer.msgHandlers.size}`,
         );
       }
       for (const h of [...peer.msgHandlers]) {
         try {
-          h(msg);
+          h(frame);
         } catch (error) {
           // A transport is a fan-out bus: one optional observer failing must not starve the
           // command/recovery handlers registered after it. Keep the fault loud and continue.
           coopWarn(
             "transport",
-            `recv ${peer.role} t=${msg.t} handler threw (isolated): ${error instanceof Error ? error.message : String(error)}`,
+            `recv ${peer.role} t=${frame.t} handler threw (isolated): ${error instanceof Error ? error.message : String(error)}`,
           );
         }
       }
