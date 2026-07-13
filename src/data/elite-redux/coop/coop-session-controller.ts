@@ -30,6 +30,7 @@ import {
   logErDataFingerprint,
 } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import type { CoopMembershipSnapshotV2 } from "#data/elite-redux/coop/coop-membership";
 import { CoopRoster, type CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import {
   canonicalCoopParticipantPair,
@@ -44,6 +45,7 @@ import {
   type CoopP33AuthenticatedContextV1,
   type CoopSessionBindingV1,
   canAdoptCoopP33Rejoin,
+  coopFrameContextMatchesBinding,
   coopSeatForAccount,
   createFreshCoopSeatMap,
   validateCoopRunSeatMap,
@@ -277,6 +279,8 @@ export class CoopSessionController {
   /** Authenticated signaling context; its bearer never leaves this browser. */
   private p33Context: CoopP33AuthenticatedContextV1 | null;
   private p33Binding: CoopSessionBindingV1 | null = null;
+  /** Live membership revision; advances on every accepted channel generation without replacing the binding. */
+  private p33MembershipRevisionValue = 0;
   private p33BindingReady = false;
   private p33BindingRejected = false;
   private p33BindingBuild: Promise<void> | null = null;
@@ -557,30 +561,159 @@ export class CoopSessionController {
     return this.p33Binding == null ? null : structuredClone(this.p33Binding);
   }
 
-  /** Exact context stamped onto addressed P33 frames once the binding is accepted. */
-  p33FrameContext(): CoopFrameContextV1 | null {
+  /**
+   * Return the exact accepted P33 binding axes. A retained-but-unacknowledged binding is deliberately not
+   * authorization: terminal/control traffic may only start after both authenticated seats proved the same
+   * immutable session, epoch, seat map, and membership revision.
+   */
+  private exactP33BindingAxes(): {
+    context: CoopP33AuthenticatedContextV1;
+    binding: CoopSessionBindingV1;
+  } | null {
     const context = this.p33Context;
     const binding = this.p33Binding;
-    if (context == null || binding == null || !this.p33BindingReady) {
+    if (
+      this.disposed
+      || context == null
+      || binding == null
+      || !this.p33BindingReady
+      || this.p33BindingRejected
+      || this.authenticatedProtocolViolation
+      || !this.p33PeerHelloAccepted
+      || context.version !== 1
+      || binding.version !== 1
+      || binding.source !== context.source
+      || binding.sessionEpoch !== this.sessionEpochValue
+      || binding.runId !== this.runIdValue
+      || binding.authoritySeatId !== context.authoritySeatId
+      || !Number.isSafeInteger(binding.membershipRevision)
+      || binding.membershipRevision < 1
+      || !Number.isSafeInteger(this.p33MembershipRevisionValue)
+      || this.p33MembershipRevisionValue < binding.membershipRevision
+      || !Number.isSafeInteger(context.connectionGeneration)
+      || context.connectionGeneration < 0
+      || !Number.isSafeInteger(context.peerConnectionGeneration)
+      || context.peerConnectionGeneration < 0
+      || binding.seatMap.version !== 1
+      || binding.seatMap.revision !== 1
+      || binding.seatMap.seats.length !== 2
+      || binding.seatMap.seats.some((seat, index) => seat.seatId !== index)
+      || !binding.seatMap.seats.some(seat => seat.seatId === binding.authoritySeatId)
+    ) {
       return null;
     }
+    const localSeat = coopSeatForAccount(binding.seatMap, context.account.accountId);
+    const peerSeat = coopSeatForAccount(binding.seatMap, context.peerAccount.accountId);
+    if (
+      localSeat == null
+      || peerSeat == null
+      || localSeat.seatId !== context.localSeatId
+      || peerSeat.seatId === localSeat.seatId
+    ) {
+      return null;
+    }
+    return { context, binding };
+  }
+
+  /** Exact context stamped onto addressed P33 frames once the binding is accepted. */
+  p33FrameContext(): CoopFrameContextV1 | null {
+    const axes = this.exactP33BindingAxes();
+    if (axes == null) {
+      return null;
+    }
+    const { context, binding } = axes;
     return {
       sessionId: binding.sessionId,
       sessionEpoch: binding.sessionEpoch,
       seatMapId: binding.seatMap.seatMapId,
-      membershipRevision: binding.membershipRevision,
+      membershipRevision: this.p33MembershipRevisionValue,
       fromSeatId: context.localSeatId,
       connectionGeneration: context.connectionGeneration,
     };
   }
 
+  /**
+   * Runtime-scoped P33 membership for retained ACK quorums. Seat ownership and display identity come from
+   * the authenticated binding, while channel generations come from the latest Worker-authenticated context.
+   * Legacy, unbound, rejected, or not-yet-reacknowledged sessions fail closed.
+   */
+  p33MembershipSnapshot(): CoopMembershipSnapshotV2 | null {
+    const axes = this.exactP33BindingAxes();
+    if (axes == null) {
+      return null;
+    }
+    const { context, binding } = axes;
+    const identities = new Map<string, { displayName: string; connectionGeneration: number }>([
+      [
+        context.account.accountId,
+        { displayName: context.account.displayName, connectionGeneration: context.connectionGeneration },
+      ],
+      [
+        context.peerAccount.accountId,
+        { displayName: context.peerAccount.displayName, connectionGeneration: context.peerConnectionGeneration },
+      ],
+    ]);
+    const members: CoopMembershipSnapshotV2["members"] = [];
+    for (const seat of binding.seatMap.seats) {
+      const identity = identities.get(seat.accountId);
+      if (identity == null) {
+        return null;
+      }
+      members.push({
+        seatId: seat.seatId,
+        accountId: seat.accountId,
+        displayName: identity.displayName,
+        state: "present",
+        connectionGeneration: identity.connectionGeneration,
+      });
+    }
+    return {
+      version: 2,
+      revision: this.p33MembershipRevisionValue,
+      authoritySeatId: binding.authoritySeatId,
+      state: "active",
+      members,
+      requiredAckSeats: members.map(member => member.seatId),
+    };
+  }
+
+  /**
+   * Authenticate an incoming addressed frame as the exact peer seat on the accepted P33 binding. The
+   * membership revision is supplied by the retained transaction and may be frozen before a hot rejoin; it
+   * must belong to this immutable binding's revision history, while generation must equal the current channel.
+   */
+  validateP33PeerFrameContext(context: CoopFrameContextV1, targetMembershipRevision: number): boolean {
+    const axes = this.exactP33BindingAxes();
+    return (
+      axes != null
+      && Number.isSafeInteger(targetMembershipRevision)
+      && targetMembershipRevision >= axes.binding.membershipRevision
+      && targetMembershipRevision <= this.p33MembershipRevisionValue
+      && coopFrameContextMatchesBinding(
+        context,
+        axes.binding,
+        axes.context.peerAccount.accountId,
+        axes.context.peerConnectionGeneration,
+        targetMembershipRevision,
+      )
+    );
+  }
+
   /** Adopt a Worker-authenticated hot rejoin without changing seat, authority, run, or epoch. */
   adoptP33Rejoin(next: CoopP33AuthenticatedContextV1): boolean {
-    if (this.p33Context == null || this.p33Binding == null || !canAdoptCoopP33Rejoin(this.p33Context, next)) {
+    if (
+      this.p33Context == null
+      || this.p33Binding == null
+      || !canAdoptCoopP33Rejoin(this.p33Context, next)
+      || !Number.isSafeInteger(this.p33MembershipRevisionValue)
+      || this.p33MembershipRevisionValue < this.p33Binding.membershipRevision
+      || this.p33MembershipRevisionValue === Number.MAX_SAFE_INTEGER
+    ) {
       coopWarn("launch", "REFUSE P33 hot rejoin because authenticated binding axes changed");
       return false;
     }
     this.p33Context = structuredClone(next);
+    this.p33MembershipRevisionValue++;
     // A fresh channel must prove the retained binding again. Authority replays it; replica re-ACKs it.
     this.p33BindingReady = false;
     this.p33BindingRejected = false;
@@ -648,6 +781,7 @@ export class CoopSessionController {
     this.clearP33BindingRetry();
     this.p33Context.source = source;
     this.p33Binding = null;
+    this.p33MembershipRevisionValue = 0;
     this.p33BindingReady = false;
     this.p33BindingRejected = false;
     this.p33BindingAuthoringEnabled = authorBinding;
@@ -2263,6 +2397,7 @@ export class CoopSessionController {
         membershipRevision: 1,
         source: context.source,
       };
+      this.p33MembershipRevisionValue = this.p33Binding.membershipRevision;
       this.transmitP33Binding();
     })()
       .catch(error => {
@@ -2394,7 +2529,8 @@ export class CoopSessionController {
       reject("stale");
       return;
     }
-    if (this.p33Binding != null && JSON.stringify(this.p33Binding) !== JSON.stringify(binding)) {
+    const retainedBinding = this.p33Binding != null;
+    if (retainedBinding && JSON.stringify(this.p33Binding) !== JSON.stringify(binding)) {
       reject("stale");
       return;
     }
@@ -2403,6 +2539,9 @@ export class CoopSessionController {
       return;
     }
     this.p33Binding = structuredClone(binding);
+    if (!retainedBinding) {
+      this.p33MembershipRevisionValue = binding.membershipRevision;
+    }
     this.sessionEpochValue = binding.sessionEpoch;
     this.onEpochNegotiated?.(binding.sessionEpoch);
     this.p33BindingRejected = false;
