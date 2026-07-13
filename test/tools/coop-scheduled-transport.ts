@@ -17,6 +17,8 @@ export interface ScheduledCoopPair {
   dropNext(role: CoopRole, predicate?: (message: CoopMessage) => boolean): void;
   /** Duplicate the next matching inbound frame once, for idempotency scenarios. */
   duplicateNext(role: CoopRole, predicate?: (message: CoopMessage) => boolean): void;
+  /** Deliver the next matching inbound frame after the frame that follows it, once. */
+  reorderNext(role: CoopRole, predicate?: (message: CoopMessage) => boolean): void;
   /** Temporarily disconnect both endpoints without discarding retained queued evidence. */
   disconnect(): void;
   /** Reconnect the same endpoints; state listeners observe a production-like generation change. */
@@ -115,6 +117,7 @@ export function createScheduledCoopPair(options: { automatic?: boolean } = {}): 
   const queues: Record<CoopRole, QueuedFrame[]> = { host: [], guest: [] };
   const drops: Record<CoopRole, DeliveryFault[]> = { host: [], guest: [] };
   const duplicates: Record<CoopRole, DeliveryFault[]> = { host: [], guest: [] };
+  const reorders: Record<CoopRole, DeliveryFault[]> = { host: [], guest: [] };
   let generation = 1;
   let automaticDelivery = options.automatic ?? false;
   let flushRole: ((role: CoopRole, limit?: number) => number) | null = null;
@@ -147,6 +150,19 @@ export function createScheduledCoopPair(options: { automatic?: boolean } = {}): 
     flush(role, limit = Number.POSITIVE_INFINITY): number {
       let delivered = 0;
       while (queues[role].length > 0 && delivered < limit) {
+        const reorder = reorders[role].find(
+          candidate => candidate.remaining > 0 && candidate.predicate(queues[role][0].message),
+        );
+        if (reorder != null) {
+          // Keep the selected frame queued until one later frame exists, then invert exactly this pair.
+          // This models a bounded out-of-order network without manufacturing or mutating either payload.
+          if (queues[role].length < 2) {
+            break;
+          }
+          const selected = queues[role].shift()!;
+          queues[role].splice(1, 0, selected);
+          reorder.remaining--;
+        }
         const frame = queues[role].shift()!;
         if (frame.generation !== generation || consumeFault(drops[role], frame.message)) {
           continue;
@@ -166,6 +182,9 @@ export function createScheduledCoopPair(options: { automatic?: boolean } = {}): 
     },
     duplicateNext(role, predicate = () => true): void {
       duplicates[role].push({ predicate, remaining: 1 });
+    },
+    reorderNext(role, predicate = () => true): void {
+      reorders[role].push({ predicate, remaining: 1 });
     },
     disconnect(): void {
       host.setState("disconnected");

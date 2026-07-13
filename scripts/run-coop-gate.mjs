@@ -74,9 +74,10 @@ const COOP_DIR_REL = "test/tests/elite-redux/coop";
  */
 const PROD_FIDELITY_GATE_FILES = new Set([
   "coop-soak-fidelity-gate.test.ts",
-  // Present on the P33 integration branch. Keeping the desired inventory here makes the base branch
-  // safely emit P1 and the integrated branch automatically emit P2 without a workflow edit.
+  // Dedicated P33 transition journeys. The standing P2 runner allocation is capped to discovered
+  // inventory and deterministically balances these files without a workflow edit.
   "coop-transition-t2-biome.test.ts",
+  "coop-transition-t2-mystery.test.ts",
 ]);
 const PROD_FIDELITY_GATE_WAVES = 12;
 
