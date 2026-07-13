@@ -185,9 +185,7 @@ let boundaryDataApplier: CoopWaveAdvanceBoundaryDataApplier | null = null;
  * Install the engine-coupled retained-DATA boundary adapter. Returns an identity-fenced disposer so a
  * focused test may temporarily replace it without removing a newer production registration.
  */
-export function registerCoopWaveAdvanceBoundaryDataApplier(
-  applier: CoopWaveAdvanceBoundaryDataApplier,
-): () => void {
+export function registerCoopWaveAdvanceBoundaryDataApplier(applier: CoopWaveAdvanceBoundaryDataApplier): () => void {
   const previous = boundaryDataApplier;
   boundaryDataApplier = applier;
   return () => {
@@ -905,26 +903,31 @@ function applyJournaledWaveEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coop
   if (staged === "conflict" || staged === "rejected") {
     return "rejected";
   }
-  // The sink bootstraps the host-stated tail and returns true only after embedded DATA + a real destination
-  // surface are ready. If its first attempt lands just before BattleEnd (or its public-UI wake lands just
-  // after BattleEnd), ask the engine-owned boundary adapter to admit the exact retained DATA, then re-run
-  // the same sink once so it can release BattleEnd / observe the already-open continuation. This closes the
-  // scheduling hole where seq-1 WAVE remained deferred forever while seq-2 reward RESULT waited behind it.
-  let sinkReady = routeCoopOperationToLiveSink("op:wave", envelope);
-  if (!sinkReady && !getCoopStagedWaveAdvanceTransaction(preflight.payload.wave)?.dataApplied) {
-    const dataOutcome = tryApplyCoopWaveAdvanceDataAtBoundary(preflight.payload.wave);
-    if (dataOutcome === "rejected") {
-      return "rejected";
+  // Once RECEIVED + STAGED, the staged transaction OWNS this wave's lifecycle: its DATA applies ONLY at the
+  // real BattleEnd boundary (BattleEndPhase is the deterministic wake - battle-end-phase.ts - not a retry
+  // timer) and its continuation latch is marked separately (maybeMarkCoopWaveContinuationReady). The journal
+  // cursor must therefore NOT wait on dataApplied/continuationReady: holding it there double-gates the staged
+  // transaction's job onto the SHARED receive cursor and DEADLOCKS the same-boundary reward RESULT
+  // (op:global seq+1), which has to apply at the PRE-BattleEnd shop for the guest to reach BattleEnd at all
+  // (soak seed 987654321 wave 1: "owner terminal never arrived"). The WAVE_ADVANCE plain ACK is already
+  // continuation-safe (coop-durability.ts:670-672); layering the UI stages on top is the redundant gate.
+  //
+  // A genuinely-absent revision never reaches here - inspectEnvelope above gates on rev == clock+1 - so
+  // advancing the cursor is conditional on the op being RECEIVED, never mere absence: global-revision gap
+  // detection / resync are unaffected. Still project the bootstrap into pendingWaveAdvance now, and admit the
+  // DATA immediately when the guest ALREADY sits at the boundary (a resent/reconnect-tail envelope landing
+  // at/after BattleEnd) so that fast path stays exact - but never GATE the cursor on it.
+  if (!getCoopStagedWaveAdvanceTransaction(preflight.payload.wave)?.dataApplied) {
+    const sinkReady = routeCoopOperationToLiveSink("op:wave", envelope);
+    if (!sinkReady) {
+      const dataOutcome = tryApplyCoopWaveAdvanceDataAtBoundary(preflight.payload.wave);
+      if (dataOutcome === "rejected") {
+        return "rejected";
+      }
+      if (dataOutcome === "applied") {
+        routeCoopOperationToLiveSink("op:wave", envelope);
+      }
     }
-    if (dataOutcome === "applied") {
-      sinkReady = routeCoopOperationToLiveSink("op:wave", envelope);
-    }
-  }
-  if (!sinkReady) {
-    return "deferred";
-  }
-  if (!isCoopWaveAdvanceTransactionComplete(preflight.payload.wave)) {
-    return "deferred";
   }
   if (g.applyEnvelope(envelope).kind !== "applied") {
     return "rejected";
@@ -932,9 +935,12 @@ function applyJournaledWaveEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coop
   if (preflight.payload.wave > lastAppliedWave) {
     lastAppliedWave = preflight.payload.wave;
   }
+  const stagedTxn = getCoopStagedWaveAdvanceTransaction(preflight.payload.wave);
   coopLog(
     "runtime",
-    `wave-advance op JOURNAL apply+continuationReady id=${preflight.operationId} rev=${envelope.revision}`,
+    `wave-advance op JOURNAL cursor-advanced id=${preflight.operationId} rev=${envelope.revision} `
+      + `dataApplied=${stagedTxn?.dataApplied === true} continuationReady=${stagedTxn?.continuationReady === true} `
+      + "(DATA applies at BattleEnd; plain ACK is continuation-safe)",
   );
   return "applied";
 }

@@ -47,6 +47,7 @@ import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import {
   commitWaveAdvanceOwnerIntent,
+  getCoopStagedWaveAdvanceTransaction,
   isCoopWaveAdvanceTransactionComplete,
   markCoopWaveAdvanceContinuationReady,
   markCoopWaveAdvanceDataApplied,
@@ -236,8 +237,13 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     guestMgr.dispose();
   });
 
-  it("withholds the journal ACK until DATA applied and continuationReady are both proven", async () => {
-    registerCoopOperationLiveSink("op:wave", () => true);
+  it("advances the shared cursor once the op is STAGED - DATA + continuation are tracked separately and never gate the cursor (invariant a: the reward-behind-wave-advance deadlock fix)", async () => {
+    // The sink never signals ready here (a pre-BattleEnd guest: the boundary DATA cannot apply yet). Under the
+    // OLD double-gate this returned "deferred" until DATA+continuationReady, holding the shared receive cursor
+    // at this wave-advance and DEADLOCKING a same-boundary reward RESULT (op:global seq+1) that has to apply at
+    // the pre-BattleEnd shop. The staged transaction ALREADY owns DATA (applied at the real BattleEnd) + the
+    // continuation latch, so the journal cursor must advance at staging; its plain ACK is continuation-safe.
+    registerCoopOperationLiveSink("op:wave", () => false);
     const pair = createLoopbackPair();
     const hostMgr = new CoopDurabilityManager(pair.host);
     const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
@@ -245,24 +251,31 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
 
     commitHostWave(13);
     await flush();
-    expect(getCoopOperationJournalApplied(), "a sink callback alone is not ACK eligibility").toHaveLength(0);
-
-    markCoopWaveAdvanceDataApplied(13);
-    hostMgr.reconnect();
-    await flush();
-    expect(getCoopOperationJournalApplied(), "DATA alone still cannot retire the transaction").toHaveLength(0);
-
-    markCoopWaveAdvanceContinuationReady(13);
-    hostMgr.reconnect();
-    await flush();
+    // The cursor advances at staging - so a LATER same-boundary op is not blocked behind this wave-advance...
     expect(
       getCoopOperationJournalApplied().map(e => (e.pendingOperation?.payload as CoopWaveAdvancePayload).wave),
+      "the cursor advances at staging (no longer double-gated on DATA/continuation)",
     ).toEqual([13]);
+    // ...WITHOUT the wave DATA having applied and WITHOUT the transaction being complete (invariant a).
+    expect(
+      getCoopStagedWaveAdvanceTransaction(13)?.dataApplied,
+      "wave DATA has NOT applied at the cursor advance",
+    ).toBe(false);
+    expect(isCoopWaveAdvanceTransactionComplete(13), "the transaction is NOT complete - DATA is still pending").toBe(
+      false,
+    );
+
+    // DATA applies + continuation latches SEPARATELY (invariant b), in the enforced order, needing no second ACK.
+    expect(markCoopWaveAdvanceContinuationReady(13), "CONTROL cannot latch before DATA").toBe(false);
+    expect(markCoopWaveAdvanceDataApplied(13)).toBe(true);
+    expect(markCoopWaveAdvanceContinuationReady(13)).toBe(true);
+    expect(isCoopWaveAdvanceTransactionComplete(13)).toBe(true);
     hostMgr.dispose();
     guestMgr.dispose();
   });
 
-  it("rejects control-before-DATA, same-id conflicts, and stale waves while exact re-delivery remains idempotent", () => {
+  it("advances the cursor at staging, keeps DATA pending, id-dedupes exact + forged re-delivery, and rejects a stale wave", () => {
+    registerCoopOperationLiveSink("op:wave", () => false); // pre-boundary: no immediate completion
     const hooks = coopOperationDurabilityHooks();
     const apply = hooks.apply!;
     const exact = waveEnvelope(15);
@@ -272,25 +285,99 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
       msg: { t: "envelope" as const, envelope },
     });
 
-    expect(apply(entry(exact)), "a valid envelope stages but waits for its safe boundary").toBe("deferred");
-    expect(markCoopWaveAdvanceContinuationReady(15), "CONTROL cannot latch before DATA").toBe(false);
+    // A valid envelope ADVANCES the shared cursor at staging (its DATA still applies later at BattleEnd)...
+    expect(apply(entry(exact)), "a valid envelope advances the cursor at staging").toBe("applied");
+    // ...but the transaction is NOT complete and its DATA has NOT applied (invariant a).
     expect(isCoopWaveAdvanceTransactionComplete(15)).toBe(false);
+    expect(getCoopStagedWaveAdvanceTransaction(15)?.dataApplied).toBe(false);
+    expect(markCoopWaveAdvanceContinuationReady(15), "CONTROL cannot latch before DATA").toBe(false);
 
+    // Exact re-delivery is idempotent (id-dedupe) - never re-stages, never re-applies (invariant e).
+    expect(apply(entry(exact)), "the exact op is idempotent after its cursor advance").toBe("duplicate");
+
+    // A forged same-id envelope carrying DIFFERENT DATA can NEVER inject it: it is id-deduped BEFORE staging,
+    // so the retained DATA is intact - a forged retry cannot borrow the cursor advance to overwrite the state.
     const conflict: CoopAuthoritativeEnvelopeV1 = {
       ...exact,
       authoritativeState: { ...exact.authoritativeState, money: exact.authoritativeState.money + 1 },
     };
-    expect(apply(entry(conflict)), "same operation id with changed DATA is a conflict").toBe("rejected");
+    expect(apply(entry(conflict)), "a forged same-id retry is id-deduped, its DATA ignored").toBe("duplicate");
+    expect(
+      getCoopStagedWaveAdvanceTransaction(15)?.envelope.authoritativeState.money,
+      "the forgery did not overwrite the retained authoritative DATA",
+    ).toBe(exact.authoritativeState.money);
 
+    // DATA applies at the boundary, continuation latches (invariant b) - order still enforced.
     expect(markCoopWaveAdvanceDataApplied(15)).toBe(true);
     expect(markCoopWaveAdvanceContinuationReady(15)).toBe(true);
-    registerCoopOperationLiveSink("op:wave", () => true);
-    expect(apply(entry(exact))).toBe("applied");
-    expect(apply(entry(exact)), "the exact completed transaction is idempotent").toBe("duplicate");
-    expect(apply(entry(conflict)), "a conflicting retry cannot borrow the original ACK").toBe("rejected");
+    expect(isCoopWaveAdvanceTransactionComplete(15)).toBe(true);
 
+    // A stale earlier wave (rev clock+1 but wave < lastApplied) is refused at staging (never a false advance).
     const stale = waveEnvelope(14, 2);
-    expect(apply(entry(stale)), "an earlier wave cannot advance after a later one completed").toBe("rejected");
+    expect(apply(entry(stale)), "an earlier wave cannot advance after a later one").toBe("rejected");
+  });
+
+  it("REFUSES a genuinely missing revision (a gap) - the cursor advance is conditional on the op being RECEIVED, never mere absence (invariant c)", () => {
+    registerCoopOperationLiveSink("op:wave", () => false);
+    const hooks = coopOperationDurabilityHooks();
+    const apply = hooks.apply!;
+    const entry = (envelope: CoopAuthoritativeEnvelopeV1) => ({
+      cls: "op:global",
+      seq: envelope.revision,
+      msg: { t: "envelope" as const, envelope },
+    });
+
+    // revision 3 with NO revision 1/2 delivered first: the global guest cursor reports a GAP (rev > clock+1),
+    // so the applier REFUSES it - the cursor is never advanced merely because the missing revs are absent; the
+    // durability manager's gap path resyncs the hole. Fixing the deadlock did NOT weaken gap detection.
+    const gapped = waveEnvelope(3, 3);
+    expect(apply(entry(gapped)), "a revision hole is refused - advance requires RECEIVED, not absence").toBe(
+      "rejected",
+    );
+    expect(getCoopOperationJournalApplied(), "nothing advances the cursor through a gap").toHaveLength(0);
+    expect(getCoopStagedWaveAdvanceTransaction(3), "a gapped op is never staged").toBeNull();
+  });
+
+  it("a staged wave-advance that cannot reach its boundary still lets a LATER op advance the cursor, then applies its own DATA at the real boundary (invariants a + b end-to-end)", () => {
+    const boundaryReadyWaves = new Set<number>();
+    const admitted: number[] = [];
+    restoreBoundaryApplier = registerCoopWaveAdvanceBoundaryDataApplier(envelope => {
+      const wave = (envelope.pendingOperation?.payload as CoopWaveAdvancePayload).wave;
+      if (!boundaryReadyWaves.has(wave)) {
+        return "deferred"; // pre-BattleEnd: the scene is not at this wave's boundary yet
+      }
+      admitted.push(wave);
+      return "applied";
+    });
+    // The sink completes only once its wave's DATA has been admitted at the boundary (mirrors production).
+    registerCoopOperationLiveSink(
+      "op:wave",
+      env =>
+        getCoopStagedWaveAdvanceTransaction((env.pendingOperation?.payload as CoopWaveAdvancePayload).wave)?.dataApplied
+        === true,
+    );
+    const hooks = coopOperationDurabilityHooks();
+    const apply = hooks.apply!;
+    const entry = (envelope: CoopAuthoritativeEnvelopeV1) => ({
+      cls: "op:global",
+      seq: envelope.revision,
+      msg: { t: "envelope" as const, envelope },
+    });
+
+    // wave 1 (rev 1) cannot reach its boundary yet -> it STILL advances the cursor (no deadlock)...
+    expect(apply(entry(waveEnvelope(1, 1))), "wave 1 advances the cursor pre-boundary").toBe("applied");
+    expect(getCoopStagedWaveAdvanceTransaction(1)?.dataApplied, "wave 1 DATA has NOT applied yet").toBe(false);
+    // ...so the LATER op (rev 2) is NOT blocked behind it - it applies immediately (the deadlock is gone).
+    expect(apply(entry(waveEnvelope(2, 2))), "the later op is not blocked behind the pre-boundary wave 1").toBe(
+      "applied",
+    );
+    expect(admitted, "no wave DATA applied before its boundary").toEqual([]);
+
+    // Reaching wave 1's real boundary admits its DATA exactly once (invariant b: at BattleEnd, never dropped).
+    boundaryReadyWaves.add(1);
+    expect(tryApplyCoopWaveAdvanceDataAtBoundary(1)).toBe("applied");
+    expect(admitted, "wave 1 DATA applies exactly at its boundary").toEqual([1]);
+    expect(getCoopStagedWaveAdvanceTransaction(1)?.dataApplied).toBe(true);
   });
 
   it("treats a legitimate Victory-to-BattleEnd delay beyond 9.1s as deferred, then ACKs exactly once on the real continuation wake", async () => {
