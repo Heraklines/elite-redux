@@ -160,6 +160,38 @@ describe("co-op Mystery active-control snapshot/rejoin", () => {
     expect(captureCoopActiveMysteryControl()).toMatchObject({ interactionCounter: 55, terminal: "pending" });
   });
 
+  it("retains the exact nested cipher quiz presentation whose answer uses the intentional -1 sentinel", () => {
+    setCoopMeInteractionStart(59);
+    const presentation = {
+      k: "mePresent" as const,
+      tokens: {},
+      meetsReqs: [],
+      labels: [],
+      subPrompt: {
+        kind: "quiz" as const,
+        stopOnWrong: false,
+        questions: [
+          {
+            kind: "cipher",
+            answerId: -1,
+            options: [],
+            prompt: "",
+            cipherWord: "VAULT",
+            cipherOptions: ["VAULT", "RELIC", "CRYPT", "RUNIC"],
+          },
+        ],
+      },
+    };
+
+    setCoopMeActivePresentation(presentation);
+    expect(captureCoopActiveMysteryControl()).toMatchObject({
+      interactionCounter: 59,
+      round: 1,
+      terminal: "pending",
+      presentation,
+    });
+  });
+
   it("accepts only monotonic content and exact same-revision idempotency on one counter", () => {
     setCoopMeInteractionStart(61);
     const pending: CoopActiveMysteryEncounterSnapshotV1 = {
