@@ -69,6 +69,7 @@ import { EncounterPhase } from "#phases/encounter-phase";
 import { NextEncounterPhase } from "#phases/next-encounter-phase";
 import { VoucherType } from "#system/voucher";
 import { GameManager } from "#test/framework/game-manager";
+import { installHeadlessCoopSemanticProjectionOracle } from "#test/tools/coop-semantic-presentation";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -101,6 +102,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   });
 
   beforeEach(() => {
+    installHeadlessCoopSemanticProjectionOracle();
     game = new GameManager(phaserGame);
     game.override
       .battleStyle("double")

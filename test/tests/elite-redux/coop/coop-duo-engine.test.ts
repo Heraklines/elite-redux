@@ -37,10 +37,10 @@ import {
   drainLoopback,
   emptyGhostSnapshot,
   installDuoLogCapture,
-  installHeadlessCoopSemanticProjectionOracle,
   mirrorHostBattleToGuest,
   withClient,
 } from "#test/tools/coop-duo-harness";
+import { installHeadlessCoopSemanticProjectionOracle } from "#test/tools/coop-semantic-presentation";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -238,6 +238,13 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
 
     // The host EMITted + the guest RECVd the turnResolution over the loopback.
     expect(guestRecvTurnResolution, "the guest received the host's turnResolution").toBe(true);
+
+    // The spike predates buildDuo's sequential-boundary bridge. Finish the real host BattleEnd seam now so
+    // the complete retained WAVE_ADVANCE transaction exists before the winning guest replay consumes it.
+    await withClient(hostCtx, async () => {
+      await game.phaseInterceptor.to("BattleEndPhase");
+    });
+    await withClient(guestCtx, () => drainLoopback());
 
     // ===== Pump the GUEST: run its REAL CoopReplayTurnPhase for the host's turn. The host won the
     // wave (it broadcast waveResolved "win"), so the guest's deferred CoopFinalizeTurnPhase consumes

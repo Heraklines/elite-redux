@@ -84,10 +84,6 @@ import {
   setCoopBiomeInteractionStart,
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import {
-  getActuallyFieldedCoopPokemon,
-  settleCoopFieldPresentation,
-} from "#data/elite-redux/coop/coop-field-presentation";
-import {
   captureCoopActiveMysteryControl,
   coopMeHandoffBattleStarted,
   coopMeHandoffBattleWaveValue,
@@ -95,8 +91,6 @@ import {
   restoreCoopMeHandoffBattleState,
   restoreCoopMeInteractionStartForHarness,
 } from "#data/elite-redux/coop/coop-me-pin-state";
-// biome-ignore lint/performance/noNamespaceImport: Vitest must spy on the live ESM export used by replay phases.
-import * as coopPresentation from "#data/elite-redux/coop/coop-presentation";
 import {
   type CoopBiomeTransitionTailPermit,
   restoreCoopBiomeTransitionTailPermit,
@@ -116,11 +110,11 @@ import {
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import {
   type CoopActiveMysteryEncounterSnapshotV1,
-  type CoopAuthoritativeBattleStateV1,
   type CoopTransport,
   createLoopbackPair,
   type SerializedCommand,
 } from "#data/elite-redux/coop/coop-transport";
+import { isCoopWaveAdvanceOperationEnabled } from "#data/elite-redux/coop/coop-wave-operation";
 import {
   type ErAchievementRunSaveData,
   getErAchievementRunState,
@@ -200,11 +194,11 @@ import { PokemonData } from "#system/pokemon-data";
 import type { GameManager } from "#test/framework/game-manager";
 import type { GameWrapper } from "#test/framework/game-wrapper";
 import { TextInterceptor } from "#test/framework/text-interceptor";
+import { installHeadlessCoopSemanticProjectionOracle } from "#test/tools/coop-semantic-presentation";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import fs from "node:fs";
 import path from "node:path";
 import Phaser from "phaser";
-import { vi } from "vitest";
 
 /**
  * The PROCESS-GLOBAL mystery-encounter pins/control that are NOT carried on the `active` runtime and
@@ -1005,6 +999,71 @@ function neutralizeCoopCandyBar(scene: BattleScene): void {
  * chainable setters; it is a semantic adapter oracle, never evidence that a browser canvas rendered. Pixel
  * postconditions belong in the built-client two-browser lane.
  */
+function makeHeadlessSprite(key: string, visible: boolean): Phaser.GameObjects.Sprite {
+  const target: Record<PropertyKey, unknown> = {
+    active: true,
+    alpha: 1,
+    anims: {
+      currentAnim: { key },
+      duration: 1,
+      msPerFrame: 1,
+      nextFrame: () => undefined,
+      pause: () => undefined,
+    },
+    frame: { name: 0 },
+    originX: 0.5,
+    originY: 0.5,
+    pipelineData: {},
+    texture: { key },
+    visible,
+    x: 0,
+    y: 0,
+  };
+  let proxy: Record<PropertyKey, unknown>;
+  const chain = () => proxy;
+  proxy = new Proxy(target, {
+    get(t, property) {
+      return Reflect.has(t, property) ? Reflect.get(t, property) : chain;
+    },
+  });
+  target.play = (nextKey: string) => {
+    target.texture = { key: nextKey };
+    target.anims = {
+      ...(target.anims as object),
+      currentAnim: { key: nextKey },
+    };
+    return proxy;
+  };
+  target.setActive = (active: boolean) => {
+    target.active = active;
+    return proxy;
+  };
+  target.setAlpha = (alpha: number) => {
+    target.alpha = alpha;
+    return proxy;
+  };
+  target.setOrigin = (originX: number, originY = originX) => {
+    target.originX = originX;
+    target.originY = originY;
+    return proxy;
+  };
+  target.setPosition = (x: number, y: number) => {
+    target.x = x;
+    target.y = y;
+    return proxy;
+  };
+  target.setTexture = (nextKey: string, frame?: string | number) => {
+    target.texture = { key: nextKey };
+    target.frame = { name: frame ?? 0 };
+    return proxy;
+  };
+  target.setVisible = (nextVisible: boolean) => {
+    target.visible = nextVisible;
+    return proxy;
+  };
+  return proxy as unknown as Phaser.GameObjects.Sprite;
+}
+
 export function stubBattleInfo(mon: Pokemon): void {
   // The real PlayerBattleInfo/EnemyBattleInfo was never built (we skipped init()). Keep the small async
   // fallback for data-refresh methods, but model the stateful Phaser setters explicitly. The old proxy
@@ -1040,86 +1099,11 @@ export function stubBattleInfo(mon: Pokemon): void {
     return proxy;
   };
   (mon as unknown as { battleInfo: unknown }).battleInfo = proxy;
-}
-
-/**
- * Install the production-semantics presentation oracle used by this in-process, headless two-engine
- * harness. The duo harness deliberately constructs guest Pokemon without production atlas/sprite
- * caches, so the browser-only pixel readiness checks in `settleCoopAuthoritativeProjection` cannot
- * honestly pass here. We still require the complete semantic projection: every authoritative,
- * presented, living seat must resolve by stable Pokemon id, occupy the exact Phaser field side, be
- * visible, and expose its battle-info surface; every stale occupant must be absent.
- *
- * This is intentionally a Vitest spy installed only by the headless harness. Built-client browser
- * journeys do not import this file and therefore continue to require real assets, sprites, animations,
- * and UI bars through the unmodified production implementation.
- */
-export function installHeadlessCoopSemanticProjectionOracle(): void {
-  const semanticProjection = async (state: CoopAuthoritativeBattleStateV1): Promise<boolean> => {
-    const wanted: {
-      player: { pokemon: Pokemon; slot: number }[];
-      enemy: { pokemon: Pokemon; slot: number }[];
-    } = { player: [], enemy: [] };
-    const arrangement = globalScene.currentBattle?.arrangement;
-
-    for (const seat of state.field) {
-      const party = seat.side === "player" ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
-      const pokemon = party.find(candidate => candidate.id === seat.pokemonId);
-      if (pokemon == null) {
-        return false;
-      }
-      const serializedParty = seat.side === "player" ? state.playerParty : state.enemyParty;
-      const serialized = serializedParty.find(candidate => candidate.id === seat.pokemonId);
-      const serializedHp = typeof serialized?.hp === "number" ? serialized.hp : pokemon.hp;
-      if (!seat.presented || serializedHp <= 0) {
-        continue;
-      }
-      const slot = seat.side === "player" ? seat.bi : Math.max(0, seat.bi - (arrangement?.enemyOffset ?? 1));
-      wanted[seat.side].push({ pokemon, slot });
-    }
-
-    settleCoopFieldPresentation({
-      side: "player",
-      seats: wanted.player,
-      capacity: arrangement?.playerCapacity ?? 1,
-      boundary: "turn-finalize",
-      desired: "visible",
-      hideStale: true,
-    });
-    settleCoopFieldPresentation({
-      side: "enemy",
-      seats: wanted.enemy,
-      capacity: arrangement?.enemyCapacity ?? 1,
-      boundary: "turn-finalize",
-      desired: "visible",
-      hideStale: true,
-    });
-
-    const expectedPlayerIds = new Set(wanted.player.map(({ pokemon }) => pokemon.id));
-    const expectedEnemyIds = new Set(wanted.enemy.map(({ pokemon }) => pokemon.id));
-    const actualPlayerIds = new Set(getActuallyFieldedCoopPokemon("player").map(pokemon => pokemon.id));
-    const actualEnemyIds = new Set(getActuallyFieldedCoopPokemon("enemy").map(pokemon => pokemon.id));
-    const exactIds =
-      expectedPlayerIds.size === actualPlayerIds.size
-      && expectedEnemyIds.size === actualEnemyIds.size
-      && [...expectedPlayerIds].every(id => actualPlayerIds.has(id))
-      && [...expectedEnemyIds].every(id => actualEnemyIds.has(id));
-    if (!exactIds) {
-      return false;
-    }
-
-    return [...wanted.player, ...wanted.enemy].every(({ pokemon }) => {
-      const info = pokemon.getBattleInfo();
-      return pokemon.isOnField() && pokemon.visible && pokemon.alpha > 0 && info?.visible === true && info.alpha > 0;
-    });
-  };
-
-  const installed = coopPresentation.settleCoopAuthoritativeProjection;
-  if (vi.isMockFunction(installed)) {
-    installed.mockImplementation(semanticProjection);
-  } else {
-    vi.spyOn(coopPresentation, "settleCoopAuthoritativeProjection").mockImplementation(semanticProjection);
-  }
+  const key = mon.getBattleSpriteKey();
+  const sprite = makeHeadlessSprite(key, false);
+  const tintSprite = makeHeadlessSprite(key, false);
+  (mon as unknown as { getSprite: () => Phaser.GameObjects.Sprite }).getSprite = () => sprite;
+  (mon as unknown as { getTintSprite: () => Phaser.GameObjects.Sprite }).getTintSprite = () => tintSprite;
 }
 
 /**
@@ -1245,6 +1229,71 @@ export interface DuoRig {
   pair: { host: CoopTransport; guest: CoopTransport };
 }
 
+interface RetainedWaveBoundaryBridge {
+  readonly hostScene: BattleScene;
+  readonly hostCtx: ClientCtx;
+  readonly runBattleEnd: () => Promise<void>;
+}
+
+/**
+ * Test-only bridge from a headless guest scene to the real host BattleEnd boundary that owns the complete
+ * retained WAVE_ADVANCE transaction. Production clients advance concurrently; the in-process duo harness
+ * deliberately pumps them sequentially and therefore must finish this host boundary before replaying a
+ * winning guest turn. Weak keys prevent a completed rig from becoming process-global test state.
+ */
+const retainedWaveBoundaryByGuestScene = new WeakMap<object, RetainedWaveBoundaryBridge>();
+
+function registerRetainedWaveBoundaryBridge(
+  hostGame: GameManager,
+  hostScene: BattleScene,
+  guestScene: BattleScene,
+  hostCtx: ClientCtx,
+): void {
+  retainedWaveBoundaryByGuestScene.set(guestScene, {
+    hostScene,
+    hostCtx,
+    runBattleEnd: async () => {
+      await hostGame.phaseInterceptor.to("BattleEndPhase");
+    },
+  });
+}
+
+async function maybeSealHostRetainedWaveBoundary(
+  guestScene: ReplayPumpScene,
+  sealRetainedWaveBoundary: boolean,
+): Promise<void> {
+  if (!sealRetainedWaveBoundary) {
+    return;
+  }
+  const bridge = retainedWaveBoundaryByGuestScene.get(guestScene as object);
+  if (bridge == null) {
+    return;
+  }
+  await withClient(bridge.hostCtx, async () => {
+    const hostBattle = bridge.hostScene.currentBattle;
+    const guestBattle = (guestScene as BattleScene).currentBattle;
+    const hostPhase = bridge.hostScene.phaseManager.getCurrentPhase();
+    const mysteryBattle =
+      hostBattle?.battleType === BattleType.MYSTERY_ENCOUNTER
+      || (coopMeHandoffBattleStarted() && coopMeHandoffBattleWaveValue() === hostBattle?.waveIndex);
+    if (
+      !isCoopWaveAdvanceOperationEnabled()
+      || bridge.hostCtx.runtime.controller.role !== "host"
+      || hostBattle == null
+      || guestBattle == null
+      || hostBattle.waveIndex !== guestBattle.waveIndex
+      || hostPhase?.phaseName !== "BattleEndPhase"
+      || mysteryBattle
+    ) {
+      return;
+    }
+    await bridge.runBattleEnd();
+  });
+  // The nested host pump restores the caller's guest context before this drain. Any retained envelope is
+  // therefore delivered/applied under the correct process-global scene/runtime in the sequential harness.
+  await drainLoopback();
+}
+
 /**
  * Stand up the full two-engine rig over ONE {@linkcode createLoopbackPair}: assemble BOTH runtimes
  * (via {@linkcode assembleCoopRuntime}, so neither close the other's transport), build the GUEST
@@ -1313,6 +1362,7 @@ export async function buildDuo(
     gf[0].coopOwner = "host";
     gf[1].coopOwner = "guest";
   });
+  registerRetainedWaveBoundaryBridge(hostGame, hostScene, guestScene, hostCtx);
 
   // Connect both controllers over the live loopback (exchange hello / runConfig).
   setCoopRuntimeFn(hostRuntime);
@@ -1433,7 +1483,12 @@ interface ReplayPumpScene {
  * withClient(guestCtx, ...). Throws on a >16-iter no-progress stall (the hang-detection the duo
  * harness exists to surface). Returns when the finalize has run (checkpoint applied, tail queued).
  */
-export async function driveGuestReplayTurn(guestScene: ReplayPumpScene, turn: number): Promise<void> {
+export async function driveGuestReplayTurn(
+  guestScene: ReplayPumpScene,
+  turn: number,
+  options: { sealRetainedWaveBoundary?: boolean } = {},
+): Promise<void> {
+  await maybeSealHostRetainedWaveBoundary(guestScene, options.sealRetainedWaveBoundary !== false);
   // Production-transition journeys arrive here through the guest's real TurnStartPhase, which has already
   // queued and selected CoopReplayTurnPhase. Reuse that CURRENT object so its end() advances the same phase
   // tree (Victory/reward/NewBattle tails cannot be stranded behind an unrelated constructor phase). Legacy
@@ -2059,6 +2114,7 @@ export async function buildDuoForMe(
     gf[0].coopOwner = "host";
     gf[1].coopOwner = "guest";
   });
+  registerRetainedWaveBoundaryBridge(hostGame, hostScene, guestScene, hostCtx);
 
   // Connect both controllers over the live loopback (exchange hello / runConfig).
   setCoopRuntimeFn(hostRuntime);

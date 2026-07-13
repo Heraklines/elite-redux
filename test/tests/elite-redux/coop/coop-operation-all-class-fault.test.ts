@@ -153,7 +153,15 @@ describe("authoritative operation fault campaign: every registered class", () =>
       for (const cls of COOP_OPERATION_SURFACES) {
         expect(liveState.get(cls), `${cls} converged through its live-mutation seam`).toBe(cls);
       }
-      expect(host.unackedCount(), "every replayed class was cumulatively ACKed").toBe(0);
+      const continuationRetained = COOP_OPERATION_SURFACES.filter(cls => cls !== "op:wave").length;
+      expect(host.unackedCount(), "generic operations remain retained after material application").toBe(
+        continuationRetained,
+      );
+      expect(guest.notifyOperationContinuationSurface("sharedInput", { epoch: 1, wave: 10, turn: 1 })).toBe(
+        continuationRetained,
+      );
+      await flush();
+      expect(host.unackedCount(), "the exact shared continuation releases every generic class").toBe(0);
     } finally {
       host.dispose();
       guest.dispose();

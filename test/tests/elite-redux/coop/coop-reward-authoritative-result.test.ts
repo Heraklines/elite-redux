@@ -148,7 +148,10 @@ describe("P33 retained reward/shop authoritative results", () => {
       getCoopOperationJournalApplied().every(envelope => envelope.authoritativeState.playerParty.length > 0),
       "no live committed envelope contains the historical empty placeholder",
     ).toBe(true);
-    expect(hostManager.unackedCount()).toBe(0);
+    expect(hostManager.unackedCount(), "material application retains all three canonical results").toBe(3);
+    expect(guestManager.notifyOperationContinuationSurface("sharedInput", { epoch: 1, wave: 7, turn: 3 })).toBe(3);
+    await flushWire();
+    expect(hostManager.unackedCount(), "the exact reward continuation releases the dense result stream").toBe(0);
     hostManager.dispose();
     guestManager.dispose();
   });
@@ -331,7 +334,14 @@ describe("P33 retained reward/shop authoritative results", () => {
       Array.from({ length: actionCount }, (_, index) => 51 + index),
     );
     expect(renderedRevisions).toEqual(Array.from({ length: actionCount }, (_, index) => index + 1));
-    expect(hostManager.unackedCount()).toBe(0);
+    expect(hostManager.unackedCount(), "every materially applied result remains retained before UI readiness").toBe(
+      actionCount,
+    );
+    expect(guestManager.notifyOperationContinuationSurface("sharedInput", { epoch: 1, wave: 7, turn: 3 })).toBe(
+      actionCount,
+    );
+    await flushWire();
+    expect(hostManager.unackedCount(), "ordered UI readiness releases every immutable result").toBe(0);
     hostManager.dispose();
     guestManager.dispose();
   });

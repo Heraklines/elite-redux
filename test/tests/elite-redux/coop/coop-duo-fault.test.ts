@@ -558,11 +558,11 @@ describe.skipIf(!RUN)(
         });
       } else {
         // Wave resolution: drop the authoritative wave-advance (both messages) as the host advances past the turn.
+        faultPair.armNextDrop(TARGET_TYPE[cls], "host");
+        faultPair.armNextDrop("waveEndState", "host");
         const turn = rig.hostScene.currentBattle.turn;
         await hostPlayWave(rig);
         await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
-        faultPair.armNextDrop(TARGET_TYPE[cls], "host");
-        faultPair.armNextDrop("waveEndState", "host");
         outcome = await classify(async () => {
           await leaveRewardShop(rig, targetWave);
           return lockstepNow() && (await convergedNow()) ? "converged" : "silent-divergence";

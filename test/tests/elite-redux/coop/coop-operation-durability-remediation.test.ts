@@ -205,8 +205,11 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     registerCoopOperationLiveSink("op:biome", () => true);
     hostMgr.reconnect();
     await flush();
-    expect(hostMgr.unackedCount(), "the retained op ACKs once materialization recovers").toBe(0);
+    expect(hostMgr.unackedCount(), "material recovery alone cannot release the retained authority").toBe(1);
     expect(guestMgr.appliedMarks()).toEqual({ "op:global": 1 });
+    expect(guestMgr.notifyOperationContinuationSurface("sharedInput", { epoch: 1, wave: 11, turn: 0 })).toBe(1);
+    await flush();
+    expect(hostMgr.unackedCount(), "the exact shared continuation releases the retained op").toBe(0);
     hostMgr.dispose();
     guestMgr.dispose();
   });
