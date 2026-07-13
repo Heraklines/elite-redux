@@ -52,6 +52,7 @@ import {
   captureCoopDexDelta,
   captureCoopEnemies,
   captureCoopFullSnapshot,
+  captureCoopMeOutcome,
   consumeCoopMeOutcomeRollbackFatal,
   resetCoopStateTicks,
 } from "#data/elite-redux/coop/coop-battle-engine";
