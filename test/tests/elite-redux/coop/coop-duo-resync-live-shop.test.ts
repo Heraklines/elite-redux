@@ -35,12 +35,14 @@ import { captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-eng
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { BattlerIndex } from "#enums/battler-index";
+import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
@@ -52,6 +54,7 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -82,6 +85,7 @@ describe.skipIf(!RUN)(
 
     beforeEach(() => {
       setCoopWaveBarrierMs(50);
+      resetCoopUiRelayTrace();
       game = new GameManager(phaserGame);
       logs = installDuoLogCapture(`resync-live-shop-${Date.now()}`);
       game.override
@@ -97,6 +101,7 @@ describe.skipIf(!RUN)(
 
     afterEach(() => {
       setCoopWaveBarrierMs(60_000);
+      resetCoopUiRelayTrace();
       logs.dispose();
       clearCoopRuntime();
       // #710 harness-citizenship: restore the host GameManager scene (buildDuo builds a 2nd BattleScene).
@@ -133,7 +138,7 @@ describe.skipIf(!RUN)(
 
     it("a mid-shop resync spares the watcher's live reward wait; the pick still relays + converges", async () => {
       await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-      const pair = createLoopbackPair();
+      const pair = createScheduledCoopPair({ automatic: true });
       const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
       wireGuestCommand(rig);
 
@@ -143,6 +148,9 @@ describe.skipIf(!RUN)(
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn);
       });
+      // The battle bootstrap may use ordinary automatic delivery. The live-shop proof itself uses
+      // destination-scoped delivery so the retained terminal can only resume the watcher under guest ctx.
+      pair.setAutomaticDelivery(false);
 
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       expect(counterBefore % 2, "wave-1 shop is host-owned (even counter)").toBe(0);
@@ -207,16 +215,18 @@ describe.skipIf(!RUN)(
       // lands at a real inter-phase boundary, NEVER mid-await against a live shop screen. The only thing a
       // mid-shop resync does to the watcher's live wait is the scoped cancelWaiters above - which spares it.
 
-      // ===== The pick STILL relays: the owner LEAVES; the surviving watcher wait receives + applies the
-      // terminal, so both engines advance the interaction in lockstep. =====
-      // SYNC send only (no host-ctx drain): draining here would deliver the LEAVE while the HOST runtime is
-      // live, so the watcher's awaitInteractionChoice continuation would resolve UNDER the host scene (a
-      // cross-ctx footgun) and advance the HOST counter. Queue the send, then flush under the GUEST ctx.
-      withClientSync(rig.hostCtx, () => {
-        hostShop.coopEndMirror();
-        hostShop.coopRelaySend(/* COOP_INTERACTION_LEAVE */ -1, undefined, "skip");
-        hostShop.end();
-        hostShop.coopAdvanceInteraction();
+      // ===== The pick STILL relays: drive the already-open owner surface through CANCEL -> CONFIRM. This
+      // public path mints and retains the terminal before continuation; the surviving watcher applies that
+      // retained result, so both engines advance the interaction in lockstep. =====
+      await withClient(rig.hostCtx, async () => {
+        expect(rig.hostScene.ui.getMode(), "host still owns the open reward UI").toBe(UiMode.MODIFIER_SELECT);
+        const handler = rig.hostScene.ui.getHandler() as unknown as { unblockInput?: () => void };
+        handler.unblockInput?.();
+        expect(rig.hostScene.ui.processInput(Button.CANCEL), "host requests reward leave through public UI").toBe(true);
+        await drainLoopback();
+        expect(rig.hostScene.ui.getMode(), "public reward leave opened confirmation").toBe(UiMode.CONFIRM);
+        expect(rig.hostScene.ui.processInput(Button.ACTION), "host confirms reward leave through public UI").toBe(true);
+        await drainLoopback();
       });
       await withClient(rig.guestCtx, async () => {
         for (let i = 0; i < 24; i++) {
@@ -226,6 +236,13 @@ describe.skipIf(!RUN)(
           }
         }
       });
+      expect(
+        getCoopUiRelayEdges().some(
+          edge =>
+            (edge.mode === UiMode.MODIFIER_SELECT || edge.mode === UiMode.CONFIRM) && edge.carrier === "operation",
+        ),
+        "the live shop terminal crossed the public UI-to-retained-operation edge",
+      ).toBe(true);
 
       // ----- ASSERTIONS -----
 

@@ -568,7 +568,11 @@ export class EncounterPhase extends BattlePhase {
       }
       rebuilt[entry.fieldIndex] = built;
     }
-    if (rebuilt.length !== enemies.length || rebuilt[0] == null || rebuilt.some(enemy => enemy == null)) {
+    if (battle.battleType === BattleType.MYSTERY_ENCOUNTER) {
+      if (rebuilt.length > 0) {
+        throw new Error(`Mystery encounter rebuilt an unexpected enemy party at wave ${battle.waveIndex}`);
+      }
+    } else if (rebuilt.length !== enemies.length || rebuilt[0] == null || rebuilt.some(enemy => enemy == null)) {
       throw new Error(`Authoritative enemy party was incomplete at wave ${battle.waveIndex}`);
     }
     battle.enemyParty = rebuilt;
