@@ -67,8 +67,8 @@ if (!preview?.includes('"--verify"') || /safeStaticFile\([^,]+,\s*["']src/gu.tes
 if (!viteConfig?.includes("SOURCE_ENTRY") || !viteConfig.includes("sourceEntryReplaced")) {
   failures.push("vite.config.mjs: exact-SHA browser build entry replacement must stay explicit and idempotent");
 }
-if (!provision?.includes('"/account/register"') || /["'`]\/coop\//u.test(provision)) {
-  failures.push("provision-accounts.mjs: fixture setup may register beta accounts but must never drive co-op APIs");
+if (!provision?.includes("randomBytes") || /fetch\s*\(|["'`]\/coop\//u.test(provision)) {
+  failures.push("provision-accounts.mjs: fixture setup may generate credentials but must not call any API");
 }
 
 const browserEntry = await readFile(new URL("../../../scripts/coop-browser-entry.ts", import.meta.url), "utf8");

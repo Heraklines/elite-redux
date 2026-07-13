@@ -28,9 +28,9 @@ the wrong visible route and the resume journey fails.
 
 ## Run on an isolated machine
 
-Use the opt-in **Co-op Public UI Journey** GitHub workflow for execution. Its primary runner provisions a
-unique pair through the beta account-registration API, then performs authentication and every game/lobby
-action through the visible application. It uploads evidence even when the journey fails. Do not use real
+Use the opt-in **Co-op Public UI Journey** GitHub workflow for execution. Its primary runner generates a
+unique masked credential pair, then creates both beta accounts through the visible registration form and
+performs every game/lobby action through the visible application. It uploads evidence even when the journey fails. Do not use real
 player accounts; journeys intentionally create or advance beta-API saves. `COOP_UI_API_URL` and
 `COOP_UI_SIGNAL_URL` are maintainer-owned repository variables; workflow inputs cannot redirect fixture
 creation or credential entry. The optional
@@ -55,6 +55,7 @@ node test/browser/coop-public-ui/run.mjs
 Relevant options:
 
 - `COOP_UI_REQUESTER_SEAT=guest-seat|host-seat` controls who sends the initial invitation.
+- `COOP_UI_ACCOUNT_MODE=login|register` chooses visible login or first-time registration; CI uses `register`.
 - `COOP_UI_FAINT_OWNER_SEAT=guest-seat|host-seat` identifies the prepared replacement owner.
 - `COOP_UI_HOST_TITLE_NEW_GAME_KEYS` and `COOP_UI_GUEST_TITLE_NEW_GAME_KEYS` are JSON key arrays. Use
   `["ArrowDown"]` when a prepared account already shows Continue above New Game.

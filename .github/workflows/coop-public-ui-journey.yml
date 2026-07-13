@@ -172,9 +172,7 @@ jobs:
       - name: Install isolated Chrome runtime
         run: pnpm exec puppeteer browsers install chrome
 
-      - name: Provision an isolated non-production account pair
-        env:
-          COOP_UI_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
+      - name: Prepare an isolated account pair for visible registration
         run: node test/browser/coop-public-ui/provision-accounts.mjs
 
       - name: Drive two isolated built clients exclusively through public UI
@@ -184,6 +182,7 @@ jobs:
           COOP_UI_ASSET_DIR: assets
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           COOP_UI_JOURNEY: ${{ inputs.journey || 'fresh-resume' }}
+          COOP_UI_ACCOUNT_MODE: register
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
           COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.faint_owner_seat || 'guest-seat' }}
           COOP_UI_HOST_TITLE_NEW_GAME_KEYS: ${{ inputs.host_title_keys || '[]' }}

@@ -60,6 +60,7 @@ function keySequence(name, fallback) {
 
 const allowedJourneys = new Set(["probe", "fresh-wave2", "fresh-resume", "reverse-resume", "faint-replacement"]);
 const allowedSeats = new Set(["host-seat", "guest-seat"]);
+const allowedAccountModes = new Set(["login", "register"]);
 
 export function loadConfig() {
   const journey = process.env.COOP_UI_JOURNEY?.trim() || "probe";
@@ -74,11 +75,15 @@ export function loadConfig() {
   }
   const requesterSeat = process.env.COOP_UI_REQUESTER_SEAT?.trim() || "guest-seat";
   const faintOwnerSeat = process.env.COOP_UI_FAINT_OWNER_SEAT?.trim() || "guest-seat";
+  const accountMode = process.env.COOP_UI_ACCOUNT_MODE?.trim() || "login";
   if (!allowedSeats.has(requesterSeat)) {
     throw new Error(`COOP_UI_REQUESTER_SEAT must be one of ${[...allowedSeats].join(", ")}`);
   }
   if (!allowedSeats.has(faintOwnerSeat)) {
     throw new Error(`COOP_UI_FAINT_OWNER_SEAT must be one of ${[...allowedSeats].join(", ")}`);
+  }
+  if (!allowedAccountModes.has(accountMode)) {
+    throw new Error(`COOP_UI_ACCOUNT_MODE must be one of ${[...allowedAccountModes].join(", ")}`);
   }
 
   return {
@@ -127,6 +132,7 @@ export function loadConfig() {
     },
     requesterSeat,
     faintOwnerSeat,
+    accountMode,
     allowedConsoleErrors: (process.env.COOP_UI_ALLOWED_CONSOLE_ERRORS ?? "")
       .split("||")
       .map(value => value.trim())
