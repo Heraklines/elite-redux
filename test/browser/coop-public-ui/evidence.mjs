@@ -8,6 +8,11 @@ import { resolve } from "node:path";
 
 export const delay = ms => new Promise(resolveDelay => setTimeout(resolveDelay, ms));
 
+const SURFACE_PREFIX = "[coop-browser:surface] ";
+const BINDING_PREFIX = "[coop-browser:binding] ";
+const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
+const CHECKSUM_SENTINEL = "0000000000000000";
+
 function cleanSegment(value) {
   return (
     String(value)
@@ -58,6 +63,78 @@ function lobbyView(body) {
   return { players, request, role };
 }
 
+function continuationSurfaceView(text) {
+  if (!text.startsWith(SURFACE_PREFIX)) {
+    return null;
+  }
+  let value;
+  try {
+    value = JSON.parse(text.slice(SURFACE_PREFIX.length));
+  } catch (error) {
+    throw new Error("built browser emitted malformed continuation JSON", { cause: error });
+  }
+  if (
+    !value
+    || typeof value !== "object"
+    || value.version !== 1
+    || !SURFACES.has(value.surface)
+    || (value.role !== "host" && value.role !== "guest")
+    || !Number.isSafeInteger(value.seat)
+    || value.seat < 0
+    || !Number.isSafeInteger(value.epoch)
+    || value.epoch <= 0
+    || !Number.isSafeInteger(value.membershipRevision)
+    || value.membershipRevision <= 0
+    || !Number.isSafeInteger(value.connectionGeneration)
+    || value.connectionGeneration < 0
+    || !Number.isSafeInteger(value.wave)
+    || value.wave <= 0
+    || !Number.isSafeInteger(value.turn)
+    || value.turn <= 0
+    || typeof value.phase !== "string"
+    || value.phase.length === 0
+    || typeof value.uiMode !== "string"
+    || value.uiMode.length === 0
+    || value.uiActive !== true
+    || typeof value.stateDigest !== "string"
+    || !/^[0-9a-f]{16}$/iu.test(value.stateDigest)
+    || value.stateDigest === CHECKSUM_SENTINEL
+  ) {
+    throw new Error("built browser emitted an invalid continuation observation");
+  }
+  return Object.freeze({ ...value });
+}
+
+function bindingView(text) {
+  if (!text.startsWith(BINDING_PREFIX)) {
+    return null;
+  }
+  let value;
+  try {
+    value = JSON.parse(text.slice(BINDING_PREFIX.length));
+  } catch (error) {
+    throw new Error("built browser emitted malformed session-binding JSON", { cause: error });
+  }
+  if (
+    !value
+    || typeof value !== "object"
+    || value.version !== 1
+    || (value.role !== "host" && value.role !== "guest")
+    || !Number.isSafeInteger(value.seat)
+    || value.seat < 0
+    || !Number.isSafeInteger(value.epoch)
+    || value.epoch <= 0
+    || !Number.isSafeInteger(value.membershipRevision)
+    || value.membershipRevision <= 0
+    || !Number.isSafeInteger(value.connectionGeneration)
+    || value.connectionGeneration < 0
+    || value.membershipState !== "active"
+  ) {
+    throw new Error("built browser emitted an invalid session-binding observation");
+  }
+  return Object.freeze({ ...value });
+}
+
 export class EvidenceSink {
   constructor(label, artifactDir, allowedConsoleErrors = []) {
     this.label = label;
@@ -104,6 +181,30 @@ export class EvidenceSink {
       .find(event => pattern.test(event.text ?? ""));
   }
 
+  findSurface(surface, from = 0) {
+    return this.events
+      .slice(from)
+      .find(event => event.kind === "browser-surface" && event.observation.surface === surface);
+  }
+
+  findLastSurface(surface, from = 0) {
+    return this.events
+      .slice(from)
+      .toReversed()
+      .find(event => event.kind === "browser-surface" && event.observation.surface === surface);
+  }
+
+  findBinding(from = 0) {
+    return this.events.slice(from).find(event => event.kind === "browser-binding");
+  }
+
+  async waitForSurface(surface, { from = 0, timeoutMs = 120_000 } = {}) {
+    return this.waitForCondition(sink => sink.findSurface(surface, from), {
+      timeoutMs,
+      description: `built-browser ${surface} continuation observation`,
+    });
+  }
+
   async waitFor(pattern, { from = 0, timeoutMs = 120_000, description = String(pattern) } = {}) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -138,6 +239,21 @@ export class EvidenceSink {
       });
       if (message.type() === "error" && !this.allowedConsoleErrors.some(pattern => pattern.test(text))) {
         this.failures.push(event);
+      }
+      try {
+        const binding = bindingView(text);
+        if (binding != null) {
+          this.record("browser-binding", { observation: binding });
+        }
+        const observation = continuationSurfaceView(text);
+        if (observation != null) {
+          this.record("browser-surface", { observation });
+        }
+      } catch (error) {
+        const invalid = this.record("browser-surface-invalid", {
+          text: error instanceof Error ? error.message : String(error),
+        });
+        this.failures.push(invalid);
       }
     });
     page.on("pageerror", error => {
@@ -178,7 +294,11 @@ export class EvidenceSink {
     if (!url) {
       return;
     }
-    if (url.pathname !== "/account/info" && !url.pathname.startsWith("/coop/lobby")) {
+    if (
+      url.pathname !== "/account/info"
+      && !url.pathname.startsWith("/coop/lobby")
+      && !url.pathname.startsWith("/coop/v3/lobby")
+    ) {
       return;
     }
     let body;

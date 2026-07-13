@@ -6,7 +6,7 @@
 
 import { readFile } from "node:fs/promises";
 
-const files = ["public-ui-harness.mjs", "journeys.mjs", "run.mjs"];
+const files = ["public-ui-harness.mjs", "journeys.mjs", "run.mjs", "evidence.mjs", "preview-server.mjs"];
 const forbidden = [
   /(?:^|["'])\.\.\/\.\.\/\.\.\/src\//mu,
   /applyResync/u,
@@ -18,6 +18,10 @@ const forbidden = [
   /RTCDataChannel/u,
   /RTCPeerConnection/u,
   /WebSocket/u,
+  /__coopBrowserBridge/u,
+  /globalScene/u,
+  /getCoopRuntime/u,
+  /captureCoop/u,
   /page\.evaluateOnNewDocument/u,
   /page\.exposeFunction/u,
 ];
@@ -40,6 +44,27 @@ if (evaluateCalls !== 1 || !harness?.includes("document.activeElement.blur()")) 
   failures.push(
     "public-ui-harness.mjs: page.evaluate must remain the single DOM-focus blur operation; do not inspect game state",
   );
+}
+
+const run = sources.get("run.mjs");
+const preview = sources.get("preview-server.mjs");
+if (!run?.includes("startSealedPreview(config)")) {
+  failures.push("run.mjs: every gameplay journey must start from a verified sealed browser artifact");
+}
+if (!preview?.includes('"--verify"') || /safeStaticFile\([^,]+,\s*["']src/gu.test(preview)) {
+  failures.push("preview-server.mjs: preview must verify the immutable manifest and never mount game source");
+}
+
+const browserEntry = await readFile(new URL("../../../scripts/coop-browser-entry.ts", import.meta.url), "utf8");
+if (
+  !browserEntry.includes("surfaceObserverVersion: 1")
+  || !browserEntry.includes("[coop-browser:binding]")
+  || !browserEntry.includes("seat: runtime.controller.seat")
+  || !browserEntry.includes("ui.getHandler().active")
+  || !browserEntry.includes("observedMechanicalDigest()")
+  || browserEntry.includes("captureCoopChecksumState")
+) {
+  failures.push("coop-browser-entry.ts: missing the read-only rendered-surface/address/digest observer contract");
 }
 
 if (failures.length > 0) {
