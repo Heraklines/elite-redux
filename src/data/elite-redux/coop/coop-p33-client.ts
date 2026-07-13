@@ -184,7 +184,7 @@ function isClientNonce(value: unknown): value is string {
 
 function dependencies(overrides: CoopP33ClientDependencies = {}) {
   return {
-    fetch: overrides.fetch ?? fetch,
+    fetch: overrides.fetch ?? ((...args) => fetch(...args)),
     getIdentityTicket: overrides.getIdentityTicket ?? (() => pokerogueApi.account.getCoopIdentityTicket()),
     createClientNonce: overrides.createClientNonce ?? randomClientNonce,
     retryDelay:
