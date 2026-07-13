@@ -248,9 +248,7 @@ export function isValidCoopActiveMysteryControl(snapshot: unknown): snapshot is 
     && operation?.owner === 0
     && operation.kind === "ME_TERMINAL"
     && operation.pinnedSeq === expectedAddress
-    && (snapshot.terminal === "battle"
-      ? snapshot.terminalStep === 0 && snapshot.terminalChoice === -1000
-      : snapshot.terminalStep <= 1 && snapshot.terminalChoice === -1)
+    && (snapshot.terminal === "battle" ? snapshot.terminalChoice === -1000 : snapshot.terminalChoice === -1)
     && (snapshot.terminal === "battle" || snapshot.hostTurn == null)
   );
 }
@@ -297,17 +295,29 @@ export function canRestoreCoopActiveMysteryControl(
   ) {
     return false;
   }
-  if (
-    snapshot.terminal === "leave"
-    && ((coopMeActiveControl.terminal === "pending" && snapshot.terminalStep !== 0)
-      || (coopMeActiveControl.terminal === "battle" && snapshot.terminalStep !== 1))
-  ) {
+  if (coopMeActiveControl.terminal === "leave" || snapshot.round < coopMeActiveControl.round) {
     return false;
   }
-  return !(
-    coopMeActiveControl.terminal === "leave"
-    || (coopMeActiveControl.terminal === "battle" && snapshot.terminal === "pending")
-    || snapshot.round < coopMeActiveControl.round
+  if (snapshot.terminal === "pending") {
+    return coopMeActiveControl.terminal === "pending";
+  }
+  if (coopMeActiveControl.terminal === "pending") {
+    return snapshot.terminalStep === 0;
+  }
+  const sameTerminal =
+    snapshot.terminal === coopMeActiveControl.terminal
+    && snapshot.terminalOperationId === coopMeActiveControl.terminalOperationId
+    && snapshot.terminalStep === coopMeActiveControl.terminalStep
+    && snapshot.terminalChoice === coopMeActiveControl.terminalChoice;
+  if (sameTerminal) {
+    return (
+      snapshot.hostTurn === coopMeActiveControl.hostTurn
+      && snapshot.handoffWave === coopMeActiveControl.handoffWave
+    );
+  }
+  return (
+    coopMeActiveControl.terminal === "battle"
+    && snapshot.terminalStep === (coopMeActiveControl.terminalStep ?? -1) + 1
   );
 }
 
@@ -492,30 +502,22 @@ export function setCoopMeTerminalControl(
   if (identity == null || identity.operationId.length === 0 || !isSafeNonNegative(identity.step)) {
     return;
   }
-  const priorTerminal =
-    coopMeActiveControl?.interactionCounter === coopMeInteractionStart ? coopMeActiveControl.terminal : "pending";
-  if (
-    (terminal === "battle" && identity.step !== 0)
-    || (terminal === "leave" && priorTerminal === "pending" && identity.step !== 0)
-    || (terminal === "leave" && priorTerminal === "battle" && identity.step !== 1)
-  ) {
-    return;
-  }
-  if (
-    coopMeActiveControl?.interactionCounter === coopMeInteractionStart
-    && coopMeActiveControl.terminal !== "pending"
-  ) {
+  const prior =
+    coopMeActiveControl?.interactionCounter === coopMeInteractionStart ? coopMeActiveControl : undefined;
+  if (prior?.terminal !== undefined && prior.terminal !== "pending") {
     const exactDuplicate =
-      coopMeActiveControl.terminal === terminal
-      && coopMeActiveControl.terminalOperationId === identity.operationId
-      && coopMeActiveControl.terminalStep === identity.step
-      && coopMeActiveControl.terminalChoice === identity.choice;
+      prior.terminal === terminal
+      && prior.terminalOperationId === identity.operationId
+      && prior.terminalStep === identity.step
+      && prior.terminalChoice === identity.choice;
     if (exactDuplicate) {
       return;
     }
-    if (coopMeActiveControl.terminal === "leave" || terminal !== "leave") {
-      return; // leave is terminal-final; battle may only advance once to the exact post-battle leave
+    if (prior.terminal === "leave" || identity.step !== (prior.terminalStep ?? -1) + 1) {
+      return; // leave is final; every new battle/leave after a battle consumes the next exact step
     }
+  } else if (identity.step !== 0) {
+    return;
   }
   const nextControl: CoopActiveMysteryEncounterSnapshotV1 = {
     version: 1,
@@ -533,6 +535,16 @@ export function setCoopMeTerminalControl(
     ...(coopMeActiveControl?.presentation == null
       ? {}
       : { presentation: clonePresentation(coopMeActiveControl.presentation) }),
+    ...(coopMeActiveControl?.colosseum == null
+      ? {}
+      : {
+          colosseum: {
+            ...coopMeActiveControl.colosseum,
+            ...(coopMeActiveControl.colosseum.decision == null
+              ? {}
+              : { decision: { ...coopMeActiveControl.colosseum.decision } }),
+          },
+        }),
   };
   if (!isValidCoopActiveMysteryControl(nextControl)) {
     return;

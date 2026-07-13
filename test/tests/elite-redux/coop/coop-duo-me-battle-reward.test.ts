@@ -126,8 +126,7 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
     expect(rig.hostRuntime.controller.interactionCounter(), "the ME opens on interaction counter 0").toBe(ME_COUNTER);
 
     // ===== HANDOFF: drive the host through option 1 (the BATTLE option) to MysteryEncounterBattlePhase -
-    // AFTER initBattleWithEnemyConfig streamed the boss (coopHostStreamMeBattleParty) + relayed the
-    // COOP_ME_BATTLE_HANDOFF sentinel on the 9M term seq. =====
+    // AFTER initBattleWithEnemyConfig committed the complete retained battle state + destination. =====
     await withClient(rig.hostCtx, async () => {
       await runSelectMysteryEncounterOption(game, 1);
       await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
@@ -142,9 +141,8 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
     // per-client ctx swap-back does NOT carry, so it must be read while the guest ctx is still live (a
     // harness state-management detail, not a production concern - production has one process per client).
     //
-    // The 9M terminal is the battle-handoff sentinel (no 8M meResync), so CoopReplayMePhase finishesWithout
-    // Leaving: it does NOT leave/advance, marks the handoff battle STARTED, adopts the host's streamed
-    // ME-battle party, and boots its OWN MysteryEncounterBattlePhase. =====
+    // The retained ME_TERMINAL applies the host's exact state before CoopReplayMePhase finishesWithoutLeaving:
+    // it does NOT leave/advance, marks the handoff battle STARTED, and boots the declared battle surface. =====
     const queued = await withClient(rig.guestCtx, async () => {
       const guestReplay = await driveGuestMeReplay(rig.guestScene);
       expect(guestReplay.settled, "guest CoopReplayMePhase settled at the battle-handoff").toBe(true);

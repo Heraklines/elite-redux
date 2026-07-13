@@ -156,6 +156,62 @@ describe("complete retained Mystery terminal transaction", () => {
     ).toBe("executed");
   });
 
+  it("retains every Colosseum round as step N, retries round N+1 after rejoin, then executes final leave", () => {
+    const receiver = new CoopMeTerminalTransactionReceiver();
+    const pinned = 12;
+    let materialApplies = 0;
+    let destinationAttempts = 0;
+    let destinationReady = true;
+    const hooks = {
+      applyMaterial: () => {
+        materialApplies++;
+        return true;
+      },
+      executeDestination: () => {
+        destinationAttempts++;
+        return destinationReady;
+      },
+    };
+    const round0 = { operationId: "battle-round-0", pinned, step: 0, payload: battlePayload(20) };
+    const round1 = {
+      operationId: "battle-round-1",
+      pinned,
+      step: 1,
+      payload: battlePayload(20, { encounterMode: 3, disableSwitch: true }),
+    };
+
+    expect(
+      receiver.receive({ operationId: "battle-round-2-early", pinned, step: 2, payload: battlePayload(20) }, hooks),
+      "a later round cannot overtake either retained battle step",
+    ).toBe("rejected");
+    expect(receiver.receive(round0, hooks)).toBe("executed");
+    expect(receiver.receive(round0, hooks), "an old round remains idempotent after execution").toBe("duplicate");
+
+    destinationReady = false;
+    expect(receiver.receive(round1, hooks), "round N+1 DATA is retained while its battle surface is late").toBe(
+      "retry",
+    );
+    expect(materialApplies).toBe(2);
+    destinationReady = true;
+    expect(receiver.receive(round1, hooks), "hot-rejoin retries only round N+1 control").toBe("executed");
+    expect(materialApplies, "the second round state image applied exactly once").toBe(2);
+    expect(receiver.receive(round0, hooks), "a late duplicate from round N never regresses the cursor").toBe(
+      "duplicate",
+    );
+
+    expect(
+      receiver.receive({ operationId: "battle-round-2", pinned, step: 2, payload: battlePayload(20) }, hooks),
+    ).toBe("executed");
+    expect(
+      receiver.receive({ operationId: "final-leave", pinned, step: 3, payload: leavePayload(20, true) }, hooks),
+    ).toBe("executed");
+    expect(
+      receiver.receive({ operationId: "battle-after-leave", pinned, step: 4, payload: battlePayload(20) }, hooks),
+      "the final leave closes the pinned transaction sequence",
+    ).toBe("rejected");
+    expect(destinationAttempts).toBe(5);
+  });
+
   it("rejects same-id payload conflicts and a second terminal for the same pinned stage", () => {
     const receiver = new CoopMeTerminalTransactionReceiver();
     let ready = false;
@@ -163,6 +219,12 @@ describe("complete retained Mystery terminal transaction", () => {
     const first = { operationId: "terminal", pinned: 13, step: 0, payload: leavePayload(30) };
     expect(receiver.receive(first, hooks)).toBe("retry");
     expect(receiver.receive({ ...first, payload: leavePayload(30, true) }, hooks)).toBe("rejected");
+    expect(receiver.receive({ ...first, pinned: 14 }, hooks), "one id cannot be rebound to another pin").toBe(
+      "rejected",
+    );
+    expect(receiver.receive({ ...first, step: 1 }, hooks), "one id cannot be rebound to another step").toBe(
+      "rejected",
+    );
     expect(
       receiver.receive({ operationId: "other", pinned: 13, step: 0, payload: leavePayload(30) }, hooks),
     ).toBe("rejected");

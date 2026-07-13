@@ -17,6 +17,7 @@ import {
   releaseCoopMeRetainedTerminal,
 } from "#data/elite-redux/coop/coop-me-operation";
 import {
+  captureCoopActiveMysteryControl,
   coopMeHandoffBattleStarted,
   coopMeInProgress,
   coopMeInteractionStartValue,
@@ -198,6 +199,12 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
   }
   coopLog("me", "coopEndMePump: close pump + advance alternation", { counter: coopMeInteractionStartValue() });
   const handoff = coopMeHandoffBattleStarted();
+  const activeControl = captureCoopActiveMysteryControl();
+  const terminalStep = handoff
+    ? activeControl?.interactionCounter === coopMeInteractionStartValue() && activeControl.terminal === "battle"
+      ? (activeControl.terminalStep ?? -1) + 1
+      : -1
+    : 0;
   let terminalOperationId: string | null = null;
   if (controller.role === "host" && isCoopMeOperationEnabled()) {
     if (outcome == null) {
@@ -205,8 +212,8 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
       return false;
     }
     const wave = globalScene.currentBattle?.waveIndex ?? -1;
-    if (wave < 0) {
-      coopWarn("me", "coopEndMePump HOLD: leave terminal has no live wave destination");
+    if (wave < 0 || terminalStep < 0 || terminalStep >= 1_000) {
+      coopWarn("me", "coopEndMePump HOLD: leave terminal has no live addressed destination");
       return false;
     }
     const payload = {
@@ -222,7 +229,7 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
       kind: "ME_TERMINAL",
       seq: COOP_ME_TERM_SEQ_BASE + coopMeInteractionStartValue(),
       pinned: coopMeInteractionStartValue(),
-      step: handoff ? 1 : 0,
+      step: terminalStep,
       payload,
       localRole: "host",
       wave,
@@ -236,7 +243,7 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
     if (terminalOperationId != null) {
       setCoopMeTerminalControl("leave", undefined, {
         operationId: terminalOperationId,
-        step: handoff ? 1 : 0,
+        step: terminalStep,
         choice: COOP_INTERACTION_LEAVE,
       });
     }

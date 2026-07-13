@@ -295,6 +295,13 @@ export class CoopReplayMePhase extends Phase {
       });
       return;
     }
+    if (isCoopOperationJournalActive()) {
+      // A fast host can commit the complete terminal before this replay surface is installed (notably an
+      // embedded shop/outro). Its first delivery correctly remains unacknowledged because the destination
+      // was not executable yet. Announce the now-live receiver immediately instead of waiting for the
+      // periodic resend ceiling; the retained exact tail then materializes on this scene/context.
+      this.boundRuntime?.durability?.reconnect();
+    }
     // Render the host's authoritative ME narration as it arrives (cosmetic; the outcome rides the
     // reward alternation + the comprehensive P4 resync, so a dropped line can never desync). Dropped
     // at the terminal in leaveDefensive / finishWithoutLeaving.
@@ -1060,16 +1067,19 @@ export class CoopReplayMePhase extends Phase {
       return false;
     }
     if (transaction.payload.terminal === "battle") {
+      if (this.acceptedTerminal.kind === "pending") {
+        return transaction.step === 0;
+      }
       return (
-        transaction.step === 0
-        && (this.acceptedTerminal.kind === "pending"
-          || (this.acceptedTerminal.kind === "battle-handoff"
-            && this.acceptedTerminal.operationId === transaction.operationId))
+        this.acceptedTerminal.kind === "battle-handoff"
+        && ((this.acceptedTerminal.operationId === transaction.operationId
+            && this.acceptedTerminal.step === transaction.step)
+          || transaction.step === this.acceptedTerminal.step + 1)
       );
     }
     return (
       (this.acceptedTerminal.kind === "pending" && transaction.step === 0)
-      || (this.acceptedTerminal.kind === "battle-handoff" && transaction.step === 1)
+      || (this.acceptedTerminal.kind === "battle-handoff" && transaction.step === this.acceptedTerminal.step + 1)
       || (this.acceptedTerminal.kind === "leave"
         && this.acceptedTerminal.operationId === transaction.operationId
         && this.acceptedTerminal.step === transaction.step)
@@ -1090,7 +1100,8 @@ export class CoopReplayMePhase extends Phase {
     this.terminalRecoveryAttempt = 0;
     try {
       if (payload.destination.kind === "battle") {
-        if (step !== 0 || this.acceptedTerminal.kind !== "pending") {
+        const expectedStep = this.acceptedTerminal.kind === "battle-handoff" ? this.acceptedTerminal.step + 1 : 0;
+        if (step !== expectedStep) {
           return (
             this.acceptedTerminal.kind === "battle-handoff"
             && this.acceptedTerminal.operationId === operationId
@@ -1107,7 +1118,7 @@ export class CoopReplayMePhase extends Phase {
         };
         return true;
       }
-      const expectedStep = this.acceptedTerminal.kind === "battle-handoff" ? 1 : 0;
+      const expectedStep = this.acceptedTerminal.kind === "battle-handoff" ? this.acceptedTerminal.step + 1 : 0;
       if (step !== expectedStep) {
         return false;
       }
@@ -1535,9 +1546,13 @@ export class CoopReplayMePhase extends Phase {
    */
   private finishWithoutLeaving(hostTurn?: number, committedDestination?: CoopMeBattleDestination): void {
     if (this.settled) {
-      if (committedDestination != null && this.settledDetached) {
-        // A quiz/nested-picker can finish its presentation phase before its option spawns a battle. The
-        // retained terminal supersedes that detached UI and is still the first mechanical terminal.
+      if (
+        committedDestination != null
+        && (this.settledDetached || this.acceptedTerminal.kind === "battle-handoff")
+      ) {
+        // A quiz/nested-picker can finish its presentation phase before its option spawns a battle, and a
+        // Colosseum CONTINUE produces another complete battle transaction after the prior round. In both
+        // cases the retained step supersedes the detached surface and is the next mechanical boundary.
         this.settled = false;
         this.settledDetached = false;
       } else {
