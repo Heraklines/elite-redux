@@ -458,7 +458,7 @@ function preflightCoopAtomicSnapshot(runtime: CoopRuntime, snapshot: CoopFullBat
       command =>
         command.owner === runtime.controller.role
         && command.address?.epoch === snapshot.sessionEpoch
-        && (snapshot.authoritativeState?.wave == null || command.address.wave === snapshot.authoritativeState.wave),
+        && (snapshot.authoritativeState?.wave == null || command.address?.wave === snapshot.authoritativeState.wave),
     )
     && (coopMeInteractionStartValue() < 0 || mystery != null)
     && (mystery == null || canRestoreCoopActiveMysteryControl(mystery))
@@ -885,7 +885,7 @@ export function queueCoopAtomicSnapshotApply(
     "CoopApplyResyncPhase",
     snapshot,
     snapshotTurn,
-    snapshot.checksum,
+    snapshot.checksum ?? "",
     undefined,
     healed => {
       if (!healed) {
@@ -4111,7 +4111,7 @@ export function coopHostStreamMeMessage(text: string): void {
  * (this is only invoked on the authoritative handoff path). Best-effort + guarded.
  */
 export async function coopMeOwnerRelayBattleHandoff(options?: {
-  readonly encounterMode?: number;
+  readonly encounterMode?: number | undefined;
   readonly disableSwitch?: boolean;
 }): Promise<boolean> {
   if (active == null) {

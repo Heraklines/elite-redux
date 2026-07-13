@@ -370,7 +370,12 @@ describe("CoopReplayMePhase fail-closed terminal recovery", () => {
 
       const originalSubmit = CoopOperationHost.prototype.submit;
       let terminalSubmits = 0;
-      vi.spyOn(CoopOperationHost.prototype, "submit").mockImplementation(function (intent, ctx, validate) {
+      vi.spyOn(CoopOperationHost.prototype, "submit").mockImplementation(function (
+        this: CoopOperationHost,
+        intent,
+        ctx,
+        validate,
+      ) {
         if (intent.kind === "ME_TERMINAL") {
           terminalSubmits++;
           throw new Error("injected terminal commit failure");

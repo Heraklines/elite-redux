@@ -31,7 +31,7 @@ class SqliteD1Statement {
     return (this.statement().get(...this.bindings) as unknown as T | undefined) ?? null;
   }
 
-  public async all<T>(): Promise<D1ResultLike & { results: T[] }> {
+  public async all<T extends Record<string, unknown>>(): Promise<D1ResultLike & { results: T[] }> {
     return {
       success: true,
       results: this.statement().all(...this.bindings) as unknown as T[],
@@ -757,10 +757,10 @@ describe("co-op save Worker endpoint integration", () => {
     sqlite
       .prepare("INSERT INTO session_saves (user_id, slot, data, updated_at) VALUES (?, ?, ?, ?)")
       .run(1, 2, stranded, 1);
-    expect((await call(`/savedata/session/coop-run-status?coopRunId=${runId}`)).status).toBe(
-      409,
+    expect(
+      (await call(`/savedata/session/coop-run-status?coopRunId=${runId}`)).status,
       "an unresolvable peer is never reported as an active resumable run",
-    );
+    ).toBe(409);
     const query = new URLSearchParams({
       slot: "2",
       coopCasRunId: runId,
@@ -944,10 +944,10 @@ describe("co-op save Worker endpoint integration", () => {
     expect(
       (await call(`/savedata/session/coop-duplicate-exact-delete?${removeOldest}`, { method: "POST" })).status,
     ).toBe(200);
-    expect((await call(`/savedata/session/coop-run-status?coopRunId=${runId}`)).status).toBe(
-      409,
+    expect(
+      (await call(`/savedata/session/coop-run-status?coopRunId=${runId}`)).status,
       "a third live copy still blocks active status",
-    );
+    ).toBe(409);
     expect(
       (await call(`/savedata/session/coop-duplicate-exact-delete?${removeOldest}`, { method: "POST" })).status,
       "the exact first repair remains idempotent while another duplicate exists",

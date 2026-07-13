@@ -26,7 +26,9 @@ function resolvePresentedPokemon(state: CoopAuthoritativeBattleStateV1): Semanti
     }
     const serializedParty = seat.side === "player" ? state.playerParty : state.enemyParty;
     const serialized = serializedParty.find(candidate => candidate.id === seat.pokemonId);
-    if (seat.presented && (serialized?.hp ?? pokemon.hp) > 0) {
+    // build-only type fix, superseded by campaign v2 on merge
+    const serializedHp = typeof serialized?.hp === "number" ? serialized.hp : pokemon.hp;
+    if (seat.presented && serializedHp > 0) {
       projection[seat.side].push(pokemon);
     }
   }

@@ -161,8 +161,8 @@ describe("co-op bounded UI transition seam", () => {
       tweens.push(config);
       return config;
     });
-    ui.fadeOut = UI.prototype.fadeOut.bind(ui as unknown as UI);
-    ui.fadeIn = UI.prototype.fadeIn.bind(ui as unknown as UI);
+    ui.fadeOut = (duration = 0) => UI.prototype.fadeOut.call(ui as unknown as UI, duration);
+    ui.fadeIn = (duration = 0) => UI.prototype.fadeIn.call(ui as unknown as UI, duration);
 
     const first = ui.setModeBounded(UiMode.PARTY, 1_000);
     tweens[0].onComplete?.(); // first fadeOut -> mode install -> first fadeIn

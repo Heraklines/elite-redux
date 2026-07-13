@@ -476,7 +476,8 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     const guestSync = new CoopBattleSync(guest);
     guestSync.setSlotOwnershipProbe(() => true);
     const address = { epoch: 61, wave: 10, pokemonId: 404 };
-    const received: Array<{ epoch?: number; wave?: number; pokemonId?: number }> = [];
+    const received: Array<{ epoch?: number | undefined; wave?: number | undefined; pokemonId?: number | undefined }> =
+      [];
     const off = host.onMessage(message => {
       if (message.t === "command") {
         received.push({ epoch: message.epoch, wave: message.wave, pokemonId: message.pokemonId });

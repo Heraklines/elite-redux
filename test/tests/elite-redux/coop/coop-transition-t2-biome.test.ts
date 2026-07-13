@@ -736,6 +736,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
 
     await withClient(rig.hostCtx, async () => {
       const boundary = deferred<{
+        point: string;
         timedOut: boolean;
         authoritativePoint?: string;
         crossPoint?: string;
@@ -749,10 +750,11 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       select.boundaryStillLive = () => selectLive;
       const selectWait = select.coopAwaitBoundaryBarrier();
       selectLive = false;
-      boundary.resolve({ timedOut: false });
+      boundary.resolve({ point: "select-biome", timedOut: false });
       await expect(selectWait, "a resolved stale SelectBiome rendezvous stays closed").resolves.toBe(false);
 
       const crossroadsBoundary = deferred<{
+        point: string;
         timedOut: boolean;
         authoritativePoint?: string;
         crossPoint?: string;
@@ -766,7 +768,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       crossroads.boundaryStillLive = () => crossroadsLive;
       const crossroadsWait = crossroads.coopAwaitBoundaryBarrier();
       crossroadsLive = false;
-      crossroadsBoundary.resolve({ timedOut: false });
+      crossroadsBoundary.resolve({ point: "crossroads", timedOut: false });
       await expect(crossroadsWait, "a resolved stale Crossroads rendezvous stays closed").resolves.toBe(false);
 
       const stock = deferred<null>();
@@ -792,7 +794,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
 
       const action = deferred<{
         choice: number;
-        data?: number[];
+        data: number[] | undefined;
         operationId?: string;
       } | null>();
       vi.spyOn(rig.hostRuntime.interactionRelay, "awaitInteractionChoice").mockReturnValueOnce(action.promise);
@@ -1051,7 +1053,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
           throw new Error("synthetic cosmetic failure");
         });
         newBiome.startPresentationIntro(true);
-        const intro = tween.mock.calls[0][0] as { onComplete(): void };
+        const intro = tween.mock.calls[0][0] as unknown as { onComplete(): void };
         expect(() => intro.onComplete(), "the cosmetic failure is contained by the phase").not.toThrow();
         expect(end).not.toHaveBeenCalled();
         await vi.advanceTimersByTimeAsync(12_000);

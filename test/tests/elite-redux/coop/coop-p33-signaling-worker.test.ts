@@ -37,7 +37,7 @@ class SqliteD1Statement {
     return (this.statement().get(...this.bindings) as unknown as T | undefined) ?? null;
   }
 
-  public async all<T>(): Promise<D1ResultLike & { results: T[] }> {
+  public async all<T extends Record<string, unknown>>(): Promise<D1ResultLike & { results: T[] }> {
     return {
       success: true,
       results: this.statement().all(...this.bindings) as unknown as T[],
@@ -165,7 +165,7 @@ describe("P33 authenticated signaling Worker", () => {
     sqlite = new DatabaseSync(":memory:");
     database = new SqliteD1Database(sqlite);
     env = {
-      DB: database as unknown as D1Database,
+      DB: database as unknown as P33SignalingEnv["DB"],
       COOP_IDENTITY_SECRET: secret,
       ALLOWED_ORIGIN: "https://staging.example.test",
       PRESENCE_WINDOW_MS: "30000",
@@ -193,7 +193,7 @@ describe("P33 authenticated signaling Worker", () => {
       new Request(`https://coop.example.test${path}`, {
         method: options.method ?? (options.body == null ? "GET" : "POST"),
         headers,
-        body: options.body == null ? undefined : JSON.stringify(options.body),
+        ...(options.body == null ? {} : { body: JSON.stringify(options.body) }),
       }),
       env,
     );

@@ -12,6 +12,29 @@ import {
   verifyCoopIdentityTicket,
 } from "./p33-auth";
 
+// Minimal structural stand-in for the Cloudflare Workers D1 binding types
+// (@cloudflare/workers-types is not a dependency of this repo). Only the surface the
+// signaling worker actually calls is modeled; the runtime binding is the real D1.
+interface D1Meta {
+  changes?: number;
+  last_row_id?: number | bigint;
+}
+interface D1Result<T = Record<string, unknown>> {
+  success?: boolean;
+  results: T[];
+  meta: D1Meta;
+}
+interface D1PreparedStatement {
+  bind(...values: unknown[]): D1PreparedStatement;
+  first<T = Record<string, unknown>>(): Promise<T | null>;
+  all<T = Record<string, unknown>>(): Promise<D1Result<T>>;
+  run<T = Record<string, unknown>>(): Promise<D1Result<T>>;
+}
+interface D1Database {
+  prepare(query: string): D1PreparedStatement;
+  batch<T = Record<string, unknown>>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]>;
+}
+
 export interface P33SignalingEnv {
   DB: D1Database;
   COOP_IDENTITY_SECRET?: string;
