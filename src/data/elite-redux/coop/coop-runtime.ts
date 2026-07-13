@@ -192,6 +192,7 @@ import {
   resetCoopGlobalOperationOrder,
   setActiveCoopRuntimeOpState,
   setCoopGlobalOperationRevisionFloor,
+  withActiveCoopRuntimeOpState,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import {
@@ -4485,6 +4486,14 @@ export function assembleCoopRuntime(
   const durability = durabilityEnabled
     ? new CoopDurabilityManager(transport, {
         ...operationDurabilityHooks,
+        // Scope every durability-delivered op APPLY to THIS runtime's per-runtime op-state (layer-B). The
+        // in-process harness loopback delivers a peer's envelope synchronously during another client's drain
+        // (or between withClient swaps with none installed), so the ACTIVE op-state at apply time is NOT
+        // reliably this receiver's - a migrated surface (bargain) would then write its cursor/aux onto the
+        // sender's record (or fail-loud throw when nothing is installed), and the receiver's watcher-adopt
+        // reads its own empty record and never converges. Installing runtime.opState here lands the apply on
+        // the receiver's own record. Production has one runtime, so active == runtime already => no-op there.
+        apply: entry => withActiveCoopRuntimeOpState(runtime.opState, () => operationDurabilityHooks.apply?.(entry)),
         sendFullSnapshot: (cls, headRevision, controlHighWater) =>
           sendCoopDurabilitySnapshot(runtime, cls, headRevision, controlHighWater),
         onRecoveryExhausted: failure =>

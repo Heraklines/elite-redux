@@ -246,6 +246,26 @@ export function setActiveCoopRuntimeOpState(state: CoopRuntimeOpState | null): v
 }
 
 /**
+ * Run `fn` with `state` installed as the active op-state, restoring the previous one after. Used to scope a
+ * durability-delivered op APPLY to the RECEIVING runtime's op-state: an in-process transport (the two-engine
+ * harness loopback) delivers a peer's envelope synchronously during whichever client happens to be draining -
+ * or between `withClient` swaps with NO client installed - so the ACTIVE op-state at delivery is NOT reliably
+ * the receiver's. Scoping the apply to the receiver's own op-state makes a migrated surface's cursor/aux
+ * writes land on the receiver's record (the record its later watcher-adopt reads), instead of the sender's
+ * record or a fail-loud throw when nothing is installed. In production (one runtime per process) the active
+ * op-state IS already the receiver's, so this is a no-op there - pure harness-fidelity scoping.
+ */
+export function withActiveCoopRuntimeOpState<T>(state: CoopRuntimeOpState, fn: () => T): T {
+  const prev = activeOpState;
+  activeOpState = state;
+  try {
+    return fn();
+  } finally {
+    activeOpState = prev;
+  }
+}
+
+/**
  * FAIL-LOUD apply-path accessor for a surface's per-runtime record. Throws (with the surface key) when no
  * runtime is installed or the surface has no record - never lazily constructs a global (that IS the bleed).
  */
