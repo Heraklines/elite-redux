@@ -171,6 +171,8 @@ describe.skipIf(!RUN)("co-op launch (#633) - real phase launch decision (hang fi
     const phase = new SelectStarterPhase();
     const initSpy = vi.spyOn(phase, "initBattle").mockImplementation(() => {});
     const setModeSpy = vi.spyOn(globalScene.ui, "setMode").mockImplementation(() => Promise.resolve());
+    const verifiedSlot = vi.spyOn(globalScene.gameData, "findVerifiedEmptyCoopSessionSlot").mockResolvedValue(1);
+    const confirmedSlot = vi.spyOn(globalScene.gameData, "confirmPendingFreshCoopSessionSlot").mockReturnValue(true);
 
     // Simulate slot 0 holding a REAL local run; 1..4 empty. The host must NOT overwrite slot 0.
     localStorage.setItem(getSessionDataLocalStorageKey(0), "EXISTING_RUN");
@@ -188,6 +190,8 @@ describe.skipIf(!RUN)("co-op launch (#633) - real phase launch decision (hang fi
       expect(openedSaveSlot).toBe(false);
       // ...it auto-picked the first EMPTY slot (1), NEVER overwriting the occupied slot 0...
       expect(globalScene.sessionSlotId).toBe(1);
+      expect(verifiedSlot).toHaveBeenCalledTimes(1);
+      expect(confirmedSlot).toHaveBeenCalledWith(1);
       expect(localStorage.getItem(getSessionDataLocalStorageKey(0))).toBe("EXISTING_RUN");
       // ...and dropped straight into the battle.
       expect(initSpy).toHaveBeenCalledTimes(1);
@@ -196,10 +200,12 @@ describe.skipIf(!RUN)("co-op launch (#633) - real phase launch decision (hang fi
     }
   });
 
-  it("the HOST falls back to its current slot only when all 5 slots are full", async () => {
+  it("the HOST fails closed instead of overwriting when no local+cloud slot is verified empty", async () => {
     const phase = new SelectStarterPhase();
     const initSpy = vi.spyOn(phase, "initBattle").mockImplementation(() => {});
-    vi.spyOn(globalScene.ui, "setMode").mockImplementation(() => Promise.resolve());
+    const setModeSpy = vi.spyOn(globalScene.ui, "setMode").mockImplementation(() => Promise.resolve());
+    vi.spyOn(globalScene.gameData, "findVerifiedEmptyCoopSessionSlot").mockResolvedValue(null);
+    const confirmedSlot = vi.spyOn(globalScene.gameData, "confirmPendingFreshCoopSessionSlot");
 
     for (let s = 0; s < 5; s++) {
       localStorage.setItem(getSessionDataLocalStorageKey(s), `RUN_${s}`);
@@ -209,9 +215,14 @@ describe.skipIf(!RUN)("co-op launch (#633) - real phase launch decision (hang fi
       await phase.launchCoopMergedParty([], [], "host");
       await Promise.resolve();
 
-      // No empty slot exists -> fall back to the current slot (the sanctioned overwrite).
+      // No replica-confirmed empty slot exists: keep every byte untouched and stop before materialization.
       expect(globalScene.sessionSlotId).toBe(3);
-      expect(initSpy).toHaveBeenCalledTimes(1);
+      expect(initSpy).not.toHaveBeenCalled();
+      expect(confirmedSlot).not.toHaveBeenCalled();
+      expect(setModeSpy.mock.calls.some(([mode]) => mode === UiMode.SAVE_SLOT)).toBe(false);
+      for (let s = 0; s < 5; s++) {
+        expect(localStorage.getItem(getSessionDataLocalStorageKey(s))).toBe(`RUN_${s}`);
+      }
     } finally {
       for (let s = 0; s < 5; s++) {
         localStorage.removeItem(getSessionDataLocalStorageKey(s));
