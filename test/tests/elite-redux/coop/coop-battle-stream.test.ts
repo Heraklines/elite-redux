@@ -16,11 +16,7 @@ import type {
   CoopMessage,
 } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import {
-  COOP_NO_FAULT_PROFILE,
-  faultableTypes,
-  wrapCoopFaultPair,
-} from "#test/tools/coop-fault-transport";
+import { COOP_NO_FAULT_PROFILE, faultableTypes, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { describe, expect, it } from "vitest";
 
 const flushWire = () => new Promise<void>(resolve => queueMicrotask(resolve));
@@ -628,7 +624,13 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
         authorityContext: () => ({ epoch: 7, wave: 1, turn: 1 }),
       });
       let observed = 0;
+      let acknowledgements = 0;
       guestStream.onTurnCommit(() => observed++);
+      host.onMessage(message => {
+        if (message.t === "turnCommitAck") {
+          acknowledgements++;
+        }
+      });
       const complete = (revision: number, text: string): Extract<CoopMessage, { t: "turnResolution" }> => ({
         t: "turnResolution",
         epoch: 7,
@@ -638,46 +640,54 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
         events: [{ k: "message", text }],
         checkpoint: { ...emptyCheckpoint(), tick: revision - 1 },
         checksum: revision === 22 ? "2222222222222222" : "2121212121212121",
-        preimage: `{\"revision\":${revision}}`,
+        preimage: `{"revision":${revision}}`,
         fullField: emptyFullField(),
         authoritativeState: emptyAuthoritativeState(1, 1, revision),
       });
       const newest = complete(22, "newest");
 
       host.send(newest);
+      await flushWire();
+
+      const resolution = await guestStream.awaitTurn(1);
+      guestStream.acknowledgeTurnCommit(resolution!);
+      await flushWire();
       host.send({ ...newest, events: newest.events.map(event => ({ ...event })) });
       host.send(complete(21, "stale"));
       await flushWire();
 
-      const resolution = await guestStream.awaitTurn(1);
       expect(resolution?.revision).toBe(22);
       expect(resolution?.events).toEqual([{ k: "message", text: "newest" }]);
-      expect(observed, "an identical retransmit is idempotent and the older revision is never routed").toBe(1);
+      expect(observed, "history remains immutable after buffer handoff and ACK").toBe(1);
+      expect(acknowledgements, "an identical immutable replay is safely re-ACKed after handoff").toBe(2);
       guestStream.dispose();
     });
 
     it("routes conflicting content for one immutable buffered revision through the shared fatal contract", async () => {
       const { host, guest } = createLoopbackPair();
-      const terminalReasons: string[] = [];
+      const hostTerminals: string[] = [];
+      const guestTerminals: string[] = [];
+      const hostStream = new CoopBattleStreamer(host, {
+        authorityContext: () => ({ epoch: 7, wave: 1, turn: 1 }),
+        onAuthorityTerminal: reason => {
+          hostTerminals.push(reason);
+          host.close();
+        },
+      });
       const guestStream = new CoopBattleStreamer(guest, {
         authorityContext: () => ({ epoch: 7, wave: 1, turn: 1 }),
-        onAuthorityTerminal: reason => terminalReasons.push(reason),
+        onAuthorityTerminal: reason => guestTerminals.push(reason),
       });
       let failures = 0;
       host.onMessage(message => {
-        if (message.t !== "authorityFailure") {
-          return;
+        if (message.t === "authorityFailure") {
+          failures++;
         }
-        failures++;
-        host.send({
-          t: "authorityFailureAck",
-          failureId: message.failureId,
-          epoch: message.epoch,
-          wave: message.wave,
-          turn: message.turn,
-          revision: message.revision,
-          boundary: message.boundary,
-        });
+      });
+      guest.onMessage(message => {
+        if (message.t === "authorityFailure") {
+          failures++;
+        }
       });
       const base: Extract<CoopMessage, { t: "turnResolution" }> = {
         t: "turnResolution",
@@ -697,10 +707,17 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       host.send({ ...base, events: [{ k: "message", text: "conflict" }] });
       await flushWire();
       await flushWire();
+      await flushWire();
 
-      expect(failures).toBe(1);
-      expect(terminalReasons).toEqual([expect.stringContaining("Conflicting turn authority")]);
+      expect(failures, "the receiving peer ACKs without echoing a fatal back").toBe(1);
+      expect(hostTerminals, "the peer receiving a guest-origin fatal latches the same terminal").toEqual([
+        expect.stringContaining("Conflicting turn authority"),
+      ]);
+      expect(guestTerminals).toEqual([expect.stringContaining("Conflicting turn authority")]);
       await expect(guestStream.awaitTurn(1), "terminal authority cannot be consumed as gameplay").resolves.toBeNull();
+      expect(hostStream.retainedAuthorityDiagnostics().terminal).toBe(true);
+      expect(guestStream.retainedAuthorityDiagnostics().terminal).toBe(true);
+      hostStream.dispose();
       guestStream.dispose();
     });
 
@@ -961,6 +978,161 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("keeps replacement authority immutable through handoff, applied-OOB retention, and ACK", async () => {
+      const { host, guest } = createLoopbackPair();
+      const authorityContext = () => ({ epoch: 7, wave: 4, turn: 2 });
+      const hostTerminals: string[] = [];
+      const guestTerminals: string[] = [];
+      const hostStream = new CoopBattleStreamer(host, {
+        authorityContext,
+        onAuthorityTerminal: reason => hostTerminals.push(reason),
+      });
+      const guestStream = new CoopBattleStreamer(guest, {
+        authorityContext,
+        onAuthorityTerminal: reason => guestTerminals.push(reason),
+      });
+      let opened = 0;
+      let acknowledgements = 0;
+      guestStream.onCheckpointEnvelope(() => opened++);
+      host.onMessage(message => {
+        if (message.t === "battleCheckpointAck") {
+          acknowledgements++;
+        }
+      });
+      const replacement = checkpointEnvelope();
+      const sendRaw = (envelope: CoopCheckpointEnvelope) => host.send({ t: "battleCheckpoint", ...envelope });
+
+      sendRaw(replacement);
+      await flushWire();
+      const handedOff = guestStream.consumeCheckpoint();
+      expect(handedOff).toEqual(replacement);
+      guestStream.retainAppliedOutOfBandCheckpoint(handedOff!);
+      guestStream.acknowledgeReplacement(handedOff!);
+      await flushWire();
+
+      sendRaw({ ...replacement, fullField: replacement.fullField.map(mon => ({ ...mon })) });
+      sendRaw(
+        checkpointEnvelope(
+          "replacement",
+          { ...emptyCheckpoint(), tick: 17 },
+          "1818181818181818",
+          emptyAuthoritativeState(4, 2, 18),
+        ),
+      );
+      await flushWire();
+
+      expect(opened, "equal-identical and lower revisions never reopen an applied surface").toBe(1);
+      expect(acknowledgements, "equal-identical authority is safely re-ACKed after application").toBe(2);
+      expect(
+        guestStream.consumeAppliedOutOfBandCheckpoint(replacement),
+        "idempotent/lower traffic cannot overwrite the applied immutable frame",
+      ).toEqual(replacement);
+
+      sendRaw({ ...replacement, checksum: "ffffffffffffffff" });
+      await flushWire();
+      await flushWire();
+      await flushWire();
+
+      expect(hostTerminals, "replacement conflict terminates the authority sender too").toEqual([
+        expect.stringContaining("Conflicting replacement authority"),
+      ]);
+      expect(guestTerminals).toEqual([expect.stringContaining("Conflicting replacement authority")]);
+      expect(opened).toBe(1);
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
+    it("fails shared and tears down every authority resource when retained capacity is exceeded", async () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 1, turn: 1 };
+      const timers: { callback: () => void; ms: number; cancelled: boolean }[] = [];
+      const schedule = (callback: () => void, ms: number) => {
+        const timer = { callback, ms, cancelled: false };
+        timers.push(timer);
+        return () => {
+          timer.cancelled = true;
+        };
+      };
+      const hostTerminals: string[] = [];
+      const guestTerminals: string[] = [];
+      const hostStream = new CoopBattleStreamer(host, {
+        authorityContext: () => current,
+        authorityRetentionLimit: 1,
+        schedule,
+        onAuthorityTerminal: reason => hostTerminals.push(reason),
+      });
+      const guestStream = new CoopBattleStreamer(guest, {
+        authorityContext: () => current,
+        schedule,
+        onAuthorityTerminal: reason => guestTerminals.push(reason),
+      });
+      let fatalFrames = 0;
+      guest.onMessage(message => {
+        if (message.t === "authorityFailure") {
+          fatalFrames++;
+        }
+      });
+
+      const turnWait = guestStream.awaitTurn(1);
+      const enemyWait = guestStream.awaitEnemyParty(99);
+      emitCompleteTurn(hostStream, 1, [], emptyCheckpoint(), "deadbeefdeadbeef");
+      const replacement = checkpointEnvelope(
+        "replacement",
+        { ...emptyCheckpoint(), tick: 21 },
+        "2222222222222222",
+        emptyAuthoritativeState(1, 1, 22),
+      );
+      hostStream.sendCheckpoint(
+        replacement.reason,
+        replacement.epoch,
+        replacement.wave,
+        replacement.turn,
+        replacement.checkpoint,
+        replacement.checksum,
+        replacement.fullField,
+        replacement.authoritativeState,
+      );
+      await flushWire();
+      await flushWire();
+      await flushWire();
+
+      expect(fatalFrames, "overflow emits one bounded fatal frame without ping-pong").toBe(1);
+      expect(hostTerminals).toEqual([expect.stringContaining("retention exceeded 1")]);
+      expect(guestTerminals).toEqual([expect.stringContaining("retention exceeded 1")]);
+      const emptyTerminalResources = {
+        turnCommits: 0,
+        replacementCommits: 0,
+        deliveryTimers: 0,
+        requestTimers: 0,
+        requests: 0,
+        redeliveryRequests: 0,
+        bufferedAuthority: 0,
+        history: 0,
+        acknowledgements: 0,
+        waiters: 0,
+        fatalPending: false,
+        terminal: true,
+      };
+      expect(hostStream.retainedAuthorityDiagnostics()).toEqual(emptyTerminalResources);
+      expect(guestStream.retainedAuthorityDiagnostics()).toEqual(emptyTerminalResources);
+      await expect(
+        turnWait,
+        "the pre-terminal turn delivery cannot preserve its retry/request loop",
+      ).resolves.not.toBeNull();
+      await expect(
+        enemyWait,
+        "a non-authority gameplay waiter is dissolved by the shared terminal",
+      ).resolves.toBeNull();
+      expect(
+        timers.every(timer => timer.cancelled),
+        "commit and fatal timers are all cancelled",
+      ).toBe(true);
+      await expect(guestStream.awaitTurn(1), "overflow cannot leak its formerly buffered turn").resolves.toBeNull();
+      expect(guestStream.consumeCheckpoint()).toBeNull();
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
     it("bounds permanent turn/replacement ACK loss with one shared terminal and releases every retry", async () => {
       const pair = wrapCoopFaultPair(
         createLoopbackPair(),
@@ -1054,10 +1226,9 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       expect(rawTurnDeliveries, "turn authority cannot resume after the terminal outcome").toBe(
         turnsBeforeTerminalProbe,
       );
-      expect(
-        rawReplacementDeliveries,
-        "replacement authority also clears only after the same terminal outcome",
-      ).toBe(replacementsBeforeTerminalProbe);
+      expect(rawReplacementDeliveries, "replacement authority also clears only after the same terminal outcome").toBe(
+        replacementsBeforeTerminalProbe,
+      );
       hostStream.dispose();
       guestStream.dispose();
     });

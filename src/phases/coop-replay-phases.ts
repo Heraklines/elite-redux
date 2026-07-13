@@ -1220,10 +1220,10 @@ export class CoopFinalizeTurnPhase extends Phase {
         this.failModernTurnCommit(streamer, `Turn ${this.turn} authority did not converge before its deadline.`);
         return;
       }
-      streamer.requestTurnCommit(failed.epoch, failed.wave, failed.turn, failed.revision);
+      streamer.requestTurnCommitRetry(failed.epoch, failed.wave, failed.turn, failed.revision);
       this.turnCommitRetryCancel = streamer.scheduleAuthorityRetry(deadlineCheck, 500);
     };
-    streamer.requestTurnCommit(failed.epoch, failed.wave, failed.turn, failed.revision);
+    streamer.requestTurnCommitRetry(failed.epoch, failed.wave, failed.turn, failed.revision);
     this.turnCommitRetryCancel = streamer.scheduleAuthorityRetry(deadlineCheck, 500);
   }
 
@@ -1231,6 +1231,9 @@ export class CoopFinalizeTurnPhase extends Phase {
     streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
     failure: CoopAuthorityFailure,
   ): void {
+    this.clearTurnCommitRetry();
+    this.authorityFailureUnsubscribe?.();
+    this.authorityFailureUnsubscribe = null;
     const generation = coopSessionGeneration();
     streamer.scheduleAuthorityRetry(() => {
       if (generation === coopSessionGeneration() && getCoopBattleStreamer() === streamer) {
@@ -1873,6 +1876,12 @@ export class CoopApplyResyncPhase extends Phase {
       }
     });
     this.stopAuthorityFailure = streamer.onAuthorityFailure(failure => {
+      this.stopCheckpointWake?.();
+      this.stopCheckpointWake = undefined;
+      this.stopCheckpointRetry?.();
+      this.stopCheckpointRetry = undefined;
+      this.stopAuthorityFailure?.();
+      this.stopAuthorityFailure = undefined;
       const generation = coopSessionGeneration();
       streamer.scheduleAuthorityRetry(() => {
         if (generation === coopSessionGeneration() && getCoopBattleStreamer() === streamer) {
