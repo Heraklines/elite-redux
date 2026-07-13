@@ -697,20 +697,32 @@ export interface CoopSessionRef extends CoopRunRef {
 
 const COOP_GAME_MODE_ID = 6;
 
+/**
+ * A tombstone for a legacy row whose source revision cannot be interpreted still needs a valid
+ * non-negative revision for the public status contract. Zero is a conservative fence-only lower
+ * bound; the exact source bytes remain identified by the tombstone digest.
+ */
+export const COOP_FENCE_ONLY_CHECKPOINT_REVISION = 0;
+
 type SessionProtection = "solo" | "coop-valid" | "coop-invalid" | "unknown";
 
-function coopRunFromParsed(parsed: unknown): CoopRunRef | null {
+function coopRunIdFromParsed(parsed: unknown): string | null {
   if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
     return null;
   }
-  const coopRun = (parsed as { coopRun?: { runId?: unknown; checkpointRevision?: unknown } }).coopRun;
+  const coopRun = (parsed as { coopRun?: { runId?: unknown } }).coopRun;
   const runId = coopRun?.runId;
+  return typeof runId === "string" && /^[A-Za-z0-9_-]{16,128}$/u.test(runId) ? runId : null;
+}
+
+function coopRunFromParsed(parsed: unknown): CoopRunRef | null {
+  const runId = coopRunIdFromParsed(parsed);
+  if (runId == null) {
+    return null;
+  }
+  const coopRun = (parsed as { coopRun?: { checkpointRevision?: unknown } }).coopRun;
   const checkpointRevision = coopRun?.checkpointRevision;
-  return typeof runId === "string"
-    && /^[A-Za-z0-9_-]{16,128}$/u.test(runId)
-    && typeof checkpointRevision === "number"
-    && Number.isSafeInteger(checkpointRevision)
-    && checkpointRevision >= 0
+  return typeof checkpointRevision === "number" && Number.isSafeInteger(checkpointRevision) && checkpointRevision >= 0
     ? { runId, checkpointRevision }
     : null;
 }
@@ -1083,6 +1095,15 @@ export function parseValidCoopRun(data: string | null): CoopRunRef | null {
   }
   try {
     return coopRunFromParsed(JSON.parse(data) as unknown);
+  } catch {
+    return null;
+  }
+}
+
+/** Recover a syntax-validated lineage fence even when its legacy revision is unusable. */
+function parseTrustedCoopRunId(data: string): string | null {
+  try {
+    return coopRunIdFromParsed(JSON.parse(data) as unknown);
   } catch {
     return null;
   }
@@ -1695,23 +1716,26 @@ async function handleClassifiedSessionExactDelete(
     return text(`${label} session changed before exact delete.`, 409, cors);
   }
   const strandedRun = expectedProtection === "coop-invalid" ? parseValidCoopRun(row.data) : null;
-  if (strandedRun != null) {
+  const strandedRunId =
+    expectedProtection === "coop-invalid" ? (strandedRun?.runId ?? parseTrustedCoopRunId(row.data)) : null;
+  if (strandedRunId != null) {
     // A structurally invalid checkpoint can still carry trustworthy, exact run metadata. Preserve
     // the same resurrection fence as a fully materializable checkpoint: the tombstone insert and
     // byte-exact delete execute in one D1 batch, while duplicate live copies make both fail closed.
     await ensureCoopRunTombstones(env);
     const now = Date.now();
+    const checkpointRevision = strandedRun?.checkpointRevision ?? COOP_FENCE_ONLY_CHECKPOINT_REVISION;
     const expected = {
       slot,
-      checkpointRevision: strandedRun.checkpointRevision,
+      checkpointRevision,
       digest: expectedDigest,
     };
     await env.DB.batch([
       env.DB.prepare(COOP_TOMBSTONE_INSERT_SQL).bind(
         auth.uid,
         slot,
-        strandedRun.runId,
-        strandedRun.checkpointRevision,
+        strandedRunId,
+        checkpointRevision,
         expectedDigest,
         now,
         row.data,
@@ -1720,12 +1744,12 @@ async function handleClassifiedSessionExactDelete(
         auth.uid,
         slot,
         row.data,
-        strandedRun.runId,
-        strandedRun.checkpointRevision,
+        strandedRunId,
+        checkpointRevision,
         expectedDigest,
       ),
     ]);
-    return (await exactCoopDeleteSettled(env, auth.uid, strandedRun.runId, expected))
+    return (await exactCoopDeleteSettled(env, auth.uid, strandedRunId, expected))
       ? text("", 200, cors)
       : text(`${label} session changed during tombstoned exact delete.`, 409, cors);
   }

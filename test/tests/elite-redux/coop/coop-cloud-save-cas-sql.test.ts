@@ -14,6 +14,7 @@ import {
   COOP_EMPTY_SESSION_INSERT_SQL,
   COOP_EXACT_SESSION_REPLAY_SQL,
   COOP_EXISTING_SESSION_UPDATE_SQL,
+  COOP_FENCE_ONLY_CHECKPOINT_REVISION,
   COOP_TOMBSTONE_INSERT_SQL,
   COOP_TOMBSTONED_SESSION_DELETE_SQL,
   classifySessionProtection,
@@ -159,6 +160,46 @@ describe("co-op cloud CAS SQL on SQLite", () => {
     expect(
       Number(db.prepare(COOP_EMPTY_SESSION_INSERT_SQL).run(1, 2, session(distinctRun, 0), 4, distinctRun).changes),
     ).toBe(1);
+  });
+
+  it("fences a regex-valid lineage whose source revision is unusable", () => {
+    const runId = "run-malformed-revision-123456789";
+    const malformed = JSON.stringify({
+      gameMode: 6,
+      coopRun: { version: 1, runId, checkpointRevision: "not-a-revision" },
+    });
+    const delayed = session(runId, 0);
+    const digest = "f".repeat(64);
+    expect(classifySessionProtection(malformed)).toBe("coop-invalid");
+    db.prepare("INSERT INTO session_saves (user_id, slot, data, updated_at) VALUES (?, ?, ?, ?)").run(
+      1,
+      2,
+      malformed,
+      1,
+    );
+
+    db.exec("BEGIN IMMEDIATE");
+    expect(
+      Number(
+        db
+          .prepare(COOP_TOMBSTONE_INSERT_SQL)
+          .run(1, 2, runId, COOP_FENCE_ONLY_CHECKPOINT_REVISION, digest, 2, malformed).changes,
+      ),
+    ).toBe(1);
+    expect(
+      Number(
+        db
+          .prepare(COOP_TOMBSTONED_SESSION_DELETE_SQL)
+          .run(1, 2, malformed, runId, COOP_FENCE_ONLY_CHECKPOINT_REVISION, digest).changes,
+      ),
+    ).toBe(1);
+    db.exec("COMMIT");
+
+    expect(db.prepare("SELECT checkpoint_revision, digest FROM coop_run_tombstones_v2").get()).toEqual({
+      checkpoint_revision: COOP_FENCE_ONLY_CHECKPOINT_REVISION,
+      digest,
+    });
+    expect(Number(db.prepare(COOP_EMPTY_SESSION_INSERT_SQL).run(1, 2, delayed, 3, runId).changes)).toBe(0);
   });
 
   it("enforces one live slot per account/run while allowing exact same-slot replay", () => {

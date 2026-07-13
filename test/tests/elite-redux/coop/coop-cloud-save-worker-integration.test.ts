@@ -484,6 +484,65 @@ describe("co-op save Worker endpoint integration", () => {
     expect(sqlite.prepare("SELECT COUNT(*) AS count FROM coop_run_tombstones_v2").get()).toEqual({ count: 0 });
   });
 
+  it("tombstones a trustworthy lineage when its source revision is missing or malformed", async () => {
+    const cases = [
+      { slot: 0, runId: "run-missing-revision-route-123456789", checkpointRevision: undefined },
+      { slot: 1, runId: "run-invalid-revision-route-123456789", checkpointRevision: "invalid" },
+    ] as const;
+    for (const testCase of cases) {
+      const raw = JSON.stringify({
+        gameMode: 6,
+        waveIndex: 4,
+        timestamp: 4,
+        coopRun: {
+          version: 1,
+          runId: testCase.runId,
+          ...(testCase.checkpointRevision === undefined ? {} : { checkpointRevision: testCase.checkpointRevision }),
+        },
+        coopParticipants: {
+          version: 1,
+          players: ["Alice", "Bob"],
+          seats: { host: "Alice", guest: "Bob" },
+        },
+      });
+      sqlite
+        .prepare("INSERT INTO session_saves (user_id, slot, data, updated_at) VALUES (?, ?, ?, ?)")
+        .run(1, testCase.slot, raw, 1);
+      const query = new URLSearchParams({ slot: testCase.slot.toString(), exactDigest: await digest(raw) });
+      expect((await call(`/savedata/session/legacy-coop-exact-delete?${query}`, { method: "POST" })).status).toBe(200);
+      expect(
+        (await call(`/savedata/session/legacy-coop-exact-delete?${query}`, { method: "POST" })).status,
+        "the exact recovery remains idempotent after its source row is gone",
+      ).toBe(200);
+      expect(
+        sqlite
+          .prepare(
+            `SELECT slot, checkpoint_revision, digest FROM coop_run_tombstones_v2
+             WHERE user_id = 1 AND run_id = ?`,
+          )
+          .get(testCase.runId),
+      ).toEqual({ slot: testCase.slot, checkpoint_revision: 0, digest: await digest(raw) });
+      const status = await call(`/savedata/session/coop-run-status?coopRunId=${testCase.runId}`);
+      expect(status.status).toBe(200);
+      await expect(status.json()).resolves.toMatchObject({
+        state: "tombstoned",
+        runId: testCase.runId,
+        slot: testCase.slot,
+        checkpointRevision: 0,
+        digest: await digest(raw),
+      });
+      expect(
+        (
+          await call(`/savedata/session/coop-cas-update?slot=${testCase.slot}&coopCasMode=empty`, {
+            method: "POST",
+            body: checkpoint(testCase.runId, 1, 5),
+          })
+        ).status,
+        "a delayed materializable checkpoint cannot resurrect the fenced lineage",
+      ).toBe(409);
+    }
+  });
+
   it("keeps participant accounts and gameplay seats immutable across existing CAS", async () => {
     const runId = "run-immutable-identity-route-123456789";
     const initial = checkpoint(runId, 0, 1);
