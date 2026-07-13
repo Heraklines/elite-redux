@@ -158,9 +158,10 @@ export class PublicUiClient {
       return entered;
     }
     await delay(this.config.settleDelayMs);
-    await this.sequence(["Space", "Space"], "complete-first-login-gender-prompt");
+    const titleCursor = this.evidence.cursor();
+    await this.press("Space", "complete-first-login-gender-prompt");
     const titleAfterOnboarding = await this.evidence.waitFor(TITLE_PHASE, {
-      from: this.pageCursor,
+      from: titleCursor,
       timeoutMs: this.config.timeoutMs,
       description: "TitlePhase after visible first-login gender selection",
     });
