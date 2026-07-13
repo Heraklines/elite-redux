@@ -5162,27 +5162,6 @@ export class GameData {
       ? this.parseSessionData(decrypt(cachedSessionRaw!, bypassLogin))
       : this.getSessionSaveData();
     const sessionJson = JSON.stringify(sessionData);
-    // [coop-l5-diag] TEMPORARY DIAGNOSTIC (remove with the layer-5 fix). The fresh co-op first-save's
-    // empty-CAS 409s server-side (validateCoopSessionAccounts / parseValidResumableCoopSession -> :1442),
-    // and the offending request body is not captured by the live tracer. Log ONLY the worker parser's
-    // preconditions by presence/shape - NEVER the account strings/full bytes (session may embed account
-    // details). Pins which field nulls the fresh serialize (partnerName-null -> coopParticipants undefined,
-    // or an empty party/enemyParty materialization shape).
-    if (!useCachedSession && (sessionData.gameMode as number) === GameModes.COOP) {
-      const l5Participants = sessionData.coopParticipants;
-      coopWarn(
-        "launch",
-        `[coop-l5-diag] fresh-serialize partnerNameNull=${getCoopRuntime()?.controller?.partnerName == null}`
-          + ` coopParticipantsPresent=${l5Participants != null} participantsVersion=${l5Participants?.version ?? "none"}`
-          + ` playersLen=${Array.isArray(l5Participants?.players) ? l5Participants.players.length : "n/a"}`
-          + ` seatsHostPresent=${l5Participants?.seats?.host != null} seatsGuestPresent=${l5Participants?.seats?.guest != null}`
-          + ` partyLen=${Array.isArray(sessionData.party) ? sessionData.party.length : "n/a"}`
-          + ` enemyPartyLen=${Array.isArray(sessionData.enemyParty) ? sessionData.enemyParty.length : "n/a"}`
-          + ` gameMode=${sessionData.gameMode} waveIndex=${sessionData.waveIndex}`
-          + ` coopRunVersion=${sessionData.coopRun?.version ?? "none"} battleType=${sessionData.battleType}`
-          + ` meType=${sessionData.mysteryEncounterType ?? "none"}`,
-      );
-    }
     if (useCachedSession && (sessionData.gameMode as number) === GameModes.COOP) {
       coopWarn("launch", "refusing cached co-op session rewrite outside a live immutable checkpoint transaction");
       globalScene.ui.savingIcon.hide();
