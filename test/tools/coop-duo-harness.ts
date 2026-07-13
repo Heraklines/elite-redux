@@ -200,6 +200,7 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 import fs from "node:fs";
 import path from "node:path";
 import Phaser from "phaser";
+import { afterEach } from "vitest";
 
 /**
  * The PROCESS-GLOBAL mystery-encounter pins/control that are NOT carried on the `active` runtime and
@@ -1230,6 +1231,9 @@ export interface DuoRig {
   pair: { host: CoopTransport; guest: CoopTransport };
 }
 
+/** Every in-process duo assembled by this module and not yet fully torn down. */
+const liveDuoRigs = new Set<DuoRig>();
+
 /**
  * Dispose both independently assembled runtimes owned by a duo rig.
  *
@@ -1239,11 +1243,26 @@ export interface DuoRig {
  * two real browser processes and no retained commit from a completed rig can bleed into another session.
  */
 export function disposeDuoRig(rig: DuoRig): void {
+  liveDuoRigs.delete(rig);
   for (const runtime of [rig.guestRuntime, rig.hostRuntime]) {
+    if (runtime.localTransport.state === "closed") {
+      continue;
+    }
     setCoopRuntime(runtime);
     clearCoopRuntime();
   }
 }
+
+/**
+ * A duo test owns two runtimes even though production's global accessor exposes only one. Register this
+ * file-local hook once so every importing suite gets strict two-process-equivalent teardown, including a
+ * failed test that never reaches its own cleanup statements.
+ */
+afterEach(() => {
+  for (const rig of [...liveDuoRigs]) {
+    disposeDuoRig(rig);
+  }
+});
 
 interface RetainedWaveBoundaryBridge {
   readonly hostScene: BattleScene;
@@ -1387,7 +1406,9 @@ export async function buildDuo(
   guestRuntime.controller.connect();
   await drainLoopback();
 
-  return { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair };
+  const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair };
+  liveDuoRigs.add(rig);
+  return rig;
 }
 
 /**
@@ -2139,7 +2160,9 @@ export async function buildDuoForMe(
   guestRuntime.controller.connect();
   await drainLoopback();
 
-  return { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair };
+  const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair };
+  liveDuoRigs.add(rig);
+  return rig;
 }
 
 /** Minimal phase-manager surface the guest ME replay pump needs (the guest scene satisfies it). */
