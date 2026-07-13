@@ -98,11 +98,13 @@ export class PublicUiClient {
     this.publicSeat = null;
     this.page = await this.context.newPage();
     await this.page.setViewport(this.config.viewport);
-    await this.page.setCacheEnabled(false);
+    // The bundle is immutable and digest-verified before launch. Preserve normal browser caching so a
+    // cold reopen exercises production cache behavior instead of reloading tens of thousands of assets.
+    await this.page.setCacheEnabled(true);
     this.evidence.attach(this.page);
     this.evidence.record("navigate", { url: new URL(this.config.baseUrl).origin });
-    await this.page.goto(this.config.baseUrl, { waitUntil: "domcontentloaded", timeout: this.config.timeoutMs });
-    await this.page.waitForSelector("#app canvas", { timeout: this.config.timeoutMs });
+    await this.page.goto(this.config.baseUrl, { waitUntil: "domcontentloaded", timeout: this.config.bootTimeoutMs });
+    await this.page.waitForSelector("#app canvas", { timeout: this.config.bootTimeoutMs });
   }
 
   async reopen() {
@@ -118,7 +120,7 @@ export class PublicUiClient {
     }
     await this.evidence.waitFor(LOGIN_PHASE, {
       from: this.pageCursor,
-      timeoutMs: this.config.timeoutMs,
+      timeoutMs: this.config.bootTimeoutMs,
       description: "public LoginPhase",
     });
     await delay(this.config.settleDelayMs);
