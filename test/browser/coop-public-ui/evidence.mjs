@@ -41,13 +41,21 @@ function parsedUrl(value) {
   }
 }
 
-function isExpectedMissingSystemSaveError(type, text, source, remaining) {
-  return (
-    type === "error"
-    && remaining > 0
-    && parsedUrl(source)?.pathname === "/savedata/system/get"
-    && /status of 404/u.test(text)
-  );
+function isExpectedMissingSystemSaveError(type, text, source, registerMode) {
+  if (type !== "error" || !registerMode) {
+    return false;
+  }
+  // A fresh (register-mode) account has NO persisted data yet: the client reads the system
+  // AND session saves, which legitimately 404 until the first persist, and the game logs its
+  // own "Session read failed (missing)." line for the same missing-session read. These are the
+  // expected fresh-account no-save condition - exempt them (dedicated exemption, NOT the
+  // general allowlist). An EXISTING (login-mode) account gets no exemption, so a real missing
+  // save there still fails closed.
+  const path = parsedUrl(source)?.pathname;
+  const missingSaveRead =
+    (path === "/savedata/system/get" || path === "/savedata/session/get") && /status of 404/u.test(text);
+  const missingSessionLog = /Session read failed \(missing\)\.?/u.test(text);
+  return missingSaveRead || missingSessionLog;
 }
 
 function accountView(body) {
@@ -299,8 +307,9 @@ export class EvidenceSink {
         this.expectedMissingSystemSaveErrors,
       );
       if (expectedMissingSystemSave) {
-        this.expectedMissingSystemSaveErrors -= 1;
-        this.record("console-error-expected", { source, reason: "fresh account has no system save" });
+        // A register-mode flag, not a countdown: a fresh account reads several missing saves
+        // (system + session) before its first persist, so all such reads are expected.
+        this.record("console-error-expected", { source, reason: "fresh account has no persisted save yet" });
       } else if (message.type() === "error" && !this.allowedConsoleErrors.some(pattern => pattern.test(text))) {
         this.failures.push(event);
       }
