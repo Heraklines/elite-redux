@@ -33,6 +33,7 @@
 // =============================================================================
 
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { beginCoopMachineWait } from "#data/elite-redux/coop/coop-stall-probe";
 import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 /**
@@ -316,6 +317,10 @@ export class CoopRendezvous {
       stale({ point, timedOut: true });
     }
     this.pendingSince.set(point, Date.now());
+    // A parked barrier await is a MACHINE wait (blocked on the PARTNER's arrival) - register it so the
+    // stall watchdog's asymmetric escalation can bound a dead-partner barrier. The barrier's own
+    // never-continue-unilaterally semantics are unchanged; only the ESCALATION path is added.
+    const endMachineWait = beginCoopMachineWait(`coop-rendezvous:${point}`);
     return new Promise<CoopRendezvousResult>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
@@ -325,6 +330,7 @@ export class CoopRendezvous {
         }
         settled = true;
         cancelTimer();
+        endMachineWait();
         if (this.pending.get(point) === finish) {
           this.pending.delete(point);
           this.pendingSince.delete(point);

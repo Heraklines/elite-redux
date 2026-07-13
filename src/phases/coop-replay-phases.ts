@@ -85,6 +85,7 @@ import {
   resolveCoopPendingWaveTransition,
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
+import { beginCoopMachineWait } from "#data/elite-redux/coop/coop-stall-probe";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopBattleCheckpoint,
@@ -1832,6 +1833,8 @@ function parseCoopCanonical(canonical: string | undefined): unknown {
 export class CoopApplyResyncPhase extends Phase {
   public readonly phaseName = "CoopApplyResyncPhase";
   private settled = false;
+  /** Ends the registered stall-probe MACHINE wait while this phase holds a non-converged boundary. */
+  private endHoldMachineWait: (() => void) | undefined;
   /** Temporary wake subscription while this phase is deliberately holding a safe boundary. */
   private stopCheckpointWake: (() => void) | undefined;
   private stopCheckpointRetry: (() => void) | undefined;
@@ -1856,6 +1859,8 @@ export class CoopApplyResyncPhase extends Phase {
 
   public override end(): void {
     this.ended = true;
+    this.endHoldMachineWait?.();
+    this.endHoldMachineWait = undefined;
     this.stopCheckpointWake?.();
     this.stopCheckpointWake = undefined;
     this.stopCheckpointRetry?.();
@@ -2078,6 +2083,10 @@ export class CoopApplyResyncPhase extends Phase {
       coopWarn("resync", `turn=${this.turn} cannot arm held-resync wake (no streamer)`);
       return false;
     }
+    // Register the held boundary as a MACHINE wait (blocked on the peer's converging authority frame) so
+    // the stall watchdog can bound the live wave-4 softlock: a hold that never converges is a local stall
+    // even though it is not a network wait. Released in end(); idempotent so a synchronous heal is a no-op.
+    this.endHoldMachineWait ??= beginCoopMachineWait(`coop-resync-hold:t${this.turn}`);
     const tryLatest = (announced?: CoopCheckpointEnvelope): boolean => {
       let isCurrent = false;
       try {

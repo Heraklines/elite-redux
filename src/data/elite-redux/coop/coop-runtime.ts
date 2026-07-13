@@ -237,6 +237,11 @@ import {
 } from "#data/elite-redux/coop/coop-shared-terminal-runtime";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import {
+  coopMachineWaitLabels,
+  createCoopAsymmetricEscalator,
+  oldestCoopMachineWaitMs,
+} from "#data/elite-redux/coop/coop-stall-probe";
+import {
   isCoopStormglassOperationEnabled,
   resetCoopStormglassOperationState,
   setCoopStormglassOperationRevisionFloor,
@@ -1815,6 +1820,11 @@ export function wireCoopStallWatchdog(
 ): void {
   let peerBeat: { ms: number; at: number } | null = null;
   let lastRecoveryAt = 0;
+  const asymEscalator = createCoopAsymmetricEscalator({
+    triggerMs: COOP_STALL_TRIGGER_MS,
+    peerFreshWindowMs: COOP_STALL_TICK_MS * 2.5,
+    recoveryCooldownMs: COOP_STALL_RECOVERY_COOLDOWN_MS,
+  });
   let compatibilityWarned = false;
   let lastHealthAt = 0;
   const offMsg = transport.onMessage(msg => {
@@ -1846,14 +1856,18 @@ export function wireCoopStallWatchdog(
           /* cosmetic */
         }
       }
-      const localMs = Math.max(relay.oldestNetworkWaitMs(), battleStream.oldestNetworkWaitMs());
+      const localMs = Math.max(
+        relay.oldestNetworkWaitMs(),
+        battleStream.oldestNetworkWaitMs(),
+        oldestCoopMachineWaitMs(),
+      );
       // #808 HEALTH LINE: one compact self-describing line every ~30s so every log capture
       // carries a session-health timeline for free (zero extra timers).
       if (Date.now() - lastHealthAt >= 30_000) {
         lastHealthAt = Date.now();
         coopLog(
           "health",
-          `tick=${coopSessionGeneration()}g turn=${point.turn || "-"} wave=${point.wave || "-"} counter=${runtime.controller.interactionCounter?.() ?? "-"} assertions=${getCoopChecksumAssertionCount()} wait=${localMs}ms peerBeat=${peerBeat ? `${Math.round((Date.now() - peerBeat.at) / 1000)}s` : "-"} lastRx=${formatLastRx(transport)} transport=${transport.state} ${formatCoopDurabilityHealth(runtime, transport)}`,
+          `tick=${coopSessionGeneration()}g turn=${point.turn || "-"} wave=${point.wave || "-"} counter=${runtime.controller.interactionCounter?.() ?? "-"} assertions=${getCoopChecksumAssertionCount()} wait=${localMs}ms machineWaits=${coopMachineWaitLabels().join(",") || "-"} peerBeat=${peerBeat ? `${Math.round((Date.now() - peerBeat.at) / 1000)}s` : "-"} lastRx=${formatLastRx(transport)} transport=${transport.state} ${formatCoopDurabilityHealth(runtime, transport)}`,
         );
       }
       // #806 faint-replacement suppression: a live human choosing (or the host awaiting) a faint
@@ -1868,12 +1882,36 @@ export function wireCoopStallWatchdog(
         transport.send({ t: "stallBeat", waitingMs: localMs });
       }
       const peerFresh = peerBeat != null && Date.now() - peerBeat.at < COOP_STALL_TICK_MS * 2.5;
-      if (
+      // ASYMMETRIC ESCALATION: the local side is stalled (network wait OR a registered machine wait like a
+      // held resync / one-sided barrier) while the peer is provably NOT mutually stalled. Attempt the same
+      // recovery a bounded number of times, then route BOTH clients into the shared terminal (never continue
+      // unilaterally) so a dead-partner / non-converging hold can't park forever.
+      const asymAction = asymEscalator.assess({
+        localMs,
+        peerBeatMs: peerBeat?.ms ?? null,
+        peerBeatAgeMs: peerBeat == null ? null : Date.now() - peerBeat.at,
+        transportConnected: transport.state === "connected",
+        now: Date.now(),
+      });
+      if (asymAction === "terminate") {
+        failCoopRuntimeSharedSession(
+          runtime,
+          "Co-op stalled: your partner is not progressing. Leaving shared play safely.",
+          {
+            boundary: "recovery",
+            reasonCode: "recovery-exhausted",
+            wave: point.wave,
+            turn: point.turn,
+          },
+        );
+        return;
+      }
+      const mutualStall =
         localMs >= COOP_STALL_TRIGGER_MS
         && peerFresh
         && (peerBeat?.ms ?? 0) >= COOP_STALL_TRIGGER_MS
-        && Date.now() - lastRecoveryAt > COOP_STALL_RECOVERY_COOLDOWN_MS
-      ) {
+        && Date.now() - lastRecoveryAt > COOP_STALL_RECOVERY_COOLDOWN_MS;
+      if (mutualStall || asymAction === "recover") {
         lastRecoveryAt = Date.now();
         const recoveryId = `stall:e${runtime.controller.sessionEpoch ?? 0}:g${coopSessionGeneration()}:w${point.wave}:t${point.turn}`;
         recordCoopCausalEvent({
@@ -1888,7 +1926,7 @@ export function wireCoopStallWatchdog(
         });
         coopWarn(
           "runtime",
-          `STALL WATCHDOG: mutual network wait (local=${Math.round(localMs / 1000)}s peer=${Math.round((peerBeat?.ms ?? 0) / 1000)}s) -> recovering (cancel orphan waits; preserve active Mystery${isCoopAuthoritativeGuest() ? " + full resync" : ""})`,
+          `STALL WATCHDOG: ${mutualStall ? "mutual" : "asymmetric"} wait (local=${Math.round(localMs / 1000)}s peer=${Math.round((peerBeat?.ms ?? 0) / 1000)}s) -> recovering (cancel orphan waits; preserve active Mystery${isCoopAuthoritativeGuest() ? " + full resync" : ""})`,
         );
         if (getCoopRuntime() === runtime) {
           try {
