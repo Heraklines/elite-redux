@@ -550,6 +550,39 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("keeps the immutable admission ledger separate from a renderer-mutated working copy", async () => {
+      const { host, guest } = createLoopbackPair();
+      const authorityContext = () => ({ epoch: 7, wave: 1, turn: 1 });
+      const hostStream = new CoopBattleStreamer(host, { authorityContext });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext });
+      const redeliveries: CoopAuthoritativeBattleStateV1[] = [];
+      guestStream.onTurnCommit(delivered => redeliveries.push(delivered.authoritativeState));
+
+      const awaited = guestStream.awaitTurn(1);
+      emitCompleteTurn(hostStream, 1, [{ k: "message", text: "immutable" }], emptyCheckpoint(), "deadbeefdeadbeef");
+      const resolution = await awaited;
+      expect(resolution).not.toBeNull();
+
+      // Production materializers normalize nested state while applying it. This disposable delivery may move,
+      // while the admission ledger and retransmitted authority must stay byte-identical to the wire commit.
+      resolution!.authoritativeState.money = 999;
+      resolution!.fullField[0].hp = 0;
+      resolution!.events.push({ k: "message", text: "renderer-only mutation" });
+      guestStream.requestTurnCommitRetry(7, 1, 1, resolution!.revision);
+      await flushWire();
+
+      expect(redeliveries.at(-1)?.money, "retry rehydrates the original admitted authority").toBe(123);
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "materialApplied")).toBe(true);
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "presentationReady")).toBe(true);
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "continuationReady")).toBe(true);
+      expect(guestStream.debugAuthorityState().terminal, "a valid applied commit never enters fatal recovery").toBe(
+        false,
+      );
+
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
     it("fails both peers closed when continuation evidence skips mandatory stages", async () => {
       const { host, guest } = createLoopbackPair();
       const authorityContext = () => ({ epoch: 7, wave: 1, turn: 1 });

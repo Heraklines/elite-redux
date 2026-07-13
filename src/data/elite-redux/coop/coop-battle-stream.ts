@@ -416,6 +416,7 @@ interface LiveTurnBuffer {
 interface SeenAuthority<T> {
   revision: number;
   canonical: string;
+  /** Private immutable ledger copy. Never hand this reference to an engine/renderer consumer. */
   value: T;
 }
 
@@ -470,6 +471,28 @@ function classifyAckProgress<T>(
     return canonical === prior.canonical ? "duplicate" : "invalid";
   }
   return AUTHORITY_ACK_STAGE_ORDER[stage] === AUTHORITY_ACK_STAGE_ORDER[prior.stage] + 1 ? "advance" : "invalid";
+}
+
+/** Rehydrate a disposable JSON wire value from the immutable canonical admission bytes. */
+function copyAdmittedAuthority<T>(seen: SeenAuthority<T>): T {
+  return structuredClone(seen.value);
+}
+
+/**
+ * ACKs commit the immutable wire identity, not the renderer's working copy. Engine appliers are allowed to
+ * normalize/mutate nested arrays while materializing them; those mutations must never turn a valid admitted
+ * commit into a fatal "foreign authority" result after application.
+ */
+function sameAuthorityAckIdentity(
+  admitted: CoopTurnResolution | CoopCheckpointEnvelope,
+  applied: CoopTurnResolution | CoopCheckpointEnvelope,
+): boolean {
+  return (
+    authorityKey(admitted) === authorityKey(applied)
+    && admitted.checkpoint.tick === applied.checkpoint.tick
+    && admitted.authoritativeState.tick === applied.authoritativeState.tick
+    && admitted.checksum === applied.checksum
+  );
 }
 
 /** Keep every in-flight staged transaction plus a bounded tail of completed duplicate proofs. */
@@ -923,7 +946,10 @@ export class CoopBattleStreamer {
         return highest.canonical === canonical ? { kind: "identical", seen: highest } : { kind: "conflict" };
       }
     }
-    const seen = { revision: value.revision, canonical, value };
+    // Keep the ledger structurally independent from every object handed to engine/render consumers. Several
+    // production appliers legitimately normalize their input in place; retaining that same reference made the
+    // later staged ACK compare a post-apply object against pre-apply bytes and terminate a converged peer.
+    const seen = { revision: value.revision, canonical, value: structuredClone(value) };
     // These maps are the immutable admission ledger for this stream lifetime, not an inbox cache. They
     // deliberately survive handoff/application/ACK and are cleared only by dispose or a shared terminal.
     // Bounding them like a delivery buffer would allow a long campaign to forget an old immutable address
@@ -1669,7 +1695,7 @@ export class CoopBattleStreamer {
     if (
       !isAuthorityAckStage(stage)
       || seen == null
-      || seen.canonical !== canonicalize(resolution)
+      || !sameAuthorityAckIdentity(seen.value, resolution)
       || (superseding != null
         && (superseding.reason !== "replacement"
           || superseding.epoch !== resolution.epoch
@@ -1749,7 +1775,12 @@ export class CoopBattleStreamer {
     };
     const key = authorityKey(envelope);
     const seen = this.seenReplacementAuthority.get(key);
-    if (!isAuthorityAckStage(stage) || seen == null || seen.canonical !== canonicalize(envelope)) {
+    if (
+      !isAuthorityAckStage(stage)
+      || envelope.reason !== "replacement"
+      || seen == null
+      || !sameAuthorityAckIdentity(seen.value, envelope)
+    ) {
       this.failLocalAckProgression(
         "replacement",
         envelope,
@@ -3223,7 +3254,7 @@ export class CoopBattleStreamer {
             );
             for (const handler of [...this.turnCommitHandlers]) {
               try {
-                handler(admission.seen.value);
+                handler(copyAdmittedAuthority(admission.seen));
               } catch (error) {
                 coopWarn("stream", `turn retry observer threw turn=${msg.turn} (isolated)`, error);
               }
@@ -3374,7 +3405,7 @@ export class CoopBattleStreamer {
             return;
           }
           if (this.replacementRedeliveryRequests.delete(exactKey)) {
-            const retained = admission.seen.value;
+            const retained = copyAdmittedAuthority(admission.seen);
             coopLog(
               "checkpoint",
               `guest REDELIVER explicitly retried replacement e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
