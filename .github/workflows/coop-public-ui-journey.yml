@@ -194,6 +194,21 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: node test/browser/coop-public-ui/run.mjs
 
+      - name: Upload compact public-UI diagnosis first
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-primary-compact-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            dev-logs/coop-public-ui/**/summary.json
+            dev-logs/coop-public-ui/**/*.jsonl
+            dev-logs/coop-public-ui/**/*.png
+            dev-logs/coop-public-ui/**/*.dom.json
+            dev-logs/coop-public-ui/**/*.cookies.json
+          compression-level: 9
+          retention-days: 14
+          if-no-files-found: warn
+
       - name: Upload full public-UI evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -256,6 +271,21 @@ jobs:
           COOP_UI_GUEST_PASSWORD: ${{ secrets.COOP_UI_ALT_GUEST_PASSWORD }}
           NODE_OPTIONS: --max-old-space-size=4096
         run: node test/browser/coop-public-ui/run.mjs
+
+      - name: Upload compact reverse diagnosis first
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-reverse-compact-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            dev-logs/coop-public-ui/**/summary.json
+            dev-logs/coop-public-ui/**/*.jsonl
+            dev-logs/coop-public-ui/**/*.png
+            dev-logs/coop-public-ui/**/*.dom.json
+            dev-logs/coop-public-ui/**/*.cookies.json
+          compression-level: 9
+          retention-days: 14
+          if-no-files-found: warn
 
       - name: Upload full reverse public-UI evidence
         if: always()
