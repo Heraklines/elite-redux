@@ -6,7 +6,7 @@
 
 import { readFile } from "node:fs/promises";
 
-const files = ["public-ui-harness.mjs", "journeys.mjs", "run.mjs"];
+const files = ["public-ui-harness.mjs", "journeys.mjs", "run.mjs", "deployed-surface.mjs"];
 const forbidden = [
   /(?:^|["'])\.\.\/\.\.\/\.\.\/src\//mu,
   /applyResync/u,
@@ -35,11 +35,15 @@ for (const file of files) {
 }
 
 const harness = sources.get("public-ui-harness.mjs");
+const run = sources.get("run.mjs");
 const evaluateCalls = harness?.match(/page\.evaluate\(/gu)?.length ?? 0;
 if (evaluateCalls !== 1 || !harness?.includes("document.activeElement.blur()")) {
   failures.push(
     "public-ui-harness.mjs: page.evaluate must remain the single DOM-focus blur operation; do not inspect game state",
   );
+}
+if (!run?.includes("captureDeployedSurface(config)") || !run.includes("assertStableDeployedSurface")) {
+  failures.push("run.mjs: deployed staging surface must be sealed and compared before/after every journey");
 }
 
 if (failures.length > 0) {

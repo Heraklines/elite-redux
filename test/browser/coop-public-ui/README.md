@@ -7,7 +7,10 @@ resyncs. `check-public-boundary.mjs` protects that boundary.
 
 The harness is deliberately separate from the engine and WebRTC gates. It is prework for the audit's first
 human-equivalent checkpoint and can be run against a built staging deployment without loading Phaser or
-Vitest on a developer workstation.
+Vitest on a developer workstation. Before opening either browser it verifies that every live Cloudflare
+asset route points to one immutable `er-assets` SHA and that staging serves the inert cache-buster manifest.
+It hashes that deployed HTML, manifest, and redirect surface again after the journey and fails if a deploy or
+asset-pin change occurred while the two clients were running.
 
 ## Journeys
 
@@ -67,11 +70,13 @@ Every run writes `dev-logs/coop-public-ui/<timestamp>-<journey>/` with:
 - per-checkpoint PNG screenshots;
 - sanitized DOM inventories and cookie metadata (never cookie values or passwords);
 - one or more Chrome performance traces when enabled; and
-- `summary.json` with duration, journey, requester direction, replacement count, and failure stack.
+- `summary.json` with duration, journey, requester direction, replacement count, the pre/post deployed-surface
+  hashes and immutable asset SHA, and any journey or surface-verification failure stack.
 
 The run fails on timeouts, page exceptions, unexpected console errors, non-aborted request failures,
-incorrect lobby roles, missing command/reward/replacement surfaces, or any stale reconnect observation. A
-screenshot alone is never treated as proof of progression.
+incorrect lobby roles, missing command/reward/replacement surfaces, a mixed/mutable asset redirect surface,
+a non-inert cache-buster manifest, a staging deployment change during the run, or any stale reconnect
+observation. A screenshot alone is never treated as proof of progression.
 
 Before changing the driver, run the cheap boundary check:
 
