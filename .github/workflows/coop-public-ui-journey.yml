@@ -90,8 +90,36 @@ jobs:
 
       - uses: ./.github/actions/setup-deps
 
-      - name: Run changed-file type and format gate externally
-        run: node scripts/run-coop-static-gate.mjs
+      - name: Run owned-file type and format gate externally
+        shell: bash
+        run: |
+          set +e
+          pnpm typecheck > coop-public-ui-typecheck.log 2>&1
+          status=$?
+          set -e
+          diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          owned="$(grep -E '^scripts/coop-browser-entry\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          if [ -n "$owned" ]; then
+            printf '%s\n' "$owned"
+            exit 1
+          fi
+          if [ "$status" -ne 0 ] && [ "$diagnostics" -eq 0 ]; then
+            cat coop-public-ui-typecheck.log
+            echo "Repository typecheck failed without parseable diagnostics"
+            exit 1
+          fi
+          echo "Public-UI TypeScript slice is clean; repository baseline reported $diagnostics unrelated diagnostics"
+          pnpm exec biome check \
+            .github/workflows/coop-public-ui-journey.yml \
+            scripts/coop-browser-entry.ts \
+            scripts/prepare-coop-browser-artifact.mjs \
+            test/browser/coop-public-ui/check-public-boundary.mjs \
+            test/browser/coop-public-ui/config.mjs \
+            test/browser/coop-public-ui/evidence.mjs \
+            test/browser/coop-public-ui/journeys.mjs \
+            test/browser/coop-public-ui/preview-server.mjs \
+            test/browser/coop-public-ui/public-ui-harness.mjs \
+            test/browser/coop-public-ui/run.mjs
 
       - name: Enforce public-driver boundary
         run: node test/browser/coop-public-ui/check-public-boundary.mjs
