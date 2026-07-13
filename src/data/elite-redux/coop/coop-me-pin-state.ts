@@ -106,10 +106,19 @@ function isValidPresentation(value: unknown): value is CoopMePresentation {
     return false;
   }
   return prompt.questions.every(question => {
+    if (!isPlainObject(question)) {
+      return false;
+    }
+    const kind = question.kind;
+    const answerIdAllowsSentinel = kind === "cipher" || kind === "braille" || kind === "item";
     if (
-      !isPlainObject(question)
-      || typeof question.kind !== "string"
-      || !isSafeNonNegative(question.answerId)
+      (kind !== "silhouette"
+        && kind !== "dex"
+        && kind !== "footprint"
+        && kind !== "cipher"
+        && kind !== "braille"
+        && kind !== "item")
+      || (!isSafeNonNegative(question.answerId) && !(answerIdAllowsSentinel && question.answerId === -1))
       || !Array.isArray(question.options)
       || !question.options.every(isSafeNonNegative)
       || typeof question.prompt !== "string"
