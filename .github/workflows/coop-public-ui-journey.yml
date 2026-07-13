@@ -1,6 +1,12 @@
 name: Co-op Public UI Journey
 
 on:
+  push:
+    branches:
+      - "ci/coop/**"
+    paths:
+      - ".github/workflows/coop-public-ui-journey.yml"
+      - "test/browser/coop-public-ui/**"
   workflow_dispatch:
     inputs:
       journey:
@@ -45,12 +51,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: coop-public-ui-${{ inputs.journey }}
+  group: coop-public-ui-${{ github.ref }}-${{ inputs.journey || 'surface-probe' }}
   cancel-in-progress: false
 
 jobs:
   journey:
-    name: ${{ inputs.journey }} through public UI
+    name: ${{ inputs.journey || 'surface-probe' }} through public UI
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -67,7 +73,14 @@ jobs:
       - name: Enforce public browser boundary
         run: node test/browser/coop-public-ui/check-public-boundary.mjs
 
+      - name: Probe sealed staging surface in two isolated browsers
+        if: github.event_name == 'push'
+        env:
+          COOP_UI_BASE_URL: ${{ vars.COOP_UI_STAGING_URL || 'https://elite-redux-staging.pages.dev' }}
+        run: node test/browser/coop-public-ui/deployed-surface-probe.mjs
+
       - name: Drive two built clients
+        if: github.event_name == 'workflow_dispatch'
         env:
           # A dispatcher cannot redirect credential entry to an arbitrary origin.
           # Override only through the maintainer-owned repository variable.
@@ -88,7 +101,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coop-public-ui-${{ inputs.journey }}-${{ github.run_attempt }}
+          name: coop-public-ui-${{ inputs.journey || 'surface-probe' }}-${{ github.run_attempt }}
           path: dev-logs/coop-public-ui/**
           retention-days: 14
           if-no-files-found: warn
