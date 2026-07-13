@@ -154,6 +154,7 @@ async function startGuestWithPendingWin(): Promise<CoopRuntime> {
           eggLapse: false,
           meBoundary: "none",
           victoryKind: "wild",
+          settledStateTick: authoritativeState.tick,
         },
       },
       authoritativeState,

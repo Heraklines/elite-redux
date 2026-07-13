@@ -37,6 +37,7 @@ import {
   drainLoopback,
   emptyGhostSnapshot,
   installDuoLogCapture,
+  installHeadlessCoopSemanticProjectionOracle,
   mirrorHostBattleToGuest,
   withClient,
 } from "#test/tools/coop-duo-harness";
@@ -55,6 +56,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
   });
 
   beforeEach(() => {
+    installHeadlessCoopSemanticProjectionOracle();
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`spike-${Date.now()}`);
     game.override

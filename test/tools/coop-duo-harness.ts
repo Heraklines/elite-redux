@@ -84,6 +84,10 @@ import {
   setCoopBiomeInteractionStart,
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import {
+  getActuallyFieldedCoopPokemon,
+  settleCoopFieldPresentation,
+} from "#data/elite-redux/coop/coop-field-presentation";
+import {
   captureCoopActiveMysteryControl,
   coopMeHandoffBattleStarted,
   coopMeHandoffBattleWaveValue,
@@ -91,6 +95,8 @@ import {
   restoreCoopMeHandoffBattleState,
   restoreCoopMeInteractionStartForHarness,
 } from "#data/elite-redux/coop/coop-me-pin-state";
+// biome-ignore lint/performance/noNamespaceImport: Vitest must spy on the live ESM export used by replay phases.
+import * as coopPresentation from "#data/elite-redux/coop/coop-presentation";
 import {
   type CoopBiomeTransitionTailPermit,
   restoreCoopBiomeTransitionTailPermit,
@@ -110,6 +116,7 @@ import {
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import {
   type CoopActiveMysteryEncounterSnapshotV1,
+  type CoopAuthoritativeBattleStateV1,
   type CoopTransport,
   createLoopbackPair,
   type SerializedCommand,
@@ -197,6 +204,7 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 import fs from "node:fs";
 import path from "node:path";
 import Phaser from "phaser";
+import { vi } from "vitest";
 
 /**
  * The PROCESS-GLOBAL mystery-encounter pins/control that are NOT carried on the `active` runtime and
@@ -1035,6 +1043,86 @@ export function stubBattleInfo(mon: Pokemon): void {
 }
 
 /**
+ * Install the production-semantics presentation oracle used by this in-process, headless two-engine
+ * harness. The duo harness deliberately constructs guest Pokemon without production atlas/sprite
+ * caches, so the browser-only pixel readiness checks in `settleCoopAuthoritativeProjection` cannot
+ * honestly pass here. We still require the complete semantic projection: every authoritative,
+ * presented, living seat must resolve by stable Pokemon id, occupy the exact Phaser field side, be
+ * visible, and expose its battle-info surface; every stale occupant must be absent.
+ *
+ * This is intentionally a Vitest spy installed only by the headless harness. Built-client browser
+ * journeys do not import this file and therefore continue to require real assets, sprites, animations,
+ * and UI bars through the unmodified production implementation.
+ */
+export function installHeadlessCoopSemanticProjectionOracle(): void {
+  const semanticProjection = async (state: CoopAuthoritativeBattleStateV1): Promise<boolean> => {
+    const wanted: {
+      player: { pokemon: Pokemon; slot: number }[];
+      enemy: { pokemon: Pokemon; slot: number }[];
+    } = { player: [], enemy: [] };
+    const arrangement = globalScene.currentBattle?.arrangement;
+
+    for (const seat of state.field) {
+      const party = seat.side === "player" ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
+      const pokemon = party.find(candidate => candidate.id === seat.pokemonId);
+      if (pokemon == null) {
+        return false;
+      }
+      const serializedParty = seat.side === "player" ? state.playerParty : state.enemyParty;
+      const serialized = serializedParty.find(candidate => candidate.id === seat.pokemonId);
+      const serializedHp = typeof serialized?.hp === "number" ? serialized.hp : pokemon.hp;
+      if (!seat.presented || serializedHp <= 0) {
+        continue;
+      }
+      const slot = seat.side === "player" ? seat.bi : Math.max(0, seat.bi - (arrangement?.enemyOffset ?? 1));
+      wanted[seat.side].push({ pokemon, slot });
+    }
+
+    settleCoopFieldPresentation({
+      side: "player",
+      seats: wanted.player,
+      capacity: arrangement?.playerCapacity ?? 1,
+      boundary: "turn-finalize",
+      desired: "visible",
+      hideStale: true,
+    });
+    settleCoopFieldPresentation({
+      side: "enemy",
+      seats: wanted.enemy,
+      capacity: arrangement?.enemyCapacity ?? 1,
+      boundary: "turn-finalize",
+      desired: "visible",
+      hideStale: true,
+    });
+
+    const expectedPlayerIds = new Set(wanted.player.map(({ pokemon }) => pokemon.id));
+    const expectedEnemyIds = new Set(wanted.enemy.map(({ pokemon }) => pokemon.id));
+    const actualPlayerIds = new Set(getActuallyFieldedCoopPokemon("player").map(pokemon => pokemon.id));
+    const actualEnemyIds = new Set(getActuallyFieldedCoopPokemon("enemy").map(pokemon => pokemon.id));
+    const exactIds =
+      expectedPlayerIds.size === actualPlayerIds.size
+      && expectedEnemyIds.size === actualEnemyIds.size
+      && [...expectedPlayerIds].every(id => actualPlayerIds.has(id))
+      && [...expectedEnemyIds].every(id => actualEnemyIds.has(id));
+    if (!exactIds) {
+      return false;
+    }
+
+    return [...wanted.player, ...wanted.enemy].every(({ pokemon }) => {
+      const info = pokemon.getBattleInfo();
+      return pokemon.isOnField() && pokemon.visible && pokemon.alpha > 0 && info?.visible === true && info.alpha > 0;
+    });
+  };
+
+  const installed = coopPresentation.settleCoopAuthoritativeProjection;
+  if (vi.isMockFunction(installed)) {
+    installed.mockImplementation(semanticProjection);
+  } else {
+    vi.spyOn(coopPresentation, "settleCoopAuthoritativeProjection").mockImplementation(semanticProjection);
+  }
+}
+
+/**
  * Build a CoopRuntime for one loopback endpoint (host or guest) via the production wiring, WITHOUT
  * tearing down any other live session. Uses {@linkcode assembleCoopRuntime} (the additive seam) so
  * standing up the SECOND client does NOT close the FIRST's loopback transport (connectCoopSession's
@@ -1173,6 +1261,7 @@ export async function buildDuo(
   setCoopRuntimeFn: (r: CoopRuntime) => void,
   toCoopGameMode: (scene: BattleScene) => void,
 ): Promise<DuoRig> {
+  installHeadlessCoopSemanticProjectionOracle();
   const hostScene = hostGame.scene;
   // Headless best-effort UI: neutralize the host's achievement candy-bar UI (see neutralizeCoopCandyBar)
   // so a won wave's REALISTIC_FLASH candy grant on an evolved starter can't throw an unhandled rejection.
@@ -1924,6 +2013,7 @@ export async function buildDuoForMe(
   setCoopRuntimeFn: (r: CoopRuntime) => void,
   toCoopGameMode: (scene: BattleScene) => void,
 ): Promise<DuoRig> {
+  installHeadlessCoopSemanticProjectionOracle();
   const hostScene = hostGame.scene;
   // Headless best-effort UI: neutralize the host's achievement candy-bar UI (see neutralizeCoopCandyBar)
   // so a won wave's REALISTIC_FLASH candy grant on an evolved starter can't throw an unhandled rejection.

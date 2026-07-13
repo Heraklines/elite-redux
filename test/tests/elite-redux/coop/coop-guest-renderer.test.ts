@@ -165,6 +165,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
             eggLapse: false,
             meBoundary: "none",
             ...(outcome === "win" || outcome === "capture" ? { victoryKind: "wild" as const } : {}),
+            settledStateTick: authoritativeState.tick,
           },
         },
         authoritativeState,
