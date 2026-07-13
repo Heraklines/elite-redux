@@ -402,11 +402,13 @@ let lastSemanticProbeAt = 0;
 
 function observeSemanticSurface(): void {
   try {
+    // Runtime is OPTIONAL: the mirror describes any interactive surface, co-op OR solo, so the
+    // state-aware navigation primitive is provable against a single-context classic run.
     const runtime = getCoopRuntime();
     const battle = globalScene?.currentBattle;
     const phase = globalScene?.phaseManager?.getCurrentPhase()?.phaseName;
     const ui = globalScene?.ui;
-    if (runtime == null || battle == null || phase == null || ui == null) {
+    if (battle == null || phase == null || ui == null) {
       return;
     }
     const handler = ui.getHandler();
@@ -418,28 +420,44 @@ function observeSemanticSurface(): void {
     if (semantic == null) {
       return;
     }
-    const membership = runtime.membership.snapshot();
-    if (membership.state !== "active") {
-      return;
+
+    let coop = false;
+    let localSeat: number | null = null;
+    let localRole: string | null = null;
+    let ownerSeat: number | null = null;
+    let epoch = 0;
+    let membershipRevision: number | null = null;
+    let connectionGeneration: number | null = null;
+    let seatsWithInput: number[] = [0];
+    if (runtime != null) {
+      const membership = runtime.membership.snapshot();
+      if (membership.state !== "active") {
+        return;
+      }
+      coop = true;
+      localSeat = runtime.controller.seat;
+      localRole = runtime.controller.role;
+      epoch = runtime.controller.sessionEpoch;
+      membershipRevision = membership.revision;
+      connectionGeneration = membership.connectionGeneration;
+      const partnerSeat = localSeat === 0 ? 1 : 0;
+      let isLocalOwner: boolean | null = null;
+      try {
+        isLocalOwner = runtime.controller.isLocalOwnerAtCounter(runtime.controller.interactionCounter());
+      } catch {
+        isLocalOwner = null;
+      }
+      ownerSeat =
+        semantic.ownerModel === "interaction" && isLocalOwner != null ? (isLocalOwner ? localSeat : partnerSeat) : null;
+      // This client's view of who may input: a local surface = this seat drives its own; an
+      // interaction surface = only the owner. A driver unions both clients' markers.
+      seatsWithInput = semantic.ownerModel === "local" ? [localSeat] : ownerSeat == null ? [] : [ownerSeat];
     }
-    const localSeat = runtime.controller.seat;
-    const partnerSeat = localSeat === 0 ? 1 : 0;
-    let isLocalOwner: boolean | null = null;
-    try {
-      isLocalOwner = runtime.controller.isLocalOwnerAtCounter(runtime.controller.interactionCounter());
-    } catch {
-      isLocalOwner = null;
-    }
-    const ownerSeat =
-      semantic.ownerModel === "interaction" && isLocalOwner != null ? (isLocalOwner ? localSeat : partnerSeat) : null;
-    // This client's view of who may input: a local surface = this seat drives its own; an
-    // interaction surface = only the owner. A driver unions both clients' markers.
-    const seatsWithInput = semantic.ownerModel === "local" ? [localSeat] : ownerSeat == null ? [] : [ownerSeat];
+
     const selection = readSelection(handler, uiMode);
     const awaitingRaw = (handler as unknown as { awaitingActionInput?: unknown }).awaitingActionInput;
     const awaitingActionInput = typeof awaitingRaw === "boolean" ? awaitingRaw : null;
 
-    const epoch = runtime.controller.sessionEpoch;
     const probeKey = [
       semantic.surfaceId,
       uiMode,
@@ -460,11 +478,12 @@ function observeSemanticSurface(): void {
       surfaceId: semantic.surfaceId,
       operationClass: semantic.operationClass,
       ownerModel: semantic.ownerModel,
+      coop,
       address: { epoch, wave: battle.waveIndex, turn: battle.turn },
-      membershipRevision: membership.revision,
-      connectionGeneration: membership.connectionGeneration,
+      membershipRevision,
+      connectionGeneration,
       localSeat,
-      localRole: runtime.controller.role,
+      localRole,
       ownerSeat,
       seatsWithInput,
       selectedOptionId: selection.selectedOptionId,
