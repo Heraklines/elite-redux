@@ -854,8 +854,18 @@ describe("#810: resume offer/reply protocol + marker", () => {
     host.connect();
     guest.connect();
 
-    // Host releases BEFORE the guest arms: the release must buffer, not vanish (or the guest hangs).
+    // A new-run decision atomically supersedes an offer that beat the guest UI. The abandoned host waiter
+    // settles and arming the offer handler later must not resurrect that stale prompt.
+    const supersededOffer = host.offerResume(resumeCommitment(12));
     const committed = host.sendResumeStartNew();
+    let staleOffers = 0;
+    guest.armResumeOfferHandler(() => {
+      staleOffers++;
+    });
+    expect(staleOffers, "the superseded offer buffer was cleared by start-new").toBe(0);
+    await expect(supersededOffer, "the superseded host offer waiter was settled").resolves.toBe(false);
+
+    // Host releases BEFORE the guest arms: the release must buffer, not vanish (or the guest hangs).
     let released = 0;
     guest.armResumeStartNewHandler(() => {
       released++;
@@ -910,6 +920,8 @@ describe("#810: resume offer/reply protocol + marker", () => {
       b.peer = a;
       const host = new CoopSessionController(new WebRtcTransport("host", a), { username: "H" });
       const guest = new CoopSessionController(new WebRtcTransport("guest", b), { username: "G" });
+      host.connect();
+      guest.connect();
       guest.armResumeOfferHandler(() => {});
       const offered = host.offerResume(resumeCommitment(9));
       const committed = guest.replyResume(true);
@@ -972,6 +984,8 @@ describe("#810: resume offer/reply protocol + marker", () => {
     b.peer = a;
     const host = new CoopSessionController(new WebRtcTransport("host", a), { username: "H" });
     const guest = new CoopSessionController(new WebRtcTransport("guest", b), { username: "G" });
+    host.connect();
+    guest.connect();
     guest.armResumeOfferHandler(() => {});
     const acceptedByHost = host.offerResume(resumeCommitment(5));
     a.peer = null; // host receives the reply but its resumeAccepted cannot return to the guest.

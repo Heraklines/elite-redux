@@ -413,6 +413,8 @@ export class CoopSessionController {
   private activeResumeOfferId: string | null = null;
   /** Guest-side de-duplication of an offer re-announced after reconnect. */
   private deliveredResumeOfferId: string | null = null;
+  /** Bounded guest-side tombstones prevent delayed, already-settled offers from reopening the lobby UI. */
+  private readonly settledResumeOfferReplies = new Map<string, boolean>();
   private resumeDecisionSeq = 0;
 
   /** Both halves of the shared roster; local edits its own, partner's is mirrored. */
@@ -968,6 +970,11 @@ export class CoopSessionController {
     }
     if (!accept) {
       coopLog("launch", `SEND resumeReply id=${decisionId} accept=false (#810 durable)`);
+      this.rememberSettledResumeOfferReply(decisionId, false);
+      this.pendingResumeOfferCommitment = null;
+      this.activeResumeOfferId = null;
+      this.activeResumeOfferEpoch = 0;
+      this.activeResumeOfferCommitment = null;
       this.transport.send({ t: "resumeReply", decisionId, accept: false });
       return Promise.resolve(false);
     }
@@ -975,6 +982,7 @@ export class CoopSessionController {
       this.transport.send({ t: "resumeReply", decisionId, accept: true });
       return this.pendingResumeReply.promise;
     }
+    this.pendingResumeOfferCommitment = null;
     this.cancelPendingResumeReply(false);
     coopLog("launch", `SEND resumeReply id=${decisionId} accept=${accept} (#810 durable)`);
     let finish!: (committed: boolean) => void;
@@ -1044,8 +1052,9 @@ export class CoopSessionController {
       return Promise.resolve(false);
     }
     if (this.resumeApplyDeliveryWaiter?.decisionId === decisionId) {
+      const waiter = this.resumeApplyDeliveryWaiter;
       this.transport.send({ t: "resumeApplied", decisionId, success });
-      return this.resumeApplyDeliveryWaiter.promise;
+      return waiter.promise;
     }
     this.cancelResumeApplyDelivery(false);
     this.latestResumeApplyResult = { decisionId, success };
@@ -1093,8 +1102,9 @@ export class CoopSessionController {
       return Promise.resolve(true);
     }
     if (this.resumeReleaseAckWaiter?.decisionId === decisionId) {
+      const waiter = this.resumeReleaseAckWaiter;
       this.transport.send({ t: "resumeRelease", decisionId });
-      return this.resumeReleaseAckWaiter.promise;
+      return waiter.promise;
     }
     this.cancelResumeReleaseAck(false);
     this.latestResumeReleaseId = decisionId;
@@ -1307,6 +1317,7 @@ export class CoopSessionController {
       return Promise.resolve(true);
     }
     if (this.latestResumeDecision?.kind === "start-new" && this.resumeStartNewAckWaiter != null) {
+      const waiter = this.resumeStartNewAckWaiter;
       this.transport.send({
         t: "resumeStartNew",
         decisionId: this.latestResumeDecision.decisionId,
@@ -1314,8 +1325,11 @@ export class CoopSessionController {
         runId: this.latestResumeDecision.runId,
         checkpointRevision: this.latestResumeDecision.checkpointRevision,
       });
-      return this.resumeStartNewAckWaiter.promise;
+      return waiter.promise;
     }
+    // A fresh-run decision supersedes any still-open resume prompt. Settle the old host waiter now;
+    // otherwise it can outlive the atomic launch decision and later mutate the lobby from a stale reply.
+    this.cancelResumeOfferWait(false);
     this.mintFreshRunIdentity("start-new");
     this.beginNewOperationEpoch("start-new", false);
     this.prepareP33BindingForCurrentBoundary(true, "fresh");
@@ -2222,6 +2236,20 @@ export class CoopSessionController {
     this.activeResumeOfferEpoch = 0;
     this.activeResumeOfferCommitment = null;
     this.pendingResumeStartNewEpoch = 0;
+    this.settledResumeOfferReplies.clear();
+  }
+
+  /** Retain a small replay window without allowing untrusted decision ids to grow the session forever. */
+  private rememberSettledResumeOfferReply(decisionId: string, accept: boolean): void {
+    this.settledResumeOfferReplies.delete(decisionId);
+    this.settledResumeOfferReplies.set(decisionId, accept);
+    while (this.settledResumeOfferReplies.size > 32) {
+      const oldest = this.settledResumeOfferReplies.keys().next().value;
+      if (oldest === undefined) {
+        break;
+      }
+      this.settledResumeOfferReplies.delete(oldest);
+    }
   }
 
   private resumeCommitmentMatchesCurrentSession(commitment: CoopResumeCommitment, requireRunIdentity = false): boolean {
@@ -2608,13 +2636,27 @@ export class CoopSessionController {
           || !Number.isSafeInteger(msg.epoch)
           || msg.epoch <= 0
           || msg.epoch !== this.sessionEpochValue
-          || (this.activeResumeOfferId != null
-            && this.activeResumeOfferEpoch === msg.epoch
-            && this.activeResumeOfferId !== msg.decisionId)
         ) {
           coopWarn(
             "launch",
             `DROP resumeOffer id=${msg.decisionId}: malformed/stale immutable commitment epoch=${msg.epoch} current=${this.sessionEpochValue}`,
+          );
+          break;
+        }
+        if (this.settledResumeOfferReplies.has(msg.decisionId)) {
+          const accept = this.settledResumeOfferReplies.get(msg.decisionId)!;
+          coopLog("launch", `RE-ACK settled resumeOffer id=${msg.decisionId} accept=${accept}`);
+          this.transport.send({ t: "resumeReply", decisionId: msg.decisionId, accept });
+          break;
+        }
+        if (
+          this.activeResumeOfferId != null
+          && this.activeResumeOfferEpoch === msg.epoch
+          && this.activeResumeOfferId !== msg.decisionId
+        ) {
+          coopWarn(
+            "launch",
+            `DROP competing resumeOffer id=${msg.decisionId} active=${this.activeResumeOfferId} epoch=${msg.epoch}`,
           );
           break;
         }
@@ -2760,6 +2802,7 @@ export class CoopSessionController {
           epoch: msg.epoch,
         });
         this.pendingResumeReply = null;
+        this.rememberSettledResumeOfferReply(msg.decisionId, true);
         pending.finish(true);
         break;
       }
@@ -2996,6 +3039,11 @@ export class CoopSessionController {
         this.sessionEpochValue = msg.epoch;
         this.prepareP33BindingForCurrentBoundary(false, "fresh");
         this.onEpochNegotiated?.(msg.epoch);
+        if (this.activeResumeOfferId != null) {
+          this.rememberSettledResumeOfferReply(this.activeResumeOfferId, false);
+        }
+        this.cancelPendingResumeReply(false);
+        this.pendingResumeOfferCommitment = null;
         this.activeResumeOfferId = null;
         this.activeResumeOfferEpoch = 0;
         this.activeResumeOfferCommitment = null;

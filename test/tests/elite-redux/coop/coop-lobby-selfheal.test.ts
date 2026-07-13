@@ -195,9 +195,13 @@ describe("co-op lobby self-healing handshake (#868)", () => {
     g.connect();
     await flush();
 
-    g.armResumeOfferHandler(() => {});
+    let surfacedOffers = 0;
+    g.armResumeOfferHandler(() => {
+      surfacedOffers++;
+    });
     const first = h.offerResume(resumeCommitment(10));
     await flush();
+    expect(surfacedOffers).toBe(1);
     const firstFrame = host.sent.find(
       (msg): msg is Extract<CoopMessage, { t: "resumeOffer" }> => msg.t === "resumeOffer" && msg.commitment.wave === 10,
     );
@@ -207,14 +211,17 @@ describe("co-op lobby self-healing handshake (#868)", () => {
 
     const second = h.offerResume(resumeCommitment(20));
     await flush();
+    expect(surfacedOffers, "a settled decline allows the next host offer in the same lobby epoch").toBe(2);
     let secondSettled = false;
     void second.then(() => {
       secondSettled = true;
     });
 
     host.deliver({ t: "resumeReply", decisionId: firstFrame!.decisionId, accept: true });
+    guest.deliver(firstFrame!);
     await flush();
     expect(secondSettled, "stale reply was rejected by transaction id").toBe(false);
+    expect(surfacedOffers, "a delayed settled offer cannot replace the active offer").toBe(2);
 
     const committed = g.replyResume(true);
     await expect(second).resolves.toBe(true);
@@ -252,9 +259,12 @@ describe("co-op lobby self-healing handshake (#868)", () => {
     expect(firstStart).toBeDefined();
     const activeEpoch = g.sessionEpoch;
     const activeRun = g.runId;
+    const offersBeforeDelayedReplay = offersSurfaced;
 
     guest.deliver(delayedOffer!);
-    expect(offersSurfaced, "old proposal is not surfaced after the epoch advanced").toBe(0);
+    expect(offersSurfaced, "old proposal is not surfaced again after the epoch advanced").toBe(
+      offersBeforeDelayedReplay,
+    );
     expect(g.sessionEpoch).toBe(activeEpoch);
     expect(g.runId).toBe(activeRun);
 
