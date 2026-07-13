@@ -1204,7 +1204,12 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       expect(opened, "equal-identical and lower revisions never reopen an applied surface").toBe(1);
       expect(acknowledgements, "equal-identical authority re-sends only final continuation evidence").toBe(4);
       expect(
-        guestStream.consumeAppliedOutOfBandCheckpoint(replacement),
+        guestStream.consumeAppliedOutOfBandCheckpoint({
+          epoch: replacement.epoch,
+          wave: replacement.wave,
+          turn: replacement.turn,
+          revision: replacement.revision - 1,
+        }),
         "idempotent/lower traffic cannot overwrite the applied immutable frame",
       ).toEqual(replacement);
 

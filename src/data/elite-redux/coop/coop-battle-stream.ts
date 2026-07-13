@@ -1236,7 +1236,13 @@ export class CoopBattleStreamer {
       : `Authority retention exceeded ${this.authorityRetentionLimit} unacknowledged commits.`;
     coopWarn("stream", `host retained authority terminal: ${reason}`);
     this.beginAuthorityTerminal({
-      ...address,
+      // `address` can be a retained turnResolution object at runtime. Copy only the authenticated
+      // address fields: spreading that carrier would also copy its `t`, allowing it to overwrite the
+      // fatal discriminator and silently retransmit gameplay after the terminal latch.
+      epoch: address.epoch,
+      wave: address.wave,
+      turn: address.turn,
+      revision: address.revision,
       boundary,
       reason,
       failureId: `retained:${boundary}:${key}`,
@@ -1996,8 +2002,11 @@ export class CoopBattleStreamer {
       return Promise.resolve(false);
     }
     const message: CoopAuthorityFailure = {
-      t: "authorityFailure",
       ...failure,
+      // Keep the wire discriminator after the defensive spread. TypeScript excludes `t` from
+      // `failure`, but retained wire objects are structurally compatible and may carry extra runtime
+      // properties; terminal framing must remain correct under that input too.
+      t: "authorityFailure",
       revision:
         Number.isSafeInteger(failure.revision) && (failure.revision as number) > 0
           ? (failure.revision as number)
@@ -3417,7 +3426,7 @@ export class CoopBattleStreamer {
             // requested retry observable yet impossible to apply.
             const key = pendingTurnKey(retained);
             this.pendingCheckpoints.delete(key);
-            rememberBounded(this.pendingCheckpoints, key, copyAdmittedAuthority(retained));
+            rememberBounded(this.pendingCheckpoints, key, structuredClone(retained));
             this.notifyCheckpointEnvelope(retained);
             this.checkpointWaiter?.(retained);
             this.checkpointHandler?.(retained.reason, retained.checkpoint);
