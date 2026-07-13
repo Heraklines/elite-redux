@@ -1602,6 +1602,12 @@ function applyJournaledBiomeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coo
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
   }
+  // Confirm the envelope WOULD apply (revision-wise) BEFORE installing engine state, so a stale/gapped frame
+  // never authors a state install (parity with the reward applier's inspect-before-install).
+  const inspected = g.inspectEnvelope(envelope);
+  if (inspected.kind !== "applied") {
+    return inspected.kind === "duplicate" ? "duplicate" : "rejected";
+  }
   // RETAINED-RESULT (design points 4, 5, 6): install the COMPLETE authoritative state ATOMICALLY through the
   // shared transactional applier BEFORE the live sink publishes the receipt the phase awaits - so the guest
   // adopts the host's exact post-mutation run-state (money/notoriety/overstay-anchor/map/party) rather than

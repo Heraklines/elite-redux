@@ -14,6 +14,7 @@ import { initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   commitAuthoritativeBiomeTransition,
+  commitBiomeAuthoritativeResult,
   coopAuthoritativeBiomeTransitionOperationId,
   resetCoopBiomeCommitWaitMs,
 } from "#data/elite-redux/coop/coop-biome-operation";
@@ -540,15 +541,20 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       expect(blockedHostEnd, "even the host cannot switch before a successful exact commit").not.toHaveBeenCalled();
       expect(rig.hostScene.arena.biomeId, "an uncommitted host switch cannot replace the arena").toBe(sourceBiomeId);
 
+      // P33 two-stage: the authority RESERVES the deterministic transition, then the retained result captures
+      // the complete state and ARMS the exact local permit before the switch tail (the successor of the
+      // former single-call commit-and-arm; production arms it in applyNextBiomeAndEnd before the switch unshift).
+      const reservedTransition = commitAuthoritativeBiomeTransition({
+        sourceWave: 10,
+        sourceBiomeId,
+        destinationBiomeId: BiomeId.VOLCANO,
+        turn: 0,
+        localRole: "host",
+      });
+      expect(reservedTransition, "the sole authority reserves the exact deterministic transition").not.toBeNull();
       expect(
-        commitAuthoritativeBiomeTransition({
-          sourceWave: 10,
-          sourceBiomeId,
-          destinationBiomeId: BiomeId.VOLCANO,
-          turn: 0,
-          localRole: "host",
-        }),
-        "the sole authority commits and arms the exact local permit before constructing the switch tail",
+        commitBiomeAuthoritativeResult(reservedTransition!.operationId),
+        "the retained result arms the exact local permit before constructing the switch tail",
       ).not.toBeNull();
       const committedHostSwitch = liveSwitch(BiomeId.VOLCANO);
       const committedHostEnd = vi.spyOn(committedHostSwitch, "end").mockImplementation(() => {});
@@ -566,15 +572,16 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     await withClient(rig.hostCtx, () => {
       rig.hostScene.currentBattle.waveIndex = 10;
       const sourceBiomeId = rig.hostScene.arena.biomeId;
-      expect(
-        commitAuthoritativeBiomeTransition({
-          sourceWave: 10,
-          sourceBiomeId,
-          destinationBiomeId: BiomeId.VOLCANO,
-          turn: 0,
-          localRole: "host",
-        }),
-      ).not.toBeNull();
+      // P33 two-stage: reserve then retain the complete result (which arms the exact local permit).
+      const reservedTransition = commitAuthoritativeBiomeTransition({
+        sourceWave: 10,
+        sourceBiomeId,
+        destinationBiomeId: BiomeId.VOLCANO,
+        turn: 0,
+        localRole: "host",
+      });
+      expect(reservedTransition).not.toBeNull();
+      expect(commitBiomeAuthoritativeResult(reservedTransition!.operationId)).not.toBeNull();
 
       type Plan = {
         readonly nodes: readonly ErRouteNode[];

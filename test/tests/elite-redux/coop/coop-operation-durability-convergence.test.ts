@@ -33,10 +33,12 @@
 
 import {
   adoptBiomeWatcherChoice,
+  commitBiomeAuthoritativeResult,
   commitBiomeOwnerIntent,
   preflightCoopBiomeJournalMaterialization,
   resetCoopBiomeOperationFlag,
   resetCoopBiomeOperationState,
+  setCoopBiomeAuthorityStateHooksForTest,
   setCoopBiomeOperationEnabled,
 } from "#data/elite-redux/coop/coop-biome-operation";
 import { CoopDurabilityManager, setCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
@@ -55,7 +57,13 @@ import {
   getCoopBiomeTransitionTailPermit,
 } from "#data/elite-redux/coop/coop-renderer-gate";
 import { COOP_BIOME_PICK_SEQ_BASE, COOP_CROSSROADS_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
-import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopConnectionState,
+  CoopMessage,
+  CoopRole,
+  CoopTransport,
+} from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -134,12 +142,48 @@ function assertNoSelfHeal(...gates: ChannelGate[]): void {
   }
 }
 
+/**
+ * P33: a COMPLETE post-mutation authoritative state (non-empty player party, real tick, exact boundary
+ * wave/turn) so the retained-result commit journals a real envelope and the guest applier accepts it. Engine
+ * -free: the capture/apply seam is a plain-state model via setCoopBiomeAuthorityStateHooksForTest.
+ */
+let biomeStateTick = 0;
+function completeBiomeState(): CoopAuthoritativeBattleStateV1 {
+  return {
+    version: 1,
+    tick: ++biomeStateTick,
+    wave: 11,
+    turn: 0,
+    playerParty: [{ id: 1, marker: "biome" }],
+    enemyParty: [],
+    field: [],
+    weather: 0,
+    weatherTurnsLeft: 0,
+    terrain: 0,
+    terrainTurnsLeft: 0,
+    arenaTags: [],
+    money: 0,
+    pokeballCounts: [],
+    playerModifiers: [],
+    enemyModifiers: [],
+  } as CoopAuthoritativeBattleStateV1;
+}
+
 describe("Wave-2e operation<->durability convergence: a cut committed op is repaired by the journal, not a self-heal", () => {
   beforeEach(() => {
     setCoopDurabilityEnabled(true);
     setCoopBiomeOperationEnabled(true);
     resetCoopBiomeOperationState();
     resetCoopOperationJournalLog();
+    biomeStateTick = 0;
+    // P33 retained-result: the biome commit is now two-stage (reserve -> commitBiomeAuthoritativeResult). The
+    // capture/apply seam is a plain-state model so this engine-free proof journals a COMPLETE post-mutation
+    // state and the guest applier installs it (never the historical empty placeholder).
+    setCoopBiomeAuthorityStateHooksForTest({
+      capture: () => completeBiomeState(),
+      apply: () => true,
+      reapply: () => true,
+    });
     // W2e-R: register a recording LIVE-MUTATION sink so the convergence proof asserts LIVE STATE (the op
     // reached the mutation seam), not just that the sidecar journal history grew (the reviewer's core point).
     // A real materializer pushes SwitchBiomePhase on the guest (the parked keystone); the mock returns true.
@@ -149,6 +193,7 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
 
   afterEach(() => {
     setCoopOperationDurability(null);
+    setCoopBiomeAuthorityStateHooksForTest(null);
     registerCoopOperationLiveSink("op:biome", null);
     resetCoopOperationJournalLog();
     resetCoopBiomeOperationState();
@@ -156,9 +201,13 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
     setCoopDurabilityEnabled(true);
   });
 
-  /** Commit a HOST-OWNED biome pick (even pin -> host seat) through the real owner seam; it journals. */
+  /**
+   * Commit a HOST-OWNED biome pick (even pin -> host seat) through the real two-stage owner seam: RESERVE the
+   * typed intent, then retain the COMPLETE post-mutation result (which journals + arms the tail). Mirrors the
+   * production terminal (coopRelayOwnerBiome -> applyNextBiomeAndEnd -> commitBiomeAuthoritativeResult).
+   */
   function commitHostOwnedBiome(pinned: number, biomeId: number): void {
-    commitBiomeOwnerIntent({
+    const reserved = commitBiomeOwnerIntent({
       kind: "BIOME_PICK",
       seq: COOP_BIOME_PICK_SEQ_BASE + pinned,
       pinned,
@@ -172,6 +221,9 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
       allowedRoutes: [biomeId],
       deterministicDestination: null,
     });
+    if (reserved != null) {
+      commitBiomeAuthoritativeResult(reserved.operationId);
+    }
   }
 
   it("host local-tail reservation precedes journal publish and re-ACK preserves the original revision", () => {
@@ -227,7 +279,9 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
       deterministicDestination: null,
       armLocalTail: true,
     });
-    expect(first?.revision).toBe(1);
+    // P33 two-stage: reserve, then retain the complete result (which journals + arms the tail at revision 1).
+    const firstResult = first == null ? null : commitBiomeAuthoritativeResult(first.operationId);
+    expect(firstResult?.revision).toBe(1);
     const later = commitBiomeOwnerIntent({
       kind: "CROSSROADS_PICK",
       seq: COOP_CROSSROADS_SEQ_BASE + 4,
@@ -242,7 +296,8 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
       allowedRoutes: [],
       deterministicDestination: null,
     });
-    expect(later?.revision).toBe(2);
+    const laterResult = later == null ? null : commitBiomeAuthoritativeResult(later.operationId);
+    expect(laterResult?.revision).toBe(2);
     const reack = commitBiomeOwnerIntent({
       kind: "BIOME_PICK",
       seq: COOP_BIOME_PICK_SEQ_BASE + 2,
@@ -258,7 +313,9 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
       deterministicDestination: null,
       armLocalTail: true,
     });
-    expect(reack?.revision, "re-ACK uses op A's immutable revision, not the later global clock").toBe(1);
+    // The exact retry re-journals the ORIGINAL immutable result (no recapture): same revision + permit.
+    const reackResult = reack == null ? null : commitBiomeAuthoritativeResult(reack.operationId);
+    expect(reackResult?.revision, "re-ACK uses op A's immutable revision, not the later global clock").toBe(1);
     expect(getCoopBiomeTransitionTailPermit()?.revision).toBe(1);
     hostMgr.dispose();
   });
@@ -285,11 +342,17 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
       armLocalTail: true,
     };
 
-    expect(commitBiomeOwnerIntent(params), "the committed-but-unretained first attempt remains closed").toBeNull();
+    // P33 two-stage: the intent RESERVES privately (no journal), then the retained result attempts retention.
+    const reserved = commitBiomeOwnerIntent(params);
+    expect(reserved, "the intent reserves privately").not.toBeNull();
+    expect(
+      commitBiomeAuthoritativeResult(reserved!.operationId),
+      "the committed-but-unretained first attempt remains closed",
+    ).toBeNull();
     expect(getCoopBiomeTransitionTailPermit(), "no permit can outrun journal retention").toBeNull();
     expect(hostGate.sentTypes, "a failed retention attempt cannot publish an envelope").not.toContain("envelope");
 
-    const reack = commitBiomeOwnerIntent(params);
+    const reack = commitBiomeAuthoritativeResult(reserved!.operationId);
     expect(reack?.revision, "the exact retry re-journals the original immutable commit").toBe(1);
     expect(getCoopBiomeTransitionTailPermit()).toMatchObject({
       operationId: reack?.operationId,
@@ -447,12 +510,21 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
       allowedRoutes: [30],
       deterministicDestination: null,
     });
-    expect(decision.adopt, "the host committed + adopted the guest's relayed pick").toBe(true);
+    expect(decision, "the host RESERVED the guest's relayed pick").toMatchObject({
+      adopt: true,
+      requiresAuthorityCommit: true,
+    });
+    if (!decision.adopt || decision.operationId == null) {
+      throw new Error("the host did not reserve the guest's relayed pick");
+    }
+    // P33: RETAIN the COMPLETE result so the journal carries a complete envelope the cut guest recovers.
+    expect(commitBiomeAuthoritativeResult(decision.operationId), "the host retains the complete result").not.toBeNull();
     const replay = adoptBiomeWatcherChoice({
       kind: "BIOME_PICK",
       seq: COOP_BIOME_PICK_SEQ_BASE + 3,
       pinned: 3,
-      // A late/callback replay tries to carry a different value. The deterministic id reacks the original.
+      // A late/callback replay carrying a DIFFERENT value cannot overwrite the already-retained result; the
+      // committed value [30] stands (the two-stage successor of the reack-the-original guarantee).
       res: { choice: 0, data: [31] },
       localRole: "host",
       wave: 11,
@@ -462,7 +534,7 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
       allowedRoutes: [30],
       deterministicDestination: null,
     });
-    expect(replay).toEqual({ adopt: true, choice: 0, data: [30] });
+    expect(replay).toMatchObject({ adopt: false, reason: "host-intent-complete" });
     const invalidRoute = adoptBiomeWatcherChoice({
       kind: "BIOME_PICK",
       seq: COOP_BIOME_PICK_SEQ_BASE + 5,
@@ -476,7 +548,9 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
       allowedRoutes: [30],
       deterministicDestination: null,
     });
-    expect(invalidRoute).toMatchObject({ adopt: false, reason: "host-rejected" });
+    expect(invalidRoute, "an out-of-route pick is refused before reservation (fail closed)").toMatchObject({
+      adopt: false,
+    });
     const invalidCrossroads = adoptBiomeWatcherChoice({
       kind: "CROSSROADS_PICK",
       seq: COOP_CROSSROADS_SEQ_BASE + 7,
@@ -490,7 +564,9 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
       allowedRoutes: [],
       deterministicDestination: null,
     });
-    expect(invalidCrossroads).toMatchObject({ adopt: false, reason: "host-rejected" });
+    expect(invalidCrossroads, "an invalid crossroads option is refused before reservation").toMatchObject({
+      adopt: false,
+    });
     await flush();
     expect(appliedBiomes()).toEqual([]); // the guest has not received the committed envelope (channel dark)
 

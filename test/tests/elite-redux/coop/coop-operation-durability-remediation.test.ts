@@ -26,9 +26,11 @@
 // =============================================================================
 
 import {
+  commitBiomeAuthoritativeResult,
   commitBiomeOwnerIntent,
   resetCoopBiomeOperationFlag,
   resetCoopBiomeOperationState,
+  setCoopBiomeAuthorityStateHooksForTest,
   setCoopBiomeOperationEnabled,
   setCoopBiomeOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-biome-operation";
@@ -109,6 +111,29 @@ function sinkBiomes(): number[] {
   return getCoopOperationLiveSinkInvoked().map(e => (e.pendingOperation?.payload as CoopBiomePickPayload).biomeId);
 }
 
+/** P33: a COMPLETE post-mutation authoritative state so the retained-result commit journals a real envelope. */
+let biomeStateTick = 0;
+function completeBiomeState(): CoopAuthoritativeBattleStateV1 {
+  return {
+    version: 1,
+    tick: ++biomeStateTick,
+    wave: 11,
+    turn: 0,
+    playerParty: [{ id: 1, marker: "biome" }],
+    enemyParty: [],
+    field: [],
+    weather: 0,
+    weatherTurnsLeft: 0,
+    terrain: 0,
+    terrainTurnsLeft: 0,
+    arenaTags: [],
+    money: 0,
+    pokeballCounts: [],
+    playerModifiers: [],
+    enemyModifiers: [],
+  } as CoopAuthoritativeBattleStateV1;
+}
+
 describe("W2e-R P0 remediation: the operation<->durability seam mutates (or declines to ACK), never a phantom ACK", () => {
   beforeEach(() => {
     setCoopDurabilityEnabled(true);
@@ -117,6 +142,15 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     resetCoopBiomeOperationState();
     resetCoopRewardOperationState();
     resetCoopOperationJournalLog();
+    biomeStateTick = 0;
+    // P33 retained-result: the biome commit is two-stage; the capture/apply seam is a plain-state model so
+    // the journal carries a COMPLETE post-mutation state and the guest applier installs it (never the
+    // historical empty placeholder).
+    setCoopBiomeAuthorityStateHooksForTest({
+      capture: () => completeBiomeState(),
+      apply: () => true,
+      reapply: () => true,
+    });
     registerCoopOperationLiveSink("op:biome", null);
     registerCoopOperationLiveSink("op:reward", null);
     setCoopOperationDurability(null);
@@ -124,6 +158,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
 
   afterEach(() => {
     setCoopOperationDurability(null);
+    setCoopBiomeAuthorityStateHooksForTest(null);
     setCoopRewardAuthorityStateHooksForTest(null);
     registerCoopOperationLiveSink("op:biome", null);
     registerCoopOperationLiveSink("op:reward", null);
@@ -136,7 +171,8 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
   });
 
   function commitHostOwnedBiome(pinned: number, biomeId: number): void {
-    commitBiomeOwnerIntent({
+    // P33 two-stage: RESERVE the typed intent, then retain the COMPLETE post-mutation result (journals it).
+    const reserved = commitBiomeOwnerIntent({
       kind: "BIOME_PICK",
       seq: COOP_BIOME_PICK_SEQ_BASE + pinned,
       pinned,
@@ -150,6 +186,9 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
       allowedRoutes: [biomeId],
       deterministicDestination: null,
     });
+    if (reserved != null) {
+      commitBiomeAuthoritativeResult(reserved.operationId);
+    }
   }
 
   // ===========================================================================================
