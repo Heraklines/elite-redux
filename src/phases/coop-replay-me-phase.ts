@@ -703,6 +703,13 @@ export class CoopReplayMePhase extends Phase {
               action,
             })));
     this.liveTerminalArm = terminalArm;
+    if (isCoopMeOperationJournalActive()) {
+      // The complete terminal may already have reached this client while an embedded reward shop, quiz,
+      // or sub-picker still owned the executable surface. That delivery correctly remained unacknowledged.
+      // Reannounce the retained tail only after this exact replay receiver is live, so closing the nested
+      // surface does not depend on a periodic resend timer before DATA+destination can complete atomically.
+      this.boundRuntime?.durability?.reconnect();
+    }
     void Promise.race([outcomeArm, terminalArm]).then(winner => {
       if (raceDone) {
         return;
