@@ -93,7 +93,8 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
 
   it("streams the board present + relays the decision so the partner watcher adopts both (host-owned)", async () => {
     // Host-owned board (even counter): the host DRIVES its real board and streams the present + its
-    // resolved decision; the guest watcher adopts exactly what the host picked, no local re-derivation.
+    // resolved decision over the explicit rollback carrier. P33 journal materialization is proved below.
+    setCoopColosseumOperationEnabled(false);
     const { seq, guestRelay } = rig(4);
     expect(coopColosseumBoardOwnedLocally()).toBe(true); // even counter -> host owns
 
@@ -138,7 +139,7 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
     coopColosseumStreamBoard([...BOARD_LABELS]);
     const present = await guestRuntime.interactionRelay.awaitInteractionOutcome(coopColosseumSeq(4), 25);
 
-    expect(pair.faultsInjected(), "the raw coloBoard carrier was actually dropped").toBe(1);
+    expect(pair.faultsInjected(), "P33 emitted no redundant raw coloBoard carrier").toBe(0);
     expect(present?.k, "the committed board reached the real guest outcome FIFO").toBe("mePresent");
     if (present?.k === "mePresent") {
       expect(present.subPrompt).toEqual({ kind: "secondary", labels: BOARD_LABELS });
@@ -164,7 +165,7 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
     coopColosseumSendDecision(COLOSSEUM_CONTINUE);
     const decision = await guestRuntime.interactionRelay.awaitInteractionChoice(coopColosseumSeq(4), 25);
 
-    expect(pair.faultsInjected(), "the raw coloPick carrier was actually dropped").toBe(1);
+    expect(pair.faultsInjected(), "P33 emitted no redundant raw coloPick carrier").toBe(0);
     expect(decision?.choice, "the committed decision reached the real guest choice FIFO").toBe(COLOSSEUM_CONTINUE);
   });
 
@@ -183,8 +184,9 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
     const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
     const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
     setCoopMeInteractionStart(5);
-    pair.armNextDrop("interactionChoice", "guest");
     setCoopRuntime(hostRuntime);
+    expect(coopColosseumStreamBoard([...BOARD_LABELS]), "host committed the guest-owned board first").toBe(true);
+    pair.armNextDrop("interactionChoice", "guest");
     const hostDecision = coopColosseumAwaitDecision(100);
     setCoopRuntime(guestRuntime);
     coopColosseumSendDecision(COLOSSEUM_CONTINUE);
@@ -197,6 +199,7 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
   it("awaits the guest owner's relayed decision index (guest-owned)", async () => {
     // Guest-owned board (odd counter): the guest DRIVES its board and relays its picked index; the host
     // (sole engine) awaits it on the SAME board seq and resolves to exactly that index, then applies it.
+    setCoopColosseumOperationEnabled(false);
     const { seq, guestRelay } = rig(5);
     expect(coopColosseumBoardOwnedLocally()).toBe(false); // odd counter -> guest owns
 
@@ -247,6 +250,7 @@ describe("co-op Colosseum guest between-rounds ROUND LOOP (#829)", () => {
     // This suite isolates the round-loop protocol over a bare guest relay. Journal-authenticated terminal
     // integration is covered by the ME operation/recovery suites with a full guest durability runtime.
     setCoopMeOperationEnabled(false);
+    setCoopColosseumOperationEnabled(false);
   });
 
   afterEach(() => {
