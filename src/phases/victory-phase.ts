@@ -70,7 +70,7 @@ export class VictoryPhase extends PokemonPhase {
       // arrives on `waveEndState` and is applied in the guest's BattleEndPhase.
       coopLog(
         "progression",
-        `GUEST applyPartyExp SKIP wave=${globalScene.currentBattle.waveIndex} koMon=${this.getPokemon().name} (awaiting host waveEndState)`,
+        `GUEST applyPartyExp SKIP wave=${globalScene.currentBattle.waveIndex} koMon=${this.getPokemon()?.name ?? "already-materialized"} (awaiting host waveEndState)`,
       );
     } else {
       const expValue = this.getPokemon().getExpValue();

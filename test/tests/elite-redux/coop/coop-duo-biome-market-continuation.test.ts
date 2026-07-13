@@ -250,6 +250,7 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
 
         const ui = globalScene.ui as unknown as {
           setMode: (...args: unknown[]) => unknown;
+          setModeBoundedWhen: (...args: unknown[]) => Promise<"completed" | "forced" | "superseded">;
           setModeWithoutClear: (...args: unknown[]) => unknown;
           setOverlayMode: (...args: unknown[]) => unknown;
           showText: (...args: unknown[]) => unknown;
@@ -276,19 +277,18 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
           return Promise.resolve(true);
         };
         let drove = false;
-        ui.setMode = (...args: unknown[]): unknown => {
+        ui.setModeBoundedWhen = (...args: unknown[]): Promise<"completed"> => {
           if (args[0] === UiMode.BIOME_SHOP && !drove) {
             drove = true; // drive the buy-then-leave ONCE (the re-shown grid on re-open is inert here)
-            const cb = args[3] as (index: number) => boolean;
+            // Production opens the market through the bounded transition seam:
+            // mode, timeout, liveness fence, stock, biome, public selection callback, quantities.
+            const cb = args[5] as (index: number) => boolean;
             queueMicrotask(() => {
               cb(0); // buy the TM
               queueMicrotask(() => cb(-1)); // then leave
             });
           }
-          if (args[0] === UiMode.PARTY) {
-            (args[3] as (slotIndex: number, option: number) => void)(0, 0);
-          }
-          return Promise.resolve(true);
+          return Promise.resolve("completed");
         };
         ui.showText = (...args: unknown[]): unknown => {
           const cb = args[2];

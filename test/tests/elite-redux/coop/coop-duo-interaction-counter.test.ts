@@ -42,6 +42,7 @@ import { type ModifierSelectCallback, SelectModifierPhase } from "#phases/select
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   drainLoopback,
@@ -234,7 +235,10 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     // Start the reciprocal real watcher BEFORE the owner can commit. This resolves the production shop
     // arrival barrier and removes the old harness fiction where the owner selected before a watcher existed.
     const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
-    withClientSync(rig.guestCtx, () => guestShop.start());
+    // Keep the guest's complete process-global client context installed while the asynchronous watcher
+    // adopts its options and commits MODIFIER_SELECT. That public UI commit is what publishes P33
+    // continuationReady and releases the retained wave transaction ahead of this reward result.
+    await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
     // Deliver the guest's arrival while the HOST context is installed. Production has one scene per
     // process; the two-engine harness shares a process-global scene binding, so draining outside a client
     // context would resume the host's async barrier continuation against the guest UI object.
