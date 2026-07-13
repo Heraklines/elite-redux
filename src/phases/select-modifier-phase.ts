@@ -18,13 +18,13 @@ import {
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
   coopMeInProgress,
+  failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
   getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
-  failCoopSharedSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REWARD_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import {
@@ -570,9 +570,7 @@ export class SelectModifierPhase extends BattlePhase {
       return false;
     }
     // Publish the intent before mutation. A guest owner stays parked; only the host executes the reroll.
-    this.coopOwnerPostMoney = Overrides.WAIVE_ROLL_FEE_OVERRIDE
-      ? -1
-      : Math.trunc(globalScene.money - rerollCost);
+    this.coopOwnerPostMoney = Overrides.WAIVE_ROLL_FEE_OVERRIDE ? -1 : Math.trunc(globalScene.money - rerollCost);
     if (this.coopRelaySend(COOP_INTERACTION_REROLL, undefined, "reroll")) {
       return true;
     }
@@ -659,7 +657,9 @@ export class SelectModifierPhase extends BattlePhase {
         ) {
           // Co-op (#633): relay the resolved transfer so the watcher mirrors it on its
           // identical party (same held items), then apply it locally.
-          if (this.coopRelaySend(0, [COOP_ACT_TRANSFER, fromSlotIndex, itemIndex, itemQuantity, toSlotIndex], "transfer")) {
+          if (
+            this.coopRelaySend(0, [COOP_ACT_TRANSFER, fromSlotIndex, itemIndex, itemQuantity, toSlotIndex], "transfer")
+          ) {
             return;
           }
           this.applyTransfer(fromSlotIndex, itemIndex, itemQuantity, toSlotIndex);
@@ -1290,8 +1290,32 @@ export class SelectModifierPhase extends BattlePhase {
       wave: globalScene.currentBattle?.waveIndex ?? -1,
       turn: globalScene.currentBattle?.turn ?? 0,
     });
-    getCoopInteractionRelay()?.sendInteractionChoice(this.coopInteractionStart, label, choice, wire);
     this.coopPendingAuthorityOperationId = prepared?.operationId ?? null;
+    // A host-owned LEAVE has no gameplay mutation after this seam: the next statement in every caller is
+    // phase teardown / interaction-counter advancement. Commit its complete retained result HERE, before
+    // publishing a raw compatibility carrier or allowing the caller to continue. This also closes the
+    // production-fidelity driver seam, which legitimately invokes coopRelaySend directly and therefore
+    // cannot rely on the confirmation callback's second commit call.
+    //
+    // In retained-result mode the committed envelope is itself materialized into the guest's reward FIFO,
+    // so a second raw host LEAVE would be both redundant and dangerous: it can remain buffered behind the
+    // tagged terminal and poison a continuation that reuses the pinned interaction. Guest-owned terminals
+    // still publish their raw intent so the host can validate, execute, and commit it.
+    if (choice === COOP_INTERACTION_LEAVE && controller.role === "host" && isCoopRewardRetainedResultMode()) {
+      if (prepared == null) {
+        failCoopSharedSession("Host reward terminal could not retain its authoritative intent");
+        return true;
+      }
+      if (!this.coopCommitPendingAuthorityResult(prepared.operationId)) {
+        return true;
+      }
+      coopLog(
+        "reward",
+        `OWNER retained terminal before continuation seq=${this.coopInteractionStart} id=${prepared.operationId}`,
+      );
+      return false;
+    }
+    getCoopInteractionRelay()?.sendInteractionChoice(this.coopInteractionStart, label, choice, wire);
     if (controller.role === "guest" && isCoopRewardRetainedResultMode() && prepared != null) {
       this.coopAwaitAuthoritativeResult(prepared.operationId);
       return true;
@@ -1355,11 +1379,7 @@ export class SelectModifierPhase extends BattlePhase {
             wave: globalScene.currentBattle?.waveIndex ?? -1,
             turn: globalScene.currentBattle?.turn ?? 0,
           });
-          if (
-            !decision.adopt
-            || decision.operationId !== operationId
-            || decision.authoritativeProjection !== true
-          ) {
+          if (!decision.adopt || decision.operationId !== operationId || decision.authoritativeProjection !== true) {
             continue;
           }
           this.applyRelayedRewardAction(action, decision);
@@ -1618,14 +1638,16 @@ export class SelectModifierPhase extends BattlePhase {
           `shop-pick-commit barrier ${point} ABORTED during teardown/recovery - pick screen remains closed`,
         );
         return false;
-      } else if (result.authoritativePoint !== undefined && result.authoritativePoint !== point) {
+      }
+      if (result.authoritativePoint !== undefined && result.authoritativePoint !== point) {
         coopWarn(
           "rendezvous",
           `shop-pick-commit barrier ${point} ROUTED AWAY to host-authoritative ${result.authoritativePoint}; closing stale shop phase`,
         );
         this.end();
         return false;
-      } else if (result.crossPoint !== undefined) {
+      }
+      if (result.crossPoint !== undefined) {
         // #847 CROSS-POINT: the partner is parked at another sync point (e.g. a phantom next command) and
         // will never reach this shop barrier. Open the pick screen now - the catch-up machinery reconciles.
         // INFO, not the anti-hang WARN (no dead partner, no 60s wait).
@@ -1919,11 +1941,11 @@ export class SelectModifierPhase extends BattlePhase {
     }
     if (act === COOP_ACT_TRANSFER) {
       this.coopRelayedMoney = -1;
-      if (!projectionOnly) {
+      if (projectionOnly) {
+        this.coopResumeOwnerShopAfterProjection();
+      } else {
         this.applyTransfer(data[1], data[2], data[3], data[4]);
         this.coopCommitPendingAuthorityResult(decision?.operationId);
-      } else {
-        this.coopResumeOwnerShopAfterProjection();
       }
       return false;
     }
@@ -1953,12 +1975,7 @@ export class SelectModifierPhase extends BattlePhase {
         const modifierType = this.typeOptions[action.choice]?.type;
         const continuation =
           modifierType != null
-          && this.queueCoopProjectedModifierFollowUp(
-            modifierType,
-            this.coopRelayedSlot,
-            this.coopRelayedOption,
-            -1,
-          );
+          && this.queueCoopProjectedModifierFollowUp(modifierType, this.coopRelayedSlot, this.coopRelayedOption, -1);
         this.coopRelayedMoney = -1;
         this.coopEndMirror();
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
@@ -2009,11 +2026,11 @@ export class SelectModifierPhase extends BattlePhase {
       // CHECK ops are NON-terminal: the owner is still in the shop. Apply against our identical
       // party and keep watching for the next relayed pick / op / leave.
       this.coopRelayedMoney = -1;
-      if (!projectionOnly) {
+      if (projectionOnly) {
+        this.coopResumeOwnerShopAfterProjection();
+      } else {
         this.applyRelayedCheckOp(data[1], data.slice(2));
         this.coopCommitPendingAuthorityResult(decision?.operationId);
-      } else {
-        this.coopResumeOwnerShopAfterProjection();
       }
       return false;
     }
