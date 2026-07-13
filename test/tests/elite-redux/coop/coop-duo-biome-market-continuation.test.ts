@@ -59,6 +59,7 @@ import {
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -194,8 +195,9 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
   it("durability: dropped biomeShop relays still materialize TM buy + leave in ordinal order", async () => {
     setCoopBiomeMarketTestSkip(false); // drive the REAL co-op market
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const scheduledPair = createScheduledCoopPair({ automatic: true });
     const pair = wrapCoopFaultPair(
-      createLoopbackPair(),
+      scheduledPair,
       {
         drop: 1,
         reorder: 0,
@@ -212,6 +214,7 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
     await withClient(rig.guestCtx, async () => {
       await driveGuestReplayTurn(rig.guestScene, turn);
     });
+    scheduledPair.setAutomaticDelivery(false);
 
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     // Counter 0 => the HOST owns this interaction (the host buys + relays; the guest is the watcher).
@@ -223,6 +226,26 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
 
     // Track the continuation copy the owner's TM buy queues (its phaseName + carried biome pin).
     const queuedContinuation: { hasBiomeStart: boolean; biomeStart: number }[] = [];
+
+    // Park the watcher's real market surface before the owner can buy or leave. P33 intentionally
+    // retains the terminal until this reciprocal continuation exists; owner-first was the old harness
+    // fiction that let one client cross the market while its partner had not opened it yet.
+    await withClient(rig.guestCtx, async () => {
+      const guestPhase = liveBiomeShop() as unknown as BiomeShopSeam;
+      (guestPhase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
+      const gui = globalScene.ui as unknown as { getHandler: () => Record<string, unknown> };
+      const realGH = gui.getHandler.bind(globalScene.ui);
+      gui.getHandler = () => {
+        const h = realGH();
+        if (h != null && typeof h.setStock !== "function") {
+          h.setStock = () => {};
+        }
+        return h;
+      };
+      guestPhase.start();
+      await drainLoopback();
+      expect(guestPhase.coopBiomeStart, "the watcher opened the exact market interaction").toBe(counterBefore);
+    });
 
     try {
       await withClient(rig.hostCtx, async () => {
@@ -317,10 +340,10 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
       Overrides.WAIVE_ROLL_FEE_OVERRIDE = waiveBefore;
     }
 
-    // The owner bought the TM and advanced the market interaction exactly once.
-    expect(rig.hostRuntime.controller.interactionCounter(), "owner advanced the interaction once").toBe(
-      counterBefore + 1,
-    );
+    expect(
+      rig.hostRuntime.controller.interactionCounter(),
+      "the owner remains retained until the watcher applies the continuation",
+    ).toBe(counterBefore);
     expect(pair.faultsInjected(), "the legacy market buy + leave stream must actually be dropped").toBeGreaterThan(0);
     // The continuation the buy queued is a PINNED BiomeShopPhase (carries coopBiomeStart), not the
     // unpinned plain-SelectModifierPhase orphan (pre-fix this array is empty - the copy had no coopBiomeStart).
@@ -329,25 +352,24 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
       counterBefore,
     );
 
-    // WATCHER (guest): adopts the streamed stock + applies the buffered TM buy + leave, then advances.
+    // WATCHER (guest): adopt the retained stock/result and acknowledge its continuation. Then pump the
+    // authority so it may release the terminal, followed by the watcher once more for the exact counter.
     await withClient(rig.guestCtx, async () => {
-      const phase = liveBiomeShop() as unknown as BiomeShopSeam;
-      (phase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
-      const gui = globalScene.ui as unknown as { getHandler: () => Record<string, unknown> };
-      const realGH = gui.getHandler.bind(globalScene.ui);
-      gui.getHandler = () => {
-        const h = realGH();
-        if (h != null && typeof h.setStock !== "function") {
-          h.setStock = () => {};
-        }
-        return h;
-      };
-      phase.start();
       for (let i = 0; i < 32; i++) {
         await drainLoopback();
         if (rig.guestRuntime.controller.interactionCounter() > counterBefore) {
           break;
         }
+      }
+    });
+    await withClient(rig.hostCtx, async () => {
+      for (let i = 0; i < 32 && rig.hostRuntime.controller.interactionCounter() === counterBefore; i++) {
+        await drainLoopback();
+      }
+    });
+    await withClient(rig.guestCtx, async () => {
+      for (let i = 0; i < 32 && rig.guestRuntime.controller.interactionCounter() === counterBefore; i++) {
+        await drainLoopback();
       }
     });
 

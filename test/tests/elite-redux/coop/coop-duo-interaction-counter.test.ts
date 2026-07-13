@@ -274,6 +274,10 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
         await drainLoopback();
       }
     });
+    // The watcher publishes its completed counter back to the owner. In scheduled mode that addressed
+    // snapshot remains in the host inbox until the host context is installed; consume it before the
+    // host's real NewBattlePhase reaches CoopPartnerSyncPhase.
+    await withClient(rig.hostCtx, () => drainLoopback());
 
     // The interaction counter advanced EXACTLY ONCE and is IDENTICAL on both clients (the #837 invariant).
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter exactly once").toBe(

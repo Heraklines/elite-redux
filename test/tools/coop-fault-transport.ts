@@ -363,6 +363,12 @@ export interface CoopFaultPair {
   host: CoopTransport;
   guest: CoopTransport;
   counters: { host: CoopFaultCounters; guest: CoopFaultCounters };
+  /** Preserve a wrapped scheduled transport's destination pump so buildDuo can bind it to ClientCtx. */
+  flush?: (role: CoopRole, limit?: number) => number;
+  /** Preserve scheduled-queue diagnostics when the inner pair exposes them. */
+  pending?: (role: CoopRole) => number;
+  /** Preserve the boot-to-manual delivery switch when composing scheduling with fault injection. */
+  setAutomaticDelivery?: (automatic: boolean) => void;
   /** Total faults injected across BOTH directions (drop + reorder + delay + one-shot drops). Asserted > 0 so a run is not vacuous. */
   faultsInjected(): number;
   /** Swap the live fault profile on BOTH endpoints mid-run (for a burst-then-recover test). */
@@ -398,6 +404,11 @@ export function wrapCoopFaultPair(
   profile: CoopFaultProfile,
   opts: CoopFaultPairOptions,
 ): CoopFaultPair {
+  const scheduled = pair as {
+    flush?: (role: CoopRole, limit?: number) => number;
+    pending?: (role: CoopRole) => number;
+    setAutomaticDelivery?: (automatic: boolean) => void;
+  };
   // Per-direction live-mutable holders (a full-object swap in setProfile is seen by both transports, which
   // hold the SAME holder reference - no in-place field mutation, no `delete`).
   const hostHolder: ProfileHolder = { profile: resolveProfile(opts.host ?? profile) };
@@ -413,6 +424,11 @@ export function wrapCoopFaultPair(
     host,
     guest,
     counters: { host: hostCounters, guest: guestCounters },
+    ...(typeof scheduled.flush === "function" ? { flush: scheduled.flush.bind(pair) } : {}),
+    ...(typeof scheduled.pending === "function" ? { pending: scheduled.pending.bind(pair) } : {}),
+    ...(typeof scheduled.setAutomaticDelivery === "function"
+      ? { setAutomaticDelivery: scheduled.setAutomaticDelivery.bind(pair) }
+      : {}),
     faultsInjected(): number {
       const f = (c: CoopFaultCounters) => c.dropped + c.reordered + c.delayed + c.oneShotDropped;
       return f(hostCounters) + f(guestCounters);

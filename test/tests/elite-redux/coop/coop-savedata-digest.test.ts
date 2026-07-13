@@ -74,22 +74,23 @@ import { BerryModifierType } from "#modifiers/modifier-type";
 import { SelectBiomePhase } from "#phases/select-biome-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
-  arriveGuestCommandBoundary,
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   disposeDuoRig,
   drainLoopback,
+  driveClientPhaseQueueTo,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
   installDuoLogCapture,
   reachQueuedRewardShop,
-  remirrorWave,
   type ShopPhaseSeam,
   setCoopHarnessModuleLetIsolation,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair, type ScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -190,11 +191,20 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     if (hostOwns) {
+      await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
       await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: false }));
-      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
+      await withClient(rig.hostCtx, () => drainLoopback());
+      await withClient(rig.guestCtx, () => drainLoopback());
     } else {
+      await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
       await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward: false }));
-      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
+      // A guest-owned UI action is still adjudicated by the host. The host watcher emits the retained
+      // result, the guest owner applies it and publishes its new counter, then the host adopts that exact
+      // counter before either phase queue may cross into the next encounter.
+      await withClient(rig.guestCtx, () => drainLoopback());
+      await withClient(rig.hostCtx, () => drainLoopback());
     }
   }
 
@@ -244,15 +254,16 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
 
   it("NO FALSE DESYNC: two real engines produce the SAME save-data digest at each wave boundary", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair: ScheduledCoopPair = createScheduledCoopPair({ automatic: true });
     const rig = await buildSavedataDuo(pair);
     wireGuestCommand(rig);
+    // The handshake may use ordinary delivery, but every gameplay continuation is delivered only while
+    // its addressed client's complete process-global context is installed. This models two browser
+    // processes and prevents either engine's async phase tail from running against its partner's scene.
+    pair.setAutomaticDelivery(false);
 
     const WAVES = 3;
     for (let w = 1; w <= WAVES; w++) {
-      if (w > 1) {
-        await remirrorWave(rig);
-      }
       // The full checksum states (which now INCLUDE saveDataDigest) match host-vs-guest at wave start.
       const hostStart = await withClient(rig.hostCtx, () => captureCoopChecksumState());
       const guestStart = await withClient(rig.guestCtx, () => captureCoopChecksumState());
@@ -280,10 +291,14 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
 
       await leaveRewardShop(rig);
       if (w < WAVES) {
-        await arriveGuestCommandBoundary(rig, w + 1);
+        // Advance the real queues in authority order. The host first generates and publishes the next
+        // encounter carrier; only then may the guest consume it and open the matching command surface.
         await withClient(rig.hostCtx, async () => {
-          await game.phaseInterceptor.to("CommandPhase");
+          await game.phaseInterceptor.to("CommandPhase", false);
         });
+        await withClient(rig.guestCtx, () => driveClientPhaseQueueTo(rig.guestScene, "CommandPhase"));
+        expect(rig.hostScene.currentBattle.waveIndex, `wave ${w}: host opened wave ${w + 1}`).toBe(w + 1);
+        expect(rig.guestScene.currentBattle.waveIndex, `wave ${w}: guest adopted wave ${w + 1}`).toBe(w + 1);
       }
     }
     logs.flush();
