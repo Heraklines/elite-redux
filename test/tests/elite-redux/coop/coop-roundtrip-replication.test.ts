@@ -55,6 +55,7 @@ import { TerrainType } from "#data/terrain";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BerryType } from "#enums/berry-type";
+import { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -73,7 +74,7 @@ import {
 } from "#test/tools/coop-duo-harness";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -366,6 +367,99 @@ describe.skipIf(!RUN)(
       expect(admittedTick, "a rejected carrier does not consume its immutable tick").toBe(-1);
       expect(retryOk, "the repaired exact-tick carrier remains admissible").toBe(true);
       expect(retryFailures).toEqual([]);
+      logs.flush();
+    }, 300_000);
+
+    it("SHADOW-ATOMIC: a late material failure restores identity topology, RNG, and retry admission", async () => {
+      await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+      addRichBench();
+      const pair = createLoopbackPair();
+      const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+      resetCoopStateTicks();
+
+      const wire = withClientSync(rig.hostCtx, () => {
+        const state = captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
+        expect(state).not.toBeNull();
+        return JSON.parse(JSON.stringify(state)) as NonNullable<typeof state>;
+      });
+
+      const result = withClientSync(rig.guestCtx, () => {
+        const beforeParty = [...globalScene.getPlayerParty()];
+        const beforeEnemyParty = [...globalScene.getEnemyParty()];
+        const beforeModifiers = [...globalScene.modifiers];
+        const beforeArena = globalScene.arena;
+        const beforeFormat = globalScene.currentBattle.format;
+        const beforeChecksum = captureCoopChecksumState();
+        const beforeMoney = globalScene.money;
+        const beforeRnd = Phaser.Math.RND.state();
+
+        const candidate = JSON.parse(JSON.stringify(wire)) as typeof wire;
+        // Retire one prior-boundary object and force construction of a candidate-only replacement. The old
+        // implementation destroyed the former before a later section could fail, so replaying a wire image
+        // could only manufacture a lookalike object and leave live phase references dangling.
+        const replacement = candidate.playerParty.at(-1) as Record<string, unknown>;
+        replacement.id = (replacement.id as number) + 1_000_000;
+        candidate.money = beforeMoney + 77_777;
+        candidate.biomeId = beforeArena.biomeId === BiomeId.FOREST ? BiomeId.PLAINS : BiomeId.FOREST;
+        candidate.waveSeed = "atomic-candidate-must-not-escape";
+
+        const updateModifiers = vi.spyOn(globalScene, "updateModifiers");
+        updateModifiers.mockImplementationOnce(() => {
+          throw new Error("injected late modifier materialization failure");
+        });
+        let applyOk = false;
+        try {
+          applyOk = applyCoopAuthoritativeBattleState(candidate, true);
+        } finally {
+          updateModifiers.mockRestore();
+        }
+        const failures = drainCoopApplyFailures();
+        const afterParty = [...globalScene.getPlayerParty()];
+        const afterEnemyParty = [...globalScene.getEnemyParty()];
+        const afterModifiers = [...globalScene.modifiers];
+        const arenaRestored = globalScene.arena === beforeArena;
+        const formatRestored = globalScene.currentBattle.format === beforeFormat;
+        const checksumRestored = JSON.stringify(captureCoopChecksumState()) === JSON.stringify(beforeChecksum);
+        const moneyRestored = globalScene.money === beforeMoney;
+        const rndRestored = Phaser.Math.RND.state() === beforeRnd;
+        const failedAdmittedTick = coopAppliedStateTick();
+
+        const retryOk = applyCoopAuthoritativeBattleState(wire, true);
+        const retryFailures = drainCoopApplyFailures();
+        return {
+          applyOk,
+          failures,
+          beforeParty,
+          afterParty,
+          beforeEnemyParty,
+          afterEnemyParty,
+          beforeModifiers,
+          afterModifiers,
+          arenaRestored,
+          formatRestored,
+          checksumRestored,
+          moneyRestored,
+          rndRestored,
+          failedAdmittedTick,
+          retryOk,
+          retryFailures,
+        };
+      });
+
+      expect(result.applyOk).toBe(false);
+      expect(result.failures.some(failure => failure.section === "modifierRefresh")).toBe(true);
+      expect(result.afterParty).toHaveLength(result.beforeParty.length);
+      expect(result.afterParty.every((pokemon, index) => pokemon === result.beforeParty[index])).toBe(true);
+      expect(result.afterEnemyParty.every((pokemon, index) => pokemon === result.beforeEnemyParty[index])).toBe(true);
+      expect(result.afterModifiers.every((modifier, index) => modifier === result.beforeModifiers[index])).toBe(true);
+      expect(result.arenaRestored).toBe(true);
+      expect(result.formatRestored).toBe(true);
+      expect(result.checksumRestored).toBe(true);
+      expect(result.moneyRestored).toBe(true);
+      expect(result.rndRestored).toBe(true);
+      expect(result.failedAdmittedTick, "the failed candidate does not consume its immutable tick").toBe(-1);
+      expect(result.retryOk).toBe(true);
+      expect(result.retryFailures).toEqual([]);
       logs.flush();
     }, 300_000);
   },
