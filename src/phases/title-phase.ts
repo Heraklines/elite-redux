@@ -9,6 +9,7 @@ import { Phase } from "#app/phase";
 import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-seed/daily-run";
 import { modifierTypes } from "#data/data-lists";
+import { awaitCoopPublicLaunchSurface } from "#data/elite-redux/coop/coop-launch-surface";
 import { CoopLobbyController, type LobbyPlayer } from "#data/elite-redux/coop/coop-lobby";
 import {
   type CoopResumeCandidate,
@@ -829,14 +830,34 @@ export class TitlePhase extends Phase {
         globalScene.ui.setMode(UiMode.MESSAGE);
         globalScene.ui.resetModeChain();
         globalScene.ui.showText("Connected! Verifying your partner and co-op saves...", null);
-        const startNewRun = () => {
+        const startNewRun = (): boolean => {
           if (!isCurrentSession()) {
-            return;
+            return false;
           }
           lobbyCompleted = true;
           stage.destroy();
           setModeAndEnd(launchMode);
+          return true;
         };
+
+        /**
+         * A start-new receipt is not a continuation ACK. Prove that the exact role-specific
+         * public picker has committed its active handler before the guest releases the host.
+         */
+        const awaitFreshRunSurface = (): Promise<boolean> =>
+          awaitCoopPublicLaunchSurface({
+            expected:
+              controller.role === "guest"
+                ? { phaseName: "SelectStarterPhase", uiMode: UiMode.STARTER_SELECT }
+                : { phaseName: "SelectChallengePhase", uiMode: UiMode.CHALLENGE_SELECT },
+            read: () => ({
+              phaseName: globalScene.phaseManager.getCurrentPhase()?.phaseName ?? null,
+              uiMode: globalScene.ui.getMode(),
+              handlerActive: globalScene.ui.getHandler().active,
+            }),
+            isCurrent: () => !lobbyTerminated && this.isExactCoopSession(runtime, controller, sessionGeneration),
+            timeoutMs: 5_000,
+          });
 
         // Showdown 1v1 (B7 item 5): a versus match is EPHEMERAL - it never saves, never resumes,
         // and never picks a save slot. The co-op RESUME / NEW-GAME barrier below (readCoopResumeMarker,
@@ -912,11 +933,29 @@ export class TitlePhase extends Phase {
               }, COOP_RESUME_GUEST_WAIT_MS);
 
               // Host chose New Game (or had no save / we declined / the offer timed out): release.
-              controller.armResumeStartNewHandler(() => {
+              controller.armResumeStartNewHandler(async decision => {
                 clearTimeout(guestWaitTimer);
-                if (isCurrentSession() && claim()) {
-                  startNewRun();
+                if (!isCurrentSession() || !claim()) {
+                  return false;
                 }
+                if (
+                  decision.epoch !== controller.sessionEpoch
+                  || decision.runId !== controller.runId
+                  || decision.checkpointRevision !== controller.checkpointRevision
+                  || !startNewRun()
+                ) {
+                  return false;
+                }
+                const ready = await awaitFreshRunSurface();
+                if (!ready && this.isExactCoopSession(runtime, controller, sessionGeneration)) {
+                  console.error(
+                    `[coop-resume] guest: fresh continuation did not open for decision=${decision.decisionId}`,
+                  );
+                  terminalFailure(
+                    "The shared New Game decision could not open team selection. Reconnect and try again.",
+                  );
+                }
+                return ready;
               });
               controller.armResumeBlockedHandler((reason, wave) => {
                 clearTimeout(guestWaitTimer);
@@ -1050,12 +1089,22 @@ export class TitlePhase extends Phase {
               globalScene.ui.showText(`Waiting for ${partner} to enter team selection...`, null);
               void controller
                 .sendResumeStartNew()
-                .then(acknowledged => {
+                .then(async acknowledged => {
                   if (!isCurrentSession()) {
                     return;
                   }
                   if (acknowledged) {
-                    startNewRun();
+                    if (!startNewRun()) {
+                      return;
+                    }
+                    if (
+                      !(await awaitFreshRunSurface())
+                      && this.isExactCoopSession(runtime, controller, sessionGeneration)
+                    ) {
+                      terminalFailure(
+                        "The shared New Game decision could not open the host setup screen. Reconnect and try again.",
+                      );
+                    }
                   } else {
                     terminalFailure("Could not commit the new co-op run. Reconnect and try again.");
                   }

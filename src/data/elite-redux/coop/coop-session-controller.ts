@@ -75,6 +75,32 @@ export type CoopResumeCheckpointDelivery =
   | { status: "superseded" }
   | { status: "disposed" };
 
+/**
+ * Immutable address of the host's fresh-run lobby decision. The guest must open the
+ * public continuation surface for this exact address before it ACKs the decision.
+ */
+export interface CoopFreshRunDecisionAddress {
+  readonly decisionId: string;
+  readonly epoch: number;
+  readonly runId: string;
+  readonly checkpointRevision: number;
+}
+
+/** `false` means the public continuation surface failed closed and must not be ACKed. */
+export type CoopFreshRunContinuationHandler = (
+  decision: CoopFreshRunDecisionAddress,
+) => boolean | void | Promise<boolean | undefined>;
+
+function sameFreshRunDecision(left: CoopFreshRunDecisionAddress | null, right: CoopFreshRunDecisionAddress): boolean {
+  return (
+    left != null
+    && left.decisionId === right.decisionId
+    && left.epoch === right.epoch
+    && left.runId === right.runId
+    && left.checkpointRevision === right.checkpointRevision
+  );
+}
+
 /** Reserved {@linkcode CoopMessage} `screen` tag carrying the interaction-turn
  *  counter (host-authoritative; the guest mirrors it). Distinct from a real
  *  interaction choice so it is dispatched separately. */
@@ -376,10 +402,11 @@ export class CoopSessionController {
   private resumeCheckpointAckTimer: ReturnType<typeof setTimeout> | null = null;
   private resumeCheckpointDeliveryTail: Promise<void> = Promise.resolve();
   /** #810 barrier: guest-side "start new" handler + buffered flag (host's release signal). */
-  private resumeStartNewHandler: (() => void) | null = null;
-  private pendingResumeStartNewId: string | null = null;
-  private pendingResumeStartNewEpoch = 0;
-  private appliedResumeStartNewId: string | null = null;
+  private resumeStartNewHandler: CoopFreshRunContinuationHandler | null = null;
+  /** Receipt/application is retained separately: receipt alone never authorizes the host to advance. */
+  private pendingResumeStartNew: CoopFreshRunDecisionAddress | null = null;
+  private applyingResumeStartNew: CoopFreshRunDecisionAddress | null = null;
+  private appliedResumeStartNew: CoopFreshRunDecisionAddress | null = null;
   private resumeStartNewAckWaiter: {
     readonly decisionId: string;
     readonly promise: Promise<boolean>;
@@ -1290,24 +1317,85 @@ export class CoopSessionController {
   /**
    * #810 barrier GUEST: arm the "host chose new game" release handler. If the host's
    * `resumeStartNew` already arrived (the wire beat the UI), it fires immediately from
-   * the buffer - so the guest can never miss the release and hang.
+   * the buffer - so the guest can never miss the release and hang. The handler may be
+   * asynchronous; the decision is ACKed only after it confirms that the addressed public
+   * continuation surface is ready. Legacy synchronous handlers remain ready-on-return.
    */
-  armResumeStartNewHandler(handler: () => void): void {
+  armResumeStartNewHandler(handler: CoopFreshRunContinuationHandler): void {
     this.resumeStartNewHandler = handler;
-    if (this.pendingResumeStartNewId != null) {
-      const decisionId = this.pendingResumeStartNewId;
-      this.pendingResumeStartNewId = null;
-      this.pendingResumeStartNewEpoch = 0;
-      this.resumeStartNewHandler = null;
-      handler();
-      this.appliedResumeStartNewId = decisionId;
-      this.transport.send({ t: "resumeDecisionAck", decisionId });
+    if (this.pendingResumeStartNew != null) {
+      this.applyResumeStartNewToPublicSurface(this.pendingResumeStartNew);
     }
+  }
+
+  /**
+   * Apply a retained fresh-run decision exactly once. A duplicate/reconnect carrier stays
+   * parked on the same address while the UI transition is in flight; it cannot invoke the
+   * handler twice or make the host mistake receipt for continuation readiness.
+   */
+  private applyResumeStartNewToPublicSurface(decision: CoopFreshRunDecisionAddress): void {
+    const handler = this.resumeStartNewHandler;
+    if (
+      handler == null
+      || !sameFreshRunDecision(this.pendingResumeStartNew, decision)
+      || sameFreshRunDecision(this.applyingResumeStartNew, decision)
+    ) {
+      return;
+    }
+    this.resumeStartNewHandler = null;
+    this.applyingResumeStartNew = decision;
+    let application: boolean | void | Promise<boolean | undefined>;
+    try {
+      // Invoke synchronously so the existing public handler opens immediately; only its ACK is staged.
+      application = handler(decision);
+    } catch (error) {
+      coopWarn("launch", `fresh continuation threw id=${decision.decisionId}; decision remains unacknowledged`, error);
+      return;
+    }
+    Promise.resolve(application)
+      .then(result => {
+        if (
+          this.disposed
+          || result === false
+          || !sameFreshRunDecision(this.pendingResumeStartNew, decision)
+          || this.sessionEpochValue !== decision.epoch
+          || this.runIdValue !== decision.runId
+          || this.checkpointRevisionValue !== decision.checkpointRevision
+        ) {
+          if (!this.disposed && result === false) {
+            coopWarn(
+              "launch",
+              `fresh continuation NOT READY id=${decision.decisionId}; decision remains unacknowledged`,
+            );
+          }
+          return;
+        }
+        this.pendingResumeStartNew = null;
+        this.applyingResumeStartNew = null;
+        this.appliedResumeStartNew = decision;
+        recordCoopCausalEvent({
+          domain: "lobby",
+          stage: "start-new-continuation-ready",
+          causalId: decision.decisionId,
+          role: "guest",
+          epoch: decision.epoch,
+        });
+        coopLog("launch", `ACK resumeStartNew continuationReady id=${decision.decisionId}`);
+        this.transport.send({ t: "resumeDecisionAck", decisionId: decision.decisionId });
+      })
+      .catch(error => {
+        coopWarn(
+          "launch",
+          `fresh continuation threw id=${decision.decisionId}; decision remains unacknowledged`,
+          error,
+        );
+      });
   }
 
   /**
    * #810 barrier HOST: tell the guest to stop waiting and proceed to a NEW game. Sent on
    * every non-resume outcome (no save, host picked New Game, guest declined, offer timeout).
+   * Resolves true only after the guest ACKs its addressed public continuation surface.
    */
   sendResumeStartNew(timeoutMs = 15_000): Promise<boolean> {
     if (
@@ -2222,7 +2310,8 @@ export class CoopSessionController {
     this.resumeOfferHandler = null;
     this.pendingResumeOfferCommitment = null;
     this.resumeStartNewHandler = null;
-    this.pendingResumeStartNewId = null;
+    this.pendingResumeStartNew = null;
+    this.applyingResumeStartNew = null;
     this.resumeBlockedHandler = null;
     this.pendingResumeBlocked = null;
     this.resumeCheckpointHandler = null;
@@ -2235,7 +2324,7 @@ export class CoopSessionController {
     this.activeResumeOfferId = null;
     this.activeResumeOfferEpoch = 0;
     this.activeResumeOfferCommitment = null;
-    this.pendingResumeStartNewEpoch = 0;
+    this.appliedResumeStartNew = null;
     this.settledResumeOfferReplies.clear();
   }
 
@@ -3013,17 +3102,20 @@ export class CoopSessionController {
           this.sessionEpochValue === msg.epoch
           && this.runIdValue === msg.runId
           && this.checkpointRevisionValue === msg.checkpointRevision;
-        if (this.appliedResumeStartNewId === msg.decisionId && exactCurrentIdentity) {
+        const decision: CoopFreshRunDecisionAddress = {
+          decisionId: msg.decisionId,
+          epoch: msg.epoch,
+          runId: msg.runId,
+          checkpointRevision: msg.checkpointRevision,
+        };
+        if (sameFreshRunDecision(this.appliedResumeStartNew, decision) && exactCurrentIdentity) {
           coopLog("launch", `RE-ACK duplicate resumeStartNew id=${msg.decisionId}`);
           this.transport.send({ t: "resumeDecisionAck", decisionId: msg.decisionId });
           break;
         }
-        if (
-          this.pendingResumeStartNewId === msg.decisionId
-          && this.pendingResumeStartNewEpoch === msg.epoch
-          && exactCurrentIdentity
-        ) {
-          coopLog("launch", `IGNORE duplicate pending resumeStartNew id=${msg.decisionId}`);
+        if (sameFreshRunDecision(this.pendingResumeStartNew, decision) && exactCurrentIdentity) {
+          coopLog("launch", `RETAIN duplicate pending resumeStartNew id=${msg.decisionId}`);
+          this.applyResumeStartNewToPublicSurface(decision);
           break;
         }
         if (
@@ -3047,16 +3139,9 @@ export class CoopSessionController {
         this.activeResumeOfferId = null;
         this.activeResumeOfferEpoch = 0;
         this.activeResumeOfferCommitment = null;
-        if (this.resumeStartNewHandler == null) {
-          this.pendingResumeStartNewId = msg.decisionId;
-          this.pendingResumeStartNewEpoch = msg.epoch;
-        } else {
-          const handler = this.resumeStartNewHandler;
-          this.resumeStartNewHandler = null;
-          handler();
-          this.appliedResumeStartNewId = msg.decisionId;
-          this.transport.send({ t: "resumeDecisionAck", decisionId: msg.decisionId });
-        }
+        this.pendingResumeStartNew = decision;
+        this.applyingResumeStartNew = null;
+        this.applyResumeStartNewToPublicSurface(decision);
         break;
       }
       case "resumeDecisionAck": {
@@ -3068,7 +3153,7 @@ export class CoopSessionController {
           );
           break;
         }
-        coopLog("launch", `RECV resumeDecisionAck id=${msg.decisionId} -> start-new committed on both peers`);
+        coopLog("launch", `RECV resumeDecisionAck id=${msg.decisionId} -> guest public continuation is ready`);
         this.resumeStartNewAckWaiter = null;
         this.ackedResumeStartNewId = msg.decisionId;
         waiter.finish(true);
