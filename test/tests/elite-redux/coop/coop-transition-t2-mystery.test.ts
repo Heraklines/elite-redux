@@ -312,7 +312,10 @@ async function crossIntoNaturallyCarriedMystery(
     "guest accepts the valid retained zero-enemy Mystery carrier without entering recovery",
   ).toHaveLength(0);
   expect(rig.hostScene.currentBattle.mysteryEncounter?.encounterType).toBe(type);
-  expect(rig.guestScene.currentBattle.mysteryEncounter?.encounterType).toBe(type);
+  expect(
+    rig.guestScene.currentBattle.mysteryEncounterType,
+    "guest adopted the host Mystery descriptor without locally initializing the event engine",
+  ).toBe(type);
   expect(rig.hostScene.phaseManager.getCurrentPhase()?.phaseName, "host parked on the Mystery selector boundary").toBe(
     "MysteryEncounterPhase",
   );

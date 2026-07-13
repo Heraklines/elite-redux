@@ -321,10 +321,8 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
       return;
     }
     if (globalScene.currentBattle.isBattleMysteryEncounter()) {
-      if (globalScene.currentBattle.mysteryEncounter == null) {
-        failCoopSharedSession(`NewBiome Mystery carrier was incomplete at wave ${this.coopWave}`);
-        return;
-      }
+      // The presentation-only guest deliberately never constructs or initializes the local encounter
+      // object. CoopReplayMePhase renders the host's retained ME_PRESENT transaction instead.
       globalScene.phaseManager.unshiftNew("MysteryEncounterPhase");
     }
     this.end();
