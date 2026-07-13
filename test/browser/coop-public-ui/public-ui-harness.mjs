@@ -8,6 +8,7 @@ import { delay, EvidenceSink } from "./evidence.mjs";
 
 const TITLE_PHASE = /Start Phase TitlePhase/u;
 const LOGIN_PHASE = /Start Phase LoginPhase/u;
+const SELECT_GENDER_PHASE = /Start Phase SelectGenderPhase/u;
 const STARTER_PHASE = /Start Phase SelectStarterPhase/u;
 const LOCAL_COMMAND = /CommandPhase .*-> LOCAL UI/u;
 const REWARD_PHASE = /Start Phase SelectModifierPhase/u;
@@ -133,13 +134,26 @@ export class PublicUiClient {
       { timeout: this.config.timeoutMs },
     );
     await this.fillLoginForm();
-    const entered = await this.evidence.waitFor(TITLE_PHASE, {
+    const entered = await this.evidence.waitForCondition(
+      sink => sink.find(TITLE_PHASE, this.pageCursor) ?? sink.find(SELECT_GENDER_PHASE, this.pageCursor),
+      {
+        timeoutMs: this.config.timeoutMs,
+        description: "TitlePhase or visible first-login gender prompt after authentication",
+      },
+    );
+    if (TITLE_PHASE.test(entered.text ?? "")) {
+      await delay(this.config.settleDelayMs);
+      return entered;
+    }
+    await delay(this.config.settleDelayMs);
+    await this.sequence(["Space", "Space"], "complete-first-login-gender-prompt");
+    const titleAfterOnboarding = await this.evidence.waitFor(TITLE_PHASE, {
       from: this.pageCursor,
       timeoutMs: this.config.timeoutMs,
-      description: "TitlePhase after visible login form submission",
+      description: "TitlePhase after visible first-login gender selection",
     });
     await delay(this.config.settleDelayMs);
-    return entered;
+    return titleAfterOnboarding;
   }
 
   async fillLoginForm() {

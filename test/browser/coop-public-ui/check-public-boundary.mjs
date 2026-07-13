@@ -12,6 +12,7 @@ const files = [
   "run.mjs",
   "evidence.mjs",
   "preview-server.mjs",
+  "provision-accounts.mjs",
   "vite.config.mjs",
 ];
 const forbidden = [
@@ -55,6 +56,7 @@ if (evaluateCalls !== 1 || !harness?.includes("document.activeElement.blur()")) 
 
 const run = sources.get("run.mjs");
 const preview = sources.get("preview-server.mjs");
+const provision = sources.get("provision-accounts.mjs");
 const viteConfig = sources.get("vite.config.mjs");
 if (!run?.includes("startSealedPreview(config)")) {
   failures.push("run.mjs: every gameplay journey must start from a verified sealed browser artifact");
@@ -64,6 +66,9 @@ if (!preview?.includes('"--verify"') || /safeStaticFile\([^,]+,\s*["']src/gu.tes
 }
 if (!viteConfig?.includes("SOURCE_ENTRY") || !viteConfig.includes("sourceEntryReplaced")) {
   failures.push("vite.config.mjs: exact-SHA browser build entry replacement must stay explicit and idempotent");
+}
+if (!provision?.includes('"/account/register"') || /["'`]\/coop\//u.test(provision)) {
+  failures.push("provision-accounts.mjs: fixture setup may register beta accounts but must never drive co-op APIs");
 }
 
 const browserEntry = await readFile(new URL("../../../scripts/coop-browser-entry.ts", import.meta.url), "utf8");
