@@ -12,6 +12,9 @@ name = "er-coop-api"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
 
+# P33 authenticated lobby/signaling (same dedicated secret as er-save-api):
+#   npx wrangler secret put COOP_IDENTITY_SECRET
+
 # D1 (SQLite) holding the coop_runs signaling rows. Create with `wrangler d1
 # create er-coop` and paste the returned id here.
 [[d1_databases]]
@@ -24,6 +27,8 @@ database_id = "62e9c1e7-2383-42de-bf66-3ac93e6fe5ea"
 ALLOWED_ORIGIN = "*"
 # A peer is considered PRESENT if its last heartbeat is within this many ms.
 PRESENCE_WINDOW_MS = "30000"
+# A P33 pairing releases its account memberships after this bounded hot-rejoin grace.
+P33_REJOIN_GRACE_MS = "120000"
 # Rows untouched for this long are pruned by the cron (abandoned/finished runs).
 RUN_TTL_MS = "86400000"
 
