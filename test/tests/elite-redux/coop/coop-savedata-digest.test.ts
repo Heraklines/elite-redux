@@ -530,19 +530,40 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       restore: () => void;
     }
     const mockErMap = (scene: BattleScene): ErMapMock => {
-      const ui = scene.ui as unknown as { setMode: (m: number, ...a: unknown[]) => Promise<void> };
-      const real = ui.setMode.bind(ui);
+      type BoundedResult = "completed" | "forced" | "superseded";
+      const ui = scene.ui as unknown as {
+        setMode: (m: number, ...a: unknown[]) => Promise<void>;
+        setModeBoundedWhen: (
+          m: number,
+          timeoutMs: number,
+          isCurrent: (() => boolean) | undefined,
+          ...a: unknown[]
+        ) => Promise<BoundedResult>;
+      };
+      const realSetMode = ui.setMode.bind(ui);
+      const realSetModeBoundedWhen = ui.setModeBoundedWhen.bind(ui);
       const box: { onSelect?: (b: BiomeId) => void } = {};
-      ui.setMode = (m: number, ...a: unknown[]): Promise<void> => {
+      const capture = (m: number, a: unknown[]): void => {
         if (m === UiMode.ER_MAP) {
           box.onSelect = (a[0] as { onSelect: (b: BiomeId) => void }).onSelect;
         }
+      };
+      ui.setMode = (m: number, ...a: unknown[]): Promise<void> => {
+        capture(m, a);
         return Promise.resolve();
+      };
+      ui.setModeBoundedWhen = (m, _timeoutMs, isCurrent, ...a): Promise<BoundedResult> => {
+        if (!(isCurrent?.() ?? true)) {
+          return Promise.resolve("superseded");
+        }
+        capture(m, a);
+        return Promise.resolve("completed");
       };
       return {
         box,
         restore: () => {
-          ui.setMode = real;
+          ui.setMode = realSetMode;
+          ui.setModeBoundedWhen = realSetModeBoundedWhen;
         },
       };
     };
@@ -591,11 +612,11 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     logs.flush();
   }, 300_000);
 
-  it("SAME BIOME (#841 item 1, timeout fallback): a disconnected owner backstops BOTH engines to the SAME deterministic roll", async () => {
-    // The anti-hang backstop (#848): if the owner never picks (disconnect / stall), each client falls back to
-    // the deterministic roll it computes off the shared, just-reset wave seed - the SAME value on both, so the
-    // fallback CANNOT desync (it is exactly the old bypass behavior, now only on the timeout path). This drives
-    // the fallback decision on both engines + asserts they converge, guarding the seed pin it relies on.
+  it("SAME BIOME (#841 item 1, missing commit): a disconnected owner cannot make the watcher advance unilaterally", async () => {
+    // A missing raw relay and missing authoritative commit must leave the watcher fail-closed. Re-deriving a
+    // destination locally used to look deterministic, but it allowed one client to enter SwitchBiomePhase
+    // without proof that its partner committed the same route. Recovery/terminal supervision owns liveness;
+    // this surface must never trade a bounded wait for unilateral gameplay mutation.
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
     const rig = await buildSavedataDuo(pair);
@@ -610,8 +631,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       { biome: BiomeId.FOREST, revealed: true },
       { biome: BiomeId.VOLCANO, revealed: true },
     ] satisfies ErRouteNode[]);
-    // Force every relay await to TIME OUT (a disconnected owner) -> the deterministic fallback. Only the
-    // WATCHER falls back: the OWNER drives the real picker (no timeout); on a true disconnect it is gone.
+    // Force every raw relay await to time out. There is deliberately no retained authoritative receipt.
     vi.spyOn(CoopInteractionRelay.prototype, "awaitInteractionChoice").mockResolvedValue(null);
 
     const counter = rig.hostRuntime.controller.interactionCounter();
@@ -619,42 +639,26 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     const ownerCtx = hostOwns ? rig.hostCtx : rig.guestCtx;
     const watcherCtx = hostOwns ? rig.guestCtx : rig.hostCtx;
 
-    // The owner reached the shared boundary, then disappeared before sending its choice. This is the
-    // legitimate fallback window: the watcher may cross the already-reciprocal boundary, then its mocked
-    // choice await returns null and it derives the shared-seed fallback. An owner that never reaches the
-    // boundary remains fail-closed (covered by the pacing-barrier tests).
+    // The owner reached the shared boundary, then disappeared before committing its choice.
     await withClient(ownerCtx, () => ownerCtx.runtime.rendezvous.arrive(`biomepick:${WAVE}`));
     await drainLoopback();
 
-    // The deterministic roll BOTH engines compute off the shared, just-reset wave seed (identical by #658
-    // seed pin) - so if both fell back they would match; the fallback cannot desync.
-    const rollUnder = (ctx: typeof rig.hostCtx): Promise<BiomeId> =>
-      withClient(ctx, () => {
-        ctx.scene.resetSeed(WAVE);
-        return ctx.scene.generateRandomBiome(WAVE + 1);
-      });
-    const hostRoll = await rollUnder(rig.hostCtx);
-    const guestRoll = await rollUnder(rig.guestCtx);
-    expect(guestRoll, "the deterministic fallback roll is identical on both engines (cannot desync)").toBe(hostRoll);
-
-    // The WATCHER engine runs the biome pick alone; the owner never sends -> it backstops to the roll.
-    const watcherFallback = await withClient(watcherCtx, async () => {
+    const hostCounter = rig.hostRuntime.controller.interactionCounter();
+    const guestCounter = rig.guestRuntime.controller.interactionCounter();
+    await withClient(watcherCtx, async () => {
       const spy = vi.spyOn(watcherCtx.scene.phaseManager, "unshiftNew");
       const phase = liveSelectBiome();
       phase.start();
-      // #858: the watcher first crosses its natural-pick boundary barrier (owner absent -> anti-hang timeout),
-      // THEN falls back on the mocked relay timeout - poll across both.
       for (let i = 0; i < 80; i++) {
         await drainLoopback();
-        const biome = spy.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1] as BiomeId | undefined;
-        if (biome !== undefined) {
-          return biome;
-        }
       }
-      return;
+      expect(
+        spy.mock.calls.some(c => c[0] === "SwitchBiomePhase"),
+        "the watcher never derives or applies a biome without the owner's retained commit",
+      ).toBe(false);
     });
-    expect(watcherFallback, "the watcher resolved on timeout (never hangs)").not.toBeUndefined();
-    expect(watcherFallback, "the watcher's fallback IS the deterministic shared-seed roll").toBe(hostRoll);
+    expect(rig.hostRuntime.controller.interactionCounter(), "the disconnected owner did not advance").toBe(hostCounter);
+    expect(rig.guestRuntime.controller.interactionCounter(), "the watcher did not advance alone").toBe(guestCounter);
     logs.flush();
   }, 300_000);
 
