@@ -86,6 +86,12 @@ export function loadConfig() {
     runId,
     journey,
     baseUrl: baseUrl.href,
+    browserDist: process.env.COOP_UI_BROWSER_DIST?.trim()
+      ? resolve(ROOT, process.env.COOP_UI_BROWSER_DIST.trim())
+      : null,
+    assetDir: resolve(ROOT, process.env.COOP_UI_ASSET_DIR?.trim() || "assets"),
+    expectedSignalOrigin: process.env.COOP_UI_EXPECTED_SIGNAL_ORIGIN?.trim() || null,
+    entryContract: process.env.COOP_BROWSER_ENTRY_CONTRACT?.trim() || "public-ui-v1",
     artifactDir: resolve(ROOT, "dev-logs", "coop-public-ui", runId),
     headless: boolean("COOP_UI_HEADLESS", true),
     chromeTrace: boolean("COOP_UI_CHROME_TRACE", true),

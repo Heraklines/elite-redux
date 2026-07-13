@@ -1,13 +1,16 @@
 # Co-op two-browser public-UI journeys
 
-This opt-in harness drives two deployed game clients through the same surfaces a player uses. Each seat has
-its own Chromium `BrowserContext`, cookie jar, local storage, login form, canvas, and keyboard. The driver
-does not import game source, call scene or phase methods, inject relay messages, mirror waves, or apply
-resyncs. `check-public-boundary.mjs` protects that boundary.
+This opt-in harness drives two clients built from the exact implementation SHA through the same surfaces a
+player uses. Each seat has its own Chromium `BrowserContext`, cookie jar, local storage, login form, canvas,
+and keyboard. The driver does not import game source, call scene or phase methods, inject relay messages,
+mirror waves, or apply resyncs. `check-public-boundary.mjs` protects that boundary.
 
-The harness is deliberately separate from the engine and WebRTC gates. It is prework for the audit's first
-human-equivalent checkpoint and can be run against a built staging deployment without loading Phaser or
-Vitest on a developer workstation.
+The workflow builds the normal application once, adds only the CI entry's read-only surface observer, seals
+the bundle manifest, and fans runners from that same artifact. The observer emits only after a real UI
+handler is rendered and active. It reports role, membership generation, epoch/wave/turn, phase/mode, and the
+mechanical digest; it exposes no mutation method. A journey passes a boundary only when both clients report
+the same address, digest, and continuation surface. Every battle turn also correlates the guest's exact
+`continuationReady` ACK with the host's retained-address release.
 
 ## Journeys
 
@@ -25,16 +28,20 @@ the wrong visible route and the resume journey fails.
 
 ## Run on an isolated machine
 
-Use the opt-in **Co-op Public UI Journey** GitHub workflow for normal execution. Its four credentials are
+Use the opt-in **Co-op Public UI Journey** GitHub workflow for execution. Its primary four credentials are
 repository secrets and it uploads evidence even when the journey fails. Do not use real player accounts;
-journeys intentionally create or advance staging saves. The workflow targets
-`https://elite-redux-staging.pages.dev` unless a maintainer sets the protected `COOP_UI_STAGING_URL`
-repository variable; a workflow dispatcher cannot redirect credential entry to another origin.
+journeys intentionally create or advance beta-API saves. `COOP_UI_API_URL` and `COOP_UI_SIGNAL_URL` are
+maintainer-owned repository variables; workflow inputs cannot redirect credential entry. The optional
+reverse-resume fan-out uses a separately provisioned `COOP_UI_ALT_*` account pair so concurrent runners
+never race one save or lobby identity.
 
-For an isolated runner with Chrome already installed:
+For an isolated runner with Chrome and an already sealed exact-SHA bundle:
 
 ```text
-COOP_UI_BASE_URL=https://elite-redux-staging.pages.dev
+COOP_UI_BASE_URL=http://127.0.0.1:4175/?coopdebug=1
+COOP_UI_BROWSER_DIST=dist-coop-public-ui
+COOP_UI_ASSET_DIR=assets
+COOP_UI_EXPECTED_SIGNAL_ORIGIN=https://er-coop-api.heraklines.workers.dev
 COOP_UI_HOST_USERNAME=<staging account A>
 COOP_UI_HOST_PASSWORD=<secret>
 COOP_UI_GUEST_USERNAME=<staging account B>
@@ -67,11 +74,14 @@ Every run writes `dev-logs/coop-public-ui/<timestamp>-<journey>/` with:
 - per-checkpoint PNG screenshots;
 - sanitized DOM inventories and cookie metadata (never cookie values or passwords);
 - one or more Chrome performance traces when enabled; and
-- `summary.json` with duration, journey, requester direction, replacement count, and failure stack.
+- `summary.json` with the sealed SHA/digest, duration, journey, requester direction, replacement count, and
+  failure stack.
 
 The run fails on timeouts, page exceptions, unexpected console errors, non-aborted request failures,
-incorrect lobby roles, missing command/reward/replacement surfaces, or any stale reconnect observation. A
-screenshot alone is never treated as proof of progression.
+incorrect lobby roles, missing command/reward/replacement surfaces, divergent epoch/wave/turn or mechanical
+digest, a UI handler that is not active on both clients, a guest ACK that releases the wrong retained host
+address, an artifact/SHA/signaling-origin mismatch, or any stale reconnect observation. A screenshot alone
+is never treated as proof of progression.
 
 Before changing the driver, run the cheap boundary check:
 
@@ -79,6 +89,6 @@ Before changing the driver, run the cheap boundary check:
 node test/browser/coop-public-ui/check-public-boundary.mjs
 ```
 
-This harness remains opt-in until the blocked observability items in
+This harness remains opt-in until the blocked observability and account-fixture items in
 [`blocked-instrumentation.md`](./blocked-instrumentation.md) are resolved and the journeys are green on
-prepared staging accounts. It does not replace the calibrated co-op gate or milestone soak matrix.
+prepared dedicated accounts. It does not replace the calibrated co-op gate or milestone soak matrix.

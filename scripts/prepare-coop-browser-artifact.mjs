@@ -12,6 +12,7 @@ const root = resolve(import.meta.dirname, "..");
 const dist = resolve(root, process.env.COOP_BROWSER_DIST ?? "dist-coop-browser");
 const manifestPath = resolve(dist, "coop-browser-artifact.json");
 const verifyOnly = process.argv.includes("--verify");
+const entryContract = process.env.COOP_BROWSER_ENTRY_CONTRACT?.trim() || "transport-v1";
 
 function filesBelow(directory) {
   const files = [];
@@ -54,12 +55,18 @@ if (verifyOnly) {
   if (expected.version !== 1 || expected.digest !== actualDigest) {
     throw new Error(`co-op browser artifact digest mismatch: expected ${expected.digest}, got ${actualDigest}`);
   }
+  if (expected.entryContract !== entryContract) {
+    throw new Error(
+      `co-op browser artifact entry contract mismatch: expected ${expected.entryContract}, got ${entryContract}`,
+    );
+  }
   process.stdout.write(`verified immutable co-op browser artifact ${actualDigest} (${files.length} files)\n`);
 } else {
   const manifest = {
     version: 1,
     sha: process.env.GITHUB_SHA ?? "local",
     signalOrigin: process.env.VITE_COOP_SERVER_URL ?? "http://127.0.0.1:4174",
+    entryContract,
     digest: aggregateDigest(files),
     files,
   };

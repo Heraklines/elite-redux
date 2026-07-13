@@ -14,6 +14,57 @@ const REWARD_PHASE = /Start Phase SelectModifierPhase/u;
 const REWARD_OWNER = /OWNER drives reward screen/u;
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
+const GUEST_CONTINUATION_ACK = /guest ACK turn stage=continuationReady e=(\d+) wave=(\d+) turn=(\d+) rev=(\d+)/u;
+
+function comparableSurfaceObservation(observation) {
+  return {
+    surface: observation.surface,
+    epoch: observation.epoch,
+    membershipRevision: observation.membershipRevision,
+    connectionGeneration: observation.connectionGeneration,
+    wave: observation.wave,
+    turn: observation.turn,
+    phase: observation.phase,
+    uiMode: observation.uiMode,
+    uiActive: observation.uiActive,
+    stateDigest: observation.stateDigest,
+  };
+}
+
+function observedSurfaceEvents(client, surface, from) {
+  return client.evidence.events
+    .slice(from)
+    .filter(event => event.kind === "browser-surface" && event.observation.surface === surface)
+    .toReversed();
+}
+
+function findSharedSurfaceMatch(host, guest, surface, cursors, priorAddress, allowAddressRepeat, expectedWave) {
+  const hostEvents = observedSurfaceEvents(host, surface, cursors[host.label]);
+  const guestEvents = observedSurfaceEvents(guest, surface, cursors[guest.label]);
+  for (const hostEvent of hostEvents) {
+    const comparable = comparableSurfaceObservation(hostEvent.observation);
+    const canonical = JSON.stringify(comparable);
+    const address = `${comparable.epoch}:${comparable.wave}:${comparable.turn}`;
+    if (
+      (!allowAddressRepeat && priorAddress === address)
+      || (expectedWave != null && comparable.wave !== expectedWave)
+    ) {
+      continue;
+    }
+    const guestEvent = guestEvents.find(
+      candidate => JSON.stringify(comparableSurfaceObservation(candidate.observation)) === canonical,
+    );
+    if (guestEvent) {
+      return {
+        hostObservation: hostEvent.observation,
+        guestObservation: guestEvent.observation,
+        comparable,
+        address,
+      };
+    }
+  }
+  return null;
+}
 
 export class PublicUiClient {
   constructor(browserContext, credentials, config) {
@@ -25,6 +76,7 @@ export class PublicUiClient {
     this.pageCursor = 0;
     this.pageGeneration = 0;
     this.publicRole = null;
+    this.publicSeat = null;
     this.titleNewGameKeys = [
       ...(this.label === "host-seat" ? config.keys.titleNewGame.hostSeat : config.keys.titleNewGame.guestSeat),
     ];
@@ -42,6 +94,7 @@ export class PublicUiClient {
     this.evidence.networkState.account = null;
     this.evidence.networkState.lobby = null;
     this.publicRole = null;
+    this.publicSeat = null;
     this.page = await this.context.newPage();
     await this.page.setViewport(this.config.viewport);
     await this.page.setCacheEnabled(false);
@@ -182,15 +235,14 @@ export class PublicUiClient {
   }
 
   async waitForPublicRole(from = this.pageCursor) {
-    const event = await this.evidence.waitFor(/lobby connected code=.* role=(?:host|guest)/u, {
-      from,
+    const event = await this.evidence.waitForCondition(sink => sink.findBinding(from), {
       timeoutMs: this.config.timeoutMs,
-      description: "lobby connected role log",
+      description: "authenticated stable-seat session binding",
     });
-    const match = /role=(host|guest)/u.exec(event.text);
-    this.publicRole = match?.[1] ?? null;
-    if (!this.publicRole) {
-      throw new Error(`${this.label}: connected without an observable public role`);
+    this.publicRole = event.observation.role;
+    this.publicSeat = event.observation.seat;
+    if (this.publicRole == null || this.publicSeat == null) {
+      throw new Error(`${this.label}: connected without an observable stable-seat binding`);
     }
     return this.publicRole;
   }
@@ -219,6 +271,10 @@ export class PublicUiClient {
       description: "owned CommandPhase public UI",
     });
   }
+
+  async waitForObservedSurface(surface, from = 0) {
+    return this.evidence.waitForSurface(surface, { from, timeoutMs: this.config.timeoutMs });
+  }
 }
 
 export class DuoPublicUiRig {
@@ -229,6 +285,8 @@ export class DuoPublicUiRig {
     this.tracePage = null;
     this.traceGeneration = 0;
     this.replacementCount = 0;
+    this.lastSharedSurfaceAddress = new Map();
+    this.activeBattleWave = null;
   }
 
   static async launch(config) {
@@ -314,13 +372,89 @@ export class DuoPublicUiRig {
     await requester.requestPlayer(acceptor.credentials.username);
     await acceptor.acceptRequest(requester.credentials.username);
     await Promise.all(Object.values(this.clients).map(client => client.waitForPublicRole(roleCursors[client.label])));
-    if (requester.publicRole !== "guest" || acceptor.publicRole !== "host") {
+    const roles = Object.values(this.clients)
+      .map(client => client.publicRole)
+      .sort();
+    const seats = Object.values(this.clients)
+      .map(client => client.publicSeat)
+      .sort();
+    if (JSON.stringify(roles) !== JSON.stringify(["guest", "host"]) || JSON.stringify(seats) !== "[0,1]") {
       throw new Error(
-        `Lobby role contract changed: requester=${requester.publicRole}, acceptor=${acceptor.publicRole}`,
+        `Stable-seat binding invalid after lobby pairing: roles=${JSON.stringify(roles)} seats=${JSON.stringify(seats)}`,
       );
     }
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("paired-and-verifying-save")));
     return { requester, acceptor };
+  }
+
+  async assertSharedSurface(surface, cursors, proofName, { allowAddressRepeat = false, expectedWave = null } = {}) {
+    const values = Object.values(this.clients);
+    const host = this.host;
+    const guest = this.guest;
+    if (!host || !guest) {
+      throw new Error(`${proofName}: paired host/guest observations were unavailable`);
+    }
+    const priorAddress = this.lastSharedSurfaceAddress.get(surface);
+    const deadline = Date.now() + this.config.timeoutMs;
+    let match = null;
+    while (Date.now() < deadline && match == null) {
+      match = findSharedSurfaceMatch(host, guest, surface, cursors, priorAddress, allowAddressRepeat, expectedWave);
+      if (match == null) {
+        await delay(100);
+      }
+    }
+    if (match == null) {
+      const hostLast = host.evidence.findLastSurface(surface, cursors[host.label])?.observation ?? null;
+      const guestLast = guest.evidence.findLastSurface(surface, cursors[guest.label])?.observation ?? null;
+      throw new Error(
+        `${proofName}: clients never converged on one ${surface} address/state/surface; host=${JSON.stringify(hostLast)} guest=${JSON.stringify(guestLast)}`,
+      );
+    }
+    const { hostObservation, guestObservation, comparable: sharedComparable, address } = match;
+    if (
+      hostObservation.role !== "host"
+      || hostObservation.seat !== 0
+      || guestObservation.role !== "guest"
+      || guestObservation.seat !== 1
+    ) {
+      throw new Error(
+        `${proofName}: surface seats disagree with the authenticated binding: host=${hostObservation.role}/${hostObservation.seat} guest=${guestObservation.role}/${guestObservation.seat}`,
+      );
+    }
+    this.lastSharedSurfaceAddress.set(surface, address);
+    for (const client of values) {
+      client.evidence.record("shared-surface-proof", {
+        proofName,
+        peer: client === host ? guest.label : host.label,
+        observation: sharedComparable,
+      });
+    }
+    return sharedComparable;
+  }
+
+  async assertRetainedContinuation(cursors, proofName) {
+    if (!this.host || !this.guest) {
+      throw new Error(`${proofName}: retained continuation proof requires a paired host and guest`);
+    }
+    const guestEvent = await this.guest.evidence.waitFor(GUEST_CONTINUATION_ACK, {
+      from: cursors[this.guest.label],
+      timeoutMs: this.config.timeoutMs,
+      description: `${proofName} guest continuationReady ACK`,
+    });
+    const guestMatch = GUEST_CONTINUATION_ACK.exec(guestEvent.text);
+    if (!guestMatch) {
+      throw new Error(`${proofName}: malformed guest continuationReady evidence`);
+    }
+    const retainedAddress = guestMatch.slice(1).join(":");
+    const exactRelease = new RegExp(`host RELEASE retained turn after continuationReady key=${retainedAddress}`, "u");
+    await this.host.evidence.waitFor(exactRelease, {
+      from: cursors[this.host.label],
+      timeoutMs: this.config.timeoutMs,
+      description: `${proofName} host exact-address retained release`,
+    });
+    this.guest.evidence.record("retained-continuation-proof", { proofName, retainedAddress, side: "ack" });
+    this.host.evidence.record("retained-continuation-proof", { proofName, retainedAddress, side: "release" });
+    return retainedAddress;
   }
 
   async startFreshRun() {
@@ -355,10 +489,14 @@ export class DuoPublicUiRig {
     await Promise.all(
       Object.values(this.clients).map(client => client.waitForLocalCommand(phaseCursors[client.label])),
     );
+    const boundary = await this.assertSharedSurface("command", phaseCursors, "fresh-wave-1-command", {
+      expectedWave: 1,
+    });
+    this.activeBattleWave = boundary.wave;
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("wave-1-command")));
   }
 
-  async resumeRun() {
+  async resumeRun({ expectedWave = null } = {}) {
     if (!this.host || !this.guest) {
       throw new Error("resumeRun requires a paired public host and guest");
     }
@@ -377,6 +515,11 @@ export class DuoPublicUiRig {
     await Promise.all(
       Object.values(this.clients).map(client => client.waitForLocalCommand(resumeCursors[client.label])),
     );
+    const boundary = await this.assertSharedSurface("command", resumeCursors, "resumed-command", {
+      allowAddressRepeat: true,
+      expectedWave,
+    });
+    this.activeBattleWave = boundary.wave;
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("resumed-command")));
   }
 
@@ -399,6 +542,10 @@ export class DuoPublicUiRig {
 
       const outcome = await this.waitForPostTurnOutcome(from);
       if (outcome.kind === "reward") {
+        await this.assertSharedSurface("reward", from, `turn-${turn}-reward`, {
+          expectedWave: this.activeBattleWave,
+        });
+        await this.assertRetainedContinuation(from, `turn-${turn}-reward`);
         return turn;
       }
       if (outcome.kind === "faint") {
@@ -406,6 +553,12 @@ export class DuoPublicUiRig {
           throw new Error("Unexpected faint picker in the wave-1 journey; use faint-replacement with prepared saves");
         }
         await this.driveReplacement(outcome.client);
+      }
+      if (outcome.kind === "command") {
+        await this.assertSharedSurface("command", from, `turn-${turn}-next-command`, {
+          expectedWave: this.activeBattleWave,
+        });
+        await this.assertRetainedContinuation(from, `turn-${turn}-next-command`);
       }
       cursors = from;
     }
@@ -473,6 +626,11 @@ export class DuoPublicUiRig {
     const commandCursors = Object.fromEntries(values.map(client => [client.label, client.evidence.cursor()]));
     await owner.sequence(this.config.keys.rewardLeave, "leave-reward-screen");
     await Promise.all(values.map(client => client.waitForLocalCommand(commandCursors[client.label])));
+    const expectedWave = this.activeBattleWave == null ? null : this.activeBattleWave + 1;
+    const boundary = await this.assertSharedSurface("command", commandCursors, "wave-2-command", {
+      expectedWave,
+    });
+    this.activeBattleWave = boundary.wave;
     await Promise.all(values.map(client => client.checkpoint("wave-2-command")));
     // A successful fresh wave boundary creates Continue above New Game on the next
     // public title menu. Treat that visible layout change as a journey postcondition.
