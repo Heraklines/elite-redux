@@ -127,13 +127,18 @@ export class PublicUiClient {
       return autoTitle;
     }
 
-    // LOGIN_OR_REGISTER selects Login by default. This is a real keyboard action against the canvas UI.
-    await this.press("Space", "open-login-form");
-    await this.page.waitForFunction(
-      () => document.querySelectorAll('input[type="text"], input[type="password"]').length >= 2,
-      { timeout: this.config.timeoutMs },
-    );
-    await this.fillLoginForm();
+    if (this.config.accountMode === "register") {
+      await this.openRegistrationForm();
+      await this.fillRegistrationForm();
+    } else {
+      // LOGIN_OR_REGISTER selects Login by default. This is a real keyboard action against the canvas UI.
+      await this.press("Space", "open-login-form");
+      await this.page.waitForFunction(
+        () => document.querySelectorAll('input[type="text"], input[type="password"]').length >= 2,
+        { timeout: this.config.timeoutMs },
+      );
+      await this.fillLoginForm();
+    }
     const entered = await this.evidence.waitForCondition(
       sink => sink.find(TITLE_PHASE, this.pageCursor) ?? sink.find(SELECT_GENDER_PHASE, this.pageCursor),
       {
@@ -154,6 +159,70 @@ export class PublicUiClient {
     });
     await delay(this.config.settleDelayMs);
     return titleAfterOnboarding;
+  }
+
+  async openRegistrationForm() {
+    await delay(this.config.settleDelayMs);
+    const canvas = await this.page.$("#app canvas");
+    if (!canvas) {
+      throw new Error(`${this.label}: public game canvas disappeared before registration`);
+    }
+    // The login/register modal is centered in the 320x180 public canvas. Try a tight cluster over the
+    // visible right-hand Register button; every attempt is a real pointer click and success is proven only
+    // by the three visible registration inputs (never scene/UI-handler inspection).
+    const candidates = [
+      [0.56, 0.42],
+      [0.58, 0.42],
+      [0.54, 0.42],
+      [0.56, 0.45],
+      [0.56, 0.39],
+    ];
+    for (const [x, y] of candidates) {
+      const box = await canvas.boundingBox();
+      if (!box) {
+        throw new Error(`${this.label}: public game canvas has no visible bounds`);
+      }
+      this.evidence.record("canvas-click", { purpose: "open-registration-form", x, y });
+      await canvas.click({ offset: { x: box.width * x, y: box.height * y } });
+      await delay(this.config.settleDelayMs);
+      const inputCount = await this.page.$$eval(
+        'input[type="text"], input[type="password"]',
+        inputs =>
+          inputs.filter(input => {
+            if (!(input instanceof HTMLInputElement)) {
+              return false;
+            }
+            const bounds = input.getBoundingClientRect();
+            return bounds.width > 0 && bounds.height > 0 && getComputedStyle(input).visibility !== "hidden";
+          }).length,
+      );
+      if (inputCount >= 3) {
+        return;
+      }
+      if (inputCount === 2) {
+        throw new Error(`${this.label}: public canvas click opened Login instead of Register`);
+      }
+    }
+    throw new Error(`${this.label}: visible Register button did not open three public form inputs`);
+  }
+
+  async fillRegistrationForm() {
+    const usernameInput = await this.page.$('input[type="text"]');
+    const passwordInputs = await this.page.$$('input[type="password"]');
+    if (!usernameInput || passwordInputs.length < 2) {
+      throw new Error(`${this.label}: visible registration inputs were not present`);
+    }
+    this.evidence.record("fill-registration-form", {
+      fields: ["username", "password", "confirm-password"],
+      values: "<redacted>",
+    });
+    await usernameInput.click({ clickCount: 3 });
+    await this.page.keyboard.type(this.credentials.username, { delay: 20 });
+    for (const passwordInput of passwordInputs.slice(0, 2)) {
+      await passwordInput.click({ clickCount: 3 });
+      await this.page.keyboard.type(this.credentials.password, { delay: 20 });
+    }
+    await this.press("Enter", "submit-registration-form", { blurInputs: false });
   }
 
   async fillLoginForm() {
