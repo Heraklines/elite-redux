@@ -32,7 +32,6 @@ import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -114,18 +113,6 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     });
   }
 
-  function wireInitialGuestCommand(rig: DuoRig): void {
-    // Wave 1 was already opened before this focused reward/counter scenario installs the live duo
-    // runtime. Supply only that pre-existing command request through the runtime's public responder;
-    // wave 2 below is deliberately driven through the guest's real Command/Fight/TargetSelect UI.
-    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-      command: Command.FIGHT,
-      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-      moveId: MoveId.TACKLE,
-      targets: [BattlerIndex.ENEMY_2],
-    }));
-  }
-
   async function takeFirstRewardThroughPublicUi(
     rig: DuoRig,
     ownerArgs: unknown[],
@@ -162,7 +149,13 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    wireInitialGuestCommand(rig);
+    // Align the directly-constructed guest to its real TurnInit/Command queue, then make all gameplay
+    // delivery addressed-context-only. Wave 1 and wave 2 both use the public command UI below.
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.phaseManager.clearAllPhases();
+      rig.guestScene.phaseManager.shiftPhase();
+    });
+    pair.setAutomaticDelivery(false);
     // This scenario verifies reward relay/counter symmetry for returning players. The first-time item
     // tutorial is a separate MESSAGE interaction that deliberately blocks reward ACTION input until its
     // text is acknowledged; keep it out of this call-chain proof on both simulated clients.
@@ -171,14 +164,13 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
 
     // ===== Wave 1: host plays to a win + guest replays (reach the reward shop, counter 0 = host owns). =====
     const turn = rig.hostScene.currentBattle.turn;
-    await hostPlayWave(rig);
+    await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
+    await hostPlayWave(rig, true);
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
     // From this point onward, deliver each retained continuation under its addressed client's
     // process-global context. The ordinary loopback resumes both sides in whichever context happened
     // to send last, which is impossible in production (one client per process) and can project the
     // owner's asynchronous reward continuation into the guest UI.
-    pair.setAutomaticDelivery(false);
-
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     expect(counterBefore % 2, "wave 1: host owns the shop (even counter)").toBe(0);
 

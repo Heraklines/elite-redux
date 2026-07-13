@@ -116,6 +116,7 @@ import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { TheBargainPhase } from "#phases/the-bargain-phase";
 import type { GameManager } from "#test/framework/game-manager";
 import {
+  beginRewardShopWatch,
   buildDuo,
   type DuoLogs,
   type DuoRig,
@@ -2149,11 +2150,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
 
     let action: string;
     if (hostOwns) {
+      await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
       action = await withClient(rig.hostCtx, () => driveOwnerReward(hostShop, rig.hostScene));
-      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
     } else {
+      await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
       action = await withClient(rig.guestCtx, () => driveOwnerReward(guestShop, rig.guestScene));
-      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
     }
     actionScript.push(`wave ${wave}: reward shop owner=${hostOwns ? "host" : "guest"} ${action}`);
 

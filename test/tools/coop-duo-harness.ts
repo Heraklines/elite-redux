@@ -1718,7 +1718,7 @@ export interface ShopPhaseSeam {
   coopInteractionStart: number;
   typeOptions: unknown[];
   selectRewardModifierOption(cursor: number, cb: () => boolean): boolean;
-  coopRelaySend(choice: number, data: number[] | undefined, label: string): void;
+  coopRelaySend(choice: number, data: number[] | undefined, label: string): boolean;
   coopEndMirror(): void;
   coopAdvanceInteraction(): void;
 }
@@ -1818,11 +1818,15 @@ export async function driveHostRewardShopOwner(
     }
   }
   if (!tookTerminalReward) {
-    // LEAVE: relay the skip + advance the interaction counter (the watcher mirrors this terminal).
+    // LEAVE: relay the skip. A retained guest-owned intent deliberately parks this owner until the
+    // host watcher commits and returns the complete result; advancing/end() here would let NewBattlePhase
+    // open and then allow the late result to rewind its battle state underneath that continuation.
     hostPhase.coopEndMirror();
-    hostPhase.coopRelaySend(/* COOP_INTERACTION_LEAVE */ -1, undefined, "skip");
-    hostPhase.end();
-    hostPhase.coopAdvanceInteraction();
+    const parkedForAuthority = hostPhase.coopRelaySend(/* COOP_INTERACTION_LEAVE */ -1, undefined, "skip");
+    if (!parkedForAuthority) {
+      hostPhase.end();
+      hostPhase.coopAdvanceInteraction();
+    }
   }
   await drainLoopback();
   return pinned;
