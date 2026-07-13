@@ -151,6 +151,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     });
   }
 
+  // Focused CI entrypoint for the reusable public guest-command driver.
   it("DUO 3-wave: host plays each wave, guest replays + converges, host drives the reward shop each wave", async () => {
     // FORCE a deterministic NON-party reward (a LURE) into every shop so the host owner can TAKE a
     // reward without driving a party-target menu - exercising the reward-grant + relay on purpose.
