@@ -7,6 +7,7 @@ on:
       - feat/elite-redux-port
     paths:
       - ".github/workflows/coop-gate-sharded.yml"
+      - ".github/workflows/coop-mutation-assurance.yml"
       - ".github/actions/setup-deps/**"
       - ".nvmrc"
       - "assets"
@@ -24,6 +25,7 @@ on:
       - "scripts/coop-gate-timings.json"
       - "scripts/prepare-coop-browser-artifact.mjs"
       - "scripts/run-coop-gate.mjs"
+      - "scripts/run-coop-mutation-gate.mjs"
       - "scripts/run-coop-static-gate.mjs"
       - "scripts/run-coop-browser-transport.mjs"
       - "scripts/vite.coop-browser.config.mjs"
@@ -403,10 +405,15 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  mutation-assurance:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Protocol-33 mutation assurance lane
+    uses: ./.github/workflows/coop-mutation-assurance.yml
+
   coop-required:
     name: Co-op required aggregate
     if: always()
-    needs: [browser, static, gate]
+    needs: [browser, static, gate, mutation-assurance]
     runs-on: ubuntu-latest
     steps:
       - name: Record aggregate status
@@ -414,20 +421,24 @@ jobs:
           BROWSER_RESULT: ${{ needs.browser.result }}
           STATIC_RESULT: ${{ needs.static.result }}
           GATE_RESULT: ${{ needs.gate.result }}
+          MUTATION_RESULT: ${{ needs.mutation-assurance.result }}
         run: >-
           node -e "require('node:fs').writeFileSync('coop-required-status.json',
           JSON.stringify({version:1,sha:process.env.GITHUB_SHA,browser:process.env.BROWSER_RESULT,
-          static:process.env.STATIC_RESULT,gate:process.env.GATE_RESULT},null,2)+'\n')"
+          static:process.env.STATIC_RESULT,gate:process.env.GATE_RESULT,
+          mutation:process.env.MUTATION_RESULT},null,2)+'\n')"
 
       - name: Require every co-op checkpoint job
         env:
           BROWSER_RESULT: ${{ needs.browser.result }}
           STATIC_RESULT: ${{ needs.static.result }}
           GATE_RESULT: ${{ needs.gate.result }}
+          MUTATION_RESULT: ${{ needs.mutation-assurance.result }}
         run: |
           test "$BROWSER_RESULT" = success
           test "$STATIC_RESULT" = success
           test "$GATE_RESULT" = success
+          test "$MUTATION_RESULT" = success
 
       - name: Upload aggregate status evidence
         if: always()
