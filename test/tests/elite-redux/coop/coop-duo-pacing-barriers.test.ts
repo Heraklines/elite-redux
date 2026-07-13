@@ -31,7 +31,6 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
@@ -43,10 +42,10 @@ import {
   driveHostRewardShopOwner,
   forceItemRewards,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
   withClient,
-  withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -170,7 +169,7 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: true }));
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
 
     await arriveGuestCommandBoundary(rig, 2);
@@ -229,7 +228,7 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
     expect(awaitedPoints, `the owner shop AWAITED the partner at ${shopPoint} before committing`).toContain(shopPoint);
 
     // The watcher then mirrors + the interaction still advances exactly once (barrier did not desync it).
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once").toBe(counter + 1);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest lockstep with host").toBe(counter + 1);

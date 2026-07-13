@@ -257,8 +257,8 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     );
     expect(
       encounterSource.match(/this\.enterEncounterPresentation\(\)/g),
-      "loaded, ephemeral, and persisted encounter branches all cross the chokepoint",
-    ).toHaveLength(3);
+      "loaded, authoritative-guest, ephemeral, and persisted encounter branches all cross the chokepoint",
+    ).toHaveLength(4);
   });
 
   it("routes turn and replacement publication through one all-or-nothing authority capture", () => {

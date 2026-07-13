@@ -23,7 +23,6 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { PokeballType } from "#enums/pokeball";
 import { SpeciesId } from "#enums/species-id";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
@@ -34,10 +33,10 @@ import {
   driveHostRewardShopOwner,
   forceItemRewards,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
   withClient,
-  withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -107,7 +106,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     expect(hostShop.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     if (hostOwns) {
       await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: true }));
       await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));

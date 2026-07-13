@@ -48,7 +48,6 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { PokemonData } from "#system/pokemon-data";
 import { GameManager } from "#test/framework/game-manager";
 import {
@@ -59,11 +58,11 @@ import {
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
   type ReplayGameManager,
+  reachQueuedRewardShop,
   remirrorWave,
   replayCoopTrace,
   type ShopPhaseSeam,
   withClient,
-  withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -356,7 +355,7 @@ describe.skipIf(!RUN)(
           await game.phaseInterceptor.to("SelectModifierPhase", false);
         });
         const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-        const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+        const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
         const takeReward = w === 1 && hostOwns;
         if (hostOwns) {
           await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward }));

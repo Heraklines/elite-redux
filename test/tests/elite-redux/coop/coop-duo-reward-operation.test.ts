@@ -51,7 +51,6 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
@@ -61,9 +60,9 @@ import {
   driveHostPartyRewardOwner,
   forceItemRewards,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   withClient,
-  withClientSync,
 } from "#test/tools/coop-duo-harness";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import Phaser from "phaser";
@@ -163,7 +162,7 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     expect(hostShop.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
 
     const hostModsBefore = rig.hostScene.modifiers.length;
     const guestModsBefore = rig.guestScene.modifiers.length;
@@ -215,7 +214,7 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
       await game.phaseInterceptor.to("SelectModifierPhase", false);
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     const guestModsBefore = rig.guestScene.modifiers.length;
 
     await withClient(rig.hostCtx, () => driveHostPartyRewardOwner(hostShop, { slot: SLOT }));

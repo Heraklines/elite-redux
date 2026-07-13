@@ -56,7 +56,6 @@ import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { LearnMovePhase } from "#phases/learn-move-phase";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   beginRewardShopWatch,
@@ -72,6 +71,7 @@ import {
   forceItemRewards,
   forceNextMysteryEncounter,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   withClient,
   withClientSync,
@@ -225,6 +225,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     });
     pair.setAutomaticDelivery(false);
 
+    const guestResetSpy = vi.spyOn(rig.guestScene, "reset");
     const applyCheckpointSpy = vi.spyOn(coopEngine, "applyCoopCheckpoint");
     // Per-wave resync watch: count the guest's requestStateSync calls (an auto-resync on a checksum
     // mismatch). A converged run resyncs at most a handful of times (the spike's organic seed/ability
@@ -336,7 +337,16 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
         await withClient(rig.hostCtx, async () => {
           await game.phaseInterceptor.to("CommandPhase", false);
         });
-        await withClient(rig.guestCtx, () => driveClientPhaseQueueTo(rig.guestScene, "CommandPhase"));
+        const guestCommand = await withClient(rig.guestCtx, () =>
+          driveClientPhaseQueueTo(rig.guestScene, "CommandPhase"),
+        );
+        expect(guestCommand.phaseName, `wave ${w}: guest opened the real wave ${w + 1} command surface`).toBe(
+          "CommandPhase",
+        );
+        expect(
+          guestResetSpy,
+          `wave ${w}: guest never treats the host-only persistence transaction as a fatal local save failure`,
+        ).not.toHaveBeenCalled();
         expect(rig.hostScene.currentBattle.waveIndex, `wave ${w}: host advanced to wave ${w + 1}`).toBe(w + 1);
         expect(rig.guestScene.currentBattle.waveIndex, `wave ${w}: guest advanced to wave ${w + 1}`).toBe(w + 1);
         const nextCarrier = waveCarrierSpy.mock.calls.find(([wave]) => wave === w + 1);
@@ -449,7 +459,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     });
 
     // Drive the GUEST watcher through the relayed TM_CASE pick + its no-op LearnMovePhase.
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     const result = await withClient(rig.guestCtx, () => driveGuestTmCaseRegression(guestShop, pair.host, pick));
 
     expect(result.queuedContinuation, "the guest watcher queued the continuation SelectModifierPhase copy").toBe(true);

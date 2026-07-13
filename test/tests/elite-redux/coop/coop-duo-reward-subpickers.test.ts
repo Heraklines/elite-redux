@@ -48,7 +48,6 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
@@ -59,6 +58,7 @@ import {
   driveHostPartyRewardOwner,
   forceItemRewards,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   withClient,
   withClientSync,
@@ -128,14 +128,14 @@ describe.skipIf(!RUN)("co-op DUO reward sub-pickers: owner drives, watcher adopt
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
   }
 
-  /** Reach the host's SelectModifierPhase and build the guest's mirror shop phase. */
+  /** Reach both clients' queued production SelectModifierPhase. */
   async function reachShops(rig: DuoRig): Promise<{ hostShop: ShopPhaseSeam; guestShop: ShopPhaseSeam }> {
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("SelectModifierPhase", false);
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     expect(hostShop.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     return { hostShop, guestShop };
   }
 
