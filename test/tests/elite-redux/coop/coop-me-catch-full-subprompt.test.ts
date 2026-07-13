@@ -42,7 +42,7 @@ import type { CoopInteractionOutcome, CoopMessage } from "#data/elite-redux/coop
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { UiMode } from "#enums/ui-mode";
 import { coopHostStreamCatchFullAwaitSlot } from "#mystery-encounters/encounter-phase-utils";
-import { CoopReplayMePhase } from "#phases/coop-replay-me-phase";
+import { CoopReplayMePhase, setActiveCoopReplayMePhaseForHarness } from "#phases/coop-replay-me-phase";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -66,6 +66,7 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
     resetCoopMeOperationFlag();
     resetCoopMeOperationState();
     setCoopMeInteractionStart(-1); // drop the ME pin so the next file starts clean
+    setActiveCoopReplayMePhaseForHarness(null);
     // Citizenship (#710): restore the real scene so the NEXT ER_SCENARIO file's GameManager does not reuse
     // one of this file's stubs. Order-robust: each stub file restores before the next file's beforeEach.
     initGlobalScene(prevGlobalScene);
@@ -82,8 +83,11 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
     const runtime = assembleCoopRuntime(host, { username: "Host", netcodeMode: "authoritative" });
     setCoopRuntime(runtime);
     setCoopMeInteractionStart(start);
+    const currentPhase = { phaseName: "HostMysterySubPrompt" };
     initGlobalScene({
       gameMode: { isCoop: true },
+      currentBattle: { waveIndex: 7 },
+      phaseManager: { getCurrentPhase: () => currentPhase },
       getPlayerParty: () => new Array(partySize).fill({}),
     } as unknown as BattleScene);
     const guestRelay = new CoopInteractionRelay(guest);
@@ -183,6 +187,7 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
     const setModeCalls: unknown[][] = [];
     initGlobalScene({
       gameMode: { isCoop: true },
+      currentBattle: { waveIndex: 7 },
       ui: {
         getMode: () => UiMode.MYSTERY_ENCOUNTER,
         showText: (_t: string, _d: unknown, cb?: () => void) => cb?.(),
@@ -192,10 +197,21 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
           cb?.(2); // the guest picks slot 2 to replace
           return Promise.resolve();
         },
+        setModeBoundedWhen: (mode: UiMode, _timeout: number, stillLive: () => boolean, ...args: unknown[]) => {
+          if (!stillLive()) {
+            return Promise.resolve("superseded");
+          }
+          setModeCalls.push([mode, ...args]);
+          const cb = args.find(a => typeof a === "function") as ((slot: number) => void) | undefined;
+          cb?.(2);
+          return Promise.resolve("completed");
+        },
       },
     } as unknown as BattleScene);
 
+    setCoopMeOperationEnabled(false); // isolate the negotiated raw-fallback picker; retained control has its own suite
     const phase = new CoopReplayMePhase(counter);
+    setActiveCoopReplayMePhaseForHarness(phase);
     // Cut the loop: after relaying the slot the real openSubPickCapture calls awaitOutcomeThenTerminal to
     // await the NEXT sub-prompt / terminal - a no-op here (this test isolates the single sub-pick relay).
     (phase as unknown as { awaitOutcomeThenTerminal: () => void }).awaitOutcomeThenTerminal = () => {};
@@ -203,11 +219,26 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
     // Arm the host observer BEFORE driving so the relayed pick can never race ahead of the waiter.
     const relayedP = hostObserver.awaitInteractionChoice(COOP_ME_PUMP_SEQ_BASE + counter, 1000);
 
-    (
-      phase as unknown as {
-        openSubPickCapture: (r: ReturnType<typeof getCoopInteractionRelay>, s: unknown) => void;
-      }
-    ).openSubPickCapture(getCoopInteractionRelay(), { kind: "catchFull", pokemonName: "Rattata" });
+    const presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }> = {
+      k: "mePresent",
+      tokens: {},
+      meetsReqs: [],
+      labels: [],
+      subPrompt: { kind: "catchFull", pokemonName: "Rattata" },
+    };
+    const seam = phase as unknown as {
+      bindSubPromptPresentation: (present: Extract<CoopInteractionOutcome, { k: "mePresent" }>) => string | null;
+      openSubPickCapture: (
+        r: ReturnType<typeof getCoopInteractionRelay>,
+        s: NonNullable<Extract<CoopInteractionOutcome, { k: "mePresent" }>["subPrompt"]>,
+        identity: string,
+      ) => void;
+    };
+    const presentationIdentity = seam.bindSubPromptPresentation(presentation);
+    if (presentationIdentity == null || presentation.subPrompt == null) {
+      throw new Error("catch-full presentation did not bind");
+    }
+    seam.openSubPickCapture(getCoopInteractionRelay(), presentation.subPrompt, presentationIdentity);
 
     await flush();
 

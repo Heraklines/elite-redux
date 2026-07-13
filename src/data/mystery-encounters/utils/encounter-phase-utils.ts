@@ -13,6 +13,7 @@ import {
   commitMeAuthorityGuestIntent,
   commitMeOwnerIntent,
   isCoopMeOperationEnabled,
+  isCoopMeOperationJournalActive,
   nextCoopMePresentationStep,
 } from "#data/elite-redux/coop/coop-me-operation";
 import {
@@ -20,7 +21,6 @@ import {
   coopMeInteractionStartValue,
   setCoopMeActivePresentation,
 } from "#data/elite-redux/coop/coop-me-pin-state";
-import { isCoopOperationJournalActive } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   coopGuestAwaitMeBattleParty,
   coopGuestShouldAdoptMeBattleParty,
@@ -150,7 +150,7 @@ function commitAndPublishMePresentation(
     failCoopSharedSession(`Mystery presentation ${seq} could not enter authoritative control`);
     return false;
   }
-  if (isCoopMeOperationEnabled() && isCoopOperationJournalActive()) {
+  if (isCoopMeOperationJournalActive()) {
     setCoopMeActivePresentation(presentation);
   } else {
     relay?.sendInteractionOutcome(seq, "mePresent", presentation);

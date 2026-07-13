@@ -12,29 +12,29 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import { COOP_INTERACTION_LEAVE, type CoopInteractionChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
-import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   adoptMeWatcherChoice,
   commitMeOwnerIntent,
   coopMeTerminalSanctionedTails,
   isCoopMeOperationEnabled,
+  isCoopMeOperationJournalActive,
   settleCoopMeOwnerIntentRetries,
 } from "#data/elite-redux/coop/coop-me-operation";
 import {
-  CoopMePresentationIntentGate,
   type CoopMeCommittedTerminalTransaction,
+  CoopMePresentationIntentGate,
   captureCoopActiveMysteryControl,
   coopMeHandoffBattleStarted,
   coopMeInteractionStartValue,
   resolveCoopMeOwnerIntentRebind,
-  setCoopMeInteractionStart,
   setCoopMeHandoffBattleStarted,
+  setCoopMeInteractionStart,
   setOnMeCommittedTerminal,
   setOnMePinCleared,
   setOnMeSnapshotRebind,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
-import { isCoopOperationJournalActive } from "#data/elite-redux/coop/coop-operation-journal";
+import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   coopSessionGeneration,
@@ -295,7 +295,7 @@ export class CoopReplayMePhase extends Phase {
       });
       return;
     }
-    if (isCoopOperationJournalActive()) {
+    if (isCoopMeOperationJournalActive()) {
       // A fast host can commit the complete terminal before this replay surface is installed (notably an
       // embedded shop/outro). Its first delivery correctly remains unacknowledged because the destination
       // was not executable yet. Announce the now-live receiver immediately instead of waiting for the
@@ -537,7 +537,7 @@ export class CoopReplayMePhase extends Phase {
       localRole: getCoopController()?.role ?? "guest",
       wave: globalScene.currentBattle?.waveIndex ?? -1,
       turn: 0,
-      resend: isCoopOperationJournalActive()
+      resend: isCoopMeOperationJournalActive()
         ? () => relay.sendInteractionChoice(this.seq, ME_CHOICE_KIND, index, [step])
         : undefined,
     });
@@ -572,7 +572,7 @@ export class CoopReplayMePhase extends Phase {
 
   private bindSubPromptPresentation(present: Extract<CoopInteractionOutcome, { k: "mePresent" }>): string | null {
     let identity: string;
-    if (isCoopOperationJournalActive()) {
+    if (isCoopMeOperationJournalActive()) {
       const control = captureCoopActiveMysteryControl();
       if (
         control == null
@@ -625,7 +625,7 @@ export class CoopReplayMePhase extends Phase {
       localRole: getCoopController()?.role ?? "guest",
       wave: globalScene.currentBattle?.waveIndex ?? -1,
       turn: 0,
-      resend: isCoopOperationJournalActive()
+      resend: isCoopMeOperationJournalActive()
         ? () => relay.sendInteractionChoice(this.seq, ME_SUBPICK_KIND, value, [step])
         : undefined,
     });
@@ -694,14 +694,14 @@ export class CoopReplayMePhase extends Phase {
     const terminalArm: MeTerminalArm =
       inheritedTerminalArm
       ?? this.liveTerminalArm
-      ?? (isCoopOperationJournalActive()
+      ?? (isCoopMeOperationJournalActive()
         ? (this.journalTerminalArm ??= new Promise(() => {}))
         : relay
-          .awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS, COOP_ME_TERMINAL_CHOICE_KINDS)
-          .then(action => ({
-            tag: "terminal" as const,
-            action,
-          })));
+            .awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS, COOP_ME_TERMINAL_CHOICE_KINDS)
+            .then(action => ({
+              tag: "terminal" as const,
+              action,
+            })));
     this.liveTerminalArm = terminalArm;
     void Promise.race([outcomeArm, terminalArm]).then(winner => {
       if (raceDone) {
@@ -767,7 +767,7 @@ export class CoopReplayMePhase extends Phase {
         return;
       }
       if (outcome != null && outcome.k === "meResync") {
-        if (isCoopOperationJournalActive()) {
+        if (isCoopMeOperationJournalActive()) {
           coopWarn("me", "raw meResync ignored while the journal owns the terminal transaction", { seq: this.seq });
           void terminalArm.then(t => {
             if (this.boundaryStillLive()) {
@@ -982,7 +982,7 @@ export class CoopReplayMePhase extends Phase {
    * pick/outcome seq). A null is transport recovery, never an encounter exit.
    */
   private awaitHostTerminal(relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>): void {
-    if (isCoopOperationJournalActive()) {
+    if (isCoopMeOperationJournalActive()) {
       // The complete retained transaction calls `applyCommittedTerminalTransaction` synchronously. A raw
       // waiter here would consume compatibility control and recreate split DATA/control correctness.
       getCoopRuntime()?.durability?.reconnect();
@@ -1062,7 +1062,7 @@ export class CoopReplayMePhase extends Phase {
     if (
       !this.boundaryStillLive()
       || transaction.pinned !== this.interactionCounter
-      || ((transaction.payload.terminal === "battle") !== (transaction.payload.destination.kind === "battle"))
+      || (transaction.payload.terminal === "battle") !== (transaction.payload.destination.kind === "battle")
     ) {
       return false;
     }
@@ -1073,7 +1073,7 @@ export class CoopReplayMePhase extends Phase {
       return (
         this.acceptedTerminal.kind === "battle-handoff"
         && ((this.acceptedTerminal.operationId === transaction.operationId
-            && this.acceptedTerminal.step === transaction.step)
+          && this.acceptedTerminal.step === transaction.step)
           || transaction.step === this.acceptedTerminal.step + 1)
       );
     }
@@ -1135,11 +1135,7 @@ export class CoopReplayMePhase extends Phase {
   }
 
   /** Project the host's final state directly into its declared continuation, skipping local ME mechanics. */
-  private completeCommittedLeave(
-    operationId: string,
-    step: number,
-    destination: CoopMeContinueDestination,
-  ): boolean {
+  private completeCommittedLeave(operationId: string, step: number, destination: CoopMeContinueDestination): boolean {
     const controller = getCoopController();
     const battle = globalScene.currentBattle;
     if (
@@ -1202,7 +1198,7 @@ export class CoopReplayMePhase extends Phase {
     ) {
       return;
     }
-    if (isCoopOperationJournalActive()) {
+    if (isCoopMeOperationJournalActive()) {
       // Recovery control proves which retained operation is missing, but it does not contain the complete
       // authoritative DATA/destination transaction. Request that exact tail; never execute from diagnostics.
       coopWarn("me", "verified Mystery terminal control rebound; awaiting complete retained transaction", {
@@ -1546,10 +1542,7 @@ export class CoopReplayMePhase extends Phase {
    */
   private finishWithoutLeaving(hostTurn?: number, committedDestination?: CoopMeBattleDestination): void {
     if (this.settled) {
-      if (
-        committedDestination != null
-        && (this.settledDetached || this.acceptedTerminal.kind === "battle-handoff")
-      ) {
+      if (committedDestination != null && (this.settledDetached || this.acceptedTerminal.kind === "battle-handoff")) {
         // A quiz/nested-picker can finish its presentation phase before its option spawns a battle, and a
         // Colosseum CONTINUE produces another complete battle transaction after the prior round. In both
         // cases the retained step supersedes the detached surface and is the next mechanical boundary.
@@ -1592,7 +1585,7 @@ export class CoopReplayMePhase extends Phase {
         coopMeBattleEndDelegate != null
         && relayRef != null
         && coopMeBattleEndDelegate({ interactionCounter: counter, seqTerm: this.seqTerm, relay: relayRef });
-      if (!delegateOwnsTerminal && !isCoopOperationJournalActive()) {
+      if (!delegateOwnsTerminal && !isCoopMeOperationJournalActive()) {
         const awaitTrueLeave = (): void => {
           void relayRef
             ?.awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS, COOP_ME_TERMINAL_CHOICE_KINDS)
@@ -1615,28 +1608,13 @@ export class CoopReplayMePhase extends Phase {
     getCoopUiMirror()?.endSession();
     // P33: a committed battle transaction already applied the host's full party/field/double state and
     // carries the exact mode + constructor argument. The split stream/inference path remains rollback-only.
-    if (committedDestination != null) {
-      const battle = globalScene.currentBattle;
-      const encounter = battle?.mysteryEncounter;
-      if (battle == null || encounter == null) {
-        throw new Error("committed Mystery battle has no live encounter");
-      }
-      battle.turn = committedDestination.hostTurn;
-      encounter.encounterMode = committedDestination.encounterMode as MysteryEncounterMode;
-      globalScene.phaseManager.clearPhaseQueue();
-      globalScene.phaseManager.pushNew("MysteryEncounterBattlePhase", committedDestination.disableSwitch);
-      coopLog("me", "guest queued committed ME battle destination", {
-        mode: committedDestination.encounterMode,
-        disableSwitch: committedDestination.disableSwitch,
-        enemies: globalScene.getEnemyParty().length,
-      });
-    } else {
+    if (committedDestination == null) {
       // #819 (live BOTH-stuck at the ME battle): the guest's field is EMPTY here - its own
-    // wave roll's summon chain was purged at the divert (#813) and the host's ME-battle
-    // summons run in a phase only the host executes. Adopt the host's streamed battle party
-    // (buffered by now - it is sent just before the terminal) and queue the guest's OWN
-    // MysteryEncounterBattlePhase so both sides summon: with a fielded party the guest's
-    // CommandPhase opens its real fight UI and answers the host's command request.
+      // wave roll's summon chain was purged at the divert (#813) and the host's ME-battle
+      // summons run in a phase only the host executes. Adopt the host's streamed battle party
+      // (buffered by now - it is sent just before the terminal) and queue the guest's OWN
+      // MysteryEncounterBattlePhase so both sides summon: with a fielded party the guest's
+      // CommandPhase opens its real fight UI and answers the host's command request.
       try {
         const key = meBattleHandoffKey(globalScene.currentBattle.waveIndex, this.interactionCounter);
         const enemies =
@@ -1662,6 +1640,21 @@ export class CoopReplayMePhase extends Phase {
       } catch (e) {
         coopWarn("me", "guest ME battle boot failed (falling through to the old flow)", e);
       }
+    } else {
+      const battle = globalScene.currentBattle;
+      const encounter = battle?.mysteryEncounter;
+      if (battle == null || encounter == null) {
+        throw new Error("committed Mystery battle has no live encounter");
+      }
+      battle.turn = committedDestination.hostTurn;
+      encounter.encounterMode = committedDestination.encounterMode as MysteryEncounterMode;
+      globalScene.phaseManager.clearPhaseQueue();
+      globalScene.phaseManager.pushNew("MysteryEncounterBattlePhase", committedDestination.disableSwitch);
+      coopLog("me", "guest queued committed ME battle destination", {
+        mode: committedDestination.encounterMode,
+        disableSwitch: committedDestination.disableSwitch,
+        enemies: globalScene.getEnemyParty().length,
+      });
     }
     this.settled = true;
     coopMeHostPresentation = null;
@@ -1673,10 +1666,10 @@ export class CoopReplayMePhase extends Phase {
     } catch {
       /* teardown is best-effort */
     }
-    if (committedDestination != null) {
-      currentPhase.end();
-    } else {
+    if (committedDestination == null) {
       this.end();
+    } else {
+      currentPhase.end();
     }
   }
 

@@ -50,8 +50,8 @@
 // cross-ME stale ordering still runs on the pinned counter (which advances once per whole ME).
 // =============================================================================
 
-import { COOP_CAP_OP_ME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
+import { COOP_CAP_OP_ME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
 import { setCoopMeOwnerIntentOrdinals } from "#data/elite-redux/coop/coop-me-pin-state";
@@ -82,10 +82,7 @@ import {
   CoopOperationGuest,
   CoopOperationHost,
 } from "#data/elite-redux/coop/coop-operation-runtime";
-import {
-  COOP_ME_PUMP_SEQ_BASE,
-  COOP_ME_TERM_SEQ_BASE,
-} from "#data/elite-redux/coop/coop-seq-registry";
+import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type {
   CoopAuthoritativeBattleStateV1,
@@ -232,11 +229,12 @@ export class CoopMeTerminalTransactionReceiver {
     }
     const priorPinned = this.pinned.get(receipt.pinned);
     if (priorReceipt == null) {
-      const expectedStep = priorPinned == null
-        ? 0
-        : priorPinned.terminal === "battle" && priorPinned.executed
-          ? priorPinned.step + 1
-          : null;
+      const expectedStep =
+        priorPinned == null
+          ? 0
+          : priorPinned.terminal === "battle" && priorPinned.executed
+            ? priorPinned.step + 1
+            : null;
       if (expectedStep == null || receipt.step !== expectedStep) {
         return "rejected";
       }
@@ -448,6 +446,11 @@ function armOwnerIntentRetry(operationId: string, resend: () => void): void {
  */
 export function isCoopMeOperationEnabled(): boolean {
   return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_ME);
+}
+
+/** Whether the complete retained ME envelope, rather than the negotiated raw fallback, owns correctness. */
+export function isCoopMeOperationJournalActive(): boolean {
+  return isCoopMeOperationEnabled() && isCoopOperationJournalActive();
 }
 
 /** Select the migrated path (true) or the legacy relay fallback (false). The one-line per-surface rollback (§5.4). */
@@ -972,10 +975,7 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
       coopWarn("me", `ME op WATCHER guest non-applied (${applyRes.kind}) id=${opId} -> fallback (Wave-2c)`);
       return { adopt: false, reason: `guest-${applyRes.kind}` };
     }
-    coopLog(
-      "me",
-      `ME op WATCHER adopt kind=${params.kind} choice=${params.res.choice} id=${opId} (Wave-2c)`,
-    );
+    coopLog("me", `ME op WATCHER adopt kind=${params.kind} choice=${params.res.choice} id=${opId} (Wave-2c)`);
     return { adopt: true, kind: params.kind };
   } catch (e) {
     coopWarn("me", "ME op WATCHER gate threw (handled - deterministic fallback) (Wave-2c)", e);

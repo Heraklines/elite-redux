@@ -60,12 +60,6 @@ export class GameOverPhase extends BattlePhase {
   start() {
     super.start();
 
-    // The game-over phase itself is the registered terminal continuation.  Publish only after start() owns
-    // the live queue; doing this before clearCoopRuntime preserves the exact retained turn evidence.
-    if (isCoopAuthoritativeGuest()) {
-      getCoopBattleStreamer()?.notifyContinuationSurface("terminal");
-    }
-
     // Showdown 1v1 (C3): a versus match NEVER runs the classic game-over (no save / ribbons /
     // achievements / cloud). Route the player's loss (or an unexpected showdown game-over) to the
     // ephemeral showdown result flow instead. Showdown-only -> every other mode is untouched.
@@ -73,12 +67,6 @@ export class GameOverPhase extends BattlePhase {
       globalScene.phaseManager.unshiftNew("ShowdownResultPhase", this.isVictory, "victory");
       return this.end();
     }
-
-    // Co-op (#633, authoritative wave-advance handshake): the host's run ended. Signal the guest
-    // renderer so the protocol is complete. The guest currently treats `gameOver` as terminal
-    // (it does not run the next-wave victory tail; the full guest game-over render is a TODO) -
-    // the wave guard still consumes it safely. Hard no-op for solo / non-host / lockstep.
-    broadcastCoopWaveResolved("gameOver");
 
     globalScene.phaseManager.hideAbilityBar();
 
@@ -106,6 +94,18 @@ export class GameOverPhase extends BattlePhase {
       return this.end();
     }
     // Otherwise, continue standard Game Over logic
+
+    // The ME hook above is allowed to turn a battle loss back into a live encounter. Only a true terminal
+    // can prove continuationReady; otherwise the retained battle transaction must remain owned by the
+    // resumed ME surface instead of being released against a terminal that never opened.
+    if (isCoopAuthoritativeGuest()) {
+      getCoopBattleStreamer()?.notifyContinuationSurface("terminal");
+    }
+
+    // Co-op (#633, authoritative wave-advance handshake): publish only after an ME's onGameOver hook
+    // confirms this is a real run terminal. Expert Breeder losses deliberately resume the encounter;
+    // announcing WAVE_ADVANCE(gameOver) before that hook split the guest onto a terminal screen forever.
+    broadcastCoopWaveResolved("gameOver");
 
     if (this.isVictory && globalScene.gameMode.isEndless) {
       const genderIndex = globalScene.gameData.gender ?? PlayerGender.UNSET;

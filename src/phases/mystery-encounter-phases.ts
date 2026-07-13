@@ -13,6 +13,7 @@ import {
   commitMeAuthorityLocalPick,
   commitMeOwnerIntent,
   isCoopMeOperationEnabled,
+  isCoopMeOperationJournalActive,
   nextCoopMePresentationStep,
   releaseCoopMeRetainedTerminal,
 } from "#data/elite-redux/coop/coop-me-operation";
@@ -26,7 +27,7 @@ import {
   setCoopMeTerminalControl,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
-import { isCoopOperationJournalActive } from "#data/elite-redux/coop/coop-operation-journal";
+import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   coopSessionGeneration,
   failCoopSharedSession,
@@ -40,7 +41,6 @@ import {
   setCoopMeBattleInteractionCounter,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ME_PICK_CHOICE_KINDS, COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
-import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { erRecordMysteryEncounterResolved } from "#data/elite-redux/er-achievement-detection";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
@@ -250,11 +250,7 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
   }
   // Legacy/non-journal fallback preserves the original DATA-before-terminal order. In journal mode the
   // complete terminal envelope is the only DATA+destination carrier.
-  if (
-    controller.role === "host"
-    && outcome != null
-    && (!isCoopMeOperationEnabled() || !isCoopOperationJournalActive())
-  ) {
+  if (controller.role === "host" && outcome != null && !isCoopMeOperationJournalActive()) {
     getCoopInteractionRelay()?.sendInteractionOutcome(
       COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue(),
       "meResync",
@@ -265,7 +261,7 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
   // pump session already ended at the battle spawn, so endOwner() below sends NO leave sentinel -
   // the guest never learns the encounter is over. Send the TRUE ME-end LEAVE explicitly; the
   // guest's detached post-handoff listener leaves + advances on it (idempotent if it already did).
-  if (handoff && controller.role === "host" && !isCoopOperationJournalActive()) {
+  if (handoff && controller.role === "host" && !isCoopMeOperationJournalActive()) {
     const relay = getCoopInteractionRelay();
     const termSeq = COOP_ME_TERM_SEQ_BASE + coopMeInteractionStartValue();
     coopLog("me", "post-handoff ME END: sending TRUE leave terminal (#822)", { termSeq });
@@ -276,7 +272,7 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
   // With a journal, the committed operation materializer is the only wake-up. Raw 9M is retained solely
   // for the negotiated legacy fallback, where there is no committed envelope to race.
   try {
-    pump.endOwner(!isCoopOperationJournalActive());
+    pump.endOwner(!isCoopMeOperationJournalActive());
     // Both clients advance LOCALLY + idempotently (keyed to the ME's start counter), so the
     // whole ME (encounter + its embedded reward shop, which suppresses its own advance) counts
     // as exactly ONE alternation step on each client - no host-broadcast race (#633).
@@ -546,7 +542,7 @@ export class MysteryEncounterPhase extends Phase {
         return false;
       }
       enc.dialogueTokens = { ...present.tokens };
-      if (isCoopMeOperationEnabled() && isCoopOperationJournalActive()) {
+      if (isCoopMeOperationJournalActive()) {
         setCoopMeActivePresentation(present);
       } else {
         getCoopInteractionRelay()?.sendInteractionOutcome(seqMe, "mePresent", present);

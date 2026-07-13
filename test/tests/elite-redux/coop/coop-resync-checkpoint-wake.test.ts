@@ -171,10 +171,13 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
       "the admitted authoritative tick uses the explicit reassert path",
     ).toHaveBeenCalledOnce();
     expect(authoritativeReapply).toHaveBeenCalledOnce();
+    const streamer = getCoopBattleStreamer();
     expect(
-      getCoopBattleStreamer()?.peekCheckpoint(),
-      "only the fully verified retry consumes the retained frame",
-    ).toBeNull();
+      streamer?.peekCheckpoint()?.authoritativeState?.tick,
+      "material and presentation proof retain authority until the real continuation opens",
+    ).toBe(20);
+    expect(streamer?.notifyContinuationSurface("command"), "the addressed wave-4 turn-2 command releases it").toBe(1);
+    expect(streamer?.peekCheckpoint(), "continuationReady consumes the fully verified carrier").toBeNull();
     expect(phaseInternals.recoveryTickFloor, "successful verification commits the recovery floor").toBe(20);
   });
 

@@ -24,6 +24,7 @@ import {
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { UiMode } from "#enums/ui-mode";
 import { CoopReplayMePhase, setActiveCoopReplayMePhaseForHarness } from "#phases/coop-replay-me-phase";
@@ -323,7 +324,7 @@ describe("CoopReplayMePhase fail-closed terminal recovery", () => {
     try {
       clearCoopRuntime();
       const { host } = createLoopbackPair();
-      const runtime = assembleCoopRuntime(host, { username: "Host", netcodeMode: "lockstep" });
+      const runtime = assembleCoopRuntime(host, { username: "Host", netcodeMode: "authoritative" });
       setCoopRuntime(runtime);
       setCoopMeOperationEnabled(true);
       const counter = 0;
@@ -344,6 +345,28 @@ describe("CoopReplayMePhase fail-closed terminal recovery", () => {
       } as unknown as BattleScene);
       const phase = new PostMysteryEncounterPhase();
       current = phase;
+      const terminalOutcome = {
+        k: "meResync",
+        base: null,
+        party: [],
+        meSaveData: "[]",
+        seed: "seed",
+        waveSeed: "wave-seed",
+        dex: "dex",
+        authoritativeState: {
+          version: 1,
+          wave: 27,
+          turn: 0,
+          playerParty: [],
+          enemyParty: [],
+        },
+      } as unknown as Extract<CoopInteractionOutcome, { k: "meResync" }>;
+      const phaseSeam = phase as unknown as {
+        terminalOutcomeLatch: {
+          getOrCapture: () => Extract<CoopInteractionOutcome, { k: "meResync" }>;
+        };
+      };
+      vi.spyOn(phaseSeam.terminalOutcomeLatch, "getOrCapture").mockReturnValue(terminalOutcome);
 
       const originalSubmit = CoopOperationHost.prototype.submit;
       let terminalSubmits = 0;

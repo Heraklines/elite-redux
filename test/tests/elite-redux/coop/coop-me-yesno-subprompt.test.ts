@@ -22,13 +22,20 @@
 // Phaser boot. The seq BASE is imported-by-value from the SOURCE constant path so the test tracks
 // production, not a copy.
 
+import type { BattleScene } from "#app/battle-scene";
+import { globalScene, initGlobalScene } from "#app/global-scene";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  resetCoopMeOperationFlag,
+  resetCoopMeOperationState,
+  setCoopMeOperationEnabled,
+} from "#data/elite-redux/coop/coop-me-operation";
 import { setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
 import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { coopHostStreamSecondaryAwaitIndex } from "#mystery-encounters/encounter-phase-utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 /** The seq base CoopReplayMePhase / the ME pump key off (`BASE + interactionCounter`); see coop-me-pump.ts. */
 const COOP_ME_PUMP_SEQ_BASE = 8_000_000;
@@ -37,9 +44,26 @@ const COOP_ME_PUMP_SEQ_BASE = 8_000_000;
 const YES_NO_LABELS = ["Yes", "No"];
 
 describe("co-op bespoke yes/no ME sub-prompt relay (#827)", () => {
+  let previousScene: BattleScene;
+
+  beforeEach(() => {
+    previousScene = globalScene;
+    setCoopMeOperationEnabled(true);
+    resetCoopMeOperationState();
+    const currentPhase = { phaseName: "HostMysterySecondaryPrompt" };
+    initGlobalScene({
+      gameMode: { isCoop: true },
+      currentBattle: { waveIndex: 7 },
+      phaseManager: { getCurrentPhase: () => currentPhase },
+    } as unknown as BattleScene);
+  });
+
   afterEach(() => {
     clearCoopRuntime();
     setCoopMeInteractionStart(-1); // drop the ME pin so the next file starts clean
+    resetCoopMeOperationFlag();
+    resetCoopMeOperationState();
+    initGlobalScene(previousScene);
   });
 
   /**
