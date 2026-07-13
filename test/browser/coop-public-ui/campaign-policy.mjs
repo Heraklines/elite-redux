@@ -101,6 +101,7 @@ function envKeys(name, fallback) {
 }
 
 const allowedRewardModes = new Set(["leave", "pick-first"]);
+const allowedModes = new Set(["gating", "shakedown", "nightly"]);
 
 /** Read every campaign-only knob (base gameplay config still comes from loadConfig). */
 export function loadCampaignPolicy() {
@@ -108,11 +109,26 @@ export function loadCampaignPolicy() {
   if (!allowedRewardModes.has(rewardMode)) {
     throw new Error(`COOP_UI_REWARD_MODE must be one of ${[...allowedRewardModes].join(", ")}`);
   }
+  // Run mode gates the loud-fail contract. autoFirst (press-through of an UNKNOWN surface) is
+  // ONLY permitted under an explicitly-labelled "shakedown"; in any gating/nightly config an
+  // unknown surface is an immediate loud failure and autoFirst is structurally forbidden.
+  const mode = envTrim("COOP_UI_CAMPAIGN_MODE") || "gating";
+  if (!allowedModes.has(mode)) {
+    throw new Error(`COOP_UI_CAMPAIGN_MODE must be one of ${[...allowedModes].join(", ")}`);
+  }
+  const autoFirstRequested = envBoolean("COOP_UI_AUTO_FIRST", false);
+  if (autoFirstRequested && mode !== "shakedown") {
+    throw new Error(
+      "COOP_UI_AUTO_FIRST is only allowed under COOP_UI_CAMPAIGN_MODE=shakedown; refusing to press through "
+        + `unknown surfaces in a "${mode}" run (unknown surface = loud fail).`,
+    );
+  }
   return {
+    mode,
     targetWaves: envInteger("COOP_UI_CAMPAIGN_WAVES", 30),
-    // Loud-fail on an unknown interactive surface by default; opt into deterministic
-    // press-through with COOP_UI_AUTO_FIRST=1 (mirrors the headless `--auto-first`).
-    autoFirst: envBoolean("COOP_UI_AUTO_FIRST", false),
+    // Press-through of an UNKNOWN interactive surface, mirroring the headless `--auto-first`.
+    // Gated to shakedown mode above; a gating/nightly run always loud-fails on the unknown.
+    autoFirst: autoFirstRequested && mode === "shakedown",
     stallMs: envInteger("COOP_UI_CAMPAIGN_STALL_MS", 8_000),
     rewardMode,
     raiseSpeed: envBoolean("COOP_UI_RAISE_SPEED", true),

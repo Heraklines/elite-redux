@@ -170,6 +170,8 @@ jobs:
           COOP_UI_ACCOUNT_MODE: register
           # push = cheap shakedown (8 waves, auto-first ON); dispatch = inputs; cron = 30-wave soak.
           COOP_UI_CAMPAIGN_WAVES: ${{ inputs.campaign_waves || (github.event_name == 'push' && '8') || '30' }}
+          # Only a shakedown may press through unknown surfaces; nightly + gating dispatch loud-fail.
+          COOP_UI_CAMPAIGN_MODE: ${{ (github.event_name == 'push' && 'shakedown') || (github.event_name == 'schedule' && 'nightly') || (inputs.auto_first && 'shakedown') || 'gating' }}
           COOP_UI_REWARD_MODE: ${{ inputs.reward_mode || 'leave' }}
           COOP_UI_AUTO_FIRST: ${{ (github.event_name == 'push' && '1') || (inputs.auto_first && '1') || '0' }}
           COOP_UI_RAISE_SPEED: ${{ (inputs.raise_speed == false && '0') || '1' }}
