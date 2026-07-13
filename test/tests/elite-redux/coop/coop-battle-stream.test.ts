@@ -524,6 +524,86 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("never aliases accepted buffered commits or live events when a later wave reuses the turn number", async () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 1, turn: 1 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+
+      hostStream.emitTurn(
+        7,
+        1,
+        1,
+        [{ k: "message", text: "old-wave" }],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        emptyAuthoritativeState(1),
+      );
+      hostStream.emitEvent(7, 1, 1, 0, { k: "message", text: "old-wave-live" });
+      await flushWire();
+
+      current.wave = 2;
+      expect(
+        guestStream.consumeLiveEvents(1),
+        "an accepted wave-1 event cannot become wave 2's event merely because both use turn 1",
+      ).toEqual([]);
+
+      const awaited = guestStream.awaitTurn(1);
+      hostStream.emitEvent(7, 2, 1, 0, { k: "message", text: "new-wave-live" });
+      hostStream.emitTurn(
+        7,
+        2,
+        1,
+        [{ k: "message", text: "new-wave" }],
+        emptyCheckpoint(),
+        "cafebabecafebabe",
+        "{}",
+        emptyFullField(),
+        emptyAuthoritativeState(2),
+      );
+
+      const resolution = await awaited;
+      expect(resolution?.wave).toBe(2);
+      expect(resolution?.events).toEqual([{ k: "message", text: "new-wave" }]);
+      expect(guestStream.consumeLiveEvents(1)).toEqual([{ seq: 0, event: { k: "message", text: "new-wave-live" } }]);
+      guestStream.acknowledgeTurnCommit(resolution!);
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
+    it("never exposes a buffered replacement checkpoint after its full authority address is no longer current", async () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 4, turn: 2 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+      const old = checkpointEnvelope();
+
+      hostStream.sendCheckpoint(
+        old.reason,
+        old.epoch,
+        old.wave,
+        old.turn,
+        old.checkpoint,
+        old.checksum,
+        old.fullField,
+        old.authoritativeState,
+      );
+      await flushWire();
+      expect(guestStream.peekCheckpoint()?.wave).toBe(4);
+
+      current.epoch = 8;
+      current.wave = 1;
+      current.turn = 1;
+      expect(
+        guestStream.peekCheckpoint(),
+        "a prior epoch's accepted singleton cannot divert the new run's replay pump",
+      ).toBeNull();
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
     it("retains multiple replacement revisions and clears only an exact converged ACK", async () => {
       const { host, guest } = createLoopbackPair();
       const hostStream = new CoopBattleStreamer(host, {
@@ -1246,5 +1326,17 @@ describe("stale-turn finalize mark (#790 + regression fix)", () => {
     stream.clearFinalizedMark();
     expect(stream.isTurnFinalized(1, 1), "after the wave-boundary clear NOTHING is stale").toBe(false);
     expect(stream.isTurnFinalized(1, 2), "after the wave-boundary clear NOTHING is stale (finalized turn)").toBe(false);
+  });
+
+  it("does not treat the same wave/turn in a replacement authority epoch as finalized", () => {
+    const { host } = createLoopbackPair();
+    const current = { epoch: 7, wave: 1, turn: 2 };
+    const stream = new CoopBattleStreamer(host, { authorityContext: () => current });
+    stream.markTurnFinalized(1, 2);
+    expect(stream.isTurnFinalized(1, 2)).toBe(true);
+
+    current.epoch = 8;
+    expect(stream.isTurnFinalized(1, 2), "finalization is scoped to the complete authority address").toBe(false);
+    stream.dispose();
   });
 });
