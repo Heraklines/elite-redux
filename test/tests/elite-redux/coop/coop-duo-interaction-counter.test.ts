@@ -32,13 +32,13 @@ import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
+import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { type ModifierSelectCallback, SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
-import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import {
   beginRewardShopWatch,
   buildDuo,
@@ -54,6 +54,7 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import type { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
 import Phaser from "phaser";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -113,6 +114,18 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     });
   }
 
+  function wireInitialGuestCommand(rig: DuoRig): void {
+    // Wave 1 was already opened before this focused reward/counter scenario installs the live duo
+    // runtime. Supply only that pre-existing command request through the runtime's public responder;
+    // wave 2 below is deliberately driven through the guest's real Command/Fight/TargetSelect UI.
+    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
+      command: Command.FIGHT,
+      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
+      moveId: MoveId.TACKLE,
+      targets: [BattlerIndex.ENEMY_2],
+    }));
+  }
+
   async function takeFirstRewardThroughPublicUi(
     rig: DuoRig,
     ownerArgs: unknown[],
@@ -149,6 +162,7 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireInitialGuestCommand(rig);
     // This scenario verifies reward relay/counter symmetry for returning players. The first-time item
     // tutorial is a separate MESSAGE interaction that deliberately blocks reward ACTION input until its
     // text is acknowledged; keep it out of this call-chain proof on both simulated clients.
