@@ -6,6 +6,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
+import * as coopPresentation from "#data/elite-redux/coop/coop-presentation";
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import type {
   CoopAuthoritativeBattleStateV1,
@@ -100,6 +101,7 @@ describe("production replacement carrier transaction", () => {
     clearPhaseQueue = vi.fn();
     showText = vi.fn();
     resetScene = vi.fn();
+    vi.spyOn(coopPresentation, "settleCoopAuthoritativeProjection").mockResolvedValue(true);
     const hostMon = { coopOwner: "host", isActive: () => true };
     const guestMon = { coopOwner: "guest", isActive: () => true };
     initGlobalScene({

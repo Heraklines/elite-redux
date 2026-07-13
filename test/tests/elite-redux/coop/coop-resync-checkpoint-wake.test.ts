@@ -6,6 +6,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
+import * as coopPresentation from "#data/elite-redux/coop/coop-presentation";
 import { clearCoopRuntime, getCoopBattleStreamer, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import type {
   CoopAuthoritativeBattleStateV1,
@@ -81,6 +82,7 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
   beforeEach(() => {
     priorScene = globalScene;
     coopEngine.resetCoopStateTicks();
+    vi.spyOn(coopPresentation, "settleCoopAuthoritativeProjection").mockResolvedValue(true);
     initGlobalScene({
       currentBattle: { waveIndex: 4, turn: 2 },
       phaseManager: {

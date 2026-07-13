@@ -2018,7 +2018,7 @@ export class CoopApplyResyncPhase extends Phase {
       const latest = streamer.peekCheckpoint();
       if (
         latest == null
-        || (announced !== undefined && latest !== announced)
+        || (announced !== undefined && !sameCoopCheckpointAuthority(latest, announced))
         || !coopCheckpointSupersedesResync(this.snapshot, latest, this.recoveryTickFloor)
       ) {
         return false;
@@ -2264,6 +2264,20 @@ export function coopResyncSnapshotIsStale(
 /** A modern wire state tick is a positive, finite, losslessly representable integer. */
 function isCoopRecoveryTick(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+/** Compare the immutable identity of an announced carrier with its separately-cloned retained handoff. */
+function sameCoopCheckpointAuthority(left: CoopCheckpointEnvelope, right: CoopCheckpointEnvelope): boolean {
+  return (
+    left.reason === right.reason
+    && left.epoch === right.epoch
+    && left.wave === right.wave
+    && left.turn === right.turn
+    && left.revision === right.revision
+    && left.checkpoint.tick === right.checkpoint.tick
+    && left.authoritativeState.tick === right.authoritativeState.tick
+    && left.checksum === right.checksum
+  );
 }
 
 /**
