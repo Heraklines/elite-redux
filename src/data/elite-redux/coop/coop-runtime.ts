@@ -213,6 +213,7 @@ import {
   COOP_STORMGLASS_SEQ,
 } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopFieldIndexOf, coopInteractionOwnerSeat, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
+import type { CoopP33AuthenticatedContextV1 } from "#data/elite-redux/coop/coop-session-binding";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import {
@@ -2078,6 +2079,13 @@ export interface CoopRuntime {
    * Resolves true when the channel is re-established within the grace window.
    */
   rejoinDriver?: () => Promise<boolean>;
+  /** Authenticated P33 signaling lifecycle. `end` is called only by the shared terminal supervisor. */
+  p33Signaling?: {
+    heartbeat: () => Promise<void>;
+    leave: () => Promise<void>;
+    end: () => Promise<void>;
+    dispose: () => void;
+  };
   /**
    * W2b APPLICATION-LEVEL DURABILITY (contract doc §4): the journal + ACK/resend + reconnect-from-revision
    * engine. Present when {@linkcode isCoopDurabilityEnabled} at assembly (flag-gated, §5). A passive
@@ -3543,6 +3551,7 @@ export function connectCoopSession(
     username?: string | undefined;
     netcodeMode?: CoopNetcodeMode | undefined;
     kind?: CoopSessionKind | undefined;
+    p33?: CoopP33AuthenticatedContextV1 | undefined;
   } = {},
 ): CoopRuntime {
   coopLog(
@@ -3637,6 +3646,7 @@ export function assembleCoopRuntime(
     username?: string | undefined;
     netcodeMode?: CoopNetcodeMode | undefined;
     kind?: CoopSessionKind | undefined;
+    p33?: CoopP33AuthenticatedContextV1 | undefined;
   } = {},
 ): CoopRuntime {
   resetCoopGlobalOperationOrder();
@@ -3680,6 +3690,7 @@ export function assembleCoopRuntime(
     requiredCapabilities: [COOP_CAP_OP_BIOME, COOP_CAP_OP_ME, COOP_CAP_DURABILITY_JOURNAL],
     requireFunctionalFingerprint: true,
     onEpochNegotiated: applyCoopOperationEpoch,
+    p33: opts.p33,
   });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
   // truth that rides along in broadcastRunConfig; on the GUEST it is only the pre-

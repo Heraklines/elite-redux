@@ -38,6 +38,16 @@ import {
   sameCoopIdentity,
 } from "#data/elite-redux/coop/coop-run-identity";
 import { CoopInteractionTurn, type CoopPlayerId, coopSeatOfRole } from "#data/elite-redux/coop/coop-session";
+import {
+  type CoopAccountIdentityV1,
+  type CoopFrameContextV1,
+  type CoopP33AuthenticatedContextV1,
+  type CoopSessionBindingV1,
+  canAdoptCoopP33Rejoin,
+  coopSeatForAccount,
+  createFreshCoopSeatMap,
+  validateCoopRunSeatMap,
+} from "#data/elite-redux/coop/coop-session-binding";
 import type {
   CoopConnectionState,
   CoopMessage,
@@ -216,7 +226,11 @@ export interface CoopSessionOptions {
   onEpochNegotiated?: ((epoch: number) => void) | undefined;
   /** Production launch requires a matching functional data fingerprint before `bothReady` can open. */
   requireFunctionalFingerprint?: boolean | undefined;
+  /** Authenticated public P33 pairing axes. Absent on legacy/manual/loopback sessions. */
+  p33?: CoopP33AuthenticatedContextV1 | undefined;
 }
+
+type CoopP33HelloMessage = Extract<CoopMessage, { t: "hello"; pairingId: string }>;
 
 /**
  * Owns the local player's co-op session state and the transport plumbing. One
@@ -260,6 +274,16 @@ export class CoopSessionController {
   private readonly onCapabilitiesNegotiated: ((negotiated: ReadonlySet<string>) => void) | undefined;
   private readonly onEpochNegotiated: ((epoch: number) => void) | undefined;
   private readonly requireFunctionalFingerprint: boolean;
+  /** Authenticated signaling context; its bearer never leaves this browser. */
+  private p33Context: CoopP33AuthenticatedContextV1 | null;
+  private p33Binding: CoopSessionBindingV1 | null = null;
+  private p33BindingReady = false;
+  private p33BindingRejected = false;
+  private p33BindingBuild: Promise<void> | null = null;
+  private p33BindingRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private p33PeerHelloAccepted = false;
+  private p33BindingAuthoringEnabled = false;
+  private authenticatedProtocolViolation = false;
   /** Candidate belongs to this controller; it becomes authoritative iff this side is host. */
   private readonly epochCandidate: number;
   private sessionEpochValue: number;
@@ -440,10 +464,18 @@ export class CoopSessionController {
 
   constructor(transport: CoopTransport, opts: CoopSessionOptions = {}) {
     this.transport = transport;
-    this.role = transport.role;
-    this.partnerRoleId = coopPartnerRole(transport.role);
+    this.p33Context = opts.p33 == null ? null : structuredClone(opts.p33);
+    // P33 authority is a stable-seat decision. The WebRTC invitation direction never reaches this axis.
+    this.role =
+      this.p33Context == null
+        ? transport.role
+        : this.p33Context.localSeatId === this.p33Context.authoritySeatId
+          ? "host"
+          : "guest";
+    this.partnerRoleId = coopPartnerRole(this.role);
     this.tiebreak = opts.tiebreak ?? Math.random();
-    this.username = opts.username ?? (transport.role === "host" ? "Player 1" : "Player 2");
+    this.username =
+      this.p33Context?.account.displayName ?? opts.username ?? (this.role === "host" ? "Player 1" : "Player 2");
     this.version = opts.version ?? "1";
     this.localCapabilities = opts.localCapabilities;
     this.requiredCapabilities = [...(opts.requiredCapabilities ?? [])];
@@ -487,11 +519,74 @@ export class CoopSessionController {
     return (
       !this.versionMismatch
       && !this.functionalFingerprintMismatch
+      && !this.authenticatedProtocolViolation
+      && (this.p33Context == null || (this.p33PeerHelloAccepted && !this.p33BindingRejected))
       && (!this.requireFunctionalFingerprint || this._functionalFingerprintStatus === "match")
       && (this.requiredCapabilities.length === 0
         || (this.negotiatedCapabilities != null
           && this.requiredCapabilities.every(capability => this.negotiatedCapabilities?.has(capability))))
     );
+  }
+
+  /** Invitation/SDP role only. It never grants gameplay ownership or authority. */
+  get transportRole(): "offerer" | "answerer" {
+    return this.p33Context?.transportRole ?? (this.transport.role === "host" ? "offerer" : "answerer");
+  }
+
+  get account(): CoopAccountIdentityV1 | null {
+    return this.p33Context == null ? null : { ...this.p33Context.account };
+  }
+
+  get localSeatId(): number {
+    return this.p33Context?.localSeatId ?? this.seat;
+  }
+
+  get authoritySeatId(): number {
+    return this.p33Context?.authoritySeatId ?? 0;
+  }
+
+  get authorityRole(): "authority" | "replica" {
+    return this.localSeatId === this.authoritySeatId ? "authority" : "replica";
+  }
+
+  get isAuthority(): boolean {
+    return this.authorityRole === "authority";
+  }
+
+  get authenticatedBinding(): CoopSessionBindingV1 | null {
+    return this.p33Binding == null ? null : structuredClone(this.p33Binding);
+  }
+
+  /** Exact context stamped onto addressed P33 frames once the binding is accepted. */
+  p33FrameContext(): CoopFrameContextV1 | null {
+    const context = this.p33Context;
+    const binding = this.p33Binding;
+    if (context == null || binding == null || !this.p33BindingReady) {
+      return null;
+    }
+    return {
+      sessionId: binding.sessionId,
+      sessionEpoch: binding.sessionEpoch,
+      seatMapId: binding.seatMap.seatMapId,
+      membershipRevision: binding.membershipRevision,
+      fromSeatId: context.localSeatId,
+      connectionGeneration: context.connectionGeneration,
+    };
+  }
+
+  /** Adopt a Worker-authenticated hot rejoin without changing seat, authority, run, or epoch. */
+  adoptP33Rejoin(next: CoopP33AuthenticatedContextV1): boolean {
+    if (this.p33Context == null || this.p33Binding == null || !canAdoptCoopP33Rejoin(this.p33Context, next)) {
+      coopWarn("launch", "REFUSE P33 hot rejoin because authenticated binding axes changed");
+      return false;
+    }
+    this.p33Context = structuredClone(next);
+    // A fresh channel must prove the retained binding again. Authority replays it; replica re-ACKs it.
+    this.p33BindingReady = false;
+    this.p33BindingRejected = false;
+    this.p33PeerHelloAccepted = false;
+    this.clearP33BindingRetry();
+    return true;
   }
 
   /** The agreed host-authored control-plane epoch (0 only before a guest receives hello). */
@@ -545,6 +640,19 @@ export class CoopSessionController {
     coopLog("launch", `RUN IDENTITY fresh reason=${reason} run=${this.runIdValue}`);
   }
 
+  /** Cold start/resume boundary: the previous binding cannot authorize the newly-minted epoch. */
+  private prepareP33BindingForCurrentBoundary(authorBinding: boolean, source: CoopSessionBindingV1["source"]): void {
+    if (this.p33Context == null) {
+      return;
+    }
+    this.clearP33BindingRetry();
+    this.p33Context.source = source;
+    this.p33Binding = null;
+    this.p33BindingReady = false;
+    this.p33BindingRejected = false;
+    this.p33BindingAuthoringEnabled = authorBinding;
+  }
+
   /** Host-only hard boundary: cold resume/new run. Hot rejoin deliberately never calls this. */
   beginNewOperationEpoch(reason: string, announce = true): number {
     if (this.role !== "host") {
@@ -566,6 +674,35 @@ export class CoopSessionController {
   }
 
   private sendHello(): void {
+    if (this.p33Context != null) {
+      const binding = this.p33Binding;
+      this.transport.send({
+        t: "hello",
+        version: "er-coop-33",
+        pairingId: this.p33Context.pairingId,
+        account: { ...this.p33Context.account },
+        transportRole: this.p33Context.transportRole,
+        authorityClaim: this.authorityRole,
+        capabilities: [...(this.localCapabilities ?? [])],
+        ...(binding == null
+          ? {}
+          : {
+              existingBinding: {
+                sessionId: binding.sessionId,
+                ...(binding.runId == null ? {} : { runId: binding.runId }),
+                sessionEpoch: binding.sessionEpoch,
+                seatMapId: binding.seatMap.seatMapId,
+                authoritySeatId: binding.authoritySeatId,
+                membershipRevision: binding.membershipRevision,
+              },
+            }),
+      });
+      if (this.isAuthority && this.p33PeerHelloAccepted && binding != null && !this.p33BindingReady) {
+        this.transmitP33Binding();
+      }
+      this.ensureP33Binding();
+      return;
+    }
     this.transport.send({
       t: "hello",
       version: this.version,
@@ -1047,6 +1184,7 @@ export class CoopSessionController {
     }
     this.mintFreshRunIdentity("start-new");
     this.beginNewOperationEpoch("start-new", false);
+    this.prepareP33BindingForCurrentBoundary(true, "fresh");
     const decisionId = `${Date.now().toString(36)}-${this.tiebreak.toString(36)}-${++this.resumeDecisionSeq}`;
     this.latestResumeDecision = {
       kind: "start-new",
@@ -1201,7 +1339,13 @@ export class CoopSessionController {
 
   /** Both players locked in and each brought at least one Pokemon. */
   bothReady(): boolean {
-    return this.compatibilityAccepted && this._localReady && this._partnerReady && this.roster.bothReady();
+    return (
+      this.compatibilityAccepted
+      && (this.p33Context == null || this.p33BindingReady)
+      && this._localReady
+      && this._partnerReady
+      && this.roster.bothReady()
+    );
   }
 
   /**
@@ -1775,6 +1919,7 @@ export class CoopSessionController {
       return;
     }
     this.disposed = true;
+    this.clearP33BindingRetry();
     this.cancelAllResumeTransactions();
     // Pending compatibility waits observe disposal before listeners are removed, so a terminal
     // lobby exit cannot leave a 15-second continuation alive against a replacement runtime.
@@ -1989,8 +2134,322 @@ export class CoopSessionController {
     });
   }
 
+  private handleP33Hello(msg: CoopP33HelloMessage): void {
+    const context = this.p33Context;
+    this.partnerVersionValue = msg.version;
+    if (context == null) {
+      this.authenticatedProtocolViolation = true;
+      this.p33BindingRejected = true;
+      coopWarn("launch", "REFUSE authenticated P33 hello on a legacy-selected session");
+      this.notifyCompatibilityLifecycle();
+      return;
+    }
+    const expectedPeerRole = context.transportRole === "offerer" ? "answerer" : "offerer";
+    const peerSeat = context.localSeatId === 0 ? 1 : 0;
+    const expectedAuthorityClaim = peerSeat === context.authoritySeatId ? "authority" : "replica";
+    const account = msg.account as CoopAccountIdentityV1 | null | undefined;
+    const identityMatches =
+      account != null
+      && typeof account === "object"
+      && account.version === 1
+      && account.accountId === context.peerAccount.accountId
+      && account.displayName === context.peerAccount.displayName
+      && account.canonicalUsername === context.peerAccount.canonicalUsername;
+    const capabilitiesValid =
+      Array.isArray(msg.capabilities)
+      && msg.capabilities.length <= 128
+      && msg.capabilities.every(capability => typeof capability === "string" && capability.length <= 128);
+    const existing = msg.existingBinding;
+    const existingBindingValid =
+      existing == null
+      || (typeof existing === "object"
+        && typeof existing.sessionId === "string"
+        && existing.sessionId.length <= 256
+        && (existing.runId == null || isCoopRunId(existing.runId))
+        && Number.isSafeInteger(existing.sessionEpoch)
+        && existing.sessionEpoch > 0
+        && typeof existing.seatMapId === "string"
+        && /^[0-9a-f]{64}$/u.test(existing.seatMapId)
+        && Number.isSafeInteger(existing.authoritySeatId)
+        && existing.authoritySeatId >= 0
+        && Number.isSafeInteger(existing.membershipRevision)
+        && existing.membershipRevision >= 1);
+    if (
+      msg.version !== this.version
+      || msg.pairingId !== context.pairingId
+      || msg.transportRole !== expectedPeerRole
+      || msg.authorityClaim !== expectedAuthorityClaim
+      || !identityMatches
+      || !capabilitiesValid
+      || !existingBindingValid
+    ) {
+      this.p33BindingRejected = true;
+      coopWarn("launch", "REFUSE P33 hello whose authenticated pairing axes do not match the Worker record");
+      this.notifyCompatibilityLifecycle();
+      this.emit();
+      return;
+    }
+    if (existing != null && this.p33Binding != null) {
+      const local = this.p33Binding;
+      if (
+        existing.sessionId !== local.sessionId
+        || existing.runId !== local.runId
+        || existing.sessionEpoch !== local.sessionEpoch
+        || existing.seatMapId !== local.seatMap.seatMapId
+        || existing.authoritySeatId !== local.authoritySeatId
+        || existing.membershipRevision !== local.membershipRevision
+      ) {
+        this.p33BindingRejected = true;
+        coopWarn("launch", "REFUSE P33 hello that attempts to replace the retained session binding");
+        this.notifyCompatibilityLifecycle();
+        this.emit();
+        return;
+      }
+    }
+    this.p33PeerHelloAccepted = true;
+    this._partnerConnected = true;
+    this._partnerName = context.peerAccount.displayName;
+    this.negotiateCapabilities(msg.capabilities);
+    if (this.isAuthority) {
+      this.ensureP33Binding();
+    } else if (this.p33Binding != null) {
+      this.transport.send({
+        t: "sessionBindingAck",
+        bindingId: this.p33Binding.bindingId,
+        seatId: context.localSeatId,
+        accountId: context.account.accountId,
+        accepted: true,
+      });
+      this.p33BindingReady = true;
+      this.notifyCompatibilityLifecycle();
+    }
+    this.emit();
+  }
+
+  private ensureP33Binding(): void {
+    if (
+      !this.p33BindingAuthoringEnabled
+      || !this.isAuthority
+      || !this.p33PeerHelloAccepted
+      || this.p33Context == null
+    ) {
+      return;
+    }
+    if (this.p33Binding != null) {
+      this.transmitP33Binding();
+      return;
+    }
+    if (this.p33BindingBuild != null) {
+      return;
+    }
+    const context = this.p33Context;
+    this.p33BindingBuild = (async () => {
+      const seatMap = await createFreshCoopSeatMap([context.account.accountId, context.peerAccount.accountId]);
+      if (seatMap == null || this.disposed || this.p33Context !== context || !isCoopRunId(this.runIdValue)) {
+        this.p33BindingRejected = true;
+        this.notifyCompatibilityLifecycle();
+        return;
+      }
+      const sessionId = `p33-session:${context.pairingId}:${this.sessionEpochValue}`;
+      this.p33Binding = {
+        version: 1,
+        bindingId: `p33-binding:${context.pairingId}:${this.sessionEpochValue}:${seatMap.seatMapId.slice(0, 16)}`,
+        sessionId,
+        runId: this.runIdValue,
+        sessionEpoch: this.sessionEpochValue,
+        checkpointRevision: this.checkpointRevisionValue,
+        seatMap,
+        authoritySeatId: context.authoritySeatId,
+        membershipRevision: 1,
+        source: context.source,
+      };
+      this.transmitP33Binding();
+    })()
+      .catch(error => {
+        this.p33BindingRejected = true;
+        const detail = error instanceof Error ? error.message : String(error);
+        coopWarn("launch", `P33 session binding construction failed: ${detail}`);
+        this.notifyCompatibilityLifecycle();
+        this.emit();
+      })
+      .finally(() => {
+        this.p33BindingBuild = null;
+      });
+  }
+
+  /** Retain and replay the exact binding until the authenticated peer accepts it. */
+  private transmitP33Binding(): void {
+    const binding = this.p33Binding;
+    if (
+      binding == null
+      || this.disposed
+      || !this.isAuthority
+      || !this.p33PeerHelloAccepted
+      || this.p33BindingReady
+      || this.p33BindingRejected
+    ) {
+      this.clearP33BindingRetry();
+      return;
+    }
+    this.transport.send({ t: "sessionBinding", binding });
+    if (this.p33BindingRetryTimer == null) {
+      this.p33BindingRetryTimer = setTimeout(() => {
+        this.p33BindingRetryTimer = null;
+        if (this.p33Binding === binding) {
+          this.transmitP33Binding();
+        }
+      }, 1_000);
+    }
+  }
+
+  private clearP33BindingRetry(): void {
+    if (this.p33BindingRetryTimer != null) {
+      clearTimeout(this.p33BindingRetryTimer);
+      this.p33BindingRetryTimer = null;
+    }
+  }
+
+  private async applyP33Binding(binding: CoopSessionBindingV1): Promise<void> {
+    const context = this.p33Context;
+    const bindingId =
+      binding != null && typeof binding === "object" && typeof binding.bindingId === "string"
+        ? binding.bindingId
+        : "invalid";
+    const reject = (reason: "identity" | "seat-map" | "authority" | "stale" | "unsupported"): void => {
+      this.p33BindingRejected = true;
+      this.p33BindingReady = false;
+      this.transport.send({
+        t: "sessionBindingAck",
+        bindingId,
+        seatId: context?.localSeatId ?? -1,
+        accountId: context?.account.accountId ?? "invalid",
+        accepted: false,
+        reason,
+      });
+      this.notifyCompatibilityLifecycle();
+      this.emit();
+    };
+    if (context == null) {
+      this.authenticatedProtocolViolation = true;
+      reject("unsupported");
+      return;
+    }
+    if (this.isAuthority || !this.p33PeerHelloAccepted) {
+      reject("unsupported");
+      return;
+    }
+    if (
+      binding == null
+      || typeof binding !== "object"
+      || Array.isArray(binding)
+      || binding.version !== 1
+      || binding.source !== context.source
+      || typeof binding.bindingId !== "string"
+      || !/^[A-Za-z0-9:_-]{1,256}$/u.test(binding.bindingId)
+      || typeof binding.sessionId !== "string"
+      || !/^[A-Za-z0-9:_-]{1,256}$/u.test(binding.sessionId)
+      || !Number.isSafeInteger(binding.sessionEpoch)
+      || binding.sessionEpoch <= 0
+      || !Number.isSafeInteger(binding.checkpointRevision)
+      || binding.checkpointRevision < 0
+      || !Number.isSafeInteger(binding.membershipRevision)
+      || binding.membershipRevision < 1
+      || !isCoopRunId(binding.runId)
+      || binding.seatMap == null
+      || typeof binding.seatMap !== "object"
+      || Array.isArray(binding.seatMap)
+    ) {
+      reject("unsupported");
+      return;
+    }
+    const runId = binding.runId;
+    if (!(await validateCoopRunSeatMap(binding.seatMap))) {
+      reject("seat-map");
+      return;
+    }
+    if (this.disposed || this.p33Context !== context) {
+      return;
+    }
+    const localSeat = coopSeatForAccount(binding.seatMap, context.account.accountId);
+    const peerSeat = coopSeatForAccount(binding.seatMap, context.peerAccount.accountId);
+    if (
+      binding.seatMap.seats.length !== 2
+      || localSeat == null
+      || localSeat.seatId !== context.localSeatId
+      || peerSeat == null
+      || peerSeat.seatId === localSeat.seatId
+    ) {
+      reject("identity");
+      return;
+    }
+    if (binding.authoritySeatId !== context.authoritySeatId) {
+      reject("authority");
+      return;
+    }
+    if (
+      binding.sessionEpoch !== this.sessionEpochValue
+      || runId !== this.runIdValue
+      || binding.checkpointRevision !== this.checkpointRevisionValue
+    ) {
+      reject("stale");
+      return;
+    }
+    if (this.p33Binding != null && JSON.stringify(this.p33Binding) !== JSON.stringify(binding)) {
+      reject("stale");
+      return;
+    }
+    if (!this.restoreCheckpointIdentity(runId, binding.checkpointRevision, "p33-session-binding")) {
+      reject("stale");
+      return;
+    }
+    this.p33Binding = structuredClone(binding);
+    this.sessionEpochValue = binding.sessionEpoch;
+    this.onEpochNegotiated?.(binding.sessionEpoch);
+    this.p33BindingRejected = false;
+    this.p33BindingReady = true;
+    this.transport.send({
+      t: "sessionBindingAck",
+      bindingId: binding.bindingId,
+      seatId: context.localSeatId,
+      accountId: context.account.accountId,
+      accepted: true,
+    });
+    this.sendHello();
+    this.notifyCompatibilityLifecycle();
+    this.emit();
+  }
+
+  private acceptP33BindingAck(msg: Extract<CoopMessage, { t: "sessionBindingAck" }>): void {
+    const context = this.p33Context;
+    const binding = this.p33Binding;
+    if (
+      context == null
+      || !this.isAuthority
+      || !this.p33PeerHelloAccepted
+      || binding == null
+      || typeof msg.accepted !== "boolean"
+      || msg.bindingId !== binding.bindingId
+      || msg.seatId !== (context.localSeatId === 0 ? 1 : 0)
+      || msg.accountId !== context.peerAccount.accountId
+    ) {
+      coopWarn("launch", "DROP stale or wrong-seat P33 session binding ACK");
+      return;
+    }
+    this.p33BindingRejected = !msg.accepted;
+    this.p33BindingReady = msg.accepted;
+    this.clearP33BindingRetry();
+    this.notifyCompatibilityLifecycle();
+    this.emit();
+  }
+
   private handleMessage(msg: CoopMessage): void {
     switch (msg.t) {
+      case "sessionBinding":
+        void this.applyP33Binding(msg.binding);
+        break;
+      case "sessionBindingAck":
+        this.acceptP33BindingAck(msg);
+        break;
       case "meCursor": {
         // #817 cosmetic cursor mirror: the ME owner's option cursor, applied to the
         // watcher's read-only selector. Best-effort; a dropped move can never desync.
@@ -2078,6 +2537,7 @@ export class CoopSessionController {
             break;
           }
           this.beginNewOperationEpoch("cold-resume", false);
+          this.prepareP33BindingForCurrentBoundary(true, "resume");
           this.latestResumeDecision = {
             kind: "resume-accepted",
             decisionId: msg.decisionId,
@@ -2151,6 +2611,7 @@ export class CoopSessionController {
           break;
         }
         this.sessionEpochValue = msg.epoch;
+        this.prepareP33BindingForCurrentBoundary(false, "resume");
         this.onEpochNegotiated?.(msg.epoch);
         recordCoopCausalEvent({
           domain: "lobby",
@@ -2394,6 +2855,7 @@ export class CoopSessionController {
           break;
         }
         this.sessionEpochValue = msg.epoch;
+        this.prepareP33BindingForCurrentBoundary(false, "fresh");
         this.onEpochNegotiated?.(msg.epoch);
         this.activeResumeOfferId = null;
         this.activeResumeOfferEpoch = 0;
@@ -2426,6 +2888,17 @@ export class CoopSessionController {
         break;
       }
       case "hello": {
+        if ("pairingId" in msg) {
+          this.handleP33Hello(msg);
+          break;
+        }
+        if (this.p33Context != null) {
+          this.p33BindingRejected = true;
+          coopWarn("launch", "REFUSE legacy hello after authenticated P33 was selected");
+          this.notifyCompatibilityLifecycle();
+          this.emit();
+          break;
+        }
         let announcePromotedHost = false;
         // #807 C (version negotiation): a protocol mismatch means someone runs a stale cached
         // bundle. Record + warn loudly; the runtime shows both players the hard-refresh banner.
