@@ -1818,6 +1818,111 @@ export async function beginRewardShopWatch(guestPhase: ShopPhaseSeam): Promise<n
 }
 
 /**
+ * Drive a host-owned teach-a-move reward through the real reward phase and its real PARTY callback.
+ * The callback is the public party UI's resolved selection seam: invoking it runs the production
+ * `coopFlushPending` path, retains the typed intent, applies the modifier on the authority, and publishes
+ * the complete result. No raw relay frame or direct state application is synthesized here.
+ *
+ * The watcher must already be parked before calling this helper so the shop rendezvous is reciprocal.
+ * Call inside the host's {@linkcode withClient} context.
+ */
+export async function driveHostTeachMoveRewardOwner(
+  hostPhase: ShopPhaseSeam,
+  pick: { slot: number; moveIndex: number },
+): Promise<number> {
+  hostPhase.start();
+  await drainLoopback();
+  const pinned = hostPhase.coopInteractionStart;
+  const rewardIndex = (hostPhase.typeOptions as { type?: { id?: string } }[]).findIndex(option =>
+    ["TM", "MEMORY_MUSHROOM", "ER_LEARNERS_SHROOM", "TM_CASE"].includes(option.type?.id ?? ""),
+  );
+  if (rewardIndex < 0) {
+    throw new Error(`teach-move reward owner found no compatible reward at interaction ${pinned}`);
+  }
+
+  const ui = globalScene.ui as unknown as { setModeWithoutClear: (...args: unknown[]) => unknown };
+  const realSetModeWithoutClear = ui.setModeWithoutClear.bind(ui);
+  let partySurfaceOpened = false;
+  ui.setModeWithoutClear = (...args: unknown[]): unknown => {
+    if (args[0] === UiMode.PARTY) {
+      partySurfaceOpened = true;
+      ui.setModeWithoutClear = realSetModeWithoutClear;
+      (args[3] as (slotIndex: number, option: number) => void)(pick.slot, pick.moveIndex);
+      return;
+    }
+    return realSetModeWithoutClear(...args);
+  };
+  try {
+    hostPhase.selectRewardModifierOption(rewardIndex, () => false);
+    for (let i = 0; i < 8; i++) {
+      await drainLoopback();
+    }
+  } finally {
+    ui.setModeWithoutClear = realSetModeWithoutClear;
+  }
+  if (!partySurfaceOpened) {
+    throw new Error(`teach-move reward owner never opened PARTY at interaction ${pinned}`);
+  }
+  return pinned;
+}
+
+/**
+ * Observe a watcher materializing a retained teach-a-move result through its real queued phase tail.
+ * Starts the watcher first, calls `driveOwner` only after the reciprocal surface exists, then pumps the
+ * retained result until the projected LearnMovePhase runs and removes its back-out shop continuation.
+ * Call inside the watcher's {@linkcode withClient} context; `driveOwner` may temporarily install the host.
+ */
+export async function driveRetainedTeachMoveRewardWatch(
+  guestPhase: ShopPhaseSeam,
+  driveOwner: () => Promise<void>,
+): Promise<{ queuedContinuation: boolean; queuedLearnMove: boolean; continuationRemoved: boolean }> {
+  const pm = globalScene.phaseManager as unknown as {
+    getCurrentPhase(): Phase | undefined;
+    unshiftPhase(phase: { phaseName?: string }): void;
+    tryRemovePhase(name: string): boolean;
+  };
+  const queued: string[] = [];
+  const removed: string[] = [];
+  const originalUnshift = pm.unshiftPhase.bind(pm);
+  const originalTryRemove = pm.tryRemovePhase.bind(pm);
+  pm.unshiftPhase = (phase: { phaseName?: string }) => {
+    queued.push(phase.phaseName ?? "?");
+    originalUnshift(phase);
+  };
+  pm.tryRemovePhase = (name: string) => {
+    removed.push(name);
+    return originalTryRemove(name);
+  };
+
+  try {
+    await beginRewardShopWatch(guestPhase);
+    await driveOwner();
+    for (let i = 0; i < 32; i++) {
+      await drainLoopback();
+      if (queued.includes("LearnMovePhase")) {
+        break;
+      }
+    }
+    const current = pm.getCurrentPhase();
+    if (current?.phaseName === "LearnMovePhase") {
+      current.start();
+      for (let i = 0; i < 8; i++) {
+        await drainLoopback();
+      }
+    }
+  } finally {
+    pm.unshiftPhase = originalUnshift;
+    pm.tryRemovePhase = originalTryRemove;
+  }
+
+  return {
+    queuedContinuation: queued.includes("SelectModifierPhase"),
+    queuedLearnMove: queued.includes("LearnMovePhase"),
+    continuationRemoved: removed.includes("SelectModifierPhase"),
+  };
+}
+
+/**
  * Drive the GUEST's REAL watcher reward shop: start the phase (it detects watcher from the pinned
  * counter+role, adopts the owner's streamed option list, and runs startCoopWatch's relay loop),
  * draining the loopback so the relayed owner picks + the terminal LEAVE arrive and are applied.

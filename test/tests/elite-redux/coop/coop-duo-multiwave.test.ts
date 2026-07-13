@@ -41,7 +41,6 @@ import {
   resetCoopTailWouldBlockLog,
 } from "#data/elite-redux/coop/coop-renderer-gate";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
-import { commitRewardOwnerIntent } from "#data/elite-redux/coop/coop-reward-operation";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -65,8 +64,9 @@ import {
   driveClientPhaseQueueTo,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
-  driveGuestTmCaseRegression,
   driveHostRewardShopOwner,
+  driveHostTeachMoveRewardOwner,
+  driveRetainedTeachMoveRewardWatch,
   driveRewardShopOwnerLeaveViaUi,
   forceItemRewards,
   forceNextMysteryEncounter,
@@ -302,9 +302,12 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
         expect(watcherPinned, `wave ${w}: watcher parked on the owner's interaction`).toBe(counterBefore);
         ownerPinned = await withClient(rig.guestCtx, () => driveRewardShopOwnerLeaveViaUi(guestShop));
         await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
+        // The host authority turned the guest intent into a retained RESULT. Pump that result back to the
+        // guest owner first; applying it completes the owner terminal and emits the guest's counter snapshot.
+        await withClient(rig.guestCtx, () => drainLoopback());
         // The guest owner broadcasts its completed counter to the HOST. Explicit scheduled delivery must
         // therefore pump the host destination before the host's NewBattlePhase reaches CoopPartnerSyncPhase.
-        // Pumping the guest again strands the already-emitted snapshot in the host inbox and makes the real
+        // Omitting this return leg strands the already-emitted snapshot in the host inbox and makes the real
         // boundary correctly remain closed at peerSeen=N-1.
         await withClient(rig.hostCtx, () => drainLoopback());
       }
@@ -409,7 +412,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     // FORCE a TM Case into the shop so the host owner rolls it + the guest watcher adopts it at index 0.
     forceItemRewards(game.override, [{ name: "TM_CASE" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
 
@@ -421,6 +424,8 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
       await game.phaseInterceptor.to("TurnEndPhase");
     });
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+    await withClient(rig.hostCtx, () => drainLoopback());
+    pair.setAutomaticDelivery(false);
 
     // Pick a real TM move + slot the guest's mirrored party can learn (the mon must have TM-Case moves).
     const pick = withClientSync(rig.guestCtx, () => {
@@ -434,37 +439,18 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
       return { slot: 0, moveIndex: 0 };
     });
 
-    // The HOST owner's REAL shop start() streams its rolled TM_CASE option list (buffered for the
-    // watcher to adopt, so the watcher's await resolves at once instead of a 20-min hang).
+    // Reach both queued production shops without starting either side. The watcher is parked first below,
+    // then the owner opens the real PARTY surface and publishes the typed retained result.
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("SelectModifierPhase", false);
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-    await withClient(rig.hostCtx, async () => {
-      hostShop.start(); // owner: streams the rolled TM_CASE options + opens the owner screen
-      await drainLoopback();
-    });
-
-    // driveGuestTmCaseRegression injects the nested party pick at the legacy carrier seam because
-    // the headless owner menu cannot be clicked. Production emits the authoritative REWARD envelope
-    // alongside that frame; explicitly commit the identical action so this regression exercises the
-    // current journal-led path instead of a raw-only frame that must now fail closed.
-    await withClient(rig.hostCtx, () => {
-      commitRewardOwnerIntent({
-        surface: "reward",
-        pinned: hostShop.coopInteractionStart,
-        label: "reward",
-        choice: 0,
-        data: [0, pick.slot, pick.moveIndex],
-        terminal: false,
-        localRole: "host",
-        wave: rig.hostScene.currentBattle.waveIndex,
-      });
-    });
-
-    // Drive the GUEST watcher through the relayed TM_CASE pick + its no-op LearnMovePhase.
     const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
-    const result = await withClient(rig.guestCtx, () => driveGuestTmCaseRegression(guestShop, pair.host, pick));
+    const result = await withClient(rig.guestCtx, () =>
+      driveRetainedTeachMoveRewardWatch(guestShop, async () => {
+        await withClient(rig.hostCtx, () => driveHostTeachMoveRewardOwner(hostShop, pick));
+      }),
+    );
 
     expect(result.queuedContinuation, "the guest watcher queued the continuation SelectModifierPhase copy").toBe(true);
     expect(result.queuedLearnMove, "the guest watcher queued the no-op LearnMovePhase").toBe(true);
