@@ -184,7 +184,9 @@ describe("co-op account-wide session cloud ordering", () => {
     expect(readCoopResumeMarker("Alice", "Bob"), "deleted run is no longer offered").toBeNull();
 
     recordCoopResumeMarker(1, "Alice", "Bob", 1, newRun, 0);
-    expect(clearCoopResumeEvidenceIfRun("Alice", oldRun), "late old cleanup cannot clobber new evidence").toBe(false);
+    expect(clearCoopResumeEvidenceIfRun("Alice", oldRun), "late old cleanup proves new evidence is untouched").toBe(
+      true,
+    );
     expect(readCoopResumeMarker("Alice", "Bob")?.runId, "fresh/new run remains resumable").toBe(newRun);
   });
 
@@ -192,7 +194,7 @@ describe("co-op account-wide session cloud ordering", () => {
     const oldRun = "run-deleted-123456789";
     const newRun = "run-distinct-123456789";
     const session = (runId: string) => ({
-      gameMode: 5,
+      gameMode: 6,
       waveIndex: 1,
       timestamp: 1,
       coopParticipants: {
@@ -205,12 +207,17 @@ describe("co-op account-wide session cloud ordering", () => {
     recordCoopResumeMarker(0, "Alice", "Bob", 1, oldRun, 0);
     expect(recordCoopDeletedRun("Alice", oldRun), "backend-success evidence is durable locally").toBe(true);
     await expect(
-      findCoopResumeCandidate("Alice", "Bob", "host", async () => session(oldRun)),
+      findCoopResumeCandidate("Alice", "Bob", "host", async () => ({
+        session: session(oldRun),
+        sessionJson: JSON.stringify(session(oldRun)),
+      })),
       "a stale local row cannot resurrect the deleted run even when physical removal was unavailable",
     ).resolves.toEqual({ kind: "no-save" });
-    await expect(findCoopResumeCandidate("Alice", "Bob", "host", async () => session(newRun))).resolves.toMatchObject({
-      kind: "candidate",
-      candidate: { runId: newRun },
-    });
+    await expect(
+      findCoopResumeCandidate("Alice", "Bob", "host", async () => ({
+        session: session(newRun),
+        sessionJson: JSON.stringify(session(newRun)),
+      })),
+    ).resolves.toMatchObject({ kind: "candidate", candidate: { runId: newRun } });
   });
 });

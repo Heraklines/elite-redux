@@ -46,11 +46,20 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
-import { encrypt } from "#utils/data";
+import { decrypt, encrypt } from "#utils/data";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+
+const coopCasMissing = () => ({
+  ok: false as const,
+  status: 404,
+  error: "Session not found.",
+  failureKind: "missing" as const,
+});
+
+const coopCasFound = (rawSavedata: string) => ({ ok: true as const, status: 200, rawSavedata });
 
 /** Serialize the host's coherent session EXACTLY as a real RESUME load broadcasts it. */
 function serializeHostLaunchSnapshot(hostScene: BattleScene): string {
@@ -89,6 +98,12 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`resume-${Date.now()}`);
     clearCoopResumeMarker();
+    vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
+    vi.spyOn(pokerogueApi.savedata.session, "getCoopRunStatus").mockImplementation(async request => ({
+      ok: true,
+      status: 200,
+      value: { state: "missing", runId: request.coopRunId },
+    }));
     game.override
       .battleStyle("double")
       .startingWave(1)
@@ -289,7 +304,9 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
           digest: baseCommitment!.digest,
         }),
       );
-      vi.spyOn(pokerogueApi.savedata.session, "get").mockResolvedValue(cloud.json);
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request =>
+        request.slot === slot ? coopCasFound(cloud.json) : coopCasMissing(),
+      );
       vi.spyOn(pokerogueApi.savedata.session, "getCoopRunStatus").mockResolvedValue({
         ok: true,
         status: 200,
@@ -332,7 +349,13 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const priorGameplaySlot = rig.guestScene.sessionSlotId;
 
     vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
-    const cloudRead = vi.spyOn(pokerogueApi.savedata.session, "get").mockResolvedValue("Session not found.");
+    let cloudSlot = -1;
+    let cloudRaw: string | null = null;
+    const cloudRead = vi
+      .spyOn(pokerogueApi.savedata.session, "getCoopCas")
+      .mockImplementation(async request =>
+        request.slot === cloudSlot && cloudRaw != null ? coopCasFound(cloudRaw) : coopCasMissing(),
+      );
     const requestedCloudBytes: string[] = [];
     const completedCloudBytes: string[] = [];
     let releaseFirstCloud!: () => void;
@@ -341,11 +364,13 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     });
     const cloudUpdate = vi
       .spyOn(pokerogueApi.savedata.session, "updateCoopCas")
-      .mockImplementation(async (_request, raw) => {
+      .mockImplementation(async (request, raw) => {
         requestedCloudBytes.push(raw);
         if (requestedCloudBytes.length === 1) {
           await firstCloudGate;
         }
+        cloudSlot = request.slot;
+        cloudRaw = raw;
         completedCloudBytes.push(raw);
         return { ok: true, status: 200, error: "", failureKind: null };
       });
@@ -461,7 +486,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     // Receiving that exact host checkpoint must rewrite local before ACKing; merely seeing it in
     // cloud is not local durability.
     cloudRead.mockImplementation(async request =>
-      request.slot === marker!.slot ? cloudAheadJson : "Session not found.",
+      request.slot === marker!.slot ? coopCasFound(cloudAheadJson) : coopCasMissing(),
     );
     await expect(
       withClient(rig.guestCtx, () => host.sendResumeCheckpoint(cloudAheadJson, cloudAheadCommitment!, 30_000, true)),
@@ -495,7 +520,9 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     );
 
     const reversed = await findCoopResumeCandidate(guest.localName(), host.localName(), "host", async slot =>
-      slot === marker!.slot ? finalReplica : undefined,
+      slot === marker!.slot && finalReplica != null
+        ? { session: finalReplica, sessionJson: JSON.stringify(finalReplica) }
+        : undefined,
     );
     expect(
       reversed,
@@ -567,7 +594,18 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       clearCoopResumeMarker();
       keys.forEach(key => localStorage.removeItem(key));
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
-      const cloudRead = vi.spyOn(pokerogueApi.savedata.session, "get").mockResolvedValue(unrelatedCloudJson);
+      const cloudRead = vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request =>
+        coopCasFound(
+          JSON.stringify({
+            ...JSON.parse(unrelatedCloudJson),
+            coopRun: {
+              version: 1,
+              runId: `unrelated-cloud-${request.slot}-${"x".repeat(16)}`,
+              checkpointRevision: 0,
+            },
+          }),
+        ),
+      );
       const cloudWrite = vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockResolvedValue({
         ok: true,
         status: 200,
@@ -619,6 +657,535 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     logs.flush();
   }, 300_000);
 
+  it("blocks a malformed ancestry head and reuses an exact tombstoned local slot", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const account = await withClient(rig.hostCtx, () => loggedInUser!.username);
+    const keys = await withClient(rig.hostCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
+    const headKey = (slot: number) => `er-coop-cloud-head:${account.normalize("NFKC").toLowerCase()}:${slot}`;
+    const tracked = [...keys, headKey(0), headKey(1), "er-coop-deleted-runs", "er-coop-resume"].map(
+      key => [key, localStorage.getItem(key)] as const,
+    );
+    const baseJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
+    const oldRunId = `old-tombstoned-${"x".repeat(20)}`;
+    const oldJson = JSON.stringify({
+      ...(JSON.parse(baseJson) as Record<string, unknown>),
+      coopRun: { version: 1, runId: oldRunId, checkpointRevision: 4 },
+    });
+    const oldSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(oldJson));
+    const oldCommitment = await deriveCoopResumeCommitment(oldJson, oldSession);
+    expect(oldCommitment).not.toBeNull();
+
+    try {
+      keys.forEach(key => localStorage.removeItem(key));
+      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      localStorage.setItem(headKey(0), "{malformed");
+      expect(
+        await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot()),
+        "malformed slot-0 lineage cannot collapse to absent",
+      ).toBe(1);
+      await withClient(rig.hostCtx, () => rig.hostScene.gameData.cancelPendingFreshCoopSessionSlot());
+
+      localStorage.setItem(
+        headKey(0),
+        JSON.stringify({
+          version: 1,
+          runId: oldCommitment!.runId,
+          checkpointRevision: oldCommitment!.checkpointRevision,
+          digest: oldCommitment!.digest,
+        }),
+      );
+      expect(
+        await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot()),
+        "an orphan head without tombstone proof is not treated as an empty slot",
+      ).toBe(1);
+      await withClient(rig.hostCtx, () => rig.hostScene.gameData.cancelPendingFreshCoopSessionSlot());
+
+      localStorage.setItem(keys[0], encrypt(oldJson, false));
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopRunStatus").mockImplementation(async request =>
+        request.coopRunId === oldRunId
+          ? {
+              ok: true,
+              status: 200,
+              value: {
+                state: "tombstoned",
+                runId: oldRunId,
+                slot: 0,
+                checkpointRevision: oldCommitment!.checkpointRevision,
+                digest: oldCommitment!.digest,
+              },
+            }
+          : { ok: true, status: 200, value: { state: "missing", runId: request.coopRunId } },
+      );
+      const deletedEvidenceBeforeFailedCleanup = localStorage.getItem("er-coop-deleted-runs");
+      localStorage.setItem("er-coop-resume", "{}");
+      expect(
+        await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot()),
+        "tombstone adoption fails closed when lineage cleanup cannot be proven",
+      ).toBe(1);
+      expect(localStorage.getItem(keys[0])).not.toBeNull();
+      expect(
+        localStorage.getItem("er-coop-deleted-runs"),
+        "failed cleanup rolls back its deletion fence instead of partially suppressing the protected row",
+      ).toBe(deletedEvidenceBeforeFailedCleanup);
+      await withClient(rig.hostCtx, () => rig.hostScene.gameData.cancelPendingFreshCoopSessionSlot());
+      localStorage.removeItem("er-coop-resume");
+      expect(
+        await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot()),
+        "status-proven tombstone retires exact local/head lineage and permits reuse",
+      ).toBe(0);
+      expect(localStorage.getItem(keys[0])).toBeNull();
+      expect(localStorage.getItem(headKey(0))).toBeNull();
+    } finally {
+      tracked.forEach(([key, value]) => {
+        value == null ? localStorage.removeItem(key) : localStorage.setItem(key, value);
+      });
+    }
+    logs.flush();
+  }, 300_000);
+
+  it("converges exact same-lineage duplicate cloud rows and rejects an equal-revision fork", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const account = await withClient(rig.hostCtx, () => loggedInUser!.username);
+    const keys = await withClient(rig.hostCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
+    const headKeys = [0, 1].map(slot => `er-coop-cloud-head:${account.normalize("NFKC").toLowerCase()}:${slot}`);
+    const tracked = [...keys, ...headKeys].map(key => [key, localStorage.getItem(key)] as const);
+    const baseJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
+    const base = JSON.parse(baseJson) as Record<string, unknown>;
+    const checkpoint = async (revision: number, moneyDelta = 0) => {
+      const json = JSON.stringify({
+        ...base,
+        money: Number(base.money ?? 0) + moneyDelta,
+        waveIndex: Number(base.waveIndex ?? 1) + revision,
+        timestamp: Number(base.timestamp ?? 1) + revision,
+        coopRun: {
+          version: 1,
+          runId: (base.coopRun as { runId: string }).runId,
+          checkpointRevision: revision,
+        },
+      });
+      const session = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(json));
+      const commitment = await deriveCoopResumeCommitment(json, session);
+      expect(commitment).not.toBeNull();
+      return { json, commitment: commitment! };
+    };
+    const older = await checkpoint(1);
+    const survivor = await checkpoint(2);
+    const cloud = new Map<number, string>([
+      [0, older.json],
+      [1, survivor.json],
+    ]);
+
+    try {
+      keys.forEach(key => localStorage.removeItem(key));
+      headKeys.forEach(key => localStorage.removeItem(key));
+      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request => {
+        const raw = cloud.get(request.slot);
+        return raw == null ? coopCasMissing() : coopCasFound(raw);
+      });
+      const duplicateDelete = vi
+        .spyOn(pokerogueApi.savedata.session, "deleteCoopDuplicateExact")
+        .mockImplementation(async request => {
+          expect(request.slot).toBe(0);
+          expect(request.survivorSlot).toBe(1);
+          cloud.delete(request.slot);
+          return { ok: true, status: 200, error: "", failureKind: null };
+        });
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopRunStatus").mockResolvedValue({
+        ok: true,
+        status: 200,
+        value: {
+          state: "active",
+          runId: survivor.commitment.runId,
+          slot: 1,
+          checkpointRevision: survivor.commitment.checkpointRevision,
+          digest: survivor.commitment.digest,
+        },
+      });
+
+      const sessions = await withClient(rig.hostCtx, () => rig.hostScene.gameData.getSessionsForCoopResume());
+      expect(duplicateDelete).toHaveBeenCalledOnce();
+      expect(sessions.get(0)).toBeUndefined();
+      expect(sessions.get(1)?.sessionJson).toBe(survivor.json);
+
+      keys.forEach(key => localStorage.removeItem(key));
+      headKeys.forEach(key => localStorage.removeItem(key));
+      const fork = await checkpoint(2, 1);
+      cloud.set(0, survivor.json);
+      cloud.set(1, fork.json);
+      duplicateDelete.mockClear();
+      await expect(
+        withClient(rig.hostCtx, () => rig.hostScene.gameData.getSessionsForCoopResume()),
+        "equal revisions with different exact digests never pick a winner",
+      ).rejects.toThrow("equal-revision fork");
+      expect(duplicateDelete).not.toHaveBeenCalled();
+    } finally {
+      tracked.forEach(([key, value]) => {
+        value == null ? localStorage.removeItem(key) : localStorage.setItem(key, value);
+      });
+    }
+    logs.flush();
+  }, 300_000);
+
+  it("imports over an exact tombstone with empty CAS and swaps ancestry only after success", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const account = await withClient(rig.hostCtx, () => loggedInUser!.username);
+    const slot = 0;
+    const localKey = await withClient(rig.hostCtx, () => getSessionDataLocalStorageKey(slot));
+    const headKey = `er-coop-cloud-head:${account.normalize("NFKC").toLowerCase()}:${slot}`;
+    const trackedKeys = [localKey, headKey, "er-coop-deleted-runs", `data_${account}`];
+    const tracked = trackedKeys.map(key => [key, localStorage.getItem(key)] as const);
+    const incomingJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
+    const incomingSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(incomingJson));
+    const incoming = await deriveCoopResumeCommitment(incomingJson, incomingSession);
+    expect(incoming).not.toBeNull();
+    const oldRunId = `old-import-${"z".repeat(22)}`;
+    const oldJson = JSON.stringify({
+      ...(JSON.parse(incomingJson) as Record<string, unknown>),
+      coopRun: { version: 1, runId: oldRunId, checkpointRevision: 9 },
+    });
+    const oldSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(oldJson));
+    const old = await deriveCoopResumeCommitment(oldJson, oldSession);
+    expect(old).not.toBeNull();
+    const systemJson = await withClient(rig.hostCtx, () => JSON.stringify(rig.hostScene.gameData.getSystemSaveData()));
+
+    try {
+      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      localStorage.setItem(localKey, encrypt(oldJson, false));
+      localStorage.setItem(
+        headKey,
+        JSON.stringify({
+          version: 1,
+          runId: old!.runId,
+          checkpointRevision: old!.checkpointRevision,
+          digest: old!.digest,
+        }),
+      );
+      vi.spyOn(pokerogueApi.savedata.system, "update").mockResolvedValue("");
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopRunStatus").mockImplementation(async request =>
+        request.coopRunId === oldRunId
+          ? {
+              ok: true,
+              status: 200,
+              value: {
+                state: "tombstoned",
+                runId: oldRunId,
+                slot,
+                checkpointRevision: old!.checkpointRevision,
+                digest: old!.digest,
+              },
+            }
+          : { ok: true, status: 200, value: { state: "missing", runId: request.coopRunId } },
+      );
+      const cloudWrite = vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockResolvedValue({
+        ok: false,
+        status: 409,
+        error: "conflict",
+        failureKind: "conflict",
+      });
+      const bundle = { system: systemJson, sessions: [{ slot, data: incomingJson }] };
+
+      await expect(
+        withClient(rig.hostCtx, () => rig.hostScene.gameData.importLocalSaveBundle(bundle)),
+        "failed empty CAS preserves exact old local/head bytes",
+      ).resolves.toBe(false);
+      expect(decrypt(localStorage.getItem(localKey)!, false)).toBe(oldJson);
+      expect(JSON.parse(localStorage.getItem(headKey) ?? "null")).toMatchObject({ runId: oldRunId });
+
+      cloudWrite.mockResolvedValue({ ok: true, status: 200, error: "", failureKind: null });
+      await expect(withClient(rig.hostCtx, () => rig.hostScene.gameData.importLocalSaveBundle(bundle))).resolves.toBe(
+        true,
+      );
+      expect(cloudWrite.mock.calls.at(-1)?.[0].coopCasMode).toBe("empty");
+      expect(decrypt(localStorage.getItem(localKey)!, false)).toBe(incomingJson);
+      expect(JSON.parse(localStorage.getItem(headKey) ?? "null")).toMatchObject({
+        runId: incoming!.runId,
+        checkpointRevision: incoming!.checkpointRevision,
+        digest: incoming!.digest,
+      });
+
+      const incomingShape = JSON.parse(incomingJson) as Record<string, unknown>;
+      const participants = incomingShape.coopParticipants as {
+        version: 1;
+        players: [string, string];
+        seats: { host: string; guest: string };
+      };
+      const swappedJson = JSON.stringify({
+        ...incomingShape,
+        timestamp: incoming!.timestamp + 1,
+        coopRun: {
+          version: 1,
+          runId: incoming!.runId,
+          checkpointRevision: incoming!.checkpointRevision + 1,
+        },
+        coopParticipants: {
+          ...participants,
+          seats: { host: participants.seats.guest, guest: participants.seats.host },
+        },
+      });
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopRunStatus").mockResolvedValue({
+        ok: true,
+        status: 200,
+        value: {
+          state: "active",
+          runId: incoming!.runId,
+          slot,
+          checkpointRevision: incoming!.checkpointRevision,
+          digest: incoming!.digest,
+        },
+      });
+      cloudWrite.mockClear();
+      await expect(
+        withClient(rig.hostCtx, () =>
+          rig.hostScene.gameData.importLocalSaveBundle({
+            system: systemJson,
+            sessions: [{ slot, data: swappedJson }],
+          }),
+        ),
+        "same-run import cannot change the exact authority seat map",
+      ).resolves.toBe(false);
+      expect(cloudWrite).not.toHaveBeenCalled();
+      expect(decrypt(localStorage.getItem(localKey)!, false)).toBe(incomingJson);
+    } finally {
+      tracked.forEach(([key, value]) => {
+        value == null ? localStorage.removeItem(key) : localStorage.setItem(key, value);
+      });
+    }
+    logs.flush();
+  }, 300_000);
+
+  it("never lets a solo cloud replica hide legacy co-op local bytes", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const slot = 0;
+    const key = await withClient(rig.hostCtx, () => getSessionDataLocalStorageKey(slot));
+    const prior = localStorage.getItem(key);
+    const account = await withClient(rig.hostCtx, () => loggedInUser!.username);
+    const systemKey = `data_${account}`;
+    const priorSystem = localStorage.getItem(systemKey);
+    const base = JSON.parse(await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene))) as Record<
+      string,
+      unknown
+    >;
+    const legacyJson = JSON.stringify({ ...base, coopRun: undefined });
+    const { coopRun: _run, coopParticipants: _participants, coopControlPlane: _control, ...soloShape } = base;
+    const soloJson = JSON.stringify({ ...soloShape, gameMode: GameModes.CLASSIC });
+
+    try {
+      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      localStorage.setItem(key, encrypt(legacyJson, false));
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request =>
+        request.slot === slot ? coopCasFound(soloJson) : coopCasMissing(),
+      );
+      await expect(
+        withClient(rig.hostCtx, () => rig.hostScene.gameData.getSessionsForCoopResume()),
+        "legacy/unknown protection is explicit and cannot collapse into local-first solo",
+      ).rejects.toThrow("conflicting protection classes");
+      expect(decrypt(localStorage.getItem(key)!, false)).toBe(legacyJson);
+
+      localStorage.setItem(systemKey, "system-before-protected-save");
+      rig.hostScene.sessionSlotId = slot;
+      const cloudWrite = vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas");
+      await expect(
+        withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+        "local protection is classified before any system/session write",
+      ).resolves.toBe(false);
+      expect(localStorage.getItem(systemKey)).toBe("system-before-protected-save");
+      expect(decrypt(localStorage.getItem(key)!, false)).toBe(legacyJson);
+      expect(cloudWrite).not.toHaveBeenCalled();
+    } finally {
+      prior == null ? localStorage.removeItem(key) : localStorage.setItem(key, prior);
+      priorSystem == null ? localStorage.removeItem(systemKey) : localStorage.setItem(systemKey, priorSystem);
+    }
+    logs.flush();
+  }, 300_000);
+
+  it("requires the account Web Lock before ordinary caching of legacy co-op or opaque bytes", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const slot = 0;
+    const key = await withClient(rig.hostCtx, () => getSessionDataLocalStorageKey(slot));
+    const prior = localStorage.getItem(key);
+    const base = JSON.parse(await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene))) as Record<
+      string,
+      unknown
+    >;
+    const legacyJson = JSON.stringify({ ...base, coopRun: undefined });
+
+    try {
+      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      localStorage.removeItem(key);
+      const cloudRead = vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue({
+        ok: false,
+        status: 401,
+        error: '{"gameMode":6,"coopRun":{"runId":"looks-like-save"}}',
+        failureKind: "unauthorized",
+      });
+      await expect(
+        withClient(rig.hostCtx, () => rig.hostScene.gameData.getSession(slot)),
+        "typed error bodies can never masquerade as savedata",
+      ).resolves.toBeUndefined();
+      expect(localStorage.getItem(key)).toBeNull();
+
+      cloudRead.mockImplementation(async request =>
+        request.slot === slot ? coopCasFound(legacyJson) : coopCasMissing(),
+      );
+      Reflect.deleteProperty(globalThis.navigator, "locks");
+      await expect(withClient(rig.hostCtx, () => rig.hostScene.gameData.getSession(slot))).resolves.toBeUndefined();
+      expect(localStorage.getItem(key), "unlocked ordinary cache cannot publish protected bytes").toBeNull();
+    } finally {
+      prior == null ? localStorage.removeItem(key) : localStorage.setItem(key, prior);
+    }
+    logs.flush();
+  }, 300_000);
+
+  it.each([
+    { outcome: "success" as const, expectedSave: true, expectedEvents: ["authority", "guest:true"] },
+    { outcome: "transient" as const, expectedSave: true, expectedEvents: ["authority", "guest:false"] },
+    { outcome: "conflict" as const, expectedSave: false, expectedEvents: ["authority"] },
+  ])("orders an existing authority CAS before guest persistence ($outcome)", async ({
+    outcome,
+    expectedSave,
+    expectedEvents,
+  }) => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const keys = [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey);
+    const prior = keys.map(key => localStorage.getItem(key));
+    const cloudBySlot = new Map<number, string>();
+    let hostSlot = -1;
+    let existingSave = false;
+    let authorityOutcome = outcome;
+    let guestPersisting = false;
+    let lastGuestReplicaRaw: string | null = null;
+    const events: string[] = [];
+    const authorityRequests: Parameters<typeof pokerogueApi.savedata.session.updateCoopCas>[0][] = [];
+
+    try {
+      keys.forEach(key => localStorage.removeItem(key));
+      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request =>
+        cloudBySlot.has(request.slot) ? coopCasFound(cloudBySlot.get(request.slot)!) : coopCasMissing(),
+      );
+      vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockImplementation(async (request, raw) => {
+        if (!existingSave || guestPersisting) {
+          if (!guestPersisting) {
+            expect(request.coopCasMode).toBe("empty");
+          }
+          cloudBySlot.set(request.slot, raw);
+          return { ok: true, status: 200, error: "", failureKind: null };
+        }
+        events.push("authority");
+        authorityRequests.push(request);
+        if (authorityOutcome === "conflict") {
+          return { ok: false, status: 409, error: "conflict", failureKind: "conflict" };
+        }
+        if (authorityOutcome === "transient") {
+          return { ok: false, status: null, error: "offline", failureKind: "transient" };
+        }
+        cloudBySlot.set(request.slot, raw);
+        return { ok: true, status: 200, error: "", failureKind: null };
+      });
+      vi.spyOn(pokerogueApi.savedata, "updateAll").mockResolvedValue("");
+      await withClient(rig.guestCtx, () => rig.guestScene.gameData.armCoopResumeCheckpointPersistence());
+      rig.guestRuntime.controller.armResumeCheckpointHandler(async (raw, commitment, mirrorCloud) => {
+        if (existingSave) {
+          events.push(`guest:${mirrorCloud}`);
+        }
+        guestPersisting = true;
+        try {
+          const persisted = await withClient(rig.guestCtx, () =>
+            rig.guestScene.gameData.persistCurrentCoopResumeCheckpoint(raw, commitment, mirrorCloud),
+          );
+          if (persisted.success) {
+            lastGuestReplicaRaw = raw;
+          }
+          return persisted;
+        } finally {
+          guestPersisting = false;
+        }
+      });
+      const slot = await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot());
+      hostSlot = slot!;
+      rig.hostScene.sessionSlotId = slot!;
+      await expect(
+        withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+      ).resolves.toBe(true);
+      await withClient(rig.hostCtx, () => rig.hostScene.gameData.consumeCommittedFreshCoopLaunchSession(1));
+
+      existingSave = true;
+      const sendResumeCheckpoint = vi.spyOn(rig.hostRuntime.controller, "sendResumeCheckpointDetailed");
+      const localBefore = localStorage.getItem(keys[hostSlot]);
+      const cloudBefore = cloudBySlot.get(hostSlot);
+      const evidenceKeys = ["er-coop-resume", "er-coop-resume-unavailable"];
+      const evidenceBefore = evidenceKeys.map(key => localStorage.getItem(key));
+      const cloudBeforeSession = await withClient(rig.hostCtx, () =>
+        rig.hostScene.gameData.parseSessionData(cloudBefore!),
+      );
+      const cloudBeforeCommitment = await deriveCoopResumeCommitment(cloudBefore!, cloudBeforeSession);
+      expect(cloudBeforeCommitment).not.toBeNull();
+      lastGuestReplicaRaw = null;
+      rig.hostScene.money += 1;
+      await expect(
+        withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+      ).resolves.toBe(expectedSave);
+      expect(events, "deterministic conflicts never reach the guest; transient debt mirrors locally").toEqual(
+        expectedEvents,
+      );
+      if (outcome === "conflict") {
+        expect(
+          sendResumeCheckpoint,
+          "a deterministic authority conflict sends no resume checkpoint",
+        ).not.toHaveBeenCalled();
+        expect(localStorage.getItem(keys[hostSlot]), "the host local row rolls back byte-exactly").toBe(localBefore);
+        evidenceKeys.forEach((key, index) =>
+          expect(localStorage.getItem(key), `${key} rolls back byte-exactly`).toBe(evidenceBefore[index]),
+        );
+        expect(lastGuestReplicaRaw, "the guest never receives the rejected checkpoint").toBeNull();
+        expect(cloudBySlot.get(hostSlot), "the frozen authority head remains unchanged").toBe(cloudBefore);
+      } else {
+        const localAfter = decrypt(localStorage.getItem(keys[hostSlot])!, false);
+        expect(lastGuestReplicaRaw, "the guest persists the authority's exact selected bytes").toBe(localAfter);
+        expect(sendResumeCheckpoint).toHaveBeenCalledOnce();
+        expect(sendResumeCheckpoint.mock.calls[0][3]).toBe(outcome === "success");
+      }
+      if (outcome === "transient") {
+        expect(rig.hostScene.gameData.lastCloudSyncFailed).toBe(true);
+        expect(cloudBySlot.get(hostSlot), "transient debt does not invent a new cloud parent").toBe(cloudBefore);
+
+        authorityOutcome = "success";
+        events.length = 0;
+        sendResumeCheckpoint.mockClear();
+        lastGuestReplicaRaw = null;
+        await expect(
+          withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+          "a later retry advances from the previously frozen cloud head",
+        ).resolves.toBe(true);
+        const retryRequest = authorityRequests.at(-1)!;
+        expect(retryRequest).toMatchObject({
+          coopCasMode: "existing",
+          coopCasRunId: cloudBeforeCommitment!.runId,
+          coopCasCheckpointRevision: cloudBeforeCommitment!.checkpointRevision,
+          coopCasDigest: cloudBeforeCommitment!.digest,
+        });
+        const retriedLocal = decrypt(localStorage.getItem(keys[hostSlot])!, false);
+        expect(cloudBySlot.get(hostSlot), "the retry publishes the exact new authority bytes").toBe(retriedLocal);
+        expect(lastGuestReplicaRaw, "the retry leaves the guest's local replica exact too").toBe(retriedLocal);
+        expect(events).toEqual(["authority", "guest:true"]);
+      }
+    } finally {
+      keys.forEach((key, slot) => {
+        const value = prior[slot];
+        value == null ? localStorage.removeItem(key) : localStorage.setItem(key, value);
+      });
+    }
+    logs.flush();
+  }, 300_000);
+
   it("commits a complete fresh session with empty-slot CAS and releases those exact bytes", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
@@ -631,8 +1198,8 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       keys.forEach(key => localStorage.removeItem(key));
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
       const cloudRead = vi
-        .spyOn(pokerogueApi.savedata.session, "get")
-        .mockImplementation(async () => committedRaw ?? "Session not found.");
+        .spyOn(pokerogueApi.savedata.session, "getCoopCas")
+        .mockImplementation(async () => (committedRaw == null ? coopCasMissing() : coopCasFound(committedRaw)));
       const firstSave = vi
         .spyOn(pokerogueApi.savedata.session, "updateCoopCas")
         .mockImplementation(async (request, raw) => {
@@ -662,7 +1229,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       ).resolves.toBe(true);
 
       expect(firstSave).toHaveBeenCalledOnce();
-      expect(cloudRead, "lost-response recovery reads back the exact committed session").toHaveBeenCalledTimes(2);
+      expect(cloudRead, "five-slot scan plus lost-response readback use typed reads").toHaveBeenCalledTimes(6);
       expect(guestCheckpointCalls).toBe(1);
       expect(updateAll).toHaveBeenCalledOnce();
       expect(updateAll.mock.calls[0][0].session, "updateAll cannot undo the first-save CAS").toBeNull();
@@ -701,12 +1268,12 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       clearCoopResumeMarker();
       keys.forEach(key => localStorage.removeItem(key));
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
-      vi.spyOn(pokerogueApi.savedata.session, "get").mockImplementation(async () => {
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async () => {
         if (!scanComplete) {
           scanComplete = true;
-          return "Session not found.";
+          return coopCasMissing();
         }
-        return concurrentRow;
+        return coopCasFound(concurrentRow);
       });
       let attemptedRaw = "";
       const firstSave = vi
@@ -767,7 +1334,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     try {
       keys.forEach(key => localStorage.removeItem(key));
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
-      vi.spyOn(pokerogueApi.savedata.session, "get").mockResolvedValue("Session not found.");
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
       const firstSave = vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockResolvedValue({
         ok: true,
         status: 200,
@@ -806,7 +1373,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     try {
       keys.forEach(key => localStorage.removeItem(key));
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
-      vi.spyOn(pokerogueApi.savedata.session, "get").mockResolvedValue("Session not found.");
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
       const slot = await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot());
       rig.hostScene.sessionSlotId = slot!;
       vi.spyOn(rig.hostScene.gameData, "getSessionSaveData").mockImplementationOnce(() => {
@@ -840,7 +1407,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     try {
       keys.forEach(key => localStorage.removeItem(key));
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
-      vi.spyOn(pokerogueApi.savedata.session, "get").mockResolvedValue("Session not found.");
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
       vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockResolvedValue({
         ok: true,
         status: 200,
@@ -882,7 +1449,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     try {
       keys.forEach(key => localStorage.removeItem(key));
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
-      vi.spyOn(pokerogueApi.savedata.session, "get").mockResolvedValue("Session not found.");
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
       const slot = await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot());
       expect(slot).toBe(0);
       localStorage.setItem(keys[slot!], "concurrent-local-save");
@@ -913,7 +1480,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     try {
       keys.forEach(key => localStorage.removeItem(key));
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
-      vi.spyOn(pokerogueApi.savedata.session, "get").mockResolvedValue("Session not found.");
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
       const firstSave = vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockResolvedValue({
         ok: true,
         status: 200,
@@ -974,7 +1541,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     try {
       keys.forEach(key => localStorage.removeItem(key));
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
-      vi.spyOn(pokerogueApi.savedata.session, "get").mockResolvedValue("Session not found.");
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
       vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockResolvedValue({
         ok: true,
         status: 200,

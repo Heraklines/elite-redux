@@ -65,6 +65,12 @@ export interface CoopResumeCandidate extends CoopResumeMarker {
   commitment: CoopResumeCommitment;
 }
 
+/** Exact selected replica. Parsed data is for validation/rendering; `sessionJson` remains authoritative. */
+export interface CoopResumeLoadedSession {
+  session: CoopResumeSessionSummary;
+  sessionJson: string;
+}
+
 interface CoopResumeUnavailableEvidence {
   version: 1;
   self: string;
@@ -186,10 +192,6 @@ export async function digestCoopResumeSession(sessionJson: string): Promise<stri
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function serializeCoopResumeSession(session: CoopResumeSessionSummary): string {
-  return JSON.stringify(session, (_key, value: unknown) => (typeof value === "bigint" ? value.toString() : value));
-}
-
 function sessionRevision(session: CoopResumeSessionSummary): number {
   const controlPlane = session.coopControlPlane;
   if (controlPlane == null) {
@@ -208,9 +210,9 @@ function sessionRevision(session: CoopResumeSessionSummary): number {
 
 async function buildResumeCandidate(
   marker: CoopResumeMarker,
-  session: CoopResumeSessionSummary,
+  loaded: CoopResumeLoadedSession,
 ): Promise<CoopResumeCandidate> {
-  const sessionJson = serializeCoopResumeSession(session);
+  const { session, sessionJson } = loaded;
   const commitment = await deriveCoopResumeCommitment(sessionJson, session);
   if (commitment == null) {
     throw new Error("validated co-op resume candidate lost its discriminator fields");
@@ -338,7 +340,7 @@ export async function findCoopResumeCandidate(
   self: string,
   partner: string,
   localRole: CoopRole,
-  loadSession: (slot: number) => Promise<CoopResumeSessionSummary | undefined>,
+  loadSession: (slot: number) => Promise<CoopResumeLoadedSession | undefined>,
 ): Promise<CoopResumeDiscovery> {
   let replicaIndeterminate = false;
   const readMarker = readCoopResumeMarker(self, partner);
@@ -346,11 +348,12 @@ export async function findCoopResumeCandidate(
   const unavailable = readCoopResumeUnavailableEvidence(self, partner);
   let unsafe: Extract<CoopResumeDiscovery, { kind: "unsafe-role-reversal" | "legacy-unmappable" }> | null = null;
   if (marker != null) {
-    const saved = await loadSession(marker.slot).catch<CoopResumeSessionSummary | undefined>(error => {
+    const loaded = await loadSession(marker.slot).catch<CoopResumeLoadedSession | undefined>(error => {
       replicaIndeterminate = true;
       coopWarn("launch", `resume marker slot=${marker.slot} load failed -> scanning saves`, error);
       return;
     });
+    const saved = loaded?.session;
     // Legacy unordered-pair saves are deliberately not resumable: without authenticated seat
     // ownership, a reversed lobby role would silently hand each player the other player's mons.
     const disposition =
@@ -363,7 +366,7 @@ export async function findCoopResumeCandidate(
       && marker.runId === saved.coopRun?.runId
       && marker.checkpointRevision <= saved.coopRun.checkpointRevision
     ) {
-      return { kind: "candidate", candidate: await buildResumeCandidate(marker, saved) };
+      return { kind: "candidate", candidate: await buildResumeCandidate(marker, loaded!) };
     }
     if (disposition === "unsafe-role-reversal" && saved?.coopParticipants != null) {
       unsafe = {
@@ -381,7 +384,7 @@ export async function findCoopResumeCandidate(
   const sessions = await Promise.all(
     [0, 1, 2, 3, 4].map(async slot => ({
       slot,
-      session: await loadSession(slot).catch<CoopResumeSessionSummary | undefined>(error => {
+      loaded: await loadSession(slot).catch<CoopResumeLoadedSession | undefined>(error => {
         replicaIndeterminate = true;
         coopWarn("launch", `resume scan slot=${slot} load failed (ignored)`, error);
         return;
@@ -390,17 +393,18 @@ export async function findCoopResumeCandidate(
   );
   const candidates = sessions
     .filter(
-      ({ session }) =>
-        sessionDisposition(session, self, partner, localRole) === "candidate"
-        && !isCoopRunLocallyDeleted(self, session?.coopRun?.runId ?? ""),
+      ({ loaded }) =>
+        sessionDisposition(loaded?.session, self, partner, localRole) === "candidate"
+        && !isCoopRunLocallyDeleted(self, loaded?.session.coopRun?.runId ?? ""),
     )
-    .sort((a, b) => (b.session?.timestamp ?? 0) - (a.session?.timestamp ?? 0));
+    .sort((a, b) => (b.loaded?.session.timestamp ?? 0) - (a.loaded?.session.timestamp ?? 0));
   const best = candidates[0];
-  if (best?.session == null) {
+  if (best?.loaded == null) {
     if (unsafe != null) {
       return unsafe;
     }
-    for (const { slot, session } of sessions) {
+    for (const { slot, loaded } of sessions) {
+      const session = loaded?.session;
       const disposition = sessionDisposition(session, self, partner, localRole);
       if (disposition === "unsafe-role-reversal" && session?.coopParticipants != null) {
         return {
@@ -435,14 +439,14 @@ export async function findCoopResumeCandidate(
     slot: best.slot,
     self,
     partner,
-    wave: best.session.waveIndex,
-    runId: best.session.coopRun!.runId,
-    checkpointRevision: best.session.coopRun!.checkpointRevision,
-    ts: best.session.timestamp,
+    wave: best.loaded.session.waveIndex,
+    runId: best.loaded.session.coopRun!.runId,
+    checkpointRevision: best.loaded.session.coopRun!.checkpointRevision,
+    ts: best.loaded.session.timestamp,
   };
   recordCoopResumeMarker(recovered.slot, self, partner, recovered.wave, recovered.runId, recovered.checkpointRevision);
   coopLog("launch", `resume candidate recovered from save slot=${recovered.slot} wave=${recovered.wave}`);
-  return { kind: "candidate", candidate: await buildResumeCandidate(recovered, best.session) };
+  return { kind: "candidate", candidate: await buildResumeCandidate(recovered, best.loaded) };
 }
 
 /**
@@ -656,7 +660,6 @@ export function clearCoopResumeMarker(): void {
 
 /** Clear only evidence for one exact account/run, preserving a newer tab's replacement marker. */
 export function clearCoopResumeEvidenceIfRun(self: string, runId: string): boolean {
-  let cleared = false;
   for (const key of [COOP_RESUME_MARKER_KEY, COOP_RESUME_UNAVAILABLE_KEY]) {
     try {
       const raw = localStorage.getItem(key);
@@ -664,21 +667,25 @@ export function clearCoopResumeEvidenceIfRun(self: string, runId: string): boole
         continue;
       }
       const evidence = JSON.parse(raw) as { self?: unknown; runId?: unknown };
-      if (
-        typeof evidence.self !== "string"
-        || !sameCoopIdentity(evidence.self, self)
-        || evidence.runId !== runId
-        || localStorage.getItem(key) !== raw
-      ) {
+      if (typeof evidence.self !== "string" || typeof evidence.runId !== "string") {
+        return false;
+      }
+      if (!sameCoopIdentity(evidence.self, self) || evidence.runId !== runId) {
         continue;
       }
+      if (localStorage.getItem(key) !== raw) {
+        return false;
+      }
       localStorage.removeItem(key);
-      cleared = true;
+      if (localStorage.getItem(key) != null) {
+        return false;
+      }
     } catch {
-      // Malformed/unrelated evidence is handled by normal discovery and is never broadly deleted here.
+      // Malformed lineage cannot prove it belongs to another run, so tombstone adoption fails closed.
+      return false;
     }
   }
-  return cleared;
+  return true;
 }
 
 interface CoopDeletedRunEvidence {
@@ -717,13 +724,39 @@ export function recordCoopDeletedRun(self: string, runId: string): boolean {
   if (!self || !isCoopRunId(runId)) {
     return false;
   }
+  const priorDeletedRuns = localStorage.getItem(COOP_DELETED_RUNS_KEY);
+  const priorMarker = localStorage.getItem(COOP_RESUME_MARKER_KEY);
+  const priorUnavailable = localStorage.getItem(COOP_RESUME_UNAVAILABLE_KEY);
+  let writtenDeletedRuns: string | null = null;
   try {
     const retained = readDeletedRuns().filter(entry => !(sameCoopIdentity(entry.self, self) && entry.runId === runId));
     retained.push({ version: 1, self, runId, ts: Date.now() });
-    localStorage.setItem(COOP_DELETED_RUNS_KEY, JSON.stringify(retained.slice(-64)));
-    clearCoopResumeEvidenceIfRun(self, runId);
-    return isCoopRunLocallyDeleted(self, runId);
+    writtenDeletedRuns = JSON.stringify(retained.slice(-64));
+    localStorage.setItem(COOP_DELETED_RUNS_KEY, writtenDeletedRuns);
+    if (clearCoopResumeEvidenceIfRun(self, runId) && isCoopRunLocallyDeleted(self, runId)) {
+      return true;
+    }
   } catch {
-    return false;
+    // Roll back below when every touched key still contains this transaction's value.
   }
+  try {
+    if (writtenDeletedRuns != null && localStorage.getItem(COOP_DELETED_RUNS_KEY) === writtenDeletedRuns) {
+      if (priorDeletedRuns == null) {
+        localStorage.removeItem(COOP_DELETED_RUNS_KEY);
+      } else {
+        localStorage.setItem(COOP_DELETED_RUNS_KEY, priorDeletedRuns);
+      }
+    }
+    for (const [key, prior] of [
+      [COOP_RESUME_MARKER_KEY, priorMarker],
+      [COOP_RESUME_UNAVAILABLE_KEY, priorUnavailable],
+    ] as const) {
+      if (prior != null && localStorage.getItem(key) == null) {
+        localStorage.setItem(key, prior);
+      }
+    }
+  } catch {
+    // Failure remains fail-closed; callers retain the protected local checkpoint and lineage head.
+  }
+  return false;
 }

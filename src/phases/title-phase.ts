@@ -1015,8 +1015,12 @@ export class TitlePhase extends Phase {
             }
 
             // HOST: is there a saved run with EXACTLY this partner (self+partner account pair)?
-            const discovery = await findCoopResumeCandidate(controller.localName(), partner, controller.role, slot =>
-              globalScene.gameData.getSessionForCoopResume(slot),
+            const resumeSnapshot = await globalScene.gameData.getSessionsForCoopResume();
+            const discovery = await findCoopResumeCandidate(
+              controller.localName(),
+              partner,
+              controller.role,
+              async slot => resumeSnapshot.get(slot),
             );
             if (!isCurrentSession()) {
               return;

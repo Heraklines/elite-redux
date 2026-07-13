@@ -26,6 +26,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const TEST_RUN_ID = `test-run-${"a".repeat(24)}`;
 
+function loadedResumeSession<T extends object>(session: T, sessionJson = JSON.stringify(session)) {
+  return { session, sessionJson };
+}
+
 /** In-process mock of a data channel implementing {@linkcode CoopWireChannel}.
  *  Two are cross-wired (`link`) to simulate the two ends of an open channel. */
 class MockWire implements CoopWireChannel {
@@ -1061,7 +1065,10 @@ describe("#810: resume offer/reply protocol + marker", () => {
       ],
     ]);
 
-    const discovery = await findCoopResumeCandidate("Alice", "Bob", "host", async slot => saves.get(slot));
+    const discovery = await findCoopResumeCandidate("Alice", "Bob", "host", async slot => {
+      const session = saves.get(slot);
+      return session == null ? undefined : loadedResumeSession(session);
+    });
     expect(discovery).toMatchObject({
       kind: "candidate",
       candidate: { slot: 3, wave: 17, self: "Alice", partner: "Bob" },
@@ -1099,9 +1106,12 @@ describe("#810: resume offer/reply protocol + marker", () => {
       ],
     ]);
 
-    await expect(findCoopResumeCandidate("Alice", "Bob", "host", async slot => saves.get(slot))).resolves.toEqual({
-      kind: "no-save",
-    });
+    await expect(
+      findCoopResumeCandidate("Alice", "Bob", "host", async slot => {
+        const session = saves.get(slot);
+        return session == null ? undefined : loadedResumeSession(session);
+      }),
+    ).resolves.toEqual({ kind: "no-save" });
     clearCoopResumeMarker();
   });
 
@@ -1121,7 +1131,7 @@ describe("#810: resume offer/reply protocol + marker", () => {
       coopRun: { version: 1 as const, runId: TEST_RUN_ID, checkpointRevision: 12 },
     };
     const discovery = await findCoopResumeCandidate("Alice", "Bob", "guest", async slot =>
-      slot === 0 ? saved : undefined,
+      slot === 0 ? loadedResumeSession(saved) : undefined,
     );
     expect(discovery, "Alice was host in the snapshot and cannot silently resume as guest").toMatchObject({
       kind: "unsafe-role-reversal",
@@ -1142,7 +1152,7 @@ describe("#810: resume offer/reply protocol + marker", () => {
       coopParticipants: { players: ["Alice", "Bob"] as [string, string] },
     };
     const discovery = await findCoopResumeCandidate("Alice", "Bob", "host", async slot =>
-      slot === 0 ? (legacy as never) : undefined,
+      slot === 0 ? loadedResumeSession(legacy as never) : undefined,
     );
     expect(discovery, "an unordered pair cannot prove authority-seat ownership").toMatchObject({
       kind: "legacy-unmappable",
@@ -1160,7 +1170,9 @@ describe("#810: resume offer/reply protocol + marker", () => {
     recordCoopResumeMarker(2, "Alice", "Bob", 6, TEST_RUN_ID, 1);
     const legacy = { gameMode: GameModes.COOP, waveIndex: 6, timestamp: 60 };
     await expect(
-      findCoopResumeCandidate("Alice", "Bob", "host", async slot => (slot === 2 ? (legacy as never) : undefined)),
+      findCoopResumeCandidate("Alice", "Bob", "host", async slot =>
+        slot === 2 ? loadedResumeSession(legacy as never) : undefined,
+      ),
       "the exact marker turns identity-unknown legacy bytes into a visible blocker, never New Game",
     ).resolves.toMatchObject({ kind: "legacy-unmappable", slot: 2, wave: 6 });
     clearCoopResumeMarker();
@@ -1186,12 +1198,17 @@ describe("#810: resume offer/reply protocol + marker", () => {
         },
       ],
     ]);
-    const discovery = await findCoopResumeCandidate("Alice", "Bob", "host", async slot => saves.get(slot));
+    const selectedRaw = `  ${JSON.stringify(saves.get(0))}\n`;
+    const discovery = await findCoopResumeCandidate("Alice", "Bob", "host", async slot => {
+      const session = saves.get(slot);
+      return session == null ? undefined : loadedResumeSession(session, selectedRaw);
+    });
     expect(discovery.kind).toBe("candidate");
     if (discovery.kind !== "candidate") {
       throw new Error("expected frozen resume candidate");
     }
     const candidate = discovery.candidate;
+    expect(candidate.sessionJson, "discovery preserves exact selected raw bytes").toBe(selectedRaw);
     saves.set(0, {
       ...saves.get(0)!,
       waveIndex: 99,
