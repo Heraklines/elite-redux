@@ -34,8 +34,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          # The planner ranks the exact tip delta ahead of the long-lived branch diff, so a newly changed
-          # test can never be crowded out by the five-shard development cap.
+          # The planner fetches the previous pushed tip explicitly below. Two commits are enough for a
+          # newly-created branch fallback without downloading the long-lived integration history.
           fetch-depth: 2
           submodules: false
 
@@ -53,12 +53,21 @@ jobs:
         id: plan
         env:
           COOP_CI_PLAN_MANIFEST: coop-ci-focused-plan.json
+          COOP_PUSH_BASE: ${{ github.event.before }}
         shell: bash
         run: |
           set +e
           set -o pipefail
+          # A push can contain several commits. HEAD^ covers only the final commit and can crowd earlier
+          # directly-changed tests out of the five-shard cap. Rank the complete pushed delta instead.
+          if [[ -n "$COOP_PUSH_BASE" && ! "$COOP_PUSH_BASE" =~ ^0+$ ]]; then
+            git fetch --no-tags --depth=1 origin "$COOP_PUSH_BASE"
+            priority_base="$COOP_PUSH_BASE"
+          else
+            priority_base="HEAD^"
+          fi
           node scripts/run-coop-gate.mjs --focused-matrix \
-            --base "$COOP_INTEGRATION_BASE" --priority-base HEAD^ --max-shards 5 \
+            --base "$COOP_INTEGRATION_BASE" --priority-base "$priority_base" --max-shards 5 \
             2>&1 | tee coop-ci-focused-plan.log
           status=${PIPESTATUS[0]}
           echo "exit_code=$status" >> "$GITHUB_OUTPUT"
