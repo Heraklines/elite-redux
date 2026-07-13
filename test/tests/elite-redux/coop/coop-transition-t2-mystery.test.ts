@@ -23,6 +23,7 @@ import { clearCoopRuntime, isCoopSharedTerminalFrozen, setCoopRuntime } from "#d
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
+import { resetErBiomeStructure, restoreErBiomeStructure } from "#data/elite-redux/er-biome-structure";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
@@ -87,6 +88,17 @@ const JOURNEYS: MysteryJourney[] = [
 
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+/** Capture snapshots treat an absent fusion and an explicit null fusion identically; every other field is exact. */
+function capturePartyWithAbsentFusionNormalized(): unknown[] {
+  return captureCoopCaptureParty().map(encoded => {
+    const pokemon = JSON.parse(encoded) as Record<string, unknown>;
+    if (pokemon.fusionSpecies == null) {
+      delete pokemon.fusionSpecies;
+    }
+    return pokemon;
+  });
 }
 
 function retainedOperationKind(message: CoopMessage): string | undefined {
@@ -301,9 +313,16 @@ async function crossIntoNaturallyCarriedMystery(
   ).toHaveLength(0);
   expect(rig.hostScene.currentBattle.mysteryEncounter?.encounterType).toBe(type);
   expect(rig.guestScene.currentBattle.mysteryEncounter?.encounterType).toBe(type);
+  expect(rig.hostScene.phaseManager.getCurrentPhase()?.phaseName, "host parked on the Mystery selector boundary").toBe(
+    "MysteryEncounterPhase",
+  );
+  expect(
+    rig.guestScene.phaseManager.getCurrentPhase(),
+    "ME-on-biome-transition guest queued the renderer-safe Mystery continuation instead of CommandPhase",
+  ).toBe(guestMe);
   expect(rig.guestScene.arena.biomeId).toBe(rig.hostScene.arena.biomeId);
-  expect(withClientSync(rig.guestCtx, () => captureCoopCaptureParty())).toEqual(
-    withClientSync(rig.hostCtx, () => captureCoopCaptureParty()),
+  expect(withClientSync(rig.guestCtx, () => capturePartyWithAbsentFusionNormalized())).toEqual(
+    withClientSync(rig.hostCtx, () => capturePartyWithAbsentFusionNormalized()),
   );
 
   await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase"));
@@ -422,6 +441,7 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
     setCoopWaveBarrierMs(60_000);
     resetCoopRendezvousWaitMs();
     resetCoopUiRelayTrace();
+    resetErBiomeStructure();
     logs?.dispose();
     clearCoopRuntime();
     initGlobalScene(game.scene);
@@ -429,6 +449,9 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
 
   it.each(JOURNEYS)("ordinary battle -> $name -> next battle stays fully converged", async journey => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    // Wave 11 is the exact end of this deterministic biome. Wave 12 therefore exercises the combined
+    // SwitchBiome -> NewBiomeEncounter -> zero-enemy Mystery carrier boundary on every journey.
+    restoreErBiomeStructure(11, 1, null);
     const pair: ScheduledCoopPair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     const hostSend = vi.spyOn(pair.host, "send");
@@ -499,8 +522,8 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
       expect(rig.hostScene.currentBattle.battleType).not.toBe(BattleType.MYSTERY_ENCOUNTER);
       expect(rig.guestScene.currentBattle.battleType).toBe(rig.hostScene.currentBattle.battleType);
       expect(rig.guestScene.arena.biomeId).toBe(rig.hostScene.arena.biomeId);
-      expect(withClientSync(rig.guestCtx, () => captureCoopCaptureParty())).toEqual(
-        withClientSync(rig.hostCtx, () => captureCoopCaptureParty()),
+      expect(withClientSync(rig.guestCtx, () => capturePartyWithAbsentFusionNormalized())).toEqual(
+        withClientSync(rig.hostCtx, () => capturePartyWithAbsentFusionNormalized()),
       );
       expect(withClientSync(rig.guestCtx, () => captureCoopEnemies())).toEqual(
         withClientSync(rig.hostCtx, () => captureCoopEnemies()),

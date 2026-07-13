@@ -268,9 +268,9 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
             ? "A mysterious encounter appeared!"
             : this.getEncounterMessage();
           try {
-            globalScene.ui.showText(message, null, () => this.end(), 1_500, true);
+            globalScene.ui.showText(message, null, () => this.finishAuthoritativeGuestPresentation(), 1_500, true);
           } catch {
-            this.end();
+            this.finishAuthoritativeGuestPresentation();
           }
         } else {
           // The host performs the real setup, but its authority boundary never waits forever on encounter text.
@@ -304,9 +304,30 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
         } catch (error) {
           coopWarn("runtime", "NewBiome watchdog could not finish cosmetic enemy materialization", error);
         }
+        this.finishAuthoritativeGuestPresentation();
+        return;
       }
       this.end();
     }, COOP_NEW_BIOME_TERMINAL_WATCHDOG_MS);
+  }
+
+  /**
+   * Finish the renderer-only new-biome intro without skipping a host-authored Mystery surface. Ordinary
+   * encounters continue to the queued command tail; a Mystery carrier must first enter the normal guest
+   * MysteryEncounterPhase divert, which replaces local simulation with CoopReplayMePhase.
+   */
+  private finishAuthoritativeGuestPresentation(): void {
+    if (!this.coopBoundaryStillLive()) {
+      return;
+    }
+    if (globalScene.currentBattle.isBattleMysteryEncounter()) {
+      if (globalScene.currentBattle.mysteryEncounter == null) {
+        failCoopSharedSession(`NewBiome Mystery carrier was incomplete at wave ${this.coopWave}`);
+        return;
+      }
+      globalScene.phaseManager.unshiftNew("MysteryEncounterPhase");
+    }
+    this.end();
   }
 
   /** Missing authority never advances; reconnect/replay may restore the exact permit/carrier and retry. */

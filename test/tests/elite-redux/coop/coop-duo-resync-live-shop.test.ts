@@ -176,6 +176,13 @@ describe.skipIf(!RUN)(
           await drainLoopback();
         }
       });
+      // The guest's rendezvous arrival is queued for the host under the destination-scoped scheduler.
+      // Pump it under host ctx so the owner can open its public picker while the guest remains parked.
+      await withClient(rig.hostCtx, async () => {
+        for (let i = 0; i < 4; i++) {
+          await drainLoopback();
+        }
+      });
 
       // The watcher is genuinely PARKED on the reward seq (the live shop wait the resync must spare).
       expect(guestHasLiveWaiter(rig, REWARD_SEQ), "the watcher is parked on a LIVE reward-seq wait (shop open)").toBe(

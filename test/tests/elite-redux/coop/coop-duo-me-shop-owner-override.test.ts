@@ -114,6 +114,7 @@ describe.skipIf(!RUN)(
 
       const pair = createScheduledCoopPair({ automatic: true });
       const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+      const hostSend = vi.spyOn(pair.host, "send");
 
       // SEED the interaction counter to 1 (ODD -> the GUEST owns the ME + its embedded pick). Both controllers
       // advance 0->1 and drain (the broadcasts only set a deferred pendingRemote, so neither double-advances).
@@ -160,8 +161,10 @@ describe.skipIf(!RUN)(
         await drainLoopback();
       });
       expect(
-        getCoopUiRelayEdges().some(edge => edge.mode === UiMode.MYSTERY_ENCOUNTER && edge.carrier === "operation"),
-        "the public guest Mystery selector minted a typed retained operation",
+        getCoopUiRelayEdges().some(
+          edge => edge.mode === UiMode.MYSTERY_ENCOUNTER && edge.carrier === "interactionChoice",
+        ),
+        "the public guest Mystery selector emitted its operation-backed proposal carrier",
       ).toBe(true);
 
       // STEP C (host): flush the relayed index -> the host applies handleOptionSelect(0) programmatically and
@@ -193,6 +196,12 @@ describe.skipIf(!RUN)(
         handleOptionSelectSpy,
         "host applied the guest's relayed option via handleOptionSelect",
       ).toHaveBeenCalled();
+      expect(
+        hostSend.mock.calls.some(
+          ([message]) => message.t === "envelope" && message.envelope.pendingOperation?.kind === "ME_PICK",
+        ),
+        "the host validated the public guest proposal and retained the typed ME_PICK operation",
+      ).toBe(true);
       // MAJOR-3: the embedded ME reward shop suppresses its own advance mid-ME - still at the ME counter.
       expect(
         rig.hostRuntime.controller.interactionCounter(),
@@ -238,9 +247,10 @@ describe.skipIf(!RUN)(
       expect(
         getCoopUiRelayEdges().some(
           edge =>
-            (edge.mode === UiMode.MODIFIER_SELECT || edge.mode === UiMode.CONFIRM) && edge.carrier === "operation",
+            (edge.mode === UiMode.MODIFIER_SELECT || edge.mode === UiMode.CONFIRM)
+            && edge.carrier === "interactionChoice",
         ),
-        "the public embedded reward UI minted a typed retained operation",
+        "the public guest reward UI emitted its operation-backed proposal carrier",
       ).toBe(true);
 
       // STEP C3 (host): flush the guest owner's LEAVE -> host watcher applies it, the shop ends, and the option
@@ -254,6 +264,12 @@ describe.skipIf(!RUN)(
         }
         await game.phaseInterceptor.to("PostMysteryEncounterPhase");
       });
+      expect(
+        hostSend.mock.calls.some(
+          ([message]) => message.t === "envelope" && message.envelope.pendingOperation?.kind === "REWARD",
+        ),
+        "the host validated the public guest reward proposal and retained the typed REWARD result",
+      ).toBe(true);
 
       // The host advanced the alternation counter EXACTLY ONCE for the whole ME (the embedded shop added none).
       expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once for the whole ME").toBe(
