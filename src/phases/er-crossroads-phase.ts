@@ -75,6 +75,61 @@ import { UiMode } from "#enums/ui-mode";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { getBiomeName } from "#utils/common";
 
+interface CoopCrossroadsContinuationRecoveryPolicy {
+  readonly retryDelayMs: number;
+  readonly maxAutomaticRetries: number;
+  readonly deadlineMs: number;
+}
+
+const DEFAULT_COOP_CROSSROADS_CONTINUATION_RECOVERY_POLICY: CoopCrossroadsContinuationRecoveryPolicy = {
+  retryDelayMs: 250,
+  maxAutomaticRetries: 2,
+  // The exact operation receipt itself waits for up to 60s. Two re-awaits preserve reconnect grace while
+  // this independent ceiling also fences a callback that never resolves or reports another failure.
+  deadlineMs: 125_000,
+};
+
+let coopCrossroadsContinuationRecoveryPolicy = DEFAULT_COOP_CROSSROADS_CONTINUATION_RECOVERY_POLICY;
+
+/** Keep production recovery generous while allowing production-shaped tests to prove exhaustion quickly. */
+export function setCoopCrossroadsContinuationRecoveryPolicyForTest(
+  policy: Partial<CoopCrossroadsContinuationRecoveryPolicy>,
+): void {
+  coopCrossroadsContinuationRecoveryPolicy = {
+    retryDelayMs: Math.max(
+      1,
+      Math.trunc(policy.retryDelayMs ?? DEFAULT_COOP_CROSSROADS_CONTINUATION_RECOVERY_POLICY.retryDelayMs),
+    ),
+    maxAutomaticRetries: Math.max(
+      0,
+      Math.trunc(
+        policy.maxAutomaticRetries ?? DEFAULT_COOP_CROSSROADS_CONTINUATION_RECOVERY_POLICY.maxAutomaticRetries,
+      ),
+    ),
+    deadlineMs: Math.max(
+      1,
+      Math.trunc(policy.deadlineMs ?? DEFAULT_COOP_CROSSROADS_CONTINUATION_RECOVERY_POLICY.deadlineMs),
+    ),
+  };
+}
+
+export function resetCoopCrossroadsContinuationRecoveryPolicyForTest(): void {
+  coopCrossroadsContinuationRecoveryPolicy = DEFAULT_COOP_CROSSROADS_CONTINUATION_RECOVERY_POLICY;
+}
+
+interface CoopCrossroadsContinuationRecovery {
+  readonly generation: number;
+  readonly wave: number;
+  readonly turn: number;
+  readonly boundaryRevision: number;
+  readonly token: number;
+  retry: () => void;
+  retries: number;
+  retryTimer: ReturnType<typeof setTimeout> | null;
+  deadlineTimer: ReturnType<typeof setTimeout> | null;
+  terminalRequested: boolean;
+}
+
 export class ErCrossroadsPhase extends Phase {
   public readonly phaseName = "ErCrossroadsPhase";
 
@@ -87,6 +142,8 @@ export class ErCrossroadsPhase extends Phase {
 
   /** Co-op (#848): interaction counter pinned at open (-1 = solo / not pinned). */
   private coopStartCounter = -1;
+  private coopCommitRecovery: CoopCrossroadsContinuationRecovery | null = null;
+  private coopCommitRecoveryToken = 0;
 
   start(): void {
     super.start();
@@ -304,6 +361,7 @@ export class ErCrossroadsPhase extends Phase {
           this.parkCrossroadsCommitRecovery(() => this.coopOwnerFlow(pinned));
           return;
         }
+        this.clearCrossroadsCommitRecovery();
         this.coopOwnerPromptState = "open";
         getCoopUiMirror()?.beginSession("owner", UiMode.OPTION_SELECT, mirrorSeq);
       });
@@ -406,6 +464,7 @@ export class ErCrossroadsPhase extends Phase {
         });
         return;
       }
+      this.clearCrossroadsCommitRecovery();
       getCoopUiMirror()?.beginSession("watcher", UiMode.OPTION_SELECT, mirrorSeq);
     } catch {
       /* cosmetic - the awaited relay still drives the authoritative apply below */
@@ -569,28 +628,138 @@ export class ErCrossroadsPhase extends Phase {
     getCoopUiMirror()?.endSession();
     const generation = coopSessionGeneration();
     const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    if (!this.boundaryStillLive(generation, wave)) {
+      return;
+    }
+
+    const turn = globalScene.currentBattle?.turn ?? 0;
+    const boundaryRevision =
+      this.coopStartCounter >= 0 ? this.coopStartCounter : Math.max(0, getCoopController()?.interactionCounter() ?? 0);
+    let recovery = this.coopCommitRecovery;
+    if (
+      recovery == null
+      || recovery.generation !== generation
+      || recovery.wave !== wave
+      || recovery.turn !== turn
+      || recovery.boundaryRevision !== boundaryRevision
+    ) {
+      this.clearCrossroadsCommitRecovery();
+      recovery = {
+        generation,
+        wave,
+        turn,
+        boundaryRevision,
+        token: ++this.coopCommitRecoveryToken,
+        retry,
+        retries: 0,
+        retryTimer: null,
+        deadlineTimer: null,
+        terminalRequested: false,
+      };
+      this.coopCommitRecovery = recovery;
+      const token = recovery.token;
+      recovery.deadlineTimer = setTimeout(() => {
+        const current = this.coopCommitRecovery;
+        if (current?.token !== token) {
+          return;
+        }
+        if (this.crossroadsCommitRecoveryStillLive(current)) {
+          this.exhaustCrossroadsCommitRecovery(current, "absolute deadline");
+        } else {
+          this.clearCrossroadsCommitRecovery();
+        }
+      }, coopCrossroadsContinuationRecoveryPolicy.deadlineMs);
+    } else {
+      recovery.retry = retry;
+    }
+
+    if (recovery.terminalRequested || recovery.retryTimer != null) {
+      return;
+    }
+    if (recovery.retries >= coopCrossroadsContinuationRecoveryPolicy.maxAutomaticRetries) {
+      this.exhaustCrossroadsCommitRecovery(recovery, "exact receipt retries exhausted");
+      return;
+    }
+
+    // The screen is cosmetic recovery feedback. Supersede/failure cannot consume another exact retry or
+    // install an input callback that a player must press before the shared session can make progress.
     globalScene.ui
-      .setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.boundaryStillLive(generation, wave))
-      .then(result => {
-        if (!this.boundaryStillLive(generation, wave)) {
-          return;
-        }
-        if (result === "superseded") {
-          this.parkCrossroadsCommitRecovery(retry);
-          return;
-        }
-        globalScene.ui.showText(
-          "Could not confirm the shared crossroads choice. Reconnect, then confirm to retry.",
-          null,
-          () => {
-            if (this.boundaryStillLive(generation, wave)) {
-              retry();
-            }
-          },
-          null,
-          true,
-        );
-      });
+      .setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.crossroadsCommitRecoveryStillLive(recovery))
+      .catch(error => coopWarn("reward", "crossroads continuation recovery UI failed (retry remains armed)", error));
+    globalScene.ui.showText("Recovering the shared crossroads choice…");
+
+    const token = recovery.token;
+    const delay = coopCrossroadsContinuationRecoveryPolicy.retryDelayMs * (recovery.retries + 1);
+    recovery.retryTimer = setTimeout(() => {
+      const current = this.coopCommitRecovery;
+      if (current?.token !== token) {
+        return;
+      }
+      if (!this.crossroadsCommitRecoveryStillLive(current)) {
+        this.clearCrossroadsCommitRecovery();
+        return;
+      }
+      current.retryTimer = null;
+      current.retries++;
+      const exactRetry = current.retry;
+      try {
+        exactRetry();
+      } catch (error) {
+        coopWarn("reward", "crossroads continuation exact retry threw - remaining closed", error);
+        this.parkCrossroadsCommitRecovery(exactRetry);
+      }
+    }, delay);
+  }
+
+  private crossroadsCommitRecoveryStillLive(recovery: CoopCrossroadsContinuationRecovery): boolean {
+    return (
+      this.coopCommitRecovery === recovery
+      && !recovery.terminalRequested
+      && this.boundaryStillLive(recovery.generation, recovery.wave)
+    );
+  }
+
+  private exhaustCrossroadsCommitRecovery(recovery: CoopCrossroadsContinuationRecovery, detail: string): void {
+    if (!this.crossroadsCommitRecoveryStillLive(recovery)) {
+      return;
+    }
+    recovery.terminalRequested = true;
+    if (recovery.retryTimer != null) {
+      clearTimeout(recovery.retryTimer);
+      recovery.retryTimer = null;
+    }
+    if (recovery.deadlineTimer != null) {
+      clearTimeout(recovery.deadlineTimer);
+      recovery.deadlineTimer = null;
+    }
+    coopWarn(
+      "reward",
+      `crossroads continuation recovery exhausted (${detail}) wave=${recovery.wave} turn=${recovery.turn} revision=${recovery.boundaryRevision}`,
+    );
+    failCoopSharedSession("The shared crossroads choice could not recover.", {
+      boundary: "surface",
+      reasonCode: "continuation-failed",
+      wave: recovery.wave,
+      turn: recovery.turn,
+      boundaryRevision: recovery.boundaryRevision,
+    });
+  }
+
+  private clearCrossroadsCommitRecovery(): void {
+    const recovery = this.coopCommitRecovery;
+    this.coopCommitRecovery = null;
+    this.coopCommitRecoveryToken++;
+    if (recovery?.retryTimer != null) {
+      clearTimeout(recovery.retryTimer);
+    }
+    if (recovery?.deadlineTimer != null) {
+      clearTimeout(recovery.deadlineTimer);
+    }
+  }
+
+  override end(): void {
+    this.clearCrossroadsCommitRecovery();
+    super.end();
   }
 
   private boundaryStillLive(generation: number, wave: number): boolean {
