@@ -16,8 +16,8 @@ the same address, digest, and continuation surface. Every battle turn also corre
 
 | Journey | Public actions and required result | Account precondition |
 | --- | --- | --- |
-| `probe` | Open both clients, log in through the visible form, reach Title | Two tutorial-complete staging accounts |
-| `fresh-wave2` | Lobby invite/accept, New Run, starter selection, wave 1 commands, reward leave, wave 2 command UI | Accounts have no title-menu Continue entry unless title keys are configured |
+| `probe` | Open both clients, log in through the visible form, complete first-login gender selection, reach Title | Workflow provisions isolated beta accounts; manual runs supply accounts |
+| `fresh-wave2` | Lobby invite/accept, New Run, starter selection, wave 1 commands, reward leave, wave 2 command UI | Isolated accounts have no title-menu Continue entry unless title keys are configured |
 | `fresh-resume` | `fresh-wave2`, close both pages, reopen/login, pair in the same direction, accept Resume, reach command UI | Same as `fresh-wave2` |
 | `reverse-resume` | Same, but reverse which player sends the lobby request after reopening | Same as `fresh-wave2`; this is the invitation-direction regression |
 | `faint-replacement` | Pair, Resume, submit battle commands, select a legal replacement through the public picker, observe summon/continued battle | A shared save at a deterministic low-HP boundary |
@@ -28,10 +28,12 @@ the wrong visible route and the resume journey fails.
 
 ## Run on an isolated machine
 
-Use the opt-in **Co-op Public UI Journey** GitHub workflow for execution. Its primary four credentials are
-repository secrets and it uploads evidence even when the journey fails. Do not use real player accounts;
-journeys intentionally create or advance beta-API saves. `COOP_UI_API_URL` and `COOP_UI_SIGNAL_URL` are
-maintainer-owned repository variables; workflow inputs cannot redirect credential entry. The optional
+Use the opt-in **Co-op Public UI Journey** GitHub workflow for execution. Its primary runner provisions a
+unique pair through the beta account-registration API, then performs authentication and every game/lobby
+action through the visible application. It uploads evidence even when the journey fails. Do not use real
+player accounts; journeys intentionally create or advance beta-API saves. `COOP_UI_API_URL` and
+`COOP_UI_SIGNAL_URL` are maintainer-owned repository variables; workflow inputs cannot redirect fixture
+creation or credential entry. The optional
 reverse-resume fan-out uses a separately provisioned `COOP_UI_ALT_*` account pair so concurrent runners
 never race one save or lobby identity.
 
@@ -63,8 +65,9 @@ Relevant options:
   screenshots remain mandatory.
 
 The default keyboard model is QWERTY: arrows navigate, Space is Action, Enter is Submit, and Backspace is
-Cancel. Test accounts must have already completed gender/tutorial setup. Fresh journeys should use clean
-accounts, or explicitly provide the title-menu selection keys above.
+Cancel. The runner completes a new account's visible gender prompt; tutorials remain disabled by the
+normal beta build flag. Manual fresh journeys should use clean accounts, or explicitly provide the
+title-menu selection keys above.
 
 ## Evidence and pass conditions
 

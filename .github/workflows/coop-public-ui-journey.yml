@@ -117,6 +117,7 @@ jobs:
             test/browser/coop-public-ui/evidence.mjs \
             test/browser/coop-public-ui/journeys.mjs \
             test/browser/coop-public-ui/preview-server.mjs \
+            test/browser/coop-public-ui/provision-accounts.mjs \
             test/browser/coop-public-ui/public-ui-harness.mjs \
             test/browser/coop-public-ui/run.mjs \
             test/browser/coop-public-ui/vite.config.mjs
@@ -171,18 +172,10 @@ jobs:
       - name: Install isolated Chrome runtime
         run: pnpm exec puppeteer browsers install chrome
 
-      - name: Reject missing dedicated staging credentials
+      - name: Provision an isolated non-production account pair
         env:
-          HOST_USERNAME: ${{ secrets.COOP_UI_HOST_USERNAME }}
-          HOST_PASSWORD: ${{ secrets.COOP_UI_HOST_PASSWORD }}
-          GUEST_USERNAME: ${{ secrets.COOP_UI_GUEST_USERNAME }}
-          GUEST_PASSWORD: ${{ secrets.COOP_UI_GUEST_PASSWORD }}
-        shell: bash
-        run: |
-          test -n "$HOST_USERNAME" || { echo "COOP_UI_HOST_USERNAME is not configured"; exit 1; }
-          test -n "$HOST_PASSWORD" || { echo "COOP_UI_HOST_PASSWORD is not configured"; exit 1; }
-          test -n "$GUEST_USERNAME" || { echo "COOP_UI_GUEST_USERNAME is not configured"; exit 1; }
-          test -n "$GUEST_PASSWORD" || { echo "COOP_UI_GUEST_PASSWORD is not configured"; exit 1; }
+          COOP_UI_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
+        run: node test/browser/coop-public-ui/provision-accounts.mjs
 
       - name: Drive two isolated built clients exclusively through public UI
         env:
@@ -197,10 +190,6 @@ jobs:
           COOP_UI_GUEST_TITLE_NEW_GAME_KEYS: ${{ inputs.guest_title_keys || '[]' }}
           COOP_UI_ACTION_DELAY_MS: ${{ (inputs.cadence == 'fast' && '70') || (inputs.cadence == 'slow' && '420') || '180' }}
           COOP_UI_SETTLE_DELAY_MS: ${{ (inputs.cadence == 'fast' && '300') || (inputs.cadence == 'slow' && '1300') || '750' }}
-          COOP_UI_HOST_USERNAME: ${{ secrets.COOP_UI_HOST_USERNAME }}
-          COOP_UI_HOST_PASSWORD: ${{ secrets.COOP_UI_HOST_PASSWORD }}
-          COOP_UI_GUEST_USERNAME: ${{ secrets.COOP_UI_GUEST_USERNAME }}
-          COOP_UI_GUEST_PASSWORD: ${{ secrets.COOP_UI_GUEST_PASSWORD }}
           NODE_OPTIONS: --max-old-space-size=4096
         run: node test/browser/coop-public-ui/run.mjs
 
