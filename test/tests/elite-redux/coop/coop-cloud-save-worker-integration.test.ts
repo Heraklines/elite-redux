@@ -643,6 +643,46 @@ describe("co-op save Worker endpoint integration", () => {
     });
   });
 
+  it("serves an authenticated account-scoped missing proof without leaking another account's run", async () => {
+    const runId = "run-status-missing-route-123456789";
+    const statusUrl = `/savedata/session/coop-run-status?coopRunId=${runId}&slot=2`;
+    const environment = {
+      DB: database,
+      SESSION_SECRET: secret,
+      COOP_IDENTITY_SECRET: coopIdentitySecret,
+      COOP_IDENTITY_TTL_MS: "60000",
+    } as never;
+
+    const unauthenticated = await saveWorker.fetch(new Request(`https://save.test${statusUrl}`), environment);
+    expect(unauthenticated.status).toBe(401);
+
+    const missing = await call(statusUrl);
+    expect(missing.status).toBe(200);
+    expect(missing.headers.get("Content-Type")).toContain("application/json");
+    await expect(missing.json()).resolves.toEqual({ state: "missing", runId });
+
+    const aliceCheckpoint = checkpoint(runId, 3, 9);
+    sqlite
+      .prepare("INSERT INTO session_saves (user_id, slot, data, updated_at) VALUES (?, ?, ?, ?)")
+      .run(1, 2, aliceCheckpoint, 1);
+
+    authorization = await authToken("Carol", 3);
+    const hiddenFromAnotherAccount = await call(statusUrl);
+    expect(hiddenFromAnotherAccount.status).toBe(200);
+    await expect(hiddenFromAnotherAccount.json()).resolves.toEqual({ state: "missing", runId });
+
+    authorization = await authToken("Alice", 1);
+    const activeForOwner = await call(statusUrl);
+    expect(activeForOwner.status).toBe(200);
+    await expect(activeForOwner.json()).resolves.toEqual({
+      state: "active",
+      runId,
+      slot: 2,
+      checkpointRevision: 3,
+      digest: await digest(aliceCheckpoint),
+    });
+  });
+
   it("routes create, exact update, status, delete, replay, and resurrection fencing end to end", async () => {
     const runId = "run-endpoint-route-123456789";
     const initial = checkpoint(runId, 0, 1);
