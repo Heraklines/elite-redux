@@ -5,7 +5,8 @@
 
 import { CoopMembershipControllerV2 } from "#data/elite-redux/coop/coop-membership";
 import type { CoopFrameContextV1, CoopRunSeatMapV1 } from "#data/elite-redux/coop/coop-session-binding";
-import { CoopSharedTerminalSupervisor } from "#data/elite-redux/coop/coop-shared-terminal";
+import type { CoopSharedTerminalSupervisor } from "#data/elite-redux/coop/coop-shared-terminal";
+import { createCoopRuntimeSharedTerminal } from "#data/elite-redux/coop/coop-shared-terminal-runtime";
 import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
@@ -105,23 +106,28 @@ function makeSupervisor(
   finalized: string[],
   prepareResult = true,
 ): CoopSharedTerminalSupervisor {
-  return new CoopSharedTerminalSupervisor(transport, {
-    localContext: () => contextFor(membership, localSeatId),
-    membership: () => membership.snapshot(),
-    validatePeerContext: peerValidator(membership, localSeatId === 0 ? 1 : 0),
-    onPrepare: commit => {
-      prepared.push(commit.terminalId);
-      if (prepareResult) {
-        membership.terminate();
-      }
-      return prepareResult;
+  return createCoopRuntimeSharedTerminal(
+    transport,
+    {
+      p33FrameContext: () => contextFor(membership, localSeatId),
+      p33MembershipSnapshot: () => membership.snapshot(),
+      validateP33PeerFrameContext: peerValidator(membership, localSeatId === 0 ? 1 : 0),
     },
-    onFinalize: (commit, completion) => finalized.push(`${commit.terminalId}:${completion}`),
-    schedule: scheduler.schedule,
-    retryMs: 250,
-    deadlineMs: 3_000,
-    receiverGraceMs: 3_500,
-  });
+    {
+      onPrepare: commit => {
+        prepared.push(commit.terminalId);
+        if (prepareResult) {
+          membership.terminate();
+        }
+        return prepareResult;
+      },
+      onFinalize: (commit, completion) => finalized.push(`${commit.terminalId}:${completion}`),
+      schedule: scheduler.schedule,
+      retryMs: 250,
+      deadlineMs: 3_000,
+      receiverGraceMs: 3_500,
+    },
+  );
 }
 
 const terminalStart = {
@@ -133,7 +139,7 @@ const terminalStart = {
   boundaryRevision: 41,
 };
 
-describe("P33 generation-scoped shared terminal supervisor", () => {
+describe("P33 runtime-bound generation-scoped shared terminal supervisor", () => {
   it("retains through a dropped first frame and finalizes only after exact terminal-entry evidence", async () => {
     const pair = wrapCoopFaultPair(createLoopbackPair(), COOP_NO_FAULT_PROFILE, { seed: 0x50333354 });
     const scheduler = new ManualScheduler();

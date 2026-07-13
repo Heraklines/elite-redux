@@ -95,6 +95,61 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     expect(cmd).toBeNull();
   });
 
+  it("fences an exact command timeout before its null continuation can choose AI", async () => {
+    const { host } = createLoopbackPair();
+    let expire: (() => void) | null = null;
+    const observed: unknown[] = [];
+    const hostSync = new CoopBattleSync(host, {
+      timeoutMs: 25,
+      schedule: cb => {
+        expire = cb;
+        return () => {
+          expire = null;
+        };
+      },
+      onCommandTimeout: timeout => {
+        observed.push({ timeout, frozenInsideCallback: hostSync.isTerminalFrozen() });
+      },
+    });
+    const awaited = hostSync.requestPartnerCommand(1, 9, [0, 1], "guest", legalOffer, {
+      epoch: 71,
+      wave: 20,
+      pokemonId: 8080,
+    });
+    let frozenAtContinuation = false;
+    const continued = awaited.then(command => {
+      frozenAtContinuation = hostSync.isTerminalFrozen();
+      return command;
+    });
+
+    expect(expire).not.toBeNull();
+    expire!();
+    await expect(continued).resolves.toBeNull();
+    expect(observed).toEqual([
+      {
+        timeout: {
+          epoch: 71,
+          wave: 20,
+          turn: 9,
+          owner: "guest",
+          pokemonId: 8080,
+          fieldIndex: 1,
+        },
+        frozenInsideCallback: true,
+      },
+    ]);
+    expect(frozenAtContinuation).toBe(true);
+    expect(hostSync.isTerminalFrozen()).toBe(true);
+    await expect(
+      hostSync.requestPartnerCommand(1, 10, [0], "guest", legalOffer, {
+        epoch: 71,
+        wave: 20,
+        pokemonId: 8080,
+      }),
+    ).resolves.toBeNull();
+    hostSync.dispose();
+  });
+
   it("the SpoofGuest answers the host's request end-to-end (loopback)", async () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host);

@@ -17,8 +17,9 @@
 //         `command`. It never needs the engine - the host did the legality work.
 //
 // The host never trusts the peer with engine state: it only accepts a slot index
-// it itself offered. A missing/slow reply resolves to `null` after a timeout so
-// the caller falls back to the AI picker and the turn never hangs.
+// it itself offered. A fully addressed missing reply enters the shared terminal
+// before resolving the retained promise; legacy unaddressed probes keep the old
+// `null` result for compatibility, but production never converts it into AI.
 //
 // Engine-FREE (transport + the wire types only), so the whole relay is unit-
 // testable headlessly over a LoopbackTransport with a spoof responder - the same
@@ -57,26 +58,41 @@ export interface CoopCommandAddress {
   pokemonId: number;
 }
 
+/** Exact immutable command surface whose bounded peer wait exhausted. */
+export interface CoopCommandTimeout {
+  epoch: number;
+  wave: number;
+  turn: number;
+  owner: CoopRole;
+  pokemonId: number;
+  fieldIndex: number;
+}
+
 /** Turns a {@linkcode CoopCommandRequest} into the command to send back. */
 export type CoopCommandResponder = (req: CoopCommandRequest) => SerializedCommand;
 
 /** Options for {@linkcode CoopBattleSync}. */
 export interface CoopBattleSyncOptions {
   /** Per-request timeout before {@linkcode CoopBattleSync.requestPartnerCommand}
-   *  resolves null (the caller then falls back to AI). Default 20min. */
+   *  exhausts its retained command surface. Default 20min. */
   timeoutMs?: number;
   /** Timer injection (tests). Returns a cancel fn. Defaults to setTimeout/clearTimeout. */
   schedule?: (cb: () => void, ms: number) => () => void;
+  /**
+   * Fail-closed production callback for a fully addressed command surface. It runs synchronously before
+   * the retained request resolves `null`, allowing the runtime to enter shared terminal control before a
+   * CommandPhase continuation can mistake that release for permission to choose local AI.
+   */
+  onCommandTimeout?: (timeout: CoopCommandTimeout) => void;
 }
 
-// Wait up to 20 MINUTES for the real partner's move before the AI takes over (#633).
-// The AI fallback is the single biggest live desync source: when it fires it picks a
+// Wait up to 20 MINUTES for the real partner's move before shared terminal control (#633).
+// The former AI fallback was the single biggest live desync source: when it fired it picked a
 // DIFFERENT move than the one the partner then actually sends -> the two engines diverge
 // from that turn on (one player ends up in the shop while the other is still choosing a
 // move). The old 30s window tripped it constantly; 5min still occasionally caught a slow
-// thinker. 20 minutes effectively means "wait for the human" - the AI is now ONLY a
-// last-resort safety net for a genuinely-disconnected partner, never a turn-timer that
-// fires while someone is mid-think.
+// thinker. 20 minutes effectively means "wait for the human"; exhaustion now stops both
+// clients coherently instead of authoring a move the absent player never chose.
 const DEFAULT_TIMEOUT_MS = 1_200_000;
 
 function defaultSchedule(cb: () => void, ms: number): () => void {
@@ -387,6 +403,9 @@ export class CoopBattleSync {
   private readonly transport: CoopTransport;
   private readonly timeoutMs: number;
   private readonly schedule: (cb: () => void, ms: number) => () => void;
+  private readonly onCommandTimeout: ((timeout: CoopCommandTimeout) => void) | null;
+  /** Set before terminal cancellation releases any retained command promise. */
+  private terminalFrozen = false;
   /** Full request state retained until resolution so a replaced channel can reissue it verbatim. */
   private readonly pending = new Map<
     string,
@@ -439,6 +458,7 @@ export class CoopBattleSync {
     this.transport = transport;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.schedule = opts.schedule ?? defaultSchedule;
+    this.onCommandTimeout = opts.onCommandTimeout ?? null;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
     this.offStateChange = transport.onStateChange(state => {
       if (state !== "connected") {
@@ -484,7 +504,9 @@ export class CoopBattleSync {
   /**
    * HOST: ask the peer for the command for `fieldIndex` on `turn`, offering the
    * `moveSlots` the host computed as legal. Resolves with the peer's chosen
-   * command, or `null` if no reply arrives within the timeout (caller -> AI).
+   * command, or `null` if no reply arrives within the timeout. Fully addressed requests synchronously
+   * enter the injected terminal fence before that null is observable; only legacy unaddressed callers can
+   * retain the historical fallback behavior.
    * A second request for the same slot supersedes the first (resolves it null).
    *
    * `owner` (#851, optional) is the awaited slot's resolved `coopOwner`
@@ -501,6 +523,10 @@ export class CoopBattleSync {
     offer?: CoopBattleCommandOffer,
     address?: CoopCommandAddress,
   ): Promise<SerializedCommand | null> {
+    if (this.terminalFrozen) {
+      traceCommand("rejected", fieldIndex, turn, owner, address, "shared-terminal-frozen");
+      return Promise.resolve(null);
+    }
     const key = commandKey(fieldIndex, turn, owner, address);
     const requestedRoute = commandRoute(fieldIndex, turn, owner, address);
     const slotPrefix = key.slice(0, key.lastIndexOf(":") + 1); // `wave:fieldIndex:` (#819)
@@ -596,9 +622,28 @@ export class CoopBattleSync {
       cancelTimer = this.schedule(() => {
         coopWarn(
           "relay",
-          `host requestPartnerCommand TIMEOUT fieldIndex=${fieldIndex} turn=${turn} after=${this.timeoutMs}ms -> resolving null (caller falls back to AI)`,
+          `host requestPartnerCommand TIMEOUT fieldIndex=${fieldIndex} turn=${turn} after=${this.timeoutMs}ms -> fail closed`,
         );
         traceCommand("timed-out", fieldIndex, turn, owner, address);
+        if (owner != null && address != null) {
+          // Fence FIRST. Even if an injected callback throws, the CommandPhase continuation can never
+          // reinterpret this terminal release as an ordinary timeout and choose a local AI command.
+          this.terminalFrozen = true;
+          try {
+            this.onCommandTimeout?.({
+              epoch: address.epoch,
+              wave: address.wave,
+              turn,
+              owner,
+              pokemonId: address.pokemonId,
+              fieldIndex,
+            });
+          } catch (error) {
+            // A terminal callback must not strand the retained promise. The fence above stays observable
+            // even when an injected diagnostic/test callback throws.
+            coopWarn("relay", "command-timeout terminal callback threw", error);
+          }
+        }
         finish(null);
       }, this.timeoutMs);
       if (isCoopDebug()) {
@@ -763,6 +808,25 @@ export class CoopBattleSync {
     this.settled.clear();
     this.responder = null;
     this.bufferedRequests.clear();
+  }
+
+  /**
+   * Enter terminal command control before releasing retained requests. This ordering is load-bearing:
+   * every promise continuation can observe the terminal fence and therefore cannot convert `null` into a
+   * local AI decision while the peer is entering the same retained terminal transaction.
+   */
+  freezeForTerminal(): void {
+    this.terminalFrozen = true;
+    // Idempotently drain on every call. An addressed timeout sets the fence immediately before invoking
+    // the runtime callback; that callback then reaches this method and must still release this request and
+    // any sibling command surfaces even though the boolean was already true.
+    this.cancelPending();
+    this.bufferedRequests.clear();
+  }
+
+  /** Whether terminal cancellation, rather than a gameplay timeout fallback, released this relay. */
+  isTerminalFrozen(): boolean {
+    return this.terminalFrozen;
   }
 
   /** Terminal membership loss: release every retained request only after recovery is no longer possible. */

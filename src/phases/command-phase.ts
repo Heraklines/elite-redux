@@ -24,6 +24,7 @@ import {
   getCoopNetcodeMode,
   getCoopRendezvous,
   getCoopRuntime,
+  isCoopSharedTerminalFrozen,
   isVersusSession,
   recordCoopOwnSlotCommand,
   recordCoopPartnerSlotCommand,
@@ -431,6 +432,11 @@ export class CommandPhase extends FieldPhase {
     if (controller == null) {
       return false;
     }
+    if (isCoopSharedTerminalFrozen()) {
+      // Terminal preparation owns this phase now. Keep it parked until exactly-once finalization; do not
+      // open local input, synthesize a command, or advance a queue already cleared by the runtime fence.
+      return true;
+    }
     // Only auto-resolve the PARTNER's slot; the local player commands their own.
     const slotOwner = coopOwnerOfPlayerFieldSlot(this.fieldIndex);
     // #819 diagnostics: ownership decides who prompts/relays this slot - a misresolve here IS
@@ -476,6 +482,7 @@ export class CommandPhase extends FieldPhase {
       apply(fallback());
       return true;
     }
+    const runtimeAtRequest = getCoopRuntime();
     // Offer the legal move slots WE computed and await the partner's pick. The
     // partner's command is applied EXACTLY ({@linkcode applyWiredPartnerCommand}:
     // matched by move ID + verbatim targets, no RNG re-roll) so both engines stay
@@ -506,6 +513,21 @@ export class CommandPhase extends FieldPhase {
         pokemonId: partner.id,
       })
       .then(cmd => {
+        if (
+          sync.isTerminalFrozen()
+          || runtimeAtRequest == null
+          || getCoopRuntime() !== runtimeAtRequest
+          || isCoopSharedTerminalFrozen(runtimeAtRequest)
+        ) {
+          // A shared terminal releases retained command promises with null only to drain the old control
+          // surface. It is never authority to invent a local AI command or end this phase independently.
+          coopWarn(
+            "battle",
+            `CommandPhase terminal fence held owner=${slotOwner} field=${this.fieldIndex} `
+              + `turn=${globalScene.currentBattle?.turn ?? -1}`,
+          );
+          return;
+        }
         // A relayed BALL / RUN (the partner threw a Poke Ball or fled) is applied
         // verbatim, NOT routed through the move path: its `cursor` is a ball type,
         // not a move slot, so applyWiredPartnerCommand would mis-read it as a move.

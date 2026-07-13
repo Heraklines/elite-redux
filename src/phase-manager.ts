@@ -331,6 +331,12 @@ export class PhaseManager {
   private currentPhase: Phase;
   /** The phase put on standby if {@linkcode overridePhase} is called */
   private standbyPhase: Phase | null = null;
+  /**
+   * Terminal fence for a co-op runtime that is retaining its peer-ACKed shutdown transaction. The current
+   * phase may receive late async completions while that handshake runs; blocking `shiftPhase` prevents
+   * those completions from rebuilding a turn after the gameplay queues were drained.
+   */
+  private coopTerminalProgressionFrozen = false;
 
   /**
    * Clear all previously set phases, then add a new {@linkcode TitlePhase} to transition to the title screen.
@@ -425,12 +431,31 @@ export class PhaseManager {
     this.standbyPhase = null;
   }
 
+  /** Freeze phase progression at the current surface while a co-op shared terminal is retained. */
+  public freezeForCoopTerminal(): void {
+    this.coopTerminalProgressionFrozen = true;
+    this.clearAllPhases();
+  }
+
+  /** Release the terminal fence immediately before exactly-once title teardown. */
+  public releaseCoopTerminalFreeze(): void {
+    this.coopTerminalProgressionFrozen = false;
+  }
+
+  /** Read-only proof used by terminal wiring tests and diagnostics. */
+  public isCoopTerminalFrozen(): boolean {
+    return this.coopTerminalProgressionFrozen;
+  }
+
   /**
    * Determine the next phase to run and start it.
    * @privateRemarks
    * This is called by {@linkcode Phase.end} by default, and should not be called by other methods.
    */
   public shiftPhase(): void {
+    if (this.coopTerminalProgressionFrozen) {
+      return;
+    }
     if (this.standbyPhase) {
       this.currentPhase = this.standbyPhase;
       this.standbyPhase = null;
