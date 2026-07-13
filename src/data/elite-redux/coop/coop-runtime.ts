@@ -41,23 +41,26 @@ import {
   resetCoopBargainOperationState,
   setCoopBargainOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-bargain-operation";
-import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
+import { COOP_CHECKSUM_SENTINEL, canonicalize, fnv1a64 } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   applyCoopDexDelta,
   applyCoopFullSnapshot,
+  applyCoopMeOutcome,
   captureCoopAuthoritativeBattleState,
   captureCoopCaptureParty,
   captureCoopChecksum,
   captureCoopDexDelta,
   captureCoopEnemies,
   captureCoopFullSnapshot,
+  consumeCoopMeOutcomeRollbackFatal,
   resetCoopStateTicks,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import {
-  armCoopBiomeJournalMaterialization,
   isCoopBiomeOperationEnabled,
+  preflightCoopBiomeJournalMaterialization,
+  publishCoopBiomeJournalMaterialization,
   resetCoopBiomeOperationState,
   setCoopBiomeOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-biome-operation";
@@ -125,10 +128,20 @@ import {
   setCoopMeOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-me-operation";
 import {
+  canRestoreCoopActiveMysteryControl,
+  captureCoopActiveMysteryControl,
+  captureCoopMeControlTransactionState,
   coopMeHandoffBattleStarted,
   coopMeHandoffBattleWaveValue,
   coopMeInteractionStartValue,
+  rebindCoopActiveMysteryControl,
+  resetCoopActiveMysteryControl,
+  restoreCoopActiveMysteryControl,
+  restoreCoopActiveMysteryControlWithoutRebind,
+  restoreCoopMeControlTransactionState,
+  setCoopMeActivePresentation,
   setCoopMeInteractionStart,
+  setCoopMeTerminalControl,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_BATTLE_HANDOFF, CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { CoopMembershipController } from "#data/elite-redux/coop/coop-membership";
@@ -159,12 +172,14 @@ import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-enve
 import { applyCoopOperationEpoch } from "#data/elite-redux/coop/coop-operation-epoch";
 import {
   coopOperationDurabilityHooks,
+  isCoopOperationJournalActive,
   registerCoopOperationLiveSink,
   resetCoopOperationJournalLog,
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   adoptCoopGlobalGuestRevision,
+  getCoopGlobalGuestRevisionClock,
   resetCoopGlobalOperationOrder,
   setCoopGlobalOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-operation-runtime";
@@ -185,17 +200,19 @@ import {
   COOP_BARGAIN_SEQ_BASE,
   COOP_BIOME_PICK_SEQ_BASE,
   COOP_BIOME_SHOP_CHOICE_KINDS,
+  COOP_BIOME_TRANSITION_SEQ_BASE,
   COOP_COLOSSEUM_SEQ_BASE,
   COOP_CROSSROADS_SEQ_BASE,
   COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE,
   COOP_LEARN_MOVE_FWD_SEQ_BASE,
+  COOP_MAX_REACHABLE_COUNTER,
   COOP_ME_PUMP_SEQ_BASE,
   COOP_ME_TERM_SEQ_BASE,
   COOP_REJOIN_SYNC_SEQ_BASE,
   COOP_REWARD_CHOICE_KINDS,
   COOP_STORMGLASS_SEQ,
 } from "#data/elite-redux/coop/coop-seq-registry";
-import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
+import { coopFieldIndexOf, coopInteractionOwnerSeat, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import {
@@ -208,6 +225,7 @@ import type {
   CoopAuthoritativeBattleStateV1,
   CoopCapturePresentation,
   CoopFullBattleSnapshot,
+  CoopInteractionOutcome,
   CoopNetcodeMode,
   CoopRole,
   CoopSerializedEnemy,
@@ -310,10 +328,21 @@ function captureCoopActiveControl(runtime: CoopRuntime): CoopActiveControlSnapsh
   } catch {
     /* headless capture */
   }
+  const interactionCounter = runtime.controller.interactionCounter();
+  const capturedMystery = captureCoopActiveMysteryControl();
+  // Retain a resolved leave through the immediately-following control revision (enough for a dropped
+  // terminal/rejoin), then stop attaching that historical event to unrelated future snapshots.
+  const activeMysteryEncounter =
+    capturedMystery?.terminal === "leave" && interactionCounter > capturedMystery.interactionCounter + 1
+      ? undefined
+      : capturedMystery;
   return {
     version: 1,
     phaseName,
-    interactionCounter: runtime.controller.interactionCounter(),
+    interactionCounter,
+    // `hostPhaseName` is diagnostic, not causal Mystery control. Do not append the current phase to the
+    // retained statement at capture time: doing so would create different content at the same revision.
+    ...(activeMysteryEncounter === undefined ? {} : { activeMysteryEncounter }),
     awaitedInteractions: runtime.interactionRelay.describeAwaitedInteractions().map(wait => ({
       seq: wait.seq,
       expectedKinds: [...wait.expectedKinds],
@@ -321,6 +350,85 @@ function captureCoopActiveControl(runtime: CoopRuntime): CoopActiveControlSnapsh
     barriers: runtime.rendezvous.describeArrivals(),
     pendingCommands: runtime.battleSync.describePendingRequests(),
   };
+}
+
+/** Stable digest over the CONTROL half of an atomic full snapshot. */
+export function coopSnapshotControlDigest(
+  snapshot: Pick<
+    CoopFullBattleSnapshot,
+    "checksum" | "sessionEpoch" | "membership" | "activeControl" | "journalHighWater"
+  >,
+): string {
+  // Hash the JSON wire representation, not an in-memory object that may still contain explicit undefined
+  // properties. JSON drops those keys; normalizing first keeps pre-send and post-parse digests identical.
+  const wireControl = JSON.parse(
+    JSON.stringify({
+      checksum: snapshot.checksum,
+      sessionEpoch: snapshot.sessionEpoch,
+      membership: snapshot.membership,
+      activeControl: snapshot.activeControl,
+      journalHighWater: snapshot.journalHighWater ?? {},
+    }),
+  ) as unknown;
+  return fnv1a64(canonicalize(wireControl));
+}
+
+function bindCoopSnapshotControl(snapshot: CoopFullBattleSnapshot): CoopFullBattleSnapshot {
+  return { ...snapshot, controlDigest: coopSnapshotControlDigest(snapshot) };
+}
+
+function isValidCoopActiveControlSnapshot(
+  control: CoopActiveControlSnapshotV1 | undefined,
+): control is CoopActiveControlSnapshotV1 {
+  return (
+    control?.version === 1
+    && typeof control.phaseName === "string"
+    && Number.isSafeInteger(control.interactionCounter)
+    && control.interactionCounter >= 0
+    && Array.isArray(control.awaitedInteractions)
+    && control.awaitedInteractions.every(
+      wait =>
+        Number.isSafeInteger(wait.seq)
+        && wait.seq >= 0
+        && Array.isArray(wait.expectedKinds)
+        && wait.expectedKinds.every(kind => typeof kind === "string"),
+    )
+    && Array.isArray(control.barriers?.localArrived)
+    && control.barriers.localArrived.every(value => typeof value === "string")
+    && Array.isArray(control.barriers?.partnerArrived)
+    && control.barriers.partnerArrived.every(value => typeof value === "string")
+    && Array.isArray(control.barriers?.awaiting)
+    && control.barriers.awaiting.every(value => typeof value === "string")
+    && Array.isArray(control.pendingCommands)
+    && control.pendingCommands.every(
+      command =>
+        Number.isSafeInteger(command.fieldIndex)
+        && Number.isSafeInteger(command.turn)
+        && Array.isArray(command.moveSlots)
+        && command.moveSlots.every(Number.isSafeInteger),
+    )
+  );
+}
+
+function preflightCoopAtomicSnapshot(runtime: CoopRuntime, snapshot: CoopFullBattleSnapshot): boolean {
+  const control = snapshot.activeControl;
+  const mystery = control?.activeMysteryEncounter;
+  return (
+    snapshot.sessionEpoch === runtime.controller.sessionEpoch
+    && snapshot.checksum != null
+    && snapshot.checksum !== COOP_CHECKSUM_SENTINEL
+    && snapshot.membership != null
+    && isValidCoopActiveControlSnapshot(control)
+    && snapshot.membership.state === "active"
+    && snapshot.membership.members.every(member => member.present)
+    && runtime.membership.canAdopt(snapshot.membership)
+    && runtime.controller.canAdoptAuthoritativeInteractionCounter(control.interactionCounter)
+    && (coopMeInteractionStartValue() < 0 || mystery != null)
+    && (mystery == null || canRestoreCoopActiveMysteryControl(mystery))
+    && Object.values(snapshot.journalHighWater ?? {}).every(value => Number.isSafeInteger(value) && value >= 0)
+    && typeof snapshot.controlDigest === "string"
+    && snapshot.controlDigest === coopSnapshotControlDigest(snapshot)
+  );
 }
 
 function wireCoopResyncResponder(runtime: CoopRuntime): void {
@@ -337,14 +445,16 @@ function wireCoopResyncResponder(runtime: CoopRuntime): void {
         return;
       }
       const blob = compressToBase64(
-        JSON.stringify({
-          ...snapshot,
-          sessionEpoch: runtime.controller.sessionEpoch,
-          checksum: captureCoopChecksum(),
-          membership: runtime.membership.snapshot(),
-          activeControl: captureCoopActiveControl(runtime),
-          journalHighWater: runtime.durability?.controlPlaneHighWater() ?? {},
-        } satisfies CoopFullBattleSnapshot),
+        JSON.stringify(
+          bindCoopSnapshotControl({
+            ...snapshot,
+            sessionEpoch: runtime.controller.sessionEpoch,
+            checksum: captureCoopChecksum(),
+            membership: runtime.membership.snapshot(),
+            activeControl: captureCoopActiveControl(runtime),
+            journalHighWater: runtime.durability?.controlPlaneHighWater() ?? {},
+          } satisfies CoopFullBattleSnapshot),
+        ),
       );
       coopLog("resync", `send stateSync seq=${seq} blob=${blob.length}b`);
       runtime.battleStream.sendStateSync(blob, seq);
@@ -374,25 +484,183 @@ export function adoptCoopSnapshotHighWater(
   }
 }
 
+/**
+ * Commit the CONTROL half of a preflighted snapshot as a rollback-capable transaction. Durable ACKs
+ * and the Mystery UI rebind are deliberately post-commit side effects: neither can create DATA-only
+ * rollback or advertise an uncommitted control image.
+ */
+function commitCoopSnapshotControls(runtime: CoopRuntime, snapshot: CoopFullBattleSnapshot): boolean {
+  if (snapshot.membership == null || snapshot.activeControl == null) {
+    return false;
+  }
+  const priorMembership = runtime.membership.snapshot();
+  const priorCounter = runtime.controller.interactionCounter();
+  const priorMystery = captureCoopMeControlTransactionState();
+  const priorAppliedMarks = runtime.durability?.appliedMarks() ?? {};
+  const guestClock = getCoopGlobalGuestRevisionClock(runtime.controller.sessionEpoch, 0);
+  const priorGlobalRevision = guestClock.revision;
+  const mystery = snapshot.activeControl.activeMysteryEncounter;
+  try {
+    if (mystery != null && !restoreCoopActiveMysteryControlWithoutRebind(mystery)) {
+      throw new Error("active Mystery control refused after preflight");
+    }
+    if (!runtime.membership.adopt(snapshot.membership)) {
+      throw new Error("membership refused after preflight");
+    }
+    if (
+      !runtime.controller.adoptAuthoritativeInteractionCounterForTransaction(snapshot.activeControl.interactionCounter)
+    ) {
+      throw new Error("interaction counter refused after preflight");
+    }
+    const globalRevision = snapshot.journalHighWater?.["op:global"] ?? 0;
+    if (globalRevision > guestClock.revision) {
+      guestClock.revision = globalRevision;
+    }
+    runtime.durability?.adoptSnapshotMarksForTransaction(snapshot.journalHighWater ?? {});
+  } catch (error) {
+    let rollbackFailed = false;
+    for (const restore of [
+      () => runtime.durability?.restoreAppliedMarksForTransaction(priorAppliedMarks),
+      () => {
+        guestClock.revision = priorGlobalRevision;
+      },
+      () => runtime.controller.restoreAuthoritativeInteractionCounterForTransaction(priorCounter),
+      () => runtime.membership.restoreForTransaction(priorMembership),
+      () => restoreCoopMeControlTransactionState(priorMystery),
+    ]) {
+      try {
+        restore();
+      } catch {
+        rollbackFailed = true;
+      }
+    }
+    coopWarn("resync", "atomic snapshot CONTROL commit rolled back", error);
+    if (rollbackFailed) {
+      failCoopSharedSession("atomic snapshot control rollback failed");
+    }
+    return false;
+  }
+
+  try {
+    runtime.durability?.ackSnapshotMarksAfterTransaction(snapshot.journalHighWater ?? {});
+  } catch (error) {
+    coopWarn("resync", "post-commit durability ACK failed", error);
+    failCoopSharedSession("snapshot control committed but durability ACK failed");
+    return true;
+  }
+  try {
+    runtime.controller.emitAuthoritativeInteractionCounterAfterTransaction();
+  } catch (error) {
+    coopWarn("resync", "post-commit interaction-counter notification failed", error);
+    failCoopSharedSession("snapshot control committed but counter notification failed");
+    return true;
+  }
+  if (mystery != null && !rebindCoopActiveMysteryControl(mystery)) {
+    // DATA+CONTROL is already coherent. A failed fenced presentation rebind is a terminal session/UI
+    // failure, never a reason to roll only DATA back underneath the committed controller state.
+    failCoopSharedSession("snapshot control committed but Mystery presentation rebind failed");
+  }
+  return true;
+}
+
+/** Adopt the optional checksum-bound Mystery control surface carried by a full snapshot. */
+export function adoptCoopActiveMysterySnapshot(snapshot: Pick<CoopFullBattleSnapshot, "activeControl">): boolean {
+  const mystery = snapshot.activeControl?.activeMysteryEncounter;
+  if (mystery == null) {
+    return true; // additive/backward-compatible snapshot
+  }
+  const adopted = restoreCoopActiveMysteryControl(mystery);
+  if (!adopted) {
+    coopWarn(
+      "resync",
+      `refused active Mystery control counter=${mystery.interactionCounter} terminal=${mystery.terminal}`,
+    );
+  }
+  return adopted;
+}
+
+/**
+ * An active CoopReplayMePhase is itself the safe boundary: it is parked in an exact network wait and
+ * cannot end until Mystery control arrives. Applying the cheap scalar snapshot here avoids queueing the
+ * recovery phase behind the very waiter it must rebind. Returns null when the normal queued path applies.
+ */
+function tryApplyCoopActiveMysterySnapshotInline(
+  runtime: CoopRuntime,
+  snapshot: CoopFullBattleSnapshot,
+  label: string,
+  onHealed?: (() => void) | undefined,
+): boolean | null {
+  const mystery = snapshot.activeControl?.activeMysteryEncounter;
+  let phaseName = "unknown";
+  try {
+    phaseName = globalScene.phaseManager.getCurrentPhase()?.phaseName ?? "unknown";
+  } catch {
+    /* headless apply */
+  }
+  if (
+    runtime.controller.role !== "guest"
+    || mystery == null
+    || (coopMeInteractionStartValue() !== mystery.interactionCounter && phaseName !== "CoopReplayMePhase")
+  ) {
+    return null;
+  }
+  if (!preflightCoopAtomicSnapshot(runtime, snapshot)) {
+    return false;
+  }
+  const rollback = captureCoopFullSnapshot();
+  if (rollback == null) {
+    coopWarn("resync", `${label} active-ME inline snapshot refused: no transactional rollback image`);
+    return false;
+  }
+  let controlsCommitted = false;
+  try {
+    applyCoopFullSnapshot(snapshot, true, /* suppressResummon */ true);
+    const healed = captureCoopChecksum();
+    if (healed !== snapshot.checksum) {
+      applyCoopFullSnapshot(rollback, true, /* suppressResummon */ true);
+      coopWarn(
+        "resync",
+        `${label} active-ME inline snapshot did not converge host=${snapshot.checksum} guest=${healed}; holding exact waits`,
+      );
+      return false;
+    }
+    controlsCommitted = commitCoopSnapshotControls(runtime, snapshot);
+    if (!controlsCommitted) {
+      applyCoopFullSnapshot(rollback, true, /* suppressResummon */ true);
+      coopWarn("resync", `${label} active-ME material state healed but control adoption failed`);
+      return false;
+    }
+    try {
+      onHealed?.();
+    } catch (error) {
+      coopWarn("resync", `${label} post-commit notification failed`, error);
+    }
+    coopLog("resync", `${label} atomically applied inline at retained Mystery wait`);
+    return true;
+  } catch (error) {
+    if (controlsCommitted) {
+      failCoopSharedSession(`${label} failed after atomic DATA+CONTROL commit`);
+      return false;
+    }
+    try {
+      applyCoopFullSnapshot(rollback, true, /* suppressResummon */ true);
+    } catch {
+      failCoopSharedSession(`${label} rollback failed`);
+    }
+    coopWarn("resync", `${label} active-ME inline snapshot apply failed`, error);
+    return false;
+  }
+}
+
 /** Queue one DATA+CONTROL snapshot for safe-boundary apply; ACK control only after checksum convergence. */
-function queueCoopAtomicSnapshotApply(
+export function queueCoopAtomicSnapshotApply(
   runtime: CoopRuntime,
   snapshot: CoopFullBattleSnapshot,
   label: string,
   onHealed?: (() => void) | undefined,
 ): boolean {
   const snapshotId = `snapshot:e${snapshot.sessionEpoch ?? 0}:tick${snapshot.authoritativeState?.tick ?? snapshot.tick ?? 0}:${snapshot.checksum ?? "missing"}`;
-  if (
-    snapshot.sessionEpoch !== runtime.controller.sessionEpoch
-    || snapshot.checksum == null
-    || snapshot.checksum === COOP_CHECKSUM_SENTINEL
-    || snapshot.membership == null
-    || snapshot.activeControl == null
-    || snapshot.activeControl.version !== 1
-    || snapshot.membership.state !== "active"
-    || !snapshot.membership.members.every(member => member.present)
-    || !runtime.membership.canAdopt(snapshot.membership)
-  ) {
+  if (!preflightCoopAtomicSnapshot(runtime, snapshot)) {
     recordCoopCausalEvent({
       domain: "snapshot",
       stage: "refused",
@@ -410,6 +678,10 @@ function queueCoopAtomicSnapshotApply(
         + `control=${snapshot.activeControl?.version ?? "missing"}`,
     );
     return false;
+  }
+  const inlineMysteryApply = tryApplyCoopActiveMysterySnapshotInline(runtime, snapshot, label, onHealed);
+  if (inlineMysteryApply != null) {
+    return inlineMysteryApply;
   }
   const snapshotTurn = snapshot.authoritativeState?.turn ?? globalScene.currentBattle?.turn ?? 0;
   recordCoopCausalEvent({
@@ -441,14 +713,9 @@ function queueCoopAtomicSnapshotApply(
           detail: label,
         });
         coopWarn("resync", `${label} did not converge -> control marks withheld`);
-        return;
+        return true;
       }
-      if (
-        snapshot.membership == null
-        || snapshot.activeControl == null
-        || !runtime.membership.adopt(snapshot.membership)
-        || !runtime.controller.adoptAuthoritativeInteractionCounter(snapshot.activeControl.interactionCounter)
-      ) {
+      if (!commitCoopSnapshotControls(runtime, snapshot)) {
         recordCoopCausalEvent({
           domain: "snapshot",
           stage: "control-adoption-failed",
@@ -460,10 +727,13 @@ function queueCoopAtomicSnapshotApply(
           detail: label,
         });
         coopWarn("resync", `${label} material state healed but control adoption failed -> marks withheld`);
-        return;
+        return false;
       }
-      adoptCoopSnapshotHighWater(runtime.durability, snapshot);
-      onHealed?.();
+      try {
+        onHealed?.();
+      } catch (error) {
+        coopWarn("resync", `${label} post-commit notification failed`, error);
+      }
       recordCoopCausalEvent({
         domain: "snapshot",
         stage: "applied",
@@ -475,6 +745,7 @@ function queueCoopAtomicSnapshotApply(
         detail: label,
       });
       coopLog("resync", `${label} atomically applied`);
+      return true;
     },
   );
   return true;
@@ -496,7 +767,7 @@ function sendCoopDurabilitySnapshot(
       coopWarn("resync", `durability snapshot unavailable cls=${cls} head=${headRevision}`);
       return;
     }
-    const stamped = {
+    const stamped = bindCoopSnapshotControl({
       ...snapshot,
       sessionEpoch: runtime.controller.sessionEpoch,
       checksum: captureCoopChecksum(),
@@ -506,7 +777,7 @@ function sendCoopDurabilitySnapshot(
         ...controlHighWater,
         [cls]: Math.max(controlHighWater[cls] ?? 0, headRevision),
       },
-    } satisfies CoopFullBattleSnapshot;
+    } satisfies CoopFullBattleSnapshot);
     runtime.battleStream.sendDurabilitySnapshot(compressToBase64(JSON.stringify(stamped)));
   } catch (e) {
     coopWarn("resync", `durability snapshot send failed cls=${cls} head=${headRevision}`, e);
@@ -878,40 +1149,13 @@ function wireCoopMeChecksumCheck(battleStream: CoopBattleStreamer): void {
         // path below is advisory by design (#839): it must never disrupt the encounter.
         const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
         const liveRuntime = getCoopRuntime();
-        if (
-          liveRuntime == null
-          || snapshot.membership == null
-          || snapshot.activeControl == null
-          || snapshot.membership.state !== "active"
-          || !snapshot.membership.members.every(member => member.present)
-          || !liveRuntime.membership.canAdopt(snapshot.membership)
-        ) {
-          coopWarn("resync", `me-entry seq=${seq} snapshot missing/incompatible atomic control -> refused`);
+        if (liveRuntime == null) {
           return;
         }
-        applyCoopFullSnapshot(snapshot, isCoopAuthoritativeGuest(), /* suppressResummon */ true);
-        const healed = captureCoopChecksum();
-        const targetChecksum = snapshot.checksum ?? ownerChecksum;
-        if (healed === targetChecksum) {
-          if (
-            !liveRuntime.membership.adopt(snapshot.membership)
-            || !liveRuntime.controller.adoptAuthoritativeInteractionCounter(snapshot.activeControl.interactionCounter)
-          ) {
-            coopWarn("resync", `me-entry seq=${seq} material healed but control adoption failed`);
-            return;
-          }
-          adoptCoopSnapshotHighWater(liveRuntime.durability, snapshot);
-          coopLog("resync", `me-entry seq=${seq} ok (healed=${healed})`);
-        } else {
-          coopWarn("resync", `me-entry seq=${seq} still-diverged owner=${targetChecksum} watcher=${healed}`);
-          // The cheap mid-ME apply could not converge. Queue the comprehensive safe-boundary apply; its
-          // phase holds play if convergence still fails and advances control marks only after success.
-          queueCoopAtomicSnapshotApply(
-            liveRuntime,
-            { ...snapshot, checksum: targetChecksum },
-            `me-entry seq=${seq} comprehensive snapshot`,
-          );
-        }
+        // One central preflight enforces epoch, checksum/sentinel, membership, control digest, monotonic
+        // interaction counter, and Mystery revision before DATA is touched. Active replay applies inline
+        // transactionally; every other phase queues the same atomic apply at a safe boundary.
+        queueCoopAtomicSnapshotApply(liveRuntime, snapshot, `me-entry seq=${seq} comprehensive snapshot`);
       } catch (e) {
         /* a malformed resync blob must never crash the ME flow */
         coopWarn("resync", `me-entry seq=${seq} malformed resync blob (ignored)`, e);
@@ -1132,6 +1376,12 @@ export function formatCoopDurabilityHealth(runtime: CoopRuntime, transport: Coop
   return `journal=${journal} queue=${depth}${owes}`;
 }
 
+/** Exact 8M/9M channels owned by the currently pinned Mystery encounter. */
+export function isCoopActiveMysteryWaitSeq(seq: number): boolean {
+  const pinned = coopMeInteractionStartValue();
+  return pinned >= 0 && (seq === COOP_ME_PUMP_SEQ_BASE + pinned || seq === COOP_ME_TERM_SEQ_BASE + pinned);
+}
+
 export function wireCoopStallWatchdog(
   transport: CoopTransport,
   relay: CoopInteractionRelay,
@@ -1213,7 +1463,7 @@ export function wireCoopStallWatchdog(
         });
         coopWarn(
           "runtime",
-          `STALL WATCHDOG: mutual network wait (local=${Math.round(localMs / 1000)}s peer=${Math.round((peerBeat?.ms ?? 0) / 1000)}s) -> recovering (cancel waits${isCoopAuthoritativeGuest() ? " + full resync" : ""})`,
+          `STALL WATCHDOG: mutual network wait (local=${Math.round(localMs / 1000)}s peer=${Math.round((peerBeat?.ms ?? 0) / 1000)}s) -> recovering (cancel orphan waits; preserve active Mystery${isCoopAuthoritativeGuest() ? " + full resync" : ""})`,
         );
         if (getCoopRuntime() === runtime) {
           try {
@@ -1230,7 +1480,11 @@ export function wireCoopStallWatchdog(
           // getCoopFaintSwitchWaitMs timeout still bounds it, and a genuine DISCONNECT still cancels the band
           // (wireCoopDisconnectReaction cancels unconditionally). Band-wide: protects co-op AND versus, which
           // share this seq band.
-          relay.cancelWaiters(seq => !isCoopFaintSwitchSeq(seq));
+          // Active Mystery waits are exact durable control surfaces, not generic timeout fallbacks. Sticky-
+          // cancelling 8M/9M manufactures null, and null is not a host terminal. Preserve both channels;
+          // the verified snapshot below rebinds the retained replay phase and the journal replays a dropped
+          // terminal. Only an exact host terminal may leave/advance the event.
+          relay.cancelWaiters(seq => !isCoopFaintSwitchSeq(seq) && !isCoopActiveMysteryWaitSeq(seq));
         } catch {
           /* recovery must never throw */
         }
@@ -1339,6 +1593,50 @@ export function routeShowdownAbandon(runtime: CoopRuntime): void {
     globalScene.phaseManager.getCurrentPhase()?.end();
   } catch {
     /* abandonment routing must never crash the game loop */
+  }
+}
+
+/**
+ * Fail one binary shared run closed after a bounded authoritative-control recovery could not converge.
+ * Never advances a local gameplay branch: both retained waiters are released only as part of terminal
+ * teardown, and the resumable session save remains the next entry point.
+ */
+export function failCoopSharedSession(reason: string): void {
+  const runtime = getCoopRuntime();
+  if (runtime == null) {
+    return;
+  }
+  coopWarn("runtime", `shared session stopped safely: ${reason}`);
+  runtime.membership.terminate();
+  try {
+    runtime.interactionRelay.cancelWaiters(() => true);
+    runtime.battleSync.cancelPending();
+    getShowdownRelay()?.cancelPending();
+  } catch {
+    /* terminal teardown continues */
+  }
+  try {
+    globalScene.ui.showText(
+      "Co-op control recovery could not converge. Shared play was stopped safely; reconnect to resume.",
+      null,
+      undefined,
+      5000,
+    );
+  } catch {
+    /* cosmetic */
+  }
+  try {
+    const interruptedPhase = globalScene.phaseManager.getCurrentPhase();
+    globalScene.phaseManager.clearPhaseQueue();
+    clearCoopRuntime();
+    globalScene.reset();
+    globalScene.phaseManager.unshiftNew("TitlePhase");
+    if (globalScene.phaseManager.getCurrentPhase() === interruptedPhase) {
+      interruptedPhase?.end();
+    }
+  } catch {
+    // Engine-free relay tests and pre-scene failures still terminate the runtime/control plane.
+    clearCoopRuntime();
   }
 }
 
@@ -2366,37 +2664,74 @@ function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAu
   }
   const op = envelope.pendingOperation;
   const parsed = op == null ? null : parseCoopOperationId(op.id);
-  if (op == null || parsed == null) {
+  const plan = preflightCoopBiomeJournalMaterialization(envelope);
+  if (op == null || parsed == null || plan == null) {
     return false;
   }
   if (op.kind === "BIOME_PICK") {
     const payload = op.payload as CoopBiomePickPayload;
+    const deterministicAddress =
+      parsed.pinnedSeq === COOP_BIOME_TRANSITION_SEQ_BASE + envelope.wave
+      && parsed.owner === 0
+      && payload?.nodeIndex === -1;
+    const interactivePinned = parsed.pinnedSeq - COOP_BIOME_PICK_SEQ_BASE;
     if (
-      parsed.pinnedSeq < COOP_BIOME_PICK_SEQ_BASE
-      || parsed.pinnedSeq >= COOP_STORMGLASS_SEQ
-      || typeof payload?.biomeId !== "number"
-      || typeof payload.nodeIndex !== "number"
+      (!deterministicAddress
+        && (interactivePinned < 0
+          || interactivePinned > COOP_MAX_REACHABLE_COUNTER
+          || parsed.pinnedSeq >= COOP_STORMGLASS_SEQ
+          || parsed.owner !== coopInteractionOwnerSeat(interactivePinned)))
+      || !Number.isSafeInteger(payload?.sourceBiomeId)
+      || payload.sourceBiomeId < 0
+      || !Number.isSafeInteger(payload?.biomeId)
+      || payload.biomeId < 0
+      || !Number.isSafeInteger(payload?.nodeIndex)
+      || payload.nodeIndex < -1
+      || !Number.isSafeInteger(payload?.nextWave)
+      || payload.nextWave !== envelope.wave + 1
     ) {
       return false;
     }
-    runtime.interactionRelay.materializeCommittedInteractionChoice(parsed.pinnedSeq, "biomePick", payload.nodeIndex, [
-      payload.biomeId,
-    ]);
-    armCoopBiomeJournalMaterialization(op.id);
-    return true;
+    if (deterministicAddress) {
+      // No interaction exists for a deterministic transition. Publish its exact receipt/permit directly;
+      // buffering it in InteractionRelay would create a phantom owner/watcher action at this wave address.
+      return publishCoopBiomeJournalMaterialization(plan);
+    }
+    try {
+      runtime.interactionRelay.materializeCommittedInteractionChoice(parsed.pinnedSeq, "biomePick", payload.nodeIndex, [
+        payload.biomeId,
+      ]);
+    } catch (e) {
+      coopWarn("runtime", `biome committed relay materialization threw id=${op.id}; receipt remains unpublished`, e);
+      return false;
+    }
+    return publishCoopBiomeJournalMaterialization(plan);
   }
   if (op.kind === "CROSSROADS_PICK") {
     const payload = op.payload as CoopCrossroadsPickPayload;
     if (
       parsed.pinnedSeq < COOP_CROSSROADS_SEQ_BASE
       || parsed.pinnedSeq >= COOP_BIOME_PICK_SEQ_BASE
-      || typeof payload?.optionIndex !== "number"
+      || !Number.isSafeInteger(payload?.optionIndex)
+      || (payload.optionIndex !== 0 && payload.optionIndex !== 1)
     ) {
       return false;
     }
-    runtime.interactionRelay.materializeCommittedInteractionChoice(parsed.pinnedSeq, "crossroads", payload.optionIndex);
-    armCoopBiomeJournalMaterialization(op.id);
-    return true;
+    try {
+      runtime.interactionRelay.materializeCommittedInteractionChoice(
+        parsed.pinnedSeq,
+        "crossroads",
+        payload.optionIndex,
+      );
+    } catch (e) {
+      coopWarn(
+        "runtime",
+        `crossroads committed relay materialization threw id=${op.id}; receipt remains unpublished`,
+        e,
+      );
+      return false;
+    }
+    return publishCoopBiomeJournalMaterialization(plan);
   }
   return false;
 }
@@ -2668,35 +3003,52 @@ function materializeCoopColosseumActionFromOp(runtime: CoopRuntime, envelope: Co
     return false;
   }
   const pinned = Math.floor(parsed.pinnedSeq / COOP_COLOSSEUM_ACTION_STRIDE);
-  if (!Number.isSafeInteger(pinned) || pinned < 0) {
+  const ordinal = parsed.pinnedSeq % COOP_COLOSSEUM_ACTION_STRIDE;
+  if (!Number.isSafeInteger(pinned) || pinned < 0 || !Number.isSafeInteger(payload.round) || payload.round < 0) {
     return false;
   }
   const seq = COOP_COLOSSEUM_SEQ_BASE + pinned;
   if (
     payload.type === "board"
+    && op.owner === 0
+    && ordinal === payload.round * 2
     && Array.isArray(payload.labels)
     && payload.labels.every(label => typeof label === "string")
   ) {
-    runtime.interactionRelay.materializeCommittedInteractionOutcome(seq, {
+    if (coopMeInteractionStartValue() !== pinned) {
+      return false;
+    }
+    const presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }> = {
       k: "mePresent",
-      tokens: {},
+      tokens: { coopColosseumRound: String(payload.round) },
       meetsReqs: [],
       labels: [],
       subPrompt: { kind: "secondary", labels: [...payload.labels] },
-    });
+    };
+    setCoopMeActivePresentation(presentation, true);
+    runtime.interactionRelay.materializeCommittedInteractionOutcome(seq, presentation);
     return true;
   }
-  if (payload.type === "decision" && Number.isSafeInteger(payload.index)) {
+  if (payload.type === "decision" && ordinal === payload.round * 2 + 1 && Number.isSafeInteger(payload.index)) {
     // A guest-owned decision was already applied locally by its capture UI; its committed envelope only
     // confirms/cancels intent resend. Feeding it back into the same pinned FIFO would poison the next round.
     if (op.owner === 1) {
       return true;
     }
-    runtime.interactionRelay.materializeCommittedInteractionChoice(seq, "coloPick", payload.index, undefined, op.id);
+    runtime.interactionRelay.materializeCommittedInteractionChoice(
+      seq,
+      "coloPick",
+      payload.index,
+      [payload.round],
+      op.id,
+    );
     return true;
   }
   return false;
 }
+
+/** ME terminal DATA stage retained across an exact redelivery when the later control wake fails. */
+const materializedMeTerminalOutcomes = new Map<string, string>();
 
 /** Feed journal-delivered ME presentation/terminal operations into the receiver's existing safe waiters. */
 function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
@@ -2724,6 +3076,18 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
     ) {
       return false;
     }
+    if (coopMeInteractionStartValue() !== pinned) {
+      return false;
+    }
+    setCoopMeActivePresentation(payload.presentation);
+    const retained = captureCoopActiveMysteryControl();
+    if (
+      retained?.interactionCounter !== pinned
+      || retained.terminal !== "pending"
+      || JSON.stringify(retained.presentation) !== JSON.stringify(payload.presentation)
+    ) {
+      return false;
+    }
     runtime.interactionRelay.materializeCommittedInteractionOutcome(seq, payload.presentation);
     return true;
   }
@@ -2741,12 +3105,16 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
   }
   if (op.kind === "QUIZ_ANSWER") {
     const payload = op.payload as CoopQuizAnswerPayload;
-    return (
+    const valid =
       kindTag === 5
       && Number.isInteger(payload?.questionIndex)
       && payload.questionIndex >= 0
-      && Number.isInteger(payload.choice)
-    );
+      && Number.isInteger(payload.choice);
+    if (!valid) {
+      return false;
+    }
+    runtime.interactionRelay.materializeCommittedInteractionChoice(seq, "quizAns", payload.choice, undefined, op.id);
+    return true;
   }
   if (op.kind !== "ME_TERMINAL") {
     return false;
@@ -2761,9 +3129,48 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
     || pinned >= 100_000
     || (payload?.terminal !== "leave" && payload?.terminal !== "battle")
     || (payload.hostTurn !== undefined && !Number.isFinite(payload.hostTurn))
+    || (payload.terminal === "leave" && payload.outcome?.k !== "meResync")
+    || (payload.terminal === "battle" && payload.outcome != null)
   ) {
     return false;
   }
+  // A leave terminal is a complete retained transaction: apply the exact authoritative Mystery DATA
+  // first. A false result withholds live materialization and the durability ACK, so no 9M waiter can
+  // advance from a terminal whose party/save/RNG/dex image did not converge.
+  if (payload.terminal === "leave") {
+    const payloadIdentity = fnv1a64(canonicalize(payload.outcome));
+    const priorIdentity = materializedMeTerminalOutcomes.get(op.id);
+    if (priorIdentity != null && priorIdentity !== payloadIdentity) {
+      return false;
+    }
+    if (priorIdentity == null) {
+      if (!applyCoopMeOutcome(payload.outcome!)) {
+        coopWarn("me", `journaled Mystery outcome failed before terminal wake id=${op.id}`);
+        if (consumeCoopMeOutcomeRollbackFatal()) {
+          failCoopSharedSession(`Mystery outcome rollback failed for ${op.id}`);
+        }
+        return false;
+      }
+      materializedMeTerminalOutcomes.set(op.id, payloadIdentity);
+    }
+  }
+  // Journal delivery is itself the authenticated host statement. Persist + arm it BEFORE waking the
+  // live 9M waiter (delivery may resolve synchronously), so the phase observes a coherent terminal and
+  // a subsequent snapshot never regresses to `pending`.
+  setCoopMeTerminalControl(payload.terminal, payload.hostTurn, {
+    operationId: op.id,
+    step: parsed.pinnedSeq % 1000,
+    choice: payload.terminal === "battle" ? COOP_ME_BATTLE_HANDOFF : COOP_INTERACTION_LEAVE,
+  });
+  const retainedControl = captureCoopActiveMysteryControl();
+  if (
+    retainedControl?.terminalOperationId !== op.id
+    || retainedControl.terminal !== payload.terminal
+    || retainedControl.terminalStep !== parsed.pinnedSeq % 1000
+  ) {
+    return false;
+  }
+  armCoopMeJournalTerminal(op.id, pinned);
   runtime.interactionRelay.materializeCommittedInteractionChoice(
     seq,
     "meBtn",
@@ -2771,7 +3178,7 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
     payload.hostTurn === undefined ? undefined : [payload.hostTurn],
     op.id,
   );
-  armCoopMeJournalTerminal(op.id, pinned);
+  materializedMeTerminalOutcomes.delete(op.id);
   return true;
 }
 
@@ -3027,27 +3434,28 @@ export function coopHostStreamMeMessage(text: string): void {
  * watcher / not in an ME pump session. Solo / lockstep keep their own pump behavior untouched
  * (this is only invoked on the authoritative handoff path). Best-effort + guarded.
  */
-export function coopMeOwnerRelayBattleHandoff(): void {
+export function coopMeOwnerRelayBattleHandoff(): boolean {
   if (active == null) {
-    return;
+    return !globalScene.gameMode?.isCoop;
   }
   const pump = active.mePump;
   // Only an active pump session relays the sentinel. Co-op is authoritative-only (#633 M6): the
   // pump is always OWNER-side (the host); the retired watcher never held a session.
   if (!pump.isSessionActive()) {
     coopLog("me", `owner-relay battle-handoff SKIP (active=${pump.isSessionActive()})`);
-    return;
+    return true;
   }
   try {
     coopLog("me", "owner-relay battle-handoff sentinel (end pump, run spawned battle)");
     const hostTurn = globalScene.currentBattle?.turn;
-    pump.relayMeBattleHandoff(hostTurn);
-    // Wave-2c: DUAL-RUN - commit the typed ME_TERMINAL {battle} op. The host STATES that this ME resolved
+    // Commit first. When durability is live, the journal materializer is the only waiter wake-up;
+    // a raw 9M frame is not allowed to outrun the committed envelope during a channel replacement.
+    // Wave-2c: commit the typed ME_TERMINAL {battle} op. The host STATES that this ME resolved
     // as a battle spawn BEFORE the guest builds its ME-battle phases, so the guest routes off the operation
     // (finishWithoutLeaving) rather than inferring a battle turn from a leftover chain (#859/#860). Step 0
     // (the TRUE post-battle leave later uses step 1). No-op when the flag is OFF; the 9M sentinel is the
     // dual-run fallback. Host-authoritative handoff path only.
-    commitMeOwnerIntent({
+    const operationId = commitMeOwnerIntent({
       kind: "ME_TERMINAL",
       seq: COOP_ME_TERM_SEQ_BASE + coopMeInteractionStartValue(),
       pinned: coopMeInteractionStartValue(),
@@ -3057,9 +3465,25 @@ export function coopMeOwnerRelayBattleHandoff(): void {
       wave: globalScene.currentBattle?.waveIndex ?? -1,
       turn: 0,
     });
+    if (operationId == null && isCoopMeOperationEnabled()) {
+      coopWarn("me", "owner-relay battle-handoff refused: authoritative terminal did not commit");
+      active.durability?.reconnect();
+      failCoopSharedSession("Mystery battle handoff terminal could not commit");
+      return false;
+    }
+    if (operationId != null) {
+      setCoopMeTerminalControl("battle", hostTurn, {
+        operationId,
+        step: 0,
+        choice: COOP_ME_BATTLE_HANDOFF,
+      });
+    }
+    pump.relayMeBattleHandoff(hostTurn, !isCoopOperationJournalActive());
+    return true;
   } catch (e) {
-    /* a relay failure must never break the owner's ME battle setup */
-    coopWarn("me", "owner-relay battle-handoff failed", e);
+    coopWarn("me", "owner-relay battle-handoff failed; stopping shared session before battle setup", e);
+    failCoopSharedSession("Mystery battle handoff could not enter authoritative control");
+    return false;
   }
 }
 
@@ -3144,7 +3568,7 @@ export function connectCoopSession(
  * value. Both peers advertise -> the enforce/journal features become negotiable (the enforce FLIP still
  * gates separately on isCoopCapabilityNegotiated).
  */
-function buildLocalCoopCapabilities(): CoopCapabilityKey[] {
+function buildLocalCoopCapabilities(durabilityEnabled: boolean): CoopCapabilityKey[] {
   const caps: CoopCapabilityKey[] = [];
   if (isCoopAbilityOperationEnabled()) {
     caps.push(COOP_CAP_OP_ABILITY);
@@ -3185,8 +3609,11 @@ function buildLocalCoopCapabilities(): CoopCapabilityKey[] {
   if (isCoopWaveAdvanceOperationEnabled()) {
     caps.push(COOP_CAP_OP_WAVE);
   }
-  // This build carries the durability journal + the renderer allowlist-enforce machinery.
-  caps.push(COOP_CAP_DURABILITY_JOURNAL);
+  // Advertise durability only when this assembly will actually install its manager. Protocol 31 requires
+  // it, so disabling the manager makes compatibility fail closed instead of claiming a dead capability.
+  if (durabilityEnabled) {
+    caps.push(COOP_CAP_DURABILITY_JOURNAL);
+  }
   caps.push(COOP_CAP_RENDERER_ALLOWLIST_ENFORCE);
   return caps;
 }
@@ -3231,6 +3658,8 @@ export function assembleCoopRuntime(
   // step 5) - drop any leftover ME op state so a new run's re-init-from-0 interaction counter can never
   // collide with a prior run's already-applied ME operationIds.
   resetCoopMeOperationState();
+  resetCoopActiveMysteryControl();
+  materializedMeTerminalOutcomes.clear();
   // Wave-2f: same fresh-control-plane reset for the post-battle wave-advance operation state (THE KEYSTONE) -
   // a new run's wave index restarts, so drop any leftover host/guest applier + last-applied wave pin.
   resetCoopWaveAdvanceOperationState();
@@ -3238,12 +3667,16 @@ export function assembleCoopRuntime(
   // negotiated capability set - the first hello of this session renegotiates it. A HOT rejoin does NOT
   // re-assemble (it pulls a snapshot in place), so this never clears a live negotiation on a flap.
   clearNegotiatedCoopCapabilities();
+  const durabilityEnabled = isCoopDurabilityEnabled();
   const controller = new CoopSessionController(transport, {
     username: opts.username,
     version: COOP_PROTOCOL_VERSION,
     // #896 W2e-R2: advertise what THIS build supports+enables; the controller negotiates the effective
     // session set (intersection with the peer's) and stores it, and the surface adapters gate on it.
-    localCapabilities: buildLocalCoopCapabilities(),
+    localCapabilities: buildLocalCoopCapabilities(durabilityEnabled),
+    // Protocol 31 removes every broad biome-tail escape hatch. Launching without these exact control and
+    // delivery capabilities would strand SelectBiome by construction, so compatibility must fail closed.
+    requiredCapabilities: [COOP_CAP_OP_BIOME, COOP_CAP_OP_ME, COOP_CAP_DURABILITY_JOURNAL],
     requireFunctionalFingerprint: true,
     onEpochNegotiated: applyCoopOperationEpoch,
   });
@@ -3271,7 +3704,7 @@ export function assembleCoopRuntime(
   // below and its journal depth/unacked feed the health line. Absent when the flag is OFF (legacy behavior).
   const operationDurabilityHooks = coopOperationDurabilityHooks();
   let runtime: CoopRuntime;
-  const durability = isCoopDurabilityEnabled()
+  const durability = durabilityEnabled
     ? new CoopDurabilityManager(transport, {
         ...operationDurabilityHooks,
         sendFullSnapshot: (cls, headRevision, controlHighWater) =>
@@ -3490,6 +3923,7 @@ export function clearCoopRuntime(): void {
   resetCoopRewardOperationState();
   // Wave-2c: same teardown for the mystery-encounter operation surface.
   resetCoopMeOperationState();
+  materializedMeTerminalOutcomes.clear();
   // Wave-2f: same teardown for the post-battle wave-advance operation surface (THE KEYSTONE).
   resetCoopWaveAdvanceOperationState();
   learnMoveForwardInFlight.clear();
@@ -3506,6 +3940,7 @@ export function clearCoopRuntime(): void {
   // family (setCoopMeInteractionStart(-1) also auto-clears the handoff + bespoke flags) and the
   // adopted host presentation alongside the battle-counter reset that already lived here.
   setCoopMeInteractionStart(-1);
+  resetCoopActiveMysteryControl();
   // Reset the authoritative wave-advance state so a subsequent run starts clean (#633).
   pendingWaveAdvance = null;
   activeGuestWaveTransition = null;

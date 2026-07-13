@@ -55,6 +55,7 @@
 import { COOP_CAP_OP_ME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
+import { setCoopMeOwnerIntentOrdinals } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   type CoopAuthoritativeEnvelopeV1,
   type CoopMeButtonPayload,
@@ -72,8 +73,8 @@ import {
 import {
   applyCoopOperationEnvelope,
   isCoopOperationJournalActive,
-  journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
+  tryJournalCoopCommittedEnvelope,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
@@ -81,8 +82,27 @@ import {
   CoopOperationGuest,
   CoopOperationHost,
 } from "#data/elite-redux/coop/coop-operation-runtime";
+import { COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
-import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopInteractionOutcome,
+  CoopRole,
+} from "#data/elite-redux/coop/coop-transport";
+
+/** First-success latch for the immutable terminal DATA image reused by every journal retry. */
+export class CoopMeTerminalOutcomeLatch {
+  private retained: Extract<CoopInteractionOutcome, { k: "meResync" }> | undefined;
+
+  public getOrCapture(
+    capture: () => Extract<CoopInteractionOutcome, { k: "meResync" }>,
+  ): Extract<CoopInteractionOutcome, { k: "meResync" }> {
+    if (this.retained == null) {
+      this.retained = JSON.parse(JSON.stringify(capture())) as Extract<CoopInteractionOutcome, { k: "meResync" }>;
+    }
+    return this.retained;
+  }
+}
 
 /** The mystery-encounter operation kinds this surface commits (the §2.1 #8/#9/#10 successors). */
 export type CoopMeOperationKind = Extract<
@@ -152,19 +172,18 @@ let authorityHost: CoopOperationHost | null = null;
 /** The watcher applier that gates adoption of a relayed decision. Lazily created; null until first use. */
 let watchGuest: CoopOperationGuest | null = null;
 
-/** Host presentation ordinal within the pinned ME (top-level, repeated rounds, then follow-up subprompts). */
-let ownerPresentationStep = 0;
-/** Authority-side ordinal for guest-owned ME_SUB proposals accepted on the host's FIFO. */
-let authoritySubPickStep = 0;
+/** Next host presentation ordinal, scoped to one pinned ME and advanced only after durable commit. */
+const ownerPresentationSteps = new Map<number, number>();
+/** Next accepted guest-owned sub-pick ordinal, scoped to one pinned ME. */
+const authoritySubPickSteps = new Map<number, number>();
+/** Next accepted top-level/Delve/Safari pick ordinal, scoped to one pinned ME. */
+const authorityPickSteps = new Map<number, number>();
+/** First exact terminal payload per deterministic operation id, retained across journal handoff retries. */
+const retainedTerminalPayloads = new Map<string, CoopMeTerminalPayload>();
 
 /** Allocate the next durable ME_PRESENT address step in host emission order. */
-export function nextCoopMePresentationStep(): number {
-  return ownerPresentationStep++;
-}
-
-/** Allocate the next authority commit address for a guest-owned ME_SUB proposal. */
-export function nextCoopMeAuthoritySubPickStep(): number {
-  return authoritySubPickStep++;
+export function nextCoopMePresentationStep(pinned: number): number {
+  return ownerPresentationSteps.get(pinned) ?? 0;
 }
 
 /** ME interactions whose terminal carrier switched from raw legacy to the durable journal. */
@@ -222,6 +241,13 @@ export function settleCoopMeOwnerIntentRetries(): void {
   }
   coopLog("me", `ME terminal retires ${pendingOwnerIntentRetries.size} completed owner-intent retry timer(s)`);
   pendingOwnerIntentRetries.clear();
+}
+
+/** Release the host's first-capture terminal image only after its local close/advance transaction succeeds. */
+export function releaseCoopMeRetainedTerminal(operationId: string | null): void {
+  if (operationId != null) {
+    retainedTerminalPayloads.delete(operationId);
+  }
 }
 
 function armOwnerIntentRetry(operationId: string, resend: () => void): void {
@@ -291,8 +317,10 @@ export function resetCoopMeOperationState(): void {
   watchGuest = null;
   journalLeadingTerminals.clear();
   pendingJournalMaterializations.clear();
-  ownerPresentationStep = 0;
-  authoritySubPickStep = 0;
+  ownerPresentationSteps.clear();
+  authoritySubPickSteps.clear();
+  authorityPickSteps.clear();
+  retainedTerminalPayloads.clear();
   lastAppliedPinned = -1;
   revisionFloor = 0;
 }
@@ -351,6 +379,37 @@ const ME_KIND_TAG: Record<CoopMeOperationKind, number> = {
  */
 function meOpAddr(kind: CoopMeOperationKind, seq: number, step: number): number {
   return seq * 8000 + ME_KIND_TAG[kind] * 1000 + (((step % 1000) + 1000) % 1000);
+}
+
+/** Project one newly applied owner intent into the reconnect control snapshot. */
+export function adoptCoopMeCommittedOwnerOrdinal(op: CoopPendingOperation): boolean {
+  if ((op.kind !== "ME_PICK" && op.kind !== "ME_SUB") || op.status !== "applied") {
+    return false;
+  }
+  const parsed = parseCoopOperationId(op.id);
+  if (parsed == null || parsed.kind !== op.kind || parsed.owner !== op.owner) {
+    return false;
+  }
+  const seq = Math.floor(parsed.pinnedSeq / 8000);
+  const remainder = parsed.pinnedSeq - seq * 8000;
+  const step = remainder - ME_KIND_TAG[op.kind] * 1000;
+  const pinned = seq - COOP_ME_PUMP_SEQ_BASE;
+  if (
+    !Number.isSafeInteger(pinned)
+    || pinned < 0
+    || !Number.isSafeInteger(step)
+    || step < 0
+    || step > 999
+    || meOpAddr(op.kind, seq, step) !== parsed.pinnedSeq
+  ) {
+    return false;
+  }
+  setCoopMeOwnerIntentOrdinals(
+    pinned,
+    op.kind === "ME_PICK" ? step + 1 : undefined,
+    op.kind === "ME_SUB" ? step + 1 : undefined,
+  );
+  return true;
 }
 
 /**
@@ -453,28 +512,60 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
       );
       return null;
     }
-    const addr = meOpAddr(params.kind, params.seq, params.step ?? 0);
+    const step = params.step ?? 0;
+    if (params.localRole === "host" && params.kind === "ME_PRESENT") {
+      const expected = ownerPresentationSteps.get(params.pinned) ?? 0;
+      if (step !== expected) {
+        coopWarn("me", `ME_PRESENT step ${step} did not match pinned ${params.pinned} expected ${expected}`);
+        return null;
+      }
+    }
+    const addr = meOpAddr(params.kind, params.seq, step);
+    const operationId = makeCoopOperationId(epoch, ownerSeat, addr, params.kind);
+    let payload = params.payload;
+    if (params.localRole === "host" && params.kind === "ME_TERMINAL") {
+      const retained = retainedTerminalPayloads.get(operationId);
+      if (retained == null) {
+        const exact = JSON.parse(JSON.stringify(params.payload)) as CoopMeTerminalPayload;
+        retainedTerminalPayloads.set(operationId, exact);
+        payload = exact;
+      } else {
+        payload = retained;
+      }
+    }
     const intent: CoopPendingOperation = {
-      id: makeCoopOperationId(epoch, ownerSeat, addr, params.kind),
+      id: operationId,
       kind: params.kind,
       owner: ownerSeat,
       status: "proposed",
-      payload: params.payload,
+      payload,
     };
     // The AUTHORITY (coop host) is the sole committer (invariant 3). When the LOCAL owner is the host, it
     // commits its own intent here; when the owner is the guest, the host commits on adopt (watcher seam).
     if (params.localRole === "host") {
       const res = host().submit(intent, controlContext(params.wave, params.turn), seatValidator(ownerSeat));
-      if (res.kind === "committed") {
+      if (res.kind === "committed" || res.kind === "reack") {
         // COMMIT -> JOURNAL (Wave-2e, §4.1/§4.2): register the committed ME step with the durability journal
-        // (resend / reconnect replay). Rides ALONGSIDE the legacy relay (dual-run); no-op when durability OFF.
-        journalCoopCommittedEnvelope(res.envelope);
-        coopLog("me", `ME op OWNER commit kind=${params.kind} rev=${res.envelope.revision} id=${intent.id} (Wave-2c)`);
+        // (resend / reconnect replay). An idempotent re-ACK is journaled again as well: this is the
+        // recovery path when the operation commit succeeded but its first journal handoff threw.
+        // Rides ALONGSIDE the legacy relay (dual-run); no-op when durability OFF.
+        if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
+          coopWarn("me", `ME op OWNER ${res.kind} could not be retained id=${intent.id}`);
+          return null;
+        }
+        if (params.kind === "ME_PRESENT") {
+          ownerPresentationSteps.set(params.pinned, step + 1);
+        }
+        coopLog(
+          "me",
+          `ME op OWNER ${res.kind} kind=${params.kind} rev=${res.envelope.revision} id=${intent.id} (Wave-2c)`,
+        );
       } else {
         coopWarn(
           "me",
-          `ME op OWNER commit non-committed (${res.kind}) id=${intent.id} - legacy relay carries it (Wave-2c)`,
+          `ME op OWNER commit non-committed (${res.kind}) id=${intent.id} - authoritative control holds (Wave-2c)`,
         );
+        return null;
       }
     } else if (params.resend != null) {
       armOwnerIntentRetry(intent.id, params.resend);
@@ -486,6 +577,87 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
     coopWarn("me", "ME op OWNER commit threw (handled - legacy relay is the fallback) (Wave-2c)", e);
     return null;
   }
+}
+
+export type CoopMeAuthorityIntentResult =
+  | { kind: "committed"; operationId: string }
+  | { kind: "duplicate" }
+  | { kind: "gap" }
+  | { kind: "failed" };
+
+export interface CoopMeAuthorityGuestIntentParams {
+  readonly kind: "ME_PICK" | "ME_SUB";
+  readonly seq: number;
+  readonly pinned: number;
+  readonly step: number;
+  readonly value: number;
+  readonly wave: number;
+  readonly turn: number;
+}
+
+/**
+ * Host acceptance seam for guest-owned Mystery intents. The guest carries its stable per-ME ordinal in
+ * the legacy proposal's data field; a retransmit below the next expected step is a duplicate, while a gap
+ * is malformed. The ordinal advances only after the exact host commit and journal handoff succeed.
+ */
+export function commitMeAuthorityGuestIntent(params: CoopMeAuthorityGuestIntentParams): CoopMeAuthorityIntentResult {
+  const steps = params.kind === "ME_PICK" ? authorityPickSteps : authoritySubPickSteps;
+  const expected = steps.get(params.pinned) ?? 0;
+  if (!Number.isSafeInteger(params.step) || params.step < 0 || params.step > 999) {
+    return { kind: "gap" };
+  }
+  if (params.step < expected) {
+    return { kind: "duplicate" };
+  }
+  if (params.step > expected) {
+    return { kind: "gap" };
+  }
+  const operationId = commitMeOwnerIntent({
+    kind: params.kind,
+    seq: params.seq,
+    pinned: params.pinned,
+    step: params.step,
+    payload: params.kind === "ME_PICK" ? { optionIndex: params.value } : { value: params.value },
+    localRole: "host",
+    wave: params.wave,
+    turn: params.turn,
+  });
+  if (operationId == null) {
+    return { kind: "failed" };
+  }
+  steps.set(params.pinned, expected + 1);
+  setCoopMeOwnerIntentOrdinals(
+    params.pinned,
+    params.kind === "ME_PICK" ? expected + 1 : undefined,
+    params.kind === "ME_SUB" ? expected + 1 : undefined,
+  );
+  return { kind: "committed", operationId };
+}
+
+/** Commit one host-owned top-level/repeated pick without burning its per-ME ordinal on failure. */
+export function commitMeAuthorityLocalPick(params: {
+  readonly seq: number;
+  readonly pinned: number;
+  readonly optionIndex: number;
+  readonly wave: number;
+  readonly turn: number;
+}): string | null {
+  const step = authorityPickSteps.get(params.pinned) ?? 0;
+  const operationId = commitMeOwnerIntent({
+    kind: "ME_PICK",
+    seq: params.seq,
+    pinned: params.pinned,
+    step,
+    payload: { optionIndex: params.optionIndex },
+    localRole: "host",
+    wave: params.wave,
+    turn: params.turn,
+  });
+  if (operationId != null) {
+    authorityPickSteps.set(params.pinned, step + 1);
+    setCoopMeOwnerIntentOrdinals(params.pinned, step + 1);
+  }
+  return operationId;
 }
 
 // -----------------------------------------------------------------------------
@@ -557,10 +729,12 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
         coopWarn("me", `ME op WATCHER(host) commit REJECTED (${res.kind}) id=${opId} -> fallback (Wave-2c)`);
         return { adopt: false, reason: `host-${res.kind}` };
       }
-      if (res.kind === "committed") {
+      if (res.kind === "committed" || res.kind === "reack") {
         // COMMIT -> JOURNAL (Wave-2e): the host is the sole committer of a GUEST-owned ME step; journal the
         // authoritative envelope so a cut is healed by the journal, not a bespoke self-heal.
-        journalCoopCommittedEnvelope(res.envelope);
+        if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
+          return { adopt: false, reason: "host-journal-retention-failed" };
+        }
         // The sole authority may apply the intent it just validated at this safe phase seam. The
         // non-authoritative peer remains strictly gated on the committed envelope.
         lastAppliedPinned = params.pinned;
@@ -673,6 +847,7 @@ function applyJournaledMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopAp
   if (applyCoopOperationEnvelope(g, "op:me", envelope) !== "applied") {
     return "rejected"; // transient non-applicable (retriable); never a permanent condition (that is a duplicate above).
   }
+  adoptCoopMeCommittedOwnerOrdinal(op);
   // Route newly-consumed ME operations into the production live sink. Supported terminal operations feed
   // the tagged host-stated sentinel into the existing 9M safe terminal handler.
   coopLog("me", `ME op JOURNAL apply kind=${op.kind} id=${op.id} rev=${envelope.revision} (Wave-2e/W2e-R)`);

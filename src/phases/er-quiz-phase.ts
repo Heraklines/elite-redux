@@ -18,11 +18,13 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   coopQuizAwaitRemoteAnswer,
   coopQuizHostStreamSession,
   coopQuizPublishAnswer,
 } from "#data/elite-redux/coop/coop-quiz-mirror";
+import { coopSessionGeneration, getCoopController, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { erRecordQuizPerfect } from "#data/elite-redux/er-achievement-detection";
 import type { ErQuizQuestion } from "#data/elite-redux/er-quiz";
 import { erQuizOptionName, getErFootprintAsset } from "#data/elite-redux/er-quiz";
@@ -73,6 +75,28 @@ export class ErQuizPhase extends Phase {
   /** #818 co-op quiz mirroring: question indices whose remote (owner-relayed) answer has already
    *  been applied, so a stale / late remote resolution can never answer a LATER question. */
   private readonly resolvedRemote = new Set<number>();
+  private coopBoundary:
+    | {
+        scene: typeof globalScene;
+        runtime: ReturnType<typeof getCoopRuntime>;
+        controller: ReturnType<typeof getCoopController>;
+        generation: number;
+        pinned: number;
+      }
+    | undefined;
+
+  private boundaryStillLive(): boolean {
+    const boundary = this.coopBoundary;
+    return (
+      boundary == null
+      || (globalScene === boundary.scene
+        && getCoopRuntime() === boundary.runtime
+        && getCoopController() === boundary.controller
+        && coopSessionGeneration() === boundary.generation
+        && coopMeInteractionStartValue() === boundary.pinned
+        && globalScene.phaseManager.getCurrentPhase() === this)
+    );
+  }
 
   constructor(config: ErQuizSessionConfig) {
     super();
@@ -83,6 +107,15 @@ export class ErQuizPhase extends Phase {
 
   start(): void {
     super.start();
+    if (globalScene.gameMode.isCoop && coopMeInProgress()) {
+      this.coopBoundary = {
+        scene: globalScene,
+        runtime: getCoopRuntime(),
+        controller: getCoopController(),
+        generation: coopSessionGeneration(),
+        pinned: coopMeInteractionStartValue(),
+      };
+    }
     // #818 co-op quiz mirroring: the HOST (sole engine) streams the whole question session so BOTH
     // clients render the SAME quiz off it. The function gates itself on host role + a live mirrored ME,
     // so this is a no-op in solo play and safe to call unconditionally.
@@ -108,6 +141,9 @@ export class ErQuizPhase extends Phase {
     // and start it once - the pattern that reliably lands every asset.
     if (globalScene.load.isLoading()) {
       await new Promise<void>(resolve => globalScene.load.once(Phaser.Loader.Events.COMPLETE, () => resolve()));
+      if (!this.boundaryStillLive()) {
+        return;
+      }
     }
 
     let queuedAnything = false;
@@ -149,6 +185,9 @@ export class ErQuizPhase extends Phase {
         }
       });
       globalScene.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onErr);
+      if (!this.boundaryStillLive()) {
+        return;
+      }
     }
     void this.ask();
   }
@@ -187,7 +226,16 @@ export class ErQuizPhase extends Phase {
         glyphRows,
         options: q.cipherOptions ?? [],
       };
-      globalScene.ui.setMode(UiMode.ER_QUIZ, cipherView, (choice: number) => void this.onAnswer(choice));
+      const opened = await globalScene.ui.setModeBoundedWhen(
+        UiMode.ER_QUIZ,
+        2_000,
+        () => this.boundaryStillLive(),
+        cipherView,
+        (choice: number) => (this.boundaryStillLive() ? void this.onAnswer(choice) : undefined),
+      );
+      if (opened === "superseded") {
+        return;
+      }
       this.armRemoteAnswer();
       return;
     }
@@ -203,7 +251,16 @@ export class ErQuizPhase extends Phase {
         showBrailleLegend: true,
         options: q.cipherOptions ?? [],
       };
-      globalScene.ui.setMode(UiMode.ER_QUIZ, brailleView, (choice: number) => void this.onAnswer(choice));
+      const opened = await globalScene.ui.setModeBoundedWhen(
+        UiMode.ER_QUIZ,
+        2_000,
+        () => this.boundaryStillLive(),
+        brailleView,
+        (choice: number) => (this.boundaryStillLive() ? void this.onAnswer(choice) : undefined),
+      );
+      if (opened === "superseded") {
+        return;
+      }
       this.armRemoteAnswer();
       return;
     }
@@ -218,7 +275,16 @@ export class ErQuizPhase extends Phase {
         iconFrame: q.itemIconFrame,
         options: q.itemOptions ?? [],
       };
-      globalScene.ui.setMode(UiMode.ER_QUIZ, itemView, (choice: number) => void this.onAnswer(choice));
+      const opened = await globalScene.ui.setModeBoundedWhen(
+        UiMode.ER_QUIZ,
+        2_000,
+        () => this.boundaryStillLive(),
+        itemView,
+        (choice: number) => (this.boundaryStillLive() ? void this.onAnswer(choice) : undefined),
+      );
+      if (opened === "superseded") {
+        return;
+      }
       this.armRemoteAnswer();
       return;
     }
@@ -268,7 +334,16 @@ export class ErQuizPhase extends Phase {
       options: q.options.map(erQuizOptionName),
     };
 
-    globalScene.ui.setMode(UiMode.ER_QUIZ, view, (choice: number) => void this.onAnswer(choice));
+    const opened = await globalScene.ui.setModeBoundedWhen(
+      UiMode.ER_QUIZ,
+      2_000,
+      () => this.boundaryStillLive(),
+      view,
+      (choice: number) => (this.boundaryStillLive() ? void this.onAnswer(choice) : undefined),
+    );
+    if (opened === "superseded") {
+      return;
+    }
     this.armRemoteAnswer();
   }
 
@@ -287,7 +362,7 @@ export class ErQuizPhase extends Phase {
     if (remote) {
       const forIndex = this.index;
       void remote.then(c => {
-        if (this.index === forIndex && !this.resolvedRemote.has(forIndex)) {
+        if (this.boundaryStillLive() && this.index === forIndex && !this.resolvedRemote.has(forIndex)) {
           this.resolvedRemote.add(forIndex);
           void this.onAnswer(c);
         }
@@ -296,11 +371,18 @@ export class ErQuizPhase extends Phase {
   }
 
   private async onAnswer(choice: number): Promise<void> {
+    if (!this.boundaryStillLive()) {
+      return;
+    }
+    const answeringIndex = this.index;
     // #818 co-op quiz mirroring (DRIVE side): relay this answer to the follower BEFORE we consume it,
     // so both clients apply the identical choice. Gates itself on the drive side (a no-op otherwise).
     coopQuizPublishAnswer(this.index, choice);
     // Hand the UI back to MESSAGE before showing the verdict text.
-    await globalScene.ui.setMode(UiMode.MESSAGE);
+    const opened = await globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.boundaryStillLive());
+    if (opened === "superseded" || !this.boundaryStillLive() || this.index !== answeringIndex) {
+      return;
+    }
 
     const q = this.questions[this.index];
     const isCipher = q.kind === "cipher" || q.kind === "braille";
@@ -328,7 +410,17 @@ export class ErQuizPhase extends Phase {
     }
 
     const msg = isCorrect ? `Correct! It's ${answerName}!` : `Wrong... it was ${answerName}.`;
-    globalScene.ui.showText(msg, null, () => this.afterVerdict(isCorrect), null, true);
+    globalScene.ui.showText(
+      msg,
+      null,
+      () => {
+        if (this.boundaryStillLive() && this.index === answeringIndex) {
+          this.afterVerdict(isCorrect);
+        }
+      },
+      null,
+      true,
+    );
   }
 
   private afterVerdict(isCorrect: boolean): void {
@@ -341,6 +433,9 @@ export class ErQuizPhase extends Phase {
   }
 
   private finish(): void {
+    if (!this.boundaryStillLive()) {
+      return;
+    }
     const result: ErQuizResult = {
       correct: this.correct,
       answered: this.answered,

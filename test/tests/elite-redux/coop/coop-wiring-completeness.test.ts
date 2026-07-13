@@ -19,6 +19,7 @@
 //      no receiver is the same bug one layer down.
 // =============================================================================
 
+import { setCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
 import {
   assembleCoopRuntime,
   type CoopRuntime,
@@ -58,7 +59,30 @@ function assertFullyWired(runtime: CoopRuntime, label: string): void {
 
 describe("#820 co-op wiring completeness (the two-factories guard)", () => {
   afterEach(() => {
+    setCoopDurabilityEnabled(true);
     clearCoopRuntime();
+  });
+
+  it("runtime assembly never advertises durability when no durability manager is installed", async () => {
+    setCoopDurabilityEnabled(false);
+    const { host, guest } = createLoopbackPair();
+    const hostRuntime = assembleCoopRuntime(host, { username: "no-durability-host" });
+    const guestRuntime = assembleCoopRuntime(guest, { username: "no-durability-guest" });
+    try {
+      expect(hostRuntime.durability).toBeUndefined();
+      expect(guestRuntime.durability).toBeUndefined();
+      hostRuntime.controller.connect();
+      guestRuntime.controller.connect();
+      await new Promise<void>(resolve => queueMicrotask(resolve));
+      expect(
+        hostRuntime.controller.compatibilityAccepted,
+        "protocol 31 must fail closed instead of claiming the missing journal capability",
+      ).toBe(false);
+      expect(guestRuntime.controller.compatibilityAccepted).toBe(false);
+    } finally {
+      hostRuntime.controller.dispose();
+      guestRuntime.controller.dispose();
+    }
   });
 
   it("assembleCoopRuntime (the LIVE + harness factory) installs every critical hook", () => {

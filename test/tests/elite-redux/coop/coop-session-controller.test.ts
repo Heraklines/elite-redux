@@ -9,6 +9,11 @@
 //   - host CoopSessionController <-> guest CoopSessionController (symmetry).
 // Pure logic over LoopbackTransport - no game engine.
 
+import {
+  COOP_CAP_DURABILITY_JOURNAL,
+  COOP_CAP_OP_BIOME,
+  clearNegotiatedCoopCapabilities,
+} from "#data/elite-redux/coop/coop-capabilities";
 import { computeErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { CoopSessionController, type CoopSessionSnapshot } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
@@ -21,6 +26,30 @@ const flush = () => new Promise<void>(resolve => queueMicrotask(resolve));
 
 describe("co-op session controller (#633, P1)", () => {
   describe("functional compatibility launch barrier", () => {
+    it("refuses protocol-31 launch when biome operations or durability do not survive negotiation", async () => {
+      clearNegotiatedCoopCapabilities();
+      const { host, guest } = createLoopbackPair();
+      const required = [COOP_CAP_OP_BIOME, COOP_CAP_DURABILITY_JOURNAL];
+      const h = new CoopSessionController(host, {
+        version: COOP_PROTOCOL_VERSION,
+        localCapabilities: required,
+        requiredCapabilities: required,
+      });
+      const g = new CoopSessionController(guest, {
+        version: COOP_PROTOCOL_VERSION,
+        localCapabilities: [COOP_CAP_OP_BIOME],
+        requiredCapabilities: required,
+      });
+      h.connect();
+      g.connect();
+      await flush();
+      expect(h.compatibilityAccepted).toBe(false);
+      expect(g.compatibilityAccepted).toBe(false);
+      h.dispose();
+      g.dispose();
+      clearNegotiatedCoopCapabilities();
+    });
+
     async function readyAgainstFingerprint(kind: "functional" | "presentation"): Promise<CoopSessionController> {
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {

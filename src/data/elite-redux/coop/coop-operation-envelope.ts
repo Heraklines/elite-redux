@@ -135,6 +135,8 @@ export interface CoopAuthoritativeEnvelopeV1 {
 
 /** BIOME_PICK intent/outcome: the chosen biome + the route-node index the owner travelled to (#15/#865). */
 export interface CoopBiomePickPayload {
+  /** The biome the committed transition leaves. Guards a delayed pick from authorizing a later boundary. */
+  readonly sourceBiomeId: number;
   /** The BiomeId the owner chose to travel to. */
   readonly biomeId: number;
   /**
@@ -142,6 +144,8 @@ export interface CoopBiomePickPayload {
    * natural single-node terminal (#865 - the World-Map auto-travel path with exactly one destination).
    */
   readonly nodeIndex: number;
+  /** The first wave in the committed destination biome. */
+  readonly nextWave: number;
 }
 
 /** CROSSROADS_PICK intent/outcome: the crossroads option index the owner chose (Stay/Leave, #14). */
@@ -192,8 +196,8 @@ export interface CoopBargainPayload {
 
 /** COLO_PICK stream: repeated host-stated boards and owner decisions within one pinned gauntlet. */
 export type CoopColosseumPayload =
-  | { readonly type: "board"; readonly labels: string[] }
-  | { readonly type: "decision"; readonly index: number };
+  | { readonly type: "board"; readonly round: number; readonly labels: string[] }
+  | { readonly type: "decision"; readonly round: number; readonly index: number };
 
 /** ABILITY_PICK outcome: literal operation code and resolved slots/ability id. */
 export interface CoopAbilityPickPayload {
@@ -302,6 +306,12 @@ export interface CoopMeTerminalPayload {
   readonly terminal: CoopMeTerminalKind;
   /** For a battle terminal, the host's current battle turn to align the guest's ME-battle boot (#822). Absent for leave. */
   readonly hostTurn?: number;
+  /**
+   * Complete host state at a leave terminal. The durability receiver applies this exact image before it
+   * materializes the terminal choice, so a dropped legacy `meResync` can never let control outrun DATA.
+   * Battle handoffs intentionally omit it: their authoritative battle stream remains the data carrier.
+   */
+  readonly outcome?: Extract<CoopInteractionOutcome, { k: "meResync" }>;
 }
 
 /** QUIZ_ANSWER intent/outcome: one committed answer of an embedded ME quiz minigame (#9/#818). */

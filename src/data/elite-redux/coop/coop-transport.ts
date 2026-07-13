@@ -70,7 +70,15 @@ export type CoopRole = "host" | "guest";
 // er-coop-30: authoritative field seats carry actual Phaser presentation membership and the guest settles
 // those seats through a pure no-RNG materializer. An older renderer would ignore the visibility boundary
 // and can reveal pre-intro/fainted seats, so cached mixed builds must refuse pairing instead of degrading.
-export const COOP_PROTOCOL_VERSION = "er-coop-30";
+// er-coop-31: cold-resume offers bind immutable SHA-256 snapshot bytes, participant seat ownership,
+// wave, and control revision; apply/start-new outcomes and host->guest checkpoint persistence use
+// bounded acknowledged transactions.
+// The same bump makes every deterministic biome destination an exact durable BIOME_PICK permit; a
+// WAVE_ADVANCE can enter SelectBiome but can no longer broadly authorize Switch/NewBiome by phase name.
+// er-coop-32: every persisted checkpoint is bound to a stable runId plus a host-monotonic checkpoint
+// revision; large logical frames use backpressured restartable chunk delivery and resume crosses a
+// symmetric final release barrier.
+export const COOP_PROTOCOL_VERSION = "er-coop-32";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -97,6 +105,39 @@ export type CoopSessionKind = "coop" | "versus";
 
 /** Connection lifecycle of a transport. */
 export type CoopConnectionState = "connecting" | "connected" | "disconnected" | "closed";
+
+export type CoopLaunchSnapshotAbortReason =
+  | "no-safe-slot"
+  | "slot-raced"
+  | "first-save-cas-failed"
+  | "guest-persistence-failed";
+
+/** Immutable discriminator for one exact cold-resume snapshot. */
+export interface CoopResumeCommitment {
+  version: 1;
+  digest: string;
+  gameMode: number;
+  wave: number;
+  revision: number;
+  /** Stable host-minted identity separating multiple runs owned by the same account pair. */
+  runId: string;
+  /** Host-monotonic persistence order, independent of wave and operation-journal revisions. */
+  checkpointRevision: number;
+  timestamp: number;
+  participants: [string, string];
+  seats: { host: string; guest: string };
+}
+
+export type CoopResumeBlockedReason = "unsafe-role-reversal" | "legacy-unmappable" | "replica-unavailable";
+
+export type CoopResumeCheckpointNackReason =
+  | "runtime-invalid"
+  | "invalid-checkpoint"
+  | "no-safe-slot"
+  | "slot-conflict"
+  | "storage-failed"
+  | "cloud-failed"
+  | "cloud-conflict";
 
 /** Lifecycle signals exchanged out of band of normal gameplay. */
 export type CoopLifecycleEvent = "ready" | "pause" | "resume" | "partner-left";
@@ -570,6 +611,8 @@ export interface CoopFullBattleSnapshot {
   activeControl?: CoopActiveControlSnapshotV1 | undefined;
   /** Operation revisions whose effects this authoritative snapshot already subsumes (§4.4). */
   journalHighWater?: Record<string, number> | undefined;
+  /** Hash binding the DATA checksum to session/membership/control/high-water as one envelope. */
+  controlDigest?: string | undefined;
   /** Every occupied field mon's full state, by battler index. */
   field: CoopFullMonSnapshot[];
   /** `WeatherType` enum value (0 = none) + turns remaining. */
@@ -676,6 +719,12 @@ export interface CoopActiveControlSnapshotV1 {
   version: 1;
   phaseName: string;
   interactionCounter: number;
+  /**
+   * Durable Mystery-event control surface. A hot-rejoin snapshot carries the exact last host screen and
+   * terminal state so the guest can rebind its retained CoopReplayMePhase instead of locally inferring an
+   * exit from a cancelled/expired 8M or 9M wait. Optional for backward-compatible snapshot decoding.
+   */
+  activeMysteryEncounter?: CoopActiveMysteryEncounterSnapshotV1 | undefined;
   awaitedInteractions: { seq: number; expectedKinds: string[] }[];
   barriers: { localArrived: string[]; partnerArrived: string[]; awaiting: string[] };
   pendingCommands: {
@@ -685,6 +734,47 @@ export interface CoopActiveControlSnapshotV1 {
     offer?: CoopBattleCommandOffer | undefined;
     owner?: CoopRole;
   }[];
+}
+
+/** Exact host-owned control statement for the current (or most recently resolved) Mystery encounter. */
+export interface CoopActiveMysteryEncounterSnapshotV1 {
+  version: 1;
+  interactionCounter: number;
+  /** Monotonic revision within this pinned interaction counter. */
+  revision: number;
+  /** Monotonic selector/sub-screen round (repeated Delve/Safari rounds never reuse one). */
+  round: number;
+  /** Next guest-owner top-level/repeated pick ordinal accepted by the host. */
+  nextPickStep?: number | undefined;
+  /** Next guest-owner party/secondary/catch-full ordinal accepted by the host. */
+  nextSubPickStep?: number | undefined;
+  /** Exact Colosseum between-round control, when this Mystery is the multi-battle gauntlet. */
+  colosseum?:
+    | {
+        /** Board round the guest loop must await or resume next. */
+        expectedRound: number;
+        /** Currently published board; omitted after its CONTINUE transition boots successfully. */
+        boardRound?: number | undefined;
+        /** Exact committed choice for boardRound, if the owner already decided. */
+        decision?: { round: number; index: number; operationId: string } | undefined;
+      }
+    | undefined;
+  /** `pending` means the exact terminal is not committed yet; the guest must remain in the event. */
+  terminal: "pending" | "leave" | "battle";
+  /** Exact committed ME_TERMINAL operation. Required for a non-pending terminal. */
+  terminalOperationId?: string | undefined;
+  /** ME_TERMINAL step (battle=0, post-battle leave=1; normal leave=0). */
+  terminalStep?: number | undefined;
+  /** Exact choice delivered by the journal materializer for this terminal. */
+  terminalChoice?: number | undefined;
+  /** Host turn carried by a battle-handoff terminal, when one has been committed. */
+  hostTurn?: number | undefined;
+  /** Wave-scoped battle handoff state, used to distinguish a selector from the spawned ME battle. */
+  handoffWave?: number | undefined;
+  /** Host phase at atomic capture; prevents an old selector from reopening after its choice was consumed. */
+  hostPhaseName?: string | undefined;
+  /** Last host-rendered event screen/sub-screen. Plain JSON; safe to replay after a channel replacement. */
+  presentation?: Extract<CoopInteractionOutcome, { k: "mePresent" }> | undefined;
 }
 
 /**
@@ -989,6 +1079,9 @@ export type CoopMessage =
       capabilities?: string[];
       /** Host-minted control-plane epoch; the guest adopts and echoes it before operations begin. */
       epoch: number;
+      /** Host-authored persistence identity; absent only from the guest before it adopts the host. */
+      runId?: string;
+      checkpointRevision?: number;
     }
   /** Keepalive / latency probe. */
   | { t: "ping"; ts: number }
@@ -1074,22 +1167,43 @@ export type CoopMessage =
   | { t: "catchFullPrompt"; pokemonName: string; speciesId: number; operationId?: string | undefined }
   /** #810 resume flow: host offers to resume the saved run with this partner at `wave`. */
   | { t: "meCursor"; index: number }
-  | { t: "resumeOffer"; decisionId: string; wave: number }
+  | { t: "resumeOffer"; decisionId: string; epoch: number; commitment: CoopResumeCommitment }
   /** #810 resume flow: guest's answer to the offer. */
   | { t: "resumeReply"; decisionId: string; accept: boolean }
   /** Host -> guest: the exact ACCEPT reply was committed and the cold-resume epoch is authoritative. */
-  | { t: "resumeAccepted"; decisionId: string; epoch: number }
+  | { t: "resumeAccepted"; decisionId: string; epoch: number; commitment: CoopResumeCommitment }
   /** Guest -> host: the committed resume snapshot finished materializing (or failed closed). */
   | { t: "resumeApplied"; decisionId: string; success: boolean }
   /** Host -> guest: the apply result is durably observed; guest may clear its reconnect outbox. */
   | { t: "resumeAppliedAck"; decisionId: string }
+  /** Host -> guest: both snapshots are materialized; guest may cross the final gameplay barrier. */
+  | { t: "resumeRelease"; decisionId: string }
+  | { t: "resumeReleaseAck"; decisionId: string }
+  /** Host -> guest: a discovered save exists but cannot be mapped safely; both remain out of gameplay. */
+  | { t: "resumeBlocked"; decisionId: string; reason: CoopResumeBlockedReason; wave: number }
+  | { t: "resumeBlockedAck"; decisionId: string }
+  /** Host persistence mirror: exact authoritative checkpoint bytes for the guest's own account/slot. */
+  | {
+      t: "resumeCheckpoint";
+      checkpointId: string;
+      commitment: CoopResumeCommitment;
+      session: string;
+      /** True only when this host save is also on the normal throttled cloud-checkpoint cadence. */
+      mirrorCloud: boolean;
+    }
+  | {
+      t: "resumeCheckpointAck";
+      checkpointId: string;
+      success: boolean;
+      reason?: CoopResumeCheckpointNackReason;
+    }
   /**
    * #810 resume flow (barrier): host tells the guest "no resume - proceed to a NEW game".
    * Sent whenever the host will NOT resume (no matching save, host picked New Game, guest
    * declined, or the offer timed out), so the guest never sits blocked waiting for an offer
    * that will never come. The guest treats it as the release signal for its wait barrier.
    */
-  | { t: "resumeStartNew"; decisionId: string }
+  | { t: "resumeStartNew"; decisionId: string; epoch: number; runId: string; checkpointRevision: number }
   /** Guest -> host: the exact start-new decision was applied to the lobby UI, so the host may enter team select. */
   | { t: "resumeDecisionAck"; decisionId: string }
   /** A forced/voluntary switch replacement: bring in party `partySlot` to `fieldIndex` (P2). */
@@ -1220,6 +1334,11 @@ export type CoopMessage =
    * (its EncounterPhase), replacing the narrow `enemyPartySync` + the `requestEnemyParty` poll.
    */
   | { t: "launchSnapshot"; wave: number; session: string }
+  | {
+      t: "launchSnapshotAbort";
+      wave: number;
+      reason: CoopLaunchSnapshotAbortReason;
+    }
   /** Guest -> host: re-send the cached authoritative launch/resume snapshot for this exact wave. */
   | { t: "requestLaunchSnapshot"; wave: number }
   /**
@@ -1587,6 +1706,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `wave=${msg.wave}`;
     case "launchSnapshot":
       return `wave=${msg.wave} session=${msg.session.length}b`;
+    case "launchSnapshotAbort":
+      return `wave=${msg.wave} reason=${msg.reason}`;
     case "requestLaunchSnapshot":
       return `wave=${msg.wave}`;
     case "meBattleEnemyPartySync":

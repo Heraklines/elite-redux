@@ -298,8 +298,9 @@ export function coopWaveAdvanceSanctionedTails(payload: CoopWaveAdvancePayload):
     }
   }
   if (payload.biomeChange) {
-    // A biome boundary adds the biome-transition tail (references the BIOME_SELECT ops, #863/#864).
-    tails.push("SelectBiomePhase", "NewBiomeEncounterPhase", "SwitchBiomePhase");
+    // WAVE_ADVANCE knows that a choice boundary exists, but cannot know its eventual destination. It may
+    // authorize entering SelectBiome only; that phase must commit an exact BIOME_PICK before Switch/NewBiome.
+    tails.push("SelectBiomePhase");
   }
   if (payload.eggLapse) {
     tails.push("EggLapsePhase");

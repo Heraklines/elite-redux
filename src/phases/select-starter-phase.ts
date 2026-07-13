@@ -21,6 +21,7 @@ import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import type { CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import {
   clearCoopRuntime,
+  failCoopSharedSession,
   getCoopBattleStreamer,
   getCoopController,
   getCoopNetcodeMode,
@@ -310,13 +311,7 @@ export class SelectStarterPhase extends Phase {
         // here creates two valid-looking but different runs and guarantees a later desync.
         if (getCoopNetcodeMode() === "authoritative") {
           if (!(await this.tryCoopGuestSnapshotBoot())) {
-            globalScene.ui.showText(
-              "Could not recover the host's co-op launch state. Reconnect and try again.",
-              null,
-              null,
-              null,
-              true,
-            );
+            failCoopSharedSession("guest could not adopt the exact fresh-launch checkpoint");
           }
           return;
         }
@@ -324,20 +319,36 @@ export class SelectStarterPhase extends Phase {
       });
       return;
     }
-    // HOST: auto-pick the first EMPTY slot (never overwrite an existing run); fall back
-    // to the current slot only when all 5 are full. Occupancy is read from localStorage
-    // DIRECTLY so a transient cloud failure can never false-empty an occupied slot.
-    const slot = await coopHostSessionSlot(
-      async s => localStorage.getItem(getSessionDataLocalStorageKey(s)) != null,
-      globalScene.sessionSlotId,
-    );
-    const allFull = localStorage.getItem(getSessionDataLocalStorageKey(slot)) != null;
-    if (allFull) {
-      console.warn(`[coop-launch] host: all 5 save slots full, falling back to current slot ${slot} (will overwrite)`);
+    // HOST: verify emptiness against BOTH replicas. Cloud-unavailable and all-full fail closed; a fresh
+    // run never overwrites an unrelated save merely because the browser cache was empty/stale.
+    let slot: number | null;
+    try {
+      slot = await globalScene.gameData.findVerifiedEmptyCoopSessionSlot();
+    } catch (error) {
+      console.error("[coop-launch] verified slot lookup failed", error);
+      getCoopBattleStreamer()?.sendLaunchSnapshotAbort(COOP_LAUNCH_WAVE, "no-safe-slot");
+      failCoopSharedSession("fresh co-op slot verification threw");
+      return;
+    }
+    if (slot == null) {
+      console.warn("[coop-launch] host: no verified empty local+cloud save slot; aborting fresh co-op launch");
+      getCoopBattleStreamer()?.sendLaunchSnapshotAbort(COOP_LAUNCH_WAVE);
+      failCoopSharedSession("fresh co-op launch has no verified empty local+cloud save slot");
+      return;
     }
     globalScene.sessionSlotId = slot;
     console.log(`[coop-launch] host: auto-picked slot ${slot} (no picker), clearing STARTER_SELECT -> MESSAGE`);
-    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.initBattle(merged, true, owners));
+    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
+      // The cloud lookup above yielded. Recheck local bytes at the last synchronous boundary before
+      // starter/battle materialization; first-save backend CAS remains the actual ownership commit.
+      if (!globalScene.gameData.confirmPendingFreshCoopSessionSlot(slot)) {
+        globalScene.gameData.cancelPendingFreshCoopSessionSlot();
+        getCoopBattleStreamer()?.sendLaunchSnapshotAbort(COOP_LAUNCH_WAVE, "slot-raced");
+        failCoopSharedSession("fresh co-op save slot changed before starter materialization");
+        return;
+      }
+      this.initBattle(merged, true, owners);
+    });
   }
 
   /**

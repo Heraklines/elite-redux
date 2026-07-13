@@ -486,10 +486,23 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     const slot = 3;
     const { getSessionDataLocalStorageKey } = await import("#app/account");
     const { encrypt } = await import("#utils/data");
-    localStorage.setItem(
-      getSessionDataLocalStorageKey(slot),
-      encrypt(JSON.stringify(globalScene.gameData.getSessionSaveData()), true),
-    );
+    const savedSession = globalScene.gameData.getSessionSaveData();
+    const storeSession = (session: typeof savedSession): void => {
+      localStorage.setItem(getSessionDataLocalStorageKey(slot), encrypt(JSON.stringify(session), true));
+    };
+    storeSession({
+      ...savedSession,
+      coopParticipants: {
+        version: 1,
+        players: [savedSession.coopParticipants!.players[0], "WrongPartner"],
+        seats: { ...savedSession.coopParticipants!.seats, guest: "WrongPartner" },
+      },
+    });
+    const wrongPairLoad = await globalScene.gameData.loadSession(slot);
+    expect(wrongPairLoad, "a live connection to a DIFFERENT participant pair is still refused").toBe(false);
+
+    // Restore the exact-pair bytes for the positive connected-resume assertion.
+    storeSession(savedSession);
 
     // CONNECTED: with the live session up, the co-op save loads (resume path).
     const connectedLoad = await globalScene.gameData.loadSession(slot);

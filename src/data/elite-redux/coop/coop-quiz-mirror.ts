@@ -26,14 +26,26 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import { commitMeOwnerIntent, nextCoopMePresentationStep } from "#data/elite-redux/coop/coop-me-operation";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import {
+  commitMeOwnerIntent,
+  isCoopMeOperationEnabled,
+  nextCoopMePresentationStep,
+} from "#data/elite-redux/coop/coop-me-operation";
 import {
   coopMeHandoffBattleStarted,
   coopMeInProgress,
   coopMeInteractionStartValue,
+  setCoopMeActivePresentation,
 } from "#data/elite-redux/coop/coop-me-pin-state";
-import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import { isCoopOperationJournalActive } from "#data/elite-redux/coop/coop-operation-journal";
+import {
+  coopSessionGeneration,
+  failCoopSharedSession,
+  getCoopController,
+  getCoopInteractionRelay,
+  getCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 // #840: ME pump base + quiz base declared in coop-seq-registry (single source of truth). The pump
 // base was previously re-declared locally in 4 files; all now import the one canonical value.
 import {
@@ -113,20 +125,32 @@ export function coopQuizPublishAnswer(index: number, choice: number): void {
   const counter = coopMeInteractionStartValue();
   const seq = coopQuizAnswerSeq(counter, index);
   coopLog("me", `quiz DRIVE publish answer index=${index} choice=${choice} seq=${seq} counter=${counter} (#818)`);
-  getCoopInteractionRelay()?.sendInteractionChoice(seq, "quizAns", choice);
   // Wave-2c: DUAL-RUN - mint the typed QUIZ_ANSWER op (the ME owner's committed answer). The per-question
   // seq + index keep every answer a DISTINCT operationId (order-proof, #818). No-op when the flag is OFF;
   // the legacy quizAns relay above is the fallback and stays live either way. Never throws.
-  commitMeOwnerIntent({
+  const relay = getCoopInteractionRelay();
+  const localRole = getCoopController()?.role ?? "guest";
+  const operationId = commitMeOwnerIntent({
     kind: "QUIZ_ANSWER",
     seq,
     pinned: counter,
     step: index,
     payload: { questionIndex: index, choice },
-    localRole: getCoopController()?.role ?? "guest",
+    localRole,
     wave: globalScene?.currentBattle?.waveIndex ?? -1,
     turn: 0,
+    resend:
+      localRole === "guest" && relay != null ? () => relay.sendInteractionChoice(seq, "quizAns", choice) : undefined,
   });
+  if (operationId == null && isCoopMeOperationEnabled()) {
+    failCoopSharedSession(`Quiz answer ${index} could not enter authoritative control`);
+    return;
+  }
+  // Guest-owned answers are proposals and must reach the host. Host-owned answers are journal-led;
+  // do not let a raw frame outrun the committed envelope on the follower.
+  if (localRole === "guest" || !isCoopMeOperationEnabled() || !isCoopOperationJournalActive()) {
+    relay?.sendInteractionChoice(seq, "quizAns", choice);
+  }
 }
 
 /**
@@ -145,9 +169,49 @@ export function coopQuizAwaitRemoteAnswer(index: number): Promise<number> | null
   }
   const counter = coopMeInteractionStartValue();
   const seq = coopQuizAnswerSeq(counter, index);
+  const scene = globalScene;
+  const runtime = getCoopRuntime();
+  const controller = getCoopController();
+  const generation = coopSessionGeneration();
   coopLog("me", `quiz FOLLOW arm remote-answer wait index=${index} seq=${seq} counter=${counter} (#818)`);
   return relay.awaitInteractionChoice(seq, COOP_QUIZ_WAIT_MS, COOP_QUIZ_CHOICE_KINDS).then(a => {
-    const choice = a?.choice ?? -1;
+    if (
+      globalScene !== scene
+      || getCoopRuntime() !== runtime
+      || getCoopController() !== controller
+      || coopSessionGeneration() !== generation
+      || coopMeInteractionStartValue() !== counter
+    ) {
+      return new Promise<number>(() => undefined);
+    }
+    if (a == null || !Number.isSafeInteger(a.choice) || a.choice < 0) {
+      coopWarn("me", `quiz FOLLOW missing/malformed answer index=${index}; retaining shared boundary`);
+      getCoopRuntime()?.durability?.reconnect();
+      failCoopSharedSession(`Quiz answer ${index} unavailable after bounded wait`);
+      return new Promise<number>(() => undefined);
+    }
+    const choice = a.choice;
+    if (getCoopController()?.role === "host") {
+      const operationId = commitMeOwnerIntent({
+        kind: "QUIZ_ANSWER",
+        seq,
+        pinned: counter,
+        step: index,
+        payload: { questionIndex: index, choice },
+        localRole: "host",
+        wave: globalScene.currentBattle?.waveIndex ?? -1,
+        turn: 0,
+      });
+      if (operationId == null && isCoopMeOperationEnabled()) {
+        failCoopSharedSession(`Quiz answer ${index} proposal could not commit`);
+        return new Promise<number>(() => undefined);
+      }
+    } else if (isCoopOperationJournalActive() && a.operationId == null) {
+      // A guest follower accepts only the journal materializer's causally tagged answer.
+      getCoopRuntime()?.durability?.reconnect();
+      failCoopSharedSession(`Quiz answer ${index} arrived without committed operation identity`);
+      return new Promise<number>(() => undefined);
+    }
     coopLog("me", `quiz FOLLOW remote-answer resolved index=${index} choice=${choice} seq=${seq} (#818)`);
     return choice;
   });
@@ -178,15 +242,26 @@ export function coopQuizHostStreamSession(questions: readonly unknown[], stopOnW
     subPrompt: { kind: "quiz", questions: wireQuestions, stopOnWrong },
   };
   coopLog("me", `quiz HOST stream session count=${wireQuestions.length} stopOnWrong=${stopOnWrong} seq=${seq} (#818)`);
-  getCoopInteractionRelay()?.sendInteractionOutcome(seq, "mePresent", outcome);
-  commitMeOwnerIntent({
+  const pinned = coopMeInteractionStartValue();
+  const operationId = commitMeOwnerIntent({
     kind: "ME_PRESENT",
     seq,
-    pinned: coopMeInteractionStartValue(),
-    step: nextCoopMePresentationStep(),
+    pinned,
+    step: nextCoopMePresentationStep(pinned),
     payload: { present: true, presentation: outcome },
     localRole: getCoopController()?.role ?? "host",
     wave: globalScene.currentBattle?.waveIndex ?? -1,
     turn: 0,
   });
+  if (operationId == null && isCoopMeOperationEnabled()) {
+    failCoopSharedSession("Quiz presentation could not enter authoritative control");
+    return;
+  }
+  // The committed envelope is the presentation carrier while durability is active. Legacy raw delivery
+  // remains only for a negotiated fallback or a non-journal operation session, and always follows commit.
+  if (isCoopMeOperationEnabled() && isCoopOperationJournalActive()) {
+    setCoopMeActivePresentation(outcome);
+  } else {
+    getCoopInteractionRelay()?.sendInteractionOutcome(seq, "mePresent", outcome);
+  }
 }

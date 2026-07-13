@@ -1,0 +1,1236 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// Production-path T2: one two-engine wave-10 battle followed by explicitly sought real phase/UI segments
+// (this is not an untouched queue proof) -> fixed reward popups -> biome market
+// -> Crossroads -> (Leave: real World Map pick + committed SwitchBiome/NewBiomeEncounter) -> wave 11.
+// No relay injection, direct phase terminal, remirror, or manual rendezvous arrival is permitted here.
+
+import type { BattleScene } from "#app/battle-scene";
+import { getGameMode } from "#app/game-mode";
+import { initGlobalScene } from "#app/global-scene";
+import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  commitAuthoritativeBiomeTransition,
+  coopAuthoritativeBiomeTransitionOperationId,
+  resetCoopBiomeCommitWaitMs,
+} from "#data/elite-redux/coop/coop-biome-operation";
+import {
+  resetCoopBiomePickerDrivenByTest,
+  setCoopBiomePickerDrivenByTest,
+} from "#data/elite-redux/coop/coop-biome-pin-state";
+import { CoopInteractionRelay, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  adoptCoopBiomeTransitionSwitchPermit,
+  armCoopBiomeTransitionTailPermit,
+  clearCoopBiomeTransitionTailPermit,
+  consumeCoopBiomeTransitionEncounterPermit,
+  getCoopBiomeTransitionTailPermit,
+  getCoopRendererNeutralizedLog,
+  getCoopTailWouldBlockLog,
+  getObservedCoopGuestPhases,
+  markCoopBiomeTransitionHistoryRecorded,
+  markCoopBiomeTransitionSwitchPrepared,
+  resetCoopRendererNeutralizedLog,
+  resetCoopTailWouldBlockLog,
+  resetObservedCoopGuestPhases,
+  setCoopWaveTailSanction,
+} from "#data/elite-redux/coop/coop-renderer-gate";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
+import { clearCoopRuntime, getCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import {
+  type ErRouteNode,
+  getErPendingNodes,
+  markErPendingNodesAwaitingAuthority,
+  setErPendingNodes,
+} from "#data/elite-redux/er-biome-routing";
+import { resetErBiomeStructure, restoreErBiomeStructure } from "#data/elite-redux/er-biome-structure";
+import {
+  getErMapSaveData,
+  getMapTravelTarget,
+  resetErMapNodes,
+  setMapTravelTarget,
+} from "#data/elite-redux/er-map-nodes";
+import { BattlerIndex } from "#enums/battler-index";
+import { BiomeId } from "#enums/biome-id";
+import { Button } from "#enums/buttons";
+import { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
+import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
+import { BiomeShopPhase, setCoopBiomeMarketTestSkip } from "#phases/biome-shop-phase";
+import { EncounterPhase } from "#phases/encounter-phase";
+import { ErCrossroadsPhase } from "#phases/er-crossroads-phase";
+import { NewBiomeEncounterPhase } from "#phases/new-biome-encounter-phase";
+import { SelectBiomePhase } from "#phases/select-biome-phase";
+import { SwitchBiomePhase } from "#phases/switch-biome-phase";
+import { GameManager } from "#test/framework/game-manager";
+import {
+  buildDuo,
+  type ClientCtx,
+  type DuoRig,
+  drainLoopback,
+  driveClientPhaseQueueTo,
+  driveGuestReplayTurn,
+  installCoopResyncProbe,
+  installDuoLogCapture,
+  setCoopHarnessModuleLetIsolation,
+  withClient,
+  withClientSync,
+} from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
+import Phaser from "phaser";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const RUN = process.env.ER_SCENARIO === "1";
+
+function toCoop(scene: BattleScene): void {
+  scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+async function pumpBoth(rig: DuoRig, rounds = 1): Promise<void> {
+  for (let i = 0; i < rounds; i++) {
+    await withClient(rig.hostCtx, () => drainLoopback());
+    await withClient(rig.guestCtx, () => drainLoopback());
+  }
+}
+
+async function waitForMode(rig: DuoRig, ctx: ClientCtx, mode: UiMode, label: string): Promise<void> {
+  for (let i = 0; i < 80; i++) {
+    await pumpBoth(rig);
+    if (ctx.scene.ui.getMode() === mode) {
+      return;
+    }
+    // A real text prompt owns MESSAGE until ACTION fires its callback and opens the requested menu.
+    await withClient(ctx, () => {
+      if (ctx.scene.ui.getMode() === UiMode.MESSAGE) {
+        ctx.scene.ui.processInput(Button.ACTION);
+      }
+    });
+    await new Promise<void>(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error(`${label} never opened ${UiMode[mode]} (stuck on ${UiMode[ctx.scene.ui.getMode()]})`);
+}
+
+async function pressUntilAccepted(rig: DuoRig, ctx: ClientCtx, button: Button, label: string): Promise<void> {
+  for (let i = 0; i < 80; i++) {
+    const accepted = await withClient(ctx, () => ctx.scene.ui.processInput(button));
+    await pumpBoth(rig);
+    if (accepted) {
+      return;
+    }
+    await new Promise<void>(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error(`${label} never accepted ${Button[button]}`);
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(r => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transition", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+  let logs: ReturnType<typeof installDuoLogCapture>;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  beforeEach(() => {
+    setCoopHarnessModuleLetIsolation(true);
+    setCoopBiomeMarketTestSkip(false);
+    setCoopBiomePickerDrivenByTest();
+    setCoopWaveBarrierMs(10_000);
+    setCoopRendezvousWaitMs(10_000);
+    resetCoopRendererNeutralizedLog();
+    resetCoopTailWouldBlockLog();
+    resetObservedCoopGuestPhases();
+    setCoopWaveTailSanction(null);
+    game = new GameManager(phaserGame);
+    logs = installDuoLogCapture(`transition-t2-biome-${Date.now()}`);
+    game.override
+      .battleStyle("double")
+      .startingWave(10)
+      .enemySpecies(SpeciesId.MAGIKARP)
+      .enemyLevel(1)
+      .enemyMoveset(MoveId.SPLASH)
+      .startingLevel(50)
+      .moveset([MoveId.TACKLE, MoveId.SPLASH])
+      .disableTrainerWaves();
+  });
+
+  afterEach(() => {
+    setCoopBiomeMarketTestSkip(true);
+    resetCoopBiomePickerDrivenByTest();
+    setCoopWaveBarrierMs(60_000);
+    setCoopHarnessModuleLetIsolation(false);
+    resetCoopRendezvousWaitMs();
+    resetCoopBiomeCommitWaitMs();
+    setCoopWaveTailSanction(null);
+    clearCoopBiomeTransitionTailPermit();
+    resetErBiomeStructure();
+    setErPendingNodes([]);
+    resetErMapNodes();
+    logs?.dispose();
+    clearCoopRuntime();
+    initGlobalScene(game.scene);
+  });
+
+  afterAll(() => {
+    // best effort
+  });
+
+  /** Direct fault/permit probes bypass the queue only after explicitly installing a live-boundary seam. */
+  function liveSwitch(nextBiome: BiomeId): SwitchBiomePhase {
+    const phase = new SwitchBiomePhase(nextBiome);
+    (phase as unknown as { coopBoundaryStillLive(): boolean }).coopBoundaryStillLive = () => true;
+    return phase;
+  }
+
+  function liveNewBiome(): NewBiomeEncounterPhase {
+    const phase = new NewBiomeEncounterPhase();
+    (phase as unknown as { coopBoundaryStillLive(requirePermit?: boolean): boolean }).coopBoundaryStillLive = () =>
+      true;
+    return phase;
+  }
+
+  async function driveGuestCommandUi(rig: DuoRig): Promise<void> {
+    const guestCommand = await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase", {
+        matches: phase =>
+          phase.phaseName === "CommandPhase"
+          && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+      }),
+    );
+    await withClient(rig.guestCtx, async () => {
+      guestCommand.start();
+      await drainLoopback();
+    });
+    await withClient(rig.hostCtx, async () => {
+      // The launch CommandPhase pre-dates the runtime; re-enter the same phase so both real rendezvous arms fire.
+      rig.hostScene.phaseManager.getCurrentPhase().start();
+      await drainLoopback();
+    });
+    await withClient(rig.guestCtx, async () => {
+      await drainLoopback();
+      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest opens Fight through public COMMAND UI").toBe(true);
+      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest picks Tackle through public FIGHT UI").toBe(true);
+      const target = await driveClientPhaseQueueTo(rig.guestScene, "SelectTargetPhase");
+      target.start();
+      await drainLoopback();
+      expect(rig.guestScene.ui.processInput(Button.RIGHT), "guest targets enemy slot 2").toBe(true);
+      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms target through public UI").toBe(true);
+      await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase");
+    });
+    await withClient(rig.hostCtx, () => drainLoopback());
+  }
+
+  async function driveRealBiomeMarketLeave(rig: DuoRig): Promise<void> {
+    const counter = rig.hostRuntime.controller.interactionCounter();
+    expect(counter % 2, "wave-10 first interaction is host-owned market").toBe(0);
+
+    await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectModifierPhase", false));
+    const hostMarket = rig.hostScene.phaseManager.getCurrentPhase();
+    expect(hostMarket, "host reached the actual queued BiomeShopPhase").toBeInstanceOf(BiomeShopPhase);
+    const guestMarket = await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, "BiomeShopPhase", {
+        matches: phase => phase instanceof BiomeShopPhase,
+      }),
+    );
+
+    // Start the real watcher first, then drive the owner's real BIOME_SHOP/CANCEL/CONFIRM handlers.
+    await withClient(rig.guestCtx, async () => {
+      guestMarket.start();
+      await drainLoopback();
+    });
+    await withClient(rig.hostCtx, async () => {
+      hostMarket.start();
+      await drainLoopback();
+    });
+    await waitForMode(rig, rig.hostCtx, UiMode.BIOME_SHOP, "host biome market");
+    await pressUntilAccepted(rig, rig.hostCtx, Button.CANCEL, "market leave");
+    await waitForMode(rig, rig.hostCtx, UiMode.CONFIRM, "market leave confirmation");
+    await pressUntilAccepted(rig, rig.hostCtx, Button.ACTION, "market confirm yes");
+
+    for (let i = 0; i < 80; i++) {
+      await pumpBoth(rig);
+      if (
+        rig.hostRuntime.controller.interactionCounter() === counter + 1
+        && rig.guestRuntime.controller.interactionCounter() === counter + 1
+      ) {
+        return;
+      }
+    }
+    throw new Error("biome market did not terminate in lockstep");
+  }
+
+  async function driveRealCrossroads(rig: DuoRig, leave: boolean): Promise<void> {
+    const counter = rig.hostRuntime.controller.interactionCounter();
+    expect(counter % 2, "after the host-owned market, the guest owns Crossroads").toBe(1);
+    await withClient(rig.hostCtx, () => game.phaseInterceptor.to("ErCrossroadsPhase", false));
+    const hostCrossroads = rig.hostScene.phaseManager.getCurrentPhase();
+    expect(hostCrossroads).toBeInstanceOf(ErCrossroadsPhase);
+    const guestCrossroads = await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, "ErCrossroadsPhase", {
+        matches: phase => phase instanceof ErCrossroadsPhase,
+      }),
+    );
+
+    // No manual rendezvous arrival: both real phases enter xroads:10 and release each other.
+    await withClient(rig.hostCtx, async () => {
+      hostCrossroads.start();
+      await drainLoopback();
+    });
+    await withClient(rig.guestCtx, async () => {
+      guestCrossroads.start();
+      await drainLoopback();
+    });
+    await waitForMode(rig, rig.guestCtx, UiMode.OPTION_SELECT, "guest-owned Crossroads");
+    if (leave) {
+      await pressUntilAccepted(rig, rig.guestCtx, Button.DOWN, "Crossroads Leave cursor");
+    }
+    await pressUntilAccepted(rig, rig.guestCtx, Button.ACTION, `Crossroads ${leave ? "Leave" : "Stay"}`);
+    await pumpBoth(rig, 8);
+  }
+
+  async function driveRealGuestOwnedMapPick(rig: DuoRig, destination: BiomeId): Promise<void> {
+    const pinned = rig.hostRuntime.controller.interactionCounter();
+    expect(pinned % 2, "the chained map retains the guest-owned Crossroads pin").toBe(1);
+    await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectBiomePhase", false));
+    const hostMap = rig.hostScene.phaseManager.getCurrentPhase();
+    expect(hostMap).toBeInstanceOf(SelectBiomePhase);
+    const guestMap = await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, "SelectBiomePhase", {
+        matches: phase => phase instanceof SelectBiomePhase,
+      }),
+    );
+    await withClient(rig.hostCtx, async () => {
+      hostMap.start();
+      await drainLoopback();
+    });
+    await withClient(rig.guestCtx, async () => {
+      // Deliberately poison the renderer's old process-local target BEFORE operation classification.
+      // The carrier says this boundary is interactive, so SelectBiome must ignore this stale value and
+      // still open ER_MAP. Consuming it only after the pick is not sufficient: that would leave the old
+      // target able to misclassify this transition as deterministic before the picker ever opens.
+      setMapTravelTarget(BiomeId.LAKE);
+      guestMap.start();
+      await drainLoopback();
+    });
+    await waitForMode(rig, rig.guestCtx, UiMode.ER_MAP, "guest-owned World Map");
+    // The real full World Map uses LEFT/RIGHT. Choose the second revealed route, then ACTION.
+    await pressUntilAccepted(rig, rig.guestCtx, Button.RIGHT, "World Map second route");
+    await pressUntilAccepted(rig, rig.guestCtx, Button.ACTION, "World Map travel");
+
+    for (let i = 0; i < 120; i++) {
+      await pumpBoth(rig);
+      if (
+        rig.hostRuntime.controller.interactionCounter() === pinned + 1
+        && rig.guestRuntime.controller.interactionCounter() === pinned + 1
+      ) {
+        break;
+      }
+      if (i === 119) {
+        throw new Error("guest-owned BIOME_PICK never returned as a host-committed envelope");
+      }
+    }
+    expect(
+      withClientSync(rig.guestCtx, () => getMapTravelTarget()),
+      "stale wrong travel target was consumed",
+    ).toBeNull();
+    expect(withClientSync(rig.hostCtx, () => getCoopBiomeTransitionTailPermit())).toMatchObject({
+      destinationBiomeId: destination,
+      switchAdopted: false,
+    });
+    expect(withClientSync(rig.guestCtx, () => getCoopBiomeTransitionTailPermit())).toMatchObject({
+      destinationBiomeId: destination,
+      switchAdopted: false,
+    });
+  }
+
+  it("permit mismatches park SwitchBiome/NewBiome in place without mutation or queue advance", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
+
+    await withClient(rig.guestCtx, async () => {
+      const ui = rig.guestScene.ui as unknown as { showText: (...args: unknown[]) => void };
+      const realShowText = ui.showText.bind(rig.guestScene.ui);
+      ui.showText = () => {
+        // Hold the recovery callback: this assertion proves the phase itself stays parked.
+      };
+      try {
+        rig.guestScene.currentBattle.waveIndex = 10;
+        const deterministicOperationId = coopAuthoritativeBiomeTransitionOperationId(10);
+        expect(deterministicOperationId).not.toBeNull();
+        const wrongOwnerOperationId = deterministicOperationId!.replace(/^1:0:/u, "1:1:");
+        const sourceBiomeId = rig.guestScene.arena.biomeId;
+        const beforeArena = rig.guestScene.arena;
+        const beforeNodes = getErPendingNodes().map(node => ({ ...node }));
+        markErPendingNodesAwaitingAuthority();
+        const randomBiome = vi.spyOn(rig.guestScene, "generateRandomBiome");
+        new SelectBiomePhase().start();
+        expect(randomBiome, "an authoritative renderer never rolls a missing route graph").not.toHaveBeenCalled();
+        setErPendingNodes(beforeNodes);
+        expect(
+          armCoopBiomeTransitionTailPermit({
+            operationId: wrongOwnerOperationId,
+            sessionEpoch: 1,
+            revision: 1,
+            wave: 10,
+            sourceBiomeId: -1,
+            destinationBiomeId: BiomeId.VOLCANO,
+            nextWave: 11,
+          }),
+          "a negative source biome cannot authorize world mutation",
+        ).toBe(false);
+        expect(
+          armCoopBiomeTransitionTailPermit({
+            operationId: wrongOwnerOperationId,
+            sessionEpoch: 1,
+            revision: 1,
+            wave: 10,
+            sourceBiomeId,
+            destinationBiomeId: 999_999,
+            nextWave: 11,
+          }),
+          "an unknown destination biome cannot authorize world mutation",
+        ).toBe(false);
+        expect(
+          armCoopBiomeTransitionTailPermit({
+            operationId: wrongOwnerOperationId,
+            sessionEpoch: 1,
+            revision: 1,
+            wave: 10,
+            sourceBiomeId,
+            destinationBiomeId: BiomeId.VOLCANO,
+            nextWave: 11,
+          }),
+        ).toBe(true);
+        const staleSwitch = new SwitchBiomePhase(BiomeId.VOLCANO);
+        staleSwitch.start();
+        expect(
+          getCoopBiomeTransitionTailPermit(),
+          "a replayed Switch that is not the current phase cannot even adopt the permit",
+        ).toMatchObject({ switchAdopted: false, historyRecorded: false, switchPrepared: false });
+        expect(rig.guestScene.arena, "stale public entry cannot replace the arena").toBe(beforeArena);
+        expect(getErPendingNodes(), "stale public entry cannot rewrite routes").toEqual(beforeNodes);
+        const wrongSwitch = liveSwitch(BiomeId.FOREST);
+        const switchEnd = vi.spyOn(wrongSwitch, "end");
+        wrongSwitch.start();
+        expect(switchEnd, "a mismatched destination cannot shift the queue").not.toHaveBeenCalled();
+        expect(rig.guestScene.arena, "a mismatched permit cannot replace the arena").toBe(beforeArena);
+        expect(getErPendingNodes(), "a mismatched permit cannot roll/clear map routes").toEqual(beforeNodes);
+
+        clearCoopBiomeTransitionTailPermit();
+        expect(
+          armCoopBiomeTransitionTailPermit({
+            operationId: deterministicOperationId!,
+            sessionEpoch: 1,
+            revision: 2,
+            wave: 10,
+            sourceBiomeId,
+            destinationBiomeId: BiomeId.VOLCANO,
+            nextWave: 11,
+          }),
+        ).toBe(true);
+        expect(
+          adoptCoopBiomeTransitionSwitchPermit({
+            sourceBiomeId,
+            destinationBiomeId: BiomeId.VOLCANO,
+            wave: 10,
+          }),
+        ).not.toBeNull();
+        const historyBeforePreparation = [...(getErMapSaveData().biomeHistory ?? [])];
+        const correctSwitch = liveSwitch(BiomeId.VOLCANO);
+        const correctSwitchEnd = vi.spyOn(correctSwitch, "end").mockImplementation(() => {});
+        correctSwitch.start();
+        expect(correctSwitchEnd, "authoritative renderer Switch is synchronous/non-gating").toHaveBeenCalledOnce();
+        expect(getCoopBiomeTransitionTailPermit()).toMatchObject({
+          switchAdopted: true,
+          historyRecorded: true,
+          switchPrepared: true,
+        });
+        const historyAfterPreparation = [...(getErMapSaveData().biomeHistory ?? [])];
+        expect(historyAfterPreparation.length).toBe(historyBeforePreparation.length + 1);
+        correctSwitch.start();
+        expect(
+          getErMapSaveData().biomeHistory,
+          "retry after permit adoption cannot duplicate arena/recent-biome preparation",
+        ).toEqual(historyAfterPreparation);
+        expect(
+          adoptCoopBiomeTransitionSwitchPermit({
+            sourceBiomeId,
+            destinationBiomeId: BiomeId.VOLCANO,
+            wave: 10,
+          }),
+          "the same SwitchBiome retry re-adopts idempotently after a lost tween callback",
+        ).not.toBeNull();
+        expect(
+          adoptCoopBiomeTransitionSwitchPermit({
+            sourceBiomeId: BiomeId.VOLCANO,
+            destinationBiomeId: BiomeId.VOLCANO,
+            wave: 10,
+          }),
+          "a retry after newArena already landed still belongs to the same committed SwitchBiome",
+        ).not.toBeNull();
+        expect(
+          adoptCoopBiomeTransitionSwitchPermit({
+            sourceBiomeId: BiomeId.VOLCANO,
+            destinationBiomeId: BiomeId.VOLCANO,
+            wave: 11,
+          }),
+          "a retry after newBattle already advanced recognizes the permitted destination wave",
+        ).not.toBeNull();
+        expect(markCoopBiomeTransitionHistoryRecorded(deterministicOperationId!)).not.toBeNull();
+        expect(markCoopBiomeTransitionSwitchPrepared(deterministicOperationId!)).not.toBeNull();
+        expect(
+          consumeCoopBiomeTransitionEncounterPermit({ destinationBiomeId: BiomeId.VOLCANO, nextWave: 11 }),
+        ).not.toBeNull();
+        expect(
+          consumeCoopBiomeTransitionEncounterPermit({ destinationBiomeId: BiomeId.VOLCANO, nextWave: 11 }),
+          "the same NewBiome start retry re-adopts without spending the one-shot before end()",
+        ).not.toBeNull();
+        expect(
+          armCoopBiomeTransitionTailPermit({
+            operationId: deterministicOperationId!,
+            sessionEpoch: 1,
+            revision: 2,
+            wave: 10,
+            sourceBiomeId,
+            destinationBiomeId: BiomeId.VOLCANO,
+            nextWave: 11,
+          }),
+          "a journal resend cannot reset an already-adopted permit back to its initial stage",
+        ).toBe(true);
+        expect(getCoopBiomeTransitionTailPermit()).toMatchObject({ switchAdopted: true, encounterAdopted: true });
+        // Model a wrong ensuing encounter address: even with a switch-adopted permit, wave 12 cannot consume
+        // the operation that authorizes only destination wave 11.
+        await rig.guestScene.newArena(BiomeId.VOLCANO);
+        rig.guestScene.currentBattle.waveIndex = 12;
+        const beforeEncounterBattle = rig.guestScene.currentBattle;
+        const wrongEncounter = liveNewBiome();
+        const encounterEnd = vi.spyOn(wrongEncounter, "end");
+        wrongEncounter.start();
+        expect(encounterEnd, "a mismatched next-wave cannot shift into command").not.toHaveBeenCalled();
+        expect(rig.guestScene.currentBattle, "the parked encounter cannot replace the battle").toBe(
+          beforeEncounterBattle,
+        );
+        expect(getCoopBiomeTransitionTailPermit(), "the mismatched consumer cannot spend the permit").not.toBeNull();
+      } finally {
+        ui.showText = realShowText;
+      }
+    });
+    clearCoopBiomeTransitionTailPermit();
+    await withClient(rig.hostCtx, () => {
+      rig.hostScene.currentBattle.waveIndex = 10;
+      const sourceBiomeId = rig.hostScene.arena.biomeId;
+      const tweenAdd = vi.spyOn(rig.hostScene.tweens, "add");
+      tweenAdd.mockClear();
+      const blockedHostSwitch = liveSwitch(BiomeId.VOLCANO);
+      const blockedHostEnd = vi.spyOn(blockedHostSwitch, "end").mockImplementation(() => {});
+      blockedHostSwitch.start();
+      expect(blockedHostEnd, "even the host cannot switch before a successful exact commit").not.toHaveBeenCalled();
+      expect(rig.hostScene.arena.biomeId, "an uncommitted host switch cannot replace the arena").toBe(sourceBiomeId);
+
+      expect(
+        commitAuthoritativeBiomeTransition({
+          sourceWave: 10,
+          sourceBiomeId,
+          destinationBiomeId: BiomeId.VOLCANO,
+          turn: 0,
+          localRole: "host",
+        }),
+        "the sole authority commits and arms the exact local permit before constructing the switch tail",
+      ).not.toBeNull();
+      const committedHostSwitch = liveSwitch(BiomeId.VOLCANO);
+      const committedHostEnd = vi.spyOn(committedHostSwitch, "end").mockImplementation(() => {});
+      committedHostSwitch.start();
+      expect(committedHostEnd, "the committed host switch remains synchronous/non-gating").toHaveBeenCalledOnce();
+      expect(tweenAdd, "co-op authority Switch materializes canonical endpoints synchronously").not.toHaveBeenCalled();
+      expect(rig.hostScene.arena.biomeId).toBe(BiomeId.VOLCANO);
+    });
+  }, 120_000);
+
+  it("SwitchBiome retries one retained deterministic plan across roll/write/reveal/structure/newArena faults", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, () => {
+      rig.hostScene.currentBattle.waveIndex = 10;
+      const sourceBiomeId = rig.hostScene.arena.biomeId;
+      expect(
+        commitAuthoritativeBiomeTransition({
+          sourceWave: 10,
+          sourceBiomeId,
+          destinationBiomeId: BiomeId.VOLCANO,
+          turn: 0,
+          localRole: "host",
+        }),
+      ).not.toBeNull();
+
+      type Plan = {
+        readonly nodes: readonly ErRouteNode[];
+        readonly visibleNodes: readonly { biome: BiomeId; label: string; kind: "biome" }[];
+        readonly structure: { readonly length: number | null; readonly startWave: number };
+      };
+      type SwitchFaultSeam = {
+        buildAuthoritativePreparationPlan(authoritativeGuest: boolean, entryWave: number): Plan;
+        applyAuthoritativeRoutes(authoritativeGuest: boolean, plan: Plan): void;
+        applyAuthoritativeReveals(authoritativeGuest: boolean, plan: Plan): void;
+        applyAuthoritativeStructure(plan: Plan): void;
+      };
+      const phase = liveSwitch(BiomeId.VOLCANO);
+      const seam = phase as unknown as SwitchFaultSeam;
+      vi.spyOn(phase, "end").mockImplementation(() => {});
+
+      let planCalls = 0;
+      const buildPlan = seam.buildAuthoritativePreparationPlan.bind(seam);
+      seam.buildAuthoritativePreparationPlan = (guest, wave) => {
+        planCalls++;
+        if (planCalls === 1) {
+          throw new Error("synthetic roll fault");
+        }
+        return buildPlan(guest, wave);
+      };
+      let routeCalls = 0;
+      const applyRoutes = seam.applyAuthoritativeRoutes.bind(seam);
+      seam.applyAuthoritativeRoutes = (guest, plan) => {
+        routeCalls++;
+        applyRoutes(guest, plan);
+        if (routeCalls === 1) {
+          throw new Error("synthetic route write fault");
+        }
+      };
+      let revealCalls = 0;
+      const applyReveals = seam.applyAuthoritativeReveals.bind(seam);
+      seam.applyAuthoritativeReveals = (guest, plan) => {
+        revealCalls++;
+        applyReveals(guest, plan);
+        if (revealCalls === 1) {
+          throw new Error("synthetic reveal fault");
+        }
+      };
+      let structureCalls = 0;
+      const applyStructure = seam.applyAuthoritativeStructure.bind(seam);
+      seam.applyAuthoritativeStructure = plan => {
+        structureCalls++;
+        applyStructure(plan);
+        if (structureCalls === 1) {
+          throw new Error("synthetic structure fault");
+        }
+      };
+      let arenaCalls = 0;
+      const newArena = rig.hostScene.newArena.bind(rig.hostScene);
+      vi.spyOn(rig.hostScene, "newArena").mockImplementation((biome, playerFaints, restoring) => {
+        arenaCalls++;
+        const arena = newArena(biome, playerFaints, restoring);
+        if (arenaCalls === 1) {
+          throw new Error("synthetic post-newArena fault");
+        }
+        return arena;
+      });
+
+      for (let attempt = 0; attempt < 6; attempt++) {
+        phase.start();
+      }
+      expect(planCalls, "only the pre-plan roll failure reruns; partial writes retain the exact plan").toBe(2);
+      expect(routeCalls, "an interrupted idempotent route write is retried").toBe(2);
+      expect(revealCalls, "an interrupted idempotent reveal write is retried").toBe(2);
+      expect(structureCalls, "an interrupted idempotent structure write is retried").toBe(2);
+      expect(arenaCalls, "newArena is not called twice after it already landed before throwing").toBe(1);
+      expect(rig.hostScene.arena.biomeId).toBe(BiomeId.VOLCANO);
+      expect(getCoopBiomeTransitionTailPermit()).toMatchObject({
+        historyRecorded: true,
+        switchPrepared: true,
+      });
+      expect(getErPendingNodes().length, "the retained route plan remains installed").toBeGreaterThan(0);
+      expect(getErMapSaveData().biomeHistory?.filter(biome => biome === sourceBiomeId)).toHaveLength(1);
+    });
+  }, 120_000);
+
+  it("stale Crossroads and biome-market callbacks cannot relay, mutate, or advance after replacement", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, async () => {
+      const counterBefore = rig.hostRuntime.controller.interactionCounter();
+      const send = vi.spyOn(CoopInteractionRelay.prototype, "sendInteractionChoice");
+      const ui = rig.hostScene.ui as unknown as {
+        setMode: (mode: UiMode, ...args: unknown[]) => Promise<void>;
+        showText: (...args: unknown[]) => void;
+      };
+      const realSetMode = ui.setMode.bind(rig.hostScene.ui);
+      const realShowText = ui.showText.bind(rig.hostScene.ui);
+      let optionConfig: { options: { handler: () => boolean }[] } | null = null;
+      let confirm: (() => void) | null = null;
+      let cancel: (() => void) | null = null;
+      ui.showText = () => {};
+      ui.setMode = (mode: UiMode, ...args: unknown[]): Promise<void> => {
+        if (mode === UiMode.OPTION_SELECT) {
+          optionConfig = args[0] as { options: { handler: () => boolean }[] };
+        } else if (mode === UiMode.CONFIRM) {
+          confirm = args[0] as () => void;
+          cancel = args[1] as () => void;
+        }
+        return Promise.resolve();
+      };
+      try {
+        let crossroadsLive = true;
+        const crossroads = new ErCrossroadsPhase() as unknown as {
+          coopOwnerFlow(pinned: number): void;
+          boundaryStillLive(generation: number, wave: number): boolean;
+        };
+        crossroads.boundaryStillLive = () => crossroadsLive;
+        crossroads.coopOwnerFlow(counterBefore);
+        await Promise.resolve();
+        expect(optionConfig, "captured the real owner option handlers").not.toBeNull();
+        crossroadsLive = false;
+        expect(optionConfig!.options[0].handler(), "stale Stay callback fails closed").toBe(false);
+        expect(optionConfig!.options[1].handler(), "stale Leave callback fails closed").toBe(false);
+
+        let marketLive = true;
+        const market = new BiomeShopPhase() as unknown as {
+          coopBiomeStart: number;
+          coopBiomeOwner: boolean;
+          confirmLeave(): void;
+          hideShopForOverlay(): void;
+          coopBoundaryStillLive(generation: number, wave: number): boolean;
+          end(): void;
+        };
+        market.coopBiomeStart = counterBefore;
+        market.coopBiomeOwner = true;
+        market.hideShopForOverlay = () => {};
+        market.coopBoundaryStillLive = () => marketLive;
+        const marketEnd = vi.spyOn(market, "end");
+        market.confirmLeave();
+        await Promise.resolve();
+        expect(confirm, "captured the real bounded market confirm handler").not.toBeNull();
+        expect(cancel, "captured the real bounded market cancel handler").not.toBeNull();
+        marketLive = false;
+        confirm!();
+        cancel!();
+
+        expect(send, "stale callbacks emit no relay choice").not.toHaveBeenCalled();
+        expect(marketEnd, "stale confirm cannot shift the phase queue").not.toHaveBeenCalled();
+        expect(rig.hostRuntime.controller.interactionCounter(), "stale callbacks cannot advance ownership").toBe(
+          counterBefore,
+        );
+      } finally {
+        ui.setMode = realSetMode;
+        ui.showText = realShowText;
+      }
+    });
+  }, 120_000);
+
+  it("stale rendezvous, market-stock, and market-action awaits cannot resume a replaced phase", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, async () => {
+      const boundary = deferred<{
+        timedOut: boolean;
+        authoritativePoint?: string;
+        crossPoint?: string;
+      }>();
+      vi.spyOn(rig.hostRuntime.rendezvous, "rendezvous").mockReturnValueOnce(boundary.promise);
+      let selectLive = true;
+      const select = new SelectBiomePhase() as unknown as {
+        boundaryStillLive(generation: number, wave: number): boolean;
+        coopAwaitBoundaryBarrier(): Promise<boolean>;
+      };
+      select.boundaryStillLive = () => selectLive;
+      const selectWait = select.coopAwaitBoundaryBarrier();
+      selectLive = false;
+      boundary.resolve({ timedOut: false });
+      await expect(selectWait, "a resolved stale SelectBiome rendezvous stays closed").resolves.toBe(false);
+
+      const crossroadsBoundary = deferred<{
+        timedOut: boolean;
+        authoritativePoint?: string;
+        crossPoint?: string;
+      }>();
+      vi.spyOn(rig.hostRuntime.rendezvous, "rendezvous").mockReturnValueOnce(crossroadsBoundary.promise);
+      let crossroadsLive = true;
+      const crossroads = new ErCrossroadsPhase() as unknown as {
+        boundaryStillLive(generation: number, wave: number): boolean;
+        coopAwaitBoundaryBarrier(): Promise<boolean>;
+      };
+      crossroads.boundaryStillLive = () => crossroadsLive;
+      const crossroadsWait = crossroads.coopAwaitBoundaryBarrier();
+      crossroadsLive = false;
+      crossroadsBoundary.resolve({ timedOut: false });
+      await expect(crossroadsWait, "a resolved stale Crossroads rendezvous stays closed").resolves.toBe(false);
+
+      const stock = deferred<null>();
+      vi.spyOn(rig.hostRuntime.interactionRelay, "awaitRewardOptions").mockReturnValueOnce(stock.promise);
+      let stockLive = true;
+      const marketStock = new BiomeShopPhase() as unknown as {
+        coopBiomeStart: number;
+        coopAsyncBoundaryStillLive(generation: number, wave: number, pinned: number): boolean;
+        coopBiomeDriveAdoptOptions(): Promise<void>;
+        openBiomeShop(): void;
+        coopBiomeAuthoritativeStockUnavailable(context: string): void;
+      };
+      marketStock.coopBiomeStart = rig.hostRuntime.controller.interactionCounter();
+      marketStock.coopAsyncBoundaryStillLive = () => stockLive;
+      const open = vi.spyOn(marketStock, "openBiomeShop");
+      const recovery = vi.spyOn(marketStock, "coopBiomeAuthoritativeStockUnavailable");
+      const stockWait = marketStock.coopBiomeDriveAdoptOptions();
+      stockLive = false;
+      stock.resolve(null);
+      await stockWait;
+      expect(open, "stale stock cannot reopen a replaced market").not.toHaveBeenCalled();
+      expect(recovery, "stale stock cannot install recovery UI into the new phase").not.toHaveBeenCalled();
+
+      const action = deferred<{
+        choice: number;
+        data?: number[];
+        operationId?: string;
+      } | null>();
+      vi.spyOn(rig.hostRuntime.interactionRelay, "awaitInteractionChoice").mockReturnValueOnce(action.promise);
+      let actionLive = true;
+      const marketAction = new BiomeShopPhase() as unknown as {
+        coopBiomeStart: number;
+        coopBiomeOptionOwner: boolean;
+        coopAsyncBoundaryStillLive(generation: number, wave: number, pinned: number): boolean;
+        coopBiomeWatch(): Promise<void>;
+        buildStock(): void;
+        applyModifier(...args: unknown[]): void;
+        finishCoopBiomeShopLeave(): void;
+      };
+      marketAction.coopBiomeStart = rig.hostRuntime.controller.interactionCounter();
+      marketAction.coopBiomeOptionOwner = true;
+      marketAction.coopAsyncBoundaryStillLive = () => actionLive;
+      marketAction.buildStock = () => {};
+      const apply = vi.spyOn(marketAction, "applyModifier");
+      const leave = vi.spyOn(marketAction, "finishCoopBiomeShopLeave");
+      const counterBefore = rig.hostRuntime.controller.interactionCounter();
+      const actionWait = marketAction.coopBiomeWatch();
+      actionLive = false;
+      action.resolve({ choice: 0, data: [0, 1] });
+      await actionWait;
+      expect(apply, "a stale buy cannot mutate a party").not.toHaveBeenCalled();
+      expect(leave, "a stale action cannot terminate the replacement phase").not.toHaveBeenCalled();
+      expect(rig.hostRuntime.controller.interactionCounter(), "a stale action cannot advance ownership").toBe(
+        counterBefore,
+      );
+    });
+  }, 120_000);
+
+  it("market LEAVE waits for journal retention and a missing watcher terminal never implies LEAVE", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, async () => {
+      const pinned = rig.hostRuntime.controller.interactionCounter();
+      const durability = rig.hostRuntime.durability;
+      expect(durability, "the production-shaped runtime has an active durability journal").not.toBeNull();
+      const retain = vi.spyOn(durability!, "commit").mockReturnValueOnce(false);
+      const rawTerminal = vi.spyOn(rig.hostRuntime.interactionRelay, "sendInteractionChoice");
+      const market = new BiomeShopPhase() as unknown as {
+        coopBiomeStart: number;
+        coopBiomeOwner: boolean;
+        coopAsyncBoundaryStillLive(generation: number, wave: number, expectedPinned: number): boolean;
+        coopBiomeTerminal(): Promise<boolean>;
+      };
+      market.coopBiomeStart = pinned;
+      market.coopBiomeOwner = true;
+      market.coopAsyncBoundaryStillLive = () => true;
+
+      const terminal = market.coopBiomeTerminal();
+      expect(
+        rig.hostRuntime.controller.interactionCounter(),
+        "the first committed-but-unretained attempt cannot advance market ownership",
+      ).toBe(pinned);
+      expect(rawTerminal, "the host cannot expose an unretained raw terminal companion").not.toHaveBeenCalled();
+      await expect(terminal).resolves.toBe(true);
+      expect(retain, "the immutable host commit is journaled again on its exact re-ACK").toHaveBeenCalledTimes(2);
+      expect(rawTerminal, "the retained terminal may keep its legacy-compatible companion").toHaveBeenCalledOnce();
+      expect(rig.hostRuntime.controller.interactionCounter()).toBe(pinned + 1);
+    });
+
+    await withClient(rig.guestCtx, async () => {
+      const pinned = rig.guestRuntime.controller.interactionCounter();
+      vi.spyOn(rig.guestRuntime.interactionRelay, "awaitInteractionChoice").mockResolvedValue(null);
+      const market = new BiomeShopPhase() as unknown as {
+        coopBiomeStart: number;
+        coopBiomeOptionOwner: boolean;
+        coopAsyncBoundaryStillLive(generation: number, wave: number, expectedPinned: number): boolean;
+        coopBiomeWatch(): Promise<void>;
+        buildStock(): void;
+        finishCoopBiomeShopLeave(): void;
+      };
+      market.coopBiomeStart = pinned;
+      market.coopBiomeOptionOwner = true;
+      market.coopAsyncBoundaryStillLive = () => true;
+      market.buildStock = () => {};
+      const leave = vi.spyOn(market, "finishCoopBiomeShopLeave");
+
+      await market.coopBiomeWatch();
+      expect(leave, "three missing exact terminals cannot be reinterpreted as LEAVE").not.toHaveBeenCalled();
+      expect(rig.guestRuntime.controller.interactionCounter(), "missing terminals cannot advance ownership").toBe(
+        pinned,
+      );
+      expect(getCoopRuntime(), "bounded terminal recovery stops the binary session safely").toBeNull();
+    });
+  }, 120_000);
+
+  it("committed Crossroads and map terminal faults fail closed instead of consuming their receipt", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, () => {
+      const pinned = rig.hostRuntime.controller.interactionCounter();
+      const crossroads = new ErCrossroadsPhase() as unknown as {
+        coopApply(expectedPinned: number, moveOn: boolean): boolean;
+      };
+      const queue = vi.spyOn(rig.hostScene.phaseManager, "unshiftNew").mockImplementationOnce(() => {
+        throw new Error("synthetic Crossroads queue failure");
+      });
+      expect(crossroads.coopApply(pinned, true), "the failed committed terminal is not acknowledged").toBe(false);
+      expect(getCoopRuntime(), "a partially mutated Crossroads cannot continue as a split session").toBeNull();
+      queue.mockRestore();
+    });
+
+    await withClient(rig.guestCtx, () => {
+      const map = new SelectBiomePhase() as unknown as {
+        applyNextBiomeAndEnd(nextBiome: BiomeId): boolean;
+      };
+      const queue = vi.spyOn(rig.guestScene.phaseManager, "unshiftNew").mockImplementationOnce(() => {
+        throw new Error("synthetic map queue failure");
+      });
+      expect(map.applyNextBiomeAndEnd(BiomeId.VOLCANO), "the failed committed map terminal is not acknowledged").toBe(
+        false,
+      );
+      expect(getCoopRuntime(), "a partially mutated map transition cannot continue as a split session").toBeNull();
+      queue.mockRestore();
+    });
+  }, 120_000);
+
+  it("NewBiome retires its consumed permit and fails closed when the installed next phase throws", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, () => {
+      const sourceWave = 20;
+      const nextWave = sourceWave + 1;
+      const biome = rig.hostScene.arena.biomeId;
+      const operationId = coopAuthoritativeBiomeTransitionOperationId(sourceWave);
+      expect(operationId).not.toBeNull();
+      expect(
+        armCoopBiomeTransitionTailPermit({
+          operationId: operationId!,
+          sessionEpoch: rig.hostRuntime.controller.sessionEpoch,
+          revision: 1,
+          wave: sourceWave,
+          sourceBiomeId: biome,
+          destinationBiomeId: biome,
+          nextWave,
+        }),
+      ).toBe(true);
+      expect(
+        adoptCoopBiomeTransitionSwitchPermit({
+          sourceBiomeId: biome,
+          destinationBiomeId: biome,
+          wave: sourceWave,
+        }),
+      ).not.toBeNull();
+      expect(markCoopBiomeTransitionHistoryRecorded(operationId!)).not.toBeNull();
+      expect(markCoopBiomeTransitionSwitchPrepared(operationId!)).not.toBeNull();
+      rig.hostScene.currentBattle.waveIndex = nextWave;
+      expect(consumeCoopBiomeTransitionEncounterPermit({ destinationBiomeId: biome, nextWave })).not.toBeNull();
+
+      const phase = new NewBiomeEncounterPhase() as unknown as {
+        coopWave: number;
+        coopOperationId: string;
+        coopAuthoritativeGuest: boolean;
+        coopCompleted: boolean;
+        coopBoundaryStillLive(requirePermit?: boolean): boolean;
+        shiftCoopAuthoritativeGuestPresentationOnly(): void;
+        completeEncounterEnd(): void;
+      };
+      phase.coopWave = nextWave;
+      phase.coopOperationId = operationId!;
+      phase.coopAuthoritativeGuest = true;
+      phase.coopBoundaryStillLive = () => true;
+      const replacement = {} as ReturnType<typeof rig.hostScene.phaseManager.getCurrentPhase>;
+      vi.spyOn(rig.hostScene.phaseManager, "getCurrentPhase").mockReturnValue(replacement);
+      phase.shiftCoopAuthoritativeGuestPresentationOnly = () => {
+        throw new Error("synthetic next phase start failure after queue install");
+      };
+
+      phase.completeEncounterEnd();
+      expect(phase.coopCompleted, "the exact consumed permit is retired before terminal teardown").toBe(true);
+      expect(getCoopBiomeTransitionTailPermit()).toBeNull();
+      expect(getCoopRuntime(), "the installed-but-failed next phase cannot leave shared play half-alive").toBeNull();
+    });
+  }, 120_000);
+
+  it("solo SelectBiome terminal failures still propagate to the phase manager", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const phase = new SelectBiomePhase() as unknown as {
+      applyNextBiomeAndEnd(nextBiome: BiomeId): boolean;
+    };
+    const queue = vi.spyOn(game.scene.phaseManager, "unshiftNew").mockImplementationOnce(() => {
+      throw new Error("synthetic solo queue failure");
+    });
+    expect(() => phase.applyNextBiomeAndEnd(BiomeId.VOLCANO)).toThrow(/synthetic solo queue failure/);
+    queue.mockRestore();
+  });
+
+  it("stale enemy carrier/assets and failed new-biome cosmetics cannot strand or revive a replaced phase", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
+
+    await withClient(rig.guestCtx, async () => {
+      type EncounterSeam = {
+        adoptCoopHostEnemyParty(isCurrent?: () => boolean): Promise<void>;
+        prepareCoopAuthoritativeGuestPresentationOnly(onReady: () => void | Promise<void>): Promise<void>;
+      };
+      const originalCurrent = rig.guestScene.phaseManager.getCurrentPhase();
+
+      const carrierPhase = new EncounterPhase() as unknown as EncounterSeam;
+      const carrier = deferred<void>();
+      carrierPhase.adoptCoopHostEnemyParty = () => carrier.promise;
+      const current = vi.spyOn(rig.guestScene.phaseManager, "getCurrentPhase").mockReturnValue(carrierPhase as never);
+      const carrierReady = vi.fn();
+      const carrierPreparation = carrierPhase.prepareCoopAuthoritativeGuestPresentationOnly(carrierReady);
+      await Promise.resolve();
+      current.mockReturnValue(originalCurrent);
+      carrier.resolve();
+      await expect(carrierPreparation, "a late carrier cannot resume the old encounter").rejects.toThrow(
+        /boundary replacement/,
+      );
+      expect(carrierReady).not.toHaveBeenCalled();
+      current.mockRestore();
+
+      const assetPhase = new EncounterPhase() as unknown as EncounterSeam;
+      assetPhase.adoptCoopHostEnemyParty = async () => {};
+      const assetCurrent = vi
+        .spyOn(rig.guestScene.phaseManager, "getCurrentPhase")
+        .mockReturnValue(assetPhase as never);
+      const assetLoads = rig.guestScene.currentBattle.enemyParty.map(() => deferred<void>());
+      const assetSpies = rig.guestScene.currentBattle.enemyParty.map((enemy, index) =>
+        vi.spyOn(enemy, "loadAssets").mockReturnValue(assetLoads[index].promise),
+      );
+      const assetReady = vi.fn();
+      const assetPreparation = assetPhase.prepareCoopAuthoritativeGuestPresentationOnly(assetReady);
+      await Promise.resolve();
+      assetCurrent.mockReturnValue(originalCurrent);
+      for (const load of assetLoads) {
+        load.resolve();
+      }
+      await expect(assetPreparation, "late assets cannot materialize into the replacement phase").rejects.toThrow(
+        /assets arrived after boundary replacement/,
+      );
+      expect(assetReady).not.toHaveBeenCalled();
+      assetSpies.forEach(spy => spy.mockRestore());
+      assetCurrent.mockRestore();
+
+      vi.useFakeTimers();
+      try {
+        const newBiome = new NewBiomeEncounterPhase() as unknown as {
+          coopBoundaryStillLive(requirePermit?: boolean): boolean;
+          isBoundedAuthoritativeCoop(): boolean;
+          startPresentationIntro(authoritativeGuest: boolean): void;
+          end(): void;
+        };
+        newBiome.coopBoundaryStillLive = () => true;
+        newBiome.isBoundedAuthoritativeCoop = () => true;
+        const end = vi.spyOn(newBiome, "end").mockImplementation(() => {});
+        const tween = vi.spyOn(rig.guestScene.tweens, "add").mockImplementation(config => config as never);
+        const failedCosmetic = vi.spyOn(rig.guestScene.tweens, "killTweensOf").mockImplementation(() => {
+          throw new Error("synthetic cosmetic failure");
+        });
+        newBiome.startPresentationIntro(true);
+        const intro = tween.mock.calls[0][0] as { onComplete(): void };
+        expect(() => intro.onComplete(), "the cosmetic failure is contained by the phase").not.toThrow();
+        expect(end).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(12_000);
+        expect(end, "the pre-armed terminal watchdog recovers the failed cosmetic path").toHaveBeenCalledOnce();
+        failedCosmetic.mockRestore();
+        tween.mockRestore();
+
+        const lostCallback = new NewBiomeEncounterPhase() as unknown as {
+          coopBoundaryStillLive(requirePermit?: boolean): boolean;
+          isBoundedAuthoritativeCoop(): boolean;
+          startPresentationIntro(authoritativeGuest: boolean): void;
+          end(): void;
+        };
+        lostCallback.coopBoundaryStillLive = () => true;
+        lostCallback.isBoundedAuthoritativeCoop = () => true;
+        const lostEnd = vi.spyOn(lostCallback, "end").mockImplementation(() => {});
+        vi.spyOn(rig.guestScene.tweens, "add").mockImplementation(config => config as never);
+        lostCallback.startPresentationIntro(true);
+        await vi.advanceTimersByTimeAsync(17_000);
+        expect(lostEnd, "lost tween and text callbacks still reach the authoritative terminal").toHaveBeenCalledOnce();
+      } finally {
+        vi.useRealTimers();
+      }
+
+      const retained = new NewBiomeEncounterPhase() as unknown as {
+        coopGeneration: number;
+        coopWave: number;
+        coopBattle: typeof rig.guestScene.currentBattle;
+        isBoundedAuthoritativeCoop(): boolean;
+        start(): void;
+        end(): void;
+        completeEncounterEnd(): void;
+      };
+      retained.coopGeneration = 0; // a previously captured lifetime; deliberately not the replacement generation
+      retained.coopWave = rig.guestScene.currentBattle.waveIndex;
+      retained.coopBattle = rig.guestScene.currentBattle;
+      retained.isBoundedAuthoritativeCoop = () => false; // model runtime teardown/replacement
+      const shift = vi.spyOn(rig.guestScene.phaseManager, "shiftPhase");
+      retained.start();
+      retained.end();
+      retained.completeEncounterEnd();
+      expect(
+        shift,
+        "a retained co-op phase can never fall back to solo super.* after its runtime disappears",
+      ).not.toHaveBeenCalled();
+    });
+  }, 120_000);
+
+  it.each([
+    { branch: "Stay", leave: false },
+    { branch: "Leave", leave: true },
+  ])("wave 10 -> market -> Crossroads $branch -> wave 11 stays converged", async ({ leave }) => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createScheduledCoopPair({ automatic: true });
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.phaseManager.clearAllPhases();
+      rig.guestScene.phaseManager.shiftPhase();
+    });
+    pair.setAutomaticDelivery(false);
+
+    const sourceBiome = rig.hostScene.arena.biomeId;
+    const routes: ErRouteNode[] = [
+      { biome: BiomeId.FOREST, revealed: true },
+      { biome: BiomeId.VOLCANO, revealed: true, source: "upgrade" },
+    ];
+    for (const ctx of [rig.hostCtx, rig.guestCtx]) {
+      await withClient(ctx, () => {
+        // Wave 10 is deliberately MID-biome: WAVE_ADVANCE biomeChange=false, but Crossroads is due.
+        restoreErBiomeStructure(25, 1, null);
+        setErPendingNodes(routes.map(node => ({ ...node })));
+      });
+    }
+
+    const resync = installCoopResyncProbe(rig.guestRuntime);
+    try {
+      await driveGuestCommandUi(rig);
+      const turn = rig.hostScene.currentBattle.turn;
+      await withClient(rig.hostCtx, async () => {
+        game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
+        await game.phaseInterceptor.to("TurnEndPhase");
+      });
+      await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+      expect(
+        rig.guestScene.currentBattle.enemyParty.every(mon => mon.isFainted()),
+        "wave-10 battle converged",
+      ).toBe(true);
+
+      await driveRealBiomeMarketLeave(rig);
+      await driveRealCrossroads(rig, leave);
+      const guestApplyModifiers = leave ? vi.spyOn(rig.guestScene, "applyModifiers") : null;
+      const guestInitSession = leave ? vi.spyOn(rig.guestScene, "initSession") : null;
+      const guestEncounterEvent = leave ? vi.spyOn(rig.guestScene.eventTarget, "dispatchEvent") : null;
+      const guestTailQueue = leave ? vi.spyOn(rig.guestScene.phaseManager, "unshiftNew") : null;
+      const guestResetBattle = leave
+        ? rig.guestScene.getPlayerParty().map(pokemon => vi.spyOn(pokemon, "resetBattleAndWaveData"))
+        : [];
+      const guestResetWave = leave
+        ? rig.guestScene.getPlayerParty().map(pokemon => vi.spyOn(pokemon, "resetWaveData"))
+        : [];
+      if (leave) {
+        await driveRealGuestOwnedMapPick(rig, BiomeId.VOLCANO);
+      }
+      const guestMeChanceBeforeNewBiome = rig.guestScene.mysteryEncounterSaveData.encounterSpawnChance;
+
+      // Host constructs/publishes wave 11 first; guest runs its own actual Switch/NewBiome/encounter tail and
+      // adopts the carrier. No remirror or manual state write occurs after the UI choices.
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase", false));
+      await withClient(rig.guestCtx, () => driveClientPhaseQueueTo(rig.guestScene, "CommandPhase"));
+
+      const expectedBiome = leave ? BiomeId.VOLCANO : sourceBiome;
+      expect(rig.hostScene.currentBattle.waveIndex).toBe(11);
+      expect(rig.guestScene.currentBattle.waveIndex).toBe(11);
+      expect(rig.hostScene.arena.biomeId).toBe(expectedBiome);
+      expect(rig.guestScene.arena.biomeId).toBe(expectedBiome);
+      expect(rig.hostRuntime.controller.interactionCounter()).toBe(2);
+      expect(rig.guestRuntime.controller.interactionCounter()).toBe(2);
+      expect(withClientSync(rig.guestCtx, () => getErPendingNodes())).toEqual(
+        withClientSync(rig.hostCtx, () => getErPendingNodes()),
+      );
+      expect(withClientSync(rig.guestCtx, () => getErMapSaveData())).toEqual(
+        withClientSync(rig.hostCtx, () => getErMapSaveData()),
+      );
+      expect(withClientSync(rig.guestCtx, () => captureCoopChecksum())).toBe(
+        withClientSync(rig.hostCtx, () => captureCoopChecksum()),
+      );
+      expect(resync.count(), "the UI-driven boundary requires no forced recovery").toBe(0);
+      if (leave) {
+        expect(
+          guestApplyModifiers,
+          "SelectBiome renderer skips MoneyInterest and every modifier mutation",
+        ).not.toHaveBeenCalled();
+        expect(
+          guestTailQueue?.mock.calls.some(call => call[0] === "PartyHealPhase" || call[0] === "SelectModifierPhase"),
+          "SelectBiome renderer cannot queue local heal/challenge rewards",
+        ).toBe(false);
+        expect(
+          guestInitSession,
+          "NewBiome renderer bypasses EncounterPhase.runEncounter/initSession",
+        ).not.toHaveBeenCalled();
+        expect(
+          guestEncounterEvent,
+          "NewBiome renderer cannot dispatch a second shared encounter event",
+        ).not.toHaveBeenCalled();
+        expect(
+          guestResetBattle.every(spy => spy.mock.calls.length === 0),
+          "NewBiome renderer skips biome reset hooks",
+        ).toBe(true);
+        expect(
+          guestResetWave.every(spy => spy.mock.calls.length === 0),
+          "NewBiome renderer skips encounter wave reset hooks",
+        ).toBe(true);
+        expect(
+          rig.guestScene.mysteryEncounterSaveData.encounterSpawnChance,
+          "NewBiome presentation cannot derive Mystery Encounter chance on the authoritative renderer",
+        ).toBe(guestMeChanceBeforeNewBiome);
+      }
+      expect(getCoopRendererNeutralizedLog(), "no guest boundary phase became CoopInert").toEqual([]);
+      expect(getCoopTailWouldBlockLog(), "the committed BIOME_PICK sanctions the late biome tail").toEqual([]);
+      expect(
+        withClientSync(rig.hostCtx, () => getCoopBiomeTransitionTailPermit()),
+        "the host one-shot permit is finalized by its NewBiomeEncounter",
+      ).toBeNull();
+      expect(
+        withClientSync(rig.guestCtx, () => getCoopBiomeTransitionTailPermit()),
+        "the guest one-shot permit is finalized independently by its NewBiomeEncounter",
+      ).toBeNull();
+      expect(rig.guestScene.ui.getMode(), "the bounded teardown cannot leave the renderer trapped on ER_MAP").not.toBe(
+        UiMode.ER_MAP,
+      );
+      if (leave) {
+        expect(getObservedCoopGuestPhases()).toContain("SwitchBiomePhase");
+        expect(getObservedCoopGuestPhases()).toContain("NewBiomeEncounterPhase");
+        expect(game.phaseInterceptor.log).toContain("SwitchBiomePhase");
+        expect(game.phaseInterceptor.log).toContain("NewBiomeEncounterPhase");
+      }
+      logs.flush();
+    } finally {
+      resync.restore();
+    }
+  }, 300_000);
+});

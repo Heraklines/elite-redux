@@ -43,6 +43,7 @@ import {
   resetCoopMeOperationState,
   setCoopMeOperationEnabled,
 } from "#data/elite-redux/coop/coop-me-operation";
+import { CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
@@ -210,6 +211,106 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       "the journal-delivered terminal states leave before the guest exits the encounter",
     ).toBe(true);
     expect(rig.guestRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
+    logs.flush();
+  }, 300_000);
+
+  it("STOPSHIP: a committed terminal whose first journal retention fails re-ACKs the exact first meResync", async () => {
+    await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+    const hostScene = game.scene;
+    const pair = createLoopbackPair();
+    const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+
+    await withClient(rig.hostCtx, async () => {
+      await runMysteryEncounterToEnd(game, 1);
+      await game.phaseInterceptor.to("SelectModifierPhase", false);
+      const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+      await driveHostRewardShopOwner(hostShop, { takeReward: false });
+      await game.phaseInterceptor.to("PostMysteryEncounterPhase", false);
+    });
+
+    const durability = rig.hostRuntime.durability;
+    expect(durability, "the production host runtime has an active durability journal").not.toBeNull();
+    const originalJournalCommit = durability!.commit.bind(durability);
+    let injected = false;
+    const journalSpy = vi.spyOn(durability!, "commit").mockImplementation((cls, seq, msg) => {
+      if (!injected && msg.t === "envelope" && msg.envelope.pendingOperation?.kind === "ME_TERMINAL") {
+        injected = true;
+        return false;
+      }
+      return originalJournalCommit(cls, seq, msg);
+    });
+    const submitSpy = vi.spyOn(CoopOperationHost.prototype, "submit");
+    const captureSpy = vi.spyOn(coopEngine, "captureCoopMeOutcome");
+    const releaseSpy = vi.spyOn(meOp, "releaseCoopMeRetainedTerminal");
+    const advanceSpy = vi.spyOn(rig.hostRuntime.controller, "advanceInteraction");
+
+    await withClient(rig.hostCtx, async () => {
+      hostScene.phaseManager.getCurrentPhase()!.start();
+      expect(injected, "the committed terminal hit the injected journal-retention failure").toBe(true);
+      expect(
+        rig.hostRuntime.controller.interactionCounter(),
+        "the host cannot queue/advance past a terminal that is committed but not retained",
+      ).toBe(counterBefore);
+      expect(
+        rig.guestRuntime.controller.interactionCounter(),
+        "the guest remains on the same exact Mystery boundary",
+      ).toBe(counterBefore);
+      expect(hostScene.phaseManager.getCurrentPhase()?.phaseName).toBe("PostMysteryEncounterPhase");
+      expect(captureSpy, "the first attempt captured one authoritative terminal image").toHaveBeenCalledTimes(1);
+      expect(advanceSpy, "journal failure occurs before the local close/advance transaction").not.toHaveBeenCalled();
+      expect(
+        releaseSpy,
+        "the exact terminal image stays retained while the shared boundary is held",
+      ).not.toHaveBeenCalled();
+
+      await new Promise(resolve => setTimeout(resolve, 350));
+    });
+
+    const terminalSubmits = submitSpy.mock.calls
+      .map((call, index) => ({ intent: call[0], result: submitSpy.mock.results[index] }))
+      .filter(({ intent }) => intent.kind === "ME_TERMINAL");
+    expect(terminalSubmits, "one committed attempt plus one exact deterministic re-ACK").toHaveLength(2);
+    expect(
+      new Set(terminalSubmits.map(({ intent }) => intent.id)).size,
+      "the retry reuses the identical terminal operation address",
+    ).toBe(1);
+    expect(
+      terminalSubmits.map(({ result }) => (result.type === "return" ? result.value.kind : result.type)),
+      "the operation commits once, then the journal-only retry is an idempotent re-ACK",
+    ).toEqual(["committed", "reack"]);
+    expect(
+      JSON.stringify(terminalSubmits[1].intent.payload),
+      "the retry submits the byte-identical first-captured meResync payload",
+    ).toBe(JSON.stringify(terminalSubmits[0].intent.payload));
+    expect(captureSpy, "PostMysteryEncounterPhase must not recapture producer state on retry").toHaveBeenCalledTimes(1);
+
+    const terminalJournalAttempts = journalSpy.mock.calls.filter(
+      ([, , msg]) => msg.t === "envelope" && msg.envelope.pendingOperation?.kind === "ME_TERMINAL",
+    );
+    expect(terminalJournalAttempts, "the re-ACK retries the exact failed journal handoff").toHaveLength(2);
+    expect(terminalJournalAttempts[1][1], "the journal retry retains the same committed envelope revision").toBe(
+      terminalJournalAttempts[0][1],
+    );
+    expect(JSON.stringify(terminalJournalAttempts[1][2])).toBe(JSON.stringify(terminalJournalAttempts[0][2]));
+    expect(rig.hostRuntime.controller.interactionCounter(), "the successful retry advances the host exactly once").toBe(
+      counterBefore + 1,
+    );
+    expect(advanceSpy, "the successful retained terminal closes/advances exactly once").toHaveBeenCalledTimes(1);
+    expect(releaseSpy, "the terminal image releases exactly once after close/advance succeeds").toHaveBeenCalledTimes(
+      1,
+    );
+    expect(releaseSpy.mock.invocationCallOrder[0]).toBeGreaterThan(advanceSpy.mock.invocationCallOrder[0]);
+    expect(
+      rig.guestRuntime.controller.interactionCounter(),
+      "delivery alone cannot mutate the inactive guest engine context",
+    ).toBe(counterBefore);
+
+    const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+    expect(guestReplay.settled, "the retried committed terminal settles the production guest replay").toBe(true);
+    expect(rig.guestRuntime.controller.interactionCounter(), "the guest advances exactly once from that terminal").toBe(
+      counterBefore + 1,
+    );
     logs.flush();
   }, 300_000);
 

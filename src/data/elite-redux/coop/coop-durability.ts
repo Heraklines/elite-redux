@@ -304,21 +304,41 @@ export class CoopJournal {
   constructor(private readonly capacity = 256) {}
 
   /** Record a committed operation (host side, at commit→applied, §1.3). Seq MUST be monotonic per class. */
-  commit(cls: string, seq: number, msg: CoopMessage): void {
+  commit(cls: string, seq: number, msg: CoopMessage): boolean {
+    const hw = this.highWater.get(cls) ?? 0;
     let list = this.byClass.get(cls);
     if (list == null) {
       list = [];
       this.byClass.set(cls, list);
     }
-    list.push({ cls, seq, msg });
+    const existing = list.find(entry => entry.seq === seq);
+    if (existing != null) {
+      // One revision has one immutable wire representation. A re-ACK may re-publish it, but a caller can
+      // never smuggle a conflicting payload under an already-committed sequence number.
+      return JSON.stringify(existing.msg) === JSON.stringify(msg);
+    }
+
+    // A cold restore persists the high-water but intentionally not the bounded replay ring. Likewise a
+    // future pruning policy may remove an ACKed entry. An exact operation re-ACK is retained only if its
+    // concrete message is reinserted; the high-water alone is not durability. Keep the list ordered because
+    // tail replay and deep-gap detection depend on ascending sequence numbers.
+    const insertionIndex = list.findIndex(entry => entry.seq > seq);
+    const entry = { cls, seq, msg };
+    if (insertionIndex < 0) {
+      list.push(entry);
+    } else {
+      list.splice(insertionIndex, 0, entry);
+    }
     // Evict the oldest so the ring stays bounded.
     while (list.length > this.capacity) {
       list.shift();
     }
-    const hw = this.highWater.get(cls) ?? 0;
     if (seq > hw) {
       this.highWater.set(cls, seq);
     }
+    // A very old retry may be below a full ring and get evicted immediately. Report failure rather than
+    // letting a gameplay permit outrun an entry that is not actually replayable.
+    return list.some(retained => retained.seq === seq && JSON.stringify(retained.msg) === JSON.stringify(msg));
   }
 
   /** Record the peer's cumulative ACK: it has applied class `cls` through revision `upto` (§4.2). */
@@ -514,6 +534,16 @@ export class CoopReceiveLedger {
       this.markApplied(cls, marks[cls]);
     }
   }
+
+  /** Exact receiver-ledger rollback for an atomic full-snapshot transaction. */
+  restoreExactForTransaction(marks: Record<string, number>): void {
+    this.lastApplied.clear();
+    for (const [cls, seq] of Object.entries(marks)) {
+      if (Number.isSafeInteger(seq) && seq > 0) {
+        this.lastApplied.set(cls, seq);
+      }
+    }
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -595,17 +625,25 @@ export class CoopDurabilityManager {
    * broadcast rides the transport's outbound queue, so a send while the channel is dark is not lost (§4.3).
    * `seq` MUST be monotonic per class (the envelope's `revision`).
    */
-  commit(cls: string, seq: number, msg: CoopMessage): void {
+  commit(cls: string, seq: number, msg: CoopMessage): boolean {
     // Journal BEFORE the send, so a send that THROWS (a DEAD channel at send time - a real WebRTC
     // InvalidStateError, not merely a dark/queued channel) leaves the op journaled + retriable: the unacked
     // tail retains it and a reconnect resends it. Catch the throw so it never breaks the committer (the
     // op is not dropped - it stays in the journal for the reconnect tail / coopResyncAll to recover).
-    this.journal.commit(cls, seq, msg);
+    try {
+      if (!this.journal.commit(cls, seq, msg)) {
+        return false;
+      }
+    } catch (e) {
+      coopWarn("durability", `commit journal retention THREW cls=${cls} seq=${seq}`, e);
+      return false;
+    }
     try {
       this.transport.send(msg);
     } catch (e) {
       coopWarn("durability", `commit send THREW cls=${cls} seq=${seq} (op stays journaled + retriable)`, e);
     }
+    return true;
   }
 
   /** Handle an inbound wire message: the ACK/reconnect arms, plus (if wired) the durable op stream. */
@@ -796,6 +834,34 @@ export class CoopDurabilityManager {
   /** The receiver's per-class applied marks (for session-save persistence, §4). */
   appliedMarks(): Record<string, number> {
     return this.ledger.serialize();
+  }
+
+  /** Exact local rollback; intentionally emits no ACK for an uncommitted snapshot. */
+  restoreAppliedMarksForTransaction(marks: Record<string, number>): void {
+    this.ledger.restoreExactForTransaction(marks);
+  }
+
+  /** Stage snapshot high-water locally without emitting an ACK until the whole control transaction commits. */
+  adoptSnapshotMarksForTransaction(marks: Record<string, number>): void {
+    for (const [cls, revision] of Object.entries(marks)) {
+      if (Number.isSafeInteger(revision) && revision > 0) {
+        this.ledger.adoptSnapshot(cls, revision);
+      }
+    }
+  }
+
+  /** Publish cumulative ACKs only after DATA+CONTROL commit; send failures remain recoverable by reconnect. */
+  ackSnapshotMarksAfterTransaction(marks: Record<string, number>): void {
+    for (const [cls, revision] of Object.entries(marks)) {
+      if (!Number.isSafeInteger(revision) || revision <= 0) {
+        continue;
+      }
+      try {
+        this.transport.send({ t: "coopAck", cls, seq: this.ledger.appliedThrough(cls) });
+      } catch (error) {
+        coopWarn("durability", `snapshot ACK deferred cls=${cls} seq=${revision}`, error);
+      }
+    }
   }
 
   /** Restore persisted high-water + applied marks on a cold resume (§4), so revisions continue monotonically. */

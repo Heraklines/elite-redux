@@ -6,6 +6,7 @@
 import { COOP_CAP_OP_COLOSSEUM, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
+import { setCoopMeColosseumControl } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   type CoopAuthoritativeEnvelopeV1,
   type CoopColosseumPayload,
@@ -14,14 +15,15 @@ import {
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
-  journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
+  tryJournalCoopCommittedEnvelope,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import { CoopOperationGuest, CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 export const COOP_COLOSSEUM_ACTION_STRIDE = 100;
+const COOP_COLOSSEUM_MAX_ROUND = Math.floor((COOP_COLOSSEUM_ACTION_STRIDE - 2) / 2);
 const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_COLOSSEUM_OP === "off");
 
 let enabled = DEFAULT_ENABLED;
@@ -29,21 +31,23 @@ let epoch = 1;
 let revisionFloor = 0;
 let authorityHost: CoopOperationHost | null = null;
 let receiverGuest: CoopOperationGuest | null = null;
-let ordinalPin = -1;
-let ordinal = 0;
+const nextBoardRoundByPin = new Map<number, number>();
+const committedBoardsByPin = new Map<number, Map<number, { labels: string[]; operationId: string | null }>>();
+const committedDecisionsByPin = new Map<number, Map<number, { index: number; operationId: string }>>();
 let decisionRetryMs = 1_000;
 const decisionRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-function decisionKey(pinned: number, index: number): string {
-  return `${pinned}:${index}`;
+function decisionKey(pinned: number, round: number, index: number): string {
+  return `${pinned}:${round}:${index}`;
 }
 
-function cancelDecisionRetry(pinned: number, index: number): void {
-  const key = decisionKey(pinned, index);
-  const timer = decisionRetryTimers.get(key);
-  if (timer != null) {
-    clearTimeout(timer);
-    decisionRetryTimers.delete(key);
+function cancelDecisionRetriesForRound(pinned: number, round: number): void {
+  const prefix = `${pinned}:${round}:`;
+  for (const [key, timer] of decisionRetryTimers) {
+    if (key.startsWith(prefix)) {
+      clearTimeout(timer);
+      decisionRetryTimers.delete(key);
+    }
   }
 }
 
@@ -56,11 +60,11 @@ export function resetCoopColosseumDecisionRetryMs(): void {
 }
 
 /** Guest owner: resend the same deterministic legacy intent until its committed envelope returns. */
-export function armCoopColosseumDecisionResend(pinned: number, index: number, resend: () => void): void {
+export function armCoopColosseumDecisionResend(pinned: number, round: number, index: number, resend: () => void): void {
   if (!isCoopColosseumOperationEnabled() || pinned < 0) {
     return;
   }
-  const key = decisionKey(pinned, index);
+  const key = decisionKey(pinned, round, index);
   if (decisionRetryTimers.has(key)) {
     return;
   }
@@ -101,8 +105,9 @@ export function resetCoopColosseumOperationState(): void {
   authorityHost = null;
   receiverGuest = null;
   revisionFloor = 0;
-  ordinalPin = -1;
-  ordinal = 0;
+  nextBoardRoundByPin.clear();
+  committedBoardsByPin.clear();
+  committedDecisionsByPin.clear();
 }
 
 export function setCoopColosseumOperationRevisionFloor(highWater: number): void {
@@ -132,14 +137,6 @@ function guest(): CoopOperationGuest {
   return receiverGuest;
 }
 
-function nextOrdinal(pinned: number): number {
-  if (ordinalPin !== pinned) {
-    ordinalPin = pinned;
-    ordinal = 0;
-  }
-  return ordinal++;
-}
-
 function context(wave: number, turn: number) {
   const authoritativeState: CoopAuthoritativeBattleStateV1 = {
     version: 1,
@@ -166,15 +163,15 @@ function commit(params: {
   pinned: number;
   payload: CoopColosseumPayload;
   owner: number;
+  actionOrdinal: number;
   wave: number;
   turn: number;
-}): void {
-  const actionOrdinal = nextOrdinal(params.pinned);
+}): string | null {
   const op: CoopPendingOperation = {
     id: makeCoopOperationId(
       epoch,
       params.owner,
-      params.pinned * COOP_COLOSSEUM_ACTION_STRIDE + actionOrdinal,
+      params.pinned * COOP_COLOSSEUM_ACTION_STRIDE + params.actionOrdinal,
       "COLO_PICK",
     ),
     kind: "COLO_PICK",
@@ -185,55 +182,123 @@ function commit(params: {
   const result = host().submit(op, context(params.wave, params.turn), intent =>
     intent.owner === params.owner ? { ok: true } : { ok: false, reason: "wrong-owner" },
   );
-  if (result.kind === "committed") {
-    journalCoopCommittedEnvelope(result.envelope);
+  if ((result.kind === "committed" || result.kind === "reack") && tryJournalCoopCommittedEnvelope(result.envelope)) {
+    return op.id;
   }
+  return null;
 }
 
 export function commitColosseumBoard(params: {
   pinned: number;
+  round?: number;
   labels: string[];
   localRole: CoopRole;
   wave: number;
   turn?: number;
-}): void {
-  if (!isCoopColosseumOperationEnabled() || params.localRole !== "host" || params.pinned < 0) {
-    return;
+}): { operationId: string | null; round: number } | null {
+  if (params.localRole !== "host" || params.pinned < 0) {
+    return null;
   }
   try {
-    commit({
+    const round = params.round ?? nextBoardRoundByPin.get(params.pinned) ?? 0;
+    if (!Number.isSafeInteger(round) || round < 0 || round > COOP_COLOSSEUM_MAX_ROUND) {
+      return null;
+    }
+    const boards = committedBoardsByPin.get(params.pinned) ?? new Map();
+    const prior = boards.get(round);
+    if (prior == null) {
+      const expected = nextBoardRoundByPin.get(params.pinned);
+      // Live Colosseum boards are numbered by wins and therefore begin at one. Headless/default callers
+      // begin at zero. The first retained board establishes that origin; every later board is contiguous.
+      if (expected != null && round !== expected) {
+        return null;
+      }
+    } else {
+      if (JSON.stringify(prior.labels) !== JSON.stringify(params.labels)) {
+        return null;
+      }
+      if (!isCoopColosseumOperationEnabled()) {
+        return { operationId: null, round };
+      }
+    }
+    if (!isCoopColosseumOperationEnabled()) {
+      boards.set(round, { labels: [...params.labels], operationId: null });
+      committedBoardsByPin.set(params.pinned, boards);
+      nextBoardRoundByPin.set(params.pinned, round + 1);
+      return { operationId: null, round };
+    }
+    const operationId = commit({
       pinned: params.pinned,
-      payload: { type: "board", labels: [...params.labels] },
+      payload: { type: "board", round, labels: [...params.labels] },
       owner: 0,
+      actionOrdinal: round * 2,
       wave: params.wave,
       turn: params.turn ?? 0,
     });
+    if (operationId == null) {
+      return null;
+    }
+    boards.set(round, { labels: [...params.labels], operationId });
+    committedBoardsByPin.set(params.pinned, boards);
+    nextBoardRoundByPin.set(params.pinned, round + 1);
+    return { operationId, round };
   } catch (error) {
-    coopWarn("me", "colosseum board op commit threw; legacy carrier remains active", error);
+    coopWarn("me", "colosseum board op commit/retention failed", error);
+    return null;
   }
 }
 
 /** Called directly for a host-owned pick and by the host awaiter for a guest-owned proposal. */
 export function commitColosseumDecision(params: {
   pinned: number;
+  round: number;
   index: number;
   localRole: CoopRole;
   wave: number;
   turn?: number;
-}): void {
-  if (!isCoopColosseumOperationEnabled() || params.localRole !== "host" || params.pinned < 0) {
-    return;
+}): { kind: "committed"; operationId: string } | { kind: "duplicate" } | { kind: "failed" } {
+  if (
+    !isCoopColosseumOperationEnabled()
+    || params.pinned < 0
+    || !Number.isSafeInteger(params.round)
+    || params.round < 0
+    || params.round > COOP_COLOSSEUM_MAX_ROUND
+    || (params.index !== 0 && params.index !== 1)
+  ) {
+    return { kind: "failed" };
   }
   try {
-    commit({
+    const operationId = makeCoopOperationId(
+      epoch,
+      coopInteractionOwnerSeat(params.pinned),
+      params.pinned * COOP_COLOSSEUM_ACTION_STRIDE + params.round * 2 + 1,
+      "COLO_PICK",
+    );
+    if (params.localRole !== "host") {
+      return { kind: "committed", operationId };
+    }
+    const committedDecisions = committedDecisionsByPin.get(params.pinned) ?? new Map();
+    const prior = committedDecisions.get(params.round);
+    if (prior != null) {
+      return prior.index === params.index ? { kind: "duplicate" } : { kind: "failed" };
+    }
+    const retainedId = commit({
       pinned: params.pinned,
-      payload: { type: "decision", index: params.index },
+      payload: { type: "decision", round: params.round, index: params.index },
       owner: coopInteractionOwnerSeat(params.pinned),
+      actionOrdinal: params.round * 2 + 1,
       wave: params.wave,
       turn: params.turn ?? 0,
     });
+    if (retainedId == null) {
+      return { kind: "failed" };
+    }
+    committedDecisions.set(params.round, { index: params.index, operationId: retainedId });
+    committedDecisionsByPin.set(params.pinned, committedDecisions);
+    return { kind: "committed", operationId: retainedId };
   } catch (error) {
-    coopWarn("me", "colosseum decision op commit threw; legacy carrier remains active", error);
+    coopWarn("me", "colosseum decision op commit/retention failed", error);
+    return { kind: "failed" };
   }
 }
 
@@ -254,11 +319,18 @@ function applyJournaledColosseumEnvelope(envelope: CoopAuthoritativeEnvelopeV1):
     return "rejected";
   }
   const payload = op.payload as CoopColosseumPayload | undefined;
-  if (payload?.type === "decision") {
-    const parsed = /^\d+:\d+:(\d+)$/.exec(op.id);
-    if (parsed != null) {
-      const pinned = Math.floor(Number(parsed[1]) / COOP_COLOSSEUM_ACTION_STRIDE);
-      cancelDecisionRetry(pinned, payload.index);
+  const parsed = /^\d+:\d+:[A-Z_]+:(\d+)$/.exec(op.id);
+  if (payload != null && parsed != null) {
+    const pinned = Math.floor(Number(parsed[1]) / COOP_COLOSSEUM_ACTION_STRIDE);
+    if (payload.type === "board") {
+      setCoopMeColosseumControl(pinned, { expectedRound: payload.round, boardRound: payload.round });
+    } else {
+      cancelDecisionRetriesForRound(pinned, payload.round);
+      setCoopMeColosseumControl(pinned, {
+        expectedRound: payload.round,
+        boardRound: payload.round,
+        decision: { round: payload.round, index: payload.index, operationId: op.id },
+      });
     }
   }
   return "applied";

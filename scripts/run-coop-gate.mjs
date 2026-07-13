@@ -28,8 +28,8 @@
 //   - Lane C (soak-style): the coop-soak* driver runs - the heaviest per file (a full randomized run) - kept
 //     in their own sequential lane so a slow soak never shares a worker with anything else. These run in the
 //     driver's DEFAULT "harness" fidelity (the driver heals the guest through convenient seams to stay green).
-//   - Lane P (PRODUCTION-FIDELITY soak, #897): a SINGLE bounded soak run (coop-soak-fidelity-gate.test.ts)
-//     with SOAK_FIDELITY=production - NO harness heals, guest commands sourced from the guest's OWN scene - so
+//   - Lane P (PRODUCTION-FIDELITY, #897/T2): the bounded fidelity soak plus the segmented wave-10 biome
+//     transition, with SOAK_FIDELITY=production - NO harness heals, guest commands sourced from the guest's OWN scene - so
 //     it catches the "guest replay drifted" divergence class lane C structurally cannot. It is GATING: the
 //     gate test does NOT swallow a hard LOCKSTEP/NO-PARK/TEARDOWN breach (unlike the non-gating evidence test
 //     coop-soak-fidelity.test.ts), so any hard-invariant failure = nonzero exit = GATE RED. Bounded to
@@ -63,10 +63,11 @@ const COOP_DIR_REL = "test/tests/elite-redux/coop";
  * wave 1 ran (the reviewer's finding: "a hard invariant failure after wave 1 still passes"). LANE P closes
  * that hole: it runs a SEPARATE, BOUNDED prod-fidelity test (coop-soak-fidelity-gate.test.ts) that does NOT
  * catch SoakInvariantError, so any hard-invariant breach = a failed test = nonzero exit = GATE RED. It runs
- * only the ONE gate file (routed here, NOT into lane C) with SOAK_FIDELITY=production + a bounded wave count
- * so the gate stays wall-clock-bounded (the long nightly god soak stays in the evidence test / nightly job).
+ * the bounded soak plus the segmented T2 wave-10 production-UI transition (routed here, NOT into lane C)
+ * with SOAK_FIDELITY=production + a bounded wave count so the gate stays wall-clock-bounded (the long
+ * nightly god soak stays in the evidence test / nightly job).
  */
-const PROD_FIDELITY_GATE_FILE = "coop-soak-fidelity-gate.test.ts";
+const PROD_FIDELITY_GATE_FILES = new Set(["coop-soak-fidelity-gate.test.ts", "coop-transition-t2-biome.test.ts"]);
 const PROD_FIDELITY_GATE_WAVES = 12;
 
 /**
@@ -124,8 +125,8 @@ function categorize() {
     if (QUARANTINE.has(f)) {
       // Pre-existing solo failure - run non-gating (see QUARANTINE).
       lanes.Q.push(rel);
-    } else if (f === PROD_FIDELITY_GATE_FILE) {
-      // #897: the GATING prod-fidelity soak - its OWN lane with SOAK_FIDELITY=production (see PROD_FIDELITY_GATE_FILE).
+    } else if (PROD_FIDELITY_GATE_FILES.has(f)) {
+      // #897/T2: GATING production-fidelity journeys - their OWN lane with SOAK_FIDELITY=production.
       // Routed here BEFORE the /soak/ match so it never lands in lane C (which runs harness-fidelity, no env).
       lanes.P.push(rel);
     } else if (/(^|[-_])soak/.test(f)) {

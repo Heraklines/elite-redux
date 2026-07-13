@@ -154,6 +154,13 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
     // best-effort
   });
 
+  function liveSelectBiome(): SelectBiomePhase {
+    const phase = new SelectBiomePhase();
+    (phase as unknown as { boundaryStillLive(generation: number, wave: number): boolean }).boundaryStillLive = () =>
+      true;
+    return phase;
+  }
+
   /** Which ctx OWNS the interaction at `counter` (host even, guest odd - production parity). */
   function rolesFor(
     rig: DuoRig,
@@ -195,7 +202,7 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
       setErPendingNodes([{ biome: ownerBiome, revealed: true } satisfies ErRouteNode]);
       await withClient(ownerCtx, async () => {
         setCoopBiomeInteractionStart(counterBefore);
-        new SelectBiomePhase().start();
+        liveSelectBiome().start();
         await drainLoopback();
       });
     } finally {
@@ -214,7 +221,7 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
       ] satisfies ErRouteNode[]);
       await withClient(watcherCtx, async () => {
         setCoopBiomeInteractionStart(counterBefore);
-        new SelectBiomePhase().start();
+        liveSelectBiome().start();
         for (let i = 0; i < 80; i++) {
           await drainLoopback();
           if (biomeArg(guestSwitch) !== undefined) {
@@ -254,6 +261,10 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
       localRole: "guest",
       wave: 11,
       turn: 0,
+      sourceBiomeId: BiomeId.PLAINS,
+      nextWave: 12,
+      allowedRoutes: [BiomeId.VOLCANO],
+      deterministicDestination: null,
     });
     expect(fresh.adopt, "the newer interaction's pick is adopted").toBe(true);
 
@@ -266,6 +277,10 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
       localRole: "guest",
       wave: 11,
       turn: 0,
+      sourceBiomeId: BiomeId.PLAINS,
+      nextWave: 12,
+      allowedRoutes: [BiomeId.SWAMP],
+      deterministicDestination: null,
     });
     expect(stale.adopt, "the stale previous-op pick is REJECTED, not applied (#861 shape)").toBe(false);
     if (stale.adopt === false) {
@@ -281,6 +296,10 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
       localRole: "guest",
       wave: 11,
       turn: 0,
+      sourceBiomeId: BiomeId.PLAINS,
+      nextWave: 12,
+      allowedRoutes: [BiomeId.VOLCANO],
+      deterministicDestination: null,
     });
     expect(dup.adopt, "a duplicate re-delivery of an already-applied op is a no-op (invariant 5)").toBe(false);
 
@@ -318,7 +337,7 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
       setErPendingNodes([{ biome: ownerBiome, revealed: true } satisfies ErRouteNode]);
       await withClient(rig.hostCtx, async () => {
         setCoopBiomeInteractionStart(pinned);
-        new SelectBiomePhase().start();
+        liveSelectBiome().start();
         await drainLoopback();
       });
     } finally {
@@ -334,7 +353,7 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
       ] satisfies ErRouteNode[]);
       await withClient(rig.guestCtx, async () => {
         setCoopBiomeInteractionStart(pinned);
-        new SelectBiomePhase().start();
+        liveSelectBiome().start();
         for (let i = 0; i < 80; i++) {
           await drainLoopback();
           if (biomeArg(guestSwitch) !== undefined) {

@@ -115,10 +115,23 @@ export function getErPrevBiome(): BiomeId | null {
  * instead of re-rolling to a different one.
  */
 let pendingNodes: ErRouteNode[] = [];
+/** Distinguishes a carrier-confirmed empty graph from "renderer cleared it and is still awaiting authority". */
+let pendingNodesReady = false;
 
 /** Stash the rolled next-biome nodes for the current biome. */
 export function setErPendingNodes(nodes: ErRouteNode[]): void {
   pendingNodes = nodes;
+  pendingNodesReady = true;
+}
+
+/** Authoritative renderer seam: clear stale routes without authorizing local RNG fallback. */
+export function markErPendingNodesAwaitingAuthority(): void {
+  pendingNodes = [];
+  pendingNodesReady = false;
+}
+
+export function erPendingNodesReady(): boolean {
+  return pendingNodesReady;
 }
 
 /** The stored next-biome nodes (empty if none rolled yet this biome). */
@@ -191,6 +204,7 @@ export function addErEventRevealedNode(biome: BiomeId): void {
 export function resetErRouting(): void {
   prevBiome = null;
   pendingNodes = [];
+  pendingNodesReady = false;
   eventRevealedBiomes = [];
   recentBiomes = [];
 }
@@ -249,7 +263,12 @@ export interface ErRouteNode {
  * Determinism: relies on the seeded RNG (randSeedInt), so a given transition is
  * stable across save/reload like every other ER roll.
  */
-export function rollErNextBiomeNodes(current: BiomeId, prev: BiomeId | null): ErRouteNode[] {
+export function rollErNextBiomeNodes(
+  current: BiomeId,
+  prev: BiomeId | null,
+  runSeed?: string,
+  entryWave?: number,
+): ErRouteNode[] {
   // Base = the biome's real links, minus the current biome and the last few you
   // came from (the no-loopback window), so the route graph never bounces you back
   // into a biome you just left.
@@ -266,6 +285,9 @@ export function rollErNextBiomeNodes(current: BiomeId, prev: BiomeId | null): Er
   }
 
   // Extras: any OTHER real biome can show up unexpectedly, each at ~50%, capped.
+  const localRng = runSeed
+    ? new Phaser.Math.RandomDataGenerator([`${runSeed}:er-biome-routes:${entryWave ?? 0}:${current}`])
+    : null;
   let extras = 0;
   for (const b of allBiomes.keys()) {
     if (extras >= MAX_EXTRA_NODES) {
@@ -274,7 +296,7 @@ export function rollErNextBiomeNodes(current: BiomeId, prev: BiomeId | null): Er
     if (seen.has(b) || NON_TRAVEL_BIOMES.has(b)) {
       continue;
     }
-    if (randSeedInt(100) < EXTRA_NODE_CHANCE) {
+    if ((localRng?.integerInRange(0, 99) ?? randSeedInt(100)) < EXTRA_NODE_CHANCE) {
       seen.add(b);
       chosen.push(b);
       extras++;

@@ -63,6 +63,40 @@ export type CoopIntentValidation = { readonly ok: true } | { readonly ok: false;
 /** A validator the host runs at the single COMMIT point (§1.3). Wrong-owner / illegal-choice -> reject. */
 export type CoopIntentValidator = (intent: CoopPendingOperation) => CoopIntentValidation;
 
+function canonicalOperationValue(value: unknown): string {
+  if (value === undefined) {
+    return "undefined";
+  }
+  if (value == null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "undefined";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalOperationValue).join(",")}]`;
+  }
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map(key => `${JSON.stringify(key)}:${canonicalOperationValue(record[key])}`)
+    .join(",")}}`;
+}
+
+function reackSemanticsMatch(
+  intent: CoopPendingOperation,
+  ctx: CoopCommitContext,
+  applied: CoopPendingOperation,
+  envelope: CoopAuthoritativeEnvelopeV1,
+): boolean {
+  return (
+    intent.kind === applied.kind
+    && intent.owner === applied.owner
+    && canonicalOperationValue(intent.payload) === canonicalOperationValue(applied.payload)
+    && ctx.wave === envelope.wave
+    && ctx.turn === envelope.turn
+    && ctx.logicalPhase === envelope.logicalPhase
+    && canonicalOperationValue(ctx.authoritativeState) === canonicalOperationValue(envelope.authoritativeState)
+  );
+}
+
 /** Outcome of submitting one proposed intent to the host commit log (§1.3). */
 export type CoopHostSubmitResult =
   /** Validated + committed + applied: revision++, broadcast this envelope (invariant 4). */
@@ -70,7 +104,12 @@ export type CoopHostSubmitResult =
   /** Validation REFUSED (wrong owner / illegal / cross-epoch): broadcast so the proposer surfaces a default. No revision change. */
   | { readonly kind: "rejected"; readonly envelope: CoopAuthoritativeEnvelopeV1; readonly reason: string }
   /** Duplicate of an ALREADY-APPLIED id (invariant 3): a no-op re-ACK, never a second commit. */
-  | { readonly kind: "reack"; readonly op: CoopPendingOperation }
+  | {
+      readonly kind: "reack";
+      readonly op: CoopPendingOperation;
+      /** Original immutable envelope; a re-ACK never borrows a later global revision. */
+      readonly envelope: CoopAuthoritativeEnvelopeV1;
+    }
   /** Late intent for an id that is already TERMINAL rejected/superseded (invariant 6, §1.6): dropped. */
   | { readonly kind: "rejected-late"; readonly reason: string };
 
@@ -167,6 +206,7 @@ export class CoopOperationHost {
   private readonly statusById = new Map<CoopOperationId, CoopOperationStatus>();
   /** The last applied op per id, returned on an idempotent re-ACK (§1.3). */
   private readonly appliedById = new Map<CoopOperationId, CoopPendingOperation>();
+  private readonly appliedEnvelopeById = new Map<CoopOperationId, CoopAuthoritativeEnvelopeV1>();
 
   /** Construct a production surface host on the one session-wide authoritative commit clock. */
   public static global(config: Omit<CoopOperationHostConfig, "revisionClock">): CoopOperationHost {
@@ -241,8 +281,13 @@ export class CoopOperationHost {
     const prior = this.statusById.get(intent.id);
     if (prior === "applied") {
       // Idempotent re-ACK (invariant 3): never a second commit, no revision change.
-      const applied = this.appliedById.get(intent.id);
-      return { kind: "reack", op: applied ?? { ...intent, status: "applied" } };
+      const op = this.appliedById.get(intent.id) ?? { ...intent, status: "applied" };
+      const envelope =
+        this.appliedEnvelopeById.get(intent.id) ?? this.buildEnvelope(ctx, op, this.revisionClock.revision);
+      if (!reackSemanticsMatch(intent, ctx, op, envelope)) {
+        return { kind: "rejected-late", reason: "conflicting-retry" };
+      }
+      return { kind: "reack", op, envelope };
     }
     if (prior === "rejected" || prior === "superseded") {
       return { kind: "rejected-late", reason: `already-${prior}` };
@@ -275,7 +320,9 @@ export class CoopOperationHost {
     this.appliedById.set(intent.id, appliedOp);
     this.pending = null;
     this.onApplied?.(appliedOp, this.revisionClock.revision); // §1.8 dual-run: advance the legacy counter in lockstep.
-    return { kind: "committed", envelope: this.buildEnvelope(ctx, appliedOp, this.revisionClock.revision) };
+    const envelope = this.buildEnvelope(ctx, appliedOp, this.revisionClock.revision);
+    this.appliedEnvelopeById.set(intent.id, envelope);
+    return { kind: "committed", envelope };
   }
 
   private buildEnvelope(

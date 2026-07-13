@@ -22,6 +22,7 @@ import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { settleCoopFieldPresentation } from "#data/elite-redux/coop/coop-field-presentation";
 import {
+  coopSessionGeneration,
   getCoopBattleStreamer,
   getCoopController,
   getCoopNetcodeMode,
@@ -452,17 +453,69 @@ export class EncounterPhase extends BattlePhase {
   }
 
   /**
+   * Authoritative-renderer entry seam for boundary subclasses. It adopts the complete retained host carrier
+   * and prepares only already-authoritative visual objects. It deliberately bypasses EncounterPhase.start /
+   * runEncounter: no initSession, encounter event, ME initialization, RNG, abilities, AI, relics, weather,
+   * save, dex, or shared modifier hooks run here.
+   */
+  protected async prepareCoopAuthoritativeGuestPresentationOnly(onReady: () => void | Promise<void>): Promise<void> {
+    const generation = coopSessionGeneration();
+    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const battle = globalScene.currentBattle;
+    const stillCurrent = (): boolean =>
+      coopSessionGeneration() === generation
+      && globalScene.currentBattle === battle
+      && globalScene.currentBattle?.waveIndex === wave
+      && globalScene.phaseManager.getCurrentPhase() === this;
+    super.start();
+    if (battle == null || !stillCurrent()) {
+      throw new Error("Authoritative encounter presentation boundary was already stale");
+    }
+    await this.adoptCoopHostEnemyParty(stillCurrent);
+    if (!stillCurrent()) {
+      throw new Error("Authoritative encounter carrier arrived after boundary replacement");
+    }
+    if (globalScene.currentBattle !== battle) {
+      throw new Error("Authoritative encounter disappeared before presentation");
+    }
+    const loads = battle.enemyParty.map(enemy => enemy.loadAssets());
+    if (battle.trainer != null) {
+      loads.push(
+        battle.trainer.loadAssets().then(() => {
+          battle.trainer?.initSprite();
+        }),
+      );
+    }
+    await Promise.all(loads);
+    if (!stillCurrent()) {
+      throw new Error("Authoritative encounter assets arrived after boundary replacement");
+    }
+    materializeCoopLoadedPlayerField();
+    materializeCoopAdoptedEnemyField();
+    globalScene.updateGameInfo();
+    if (!stillCurrent()) {
+      throw new Error("Authoritative encounter presentation was superseded");
+    }
+    await onReady();
+  }
+
+  /** Presentation-only terminal: shift exactly once without EncounterPhase.end's shared mutation hooks. */
+  protected shiftCoopAuthoritativeGuestPresentationOnly(): void {
+    super.end();
+  }
+
+  /**
    * Co-op GUEST (#633, LIVE-D6): pull the host's authoritative enemy party off the
    * stream and pre-populate `battle.enemyParty` from it, so {@linkcode runEncounter}'s
    * generation loop SKIPS rolling our own (its `!battle.enemyParty[e]` guard) and we
    * fight the host's exact mons. The whole party is adopted atomically; missing or malformed
    * authority fails the transition closed instead of letting the guest generate a different battle.
    */
-  private async adoptCoopHostEnemyParty(): Promise<void> {
+  private async adoptCoopHostEnemyParty(isCurrent?: () => boolean): Promise<void> {
     const streamer = getCoopBattleStreamer();
     const battle = globalScene.currentBattle;
     if (streamer == null || battle == null) {
-      return;
+      throw new Error("Authoritative enemy carrier unavailable");
     }
     // Ordered WebRTC cannot guarantee a one-shot frame sent across an SCTP abort, suspended tab, or
     // reconnect generation. Keep the boundary closed and re-request the exact wave until the ceiling.
@@ -474,9 +527,15 @@ export class EncounterPhase extends BattlePhase {
     if (enemies == null) {
       throw new Error(`Authoritative enemy party unavailable for wave ${battle.waveIndex}; refusing local derivation`);
     }
+    if ((isCurrent != null && !isCurrent()) || globalScene.currentBattle !== battle) {
+      throw new Error(`Authoritative enemy carrier for wave ${battle.waveIndex} arrived after phase replacement`);
+    }
     const encounter = streamer.consumeEnemyPartyEncounter(battle.waveIndex);
     if (encounter == null) {
       throw new Error(`Authoritative encounter descriptor unavailable for wave ${battle.waveIndex}`);
+    }
+    if ((isCurrent != null && !isCurrent()) || globalScene.currentBattle !== battle) {
+      throw new Error(`Authoritative encounter descriptor for wave ${battle.waveIndex} became stale`);
     }
     applyCoopEncounterAuthority(battle, encounter);
     if (battle.battleType !== BattleType.MYSTERY_ENCOUNTER && enemies.length === 0) {
@@ -594,7 +653,7 @@ export class EncounterPhase extends BattlePhase {
    * (`this.phaseName === "EncounterPhase"`); NextEncounter/NewBiome waves keep the per-wave
    * enemy-adopt. No-op for solo / guest / loaded. Best-effort + guarded - never breaks the host.
    */
-  private broadcastCoopLaunchSnapshot(): void {
+  private broadcastCoopLaunchSnapshot(committedSessionJson?: string): void {
     // Showdown-versus (C5): the host pushes the full launch snapshot so the guest boots its render
     // from the host's authoritative bytes. Co-op OR showdown; solo/guest/non-EncounterPhase no-op.
     if (!isAuthoritativeBattleSession() || this.phaseName !== "EncounterPhase") {
@@ -606,10 +665,14 @@ export class EncounterPhase extends BattlePhase {
       return;
     }
     try {
-      const session = globalScene.gameData.getSessionSaveData();
-      // bigint-safe (mirrors game-data.ts initSessionFromData's debug serialize); parseSessionData
-      // rehydrates every class instance (PokemonData / ArenaData / modifiers / challenges) on the guest.
-      const json = JSON.stringify(session, (_k, v: unknown) => (typeof v === "bigint" ? v.toString() : v));
+      // Fresh co-op releases the exact bytes already committed locally, in host cloud, and through
+      // the guest checkpoint ACK. Showdown has no persistence transaction and uses the coherent
+      // in-memory serializer as before.
+      const json =
+        committedSessionJson
+        ?? JSON.stringify(globalScene.gameData.getSessionSaveData(), (_k, v: unknown) =>
+          typeof v === "bigint" ? v.toString() : v,
+        );
       streamer.sendLaunchSnapshot(globalScene.currentBattle.waveIndex, json);
     } catch {
       /* a serialize/send failure must never break the host; the guest remains at its recovery boundary */
@@ -948,28 +1011,65 @@ export class EncounterPhase extends BattlePhase {
           } else {
             erStormglassApplyChosenWeather();
           }
-          // Co-op HOST (#633 M4): the session is now fully coherent (party + enemy + arena +
-          // weather/terrain), so PUSH the launch snapshot for the guest to boot from. Placed after
-          // the weather/terrain set so the snapshot carries them; before saveAll (same coherent point).
-          this.broadcastCoopLaunchSnapshot();
           if (globalScene.gameMode.isShowdown) {
             // Showdown 1v1 (B7 item 5): a versus match is EPHEMERAL - it NEVER writes a session
             // (no localStorage slot, no cloud `updateAll` push). Skip the per-wave saveAll entirely
             // and boot the encounter directly. The guest already boots from the host's launch
             // snapshot (the `this.loaded` branch above), so only the host reaches here.
+            this.broadcastCoopLaunchSnapshot();
             globalScene.disableMenu = false;
             this.enterEncounterPresentation();
             globalScene.resetSeed();
           } else {
+            const saveController = getCoopController();
+            const saveGeneration = coopSessionGeneration();
             globalScene.gameData
               .saveAll(true, battle.waveIndex % 20 === 1 || (globalScene.lastSavePlayTime ?? 0) >= 1200)
-              .then(success => {
+              .then(async success => {
+                if (
+                  globalScene.gameMode.isCoop
+                  && (getCoopController() !== saveController
+                    || coopSessionGeneration() !== saveGeneration
+                    || globalScene.currentBattle !== battle)
+                ) {
+                  coopWarn("launch", "discarding stale first-save continuation after co-op runtime replacement");
+                  return;
+                }
                 globalScene.disableMenu = false;
                 if (!success) {
                   return globalScene.reset(true);
                 }
+                const launchConsumption = await globalScene.gameData.consumeCommittedFreshCoopLaunchSession(
+                  battle.waveIndex,
+                );
+                if (launchConsumption.kind === "invalid") {
+                  globalScene.disableMenu = false;
+                  globalScene.reset(true);
+                  return;
+                }
+                this.broadcastCoopLaunchSnapshot(
+                  launchConsumption.kind === "committed" ? launchConsumption.sessionJson : undefined,
+                );
                 this.enterEncounterPresentation();
                 globalScene.resetSeed();
+              })
+              .catch(error => {
+                if (
+                  globalScene.gameMode.isCoop
+                  && (getCoopController() !== saveController
+                    || coopSessionGeneration() !== saveGeneration
+                    || globalScene.currentBattle !== battle)
+                ) {
+                  coopWarn("launch", "discarding stale first-save failure after co-op runtime replacement", error);
+                  return;
+                }
+                // Last-resort terminal path: saveAll itself emits the retained launch abort while its
+                // exact claim is still available. Never leave the guest waiting if an unexpected
+                // serializer/storage/API exception escapes the transaction.
+                coopWarn("launch", "first-save transaction threw before launch release", error);
+                globalScene.gameData.cancelPendingFreshCoopSessionSlot();
+                globalScene.disableMenu = false;
+                globalScene.reset(true);
               });
           }
         }
@@ -1364,13 +1464,18 @@ export class EncounterPhase extends BattlePhase {
         }
       }
     }
-    handleTutorial(Tutorial.ACCESS_MENU).then(() => super.end());
+    handleTutorial(Tutorial.ACCESS_MENU).then(() => this.completeEncounterEnd());
 
     // InitEncounterPhase derives PostSummon effects. The authoritative guest rendered the adopted launch
     // above and must wait for host state instead; constructing it only trips the default-deny renderer gate.
     if (!isCoopAuthoritativeGuest()) {
       globalScene.phaseManager.pushNew("InitEncounterPhase");
     }
+  }
+
+  /** Actual queue-shift seam, overridable by exact authoritative boundary subclasses. */
+  protected completeEncounterEnd(): void {
+    super.end();
   }
 
   protected displayFinalBossDialogue(): void {

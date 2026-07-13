@@ -131,10 +131,14 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
       seq: COOP_BIOME_PICK_SEQ_BASE + pinned,
       pinned,
       choice: 0,
-      payload: { biomeId, nodeIndex: 0 } satisfies CoopBiomePickPayload,
+      payload: { sourceBiomeId: 0, biomeId, nodeIndex: 0, nextWave: 12 } satisfies CoopBiomePickPayload,
       localRole: "host",
       wave: 11,
       turn: 0,
+      boundarySourceBiomeId: 0,
+      boundaryNextWave: 12,
+      allowedRoutes: [biomeId],
+      deterministicDestination: null,
     });
   }
 

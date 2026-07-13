@@ -42,6 +42,50 @@ import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "
  */
 export const COOP_KEEPALIVE_MS = 5_000;
 
+/**
+ * Conservative application framing below common SCTP message ceilings. Session/launch snapshots
+ * grow throughout a long campaign; splitting their JSON keeps a late-wave save from becoming one
+ * oversized RTCDataChannel send while remaining transparent to every protocol consumer.
+ */
+export const COOP_WIRE_CHUNK_RAW_BYTES = 9_000;
+/** Backward-compatible test/diagnostic alias; framing is byte-budgeted, not character-budgeted. */
+export const COOP_WIRE_CHUNK_PAYLOAD_CHARS = COOP_WIRE_CHUNK_RAW_BYTES;
+export const COOP_WIRE_BUFFER_HIGH_BYTES = 256 * 1024;
+export const COOP_WIRE_BUFFER_LOW_BYTES = 64 * 1024;
+const COOP_WIRE_MAX_CHUNKS = 2_048;
+const COOP_WIRE_MAX_REASSEMBLED_BYTES = 16 * 1024 * 1024;
+const COOP_LOGICAL_QUEUE_MAX_BYTES = 32 * 1024 * 1024;
+const COOP_LOGICAL_QUEUE_MAX_COUNT = 512;
+
+interface CoopWireChunkFrame {
+  __coopChunk: 1;
+  id: string;
+  index: number;
+  total: number;
+  payload: string;
+  bytes: number;
+}
+
+interface CoopLogicalOutbound {
+  msg: CoopMessage;
+  json: string;
+  byteLength: number;
+  attempt: { generation: number; id: string; frames: string[]; index: number } | null;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 8_192) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 8_192));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  return Uint8Array.from(binary, char => char.charCodeAt(0));
+}
+
 /** Default keepalive scheduler (real timer); injectable so unit tests drive ticks deterministically. */
 function defaultKeepaliveSchedule(cb: () => void, ms: number): () => void {
   const id = setInterval(cb, ms);
@@ -57,6 +101,8 @@ function defaultKeepaliveSchedule(cb: () => void, ms: number): () => void {
 export interface CoopWireChannel {
   /** Mirrors RTCDataChannel.readyState ("connecting" | "open" | "closing" | "closed"). */
   readonly readyState: string;
+  readonly bufferedAmount?: number;
+  bufferedAmountLowThreshold?: number;
   /** Send a UTF-8 string frame to the peer. */
   send(data: string): void;
   /** Close the channel. */
@@ -67,6 +113,7 @@ export interface CoopWireChannel {
   onOpen(handler: () => void): void;
   /** Register the channel-close handler. */
   onClose(handler: () => void): void;
+  onBufferedAmountLow?(handler: () => void): void;
   /**
    * #857: the most recent RAW channel error message (e.g. the SCTP abort reason
    * "User-Initiated Abort, reason=Close called"), captured so the reconnect banner can carry
@@ -99,6 +146,15 @@ export class WebRtcTransport implements CoopTransport {
    * frames are shed, never queued (§4.1). Survives {@linkcode replaceChannel} (it lives on the instance).
    */
   private outboundQueue: CoopOutboundQueue | null = null;
+  private outboundChunkSeq = 0;
+  private readonly logicalOutbound: CoopLogicalOutbound[] = [];
+  private logicalOutboundBytes = 0;
+  private drainingLogicalOutbound = false;
+  private blockedSendGeneration: number | null = null;
+  private readonly inboundChunks = new Map<
+    string,
+    { readonly total: number; readonly parts: (string | undefined)[]; received: number; bytes: number }
+  >();
 
   constructor(role: CoopRole, wire: CoopWireChannel) {
     this.role = role;
@@ -111,19 +167,32 @@ export class WebRtcTransport implements CoopTransport {
   /** Bind channel events for the CURRENT generation; a replaced channel's events are inert. */
   private attach(wire: CoopWireChannel): void {
     const gen = this.wireGeneration;
+    try {
+      wire.bufferedAmountLowThreshold = COOP_WIRE_BUFFER_LOW_BYTES;
+    } catch {
+      /* optional on minimal test wires */
+    }
+    wire.onBufferedAmountLow?.(() => {
+      if (gen === this.wireGeneration) {
+        this.drainLogicalOutbound();
+      }
+    });
     wire.onOpen(() => {
       if (gen !== this.wireGeneration) {
         return;
       }
       coopLog("webrtc", `channel OPEN role=${this.role} gen=${gen}`);
       this.setState("connected");
+      this.blockedSendGeneration = null;
       this.flushOutboundQueue();
+      this.drainLogicalOutbound();
     });
     wire.onClose(() => {
       if (gen !== this.wireGeneration) {
         return;
       }
       coopLog("webrtc", `channel CLOSE role=${this.role} state=${this._state} gen=${gen}`);
+      this.inboundChunks.clear();
       this.setState("disconnected");
     });
     wire.onMessage(data => {
@@ -142,6 +211,11 @@ export class WebRtcTransport implements CoopTransport {
    */
   replaceChannel(wire: CoopWireChannel): void {
     this.wireGeneration++;
+    this.inboundChunks.clear();
+    this.blockedSendGeneration = null;
+    for (const logical of this.logicalOutbound) {
+      logical.attempt = null;
+    }
     coopLog("webrtc", `replaceChannel role=${this.role} gen=${this.wireGeneration} readyState=${wire.readyState}`);
     try {
       this.wire.close();
@@ -155,6 +229,7 @@ export class WebRtcTransport implements CoopTransport {
       // The fresh channel came up already open (no `open` event to wait for): flush the frames that
       // queued while it was dark (§4.3) so a #805 hot rejoin loses nothing sent during the blip.
       this.flushOutboundQueue();
+      this.drainLogicalOutbound();
     }
   }
 
@@ -211,7 +286,7 @@ export class WebRtcTransport implements CoopTransport {
       // drop-on-not-open path unchanged.
       if (isCoopDurabilityEnabled() && classifyCoopMessage(msg) === "durable") {
         const queue = this.outboundQueue ?? (this.outboundQueue = new CoopOutboundQueue());
-        const outcome = queue.offer(msg, JSON.stringify(msg).length);
+        const outcome = queue.offer(msg, new TextEncoder().encode(JSON.stringify(msg)).byteLength);
         if (isCoopDebug()) {
           coopWarn(
             "webrtc",
@@ -237,17 +312,117 @@ export class WebRtcTransport implements CoopTransport {
    * uncaught out of every caller). A failed send is logged; the channel's close event drives the rejoin.
    */
   private transmit(msg: CoopMessage): void {
-    const frame = JSON.stringify(msg);
+    const json = JSON.stringify(msg);
+    const byteLength = new TextEncoder().encode(json).byteLength;
     if (isCoopDebug()) {
-      coopLog("webrtc", `raw tx role=${this.role} t=${msg.t} bytes=${frame.length}`);
+      coopLog("webrtc", `raw tx QUEUE role=${this.role} t=${msg.t} bytes=${byteLength}`);
     }
-    try {
-      this.wire.send(frame);
-    } catch (e) {
+    if (
+      byteLength > COOP_WIRE_MAX_REASSEMBLED_BYTES
+      || this.logicalOutbound.length >= COOP_LOGICAL_QUEUE_MAX_COUNT
+      || this.logicalOutboundBytes + byteLength > COOP_LOGICAL_QUEUE_MAX_BYTES
+    ) {
       coopWarn(
         "webrtc",
-        `raw send THREW role=${this.role} t=${msg.t} err=${(e as Error)?.message ?? "?"} (close event drives the rejoin)`,
+        `raw send REFUSED role=${this.role} t=${msg.t} bytes=${byteLength} queue=${this.logicalOutbound.length}/${this.logicalOutboundBytes} (bounded FIFO limit)`,
       );
+      return;
+    }
+    this.logicalOutbound.push({ msg, json, byteLength, attempt: null });
+    this.logicalOutboundBytes += byteLength;
+    this.drainLogicalOutbound();
+  }
+
+  /** Build a fresh chunk-zero attempt for the current channel generation. */
+  private buildLogicalAttempt(logical: CoopLogicalOutbound): NonNullable<CoopLogicalOutbound["attempt"]> | null {
+    const bytes = new TextEncoder().encode(logical.json);
+    if (bytes.byteLength <= COOP_WIRE_CHUNK_RAW_BYTES) {
+      return {
+        generation: this.wireGeneration,
+        id: `${this.role}-${this.wireGeneration}-${++this.outboundChunkSeq}`,
+        frames: [logical.json],
+        index: 0,
+      };
+    }
+    const total = Math.ceil(bytes.byteLength / COOP_WIRE_CHUNK_RAW_BYTES);
+    if (total > COOP_WIRE_MAX_CHUNKS) {
+      coopWarn(
+        "webrtc",
+        `raw send REFUSED role=${this.role} t=${logical.msg.t} bytes=${bytes.byteLength} chunks=${total} (bounded framing limit)`,
+      );
+      return null;
+    }
+    const id = `${this.role}-${this.wireGeneration}-${++this.outboundChunkSeq}`;
+    const frames: string[] = [];
+    for (let index = 0; index < total; index++) {
+      const part = bytes.subarray(index * COOP_WIRE_CHUNK_RAW_BYTES, (index + 1) * COOP_WIRE_CHUNK_RAW_BYTES);
+      const chunk: CoopWireChunkFrame = {
+        __coopChunk: 1,
+        id,
+        index,
+        total,
+        payload: bytesToBase64(part),
+        bytes: part.byteLength,
+      };
+      frames.push(JSON.stringify(chunk));
+    }
+    coopLog(
+      "webrtc",
+      `raw tx CHUNKED role=${this.role} t=${logical.msg.t} bytes=${bytes.byteLength} chunks=${total} id=${id}`,
+    );
+    return { generation: this.wireGeneration, id, frames, index: 0 };
+  }
+
+  /**
+   * Drain the logical FIFO while the channel is open and below its byte watermark. A mid-attempt
+   * exception leaves the logical item at the head; replacement builds a new id and restarts at chunk 0.
+   */
+  private drainLogicalOutbound(): void {
+    if (
+      this.drainingLogicalOutbound
+      || this._state !== "connected"
+      || this.wire.readyState !== "open"
+      || this.blockedSendGeneration === this.wireGeneration
+    ) {
+      return;
+    }
+    this.drainingLogicalOutbound = true;
+    try {
+      while (this.logicalOutbound.length > 0) {
+        const logical = this.logicalOutbound[0];
+        if (logical.attempt == null || logical.attempt.generation !== this.wireGeneration) {
+          logical.attempt = this.buildLogicalAttempt(logical);
+          if (logical.attempt == null) {
+            this.logicalOutbound.shift();
+            this.logicalOutboundBytes -= logical.byteLength;
+            continue;
+          }
+        }
+        const attempt = logical.attempt;
+        while (attempt.index < attempt.frames.length) {
+          const frame = attempt.frames[attempt.index];
+          const encodedFrameBytes = new TextEncoder().encode(frame).byteLength;
+          if ((this.wire.bufferedAmount ?? 0) + encodedFrameBytes > COOP_WIRE_BUFFER_HIGH_BYTES) {
+            return;
+          }
+          try {
+            this.wire.send(frame);
+          } catch (error) {
+            coopWarn(
+              "webrtc",
+              `raw send THREW role=${this.role} t=${logical.msg.t} chunk=${attempt.index}/${attempt.frames.length} err=${(error as Error)?.message ?? "?"} (restart on replacement)`,
+            );
+            logical.attempt = null;
+            this.blockedSendGeneration = this.wireGeneration;
+            return;
+          }
+          attempt.index++;
+        }
+        this.logicalOutbound.shift();
+        this.logicalOutboundBytes -= logical.byteLength;
+      }
+    } finally {
+      this.drainingLogicalOutbound = false;
     }
   }
 
@@ -298,6 +473,10 @@ export class WebRtcTransport implements CoopTransport {
     this.keepaliveCancel = null;
     this.setState("closed");
     this.wire.close();
+    this.inboundChunks.clear();
+    this.logicalOutbound.length = 0;
+    this.logicalOutboundBytes = 0;
+    this.blockedSendGeneration = null;
     this.msgHandlers.clear();
     this.stateHandlers.clear();
   }
@@ -334,6 +513,10 @@ export class WebRtcTransport implements CoopTransport {
       coopWarn("webrtc", `raw rx DECODE FAIL role=${this.role} bytes=${data.length} (malformed JSON, dropped)`);
       return;
     }
+    if (this.isChunkFrame(parsed)) {
+      this.receiveChunk(parsed);
+      return;
+    }
     if (parsed != null && typeof parsed === "object" && typeof (parsed as { t?: unknown }).t === "string") {
       const msg = parsed as CoopMessage;
       // #857: keepalive frames are TRANSPORT-INTERNAL - swallow them (no fan-out, no per-frame log
@@ -362,6 +545,113 @@ export class WebRtcTransport implements CoopTransport {
         `raw rx UNKNOWN frame role=${this.role} bytes=${data.length} (no string .t discriminant, dropped)`,
       );
     }
+  }
+
+  private isChunkFrame(value: unknown): value is CoopWireChunkFrame {
+    if (value == null || typeof value !== "object") {
+      return false;
+    }
+    const chunk = value as Partial<CoopWireChunkFrame>;
+    return (
+      chunk.__coopChunk === 1
+      && typeof chunk.id === "string"
+      && chunk.id.length > 0
+      && Number.isInteger(chunk.index)
+      && Number.isInteger(chunk.total)
+      && typeof chunk.payload === "string"
+      && Number.isInteger(chunk.bytes)
+    );
+  }
+
+  private receiveChunk(chunk: CoopWireChunkFrame): void {
+    if (
+      chunk.total <= 0
+      || chunk.total > COOP_WIRE_MAX_CHUNKS
+      || chunk.index < 0
+      || chunk.index >= chunk.total
+      || chunk.bytes <= 0
+      || chunk.bytes > COOP_WIRE_CHUNK_RAW_BYTES
+      || chunk.payload.length > Math.ceil(COOP_WIRE_CHUNK_RAW_BYTES / 3) * 4
+    ) {
+      coopWarn("webrtc", `raw rx invalid chunk role=${this.role} id=${chunk.id} index=${chunk.index}/${chunk.total}`);
+      this.inboundChunks.delete(chunk.id);
+      return;
+    }
+    let decodedPart: Uint8Array;
+    try {
+      decodedPart = base64ToBytes(chunk.payload);
+    } catch {
+      coopWarn("webrtc", `raw rx invalid base64 chunk role=${this.role} id=${chunk.id} index=${chunk.index}`);
+      this.inboundChunks.delete(chunk.id);
+      return;
+    }
+    if (decodedPart.byteLength !== chunk.bytes) {
+      coopWarn("webrtc", `raw rx invalid byte count role=${this.role} id=${chunk.id} index=${chunk.index}`);
+      this.inboundChunks.delete(chunk.id);
+      return;
+    }
+    let assembly = this.inboundChunks.get(chunk.id);
+    if (assembly == null) {
+      // Bound concurrent partial frames as well as each frame's final size. Reliable ordered SCTP
+      // normally leaves only one; four allows overlapping application sends without unbounded input.
+      if (this.inboundChunks.size >= 4) {
+        const oldest = this.inboundChunks.keys().next().value;
+        if (typeof oldest === "string") {
+          this.inboundChunks.delete(oldest);
+        }
+      }
+      assembly = { total: chunk.total, parts: new Array(chunk.total), received: 0, bytes: 0 };
+      this.inboundChunks.set(chunk.id, assembly);
+    }
+    if (assembly.total !== chunk.total) {
+      coopWarn("webrtc", `raw rx inconsistent chunk total role=${this.role} id=${chunk.id}`);
+      this.inboundChunks.delete(chunk.id);
+      return;
+    }
+    const prior = assembly.parts[chunk.index];
+    if (prior != null) {
+      if (prior !== chunk.payload) {
+        coopWarn("webrtc", `raw rx conflicting duplicate chunk role=${this.role} id=${chunk.id}`);
+        this.inboundChunks.delete(chunk.id);
+      }
+      return;
+    }
+    assembly.parts[chunk.index] = chunk.payload;
+    assembly.received++;
+    assembly.bytes += decodedPart.byteLength;
+    if (assembly.bytes > COOP_WIRE_MAX_REASSEMBLED_BYTES) {
+      coopWarn("webrtc", `raw rx oversized chunk assembly role=${this.role} id=${chunk.id}`);
+      this.inboundChunks.delete(chunk.id);
+      return;
+    }
+    if (assembly.received !== assembly.total) {
+      return;
+    }
+    this.inboundChunks.delete(chunk.id);
+    const completeBytes = new Uint8Array(assembly.bytes);
+    let offset = 0;
+    try {
+      for (const payload of assembly.parts) {
+        if (payload == null) {
+          throw new Error("missing chunk");
+        }
+        const part = base64ToBytes(payload);
+        completeBytes.set(part, offset);
+        offset += part.byteLength;
+      }
+    } catch {
+      coopWarn("webrtc", `raw rx chunk decode failed role=${this.role} id=${chunk.id}`);
+      return;
+    }
+    let complete: string;
+    try {
+      complete = new TextDecoder("utf-8", { fatal: true }).decode(completeBytes);
+    } catch {
+      coopWarn("webrtc", `raw rx invalid UTF-8 assembly role=${this.role} id=${chunk.id}`);
+      return;
+    }
+    coopLog("webrtc", `raw rx REASSEMBLED role=${this.role} bytes=${assembly.bytes} chunks=${assembly.total}`);
+    this.receive(complete);
   }
 }
 
@@ -409,6 +699,15 @@ export function wireFromRtcChannel(role: CoopRole, channel: RTCDataChannel, pc?:
     get readyState() {
       return channel.readyState;
     },
+    get bufferedAmount() {
+      return channel.bufferedAmount;
+    },
+    get bufferedAmountLowThreshold() {
+      return channel.bufferedAmountLowThreshold;
+    },
+    set bufferedAmountLowThreshold(value: number) {
+      channel.bufferedAmountLowThreshold = value;
+    },
     get lastError() {
       return lastError;
     },
@@ -436,6 +735,9 @@ export function wireFromRtcChannel(role: CoopRole, channel: RTCDataChannel, pc?:
     },
     onClose: handler => {
       channel.addEventListener("close", () => handler());
+    },
+    onBufferedAmountLow: handler => {
+      channel.addEventListener("bufferedamountlow", () => handler());
     },
   };
   return wire;

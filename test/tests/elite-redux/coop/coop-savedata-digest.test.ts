@@ -138,6 +138,13 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     // best-effort
   });
 
+  function liveSelectBiome(): SelectBiomePhase {
+    const phase = new SelectBiomePhase();
+    (phase as unknown as { boundaryStillLive(generation: number, wave: number): boolean }).boundaryStillLive = () =>
+      true;
+    return phase;
+  }
+
   function wireGuestCommand(rig: DuoRig): void {
     rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
       command: Command.FIGHT,
@@ -528,7 +535,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       // OWNER drives the real picker + relays its chosen biome (buffered for the watcher). #858: the picker
       // opens AFTER the reciprocal boundary barrier, which buffer-hits the watcher arrival above.
       await withClient(ownerCtx, async () => {
-        const phase = new SelectBiomePhase();
+        const phase = liveSelectBiome();
         phase.start();
         for (let i = 0; i < 80 && ownerMock.box.onSelect == null; i++) {
           await drainLoopback();
@@ -539,7 +546,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       });
       // WATCHER opens the mirrored copy + adopts the owner's relayed biome.
       await withClient(watcherCtx, async () => {
-        const phase = new SelectBiomePhase();
+        const phase = liveSelectBiome();
         phase.start();
         for (let i = 0; i < 40; i++) {
           await drainLoopback();
@@ -611,7 +618,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     // The WATCHER engine runs the biome pick alone; the owner never sends -> it backstops to the roll.
     const watcherFallback = await withClient(watcherCtx, async () => {
       const spy = vi.spyOn(watcherCtx.scene.phaseManager, "unshiftNew");
-      const phase = new SelectBiomePhase();
+      const phase = liveSelectBiome();
       phase.start();
       // #858: the watcher first crosses its natural-pick boundary barrier (owner absent -> anti-hang timeout),
       // THEN falls back on the mocked relay timeout - poll across both.

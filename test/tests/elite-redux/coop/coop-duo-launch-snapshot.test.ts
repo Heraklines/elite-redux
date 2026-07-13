@@ -29,11 +29,13 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
+import { deriveCoopResumeCommitment } from "#data/elite-redux/coop/coop-resume-marker";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { PlayerPokemon } from "#field/pokemon";
 import { materializeCoopAdoptedEnemyField, materializeCoopLoadedPlayerField } from "#phases/encounter-phase";
 import { ShowTrainerPhase } from "#phases/show-trainer-phase";
 import { GameManager } from "#test/framework/game-manager";
@@ -180,6 +182,103 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
       }
     });
 
+    logs.flush();
+  }, 300_000);
+
+  it("returns false when a parseable launch snapshot fails during session materialization", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const hostJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
+    const materializer = vi
+      .spyOn(
+        rig.guestScene.gameData as unknown as {
+          initSessionFromData: (data: unknown) => Promise<void>;
+        },
+        "initSessionFromData",
+      )
+      .mockRejectedValueOnce(new Error("asset materialization failed"));
+
+    await expect(
+      withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(hostJson)),
+      "a post-parse failure becomes an explicit negative resume result",
+    ).resolves.toBe(false);
+    expect(materializer).toHaveBeenCalledOnce();
+    materializer.mockRestore();
+    logs.flush();
+  }, 300_000);
+
+  it("rejects wrong-mode, wrong-seat, and digest-swapped snapshots before session mutation", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const hostJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
+    const parsed = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(hostJson));
+    const commitment = await deriveCoopResumeCommitment(hostJson, parsed);
+    expect(commitment).not.toBeNull();
+    const raw = JSON.parse(hostJson) as Record<string, unknown>;
+
+    const wrongMode = JSON.stringify({ ...raw, gameMode: GameModes.CLASSIC });
+    await expect(
+      withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(wrongMode)),
+      "a parseable solo snapshot cannot cross the co-op adoption boundary",
+    ).resolves.toBe(false);
+
+    const participants = raw.coopParticipants as {
+      version: 1;
+      players: [string, string];
+      seats: { host: string; guest: string };
+    };
+    const wrongSeat = JSON.stringify({
+      ...raw,
+      coopParticipants: { ...participants, seats: { ...participants.seats, guest: "Mallory" } },
+    });
+    await expect(
+      withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(wrongSeat)),
+      "the right pair in the wrong authority seats is rejected",
+    ).resolves.toBe(false);
+
+    const swappedAfterOffer = JSON.stringify({ ...raw, money: Number(raw.money ?? 0) + 1 });
+    await expect(
+      withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(swappedAfterOffer, commitment!)),
+      "bytes changed after the offer cannot satisfy its digest",
+    ).resolves.toBe(false);
+    logs.flush();
+  }, 300_000);
+
+  it("stages assets without mutating the scene when the exact runtime is replaced mid-load", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const hostJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
+    const moneyBefore = rig.guestScene.money;
+    const partyBefore = rig.guestScene.getPlayerParty().map(pokemon => pokemon.id);
+    let releaseLoad!: () => void;
+    let markLoadStarted!: () => void;
+    const loadStarted = new Promise<void>(resolve => {
+      markLoadStarted = resolve;
+    });
+    const heldLoad = new Promise<void>(resolve => {
+      releaseLoad = resolve;
+    });
+    const loadSpy = vi.spyOn(PlayerPokemon.prototype, "loadAssets").mockImplementationOnce(async () => {
+      markLoadStarted();
+      await heldLoad;
+    });
+
+    const applying = withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(hostJson));
+    await loadStarted;
+    expect(rig.guestScene.money, "money is not committed before staged assets settle").toBe(moneyBefore);
+    expect(
+      rig.guestScene.getPlayerParty().map(pokemon => pokemon.id),
+      "party is not replaced before staged assets settle",
+    ).toEqual(partyBefore);
+    setCoopRuntime(rig.hostRuntime);
+    releaseLoad();
+    await expect(applying, "the stale materialization lease fails closed").resolves.toBe(false);
+    expect(rig.guestScene.money, "stale staged bytes never commit money").toBe(moneyBefore);
+    expect(
+      rig.guestScene.getPlayerParty().map(pokemon => pokemon.id),
+      "stale staged bytes never replace party",
+    ).toEqual(partyBefore);
+    loadSpy.mockRestore();
     logs.flush();
   }, 300_000);
 });

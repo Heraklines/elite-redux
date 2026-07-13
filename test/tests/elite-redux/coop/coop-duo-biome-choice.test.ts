@@ -20,8 +20,8 @@
 //      a NON-DEFAULT biome; the watcher's mirror session began; BOTH land in the SAME
 //      chosen biome; the WHOLE chain is ONE interaction (one counter advance on both).
 //   3. ALTERNATION: the picker owner flips to the other player at the next crossroads.
-//   4. FALLBACK: a disconnected owner (the watcher's relay times out) backstops to the
-//      SAME deterministic auto-resolve both engines compute off the shared seed.
+//   4. FAIL-CLOSED: a disconnected owner cannot make the watcher derive a biome locally;
+//      it remains parked until the exact host-committed BIOME_PICK arrives.
 //
 // FAILS-BEFORE: under the old bypass (select-biome-phase auto-rolled generateNextBiome;
 // er-crossroads auto-resolved erHasNotoriety), NO picker opens, NO mirror session begins,
@@ -35,6 +35,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { applyCoopFullSnapshot, captureCoopFullSnapshot } from "#data/elite-redux/coop/coop-battle-engine";
+import { resetCoopBiomeCommitWaitMs, setCoopBiomeCommitWaitMs } from "#data/elite-redux/coop/coop-biome-operation";
 import {
   coopBiomeInteractionStartValue,
   resetCoopBiomePickerDrivenByTest,
@@ -166,6 +167,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     setCoopWaveBarrierMs(50);
     setCoopRendezvousWaitMs(50);
     setCoopOrphanGraceMs(20); // #863: fast orphan-backstop poll for the stuck-map repro
+    setCoopBiomeCommitWaitMs(20);
     // This suite DRIVES the real crossroads / World-Map picker (the owner opens the actual screen and we
     // invoke its callbacks), so opt OUT of the vitest owner auto-resolve. Reset in afterEach (anti-latch).
     setCoopBiomePickerDrivenByTest();
@@ -186,6 +188,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     setCoopWaveBarrierMs(60_000);
     resetCoopRendezvousWaitMs();
     resetCoopOrphanGraceMs();
+    resetCoopBiomeCommitWaitMs();
     resetCoopBiomePickerDrivenByTest();
     resetErBiomeStructure();
     setErPendingNodes([]);
@@ -225,11 +228,26 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     resolving: boolean;
   }
 
+  /** These legacy focused probes construct a phase directly; make that synthetic instance the live seam. */
+  function liveCrossroads(): ErCrossroadsPhase {
+    const phase = new ErCrossroadsPhase();
+    (phase as unknown as { boundaryStillLive(generation: number, wave: number): boolean }).boundaryStillLive = () =>
+      true;
+    return phase;
+  }
+
+  function liveSelectBiome(): SelectBiomePhase {
+    const phase = new SelectBiomePhase();
+    (phase as unknown as { boundaryStillLive(generation: number, wave: number): boolean }).boundaryStillLive = () =>
+      true;
+    return phase;
+  }
+
   /** Drive the OWNER crossroads: start (opens mocked OPTION_SELECT after the #858 boundary barrier), then
    *  press Stay(0)/Leave(1). The owner drives alone here, so its reciprocal boundary barrier resolves via
    *  the anti-hang timeout (setCoopRendezvousWaitMs(50)) - poll for the menu across it. */
   async function driveCrossroadsOwner(cap: UiCapture, moveOn: boolean): Promise<void> {
-    const phase = new ErCrossroadsPhase();
+    const phase = liveCrossroads();
     phase.start();
     for (let i = 0; i < 80 && cap.optionConfig == null; i++) {
       await drainLoopback();
@@ -243,7 +261,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
 
   /** Drive the WATCHER crossroads: start (opens mirrored copy + awaits), drain until it applies. */
   async function driveCrossroadsWatch(): Promise<CrossroadsSeam> {
-    const phase = new ErCrossroadsPhase() as unknown as CrossroadsSeam;
+    const phase = liveCrossroads() as unknown as CrossroadsSeam;
     phase.start();
     for (let i = 0; i < 40; i++) {
       await drainLoopback();
@@ -362,7 +380,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       await arriveBoundary(watcherCtx, "biomepick:11");
       setCoopBiomeInteractionStart(pinAfterLeave); // the owner engine's chained pin
       await withClient(ownerCtx, async () => {
-        const phase = new SelectBiomePhase();
+        const phase = liveSelectBiome();
         phase.start(); // reaches coopBiomePickOwner and opens the real ER_MAP handler
         for (let i = 0; i < 100 && ownerCtx.scene.ui.getMode() !== UiMode.ER_MAP; i++) {
           await drainLoopback();
@@ -379,7 +397,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       });
       setCoopBiomeInteractionStart(pinAfterLeave); // the watcher engine's own chained pin
       await withClient(watcherCtx, async () => {
-        const phase = new SelectBiomePhase();
+        const phase = liveSelectBiome();
         phase.start(); // reaches coopBiomePickWatch (ER_MAP mocked), beginSession("watcher"), awaits relay
         for (let i = 0; i < 40; i++) {
           await drainLoopback();
@@ -419,10 +437,10 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   }, 300_000);
 
   // =====================================================================================
-  // SCENARIO 4: FALLBACK - a disconnected owner (relay times out) backstops to the SAME
-  // deterministic roll both engines compute off the shared seed (cannot desync).
+  // SCENARIO 4: FAIL CLOSED - a disconnected owner cannot make the authoritative renderer
+  // derive a biome locally. It remains parked until the exact host BIOME_PICK is journaled.
   // =====================================================================================
-  it("FALLBACK: a timed-out owner pick backstops the watcher to the deterministic roll (no desync)", async () => {
+  it("AUTHORITY LOSS: a timed-out owner pick parks without renderer RNG, mutation, or counter advance", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
 
@@ -440,43 +458,41 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     const { ownerCtx, watcherCtx } = ownerCtxFor(rig, counterBefore);
     const watcherCounterBefore = watcherCtx.runtime.controller.interactionCounter();
     const switchSpy = vi.spyOn(watcherCtx.scene.phaseManager, "unshiftNew");
+    const randomBiome = vi.spyOn(watcherCtx.scene, "generateRandomBiome");
+    const sourceBiome = watcherCtx.scene.arena.biomeId;
 
     // The owner reached the shared boundary, then disappeared before sending a choice. This lets the
     // watcher cross the reciprocal barrier while still exercising the deterministic relay fallback.
     await arriveBoundary(ownerCtx, "biomepick:11");
     const cap = installUiCapture(watcherCtx.scene);
-    let fallbackBiome: BiomeId | undefined;
+    const ui = watcherCtx.scene.ui as unknown as {
+      showText: (text: string, delay?: number | null, cb?: (() => void) | null, ...rest: unknown[]) => void;
+    };
+    ui.showText = () => {
+      // Hold the explicit recovery action: authority loss must park rather than self-select.
+    };
     try {
       await withClient(watcherCtx, async () => {
-        const phase = new SelectBiomePhase();
-        phase.start();
-        // #858: the watcher crosses the already-paired boundary, THEN falls back on the mocked relay timeout.
-        for (let i = 0; i < 80; i++) {
+        liveSelectBiome().start();
+        for (let i = 0; i < 40; i++) {
           await drainLoopback();
-          fallbackBiome = switchSpy.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1] as BiomeId | undefined;
-          if (fallbackBiome !== undefined) {
-            return;
-          }
+          await new Promise(resolve => setTimeout(resolve, 2));
         }
-        throw new Error("fallback HANG: the watcher never resolved on timeout");
       });
     } finally {
       cap.restore();
     }
 
-    // The fallback equals the SAME deterministic roll both engines compute off the just-reset shared seed.
-    const deterministic = await withClient(watcherCtx, () => {
-      watcherCtx.scene.resetSeed();
-      return watcherCtx.scene.generateRandomBiome(12);
-    });
-    expect(fallbackBiome, "the watcher fell back to a biome (never hangs)").not.toBeUndefined();
-    expect(fallbackBiome, "the fallback IS the deterministic shared-seed roll (cannot desync)").toBe(deterministic);
-    // The counter still advances once on the engine that ran (the interaction terminates even on the
-    // fallback path, so alternation never freezes). Only the watcher engine ran (owner "disconnected").
+    expect(
+      switchSpy.mock.calls.some(c => c[0] === "SwitchBiomePhase"),
+      "no uncommitted switch",
+    ).toBe(false);
+    expect(randomBiome, "the authoritative renderer cannot choose a timeout fallback").not.toHaveBeenCalled();
+    expect(watcherCtx.scene.arena.biomeId, "the renderer keeps its source arena while parked").toBe(sourceBiome);
     expect(
       watcherCtx.runtime.controller.interactionCounter(),
-      "the interaction still terminates (advances once) on fallback",
-    ).toBe(watcherCounterBefore + 1);
+      "the renderer cannot advance an interaction that authority never committed",
+    ).toBe(watcherCounterBefore);
     logs.flush();
   }, 300_000);
 
@@ -499,9 +515,9 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   // FAILS-BEFORE: with only the choice-relay await, the watcher's UI mode never leaves ER_MAP (it sits on
   // the 20-min timeout) - the drain loop below never satisfies "mode left ER_MAP", so it throws.
   // PASSES-AFTER: the orphan backstop returns null promptly, the watcher ends its mirror, tears the map
-  // down to MESSAGE, and applies the deterministic fallback biome (run proceeds).
+  // down to MESSAGE, and parks for the missing exact commit without choosing a biome locally.
   // =====================================================================================
-  it("ORPHAN (#863): owner advances past the biome pick with NO relay -> watcher LEAVES the map + the run proceeds", async () => {
+  it("ORPHAN (#863): owner advances with NO exact commit -> watcher leaves the map and parks without mutation", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
 
@@ -519,7 +535,14 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     const beginSpy = vi.spyOn(CoopUiMirror.prototype, "beginSession");
     const watcherTracker = installUiModeTracker(watcherCtx.scene);
     const switchSpy = vi.spyOn(watcherCtx.scene.phaseManager, "unshiftNew");
-    const watcherCounterBefore = watcherCtx.runtime.controller.interactionCounter();
+    const randomBiome = vi.spyOn(watcherCtx.scene, "generateRandomBiome");
+    const sourceBiome = watcherCtx.scene.arena.biomeId;
+    const ui = watcherCtx.scene.ui as unknown as {
+      showText: (text: string, delay?: number | null, cb?: (() => void) | null, ...rest: unknown[]) => void;
+    };
+    ui.showText = () => {
+      // Hold the recovery action after the orphan detector closes the map.
+    };
 
     // The OWNER commits + moves on WITHOUT relaying a biomePick: advance the shared interaction counter and
     // broadcast it. The watcher receives ONLY this advance (never a pick) - the exact one-sided orphan.
@@ -529,11 +552,12 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     try {
       await withClient(watcherCtx, async () => {
         setCoopBiomeInteractionStart(counterBefore); // chained pin -> the watcher takes coopBiomePickWatch
-        const phase = new SelectBiomePhase();
+        const phase = liveSelectBiome();
         phase.start();
         for (let i = 0; i < 200; i++) {
           await drainLoopback();
-          if (watcherTracker.mode() !== UiMode.ER_MAP && switchSpy.mock.calls.some(c => c[0] === "SwitchBiomePhase")) {
+          await new Promise(resolve => setTimeout(resolve, 2));
+          if (watcherTracker.mode() !== UiMode.ER_MAP) {
             return;
           }
         }
@@ -555,13 +579,12 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     );
     expect(
       switchSpy.mock.calls.some(c => c[0] === "SwitchBiomePhase"),
-      "the run PROCEEDS: the watcher queued SwitchBiomePhase (deterministic fallback biome) (#863)",
-    ).toBe(true);
-    // The interaction terminates on the watcher (advances once), so alternation never freezes.
-    expect(
-      watcherCtx.runtime.controller.interactionCounter(),
-      "the interaction terminates (advances once) on the orphan dismiss",
-    ).toBe(watcherCounterBefore + 1);
+      "the renderer cannot queue SwitchBiomePhase without the exact journal commit",
+    ).toBe(false);
+    expect(randomBiome, "the orphan path cannot derive a renderer fallback").not.toHaveBeenCalled();
+    expect(watcherCtx.scene.arena.biomeId, "the orphan path leaves authoritative run state untouched").toBe(
+      sourceBiome,
+    );
     logs.flush();
   }, 300_000);
 
@@ -592,7 +615,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
 
     await arriveBoundary(watcherCtx, "biomepick:11");
     await withClient(ownerCtx, async () => {
-      const phase = new SelectBiomePhase();
+      const phase = liveSelectBiome();
       phase.start();
       // Poll across the #858 boundary barrier after the watcher has genuinely arrived; then the real handler opens.
       let opened = false;
@@ -639,88 +662,42 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   // PASSES-AFTER: setNextBiomeAndEnd's owner funnel relays the single-node biome, so the watcher adopts
   // it verbatim -> both engines land in the SAME biome.
   // =====================================================================================
-  it("SCENARIO 6 (#864): owner travels via a DETERMINISTIC terminal -> still relays biomePick; watcher adopts the SAME biome", async () => {
+  it("SCENARIO 6: a chained deterministic terminal uses an exact host BIOME_PICK, not a phantom interaction relay", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-
     rig.hostScene.currentBattle.waveIndex = 11;
     rig.guestScene.currentBattle.waveIndex = 11;
-
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
-    const { ownerCtx, watcherCtx } = ownerCtxFor(rig, counterBefore);
-    // The owner's single deterministic node - the biome BOTH engines must end up in.
-    const ownerBiome = BiomeId.VOLCANO;
-
-    const beginSpy = vi.spyOn(CoopUiMirror.prototype, "beginSession");
+    const destination = BiomeId.VOLCANO;
     const sendSpy = vi.spyOn(CoopInteractionRelay.prototype, "sendInteractionChoice");
-    const guestSwitch = vi.spyOn(watcherCtx.scene.phaseManager, "unshiftNew");
-    const ownerSwitch = vi.spyOn(ownerCtx.scene.phaseManager, "unshiftNew");
-    const biomeArg = (spy: typeof guestSwitch): BiomeId | undefined =>
+    const hostSwitch = vi.spyOn(rig.hostScene.phaseManager, "unshiftNew");
+    const guestSwitch = vi.spyOn(rig.guestScene.phaseManager, "unshiftNew");
+    const biomeArg = (spy: typeof hostSwitch): BiomeId | undefined =>
       spy.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1] as BiomeId | undefined;
-    const ownerCounterBefore = ownerCtx.runtime.controller.interactionCounter();
 
-    // ===== OWNER: a chained crossroads-Leave that resolves to a SINGLE revealed node (deterministic,
-    // never opens the picker). It must STILL relay the biome (#864). =====
-    const ownerCap = installUiCapture(ownerCtx.scene);
-    try {
-      setErPendingNodes([{ biome: ownerBiome, revealed: true }]); // single node -> deterministic terminal
-      await withClient(ownerCtx, async () => {
-        setCoopBiomeInteractionStart(counterBefore); // the crossroads Leave pinned this interaction on the owner
-        new SelectBiomePhase().start();
+    await withClient(rig.hostCtx, async () => {
+      setErPendingNodes([{ biome: destination, revealed: true }]);
+      setCoopBiomeInteractionStart(counterBefore);
+      liveSelectBiome().start();
+      await drainLoopback();
+    });
+    await withClient(rig.guestCtx, async () => {
+      setErPendingNodes([{ biome: destination, revealed: true }]);
+      setCoopBiomeInteractionStart(counterBefore);
+      liveSelectBiome().start();
+      for (let i = 0; i < 80 && biomeArg(guestSwitch) === undefined; i++) {
         await drainLoopback();
-      });
-    } finally {
-      ownerCap.restore();
-    }
+      }
+    });
 
-    // The owner NEVER opened the picker (single node), yet it RELAYED the biome (#864 core fix).
-    const ownerBiomePickSends = sendSpy.mock.calls.filter(c => c[1] === "biomePick");
+    expect(biomeArg(hostSwitch)).toBe(destination);
+    expect(biomeArg(guestSwitch)).toBe(destination);
     expect(
-      ownerBiomePickSends.length,
-      "the owner relayed a biomePick even though it travelled via a deterministic single-node terminal (#864)",
-    ).toBe(1);
-    expect(ownerBiomePickSends[0]?.[3], "the relay carries the owner's chosen biome verbatim").toEqual([ownerBiome]);
-    expect(biomeArg(ownerSwitch), "the owner switched to its single-node biome").toBe(ownerBiome);
-    // The owner advanced the interaction counter (so alternation + the #863 orphan backstop hold).
-    expect(
-      ownerCtx.runtime.controller.interactionCounter(),
-      "the owner advanced the interaction counter on its deterministic travel (#864)",
-    ).toBe(ownerCounterBefore + 1);
-
-    // ===== WATCHER: a divergent-state boundary (MULTIPLE nodes) -> opens the mirrored map + awaits the
-    // owner's relay, then adopts the owner's biome verbatim (NOT its own fallback). =====
-    const watcherTracker = installUiModeTracker(watcherCtx.scene);
-    try {
-      setErPendingNodes([
-        { biome: BiomeId.FOREST, revealed: true },
-        { biome: ownerBiome, revealed: true },
-      ]);
-      await withClient(watcherCtx, async () => {
-        setCoopBiomeInteractionStart(counterBefore); // the watcher's own chained pin (same interaction)
-        new SelectBiomePhase().start();
-        for (let i = 0; i < 80; i++) {
-          await drainLoopback();
-          if (biomeArg(guestSwitch) !== undefined) {
-            return;
-          }
-        }
-        throw new Error("biome pick WATCH HANG: the watcher never adopted the owner's deterministic biome (#864)");
-      });
-    } finally {
-      watcherTracker.restore();
-    }
-
-    // The watcher opened the mirrored MAP (real owner-alternated path) and then LEFT it.
-    expect(
-      beginSpy.mock.calls.some(c => c[0] === "watcher"),
-      "the watcher opened a mirrored MAP session",
-    ).toBe(true);
-    expect(watcherTracker.mode(), "the watcher's UI mode LEFT the map (not stuck in ER_MAP)").not.toBe(UiMode.ER_MAP);
-    // THE CONVERGENCE: both engines switch to the OWNER's biome (the watcher ADOPTED it, not a fallback).
-    expect(
-      biomeArg(guestSwitch),
-      "the watcher adopts the owner's biome verbatim (SAME biome, no divergence) (#864)",
-    ).toBe(ownerBiome);
+      sendSpy.mock.calls.filter(c => c[1] === "biomePick"),
+      "no phantom deterministic relay",
+    ).toHaveLength(0);
+    expect(rig.hostRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
+    expect(rig.guestRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
     logs.flush();
   }, 300_000);
 
@@ -799,16 +776,20 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     expect(guestAfter.pending[0]?.biome, "the guest's pending node IS the host's biome").toBe(hostBiome);
     expect(guestAfter.mapNodes, "the guest's revealed MAP nodes match the host").toEqual([hostBiome]);
 
-    // Now the NATURAL single-node terminal runs on the guest -> travels to the host's biome, NO picker, NO
-    // biomePick relay (it is not an interaction), NO counter tick.
+    // The host commits the exact deterministic BIOME_PICK first; the guest then adopts that receipt/permit.
+    const hostSwitch = vi.spyOn(rig.hostScene.phaseManager, "unshiftNew");
     const guestSwitch = vi.spyOn(rig.guestScene.phaseManager, "unshiftNew");
     const sendSpy = vi.spyOn(CoopInteractionRelay.prototype, "sendInteractionChoice");
     const counterBefore = rig.guestRuntime.controller.interactionCounter();
     const guestTracker = installUiModeTracker(rig.guestScene);
     try {
+      await withClient(rig.hostCtx, async () => {
+        liveSelectBiome().start();
+        await drainLoopback();
+      });
       await withClient(rig.guestCtx, async () => {
         // NOT chained (no setCoopBiomeInteractionStart): the natural single-node deterministic terminal.
-        new SelectBiomePhase().start();
+        liveSelectBiome().start();
         for (let i = 0; i < 80; i++) {
           await drainLoopback();
           if (
@@ -825,7 +806,8 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
 
     const biomeArg = (spy: typeof guestSwitch): BiomeId | undefined =>
       spy.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1] as BiomeId | undefined;
-    // THE CONVERGENCE: the guest travels to the host's single-node biome (coherent by construction).
+    expect(biomeArg(hostSwitch), "the authority committed its exact single-node tail").toBe(hostBiome);
+    // THE CONVERGENCE: the guest travels only after adopting the host's exact single-node operation.
     expect(biomeArg(guestSwitch), "the guest travels to the host's single-node biome (coherent) (#865)").toBe(
       hostBiome,
     );

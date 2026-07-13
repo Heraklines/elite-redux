@@ -87,7 +87,7 @@ describe("co-op authoritative ME forwarding - reverse round-trip + seq-channel d
     expect(guestSawPrompt.subPrompt).toEqual({ kind: "party" });
 
     // --- P1b: guest relays the captured party SLOT (kind "meSub") on the SAME seq_me / choice inbox.
-    guestRelay.sendInteractionChoice(seqMe, "meSub", 2);
+    guestRelay.sendInteractionChoice(seqMe, "meSub", 2, [0]);
     const hostSawSlot = await hostRelay.awaitInteractionChoice(seqMe);
     expect(hostSawSlot?.choice).toBe(2);
 

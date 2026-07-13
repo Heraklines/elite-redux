@@ -86,7 +86,8 @@ jobs:
           - { lane: C, shard: 1, total: 3 }
           - { lane: C, shard: 2, total: 3 }
           - { lane: C, shard: 3, total: 3 }
-          - { lane: P, shard: 1, total: 1 }
+          - { lane: P, shard: 1, total: 2 }
+          - { lane: P, shard: 2, total: 2 }
     steps:
       - name: Check out repository
         uses: actions/checkout@v6

@@ -406,7 +406,7 @@ describe("CoopOperationGuest: idempotent applier (§1.6, §1.7)", () => {
         kind: "BIOME_PICK",
         owner: 1,
         status: "committed",
-        payload: { biomeId: 4, nodeIndex: 0 },
+        payload: { sourceBiomeId: 1, biomeId: 4, nodeIndex: 0, nextWave: 4 },
       },
       authoritativeState: makeState(),
     };

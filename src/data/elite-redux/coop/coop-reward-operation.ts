@@ -73,8 +73,8 @@ import {
 import {
   applyCoopOperationEnvelope,
   isCoopOperationJournalActive,
-  journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
+  tryJournalCoopCommittedEnvelope,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
@@ -172,6 +172,8 @@ export function armCoopRewardJournalMaterialization(operationId: string, pinned:
 /** The owner's per-interaction monotonic action ordinal (for the committed op-id). Reset when the pin changes. */
 let ownerOrdinal = 0;
 let ownerOrdinalStart = -1;
+/** Exact once-only identity retained when a terminal must be retried after commit/journal failure. */
+const ownerTerminalOperations = new Map<string, { readonly ordinal: number; readonly operationId: string }>();
 
 /** The watcher's per-interaction monotonic action ordinal (for the applied op-id). Reset when the pin changes. */
 
@@ -231,6 +233,7 @@ export function resetCoopRewardOperationState(): void {
   watcherStateByRole.guest = freshWatcherState();
   ownerOrdinal = 0;
   ownerOrdinalStart = -1;
+  ownerTerminalOperations.clear();
   revisionFloor = 0;
 }
 
@@ -370,24 +373,36 @@ export interface CoopRewardOwnerCommitParams {
   readonly turn?: number;
 }
 
+export interface CoopRewardOwnerCommitResult {
+  readonly operationId: string;
+  readonly revision: number;
+}
+
 /**
  * OWNER: mint + (on the authority) COMMIT one typed reward/market action through the operation primitive
  * (§1.3). ADDITIVE + dual-run: the phase still fires the legacy relay send; this records the authoritative
  * operation. No-op when the flag is OFF. Never throws (the legacy relay is the fallback).
  */
-export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): void {
+export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): CoopRewardOwnerCommitResult | null {
   if (!isCoopRewardOperationEnabled() || params.pinned < 0) {
-    return;
+    return null;
   }
   try {
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
-    const ordinal = nextOwnerOrdinal(params.pinned);
-    const opId = makeCoopOperationId(
-      epoch,
-      ownerSeat,
-      params.pinned * COOP_REWARD_ACTION_STRIDE + ordinal,
-      kindFor(params.surface),
-    );
+    const terminalKey = `${params.surface}:${params.pinned}`;
+    const retainedTerminal = params.terminal ? ownerTerminalOperations.get(terminalKey) : undefined;
+    const ordinal = retainedTerminal?.ordinal ?? nextOwnerOrdinal(params.pinned);
+    const opId =
+      retainedTerminal?.operationId
+      ?? makeCoopOperationId(
+        epoch,
+        ownerSeat,
+        params.pinned * COOP_REWARD_ACTION_STRIDE + ordinal,
+        kindFor(params.surface),
+      );
+    if (params.terminal && retainedTerminal == null) {
+      ownerTerminalOperations.set(terminalKey, { ordinal, operationId: opId });
+    }
     const payload = buildPayload(params.surface, params.label, params.choice, params.data, params.terminal);
     const intent: CoopPendingOperation = {
       id: opId,
@@ -404,25 +419,34 @@ export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): vo
         controlContext(params.surface, params.wave, params.turn ?? 0),
         ownerParityValidator(params.pinned),
       );
-      if (res.kind === "committed") {
+      if (res.kind === "committed" || res.kind === "reack") {
+        const canonicalPayload = res.kind === "reack" ? res.op.payload : res.envelope.pendingOperation?.payload;
+        if (JSON.stringify(canonicalPayload) !== JSON.stringify(intent.payload)) {
+          return null;
+        }
         // COMMIT -> JOURNAL (Wave-2e, §4.1/§4.2): register the committed action with the durability journal
         // (resend / reconnect replay). Rides ALONGSIDE the legacy relay (dual-run); no-op when durability OFF.
-        journalCoopCommittedEnvelope(res.envelope);
+        if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
+          return null;
+        }
         coopLog(
           "reward",
           `${params.surface} op OWNER commit label=${params.label} rev=${res.envelope.revision} id=${opId} (Wave-2d)`,
         );
-      } else {
-        coopWarn(
-          "reward",
-          `${params.surface} op OWNER commit non-committed (${res.kind}) id=${opId} - legacy relay carries it (Wave-2d)`,
-        );
+        return { operationId: opId, revision: res.envelope.revision };
       }
+      coopWarn(
+        "reward",
+        `${params.surface} op OWNER commit non-committed (${res.kind}) id=${opId} - legacy relay carries it (Wave-2d)`,
+      );
+      return null;
     }
     // NOTE: the owner does NOT advance the watcher watermarks - those are a WATCHER-only order (§8.2). The
     // owner knows its own picks; only an adopted RELAY needs the stale-ordering guard.
+    return { operationId: opId, revision: 0 };
   } catch (e) {
     coopWarn("reward", `${params.surface} op OWNER commit threw (handled - legacy relay is the fallback) (Wave-2d)`, e);
+    return null;
   }
 }
 
@@ -515,10 +539,16 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
         coopWarn("reward", `${params.surface} op WATCHER(host) commit REJECTED (${res.kind}) id=${opId} (Wave-2d)`);
         return { adopt: false, reason: `host-${res.kind}` };
       }
-      if (res.kind === "committed") {
+      if (res.kind === "committed" || res.kind === "reack") {
+        const canonicalPayload = res.kind === "reack" ? res.op.payload : res.envelope.pendingOperation?.payload;
+        if (JSON.stringify(canonicalPayload) !== JSON.stringify(intent.payload)) {
+          return { adopt: false, reason: "host-reack-payload-conflict" };
+        }
         // COMMIT -> JOURNAL (Wave-2e): the host is the sole committer of a GUEST-owned action; journal the
         // authoritative envelope so a cut is healed by the journal, not a bespoke self-heal.
-        journalCoopCommittedEnvelope(res.envelope);
+        if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
+          return { adopt: false, reason: "host-journal-not-retained" };
+        }
         // The authoritative host applies its validated guest-owned action at this safe phase seam.
         // The remote guest remains envelope-gated and merely ACKs/dedupes its already-proposed action.
         state.ordinal += 1;

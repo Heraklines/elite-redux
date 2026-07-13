@@ -32,6 +32,7 @@ import type {
   CoopConnectionState,
   CoopEncounterAuthority,
   CoopFullMonSnapshot,
+  CoopLaunchSnapshotAbortReason,
   CoopMessage,
   CoopSerializedEnemy,
   CoopTransport,
@@ -209,10 +210,14 @@ export class CoopBattleStreamer {
   private readonly launchSnapshotWaiters = new Map<number, (res: string | null) => void>();
   /** Latest launch snapshot that arrived before its waiter (race buffer, keyed by wave). */
   private lastLaunchSnapshot: { wave: number; session: string } | null = null;
+  /** A host fresh-run allocation failure, buffered if it beats the guest's launch waiter. */
+  private readonly launchSnapshotAbortWaves = new Set<number>();
   /** Guest-side exact-once guard: reconnect resends cannot leave a second snapshot buffered. */
   private readonly consumedLaunchSnapshotWaves = new Set<number>();
   /** HOST: latest authoritative launch/resume snapshot, retained so a lost push is re-answerable. */
   private lastSentLaunchSnapshot: { wave: number; session: string } | null = null;
+  /** HOST: mutually-exclusive retained launch failure, re-answerable after loss/reconnect. */
+  private lastSentLaunchSnapshotAbort: Extract<CoopMessage, { t: "launchSnapshotAbort" }> | null = null;
   /** GUEST: handler for the host's authoritative ghost-team pool (#633 ghost-pool sync). */
   private ghostPoolHandler: ((pool: GhostTeamSnapshot[]) => void) | null = null;
   /** GUEST: the host's ghost pool that arrived before a handler subscribed (delivered on subscribe). */
@@ -380,8 +385,17 @@ export class CoopBattleStreamer {
    */
   sendLaunchSnapshot(wave: number, session: string): void {
     this.lastSentLaunchSnapshot = { wave, session };
+    this.lastSentLaunchSnapshotAbort = null;
     coopLog("replay", `host SEND launchSnapshot wave=${wave} sessionLen=${session.length}`);
     this.transport.send({ t: "launchSnapshot", wave, session });
+  }
+
+  sendLaunchSnapshotAbort(wave: number, reason: CoopLaunchSnapshotAbortReason = "no-safe-slot"): void {
+    const abort: Extract<CoopMessage, { t: "launchSnapshotAbort" }> = { t: "launchSnapshotAbort", wave, reason };
+    this.lastSentLaunchSnapshot = null;
+    this.lastSentLaunchSnapshotAbort = abort;
+    coopWarn("stream", `host SEND launchSnapshotAbort wave=${wave} reason=${reason}`);
+    this.transport.send(abort);
   }
 
   /**
@@ -768,7 +782,15 @@ export class CoopBattleStreamer {
    * Mirrors {@linkcode awaitEnemyParty} exactly. The guest calls
    * this at launch BEFORE building anything, then boots from the snapshot (computing nothing).
    */
-  awaitLaunchSnapshot(wave: number, timeoutMs = this.timeoutMs): Promise<string | null> {
+  awaitLaunchSnapshot(
+    wave: number,
+    timeoutMs = this.timeoutMs,
+    retry: { retryIntervalMs?: number; maxRetries?: number } = {},
+  ): Promise<string | null> {
+    if (this.launchSnapshotAbortWaves.delete(wave)) {
+      coopWarn("stream", `guest awaitLaunchSnapshot wave=${wave} -> null (buffered host abort)`);
+      return Promise.resolve(null);
+    }
     // Already buffered for this wave (the host raced ahead) -> consume + return immediately.
     const buffered = this.lastLaunchSnapshot;
     if (buffered != null && buffered.wave === wave) {
@@ -789,13 +811,18 @@ export class CoopBattleStreamer {
     coopLog("stream", `guest awaitLaunchSnapshot wave=${wave} START timeout=${timeoutMs}ms`);
     return new Promise<string | null>(resolve => {
       let settled = false;
-      let cancelTimer: () => void = () => {};
+      let cancelTimeout: () => void = () => {};
+      let cancelRetry: () => void = () => {};
+      let retryCount = 0;
+      const retryIntervalMs = retry.retryIntervalMs ?? 1_000;
+      const maxRetries = retry.maxRetries ?? 12;
       const finish = (res: string | null) => {
         if (settled) {
           return;
         }
         settled = true;
-        cancelTimer();
+        cancelTimeout();
+        cancelRetry();
         if (this.launchSnapshotWaiters.get(wave) === finish) {
           this.launchSnapshotWaiters.delete(wave);
         }
@@ -815,7 +842,25 @@ export class CoopBattleStreamer {
       // parked; the response is idempotent and wave-keyed, so it cannot satisfy another launch.
       coopLog("stream", `guest SEND requestLaunchSnapshot wave=${wave}`);
       this.transport.send({ t: "requestLaunchSnapshot", wave });
-      cancelTimer = this.schedule(() => finish(null), timeoutMs);
+      const scheduleRetry = () => {
+        if (retryIntervalMs <= 0 || retryCount >= maxRetries) {
+          return;
+        }
+        cancelRetry = this.schedule(() => {
+          if (settled) {
+            return;
+          }
+          retryCount++;
+          coopWarn(
+            "stream",
+            `guest awaitLaunchSnapshot wave=${wave} no snapshot yet, RE-REQUEST attempt ${retryCount}/${maxRetries}`,
+          );
+          this.transport.send({ t: "requestLaunchSnapshot", wave });
+          scheduleRetry();
+        }, retryIntervalMs);
+      };
+      scheduleRetry();
+      cancelTimeout = this.schedule(() => finish(null), timeoutMs);
     });
   }
 
@@ -1239,7 +1284,11 @@ export class CoopBattleStreamer {
     for (const finish of [...this.stateSyncWaiters.values()]) {
       finish(null);
     }
+    for (const finish of [...this.launchSnapshotWaiters.values()]) {
+      finish(null);
+    }
     this.stateSyncWaiters.clear();
+    this.launchSnapshotWaiters.clear();
     const seq = ++this.stateSyncSeq;
     // The host may have already answered this exact seq (race) - consume it if so.
     const buffered = this.stateSyncInbox.get(seq);
@@ -1322,6 +1371,8 @@ export class CoopBattleStreamer {
     this.battleTypeByWave.clear();
     this.lastLaunchSnapshot = null;
     this.lastSentLaunchSnapshot = null;
+    this.lastSentLaunchSnapshotAbort = null;
+    this.launchSnapshotAbortWaves.clear();
     this.consumedLaunchSnapshotWaves.clear();
     this.enemyPartyHandler = null;
     this.checkpointHandler = null;
@@ -1394,7 +1445,26 @@ export class CoopBattleStreamer {
         this.lastLaunchSnapshot = { wave: msg.wave, session: msg.session };
         return;
       }
+      case "launchSnapshotAbort": {
+        const waiter = this.launchSnapshotWaiters.get(msg.wave);
+        coopWarn("stream", `guest RECV launchSnapshotAbort wave=${msg.wave} reason=${msg.reason}`);
+        if (waiter == null) {
+          this.launchSnapshotAbortWaves.add(msg.wave);
+        } else {
+          waiter(null);
+        }
+        return;
+      }
       case "requestLaunchSnapshot": {
+        const aborted = this.lastSentLaunchSnapshotAbort;
+        if (aborted?.wave === msg.wave) {
+          coopWarn(
+            "stream",
+            `host RECV requestLaunchSnapshot wave=${msg.wave} -> RESEND abort reason=${aborted.reason}`,
+          );
+          this.transport.send(aborted);
+          return;
+        }
         const cached = this.lastSentLaunchSnapshot;
         if (cached?.wave !== msg.wave) {
           coopWarn(

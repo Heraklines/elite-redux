@@ -103,6 +103,13 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     initGlobalScene(game.scene);
   });
 
+  function liveBiomeShop(): BiomeShopPhase {
+    const phase = new BiomeShopPhase();
+    (phase as unknown as { coopBoundaryStillLive(generation: number, wave: number): boolean }).coopBoundaryStillLive =
+      () => true;
+    return phase;
+  }
+
   function wireGuestCommand(rig: DuoRig): void {
     rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
       command: Command.FIGHT,
@@ -287,7 +294,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     let boughtTypeId = "";
     try {
       await withClient(rig.hostCtx, async () => {
-        const phase = new BiomeShopPhase();
+        const phase = liveBiomeShop();
         // The leave-confirm path first hides the shop backdrop via real UI handler calls the
         // headless mock cannot service - neutralize it (purely cosmetic; the flow continues).
         (phase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
@@ -345,6 +352,10 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
             cb(0, 0);
             return Promise.resolve(true);
           }
+          if (args[0] === UiMode.CONFIRM) {
+            (args[1] as () => void)(); // co-op uses bounded base-mode confirm, not an overlay
+            return Promise.resolve(true);
+          }
           return Promise.resolve(true);
         };
         ui.showText = (...args: unknown[]): unknown => {
@@ -382,7 +393,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
 
     // WATCHER (guest): its market phase adopts the streamed stock + applies the buffered buy + leave.
     await withClient(rig.guestCtx, async () => {
-      const phase = new BiomeShopPhase();
+      const phase = liveBiomeShop();
       haltQueueAfterCurrent();
       phase.start();
       for (let i = 0; i < 16; i++) {
@@ -427,7 +438,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     // OWNER opens the market + streams the stock but does NOT leave yet (the watcher must PARK).
     let leaveCb: ((index: number) => boolean) | null = null;
     await withClient(rig.hostCtx, async () => {
-      const phase = new BiomeShopPhase();
+      const phase = liveBiomeShop();
       (phase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
       const ui = globalScene.ui as unknown as {
         setMode: (...args: unknown[]) => unknown;
@@ -437,6 +448,8 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       ui.setMode = (...args: unknown[]): unknown => {
         if (args[0] === UiMode.BIOME_SHOP) {
           leaveCb = args[3] as (index: number) => boolean;
+        } else if (args[0] === UiMode.CONFIRM) {
+          (args[1] as () => void)();
         }
         return Promise.resolve(true);
       };
@@ -461,7 +474,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     // WATCHER parks mid-market (stock adopted, no buys yet), then the resync sweep fires.
     let watchDone = false;
     await withClient(rig.guestCtx, async () => {
-      const phase = new BiomeShopPhase();
+      const phase = liveBiomeShop();
       haltQueueAfterCurrent();
       const seamEnd = phase as unknown as { end: () => void };
       const realEnd = seamEnd.end.bind(phase);

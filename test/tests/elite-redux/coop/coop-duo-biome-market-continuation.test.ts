@@ -118,6 +118,13 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
     initGlobalScene(game.scene);
   });
 
+  function liveBiomeShop(): BiomeShopPhase {
+    const phase = new BiomeShopPhase();
+    (phase as unknown as { coopBoundaryStillLive(generation: number, wave: number): boolean }).coopBoundaryStillLive =
+      () => true;
+    return phase;
+  }
+
   function wireGuestCommand(rig: DuoRig): void {
     rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
       command: Command.FIGHT,
@@ -219,7 +226,7 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
 
     try {
       await withClient(rig.hostCtx, async () => {
-        const phase = new BiomeShopPhase() as unknown as BiomeShopSeam;
+        const phase = liveBiomeShop() as unknown as BiomeShopSeam;
         // Inject a TM as the sole stock item (a continuation item) so the buy runs queuesContinuation.
         (phase as unknown as { buildStock: () => void }).buildStock = function (this: {
           shopOptions: unknown[];
@@ -238,7 +245,7 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
           if (pp != null && Object.hasOwn(pp, "coopBiomeStart")) {
             queuedContinuation.push({ hasBiomeStart: true, biomeStart: pp.coopBiomeStart ?? -999 });
           }
-          return origUnshift(p);
+          origUnshift(p);
         };
 
         const ui = globalScene.ui as unknown as {
@@ -263,6 +270,9 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
           if (args[0] === UiMode.PARTY) {
             (args[3] as (slotIndex: number, option: number) => void)(0, 0);
           }
+          if (args[0] === UiMode.CONFIRM) {
+            (args[1] as () => void)(); // co-op bounded confirm callback
+          }
           return Promise.resolve(true);
         };
         let drove = false;
@@ -285,7 +295,7 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
           if (typeof cb === "function") {
             (cb as () => void)();
           }
-          return undefined;
+          return;
         };
         ui.setOverlayMode = (...args: unknown[]): unknown => {
           if (args[0] === UiMode.CONFIRM) {
@@ -321,7 +331,7 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
 
     // WATCHER (guest): adopts the streamed stock + applies the buffered TM buy + leave, then advances.
     await withClient(rig.guestCtx, async () => {
-      const phase = new BiomeShopPhase() as unknown as BiomeShopSeam;
+      const phase = liveBiomeShop() as unknown as BiomeShopSeam;
       (phase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
       const gui = globalScene.ui as unknown as { getHandler: () => Record<string, unknown> };
       const realGH = gui.getHandler.bind(globalScene.ui);

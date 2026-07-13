@@ -146,6 +146,49 @@ const sitKey = (s: string): string => `situation:${s}`;
 const operationKey = (cls: string): string => `operation:${cls}`;
 const uiRelayKey = (m: UiMode): string => `uiRelay:${UiMode[m]}`;
 
+/** Coverage proved by a dedicated production-path scenario, outside the default soak collector. */
+export interface CoopDedicatedScenarioCoverage {
+  readonly testFile: string;
+  readonly surfaces: ReadonlySet<string>;
+  readonly residual: string;
+  /** This registry is descriptive; the scenario's runtime assertions are the gate evidence. */
+  readonly evidence: "documentation-only";
+}
+
+/**
+ * Keep dedicated production-fidelity journeys explicit without falsely promoting the DEFAULT soak's
+ * KNOWN_UNDRIVABLE partition. T2 drives these surfaces through real public UI and authoritative carriers;
+ * the ordinary soak still auto-resolves its map boundary and therefore honestly keeps its omissions below.
+ */
+export const COOP_DEDICATED_SCENARIO_COVERAGE: ReadonlyMap<string, CoopDedicatedScenarioCoverage> = new Map([
+  [
+    "T2_WAVE10_BIOME_TRANSITION",
+    {
+      testFile: "test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts",
+      surfaces: new Set([
+        modeKey(UiMode.BIOME_SHOP),
+        modeKey(UiMode.ER_MAP),
+        uiRelayKey(UiMode.BIOME_SHOP),
+        uiRelayKey(UiMode.ER_MAP),
+        kindKey("biomeShop"),
+        kindKey("crossroads"),
+        kindKey("biomePick"),
+        bandKey("biomeShop"),
+        bandKey("crossroads"),
+        bandKey("biomePick"),
+        sitKey(COOP_SOAK_SITUATIONS.biomeBoundary),
+        operationKey("op:biome"),
+      ]),
+      residual:
+        "Dedicated T2 is a segmented production-path journey (real UI, but explicit phase seeking/starting), not an "
+        + "untouched continuous queue proof. It covers Stay and guest-owned Leave/BIOME_PICK at the wave-10 market boundary. The default "
+        + "soak still auto-resolves this boundary; a continuous host-owned map-pick parity remains separate "
+        + "(focused owner-parity tests cover the operation/UI path but not the whole wave-10 journey).",
+      evidence: "documentation-only",
+    },
+  ],
+]);
+
 /**
  * The EXPECTED surface set, derived AT RUNTIME from the registries (never hardcoded): every mirrored
  * UiMode, every relay kind, every seq band, plus every situation. A new registry entry lands here

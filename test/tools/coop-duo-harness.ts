@@ -78,10 +78,24 @@ import {
   reconcileCoopPlayerModifiers,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import {
+  clearCoopBiomeInteractionStart,
+  coopBiomeInteractionInProgress,
+  coopBiomeInteractionStartValue,
+  setCoopBiomeInteractionStart,
+} from "#data/elite-redux/coop/coop-biome-pin-state";
+import {
+  captureCoopActiveMysteryControl,
   coopMeHandoffBattleStarted,
   coopMeHandoffBattleWaveValue,
+  restoreCoopActiveMysteryControlForHarness,
   restoreCoopMeHandoffBattleState,
+  restoreCoopMeInteractionStartForHarness,
 } from "#data/elite-redux/coop/coop-me-pin-state";
+import {
+  type CoopBiomeTransitionTailPermit,
+  restoreCoopBiomeTransitionTailPermit,
+  snapshotCoopBiomeTransitionTailPermit,
+} from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   assembleCoopRuntime,
   type CoopRuntime,
@@ -94,12 +108,24 @@ import {
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import {
+  type CoopActiveMysteryEncounterSnapshotV1,
+  type CoopTransport,
+  createLoopbackPair,
+  type SerializedCommand,
+} from "#data/elite-redux/coop/coop-transport";
 import {
   type ErAchievementRunSaveData,
   getErAchievementRunState,
   restoreErAchievementRunState,
 } from "#data/elite-redux/er-achievement-run-state";
+import {
+  type ErRouteNode,
+  erPendingNodesReady,
+  getErPendingNodes,
+  markErPendingNodesAwaitingAuthority,
+  setErPendingNodes,
+} from "#data/elite-redux/er-biome-routing";
 import {
   erBiomeOverstayAnchor,
   getErBiomeLength,
@@ -113,6 +139,13 @@ import {
   restoreErGhostRunState,
   snapshotErGhostRunState,
 } from "#data/elite-redux/er-ghost-teams";
+import {
+  type ErMapSaveData,
+  getErMapSaveData,
+  restoreAuthoritativeMapTravelClassification,
+  restoreErMapState,
+  snapshotAuthoritativeMapTravelClassification,
+} from "#data/elite-redux/er-map-nodes";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
 import {
@@ -134,6 +167,7 @@ import { Terrain, TerrainType } from "#data/terrain";
 import { Weather } from "#data/weather";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
+import type { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -147,12 +181,13 @@ import { Modifier, PersistentModifier } from "#modifiers/modifier";
 import type { ModifierOverride } from "#modifiers/modifier-type";
 import { PokemonModifierType, PokemonReviveModifierType } from "#modifiers/modifier-type";
 import { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
-import { getCoopMeHostPresentation, setCoopMeHostPresentation } from "#phases/coop-replay-me-phase";
 import {
-  coopClearMePinForGuest,
-  coopMeInteractionStartValue,
-  coopSetMePinForGuest,
-} from "#phases/mystery-encounter-phases";
+  getActiveCoopReplayMePhaseForHarness,
+  getCoopMeHostPresentation,
+  setActiveCoopReplayMePhaseForHarness,
+  setCoopMeHostPresentation,
+} from "#phases/coop-replay-me-phase";
+import { coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
 import { ModifierData } from "#system/modifier-data";
 import { PokemonData } from "#system/pokemon-data";
 import type { GameManager } from "#test/framework/game-manager";
@@ -164,7 +199,7 @@ import path from "node:path";
 import Phaser from "phaser";
 
 /**
- * The three PROCESS-GLOBAL mystery-encounter pins that are NOT carried on the `active` runtime and
+ * The PROCESS-GLOBAL mystery-encounter pins/control that are NOT carried on the `active` runtime and
  * therefore bleed between the two engines unless swapped per client (the documented ME/ghost-wave
  * harness gap). They are module lets across three files:
  *  - `start`        = `coopMeInteractionStart` (mystery-encounter-phases.ts): the pinned ME-entry
@@ -173,12 +208,16 @@ import Phaser from "phaser";
  *                     party handoff (meBattleHandoffKey). Must equal `start` on the same client.
  *  - `presentation` = `coopMeHostPresentation` (coop-replay-me-phase.ts): the host-streamed ME
  *                     presentation the GUEST's MysteryEncounterUiHandler reads; non-null only mid-ME.
+ *  - `activeReplay` = retained CoopReplayMePhase pointer used by verified snapshot UI/terminal rebound.
+ *  - `activeControl`= checksum-bound selector/terminal state carried by hot-rejoin snapshots.
  * `-1` / `null` = idle.
  */
 interface MePins {
   start: number;
   battleCounter: number;
   presentation: ReturnType<typeof getCoopMeHostPresentation>;
+  activeReplay: ReturnType<typeof getActiveCoopReplayMePhaseForHarness>;
+  activeControl: CoopActiveMysteryEncounterSnapshotV1 | undefined;
   handoffBattle: boolean;
   handoffWave: number;
 }
@@ -187,6 +226,8 @@ const IDLE_ME_PINS: MePins = {
   start: -1,
   battleCounter: -1,
   presentation: null,
+  activeReplay: null,
+  activeControl: undefined,
   handoffBattle: false,
   handoffWave: -1,
 };
@@ -197,6 +238,8 @@ function readMePins(): MePins {
     start: coopMeInteractionStartValue(),
     battleCounter: getCoopMeBattleInteractionCounter(),
     presentation: getCoopMeHostPresentation(),
+    activeReplay: getActiveCoopReplayMePhaseForHarness(),
+    activeControl: captureCoopActiveMysteryControl(),
     handoffBattle: coopMeHandoffBattleStarted(),
     handoffWave: coopMeHandoffBattleWaveValue(),
   };
@@ -204,14 +247,12 @@ function readMePins(): MePins {
 
 /** Install `pins` as the live process-global ME pins (the inverse of {@linkcode readMePins}). */
 function writeMePins(pins: MePins): void {
-  if (pins.start >= 0) {
-    coopSetMePinForGuest(pins.start);
-  } else {
-    coopClearMePinForGuest();
-  }
+  restoreCoopMeInteractionStartForHarness(pins.start);
   setCoopMeBattleInteractionCounter(pins.battleCounter);
   setCoopMeHostPresentation(pins.presentation);
+  restoreCoopActiveMysteryControlForHarness(pins.activeControl);
   restoreCoopMeHandoffBattleState(pins.handoffBattle, pins.handoffWave);
+  setActiveCoopReplayMePhaseForHarness(pins.activeReplay);
 }
 
 /**
@@ -277,6 +318,16 @@ interface CoopModuleLetSnapshot {
   biomeLength: number | null;
   biomeStartWave: number;
   relic: ErRelicBattleStateData;
+  /** Full World-Map UI/routing substrate; production clients own independent module instances. */
+  mapState: ErMapSaveData;
+  /** The actual route-decision input, intentionally separate from the persisted map state. */
+  pendingNodes: ErRouteNode[];
+  pendingNodesReady: boolean;
+  /** Deferred Crossroads Leave -> SelectBiome interaction pin, or -1 when idle. */
+  biomeInteractionStart: number;
+  /** Exact committed Switch/NewBiome permit, including this client's independent stage progress. */
+  biomeTailPermit: CoopBiomeTransitionTailPermit | null;
+  authoritativeTravelClassification: { readonly wave: number; readonly target: BiomeId | null } | null;
 }
 
 function snapshotModuleLets(): CoopModuleLetSnapshot {
@@ -287,15 +338,39 @@ function snapshotModuleLets(): CoopModuleLetSnapshot {
     biomeLength: getErBiomeLength(),
     biomeStartWave: getErBiomeStartWave(),
     relic: getErRelicBattleState(),
+    mapState: structuredClone(getErMapSaveData()),
+    pendingNodes: getErPendingNodes().map(node => ({ ...node })),
+    pendingNodesReady: erPendingNodesReady(),
+    biomeInteractionStart: coopBiomeInteractionInProgress() ? coopBiomeInteractionStartValue() : -1,
+    biomeTailPermit: snapshotCoopBiomeTransitionTailPermit(),
+    authoritativeTravelClassification: snapshotAuthoritativeMapTravelClassification(),
   };
 }
 
 function restoreModuleLets(s: CoopModuleLetSnapshot): void {
   restoreErAchievementRunState(s.achievementRun);
   restoreErMoneyStreaks(s.moneyStreaks);
+  restoreErRelicBattleState(s.relic);
+  // restoreErMapState resets routing + structure; restore the non-persisted pending nodes and the exact
+  // structure/overstay snapshot afterward. This makes a two-engine map transition faithful instead of both
+  // scenes accidentally sharing one process-global graph.
+  restoreErMapState(structuredClone(s.mapState), s.biomeStartWave);
+  if (s.pendingNodesReady) {
+    setErPendingNodes(s.pendingNodes.map(node => ({ ...node })));
+  } else {
+    markErPendingNodesAwaitingAuthority();
+  }
   setErBiomeOverstayAnchor(s.overstayAnchor);
   setErBiomeStructureExtent(s.biomeLength, s.biomeStartWave);
-  restoreErRelicBattleState(s.relic);
+  if (s.biomeInteractionStart >= 0) {
+    setCoopBiomeInteractionStart(s.biomeInteractionStart);
+  } else {
+    clearCoopBiomeInteractionStart();
+  }
+  if (!restoreCoopBiomeTransitionTailPermit(s.biomeTailPermit)) {
+    throw new Error("Invalid isolated co-op biome-tail permit snapshot");
+  }
+  restoreAuthoritativeMapTravelClassification(s.authoritativeTravelClassification);
 }
 
 function snapshotGhostState(): ErGhostRunStateSnapshot {

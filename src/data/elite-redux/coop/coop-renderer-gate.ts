@@ -50,6 +50,18 @@
 // =============================================================================
 
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
+import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  COOP_BIOME_PICK_SEQ_BASE,
+  COOP_BIOME_TRANSITION_SEQ_BASE,
+  COOP_MAX_REACHABLE_COUNTER,
+} from "#data/elite-redux/coop/coop-seq-registry";
+import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
+import { BiomeId } from "#enums/biome-id";
+
+const VALID_BIOME_IDS: ReadonlySet<number> = new Set(
+  Object.values(BiomeId).filter((value): value is number => typeof value === "number"),
+);
 
 /**
  * The phases a co-op RENDERER (authoritative GUEST) may legitimately construct. Everything NOT
@@ -320,6 +332,254 @@ let strictTails = readInitialStrictTails();
 /** The tail phases the CURRENT adopted WAVE_ADVANCE op sanctions, or null when no op is adopted (all tails would-block). */
 let sanctionedTailPhases: ReadonlySet<string> | null = null;
 
+/**
+ * A BIOME_PICK committed after the wave's WAVE_ADVANCE can legitimately add a biome tail that the earlier
+ * wave operation could not predict (the wave-10 shop -> Crossroads Leave case). Keep that authority as a
+ * single exact permit, not as a broad phase allow: destination, source, wave and operation identity all
+ * travel with the committed envelope and the permit is consumed by the ensuing encounter.
+ */
+export interface CoopBiomeTransitionTailPermit {
+  readonly operationId: string;
+  readonly sessionEpoch: number;
+  readonly revision: number;
+  readonly wave: number;
+  readonly sourceBiomeId: number;
+  readonly destinationBiomeId: number;
+  readonly nextWave: number;
+  readonly switchAdopted: boolean;
+  readonly historyRecorded: boolean;
+  readonly switchPrepared: boolean;
+  readonly encounterAdopted: boolean;
+}
+
+let biomeTransitionTailPermit: CoopBiomeTransitionTailPermit | null = null;
+
+type CoopBiomeTransitionTailPermitSeed = Omit<
+  CoopBiomeTransitionTailPermit,
+  "switchAdopted" | "historyRecorded" | "switchPrepared" | "encounterAdopted"
+>;
+
+function isValidBiomeTransitionTailPermitSeed(permit: CoopBiomeTransitionTailPermitSeed): boolean {
+  const parsed = parseCoopOperationId(permit.operationId);
+  const interactivePinned = (parsed?.pinnedSeq ?? -1) - COOP_BIOME_PICK_SEQ_BASE;
+  const exactInteractive =
+    interactivePinned >= 0
+    && interactivePinned <= COOP_MAX_REACHABLE_COUNTER
+    && parsed?.owner === coopInteractionOwnerSeat(interactivePinned);
+  const exactDeterministic =
+    permit.wave >= 0
+    && permit.wave < COOP_MAX_REACHABLE_COUNTER
+    && parsed?.pinnedSeq === COOP_BIOME_TRANSITION_SEQ_BASE + permit.wave
+    && parsed?.owner === 0;
+  return (
+    permit.operationId.length > 0
+    && parsed != null
+    && parsed.epoch === permit.sessionEpoch
+    && parsed.kind === "BIOME_PICK"
+    && (exactInteractive || exactDeterministic)
+    && Number.isSafeInteger(permit.sessionEpoch)
+    && permit.sessionEpoch > 0
+    && Number.isSafeInteger(permit.revision)
+    && permit.revision > 0
+    && Number.isSafeInteger(permit.wave)
+    && permit.wave >= 0
+    && permit.wave < COOP_MAX_REACHABLE_COUNTER
+    && Number.isSafeInteger(permit.sourceBiomeId)
+    && VALID_BIOME_IDS.has(permit.sourceBiomeId)
+    && Number.isSafeInteger(permit.destinationBiomeId)
+    && VALID_BIOME_IDS.has(permit.destinationBiomeId)
+    && Number.isSafeInteger(permit.nextWave)
+    && permit.nextWave === permit.wave + 1
+  );
+}
+
+/** Pure conflict/identity preflight. It never reserves or changes the active permit. */
+export function canArmCoopBiomeTransitionTailPermit(permit: CoopBiomeTransitionTailPermitSeed): boolean {
+  if (!isValidBiomeTransitionTailPermitSeed(permit)) {
+    return false;
+  }
+  if (biomeTransitionTailPermit == null) {
+    return true;
+  }
+  return (
+    biomeTransitionTailPermit.operationId === permit.operationId
+    && biomeTransitionTailPermit.sessionEpoch === permit.sessionEpoch
+    && biomeTransitionTailPermit.revision === permit.revision
+    && biomeTransitionTailPermit.wave === permit.wave
+    && biomeTransitionTailPermit.sourceBiomeId === permit.sourceBiomeId
+    && biomeTransitionTailPermit.destinationBiomeId === permit.destinationBiomeId
+    && biomeTransitionTailPermit.nextWave === permit.nextWave
+  );
+}
+
+/** Arm (or idempotently re-arm) the exact committed BIOME_PICK tail. */
+export function armCoopBiomeTransitionTailPermit(permit: CoopBiomeTransitionTailPermitSeed): boolean {
+  if (!canArmCoopBiomeTransitionTailPermit(permit)) {
+    return false;
+  }
+  if (biomeTransitionTailPermit?.operationId === permit.operationId) {
+    return true;
+  }
+  biomeTransitionTailPermit = {
+    ...permit,
+    switchAdopted: false,
+    historyRecorded: false,
+    switchPrepared: false,
+    encounterAdopted: false,
+  };
+  return true;
+}
+
+/** Read-only diagnostic/test view of the current exact biome-tail permit. */
+export function getCoopBiomeTransitionTailPermit(): CoopBiomeTransitionTailPermit | null {
+  return biomeTransitionTailPermit == null ? null : { ...biomeTransitionTailPermit };
+}
+
+/** Capture the complete staged permit for a production-process/test-harness context swap. */
+export function snapshotCoopBiomeTransitionTailPermit(): CoopBiomeTransitionTailPermit | null {
+  return getCoopBiomeTransitionTailPermit();
+}
+
+/** Restore one process's exact permit stages without replaying or collapsing another client's progress. */
+export function restoreCoopBiomeTransitionTailPermit(snapshot: CoopBiomeTransitionTailPermit | null): boolean {
+  if (snapshot == null) {
+    biomeTransitionTailPermit = null;
+    return true;
+  }
+  if (
+    !isValidBiomeTransitionTailPermitSeed(snapshot)
+    || (snapshot.historyRecorded && !snapshot.switchAdopted)
+    || (snapshot.switchPrepared && !snapshot.historyRecorded)
+    || (snapshot.encounterAdopted && !snapshot.switchPrepared)
+  ) {
+    return false;
+  }
+  biomeTransitionTailPermit = { ...snapshot };
+  return true;
+}
+
+/**
+ * SwitchBiomePhase adopts the permit before touching world state. A wrong source/destination/wave is a
+ * hard miss and leaves the permit untouched; the authoritative guest must remain closed.
+ */
+export function adoptCoopBiomeTransitionSwitchPermit(params: {
+  readonly destinationBiomeId: number;
+  readonly sourceBiomeId: number;
+  readonly wave: number;
+}): CoopBiomeTransitionTailPermit | null {
+  const permit = biomeTransitionTailPermit;
+  const replayAfterNewBattle =
+    permit?.switchAdopted === true
+    && permit.destinationBiomeId === params.sourceBiomeId
+    && permit.nextWave === params.wave;
+  if (
+    permit == null
+    || permit.destinationBiomeId !== params.destinationBiomeId
+    || (permit.wave !== params.wave && !replayAfterNewBattle)
+    || (permit.sourceBiomeId !== params.sourceBiomeId
+      && !(permit.switchAdopted && permit.destinationBiomeId === params.sourceBiomeId))
+  ) {
+    return null;
+  }
+  const adopted = permit.switchAdopted ? permit : { ...permit, switchAdopted: true };
+  biomeTransitionTailPermit = adopted;
+  return { ...adopted };
+}
+
+/** Mark the exact history append complete so a retry cannot duplicate recent-biome history. */
+export function markCoopBiomeTransitionHistoryRecorded(operationId: string): CoopBiomeTransitionTailPermit | null {
+  const permit = biomeTransitionTailPermit;
+  if (permit == null || !permit.switchAdopted || permit.operationId !== operationId) {
+    return null;
+  }
+  const prepared = permit.historyRecorded ? permit : { ...permit, historyRecorded: true };
+  biomeTransitionTailPermit = prepared;
+  return { ...prepared };
+}
+
+/** Mark guest route/structure preparation complete only after every deterministic write succeeded. */
+export function markCoopBiomeTransitionSwitchPrepared(operationId: string): CoopBiomeTransitionTailPermit | null {
+  const permit = biomeTransitionTailPermit;
+  if (permit == null || !permit.switchAdopted || !permit.historyRecorded || permit.operationId !== operationId) {
+    return null;
+  }
+  const prepared = permit.switchPrepared ? permit : { ...permit, switchPrepared: true };
+  biomeTransitionTailPermit = prepared;
+  return { ...prepared };
+}
+
+/**
+ * Adopt the one-shot permit at the exact new-biome encounter boundary. Idempotent for the same phase retry;
+ * the permit remains durable until NewBiomeEncounterPhase.end() finalizes it.
+ */
+export function consumeCoopBiomeTransitionEncounterPermit(params: {
+  readonly destinationBiomeId: number;
+  readonly nextWave: number;
+}): CoopBiomeTransitionTailPermit | null {
+  const permit = biomeTransitionTailPermit;
+  if (
+    permit == null
+    || !permit.switchAdopted
+    || !permit.switchPrepared
+    || permit.destinationBiomeId !== params.destinationBiomeId
+    || permit.nextWave !== params.nextWave
+  ) {
+    return null;
+  }
+  const adopted = permit.encounterAdopted ? permit : { ...permit, encounterAdopted: true };
+  biomeTransitionTailPermit = adopted;
+  return { ...adopted };
+}
+
+/** Pure terminal preflight; queue shift must succeed before the permit is actually cleared. */
+export function canFinalizeCoopBiomeTransitionEncounterPermit(params: {
+  readonly operationId: string;
+  readonly destinationBiomeId: number;
+  readonly nextWave: number;
+}): boolean {
+  const permit = biomeTransitionTailPermit;
+  return (
+    permit != null
+    && permit.switchAdopted
+    && permit.encounterAdopted
+    && permit.operationId === params.operationId
+    && permit.destinationBiomeId === params.destinationBiomeId
+    && permit.nextWave === params.nextWave
+  );
+}
+
+/** Finalize the exact permit only after the new-biome encounter successfully shifts its queue. */
+export function finalizeCoopBiomeTransitionEncounterPermit(params: {
+  readonly operationId: string;
+  readonly destinationBiomeId: number;
+  readonly nextWave: number;
+}): CoopBiomeTransitionTailPermit | null {
+  if (!canFinalizeCoopBiomeTransitionEncounterPermit(params)) {
+    return null;
+  }
+  const permit = biomeTransitionTailPermit!;
+  biomeTransitionTailPermit = null;
+  return { ...permit };
+}
+
+/** Clear a stale permit on teardown/recovery. */
+export function clearCoopBiomeTransitionTailPermit(): void {
+  biomeTransitionTailPermit = null;
+}
+
+function biomePermitSanctions(phaseName: string, constructorArgs: readonly unknown[]): boolean {
+  const permit = biomeTransitionTailPermit;
+  if (permit == null) {
+    return false;
+  }
+  if (phaseName === "SwitchBiomePhase") {
+    return constructorArgs[0] === permit.destinationBiomeId;
+  }
+  // Construction is allowed only after the exact Switch preparation landed. The phase has no constructor
+  // args, so start() still performs destination + next-wave + operation validation before presentation.
+  return phaseName === "NewBiomeEncounterPhase" && permit.switchAdopted && permit.switchPrepared;
+}
+
 /** Whether strict-tails OBSERVE mode is on (boundary tails checked against the adopted WAVE_ADVANCE op). */
 export function isCoopStrictTailsMode(): boolean {
   return strictTails;
@@ -337,6 +597,11 @@ export function setCoopStrictTailsMode(on: boolean): void {
  */
 export function setCoopWaveTailSanction(phases: readonly string[] | null): void {
   sanctionedTailPhases = phases == null ? null : new Set(phases);
+}
+
+/** Read-only phase check for boundary implementations that must fail closed before mutating. */
+export function isCoopWaveTailSanctioned(phaseName: string): boolean {
+  return sanctionedTailPhases?.has(phaseName) ?? false;
 }
 
 /** Phases that STRICT-TAILS mode flagged (built a boundary tail the adopted op did not sanction). For tests/soak. */
@@ -429,7 +694,12 @@ export function coopRendererGateNeutralizes(phaseName: string, constructorArgs: 
     // Wave-2f STRICT-TAILS: a tail the current authoritative operation did NOT sanction fails closed under
     // renderer enforcement, or is surfaced loudly and allowed under observe rollback. Only the boundary-tail
     // group is checked; presentation / input-intent allowlist entries are always fine.
-    if (strictTails && COOP_WAVE_TAIL_PHASES.has(phaseName) && !(sanctionedTailPhases?.has(phaseName) ?? false)) {
+    if (
+      strictTails
+      && COOP_WAVE_TAIL_PHASES.has(phaseName)
+      && !(sanctionedTailPhases?.has(phaseName) ?? false)
+      && !biomePermitSanctions(phaseName, constructorArgs)
+    ) {
       if (enforced) {
         logTailBlock(phaseName);
         recordNeutralized(phaseName);

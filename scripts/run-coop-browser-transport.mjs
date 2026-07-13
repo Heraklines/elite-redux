@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Browser-native co-op transport checkpoint. Two isolated Chromium contexts load the real Vite client,
 // establish the production WebRTC connector through an in-memory signaling relay, complete the protocol /
-// fingerprint / identity handshake, then tear down the first RTCDataChannel and prove hot rejoin replaces it.
+// fingerprint / identity handshake, then force a 512 KiB UTF-8 checkpoint to lose its channel mid-chunk.
+// Hot rejoin must restart chunk zero with a new transfer id, deliver the logical checkpoint exactly once,
+// and carry subsequent protocol traffic.
 
 import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
@@ -108,6 +110,8 @@ async function browserStatus(page) {
       versionMismatch: runtime?.controller?.versionMismatch,
       fingerprintMismatch: runtime?.controller?.functionalFingerprintMismatch,
       epoch: runtime?.controller?.sessionEpoch,
+      runId: runtime?.controller?.runId,
+      checkpointRevision: runtime?.controller?.checkpointRevision,
     };
   });
 }
@@ -170,9 +174,88 @@ try {
     throw new Error(`operation epoch did not converge: ${JSON.stringify(initial)}`);
   }
 
-  // Close only the current raw channel. The production lifecycle sees "disconnected" and both clients use
-  // their installed rejoin drivers to exchange a fresh offer/answer and replace the channel in place.
-  await hostPage.evaluate(() => globalThis.__coopBrowserRuntime.localTransport.wire.close());
+  // Install a direct transport observer in the isolated guest context. The normal controller remains a
+  // consumer too; this probe only verifies byte-exact/exactly-once framing below it.
+  await guestPage.evaluate(() => {
+    const targetBytes = 512 * 1024;
+    const quoteHeavy = '"quoted\\path" — café — 漢字 — 🧬 — e\u0301\n'.repeat(4_096);
+    const shell = JSON.stringify({ waveIndex: 77, quoteHeavy, filler: "" });
+    const shellBytes = new TextEncoder().encode(shell).byteLength;
+    const expected = JSON.stringify({ waveIndex: 77, quoteHeavy, filler: "x".repeat(targetBytes - shellBytes) });
+    if (new TextEncoder().encode(expected).byteLength !== targetBytes) {
+      throw new Error("browser checkpoint fixture is not exactly 512 KiB");
+    }
+    globalThis.__coopBrowserProbe = { expected, received: null, checkpointCount: 0, continued: 0 };
+    globalThis.__coopBrowserRuntime.localTransport.onMessage(message => {
+      if (message.t === "resumeCheckpoint" && message.checkpointId === "browser-midchunk-checkpoint") {
+        globalThis.__coopBrowserProbe.checkpointCount++;
+        globalThis.__coopBrowserProbe.received = message.session;
+      }
+      if (message.t === "stallBeat" && message.waitingMs === 424_242) {
+        globalThis.__coopBrowserProbe.continued++;
+      }
+    });
+  });
+
+  const checkpointFixture = await hostPage.evaluate(async () => {
+    const targetBytes = 512 * 1024;
+    const quoteHeavy = '"quoted\\path" — café — 漢字 — 🧬 — e\u0301\n'.repeat(4_096);
+    const shell = JSON.stringify({ waveIndex: 77, quoteHeavy, filler: "" });
+    const shellBytes = new TextEncoder().encode(shell).byteLength;
+    const session = JSON.stringify({ waveIndex: 77, quoteHeavy, filler: "x".repeat(targetBytes - shellBytes) });
+    const bytes = new TextEncoder().encode(session);
+    if (bytes.byteLength !== targetBytes) {
+      throw new Error(`browser checkpoint fixture has ${bytes.byteLength} bytes, expected ${targetBytes}`);
+    }
+    const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+    const digest = [...hash].map(value => value.toString(16).padStart(2, "0")).join("");
+    const runtime = globalThis.__coopBrowserRuntime;
+    const transport = runtime.localTransport;
+    const wire = transport.wire;
+    const originalSend = wire.send.bind(wire);
+    let chunkFrames = 0;
+    let faulted = false;
+    wire.send = data => {
+      let frame;
+      try {
+        frame = JSON.parse(data);
+      } catch {
+        frame = null;
+      }
+      if (!faulted && frame?.__coopChunk === 1 && ++chunkFrames === 8) {
+        faulted = true;
+        wire.close();
+        throw new Error("forced browser-native mid-chunk channel loss");
+      }
+      originalSend(data);
+    };
+    const { GameModes } = await import("/src/enums/game-modes.ts");
+    transport.send({
+      t: "resumeCheckpoint",
+      checkpointId: "browser-midchunk-checkpoint",
+      commitment: {
+        version: 1,
+        digest,
+        gameMode: GameModes.COOP,
+        wave: 77,
+        revision: 0,
+        runId: runtime.controller.runId,
+        checkpointRevision: runtime.controller.checkpointRevision,
+        timestamp: 77,
+        participants: ["Browser Guest", "Browser Host"],
+        seats: { host: "Browser Host", guest: "Browser Guest" },
+      },
+      session,
+      mirrorCloud: false,
+    });
+    if (!faulted) {
+      throw new Error(`forced mid-chunk fault did not fire (sent chunks=${chunkFrames})`);
+    }
+    return { bytes: bytes.byteLength, chunkFramesBeforeLoss: chunkFrames };
+  });
+
+  // The production lifecycle sees "disconnected" and both clients use their installed rejoin drivers to
+  // exchange a fresh offer/answer and replace the channel in place. The queued logical send must restart.
   await Promise.all([
     hostPage.waitForFunction(
       () =>
@@ -187,6 +270,30 @@ try {
       { timeout: 90_000, polling: 250 },
     ),
   ]);
+
+  await guestPage.waitForFunction(
+    () =>
+      globalThis.__coopBrowserProbe?.checkpointCount === 1
+      && globalThis.__coopBrowserProbe?.received === globalThis.__coopBrowserProbe?.expected,
+    { timeout: 90_000, polling: 100 },
+  );
+  await delay(500);
+  const exactCheckpoint = await guestPage.evaluate(() => ({
+    count: globalThis.__coopBrowserProbe.checkpointCount,
+    exact: globalThis.__coopBrowserProbe.received === globalThis.__coopBrowserProbe.expected,
+    bytes: new TextEncoder().encode(globalThis.__coopBrowserProbe.received ?? "").byteLength,
+  }));
+  if (exactCheckpoint.count !== 1 || !exactCheckpoint.exact || exactCheckpoint.bytes !== 512 * 1024) {
+    throw new Error(`mid-chunk checkpoint was not byte-exact/exactly-once: ${JSON.stringify(exactCheckpoint)}`);
+  }
+
+  await hostPage.evaluate(() => {
+    globalThis.__coopBrowserRuntime.localTransport.send({ t: "stallBeat", waitingMs: 424_242 });
+  });
+  await guestPage.waitForFunction(() => globalThis.__coopBrowserProbe?.continued === 1, {
+    timeout: 15_000,
+    polling: 50,
+  });
 
   const rejoined = await Promise.all([browserStatus(hostPage), browserStatus(guestPage)]);
   if (
@@ -205,7 +312,7 @@ try {
     throw new Error(`browser errors:\n${browserErrors.join("\n")}`);
   }
   process.stdout.write(
-    `[coop-browser] PASS native WebRTC handshake + protocol/fingerprint identity + hot rejoin ${JSON.stringify(rejoined)}\n`,
+    `[coop-browser] PASS native WebRTC handshake + exact 512KiB UTF-8 mid-chunk restart + hot rejoin + continued traffic ${JSON.stringify({ checkpointFixture, exactCheckpoint, rejoined })}\n`,
   );
 } catch (error) {
   process.stderr.write(`[coop-browser] FAIL ${error.stack ?? error}\n`);

@@ -183,6 +183,10 @@ export class UI extends Phaser.GameObjects.Container {
   private tooltipContent: Phaser.GameObjects.Text;
 
   private overlayActive: boolean;
+  /** Invalidates late fade/delayed callbacks when a newer or bounded mode transition supersedes them. */
+  private modeTransitionGeneration = 0;
+  /** Releases a killed overlay tween so superseded setMode promises cannot remain pending forever. */
+  private overlayTransitionRelease: (() => void) | null = null;
 
   /** Co-op (#633): cached engine surface for the live-cursor UI mirror (lazily built). */
   private _coopMirrorEngine: CoopUiMirrorEngine | null = null;
@@ -713,36 +717,50 @@ export class UI extends Phaser.GameObjects.Container {
 
   fadeOut(duration: number): Promise<void> {
     return new Promise(resolve => {
+      this.cancelOverlayTransitionTween();
       if (this.overlayActive) {
         return resolve();
       }
       this.overlayActive = true;
       this.overlay.setAlpha(0);
       this.overlay.setVisible(true);
+      const finish = (): void => {
+        if (this.overlayTransitionRelease === finish) {
+          this.overlayTransitionRelease = null;
+        }
+        resolve();
+      };
+      this.overlayTransitionRelease = finish;
       globalScene.tweens.add({
         targets: this.overlay,
         alpha: 1,
         duration,
         ease: "Sine.easeOut",
-        onComplete: () => resolve(),
+        onComplete: finish,
       });
     });
   }
 
   fadeIn(duration: number): Promise<void> {
     return new Promise(resolve => {
+      this.cancelOverlayTransitionTween();
       if (!this.overlayActive) {
         return resolve();
       }
+      const finish = (): void => {
+        if (this.overlayTransitionRelease === finish) {
+          this.overlayTransitionRelease = null;
+          this.overlay.setVisible(false);
+        }
+        resolve();
+      };
+      this.overlayTransitionRelease = finish;
       globalScene.tweens.add({
         targets: this.overlay,
         alpha: 0,
         duration,
         ease: "Sine.easeIn",
-        onComplete: () => {
-          this.overlay.setVisible(false);
-          resolve();
-        },
+        onComplete: finish,
       });
       this.overlayActive = false;
     });
@@ -755,7 +773,17 @@ export class UI extends Phaser.GameObjects.Container {
     forceTransition: boolean,
     chainMode: boolean,
     args: any[],
+    isCurrent?: () => boolean,
   ): Promise<void> {
+    const transitionGeneration = ++this.modeTransitionGeneration;
+    const attemptCurrent = (): boolean =>
+      transitionGeneration === this.modeTransitionGeneration && (isCurrent?.() ?? true);
+    const abortCurrentAttempt = (): void => {
+      if (transitionGeneration === this.modeTransitionGeneration) {
+        ++this.modeTransitionGeneration;
+        this.normalizeTransitionOverlay();
+      }
+    };
     // Co-op (#633): keep the live-cursor mirror's engine surface attached so the WATCHER
     // can replay the owner's relayed buttons even while the local human is idle (its screen
     // opens via setMode, not via local input). Cheap + idempotent; hard no-op in solo.
@@ -770,11 +798,27 @@ export class UI extends Phaser.GameObjects.Container {
       }
     }
     return new Promise(resolve => {
-      if (this.mode === mode && !forceTransition) {
+      if (!attemptCurrent()) {
+        abortCurrentAttempt();
         resolve();
         return;
       }
-      const doSetMode = () => {
+      if (this.mode === mode && !forceTransition) {
+        // A newer same-mode winner must still clear an opaque fade left by the superseded attempt.
+        this.normalizeTransitionOverlay();
+        resolve();
+        return;
+      }
+      const doSetMode = (normalizeOverlay: boolean) => {
+        if (!attemptCurrent()) {
+          abortCurrentAttempt();
+          resolve();
+          return;
+        }
+        if (normalizeOverlay) {
+          // Direct/no-transition winners own the screen now; normalize any older fade globally.
+          this.normalizeTransitionOverlay();
+        }
         if (this.mode !== mode) {
           if (clear) {
             this.getHandler().clear();
@@ -784,7 +828,7 @@ export class UI extends Phaser.GameObjects.Container {
             globalScene.updateGameInfo();
           }
           this.mode = mode;
-          const touchControls = document?.getElementById("touchControls");
+          const touchControls = typeof document === "undefined" ? null : document.getElementById("touchControls");
           if (touchControls) {
             touchControls.dataset.uiMode = UiMode[mode];
           }
@@ -799,14 +843,33 @@ export class UI extends Phaser.GameObjects.Container {
           && noTransitionModes.indexOf(mode) === -1)
         || (chainMode && noTransitionModes.indexOf(mode) === -1)
       ) {
+        if (!attemptCurrent()) {
+          abortCurrentAttempt();
+          resolve();
+          return;
+        }
+        // Cancel any prior fadeIn/fadeOut owner before starting this generation's fade.
+        this.normalizeTransitionOverlay();
         this.fadeOut(250).then(() => {
+          if (!attemptCurrent()) {
+            abortCurrentAttempt();
+            resolve();
+            return;
+          }
           globalScene.time.delayedCall(100, () => {
-            doSetMode();
-            this.fadeIn(250);
+            if (!attemptCurrent()) {
+              abortCurrentAttempt();
+              resolve();
+              return;
+            }
+            doSetMode(false);
+            if (attemptCurrent()) {
+              this.fadeIn(250);
+            }
           });
         });
       } else {
-        doSetMode();
+        doSetMode(true);
       }
     });
   }
@@ -840,6 +903,88 @@ export class UI extends Phaser.GameObjects.Container {
 
   setMode(mode: UiMode, ...args: any[]): Promise<void> {
     return this.setModeInternal(mode, true, false, false, args);
+  }
+
+  /** Clear only the transition-black overlay; generation owners call this before committing their screen. */
+  private normalizeTransitionOverlay(): void {
+    this.cancelOverlayTransitionTween();
+    this.overlayActive = false;
+    this.overlay.setAlpha(0);
+    this.overlay.setVisible(false);
+  }
+
+  private cancelOverlayTransitionTween(): void {
+    const release = this.overlayTransitionRelease;
+    this.overlayTransitionRelease = null;
+    try {
+      globalScene.tweens.killTweensOf(this.overlay);
+    } catch {
+      // Teardown may already have destroyed the scene/tween manager; the local flags still normalize.
+    }
+    release?.();
+  }
+
+  /**
+   * Co-op boundary seam: a lost fade/delayed callback cannot hold a shared transition forever. Timeout
+   * invalidates every callback from that attempt, clears the old handler, and commits the target mode
+   * synchronously; a later transition wins and reports `superseded` instead of being overwritten.
+   */
+  setModeBounded(mode: UiMode, timeoutMs = 2_000, ...args: any[]): Promise<"completed" | "forced" | "superseded"> {
+    return this.setModeBoundedWhen(mode, timeoutMs, undefined, ...args);
+  }
+
+  /** Bounded co-op mode transition whose mutations are aborted when its exact phase/session fence expires. */
+  setModeBoundedWhen(
+    mode: UiMode,
+    timeoutMs: number,
+    isCurrent: (() => boolean) | undefined,
+    ...args: any[]
+  ): Promise<"completed" | "forced" | "superseded"> {
+    const transition = this.setModeInternal(mode, true, false, false, args, isCurrent);
+    const generation = this.modeTransitionGeneration;
+    return new Promise(resolve => {
+      let settled = false;
+      const finish = (result: "completed" | "forced" | "superseded"): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        resolve(result);
+      };
+      const timer = setTimeout(
+        () => {
+          if (generation !== this.modeTransitionGeneration || !(isCurrent?.() ?? true)) {
+            if (generation === this.modeTransitionGeneration) {
+              ++this.modeTransitionGeneration;
+              this.normalizeTransitionOverlay();
+            }
+            finish("superseded");
+            return;
+          }
+          ++this.modeTransitionGeneration;
+          try {
+            this.normalizeTransitionOverlay();
+            this.getHandler().clear();
+            this.mode = mode;
+            const touchControls = typeof document === "undefined" ? null : document.getElementById("touchControls");
+            if (touchControls) {
+              touchControls.dataset.uiMode = UiMode[mode];
+            }
+            this.getHandler().show(args);
+            finish("forced");
+          } catch {
+            // The caller's exact phase/operation fence decides whether it may proceed after a failed force.
+            finish("superseded");
+          }
+        },
+        Math.max(1, Math.trunc(timeoutMs)),
+      );
+      transition.then(
+        () => finish(generation === this.modeTransitionGeneration ? "completed" : "superseded"),
+        () => finish("superseded"),
+      );
+    });
   }
 
   setModeForceTransition(mode: UiMode, ...args: any[]): Promise<void> {

@@ -197,6 +197,24 @@ describe("durability §4.1/§4.2: journal commit + cumulative ACK + resend tail"
     // The host's resend set is the tail after the last ACK: exactly {2,3}.
     expect(j.resendTail("envelope").map(e => e.seq)).toEqual([2, 3]);
   });
+
+  it("an exact retry restores an absent high-water entry and rejects a conflicting same-seq payload", () => {
+    const j = new CoopJournal(4);
+    j.restoreHighWater({ envelope: 5 });
+    expect(j.highWaterMark("envelope"), "cold resume retained the committed revision identity").toBe(5);
+    expect(j.tailFrom("envelope", 4), "the bounded replay entry itself was not persisted").toEqual([]);
+
+    expect(j.commit("envelope", 5, durableMsg(5)), "exact retry concretely restores replayability").toBe(true);
+    expect(j.tailFrom("envelope", 4)).toEqual([
+      expect.objectContaining({ cls: "envelope", seq: 5, msg: durableMsg(5) }),
+    ]);
+
+    expect(
+      j.commit("envelope", 5, durableMsg(6)),
+      "the immutable revision cannot be rebound to a conflicting wire payload",
+    ).toBe(false);
+    expect(j.tailFrom("envelope", 4)[0].msg).toEqual(durableMsg(5));
+  });
 });
 
 describe("durability §1.6: receiver idempotency ledger (duplicate + gap detection)", () => {

@@ -105,7 +105,7 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
     expect(seen.subPrompt).toEqual({ kind: "catchFull", pokemonName: "Rattata" });
 
     // The guest relays its captured replace slot (2) on the SAME seq_me CHOICE inbox (kind "meSub").
-    guestRelay.sendInteractionChoice(seqMe, "meSub", 2);
+    guestRelay.sendInteractionChoice(seqMe, "meSub", 2, [0]);
 
     // The helper resolves to exactly the guest's slot (the host then releases slot 2 + adds the new mon there).
     expect(await hostAwait).toBe(2);
@@ -117,7 +117,7 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
 
     const hostAwait = coopHostStreamCatchFullAwaitSlot("Rattata");
     await guestRelay.awaitInteractionOutcome(seqMe);
-    guestRelay.sendInteractionChoice(seqMe, "meSub", 2);
+    guestRelay.sendInteractionChoice(seqMe, "meSub", 2, [0]);
     expect(await hostAwait).toBe(2);
 
     const presentationCommits = commitSpy.mock.calls.filter(call => call[0].kind === "ME_PRESENT");
@@ -137,7 +137,7 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
 
     const hostAwait = coopHostStreamCatchFullAwaitSlot("Rattata");
     await guestRelay.awaitInteractionOutcome(seqMe);
-    guestRelay.sendInteractionChoice(seqMe, "meSub", 2);
+    guestRelay.sendInteractionChoice(seqMe, "meSub", 2, [0]);
     expect(await hostAwait).toBe(2);
 
     const subCommits = commitSpy.mock.calls.filter(call => call[0].kind === "ME_SUB");
@@ -155,7 +155,7 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
     const seen = await guestRelay.awaitInteractionOutcome(seqMe);
     expect(seen?.k === "mePresent" ? seen.subPrompt : undefined).toEqual({ kind: "catchFull", pokemonName: "Rattata" });
 
-    guestRelay.sendInteractionChoice(seqMe, "meSub", 6); // cancel / out-of-range (== party length) -> skip
+    guestRelay.sendInteractionChoice(seqMe, "meSub", 6, [0]); // cancel / out-of-range (== party length) -> skip
     expect(await hostAwait).toBeNull();
   });
 

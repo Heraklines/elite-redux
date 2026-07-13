@@ -190,17 +190,27 @@ export function isCoopOperationJournalActive(): boolean {
 /**
  * COMMIT -> JOURNAL (§4.1/§4.2). Called by a migrated surface adapter immediately after its
  * CoopOperationHost COMMITS an op. Journals the committed envelope (for resend / reconnect replay) and
- * broadcasts it on the `envelope` wire arm. No-op when durability is OFF or the phase is not a migrated
- * operation surface. Never throws (a failure must fall back to the legacy relay carrier, dual-run).
+ * broadcasts it on the `envelope` wire arm. Returns true when durability is OFF (legacy mode) or when the
+ * exact entry is concretely retained; returns false for an unmapped surface, journal failure, eviction, or
+ * conflicting same-revision payload. Never throws. Terminal callers must remain closed on false.
  */
-export function journalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelopeV1): void {
+export function tryJournalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelopeV1): boolean {
   const manager = activeDurability;
   if (manager == null) {
-    return;
+    return true;
   }
   const cls = coopOperationClassForEnvelope(envelope);
   if (cls == null) {
-    return;
+    return false;
+  }
+  let retained = false;
+  try {
+    retained = manager.commit("op:global", envelope.revision, { t: "envelope", envelope });
+  } catch {
+    retained = false;
+  }
+  if (!retained) {
+    return false;
   }
   if (isCoopOperationSurfaceClass(cls)) {
     journalCommittedClasses.add(cls);
@@ -221,12 +231,12 @@ export function journalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelope
     turn: envelope.turn,
     detail: `class=${cls} kind=${envelope.pendingOperation?.kind ?? "none"}`,
   });
-  try {
-    manager.commit("op:global", envelope.revision, { t: "envelope", envelope });
-  } catch {
-    // Journaling is a durability BACKSTOP over the legacy relay carrier (still firing in dual-run); a
-    // failure here must never break the live commit. The relay + the deep-gap snapshot remain the fallback.
-  }
+  return true;
+}
+
+/** Compatibility wrapper for surfaces whose live migration still treats the journal as a backstop. */
+export function journalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelopeV1): void {
+  tryJournalCoopCommittedEnvelope(envelope);
 }
 
 /**

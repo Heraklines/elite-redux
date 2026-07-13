@@ -42,6 +42,7 @@ import {
   type CoopApplyFailure,
   captureCoopChecksum,
   captureCoopChecksumState,
+  captureCoopFullSnapshot,
   drainCoopApplyFailures,
   reapplyAcceptedCoopAuthoritativeBattleState,
 } from "#data/elite-redux/coop/coop-battle-engine";
@@ -52,7 +53,6 @@ import { armCoopFaintSwitchIntentResend } from "#data/elite-redux/coop/coop-fain
 import { isCoopFaintSwitchSeq, sendCoopFaintSwitchChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
-  adoptCoopSnapshotHighWater,
   buildCoopWaveAdvancePayload,
   consumeCoopPendingWaveAdvance,
   coopHasPendingWaveAdvance,
@@ -60,6 +60,7 @@ import {
   coopOwnerOfPlayerFieldSlot,
   coopSessionGeneration,
   coopWaveAdvanceSignaledFor,
+  failCoopSharedSession,
   getCoopBattleStreamer,
   getCoopController,
   getCoopInteractionRelay,
@@ -67,6 +68,7 @@ import {
   isCoopAuthoritativeGuest,
   isShowdownGuestFlip,
   isVersusSession,
+  queueCoopAtomicSnapshotApply,
   queueCoopMeBattleVictoryTail,
   resolveCoopPendingWaveTransition,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -1033,16 +1035,6 @@ export class CoopFinalizeTurnPhase extends Phase {
         // counter (`peerAdvancedPastInteraction`) is the orphan signal; with no controller, fall back to
         // the old cancel-all so a resync can never hang. This .then is message-driven (the host's
         // stateSync reply), so it runs INDEPENDENT of the stuck phase and can actually unblock it.
-        const interactionController = getCoopController();
-        // Band-wide with the watchdog's rescue: a pending faint-replacement pick is NEVER orphaned by a
-        // resync (a stateSync snapshot does not invalidate a replacement the human is still choosing), so
-        // spare the COOP_FAINT_SWITCH_SEQ_BASE band here too - only its own timeout / a genuine disconnect
-        // cancels it. Every other watcher wait keeps the scoped orphan cancellation.
-        getCoopInteractionRelay()?.cancelWaiters(
-          seq =>
-            !isCoopFaintSwitchSeq(seq)
-            && (interactionController == null ? true : interactionController.peerAdvancedPastInteraction(seq)),
-        );
         // BLOCKING-1 (#633, async resync race guard): the apply now re-summons field mons, vacates
         // slots, and rebuilds boss bars - running THAT inline here (a detached promise continuation,
         // very likely mid-way through the next turn's animation replay) could teardown a live sprite
@@ -1050,36 +1042,19 @@ export class CoopFinalizeTurnPhase extends Phase {
         // so the heavy rebuild lands at a real inter-phase boundary, never mid-drain. The heal-check +
         // UNHEALED diagnostics moved INTO the phase (they must run AFTER the deferred apply).
         const runtime = getCoopRuntime();
-        const controller = runtime?.controller;
-        if (
-          runtime == null
-          || snapshot.sessionEpoch !== controller?.sessionEpoch
-          || snapshot.membership == null
-          || snapshot.activeControl == null
-          || snapshot.membership.state !== "active"
-          || !snapshot.membership.members.every(member => member.present)
-          || !runtime.membership.canAdopt(snapshot.membership)
-        ) {
-          coopWarn(
-            "resync",
-            `turn=${this.turn} snapshot control incompatible epoch=${snapshot.sessionEpoch ?? "missing"}/`
-              + `${controller?.sessionEpoch ?? "none"} membership=${snapshot.membership?.revision ?? "missing"} -> refused`,
-          );
+        if (runtime == null) {
           return;
         }
-        const targetChecksum = snapshot.checksum ?? hostChecksum;
-        globalScene.phaseManager.pushPhase(
-          new CoopApplyResyncPhase(snapshot, this.turn, targetChecksum, hostObj, healed => {
-            if (
-              healed
-              && snapshot.membership != null
-              && snapshot.activeControl != null
-              && runtime.membership.adopt(snapshot.membership)
-              && runtime.controller.adoptAuthoritativeInteractionCounter(snapshot.activeControl.interactionCounter)
-            ) {
-              adoptCoopSnapshotHighWater(runtime.durability, snapshot);
-            }
-          }),
+        if (!queueCoopAtomicSnapshotApply(runtime, snapshot, `turn=${this.turn} checksum safety-net`)) {
+          return;
+        }
+        const interactionController = getCoopController();
+        // Cancellation occurs only AFTER the atomic envelope passed central preflight. A malformed
+        // snapshot cannot mutate live wait/control state merely by reaching this callback.
+        getCoopInteractionRelay()?.cancelWaiters(
+          seq =>
+            !isCoopFaintSwitchSeq(seq)
+            && (interactionController == null ? true : interactionController.peerAdvancedPastInteraction(seq)),
         );
       } catch {
         /* a malformed resync blob must never crash the guest's battle */
@@ -1387,25 +1362,33 @@ export class CoopApplyResyncPhase extends Phase {
     private readonly turn: number,
     private readonly hostChecksum: string,
     private readonly hostObj: unknown,
-    private readonly onSettled?: ((healed: boolean) => void) | undefined,
+    private readonly onSettled?: ((healed: boolean) => boolean | void) | undefined,
   ) {
     super();
   }
 
-  private settle(healed: boolean): void {
+  private settle(healed: boolean): boolean {
     if (this.settled) {
-      return;
+      return false;
     }
-    this.settled = true;
     try {
-      this.onSettled?.(healed);
+      const accepted = this.onSettled?.(healed);
+      if (healed && accepted === false) {
+        return false;
+      }
     } catch (error) {
       coopWarn("resync", `turn=${this.turn} snapshot settle callback failed`, error);
+      if (healed) {
+        return false;
+      }
     }
+    this.settled = true;
+    return true;
   }
 
   public override start(): void {
     super.start();
+    let rollback: CoopFullBattleSnapshot | null = null;
     try {
       // #790-class STALE GUARD for resyncs (live faint softlock, 00:47 logs): a resync REQUESTED
       // at turn N can be answered + queued while turn N+1 already finalized. Applying that OLD
@@ -1434,6 +1417,12 @@ export class CoopApplyResyncPhase extends Phase {
         coopWarn("resync", `turn=${this.turn} persistent divergence, suppressing re-summon`);
       }
       coopLog("resync", `turn=${this.turn} applying full snapshot (suppressResummon=${suppressResummon})`);
+      rollback = captureCoopFullSnapshot();
+      if (rollback == null) {
+        coopWarn("resync", `turn=${this.turn} snapshot refused: no transactional rollback image`);
+        this.settle(false);
+        return;
+      }
       // Pass the isCoopAuthoritativeGuest() gate from here (cycle-free) so the engine's level/exp +
       // boss re-assert branches stay guest-only without the engine importing the runtime.
       applyCoopFullSnapshot(this.snapshot, isCoopAuthoritativeGuest(), suppressResummon);
@@ -1443,8 +1432,16 @@ export class CoopApplyResyncPhase extends Phase {
         // Healed: reset the give-up tracker so a fresh future divergence gets the full re-summon again.
         coopResyncUnhealedChecksum = undefined;
         coopResyncUnhealedCount = 0;
-        this.settle(true);
+        if (!this.settle(true)) {
+          // DATA converged, but CONTROL did not commit. Restore the exact pre-image before holding.
+          applyCoopFullSnapshot(rollback, isCoopAuthoritativeGuest(), true);
+          this.settle(false);
+          coopWarn("resync", `turn=${this.turn} control commit failed; DATA rolled back atomically`);
+          return;
+        }
       } else {
+        // Never leave a checksum-failed DATA image partially committed while this phase holds.
+        applyCoopFullSnapshot(rollback, isCoopAuthoritativeGuest(), suppressResummon);
         coopWarn("resync", `turn=${this.turn} still-diverged host=${this.hostChecksum} guest=${healed}`);
         // Track consecutive UNHEALED on the SAME dimensions (host checksum) for the give-up cap.
         if (coopResyncUnhealedChecksum === this.hostChecksum) {
@@ -1501,6 +1498,14 @@ export class CoopApplyResyncPhase extends Phase {
         return;
       }
     } catch {
+      if (rollback != null) {
+        try {
+          applyCoopFullSnapshot(rollback, isCoopAuthoritativeGuest(), true);
+        } catch {
+          coopWarn("resync", `turn=${this.turn} rollback failed; shared session cannot safely continue`);
+          failCoopSharedSession(`turn=${this.turn} atomic DATA rollback failed`);
+        }
+      }
       // A malformed resync snapshot must never hang the guest's turn.
       coopWarn("resync", `turn=${this.turn} CoopApplyResyncPhase: apply/verify threw (handled)`);
       this.settle(false);

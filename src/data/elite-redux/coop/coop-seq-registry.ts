@@ -97,6 +97,13 @@ export const COOP_BIOME_PICK_SEQ_BASE = 9_700_000;
  */
 export const COOP_STORMGLASS_SEQ = 9_800_000;
 /**
+ * Host-authoritative deterministic biome transitions: `BASE + sourceWave`. These are BIOME_PICK
+ * operations for paths with no human route choice (single route, travel target, random/final biome).
+ * The disjoint band prevents a later picker at the same interaction counter from re-acking an older
+ * deterministic transition.
+ */
+export const COOP_BIOME_TRANSITION_SEQ_BASE = 9_800_001;
+/**
  * The wild-catch FULL-PARTY keep/release owner-driven relay: a FIXED singleton seq (#856). On a successful
  * WILD catch with a full party the keep/release (box/release) picker belongs to the CATCHER (the ball
  * thrower), not the sole-engine host. For a GUEST-thrown catch the HOST streams a `catchFullPrompt`, the
@@ -285,6 +292,13 @@ export const COOP_SEQ_BANDS: readonly CoopSeqBand[] = [
     owner: "er-stormglass-picker-phase.ts",
   },
   {
+    key: "biomeTransition",
+    base: COOP_BIOME_TRANSITION_SEQ_BASE,
+    maxOffset: COOP_MAX_REACHABLE_COUNTER - 1,
+    offset: "+ sourceWave",
+    owner: "select-biome-phase.ts",
+  },
+  {
     key: "catchFull",
     base: COOP_CATCH_FULL_SEQ,
     maxOffset: 0,
@@ -409,6 +423,12 @@ export const COOP_RELAY_KINDS: readonly CoopRelayKind[] = [
 export const COOP_REWARD_CHOICE_KINDS = ["reward", "shop", "skip", "reroll", "check", "transfer", "lock"] as const;
 /** The mystery-encounter pump/terminal awaits (present-pick / sub-pick / terminal LEAVE button). */
 export const COOP_ME_CHOICE_KINDS = ["me", "meSub", "meBtn"] as const;
+/** Top-level Mystery selector only. */
+export const COOP_ME_PICK_CHOICE_KINDS = ["me"] as const;
+/** Mystery party/secondary/catch-full sub-pickers only. */
+export const COOP_ME_SUB_CHOICE_KINDS = ["meSub"] as const;
+/** Mystery terminal/battle-handoff carrier only. */
+export const COOP_ME_TERMINAL_CHOICE_KINDS = ["meBtn"] as const;
 /** Faint / voluntary switch replacement picks (switch-phase.ts). */
 export const COOP_SWITCH_CHOICE_KINDS = ["switch"] as const;
 /** Revival Blessing owner pick (revival-blessing-phase.ts). */

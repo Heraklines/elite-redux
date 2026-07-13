@@ -26,6 +26,7 @@
 // =============================================================================
 
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { setCoopMeActivePresentation } from "#data/elite-redux/coop/coop-me-pin-state";
 // #840: seq bands now live in the single-source-of-truth registry; re-exported below under their
 // historical names so no call site changes (pure re-export, zero behavior change).
 import {
@@ -528,6 +529,11 @@ export class CoopInteractionRelay {
    * change the result. Same FIFO-per-seq semantics as the choice relay.
    */
   sendInteractionOutcome(seq: number, kind: string, outcome: CoopInteractionOutcome): void {
+    if (outcome.k === "mePresent") {
+      // Snapshot the exact screen before the carrier can be dropped. The pin-state seam self-gates to a
+      // live ME, so unrelated outcomes and non-co-op/legacy sessions remain byte-identical.
+      setCoopMeActivePresentation(outcome);
+    }
     recordCoopUiRelayCarrier("interactionOutcome", `seq=${seq} kind=${kind} outcome=${outcome.k}`);
     if (isCoopDebug()) {
       coopLog("relay", `SEND interactionOutcome seq=${seq} kind=${kind} ${summarizeOutcome(outcome)}`);

@@ -69,7 +69,11 @@ import {
   setErBiomeOverstayAnchor,
   setErBiomeStructureExtent,
 } from "#data/elite-redux/er-biome-structure";
-import { getErMapSaveData, restoreErMapState } from "#data/elite-redux/er-map-nodes";
+import {
+  getErMapSaveData,
+  restoreErMapState,
+  setAuthoritativeMapTravelClassification,
+} from "#data/elite-redux/er-map-nodes";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
 import {
@@ -3917,6 +3921,10 @@ function restoreCoopModuleLetSubstrates(
         `erMapState host nodes=${snapshot.erMapState.nodes?.length ?? 0} travelTarget=${snapshot.erMapState.travelTarget ?? "-"} fragments=${snapshot.erMapState.fragments ?? 0} -> restored (#865/#841 item 1)`,
       );
       restoreErMapState(snapshot.erMapState, globalScene.currentBattle?.waveIndex ?? 1);
+      setAuthoritativeMapTravelClassification(
+        globalScene.currentBattle?.waveIndex ?? -1,
+        typeof snapshot.erMapState.travelTarget === "number" ? snapshot.erMapState.travelTarget : null,
+      );
     }
     if (Array.isArray(snapshot.erPendingNodes)) {
       coopLog(
@@ -4681,36 +4689,86 @@ export function captureCoopMeOutcome(): Extract<CoopInteractionOutcome, { k: "me
  * older host that omits `authoritativeState`. Fully guarded as a WHOLE so a partial-blob apply can never
  * hang or crash the guest - the per-turn checksum re-syncs any residual drift.
  */
-export function applyCoopMeOutcome(o: Extract<CoopInteractionOutcome, { k: "meResync" }>): void {
+function applyCoopMeOutcomeUnchecked(
+  o: Extract<CoopInteractionOutcome, { k: "meResync" }>,
+  rollbackReassert = false,
+): void {
+  // #838 UNIFY: a modern host carries the id-based authoritative full-state (captured off-field too).
+  // Adopt it via the SAME apply the live turns use - mutate-in-place by Pokemon.id, reconstruct/remove
+  // by id, adopt host party order - replacing the legacy species-based `applyCoopMePartyFromData` + the
+  // `base` species-order/benchParty heal. authoritativeGuest=true: applyCoopMeOutcome is definitionally
+  // the GUEST adopting the host's ME terminal (no runtime import needed to know that), so the full
+  // modifier / enemy-boss reconcile runs. Falls back to base + species party only for an older host.
+  if (o.authoritativeState === undefined) {
+    if (o.base != null) {
+      applyCoopFullSnapshot(o.base);
+    }
+    applyCoopMePartyFromData(o.party);
+  } else {
+    const applied = rollbackReassert
+      ? applyCoopAuthoritativeBattleStateInternal(o.authoritativeState, true, true)
+      : applyCoopAuthoritativeBattleState(o.authoritativeState, true);
+    const structuredFailures = drainCoopApplyFailures();
+    if (!applied || structuredFailures.length > 0) {
+      throw new Error(
+        applied
+          ? `authoritative Mystery state reported ${structuredFailures.length} structured failure(s)`
+          : "authoritative Mystery state refused",
+      );
+    }
+  }
+  // mysteryEncounterSaveData: replace encounteredEvents wholesale (it is plain data).
+  if (typeof o.meSaveData === "string" && o.meSaveData.length > 0) {
+    globalScene.mysteryEncounterSaveData.encounteredEvents = JSON.parse(o.meSaveData);
+  }
+  // RNG cursor: restore so the guest's seed pointer matches after the host alone advanced it.
+  if (typeof o.seed === "string") {
+    globalScene.setSeed(o.seed);
+  }
+  if (typeof o.waveSeed === "string") {
+    globalScene.waveSeed = o.waveSeed;
+    Phaser.Math.RND.sow([o.waveSeed]);
+  }
+  applyCoopDexDelta(o.dex);
+}
+
+let coopMeOutcomeRollbackFatal = false;
+
+export function consumeCoopMeOutcomeRollbackFatal(): boolean {
+  const fatal = coopMeOutcomeRollbackFatal;
+  coopMeOutcomeRollbackFatal = false;
+  return fatal;
+}
+
+export function applyCoopMeOutcome(o: Extract<CoopInteractionOutcome, { k: "meResync" }>): boolean {
+  coopMeOutcomeRollbackFatal = false;
+  let rollback: Extract<CoopInteractionOutcome, { k: "meResync" }>;
+  const priorTickCounter = coopStateTickCounter;
+  const priorLastAppliedTick = coopLastAppliedStateTick;
   try {
-    // #838 UNIFY: a modern host carries the id-based authoritative full-state (captured off-field too).
-    // Adopt it via the SAME apply the live turns use - mutate-in-place by Pokemon.id, reconstruct/remove
-    // by id, adopt host party order - replacing the legacy species-based `applyCoopMePartyFromData` + the
-    // `base` species-order/benchParty heal. authoritativeGuest=true: applyCoopMeOutcome is definitionally
-    // the GUEST adopting the host's ME terminal (no runtime import needed to know that), so the full
-    // modifier / enemy-boss reconcile runs. Falls back to base + species party only for an older host.
-    if (o.authoritativeState === undefined) {
-      if (o.base != null) {
-        applyCoopFullSnapshot(o.base);
-      }
-      applyCoopMePartyFromData(o.party);
-    } else {
-      applyCoopAuthoritativeBattleState(o.authoritativeState, true);
-    }
-    // mysteryEncounterSaveData: replace encounteredEvents wholesale (it is plain data).
-    if (typeof o.meSaveData === "string" && o.meSaveData.length > 0) {
-      globalScene.mysteryEncounterSaveData.encounteredEvents = JSON.parse(o.meSaveData);
-    }
-    // RNG cursor: restore so the guest's seed pointer matches after the host alone advanced it.
-    if (typeof o.seed === "string") {
-      globalScene.setSeed(o.seed);
-    }
-    if (typeof o.waveSeed === "string") {
-      globalScene.waveSeed = o.waveSeed;
-      Phaser.Math.RND.sow([o.waveSeed]);
-    }
-    applyCoopDexDelta(o.dex);
+    rollback = captureCoopMeOutcome();
   } catch {
-    // A resync apply failure must NEVER hang or crash the guest; the per-turn checksum re-syncs.
+    return false;
+  }
+  try {
+    applyCoopMeOutcomeUnchecked(o);
+    // Capturing the rollback is observational on the receiver; do not advance its producer-side tick.
+    coopStateTickCounter = priorTickCounter;
+    return true;
+  } catch {
+    // A terminal image is a transaction: an exception cannot leave a partially-applied DATA image while
+    // the exact terminal remains held. Best-effort restore is followed by a false result, which withholds
+    // the journal ACK and terminal materialization so durability can retry or terminate the shared session.
+    let rollbackApplied = false;
+    try {
+      applyCoopMeOutcomeUnchecked(rollback, true);
+      rollbackApplied = true;
+    } catch {
+      // The caller will fail the shared session; there is no safe terminal wake-up after rollback failure.
+    }
+    coopMeOutcomeRollbackFatal = !rollbackApplied;
+    coopStateTickCounter = priorTickCounter;
+    coopLastAppliedStateTick = priorLastAppliedTick;
+    return false;
   }
 }

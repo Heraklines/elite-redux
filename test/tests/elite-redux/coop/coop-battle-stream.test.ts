@@ -642,6 +642,18 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       expect(await guestStream.awaitLaunchSnapshot(1)).toBe(SESSION_JSON);
     });
 
+    it("a guest that missed a first-save abort re-requests the host's retained abort", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host);
+
+      // The first carrier is lost before the guest streamer exists. The later wave-keyed request
+      // must replay the abort, never hang and never synthesize a launch snapshot.
+      hostStream.sendLaunchSnapshotAbort(1, "first-save-cas-failed");
+      await new Promise(r => setTimeout(r, 0));
+      const guestStream = new CoopBattleStreamer(guest);
+      expect(await guestStream.awaitLaunchSnapshot(1)).toBeNull();
+    });
+
     it("awaitLaunchSnapshot resolves null on timeout (authoritative caller fails closed)", async () => {
       const { guest } = createLoopbackPair();
       const timer: { fire?: () => void } = {};

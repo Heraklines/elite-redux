@@ -78,7 +78,7 @@ describe("co-op bespoke yes/no ME sub-prompt relay (#827)", () => {
       expect(seen.subPrompt).toEqual({ kind: "secondary", labels: YES_NO_LABELS });
 
       // The guest relays its captured index on the SAME seq_me CHOICE inbox (kind "meSub").
-      guestRelay.sendInteractionChoice(seqMe, "meSub", pick);
+      guestRelay.sendInteractionChoice(seqMe, "meSub", pick, [0]);
 
       // The helper resolves to exactly the guest's index (the wrapper then calls fullOptions[index].handler()).
       expect(await hostAwait).toBe(pick);
@@ -98,7 +98,7 @@ describe("co-op bespoke yes/no ME sub-prompt relay (#827)", () => {
     const seen = await guestRelay.awaitInteractionOutcome(seqMe);
     expect(seen?.k === "mePresent" ? seen.subPrompt : undefined).toEqual({ kind: "secondary", labels: YES_NO_LABELS });
 
-    guestRelay.sendInteractionChoice(seqMe, "meSub", YES_NO_LABELS.length); // the cancel / not-selected sentinel
+    guestRelay.sendInteractionChoice(seqMe, "meSub", YES_NO_LABELS.length, [0]); // cancel / not-selected sentinel
     const idx = await hostAwait;
     expect(idx).toBe(YES_NO_LABELS.length);
     expect(idx == null || idx >= YES_NO_LABELS.length).toBe(true); // the wrapper's re-prompt guard fires

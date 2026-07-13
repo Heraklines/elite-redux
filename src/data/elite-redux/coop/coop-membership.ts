@@ -107,6 +107,15 @@ export class CoopMembershipController {
     return true;
   }
 
+  /** Exact local rollback for a failed atomic DATA+CONTROL snapshot commit. */
+  restoreForTransaction(snapshot: CoopMembershipSnapshotV1): void {
+    this.revision = snapshot.revision;
+    this.connectionGeneration = snapshot.connectionGeneration;
+    this.state = snapshot.state;
+    this.present[0] = snapshot.members[0].present;
+    this.present[1] = snapshot.members[1].present;
+  }
+
   snapshot(): CoopMembershipSnapshotV1 {
     return {
       version: 1,

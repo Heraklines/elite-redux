@@ -24,7 +24,9 @@
 
 import {
   COOP_COLOSSEUM_SEQ_BASE,
+  CoopColosseumLoopLeaseRegistry,
   type CoopColosseumRoundOps,
+  canRebindColosseumGuestLoop,
   coopColosseumAwaitDecision,
   coopColosseumBoardOwnedLocally,
   coopColosseumSendDecision,
@@ -39,6 +41,7 @@ import {
   setCoopColosseumOperationEnabled,
 } from "#data/elite-redux/coop/coop-colosseum-operation";
 import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { resetCoopMeOperationFlag, setCoopMeOperationEnabled } from "#data/elite-redux/coop/coop-me-operation";
 import { setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import {
@@ -47,11 +50,16 @@ import {
   getCoopInteractionRelay,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopInteractionOutcome, CoopMessage, CoopSerializedEnemy } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopActiveMysteryEncounterSnapshotV1,
+  CoopInteractionOutcome,
+  CoopMessage,
+  CoopSerializedEnemy,
+} from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { COLOSSEUM_CASH_OUT, COLOSSEUM_CONTINUE } from "#ui/colosseum-ui-handler";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 /** The board's two decision labels (index 0 == CONTINUE, index 1 == CASH OUT); asserted verbatim on the wire. */
 const BOARD_LABELS = ["CONTINUE (risk for S+)", "CASH OUT (claim S)"];
@@ -235,9 +243,16 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
 // injected CoopColosseumRoundOps, so what is asserted is the loop's decisions, not the engine.
 // =============================================================================
 describe("co-op Colosseum guest between-rounds ROUND LOOP (#829)", () => {
+  beforeEach(() => {
+    // This suite isolates the round-loop protocol over a bare guest relay. Journal-authenticated terminal
+    // integration is covered by the ME operation/recovery suites with a full guest durability runtime.
+    setCoopMeOperationEnabled(false);
+  });
+
   afterEach(() => {
     clearCoopRuntime();
     setCoopMeInteractionStart(-1);
+    resetCoopMeOperationFlag();
   });
 
   /**
@@ -283,15 +298,117 @@ describe("co-op Colosseum guest between-rounds ROUND LOOP (#829)", () => {
       awaitBoss: async () => opts.boss,
       bootRoundBattle: (enemies: CoopSerializedEnemy[]) => {
         state.boots.push(enemies);
+        return true;
       },
       leaveAndAdvance: () => {
         state.leaves++;
+        return true;
       },
       showTag: () => {},
       hideTag: () => {},
     };
     return { ops, state };
   };
+
+  it("battle-terminal hot-rejoin supersedes an old parked relay loop and resumes without re-picking", async () => {
+    const snapshot = {
+      version: 1,
+      interactionCounter: 4,
+      revision: 8,
+      round: 2,
+      terminal: "battle",
+      terminalOperationId: "1:0:ME_TERMINAL:72000036000",
+      terminalStep: 0,
+      terminalChoice: -1000,
+      colosseum: {
+        expectedRound: 2,
+        boardRound: 2,
+        decision: { round: 2, index: COLOSSEUM_CONTINUE, operationId: "1:0:COLO_PICK:405" },
+      },
+    } satisfies CoopActiveMysteryEncounterSnapshotV1;
+    expect(canRebindColosseumGuestLoop(snapshot), "battle handoff is the normal mid-gauntlet state").toBe(true);
+
+    setCoopMeInteractionStart(4);
+    const oldPair = createLoopbackPair();
+    const newPair = createLoopbackPair();
+    const oldHostRelay = new CoopInteractionRelay(oldPair.host);
+    const oldGuestRelay = new CoopInteractionRelay(oldPair.guest);
+    const newGuestRelay = new CoopInteractionRelay(newPair.guest);
+    const leases = new CoopColosseumLoopLeaseRegistry();
+    const oldIdentity = {};
+    const oldLease = leases.acquire(4, [oldIdentity, oldGuestRelay]);
+    let oldBoots = 0;
+    const oldRun = runColosseumGuestRoundLoop(
+      4,
+      COOP_ME_TERM_SEQ_BASE + 4,
+      oldGuestRelay,
+      {
+        boardOwnedLocally: () => true,
+        driveBoard: async () => COLOSSEUM_CONTINUE,
+        awaitBoss: async () => FAKE_BOSS,
+        bootRoundBattle: () => {
+          oldBoots++;
+          return true;
+        },
+        leaveAndAdvance: () => true,
+        showTag: () => {},
+        hideTag: () => {},
+      },
+      undefined,
+      oldLease.isLive,
+    );
+
+    const newLease = leases.acquire(4, [{ replacement: true }, newGuestRelay]);
+    expect(newLease.accepted).toBe(true);
+    expect(oldLease.isLive(), "replacement identity cancels the old loop lease").toBe(false);
+    let drives = 0;
+    let newBoots = 0;
+    await runColosseumGuestRoundLoop(
+      4,
+      COOP_ME_TERM_SEQ_BASE + 4,
+      newGuestRelay,
+      {
+        boardOwnedLocally: () => true,
+        driveBoard: async () => {
+          drives++;
+          return COLOSSEUM_CASH_OUT;
+        },
+        awaitBoss: async () => FAKE_BOSS,
+        bootRoundBattle: () => {
+          newBoots++;
+          newLease.release(); // finish this headless proof after the exact resumed CONTINUE
+          return true;
+        },
+        leaveAndAdvance: () => true,
+        showTag: () => {},
+        hideTag: () => {},
+      },
+      {
+        expectedRound: 2,
+        presentation: {
+          k: "mePresent",
+          tokens: { coopColosseumRound: "2" },
+          meetsReqs: [],
+          labels: [],
+          subPrompt: { kind: "secondary", labels: [...BOARD_LABELS] },
+        },
+        decision: { round: 2, index: COLOSSEUM_CONTINUE, operationId: "1:0:COLO_PICK:402" },
+      },
+      newLease.isLive,
+    );
+    expect(drives, "the already committed decision is not solicited again").toBe(0);
+    expect(newBoots).toBe(1);
+
+    oldHostRelay.sendInteractionOutcome(coopColosseumSeq(4), "coloBoard", {
+      k: "mePresent",
+      tokens: { coopColosseumRound: "2" },
+      meetsReqs: [],
+      labels: [],
+      subPrompt: { kind: "secondary", labels: [...BOARD_LABELS] },
+    });
+    await oldRun;
+    expect(oldBoots, "the superseded old relay loop performs no mutation when it eventually wakes").toBe(0);
+  });
 
   it("WATCHER: watches CONTINUE (boots the next round) then CASH OUT (defers the leave to the true 9M LEAVE)", async () => {
     // Host-owned board: the guest WATCHES the host's relayed pick. Round 1 -> CONTINUE -> boot round 2;
@@ -375,9 +492,7 @@ describe("co-op Colosseum guest between-rounds ROUND LOOP (#829)", () => {
     guestRelay.dispose();
   });
 
-  it("DEFENSIVE: a malformed board present (no secondary sub-prompt) leaves once - never strands", async () => {
-    // A board present the loop cannot read (a host stall / malformed frame: no secondary sub-prompt) must
-    // defensively leave + advance rather than park forever waiting for a decision it can never render.
+  it("FAIL-CLOSED: a malformed board never synthesizes a local leave/advance", async () => {
     const { seq, guestRelay } = rig(8);
     const seqTerm = COOP_ME_TERM_SEQ_BASE + 8;
     const { ops, state } = makeFakeOps({ owned: false, boss: null });
@@ -386,7 +501,7 @@ describe("co-op Colosseum guest between-rounds ROUND LOOP (#829)", () => {
     const malformed: CoopInteractionOutcome = { k: "mePresent", tokens: {}, meetsReqs: [], labels: [] };
     getCoopInteractionRelay()?.sendInteractionOutcome(seq, "coloBoard", malformed);
     await loop;
-    expect(state.leaves, "defensively left + advanced once on a malformed board").toBe(1);
+    expect(state.leaves, "malformed board is not authority to leave or advance").toBe(0);
     expect(state.boots.length, "booted no round").toBe(0);
     guestRelay.dispose();
   });

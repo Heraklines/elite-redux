@@ -10,21 +10,30 @@ import { Egg } from "#data/egg";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
+  commitMeAuthorityGuestIntent,
   commitMeOwnerIntent,
-  nextCoopMeAuthoritySubPickStep,
+  isCoopMeOperationEnabled,
   nextCoopMePresentationStep,
 } from "#data/elite-redux/coop/coop-me-operation";
-import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
+import {
+  coopMeInProgress,
+  coopMeInteractionStartValue,
+  setCoopMeActivePresentation,
+} from "#data/elite-redux/coop/coop-me-pin-state";
+import { isCoopOperationJournalActive } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   coopGuestAwaitMeBattleParty,
   coopGuestShouldAdoptMeBattleParty,
   coopHostStreamMeBattleParty,
   coopMeOwnerRelayBattleHandoff,
+  coopSessionGeneration,
+  failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
+  getCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_ME_CHOICE_KINDS, COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_SUB_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import type { Gender } from "#data/gender";
 import { getNatureName } from "#data/nature";
@@ -86,18 +95,113 @@ import i18next from "i18next";
 /** Disconnect ceiling for every host<->guest ME await; steady state resolves on the relayed pick. */
 const COOP_ME_REPLAY_WAIT_MS = 1_200_000;
 
-/** Authority commit for one guest-owned ME sub-pick accepted from the host's real FIFO waiter. */
-function commitGuestMeSubPick(seq: number, value: number): void {
-  commitMeOwnerIntent({
-    kind: "ME_SUB",
-    seq,
+interface CoopMeWaitBoundary {
+  scene: typeof globalScene;
+  runtime: ReturnType<typeof getCoopRuntime>;
+  controller: ReturnType<typeof getCoopController>;
+  generation: number;
+  pinned: number;
+  wave: number;
+  phase: unknown;
+}
+
+function captureCoopMeWaitBoundary(): CoopMeWaitBoundary {
+  return {
+    scene: globalScene,
+    runtime: getCoopRuntime(),
+    controller: getCoopController(),
+    generation: coopSessionGeneration(),
     pinned: coopMeInteractionStartValue(),
-    step: nextCoopMeAuthoritySubPickStep(),
-    payload: { value },
-    localRole: "host",
-    wave: globalScene?.currentBattle?.waveIndex ?? -1,
+    wave: globalScene.currentBattle?.waveIndex ?? -1,
+    phase: globalScene.phaseManager.getCurrentPhase(),
+  };
+}
+
+function coopMeWaitBoundaryLive(boundary: CoopMeWaitBoundary): boolean {
+  return (
+    globalScene === boundary.scene
+    && getCoopRuntime() === boundary.runtime
+    && getCoopController() === boundary.controller
+    && coopSessionGeneration() === boundary.generation
+    && coopMeInteractionStartValue() === boundary.pinned
+    && (globalScene.currentBattle?.waveIndex ?? -1) === boundary.wave
+    && globalScene.phaseManager.getCurrentPhase() === boundary.phase
+  );
+}
+
+/** Commit then publish one host-owned presentation. Journal mode never uses raw as correctness carrier. */
+function commitAndPublishMePresentation(
+  relay: ReturnType<typeof getCoopInteractionRelay>,
+  seq: number,
+  presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }>,
+): boolean {
+  const pinned = coopMeInteractionStartValue();
+  const operationId = commitMeOwnerIntent({
+    kind: "ME_PRESENT",
+    seq,
+    pinned,
+    step: nextCoopMePresentationStep(pinned),
+    payload: { present: true, presentation },
+    localRole: getCoopController()?.role ?? "host",
+    wave: globalScene.currentBattle?.waveIndex ?? -1,
     turn: 0,
   });
+  if (operationId == null && isCoopMeOperationEnabled()) {
+    failCoopSharedSession(`Mystery presentation ${seq} could not enter authoritative control`);
+    return false;
+  }
+  if (isCoopMeOperationEnabled() && isCoopOperationJournalActive()) {
+    setCoopMeActivePresentation(presentation);
+  } else {
+    relay?.sendInteractionOutcome(seq, "mePresent", presentation);
+  }
+  return true;
+}
+
+/** Consume duplicates without allowing an old retry to satisfy the next sub-picker. */
+async function awaitCommittedGuestMeSubPick(
+  relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
+  seq: number,
+  boundary: CoopMeWaitBoundary,
+  label: string,
+): Promise<number | null> {
+  while (coopMeWaitBoundaryLive(boundary)) {
+    const pick = await relay.awaitInteractionChoice(seq, COOP_ME_REPLAY_WAIT_MS, COOP_ME_SUB_CHOICE_KINDS);
+    if (!coopMeWaitBoundaryLive(boundary)) {
+      return null;
+    }
+    if (pick == null) {
+      getCoopRuntime()?.durability?.reconnect();
+      failCoopSharedSession(`${label} ${seq} unavailable after bounded wait`);
+      return null;
+    }
+    if (!isCoopMeOperationEnabled()) {
+      return pick.choice;
+    }
+    const step = pick.data?.[0];
+    if (!Number.isSafeInteger(step) || (step as number) < 0) {
+      failCoopSharedSession(`${label} ${seq} arrived without an exact operation step`);
+      return null;
+    }
+    const result = commitMeAuthorityGuestIntent({
+      kind: "ME_SUB",
+      seq,
+      pinned: boundary.pinned,
+      step: step as number,
+      value: pick.choice,
+      wave: boundary.wave,
+      turn: 0,
+    });
+    if (result.kind === "duplicate") {
+      continue;
+    }
+    if (result.kind !== "committed") {
+      failCoopSharedSession(`${label} ${seq}/${String(step)} could not commit (${result.kind})`);
+      return null;
+    }
+    return pick.choice;
+  }
+  return null;
 }
 /**
  * Co-op authoritative non-battle ME (#633, ADD-2c; #818/#827 mirrored): MEs whose selected-option chain
@@ -171,28 +275,19 @@ export function coopHostStreamSecondaryAwaitIndex(labels: string[]): Promise<num
     seq: seqMe,
     labels: labels.length,
   });
-  relay?.sendInteractionOutcome(seqMe, "mePresent", prompt);
-  commitMeOwnerIntent({
-    kind: "ME_PRESENT",
-    seq: seqMe,
-    pinned: coopMeInteractionStartValue(),
-    step: nextCoopMePresentationStep(),
-    payload: { present: true, presentation: prompt },
-    localRole: getCoopController()?.role ?? "host",
-    wave: globalScene?.currentBattle?.waveIndex ?? -1,
-    turn: 0,
-  });
-  const awaited =
-    relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS) ?? Promise.resolve(null);
-  return awaited.then(pick => {
-    const idx = pick?.choice ?? null;
-    if (idx != null) {
-      commitGuestMeSubPick(seqMe, idx);
+  if (relay == null || !commitAndPublishMePresentation(relay, seqMe, prompt)) {
+    failCoopSharedSession(`Mystery secondary presentation ${seqMe} unavailable`);
+    return Promise.resolve(null);
+  }
+  const boundary = captureCoopMeWaitBoundary();
+  return awaitCommittedGuestMeSubPick(relay, seqMe, boundary, "Mystery secondary choice").then(idx => {
+    if (idx == null || !coopMeWaitBoundaryLive(boundary)) {
+      return null;
     }
     coopLog("me", "host received guest bespoke yes/no sub-pick (#827)", {
       seq: seqMe,
       idx,
-      fromNull: pick == null,
+      fromNull: false,
     });
     return idx;
   });
@@ -222,23 +317,14 @@ export function coopHostStreamCatchFullAwaitSlot(pokemonName: string): Promise<n
     subPrompt: { kind: "catchFull", pokemonName },
   };
   coopLog("me", "host streams catch-FULL replace-or-skip sub-prompt + awaits guest slot (#855)", { seq: seqMe });
-  relay?.sendInteractionOutcome(seqMe, "mePresent", prompt);
-  commitMeOwnerIntent({
-    kind: "ME_PRESENT",
-    seq: seqMe,
-    pinned: coopMeInteractionStartValue(),
-    step: nextCoopMePresentationStep(),
-    payload: { present: true, presentation: prompt },
-    localRole: getCoopController()?.role ?? "host",
-    wave: globalScene?.currentBattle?.waveIndex ?? -1,
-    turn: 0,
-  });
-  const awaited =
-    relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS) ?? Promise.resolve(null);
-  return awaited.then(pick => {
-    const slot = pick?.choice ?? null;
-    if (slot != null) {
-      commitGuestMeSubPick(seqMe, slot);
+  if (relay == null || !commitAndPublishMePresentation(relay, seqMe, prompt)) {
+    failCoopSharedSession(`Mystery catch-full presentation ${seqMe} unavailable`);
+    return Promise.resolve(null);
+  }
+  const boundary = captureCoopMeWaitBoundary();
+  return awaitCommittedGuestMeSubPick(relay, seqMe, boundary, "Mystery catch-full choice").then(slot => {
+    if (slot == null || !coopMeWaitBoundaryLive(boundary)) {
+      return null;
     }
     const partySize = globalScene.getPlayerParty().length;
     if (slot == null || slot < 0 || slot >= partySize) {
@@ -246,7 +332,7 @@ export function coopHostStreamCatchFullAwaitSlot(pokemonName: string): Promise<n
         seq: seqMe,
         slot,
         partySize,
-        fromNull: pick == null,
+        fromNull: false,
       });
       return null;
     }
@@ -675,7 +761,9 @@ export async function initBattleWithEnemyConfig(partyConfig: EnemyPartyConfig): 
     battle.setDouble(false);
   }
   coopHostStreamMeBattleParty();
-  coopMeOwnerRelayBattleHandoff();
+  if (!coopMeOwnerRelayBattleHandoff()) {
+    return;
+  }
   if (coopGuestShouldAdoptMeBattleParty()) {
     await adoptCoopMeBattleParty(battle, loadEnemyAssets);
   }
@@ -847,6 +935,24 @@ export function selectPokemonForOption(
 ): Promise<boolean> {
   return new Promise(resolve => {
     const modeToSetOnExit = globalScene.ui.getMode();
+    const boundScene = globalScene;
+    const boundRuntime = getCoopRuntime();
+    const boundController = getCoopController();
+    const boundGeneration = coopSessionGeneration();
+    const boundPin = coopMeInteractionStartValue();
+    const coopFence =
+      coopMeInProgress() && boundRuntime != null && boundController != null
+        ? () =>
+            globalScene === boundScene
+            && getCoopRuntime() === boundRuntime
+            && getCoopController() === boundController
+            && coopSessionGeneration() === boundGeneration
+            && coopMeInteractionStartValue() === boundPin
+        : undefined;
+    const setMode = (mode: UiMode, ...args: unknown[]) =>
+      coopFence == null
+        ? globalScene.ui.setMode(mode, ...args)
+        : globalScene.ui.setModeBoundedWhen(mode, 2_000, coopFence, ...args);
 
     // Co-op AUTHORITATIVE host on a GUEST-OWNED ME (#633, ADD-2b): the host runs the sole engine, so
     // the party target + any secondary index come from the GUEST's relayed picks, NOT a local host
@@ -864,27 +970,19 @@ export function selectPokemonForOption(
         subPrompt: { kind: "party" },
       };
       coopLog("me", "host streams PARTY sub-prompt + awaits guest slot", { seq: seqMe });
-      relay?.sendInteractionOutcome(seqMe, "mePresent", partyPrompt);
-      commitMeOwnerIntent({
-        kind: "ME_PRESENT",
-        seq: seqMe,
-        pinned: coopMeInteractionStartValue(),
-        step: nextCoopMePresentationStep(),
-        payload: { present: true, presentation: partyPrompt },
-        localRole: getCoopController()?.role ?? "host",
-        wave: globalScene?.currentBattle?.waveIndex ?? -1,
-        turn: 0,
-      });
-      void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(async pick => {
-        // A null (disconnected guest) maps past the party tail => the not-selected branch.
-        const slotIndex = pick?.choice ?? globalScene.getPlayerParty().length;
-        if (pick != null) {
-          commitGuestMeSubPick(seqMe, slotIndex);
+      if (relay == null || !commitAndPublishMePresentation(relay, seqMe, partyPrompt)) {
+        failCoopSharedSession(`Mystery party presentation ${seqMe} unavailable`);
+        return;
+      }
+      const boundary = captureCoopMeWaitBoundary();
+      void awaitCommittedGuestMeSubPick(relay, seqMe, boundary, "Mystery party choice").then(async slotIndex => {
+        if (slotIndex == null || !coopMeWaitBoundaryLive(boundary)) {
+          return;
         }
         coopLog("me", "host received guest party sub-pick", {
           seq: seqMe,
           slotIndex,
-          fromNull: pick == null,
+          fromNull: false,
         });
         if (slotIndex >= globalScene.getPlayerParty().length) {
           coopWarn("me", "host: party sub-pick out of range; not-selected branch", {
@@ -917,23 +1015,14 @@ export function selectPokemonForOption(
           slotIndex,
           labels: secondaryOptions.length,
         });
-        relay?.sendInteractionOutcome(seqMe, "mePresent", secondaryPrompt);
-        commitMeOwnerIntent({
-          kind: "ME_PRESENT",
-          seq: seqMe,
-          pinned: coopMeInteractionStartValue(),
-          step: nextCoopMePresentationStep(),
-          payload: { present: true, presentation: secondaryPrompt },
-          localRole: getCoopController()?.role ?? "host",
-          wave: globalScene?.currentBattle?.waveIndex ?? -1,
-          turn: 0,
-        });
-        void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(sec => {
-          globalScene.currentBattle.mysteryEncounter!.setDialogueToken("selectedPokemon", pokemon.getNameToRender());
-          const idx = sec?.choice ?? -1;
-          if (sec != null) {
-            commitGuestMeSubPick(seqMe, idx);
+        if (!commitAndPublishMePresentation(relay, seqMe, secondaryPrompt)) {
+          return;
+        }
+        void awaitCommittedGuestMeSubPick(relay, seqMe, boundary, "Mystery secondary choice").then(idx => {
+          if (idx == null || !coopMeWaitBoundaryLive(boundary)) {
+            return;
           }
+          globalScene.currentBattle.mysteryEncounter!.setDialogueToken("selectedPokemon", pokemon.getNameToRender());
           coopLog("me", "host received guest secondary sub-pick", {
             seq: seqMe,
             idx,
@@ -949,12 +1038,18 @@ export function selectPokemonForOption(
     }
 
     // Open party screen to choose pokemon
-    globalScene.ui.setMode(
+    setMode(
       UiMode.PARTY,
       PartyUiMode.SELECT,
       -1,
       async (slotIndex: number, _option: PartyOption) => {
-        await globalScene.ui.setMode(modeToSetOnExit);
+        if (coopFence != null && !coopFence()) {
+          return;
+        }
+        await setMode(modeToSetOnExit);
+        if (coopFence != null && !coopFence()) {
+          return;
+        }
         if (slotIndex >= globalScene.getPlayerParty().length) {
           onPokemonNotSelected?.();
           resolve(false);
@@ -970,7 +1065,10 @@ export function selectPokemonForOption(
         }
 
         // There is a second option to choose after selecting the Pokemon
-        await globalScene.ui.setMode(UiMode.MESSAGE);
+        await setMode(UiMode.MESSAGE);
+        if (coopFence != null && !coopFence()) {
+          return;
+        }
         // TODO: fix this
         const displayOptions = () => {
           // Always appends a cancel option to bottom of options
@@ -979,6 +1077,9 @@ export function selectPokemonForOption(
               // Update handler to resolve promise
               const onSelect = option.handler;
               option.handler = () => {
+                if (coopFence != null && !coopFence()) {
+                  return false;
+                }
                 onSelect();
                 globalScene.currentBattle.mysteryEncounter!.setDialogueToken(
                   "selectedPokemon",
@@ -992,8 +1093,11 @@ export function selectPokemonForOption(
             .concat({
               label: i18next.t("menu:cancel"),
               handler: () => {
+                if (coopFence != null && !coopFence()) {
+                  return false;
+                }
                 globalScene.ui.clearText();
-                globalScene.ui.setMode(modeToSetOnExit);
+                setMode(modeToSetOnExit);
                 resolve(false);
                 return true;
               },
@@ -1013,7 +1117,11 @@ export function selectPokemonForOption(
           if (fullOptions[0]?.onHover) {
             fullOptions[0].onHover();
           }
-          globalScene.ui.setModeWithoutClear(UiMode.OPTION_SELECT, config, null, true);
+          if (coopFence == null) {
+            globalScene.ui.setModeWithoutClear(UiMode.OPTION_SELECT, config, null, true);
+          } else {
+            globalScene.ui.setModeBoundedWhen(UiMode.OPTION_SELECT, 2_000, coopFence, config, null, true);
+          }
         };
 
         const textPromptKey = globalScene.currentBattle.mysteryEncounter?.selectedOption?.dialogue?.secondOptionPrompt;
@@ -1049,9 +1157,30 @@ export function selectOptionThenPokemon(
 ): Promise<PokemonAndOptionSelected | null> {
   return new Promise<PokemonAndOptionSelected | null>(resolve => {
     const modeToSetOnExit = globalScene.ui.getMode();
+    const boundScene = globalScene;
+    const boundRuntime = getCoopRuntime();
+    const boundController = getCoopController();
+    const boundGeneration = coopSessionGeneration();
+    const boundPin = coopMeInteractionStartValue();
+    const coopFence =
+      coopMeInProgress() && boundRuntime != null && boundController != null
+        ? () =>
+            globalScene === boundScene
+            && getCoopRuntime() === boundRuntime
+            && getCoopController() === boundController
+            && coopSessionGeneration() === boundGeneration
+            && coopMeInteractionStartValue() === boundPin
+        : undefined;
+    const setMode = (mode: UiMode, ...args: unknown[]) =>
+      coopFence == null
+        ? globalScene.ui.setMode(mode, ...args)
+        : globalScene.ui.setModeBoundedWhen(mode, 2_000, coopFence, ...args);
 
     const displayOptions = async (config: OptionSelectConfig) => {
-      await globalScene.ui.setMode(UiMode.MESSAGE);
+      await setMode(UiMode.MESSAGE);
+      if (coopFence != null && !coopFence()) {
+        return;
+      }
       if (optionSelectPromptKey) {
         showEncounterText(optionSelectPromptKey);
       }
@@ -1059,19 +1188,25 @@ export function selectOptionThenPokemon(
       if (fullOptions[0]?.onHover) {
         fullOptions[0].onHover();
       }
-      globalScene.ui.setMode(UiMode.OPTION_SELECT, config);
+      setMode(UiMode.OPTION_SELECT, config);
     };
 
     const selectPokemonAfterOption = (selectedOptionIndex: number) => {
       // Open party screen to choose a Pokemon
-      globalScene.ui.setMode(
+      setMode(
         UiMode.PARTY,
         PartyUiMode.SELECT,
         -1,
         (slotIndex: number, _option: PartyOption) => {
+          if (coopFence != null && !coopFence()) {
+            return;
+          }
           if (slotIndex < globalScene.getPlayerParty().length) {
             // Pokemon and option selected
-            globalScene.ui.setMode(modeToSetOnExit).then(() => {
+            setMode(modeToSetOnExit).then(() => {
+              if (coopFence != null && !coopFence()) {
+                return;
+              }
               const result: PokemonAndOptionSelected = {
                 selectedPokemonIndex: slotIndex,
                 selectedOptionIndex,
@@ -1093,6 +1228,9 @@ export function selectOptionThenPokemon(
         // Update handler to resolve promise
         const onSelect = option.handler;
         option.handler = () => {
+          if (coopFence != null && !coopFence()) {
+            return false;
+          }
           onSelect();
           selectPokemonAfterOption(index);
           return true;
@@ -1102,8 +1240,11 @@ export function selectOptionThenPokemon(
       .concat({
         label: i18next.t("menu:cancel"),
         handler: () => {
+          if (coopFence != null && !coopFence()) {
+            return false;
+          }
           globalScene.ui.clearText();
-          globalScene.ui.setMode(modeToSetOnExit);
+          setMode(modeToSetOnExit);
           resolve(null);
           return true;
         },

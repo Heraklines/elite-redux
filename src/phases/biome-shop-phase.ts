@@ -24,16 +24,23 @@ import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
+  awaitCoopChoiceWithOrphanBackstop,
   COOP_BIOME_STOCK_REROLL,
   COOP_BIOME_WAIT_MS,
   COOP_INTERACTION_LEAVE,
   coopBiomeShopSeq,
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
-import { adoptRewardWatcherChoice, commitRewardOwnerIntent } from "#data/elite-redux/coop/coop-reward-operation";
+import {
+  adoptRewardWatcherChoice,
+  commitRewardOwnerIntent,
+  isCoopRewardOperationEnabled,
+} from "#data/elite-redux/coop/coop-reward-operation";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
   advanceCoopInteractionForContinuation,
+  coopSessionGeneration,
+  failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
   getCoopRuntime,
@@ -87,6 +94,9 @@ export class BiomeShopPhase extends SelectModifierPhase {
    * stock), even when the GUEST owns the ME pick - mirrors SelectModifierPhase's #828 option/pick split.
    */
   private coopBiomeOptionOwner = false;
+  /** Invalidates callbacks retained by an older CONFIRM handler on this same phase instance. */
+  private coopConfirmAttempt = 0;
+  private coopTerminalPromise: Promise<boolean> | null = null;
   /**
    * Co-op (#866): true when THIS phase is a move-learn CONTINUATION copy (queued by
    * {@linkcode SelectModifierPhase.applyModifier} when a TM / Memory Mushroom / Learner's Shroom /
@@ -179,8 +189,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
           return;
         }
         if (this.shopOptions.length === 0) {
-          this.coopBiomeTerminal();
-          this.end();
+          void this.finishEmptyCoopBiomeShop();
           return;
         }
         this.openBiomeShop();
@@ -207,8 +216,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
     // open; re-streaming an adopted list here is unnecessary and the watcher is past its stock await.)
     if (this.coopBiomeContinuation) {
       if (this.shopOptions.length === 0) {
-        this.coopBiomeTerminal();
-        this.end();
+        void this.finishEmptyCoopBiomeShop();
         return;
       }
       this.openBiomeShop();
@@ -228,8 +236,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       );
     }
     if (this.shopOptions.length === 0) {
-      this.coopBiomeTerminal();
-      this.end();
+      void this.finishEmptyCoopBiomeShop();
       return;
     }
     this.openBiomeShop();
@@ -253,13 +260,33 @@ export class BiomeShopPhase extends SelectModifierPhase {
   }
 
   private openBiomeShop(): void {
-    globalScene.ui.setMode(
-      UiMode.BIOME_SHOP,
-      this.shopOptions,
-      globalScene.arena.biomeId,
-      (index: number) => this.onSelect(index),
-      this.qtys,
-    );
+    if (!globalScene.gameMode.isCoop) {
+      globalScene.ui.setMode(
+        UiMode.BIOME_SHOP,
+        this.shopOptions,
+        globalScene.arena.biomeId,
+        (index: number) => this.onSelect(index),
+        this.qtys,
+      );
+      return;
+    }
+    const generation = coopSessionGeneration();
+    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    void globalScene.ui
+      .setModeBoundedWhen(
+        UiMode.BIOME_SHOP,
+        2_000,
+        () => this.coopBoundaryStillLive(generation, wave),
+        this.shopOptions,
+        globalScene.arena.biomeId,
+        (index: number) => (this.coopBoundaryStillLive(generation, wave) ? this.onSelect(index) : false),
+        this.qtys,
+      )
+      .then(result => {
+        if (result === "superseded" && this.coopBoundaryStillLive(generation, wave)) {
+          this.openBiomeShop();
+        }
+      });
   }
 
   /** Buy slot `index`, or leave the shop when `index < 0`. */
@@ -302,26 +329,86 @@ export class BiomeShopPhase extends SelectModifierPhase {
     // cover the question text + the Yes/No box. Hide it for the prompt (the same
     // trick the held-item party overlay uses); "No" re-opens it.
     this.hideShopForOverlay();
+    const coOp = globalScene.gameMode.isCoop;
+    const generation = coOp ? coopSessionGeneration() : -1;
+    const wave = coOp ? (globalScene.currentBattle?.waveIndex ?? -1) : -1;
+    const attempt = coOp ? ++this.coopConfirmAttempt : 0;
+    const coopCallbackStillLive = (): boolean =>
+      !coOp || (attempt === this.coopConfirmAttempt && this.coopBoundaryStillLive(generation, wave));
+    const confirm = (): void => {
+      if (!coopCallbackStillLive()) {
+        return;
+      }
+      if (coOp) {
+        ++this.coopConfirmAttempt;
+      }
+      if (coOp) {
+        globalScene.ui.resetModeChain();
+        void this.finishConfirmedCoopBiomeShopLeave();
+      } else {
+        globalScene.ui.clearText();
+        globalScene.ui.revertMode();
+        globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
+      }
+    };
+    const cancel = (): void => {
+      if (!coopCallbackStillLive()) {
+        return;
+      }
+      if (coOp) {
+        ++this.coopConfirmAttempt;
+      }
+      globalScene.ui.clearText();
+      if (coOp) {
+        globalScene.ui.resetModeChain();
+      } else {
+        globalScene.ui.revertMode();
+      }
+      this.openBiomeShop();
+    };
+    if (coOp) {
+      globalScene.ui.showText(i18next.t("battle:leaveShopQuestion"));
+      void globalScene.ui
+        .setModeBoundedWhen(UiMode.CONFIRM, 2_000, coopCallbackStillLive, confirm, cancel)
+        .then(result => {
+          if (result === "superseded" && this.coopBoundaryStillLive(generation, wave)) {
+            this.confirmLeave();
+          }
+        });
+      return;
+    }
     globalScene.ui.showText(i18next.t("battle:leaveShopQuestion"), null, () => {
-      globalScene.ui.setOverlayMode(
-        UiMode.CONFIRM,
-        () => {
-          // YES: pop the confirm, drop the prompt, hand off to the next phase.
-          // Co-op (#673): fire the terminal FIRST - a UI teardown hiccup must never
-          // eat the relayed LEAVE + the alternation advance (the watcher would strand).
-          this.coopBiomeTerminal();
-          globalScene.ui.revertMode();
-          globalScene.ui.clearText();
-          globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
-        },
-        () => {
-          // NO: drop the prompt and re-show the market (setMode out of CONFIRM
-          // rebuilds + re-reveals the hidden shop).
-          globalScene.ui.clearText();
-          this.openBiomeShop();
-        },
-      );
+      globalScene.ui.setOverlayMode(UiMode.CONFIRM, confirm, cancel);
     });
+  }
+
+  private finishCoopBiomeShopLeave(): void {
+    const generation = coopSessionGeneration();
+    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    void globalScene.ui
+      .setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.coopBoundaryStillLive(generation, wave))
+      .then(result => {
+        if (!this.coopBoundaryStillLive(generation, wave)) {
+          return;
+        }
+        if (result === "superseded") {
+          this.finishCoopBiomeShopLeave();
+          return;
+        }
+        this.end();
+      });
+  }
+
+  private coopBoundaryStillLive(generation: number, wave: number): boolean {
+    return (
+      coopSessionGeneration() === generation
+      && globalScene.currentBattle?.waveIndex === wave
+      && globalScene.phaseManager.getCurrentPhase() === this
+    );
+  }
+
+  private coopAsyncBoundaryStillLive(generation: number, wave: number, pinned: number): boolean {
+    return this.coopBiomeStart === pinned && this.coopBoundaryStillLive(generation, wave);
   }
 
   /**
@@ -334,28 +421,103 @@ export class BiomeShopPhase extends SelectModifierPhase {
    * parked watcher exits its watch loop; BOTH sides then advance the alternation locally
    * (from-pinned, so the partner's broadcast merging first makes it a no-op).
    */
-  private coopBiomeTerminal(): void {
-    if (this.coopBiomeStart < 0) {
-      return;
+  private coopBiomeTerminal(): Promise<boolean> {
+    if (this.coopTerminalPromise != null) {
+      return this.coopTerminalPromise;
     }
+    this.coopTerminalPromise = this.commitCoopBiomeTerminal();
+    return this.coopTerminalPromise;
+  }
+
+  private async commitCoopBiomeTerminal(): Promise<boolean> {
+    if (this.coopBiomeStart < 0) {
+      return true;
+    }
+    const generation = coopSessionGeneration();
+    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const pinned = this.coopBiomeStart;
     if (this.coopBiomeOwner) {
-      getCoopInteractionRelay()?.sendInteractionChoice(
-        coopBiomeShopSeq(this.coopBiomeStart),
-        "biomeShop",
-        COOP_INTERACTION_LEAVE,
-      );
-      // Wave-2d: DUAL-RUN - COMMIT the market LEAVE terminal through the operation primitive (advances the
-      // late-after-leave watermark on the watcher's adopt). No-op when the flag is OFF.
-      commitRewardOwnerIntent({
-        surface: "market",
-        pinned: this.coopBiomeStart,
-        label: "biomeShop",
-        choice: COOP_INTERACTION_LEAVE,
-        data: undefined,
-        terminal: true,
-        localRole: getCoopController()?.role ?? "guest",
-        wave: globalScene.currentBattle?.waveIndex ?? -1,
-      });
+      const role = getCoopController()?.role ?? "guest";
+      const relay = getCoopInteractionRelay();
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
+          return false;
+        }
+        const commit = commitRewardOwnerIntent({
+          surface: "market",
+          pinned,
+          label: "biomeShop",
+          choice: COOP_INTERACTION_LEAVE,
+          data: undefined,
+          terminal: true,
+          localRole: role,
+          wave,
+        });
+        if (!isCoopRewardOperationEnabled() || commit != null) {
+          const resend = (): void =>
+            relay?.sendInteractionChoice(coopBiomeShopSeq(pinned), "biomeShop", COOP_INTERACTION_LEAVE);
+          try {
+            resend();
+          } catch {
+            /* the retained journal or the next exact resend remains authoritative */
+          }
+          if (role === "guest" && isCoopRewardOperationEnabled()) {
+            let resendTimer: ReturnType<typeof setInterval> | null = null;
+            resendTimer = setInterval(() => {
+              if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
+                if (resendTimer != null) {
+                  clearInterval(resendTimer);
+                  resendTimer = null;
+                }
+                return;
+              }
+              try {
+                resend();
+              } catch {
+                /* retry remains armed */
+              }
+            }, 1_000);
+            const action =
+              relay == null
+                ? null
+                : await awaitCoopChoiceWithOrphanBackstop(
+                    relay,
+                    getCoopController(),
+                    coopBiomeShopSeq(pinned),
+                    pinned,
+                    COOP_BIOME_SHOP_CHOICE_KINDS,
+                  );
+            if (resendTimer != null) {
+              clearInterval(resendTimer);
+              resendTimer = null;
+            }
+            if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
+              return false;
+            }
+            const adopted =
+              action != null
+              && action.choice === COOP_INTERACTION_LEAVE
+              && action.operationId === commit?.operationId
+              && adoptRewardWatcherChoice({
+                surface: "market",
+                pinned,
+                action: { choice: action.choice, data: action.data, operationId: action.operationId },
+                terminal: true,
+                localRole: role,
+                wave,
+              }).adopt;
+            if (!adopted) {
+              getCoopRuntime()?.durability?.reconnect();
+              continue;
+            }
+          }
+          return this.advanceCoopBiomeTerminal(pinned);
+        }
+        getCoopRuntime()?.durability?.reconnect();
+        await new Promise(resolve => setTimeout(resolve, 250));
+      }
+      failCoopSharedSession(`Biome market terminal could not commit for ${pinned}`);
+      return false;
     }
     // #832 (audit P1#5, defect c): advanceCoopInteractionForContinuation SUPPRESSES its own advance while
     // an ME is in progress (its coopMeInProgress guard) - the whole ME counts as ONE alternation step,
@@ -364,7 +526,32 @@ export class BiomeShopPhase extends SelectModifierPhase {
     // matching coopMeInProgress guard). Outside an ME (the wave market) it advances normally. So the owner
     // terminal here AND the watcher terminal in coopBiomeWatch are both no-ops inside an ME - no host-only
     // extra advance, no counter desync.
-    advanceCoopInteractionForContinuation(this.coopBiomeStart);
+    return this.advanceCoopBiomeTerminal(pinned);
+  }
+
+  private advanceCoopBiomeTerminal(pinned: number): boolean {
+    const controller = getCoopController();
+    const interactionEndsHere = !coopMeInProgress();
+    advanceCoopInteractionForContinuation(pinned);
+    if (interactionEndsHere && controller != null && controller.interactionCounter() <= pinned) {
+      failCoopSharedSession(`Biome market terminal ${pinned} did not advance shared ownership`);
+      return false;
+    }
+    return true;
+  }
+
+  private async finishEmptyCoopBiomeShop(): Promise<void> {
+    if (await this.coopBiomeTerminal()) {
+      this.end();
+    }
+  }
+
+  private async finishConfirmedCoopBiomeShopLeave(): Promise<void> {
+    if (!(await this.coopBiomeTerminal())) {
+      return;
+    }
+    globalScene.ui.clearText();
+    this.finishCoopBiomeShopLeave();
   }
 
   /**
@@ -376,15 +563,27 @@ export class BiomeShopPhase extends SelectModifierPhase {
    * (#828). A missing/invalid stream fails closed with a recovery message; local stock is never generated.
    */
   private async coopBiomeDriveAdoptOptions(): Promise<void> {
+    const generation = coopSessionGeneration();
+    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const pinned = this.coopBiomeStart;
+    if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
+      return;
+    }
     const relay = getCoopInteractionRelay();
     if (relay == null) {
       this.coopBiomeAuthoritativeStockUnavailable("guest owner has no live relay");
       return;
     }
     const streamed = await relay.awaitRewardOptions(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL, COOP_BIOME_WAIT_MS);
+    if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
+      return;
+    }
     const rebuilt = streamed == null ? null : reconstructRewardOptions(streamed, globalScene.getPlayerParty());
     if (rebuilt == null) {
       this.coopBiomeAuthoritativeStockUnavailable("guest owner could not recover/reconstruct streamed stock");
+      return;
+    }
+    if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
       return;
     }
     this.shopOptions = rebuilt;
@@ -392,8 +591,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
     // resolved tier - erBiomeStockCount is pure, so this matches the host's buildStock quantities exactly.
     this.qtys = this.shopOptions.map(o => erBiomeStockCount(o.type.getOrInferTier() ?? ModifierTier.GREAT));
     if (this.shopOptions.length === 0) {
-      this.coopBiomeTerminal();
-      this.end();
+      void this.finishEmptyCoopBiomeShop();
       return;
     }
     this.openBiomeShop();
@@ -402,11 +600,17 @@ export class BiomeShopPhase extends SelectModifierPhase {
   /**
    * Co-op (#673) WATCHER: never opens the market UI. Adopts the owner's streamed stock, then
    * applies each relayed buy VERBATIM (slot into that stock + target party slot + the owner's
-   * post-buy money) until the LEAVE terminal. A timeout resolves like a LEAVE (never hangs);
-   * the auto-resync heals any residue. #832: the host on a GUEST-owned ME (option owner, pick watcher)
+   * post-buy money) until the exact LEAVE terminal. A timeout reconnects and retries without ever
+   * inferring a terminal; bounded repeated absence stops the shared session safely. #832: the host on a GUEST-owned ME (option owner, pick watcher)
    * ROLLS + STREAMS its own stock here instead of adopting - see the coopBiomeOptionOwner branch.
    */
   private async coopBiomeWatch(): Promise<void> {
+    const generation = coopSessionGeneration();
+    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const pinned = this.coopBiomeStart;
+    if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
+      return;
+    }
     const relay = getCoopInteractionRelay();
     if (relay == null) {
       this.coopBiomeAuthoritativeStockUnavailable("watcher has no live relay");
@@ -425,20 +629,47 @@ export class BiomeShopPhase extends SelectModifierPhase {
       }
     } else {
       const streamed = await relay.awaitRewardOptions(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL, COOP_BIOME_WAIT_MS);
+      if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
+        return;
+      }
       const rebuilt = streamed == null ? null : reconstructRewardOptions(streamed, globalScene.getPlayerParty());
       if (rebuilt == null) {
         this.coopBiomeAuthoritativeStockUnavailable("watcher could not recover/reconstruct streamed stock");
+        return;
+      }
+      if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
         return;
       }
       this.shopOptions = rebuilt;
       this.qtys = this.shopOptions.map(() => 99);
     }
     const seq = coopBiomeShopSeq(this.coopBiomeStart);
+    let missingTerminalAttempts = 0;
     for (;;) {
-      const action = await relay.awaitInteractionChoice(seq, COOP_BIOME_WAIT_MS, COOP_BIOME_SHOP_CHOICE_KINDS);
-      if (action == null) {
-        break;
+      const action = await awaitCoopChoiceWithOrphanBackstop(
+        relay,
+        getCoopController(),
+        seq,
+        pinned,
+        COOP_BIOME_SHOP_CHOICE_KINDS,
+      );
+      if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
+        return;
       }
+      if (action == null) {
+        missingTerminalAttempts += 1;
+        coopWarn(
+          "reward",
+          `biome market watcher did not receive an exact terminal seq=${seq} attempt=${missingTerminalAttempts}/3 - reconnecting without inferring LEAVE`,
+        );
+        getCoopRuntime()?.durability?.reconnect();
+        if (missingTerminalAttempts >= 3) {
+          failCoopSharedSession(`Biome market watcher never received an exact terminal for ${pinned}`);
+          return;
+        }
+        continue;
+      }
+      missingTerminalAttempts = 0;
       const terminal = action.choice === COOP_INTERACTION_LEAVE;
       // Wave-2d: gate adoption through the authoritative operation primitive (idempotent by operationId,
       // stale-/late-rejecting a buy from an earlier interaction or after this market left - the #861 shape).
@@ -461,6 +692,9 @@ export class BiomeShopPhase extends SelectModifierPhase {
       }
       if (terminal) {
         break;
+      }
+      if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
+        return;
       }
       const slot = action.choice;
       const data = action.data ?? [];
@@ -486,13 +720,21 @@ export class BiomeShopPhase extends SelectModifierPhase {
         /* one bad relayed buy must never strand the watcher */
       }
       if (money >= 0) {
+        if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
+          return;
+        }
         globalScene.money = money;
         globalScene.updateMoneyText();
       }
     }
-    advanceCoopInteractionForContinuation(this.coopBiomeStart);
+    if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
+      return;
+    }
+    if (!this.advanceCoopBiomeTerminal(this.coopBiomeStart)) {
+      return;
+    }
     globalScene.ui.clearText();
-    globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
+    this.finishCoopBiomeShopLeave();
   }
 
   /** Never let a market continue against locally generated stock after authority was lost. */

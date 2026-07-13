@@ -13,8 +13,10 @@
 import type { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { getCoopCausalTrace, resetCoopCausalTrace } from "#data/elite-redux/coop/coop-causal-trace";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
 import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { wireCoopStallWatchdog } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { type CoopWireChannel, WebRtcTransport } from "#data/elite-redux/coop/coop-webrtc-transport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -51,8 +53,52 @@ describe("#806 stall watchdog end-to-end (keepalive + mutual-wait detection + re
     resetCoopCausalTrace();
   });
   afterEach(() => {
+    setCoopMeInteractionStart(-1);
     vi.useRealTimers();
     resetCoopCausalTrace();
+  });
+
+  it("active Mystery 8M/9M waits survive mutual-stall recovery and resolve only from exact host/owner carriers", async () => {
+    const a = new MockWire();
+    const b = new MockWire();
+    a.peer = b;
+    b.peer = a;
+    const hostT = new WebRtcTransport("host", a);
+    const guestT = new WebRtcTransport("guest", b);
+    const hostRelay = new CoopInteractionRelay(hostT);
+    const guestRelay = new CoopInteractionRelay(guestT);
+    const stubRuntime = { controller: { versionMismatch: false } } as unknown as CoopRuntime;
+    wireCoopStallWatchdog(hostT, hostRelay, idleStream, stubRuntime);
+    wireCoopStallWatchdog(guestT, guestRelay, idleStream, stubRuntime);
+
+    const pinned = 17;
+    const seqMe = COOP_ME_PUMP_SEQ_BASE + pinned;
+    const seqTerm = COOP_ME_TERM_SEQ_BASE + pinned;
+    setCoopMeInteractionStart(pinned);
+    const hostPickWait = hostRelay.awaitInteractionChoice(seqMe, 1_200_000);
+    const guestTerminalWait = guestRelay.awaitInteractionChoice(seqTerm, 1_200_000);
+    let hostResolved = false;
+    let guestResolved = false;
+    void hostPickWait.then(() => {
+      hostResolved = true;
+    });
+    void guestTerminalWait.then(() => {
+      guestResolved = true;
+    });
+
+    // The watchdog still detects the mutual wait and runs recovery, but must not synthesize null by
+    // sticky-cancelling the active Mystery control channels.
+    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getCoopCausalTrace().some(event => event.stage === "stall-detected")).toBe(true);
+    expect(hostResolved, "8M owner-pick wait is retained").toBe(false);
+    expect(guestResolved, "9M terminal wait is retained").toBe(false);
+
+    guestRelay.sendInteractionChoice(seqMe, "me", 2);
+    hostRelay.sendInteractionChoice(seqTerm, "meBtn", -1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect((await hostPickWait)?.choice).toBe(2);
+    expect((await guestTerminalWait)?.choice).toBe(-1);
   });
 
   it("both peers parked 20s+ -> beats exchange -> recovery cancels the parked waits", async () => {

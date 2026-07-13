@@ -23,14 +23,19 @@
 // =============================================================================
 
 import { setCoopAuthoritativeGuestPredicate } from "#data/elite-redux/coop/coop-authoritative-gate";
-import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import { coopMeTerminalSanctionedTails } from "#data/elite-redux/coop/coop-me-operation";
+import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  adoptCoopBiomeTransitionSwitchPermit,
+  armCoopBiomeTransitionTailPermit,
   COOP_RENDERER_ALLOWED_PHASES,
   COOP_WAVE_TAIL_PHASES,
+  clearCoopBiomeTransitionTailPermit,
   coopRendererGateNeutralizes,
   getCoopTailWouldBlockLog,
   isCoopStrictTailsMode,
+  markCoopBiomeTransitionHistoryRecorded,
+  markCoopBiomeTransitionSwitchPrepared,
   resetCoopTailWouldBlockLog,
   setCoopRendererGateEnforced,
   setCoopStrictTailsMode,
@@ -66,10 +71,12 @@ function payload(over: Partial<CoopWaveAdvancePayload> & { wave: number }): Coop
 
 describe("co-op WAVE-ADVANCE operation - the keystone (Wave-2f)", () => {
   beforeEach(() => {
+    clearCoopBiomeTransitionTailPermit();
     setCoopWaveAdvanceOperationEnabled(true);
     resetCoopWaveAdvanceOperationState();
   });
   afterEach(() => {
+    clearCoopBiomeTransitionTailPermit();
     resetCoopWaveAdvanceOperationFlag();
     resetCoopWaveAdvanceOperationState();
   });
@@ -223,11 +230,13 @@ describe("co-op WAVE-ADVANCE operation - the keystone (Wave-2f)", () => {
       expect(tails).toContain("TrainerVictoryPhase");
     });
 
-    it("BIOME boundary: adds the biome-transition tail", () => {
+    it("BIOME boundary sanctions only SelectBiome; destination tails require the later exact pick", () => {
       const tails = coopWaveAdvanceSanctionedTails(
         payload({ wave: 10, outcome: "win", victoryKind: "wild", biomeChange: true }),
       );
-      expect(tails).toEqual(expect.arrayContaining(["SelectBiomePhase", "NewBiomeEncounterPhase", "SwitchBiomePhase"]));
+      expect(tails).toContain("SelectBiomePhase");
+      expect(tails).not.toContain("SwitchBiomePhase");
+      expect(tails).not.toContain("NewBiomeEncounterPhase");
     });
 
     it("EGG LAPSE: adds EggLapsePhase", () => {
@@ -280,6 +289,7 @@ it("normalizes an undefined ordinary-wave biome predicate to a concrete false wi
 
 describe("co-op STRICT-TAILS renderer gate mode (Wave-2f, §3.3)", () => {
   beforeEach(() => {
+    clearCoopBiomeTransitionTailPermit();
     setCoopRendererGateEnforced(true);
     setCoopStrictTailsMode(true);
     setCoopWaveTailSanction(null);
@@ -287,6 +297,7 @@ describe("co-op STRICT-TAILS renderer gate mode (Wave-2f, §3.3)", () => {
     setCoopAuthoritativeGuestPredicate(() => true); // the authoritative guest (else the gate short-circuits)
   });
   afterEach(() => {
+    clearCoopBiomeTransitionTailPermit();
     setCoopAuthoritativeGuestPredicate(null);
     setCoopStrictTailsMode(false);
     setCoopWaveTailSanction(null);
@@ -360,6 +371,38 @@ describe("co-op STRICT-TAILS renderer gate mode (Wave-2f, §3.3)", () => {
     setCoopWaveTailSanction(null);
     expect(coopRendererGateNeutralizes("VictoryPhase")).toBe(true);
     expect(getCoopTailWouldBlockLog()).toContain("VictoryPhase");
+  });
+
+  it("a biome tail blocks without a permit and admits only the matching, fully-prepared exact permit", () => {
+    const sanction = coopWaveAdvanceSanctionedTails(
+      payload({ wave: 10, outcome: "win", victoryKind: "wild", biomeChange: true }),
+    );
+    setCoopWaveTailSanction(sanction);
+    expect(coopRendererGateNeutralizes("SwitchBiomePhase", [30])).toBe(true);
+    expect(coopRendererGateNeutralizes("NewBiomeEncounterPhase")).toBe(true);
+
+    expect(
+      armCoopBiomeTransitionTailPermit({
+        operationId: "1:0:BIOME_PICK:9800011",
+        sessionEpoch: 1,
+        revision: 1,
+        wave: 10,
+        sourceBiomeId: 1,
+        destinationBiomeId: 30,
+        nextWave: 11,
+      }),
+    ).toBe(true);
+    expect(coopRendererGateNeutralizes("SwitchBiomePhase", [31]), "wrong destination remains blocked").toBe(true);
+    expect(coopRendererGateNeutralizes("SwitchBiomePhase", [30]), "exact destination can enter Switch").toBe(false);
+    expect(coopRendererGateNeutralizes("NewBiomeEncounterPhase"), "unprepared Switch cannot construct NewBiome").toBe(
+      true,
+    );
+
+    const adopted = adoptCoopBiomeTransitionSwitchPermit({ destinationBiomeId: 30, sourceBiomeId: 1, wave: 10 });
+    expect(adopted).not.toBeNull();
+    expect(markCoopBiomeTransitionHistoryRecorded(adopted!.operationId)).not.toBeNull();
+    expect(markCoopBiomeTransitionSwitchPrepared(adopted!.operationId)).not.toBeNull();
+    expect(coopRendererGateNeutralizes("NewBiomeEncounterPhase")).toBe(false);
   });
 
   it("ON: a non-boundary-tail allowlist phase is NEVER strict-tails checked", () => {
