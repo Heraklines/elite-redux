@@ -36,11 +36,9 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
-import {
-  type CoopMePresentPayload,
-  parseCoopOperationId,
-} from "#data/elite-redux/coop/coop-operation-envelope";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import * as meOp from "#data/elite-redux/coop/coop-me-operation";
+import { type CoopMePresentPayload, parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import { clearCoopRuntime, getCoopInteractionRelay, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
@@ -62,7 +60,6 @@ import {
   driveHostRewardShopOwner,
   type ErQuizPhaseSeam,
   installDuoLogCapture,
-  relayGuestMeOptionIndexOnly,
   relayGuestMeShopLeaveSync,
   type ShopPhaseSeam,
   startGuestMeOutcomeRace,
@@ -95,10 +92,7 @@ function committedMeOperations(calls: readonly (readonly CoopMessage[])[]): {
       continue;
     }
     const operation = message.envelope.pendingOperation;
-    if (
-      operation?.status !== "applied"
-      || (!operation.kind.startsWith("ME_") && operation.kind !== "QUIZ_ANSWER")
-    ) {
+    if (operation?.status !== "applied" || (!operation.kind.startsWith("ME_") && operation.kind !== "QUIZ_ANSWER")) {
       continue;
     }
     byId.set(operation.id, { id: operation.id, kind: operation.kind, payload: operation.payload });
@@ -122,6 +116,35 @@ function committedMePresentations(
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+/**
+ * Mint the same retained owner intent and addressed proposal ordinal as the public Mystery selector.
+ * The two-engine harness defers the replay's outcome race until the host has run, so it cannot invoke the
+ * selector handler directly without resolving its promises under the shared process-global host context.
+ */
+function relayGuestMePickWithIntent(replay: Phase, scene: BattleScene, pinned: number, optionIndex: number): void {
+  const relay = getCoopInteractionRelay();
+  if (relay == null) {
+    throw new Error("guest-owned ME test lost its production interaction relay");
+  }
+  const seq = (replay as unknown as { seq: number }).seq;
+  const step = 0;
+  const operationId = meOp.commitMeOwnerIntent({
+    kind: "ME_PICK",
+    seq,
+    pinned,
+    step,
+    payload: { optionIndex },
+    localRole: "guest",
+    wave: scene.currentBattle.waveIndex,
+    turn: scene.currentBattle.turn,
+    resend: () => relay.sendInteractionChoice(seq, "me", optionIndex, [step]),
+  });
+  if (operationId == null) {
+    throw new Error("guest-owned ME test could not retain its typed ME_PICK intent");
+  }
+  relay.sendInteractionChoice(seq, "me", optionIndex, [step]);
 }
 
 /**
@@ -450,7 +473,7 @@ describe.skipIf(!RUN)(
       // mysteryEncounterSaveData is the harness's #1 footgun). The guest's OWN outcome/terminal race is
       // deferred to STEP D so ITS awaits also resolve under the guest scene. =====
       const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
-      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
+      withClientSync(rig.guestCtx, () => relayGuestMePickWithIntent(replay, rig.guestScene, counterBefore, 0));
 
       // ===== STEP C (host): the relayed index's deliver-microtask is queued but UNFIRED. Pump the host
       // UNDER hostCtx: the first drainLoopback flushes it, the coopHostAwaitGuestIndex await resolves (its
@@ -618,10 +641,9 @@ describe.skipIf(!RUN)(
       // The guest settled (ended) - via the BATTLE-HANDOFF branch, NOT a leave. Discriminators:
       expect(guestReplay.settled, "guest CoopReplayMePhase settled (ended once) at the battle-handoff").toBe(true);
       // (1) The comprehensive battle-handoff state applies exactly once before control opens.
-      expect(
-        applyMeOutcomeSpy.mock.calls.length,
-        "guest applied the retained battle-handoff state exactly once",
-      ).toBe(1);
+      expect(applyMeOutcomeSpy.mock.calls.length, "guest applied the retained battle-handoff state exactly once").toBe(
+        1,
+      );
       // (2) the guest did NOT advance the counter (finishWithoutLeaving defers the single advance past the
       // spawned battle - a leaveDefensive would have advanced). This is the load-bearing handoff assertion.
       expect(
@@ -848,10 +870,9 @@ describe.skipIf(!RUN)(
       const quizAnswerOperations = committedMeOperations(hostTransportSendSpy.mock.calls).filter(
         operation => operation.kind === "QUIZ_ANSWER",
       );
-      expect(
-        quizAnswerOperations.length,
-        "host retained one addressed QUIZ_ANSWER operation per question (#818)",
-      ).toBe(QUIZ_QUESTIONS);
+      expect(quizAnswerOperations.length, "host retained one addressed QUIZ_ANSWER operation per question (#818)").toBe(
+        QUIZ_QUESTIONS,
+      );
       // Each answer retains its own per-question address (seq*8000 + QUIZ_ANSWER tag + question index)
       // and carries the fixed committed choice.
       expect(
@@ -1294,7 +1315,7 @@ describe.skipIf(!RUN)(
       // ===== PROVE NO ORPHAN by completing the guest-owned ME through convergence (the IT #2 handshake).
       // The selector is still live, so the guest relays its pick, the host applies it, and both advance in
       // lockstep - impossible if the heal had orphaned the divert. =====
-      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
+      withClientSync(rig.guestCtx, () => relayGuestMePickWithIntent(replay, rig.guestScene, counterBefore, 0));
 
       let hostShop!: ShopPhaseSeam;
       await withClient(rig.hostCtx, async () => {
