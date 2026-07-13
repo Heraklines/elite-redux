@@ -200,7 +200,7 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 import fs from "node:fs";
 import path from "node:path";
 import Phaser from "phaser";
-import { afterEach } from "vitest";
+import { afterEach, expect } from "vitest";
 
 /**
  * The PROCESS-GLOBAL mystery-encounter pins/control that are NOT carried on the `active` runtime and
