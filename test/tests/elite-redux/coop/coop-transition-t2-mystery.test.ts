@@ -18,28 +18,25 @@ import {
   captureCoopEnemies,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import {
-  clearCoopRuntime,
-  isCoopSharedTerminalFrozen,
-  setCoopRuntime,
-} from "#data/elite-redux/coop/coop-runtime";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
+import { clearCoopRuntime, isCoopSharedTerminalFrozen, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
-import { BattlerIndex } from "#enums/battler-index";
 import { BattleType } from "#enums/battle-type";
+import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
-import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { GameManager } from "#test/framework/game-manager";
 import {
   beginRewardShopWatch,
   buildDuo,
   type ClientCtx,
+  type DuoRig,
   drainLoopback,
   driveClientPhaseQueueTo,
   driveGuestReplayTurn,
@@ -49,9 +46,8 @@ import {
   installCoopResyncProbe,
   installDuoLogCapture,
   reachQueuedRewardShop,
-  setCoopHarnessModuleLetIsolation,
-  type DuoRig,
   type ShopPhaseSeam,
+  setCoopHarnessModuleLetIsolation,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -141,24 +137,60 @@ async function waitForMode(ctx: ClientCtx, mode: UiMode, label: string): Promise
   throw new Error(`${label} never opened ${UiMode[mode]} (stuck on ${UiMode[ctx.scene.ui.getMode()]})`);
 }
 
+async function waitForRepeatedMysteryRound(ctx: ClientCtx, replay: Phase, round: number): Promise<void> {
+  for (let attempt = 0; attempt < 120; attempt++) {
+    await withClient(ctx, () => drainLoopback());
+    if (
+      (replay as unknown as { newRoundsRendered: number }).newRoundsRendered >= round
+      && ctx.scene.ui.getMode() === UiMode.MYSTERY_ENCOUNTER
+    ) {
+      return;
+    }
+    await new Promise<void>(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error(`guest Mystery selector round ${round} never opened from a fresh retained presentation`);
+}
+
 async function driveQueuedPhaseWithPublicDialogue(
   ctx: ClientCtx,
   target: string,
   options: { matches?: (phase: Phase) => boolean } = {},
 ): Promise<Phase> {
-  return withClient(ctx, () =>
-    driveClientPhaseQueueTo(ctx.scene, target, {
-      ...options,
-      onWait: () => {
-        if (ctx.scene.ui.getMode() !== UiMode.MESSAGE) {
-          return;
+  return withClient(ctx, async () => {
+    const matches = options.matches ?? (phase => phase.phaseName === target);
+    for (let step = 0; step < 128; step++) {
+      await drainLoopback();
+      const phase = ctx.scene.phaseManager.getCurrentPhase();
+      if (phase == null) {
+        throw new Error(`public queue drive to ${target} lost its current phase at step ${step}`);
+      }
+      if (matches(phase)) {
+        return phase;
+      }
+      phase.start();
+      const deadline = Date.now() + 10_000;
+      while (ctx.scene.phaseManager.getCurrentPhase() === phase) {
+        await drainLoopback();
+        if (ctx.scene.phaseManager.getCurrentPhase() !== phase) {
+          break;
         }
-        const handler = ctx.scene.ui.getHandler() as unknown as { unblockInput?: () => void };
-        handler.unblockInput?.();
-        ctx.scene.ui.processInput(Button.ACTION);
-      },
-    }),
-  );
+        if (ctx.scene.ui.getMode() === UiMode.MESSAGE) {
+          const handler = ctx.scene.ui.getHandler() as unknown as { unblockInput?: () => void };
+          handler.unblockInput?.();
+          ctx.scene.ui.processInput(Button.ACTION);
+        }
+        if (Date.now() >= deadline) {
+          const queued = ctx.scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+          throw new Error(
+            `public queue drive to ${target} hung on ${phase.phaseName}; queued=[${queued.join(",")}], `
+              + `ui=${UiMode[ctx.scene.ui.getMode()] ?? ctx.scene.ui.getMode()}`,
+          );
+        }
+      }
+    }
+    const current = ctx.scene.phaseManager.getCurrentPhase();
+    throw new Error(`public queue drive to ${target} exceeded 128 phases at ${current?.phaseName ?? "none"}`);
+  });
 }
 
 async function submitPublicUi(ctx: ClientCtx, movements: readonly Button[], label: string): Promise<void> {
@@ -262,6 +294,11 @@ async function crossIntoNaturallyCarriedMystery(
   expect(rig.guestScene.currentBattle.waveIndex).toBe(MYSTERY_WAVE);
   expect(rig.hostScene.currentBattle.battleType).toBe(BattleType.MYSTERY_ENCOUNTER);
   expect(rig.guestScene.currentBattle.battleType).toBe(BattleType.MYSTERY_ENCOUNTER);
+  expect(rig.hostScene.currentBattle.enemyParty, "host Mystery carrier contains no ordinary enemies").toHaveLength(0);
+  expect(
+    rig.guestScene.currentBattle.enemyParty,
+    "guest accepts the valid retained zero-enemy Mystery carrier without entering recovery",
+  ).toHaveLength(0);
   expect(rig.hostScene.currentBattle.mysteryEncounter?.encounterType).toBe(type);
   expect(rig.guestScene.currentBattle.mysteryEncounter?.encounterType).toBe(type);
   expect(rig.guestScene.arena.biomeId).toBe(rig.hostScene.arena.biomeId);
@@ -298,7 +335,7 @@ async function driveGuestOwnedMysteryRounds(
       await game.phaseInterceptor.to("MysteryEncounterPhase", false);
       await game.phaseInterceptor.to("MysteryEncounterPhase");
     });
-    await waitForMode(rig.guestCtx, UiMode.MYSTERY_ENCOUNTER, `guest Mystery selector round ${round + 1}`);
+    await waitForRepeatedMysteryRound(rig.guestCtx, replay, round + 1);
   }
   expect((replay as unknown as { newRoundsRendered: number }).newRoundsRendered).toBe(picks.length - 1);
 }
@@ -332,9 +369,7 @@ async function driveGuestOwnedEmbeddedReward(game: GameManager, rig: DuoRig): Pr
   expect(rig.hostRuntime.controller.interactionCounter(), "embedded shop does not consume the ME interaction").toBe(
     pinned,
   );
-  expect(rig.guestRuntime.controller.interactionCounter(), "guest embedded shop remains on the pinned ME").toBe(
-    pinned,
-  );
+  expect(rig.guestRuntime.controller.interactionCounter(), "guest embedded shop remains on the pinned ME").toBe(pinned);
 }
 
 async function openMatchingNextCommandSurfaces(game: GameManager, rig: DuoRig): Promise<void> {
@@ -420,9 +455,7 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
       const replay = await crossIntoNaturallyCarriedMystery(game, rig, journey.type);
       const rand =
         journey.picks.length > 1
-          ? vi
-              .spyOn(Common, "randSeedInt")
-              .mockImplementation((range: number, min = 0) => min + Math.max(0, range - 1))
+          ? vi.spyOn(Common, "randSeedInt").mockImplementation((range: number, min = 0) => min + Math.max(0, range - 1))
           : null;
       const showText = vi.spyOn(rig.hostScene.ui, "showText").mockImplementation((_text, _delay, callback) => {
         callback?.();
@@ -495,8 +528,11 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
         "the public Mystery selector minted a typed operation",
       ).toBe(true);
       expect(
-        uiEdges.some(edge => edge.mode === UiMode.MODIFIER_SELECT && edge.carrier === "operation"),
-        "the public embedded reward UI minted a typed operation",
+        uiEdges.some(
+          edge =>
+            (edge.mode === UiMode.MODIFIER_SELECT || edge.mode === UiMode.CONFIRM) && edge.carrier === "operation",
+        ),
+        "the public embedded reward/confirmation UI minted a typed operation",
       ).toBe(true);
       logs.flush();
     } finally {

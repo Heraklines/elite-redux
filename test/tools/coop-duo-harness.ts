@@ -1171,8 +1171,6 @@ export async function driveClientPhaseQueueTo(
     matches?: (phase: Phase) => boolean;
     maxPhases?: number;
     perPhaseTimeoutMs?: number;
-    /** Public-input driver invoked while one real phase remains parked (for dialogue-gated journeys). */
-    onWait?: (phase: Phase) => void | Promise<void>;
   } = {},
 ): Promise<Phase> {
   const matches = options.matches ?? (phase => phase.phaseName === target);
@@ -1193,7 +1191,6 @@ export async function driveClientPhaseQueueTo(
     const deadline = Date.now() + perPhaseTimeoutMs;
     while (scene.phaseManager.getCurrentPhase() === phase) {
       await drainLoopback();
-      await options.onWait?.(phase);
       if (Date.now() >= deadline) {
         const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
         throw new Error(
