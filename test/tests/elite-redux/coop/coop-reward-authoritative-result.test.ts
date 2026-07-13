@@ -23,7 +23,7 @@ import {
 } from "#data/elite-redux/coop/coop-reward-operation";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
+import { type CoopFaultProfile, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 async function flushWire(): Promise<void> {
@@ -266,6 +266,79 @@ describe("P33 retained reward/shop authoritative results", () => {
     hostManager.dispose();
     guestManager.dispose();
   });
+
+  it.each([
+    {
+      name: "reordered",
+      actionCount: 2,
+      profile: { drop: 0, reorder: 1, delay: 0, maxDelay: 2 },
+    },
+    {
+      name: "delayed",
+      actionCount: 3,
+      profile: { drop: 0, reorder: 0, delay: 1, maxDelay: 2 },
+    },
+  ] satisfies { name: string; actionCount: number; profile: Omit<CoopFaultProfile, "faultable"> }[]>(
+    "$name immutable results converge in revision order before any continuation renders",
+    async ({ actionCount, profile }) => {
+      const faultable = (message: Parameters<NonNullable<CoopFaultProfile["faultable"]>>[0]) =>
+        message.t === "envelope";
+      const pair = wrapCoopFaultPair(
+        createLoopbackPair(),
+        { ...profile, faultable },
+        { seed: 0x33c0ffee },
+      );
+      const hostManager = new CoopDurabilityManager(pair.host);
+      const guestManager = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
+      setCoopOperationDurability(hostManager);
+      const renderedRevisions: number[] = [];
+      registerCoopOperationLiveSink("op:reward", envelope => {
+        renderedRevisions.push(envelope.revision);
+        expect(appliedStates.at(-1)?.tick).toBe(envelope.authoritativeState.tick);
+        return true;
+      });
+
+      const commit = (index: number): void => {
+        const prepared = commitRewardOwnerIntent({
+          surface: "reward",
+          pinned: 2,
+          label: "shop",
+          choice: index,
+          data: [1, index, 0, 0],
+          terminal: false,
+          localRole: "host",
+          wave: 7,
+          turn: 3,
+        })!;
+        expect(commitRewardAuthoritativeResult(prepared.operationId, state(51 + index, 800 - index, `r${index}`)))
+          .not.toBeNull();
+      };
+
+      // Fault exactly the first immutable result. Later sends release it behind newer revisions; the dense
+      // journal must park those revisions and then render 1..N, never the arrival order.
+      commit(0);
+      pair.setProfile({ drop: 0, reorder: 0, delay: 0, faultable });
+      for (let index = 1; index < actionCount; index++) {
+        commit(index);
+      }
+      await flushWire();
+      hostManager.reconnect();
+      guestManager.reconnect();
+      await flushWire();
+
+      expect(pair.faultsInjected()).toBe(1);
+      expect(getCoopOperationJournalApplied().map(envelope => envelope.revision)).toEqual(
+        Array.from({ length: actionCount }, (_, index) => index + 1),
+      );
+      expect(appliedStates.map(authoritative => authoritative.tick)).toEqual(
+        Array.from({ length: actionCount }, (_, index) => 51 + index),
+      );
+      expect(renderedRevisions).toEqual(Array.from({ length: actionCount }, (_, index) => index + 1));
+      expect(hostManager.unackedCount()).toBe(0);
+      hostManager.dispose();
+      guestManager.dispose();
+    },
+  );
 
   it("refuses an empty placeholder and retains exact typed market terminal output", async () => {
     const pair = createLoopbackPair();
