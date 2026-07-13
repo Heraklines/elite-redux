@@ -23,22 +23,25 @@ export default defineConfig(async env => {
       {
         name: "coop-public-ui-ci-entry",
         enforce: "pre",
-        transformIndexHtml(html) {
-          if (html.includes(BROWSER_ENTRY)) {
-            sourceEntryReplaced = true;
-            return html;
-          }
-          const replaced = html.replace(SOURCE_ENTRY, `$1${BROWSER_ENTRY}$2`);
-          if (replaced !== html) {
-            sourceEntryReplaced = true;
-            return replaced;
-          }
-          // Vite 8 can invoke HTML hooks again after it has emitted the hashed entry. The first pass is
-          // load-bearing and must replace the normal app entry; later output passes are intentionally inert.
-          if (sourceEntryReplaced) {
-            return html;
-          }
-          throw new Error("public-UI browser build could not replace the normal application entry");
+        transformIndexHtml: {
+          order: "pre",
+          handler(html) {
+            if (html.includes(BROWSER_ENTRY)) {
+              sourceEntryReplaced = true;
+              return html;
+            }
+            const replaced = html.replace(SOURCE_ENTRY, `$1${BROWSER_ENTRY}$2`);
+            if (replaced !== html) {
+              sourceEntryReplaced = true;
+              return replaced;
+            }
+            // Vite 8 can invoke HTML hooks again after it has emitted the hashed entry. The first pass is
+            // load-bearing and must replace the normal app entry; later output passes are intentionally inert.
+            if (sourceEntryReplaced) {
+              return html;
+            }
+            throw new Error("public-UI browser build could not replace the normal application entry");
+          },
         },
       },
     ],
