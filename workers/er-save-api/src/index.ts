@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+/// <reference path="./cloudflare-workers.d.ts" />
+
 // =============================================================================
 // Elite Redux — cloud-save + account API (Cloudflare Worker + D1). #229
 //
@@ -137,7 +139,7 @@ function toBase64(bytes: Uint8Array): string {
   }
   return btoa(s);
 }
-function fromBase64(b64: string): Uint8Array {
+function fromBase64(b64: string): Uint8Array<ArrayBuffer> {
   const bin = atob(b64);
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) {
@@ -205,7 +207,12 @@ async function decompressSave(stored: string): Promise<string> {
 // #endregion
 // #region helpers — crypto (passwords + tokens)
 
-async function pbkdf2(password: string, salt: Uint8Array, iterations: number, keyLen: number): Promise<Uint8Array> {
+async function pbkdf2(
+  password: string,
+  salt: Uint8Array<ArrayBuffer>,
+  iterations: number,
+  keyLen: number,
+): Promise<Uint8Array> {
   const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, key, keyLen * 8);
   return new Uint8Array(bits);
@@ -232,7 +239,7 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
   return timingSafeEqual(actual, expected);
 }
 
-async function hmacSha256(data: Uint8Array, secret: string): Promise<Uint8Array> {
+async function hmacSha256(data: Uint8Array<ArrayBuffer>, secret: string): Promise<Uint8Array> {
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
     "sign",
   ]);

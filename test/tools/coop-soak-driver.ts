@@ -7,8 +7,7 @@
 // NIGHTLY CO-OP SOAK driver (#841). A SEEDED, randomized two-engine run that finds
 // desyncs / strands / leaks BY MACHINE instead of by live players. It stands up the
 // two-engine duo harness (host BattleScene = sole authoritative engine, guest
-// BattleScene = pure renderer, paired over a SCHEDULED loopback pair so each peer's
-// inbound frames apply only under its own withClient context) and plays a co-op run
+// BattleScene = pure renderer, paired over createLoopbackPair) and plays a co-op run
 // WAVE BY WAVE, driving both owners' commands through the REAL command relay and the
 // reward shops through the REAL owner/watcher machinery - every decision drawn from a
 // SINGLE seed (a tiny local mulberry32 PRNG; NEVER Math.random, which is blocked by
@@ -88,6 +87,7 @@ import {
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { COOP_UI_MIRRORED_MODES } from "#data/elite-redux/coop/coop-ui-registry";
 import {
   getCoopUiOperationHits,
@@ -134,7 +134,6 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
-import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import {
   bandForSeq,
   COOP_SOAK_SITUATIONS,
@@ -1297,18 +1296,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   // trainer sub-class not exercised, and it degrades safely rather than being a silent gap.
 
   // Stand up the two-engine rig over one loopback pair (host owns EVEN interaction counters, guest ODD).
-  // Use the SCHEDULED pair (not the plain microtask LoopbackTransport): with automatic delivery the plain
-  // loopback flushes a queued frame to the PEER on the next microtask hop, which lands DURING whichever
-  // client's drainLoopback is currently running - so an op:global reward envelope the HOST broadcast while
-  // driving its owner shop was delivered to the GUEST's durability manager UNDER THE HOST's ClientCtx
-  // (host globalScene/runtime installed). The guest apply then materialized against the HOST controller and
-  // coopAdvanceInteraction no-oped on the host's already-advanced counter, leaving the guest's OWN counter
-  // pinned at its start forever (the persistent "guest reward WATCH HANG"). The scheduled pair BUFFERS every
-  // frame and delivers it only when THAT destination client's inbox is pumped (drainLoopback's
-  // activeClientInboundPump), which only happens inside withClient(guestCtx) - so the guest's inbound apply +
-  // watcher advance always run under the guest context. `automatic: true` keeps ordinary microtask delivery
-  // during boot (identical to the old plain loopback); it is switched OFF just before the timed wave loop.
-  const pair = createScheduledCoopPair({ automatic: true });
+  const pair = createLoopbackPair();
   const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
   let previousBiome = rig.hostScene.arena.biomeId;
   let biomeTransitions = 0;
@@ -2950,12 +2938,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   let runEnded: { wave: number; reason: string } | undefined;
 
   // ===== The wave loop. =====
-  // Boot (buildDuo handshake, heal, coverage taps) is done: switch OFF automatic microtask delivery so every
-  // subsequent inbound frame is delivered ONLY when its destination client's inbox is explicitly pumped
-  // (drainLoopback -> activeClientInboundPump), i.e. under that client's own withClient context. This is what
-  // keeps the GUEST's op:global/reward-envelope apply + watcher advance from running under the HOST context
-  // (the "guest reward WATCH HANG" root cause). Mirrors coop-duo-multiwave.test.ts's timed-journey pattern.
-  pair.setAutomaticDelivery(false);
   const captureOperationHits = (): void => {
     for (const cls of getCoopOperationJournalCommittedClasses()) {
       hits.operations.add(cls);
