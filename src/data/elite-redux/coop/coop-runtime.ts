@@ -186,8 +186,11 @@ import {
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   adoptCoopGlobalGuestRevision,
+  type CoopRuntimeOpState,
+  createCoopRuntimeOpState,
   getCoopGlobalGuestRevisionClock,
   resetCoopGlobalOperationOrder,
+  setActiveCoopRuntimeOpState,
   setCoopGlobalOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
@@ -2605,6 +2608,14 @@ export interface CoopRuntime {
    * control-plane block. Disposed with the runtime.
    */
   durability?: CoopDurabilityManager | undefined;
+  /**
+   * PER-RUNTIME authoritative-operation state (the guest/host cursors, the shared revision clocks, and each
+   * op-surface's per-client apply record). In production one runtime per process makes this identical to the
+   * former module globals; in the two-engine harness it gives each client its own cursor so the surfaces no
+   * longer bleed appliedIds/clock across the two in-process engines. Constructed at assembly
+   * ({@linkcode createCoopRuntimeOpState}); installed as the active op-state by {@linkcode setCoopRuntime}.
+   */
+  opState: CoopRuntimeOpState;
 }
 
 let active: CoopRuntime | null = null;
@@ -2658,6 +2669,9 @@ export function setCoopRuntime(runtime: CoopRuntime): void {
   // harness, where two runtimes coexist in-process and `withClient` swaps the active one per pumped client -
   // the migrated adapters' commit path must journal into the ACTIVE client's manager, not a stale global.
   setCoopOperationDurability(runtime.durability ?? null);
+  // Layer-B: install THIS runtime's per-surface op-state as the active one, so the migrated surfaces read
+  // the pumped client's own cursors/clock (never the other engine's) across a `withClient` swap.
+  setActiveCoopRuntimeOpState(runtime.opState);
   // Install the cycle-free authoritative-guest predicate (#633 B6) so `field/pokemon.ts` can gate the
   // Shedinja party-add without importing this module (which would close a value-level import cycle).
   setCoopAuthoritativeGuestPredicate(isCoopAuthoritativeGuest);
@@ -4383,13 +4397,13 @@ export function assembleCoopRuntime(
   // pulls a snapshot without re-assembling), so this never wipes a live pending op.
   resetCoopBiomeOperationState();
   resetCoopAbilityOperationState();
-  resetCoopBargainOperationState();
+  // bargain + stormglass are per-runtime (layer-B): their fresh records come from createCoopRuntimeOpState
+  // below, so the old reset-at-assembly call sites are removed (a fresh runtime's records ARE the reset).
   resetCoopCatchFullOperationState();
   resetCoopColosseumOperationState();
   resetCoopFaintSwitchOperationState();
   resetCoopLearnMoveOperationState();
   resetCoopRevivalOperationState();
-  resetCoopStormglassOperationState();
   // Wave-2d: same fresh-control-plane reset for the reward-shop + biome-market operation state (SURFACE 3).
   resetCoopRewardOperationState();
   // Wave-2c: the mystery-encounter operation surface shares the same fresh-control-plane discipline (§8
@@ -4495,6 +4509,10 @@ export function assembleCoopRuntime(
     rendezvous,
     localTransport: transport,
     durability,
+    // Per-runtime op-state (layer-B): fresh guest/host cursors + per-surface records for THIS runtime, so
+    // the two-engine harness's clients no longer share module-global apply state. Installed active by
+    // setCoopRuntime; the migrated surfaces (bargain/stormglass, more to follow) read it fail-loud.
+    opState: createCoopRuntimeOpState(),
   };
   sharedTerminalStates.set(runtime, { frozen: false, finalized: false, reason: null });
   if (opts.p33 != null) {
@@ -4770,5 +4788,8 @@ export function clearCoopRuntime(): void {
   setShowdownGuestFlipPredicate(null);
   // #record-replay: stop + drop the captured trace at run teardown so the next run records fresh.
   clearReplayRecording();
+  // Layer-B: drop the active per-runtime op-state so a post-teardown migrated-surface access fails LOUD
+  // (never silently falls back to a stale/global cursor).
+  setActiveCoopRuntimeOpState(null);
   active = null;
 }

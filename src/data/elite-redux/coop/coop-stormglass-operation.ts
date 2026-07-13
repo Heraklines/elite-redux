@@ -18,7 +18,14 @@ import {
   journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
 } from "#data/elite-redux/coop/coop-operation-journal";
-import { CoopOperationGuest, CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
+import {
+  CoopOperationGuest,
+  CoopOperationHost,
+  maybeCoopOpSurfaceState,
+  registerCoopOpSurfaceState,
+  requireCoopOpSurfaceState,
+  resetActiveCoopRuntimeClocks,
+} from "#data/elite-redux/coop/coop-operation-runtime";
 import { COOP_STORMGLASS_SEQ } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopSeatOfRole } from "#data/elite-redux/coop/coop-session";
 import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
@@ -26,11 +33,25 @@ import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux
 const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_STORMGLASS_OP === "off");
 
 let enabled = DEFAULT_ENABLED;
-let epoch = 1;
-let revisionFloor = 0;
-let ordinal = 0;
-let authorityHost: CoopOperationHost | null = null;
-let receiverGuest: CoopOperationGuest | null = null;
+
+/** Per-runtime apply state for the stormglass surface (see coop-operation-runtime.ts opState infra). */
+interface StormglassOpState {
+  epoch: number;
+  revisionFloor: number;
+  ordinal: number;
+  authorityHost: CoopOperationHost | null;
+  receiverGuest: CoopOperationGuest | null;
+}
+
+registerCoopOpSurfaceState(
+  "stormglass",
+  (): StormglassOpState => ({ epoch: 1, revisionFloor: 0, ordinal: 0, authorityHost: null, receiverGuest: null }),
+);
+
+/** Fail-loud apply-path accessor: requires an installed runtime (a fresh runtime holds a reset record). */
+function state(): StormglassOpState {
+  return requireCoopOpSurfaceState<StormglassOpState>("stormglass");
+}
 
 export function isCoopStormglassOperationEnabled(): boolean {
   return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_STORMGLASS);
@@ -45,39 +66,53 @@ export function resetCoopStormglassOperationFlag(): void {
 }
 
 export function resetCoopStormglassOperationState(): void {
-  CoopOperationHost.resetGlobalOrder();
-  authorityHost = null;
-  receiverGuest = null;
-  revisionFloor = 0;
-  ordinal = 0;
+  const s = maybeCoopOpSurfaceState<StormglassOpState>("stormglass");
+  if (s == null) {
+    return; // safe no-op: no runtime installed, nothing exists to reset
+  }
+  resetActiveCoopRuntimeClocks();
+  s.authorityHost = null;
+  s.receiverGuest = null;
+  s.revisionFloor = 0;
+  s.ordinal = 0;
 }
 
 export function setCoopStormglassOperationRevisionFloor(highWater: number): void {
-  if (!Number.isFinite(highWater) || highWater <= 0 || highWater === revisionFloor) {
+  const s = maybeCoopOpSurfaceState<StormglassOpState>("stormglass");
+  if (s == null) {
     return;
   }
-  revisionFloor = highWater;
-  ordinal = 0;
-  authorityHost = null;
-  receiverGuest = null;
+  if (!Number.isFinite(highWater) || highWater <= 0 || highWater === s.revisionFloor) {
+    return;
+  }
+  s.revisionFloor = highWater;
+  s.ordinal = 0;
+  s.authorityHost = null;
+  s.receiverGuest = null;
 }
 
 export function setCoopStormglassOperationEpoch(value: number): void {
-  if (!Number.isSafeInteger(value) || value <= 0 || value === epoch) {
+  const s = maybeCoopOpSurfaceState<StormglassOpState>("stormglass");
+  if (s == null) {
     return;
   }
-  epoch = value;
+  if (!Number.isSafeInteger(value) || value <= 0 || value === s.epoch) {
+    return;
+  }
+  s.epoch = value;
   resetCoopStormglassOperationState();
 }
 
 function host(): CoopOperationHost {
-  authorityHost ??= CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
-  return authorityHost;
+  const s = state();
+  s.authorityHost ??= CoopOperationHost.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor });
+  return s.authorityHost;
 }
 
 function guest(): CoopOperationGuest {
-  receiverGuest ??= CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
-  return receiverGuest;
+  const s = state();
+  s.receiverGuest ??= CoopOperationGuest.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor });
+  return s.receiverGuest;
 }
 
 function context(wave: number, turn: number) {
@@ -111,9 +146,10 @@ export function commitCoopStormglassDecision(
 ): void {
   if (isCoopStormglassOperationEnabled() && params.localRole === "host") {
     try {
+      const s = state();
       const owner = coopSeatOfRole("host");
       const operation: CoopPendingOperation = {
-        id: makeCoopOperationId(epoch, owner, revisionFloor + ++ordinal, "STORMGLASS"),
+        id: makeCoopOperationId(s.epoch, owner, s.revisionFloor + ++s.ordinal, "STORMGLASS"),
         kind: "STORMGLASS",
         owner,
         status: "proposed",

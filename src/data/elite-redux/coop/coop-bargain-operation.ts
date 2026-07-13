@@ -18,7 +18,14 @@ import {
   journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
 } from "#data/elite-redux/coop/coop-operation-journal";
-import { CoopOperationGuest, CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
+import {
+  CoopOperationGuest,
+  CoopOperationHost,
+  maybeCoopOpSurfaceState,
+  registerCoopOpSurfaceState,
+  requireCoopOpSurfaceState,
+  resetActiveCoopRuntimeClocks,
+} from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type {
   CoopAuthoritativeBattleStateV1,
@@ -29,11 +36,31 @@ import type {
 const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_BARGAIN_OP === "off");
 
 let enabled = DEFAULT_ENABLED;
-let epoch = 1;
-let revisionFloor = 0;
-let authorityHost: CoopOperationHost | null = null;
-let watcherGuest: CoopOperationGuest | null = null;
-const pendingJournalMaterializations = new Set<string>();
+
+/** Per-runtime apply state for the bargain surface (see coop-operation-runtime.ts opState infra). */
+interface BargainOpState {
+  epoch: number;
+  revisionFloor: number;
+  authorityHost: CoopOperationHost | null;
+  watcherGuest: CoopOperationGuest | null;
+  readonly pendingJournalMaterializations: Set<string>;
+}
+
+registerCoopOpSurfaceState(
+  "bargain",
+  (): BargainOpState => ({
+    epoch: 1,
+    revisionFloor: 0,
+    authorityHost: null,
+    watcherGuest: null,
+    pendingJournalMaterializations: new Set<string>(),
+  }),
+);
+
+/** Fail-loud apply-path accessor: requires an installed runtime (a fresh runtime holds a reset record). */
+function state(): BargainOpState {
+  return requireCoopOpSurfaceState<BargainOpState>("bargain");
+}
 
 export function isCoopBargainOperationEnabled(): boolean {
   return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_BARGAIN);
@@ -48,42 +75,56 @@ export function resetCoopBargainOperationFlag(): void {
 }
 
 export function resetCoopBargainOperationState(): void {
-  CoopOperationHost.resetGlobalOrder();
-  authorityHost = null;
-  watcherGuest = null;
-  pendingJournalMaterializations.clear();
-  revisionFloor = 0;
+  const s = maybeCoopOpSurfaceState<BargainOpState>("bargain");
+  if (s == null) {
+    return; // safe no-op: no runtime installed, nothing exists to reset
+  }
+  resetActiveCoopRuntimeClocks();
+  s.authorityHost = null;
+  s.watcherGuest = null;
+  s.pendingJournalMaterializations.clear();
+  s.revisionFloor = 0;
 }
 
 export function setCoopBargainOperationRevisionFloor(highWater: number): void {
-  if (!Number.isFinite(highWater) || highWater <= 0 || highWater === revisionFloor) {
+  const s = maybeCoopOpSurfaceState<BargainOpState>("bargain");
+  if (s == null) {
     return;
   }
-  revisionFloor = highWater;
-  authorityHost = null;
-  watcherGuest = null;
+  if (!Number.isFinite(highWater) || highWater <= 0 || highWater === s.revisionFloor) {
+    return;
+  }
+  s.revisionFloor = highWater;
+  s.authorityHost = null;
+  s.watcherGuest = null;
 }
 
 export function setCoopBargainOperationEpoch(next: number): void {
-  if (next === epoch) {
+  const s = maybeCoopOpSurfaceState<BargainOpState>("bargain");
+  if (s == null) {
     return;
   }
-  epoch = next;
+  if (next === s.epoch) {
+    return;
+  }
+  s.epoch = next;
   resetCoopBargainOperationState();
 }
 
 function host(): CoopOperationHost {
-  authorityHost ??= CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
-  return authorityHost;
+  const s = state();
+  s.authorityHost ??= CoopOperationHost.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor });
+  return s.authorityHost;
 }
 
 function guest(): CoopOperationGuest {
-  watcherGuest ??= CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
-  return watcherGuest;
+  const s = state();
+  s.watcherGuest ??= CoopOperationGuest.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor });
+  return s.watcherGuest;
 }
 
 function bargainOperationId(pinned: number): string {
-  return makeCoopOperationId(epoch, coopInteractionOwnerSeat(pinned), pinned, "BARGAIN");
+  return makeCoopOperationId(state().epoch, coopInteractionOwnerSeat(pinned), pinned, "BARGAIN");
 }
 
 function controlContext(
@@ -171,9 +212,10 @@ export function adoptBargainWatcherOutcome(params: {
       commit(params.pinned, params.outcome, params.wave, params.turn ?? 0);
       return true;
     }
+    const s = state();
     const g = guest();
     if (g.hasApplied(id)) {
-      return pendingJournalMaterializations.delete(id);
+      return s.pendingJournalMaterializations.delete(id);
     }
     if (isCoopOperationJournalActive()) {
       return false;
@@ -181,7 +223,7 @@ export function adoptBargainWatcherOutcome(params: {
     const intent = intentFor(params.pinned, params.outcome);
     const result = g.applyEnvelope({
       version: 1,
-      sessionEpoch: epoch,
+      sessionEpoch: s.epoch,
       revision: g.getLastAppliedRevision() + 1,
       ...controlContext(params.wave, params.turn ?? 0),
       pendingOperation: { ...intent, status: "applied" },
@@ -194,7 +236,7 @@ export function adoptBargainWatcherOutcome(params: {
 }
 
 export function armCoopBargainJournalMaterialization(operationId: string): void {
-  pendingJournalMaterializations.add(operationId);
+  state().pendingJournalMaterializations.add(operationId);
 }
 
 function applyJournaledBargainEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {

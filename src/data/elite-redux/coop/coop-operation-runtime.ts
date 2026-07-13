@@ -192,6 +192,129 @@ export function resetCoopGlobalOperationOrder(): void {
   globalGuestClock = null;
 }
 
+// =============================================================================
+// PER-RUNTIME operation state (harness-fidelity, per the layer-B decision). In production there is exactly
+// ONE runtime per process, so relocating each surface's module-global apply state (guest/host cursors, the
+// shared revision clock, and per-surface aux tracking) onto the ACTIVE runtime is semantically identical to
+// today. In the single-process two-engine harness there are TWO runtimes, and the module globals bled
+// between them (a host applyEnvelope marked appliedIds that the guest then short-circuited on). Per-runtime
+// state gives each client its own cursor - exactly like two production processes.
+//
+// Lifecycle: the record for a surface is CONSTRUCTED at assembly (initCoopRuntimeOpState calls each surface's
+// registered factory onto the runtime being built). The apply-path accessor {@linkcode requireCoopOpSurfaceState}
+// is FAIL-LOUD: no active runtime = throw (never lazily create a global, which would reintroduce the bleed).
+// The reset/init entrypoints use {@linkcode maybeCoopOpSurfaceState} and are SAFE NO-OPS when idle.
+// =============================================================================
+
+/** One runtime's authoritative-operation state: the shared clocks + every surface's per-client record. */
+export interface CoopRuntimeOpState {
+  /** Shared host commit clock for THIS runtime (re-keyed on an epoch change, mirroring the old global clock). */
+  hostClock: CoopOperationRevisionClock | null;
+  /** Shared guest receive clock for THIS runtime. */
+  guestClock: CoopOperationRevisionClock | null;
+  /** surfaceKey -> that surface's opaque state record (each surface owns + casts its own type). */
+  readonly surfaces: Map<string, unknown>;
+}
+
+/** Registered per-surface factories, run by {@linkcode initCoopRuntimeOpState} to populate a fresh runtime. */
+const opSurfaceFactories = new Map<string, () => unknown>();
+
+/**
+ * Register a surface's fresh-state factory (called once at module import, next to registerCoopOperationApplier).
+ * A surface with NO factory simply has no per-runtime record; its {@linkcode requireCoopOpSurfaceState} then
+ * throws - so a newly-added surface that forgets to register fails LOUDLY instead of silently sharing a global.
+ */
+export function registerCoopOpSurfaceState(surface: string, factory: () => unknown): void {
+  opSurfaceFactories.set(surface, factory);
+}
+
+/** Build a fresh op-state container for a runtime under construction (clocks lazily keyed on first use). */
+export function createCoopRuntimeOpState(): CoopRuntimeOpState {
+  const surfaces = new Map<string, unknown>();
+  for (const [surface, factory] of opSurfaceFactories) {
+    surfaces.set(surface, factory());
+  }
+  return { hostClock: null, guestClock: null, surfaces };
+}
+
+/** The op-state of the currently-installed runtime, set by setCoopRuntime; null when no run is active. */
+let activeOpState: CoopRuntimeOpState | null = null;
+
+/** Install/clear the active runtime's op-state (called by setCoopRuntime / clearCoopRuntime). */
+export function setActiveCoopRuntimeOpState(state: CoopRuntimeOpState | null): void {
+  activeOpState = state;
+}
+
+/**
+ * FAIL-LOUD apply-path accessor for a surface's per-runtime record. Throws (with the surface key) when no
+ * runtime is installed or the surface has no record - never lazily constructs a global (that IS the bleed).
+ */
+export function requireCoopOpSurfaceState<T>(surface: string): T {
+  if (activeOpState == null) {
+    throw new Error(
+      `[coop-op] no runtime installed for surface=${surface} (apply-path access requires an active runtime)`,
+    );
+  }
+  const record = activeOpState.surfaces.get(surface);
+  if (record === undefined) {
+    throw new Error(
+      `[coop-op] surface=${surface} has no per-runtime record (missing registerCoopOpSurfaceState / init)`,
+    );
+  }
+  return record as T;
+}
+
+/** SAFE reset/init-path accessor: returns null when idle (nothing to reset) instead of throwing. */
+export function maybeCoopOpSurfaceState<T>(surface: string): T | null {
+  return (activeOpState?.surfaces.get(surface) as T | undefined) ?? null;
+}
+
+/** Per-runtime equivalent of the old shared globalClock: re-keys the active runtime's clock on an epoch change. */
+function activeRuntimeClock(
+  side: "host" | "guest",
+  epoch: CoopSessionEpoch,
+  initialRevision: CoopRevision,
+): CoopOperationRevisionClock {
+  if (activeOpState == null) {
+    throw new Error(`[coop-op] no runtime installed (${side} clock)`);
+  }
+  let clock = side === "host" ? activeOpState.hostClock : activeOpState.guestClock;
+  if (clock == null || clock.epoch !== epoch) {
+    clock = { epoch, revision: initialRevision };
+    if (side === "host") {
+      activeOpState.hostClock = clock;
+    } else {
+      activeOpState.guestClock = clock;
+    }
+  } else if (initialRevision > clock.revision) {
+    clock.revision = initialRevision;
+  }
+  return clock;
+}
+
+export function activeRuntimeHostClock(
+  epoch: CoopSessionEpoch,
+  initialRevision: CoopRevision = 0,
+): CoopOperationRevisionClock {
+  return activeRuntimeClock("host", epoch, initialRevision);
+}
+
+export function activeRuntimeGuestClock(
+  epoch: CoopSessionEpoch,
+  initialRevision: CoopRevision = 0,
+): CoopOperationRevisionClock {
+  return activeRuntimeClock("guest", epoch, initialRevision);
+}
+
+/** Reset the ACTIVE runtime's shared clocks (the per-runtime equivalent of CoopOperationHost.resetGlobalOrder). */
+export function resetActiveCoopRuntimeClocks(): void {
+  if (activeOpState == null) {
+    return;
+  }
+  activeOpState.hostClock = null;
+  activeOpState.guestClock = null;
+}
+
 /**
  * The sole-authority commit log. The host receives proposed intents (its own or the guest's relayed one),
  * validates + commits each EXACTLY ONCE, applies (revision++), and produces the envelope to broadcast.
@@ -213,6 +336,14 @@ export class CoopOperationHost {
     return new CoopOperationHost({
       ...config,
       revisionClock: getCoopGlobalHostRevisionClock(config.epoch, config.initialRevision ?? 0),
+    });
+  }
+
+  /** Per-runtime sibling of {@linkcode global}: binds to the ACTIVE runtime's host clock (fail-loud if idle). */
+  public static forActiveRuntime(config: Omit<CoopOperationHostConfig, "revisionClock">): CoopOperationHost {
+    return new CoopOperationHost({
+      ...config,
+      revisionClock: activeRuntimeHostClock(config.epoch, config.initialRevision ?? 0),
     });
   }
 
@@ -462,6 +593,14 @@ export class CoopOperationGuest {
     return new CoopOperationGuest({
       ...config,
       revisionClock: getCoopGlobalGuestRevisionClock(config.epoch, config.initialRevision ?? 0),
+    });
+  }
+
+  /** Per-runtime sibling of {@linkcode global}: binds to the ACTIVE runtime's guest clock (fail-loud if idle). */
+  public static forActiveRuntime(config: Omit<CoopOperationGuestConfig, "revisionClock">): CoopOperationGuest {
+    return new CoopOperationGuest({
+      ...config,
+      revisionClock: activeRuntimeGuestClock(config.epoch, config.initialRevision ?? 0),
     });
   }
 
