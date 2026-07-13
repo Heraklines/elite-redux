@@ -168,6 +168,36 @@ const stagedWaveTransactions = new Map<string, MutableStagedWaveAdvanceTransacti
 const stagedWaveOperationIdByWave = new Map<number, string>();
 
 /**
+ * Engine-owned admission seam for the immutable post-BattleEnd DATA image. The wave adapter deliberately
+ * does not import BattleScene/Phaser: BattleEndPhase installs the one production callback and decides
+ * whether the currently active scene is still at an executable source-wave boundary. A deferred journal
+ * retry can therefore finish DATA at the real BattleEnd phase, or at the source wave's already-open shared
+ * reward/biome surface when scheduling delivered the first retry just after BattleEnd handed off.
+ */
+export type CoopWaveAdvanceBoundaryApplyOutcome = "deferred" | "applied" | "rejected";
+export type CoopWaveAdvanceBoundaryDataApplier = (
+  envelope: CoopAuthoritativeEnvelopeV1,
+) => CoopWaveAdvanceBoundaryApplyOutcome;
+
+let boundaryDataApplier: CoopWaveAdvanceBoundaryDataApplier | null = null;
+
+/**
+ * Install the engine-coupled retained-DATA boundary adapter. Returns an identity-fenced disposer so a
+ * focused test may temporarily replace it without removing a newer production registration.
+ */
+export function registerCoopWaveAdvanceBoundaryDataApplier(
+  applier: CoopWaveAdvanceBoundaryDataApplier,
+): () => void {
+  const previous = boundaryDataApplier;
+  boundaryDataApplier = applier;
+  return () => {
+    if (boundaryDataApplier === applier) {
+      boundaryDataApplier = previous;
+    }
+  };
+}
+
+/**
  * True iff the migrated (envelope-gated) wave-advance path is active; else pure legacy derivation (§5.1).
  * The local rollback flag (`enabled`) is the OUTER gate; the NEGOTIATED capability set is the inner one
  * (#896 W2e-R2): if the peer did not advertise "opSurface.wave" it is not in the intersection and the surface
@@ -599,6 +629,41 @@ export function markCoopWaveAdvanceDataApplied(wave: number): boolean {
   });
 }
 
+/**
+ * Ask the engine-owned boundary adapter to apply this wave's exact retained state image. This is the only
+ * late-admission path: the adapter must prove the live scene is either in BattleEnd or still on the source
+ * wave with its real shared continuation UI open. It may never admit wave-N DATA after wave N+1 began.
+ *
+ * `applied` also covers an already-applied transaction, making BattleEnd start, deferred polling and the
+ * public-UI wake freely repeatable. A callback may mutate the scene only from the immutable defensive copy;
+ * the transaction's retained canonical envelope is never exposed for mutation.
+ */
+export function tryApplyCoopWaveAdvanceDataAtBoundary(wave: number): CoopWaveAdvanceBoundaryApplyOutcome {
+  const id = stagedWaveOperationIdByWave.get(wave);
+  const staged = id == null ? undefined : stagedWaveTransactions.get(id);
+  if (staged == null || boundaryDataApplier == null) {
+    return "deferred";
+  }
+  if (staged.dataApplied) {
+    return "applied";
+  }
+  let outcome: CoopWaveAdvanceBoundaryApplyOutcome;
+  try {
+    outcome = boundaryDataApplier(structuredClone(staged.envelope));
+  } catch (error) {
+    coopWarn("runtime", `wave-advance retained DATA boundary adapter threw wave=${wave}`, error);
+    return "rejected";
+  }
+  if (outcome !== "applied") {
+    return outcome;
+  }
+  if (!markCoopWaveAdvanceDataApplied(wave)) {
+    return "rejected";
+  }
+  coopLog("runtime", `wave-advance retained DATA boundary admitted wave=${wave}`);
+  return "applied";
+}
+
 /** A real destination UI/terminal/next-command surface is now active after DATA application. */
 export function markCoopWaveAdvanceContinuationReady(wave: number): boolean {
   const id = stagedWaveOperationIdByWave.get(wave);
@@ -840,9 +905,22 @@ function applyJournaledWaveEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coop
   if (staged === "conflict" || staged === "rejected") {
     return "rejected";
   }
-  // The sink returns true only after the embedded DATA has applied at BattleEnd and a real destination
-  // surface has opened. Until then the durability manager retains/retries this exact immutable envelope.
-  if (!routeCoopOperationToLiveSink("op:wave", envelope)) {
+  // The sink bootstraps the host-stated tail and returns true only after embedded DATA + a real destination
+  // surface are ready. If its first attempt lands just before BattleEnd (or its public-UI wake lands just
+  // after BattleEnd), ask the engine-owned boundary adapter to admit the exact retained DATA, then re-run
+  // the same sink once so it can release BattleEnd / observe the already-open continuation. This closes the
+  // scheduling hole where seq-1 WAVE remained deferred forever while seq-2 reward RESULT waited behind it.
+  let sinkReady = routeCoopOperationToLiveSink("op:wave", envelope);
+  if (!sinkReady && !getCoopStagedWaveAdvanceTransaction(preflight.payload.wave)?.dataApplied) {
+    const dataOutcome = tryApplyCoopWaveAdvanceDataAtBoundary(preflight.payload.wave);
+    if (dataOutcome === "rejected") {
+      return "rejected";
+    }
+    if (dataOutcome === "applied") {
+      sinkReady = routeCoopOperationToLiveSink("op:wave", envelope);
+    }
+  }
+  if (!sinkReady) {
     return "deferred";
   }
   if (!isCoopWaveAdvanceTransactionComplete(preflight.payload.wave)) {

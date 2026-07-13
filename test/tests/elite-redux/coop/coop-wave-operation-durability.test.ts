@@ -50,10 +50,12 @@ import {
   isCoopWaveAdvanceTransactionComplete,
   markCoopWaveAdvanceContinuationReady,
   markCoopWaveAdvanceDataApplied,
+  registerCoopWaveAdvanceBoundaryDataApplier,
   resetCoopWaveAdvanceOperationFlag,
   resetCoopWaveAdvanceOperationState,
   setCoopWaveAdvanceOperationEnabled,
   setCoopWaveAdvanceOperationRevisionFloor,
+  tryApplyCoopWaveAdvanceDataAtBoundary,
 } from "#data/elite-redux/coop/coop-wave-operation";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -183,7 +185,10 @@ function sinkWaves(): number[] {
 }
 
 describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2e-R)", () => {
+  let restoreBoundaryApplier: (() => void) | null;
+
   beforeEach(() => {
+    restoreBoundaryApplier = null;
     setCoopWaveAdvanceOperationEnabled(true);
     resetCoopWaveAdvanceOperationState();
     resetCoopOperationJournalLog();
@@ -192,6 +197,7 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     setCoopDurabilityEnabled(true);
   });
   afterEach(() => {
+    restoreBoundaryApplier?.();
     registerCoopOperationLiveSink("op:wave", null);
     setCoopOperationDurability(null);
     resetCoopOperationJournalLog();
@@ -292,15 +298,20 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     const failures: unknown[] = [];
     let battleEndOpen = false;
     let continuationOpen = false;
+    const appliedStateTicks: number[] = [];
+    restoreBoundaryApplier = registerCoopWaveAdvanceBoundaryDataApplier(envelope => {
+      if (!battleEndOpen) {
+        return "deferred";
+      }
+      appliedStateTicks.push(envelope.authoritativeState.tick);
+      return "applied";
+    });
     registerCoopOperationLiveSink("op:wave", envelope => {
       const wave = (envelope.pendingOperation?.payload as CoopWaveAdvancePayload).wave;
-      if (battleEndOpen) {
-        markCoopWaveAdvanceDataApplied(wave);
-      }
       if (continuationOpen) {
         markCoopWaveAdvanceContinuationReady(wave);
       }
-      return battleEndOpen && continuationOpen;
+      return isCoopWaveAdvanceTransactionComplete(wave);
     });
     const pair = createLoopbackPair();
     let ackCount = 0;
@@ -341,6 +352,9 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     scheduler.advance(100);
     await flush();
     expect(getCoopOperationJournalApplied(), "DATA alone still cannot ACK").toHaveLength(0);
+    expect(appliedStateTicks, "the immutable state image entered at the BattleEnd-owned wake exactly once").toEqual([
+      114,
+    ]);
 
     continuationOpen = true;
     expect(guestMgr.retryDeferred("op:global"), "the public continuation wake reattempts immediately").toBe(1);
@@ -354,6 +368,11 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     expect(ackCount, "the successful boundary emits one cumulative ACK").toBe(1);
     expect(guestMgr.retryDeferred("op:global"), "the wake is one-shot after completion").toBe(0);
     expect(ackCount).toBe(1);
+    expect(
+      tryApplyCoopWaveAdvanceDataAtBoundary(14),
+      "an already-admitted DATA image is idempotent and cannot call the engine applier twice",
+    ).toBe("applied");
+    expect(appliedStateTicks).toEqual([114]);
     expect(failures).toEqual([]);
     hostMgr.dispose();
     guestMgr.dispose();

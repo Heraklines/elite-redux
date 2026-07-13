@@ -1,18 +1,82 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
-import { applyCoopAuthoritativeBattleState } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  applyCoopAuthoritativeBattleState,
+  coopAppliedStateTick,
+  reapplyAcceptedCoopAuthoritativeBattleState,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import {
   awaitCoopSettledWaveAdvanceAtBattleEnd,
   broadcastCoopWaveEndState,
   consumeCoopPendingWaveEndState,
+  failCoopSharedSession,
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
+import { coopAuthorityContinuationSurface } from "#data/elite-redux/coop/coop-ui-registry";
+import {
+  isValidCoopWaveAdvancePayload,
+  registerCoopWaveAdvanceBoundaryDataApplier,
+  tryApplyCoopWaveAdvanceDataAtBoundary,
+} from "#data/elite-redux/coop/coop-wave-operation";
 import { erAdvanceCommunityItemCharges } from "#data/elite-redux/er-community-items";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { advanceErWardStoneCharges } from "#data/elite-redux/er-ward-stones";
 import { LapsingPersistentModifier, LapsingPokemonHeldItemModifier } from "#modifiers/modifier";
 import { BattlePhase } from "#phases/battle-phase";
+
+/**
+ * The one engine-coupled DATA admission seam for retained WAVE_ADVANCE transactions. BattleEnd is the
+ * preferred boundary. A source-wave shared input / biome / terminal surface is also safe when a scheduled
+ * retry runs immediately after BattleEnd handed off: no later reward result can have applied because it is
+ * ordered behind this transaction. Once the next wave begins, applying the old image is forbidden.
+ */
+registerCoopWaveAdvanceBoundaryDataApplier(envelope => {
+  if (!isCoopAuthoritativeGuest()) {
+    return "deferred";
+  }
+  const payload = envelope.pendingOperation?.payload;
+  if (
+    envelope.pendingOperation?.kind !== "WAVE_ADVANCE"
+    || !isValidCoopWaveAdvancePayload(payload)
+  ) {
+    return "rejected";
+  }
+  const sourceWave = payload.wave;
+  const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+  if (currentWave > sourceWave) {
+    return "rejected";
+  }
+  if (currentWave !== sourceWave) {
+    return "deferred";
+  }
+
+  const phaseName = globalScene.phaseManager?.getCurrentPhase()?.phaseName;
+  let publicSourceBoundary = false;
+  try {
+    const handlerActive = globalScene.ui.getHandler()?.active === true;
+    const surface = handlerActive ? coopAuthorityContinuationSurface(globalScene.ui.getMode()) : null;
+    const phaseOwnsPostBattleSharedInput =
+      phaseName === "SelectModifierPhase"
+      || phaseName === "BiomeShopPhase";
+    publicSourceBoundary =
+      (surface === "sharedInput" && phaseOwnsPostBattleSharedInput)
+      || (payload.biomeChange === true && phaseName === "SelectBiomePhase" && handlerActive)
+      || (payload.nextWave === sourceWave && phaseName === "GameOverPhase");
+  } catch {
+    publicSourceBoundary = false;
+  }
+  if (phaseName !== "BattleEndPhase" && !publicSourceBoundary) {
+    return "deferred";
+  }
+
+  const immutableState = structuredClone(envelope.authoritativeState);
+  let applied = applyCoopAuthoritativeBattleState(immutableState, true);
+  if (!applied && coopAppliedStateTick() === immutableState.tick) {
+    applied = reapplyAcceptedCoopAuthoritativeBattleState(immutableState, true);
+  }
+  return applied ? "applied" : "rejected";
+});
 
 export class BattleEndPhase extends BattlePhase {
   public readonly phaseName = "BattleEndPhase";
@@ -36,6 +100,17 @@ export class BattleEndPhase extends BattlePhase {
       (phase: BattleEndPhase) => phase.isVictory,
     );
     globalScene.phaseManager.removeAllPhasesOfType("BattleEndPhase");
+
+    // Make BattleEnd itself the deterministic DATA wake. Polling and UI notifications remain backstops,
+    // but correctness no longer depends on a retry timer happening to fire while this short phase is live.
+    if (isCoopAuthoritativeGuest()) {
+      const wave = globalScene.currentBattle?.waveIndex ?? -1;
+      const dataOutcome = tryApplyCoopWaveAdvanceDataAtBoundary(wave);
+      if (dataOutcome === "rejected") {
+        failCoopSharedSession(`Could not apply the complete retained state at wave ${wave} BattleEnd.`);
+        return;
+      }
+    }
 
     // P33 guest: the host's post-BattleEnd image already contains every mutation below. Hold this phase
     // until that exact retained DATA applies, then release the existing host-stated tail without dual-run.

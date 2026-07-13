@@ -322,6 +322,10 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
         rig.guestRuntime.controller.interactionCounter(),
         `wave ${w}: guest advanced the interaction counter once (lockstep with host)`,
       ).toBe(counterBefore + 1);
+      expect(
+        rig.guestRuntime.durability?.appliedMarks()["op:global"] ?? 0,
+        `wave ${w}: retained WAVE then reward RESULT drained in order after the real reward UI opened`,
+      ).toBe(rig.hostRuntime.durability?.controlPlaneHighWater()["op:global"] ?? 0);
 
       // ===== Host crosses into the NEXT wave's battle (real EncounterPhase rolls wave w+1). =====
       if (w < WAVES) {
