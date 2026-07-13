@@ -385,6 +385,35 @@ function pendingTurnKey(address: { epoch: number; wave: number; turn: number }):
   return `${address.epoch}:${address.wave}:${address.turn}`;
 }
 
+interface CoopTurnAddress {
+  epoch: number;
+  wave: number;
+  turn: number;
+}
+
+interface PendingTurnWaiter {
+  turn: number;
+  address: CoopTurnAddress | null;
+  finish: (res: CoopTurnResolution | null) => void;
+}
+
+interface LiveTurnBuffer {
+  address: CoopTurnAddress;
+  events: Map<number, CoopBattleEvent>;
+}
+
+function legacyTurnKey(turn: number): string {
+  return `legacy:${turn}`;
+}
+
+function invalidAuthorityTurnKey(turn: number): string {
+  return `invalid:${turn}`;
+}
+
+function sameTurnAddress(left: CoopTurnAddress, right: CoopTurnAddress): boolean {
+  return left.epoch === right.epoch && left.wave === right.wave && left.turn === right.turn;
+}
+
 function sameAuthorityAddress(
   left: { epoch: number; wave: number; turn: number; revision: number },
   right: { epoch: number; wave: number; turn: number; revision: number },
@@ -406,10 +435,10 @@ function authorityFailureKey(failure: CoopAuthorityFailure): string {
  * the guest. One instance per client. The HOST calls the `send*` methods; the GUEST
  * registers `onEnemyPartySync` / `onCheckpoint` and `await`s {@linkcode awaitTurn}.
  *
- * Turn resolutions are matched by `turn`. Because the two clients are NOT time-locked
- * (the host may finish + send turn N before the guest reaches its await), a resolution
- * that arrives with no waiter is BUFFERED (latest-per-turn wins) and consumed by the
- * next {@linkcode awaitTurn} for that turn - the same race fix the command relay uses.
+ * Turn resolutions are matched by the complete `(epoch, wave, turn)` address. Because the two clients
+ * are NOT time-locked (the host may finish + send turn N before the guest reaches its await), a resolution
+ * that arrives with no waiter is BUFFERED at that exact address and consumed by the matching
+ * {@linkcode awaitTurn} - the same race fix the command relay uses without bare-turn aliasing.
  */
 export class CoopBattleStreamer {
   private readonly transport: CoopTransport;
@@ -420,12 +449,12 @@ export class CoopBattleStreamer {
   private readonly offMessage: () => void;
   private readonly offStateChange: () => void;
 
-  /** turn -> resolver for an in-flight {@linkcode awaitTurn}. */
-  private readonly pending = new Map<number, (res: CoopTurnResolution | null) => void>();
+  /** Complete turn address -> resolver for an in-flight {@linkcode awaitTurn}. */
+  private readonly pending = new Map<string, PendingTurnWaiter>();
   /** #806 stall watchdog: when each parked turn wait began (same keys as `pending`). */
-  private readonly pendingSince = new Map<number, number>();
-  /** turn -> a resolution that arrived before its waiter (race buffer). */
-  private readonly inbox = new Map<number, CoopTurnResolution>();
+  private readonly pendingSince = new Map<string, number>();
+  /** Complete turn address -> a resolution that arrived before its waiter (race buffer). */
+  private readonly inbox = new Map<string, CoopTurnResolution>();
   /** HOST: complete turn commits remain replayable until the guest ACKs exact convergence. */
   private readonly sentTurnCommits = new Map<string, Extract<CoopMessage, { t: "turnResolution" }>>();
   private readonly sentTurnCommitTimers = new Map<string, () => void>();
@@ -445,33 +474,42 @@ export class CoopBattleStreamer {
    * retained ({@linkcode LIVE_EVENT_TURN_RETENTION}) so a late event for a just-finished turn is not
    * silently dropped while old turns never leak.
    */
-  private readonly liveEvents = new Map<number, Map<number, CoopBattleEvent>>();
+  private readonly liveEvents = new Map<string, LiveTurnBuffer>();
   /** GUEST: live-event arrival handler (optional; lets a live pump react the instant one lands). */
   private liveEventHandler: ((turn: number, seq: number, event: CoopBattleEvent) => void) | null = null;
   /** GUEST: one-shot live-arrival waiter for the pump race ({@linkcode awaitTurnOrLiveEvent}). */
-  private liveWaiter: ((turn: number, seq: number) => void) | null = null;
+  private liveWaiter: ((address: CoopTurnAddress, seq: number) => void) | null = null;
   /** GUEST: one-shot OUT-OF-BAND-checkpoint waiter for the pump race (#633 guest-faint deadlock). */
-  private checkpointWaiter: (() => void) | null = null;
+  private checkpointWaiter: ((envelope: CoopCheckpointEnvelope) => void) | null = null;
   /**
    * GUEST (#790, the post-resync strand): the last (wave, turn) whose resolution was HANDED TO A
    * FINALIZE. A duplicate CoopReplayTurnPhase for an already-finalized turn (leftover pump
    * continuation racing a resync) must END instead of parking 20 minutes on a resolution the
    * host will never resend. Per-session by construction (a new session builds a new streamer).
    */
-  private finalizedMark: { wave: number; turn: number } | null = null;
+  private readonly finalizedMarks = new Map<string, { epoch: number; wave: number; turn: number }>();
 
-  markTurnFinalized(wave: number, turn: number): void {
-    if (
-      this.finalizedMark == null
-      || wave > this.finalizedMark.wave
-      || (wave === this.finalizedMark.wave && turn > this.finalizedMark.turn)
-    ) {
-      this.finalizedMark = { wave, turn };
+  markTurnFinalized(epoch: number, wave: number, turn: number): void {
+    if (!isSafeAddressPart(epoch, false) || !isSafeAddressPart(wave, false) || !isSafeAddressPart(turn, false)) {
+      return;
+    }
+    const key = `${epoch}:${wave}`;
+    const previous = this.finalizedMarks.get(key);
+    if (previous == null || turn > previous.turn) {
+      rememberBounded(this.finalizedMarks, key, { epoch, wave, turn });
     }
   }
 
   isTurnFinalized(wave: number, turn: number): boolean {
-    return this.finalizedMark != null && this.finalizedMark.wave === wave && turn <= this.finalizedMark.turn;
+    if (this.authorityContext == null) {
+      return [...this.finalizedMarks.values()].some(mark => mark.wave === wave && turn <= mark.turn);
+    }
+    const current = this.currentAuthorityAddress(turn);
+    if (current == null || current.wave !== wave) {
+      return false;
+    }
+    const mark = this.finalizedMarks.get(`${current.epoch}:${wave}`);
+    return mark != null && turn <= mark.turn;
   }
 
   /**
@@ -482,7 +520,7 @@ export class CoopBattleStreamer {
    * the mark only ever exists to kill duplicates WITHIN the wave it was set in.
    */
   clearFinalizedMark(): void {
-    this.finalizedMark = null;
+    this.finalizedMarks.clear();
   }
 
   private enemyPartyHandler: ((wave: number, enemies: CoopSerializedEnemy[]) => void) | null = null;
@@ -491,7 +529,7 @@ export class CoopBattleStreamer {
    * GUEST: safe-boundary observers for the complete checkpoint envelope. Unlike
    * {@linkcode checkpointHandler}, these are subscriptions rather than a singleton because a held
    * recovery phase may temporarily listen for a strictly-newer authority frame without replacing a
-   * presentation observer. The receiver still only retains ONE latest envelope.
+   * presentation observer. The receiver retains one latest envelope per complete turn address.
    */
   private readonly checkpointEnvelopeHandlers = new Set<(envelope: CoopCheckpointEnvelope) => void>();
   /** wave -> resolver for an in-flight {@linkcode awaitEnemyParty}. */
@@ -502,8 +540,8 @@ export class CoopBattleStreamer {
   private readonly meBattlePartyInbox = new Map<string, CoopSerializedEnemy[]>();
   /** HOST: retained authoritative ME parties, re-answerable by exact interaction key after loss/reconnect. */
   private readonly sentMeBattleParties = new Map<string, CoopSerializedEnemy[]>();
-  /** Latest authoritative checkpoint (+ checksum) the guest has not yet applied. */
-  private lastCheckpoint: CoopCheckpointEnvelope | null = null;
+  /** Complete turn address -> latest authoritative checkpoint the guest has not yet applied. */
+  private readonly pendingCheckpoints = new Map<string, CoopCheckpointEnvelope>();
   /** HOST: latest complete replacement frame, retained for explicit guest retransmit requests. */
   private readonly sentReplacementCheckpoints = new Map<string, CoopCheckpointEnvelope>();
   private readonly sentReplacementTimers = new Map<string, () => void>();
@@ -527,7 +565,7 @@ export class CoopBattleStreamer {
    * before the older turn-resolution finalizer runs, so the finalizer consumes this
    * envelope and reasserts its newer full state at the safe post-animation boundary.
    */
-  private appliedOutOfBandCheckpoint: CoopCheckpointEnvelope | null = null;
+  private readonly appliedOutOfBandCheckpoints = new Map<string, CoopCheckpointEnvelope>();
   /** Latest enemy party the guest has not yet adopted (consumed at the wave's first turn). */
   private lastEnemyParty: { wave: number; enemies: CoopSerializedEnemy[] } | null = null;
   /** HOST: exact wave-boundary carriers retained for loss/reconnect replay. */
@@ -658,9 +696,20 @@ export class CoopBattleStreamer {
   }
 
   private currentAuthorityAddress(turn?: number): { epoch: number; wave: number; turn: number } | null {
+    if (this.authorityContext == null) {
+      return null;
+    }
+    if (turn !== undefined && !isSafeAddressPart(turn, false)) {
+      return null;
+    }
     try {
-      const current = this.authorityContext?.();
-      if (current == null) {
+      const current = this.authorityContext();
+      if (
+        current == null
+        || !isSafeAddressPart(current.epoch, false)
+        || !isSafeAddressPart(current.wave, false)
+        || !isSafeAddressPart(current.turn, false)
+      ) {
         return null;
       }
       return { ...current, ...(turn === undefined ? {} : { turn }) };
@@ -670,12 +719,93 @@ export class CoopBattleStreamer {
   }
 
   private acceptsCurrentAddress(address: { epoch: number; wave: number; turn: number }, exactTurn = true): boolean {
+    if (this.authorityContext == null) {
+      return true;
+    }
     const current = this.currentAuthorityAddress();
     if (current == null) {
-      return true;
+      return false;
     }
     return (
       address.epoch === current.epoch && address.wave === current.wave && (!exactTurn || address.turn === current.turn)
+    );
+  }
+
+  private acceptsAwaitedTurnAddress(address: CoopTurnAddress): boolean {
+    if (this.authorityContext == null) {
+      return true;
+    }
+    const current = this.currentAuthorityAddress();
+    if (current == null || current.epoch !== address.epoch || current.wave !== address.wave) {
+      return false;
+    }
+    const key = pendingTurnKey(address);
+    return current.turn === address.turn || this.pending.has(key) || this.requestedTurnCommits.has(key);
+  }
+
+  private turnWaitAddress(turn: number): { key: string; address: CoopTurnAddress | null } {
+    const address = this.currentAuthorityAddress(turn);
+    if (address != null) {
+      return { key: pendingTurnKey(address), address };
+    }
+    return {
+      key: this.authorityContext == null ? legacyTurnKey(turn) : invalidAuthorityTurnKey(turn),
+      address: null,
+    };
+  }
+
+  private bufferedTurnEntry(turn: number): [string, CoopTurnResolution] | undefined {
+    const current = this.currentAuthorityAddress(turn);
+    if (this.authorityContext != null) {
+      if (current == null) {
+        return;
+      }
+      const key = pendingTurnKey(current);
+      const resolution = this.inbox.get(key);
+      return resolution === undefined ? undefined : [key, resolution];
+    }
+    return [...this.inbox.entries()].reverse().find(([, resolution]) => resolution.turn === turn);
+  }
+
+  private liveTurnEntry(turn: number): [string, LiveTurnBuffer] | undefined {
+    const current = this.currentAuthorityAddress(turn);
+    if (this.authorityContext != null) {
+      if (current == null) {
+        return;
+      }
+      const key = pendingTurnKey(current);
+      const buffer = this.liveEvents.get(key);
+      return buffer === undefined ? undefined : [key, buffer];
+    }
+    return [...this.liveEvents.entries()].reverse().find(([, buffer]) => buffer.address.turn === turn);
+  }
+
+  private currentCheckpointEntry(): [string, CoopCheckpointEnvelope] | undefined {
+    const current = this.currentAuthorityAddress();
+    if (this.authorityContext != null) {
+      if (current == null) {
+        return;
+      }
+      const key = pendingTurnKey(current);
+      const checkpoint = this.pendingCheckpoints.get(key);
+      return checkpoint === undefined ? undefined : [key, checkpoint];
+    }
+    return [...this.pendingCheckpoints.entries()].at(-1);
+  }
+
+  private checkpointCanWakeTurn(
+    envelope: CoopCheckpointEnvelope,
+    waitedAddress: CoopTurnAddress | null,
+    legacyTurn: number,
+  ): boolean {
+    if (waitedAddress == null) {
+      return this.authorityContext == null && envelope.turn === legacyTurn;
+    }
+    return (
+      envelope.epoch === waitedAddress.epoch
+      && envelope.wave === waitedAddress.wave
+      && (envelope.turn === waitedAddress.turn
+        || (envelope.reason === "replacement" && envelope.turn === waitedAddress.turn + 1))
     );
   }
 
@@ -960,6 +1090,12 @@ export class CoopBattleStreamer {
     this.transport.send({ t: "requestTurnCommit", ...request });
   }
 
+  private clearTurnCommitRequest(key: string): void {
+    this.requestedTurnCommits.delete(key);
+    this.turnRequestTimers.get(key)?.();
+    this.turnRequestTimers.delete(key);
+  }
+
   /** GUEST: keep requesting one exact logical turn until its verified ACK clears the request. */
   requestTurnCommit(epoch: number, wave: number, turn: number, revision?: number): void {
     const key = pendingTurnKey({ epoch, wave, turn });
@@ -1006,13 +1142,12 @@ export class CoopBattleStreamer {
     };
     const key = authorityKey(resolution);
     rememberBounded(this.ackedTurnCommits, key, ack);
-    if (this.inbox.get(resolution.turn)?.revision === resolution.revision) {
-      this.inbox.delete(resolution.turn);
+    const inboxKey = pendingTurnKey(resolution);
+    if (this.inbox.get(inboxKey)?.revision === resolution.revision) {
+      this.inbox.delete(inboxKey);
     }
     const pendingKey = pendingTurnKey(resolution);
-    this.requestedTurnCommits.delete(pendingKey);
-    this.turnRequestTimers.get(pendingKey)?.();
-    this.turnRequestTimers.delete(pendingKey);
+    this.clearTurnCommitRequest(pendingKey);
     this.transport.send(ack);
   }
 
@@ -1656,29 +1791,63 @@ export class CoopBattleStreamer {
    * running phase. The `checksum` lets the guest verify it converged after applying.
    */
   consumeCheckpoint(): CoopCheckpointEnvelope | null {
-    const cp = this.lastCheckpoint;
-    this.lastCheckpoint = null;
-    return cp;
+    const entry = this.currentCheckpointEntry();
+    if (entry == null) {
+      return null;
+    }
+    this.pendingCheckpoints.delete(entry[0]);
+    return entry[1];
   }
 
   /** Inspect, but do not consume, the latest authoritative checkpoint envelope. */
   peekCheckpoint(): CoopCheckpointEnvelope | null {
-    return this.lastCheckpoint;
+    return this.currentCheckpointEntry()?.[1] ?? null;
   }
 
   /** Record an out-of-band envelope only after its numeric/full state applied successfully. */
   retainAppliedOutOfBandCheckpoint(checkpoint: CoopCheckpointEnvelope): void {
-    this.appliedOutOfBandCheckpoint = checkpoint;
+    const key = pendingTurnKey(checkpoint);
+    const previous = this.appliedOutOfBandCheckpoints.get(key);
+    if (previous != null && previous.revision >= checkpoint.revision) {
+      return;
+    }
+    this.appliedOutOfBandCheckpoints.delete(key);
+    rememberBounded(this.appliedOutOfBandCheckpoints, key, checkpoint);
   }
 
   /**
-   * Take the newer envelope that must be reasserted after delayed turn presentation.
-   * One-shot: a completed finalizer is the only consumer for that interaction boundary.
+   * Take the newer replacement envelope that must be reasserted after delayed turn presentation.
+   * Only the same addressed turn or its exact N+1 replacement may supersede a resolution. An older
+   * finalizer therefore cannot consume authority that belongs to a later turn before that turn's
+   * own finalizer reaches its safe boundary.
    */
-  consumeAppliedOutOfBandCheckpoint(): CoopCheckpointEnvelope | null {
-    const checkpoint = this.appliedOutOfBandCheckpoint;
-    this.appliedOutOfBandCheckpoint = null;
-    return checkpoint;
+  consumeAppliedOutOfBandCheckpoint(
+    resolution: Pick<CoopTurnResolution, "epoch" | "wave" | "turn" | "revision">,
+  ): CoopCheckpointEnvelope | null {
+    if (
+      !isSafeAddressPart(resolution.epoch, false)
+      || !isSafeAddressPart(resolution.wave, false)
+      || !isSafeAddressPart(resolution.turn, false)
+      || !isSafeAddressPart(resolution.revision, false)
+    ) {
+      return null;
+    }
+    const candidates = [...this.appliedOutOfBandCheckpoints.entries()]
+      .filter(
+        ([, checkpoint]) =>
+          checkpoint.reason === "replacement"
+          && checkpoint.epoch === resolution.epoch
+          && checkpoint.wave === resolution.wave
+          && (checkpoint.turn === resolution.turn || checkpoint.turn === resolution.turn + 1)
+          && checkpoint.revision > resolution.revision,
+      )
+      .sort((left, right) => right[1].revision - left[1].revision);
+    const selected = candidates[0];
+    if (selected == null) {
+      return null;
+    }
+    this.appliedOutOfBandCheckpoints.delete(selected[0]);
+    return selected[1];
   }
 
   /**
@@ -1707,19 +1876,13 @@ export class CoopBattleStreamer {
    * retention window so a long run never leaks.
    */
   consumeLiveEvents(turn: number): { seq: number; event: CoopBattleEvent }[] {
-    const perTurn = this.liveEvents.get(turn);
-    this.liveEvents.delete(turn);
-    // Prune stale turns (anything well before the one being consumed) so the buffer stays bounded.
-    for (const t of [...this.liveEvents.keys()]) {
-      if (t < turn - LIVE_EVENT_TURN_RETENTION) {
-        this.liveEvents.delete(t);
-      }
-    }
-    if (perTurn == null) {
+    const entry = this.liveTurnEntry(turn);
+    if (entry == null) {
       coopLog("replay", `guest consume live events turn=${turn} count=0`);
       return [];
     }
-    const consumed = [...perTurn.entries()].sort((a, b) => a[0] - b[0]).map(([seq, event]) => ({ seq, event }));
+    this.liveEvents.delete(entry[0]);
+    const consumed = [...entry[1].events.entries()].sort((a, b) => a[0] - b[0]).map(([seq, event]) => ({ seq, event }));
     coopLog("replay", `guest consume live events turn=${turn} count=${consumed.length}`);
     return consumed;
   }
@@ -1732,10 +1895,11 @@ export class CoopBattleStreamer {
    * turn-end merge. Returns the ordered contiguous events (empty when seq `fromSeq` has not arrived).
    */
   consumeLiveEventsFrom(turn: number, fromSeq: number): CoopBattleEvent[] {
-    const perTurn = this.liveEvents.get(turn);
-    if (perTurn == null) {
+    const entry = this.liveTurnEntry(turn);
+    if (entry == null) {
       return [];
     }
+    const perTurn = entry[1].events;
     const run: CoopBattleEvent[] = [];
     for (let seq = fromSeq; ; seq++) {
       const event = perTurn.get(seq);
@@ -1774,14 +1938,16 @@ export class CoopBattleStreamer {
     // turn-end checkpoint (slot still fainted) skips. Live failure this fixes: the resolution
     // beat the replacement snapshot into the buffer and the chooser never saw their mon
     // come out on screen.
-    if (this.lastCheckpoint != null) {
+    const waitedAddress = this.currentAuthorityAddress(turn);
+    const checkpoint = this.peekCheckpoint();
+    if (checkpoint != null && this.checkpointCanWakeTurn(checkpoint, waitedAddress, turn)) {
       return Promise.resolve({ kind: "checkpoint" as const });
     }
-    if (this.inbox.has(turn)) {
+    if (this.bufferedTurnEntry(turn) != null) {
       return this.awaitTurn(turn).then(res => ({ kind: "turn" as const, res }));
     }
-    const perTurn = this.liveEvents.get(turn);
-    if (perTurn != null && perTurn.has(fromSeq)) {
+    const liveEntry = this.liveTurnEntry(turn);
+    if (liveEntry != null && liveEntry[1].events.has(fromSeq)) {
       return Promise.resolve({ kind: "live" as const });
     }
     return new Promise(resolve => {
@@ -1795,8 +1961,12 @@ export class CoopBattleStreamer {
           this.checkpointWaiter = null;
         }
       };
-      const settleLive = (liveTurn: number, seq: number) => {
-        if (settled || liveTurn !== turn || seq < fromSeq) {
+      const settleLive = (liveAddress: CoopTurnAddress, seq: number) => {
+        const matchesWait =
+          waitedAddress == null
+            ? this.authorityContext == null && liveAddress.turn === turn
+            : sameTurnAddress(liveAddress, waitedAddress);
+        if (settled || !matchesWait || seq < fromSeq) {
           return;
         }
         settled = true;
@@ -1806,8 +1976,8 @@ export class CoopBattleStreamer {
       // #633 guest-faint deadlock: an OUT-OF-BAND checkpoint (the host auto-summoned a
       // replacement into the guest-owned slot) must WAKE the parked pump - it carries the
       // mon the guest has to command before the turn resolution can ever arrive.
-      const settleCheckpoint = () => {
-        if (settled) {
+      const settleCheckpoint = (envelope: CoopCheckpointEnvelope) => {
+        if (settled || !this.checkpointCanWakeTurn(envelope, waitedAddress, turn)) {
           return;
         }
         settled = true;
@@ -1827,7 +1997,7 @@ export class CoopBattleStreamer {
         // waiter must be REBUFFERED so the pump's next race consumes it (never lost).
         if (res != null) {
           coopLog("replay", `guest live-pump rebuffer turnResolution turn=${turn} (raced out)`);
-          this.inbox.set(turn, res);
+          rememberBounded(this.inbox, pendingTurnKey(res), res);
         }
       });
     });
@@ -1846,29 +2016,39 @@ export class CoopBattleStreamer {
    * null resolution is interpreted as "aborted", never as a host stall.
    */
   abortTurnWait(turn: number): boolean {
-    const pending = this.pending.get(turn);
+    const lookup = this.turnWaitAddress(turn);
+    const pending = this.pending.get(lookup.key);
     if (pending == null) {
       return false;
     }
     coopWarn("replay", `guest awaitTurn turn=${turn} ABORT (phantom turn dissolve #859)`);
-    pending(null);
+    pending.finish(null);
     return true;
   }
 
   awaitTurn(turn: number): Promise<CoopTurnResolution | null> {
-    const address = this.currentAuthorityAddress(turn);
-    if (address != null && this.authorityContext != null) {
-      this.requestTurnCommit(address.epoch, address.wave, address.turn);
+    const lookup = this.turnWaitAddress(turn);
+    // Supersede every stale waiter for this numeric turn. Addressed keys prevent it from resolving the
+    // new waiter, while actively dissolving it avoids a prior wave's 20-minute timeout firing later.
+    for (const [key, stale] of [...this.pending.entries()]) {
+      if (key !== lookup.key && stale.turn === turn) {
+        coopWarn("stream", `guest awaitTurn turn=${turn} superseding stale addressed waiter key=${key}`);
+        stale.finish(null);
+        this.clearTurnCommitRequest(key);
+      }
     }
-    // Supersede any stale waiter for this turn.
-    const staleTurn = this.pending.get(turn);
-    if (staleTurn != null) {
-      coopWarn("stream", `guest awaitTurn turn=${turn} superseding stale waiter`);
-      staleTurn(null);
+    const duplicate = this.pending.get(lookup.key);
+    if (duplicate != null) {
+      coopWarn("stream", `guest awaitTurn turn=${turn} superseding duplicate addressed waiter`);
+      duplicate.finish(null);
     }
-    const buffered = this.inbox.get(turn);
-    if (buffered !== undefined) {
-      this.inbox.delete(turn);
+    if (lookup.address != null && this.authorityContext != null) {
+      this.requestTurnCommit(lookup.address.epoch, lookup.address.wave, lookup.address.turn);
+    }
+    const bufferedEntry = this.bufferedTurnEntry(turn);
+    if (bufferedEntry !== undefined) {
+      const [bufferedKey, buffered] = bufferedEntry;
+      this.inbox.delete(bufferedKey);
       if (this.authorityContext != null) {
         this.requestTurnCommit(buffered.epoch, buffered.wave, buffered.turn, buffered.revision);
       }
@@ -1876,7 +2056,7 @@ export class CoopBattleStreamer {
       return Promise.resolve(buffered);
     }
     coopLog("replay", `guest awaitTurn turn=${turn} START timeout=${this.timeoutMs}ms`);
-    this.pendingSince.set(turn, Date.now());
+    this.pendingSince.set(lookup.key, Date.now());
     return new Promise<CoopTurnResolution | null>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
@@ -1886,9 +2066,9 @@ export class CoopBattleStreamer {
         }
         settled = true;
         cancelTimer();
-        if (this.pending.get(turn) === finish) {
-          this.pending.delete(turn);
-          this.pendingSince.delete(turn);
+        if (this.pending.get(lookup.key)?.finish === finish) {
+          this.pending.delete(lookup.key);
+          this.pendingSince.delete(lookup.key);
         }
         if (res == null) {
           coopWarn("replay", `guest awaitTurn turn=${turn} STALL -> null (timeout/superseded)`);
@@ -1903,7 +2083,7 @@ export class CoopBattleStreamer {
         }
         resolve(res);
       };
-      this.pending.set(turn, finish);
+      this.pending.set(lookup.key, { turn, address: lookup.address, finish });
       cancelTimer = this.schedule(() => finish(null), this.timeoutMs);
     });
   }
@@ -1979,8 +2159,8 @@ export class CoopBattleStreamer {
     );
     this.offMessage();
     this.offStateChange();
-    for (const finish of [...this.pending.values()]) {
-      finish(null);
+    for (const pending of [...this.pending.values()]) {
+      pending.finish(null);
     }
     for (const finish of [...this.enemyPartyWaiters.values()]) {
       finish(null);
@@ -1992,6 +2172,7 @@ export class CoopBattleStreamer {
       finish(null);
     }
     this.pending.clear();
+    this.pendingSince.clear();
     for (const cancel of this.turnRequestTimers.values()) {
       cancel();
     }
@@ -2012,9 +2193,10 @@ export class CoopBattleStreamer {
     this.stateSyncInbox.clear();
     this.inbox.clear();
     this.liveEvents.clear();
+    this.finalizedMarks.clear();
     this.liveEventHandler = null;
     this.liveWaiter = null;
-    this.lastCheckpoint = null;
+    this.pendingCheckpoints.clear();
     for (const cancel of this.sentReplacementTimers.values()) {
       cancel();
     }
@@ -2030,7 +2212,7 @@ export class CoopBattleStreamer {
       this.pendingAuthorityFailure.resolve(false);
       this.pendingAuthorityFailure = null;
     }
-    this.appliedOutOfBandCheckpoint = null;
+    this.appliedOutOfBandCheckpoints.clear();
     this.lastEnemyParty = null;
     this.sentEnemyParties.clear();
     this.enemyPartyStateByWave.clear();
@@ -2179,7 +2361,7 @@ export class CoopBattleStreamer {
           || !Array.isArray(msg.events)
           || !msg.events.every(isStrictBattleEvent)
           || !hasCompleteAuthorityCompanions(msg)
-          || !this.acceptsCurrentAddress(msg)
+          || !this.acceptsAwaitedTurnAddress(msg)
         ) {
           coopWarn(
             "replay",
@@ -2207,22 +2389,29 @@ export class CoopBattleStreamer {
           fullField: msg.fullField,
           authoritativeState: msg.authoritativeState,
         };
-        const resolver = this.pending.get(msg.turn);
+        const address: CoopTurnAddress = { epoch: msg.epoch, wave: msg.wave, turn: msg.turn };
+        const key = pendingTurnKey(address);
+        const exactPending = this.pending.get(key);
+        const legacyPending = this.authorityContext == null ? this.pending.get(legacyTurnKey(msg.turn)) : undefined;
+        const resolver = exactPending ?? legacyPending;
         coopLog(
           "replay",
-          `guest RECV turnResolution turn=${msg.turn} events=${msg.events.length} checksum=${msg.checksum} ${resolver ? "-> parked waiter" : "-> buffered (no waiter)"}`,
+          `guest RECV turnResolution e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} events=${msg.events.length} `
+            + `checksum=${msg.checksum} ${resolver ? "-> parked waiter" : "-> buffered (no waiter)"}`,
         );
         if (resolver) {
-          resolver(res);
+          resolver.finish(res);
         } else {
-          // No waiter yet - buffer (latest per turn wins) for the next awaitTurn.
-          if (this.inbox.has(msg.turn)) {
+          // No waiter yet - buffer the latest revision at this exact authority address.
+          if (this.inbox.has(key)) {
             coopWarn(
               "stream",
-              `guest RECV turnResolution turn=${msg.turn} superseding earlier buffered (no waiter, latest wins)`,
+              `guest RECV turnResolution e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} `
+                + "superseding earlier buffered revision",
             );
+            this.inbox.delete(key);
           }
-          this.inbox.set(msg.turn, res);
+          rememberBounded(this.inbox, key, res);
         }
         for (const handler of [...this.turnCommitHandlers]) {
           try {
@@ -2254,14 +2443,23 @@ export class CoopBattleStreamer {
         if (isCoopDebug()) {
           coopLog("replay", `guest RECV live battleEvent turn=${msg.turn} seq=${msg.seq} k=${msg.event.k}`);
         }
-        let perTurn = this.liveEvents.get(msg.turn);
+        const address: CoopTurnAddress = { epoch: msg.epoch, wave: msg.wave, turn: msg.turn };
+        const key = pendingTurnKey(address);
+        let perTurn = this.liveEvents.get(key);
         if (perTurn == null) {
-          perTurn = new Map<number, CoopBattleEvent>();
-          this.liveEvents.set(msg.turn, perTurn);
+          perTurn = { address, events: new Map<number, CoopBattleEvent>() };
+          rememberBounded(this.liveEvents, key, perTurn);
+          while (this.liveEvents.size > LIVE_EVENT_TURN_RETENTION + 1) {
+            const oldest = this.liveEvents.keys().next().value as string | undefined;
+            if (oldest === undefined) {
+              break;
+            }
+            this.liveEvents.delete(oldest);
+          }
         }
-        perTurn.set(msg.seq, msg.event);
+        perTurn.events.set(msg.seq, msg.event);
         this.liveEventHandler?.(msg.turn, msg.seq, msg.event);
-        this.liveWaiter?.(msg.turn, msg.seq);
+        this.liveWaiter?.(address, msg.seq);
         return;
       }
       case "battleCheckpoint": {
@@ -2283,16 +2481,12 @@ export class CoopBattleStreamer {
           this.transport.send(acked);
           return;
         }
-        if (
-          this.lastCheckpoint != null
-          && this.lastCheckpoint.epoch === msg.epoch
-          && this.lastCheckpoint.wave === msg.wave
-          && this.lastCheckpoint.turn === msg.turn
-          && this.lastCheckpoint.revision > msg.revision
-        ) {
+        const key = pendingTurnKey(msg);
+        const buffered = this.pendingCheckpoints.get(key);
+        if (buffered != null && buffered.revision > msg.revision) {
           coopWarn(
             "checkpoint",
-            `guest DROP out-of-order checkpoint rev=${msg.revision} behind buffered=${this.lastCheckpoint.revision}`,
+            `guest DROP out-of-order checkpoint rev=${msg.revision} behind buffered=${buffered.revision}`,
           );
           return;
         }
@@ -2310,9 +2504,10 @@ export class CoopBattleStreamer {
           fullField: msg.fullField,
           authoritativeState: msg.authoritativeState,
         };
-        this.lastCheckpoint = envelope;
+        this.pendingCheckpoints.delete(key);
+        rememberBounded(this.pendingCheckpoints, key, envelope);
         this.notifyCheckpointEnvelope(envelope);
-        this.checkpointWaiter?.();
+        this.checkpointWaiter?.(envelope);
         this.checkpointHandler?.(msg.reason, msg.checkpoint);
         return;
       }
@@ -2349,7 +2544,7 @@ export class CoopBattleStreamer {
         return;
       }
       case "turnCommitPending": {
-        if (!this.acceptsCurrentAddress(msg)) {
+        if (!this.acceptsAwaitedTurnAddress(msg)) {
           coopWarn(
             "stream",
             `guest DROP cross-address turnCommitPending e=${msg.epoch} wave=${msg.wave} turn=${msg.turn}`,
@@ -2487,10 +2682,9 @@ export class CoopBattleStreamer {
             coopWarn("stream", `authority failure observer threw id=${msg.failureId} (isolated)`, error);
           }
         }
-        for (const finish of [...this.pending.values()]) {
-          finish(null);
+        for (const pending of [...this.pending.values()]) {
+          pending.finish(null);
         }
-        this.checkpointWaiter?.();
         return;
       }
       case "authorityFailureAck": {

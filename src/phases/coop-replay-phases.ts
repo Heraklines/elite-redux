@@ -938,7 +938,15 @@ export class CoopFinalizeTurnPhase extends Phase {
       // stale host checksum would only manufacture a spurious forced resync.
       const applied = applyCoopCheckpoint(this.checkpoint);
       const streamer = getCoopBattleStreamer();
-      const superseding = streamer?.consumeAppliedOutOfBandCheckpoint() ?? null;
+      const superseding =
+        streamer != null && this.epoch != null && this.wave != null && this.revision != null
+          ? streamer.consumeAppliedOutOfBandCheckpoint({
+              epoch: this.epoch,
+              wave: this.wave,
+              turn: this.turn,
+              revision: this.revision,
+            })
+          : null;
       if (applied) {
         // New authoritative state wins when present: PokemonData.summonData carries the live battler
         // state losslessly, while the legacy fullField tag-type list is only a fallback for older hosts.
@@ -1066,7 +1074,7 @@ export class CoopFinalizeTurnPhase extends Phase {
     try {
       const admittedBefore = coopAppliedStateTick();
       if (admittedBefore > stateTick) {
-        this.supersedingCheckpoint ??= streamer.consumeAppliedOutOfBandCheckpoint();
+        this.supersedingCheckpoint ??= streamer.consumeAppliedOutOfBandCheckpoint(resolution);
         const superseding = this.supersedingCheckpoint;
         // A faint replacement is captured after TurnEnd has opened N+1, while the delayed resolution it
         // supersedes is addressed to N. Same-turn replacements also exist on recovery/replay paths. Admit
@@ -1157,7 +1165,7 @@ export class CoopFinalizeTurnPhase extends Phase {
   ): void {
     this.clearTurnCommitRetry();
     streamer.acknowledgeTurnCommit(resolution, this.turnCommitSupersededBy);
-    streamer.markTurnFinalized(resolution.wave, resolution.turn);
+    streamer.markTurnFinalized(resolution.epoch, resolution.wave, resolution.turn);
     coopLog(
       "checksum",
       `guest finalize ACK e=${resolution.epoch} wave=${resolution.wave} turn=${resolution.turn} rev=${resolution.revision}`,

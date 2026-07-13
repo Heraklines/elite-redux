@@ -573,6 +573,51 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("never lets delayed prior-epoch frames resolve or wake the new epoch's exact waiter", async () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 1, turn: 1 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+
+      const oldWait = guestStream.awaitTurn(1);
+      current.epoch = 8;
+      const newWait = guestStream.awaitTurn(1);
+      expect(await oldWait, "opening the new epoch dissolves the old addressed waiter").toBeNull();
+
+      hostStream.emitEvent(7, 1, 1, 0, { k: "message", text: "stale-live" });
+      hostStream.emitTurn(
+        7,
+        1,
+        1,
+        [{ k: "message", text: "stale-turn" }],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        emptyAuthoritativeState(1),
+      );
+      hostStream.emitEvent(8, 1, 1, 0, { k: "message", text: "current-live" });
+      hostStream.emitTurn(
+        8,
+        1,
+        1,
+        [{ k: "message", text: "current-turn" }],
+        emptyCheckpoint(),
+        "cafebabecafebabe",
+        "{}",
+        emptyFullField(),
+        emptyAuthoritativeState(1),
+      );
+
+      const resolution = await newWait;
+      expect(resolution?.epoch).toBe(8);
+      expect(resolution?.events).toEqual([{ k: "message", text: "current-turn" }]);
+      expect(guestStream.consumeLiveEvents(1)).toEqual([{ seq: 0, event: { k: "message", text: "current-live" } }]);
+      guestStream.acknowledgeTurnCommit(resolution!);
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
     it("never exposes a buffered replacement checkpoint after its full authority address is no longer current", async () => {
       const { host, guest } = createLoopbackPair();
       const current = { epoch: 7, wave: 4, turn: 2 };
@@ -602,6 +647,112 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       ).toBeNull();
       hostStream.dispose();
       guestStream.dispose();
+    });
+
+    it("wakes a turn-N replay parked before the exact N+1 replacement arrives", async () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 4, turn: 2 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+      const parked = guestStream.awaitTurnOrLiveEvent(2, 0);
+      await flushWire();
+
+      current.turn = 3;
+      const replacement = checkpointEnvelope(
+        "replacement",
+        { ...emptyCheckpoint(), tick: 21 },
+        "cafebabecafebabe",
+        emptyAuthoritativeState(4, 3, 22),
+      );
+      hostStream.sendCheckpoint(
+        replacement.reason,
+        replacement.epoch,
+        replacement.wave,
+        replacement.turn,
+        replacement.checkpoint,
+        replacement.checksum,
+        replacement.fullField,
+        replacement.authoritativeState,
+      );
+
+      expect(await parked).toEqual({ kind: "checkpoint" });
+      expect(guestStream.peekCheckpoint()).toEqual(replacement);
+      guestStream.dispose();
+      hostStream.dispose();
+    });
+
+    it("reasserts only a same-turn or exact N+1 applied replacement for a delayed resolution", () => {
+      const { guest } = createLoopbackPair();
+      const stream = new CoopBattleStreamer(guest);
+      const resolution = {
+        epoch: 7,
+        wave: 4,
+        turn: 2,
+        revision: 20,
+      };
+      const sameTurn = checkpointEnvelope(
+        "replacement",
+        { ...emptyCheckpoint(), tick: 20 },
+        "1111111111111111",
+        emptyAuthoritativeState(4, 2, 21),
+      );
+      const nextTurn = checkpointEnvelope(
+        "replacement",
+        { ...emptyCheckpoint(), tick: 21 },
+        "2222222222222222",
+        emptyAuthoritativeState(4, 3, 22),
+      );
+
+      stream.retainAppliedOutOfBandCheckpoint(sameTurn);
+      expect(stream.consumeAppliedOutOfBandCheckpoint(resolution)).toBe(sameTurn);
+      stream.retainAppliedOutOfBandCheckpoint(nextTurn);
+      expect(stream.consumeAppliedOutOfBandCheckpoint(resolution)).toBe(nextTurn);
+      expect(stream.consumeAppliedOutOfBandCheckpoint(resolution), "causal carriers are one-shot").toBeNull();
+      stream.dispose();
+    });
+
+    it("does not consume wrong-epoch, wrong-wave, or N+2 applied replacement authority", () => {
+      const { guest } = createLoopbackPair();
+      const stream = new CoopBattleStreamer(guest);
+      const wrongEpoch = {
+        ...checkpointEnvelope(
+          "replacement",
+          { ...emptyCheckpoint(), tick: 22 },
+          "3333333333333333",
+          emptyAuthoritativeState(4, 3, 23),
+        ),
+        epoch: 8,
+      };
+      const wrongWave = checkpointEnvelope(
+        "replacement",
+        { ...emptyCheckpoint(), tick: 23 },
+        "4444444444444444",
+        emptyAuthoritativeState(5, 3, 24),
+      );
+      const twoTurnsAhead = checkpointEnvelope(
+        "replacement",
+        { ...emptyCheckpoint(), tick: 24 },
+        "5555555555555555",
+        emptyAuthoritativeState(4, 4, 25),
+      );
+      stream.retainAppliedOutOfBandCheckpoint(wrongEpoch);
+      stream.retainAppliedOutOfBandCheckpoint(wrongWave);
+      stream.retainAppliedOutOfBandCheckpoint(twoTurnsAhead);
+
+      expect(stream.consumeAppliedOutOfBandCheckpoint({ epoch: 7, wave: 4, turn: 2, revision: 20 })).toBeNull();
+      expect(
+        stream.consumeAppliedOutOfBandCheckpoint({ epoch: 8, wave: 4, turn: 2, revision: 20 }),
+        "wrong-epoch authority remained available only to its own epoch",
+      ).toBe(wrongEpoch);
+      expect(
+        stream.consumeAppliedOutOfBandCheckpoint({ epoch: 7, wave: 5, turn: 2, revision: 20 }),
+        "wrong-wave authority remained available only to its own wave",
+      ).toBe(wrongWave);
+      expect(
+        stream.consumeAppliedOutOfBandCheckpoint({ epoch: 7, wave: 4, turn: 3, revision: 20 }),
+        "N+2 authority remained available for the exact preceding turn",
+      ).toBe(twoTurnsAhead);
+      stream.dispose();
     });
 
     it("retains multiple replacement revisions and clears only an exact converged ACK", async () => {
@@ -1314,7 +1465,7 @@ describe("stale-turn finalize mark (#790 + regression fix)", () => {
     const { host } = createLoopbackPair();
     const stream = new CoopBattleStreamer(host);
     // Within a wave: once turn N finalized, N and below are stale, N+1 is live.
-    stream.markTurnFinalized(1, 2);
+    stream.markTurnFinalized(7, 1, 2);
     expect(stream.isTurnFinalized(1, 1), "earlier turn same wave is stale").toBe(true);
     expect(stream.isTurnFinalized(1, 2), "the finalized turn itself is stale").toBe(true);
     expect(stream.isTurnFinalized(1, 3), "the NEXT turn is live").toBe(false);
@@ -1330,11 +1481,18 @@ describe("stale-turn finalize mark (#790 + regression fix)", () => {
 
   it("does not treat the same wave/turn in a replacement authority epoch as finalized", () => {
     const { host } = createLoopbackPair();
-    const current = { epoch: 7, wave: 1, turn: 2 };
+    const current = { epoch: 8, wave: 1, turn: 2 };
     const stream = new CoopBattleStreamer(host, { authorityContext: () => current });
-    stream.markTurnFinalized(1, 2);
-    expect(stream.isTurnFinalized(1, 2)).toBe(true);
+    // The accepted epoch-7 resolution finalized after recovery had already installed epoch 8.
+    // The mark must retain the resolution's explicit epoch rather than sampling mutable context.
+    stream.markTurnFinalized(7, 1, 2);
+    expect(stream.isTurnFinalized(1, 2)).toBe(false);
 
+    stream.markTurnFinalized(8, 1, 2);
+    stream.markTurnFinalized(7, 1, 3);
+    expect(stream.isTurnFinalized(1, 2), "an older epoch mark cannot overwrite the current epoch").toBe(true);
+    current.epoch = 7;
+    expect(stream.isTurnFinalized(1, 2)).toBe(true);
     current.epoch = 8;
     expect(stream.isTurnFinalized(1, 2), "finalization is scoped to the complete authority address").toBe(false);
     stream.dispose();
