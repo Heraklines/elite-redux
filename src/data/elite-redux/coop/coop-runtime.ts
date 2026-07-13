@@ -431,7 +431,12 @@ function isValidCoopActiveControlSnapshot(
         Number.isSafeInteger(command.fieldIndex)
         && Number.isSafeInteger(command.turn)
         && Array.isArray(command.moveSlots)
-        && command.moveSlots.every(Number.isSafeInteger),
+        && command.moveSlots.every(Number.isSafeInteger)
+        && (command.owner === "host" || command.owner === "guest")
+        && command.address != null
+        && Number.isSafeInteger(command.address.epoch)
+        && Number.isSafeInteger(command.address.wave)
+        && Number.isSafeInteger(command.address.pokemonId),
     )
   );
 }
@@ -449,6 +454,12 @@ function preflightCoopAtomicSnapshot(runtime: CoopRuntime, snapshot: CoopFullBat
     && snapshot.membership.members.every(member => member.present)
     && runtime.membership.canAdopt(snapshot.membership)
     && runtime.controller.canAdoptAuthoritativeInteractionCounter(control.interactionCounter)
+    && control.pendingCommands.every(
+      command =>
+        command.owner === runtime.controller.role
+        && command.address?.epoch === snapshot.sessionEpoch
+        && (snapshot.authoritativeState?.wave == null || command.address.wave === snapshot.authoritativeState.wave),
+    )
     && (coopMeInteractionStartValue() < 0 || mystery != null)
     && (mystery == null || canRestoreCoopActiveMysteryControl(mystery))
     && Object.values(snapshot.journalHighWater ?? {}).every(value => Number.isSafeInteger(value) && value >= 0)
@@ -470,18 +481,22 @@ function wireCoopResyncResponder(runtime: CoopRuntime): void {
         coopWarn("resync", `host has no live snapshot for requestStateSync seq=${seq} -> no reply`);
         return;
       }
-      const blob = compressToBase64(
-        JSON.stringify(
-          bindCoopSnapshotControl({
-            ...snapshot,
-            sessionEpoch: runtime.controller.sessionEpoch,
-            checksum: captureCoopChecksum(),
-            membership: runtime.membership.snapshot(),
-            activeControl: captureCoopActiveControl(runtime),
-            journalHighWater: runtime.durability?.controlPlaneHighWater() ?? {},
-          } satisfies CoopFullBattleSnapshot),
-        ),
-      );
+      const stamped = bindCoopSnapshotControl({
+        ...snapshot,
+        sessionEpoch: runtime.controller.sessionEpoch,
+        checksum: captureCoopChecksum(),
+        membership: runtime.membership.snapshot(),
+        activeControl: captureCoopActiveControl(runtime),
+        journalHighWater: runtime.durability?.controlPlaneHighWater() ?? {},
+      } satisfies CoopFullBattleSnapshot);
+      if (
+        runtime.durability != null
+        && !runtime.durability.retainSnapshotFrontier(stamped.controlDigest!, stamped.journalHighWater ?? {})
+      ) {
+        coopWarn("resync", `host refused unretained stateSync frontier seq=${seq}`);
+        return;
+      }
+      const blob = compressToBase64(JSON.stringify(stamped));
       coopLog("resync", `send stateSync seq=${seq} blob=${blob.length}b`);
       runtime.battleStream.sendStateSync(blob, seq);
     } catch (e) {
@@ -489,6 +504,162 @@ function wireCoopResyncResponder(runtime: CoopRuntime): void {
       coopWarn("resync", `host stateSync send failed seq=${seq}`, e);
     }
   });
+}
+
+function activePublicSnapshotSurface(): "command" | "sharedInput" | null {
+  try {
+    return globalScene.ui.getHandler()?.active === true
+      ? coopAuthorityContinuationSurface(globalScene.ui.getMode())
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Reconstruct every executable CONTROL surface before publishing the checksum-bound snapshot proof. */
+function restoreCoopExecutableSnapshotControls(runtime: CoopRuntime, snapshot: CoopFullBattleSnapshot): boolean {
+  const control = snapshot.activeControl;
+  if (control == null) {
+    return false;
+  }
+  const mystery = control.activeMysteryEncounter;
+  if (mystery != null && !rebindCoopActiveMysteryControl(mystery)) {
+    coopWarn("resync", "snapshot Mystery presentation could not be rebound");
+    return false;
+  }
+  try {
+    runtime.controller.emitAuthoritativeInteractionCounterAfterTransaction();
+  } catch (error) {
+    coopWarn("resync", "post-commit interaction-counter notification failed", error);
+    return false;
+  }
+  if (!runtime.rendezvous.restorePeerControlSnapshot(control.barriers)) {
+    return false;
+  }
+  if (
+    !runtime.battleSync.restorePeerPendingRequests(
+      control.pendingCommands,
+      runtime.controller.sessionEpoch,
+      snapshot.authoritativeState?.wave,
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+const COOP_SNAPSHOT_CONTINUATION_DEADLINE_MS = 60_000;
+
+interface PendingCoopSnapshotProof {
+  snapshot: CoopFullBattleSnapshot;
+  cancelDeadline: () => void;
+}
+
+const pendingCoopSnapshotProofs = new WeakMap<CoopRuntime, PendingCoopSnapshotProof>();
+
+function snapshotContinuationReady(runtime: CoopRuntime, snapshot: CoopFullBattleSnapshot): boolean {
+  const control = snapshot.activeControl;
+  if (control == null) {
+    return false;
+  }
+  if (control.activeMysteryEncounter != null) {
+    return true; // the exact retained Mystery presentation was successfully rebound above
+  }
+
+  const surface = activePublicSnapshotSurface();
+  let currentPhase = "unknown";
+  let currentWave = -1;
+  let currentTurn = -1;
+  try {
+    currentPhase = globalScene.phaseManager.getCurrentPhase()?.phaseName ?? "unknown";
+    currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+    currentTurn = globalScene.currentBattle?.turn ?? -1;
+  } catch {
+    /* headless recovery remains unready until a real surface notification */
+  }
+
+  if (control.pendingCommands.length > 0) {
+    const retained = runtime.battleSync.hasRetainedSnapshotCommand(control.pendingCommands);
+    const addressedCommandUi =
+      surface === "command"
+      && control.pendingCommands.every(
+        request => request.address?.wave === currentWave && request.turn === currentTurn,
+      );
+    if (!retained && !addressedCommandUi) {
+      return false;
+    }
+  }
+  if (control.awaitedInteractions.length > 0 && !(surface === "sharedInput" && currentPhase === control.phaseName)) {
+    // Raw choices are not fully addressed. Only the same real public input surface can safely resume them.
+    return false;
+  }
+
+  const arrivals = runtime.rendezvous.describeArrivals();
+  const localArrived = new Set(arrivals.localArrived);
+  if (arrivals.awaiting.length > 0 || control.barriers.awaiting.some(point => !localArrived.has(point))) {
+    return false;
+  }
+  if (
+    control.pendingCommands.length > 0
+    || control.awaitedInteractions.length > 0
+    || control.barriers.awaiting.length > 0
+  ) {
+    return true;
+  }
+  if (currentPhase === "GameOverPhase") {
+    return true;
+  }
+  if (surface == null) {
+    return false;
+  }
+  const snapshotWave = snapshot.authoritativeState?.wave;
+  return snapshotWave == null || currentWave === snapshotWave || currentWave === snapshotWave + 1;
+}
+
+function clearPendingCoopSnapshotProof(runtime: CoopRuntime): void {
+  const pending = pendingCoopSnapshotProofs.get(runtime);
+  pending?.cancelDeadline();
+  pendingCoopSnapshotProofs.delete(runtime);
+}
+
+function publishPendingCoopSnapshotProof(runtime: CoopRuntime): boolean {
+  const pending = pendingCoopSnapshotProofs.get(runtime);
+  if (pending == null || !snapshotContinuationReady(runtime, pending.snapshot)) {
+    return false;
+  }
+  const snapshot = pending.snapshot;
+  if (
+    runtime.durability == null
+    || !runtime.durability.ackSnapshotMarksAfterTransaction(snapshot.journalHighWater ?? {}, snapshot.controlDigest!)
+  ) {
+    return false;
+  }
+  clearPendingCoopSnapshotProof(runtime);
+  coopLog("resync", `published continuation-ready snapshot proof control=${snapshot.controlDigest}`);
+  return true;
+}
+
+function publishOrStageCoopSnapshotProof(runtime: CoopRuntime, snapshot: CoopFullBattleSnapshot): boolean {
+  if (runtime.durability == null) {
+    return true;
+  }
+  clearPendingCoopSnapshotProof(runtime);
+  const timeout = setTimeout(() => {
+    if (pendingCoopSnapshotProofs.get(runtime)?.snapshot !== snapshot) {
+      return;
+    }
+    pendingCoopSnapshotProofs.delete(runtime);
+    failCoopSharedSession("snapshot continuation surface did not open before the recovery deadline");
+  }, COOP_SNAPSHOT_CONTINUATION_DEADLINE_MS);
+  if (typeof timeout === "object" && timeout != null && "unref" in timeout) {
+    (timeout as { unref: () => void }).unref();
+  }
+  pendingCoopSnapshotProofs.set(runtime, { snapshot, cancelDeadline: () => clearTimeout(timeout) });
+  if (publishPendingCoopSnapshotProof(runtime)) {
+    return true;
+  }
+  coopLog("resync", `retained snapshot proof until public continuation control=${snapshot.controlDigest}`);
+  return true;
 }
 
 /** Fast-forward the durability receiver through every operation revision a full DATA snapshot subsumes. */
@@ -567,24 +738,14 @@ function commitCoopSnapshotControls(runtime: CoopRuntime, snapshot: CoopFullBatt
     return false;
   }
 
-  try {
-    runtime.durability?.ackSnapshotMarksAfterTransaction(snapshot.journalHighWater ?? {});
-  } catch (error) {
-    coopWarn("resync", "post-commit durability ACK failed", error);
-    failCoopSharedSession("snapshot control committed but durability ACK failed");
-    return true;
-  }
-  try {
-    runtime.controller.emitAuthoritativeInteractionCounterAfterTransaction();
-  } catch (error) {
-    coopWarn("resync", "post-commit interaction-counter notification failed", error);
-    failCoopSharedSession("snapshot control committed but counter notification failed");
-    return true;
-  }
-  if (mystery != null && !rebindCoopActiveMysteryControl(mystery)) {
-    // DATA+CONTROL is already coherent. A failed fenced presentation rebind is a terminal session/UI
+  if (!restoreCoopExecutableSnapshotControls(runtime, snapshot)) {
+    // DATA+CONTROL is already coherent. A failed executable-surface reconstruction is a terminal session/UI
     // failure, never a reason to roll only DATA back underneath the committed controller state.
-    failCoopSharedSession("snapshot control committed but Mystery presentation rebind failed");
+    failCoopSharedSession("snapshot control committed but executable continuation restore failed");
+    return true;
+  }
+  if (!publishOrStageCoopSnapshotProof(runtime, snapshot)) {
+    failCoopSharedSession("snapshot control committed but durability snapshot proof was refused");
   }
   return true;
 }
@@ -804,6 +965,13 @@ function sendCoopDurabilitySnapshot(
         [cls]: Math.max(controlHighWater[cls] ?? 0, headRevision),
       },
     } satisfies CoopFullBattleSnapshot);
+    if (
+      runtime.durability != null
+      && !runtime.durability.retainSnapshotFrontier(stamped.controlDigest!, stamped.journalHighWater ?? {})
+    ) {
+      coopWarn("resync", `durability snapshot frontier refused cls=${cls} head=${headRevision}`);
+      return;
+    }
     runtime.battleStream.sendDurabilitySnapshot(compressToBase64(JSON.stringify(stamped)));
   } catch (e) {
     coopWarn("resync", `durability snapshot send failed cls=${cls} head=${headRevision}`, e);
@@ -4356,6 +4524,7 @@ export function assembleCoopRuntime(
   battleStream.notifyContinuationSurface = surface => {
     const released = notifyContinuationSurface(surface);
     durability?.retryDeferred("op:global");
+    publishPendingCoopSnapshotProof(runtime);
     return released;
   };
   // Per-runtime production sink: a journal-delivered biome op feeds this receiver's own relay. In a real
@@ -4520,6 +4689,7 @@ export function clearCoopRuntime(): void {
   const sharedTerminal = sharedTerminalSupervisors.get(active);
   sharedTerminal?.dispose();
   sharedTerminalSupervisors.delete(active);
+  clearPendingCoopSnapshotProof(active);
   active.controller.dispose();
   active.battleSync.dispose();
   active.battleStream.dispose();

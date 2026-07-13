@@ -58,6 +58,12 @@ export interface CoopCommandAddress {
   pokemonId: number;
 }
 
+/** Exact host-retained command surface carried by a checksum-bound control snapshot. */
+export interface CoopPendingCommandSnapshot extends CoopCommandRequest {
+  owner?: CoopRole | undefined;
+  address?: CoopCommandAddress | undefined;
+}
+
 /** Exact immutable command surface whose bounded peer wait exhausted. */
 export interface CoopCommandTimeout {
   epoch: number;
@@ -854,6 +860,76 @@ export class CoopBattleSync {
       ...(request.owner == null ? {} : { owner: request.owner }),
       ...(request.address == null ? {} : { address: request.address }),
     }));
+  }
+
+  /**
+   * Re-deliver authoritative peer command requests through the same live inbound path after a full snapshot.
+   * The whole set is preflighted before any request is admitted: P33 recovery never guesses an owner/entity
+   * from a numeric turn, and a stale epoch/wave cannot reopen a prior command surface.
+   */
+  restorePeerPendingRequests(
+    requests: readonly CoopPendingCommandSnapshot[],
+    expectedEpoch: number,
+    expectedWave?: number,
+  ): boolean {
+    if (this.terminalFrozen || !Array.isArray(requests) || !Number.isSafeInteger(expectedEpoch)) {
+      return false;
+    }
+    const keys = new Set<string>();
+    for (const request of requests) {
+      const address = request?.address;
+      if (
+        !Number.isSafeInteger(request?.fieldIndex)
+        || request.fieldIndex < 0
+        || request.fieldIndex > 255
+        || !Number.isSafeInteger(request.turn)
+        || request.turn < 0
+        || !Array.isArray(request.moveSlots)
+        || request.moveSlots.some(slot => !Number.isSafeInteger(slot) || slot < 0 || slot > 3)
+        || (request.owner !== "host" && request.owner !== "guest")
+        || request.owner !== this.transport.role
+        || address == null
+        || !Number.isSafeInteger(address.epoch)
+        || address.epoch !== expectedEpoch
+        || !Number.isSafeInteger(address.wave)
+        || address.wave < 0
+        || (expectedWave != null && address.wave !== expectedWave)
+        || !Number.isSafeInteger(address.pokemonId)
+        || address.pokemonId < 0
+      ) {
+        coopWarn("relay", "refused malformed or stale snapshot command surface");
+        return false;
+      }
+      const key = commandKey(request.fieldIndex, request.turn, request.owner, address);
+      if (keys.has(key)) {
+        coopWarn("relay", `refused duplicate snapshot command surface key=${key}`);
+        return false;
+      }
+      keys.add(key);
+    }
+
+    for (const request of requests) {
+      this.handle({
+        t: "commandRequest",
+        fieldIndex: request.fieldIndex,
+        turn: request.turn,
+        moveSlots: [...request.moveSlots],
+        ...(request.offer == null ? {} : { offer: request.offer }),
+        owner: request.owner!,
+        ...request.address!,
+      });
+    }
+    return true;
+  }
+
+  /** True when every restored request already has the exact retained local human decision. */
+  hasRetainedSnapshotCommand(requests: readonly CoopPendingCommandSnapshot[]): boolean {
+    return requests.every(request => {
+      if (request.owner == null || request.address == null) {
+        return false;
+      }
+      return this.localOutbox.has(commandKey(request.fieldIndex, request.turn, request.owner, request.address));
+    });
   }
 
   private handle(msg: CoopMessage): void {

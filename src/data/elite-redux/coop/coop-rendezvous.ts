@@ -110,6 +110,20 @@ export interface CoopRendezvousOptions {
   getEpoch?: () => number;
 }
 
+export interface CoopRendezvousControlSnapshot {
+  localArrived: string[];
+  partnerArrived: string[];
+  awaiting: string[];
+}
+
+function validControlPoints(points: unknown): points is string[] {
+  return (
+    Array.isArray(points)
+    && points.every(point => typeof point === "string" && point.length > 0 && point.length <= 512)
+    && new Set(points).size === points.length
+  );
+}
+
 /**
  * Rides a {@linkcode CoopTransport} to run reciprocal two-sided rendezvous barriers. One instance
  * per client. Both clients call {@linkcode rendezvous} (or {@linkcode arrive} + {@linkcode awaitPartner})
@@ -173,6 +187,60 @@ export class CoopRendezvous {
       partnerArrived: [...this.partnerArrived],
       awaiting: [...this.pending.keys()],
     };
+  }
+
+  /**
+   * Restore the complementary view of an authoritative peer snapshot. A peer's local arrival is our
+   * partner arrival; a peer-observed partner arrival proves our local frame reached it. Local arrivals that
+   * the snapshot did not yet observe are preserved only when this client is already parked there or the
+   * peer is explicitly awaiting that point, then retransmitted. No arrival is invented from `awaiting`.
+   */
+  restorePeerControlSnapshot(snapshot: CoopRendezvousControlSnapshot): boolean {
+    if (
+      !validControlPoints(snapshot?.localArrived)
+      || !validControlPoints(snapshot?.partnerArrived)
+      || !validControlPoints(snapshot?.awaiting)
+    ) {
+      coopWarn("rendezvous", "refused malformed peer control snapshot");
+      return false;
+    }
+
+    const locallyAwaited = new Set(this.pending.keys());
+    const peerAwaiting = new Set(snapshot.awaiting);
+    const nextLocal = new Set(snapshot.partnerArrived);
+    for (const point of this.localArrived) {
+      if (locallyAwaited.has(point) || peerAwaiting.has(point)) {
+        nextLocal.add(point);
+      }
+    }
+    const nextPartner = new Set(snapshot.localArrived);
+
+    this.localArrived.clear();
+    this.partnerArrived.clear();
+    for (const point of nextLocal) {
+      this.localArrived.add(point);
+    }
+    for (const point of nextPartner) {
+      this.partnerArrived.add(point);
+    }
+
+    // Reassert every proven local arrival before releasing any waiter. If its earlier carrier was the lost
+    // frame, the authoritative peer can now cross the same barrier rather than remaining parked alone.
+    for (const point of nextLocal) {
+      this.transport.send({ t: "rendezvous", point });
+    }
+    for (const [point, finish] of [...this.pending]) {
+      if (!nextPartner.has(point)) {
+        continue;
+      }
+      this.transport.send({ t: "rendezvous", point });
+      finish({ point, timedOut: false });
+    }
+    coopLog(
+      "rendezvous",
+      `restored peer control local=${nextLocal.size} partner=${nextPartner.size} awaiting=${this.pending.size}`,
+    );
+    return true;
   }
 
   /**

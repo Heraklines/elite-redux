@@ -173,6 +173,60 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     guest.dispose();
   });
 
+  it("restores the peer-complementary barrier, releases the exact waiter, and never invents an arrival", async () => {
+    const faulted = wrapCoopFaultPair(createLoopbackPair(), { drop: 0, reorder: 0, delay: 0 }, { seed: 933 });
+    faulted.armNextDrop("rendezvous", "guest");
+    const host = new CoopRendezvous(faulted.host);
+    const guest = new CoopRendezvous(faulted.guest);
+    const point = "cmd:7:1";
+
+    const guestWait = guest.rendezvous(point);
+    await flush();
+    expect(host.partnerHasArrived(point), "the original guest arrival was lost").toBe(false);
+
+    expect(
+      guest.restorePeerControlSnapshot({
+        localArrived: [point],
+        partnerArrived: [],
+        awaiting: [point, "cmd:future:1"],
+      }),
+    ).toBe(true);
+    const result = await guestWait;
+    await flush();
+
+    expect(result).toMatchObject({ point, timedOut: false });
+    expect(host.partnerHasArrived(point), "the preserved local arrival is retransmitted to the peer").toBe(true);
+    expect(guest.describeArrivals()).toMatchObject({
+      localArrived: [point],
+      partnerArrived: [point],
+      awaiting: [],
+    });
+    expect(
+      guest.describeArrivals().localArrived,
+      "a peer wait alone is not proof that this client reached a future barrier",
+    ).not.toContain("cmd:future:1");
+
+    host.dispose();
+    guest.dispose();
+  });
+
+  it("refuses malformed barrier snapshots without mutating the live view", () => {
+    const pair = createLoopbackPair();
+    const guest = new CoopRendezvous(pair.guest);
+    guest.arrive("shop:8:2");
+    const before = guest.describeArrivals();
+
+    expect(
+      guest.restorePeerControlSnapshot({
+        localArrived: ["cmd:8:2", "cmd:8:2"],
+        partnerArrived: [],
+        awaiting: [],
+      }),
+    ).toBe(false);
+    expect(guest.describeArrivals()).toEqual(before);
+    guest.dispose();
+  });
+
   it("LOST ARRIVAL: timeout retransmits and keeps the boundary closed until the partner arrives", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const pair = createLoopbackPair();

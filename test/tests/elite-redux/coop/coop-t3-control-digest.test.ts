@@ -79,4 +79,27 @@ describe("T3 atomic control digest", () => {
     decisionTamper.activeControl!.activeMysteryEncounter!.colosseum!.decision!.index = 1;
     expect(coopSnapshotControlDigest(decisionTamper)).not.toBe(digest);
   });
+
+  it("binds every pending command to its epoch, wave, and Pokemon identity", () => {
+    const original = control();
+    original.activeControl!.pendingCommands = [
+      {
+        fieldIndex: 1,
+        turn: 4,
+        moveSlots: [0, 2],
+        owner: "guest",
+        address: { epoch: 4, wave: 20, pokemonId: 8080 },
+      },
+    ];
+    const digest = coopSnapshotControlDigest(original);
+    for (const [part, value] of [
+      ["epoch", 5],
+      ["wave", 21],
+      ["pokemonId", 8081],
+    ] as const) {
+      const tampered = structuredClone(original);
+      tampered.activeControl!.pendingCommands[0].address![part] = value;
+      expect(coopSnapshotControlDigest(tampered), part).not.toBe(digest);
+    }
+  });
 });

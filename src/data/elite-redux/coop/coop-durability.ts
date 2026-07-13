@@ -707,6 +707,33 @@ function operationAckCanonical(msg: Extract<CoopMessage, { t: "coopAck" }>): str
   return JSON.stringify(msg);
 }
 
+const SNAPSHOT_FRONTIER_RETENTION = 8;
+
+interface RetainedSnapshotFrontier {
+  marks: Record<string, number>;
+  canonical: string;
+}
+
+/** Strict, stable wire image for an exact snapshot frontier. */
+function normalizeSnapshotMarks(marks: unknown): Record<string, number> | null {
+  if (marks == null || typeof marks !== "object" || Array.isArray(marks)) {
+    return null;
+  }
+  const normalized: Record<string, number> = {};
+  for (const cls of Object.keys(marks as Record<string, unknown>).sort()) {
+    const seq = (marks as Record<string, unknown>)[cls];
+    if (cls.length === 0 || cls.length > 256 || !Number.isSafeInteger(seq) || (seq as number) < 0) {
+      return null;
+    }
+    normalized[cls] = seq as number;
+  }
+  return normalized;
+}
+
+function snapshotMarksCanonical(marks: Record<string, number>): string {
+  return JSON.stringify(marks);
+}
+
 function operationAckMatchesAuthority(
   msg: Extract<CoopMessage, { t: "coopAck" }>,
   authority: CoopOperationAuthorityAddress,
@@ -824,6 +851,10 @@ export class CoopDurabilityManager {
   private readonly hostOperationAckEvidence = new Map<string, OperationAckEvidence>();
   /** Host: later plain cumulative ACKs parked behind an earlier operation that still lacks UI readiness. */
   private readonly pendingCumulativeAcks = new Map<string, number>();
+  /** Host: exact checksum-bound frontiers emitted in the most recent full snapshots. */
+  private readonly retainedSnapshotFrontiers = new Map<string, RetainedSnapshotFrontier>();
+  /** Guest: committed snapshot proofs retained across a channel replacement (bounded, idempotent). */
+  private readonly committedSnapshotAcks = new Map<string, Extract<CoopMessage, { t: "coopSnapshotAck" }>>();
   private readonly operationContinuationTimers = new Map<string, () => void>();
   private readonly exhaustedOperationContinuations = new Set<string>();
   private readonly scheduleOperationContinuationDeadline: (callback: () => void, ms: number) => () => void;
@@ -903,6 +934,10 @@ export class CoopDurabilityManager {
 
   /** Handle an inbound wire message: the ACK/reconnect arms, plus (if wired) the durable op stream. */
   private onMessage(msg: CoopMessage): void {
+    if (msg.t === "coopSnapshotAck") {
+      this.acceptSnapshotAck(msg);
+      return;
+    }
     if (msg.t === "coopAck") {
       const retained = this.journal.entry(msg.cls, msg.seq);
       const retainedOperation =
@@ -1446,6 +1481,84 @@ export class CoopDurabilityManager {
     }
   }
 
+  /**
+   * Register one immutable snapshot frontier before its carrier is sent. A later snapshot ACK has authority
+   * only when both the digest and the complete canonical mark set match this bounded host-side record.
+   */
+  retainSnapshotFrontier(controlDigest: string, marks: Record<string, number>): boolean {
+    const normalized = normalizeSnapshotMarks(marks);
+    if (
+      typeof controlDigest !== "string"
+      || controlDigest.length === 0
+      || controlDigest.length > 256
+      || normalized == null
+    ) {
+      coopWarn("durability", "refused invalid snapshot frontier registration");
+      return false;
+    }
+    const canonical = snapshotMarksCanonical(normalized);
+    const prior = this.retainedSnapshotFrontiers.get(controlDigest);
+    if (prior != null) {
+      if (prior.canonical !== canonical) {
+        coopWarn("durability", `refused conflicting snapshot frontier control=${controlDigest}`);
+        return false;
+      }
+      return true;
+    }
+    this.retainedSnapshotFrontiers.set(controlDigest, { marks: normalized, canonical });
+    while (this.retainedSnapshotFrontiers.size > SNAPSHOT_FRONTIER_RETENTION) {
+      const oldest = this.retainedSnapshotFrontiers.keys().next().value as string | undefined;
+      if (oldest == null) {
+        break;
+      }
+      this.retainedSnapshotFrontiers.delete(oldest);
+    }
+    return true;
+  }
+
+  /** Accept only an exact proof for a snapshot this manager actually retained before sending. */
+  private acceptSnapshotAck(msg: Extract<CoopMessage, { t: "coopSnapshotAck" }>): void {
+    const normalized = normalizeSnapshotMarks(msg.marks);
+    const retained = this.retainedSnapshotFrontiers.get(msg.controlDigest);
+    if (normalized == null || retained == null || snapshotMarksCanonical(normalized) !== retained.canonical) {
+      coopWarn("durability", `DROP unknown or altered snapshot ACK control=${msg.controlDigest}`);
+      return;
+    }
+    for (const [cls, snapshotSeq] of Object.entries(retained.marks)) {
+      const committedSeq = Math.min(snapshotSeq, this.journal.highWaterMark(cls));
+      if (committedSeq <= this.journal.ackedThrough(cls)) {
+        continue;
+      }
+      this.cancelOperationContinuationThrough(cls, committedSeq);
+      this.journal.ack(cls, committedSeq);
+      const cumulative = this.pendingCumulativeAcks.get(cls);
+      if (cumulative != null && cumulative <= committedSeq) {
+        this.pendingCumulativeAcks.delete(cls);
+      }
+      coopLog(
+        "durability",
+        `host RELEASE checksum-bound snapshot authority cls=${cls} seq=${committedSeq} control=${msg.controlDigest}`,
+      );
+    }
+  }
+
+  /** Cancel retained continuation deadlines even when their concrete journal entry was ring-evicted. */
+  private cancelOperationContinuationThrough(cls: string, through: number): void {
+    const prefix = `${cls}:`;
+    for (const [key, cancel] of [...this.operationContinuationTimers]) {
+      if (!key.startsWith(prefix)) {
+        continue;
+      }
+      const remainder = key.slice(prefix.length);
+      const separator = remainder.indexOf(":");
+      const seq = Number(separator < 0 ? remainder : remainder.slice(0, separator));
+      if (Number.isSafeInteger(seq) && seq <= through) {
+        cancel();
+        this.operationContinuationTimers.delete(key);
+      }
+    }
+  }
+
   private armOperationContinuationDeadline(authority: CoopOperationAuthorityAddress): void {
     const key = operationAuthorityKey(authority);
     if (this.operationContinuationTimers.has(key) || this.exhaustedOperationContinuations.has(key)) {
@@ -1644,6 +1757,11 @@ export class CoopDurabilityManager {
   reconnect(): void {
     // Committer side: proactively resend the unacked tail (the peer may have missed the last broadcasts).
     this.resendUnackedTail("reconnect");
+    // A snapshot proof is itself retained application state. Re-publish it after channel replacement so a
+    // lost ACK cannot leave the committer resending operations already subsumed by the exact snapshot.
+    for (const ack of this.committedSnapshotAcks.values()) {
+      this.transport.send(ack);
+    }
     // Receiver side: request the tail after our last-applied revision for every class we track...
     for (const cls of this.ledger.serializeClasses()) {
       this.transport.send({ t: "coopResync", cls, from: this.ledger.appliedThrough(cls) });
@@ -1751,19 +1869,44 @@ export class CoopDurabilityManager {
     }
   }
 
-  /** Publish cumulative ACKs only after DATA+CONTROL commit; send failures remain recoverable by reconnect. */
-  ackSnapshotMarksAfterTransaction(marks: Record<string, number>): void {
-    for (const [cls, revision] of Object.entries(marks)) {
-      if (!Number.isSafeInteger(revision) || revision <= 0) {
-        continue;
-      }
-      try {
+  /** Publish one exact bound proof only after DATA+CONTROL+executable-surface commit. */
+  ackSnapshotMarksAfterTransaction(marks: Record<string, number>, controlDigest: string): boolean {
+    const normalized = normalizeSnapshotMarks(marks);
+    if (
+      typeof controlDigest !== "string"
+      || controlDigest.length === 0
+      || controlDigest.length > 256
+      || normalized == null
+    ) {
+      coopWarn("durability", "refused invalid post-transaction snapshot ACK");
+      return false;
+    }
+    for (const [cls, revision] of Object.entries(normalized)) {
+      if (revision > 0) {
         this.clearRecoveryAfterProgress(cls);
-        this.transport.send({ t: "coopAck", cls, seq: this.ledger.appliedThrough(cls) });
-      } catch (error) {
-        coopWarn("durability", `snapshot ACK deferred cls=${cls} seq=${revision}`, error);
       }
     }
+    const ack = { t: "coopSnapshotAck", controlDigest, marks: normalized } as const;
+    const prior = this.committedSnapshotAcks.get(controlDigest);
+    if (prior != null && snapshotMarksCanonical(prior.marks) !== snapshotMarksCanonical(normalized)) {
+      coopWarn("durability", `refused conflicting local snapshot ACK control=${controlDigest}`);
+      return false;
+    }
+    this.committedSnapshotAcks.set(controlDigest, ack);
+    while (this.committedSnapshotAcks.size > SNAPSHOT_FRONTIER_RETENTION) {
+      const oldest = this.committedSnapshotAcks.keys().next().value as string | undefined;
+      if (oldest == null) {
+        break;
+      }
+      this.committedSnapshotAcks.delete(oldest);
+    }
+    try {
+      this.transport.send(ack);
+    } catch (error) {
+      // The committed proof remains in `committedSnapshotAcks`; reconnect republishes it verbatim.
+      coopWarn("durability", `snapshot ACK retained for reconnect control=${controlDigest}`, error);
+    }
+    return true;
   }
 
   /** Restore persisted high-water + applied marks on a cold resume (§4), so revisions continue monotonically. */
@@ -1774,6 +1917,8 @@ export class CoopDurabilityManager {
     this.pendingDeferred.clear();
     this.deferredFollowers.clear();
     this.pendingCumulativeAcks.clear();
+    this.retainedSnapshotFrontiers.clear();
+    this.committedSnapshotAcks.clear();
     this.journal.restoreHighWater(highWater);
     // Restore the committer's peer-ACK view too: a converged save has the peer applied through the high-water,
     // so without this the committer's acked=0 makes a post-resume reconnect resync spuriously escalate to a
@@ -1803,6 +1948,8 @@ export class CoopDurabilityManager {
     this.operationContinuationTimers.clear();
     this.pendingOperationContinuations.clear();
     this.pendingCumulativeAcks.clear();
+    this.retainedSnapshotFrontiers.clear();
+    this.committedSnapshotAcks.clear();
     this.off();
   }
 }

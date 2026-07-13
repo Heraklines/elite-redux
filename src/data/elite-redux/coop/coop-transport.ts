@@ -799,6 +799,8 @@ export interface CoopActiveControlSnapshotV1 {
     moveSlots: number[];
     offer?: CoopBattleCommandOffer | undefined;
     owner?: CoopRole;
+    /** Immutable entity boundary. Required whenever a P33 snapshot carries an active command surface. */
+    address?: { epoch: number; wave: number; pokemonId: number } | undefined;
   }[];
 }
 
@@ -1767,6 +1769,13 @@ export type CoopMessage =
       continuationTurn?: number;
     }
   /**
+   * Receiver -> snapshot committer: the exact checksum-bound DATA+CONTROL snapshot has been materialized
+   * and its executable continuation surface has been restored. Unlike a normal cumulative ACK, this proof
+   * is bound to a host-retained `controlDigest` and may therefore retire journal revisions that have already
+   * fallen out of the bounded replay ring. Unknown, altered, or unregistered frontiers are fail-closed.
+   */
+  | { t: "coopSnapshotAck"; controlDigest: string; marks: Record<string, number> }
+  /**
    * Receiver -> committer (§4.4, reconnect-from-revision): "resend class `cls`'s committed tail after
    * revision `from`". Sent on a #805 hot rejoin (carrying the last-applied revision instead of a turn, the
    * successor of `requestStateSync`). The committer replays the journal tail after `from`, or falls back to
@@ -1987,6 +1996,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `epoch=${msg.epoch} rev=${msg.revision}`;
     case "coopAck":
       return `cls=${msg.cls} seq=${msg.seq}`;
+    case "coopSnapshotAck":
+      return `control=${msg.controlDigest} classes=${Object.keys(msg.marks).length}`;
     case "coopResync":
       return `cls=${msg.cls} from=${msg.from}`;
     case "showdownStakeOffer":

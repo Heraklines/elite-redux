@@ -385,6 +385,102 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     guestSync.dispose();
   });
 
+  it("snapshot recovery replays the retained local command only at the exact epoch/wave/entity address", async () => {
+    const { host, guest } = createLoopbackPair();
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.setSlotOwnershipProbe(() => true);
+    const address = { epoch: 61, wave: 10, pokemonId: 404 };
+    const received: Array<{ epoch?: number; wave?: number; pokemonId?: number }> = [];
+    const off = host.onMessage(message => {
+      if (message.t === "command") {
+        received.push({ epoch: message.epoch, wave: message.wave, pokemonId: message.pokemonId });
+      }
+    });
+    guestSync.broadcastLocalCommand(
+      1,
+      3,
+      { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] },
+      "guest",
+      address,
+    );
+    await new Promise(resolve => setTimeout(resolve, 0));
+    received.length = 0;
+
+    expect(
+      guestSync.restorePeerPendingRequests(
+        [{ fieldIndex: 1, turn: 3, moveSlots: [1], offer: legalOffer, owner: "guest", address }],
+        61,
+        10,
+      ),
+    ).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(received).toEqual([{ epoch: 61, wave: 10, pokemonId: 404 }]);
+
+    expect(
+      guestSync.restorePeerPendingRequests(
+        [
+          {
+            fieldIndex: 1,
+            turn: 3,
+            moveSlots: [1],
+            offer: legalOffer,
+            owner: "guest",
+            address: { ...address, epoch: 60 },
+          },
+        ],
+        61,
+        10,
+      ),
+    ).toBe(false);
+    expect(
+      guestSync.restorePeerPendingRequests(
+        [{ fieldIndex: 1, turn: 3, moveSlots: [1], offer: legalOffer, owner: "host", address }],
+        61,
+        10,
+      ),
+    ).toBe(false);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(received, "stale/foreign surfaces must not emit another command").toHaveLength(1);
+    off();
+    guestSync.dispose();
+  });
+
+  it("snapshot recovery buffers an exact addressed request until the public command responder opens", async () => {
+    const { host, guest } = createLoopbackPair();
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.setSlotOwnershipProbe(() => true);
+    const received: CoopBattleCommandOffer[] = [];
+    const commands: number[] = [];
+    const off = host.onMessage(message => {
+      if (message.t === "command") {
+        commands.push(message.command.cursor);
+      }
+    });
+    const address = { epoch: 62, wave: 20, pokemonId: 505 };
+
+    expect(
+      guestSync.restorePeerPendingRequests(
+        [{ fieldIndex: 1, turn: 4, moveSlots: [1], offer: legalOffer, owner: "guest", address }],
+        62,
+        20,
+      ),
+    ).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(commands).toEqual([]);
+
+    guestSync.onCommandRequest(request => {
+      if (request.offer != null) {
+        received.push(request.offer);
+      }
+      return { command: Command.FIGHT, cursor: request.moveSlots[0] };
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(received).toEqual([legalOffer]);
+    expect(commands).toEqual([1]);
+    off();
+    guestSync.dispose();
+  });
+
   it("keeps two same-owner active Pokemon on distinct epoch/wave/entity command addresses", async () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host);
