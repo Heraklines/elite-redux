@@ -7,7 +7,6 @@ import {
   COOP_INTERACTION_REROLL,
   type CoopInteractionChoice,
 } from "#data/elite-redux/coop/coop-interaction-relay";
-import { coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
 import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
@@ -1499,14 +1498,6 @@ export class SelectModifierPhase extends BattlePhase {
    *  via the counter this shop opened on, so the owner's terminal, the watcher's terminal,
    *  and the reconcile broadcast can't double-count. */
   private coopAdvanceInteraction(): void {
-    // [LAYER3-DIAG] discriminate why the watcher counter never advances past interaction 0 (remove in fix):
-    // which guard (isCoop / stale-ME-pin / unpinned) short-circuits, or does it reach the real advance.
-    coopLog(
-      "reward",
-      `[LAYER3-DIAG] coopAdvanceInteraction ENTER isCoop=${globalScene.gameMode.isCoop} `
-        + `meInProgress=${coopMeInProgress()} meStart=${coopMeInteractionStartValue()} `
-        + `coopInteractionStart=${this.coopInteractionStart} coopWatcher=${this.coopWatcher}`,
-    );
     if (!globalScene.gameMode.isCoop) {
       return;
     }
@@ -1994,12 +1985,6 @@ export class SelectModifierPhase extends BattlePhase {
         const continuation =
           modifierType != null
           && this.queueCoopProjectedModifierFollowUp(modifierType, this.coopRelayedSlot, this.coopRelayedOption, -1);
-        // [LAYER3-DIAG] projection REWARD path (remove in fix): does a continuation defer the counter advance?
-        coopLog(
-          "reward",
-          `[LAYER3-DIAG] projection REWARD modType=${modifierType?.id ?? "null"} continuation=${continuation} `
-            + `-> ${continuation ? "DEFERRED to continuation (no advance here)" : "WILL coopAdvanceInteraction"}`,
-        );
         this.coopRelayedMoney = -1;
         this.coopEndMirror();
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
@@ -2008,9 +1993,6 @@ export class SelectModifierPhase extends BattlePhase {
         }
         return true;
       }
-      // [LAYER3-DIAG] non-projection REWARD path (remove in fix): this branch never advances the counter -
-      // if the journal-materialized watcher reaches HERE (projectionOnly=false) that is the bug.
-      coopLog("reward", "[LAYER3-DIAG] NON-projection REWARD path (projectionOnly=false) - no counter advance here");
       // coopRelayedMoney (set above) drives applyModifier's set-verbatim for a PAID reward (#698);
       // -1 (free reward / older host) falls back to the unchanged deduction.
       this.selectRewardModifierOption(action.choice, noop);
