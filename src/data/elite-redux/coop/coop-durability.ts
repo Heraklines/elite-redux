@@ -567,6 +567,29 @@ export class CoopReceiveLedger {
  */
 export type CoopApplyOutcome = "applied" | "duplicate" | "rejected";
 
+export interface CoopDurabilityRecoveryFailure {
+  cls: string;
+  from: number;
+  blockedSeq: number;
+  attempts: number;
+  reason: "apply-rejected" | "gap";
+}
+
+interface PendingDurabilityRecovery extends CoopDurabilityRecoveryFailure {
+  startedAt: number;
+  cancel: () => void;
+}
+
+const DURABILITY_RECOVERY_INITIAL_MS = 100;
+const DURABILITY_RECOVERY_MAX_MS = 2_000;
+const DURABILITY_RECOVERY_MAX_ATTEMPTS = 8;
+const DURABILITY_RECOVERY_DEADLINE_MS = 12_000;
+
+function defaultDurabilitySchedule(callback: () => void, ms: number): () => void {
+  const timer = setTimeout(callback, ms);
+  return () => clearTimeout(timer);
+}
+
 /**
  * How the manager identifies + applies an inbound COMMITTED operation. Kept GENERIC (a `(class, seq)`
  * extractor + an apply callback) so the Wave-2a operation envelope plugs in as one class keyed by
@@ -593,6 +616,15 @@ export interface CoopDurabilityHooks {
    * the deep gap in that case, so this is not required for correctness of the shallow-gap path).
    */
   sendFullSnapshot?: (cls: string, headRevision: number, controlHighWater: Record<string, number>) => void;
+  /** Timer/clock seams keep bounded retry deterministic without allowing a synchronous replay recursion. */
+  scheduleRecovery?: (callback: () => void, ms: number) => () => void;
+  recoveryNow?: () => number;
+  recoveryInitialMs?: number;
+  recoveryMaxMs?: number;
+  recoveryMaxAttempts?: number;
+  recoveryDeadlineMs?: number;
+  /** Runtime bridge into the peer-coherent terminal supervisor after one class exhausts its retry budget. */
+  onRecoveryExhausted?: (failure: CoopDurabilityRecoveryFailure) => void;
 }
 
 /**
@@ -610,6 +642,15 @@ export class CoopDurabilityManager {
   private readonly journal: CoopJournal;
   private readonly ledger = new CoopReceiveLedger();
   private readonly off: () => void;
+  private readonly pendingRecovery = new Map<string, PendingDurabilityRecovery>();
+  private readonly exhaustedRecovery = new Map<string, number>();
+  private readonly scheduleRecovery: (callback: () => void, ms: number) => () => void;
+  private readonly recoveryNow: () => number;
+  private readonly recoveryInitialMs: number;
+  private readonly recoveryMaxMs: number;
+  private readonly recoveryMaxAttempts: number;
+  private readonly recoveryDeadlineMs: number;
+  private disposed = false;
 
   constructor(
     private readonly transport: CoopTransport,
@@ -617,6 +658,24 @@ export class CoopDurabilityManager {
     journalCapacity = 256,
   ) {
     this.journal = new CoopJournal(journalCapacity);
+    this.scheduleRecovery = hooks.scheduleRecovery ?? defaultDurabilitySchedule;
+    this.recoveryNow = hooks.recoveryNow ?? Date.now;
+    this.recoveryInitialMs = hooks.recoveryInitialMs ?? DURABILITY_RECOVERY_INITIAL_MS;
+    this.recoveryMaxMs = hooks.recoveryMaxMs ?? DURABILITY_RECOVERY_MAX_MS;
+    this.recoveryMaxAttempts = hooks.recoveryMaxAttempts ?? DURABILITY_RECOVERY_MAX_ATTEMPTS;
+    this.recoveryDeadlineMs = hooks.recoveryDeadlineMs ?? DURABILITY_RECOVERY_DEADLINE_MS;
+    if (
+      !Number.isSafeInteger(this.recoveryInitialMs)
+      || this.recoveryInitialMs <= 0
+      || !Number.isSafeInteger(this.recoveryMaxMs)
+      || this.recoveryMaxMs < this.recoveryInitialMs
+      || !Number.isSafeInteger(this.recoveryMaxAttempts)
+      || this.recoveryMaxAttempts <= 0
+      || !Number.isSafeInteger(this.recoveryDeadlineMs)
+      || this.recoveryDeadlineMs < this.recoveryInitialMs
+    ) {
+      throw new Error("invalid durability recovery timing configuration");
+    }
     this.off = transport.onMessage(msg => this.onMessage(msg));
   }
 
@@ -673,6 +732,7 @@ export class CoopDurabilityManager {
   /** Receiver: apply an inbound committed op idempotently by `(cls, seq)` (§1.6), then ACK / request tail. */
   private receiveOp(cls: string, seq: number, msg: CoopMessage): void {
     if (this.ledger.isDuplicate(cls, seq)) {
+      this.clearRecoveryAfterProgress(cls);
       // Already applied (a safe resend, §4.2): re-ACK so the committer stops resending, do NOT re-apply.
       this.transport.send({ t: "coopAck", cls, seq: this.ledger.appliedThrough(cls) });
       return;
@@ -680,7 +740,7 @@ export class CoopDurabilityManager {
     if (this.ledger.hasGap(cls, seq)) {
       // A revision was missed: do NOT apply out of order - request the tail after our last-applied (§4.4).
       coopWarn("durability", `gap cls=${cls} got=${seq} have=${this.ledger.appliedThrough(cls)} -> request tail`);
-      this.transport.send({ t: "coopResync", cls, from: this.ledger.appliedThrough(cls) });
+      this.requestBoundedRecovery(cls, seq, "gap");
       return;
     }
     // In order: apply, then GATE the ACK + ledger advance on the apply OUTCOME (W2e-R P0-1). Before, a void
@@ -693,10 +753,123 @@ export class CoopDurabilityManager {
     const outcome = this.safeApply({ cls, seq, msg });
     if (outcome === "rejected") {
       coopWarn("durability", `apply REJECTED cls=${cls} seq=${seq} -> no ack (retriable)`);
+      this.requestBoundedRecovery(cls, seq, "apply-rejected");
       return;
     }
     this.ledger.markApplied(cls, seq);
+    this.clearRecoveryAfterProgress(cls);
     this.transport.send({ t: "coopAck", cls, seq });
+  }
+
+  /**
+   * Coalesce one missing/rejected class into a single retry schedule. Setting the state before sending is
+   * load-bearing: loopback and some test transports deliver synchronously, so a replayed N+1 gap can re-enter
+   * this method before the original `coopResync` send returns.
+   */
+  private requestBoundedRecovery(
+    cls: string,
+    blockedSeq: number,
+    reason: CoopDurabilityRecoveryFailure["reason"],
+  ): void {
+    if (this.disposed) {
+      return;
+    }
+    const from = this.ledger.appliedThrough(cls);
+    if (this.exhaustedRecovery.get(cls) === from) {
+      return;
+    }
+    const current = this.pendingRecovery.get(cls);
+    if (current?.from === from) {
+      current.blockedSeq = Math.max(current.blockedSeq, blockedSeq);
+      if (reason === "apply-rejected") {
+        current.reason = reason;
+      }
+      return;
+    }
+    current?.cancel();
+    const pending: PendingDurabilityRecovery = {
+      cls,
+      from,
+      blockedSeq,
+      attempts: 0,
+      reason,
+      startedAt: this.recoveryNow(),
+      cancel: () => {},
+    };
+    this.pendingRecovery.set(cls, pending);
+    this.sendRecoveryAttempt(pending);
+  }
+
+  private sendRecoveryAttempt(pending: PendingDurabilityRecovery): void {
+    if (this.disposed || this.pendingRecovery.get(pending.cls) !== pending) {
+      return;
+    }
+    if (this.ledger.appliedThrough(pending.cls) > pending.from) {
+      this.clearRecoveryAfterProgress(pending.cls);
+      return;
+    }
+    const elapsed = this.recoveryNow() - pending.startedAt;
+    if (pending.attempts >= this.recoveryMaxAttempts || elapsed >= this.recoveryDeadlineMs) {
+      this.exhaustRecovery(pending);
+      return;
+    }
+    pending.attempts++;
+    coopWarn(
+      "durability",
+      `recover cls=${pending.cls} from=${pending.from} blocked=${pending.blockedSeq} `
+        + `attempt=${pending.attempts}/${this.recoveryMaxAttempts} reason=${pending.reason}`,
+    );
+    try {
+      this.transport.send({ t: "coopResync", cls: pending.cls, from: pending.from });
+    } catch (error) {
+      coopWarn("durability", `recovery request send deferred cls=${pending.cls} from=${pending.from}`, error);
+    }
+    // A synchronous transport can deliver the requested tail before send() returns. If that replay made
+    // progress, clearRecoveryAfterProgress already retired this object; never leave a stray retry timer.
+    if (this.pendingRecovery.get(pending.cls) !== pending || this.ledger.appliedThrough(pending.cls) > pending.from) {
+      return;
+    }
+    const delay = Math.min(this.recoveryInitialMs * 2 ** (pending.attempts - 1), this.recoveryMaxMs);
+    pending.cancel = this.scheduleRecovery(() => this.sendRecoveryAttempt(pending), delay);
+  }
+
+  private clearRecoveryAfterProgress(cls: string): void {
+    const applied = this.ledger.appliedThrough(cls);
+    const pending = this.pendingRecovery.get(cls);
+    if (pending != null && applied > pending.from) {
+      pending.cancel();
+      this.pendingRecovery.delete(cls);
+    }
+    const exhaustedFrom = this.exhaustedRecovery.get(cls);
+    if (exhaustedFrom != null && applied > exhaustedFrom) {
+      this.exhaustedRecovery.delete(cls);
+    }
+  }
+
+  private exhaustRecovery(pending: PendingDurabilityRecovery): void {
+    if (this.pendingRecovery.get(pending.cls) !== pending) {
+      return;
+    }
+    pending.cancel();
+    this.pendingRecovery.delete(pending.cls);
+    this.exhaustedRecovery.set(pending.cls, pending.from);
+    const failure: CoopDurabilityRecoveryFailure = {
+      cls: pending.cls,
+      from: pending.from,
+      blockedSeq: pending.blockedSeq,
+      attempts: pending.attempts,
+      reason: pending.reason,
+    };
+    coopWarn(
+      "durability",
+      `recovery EXHAUSTED cls=${failure.cls} from=${failure.from} blocked=${failure.blockedSeq} `
+        + `attempts=${failure.attempts} reason=${failure.reason}`,
+    );
+    try {
+      this.hooks.onRecoveryExhausted?.(failure);
+    } catch (error) {
+      coopWarn("durability", `recovery terminal hook threw cls=${failure.cls} (isolated)`, error);
+    }
   }
 
   /** Run the apply hook, mapping a `void` return to `applied` (back-compat) and a THROW to `rejected` (retriable). */
@@ -766,6 +939,7 @@ export class CoopDurabilityManager {
    */
   adoptSnapshot(cls: string, headRevision: number): void {
     this.ledger.adoptSnapshot(cls, headRevision);
+    this.clearRecoveryAfterProgress(cls);
     this.transport.send({ t: "coopAck", cls, seq: this.ledger.appliedThrough(cls) });
   }
 
@@ -857,6 +1031,7 @@ export class CoopDurabilityManager {
         continue;
       }
       try {
+        this.clearRecoveryAfterProgress(cls);
         this.transport.send({ t: "coopAck", cls, seq: this.ledger.appliedThrough(cls) });
       } catch (error) {
         coopWarn("durability", `snapshot ACK deferred cls=${cls} seq=${revision}`, error);
@@ -876,6 +1051,14 @@ export class CoopDurabilityManager {
 
   /** Tear down the wire handler. */
   dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+    for (const pending of this.pendingRecovery.values()) {
+      pending.cancel();
+    }
+    this.pendingRecovery.clear();
     this.off();
   }
 }

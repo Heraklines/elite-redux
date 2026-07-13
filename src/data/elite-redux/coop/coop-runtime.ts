@@ -3717,6 +3717,11 @@ export function assembleCoopRuntime(
         ...operationDurabilityHooks,
         sendFullSnapshot: (cls, headRevision, controlHighWater) =>
           sendCoopDurabilitySnapshot(runtime, cls, headRevision, controlHighWater),
+        onRecoveryExhausted: failure =>
+          failCoopSharedSession(
+            `Durable operation recovery exhausted for ${failure.cls} at ${failure.from} `
+              + `(blocked ${failure.blockedSeq}, ${failure.attempts} attempts, ${failure.reason}).`,
+          ),
       })
     : undefined;
   // Install the active manager so the migrated surface adapters' commit path journals into it (Wave-2e).

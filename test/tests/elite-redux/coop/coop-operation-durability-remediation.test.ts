@@ -241,6 +241,62 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     guestMgr.dispose();
   });
 
+  it("T2a: rejected N plus retained N+1 coalesces and exhausts without recursive replay ping-pong", async () => {
+    const pair = createLoopbackPair();
+    const scheduled: { callback: () => void; cancelled: boolean }[] = [];
+    const failures: { cls: string; from: number; blockedSeq: number; attempts: number; reason: string }[] = [];
+    let resyncRequests = 0;
+    pair.host.onMessage(message => {
+      if (message.t === "coopResync") {
+        resyncRequests++;
+      }
+    });
+    const hooks: CoopDurabilityHooks = {
+      extractKey: message => (message.t === "waveResolved" ? { cls: "wave", seq: message.wave } : null),
+      apply: () => "rejected",
+      scheduleRecovery: callback => {
+        const timer = { callback, cancelled: false };
+        scheduled.push(timer);
+        return () => {
+          timer.cancelled = true;
+        };
+      },
+      recoveryInitialMs: 1,
+      recoveryMaxMs: 1,
+      recoveryMaxAttempts: 3,
+      recoveryDeadlineMs: 100,
+      onRecoveryExhausted: failure => failures.push(failure),
+    };
+    const hostMgr = new CoopDurabilityManager(pair.host);
+    const guestMgr = new CoopDurabilityManager(pair.guest, hooks);
+
+    // Pre-fix, seq=2's synchronous gap response recursively replayed [1,2] until the process OOMed.
+    expect(hostMgr.commit("wave", 1, { t: "waveResolved", wave: 1, outcome: "win" })).toBe(true);
+    expect(hostMgr.commit("wave", 2, { t: "waveResolved", wave: 2, outcome: "win" })).toBe(true);
+    await flush();
+    expect(resyncRequests, "nested rejection/gap deliveries coalesce behind the in-flight request").toBe(1);
+
+    while (scheduled.some(timer => !timer.cancelled) && failures.length === 0) {
+      const next = scheduled.find(timer => !timer.cancelled)!;
+      next.cancelled = true;
+      next.callback();
+      await flush();
+    }
+
+    expect(failures).toEqual([{ cls: "wave", from: 0, blockedSeq: 2, attempts: 3, reason: "apply-rejected" }]);
+    expect(resyncRequests, "the retry budget is finite and never recursively amplifies").toBe(3);
+    const requestsAtTerminal = resyncRequests;
+    hostMgr.reconnect();
+    await flush();
+    expect(resyncRequests, "the exhausted boundary stays latched until state actually advances").toBe(
+      requestsAtTerminal,
+    );
+    expect(guestMgr.appliedMarks()).toEqual({});
+
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
   it("T2b: a DUPLICATE apply (already consumed) still ACKs, so a resend cannot spin the committer forever", async () => {
     const pair = createLoopbackPair();
     const guestGate = new ChannelGate(pair.guest);
