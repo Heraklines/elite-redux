@@ -53,6 +53,14 @@ function state(tick: number, money: number, marker: string, wave = 7, turn = 3):
   };
 }
 
+function latestAppliedOperationAddress(): { epoch: number; wave: number; turn: number } {
+  const envelope = getCoopOperationJournalApplied().at(-1);
+  if (envelope == null) {
+    throw new Error("no applied authoritative operation is available for continuation readiness");
+  }
+  return { epoch: envelope.sessionEpoch, wave: envelope.wave, turn: envelope.turn };
+}
+
 describe("P33 retained reward/shop authoritative results", () => {
   let appliedStates: CoopAuthoritativeBattleStateV1[];
   let applyCalls: number;
@@ -149,7 +157,7 @@ describe("P33 retained reward/shop authoritative results", () => {
       "no live committed envelope contains the historical empty placeholder",
     ).toBe(true);
     expect(hostManager.unackedCount(), "material application retains all three canonical results").toBe(3);
-    expect(guestManager.notifyOperationContinuationSurface("sharedInput", { epoch: 1, wave: 7, turn: 3 })).toBe(3);
+    expect(guestManager.notifyOperationContinuationSurface("sharedInput", latestAppliedOperationAddress())).toBe(3);
     await flushWire();
     expect(hostManager.unackedCount(), "the exact reward continuation releases the dense result stream").toBe(0);
     hostManager.dispose();
@@ -337,7 +345,7 @@ describe("P33 retained reward/shop authoritative results", () => {
     expect(hostManager.unackedCount(), "every materially applied result remains retained before UI readiness").toBe(
       actionCount,
     );
-    expect(guestManager.notifyOperationContinuationSurface("sharedInput", { epoch: 1, wave: 7, turn: 3 })).toBe(
+    expect(guestManager.notifyOperationContinuationSurface("sharedInput", latestAppliedOperationAddress())).toBe(
       actionCount,
     );
     await flushWire();

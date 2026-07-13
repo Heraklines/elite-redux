@@ -151,6 +151,55 @@ describe("protocol-33 retained operation continuation lifecycle", () => {
     }
   });
 
+  it("parks a later plain wave ACK behind an earlier operation until its continuation is ready", async () => {
+    const pair = createLoopbackPair();
+    const host = new CoopDurabilityManager(pair.host);
+    const guest = new CoopDurabilityManager(pair.guest, {
+      extractKey: message => (message.t === "envelope" ? { cls: "op:global", seq: message.envelope.revision } : null),
+      apply: () => "applied",
+    });
+    try {
+      const reward = envelope(1);
+      const wave: CoopAuthoritativeEnvelopeV1 = {
+        ...envelope(2),
+        logicalPhase: "WAVE_VICTORY",
+        pendingOperation: {
+          id: "7:0:WAVE_ADVANCE:2",
+          kind: "WAVE_ADVANCE",
+          owner: 0,
+          status: "committed",
+          payload: {
+            wave: 10,
+            outcome: "win",
+            nextLogicalPhase: "WAVE_VICTORY",
+            nextWave: 11,
+            biomeChange: false,
+            eggLapse: false,
+            meBoundary: "none",
+            victoryKind: "wild",
+            settledStateTick: STATE.tick + 1,
+          },
+        },
+      };
+      expect(host.commit("op:global", 1, { t: "envelope", envelope: reward })).toBe(true);
+      expect(host.commit("op:global", 2, { t: "envelope", envelope: wave })).toBe(true);
+      await flush();
+
+      expect(guest.appliedMarks()).toEqual({ "op:global": 2 });
+      expect(
+        host.unackedCount(),
+        "a later cumulative wave ACK cannot jump the reward's missing continuation proof",
+      ).toBe(2);
+
+      expect(guest.notifyOperationContinuationSurface("sharedInput", { epoch: 7, wave: 10, turn: 3 })).toBe(1);
+      await flush();
+      expect(host.unackedCount(), "the contiguous prefix releases only after both exact proofs exist").toBe(0);
+    } finally {
+      host.dispose();
+      guest.dispose();
+    }
+  });
+
   it("routes a missing continuation through the bounded failure callback without discarding authority", async () => {
     const pair = createLoopbackPair();
     const deadlines: { callback: () => void; cancelled: boolean; ms: number }[] = [];

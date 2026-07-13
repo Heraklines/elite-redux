@@ -822,6 +822,8 @@ export class CoopDurabilityManager {
   private readonly guestOperationAckEvidence = new Map<string, OperationAckEvidence>();
   /** Host: latest accepted exact stage; material/presentation evidence never releases the journal. */
   private readonly hostOperationAckEvidence = new Map<string, OperationAckEvidence>();
+  /** Host: later plain cumulative ACKs parked behind an earlier operation that still lacks UI readiness. */
+  private readonly pendingCumulativeAcks = new Map<string, number>();
   private readonly operationContinuationTimers = new Map<string, () => void>();
   private readonly exhaustedOperationContinuations = new Set<string>();
   private readonly scheduleOperationContinuationDeadline: (callback: () => void, ms: number) => () => void;
@@ -911,7 +913,7 @@ export class CoopDurabilityManager {
         this.acceptOperationAck(msg, retained);
         return;
       }
-      this.journal.ack(msg.cls, msg.seq);
+      this.acceptCumulativeAck(msg.cls, msg.seq);
       return;
     }
     if (msg.t === "coopResync") {
@@ -1390,28 +1392,57 @@ export class CoopDurabilityManager {
     if (msg.stage !== "continuationReady") {
       return;
     }
-    this.releaseCompletedOperationAcks(authority.cls);
+    this.releaseAcknowledgedPrefix(authority.cls);
   }
 
-  private releaseCompletedOperationAcks(cls: string): void {
+  /**
+   * Record a normal cumulative ACK without allowing it to jump an earlier retained operation. The shared
+   * `op:global` stream intentionally mixes generic UI operations with transactions such as WAVE_ADVANCE,
+   * whose DATA+continuation latch emits a plain ACK. A later plain ACK proves that later transaction, but
+   * it cannot prove the earlier reward/shop/event surface opened.
+   */
+  private acceptCumulativeAck(cls: string, seq: number): void {
+    const highWater = this.journal.highWaterMark(cls);
+    if (!Number.isSafeInteger(seq) || seq <= 0 || seq > highWater) {
+      coopWarn("durability", `DROP cumulative ACK outside committed range cls=${cls} seq=${seq} high=${highWater}`);
+      return;
+    }
+    const prior = this.pendingCumulativeAcks.get(cls) ?? this.journal.ackedThrough(cls);
+    if (seq > prior) {
+      this.pendingCumulativeAcks.set(cls, seq);
+    }
+    this.releaseAcknowledgedPrefix(cls);
+  }
+
+  /** Release only the contiguous prefix for which every entry has its own required proof. */
+  private releaseAcknowledgedPrefix(cls: string): void {
     const prior = this.journal.ackedThrough(cls);
+    const cumulativeThrough = this.pendingCumulativeAcks.get(cls) ?? prior;
     let through = prior;
     for (const entry of this.journal.tailFrom(cls, prior)) {
-      const admitted = operationAuthorityFor(entry.cls, entry.seq, entry.msg);
-      if (admitted == null) {
+      if (entry.seq !== through + 1) {
+        coopWarn("durability", `retain ACK at journal gap cls=${cls} expected=${through + 1} got=${entry.seq}`);
         break;
       }
-      const key = operationAuthorityKey(admitted.authority);
-      if (this.hostOperationAckEvidence.get(key)?.stage !== "continuationReady") {
+      const admitted = operationAuthorityFor(entry.cls, entry.seq, entry.msg);
+      if (admitted != null) {
+        const key = operationAuthorityKey(admitted.authority);
+        if (this.hostOperationAckEvidence.get(key)?.stage !== "continuationReady") {
+          break;
+        }
+        this.operationContinuationTimers.get(key)?.();
+        this.operationContinuationTimers.delete(key);
+      } else if (entry.seq > cumulativeThrough) {
         break;
       }
       through = entry.seq;
-      this.operationContinuationTimers.get(key)?.();
-      this.operationContinuationTimers.delete(key);
     }
     if (through > prior) {
       this.journal.ack(cls, through);
-      coopLog("durability", `host RELEASE operation authority through continuationReady cls=${cls} seq=${through}`);
+      coopLog("durability", `host RELEASE contiguous acknowledged authority cls=${cls} seq=${through}`);
+    }
+    if (cumulativeThrough <= through) {
+      this.pendingCumulativeAcks.delete(cls);
     }
   }
 
@@ -1742,6 +1773,7 @@ export class CoopDurabilityManager {
     }
     this.pendingDeferred.clear();
     this.deferredFollowers.clear();
+    this.pendingCumulativeAcks.clear();
     this.journal.restoreHighWater(highWater);
     // Restore the committer's peer-ACK view too: a converged save has the peer applied through the high-water,
     // so without this the committer's acked=0 makes a post-resume reconnect resync spuriously escalate to a
@@ -1770,6 +1802,7 @@ export class CoopDurabilityManager {
     }
     this.operationContinuationTimers.clear();
     this.pendingOperationContinuations.clear();
+    this.pendingCumulativeAcks.clear();
     this.off();
   }
 }

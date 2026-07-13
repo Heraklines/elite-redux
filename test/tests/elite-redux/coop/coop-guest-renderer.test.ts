@@ -117,7 +117,11 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   });
 
   /** Production wave completion is the legacy cue plus one committed authoritative envelope. */
-  function sendWaveAdvance(partner: CoopTransport, outcome: CoopWaveOutcome): void {
+  function sendWaveAdvance(
+    partner: CoopTransport,
+    outcome: CoopWaveOutcome,
+    authoritativeStateOverride?: CoopAuthoritativeBattleStateV1,
+  ): void {
     const controller = getCoopController();
     if (controller == null) {
       throw new Error("missing co-op controller");
@@ -125,7 +129,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const wave = globalScene.currentBattle.waveIndex;
     const turn = globalScene.currentBattle.turn;
     const logicalPhase = outcome === "gameOver" ? "GAME_OVER" : outcome === "flee" ? "WAVE_FLEE" : "WAVE_VICTORY";
-    const authoritativeState: CoopAuthoritativeBattleStateV1 = {
+    const authoritativeState: CoopAuthoritativeBattleStateV1 = authoritativeStateOverride ?? {
       version: 1,
       tick: 0,
       wave,
@@ -1097,12 +1101,16 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const turn = globalScene.currentBattle.turn;
     const partner = getCoopRuntime()!.partnerTransport!;
 
-    sendWaveAdvance(partner, "gameOver");
+    const carrier = completeTurnCarrier(turn);
+    sendWaveAdvance(partner, "gameOver", {
+      ...carrier.authoritativeState,
+      tick: carrier.authoritativeState.tick + 1,
+    });
     await new Promise(r => setTimeout(r, 0));
     partner.send({
       t: "turnResolution",
       turn,
-      ...completeTurnCarrier(turn),
+      ...carrier,
       events: [{ k: "message", text: "The run ended." }],
     });
     await new Promise(r => setTimeout(r, 0));
