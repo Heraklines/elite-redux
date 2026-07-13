@@ -191,7 +191,9 @@ interface CoopMeTerminalPinnedState {
 /**
  * Durable ME terminal admission/once gate. DATA and CONTROL have separate progress bits so a late replay
  * phase or hot-rejoin can retry destination execution without reapplying a monotonic state tick. A pinned
- * ME accepts only step-0 `{leave|battle}`, followed (for a battle only) by the exact step-1 leave.
+ * ME accepts step 0 first, then one monotonically-addressed step after every executed battle. This covers
+ * both the ordinary `battle(0) -> leave(1)` path and multi-battle encounters such as Colosseum without a
+ * separately timed enemy-party carrier.
  */
 export class CoopMeTerminalTransactionReceiver {
   private readonly receipts = new Map<string, CoopMeTerminalReceiptState>();
@@ -211,32 +213,30 @@ export class CoopMeTerminalTransactionReceiver {
     ) {
       return "rejected";
     }
-    const expectedStep = receipt.payload.terminal === "battle" ? 0 : this.expectedLeaveStep(receipt.pinned);
-    if (expectedStep == null || receipt.step !== expectedStep) {
-      return "rejected";
-    }
-    const identity = canonicalize(receipt.payload);
+    const identity = canonicalize({ pinned: receipt.pinned, step: receipt.step, payload: receipt.payload });
     const priorReceipt = this.receipts.get(receipt.operationId);
     if (priorReceipt != null && priorReceipt.identity !== identity) {
       return "rejected";
     }
+    if (priorReceipt?.executed) {
+      return "duplicate";
+    }
     const priorPinned = this.pinned.get(receipt.pinned);
-    if (
-      priorReceipt == null
-      && priorPinned != null
-      && (priorPinned.operationId !== receipt.operationId || priorPinned.step !== receipt.step)
-      && !(priorPinned.terminal === "battle" && priorPinned.executed && receipt.payload.terminal === "leave")
-    ) {
-      return "rejected";
+    if (priorReceipt == null) {
+      const expectedStep = priorPinned == null
+        ? 0
+        : priorPinned.terminal === "battle" && priorPinned.executed
+          ? priorPinned.step + 1
+          : null;
+      if (expectedStep == null || receipt.step !== expectedStep) {
+        return "rejected";
+      }
     }
     const state: CoopMeTerminalReceiptState = priorReceipt ?? {
       identity,
       materialApplied: false,
       executed: false,
     };
-    if (state.executed) {
-      return "duplicate";
-    }
     if (priorReceipt == null) {
       this.receipts.set(receipt.operationId, state);
       this.pinned.set(receipt.pinned, {
@@ -265,21 +265,6 @@ export class CoopMeTerminalTransactionReceiver {
       current.executed = true;
     }
     return "executed";
-  }
-
-  private expectedLeaveStep(pinned: number): number | null {
-    const prior = this.pinned.get(pinned);
-    if (prior == null) {
-      return 0;
-    }
-    if (prior.terminal === "battle" && prior.executed) {
-      return 1;
-    }
-    // An exact duplicate is admitted by its existing receipt before execution and has the same step.
-    if (prior.terminal === "leave") {
-      return prior.step;
-    }
-    return null;
   }
 }
 

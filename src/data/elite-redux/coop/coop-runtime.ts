@@ -3136,8 +3136,6 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
     || !isCompleteCoopMeTerminalPayload(payload)
     || payload.outcome.authoritativeState?.wave !== envelope.wave
     || (payload.destination.kind === "continue" && payload.destination.nextWave !== envelope.wave + 1)
-    || (payload.terminal === "battle" && step !== 0)
-    || (payload.terminal === "leave" && step > 1)
     || coopMeInteractionStartValue() !== pinned
   ) {
     return false;
@@ -3467,9 +3465,14 @@ export async function coopMeOwnerRelayBattleHandoff(options?: {
   }
   const runtime = active;
   const pump = runtime.mePump;
-  // Only an active pump session relays the sentinel. Co-op is authoritative-only (#633 M6): the
-  // pump is always OWNER-side (the host); the retired watcher never held a session.
-  if (!pump.isSessionActive()) {
+  const pinned = coopMeInteractionStartValue();
+  // The initial battle closes the ME pump. A multi-battle event (Colosseum) can then generate another
+  // battle while the same pin remains live; P33 commits each such handoff as the next retained terminal
+  // step. Without a journal, preserve the rollback path's separately streamed boss + inactive-pump no-op.
+  if (
+    !pump.isSessionActive()
+    && !(isCoopOperationJournalActive() && runtime.controller.role === "host" && pinned >= 0)
+  ) {
     coopLog("me", `owner-relay battle-handoff SKIP (active=${pump.isSessionActive()})`);
     return true;
   }
@@ -3478,15 +3481,24 @@ export async function coopMeOwnerRelayBattleHandoff(options?: {
     const scene = globalScene;
     const controller = runtime.controller;
     const generation = coopSessionGeneration();
-    const pinned = coopMeInteractionStartValue();
     const wave = globalScene.currentBattle?.waveIndex ?? -1;
     const hostTurn = globalScene.currentBattle?.turn ?? -1;
     const encounterMode = options?.encounterMode ?? globalScene.currentBattle?.mysteryEncounter?.encounterMode;
     const disableSwitch = options?.disableSwitch ?? false;
+    const priorControl = captureCoopActiveMysteryControl();
+    const step =
+      priorControl?.interactionCounter === pinned && priorControl.terminal === "battle"
+        ? (priorControl.terminalStep ?? -1) + 1
+        : priorControl == null || priorControl.terminal === "pending"
+          ? 0
+          : -1;
     if (
       controller.role !== "host"
       || pinned < 0
       || wave < 0
+      || !Number.isSafeInteger(step)
+      || step < 0
+      || step >= 1_000
       || !Number.isSafeInteger(hostTurn)
       || hostTurn < 0
       || typeof encounterMode !== "number"
@@ -3511,7 +3523,7 @@ export async function coopMeOwnerRelayBattleHandoff(options?: {
         kind: "ME_TERMINAL",
         seq: COOP_ME_TERM_SEQ_BASE + pinned,
         pinned,
-        step: 0,
+        step,
         payload,
         localRole: "host",
         wave,
@@ -3541,7 +3553,7 @@ export async function coopMeOwnerRelayBattleHandoff(options?: {
     if (operationId != null) {
       setCoopMeTerminalControl("battle", hostTurn, {
         operationId,
-        step: 0,
+        step,
         choice: COOP_ME_BATTLE_HANDOFF,
       });
     }

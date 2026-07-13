@@ -63,7 +63,10 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import { COOP_INTERACTION_LEAVE } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
-import { adoptMeWatcherChoice } from "#data/elite-redux/coop/coop-me-operation";
+import {
+  adoptMeWatcherChoice,
+  isCoopMeOperationEnabled,
+} from "#data/elite-redux/coop/coop-me-operation";
 import {
   coopMeInProgress,
   coopMeInteractionStartValue,
@@ -613,6 +616,19 @@ export async function runColosseumGuestRoundLoop(
       return;
     }
     expectedRound = round + 1;
+
+    if (isCoopMeOperationEnabled() && isCoopOperationJournalActive()) {
+      // P33 carries every continued round as the next complete retained ME_TERMINAL battle transaction.
+      // Its live sink adopts the authoritative state and boots the exact battle directly; this detached
+      // board loop merely advances its recovery cursor and waits for the next board. Consuming the old
+      // boss side channel here would reintroduce the split state/control race P33 removes.
+      ops.hideTag();
+      if (coopColosseumStillPinned(counter) && !setCoopMeColosseumControl(counter, { expectedRound })) {
+        failCoopSharedSession(`Colosseum next-round retained control could not advance for ${counter}`);
+        return;
+      }
+      continue;
+    }
 
     // CONTINUE: adopt the host's re-streamed boss for the next round and boot that round's battle. The
     // boss is streamed AFTER the decision (in startNextColosseumBattle), so we AWAIT it (a synchronous

@@ -12,14 +12,14 @@
 //
 // THREE distinct authoritative-ME code paths, each its own it():
 //   1. HOST-OWNED non-battle ME (counter 0, even): the host drives the pick off its OWN local input;
-//      the guest is a pure renderer (awaits the comprehensive meResync + LEAVE). DEPARTMENT_STORE_SALE.
+//      the guest is a pure renderer that adopts the complete retained DATA+continuation. DEPARTMENT_STORE_SALE.
 //   2. GUEST-OWNED non-battle ME (counter 1, odd): the host CANNOT take the human pick, so it AWAITS
 //      the guest's relayed option INDEX on 8M (coopHostAwaitGuestIndex) and applies it PROGRAMMATICALLY;
 //      the guest renders the selector off the host presentation + relays its pick. DEPARTMENT_STORE_SALE.
-//   3. BATTLE-HANDOFF ME (the documented #693 softlock class): an option that SPAWNS a battle relays
-//      COOP_ME_BATTLE_HANDOFF (-1000) on the 9M term seq with NO trailing 8M meResync; the guest's
-//      CoopReplayMePhase must finishWithoutLeaving() (end WITHOUT advancing - the single advance defers
-//      to the TRUE ME terminal after the battle), NOT hang awaiting an 8M outcome. FIGHT_OR_FLIGHT opt 1.
+//   3. BATTLE-HANDOFF ME (the documented #693 softlock class): an option that SPAWNS a battle commits one
+//      retained ME_TERMINAL carrying the comprehensive state + exact battle destination. The guest must
+//      finishWithoutLeaving() (end WITHOUT advancing - the single advance defers to the TRUE ME terminal
+//      after the battle), with no raw party/9M correctness dependency. FIGHT_OR_FLIGHT opt 1.
 //
 // HOW TO RUN (gated ER_SCENARIO=1, like every ER engine test):
 //   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-duo-mystery.test.ts --reporter=dot
@@ -529,16 +529,13 @@ describe.skipIf(!RUN)(
 
     // ===========================================================================================
     // IT #3 - BATTLE-HANDOFF ME (the documented #693 softlock class). An ME OPTION that SPAWNS a battle
-    // (FIGHT_OR_FLIGHT option 1 -> initBattleWithEnemyConfig) relays COOP_ME_BATTLE_HANDOFF (-1000) on the
-    // 9M term seq with NO trailing 8M meResync. The guest's CoopReplayMePhase.awaitOutcomeThenTerminal
-    // RACES 8M (outcome) vs 9M (terminal): the terminal wins, handleTerminalAction sees the battle-handoff
-    // sentinel and calls finishWithoutLeaving() - it ends WITHOUT leaving the encounter and WITHOUT
-    // advancing the counter (the single ME advance defers to the TRUE terminal AFTER the spawned battle).
-    // This is the EXACT path that hung the guest pre-fix: a guest awaiting ONLY the 8M outcome parks forever
-    // on a meResync the host never sends. The harness asserts the handoff boundary: settled via the
-    // battle-handoff branch (NOT a leave), counter NOT advanced, no meResync applied, no hang.
+    // (FIGHT_OR_FLIGHT option 1 -> initBattleWithEnemyConfig) commits a complete retained battle terminal.
+    // The guest applies that exact DATA image and destination, then calls finishWithoutLeaving() - it ends
+    // WITHOUT leaving the encounter and WITHOUT advancing the counter (the single ME advance defers to the
+    // TRUE terminal AFTER the spawned battle). The harness asserts the handoff boundary: settled via the
+    // battle-handoff branch (NOT a leave), counter NOT advanced, state applied once, no hang.
     // ===========================================================================================
-    it("DUO ME: a host-owned BATTLE-spawning ME (FIGHT_OR_FLIGHT opt 1) hands off via 9M with no meResync - guest finishes WITHOUT leaving/advancing, no hang", async () => {
+    it("DUO ME: a host-owned BATTLE-spawning ME hands off via one retained state+destination transaction", async () => {
       await game.runToMysteryEncounter(MysteryEncounterType.FIGHT_OR_FLIGHT, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
       const hostScene = game.scene;
       expect(hostScene.currentBattle.mysteryEncounter?.encounterType, "the forced ME is FIGHT_OR_FLIGHT").toBe(
@@ -572,19 +569,18 @@ describe.skipIf(!RUN)(
         "host did NOT advance at the battle-handoff (advance defers past the spawned battle)",
       ).toBe(counterBefore);
 
-      // ===== Drive the GUEST's CoopReplayMePhase. The host buffered COOP_ME_BATTLE_HANDOFF on 9M and NO
-      // meResync on 8M. The guest's outcome/terminal race MUST resolve the 9M terminal (battle-handoff) and
-      // finishWithoutLeaving - NOT hang awaiting an 8M meResync that never comes. driveGuestMeReplay drains
-      // to `settled`; a no-progress stall THROWS (the #693 hang detection). =====
+      // ===== Drive the GUEST's CoopReplayMePhase. Its now-live retained receiver requests any fast host
+      // tail, applies the complete state image, and opens the exact battle destination. driveGuestMeReplay
+      // drains to `settled`; a no-progress stall THROWS (the #693 hang detection). =====
       const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
 
       // The guest settled (ended) - via the BATTLE-HANDOFF branch, NOT a leave. Discriminators:
       expect(guestReplay.settled, "guest CoopReplayMePhase settled (ended once) at the battle-handoff").toBe(true);
-      // (1) NO meResync was applied (battle-handoff has no trailing 8M outcome - the softlock-class signature).
+      // (1) The comprehensive battle-handoff state applies exactly once before control opens.
       expect(
         applyMeOutcomeSpy.mock.calls.length,
-        "guest applied NO meResync at a battle-handoff (the 9M terminal had no trailing 8M outcome)",
-      ).toBe(0);
+        "guest applied the retained battle-handoff state exactly once",
+      ).toBe(1);
       // (2) the guest did NOT advance the counter (finishWithoutLeaving defers the single advance past the
       // spawned battle - a leaveDefensive would have advanced). This is the load-bearing handoff assertion.
       expect(
@@ -607,6 +603,10 @@ describe.skipIf(!RUN)(
         hostEnemies[0].species.speciesId,
       );
       expect(hostEnemies[1].id, "the duplicate has its OWN pokemon id").not.toBe(hostEnemies[0].id);
+      expect(
+        rig.guestScene.currentBattle.enemyParty.map(mon => ({ id: mon.id, species: mon.species.speciesId })),
+        "guest adopted the exact host battle party from the retained transaction",
+      ).toEqual(hostEnemies.map(mon => ({ id: mon.id, species: mon.species.speciesId })));
 
       // ===== LOCKSTEP at the handoff boundary: BOTH controllers are still at counterBefore (the single ME
       // advance is deferred to the TRUE terminal after the spawned battle + its shop). NO double-advance,
