@@ -36,8 +36,12 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  type CoopMePresentPayload,
+  parseCoopOperationId,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
+import type { CoopInteractionOutcome, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { BattleType } from "#enums/battle-type";
@@ -77,6 +81,43 @@ const RUN = process.env.ER_SCENARIO === "1";
 
 /** A valid ME wave: WILD, non-boss, in [10,180], waveIndex % 10 != 1 (see isMysteryEncounterValidForWave). */
 const ME_WAVE = 12;
+
+/** Unique committed Mystery operations observed on the retained transport, in first-send order. */
+function committedMeOperations(calls: readonly (readonly CoopMessage[])[]): {
+  id: string;
+  kind: string;
+  payload: unknown;
+}[] {
+  const byId = new Map<string, { id: string; kind: string; payload: unknown }>();
+  for (const call of calls) {
+    const message = call[0];
+    if (message?.t !== "envelope") {
+      continue;
+    }
+    const operation = message.envelope.pendingOperation;
+    if (
+      operation?.status !== "applied"
+      || (!operation.kind.startsWith("ME_") && operation.kind !== "QUIZ_ANSWER")
+    ) {
+      continue;
+    }
+    byId.set(operation.id, { id: operation.id, kind: operation.kind, payload: operation.payload });
+  }
+  return [...byId.values()];
+}
+
+/** Complete host-authored presentations carried by retained ME_PRESENT operations. */
+function committedMePresentations(
+  calls: readonly (readonly CoopMessage[])[],
+): Extract<CoopInteractionOutcome, { k: "mePresent" }>[] {
+  return committedMeOperations(calls).flatMap(operation => {
+    if (operation.kind !== "ME_PRESENT") {
+      return [];
+    }
+    const presentation = (operation.payload as CoopMePresentPayload).presentation;
+    return presentation?.k === "mePresent" ? [presentation] : [];
+  });
+}
 
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
@@ -702,6 +743,7 @@ describe.skipIf(!RUN)(
 
       const pair = createLoopbackPair();
       const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+      const hostTransportSendSpy = vi.spyOn(pair.host, "send");
 
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       expect(counterBefore, "the quiz ME opens on interaction counter 0 (host owns even)").toBe(0);
@@ -709,10 +751,8 @@ describe.skipIf(!RUN)(
 
       // Spy the guest's sole convergence mechanism (fires EXACTLY once at the host's terminal meResync).
       const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
-      // Tap the HOST relay: sendInteractionOutcome carries the streamed quiz SESSION (mePresent subPrompt
-      // kind "quiz"); sendInteractionChoice carries each committed answer as a "quizAns" (the DRIVE proof).
-      const sendOutcomeSpy = vi.spyOn(rig.hostRuntime.interactionRelay, "sendInteractionOutcome");
-      const sendChoiceSpy = vi.spyOn(rig.hostRuntime.interactionRelay, "sendInteractionChoice");
+      // Tap the retained host transport. P33 carries the quiz session and every host-owned answer as
+      // addressed operations; the raw mePresent/quizAns relays are intentionally absent in journal mode.
 
       // A mirror-quiz handoff must be INTERLEAVED (the IT #2 split), NOT driven host-fully-first. On the
       // quiz's `mePresent subPrompt {kind:"quiz"}`, the guest's CoopReplayMePhase.start races the 8M outcome
@@ -791,34 +831,43 @@ describe.skipIf(!RUN)(
         "host has NOT advanced yet (terminal parked before PostMysteryEncounterPhase.start)",
       ).toBe(counterBefore);
 
-      // ===== DRIVE-SIDE PROOF (host): it streamed the quiz SESSION and published one "quizAns" per question.
-      const quizSessionSends = sendOutcomeSpy.mock.calls.filter(c => {
-        const outcome = c[2] as CoopInteractionOutcome;
-        return outcome.k === "mePresent" && outcome.subPrompt?.kind === "quiz";
-      });
+      // ===== DRIVE-SIDE PROOF (host): one retained quiz SESSION plus one addressed answer per question.
+      const quizSessionSends = committedMePresentations(hostTransportSendSpy.mock.calls).filter(
+        outcome => outcome.subPrompt?.kind === "quiz",
+      );
       expect(
         quizSessionSends.length,
-        "host streamed the quiz SESSION as a mePresent subPrompt { kind:'quiz' } (#818)",
+        "host retained the quiz SESSION as an ME_PRESENT subPrompt { kind:'quiz' } (#818)",
       ).toBe(1);
-      const streamedSession = quizSessionSends[0][2] as Extract<CoopInteractionOutcome, { k: "mePresent" }>;
+      const streamedSession = quizSessionSends[0];
       expect(
         streamedSession.subPrompt?.kind === "quiz" ? streamedSession.subPrompt.questions.length : -1,
-        "the streamed session carries all GLYPH_COUNT questions",
+        "the retained session carries all GLYPH_COUNT questions",
       ).toBe(QUIZ_QUESTIONS);
 
-      const quizAnsSends = sendChoiceSpy.mock.calls.filter(c => c[1] === "quizAns");
-      expect(quizAnsSends.length, "host published one 'quizAns' per question (the DRIVE-side relay proof, #818)").toBe(
-        QUIZ_QUESTIONS,
+      const quizAnswerOperations = committedMeOperations(hostTransportSendSpy.mock.calls).filter(
+        operation => operation.kind === "QUIZ_ANSWER",
       );
-      // Each answer sits on its OWN per-question seq (coopQuizAnswerSeq(counter=0, index) = 8_500_000 + index)
+      expect(
+        quizAnswerOperations.length,
+        "host retained one addressed QUIZ_ANSWER operation per question (#818)",
+      ).toBe(QUIZ_QUESTIONS);
+      // Each answer retains its own per-question address (seq*8000 + QUIZ_ANSWER tag + question index)
       // and carries the fixed committed choice.
       expect(
-        quizAnsSends.map(c => c[0]),
-        "quizAns answers relayed on the per-question 8_500_000 seqs (order-proof, collision-free)",
-      ).toEqual([QUIZ_ANSWER_SEQ_BASE, QUIZ_ANSWER_SEQ_BASE + 1, QUIZ_ANSWER_SEQ_BASE + 2]);
+        quizAnswerOperations.map(operation => parseCoopOperationId(operation.id)?.pinnedSeq),
+        "quiz answers use exact per-question retained addresses (order-proof, collision-free)",
+      ).toEqual([
+        QUIZ_ANSWER_SEQ_BASE * 8000 + 5000,
+        (QUIZ_ANSWER_SEQ_BASE + 1) * 8000 + 5001,
+        (QUIZ_ANSWER_SEQ_BASE + 2) * 8000 + 5002,
+      ]);
       expect(
-        quizAnsSends.every(c => c[2] === HOST_ANSWER),
-        "every relayed quizAns is the fixed committed answer index",
+        quizAnswerOperations.every((operation, questionIndex) => {
+          const payload = operation.payload as { questionIndex: number; choice: number };
+          return payload.questionIndex === questionIndex && payload.choice === HOST_ANSWER;
+        }),
+        "every retained quiz answer carries the exact question and committed choice",
       ).toBe(true);
 
       // ===== STEP B (guest): start the divert, drain to the quiz handoff (the first outcome/terminal race
@@ -975,6 +1024,7 @@ describe.skipIf(!RUN)(
 
       const pair = createLoopbackPair();
       const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+      const hostTransportSendSpy = vi.spyOn(pair.host, "send");
 
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       expect(counterBefore, "the delve opens on interaction counter 0 (host owns even)").toBe(0);
@@ -982,8 +1032,7 @@ describe.skipIf(!RUN)(
 
       // Spy the guest's sole convergence mechanism (fires EXACTLY once at the host's terminal meResync).
       const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
-      // Tap the HOST relay's outcome sends: a FRESH `mePresent` (no subPrompt) must be streamed PER round.
-      const sendOutcomeSpy = vi.spyOn(rig.hostRuntime.interactionRelay, "sendInteractionOutcome");
+      // Tap the retained host transport: each round is a distinct addressed ME_PRESENT operation.
 
       // ===== STEP A (host): drive the REAL delve DIVE -> PUSH(survives) -> BANK, then the embedded reward
       // shop, and PARK at PostMysteryEncounterPhase WITHOUT running it - so the 3 round presents are streamed
@@ -1045,16 +1094,14 @@ describe.skipIf(!RUN)(
         "host has NOT advanced yet (terminal parked before PostMysteryEncounterPhase.start)",
       ).toBe(counterBefore);
 
-      // ===== HOST DRIVE-SIDE PROOF: the host re-streamed a FRESH top-level `mePresent` (no subPrompt) PER
-      // round - the initial DIVE/RISE present + one per re-fired round (PUSH/BANK x2) = 3. =====
-      const presentSends = sendOutcomeSpy.mock.calls
-        .map(c => c[2] as CoopInteractionOutcome)
-        .filter(
-          (o): o is Extract<CoopInteractionOutcome, { k: "mePresent" }> => o.k === "mePresent" && o.subPrompt == null,
-        );
+      // ===== HOST DRIVE-SIDE PROOF: the host retained a distinct top-level `ME_PRESENT` (no subPrompt)
+      // per round - the initial DIVE/RISE present + one per re-fired round (PUSH/BANK x2) = 3. =====
+      const presentSends = committedMePresentations(hostTransportSendSpy.mock.calls).filter(
+        presentation => presentation.subPrompt == null,
+      );
       expect(
         presentSends.length,
-        "host streamed a FRESH bare mePresent per round (initial DIVE/RISE + 2 re-fired press-your-luck rounds)",
+        "host retained a fresh bare ME_PRESENT per round (initial DIVE/RISE + 2 re-fired rounds)",
       ).toBe(EXPECTED_NEW_ROUNDS + 1);
       // #831 host label fix: the re-fired rounds stream the ROUND's overrideOptions (PUSH/BANK), NOT the
       // stale base DIVE/RISE options - so the guest renders the round's real prompt. Round labels differ
