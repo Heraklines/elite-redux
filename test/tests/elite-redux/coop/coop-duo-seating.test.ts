@@ -226,6 +226,16 @@ describe.skipIf(!RUN)("co-op DUO field seating: strict same-owner switch/replace
       SpeciesId.CHARIZARD,
     );
     expect(hostReplacement?.coopOwner, "the seated replacement is GUEST-owned (no cross-owner seating)").toBe("guest");
+    expect(hostReplacement?.getBattlerIndex(), "host projected the replacement into player seat 1").toBe(
+      COOP_GUEST_FIELD_INDEX,
+    );
+    expect(
+      hostReplacement == null ? -1 : rig.hostScene.field.getIndex(hostReplacement),
+      "host field container contains the replacement",
+    ).toBeGreaterThanOrEqual(0);
+    expect(hostReplacement?.visible, "host can see the guest-owned replacement container").toBe(true);
+    expect(hostReplacement?.getSprite()?.visible, "host can see the guest-owned replacement sprite").toBe(true);
+    expect(hostReplacement?.getBattleInfo()?.visible, "host can see the guest-owned replacement UI bar").toBe(true);
     // Seating ownership resolves correctly on the HOST: slot 0 host, slot 1 guest (never swapped).
     expect(
       withClientSync(rig.hostCtx, () => coopOwnerOfPlayerFieldSlot(COOP_HOST_FIELD_INDEX)),
@@ -246,6 +256,16 @@ describe.skipIf(!RUN)("co-op DUO field seating: strict same-owner switch/replace
         SpeciesId.CHARIZARD,
       );
       expect(guestReplacement?.coopOwner, "the guest's seated replacement is GUEST-owned").toBe("guest");
+      expect(guestReplacement?.getBattlerIndex(), "owner projected its replacement into player seat 1").toBe(
+        COOP_GUEST_FIELD_INDEX,
+      );
+      expect(
+        guestReplacement == null ? -1 : rig.guestScene.field.getIndex(guestReplacement),
+        "owner field container contains its replacement",
+      ).toBeGreaterThanOrEqual(0);
+      expect(guestReplacement?.visible, "owner can see its replacement container").toBe(true);
+      expect(guestReplacement?.getSprite()?.visible, "owner can see its replacement sprite").toBe(true);
+      expect(guestReplacement?.getBattleInfo()?.visible, "owner can see its replacement UI bar").toBe(true);
       // BOTH engines agree the guest controls slot 1 - the seating desync (#848) is impossible.
       expect(coopOwnerOfPlayerFieldSlot(COOP_GUEST_FIELD_INDEX), "guest resolves field slot 1 as GUEST-owned").toBe(
         "guest",
