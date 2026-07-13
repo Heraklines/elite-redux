@@ -918,9 +918,27 @@ function applyJournaledWaveEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coop
   //
   // A genuinely-absent revision never reaches here - inspectEnvelope above gates on rev == clock+1 - so
   // advancing the cursor is conditional on the op being RECEIVED, never mere absence: global-revision gap
-  // detection / resync are unaffected. Still project the bootstrap into pendingWaveAdvance now, and admit the
-  // DATA immediately when the guest ALREADY sits at the boundary (a resent/reconnect-tail envelope landing
-  // at/after BattleEnd) so that fast path stays exact - but never GATE the cursor on it.
+  // detection / resync are unaffected.
+  //
+  // Advance ONLY the shared ORDERING cursor - NOT the application ledger - and do it BEFORE the boundary DATA
+  // block below. Marking the wave-advance `hasApplied` here (as a full applyEnvelope would) is premature: its
+  // DATA lands only at the real BattleEnd boundary, and a premature `hasApplied` makes
+  // adoptWaveAdvanceWatcherChoice reject the exact staged wave-advance as a duplicate ("WATCHER REJECT
+  // stale/dup"), starving the watcher. The eager cursor advance is also what keeps the same-boundary reward
+  // RESULT at rev+1 from being a spurious GAP. ORDER MATTERS (the wave-first regression the duo reward tests
+  // caught): when the watcher already sits at THIS wave's public boundary (its reward SelectModifierPhase),
+  // the boundary block below applies the DATA in-line and calls markOperationApplied, which bumps the shared
+  // clock to THIS revision - so advancing the cursor AFTER it would re-inspect this same envelope as
+  // `rev <= clock` (duplicate), wrongly return "rejected", and stall op:global so the watcher's same-boundary
+  // reward terminal never arrives. Advancing FIRST makes that later markOperationApplied a monotonic clock
+  // no-op that only records appliedIds; the application fact still lands solely at the real boundary, and a
+  // re-delivery before the boundary is still deduped by the clock (rev <= clock -> the duplicate return above).
+  if (g.advanceRevisionOrdering(envelope).kind !== "applied") {
+    return "rejected";
+  }
+  // Project the bootstrap into pendingWaveAdvance now, and admit the DATA immediately when the guest ALREADY
+  // sits at the boundary (a resent/reconnect-tail envelope, or a watcher parked at its reward shop) so that
+  // fast path stays exact - but never GATE the cursor on it (the cursor already advanced above).
   if (!getCoopStagedWaveAdvanceTransaction(preflight.payload.wave)?.dataApplied) {
     const sinkReady = routeCoopOperationToLiveSink("op:wave", envelope);
     if (!sinkReady) {
@@ -932,15 +950,6 @@ function applyJournaledWaveEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coop
         routeCoopOperationToLiveSink("op:wave", envelope);
       }
     }
-  }
-  // Advance ONLY the shared ORDERING cursor - NOT the application ledger. Marking the wave-advance
-  // `hasApplied` here (as a full applyEnvelope would) is premature: its DATA lands only at the real
-  // BattleEnd boundary, and a premature `hasApplied` makes adoptWaveAdvanceWatcherChoice reject the exact
-  // staged wave-advance as a duplicate ("WATCHER REJECT stale/dup"), starving the watcher's reward-terminal
-  // flow. The application fact is recorded at the boundary via markOperationApplied (see
-  // tryApplyCoopWaveAdvanceDataAtBoundary). Re-delivery before the boundary is still deduped by the clock.
-  if (g.advanceRevisionOrdering(envelope).kind !== "applied") {
-    return "rejected";
   }
   if (preflight.payload.wave > lastAppliedWave) {
     lastAppliedWave = preflight.payload.wave;

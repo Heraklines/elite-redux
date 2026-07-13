@@ -32,6 +32,7 @@ import type {
   CoopAuthoritativeEnvelopeV1,
   CoopLogicalPhase,
   CoopOperationId,
+  CoopOperationKind,
   CoopOperationStatus,
   CoopPendingOperation,
   CoopRevision,
@@ -385,6 +386,63 @@ export interface CoopOperationGuestConfig {
 }
 
 /**
+ * The two ORDERING-vs-APPLICATION buckets an inbound op falls into, chosen EXPLICITLY from `op.kind` (never
+ * inferred from which applier/call-site delivered the envelope):
+ *  - `"applyAtDelivery"`: a terminal whose DATA materializes the instant the journal delivers it. The guest
+ *    advances the ordering cursor AND `appliedIds` in ONE step ({@linkcode CoopOperationGuest.applyEnvelope}).
+ *    Every reward-class terminal (REWARD / SHOP_BUY / ME_* / FAINT_SWITCH / ...) is this bucket.
+ *  - `"deferApplicationToBoundary"`: a RETAINED transaction whose ordering cursor advances at delivery (via
+ *    {@linkcode CoopOperationGuest.advanceRevisionOrdering}, so a later same-boundary op at rev+1 is not a
+ *    spurious gap) but whose immutable DATA image + `appliedIds` land only at a LATER engine boundary (a
+ *    WAVE_ADVANCE whose DATA applies at the host's BattleEndPhase), recorded then via
+ *    {@linkcode CoopOperationGuest.markOperationApplied}.
+ * EXHAUSTIVE over {@linkcode CoopOperationKind}: the `Record` below MUST name every kind, so a newly-added
+ * kind fails to COMPILE here (a missing key is a tsc error) - a new operation class can NEVER silently
+ * inherit either behavior; it must be bucketed deliberately in exactly one entry.
+ */
+export type CoopOperationOrderingClass = "applyAtDelivery" | "deferApplicationToBoundary";
+
+/**
+ * The single explicit classification source of truth, keyed by {@linkcode CoopOperationKind}. `WAVE_ADVANCE`
+ * is the ONLY `deferApplicationToBoundary` bucket (the between-wave transition retained at staging, DATA
+ * applied at the host's BattleEndPhase); every reward-class / interaction terminal is `applyAtDelivery`
+ * (cursor + appliedIds together). tsc requires a value for EVERY kind, so a new kind cannot compile until it
+ * is bucketed here.
+ */
+const COOP_OPERATION_ORDERING_CLASS: Record<CoopOperationKind, CoopOperationOrderingClass> = {
+  WAVE_ADVANCE: "deferApplicationToBoundary",
+  BIOME_PICK: "applyAtDelivery",
+  CROSSROADS_PICK: "applyAtDelivery",
+  REWARD: "applyAtDelivery",
+  SHOP_BUY: "applyAtDelivery",
+  FAINT_SWITCH: "applyAtDelivery",
+  REVIVAL: "applyAtDelivery",
+  ABILITY_PICK: "applyAtDelivery",
+  BARGAIN: "applyAtDelivery",
+  COLO_PICK: "applyAtDelivery",
+  ME_PRESENT: "applyAtDelivery",
+  ME_PICK: "applyAtDelivery",
+  ME_SUB: "applyAtDelivery",
+  ME_BUTTON: "applyAtDelivery",
+  ME_TERMINAL: "applyAtDelivery",
+  QUIZ_ANSWER: "applyAtDelivery",
+  LEARN_MOVE: "applyAtDelivery",
+  LEARN_MOVE_BATCH: "applyAtDelivery",
+  STORMGLASS: "applyAtDelivery",
+  CATCH_FULL: "applyAtDelivery",
+};
+
+export function coopOperationOrderingClass(kind: CoopOperationKind): CoopOperationOrderingClass {
+  const cls = COOP_OPERATION_ORDERING_CLASS[kind];
+  if (cls === undefined) {
+    // Unreachable while the map stays exhaustive (tsc enforces an entry for every CoopOperationKind); a
+    // forged/off-type kind that slips past the type system fails LOUDLY rather than silently deferring.
+    throw new Error(`coop op kind not classified for ordering: ${String(kind)}`);
+  }
+  return cls;
+}
+
+/**
  * The idempotent guest applier. Never mutates shared state itself (invariant 1); it CLASSIFIES each
  * inbound envelope (§1.6) and tells the caller whether to adopt it. Application is a pure function of
  * (sessionEpoch, revision, operationId) (invariant 5).
@@ -511,6 +569,7 @@ export class CoopOperationGuest {
    * a premature duplicate. Idempotent + monotonic (inspect gates it; the clock never regresses).
    */
   public advanceRevisionOrdering(env: CoopAuthoritativeEnvelopeV1): CoopGuestApplyResult {
+    assertDeferApplicationToBoundary(env, "advanceRevisionOrdering");
     const inspected = this.inspectEnvelope(env);
     if (inspected.kind !== "applied") {
       return inspected;
@@ -527,6 +586,7 @@ export class CoopOperationGuest {
    * former single-step apply did. Idempotent; never regresses the clock.
    */
   public markOperationApplied(env: CoopAuthoritativeEnvelopeV1): void {
+    assertDeferApplicationToBoundary(env, "markOperationApplied");
     const op = env.pendingOperation;
     if (op != null) {
       this.appliedIds.add(op.id);
@@ -535,5 +595,19 @@ export class CoopOperationGuest {
       this.revisionClock.revision = env.revision;
     }
     this.lastGoodEnvelope = env;
+  }
+}
+
+/**
+ * Guard the deferred-application cursor path (advanceRevisionOrdering / markOperationApplied). Its ONLY
+ * legitimate caller is a `deferApplicationToBoundary`-class op (WAVE_ADVANCE); an `applyAtDelivery` op that
+ * reached here would mean a caller wired a reward-class terminal into the deferred ledger by mistake - fail
+ * LOUDLY (the classification is by {@linkcode coopOperationOrderingClass}(op.kind), never by call-site). A
+ * quiescent envelope (no pendingOperation) is a plain ordering ACK and passes through.
+ */
+function assertDeferApplicationToBoundary(env: CoopAuthoritativeEnvelopeV1, site: string): void {
+  const op = env.pendingOperation;
+  if (op != null && coopOperationOrderingClass(op.kind) !== "deferApplicationToBoundary") {
+    throw new Error(`${site}: ${op.kind} is an apply-at-delivery op; use applyEnvelope, not the deferred cursor path`);
   }
 }
