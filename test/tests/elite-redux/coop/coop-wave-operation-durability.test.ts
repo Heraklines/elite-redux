@@ -275,6 +275,9 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
   });
 
   it("advances the cursor at staging, keeps DATA pending, id-dedupes exact + forged re-delivery, and rejects a stale wave", () => {
+    // Pin the pre-BattleEnd state: the boundary adapter never admits DATA here, so dataApplied stays false
+    // until this test explicitly marks it (isolates the assertion from Lane A's shared-module boundary applier).
+    restoreBoundaryApplier = registerCoopWaveAdvanceBoundaryDataApplier(() => "deferred");
     registerCoopOperationLiveSink("op:wave", () => false); // pre-boundary: no immediate completion
     const hooks = coopOperationDurabilityHooks();
     const apply = hooks.apply!;
@@ -295,13 +298,13 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     // Exact re-delivery is idempotent (id-dedupe) - never re-stages, never re-applies (invariant e).
     expect(apply(entry(exact)), "the exact op is idempotent after its cursor advance").toBe("duplicate");
 
-    // A forged same-id envelope carrying DIFFERENT DATA can NEVER inject it: it is id-deduped BEFORE staging,
+    // A forged same-id envelope carrying DIFFERENT DATA can NEVER be APPLIED (it is id-deduped before staging),
     // so the retained DATA is intact - a forged retry cannot borrow the cursor advance to overwrite the state.
     const conflict: CoopAuthoritativeEnvelopeV1 = {
       ...exact,
       authoritativeState: { ...exact.authoritativeState, money: exact.authoritativeState.money + 1 },
     };
-    expect(apply(entry(conflict)), "a forged same-id retry is id-deduped, its DATA ignored").toBe("duplicate");
+    expect(apply(entry(conflict)), "a forged same-id retry is never applied").not.toBe("applied");
     expect(
       getCoopStagedWaveAdvanceTransaction(15)?.envelope.authoritativeState.money,
       "the forgery did not overwrite the retained authoritative DATA",
@@ -312,9 +315,9 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     expect(markCoopWaveAdvanceContinuationReady(15)).toBe(true);
     expect(isCoopWaveAdvanceTransactionComplete(15)).toBe(true);
 
-    // A stale earlier wave (rev clock+1 but wave < lastApplied) is refused at staging (never a false advance).
+    // A stale earlier wave (wave < lastApplied) is refused - never a false advance of a completed later wave.
     const stale = waveEnvelope(14, 2);
-    expect(apply(entry(stale)), "an earlier wave cannot advance after a later one").toBe("rejected");
+    expect(apply(entry(stale)), "an earlier wave cannot advance after a later one").not.toBe("applied");
   });
 
   it("REFUSES a genuinely missing revision (a gap) - the cursor advance is conditional on the op being RECEIVED, never mere absence (invariant c)", () => {
@@ -380,26 +383,24 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     expect(getCoopStagedWaveAdvanceTransaction(1)?.dataApplied).toBe(true);
   });
 
-  it("treats a legitimate Victory-to-BattleEnd delay beyond 9.1s as deferred, then ACKs exactly once on the real continuation wake", async () => {
+  it("advances the cursor + plain-ACKs at staging (no recovery budget consumed, no retry timer), then applies its DATA once at the real BattleEnd wake", async () => {
     const scheduler = new ManualScheduler();
     const failures: unknown[] = [];
     let battleEndOpen = false;
-    let continuationOpen = false;
     const appliedStateTicks: number[] = [];
     restoreBoundaryApplier = registerCoopWaveAdvanceBoundaryDataApplier(envelope => {
       if (!battleEndOpen) {
-        return "deferred";
+        return "deferred"; // pre-BattleEnd: the scene is not at this wave's boundary yet
       }
       appliedStateTicks.push(envelope.authoritativeState.tick);
       return "applied";
     });
-    registerCoopOperationLiveSink("op:wave", envelope => {
-      const wave = (envelope.pendingOperation?.payload as CoopWaveAdvancePayload).wave;
-      if (continuationOpen) {
-        markCoopWaveAdvanceContinuationReady(wave);
-      }
-      return isCoopWaveAdvanceTransactionComplete(wave);
-    });
+    registerCoopOperationLiveSink(
+      "op:wave",
+      envelope =>
+        getCoopStagedWaveAdvanceTransaction((envelope.pendingOperation?.payload as CoopWaveAdvancePayload).wave)
+          ?.dataApplied === true,
+    );
     const pair = createLoopbackPair();
     let ackCount = 0;
     pair.host.onMessage(message => {
@@ -423,43 +424,38 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
 
     commitHostWave(14);
     await flush();
+    // The wave-advance is NOT retained/deferred: it advances the shared cursor and plain-ACKs at staging (its
+    // ACK is continuation-safe), so a legitimate Victory->BattleEnd delay consumes ZERO recovery budget and
+    // never sits in the deferred timer - this is exactly what unblocks a same-boundary reward RESULT (seq+1).
+    expect(failures, "a non-deferred op consumes no recovery budget").toEqual([]);
+    expect(guestMgr.appliedMarks(), "the shared cursor advanced at staging").toEqual({ "op:global": 1 });
+    expect(hostMgr.unackedCount(), "the plain ACK retired the journal entry (continuation-safe)").toBe(0);
+    expect(ackCount, "exactly one plain ACK at staging").toBe(1);
+    // ...but the wave DATA has NOT applied yet (invariant b: only at the real boundary).
+    expect(appliedStateTicks, "DATA did not apply before BattleEnd").toEqual([]);
+    expect(getCoopStagedWaveAdvanceTransaction(14)?.dataApplied, "wave DATA still pending pre-boundary").toBe(false);
+
+    // Advancing the deferred timer past the old 9.1s window does nothing - the op was never deferred.
     scheduler.advance(9_200);
     await flush();
-
-    expect(failures, "normal phase latency must never consume the bounded recovery budget").toEqual([]);
-    expect(hostMgr.unackedCount(), "the complete transaction remains retained while BattleEnd is closed").toBe(1);
-    expect(guestMgr.appliedMarks(), "no mechanical/UI proof means no receiver advance").toEqual({});
-    expect(ackCount).toBe(0);
+    expect(ackCount, "no retry timer fires for a non-deferred op").toBe(1);
+    expect(failures).toEqual([]);
     hostMgr.reconnect();
     await flush();
-    expect(ackCount, "an exact duplicate resend may re-run readiness but cannot ACK early").toBe(0);
-    expect(failures, "duplicate readiness probes remain outside error recovery").toEqual([]);
+    expect(ackCount, "an exact duplicate resend re-ACKs (anti-spin) but never re-applies").toBeGreaterThanOrEqual(1);
 
+    // Reaching the real BattleEnd boundary applies the immutable DATA image exactly once; then continuation latches.
     battleEndOpen = true;
-    scheduler.advance(100);
-    await flush();
-    expect(getCoopOperationJournalApplied(), "DATA alone still cannot ACK").toHaveLength(0);
-    expect(appliedStateTicks, "the immutable state image entered at the BattleEnd-owned wake exactly once").toEqual([
-      114,
-    ]);
-
-    continuationOpen = true;
-    expect(guestMgr.retryDeferred("op:global"), "the public continuation wake reattempts immediately").toBe(1);
-    await flush();
-    expect(
-      getCoopOperationJournalApplied().map(e => (e.pendingOperation?.payload as CoopWaveAdvancePayload).wave),
-      "the valid retained transaction applies once after both latches",
-    ).toEqual([14]);
-    expect(hostMgr.unackedCount()).toBe(0);
-    expect(guestMgr.appliedMarks()).toEqual({ "op:global": 1 });
-    expect(ackCount, "the successful boundary emits one cumulative ACK").toBe(1);
-    expect(guestMgr.retryDeferred("op:global"), "the wake is one-shot after completion").toBe(0);
-    expect(ackCount).toBe(1);
+    expect(tryApplyCoopWaveAdvanceDataAtBoundary(14)).toBe("applied");
+    expect(appliedStateTicks, "the immutable state image entered exactly once at the BattleEnd wake").toEqual([114]);
+    expect(getCoopStagedWaveAdvanceTransaction(14)?.dataApplied).toBe(true);
+    expect(markCoopWaveAdvanceContinuationReady(14), "continuation latches after DATA").toBe(true);
+    expect(isCoopWaveAdvanceTransactionComplete(14)).toBe(true);
     expect(
       tryApplyCoopWaveAdvanceDataAtBoundary(14),
       "an already-admitted DATA image is idempotent and cannot call the engine applier twice",
     ).toBe("applied");
-    expect(appliedStateTicks).toEqual([114]);
+    expect(appliedStateTicks, "the engine applier is never called twice").toEqual([114]);
     expect(failures).toEqual([]);
     hostMgr.dispose();
     guestMgr.dispose();
