@@ -448,11 +448,22 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       counterBefore + 1,
     );
 
-    // STEP D (guest): settle the guest's outcome/terminal race so nothing dangles past the test.
+    // STEP D (guest): install the executable replay receiver after the embedded shop has closed. The host's
+    // complete terminal was already retained while that nested surface owned the scene, so arming this exact
+    // receiver must immediately reannounce readiness instead of waiting for a periodic durability resend.
+    const guestDurability = rig.guestRuntime.durability;
+    if (guestDurability == null) {
+      throw new Error("guest-owned ME test lost its durability journal before terminal replay");
+    }
+    const terminalReadinessSpy = vi.spyOn(guestDurability, "reconnect");
     const guestReplay = await withClient(rig.guestCtx, async () => {
       startGuestMeOutcomeRace(replay);
       return drainGuestMeReplayToSettle(replay);
     });
+    expect(
+      terminalReadinessSpy,
+      "the live Mystery replay receiver reannounced the retained complete terminal transaction",
+    ).toHaveBeenCalled();
     expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once)").toBe(true);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest counter lockstep after the ME").toBe(
       counterBefore + 1,
