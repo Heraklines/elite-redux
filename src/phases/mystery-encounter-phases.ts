@@ -39,6 +39,7 @@ import {
   setCoopMeBattleInteractionCounter,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ME_PICK_CHOICE_KINDS, COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { erRecordMysteryEncounterResolved } from "#data/elite-redux/er-achievement-detection";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
@@ -198,22 +199,36 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
   coopLog("me", "coopEndMePump: close pump + advance alternation", { counter: coopMeInteractionStartValue() });
   const handoff = coopMeHandoffBattleStarted();
   let terminalOperationId: string | null = null;
-  if (controller.role === "host") {
-    if (isCoopMeOperationEnabled() && outcome == null) {
+  if (controller.role === "host" && isCoopMeOperationEnabled()) {
+    if (outcome == null) {
       coopWarn("me", "coopEndMePump HOLD: leave terminal has no retained authoritative outcome");
       return false;
     }
+    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    if (wave < 0) {
+      coopWarn("me", "coopEndMePump HOLD: leave terminal has no live wave destination");
+      return false;
+    }
+    const payload = {
+      terminal: "leave",
+      outcome,
+      destination: {
+        kind: "continue",
+        nextWave: wave + 1,
+        selectBiome: globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome(),
+      },
+    } satisfies CoopMeTerminalPayload;
     terminalOperationId = commitMeOwnerIntent({
       kind: "ME_TERMINAL",
       seq: COOP_ME_TERM_SEQ_BASE + coopMeInteractionStartValue(),
       pinned: coopMeInteractionStartValue(),
       step: handoff ? 1 : 0,
-      payload: outcome == null ? { terminal: "leave" } : { terminal: "leave", outcome },
+      payload,
       localRole: "host",
-      wave: globalScene.currentBattle?.waveIndex ?? -1,
+      wave,
       turn: 0,
     });
-    if (terminalOperationId == null && isCoopMeOperationEnabled()) {
+    if (terminalOperationId == null) {
       coopWarn("me", "coopEndMePump HOLD: exact authoritative leave did not commit");
       getCoopRuntime()?.durability?.reconnect();
       return false;
@@ -227,7 +242,7 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
     }
   }
   // Legacy/non-journal fallback preserves the original DATA-before-terminal order. In journal mode the
-  // terminal envelope retains this outcome and the receiver applies it before waking the 9M waiter.
+  // complete terminal envelope is the only DATA+destination carrier.
   if (
     controller.role === "host"
     && outcome != null

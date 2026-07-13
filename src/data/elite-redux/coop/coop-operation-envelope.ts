@@ -274,6 +274,25 @@ export type CoopMeTerminalKind =
   | "leave" // the ME ended (non-battle): the watcher leaves the encounter + advances the alternation
   | "battle"; // an option spawned a battle: the watcher finishes WITHOUT leaving (the battle runs host-authoritative)
 
+/** Exact host-authored continuation opened after the terminal state image has been adopted. */
+export type CoopMeTerminalDestination =
+  | {
+      readonly kind: "battle";
+      /** Host turn-space at the instant the spawned battle becomes executable. */
+      readonly hostTurn: number;
+      /** Exact {@linkcode MysteryEncounterMode}; the guest must never infer it from its reconstructed party. */
+      readonly encounterMode: number;
+      /** Constructor argument for the host's `MysteryEncounterBattlePhase`. */
+      readonly disableSwitch: boolean;
+    }
+  | {
+      readonly kind: "continue";
+      /** Exact next wave expected after this encounter. Guards a late terminal from advancing a newer wave. */
+      readonly nextWave: number;
+      /** Whether `SelectBiomePhase` precedes `NewBattlePhase` at this boundary. */
+      readonly selectBiome: boolean;
+    };
+
 /** ME_PICK intent/outcome: the top-level option index the ME owner selected (#8, guest->host forward). */
 export interface CoopMePickPayload {
   /** The option index the owner chose in the ME selector. */
@@ -300,19 +319,28 @@ export interface CoopMePresentPayload {
   readonly presentation?: Extract<CoopInteractionOutcome, { k: "mePresent" }>;
 }
 
-/** ME_TERMINAL intent/outcome: the ME's terminal transition (#10). Carries the host-stated resolution (#859). */
-export interface CoopMeTerminalPayload {
-  /** The terminal resolution the host committed: leave (non-battle) or battle (an option spawned a fight). */
-  readonly terminal: CoopMeTerminalKind;
-  /** For a battle terminal, the host's current battle turn to align the guest's ME-battle boot (#822). Absent for leave. */
-  readonly hostTurn?: number;
-  /**
-   * Complete host state at a leave terminal. The durability receiver applies this exact image before it
-   * materializes the terminal choice, so a dropped legacy `meResync` can never let control outrun DATA.
-   * Battle handoffs intentionally omit it: their authoritative battle stream remains the data carrier.
-   */
-  readonly outcome?: Extract<CoopInteractionOutcome, { k: "meResync" }>;
-}
+/**
+ * ME_TERMINAL transaction: one retained host state image plus the exact executable destination (#10).
+ * Both variants are complete. In particular a battle handoff may not delegate DATA to a separately timed
+ * party/raw terminal carrier: the guest adopts `outcome` first, then opens `destination`, exactly once.
+ */
+export type CoopMeTerminalPayload =
+  | {
+      /** The option spawned a battle. */
+      readonly terminal: "battle";
+      /** Comprehensive post-effect state, including the generated/degraded battle party. */
+      readonly outcome: Extract<CoopInteractionOutcome, { k: "meResync" }>;
+      /** Exact battle boot, causally bound to the state image above. */
+      readonly destination: Extract<CoopMeTerminalDestination, { kind: "battle" }>;
+    }
+  | {
+      /** The encounter reached its true final leave (directly or after a spawned battle). */
+      readonly terminal: "leave";
+      /** Comprehensive post-effect/final reward/material state. */
+      readonly outcome: Extract<CoopInteractionOutcome, { k: "meResync" }>;
+      /** Exact between-wave continuation, causally bound to the state image above. */
+      readonly destination: Extract<CoopMeTerminalDestination, { kind: "continue" }>;
+    };
 
 /** QUIZ_ANSWER intent/outcome: one committed answer of an embedded ME quiz minigame (#9/#818). */
 export interface CoopQuizAnswerPayload {
