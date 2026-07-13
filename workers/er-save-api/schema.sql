@@ -41,6 +41,18 @@ CREATE TABLE IF NOT EXISTS session_saves (
   PRIMARY KEY (user_id, slot)
 );
 
+-- Co-op run tombstones live outside session_saves so normal GET/account-info sees a reusable empty
+-- slot while delayed writes for the deleted run remain permanently fenced.
+CREATE TABLE IF NOT EXISTS coop_run_tombstones_v2 (
+  user_id INTEGER NOT NULL,
+  slot INTEGER NOT NULL CHECK (slot BETWEEN 0 AND 4),
+  run_id TEXT NOT NULL,
+  checkpoint_revision INTEGER NOT NULL CHECK (checkpoint_revision >= 0),
+  digest TEXT NOT NULL CHECK (length(digest) = 64),
+  deleted_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, run_id)
+);
+
 -- Run history (#217 ghost teams + balancing analytics). One row per finished run
 -- (win or loss), append-only. Winning rows are sampled to build the shared pool of
 -- "ghost trainers" other players face. `id` is client-generated (seed+timestamp)

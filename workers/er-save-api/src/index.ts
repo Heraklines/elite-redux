@@ -642,8 +642,9 @@ async function handleSystemUpdate(
 }
 
 function parseSlot(url: URL): number | null {
-  const slot = Number.parseInt(url.searchParams.get("slot") ?? "", 10);
-  if (!Number.isFinite(slot) || slot < 0 || slot > 4) {
+  const raw = url.searchParams.get("slot") ?? "";
+  const slot = /^\d+$/u.test(raw) ? Number(raw) : Number.NaN;
+  if (!Number.isSafeInteger(slot) || slot < 0 || slot > 4) {
     return null;
   }
   return slot;
@@ -668,14 +669,247 @@ async function handleSessionGet(
   return text(row.data, 200, cors);
 }
 
-async function upsertSession(env: Env, userId: number, slot: number, data: string): Promise<void> {
-  await env.DB.prepare(
-    `INSERT INTO session_saves (user_id, slot, data, updated_at)
-       VALUES (?1, ?2, ?3, ?4)
-       ON CONFLICT(user_id, slot) DO UPDATE SET data = ?3, updated_at = ?4`,
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+interface CoopRunRef {
+  runId: string;
+  checkpointRevision: number;
+}
+
+const COOP_GAME_MODE_ID = 6;
+
+type SessionProtection = "solo" | "coop-valid" | "coop-invalid" | "unknown";
+
+function coopRunFromParsed(parsed: unknown): CoopRunRef | null {
+  if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const coopRun = (parsed as { coopRun?: { runId?: unknown; checkpointRevision?: unknown } }).coopRun;
+  const runId = coopRun?.runId;
+  const checkpointRevision = coopRun?.checkpointRevision;
+  return typeof runId === "string"
+    && /^[A-Za-z0-9_-]{16,128}$/u.test(runId)
+    && typeof checkpointRevision === "number"
+    && Number.isSafeInteger(checkpointRevision)
+    && checkpointRevision >= 0
+    ? { runId, checkpointRevision }
+    : null;
+}
+
+/** A co-op row is protected whenever it carries a well-formed durable run identity. */
+export function parseValidCoopRun(data: string | null): CoopRunRef | null {
+  if (data == null) {
+    return null;
+  }
+  try {
+    return coopRunFromParsed(JSON.parse(data) as unknown);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Legacy mutations may touch only an unambiguously solo row. A parsable save carrying any co-op
+ * discriminator is protected even when its durable identity is missing/malformed (including
+ * pre-run-id staging checkpoints); only the dedicated CAS path may decide how to recover it.
+ */
+export function classifySessionProtection(data: string | null): SessionProtection {
+  if (data == null) {
+    return "solo";
+  }
+  try {
+    const parsed = JSON.parse(data) as unknown;
+    if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return "unknown";
+    }
+    if (coopRunFromParsed(parsed) != null) {
+      return "coop-valid";
+    }
+    const record = parsed as Record<string, unknown>;
+    return record.gameMode === COOP_GAME_MODE_ID
+      || Object.hasOwn(record, "coopRun")
+      || Object.hasOwn(record, "coopParticipants")
+      || Object.hasOwn(record, "coopControlPlane")
+      ? "coop-invalid"
+      : "solo";
+  } catch {
+    return "unknown";
+  }
+}
+
+function isCoopLikeSession(data: string | null): boolean {
+  return classifySessionProtection(data) !== "solo";
+}
+
+/** SQL used by D1 and by the Node-SQLite contract tests. */
+export const COOP_EMPTY_SESSION_INSERT_SQL = `INSERT INTO session_saves (user_id, slot, data, updated_at)
+  SELECT ?1, ?2, ?3, ?4
+  WHERE NOT EXISTS (
+    SELECT 1 FROM coop_run_tombstones_v2 WHERE user_id = ?1 AND run_id = ?5
   )
-    .bind(userId, slot, data, Date.now())
-    .run();
+  AND NOT EXISTS (
+    SELECT 1 FROM session_saves
+    WHERE user_id = ?1
+      AND json_extract(CASE WHEN json_valid(data) THEN data ELSE '{}' END, '$.coopRun.runId') = ?5
+  )
+  ON CONFLICT(user_id, slot) DO NOTHING`;
+
+export const COOP_EXISTING_SESSION_UPDATE_SQL = `UPDATE session_saves SET data = ?1, updated_at = ?2
+  WHERE user_id = ?3 AND slot = ?4 AND data = ?5
+    AND NOT EXISTS (
+      SELECT 1 FROM coop_run_tombstones_v2 WHERE user_id = ?3 AND run_id = ?6
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM session_saves AS duplicate
+      WHERE duplicate.user_id = ?3 AND duplicate.slot <> ?4
+        AND json_extract(
+          CASE WHEN json_valid(duplicate.data) THEN duplicate.data ELSE '{}' END,
+          '$.coopRun.runId'
+        ) = ?6
+    )`;
+
+export const COOP_EXACT_SESSION_REPLAY_SQL = `UPDATE session_saves SET updated_at = updated_at
+  WHERE user_id = ?1 AND slot = ?2 AND data = ?3
+    AND NOT EXISTS (
+      SELECT 1 FROM coop_run_tombstones_v2 WHERE user_id = ?1 AND run_id = ?4
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM session_saves AS duplicate
+      WHERE duplicate.user_id = ?1 AND duplicate.slot <> ?2
+        AND json_extract(
+          CASE WHEN json_valid(duplicate.data) THEN duplicate.data ELSE '{}' END,
+          '$.coopRun.runId'
+        ) = ?4
+    )`;
+
+export const COOP_TOMBSTONE_INSERT_SQL = `INSERT INTO coop_run_tombstones_v2
+    (user_id, slot, run_id, checkpoint_revision, digest, deleted_at)
+  SELECT ?1, ?2, ?3, ?4, ?5, ?6
+  WHERE EXISTS (
+    SELECT 1 FROM session_saves WHERE user_id = ?1 AND slot = ?2 AND data = ?7
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM session_saves AS duplicate
+    WHERE duplicate.user_id = ?1 AND duplicate.slot <> ?2
+      AND json_extract(
+        CASE WHEN json_valid(duplicate.data) THEN duplicate.data ELSE '{}' END,
+        '$.coopRun.runId'
+      ) = ?3
+  )
+  ON CONFLICT(user_id, run_id) DO NOTHING`;
+
+export const COOP_TOMBSTONED_SESSION_DELETE_SQL = `DELETE FROM session_saves
+  WHERE user_id = ?1 AND slot = ?2 AND data = ?3
+    AND EXISTS (
+      SELECT 1 FROM coop_run_tombstones_v2
+      WHERE user_id = ?1 AND run_id = ?4 AND slot = ?2
+        AND checkpoint_revision = ?5 AND digest = ?6
+    )`;
+
+export const COOP_LIVE_RUN_ROWS_SQL = `SELECT slot, data FROM session_saves
+  WHERE user_id = ?1
+    AND json_extract(CASE WHEN json_valid(data) THEN data ELSE '{}' END, '$.coopRun.runId') = ?2
+  ORDER BY slot ASC LIMIT 2`;
+
+export const UPDATE_ALL_CONDITIONAL_SYSTEM_SQL = `INSERT INTO system_saves (user_id, data, updated_at)
+  SELECT ?1, ?2, ?3
+  WHERE EXISTS (
+    SELECT 1 FROM session_saves WHERE user_id = ?1 AND slot = ?4 AND data = ?5
+  )
+  ON CONFLICT(user_id) DO UPDATE SET data = ?2, updated_at = ?3`;
+
+async function ensureCoopRunTombstones(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS coop_run_tombstones_v2 (
+       user_id INTEGER NOT NULL,
+       slot INTEGER NOT NULL CHECK (slot BETWEEN 0 AND 4),
+       run_id TEXT NOT NULL,
+       checkpoint_revision INTEGER NOT NULL CHECK (checkpoint_revision >= 0),
+       digest TEXT NOT NULL CHECK (length(digest) = 64),
+       deleted_at INTEGER NOT NULL,
+       PRIMARY KEY (user_id, run_id)
+     )`,
+  ).run();
+}
+
+async function exactLiveCoopSessionExists(
+  env: Env,
+  userId: number,
+  slot: number,
+  data: string,
+  runId: string,
+): Promise<boolean> {
+  const result = await env.DB.prepare(COOP_EXACT_SESSION_REPLAY_SQL).bind(userId, slot, data, runId).run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+interface CoopTombstoneRow {
+  slot: number;
+  checkpoint_revision: number;
+  digest: string;
+}
+
+async function exactCoopDeleteSettled(
+  env: Env,
+  userId: number,
+  runId: string,
+  expected: { slot: number; checkpointRevision: number; digest: string },
+): Promise<boolean> {
+  const [tombstoneResult, liveResult] = await env.DB.batch([
+    env.DB.prepare(
+      `SELECT slot, checkpoint_revision, digest FROM coop_run_tombstones_v2
+       WHERE user_id = ? AND run_id = ?`,
+    ).bind(userId, runId),
+    env.DB.prepare(COOP_LIVE_RUN_ROWS_SQL).bind(userId, runId),
+  ]);
+  const tombstone = (tombstoneResult?.results?.[0] ?? null) as CoopTombstoneRow | null;
+  return (
+    exactCoopDeleteReplaySatisfied(
+      tombstone == null
+        ? null
+        : {
+            slot: tombstone.slot,
+            checkpointRevision: tombstone.checkpoint_revision,
+            digest: tombstone.digest,
+          },
+      expected,
+    ) && (liveResult?.results?.length ?? 0) === 0
+  );
+}
+
+/** Exact lost-response idempotence rule for first-save empty-slot CAS. */
+export function coopEmptySessionCasSatisfied(
+  insertedChanges: number,
+  existingData: string | null,
+  incomingData: string,
+): boolean {
+  return insertedChanges > 0 || existingData === incomingData;
+}
+
+export function exactSessionWriteSatisfied(changes: number, readback: string | null, incoming: string): boolean {
+  return changes > 0 || readback === incoming;
+}
+
+export function exactSessionDeleteSatisfied(changes: number, readback: string | null): boolean {
+  return changes > 0 || readback == null;
+}
+
+export function coopTombstoneBlocksRun(tombstonedRunId: string | null, incomingRunId: string): boolean {
+  return tombstonedRunId === incomingRunId;
+}
+
+export function exactCoopDeleteReplaySatisfied(
+  tombstone: { slot: number; checkpointRevision: number; digest: string } | null,
+  expected: { slot: number; checkpointRevision: number; digest: string },
+): boolean {
+  return (
+    tombstone?.slot === expected.slot
+    && tombstone.checkpointRevision === expected.checkpointRevision
+    && tombstone.digest === expected.digest
+  );
 }
 
 async function handleSessionUpdate(
@@ -684,6 +918,7 @@ async function handleSessionUpdate(
   auth: TokenPayload,
   env: Env,
   cors: Record<string, string>,
+  allowCoopCas = false,
 ): Promise<Response> {
   const slot = parseSlot(url);
   if (slot === null) {
@@ -693,8 +928,306 @@ async function handleSessionUpdate(
   if (data === null) {
     return text("Save data too large.", 413, cors);
   }
-  await upsertSession(env, auth.uid, slot, data);
-  return text("", 200, cors);
+  const casMode = url.searchParams.get("coopCasMode");
+  if (!allowCoopCas && casMode != null) {
+    return text("Co-op session CAS requires the dedicated endpoint.", 409, cors);
+  }
+  let incomingCoopRun: CoopRunRef | null = null;
+  if (casMode === "empty" || casMode === "existing") {
+    incomingCoopRun = parseValidCoopRun(data);
+    if (incomingCoopRun == null) {
+      return text("Session CAS conflict: incoming run identity is invalid.", 409, cors);
+    }
+    await ensureCoopRunTombstones(env);
+  }
+  if (casMode === "empty") {
+    const result = await env.DB.prepare(COOP_EMPTY_SESSION_INSERT_SQL)
+      .bind(auth.uid, slot, data, Date.now(), incomingCoopRun!.runId)
+      .run();
+    if ((result.meta.changes ?? 0) > 0) {
+      return text("", 200, cors);
+    }
+    // A byte-identical retry is success only while one atomic write predicate proves the run is
+    // live, unique account-wide, and not tombstoned. A plain readback would reopen delete->insert.
+    return (await exactLiveCoopSessionExists(env, auth.uid, slot, data, incomingCoopRun!.runId))
+      ? text("", 200, cors)
+      : text("Session CAS conflict: expected an empty, untombstoned, unique run slot.", 409, cors);
+  }
+  if (casMode === "existing") {
+    const expectedRunId = url.searchParams.get("coopCasRunId") ?? "";
+    const expectedRevisionRaw = url.searchParams.get("coopCasCheckpointRevision") ?? "";
+    const expectedRevision = /^\d+$/u.test(expectedRevisionRaw) ? Number(expectedRevisionRaw) : Number.NaN;
+    const expectedDigest = url.searchParams.get("coopCasDigest") ?? "";
+    const incomingDigest = await sha256Hex(data);
+    if (
+      incomingCoopRun?.runId !== expectedRunId
+      || !Number.isSafeInteger(expectedRevision)
+      || expectedRevision < 0
+      || !/^[0-9a-f]{64}$/u.test(expectedDigest)
+      || incomingCoopRun.checkpointRevision < expectedRevision
+      || (incomingCoopRun.checkpointRevision === expectedRevision && incomingDigest !== expectedDigest)
+    ) {
+      return text("Session CAS conflict: incoming checkpoint does not advance the expected run.", 409, cors);
+    }
+    const row = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+      .bind(auth.uid, slot)
+      .first<{ data: string }>();
+    if (row == null) {
+      return text("Session CAS conflict: expected checkpoint missing.", 409, cors);
+    }
+    // Direct request replay after a committed-but-lost response. Validate through the same atomic
+    // tombstone/uniqueness predicate rather than rejecting on the now-advanced stored revision.
+    if (row.data === data) {
+      return (await exactLiveCoopSessionExists(env, auth.uid, slot, data, incomingCoopRun!.runId))
+        ? text("", 200, cors)
+        : text("Session CAS conflict: exact checkpoint is deleted or duplicated.", 409, cors);
+    }
+    const existing = parseValidCoopRun(row.data);
+    if (
+      existing?.runId !== expectedRunId
+      || existing.checkpointRevision !== expectedRevision
+      || !/^[0-9a-f]{64}$/u.test(expectedDigest)
+      || (await sha256Hex(row.data)) !== expectedDigest
+    ) {
+      return text("Session CAS conflict: checkpoint changed.", 409, cors);
+    }
+    // Exact-row WHERE closes the read->write race: a concurrent tab/device mutation makes changes=0.
+    const result = await env.DB.prepare(COOP_EXISTING_SESSION_UPDATE_SQL)
+      .bind(data, Date.now(), auth.uid, slot, row.data, incomingCoopRun!.runId)
+      .run();
+    if ((result.meta.changes ?? 0) > 0) {
+      return text("", 200, cors);
+    }
+    return (await exactLiveCoopSessionExists(env, auth.uid, slot, data, incomingCoopRun!.runId))
+      ? text("", 200, cors)
+      : text("Session CAS conflict: checkpoint changed during update.", 409, cors);
+  }
+  const existing = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  if (isCoopLikeSession(existing?.data ?? null) || isCoopLikeSession(data)) {
+    return text("Co-op session writes require compare-and-swap.", 409, cors);
+  }
+  const result =
+    existing == null
+      ? await env.DB.prepare(
+          `INSERT INTO session_saves (user_id, slot, data, updated_at)
+         VALUES (?1, ?2, ?3, ?4) ON CONFLICT(user_id, slot) DO NOTHING`,
+        )
+          .bind(auth.uid, slot, data, Date.now())
+          .run()
+      : await env.DB.prepare(
+          `UPDATE session_saves SET data = ?1, updated_at = ?2
+         WHERE user_id = ?3 AND slot = ?4 AND data = ?5`,
+        )
+          .bind(data, Date.now(), auth.uid, slot, existing.data)
+          .run();
+  if ((result.meta.changes ?? 0) > 0) {
+    return text("", 200, cors);
+  }
+  const readback = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  return exactSessionWriteSatisfied(0, readback?.data ?? null, data)
+    ? text("", 200, cors)
+    : text("Session changed during legacy update.", 409, cors);
+}
+
+async function handleCoopSessionCasUpdate(
+  request: Request,
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const casMode = url.searchParams.get("coopCasMode");
+  if (casMode !== "empty" && casMode !== "existing") {
+    return text("Session CAS mode is required.", 400, cors);
+  }
+  return handleSessionUpdate(request, url, auth, env, cors, true);
+}
+
+async function handleCoopSessionCasDelete(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const slot = parseSlot(url);
+  const expectedRunId = url.searchParams.get("coopCasRunId") ?? "";
+  const expectedRevisionRaw = url.searchParams.get("coopCasCheckpointRevision") ?? "";
+  const expectedRevision = /^\d+$/u.test(expectedRevisionRaw) ? Number(expectedRevisionRaw) : Number.NaN;
+  const expectedDigest = url.searchParams.get("coopCasDigest") ?? "";
+  if (
+    slot == null
+    || !/^[A-Za-z0-9_-]{16,128}$/u.test(expectedRunId)
+    || !Number.isSafeInteger(expectedRevision)
+    || expectedRevision < 0
+    || !/^[0-9a-f]{64}$/u.test(expectedDigest)
+  ) {
+    return text("Invalid co-op delete commitment.", 400, cors);
+  }
+  await ensureCoopRunTombstones(env);
+  const expected = { slot, checkpointRevision: expectedRevision, digest: expectedDigest };
+  if (await exactCoopDeleteSettled(env, auth.uid, expectedRunId, expected)) {
+    return text("", 200, cors);
+  }
+  const row = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  const run = parseValidCoopRun(row?.data ?? null);
+  if (row == null) {
+    return text("Session CAS conflict: checkpoint missing without exact tombstone.", 409, cors);
+  }
+  if (
+    run?.runId !== expectedRunId
+    || run.checkpointRevision !== expectedRevision
+    || (await sha256Hex(row.data)) !== expectedDigest
+  ) {
+    return text("Session CAS conflict: checkpoint changed before delete.", 409, cors);
+  }
+  const now = Date.now();
+  const results = await env.DB.batch([
+    env.DB.prepare(COOP_TOMBSTONE_INSERT_SQL).bind(
+      auth.uid,
+      slot,
+      expectedRunId,
+      expectedRevision,
+      expectedDigest,
+      now,
+      row.data,
+    ),
+    env.DB.prepare(COOP_TOMBSTONED_SESSION_DELETE_SQL).bind(
+      auth.uid,
+      slot,
+      row.data,
+      expectedRunId,
+      expectedRevision,
+      expectedDigest,
+    ),
+  ]);
+  return (results[1]?.meta.changes ?? 0) > 0 && (await exactCoopDeleteSettled(env, auth.uid, expectedRunId, expected))
+    ? text("", 200, cors)
+    : text("Session CAS conflict: checkpoint changed during delete.", 409, cors);
+}
+
+async function handleCoopRunStatus(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const runId = url.searchParams.get("coopRunId") ?? "";
+  const requestedSlot = url.searchParams.get("slot");
+  if (!/^[A-Za-z0-9_-]{16,128}$/u.test(runId) || (requestedSlot != null && parseSlot(url) == null)) {
+    return text("Invalid co-op run status request.", 400, cors);
+  }
+  await ensureCoopRunTombstones(env);
+  const [tombstoneResult, liveResult] = await env.DB.batch([
+    env.DB.prepare(
+      `SELECT slot, checkpoint_revision, digest FROM coop_run_tombstones_v2
+       WHERE user_id = ? AND run_id = ?`,
+    ).bind(auth.uid, runId),
+    env.DB.prepare(COOP_LIVE_RUN_ROWS_SQL).bind(auth.uid, runId),
+  ]);
+  const tombstone = (tombstoneResult?.results?.[0] ?? null) as CoopTombstoneRow | null;
+  const live = (liveResult?.results ?? []) as { slot: number; data: string }[];
+  if (tombstone != null && live.length === 0) {
+    return json(
+      {
+        state: "tombstoned",
+        runId,
+        slot: tombstone.slot,
+        checkpointRevision: tombstone.checkpoint_revision,
+        digest: tombstone.digest,
+      },
+      200,
+      cors,
+    );
+  }
+  if (tombstone == null && live.length === 0) {
+    return json({ state: "missing", runId }, 200, cors);
+  }
+  if (tombstone != null || live.length !== 1) {
+    return text("Session CAS conflict: co-op run has contradictory account state.", 409, cors);
+  }
+  const active = parseValidCoopRun(live[0].data);
+  if (active?.runId !== runId) {
+    return text("Session CAS conflict: active co-op run identity is invalid.", 409, cors);
+  }
+  return json(
+    {
+      state: "active",
+      runId,
+      slot: live[0].slot,
+      checkpointRevision: active.checkpointRevision,
+      digest: await sha256Hex(live[0].data),
+    },
+    200,
+    cors,
+  );
+}
+
+/**
+ * Recovery-only deletion for an opaque/corrupt row that cannot be proven solo or co-op. The caller
+ * must first read and hash the exact bytes; valid/co-op-like JSON is deliberately ineligible so this
+ * endpoint can never bypass the co-op tombstone protocol.
+ */
+async function handleClassifiedSessionExactDelete(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+  expectedProtection: "unknown" | "coop-invalid",
+  label: "opaque" | "legacy co-op",
+): Promise<Response> {
+  const slot = parseSlot(url);
+  const expectedDigest = url.searchParams.get("exactDigest") ?? "";
+  if (slot == null || !/^[0-9a-f]{64}$/u.test(expectedDigest)) {
+    return text(`Invalid ${label} session delete commitment.`, 400, cors);
+  }
+  const row = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  if (row == null) {
+    return text("", 200, cors);
+  }
+  if (classifySessionProtection(row.data) !== expectedProtection) {
+    return text(`${label} exact delete cannot remove a differently classified session.`, 409, cors);
+  }
+  if ((await sha256Hex(row.data)) !== expectedDigest) {
+    return text(`${label} session changed before exact delete.`, 409, cors);
+  }
+  const result = await env.DB.prepare("DELETE FROM session_saves WHERE user_id = ?1 AND slot = ?2 AND data = ?3")
+    .bind(auth.uid, slot, row.data)
+    .run();
+  if ((result.meta.changes ?? 0) > 0) {
+    return text("", 200, cors);
+  }
+  const readback = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  return exactSessionDeleteSatisfied(0, readback?.data ?? null)
+    ? text("", 200, cors)
+    : text(`${label} session changed during exact delete.`, 409, cors);
+}
+
+async function handleOpaqueSessionExactDelete(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  return handleClassifiedSessionExactDelete(url, auth, env, cors, "unknown", "opaque");
+}
+
+async function handleLegacyCoopSessionExactDelete(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  return handleClassifiedSessionExactDelete(url, auth, env, cors, "coop-invalid", "legacy co-op");
 }
 
 async function handleSessionDelete(
@@ -707,8 +1240,27 @@ async function handleSessionDelete(
   if (slot === null) {
     return text("Invalid slot.", 400, cors);
   }
-  await env.DB.prepare("DELETE FROM session_saves WHERE user_id = ? AND slot = ?").bind(auth.uid, slot).run();
-  return text("", 200, cors);
+  const existing = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  if (isCoopLikeSession(existing?.data ?? null)) {
+    return text("Co-op session deletes require compare-and-swap.", 409, cors);
+  }
+  if (existing == null) {
+    return text("", 200, cors);
+  }
+  const result = await env.DB.prepare("DELETE FROM session_saves WHERE user_id = ? AND slot = ? AND data = ?")
+    .bind(auth.uid, slot, existing.data)
+    .run();
+  if ((result.meta.changes ?? 0) > 0) {
+    return text("", 200, cors);
+  }
+  const readback = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  return exactSessionDeleteSatisfied(0, readback?.data ?? null)
+    ? text("", 200, cors)
+    : text("Session changed during legacy delete.", 409, cors);
 }
 
 async function handleSessionClear(
@@ -729,9 +1281,31 @@ async function handleSessionClear(
   // "Continue", and loading the all-fainted party instantly game-overed back to
   // the title in a loop. Run history for ghosts/analytics is captured separately
   // via POST /savedata/run, so nothing is lost by deleting here.
-  await readSaveBody(request); // drain the request body (final session, unused)
-  await env.DB.prepare("DELETE FROM session_saves WHERE user_id = ? AND slot = ?").bind(auth.uid, slot).run();
-  return json({ success: true }, 200, cors);
+  const incoming = await readSaveBody(request); // drain the request body (final session)
+  if (incoming == null) {
+    return json({ success: false, error: "Save data too large." }, 413, cors);
+  }
+  const existing = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  if (isCoopLikeSession(existing?.data ?? null) || isCoopLikeSession(incoming)) {
+    return json({ success: false, error: "Co-op session clears require compare-and-swap." }, 409, cors);
+  }
+  if (existing == null) {
+    return json({ success: true }, 200, cors);
+  }
+  const result = await env.DB.prepare("DELETE FROM session_saves WHERE user_id = ? AND slot = ? AND data = ?")
+    .bind(auth.uid, slot, existing.data)
+    .run();
+  if ((result.meta.changes ?? 0) > 0) {
+    return json({ success: true }, 200, cors);
+  }
+  const readback = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+    .bind(auth.uid, slot)
+    .first<{ data: string }>();
+  return exactSessionDeleteSatisfied(0, readback?.data ?? null)
+    ? json({ success: true }, 200, cors)
+    : json({ success: false, error: "Session changed during legacy clear." }, 409, cors);
 }
 
 async function handleUpdateAll(
@@ -752,6 +1326,8 @@ async function handleUpdateAll(
   }
   const now = Date.now();
   const stmts: D1PreparedStatement[] = [];
+  let sessionMutation: { index: number; slot: number; data: string } | null = null;
+  let storedSystem: string | null = null;
   if (payload.system !== undefined && payload.system !== null) {
     const sys = typeof payload.system === "string" ? payload.system : JSON.stringify(payload.system);
     const allowReset = new URL(request.url).searchParams.get("allowReset") === "1";
@@ -759,26 +1335,72 @@ async function handleUpdateAll(
     if (guard) {
       return guard;
     }
-    const storedSys = await compressSave(sys);
-    stmts.push(
-      env.DB.prepare(
-        `INSERT INTO system_saves (user_id, data, updated_at) VALUES (?1, ?2, ?3)
-           ON CONFLICT(user_id) DO UPDATE SET data = ?2, updated_at = ?3`,
-      ).bind(auth.uid, storedSys, now),
-    );
+    storedSystem = await compressSave(sys);
   }
-  const slot = Number.parseInt(String(payload.sessionSlotId ?? ""), 10);
-  if (payload.session !== undefined && payload.session !== null && Number.isFinite(slot) && slot >= 0 && slot <= 4) {
-    const sess = typeof payload.session === "string" ? payload.session : JSON.stringify(payload.session);
+  const slotRaw = String(payload.sessionSlotId ?? "");
+  const slot = /^\d+$/u.test(slotRaw) ? Number(slotRaw) : Number.NaN;
+  const sessionPayload = payload.session;
+  const hasSession = sessionPayload !== undefined && sessionPayload !== null;
+  if (hasSession && (!Number.isSafeInteger(slot) || slot < 0 || slot > 4)) {
+    return text("Invalid session slot in updateAll.", 400, cors);
+  }
+  if (hasSession) {
+    const sess = typeof sessionPayload === "string" ? sessionPayload : JSON.stringify(sessionPayload);
+    const existing = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+      .bind(auth.uid, slot)
+      .first<{ data: string }>();
+    if (isCoopLikeSession(existing?.data ?? null) || isCoopLikeSession(sess)) {
+      return text("Co-op session updateAll writes require compare-and-swap.", 409, cors);
+    }
+    const statement =
+      existing == null
+        ? env.DB.prepare(
+            `INSERT INTO session_saves (user_id, slot, data, updated_at)
+           VALUES (?1, ?2, ?3, ?4) ON CONFLICT(user_id, slot) DO NOTHING`,
+          ).bind(auth.uid, slot, sess, now)
+        : env.DB.prepare(
+            `UPDATE session_saves SET data = ?1, updated_at = ?2
+           WHERE user_id = ?3 AND slot = ?4 AND data = ?5`,
+          ).bind(sess, now, auth.uid, slot, existing.data);
+    sessionMutation = { index: stmts.length, slot, data: sess };
+    stmts.push(statement);
+  }
+  let systemMutationIndex: number | null = null;
+  if (storedSystem != null) {
+    systemMutationIndex = stmts.length;
     stmts.push(
-      env.DB.prepare(
-        `INSERT INTO session_saves (user_id, slot, data, updated_at) VALUES (?1, ?2, ?3, ?4)
-           ON CONFLICT(user_id, slot) DO UPDATE SET data = ?3, updated_at = ?4`,
-      ).bind(auth.uid, slot, sess, now),
+      sessionMutation == null
+        ? env.DB.prepare(
+            `INSERT INTO system_saves (user_id, data, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(user_id) DO UPDATE SET data = ?2, updated_at = ?3`,
+          ).bind(auth.uid, storedSystem, now)
+        : env.DB.prepare(UPDATE_ALL_CONDITIONAL_SYSTEM_SQL).bind(
+            auth.uid,
+            storedSystem,
+            now,
+            sessionMutation.slot,
+            sessionMutation.data,
+          ),
     );
   }
   if (stmts.length > 0) {
-    await env.DB.batch(stmts);
+    const results = await env.DB.batch(stmts);
+    if (sessionMutation != null) {
+      const sessionChanged = (results[sessionMutation.index]?.meta.changes ?? 0) > 0;
+      const systemChanged = systemMutationIndex == null || (results[systemMutationIndex]?.meta.changes ?? 0) > 0;
+      if (sessionChanged && !systemChanged) {
+        return text("System save did not commit with the accepted session update.", 500, cors);
+      }
+      if (sessionChanged) {
+        return text("", 200, cors);
+      }
+      const readback = await env.DB.prepare("SELECT data FROM session_saves WHERE user_id = ? AND slot = ?")
+        .bind(auth.uid, sessionMutation.slot)
+        .first<{ data: string }>();
+      if (!systemChanged || !exactSessionWriteSatisfied(0, readback?.data ?? null, sessionMutation.data)) {
+        return text("Session changed during updateAll.", 409, cors);
+      }
+    }
   }
   return text("", 200, cors);
 }
@@ -3629,6 +4251,21 @@ export default {
       }
       if (pathname === "/savedata/session/update" && method === "POST") {
         return await handleSessionUpdate(request, url, auth, env, cors);
+      }
+      if (pathname === "/savedata/session/coop-cas-update" && method === "POST") {
+        return await handleCoopSessionCasUpdate(request, url, auth, env, cors);
+      }
+      if (pathname === "/savedata/session/coop-cas-delete" && method === "POST") {
+        return await handleCoopSessionCasDelete(url, auth, env, cors);
+      }
+      if (pathname === "/savedata/session/coop-run-status" && method === "GET") {
+        return await handleCoopRunStatus(url, auth, env, cors);
+      }
+      if (pathname === "/savedata/session/opaque-exact-delete" && method === "POST") {
+        return await handleOpaqueSessionExactDelete(url, auth, env, cors);
+      }
+      if (pathname === "/savedata/session/legacy-coop-exact-delete" && method === "POST") {
+        return await handleLegacyCoopSessionExactDelete(url, auth, env, cors);
       }
       if (pathname === "/savedata/session/delete" && method === "GET") {
         return await handleSessionDelete(url, auth, env, cors);
