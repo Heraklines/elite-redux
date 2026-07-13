@@ -37,6 +37,7 @@ import {
   resetCoopOperationJournalLog,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
+  awaitCoopSettledWaveAdvanceAtBattleEnd,
   broadcastCoopWaveEndState,
   broadcastCoopWaveResolved,
   clearCoopRuntime,
@@ -278,6 +279,21 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       "an ME-spawned battle has its own retained terminal and must not be reclassified as an ordinary win",
     ).not.toHaveBeenCalled();
     expect(routed).toEqual([]);
+
+    const release = vi.fn();
+    vi.spyOn(rig.guestScene.currentBattle, "isBattleMysteryEncounter").mockReturnValue(true);
+    let heldByWaveTransaction = true;
+    await withClient(rig.guestCtx, () => {
+      heldByWaveTransaction = awaitCoopSettledWaveAdvanceAtBattleEnd(release);
+    });
+    expect(
+      heldByWaveTransaction,
+      "the guest ME BattleEnd remains owned by the retained ME terminal instead of waiting for WAVE_ADVANCE",
+    ).toBe(false);
+    expect(
+      release,
+      "the wave boundary did not steal or prematurely execute the ME continuation",
+    ).not.toHaveBeenCalled();
     logs.flush();
   }, 300_000);
 

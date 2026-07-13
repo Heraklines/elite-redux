@@ -966,6 +966,12 @@ export function awaitCoopSettledWaveAdvanceAtBattleEnd(release: () => void): boo
   if (!isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction()) {
     return false;
   }
+  // A Mystery battle is the continuation of an already-retained ME terminal transaction. Its BattleEnd
+  // returns through PostMysteryEncounterPhase and must never wait for (or synthesize) a second, colliding
+  // WAVE_ADVANCE transaction for the same pinned wave. The ME surface remains the sole owner of this tail.
+  if (globalScene.currentBattle?.isBattleMysteryEncounter?.()) {
+    return false;
+  }
   const wave = globalScene.currentBattle?.waveIndex ?? -1;
   if (!Number.isSafeInteger(wave) || wave < 0) {
     failCoopSharedSession("The retained post-battle boundary had no valid source wave.");
