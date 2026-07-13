@@ -22,6 +22,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { EntryHazardTag } from "#data/arena-tag";
+import type { BattleFormat } from "#data/battle-format";
 import { SerializableBattlerTag } from "#data/battler-tags";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import {
@@ -900,7 +901,7 @@ export function summonCoopPlayerField(fieldIndex: number, partySlot: number): vo
  * guarded so one bad tag can't break the rest of the heal. A `null`/`undefined` `hostTags` (an older
  * payload that never carried tags) is a hard skip - the guest's tags are left exactly as they were.
  */
-export function reconcileArenaTags(hostTags: CoopSerializedArenaTag[] | undefined): void {
+export function reconcileArenaTags(hostTags: CoopSerializedArenaTag[] | undefined, strict = false): void {
   if (hostTags == null) {
     return;
   }
@@ -921,8 +922,10 @@ export function reconcileArenaTags(hostTags: CoopSerializedArenaTag[] | undefine
         coopWarn("heal", `arenaTag REMOVE tagType=${tag.tagType} side=${tag.side} (host lacks it) -> removed`);
         try {
           arena.removeTagOnSide(tag.tagType, tag.side, true);
-        } catch {
-          /* one tag removal failed; continue */
+        } catch (error) {
+          if (strict) {
+            recordCoopApplyFailure("arenaTags", error);
+          }
         }
       }
     }
@@ -952,12 +955,18 @@ export function reconcileArenaTags(hostTags: CoopSerializedArenaTag[] | undefine
         if (existing != null) {
           existing.turnCount = Math.max(0, Math.trunc(want.turnCount));
         }
-      } catch {
-        /* one tag add/refresh failed; continue with the rest */
+      } catch (error) {
+        if (strict) {
+          recordCoopApplyFailure("arenaTags", error);
+        }
       }
     }
-  } catch {
-    // A malformed arena-tag set must never crash the guest's battle.
+  } catch (error) {
+    // A malformed arena-tag set must never crash the guest's battle. A full authoritative transaction,
+    // however, must reject instead of silently committing the other sections around this failed one.
+    if (strict) {
+      recordCoopApplyFailure("arenaTags", error);
+    }
   }
 }
 
@@ -2791,12 +2800,32 @@ function applyAuthoritativeMonData(mon: Pokemon, data: PokemonData, authoritativ
   }
 }
 
-function constructAuthoritativePokemon(data: PokemonData, index: number): Pokemon | null {
+interface CoopAuthoritativeApplyMutationScope {
+  /** Candidate-only objects are quarantined until the transaction commits. */
+  readonly createdPokemon: Pokemon[];
+  /** Prior-boundary objects are not destroyed until the transaction commits. */
+  readonly retiredPokemon: { pokemon: Pokemon; side: "player" | "enemy" }[];
+  /** Field/sprite projection is queued only after every material section succeeds. */
+  fieldPresentation?: {
+    readonly playerSeats: { pokemon: Pokemon; slot: number }[];
+    readonly enemySeats: { pokemon: Pokemon; slot: number }[];
+    readonly playerCapacity: number;
+    readonly enemyCapacity: number;
+  };
+  preSpriteKeys?: Map<number, string>;
+}
+
+function constructAuthoritativePokemon(
+  data: PokemonData,
+  index: number,
+  mutationScope?: CoopAuthoritativeApplyMutationScope,
+): Pokemon | null {
   try {
     const battle = globalScene.currentBattle;
     const mon = data.toPokemon(battle?.battleType ?? BattleType.WILD, index, battle?.double === true);
     mon.setVisible(false);
     mon.getSprite()?.setVisible(false);
+    mutationScope?.createdPokemon.push(mon);
     return mon;
   } catch {
     return null;
@@ -2807,6 +2836,7 @@ function reconcileAuthoritativeParty(
   side: "player" | "enemy",
   hostParty: PokemonData[],
   authoritativeGuest: boolean,
+  mutationScope?: CoopAuthoritativeApplyMutationScope,
 ): Pokemon[] {
   const liveParty =
     side === "player" ? (globalScene.getPlayerParty() as Pokemon[]) : (globalScene.getEnemyParty() as Pokemon[]);
@@ -2834,7 +2864,7 @@ function reconcileAuthoritativeParty(
     const data = hostParty[i];
     let mon = byId.get(data.id);
     if (mon == null) {
-      mon = constructAuthoritativePokemon(data, i) ?? undefined;
+      mon = constructAuthoritativePokemon(data, i, mutationScope) ?? undefined;
     }
     if (mon == null) {
       continue;
@@ -2844,6 +2874,13 @@ function reconcileAuthoritativeParty(
   }
   for (const mon of liveParty) {
     if (mon != null && !wantedIds.has(mon.id)) {
+      if (mutationScope != null) {
+        // Never destroy a prior-boundary object while the candidate can still fail. Field
+        // presentation hides the stale seat below; physical teardown happens only after every
+        // material section has committed and the state tick is ready to advance.
+        mutationScope.retiredPokemon.push({ pokemon: mon, side });
+        continue;
+      }
       try {
         if (mon.isOnField()) {
           mon.leaveField(true, true, false);
@@ -2876,6 +2913,7 @@ function reconcileAuthoritativeField(
   state: CoopAuthoritativeBattleStateV1,
   playerParty: PokemonData[],
   enemyParty: PokemonData[],
+  mutationScope?: CoopAuthoritativeApplyMutationScope,
 ): void {
   const playerById = new Map(playerParty.map(p => [p.id, p]));
   const enemyById = new Map(enemyParty.map(p => [p.id, p]));
@@ -2910,6 +2948,15 @@ function reconcileAuthoritativeField(
     }
   }
   const arrangement = globalScene.currentBattle?.arrangement;
+  if (mutationScope != null) {
+    mutationScope.fieldPresentation = {
+      playerSeats: visiblePlayerSeats,
+      enemySeats: visibleEnemySeats,
+      playerCapacity: arrangement?.playerCapacity ?? 1,
+      enemyCapacity: arrangement?.enemyCapacity ?? 1,
+    };
+    return;
+  }
   settleCoopFieldPresentation({
     side: "player",
     seats: visiblePlayerSeats,
@@ -3020,8 +3067,8 @@ function reconcileAuthoritativeModifiers(rawBlobs: Record<string, unknown>[] | u
           }
           pushPersistentModifier(modifier, player);
           changed = true;
-        } catch {
-          /* one missing modifier failed to reconstruct */
+        } catch (error) {
+          recordCoopApplyFailure(player ? "playerModifiers" : "enemyModifiers", error);
         }
       }
     }
@@ -3158,6 +3205,333 @@ export function reapplyAcceptedCoopAuthoritativeBattleState(
   return applyCoopAuthoritativeBattleStateTransaction(state, authoritativeGuest, true);
 }
 
+interface CoopAuthoritativeApplyPlan {
+  /** Deep-cloned wire image in this renderer's local side orientation. */
+  readonly state: CoopAuthoritativeBattleStateV1;
+  readonly playerParty: PokemonData[];
+  readonly enemyParty: PokemonData[];
+}
+
+interface CoopAuthoritativeApplyPlanFailure {
+  readonly section: string;
+  readonly error: string;
+  readonly monId?: number;
+}
+
+interface CoopAuthoritativeApplyBoundary {
+  readonly rollbackState: CoopAuthoritativeBattleStateV1;
+  readonly playerParty: Pokemon[];
+  readonly enemyParty: Pokemon[];
+  readonly playerModifiers: PersistentModifier[];
+  readonly enemyModifiers: PersistentModifier[];
+  readonly arena: typeof globalScene.arena;
+  readonly battleFormat?: BattleFormat;
+  readonly rndState: string;
+  readonly stateTickCounter: number;
+  readonly lastAppliedTick: number;
+}
+
+let coopAuthoritativeApplyTransactionActive = false;
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function validateAuthoritativeMonData(data: PokemonData): CoopAuthoritativeApplyPlanFailure | null {
+  const raw = data as unknown as Record<string, unknown>;
+  if (!Number.isSafeInteger(data.id) || !isFiniteNumber(data.hp)) {
+    return { section: "monData", monId: data.id, error: "invalid Pokemon identity or hp" };
+  }
+  for (const field of ["usedTMs", "stellarTypesBoosted", "ivs", "moveset"] as const) {
+    if (raw[field] != null && !Array.isArray(raw[field])) {
+      return { section: "monData", monId: data.id, error: `${field} must be an array` };
+    }
+  }
+  if (Array.isArray(raw.stats) && raw.stats.some(value => !isFiniteNumber(value))) {
+    return { section: "monData", monId: data.id, error: "stats must contain only finite numbers" };
+  }
+  if (
+    Array.isArray(raw.ivs)
+    && raw.ivs.some(value => !isFiniteNumber(value) || value < 0 || value > 31)
+  ) {
+    return { section: "monData", monId: data.id, error: "ivs must contain only values from 0 through 31" };
+  }
+  if (
+    Array.isArray(raw.moveset)
+    && raw.moveset.some(
+      move =>
+        move == null
+        || typeof move !== "object"
+        || !isFiniteNumber((move as Record<string, unknown>).moveId),
+    )
+  ) {
+    return { section: "monData", monId: data.id, error: "moveset contains an invalid move" };
+  }
+  return null;
+}
+
+function validateAuthoritativeModifierBlobs(
+  blobs: Record<string, unknown>[] | undefined,
+  player: boolean,
+): CoopAuthoritativeApplyPlanFailure | null {
+  if (blobs === undefined) {
+    return null;
+  }
+  if (!Array.isArray(blobs)) {
+    return { section: player ? "playerModifiers" : "enemyModifiers", error: "modifier set must be an array" };
+  }
+  for (const raw of blobs) {
+    if (raw == null || typeof raw !== "object") {
+      return { section: player ? "playerModifiers" : "enemyModifiers", error: "invalid modifier blob" };
+    }
+    const keyed = rawModifierInstanceKey(raw, player);
+    if (keyed == null) {
+      return {
+        section: player ? "playerModifiers" : "enemyModifiers",
+        error: "modifier blob could not be decoded",
+      };
+    }
+    try {
+      const modifier = keyed.data.toModifier(
+        Modifier[keyed.data.className as keyof typeof Modifier] ?? resolveErModifierClass(keyed.data.className),
+      );
+      if (!(modifier instanceof PersistentModifier)) {
+        return {
+          section: player ? "playerModifiers" : "enemyModifiers",
+          error: `modifier ${keyed.data.className} is not persistent`,
+        };
+      }
+    } catch (error) {
+      return {
+        section: player ? "playerModifiers" : "enemyModifiers",
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+  return null;
+}
+
+function validateAuthoritativeStateEnvelope(
+  state: CoopAuthoritativeBattleStateV1,
+  playerParty: PokemonData[],
+  enemyParty: PokemonData[],
+): CoopAuthoritativeApplyPlanFailure | null {
+  if (
+    (state.tick !== undefined && (!Number.isSafeInteger(state.tick) || state.tick < 0))
+    || !Number.isSafeInteger(state.wave)
+    || state.wave < 0
+    || !Number.isSafeInteger(state.turn)
+    || state.turn < 0
+  ) {
+    return { section: "preflight", error: "invalid state address" };
+  }
+  for (const value of [state.weather, state.terrain, state.money, state.score ?? 0, state.biomeId ?? 0]) {
+    if (!isFiniteNumber(value)) {
+      return { section: "preflight", error: "authoritative scalar is not finite" };
+    }
+  }
+  for (const mon of [...playerParty, ...enemyParty]) {
+    const failure = validateAuthoritativeMonData(mon);
+    if (failure != null) {
+      return failure;
+    }
+  }
+  if (!Array.isArray(state.field)) {
+    return { section: "field", error: "field seats must be an array" };
+  }
+  const partyIds = {
+    player: new Set(playerParty.map(mon => mon.id)),
+    enemy: new Set(enemyParty.map(mon => mon.id)),
+  };
+  const seatKeys = new Set<string>();
+  for (const seat of state.field) {
+    if (seat == null || typeof seat !== "object") {
+      return { section: "field", error: "field contains a non-object seat" };
+    }
+    const seatKey = `${seat.side}:${seat.bi}`;
+    if (
+      (seat.side !== "player" && seat.side !== "enemy")
+      || !Number.isSafeInteger(seat.bi)
+      || !Number.isSafeInteger(seat.partyIndex)
+      || !Number.isSafeInteger(seat.pokemonId)
+      || typeof seat.presented !== "boolean"
+      || seatKeys.has(seatKey)
+      || !partyIds[seat.side].has(seat.pokemonId)
+    ) {
+      return { section: "field", error: `invalid or duplicate authoritative seat ${seatKey}` };
+    }
+    seatKeys.add(seatKey);
+  }
+  if (
+    state.pokeballCounts != null
+    && (!Array.isArray(state.pokeballCounts)
+      || state.pokeballCounts.some(
+        entry =>
+          !Array.isArray(entry)
+          || entry.length !== 2
+          || !Number.isSafeInteger(entry[0])
+          || !Number.isSafeInteger(entry[1]),
+      ))
+  ) {
+    return { section: "pokeballCounts", error: "invalid pokeball count tuple" };
+  }
+  if (
+    state.arenaTags != null
+    && (!Array.isArray(state.arenaTags)
+      || state.arenaTags.some(
+        tag =>
+          tag == null
+          || typeof tag.tagType !== "string"
+          || !isFiniteNumber(tag.side)
+          || !isFiniteNumber(tag.turnCount)
+          || !isFiniteNumber(tag.layers),
+      ))
+  ) {
+    return { section: "arenaTags", error: "invalid arena tag" };
+  }
+  return (
+    validateAuthoritativeModifierBlobs(state.playerModifiers, true)
+    ?? validateAuthoritativeModifierBlobs(state.enemyModifiers, false)
+  );
+}
+
+function prepareCoopAuthoritativeApplyPlan(
+  source: CoopAuthoritativeBattleStateV1,
+  stateAlreadyLocal: boolean,
+): { plan?: CoopAuthoritativeApplyPlan; failure?: CoopAuthoritativeApplyPlanFailure } {
+  let state: CoopAuthoritativeBattleStateV1;
+  try {
+    // A carrier is immutable once admitted. Cloning through its real JSON encoding prevents a callback or
+    // retry owner from changing fields underneath this synchronous transaction and rejects non-wire values.
+    state = JSON.parse(JSON.stringify(source)) as CoopAuthoritativeBattleStateV1;
+  } catch (error) {
+    return { failure: { section: "preflight", error: error instanceof Error ? error.message : String(error) } };
+  }
+  try {
+    if (state.version !== 1) {
+      return { failure: { section: "preflight", error: "unsupported authoritative state version" } };
+    }
+    if (!stateAlreadyLocal && isShowdownGuestFlipGated()) {
+      state = swapAuthoritativeState(state);
+    }
+    const playerParty = parseAuthoritativeParty(state.playerParty);
+    const enemyParty = parseAuthoritativeParty(state.enemyParty);
+    if (playerParty == null || enemyParty == null) {
+      return { failure: { section: "preflight", error: "party payload could not be decoded" } };
+    }
+    if (!assertNoDuplicateAuthoritativeIds([state.playerParty, state.enemyParty])) {
+      return { failure: { section: "preflight", error: "party contains a duplicate identity" } };
+    }
+    const failure = validateAuthoritativeStateEnvelope(state, playerParty, enemyParty);
+    return failure == null ? { plan: { state, playerParty, enemyParty } } : { failure };
+  } catch (error) {
+    return { failure: { section: "preflight", error: error instanceof Error ? error.message : String(error) } };
+  }
+}
+
+function captureCoopAuthoritativeApplyBoundary(): CoopAuthoritativeApplyBoundary | null {
+  const stateTickCounter = coopStateTickCounter;
+  const lastAppliedTick = coopLastAppliedStateTick;
+  const rndState = Phaser.Math.RND.state();
+  const rollbackState = captureCoopAuthoritativeBattleState(globalScene.currentBattle?.turn ?? 0);
+  // Capturing a receiver boundary is observational: neither authority sequencing nor RNG may move.
+  coopStateTickCounter = stateTickCounter;
+  coopLastAppliedStateTick = lastAppliedTick;
+  Phaser.Math.RND.state(rndState);
+  if (rollbackState == null) {
+    return null;
+  }
+  return {
+    rollbackState,
+    playerParty: [...(globalScene.getPlayerParty() as Pokemon[])],
+    enemyParty: [...(globalScene.getEnemyParty() as Pokemon[])],
+    playerModifiers: [...globalScene.modifiers],
+    enemyModifiers: [
+      ...(globalScene as unknown as { enemyModifiers: PersistentModifier[] }).enemyModifiers,
+    ],
+    arena: globalScene.arena,
+    battleFormat: globalScene.currentBattle?.format,
+    rndState,
+    stateTickCounter,
+    lastAppliedTick,
+  };
+}
+
+function discardCandidatePokemon(pokemon: Pokemon): void {
+  try {
+    globalScene.field.remove(pokemon, true);
+    pokemon.destroy();
+  } catch {
+    /* candidate-only object cleanup cannot alter the restored material boundary */
+  }
+}
+
+function restoreCoopAuthoritativeApplyTopology(
+  boundary: CoopAuthoritativeApplyBoundary,
+  mutationScope: CoopAuthoritativeApplyMutationScope,
+): void {
+  for (const pokemon of mutationScope.createdPokemon) {
+    discardCandidatePokemon(pokemon);
+  }
+  (globalScene.getPlayerParty() as Pokemon[]).splice(0, globalScene.getPlayerParty().length, ...boundary.playerParty);
+  (globalScene.getEnemyParty() as Pokemon[]).splice(0, globalScene.getEnemyParty().length, ...boundary.enemyParty);
+  globalScene.modifiers.splice(0, globalScene.modifiers.length, ...boundary.playerModifiers);
+  const enemyModifiers = (globalScene as unknown as { enemyModifiers: PersistentModifier[] }).enemyModifiers;
+  enemyModifiers.splice(0, enemyModifiers.length, ...boundary.enemyModifiers);
+  globalScene.arena = boundary.arena;
+  if (boundary.battleFormat != null) {
+    globalScene.currentBattle?.setFormat(boundary.battleFormat);
+  }
+  Phaser.Math.RND.state(boundary.rndState);
+}
+
+function commitCoopAuthoritativeApplyPresentation(mutationScope: CoopAuthoritativeApplyMutationScope): void {
+  const presentation = mutationScope.fieldPresentation;
+  if (presentation == null) {
+    return;
+  }
+  try {
+    settleCoopFieldPresentation({
+      side: "player",
+      seats: presentation.playerSeats,
+      capacity: presentation.playerCapacity,
+      boundary: presentation.playerSeats.length > 0 ? "resync-stable" : "wave-start-pre-intro",
+      desired: "visible",
+      hideStale: true,
+    });
+    settleCoopFieldPresentation({
+      side: "enemy",
+      seats: presentation.enemySeats,
+      capacity: presentation.enemyCapacity,
+      boundary: presentation.enemySeats.length > 0 ? "resync-stable" : "wave-start-pre-intro",
+      desired: "visible",
+      hideStale: true,
+    });
+    if (mutationScope.preSpriteKeys != null) {
+      runCoopRenderDiffer(mutationScope.preSpriteKeys);
+    }
+  } catch (error) {
+    // Material state is already complete. Presentation has its own continuation-ready gate and bounded
+    // recovery, so a torn-down renderer is reported there rather than invalidating committed battle data.
+    coopWarn("resync", "authoritative presentation commit deferred to renderer recovery", error);
+  }
+}
+
+function commitCoopAuthoritativeApplyCleanup(mutationScope: CoopAuthoritativeApplyMutationScope): void {
+  const retired = new Set(mutationScope.retiredPokemon.map(entry => entry.pokemon));
+  for (const pokemon of retired) {
+    try {
+      if (pokemon.isOnField()) {
+        pokemon.leaveField(true, true, false);
+      }
+      globalScene.field.remove(pokemon, true);
+      pokemon.destroy();
+    } catch {
+      /* the committed party no longer addresses this quarantined stale object */
+    }
+  }
+}
+
 /**
  * Apply one immutable wire image as a DATA transaction. The receiver first captures its current
  * material state without advancing the producer tick, then either commits the complete candidate or
@@ -3169,51 +3543,103 @@ function applyCoopAuthoritativeBattleStateTransaction(
   authoritativeGuest: boolean,
   reassertAccepted: boolean,
 ): boolean {
+  if (coopAuthoritativeApplyTransactionActive) {
+    recordCoopApplyFailure("transactionReentry", new Error("nested authoritative state apply rejected"));
+    return false;
+  }
+  coopAuthoritativeApplyTransactionActive = true;
   beginCoopApplyFailureCapture();
-  if (state === undefined || state.version !== 1) {
-    return false;
-  }
+  const preflightRndState = Phaser.Math.RND.state();
+  try {
+    if (state === undefined || state.version !== 1) {
+      return false;
+    }
+    const prepared = prepareCoopAuthoritativeApplyPlan(state, false);
+    // Modifier constructors used by shadow validation are not allowed to consume the live battle cursor.
+    Phaser.Math.RND.state(preflightRndState);
+    if (prepared.plan == null) {
+      const failure = prepared.failure ?? { section: "preflight", error: "unknown validation failure" };
+      recordCoopApplyFailure(failure.section, new Error(failure.error), failure.monId);
+      return false;
+    }
+    const plan = prepared.plan;
+    if (
+      !reassertAccepted
+      && plan.state.tick !== undefined
+      && plan.state.tick <= coopLastAppliedStateTick
+    ) {
+      coopWarn(
+        "resync",
+        `authoritativeState tick=${plan.state.tick} STALE (lastApplied=${coopLastAppliedStateTick}) -> REJECTED (#807)`,
+      );
+      return false;
+    }
 
-  const priorStateTickCounter = coopStateTickCounter;
-  const priorLastAppliedTick = coopLastAppliedStateTick;
-  const rollback = captureCoopAuthoritativeBattleState(globalScene.currentBattle?.turn ?? 0);
-  // Capturing a receiver rollback image is observational; it must not consume a host-authority tick.
-  coopStateTickCounter = priorStateTickCounter;
-  if (rollback == null) {
-    recordCoopApplyFailure("rollbackCapture", new Error("could not capture the pre-apply material state"));
-    return false;
-  }
-
-  const applied = applyCoopAuthoritativeBattleStateInternal(state, authoritativeGuest, reassertAccepted);
-  const candidateFailures = [...coopApplyFailures];
-  if (applied && candidateFailures.length === 0) {
-    coopStateTickCounter = priorStateTickCounter;
-    return true;
-  }
-
-  // Structural/stale rejection occurs before any scene mutation. Avoid a needless render/material
-  // reassert in that case; a moved high-water or a structured failure proves mutation was attempted.
-  if (coopLastAppliedStateTick === priorLastAppliedTick && candidateFailures.length === 0) {
-    coopStateTickCounter = priorStateTickCounter;
-    return false;
-  }
-
-  const rollbackApplied = applyCoopAuthoritativeBattleStateInternal(rollback, authoritativeGuest, true, true);
-  const rollbackFailures = [...coopApplyFailures];
-  coopStateTickCounter = priorStateTickCounter;
-  coopLastAppliedStateTick = priorLastAppliedTick;
-  coopApplyFailures = candidateFailures;
-  if (!rollbackApplied || rollbackFailures.length > 0) {
-    recordCoopApplyFailure(
-      "rollback",
-      new Error(
-        rollbackApplied
-          ? `rollback reported ${rollbackFailures.length} structured failure(s)`
-          : "rollback materialization refused",
-      ),
+    const boundary = captureCoopAuthoritativeApplyBoundary();
+    if (boundary == null) {
+      recordCoopApplyFailure("rollbackCapture", new Error("could not capture the pre-apply material state"));
+      return false;
+    }
+    const mutationScope: CoopAuthoritativeApplyMutationScope = { createdPokemon: [], retiredPokemon: [] };
+    const applied = applyCoopAuthoritativeBattleStateInternal(
+      plan.state,
+      authoritativeGuest,
+      reassertAccepted,
+      true,
+      mutationScope,
+      plan,
     );
+    const candidateFailures = [...coopApplyFailures];
+    if (applied && candidateFailures.length === 0) {
+      commitCoopAuthoritativeApplyPresentation(mutationScope);
+      commitCoopAuthoritativeApplyCleanup(mutationScope);
+      coopStateTickCounter = boundary.stateTickCounter;
+      if (!reassertAccepted && plan.state.tick !== undefined) {
+        // Admission is the COMMIT marker. A failed apply can therefore never expose or consume this tick.
+        coopLastAppliedStateTick = plan.state.tick;
+      }
+      return true;
+    }
+
+    // Restore exact identity topology before replaying the trusted immutable material image. In particular,
+    // candidate-only Pokemon are discarded, prior Pokemon/modifier objects are reinserted, the old Arena
+    // object is reinstated, and the process-global RNG cursor is put back. No destructive cleanup has run.
+    restoreCoopAuthoritativeApplyTopology(boundary, mutationScope);
+    const rollbackPrepared = prepareCoopAuthoritativeApplyPlan(boundary.rollbackState, true);
+    Phaser.Math.RND.state(boundary.rndState);
+    let rollbackApplied = false;
+    let rollbackFailures: CoopApplyFailure[] = [];
+    if (rollbackPrepared.plan != null) {
+      rollbackApplied = applyCoopAuthoritativeBattleStateInternal(
+        rollbackPrepared.plan.state,
+        authoritativeGuest,
+        true,
+        true,
+        undefined,
+        rollbackPrepared.plan,
+      );
+      rollbackFailures = [...coopApplyFailures];
+    } else if (rollbackPrepared.failure != null) {
+      rollbackFailures = [rollbackPrepared.failure];
+    }
+    coopStateTickCounter = boundary.stateTickCounter;
+    coopLastAppliedStateTick = boundary.lastAppliedTick;
+    Phaser.Math.RND.state(boundary.rndState);
+    coopApplyFailures = candidateFailures;
+    if (!rollbackApplied || rollbackFailures.length > 0) {
+      recordCoopApplyFailure(
+        "rollback",
+        new Error(
+          rollbackApplied
+            ? `rollback reported ${rollbackFailures.length} structured failure(s)`
+            : "rollback materialization refused",
+        ),
+      );
+    }
+    return false;
+  } finally {
+    coopAuthoritativeApplyTransactionActive = false;
   }
-  return false;
 }
 
 function applyCoopAuthoritativeBattleStateInternal(
@@ -3221,6 +3647,8 @@ function applyCoopAuthoritativeBattleStateInternal(
   authoritativeGuest: boolean,
   reassertAccepted: boolean,
   stateAlreadyLocal = false,
+  mutationScope?: CoopAuthoritativeApplyMutationScope,
+  preparedPlan?: CoopAuthoritativeApplyPlan,
 ): boolean {
   // Reset the structured-failure accumulator FIRST (item 4): a prior apply's failures must never leak into
   // this one's drain, and an early reject below leaves it empty (no apply attempted -> nothing to heal).
@@ -3241,15 +3669,12 @@ function applyCoopAuthoritativeBattleStateInternal(
     state = swapAuthoritativeState(state);
   }
   try {
-    const playerParty = parseAuthoritativeParty(state.playerParty);
-    const enemyParty = parseAuthoritativeParty(state.enemyParty);
+    const playerParty = preparedPlan?.playerParty ?? parseAuthoritativeParty(state.playerParty);
+    const enemyParty = preparedPlan?.enemyParty ?? parseAuthoritativeParty(state.enemyParty);
     if (playerParty == null || enemyParty == null) {
       return false;
     }
     if (!assertNoDuplicateAuthoritativeIds([state.playerParty, state.enemyParty])) {
-      return false;
-    }
-    if (!reassertAccepted && !coopAcceptStateTick(state.tick, "authoritativeState")) {
       return false;
     }
     // PHASE 3 (#838): snapshot the on-field sprite keys BEFORE the data apply mutates species/form/
@@ -3265,9 +3690,9 @@ function applyCoopAuthoritativeBattleStateInternal(
     if (typeof state.biomeId === "number" && (globalScene.arena?.biomeId ?? -1) !== state.biomeId) {
       globalScene.newArena(state.biomeId as BiomeId);
     }
-    reconcileAuthoritativeParty("player", playerParty, authoritativeGuest);
-    reconcileAuthoritativeParty("enemy", enemyParty, authoritativeGuest);
-    reconcileAuthoritativeField(state, playerParty, enemyParty);
+    reconcileAuthoritativeParty("player", playerParty, authoritativeGuest, mutationScope);
+    reconcileAuthoritativeParty("enemy", enemyParty, authoritativeGuest, mutationScope);
+    reconcileAuthoritativeField(state, playerParty, enemyParty, mutationScope);
     reassertAuthoritativePartyOrder("player", playerParty);
     reassertAuthoritativePartyOrder("enemy", enemyParty);
     const arena = globalScene.arena;
@@ -3277,7 +3702,7 @@ function applyCoopAuthoritativeBattleStateInternal(
     if ((arena.terrain?.terrainType ?? 0) !== state.terrain) {
       arena.trySetTerrain(state.terrain as TerrainType, true);
     }
-    reconcileArenaTags(state.arenaTags);
+    reconcileArenaTags(state.arenaTags, true);
     globalScene.money = state.money;
     if (typeof state.score === "number") {
       globalScene.score = state.score;
@@ -3303,8 +3728,10 @@ function applyCoopAuthoritativeBattleStateInternal(
     try {
       globalScene.updateModifiers(true, true);
       globalScene.updateModifiers(false, true);
-    } catch {
-      /* held-item bar refresh is best-effort */
+    } catch (error) {
+      // updateModifiers is also a material stat application entrypoint. Committing around a failed call can
+      // leave HP/max-HP inconsistent even when its icon refresh was the visible symptom.
+      recordCoopApplyFailure("modifierRefresh", error);
     }
     // Field reconciliation, modifier reconciliation, and ER substrate restoration can all recalculate
     // derived stats after the party-data apply. Reassert the host's explicit arrays at the TRUE completed
@@ -3332,7 +3759,14 @@ function applyCoopAuthoritativeBattleStateInternal(
     // PHASE 3 (#838): reconcile the RENDER to the freshly-applied DATA over every on-field mon -
     // unconditional cheap refresh (battle-info bars, status badge, boss segments, both held-item bars)
     // + a sprite-key-gated re-summon. Runs LAST so it sees the final field composition + modifier state.
-    runCoopRenderDiffer(preSpriteKeys);
+    // Presentation is an irreversible/asynchronous effect and therefore belongs only to a materially clean
+    // candidate (or the trusted rollback image). A structured failure must not queue candidate atlas work
+    // that can race the restored prior boundary after this synchronous function returns.
+    if (coopApplyFailures.length === 0 && mutationScope != null) {
+      mutationScope.preSpriteKeys = preSpriteKeys;
+    } else if (coopApplyFailures.length === 0) {
+      runCoopRenderDiffer(preSpriteKeys);
+    }
     coopLog(
       "resync",
       `guest ${reassertAccepted ? "reassert" : "apply"} authoritativeState tick=${state.tick} wave=${state.wave} turn=${state.turn} party=${state.playerParty.length}/${state.enemyParty.length} field=${state.field.length}`,
