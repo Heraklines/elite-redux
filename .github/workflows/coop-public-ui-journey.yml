@@ -8,7 +8,6 @@ on:
       - ".github/workflows/coop-public-ui-journey.yml"
       - "scripts/coop-browser-entry.ts"
       - "scripts/prepare-coop-browser-artifact.mjs"
-      - "scripts/vite.coop-browser.config.mjs"
       - "test/browser/coop-public-ui/**"
   workflow_dispatch:
     inputs:
@@ -119,7 +118,8 @@ jobs:
             test/browser/coop-public-ui/journeys.mjs \
             test/browser/coop-public-ui/preview-server.mjs \
             test/browser/coop-public-ui/public-ui-harness.mjs \
-            test/browser/coop-public-ui/run.mjs
+            test/browser/coop-public-ui/run.mjs \
+            test/browser/coop-public-ui/vite.config.mjs
 
       - name: Enforce public-driver boundary
         run: node test/browser/coop-public-ui/check-public-boundary.mjs
@@ -132,7 +132,7 @@ jobs:
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_SERVER_URL: ${{ env.COOP_UI_API_ORIGIN }}
-        run: pnpm exec vite build --mode beta --config scripts/vite.coop-browser.config.mjs
+        run: pnpm exec vite build --mode beta --config test/browser/coop-public-ui/vite.config.mjs
 
       - name: Seal immutable execution input
         env:
