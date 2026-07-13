@@ -205,6 +205,13 @@ export class SelectBiomePhase extends BattlePhase {
     // either the interactive BIOME_PICK address or the wave-scoped deterministic address, so a renderer
     // with a late/missing travel-classification carrier must still enter that bounded receipt path. The
     // exact commit (never local target/RNG) resolves any host-vs-renderer route-classification difference.
+    if (
+      authoritativeGuest
+      && getCoopBiomeTransitionCommitReceipt({ sourceWave: currentWaveIndex }) != null
+    ) {
+      this.awaitAuthoritativeDeterministicBiome();
+      return;
+    }
     if (authoritativeGuest && travelClassification?.ready !== true && !this.coopChained) {
       this.parkForAuthoritativeRoutes(currentWaveIndex);
       return;
@@ -801,6 +808,13 @@ export class SelectBiomePhase extends BattlePhase {
     const retry = (): void => {
       this.coopRouteRetryTimer = null;
       if (!this.boundaryStillLive(generation, wave)) {
+        return;
+      }
+      if (getCoopBiomeTransitionCommitReceipt({ sourceWave: wave }) != null) {
+        this.coopRouteRetryAttempts = 0;
+        this.coopRouteRecoveryShown = false;
+        this.clearBiomeCommitRecovery();
+        this.awaitAuthoritativeDeterministicBiome();
         return;
       }
       const classificationReady =
