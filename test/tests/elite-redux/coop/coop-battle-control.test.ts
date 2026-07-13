@@ -23,7 +23,7 @@
 // =============================================================================
 
 import { getGameMode } from "#app/game-mode";
-import { globalScene } from "#app/global-scene";
+import { globalScene, initGlobalScene } from "#app/global-scene";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resolvePartnerCommand } from "#data/elite-redux/coop/coop-partner-ai";
 import { coopGiveMonToPartner, coopReorderParty } from "#data/elite-redux/coop/coop-party-ops";
@@ -31,6 +31,7 @@ import {
   clearCoopRuntime,
   getCoopController,
   getCoopRuntime,
+  setCoopRuntime,
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import {
@@ -40,6 +41,7 @@ import {
   coopOwnerOfFieldIndex,
   coopSwitchBlocksMon,
 } from "#data/elite-redux/coop/coop-session";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { captureGhostTeam } from "#data/elite-redux/er-ghost-teams";
 import { Challenges } from "#enums/challenges";
@@ -50,6 +52,7 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { CommandPhase } from "#phases/command-phase";
 import { GameManager } from "#test/framework/game-manager";
+import { buildDuo, withClient } from "#test/tools/coop-duo-harness";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
 import Phaser from "phaser";
@@ -476,17 +479,21 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
   });
 
   it("P5 resume (#807 contract): a co-op save loads while CONNECTED and is REFUSED solo", async () => {
-    await startCoopDouble();
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, scene => {
+      scene.gameMode = getGameMode(GameModes.COOP);
+    });
 
-    // Win the wave and advance, then place the session into a slot through the
-    // game's own key + encrypt path (the headless auto-save skips slot storage).
-    game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX);
-    await game.doKillOpponents();
-    await game.toNextWave();
+    // Place an exact live-pair checkpoint into a slot through the game's own key +
+    // encrypt path. The old fixture used startLocalCoopSession(), whose one-sided
+    // SpoofGuest never established partner identity, compatibility, or membership;
+    // such a runtime correctly cannot mint resumable participant metadata.
     const slot = 3;
     const { getSessionDataLocalStorageKey } = await import("#app/account");
     const { encrypt } = await import("#utils/data");
-    const savedSession = globalScene.gameData.getSessionSaveData();
+    const savedSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.getSessionSaveData());
+    expect(savedSession.coopParticipants, "the connected duo save embeds its exact participant pair").toBeDefined();
+    expect(savedSession.coopRun, "the connected duo save embeds its exact run checkpoint").toBeDefined();
     const storeSession = (session: typeof savedSession): void => {
       localStorage.setItem(getSessionDataLocalStorageKey(slot), encrypt(JSON.stringify(session), true));
     };
@@ -498,23 +505,24 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
         seats: { ...savedSession.coopParticipants!.seats, guest: "WrongPartner" },
       },
     });
-    const wrongPairLoad = await globalScene.gameData.loadSession(slot);
+    const wrongPairLoad = await withClient(rig.hostCtx, () => rig.hostScene.gameData.loadSession(slot));
     expect(wrongPairLoad, "a live connection to a DIFFERENT participant pair is still refused").toBe(false);
 
     // Restore the exact-pair bytes for the positive connected-resume assertion.
     storeSession(savedSession);
 
     // CONNECTED: with the live session up, the co-op save loads (resume path).
-    const connectedLoad = await globalScene.gameData.loadSession(slot);
+    const connectedLoad = await withClient(rig.hostCtx, () => rig.hostScene.gameData.loadSession(slot));
     expect(connectedLoad, "connected load proceeds").toBe(true);
-    expect(globalScene.gameMode.isCoop).toBe(true);
+    expect(rig.hostScene.gameMode.isCoop).toBe(true);
 
     // SOLO: wipe the runtime (page reload without re-pairing). The OLD behavior
     // re-established a local spoof session from the save - the corruption source.
     // The #807 gate now REFUSES: connect with your partner in the lobby first.
+    initGlobalScene(rig.hostScene);
     clearCoopRuntime();
     expect(getCoopController()).toBeNull();
-    const soloLoad = await globalScene.gameData.loadSession(slot);
+    const soloLoad = await rig.hostScene.gameData.loadSession(slot);
     expect(soloLoad, "SOLO load of a co-op save is REFUSED (#807)").toBe(false);
     expect(getCoopController(), "no session conjured from a solo load").toBeNull();
   });
