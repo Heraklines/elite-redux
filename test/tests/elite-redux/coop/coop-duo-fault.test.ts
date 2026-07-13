@@ -42,7 +42,6 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
@@ -52,11 +51,11 @@ import {
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
   setCoopHarnessLiveEvents,
   withClient,
-  withClientSync,
 } from "#test/tools/coop-duo-harness";
 import {
   COOP_NO_FAULT_PROFILE,
@@ -169,7 +168,7 @@ describe.skipIf(!RUN)(
       });
       const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       expect(hostShop.phaseName, `wave ${w}: host reached SelectModifierPhase`).toBe("SelectModifierPhase");
-      const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+      const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
       if (hostOwns) {
         await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: false }));
         await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));

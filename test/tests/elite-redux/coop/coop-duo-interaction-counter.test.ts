@@ -48,6 +48,7 @@ import {
   driveGuestReplayTurn,
   forceItemRewards,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
   withClient,
@@ -232,7 +233,7 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
 
     // Start the reciprocal real watcher BEFORE the owner can commit. This resolves the production shop
     // arrival barrier and removes the old harness fiction where the owner selected before a watcher existed.
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     withClientSync(rig.guestCtx, () => guestShop.start());
     // Deliver the guest's arrival while the HOST context is installed. Production has one scene per
     // process; the two-engine harness shares a process-global scene binding, so draining outside a client
