@@ -177,11 +177,15 @@ describe("held resync checkpoint wake (live wave-4 faint transition)", () => {
     expect(authoritativeReapply).toHaveBeenCalledOnce();
     const streamer = getCoopBattleStreamer();
     expect(
-      streamer?.peekCheckpoint()?.authoritativeState?.tick,
-      "material and presentation proof retain authority until the real continuation opens",
-    ).toBe(20);
+      streamer?.retainedAuthorityDiagnostics(),
+      "material/presentation proof moves the carrier into retained out-of-band storage while continuation waits",
+    ).toMatchObject({ bufferedAuthority: 1, waiters: 1 });
+    expect(streamer?.peekCheckpoint(), "the mechanically consumed inbox is no longer the retained owner").toBeNull();
     expect(streamer?.notifyContinuationSurface("command"), "the addressed wave-4 turn-2 command releases it").toBe(1);
-    expect(streamer?.peekCheckpoint(), "continuationReady consumes the fully verified carrier").toBeNull();
+    expect(
+      streamer?.retainedAuthorityDiagnostics(),
+      "continuationReady releases the waiter while the turn finalizer still owns out-of-band cleanup",
+    ).toMatchObject({ bufferedAuthority: 1, waiters: 0 });
     expect(phaseInternals.recoveryTickFloor, "successful verification commits the recovery floor").toBe(20);
   });
 

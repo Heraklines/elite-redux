@@ -83,6 +83,12 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
     // operation assertions opt into the retained journal explicitly and drive the known seq directly.
     setCoopMeOperationEnabled(journal);
     const { host, guest } = createLoopbackPair();
+    const committedEnvelopes: Extract<CoopMessage, { t: "envelope" }>["envelope"][] = [];
+    guest.onMessage(message => {
+      if (message.t === "envelope") {
+        committedEnvelopes.push(message.envelope);
+      }
+    });
     const runtime = assembleCoopRuntime(host, { username: "Host", netcodeMode: "authoritative" });
     setCoopRuntime(runtime);
     setCoopMeInteractionStart(start);
@@ -94,7 +100,7 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
       getPlayerParty: () => new Array(partySize).fill({}),
     } as unknown as BattleScene);
     const guestRelay = new CoopInteractionRelay(guest);
-    return { seqMe: COOP_ME_PUMP_SEQ_BASE + start, guestRelay, runtime };
+    return { seqMe: COOP_ME_PUMP_SEQ_BASE + start, guestRelay, runtime, committedEnvelopes };
   };
 
   it("HOST streams a {kind:'catchFull'} sub-prompt and resolves to the guest owner's relayed replace slot", async () => {
@@ -140,16 +146,16 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
   });
 
   it("HOST commits the guest-owned catch-full slot as a durable ME_SUB step", async () => {
-    const commitSpy = vi.spyOn(meOp, "commitMeOwnerIntent");
-    const { seqMe, guestRelay } = hostRig(3, 6, true);
+    const { seqMe, guestRelay, committedEnvelopes } = hostRig(3, 6, true);
 
     const hostAwait = coopHostStreamCatchFullAwaitSlot("Rattata");
     guestRelay.sendInteractionChoice(seqMe, "meSub", 2, [0]);
     expect(await hostAwait).toBe(2);
+    await flush();
 
-    const subCommits = commitSpy.mock.calls.filter(call => call[0].kind === "ME_SUB");
+    const subCommits = committedEnvelopes.filter(envelope => envelope.pendingOperation?.kind === "ME_SUB");
     expect(subCommits, "the authority must commit the guest proposal after accepting its slot").toHaveLength(1);
-    expect(subCommits[0][0]).toMatchObject({ seq: seqMe, payload: { value: 2 }, localRole: "host" });
+    expect(subCommits[0].pendingOperation).toMatchObject({ payload: { value: 2 }, owner: 1 });
   });
 
   it("HOST LOUDLY declines (resolves null) when the guest cancels / relays an out-of-range slot (skip the grant)", async () => {
