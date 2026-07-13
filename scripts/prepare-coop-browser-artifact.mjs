@@ -65,6 +65,7 @@ if (verifyOnly) {
   const manifest = {
     version: 1,
     sha: process.env.GITHUB_SHA ?? "local",
+    apiOrigin: process.env.COOP_BROWSER_API_ORIGIN ?? process.env.VITE_SERVER_URL ?? null,
     signalOrigin: process.env.VITE_COOP_SERVER_URL ?? "http://127.0.0.1:4174",
     entryContract,
     digest: aggregateDigest(files),

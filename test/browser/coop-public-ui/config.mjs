@@ -95,6 +95,7 @@ export function loadConfig() {
       ? resolve(ROOT, process.env.COOP_UI_BROWSER_DIST.trim())
       : null,
     assetDir: resolve(ROOT, process.env.COOP_UI_ASSET_DIR?.trim() || "assets"),
+    expectedApiOrigin: process.env.COOP_UI_EXPECTED_API_ORIGIN?.trim() || null,
     expectedSignalOrigin: process.env.COOP_UI_EXPECTED_SIGNAL_ORIGIN?.trim() || null,
     entryContract: process.env.COOP_BROWSER_ENTRY_CONTRACT?.trim() || "public-ui-v1",
     artifactDir: resolve(ROOT, "dev-logs", "coop-public-ui", runId),
