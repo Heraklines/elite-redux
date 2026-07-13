@@ -653,10 +653,25 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       withClientSync(rig.guestCtx, () => {
         const g0 = rig.guestScene.getPlayerField()[0];
         const g1 = rig.guestScene.getPlayerField()[1];
+        expect(
+          rig.guestScene.getPlayerParty().map(mon => mon.id),
+          "double replacement preserves the host's exact authoritative party order",
+        ).toEqual(rig.hostScene.getPlayerParty().map(mon => mon.id));
         expect(g0?.species.speciesId, "guest materialized slot 0 (LAPRAS)").toBe(SpeciesId.LAPRAS);
         expect(g1?.species.speciesId, "guest materialized slot 1 (CHARIZARD)").toBe(SpeciesId.CHARIZARD);
         expect(g0?.isFainted(), "guest slot 0 battle-ready").toBe(false);
         expect(g1?.isFainted(), "guest slot 1 battle-ready").toBe(false);
+        expect(g0?.getBattlerIndex(), "first replacement retained authoritative seat 0").toBe(0);
+        expect(g1?.getBattlerIndex(), "second replacement retained authoritative seat 1").toBe(1);
+        for (const [slot, mon] of [g0, g1].entries()) {
+          expect(
+            mon == null ? -1 : rig.guestScene.field.getIndex(mon),
+            `replacement ${slot} is a real field-container member`,
+          ).toBeGreaterThanOrEqual(0);
+          expect(mon?.visible, `replacement ${slot} container is visible`).toBe(true);
+          expect(mon?.getSprite()?.visible, `replacement ${slot} sprite is visible`).toBe(true);
+          expect(mon?.getBattleInfo()?.visible, `replacement ${slot} UI bar is visible`).toBe(true);
+        }
       });
     } finally {
       setCoopFaintSwitchWaitMs(60_000);

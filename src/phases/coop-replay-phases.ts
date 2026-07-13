@@ -1056,6 +1056,17 @@ export class CoopFinalizeTurnPhase extends Phase {
       terminateCoopAuthoritySession(`No authority stream was available to finalize turn ${this.turn}.`);
       return;
     }
+    const resolution = this.modernTurnResolution();
+    // A queued/detached old finalizer can survive until after the same turn already published its
+    // presentation-ready evidence.  It must never replay that ACK with newly-observed replacement
+    // supersession metadata: changing an immutable ACK is correctly fatal at the stream layer.  Consume
+    // the duplicate as control-only work instead.  If delayed presentation wrote over an already-applied
+    // N/N+1 replacement, reassert that exact retained frame once, but do not ACK or advance the old turn
+    // a second time.
+    if (streamer.isTurnFinalized(resolution.wave, resolution.turn)) {
+      this.finishFinalizedDuplicate(streamer, resolution);
+      return;
+    }
     this.authorityFailureUnsubscribe = streamer.onAuthorityFailure(failure => {
       this.handleModernAuthorityFailure(streamer, failure);
     });
@@ -1064,12 +1075,55 @@ export class CoopFinalizeTurnPhase extends Phase {
       this.handleModernAuthorityFailure(streamer, bufferedFailure);
       return;
     }
-    const resolution = this.modernTurnResolution();
     if (this.applyModernTurnCommit(streamer, resolution)) {
       this.completeModernTurnCommit(streamer, resolution);
       return;
     }
     this.parkModernTurnCommit(streamer, resolution);
+  }
+
+  /** Consume an already-finalized duplicate without changing its immutable staged ACK evidence. */
+  private finishFinalizedDuplicate(
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    resolution: CoopTurnResolution,
+  ): void {
+    const superseding = streamer.consumeAppliedOutOfBandCheckpoint(resolution);
+    if (superseding == null) {
+      coopWarn(
+        "checksum",
+        `guest finalize turn=${this.turn}: duplicate already finalized -> ignored without replaying ACKs`,
+      );
+      this.end();
+      return;
+    }
+
+    const stateApplied = reapplyAcceptedCoopAuthoritativeBattleState(
+      superseding.authoritativeState,
+      isCoopAuthoritativeGuest(),
+    );
+    if (stateApplied) {
+      applyCoopFieldSnapshot(superseding.fullField, isCoopAuthoritativeGuest());
+    }
+    const failures = drainCoopApplyFailures();
+    const checksum = captureCoopChecksum();
+    if (
+      !stateApplied
+      || failures.length > 0
+      || checksum === COOP_CHECKSUM_SENTINEL
+      || checksum !== superseding.checksum
+    ) {
+      this.failModernTurnCommit(
+        streamer,
+        `Already-finalized turn ${this.turn} could not reassert its retained replacement boundary.`,
+      );
+      return;
+    }
+    coopLog(
+      "checksum",
+      `guest finalize turn=${this.turn}: duplicate reasserted replacement rev=${superseding.revision} `
+        + "without replaying staged turn ACKs",
+    );
+    this.end();
   }
 
   private applyModernTurnCommit(

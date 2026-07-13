@@ -619,13 +619,18 @@ export class CoopReplayTurnPhase extends Phase {
         }
         settled = true;
         cancelDeadline();
+        // The replay pump has its own exact active-instance fence. Use it instead of the phase
+        // manager's current pointer: focused two-engine drivers can run the pump as a detached
+        // renderer phase, while production can temporarily expose a presentation child during an
+        // awaited atlas load. In both cases a newer replay, abort, end, session replacement, or
+        // streamer replacement invalidates this completion before it can ACK presentationReady.
         resolve(
           ready
             && !this.aborted
             && !this.ended
             && generation === coopSessionGeneration()
             && getCoopBattleStreamer() === streamer
-            && globalScene.phaseManager.getCurrentPhase() === this,
+            && activeCoopReplayTurnPhase === this,
         );
       };
       const scheduledCancel = streamer.scheduleAuthorityRetry(() => finish(false), REPLACEMENT_PRESENTATION_TIMEOUT_MS);
