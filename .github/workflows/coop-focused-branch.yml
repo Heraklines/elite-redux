@@ -1,0 +1,185 @@
+name: Focused Co-op Branch Gate
+
+on:
+  push:
+    branches:
+      - "ci/coop/**"
+    paths:
+      - ".github/workflows/coop-focused-branch.yml"
+      - ".github/workflows/coop-gate-sharded.yml"
+      - ".github/actions/setup-deps/**"
+      - ".nvmrc"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/coop-gate-timings.json"
+      - "scripts/run-coop-gate.mjs"
+      - "scripts/write-coop-ci-status.mjs"
+      - "src/**"
+      - "test/**"
+      - "tsconfig*.json"
+      - "vite.config.ts"
+      - "vitest.config.ts"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Select affected integration shards
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Fetch explicit integration base
+        shell: bash
+        run: |
+          git fetch --no-tags --depth=1 origin feat/elite-redux-port
+          echo "COOP_INTEGRATION_BASE=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
+
+      - name: Select one to five affected shards deterministically
+        id: plan
+        env:
+          COOP_CI_PLAN_MANIFEST: coop-ci-focused-plan.json
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          node scripts/run-coop-gate.mjs --focused-matrix \
+            --base "$COOP_INTEGRATION_BASE" --max-shards 5 \
+            2>&1 | tee coop-ci-focused-plan.log
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Write focused planner status evidence
+        if: always()
+        env:
+          PLAN_EXIT: ${{ steps.plan.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs --output coop-ci-focused-plan-status.json
+          --kind focused-plan --exit-code "$PLAN_EXIT" --log coop-ci-focused-plan.log
+          --assignment coop-ci-focused-plan.json
+
+      - name: Upload focused plan evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-plan-${{ github.sha }}
+          overwrite: true
+          path: |
+            coop-ci-focused-plan.json
+            coop-ci-focused-plan-status.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload focused plan failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-plan-${{ github.sha }}-failure
+          overwrite: true
+          path: |
+            coop-ci-focused-plan.json
+            coop-ci-focused-plan-status.json
+            coop-ci-focused-plan.log
+          retention-days: 7
+          if-no-files-found: warn
+
+  gate:
+    if: github.repository == 'Heraklines/elite-redux'
+    needs: plan
+    name: Focused ${{ matrix.lane }} ${{ matrix.shard }}/${{ matrix.total }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Run affected isolated shard
+        id: shard
+        env:
+          COOP_GATE_MANIFEST: coop-focused-assignment.json
+          NODE_OPTIONS: --max-old-space-size=8192
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          node scripts/run-coop-gate.mjs \
+            --lane "${{ matrix.lane }}" \
+            --shard "${{ matrix.shard }}/${{ matrix.total }}" \
+            2>&1 | tee "coop-focused-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log"
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Write focused status evidence
+        if: always()
+        env:
+          SHARD_EXIT: ${{ steps.shard.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs
+          --output coop-focused-status.json --kind focused-shard --exit-code "$SHARD_EXIT"
+          --lane "${{ matrix.lane }}" --shard "${{ matrix.shard }}/${{ matrix.total }}"
+          --log "coop-focused-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log"
+          --assignment coop-focused-assignment.json
+
+      - name: Upload compact focused evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}-status
+          overwrite: true
+          path: |
+            coop-focused-status.json
+            coop-focused-assignment.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload full focused failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}-failure
+          overwrite: true
+          path: |
+            coop-focused-status.json
+            coop-focused-assignment.json
+            coop-focused-${{ matrix.lane }}-${{ matrix.shard }}-of-${{ matrix.total }}.log
+            dev-logs/coop-duo/**
+            dev-logs/coop-soak/**
+            .vitest-reports/**
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
+
+  focused-required:
+    name: Focused co-op required aggregate
+    if: always()
+    needs: [plan, gate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require planner and every selected shard
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          GATE_RESULT: ${{ needs.gate.result }}
+        run: |
+          test "$PLAN_RESULT" = success
+          test "$GATE_RESULT" = success

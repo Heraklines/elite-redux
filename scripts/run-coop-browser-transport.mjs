@@ -1,14 +1,15 @@
 #!/usr/bin/env node
-// Browser-native co-op transport checkpoint. Two isolated Chromium contexts load the real Vite client,
+// Browser-native co-op transport checkpoint. Two isolated Chromium contexts load one sealed production bundle,
 // establish the production WebRTC connector through an in-memory signaling relay, complete the protocol /
 // fingerprint / identity handshake, then force a 512 KiB UTF-8 checkpoint to lose its channel mid-chunk.
 // Hot rejoin must restart chunk zero with a new transfer id, deliver the logical checkpoint exactly once,
 // and carry subsequent protocol traffic.
 
-import { spawn } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { createServer } from "node:http";
-import { resolve } from "node:path";
+import { extname, normalize, relative, resolve } from "node:path";
 import process from "node:process";
 import puppeteer from "puppeteer";
 
@@ -18,16 +19,70 @@ const signalPort = Number(process.env.COOP_BROWSER_SIGNAL_PORT ?? port + 1);
 const origin = `http://127.0.0.1:${port}`;
 const signalOrigin = `http://127.0.0.1:${signalPort}`;
 const artifactDir = resolve(root, "dev-logs", "coop-browser");
-const vite = resolve(root, "node_modules", ".bin", process.platform === "win32" ? "vite.cmd" : "vite");
-const server = spawn(vite, ["--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
-  cwd: root,
-  env: { ...process.env, VITE_COOP_SERVER_URL: signalOrigin },
-  stdio: ["ignore", "pipe", "pipe"],
-  shell: process.platform === "win32",
-});
+const browserDist = resolve(root, process.env.COOP_BROWSER_DIST ?? "dist-coop-browser");
+const browserAssets = resolve(root, process.env.COOP_BROWSER_ASSET_DIR ?? "assets");
 
-server.stdout.on("data", chunk => process.stdout.write(`[vite] ${chunk}`));
-server.stderr.on("data", chunk => process.stderr.write(`[vite] ${chunk}`));
+const verify = spawnSync(
+  process.execPath,
+  [resolve(root, "scripts", "prepare-coop-browser-artifact.mjs"), "--verify"],
+  { cwd: root, env: { ...process.env, COOP_BROWSER_DIST: browserDist }, encoding: "utf8" },
+);
+if (verify.status !== 0) {
+  throw new Error(`browser artifact verification failed:\n${verify.stdout ?? ""}\n${verify.stderr ?? ""}`);
+}
+process.stdout.write(verify.stdout);
+const sealedManifest = JSON.parse(readFileSync(resolve(browserDist, "coop-browser-artifact.json"), "utf8"));
+if (process.env.GITHUB_SHA && sealedManifest.sha !== process.env.GITHUB_SHA) {
+  throw new Error(`browser artifact SHA mismatch: built=${sealedManifest.sha} runtime=${process.env.GITHUB_SHA}`);
+}
+if (sealedManifest.signalOrigin !== signalOrigin) {
+  throw new Error(
+    `browser artifact signaling origin mismatch: built=${sealedManifest.signalOrigin} runtime=${signalOrigin}`,
+  );
+}
+
+const CONTENT_TYPES = {
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".ico": "image/x-icon",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
+  ".woff2": "font/woff2",
+};
+
+function safeStaticFile(directory, requested) {
+  const absolute = normalize(resolve(directory, requested));
+  const inside = relative(directory, absolute);
+  return !inside.startsWith("..") && !inside.includes(":") && existsSync(absolute) && statSync(absolute).isFile()
+    ? absolute
+    : null;
+}
+
+/** Serve the sealed production bundle plus its exact checked-out immutable asset pin; never source code. */
+const previewServer = createServer((request, response) => {
+  let pathname = "/";
+  try {
+    pathname = decodeURIComponent(new URL(request.url ?? "/", origin).pathname);
+  } catch {
+    response.writeHead(400).end("bad request");
+    return;
+  }
+  const requested = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+  const absolute = safeStaticFile(browserDist, requested) ?? safeStaticFile(browserAssets, requested);
+  if (absolute == null) {
+    response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("not found");
+    return;
+  }
+  response.writeHead(200, {
+    "Cache-Control": "no-store",
+    "Content-Type": CONTENT_TYPES[extname(absolute)] ?? "application/octet-stream",
+  });
+  createReadStream(absolute).pipe(response);
+});
 
 const delay = ms => new Promise(resolveDelay => setTimeout(resolveDelay, ms));
 
@@ -38,15 +93,16 @@ const sourceAssetFiles = new Set([
   "/biome-bgm-loop-points.json",
   "/logo128.png",
   "/logo512.png",
+  "/manifest.webmanifest",
 ]);
 
 /**
- * Source-mode Vite deliberately has no Cloudflare Pages redirect layer, so CDN-owned assets can 404 even
+ * The sealed preview deliberately has no Cloudflare Pages redirect layer, so CDN-owned assets can 404 even
  * though the same paths are served by the immutable er-assets pin in staging/production. The browser lane
  * proves WebRTC/session behavior, not CDN completeness; keep these misses visible as diagnostics without
  * allowing unrelated console errors to pass.
  */
-function isExpectedSourceAssetMiss(text, locationUrl) {
+function isExpectedPreviewAssetMiss(text, locationUrl) {
   if (!text.includes("Failed to load resource") || !locationUrl) {
     return false;
   }
@@ -64,9 +120,6 @@ function isExpectedSourceAssetMiss(text, locationUrl) {
 async function waitForServer() {
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
-    if (server.exitCode != null) {
-      throw new Error(`Vite exited before readiness (${server.exitCode})`);
-    }
     try {
       const response = await fetch(origin);
       if (response.ok) {
@@ -77,49 +130,55 @@ async function waitForServer() {
     }
     await delay(250);
   }
-  throw new Error("Timed out waiting for Vite");
+  throw new Error("Timed out waiting for sealed browser preview");
 }
 
 const signals = { host: [], guest: [] };
+async function acceptPostedSignal(request, response) {
+  const chunks = [];
+  for await (const chunk of request) {
+    chunks.push(chunk);
+  }
+  const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+  if ((body.role !== "host" && body.role !== "guest") || typeof body.signal !== "string") {
+    response.writeHead(400, { "Content-Type": "application/json" }).end('{"error":"bad signal"}');
+    return;
+  }
+  signals[body.role].push(body.signal);
+  response.writeHead(200, { "Content-Type": "application/json" }).end('{"ok":true}');
+}
+
+async function handleSignalRequest(request, response) {
+  response.setHeader("Access-Control-Allow-Origin", "*");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (request.method === "OPTIONS") {
+    response.writeHead(204).end();
+    return;
+  }
+  const url = new URL(request.url ?? "/", signalOrigin);
+  if (url.pathname === "/coop/signal" && request.method === "POST") {
+    await acceptPostedSignal(request, response);
+    return;
+  }
+  if (url.pathname === "/coop/signal" && request.method === "GET") {
+    const role = url.searchParams.get("role");
+    const peer = role === "host" ? "guest" : "host";
+    response
+      .writeHead(200, { "Content-Type": "application/json" })
+      .end(JSON.stringify({ signal: signals[peer].shift() ?? null }));
+    return;
+  }
+  response.writeHead(404, { "Content-Type": "application/json" }).end('{"error":"not found"}');
+}
+
 const signalServer = createServer((request, response) => {
-  void (async () => {
-    response.setHeader("Access-Control-Allow-Origin", "*");
-    response.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    if (request.method === "OPTIONS") {
-      response.writeHead(204).end();
-      return;
-    }
-    const url = new URL(request.url ?? "/", signalOrigin);
-    if (url.pathname === "/coop/signal" && request.method === "POST") {
-      const chunks = [];
-      for await (const chunk of request) {
-        chunks.push(chunk);
-      }
-      const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
-      if ((body.role !== "host" && body.role !== "guest") || typeof body.signal !== "string") {
-        response.writeHead(400, { "Content-Type": "application/json" }).end('{"error":"bad signal"}');
-        return;
-      }
-      signals[body.role].push(body.signal);
-      response.writeHead(200, { "Content-Type": "application/json" }).end('{"ok":true}');
-      return;
-    }
-    if (url.pathname === "/coop/signal" && request.method === "GET") {
-      const role = url.searchParams.get("role");
-      const peer = role === "host" ? "guest" : "host";
-      response
-        .writeHead(200, { "Content-Type": "application/json" })
-        .end(JSON.stringify({ signal: signals[peer].shift() ?? null }));
-      return;
-    }
-    response.writeHead(404, { "Content-Type": "application/json" }).end('{"error":"not found"}');
-  })().catch(error => {
+  handleSignalRequest(request, response).catch(error => {
     response.writeHead(500, { "Content-Type": "application/json" }).end(JSON.stringify({ error: String(error) }));
   });
 });
 
 async function configurePage(page, label, browserErrors, sourceAssetMisses) {
-  // Stub only services that the transport checkpoint does not own. This removes known source-mode noise
+  // Stub only services that the transport checkpoint does not own. This removes known sealed-preview noise
   // without weakening page errors, co-op console errors, or arbitrary failed-resource diagnostics.
   await page.setRequestInterception(true);
   page.on("request", request => {
@@ -174,7 +233,7 @@ async function configurePage(page, label, browserErrors, sourceAssetMisses) {
       const source = location.url
         ? ` (${location.url}${location.lineNumber == null ? "" : `:${location.lineNumber}`})`
         : "";
-      if (isExpectedSourceAssetMiss(text, location.url)) {
+      if (isExpectedPreviewAssetMiss(text, location.url)) {
         sourceAssetMisses.push(`[${label}] ${location.url}`);
       } else {
         browserErrors.push(`[${label}:console] ${text}${source}`);
@@ -185,7 +244,10 @@ async function configurePage(page, label, browserErrors, sourceAssetMisses) {
     }
   });
   await page.goto(origin, { waitUntil: "domcontentloaded", timeout: 90_000 });
-  await page.waitForFunction(() => globalThis.dev?.scene?.gameData != null, { timeout: 180_000, polling: 250 });
+  await page.waitForFunction(() => globalThis.__coopBrowserBridge?.ready?.() === true, {
+    timeout: 180_000,
+    polling: 250,
+  });
 }
 
 async function browserStatus(page) {
@@ -207,6 +269,10 @@ async function browserStatus(page) {
 let browser;
 try {
   await mkdir(artifactDir, { recursive: true });
+  await new Promise((resolveListen, rejectListen) => {
+    previewServer.once("error", rejectListen);
+    previewServer.listen(port, "127.0.0.1", resolveListen);
+  });
   await new Promise((resolveListen, rejectListen) => {
     signalServer.once("error", rejectListen);
     signalServer.listen(signalPort, "127.0.0.1", resolveListen);
@@ -235,8 +301,7 @@ try {
   const connect = (page, role, username) =>
     page.evaluate(
       async ({ role: localRole, username: localUsername }) => {
-        const { connectCoopWithCode } = await import("/src/data/elite-redux/coop/coop-webrtc-connect.ts");
-        const runtime = await connectCoopWithCode("BROWSER", localRole, {
+        const runtime = await globalThis.__coopBrowserBridge.connect("BROWSER", localRole, {
           username: localUsername,
           ice: { stunUrls: ["stun:stun.cloudflare.com:3478"] },
         });
@@ -406,7 +471,7 @@ try {
   if (sourceAssetMisses.length > 0) {
     const uniqueMisses = [...new Set(sourceAssetMisses)];
     process.stdout.write(
-      "[coop-browser] source-mode CDN misses (non-fatal; staging owns redirect/asset verification): "
+      "[coop-browser] sealed-preview CDN misses (non-fatal; staging owns redirect/asset verification): "
         + `${uniqueMisses.length} unique\n${uniqueMisses.join("\n")}\n`,
     );
   }
@@ -424,5 +489,5 @@ try {
 } finally {
   await browser?.close().catch(() => {});
   signalServer.close();
-  server.kill("SIGTERM");
+  previewServer.close();
 }

@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "fallbackWeight": 1,
+  "lanes": {
+    "B": {
+      "source": "green GitHub Actions run 29177743451",
+      "files": {
+        "test/tests/elite-redux/coop/coop-duo-exploration.test.ts": { "historicalSeconds": 49.31 },
+        "test/tests/elite-redux/coop/coop-battle-control.test.ts": { "historicalSeconds": 43.97 },
+        "test/tests/elite-redux/coop/coop-duo-fault.test.ts": { "historicalSeconds": 43.42 },
+        "test/tests/elite-redux/coop/coop-savedata-digest.test.ts": { "historicalSeconds": 42.49 },
+        "test/tests/elite-redux/coop/coop-duo-reward-subpickers.test.ts": { "historicalSeconds": 41.15 },
+        "test/tests/elite-redux/coop/coop-determinism-contract.test.ts": { "historicalSeconds": 38.45 },
+        "test/tests/elite-redux/coop/coop-guest-renderer.test.ts": { "historicalSeconds": 38.26 },
+        "test/tests/elite-redux/coop/coop-duo-voluntary-switch-transposition.test.ts": {
+          "historicalSeconds": 37.62
+        },
+        "test/tests/elite-redux/coop/coop-duo-mystery.test.ts": { "historicalSeconds": 35.77 },
+        "test/tests/elite-redux/coop/coop-duo-replay.test.ts": { "historicalSeconds": 35.72 },
+        "test/tests/elite-redux/coop/coop-duo-biome-choice.test.ts": { "historicalSeconds": 34.63 },
+        "test/tests/elite-redux/coop/coop-duo-multiwave.test.ts": { "historicalSeconds": 34.36 },
+        "test/tests/elite-redux/coop/coop-battle-checksum-engine.test.ts": { "historicalSeconds": 33.61 },
+        "test/tests/elite-redux/coop/coop-battle-events.test.ts": { "historicalSeconds": 33.14 },
+        "test/tests/elite-redux/coop/coop-duo-seating.test.ts": { "historicalSeconds": 31.95 }
+      }
+    },
+    "C": { "files": {} },
+    "P": { "files": {} },
+    "S": { "files": {} },
+    "T": { "files": {} }
+  }
+}
