@@ -313,6 +313,40 @@ describe("co-op save Worker endpoint integration", () => {
     });
   }
 
+  it("from-nothing empty-CAS rejects a fresh checkpoint whose mons drop the boolean `passive` key (#P33 layer-5), accepts it with a real boolean", async () => {
+    const runId = "run-fresh-passive-drop-123456789";
+
+    // Root of the bug: a FRESHLY-generated Pokemon never assigns its declared-`boolean` `passive`
+    // field (Pokemon only sets it via `!!dataSource.passive` on the LOAD path), so PokemonData used to
+    // serialize `passive: undefined`, and JSON.stringify DROPS an undefined value -> the key vanishes.
+    const monWithUndefinedPassive = { ...capturedPokemonData(101, true, 1), passive: undefined };
+    const roundTripped = JSON.parse(JSON.stringify(monWithUndefinedPassive));
+    expect("passive" in roundTripped, "JSON.stringify drops an undefined boolean - this is the bug").toBe(false);
+
+    // The client's fresh serialize shape on the UNPATCHED path: valid session, valid two registered
+    // accounts, but every party AND enemyParty mon is missing the `passive` key. The worker's fail-closed
+    // isPokemonDataShape (typeof passive === "boolean") rejects it -> parseValidResumableCoopSession null
+    // -> 409 "incoming resumable co-op checkpoint is invalid" (the exact production first-save 409).
+    const droppedPassive = JSON.parse(checkpoint(runId, 0, 1));
+    for (const mon of [...droppedPassive.party, ...droppedPassive.enemyParty]) {
+      delete mon.passive;
+    }
+    const rejected = await call("/savedata/session/coop-cas-update?slot=0&coopCasMode=empty", {
+      method: "POST",
+      body: JSON.stringify(droppedPassive),
+    });
+    expect(rejected.status, "a fresh mon missing the boolean passive key is rejected fail-closed").toBe(409);
+    await expect(rejected.text()).resolves.toContain("incoming resumable co-op checkpoint is invalid");
+
+    // The PATCHED client shape (pokemon-data.ts now serializes `passive ?? false`): the boolean key
+    // survives, the shape validates, and the from-nothing empty-slot CAS commits.
+    const patched = await call("/savedata/session/coop-cas-update?slot=0&coopCasMode=empty", {
+      method: "POST",
+      body: checkpoint(runId, 0, 1),
+    });
+    expect(patched.status, "the same fresh save with a real boolean passive commits from nothing").toBe(200);
+  });
+
   it("rejects incomplete, non-canonical, and foreign-account checkpoints through the real route", async () => {
     const runId = "run-structural-route-123456789";
     const incomplete = JSON.stringify({ coopRun: { version: 1, runId, checkpointRevision: 0 } });
