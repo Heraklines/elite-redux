@@ -45,7 +45,6 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
@@ -55,10 +54,10 @@ import {
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
   withClient,
-  withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -150,7 +149,7 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     expect(hostShop.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     if (hostOwns) {
       await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: false }));
       await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));

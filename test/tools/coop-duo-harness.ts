@@ -1666,6 +1666,19 @@ export interface ShopPhaseSeam {
 }
 
 /**
+ * Reach the reward shop through the client's queued production victory tail.
+ *
+ * Detached `new SelectModifierPhase()` fixtures skip BattleEnd, so a retained WAVE_ADVANCE correctly
+ * remains the unacknowledged head of the global operation stream and every later reward result waits
+ * behind it. Production never enters a shop that way. This helper makes transition tests execute the
+ * real Victory -> BattleEnd -> SelectModifier path and stops before the public reward surface starts.
+ * Call inside the destination client's {@linkcode withClient} context.
+ */
+export async function reachQueuedRewardShop(scene: BattleScene): Promise<ShopPhaseSeam> {
+  return (await driveClientPhaseQueueTo(scene, "SelectModifierPhase")) as unknown as ShopPhaseSeam;
+}
+
+/**
  * Drive the HOST's REAL owner reward shop for one interaction: start the phase (it streams its rolled
  * option list to the watcher + opens the owner screen), TAKE reward index 0 (a free reward; relayed),
  * then LEAVE (the terminal that advances the alternating-interaction counter). MUST be called inside
@@ -1814,11 +1827,14 @@ export async function driveGuestRewardWatch(
   // the phase's end() directly as a third completion signal (found by the #789 exploration probe:
   // the old leave-or-advance detector misread this legitimate terminal as a WATCH HANG).
   let terminalApplied = false;
-  const seamApply = guestPhase as unknown as { applyRelayedRewardAction?: (a: unknown) => boolean };
+  const seamApply = guestPhase as unknown as { applyRelayedRewardAction?: (...args: unknown[]) => boolean };
   const realApply = seamApply.applyRelayedRewardAction?.bind(guestPhase);
   if (realApply) {
-    seamApply.applyRelayedRewardAction = (a: unknown): boolean => {
-      const terminal = realApply(a);
+    seamApply.applyRelayedRewardAction = (...args: unknown[]): boolean => {
+      // Forward the complete watcher decision. Dropping its second argument strips the retained
+      // operationId/requiresAuthorityCommit proof on guest-owned rewards and can make the owner apply a
+      // raw terminal without committing the RESULT, leaving the guest parked one interaction behind.
+      const terminal = realApply(...args);
       terminalApplied ||= terminal;
       return terminal;
     };
@@ -2775,7 +2791,7 @@ export async function replayCoopTrace(
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     if (hostShop.phaseName === "SelectModifierPhase") {
-      const guestShop = withClientSync(rig.guestCtx, () => buildGuestShopPhase()) as unknown as ShopPhaseSeam;
+      const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
       if (hostOwns) {
         await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward }));
         await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
@@ -2818,11 +2834,6 @@ export async function replayCoopTrace(
     finalHostCounter: rig.hostRuntime.controller.interactionCounter(),
     finalGuestCounter: rig.guestRuntime.controller.interactionCounter(),
   };
-}
-
-/** Build a fresh guest-side SelectModifierPhase for the watcher (under withClientSync, globalScene=guest). */
-function buildGuestShopPhase(): Phase {
-  return globalScene.phaseManager.create("SelectModifierPhase");
 }
 
 // =============================================================================

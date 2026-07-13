@@ -72,7 +72,6 @@ import { UiMode } from "#enums/ui-mode";
 import { BerryModifier } from "#modifiers/modifier";
 import { BerryModifierType } from "#modifiers/modifier-type";
 import { SelectBiomePhase } from "#phases/select-biome-phase";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
@@ -84,6 +83,7 @@ import {
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
   setCoopHarnessModuleLetIsolation,
@@ -188,7 +188,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       await game.phaseInterceptor.to("SelectModifierPhase", false);
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     if (hostOwns) {
       await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: false }));
       await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
