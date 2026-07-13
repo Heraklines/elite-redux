@@ -104,6 +104,9 @@ export const COOP_PROTOCOL_VERSION = "er-coop-33";
  */
 export type CoopAuthorityAckStage = "materialApplied" | "presentationReady" | "continuationReady";
 
+/** Public shared-run surfaces that can prove an authoritative operation reached a usable continuation. */
+export type CoopOperationContinuationSurface = "command" | "sharedInput" | "terminal";
+
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
  * implementations live side by side:
@@ -1742,7 +1745,27 @@ export type CoopMessage =
    * anything above is the resend tail. Cumulative (not per-frame) so it stays cheap on the 5s-keepalive
    * channel - the guest acks its last-applied revision, not every frame.
    */
-  | { t: "coopAck"; cls: string; seq: number }
+  | {
+      t: "coopAck";
+      cls: string;
+      seq: number;
+      /**
+       * Protocol-33 operation-envelope evidence. Absent only for non-operation durability classes and
+       * backwards-compatible synthetic durability users. Operation commits are never retired by an ACK
+       * without this ordered evidence.
+       */
+      stage?: CoopAuthorityAckStage;
+      operationId?: string;
+      epoch?: number;
+      wave?: number;
+      turn?: number;
+      /** The real public surface observed after material application (presentation/final stages only). */
+      surface?: CoopOperationContinuationSurface;
+      /** Exact authority address at which that public continuation was observed. */
+      continuationEpoch?: number;
+      continuationWave?: number;
+      continuationTurn?: number;
+    }
   /**
    * Receiver -> committer (§4.4, reconnect-from-revision): "resend class `cls`'s committed tail after
    * revision `from`". Sent on a #805 hot rejoin (carrying the last-applied revision instead of a turn, the
