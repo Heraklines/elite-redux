@@ -80,6 +80,7 @@ import {
   disposeDuoRig,
   drainLoopback,
   driveClientPhaseQueueTo,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
@@ -174,10 +175,12 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     return rig;
   }
 
-  async function hostPlayWave(rig: DuoRig): Promise<void> {
+  async function hostPlayWave(rig: DuoRig, guestCommandAlreadyCommitted = false): Promise<void> {
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-      game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
+      if (!guestCommandAlreadyCommitted) {
+        game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
+      }
       await game.phaseInterceptor.to("TurnEndPhase");
     });
   }
@@ -256,7 +259,12 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair: ScheduledCoopPair = createScheduledCoopPair({ automatic: true });
     const rig = await buildSavedataDuo(pair);
-    wireGuestCommand(rig);
+    // Align the direct guest scene to the real TurnInit/Command queue. Its constructor starts on TitlePhase;
+    // shiftPhase on an empty queue selects production TurnInitPhase, which builds both command slots.
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.phaseManager.clearAllPhases();
+      rig.guestScene.phaseManager.shiftPhase();
+    });
     // The handshake may use ordinary delivery, but every gameplay continuation is delivered only while
     // its addressed client's complete process-global context is installed. This models two browser
     // processes and prevents either engine's async phase tail from running against its partner's scene.
@@ -271,8 +279,9 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
         hostStart.saveDataDigest,
       );
 
+      await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: w === 1 });
       const turn = rig.hostScene.currentBattle.turn;
-      await hostPlayWave(rig);
+      await hostPlayWave(rig, true);
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn);
       });

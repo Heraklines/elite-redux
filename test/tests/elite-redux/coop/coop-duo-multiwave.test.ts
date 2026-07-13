@@ -46,14 +46,12 @@ import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import { BattlerIndex } from "#enums/battler-index";
-import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { LearnMoveType } from "#enums/learn-move-type";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
-import { UiMode } from "#enums/ui-mode";
 import { LearnMovePhase } from "#phases/learn-move-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
@@ -62,6 +60,7 @@ import {
   type DuoRig,
   drainLoopback,
   driveClientPhaseQueueTo,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
@@ -152,60 +151,6 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     });
   }
 
-  /**
-   * Bring both real clients to the same command point and submit the GUEST's move through public UI input.
-   * The guest first auto-resolves the host-owned slot, then parks its own CommandPhase at the reciprocal
-   * rendezvous. The host starts its own command phase, both barriers cross, and ACTION/ACTION/RIGHT/ACTION
-   * commits Tackle against enemy slot 2 through Command/Fight/TargetSelect—the production relay path.
-   */
-  async function driveGuestCommandUi(rig: DuoRig, restartAlreadyOpenHost: boolean): Promise<void> {
-    const guestOwnCommand = await withClient(rig.guestCtx, () =>
-      driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase", {
-        matches: phase =>
-          phase.phaseName === "CommandPhase"
-          && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
-      }),
-    );
-    await withClient(rig.guestCtx, async () => {
-      guestOwnCommand.start();
-      await drainLoopback();
-    });
-
-    await withClient(rig.hostCtx, async () => {
-      await drainLoopback();
-      if (restartAlreadyOpenHost) {
-        // Wave 1's host CommandPhase opened before buildDuo installed the live runtime. Re-enter that same
-        // public phase once so it participates in the now-live reciprocal rendezvous; no state was committed.
-        rig.hostScene.phaseManager.getCurrentPhase().start();
-        await drainLoopback();
-      } else {
-        await game.phaseInterceptor.to("CommandPhase");
-      }
-    });
-
-    await withClient(rig.guestCtx, async () => {
-      await drainLoopback();
-      expect(rig.guestScene.ui.getMode(), "guest command UI opens only after both clients arrive").toBe(UiMode.COMMAND);
-      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Fight through COMMAND UI").toBe(true);
-      expect(rig.guestScene.ui.getMode(), "guest reaches the move picker").toBe(UiMode.FIGHT);
-      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Tackle through FIGHT UI").toBe(true);
-      // The direct guest scene has a deliberately MANUAL phase manager: choosing Tackle ends the current
-      // CommandPhase and queues the REAL SelectTargetPhase, but does not auto-start it. Start that queued
-      // production phase before reading TARGET_SELECT; checking the UI immediately after the Fight click
-      // used to see the stale FIGHT mode, skip the target input, and then park forever on the untouched
-      // SelectTargetPhase when the queue driver reached it.
-      const targetPhase = await driveClientPhaseQueueTo(rig.guestScene, "SelectTargetPhase");
-      targetPhase.start();
-      await drainLoopback();
-      expect(rig.guestScene.ui.getMode(), "guest reaches the real target picker").toBe(UiMode.TARGET_SELECT);
-      expect(rig.guestScene.ui.processInput(Button.RIGHT), "guest moves to the second enemy target").toBe(true);
-      expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms the second enemy target").toBe(true);
-      await drainLoopback();
-      await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase");
-    });
-    await withClient(rig.hostCtx, () => drainLoopback());
-  }
-
   it("DUO 3-wave: host plays each wave, guest replays + converges, host drives the reward shop each wave", async () => {
     // FORCE a deterministic NON-party reward (a LURE) into every shop so the host owner can TAKE a
     // reward without driving a party-target menu - exercising the reward-grant + relay on purpose.
@@ -239,7 +184,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
 
     const WAVES = 3;
     for (let w = 1; w <= WAVES; w++) {
-      await driveGuestCommandUi(rig, w === 1);
+      await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: w === 1 });
       // ===== Host plays this wave to a win (emits turnResolution + checkpoint + waveResolved). =====
       const turn = rig.hostScene.currentBattle.turn;
       await hostPlayWave(rig);

@@ -1231,6 +1231,64 @@ export interface DuoRig {
   pair: { host: CoopTransport; guest: CoopTransport };
 }
 
+/**
+ * Bring both real clients to the reciprocal command boundary and submit Tackle for the guest-owned
+ * battler exclusively through the production Command/Fight/TargetSelect UI handlers.
+ *
+ * Scheduled duo tests call this while automatic transport delivery is disabled. Every addressed packet
+ * is therefore pumped only while its destination's complete client context is installed, matching two
+ * browser processes instead of allowing a shared-process async continuation to borrow the other scene.
+ */
+export async function driveDuoGuestTackleThroughPublicUi(
+  hostGame: GameManager,
+  rig: DuoRig,
+  options: { restartAlreadyOpenHost?: boolean } = {},
+): Promise<void> {
+  const guestOwnCommand = await withClient(rig.guestCtx, () =>
+    driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase", {
+      matches: phase =>
+        phase.phaseName === "CommandPhase"
+        && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+    }),
+  );
+  await withClient(rig.guestCtx, async () => {
+    guestOwnCommand.start();
+    await drainLoopback();
+  });
+
+  await withClient(rig.hostCtx, async () => {
+    await drainLoopback();
+    if (options.restartAlreadyOpenHost) {
+      // Wave 1 opened before buildDuo installed the live runtime. Re-enter that untouched public phase
+      // once so it participates in the now-live reciprocal rendezvous.
+      rig.hostScene.phaseManager.getCurrentPhase().start();
+      await drainLoopback();
+    } else {
+      await hostGame.phaseInterceptor.to("CommandPhase");
+    }
+  });
+
+  await withClient(rig.guestCtx, async () => {
+    await drainLoopback();
+    expect(rig.guestScene.ui.getMode(), "guest command UI opens only after both clients arrive").toBe(UiMode.COMMAND);
+    expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Fight through COMMAND UI").toBe(true);
+    expect(rig.guestScene.ui.getMode(), "guest reaches the move picker").toBe(UiMode.FIGHT);
+    expect(rig.guestScene.ui.processInput(Button.ACTION), "guest selects Tackle through FIGHT UI").toBe(true);
+
+    // The direct guest scene uses a manual phase manager. The Fight click queues the production target
+    // phase, so start that real queued phase before sending the target inputs.
+    const targetPhase = await driveClientPhaseQueueTo(rig.guestScene, "SelectTargetPhase");
+    targetPhase.start();
+    await drainLoopback();
+    expect(rig.guestScene.ui.getMode(), "guest reaches the real target picker").toBe(UiMode.TARGET_SELECT);
+    expect(rig.guestScene.ui.processInput(Button.RIGHT), "guest moves to the second enemy target").toBe(true);
+    expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms the second enemy target").toBe(true);
+    await drainLoopback();
+    await driveClientPhaseQueueTo(rig.guestScene, "CoopReplayTurnPhase");
+  });
+  await withClient(rig.hostCtx, () => drainLoopback());
+}
+
 /** Every in-process duo assembled by this module and not yet fully torn down. */
 const liveDuoRigs = new Set<DuoRig>();
 

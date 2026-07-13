@@ -32,7 +32,6 @@ import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -41,16 +40,16 @@ import { type ModifierSelectCallback, SelectModifierPhase } from "#phases/select
 import { GameManager } from "#test/framework/game-manager";
 import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import {
-  arriveGuestCommandBoundary,
   beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   drainLoopback,
+  driveClientPhaseQueueTo,
+  driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   forceItemRewards,
   installDuoLogCapture,
   reachQueuedRewardShop,
-  remirrorWave,
   type ShopPhaseSeam,
   withClient,
   withClientSync,
@@ -104,19 +103,12 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     initGlobalScene(game.scene);
   });
 
-  function wireGuestCommand(rig: DuoRig): void {
-    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-      command: Command.FIGHT,
-      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-      moveId: MoveId.TACKLE,
-      targets: [BattlerIndex.ENEMY_2],
-    }));
-  }
-
-  async function hostPlayWave(rig: DuoRig): Promise<void> {
+  async function hostPlayWave(rig: DuoRig, guestCommandAlreadyCommitted = false): Promise<void> {
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-      game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
+      if (!guestCommandAlreadyCommitted) {
+        game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
+      }
       await game.phaseInterceptor.to("TurnEndPhase");
     });
   }
@@ -157,7 +149,6 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    wireGuestCommand(rig);
     // This scenario verifies reward relay/counter symmetry for returning players. The first-time item
     // tutorial is a separate MESSAGE interaction that deliberately blocks reward ACTION input until its
     // text is acknowledged; keep it out of this call-chain proof on both simulated clients.
@@ -288,27 +279,23 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     );
 
     // ===== The NEXT battle resolves turns 1-2 with NO stall (the wedge the counter drift caused). =====
-    await arriveGuestCommandBoundary(rig, 2);
     await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("CommandPhase");
+      await game.phaseInterceptor.to("CommandPhase", false);
     });
+    const guestCommand = await withClient(rig.guestCtx, () => driveClientPhaseQueueTo(rig.guestScene, "CommandPhase"));
     expect(rig.hostScene.currentBattle.waveIndex, "host crossed into wave 2").toBe(2);
+    expect(guestCommand.phaseName, "guest crossed the real queue into wave 2").toBe("CommandPhase");
+    expect(rig.guestScene.currentBattle.waveIndex, "guest adopted wave 2").toBe(2);
 
-    await remirrorWave(rig);
     for (let t = 0; t < 2; t++) {
+      await driveDuoGuestTackleThroughPublicUi(game, rig);
       const w2turn = rig.hostScene.currentBattle.turn;
-      await hostPlayWave(rig);
+      await hostPlayWave(rig, true);
       await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, w2turn));
       // Guest kept converging turn-by-turn (a wedge would THROW inside driveGuestReplayTurn).
       if (rig.guestScene.currentBattle.enemyParty.every(e => e.isFainted())) {
         break;
       }
-      await withClient(rig.hostCtx, async () => {
-        if (rig.hostScene.phaseManager.getCurrentPhase()?.phaseName === "CommandPhase") {
-          return;
-        }
-        await game.phaseInterceptor.to("CommandPhase", false).catch(() => {});
-      });
     }
     expect(
       rig.guestScene.currentBattle.enemyParty.every(e => e.isFainted()),
