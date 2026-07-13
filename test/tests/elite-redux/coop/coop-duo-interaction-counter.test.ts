@@ -144,7 +144,7 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     );
   }
 
-  // Focused CI entrypoint for the public-command continuation regression.
+  // Focused CI entrypoint for the reciprocal public-command continuation regression.
   it("copy() carries the pin, an unpinned advance is refused, counters stay lockstep, wave 2 resolves", async () => {
     forceItemRewards(game.override, [{ name: "LURE" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);

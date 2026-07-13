@@ -255,7 +255,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     logs.flush();
   }, 300_000);
 
-  // Focused CI entrypoint for the reciprocal command/reward/next-wave digest journey.
+  // Focused CI entrypoint for the reciprocal public-command/reward/next-wave digest journey.
   it("NO FALSE DESYNC: two real engines produce the SAME save-data digest at each wave boundary", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair: ScheduledCoopPair = createScheduledCoopPair({ automatic: true });
