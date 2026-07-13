@@ -18,7 +18,19 @@ export const isApp = import.meta.env.MODE === "app";
 /** `true` if running automated tests via Vitest. */
 export const IS_TEST = import.meta.env.MODE === "test";
 
-export const bypassLogin = import.meta.env.VITE_BYPASS_LOGIN === "1";
+const configuredBypassLogin = import.meta.env.VITE_BYPASS_LOGIN === "1";
+
+/**
+ * Whether persistence uses the local-only development codec instead of the authenticated cloud path.
+ * This is mutable only through the explicit test seam below; an ESM namespace spy does not reliably
+ * update already-imported live bindings in every Vitest/Vite execution mode.
+ */
+export let bypassLogin = configuredBypassLogin;
+
+/** Exercise both persistence modes without rebuilding the complete browser bundle. */
+export function setBypassLoginForTesting(value: boolean | null): void {
+  bypassLogin = value ?? configuredBypassLogin;
+}
 
 /**
  * Elite Redux mod version, shown on the title screen instead of the upstream

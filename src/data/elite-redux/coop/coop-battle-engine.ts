@@ -1841,6 +1841,10 @@ const COOP_SAVEDATA_DIGEST_EXCLUDED_KEYS: ReadonlySet<string> = new Set<string>(
   // renderers do not all share one self/partner orientation). Never manufacture a battle resync
   // from this local resume-index field; the lobby validates it against the saved session separately.
   "coopParticipants",
+  // Stable run/checkpoint identity belongs to persistence ordering, not deterministic battle state.
+  // Independent executions of the same seeded script intentionally mint different run ids, while
+  // retained commit addressing and CAS ancestry validate checkpoint revisions directly.
+  "coopRun",
   // Arena weather/terrain TURN COUNTERS (`turnsLeft`) decrement per tick and legitimately differ by
   // one between two correct engines - the base field checksum EXCLUDES them for exactly this reason.
   // Arena IDENTITY (weather/terrain type, tags, biome) is already hashed by the base checksum, so

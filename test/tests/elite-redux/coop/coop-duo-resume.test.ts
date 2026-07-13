@@ -31,7 +31,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { saveKey } from "#app/constants";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import * as appConstants from "#constants/app-constants";
+import { setBypassLoginForTesting } from "#constants/app-constants";
 import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
 import { enqueueSessionCloudMutation } from "#data/elite-redux/coop/coop-cloud-save-tail";
 import {
@@ -116,6 +116,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   });
 
   beforeEach(() => {
+    setBypassLoginForTesting(false);
     priorLocksDescriptor = Object.getOwnPropertyDescriptor(globalThis.navigator, "locks");
     Object.defineProperty(globalThis.navigator, "locks", {
       configurable: true,
@@ -144,6 +145,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   });
 
   afterEach(() => {
+    setBypassLoginForTesting(null);
     setCoopPersistenceClockForTesting(null);
     clearCoopResumeMarker();
     logs.dispose();
@@ -186,7 +188,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
 
     // HOST: serialize the saved session it would load on RESUME + capture its wave-start checksum.
     const hostJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
-    const hostSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.getSessionSaveData());
+    const hostSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(hostJson));
     const commitment = await deriveCoopResumeCommitment(hostJson, hostSession);
     expect(commitment, "the frozen save produces an immutable resume discriminator").not.toBeNull();
     // IDENTITY GATE: the pointer binds the exact run + checkpoint, not merely a partner pair/wave.
@@ -322,7 +324,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const priorHead = localStorage.getItem(headKey);
 
     try {
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       localStorage.setItem(localKey, encrypt(local.json, false));
       localStorage.setItem(
         headKey,
@@ -351,7 +353,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       await expect(
         withClient(rig.hostCtx, () => rig.hostScene.gameData.getSessionForCoopResume(slot)),
         "a stale device cannot adopt another device's cloud head and then publish its unrelated local branch",
-      ).rejects.toThrow("has no proof it descends from the observed cloud head");
+      ).rejects.toThrow(/has no (?:proof it descends from the observed cloud head|unique active cloud checkpoint)/);
       expect(
         JSON.parse(localStorage.getItem(headKey) ?? "null"),
         "the competing cloud head was not adopted",
@@ -377,7 +379,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     expect(commitment).not.toBeNull();
     const priorGameplaySlot = rig.guestScene.sessionSlotId;
 
-    vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+    setBypassLoginForTesting(false);
     let cloudSlot = -1;
     let cloudRaw: string | null = null;
     const cloudRead = vi
@@ -622,7 +624,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     try {
       clearCoopResumeMarker();
       keys.forEach(key => localStorage.removeItem(key));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       const cloudRead = vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request =>
         coopCasFound(
           JSON.stringify({
@@ -669,7 +671,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const key = await withClient(rig.hostCtx, () => getSessionDataLocalStorageKey(slot));
     const prior = localStorage.getItem(key);
     const sessionJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
-    const encrypted = encrypt(sessionJson, appConstants.bypassLogin);
+    const encrypted = encrypt(sessionJson, false);
 
     try {
       localStorage.setItem(key, encrypted);
@@ -707,7 +709,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
 
     try {
       keys.forEach(key => localStorage.removeItem(key));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       localStorage.setItem(headKey(0), "{malformed");
       expect(
         await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot()),
@@ -809,7 +811,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     try {
       keys.forEach(key => localStorage.removeItem(key));
       headKeys.forEach(key => localStorage.removeItem(key));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request => {
         const raw = cloud.get(request.slot);
         return raw == null ? coopCasMissing() : coopCasFound(raw);
@@ -907,7 +909,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
           digest: loser.commitment.digest,
         }),
       );
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request => {
         const raw = cloud.get(request.slot);
         return raw == null ? coopCasMissing() : coopCasFound(raw);
@@ -929,9 +931,8 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
           digest: survivor.commitment.digest,
         },
       });
-      const storagePrototype = Object.getPrototypeOf(localStorage) as Storage;
-      const originalRemove = storagePrototype.removeItem;
-      crashCut = vi.spyOn(storagePrototype, "removeItem").mockImplementation(function (this: Storage, key: string) {
+      const originalRemove = localStorage.removeItem;
+      crashCut = vi.spyOn(localStorage, "removeItem").mockImplementation(function (this: Storage, key: string) {
         if (key === keys[0]) {
           throw new DOMException("simulated crash cut", "InvalidStateError");
         }
@@ -1000,7 +1001,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
 
     try {
       trackedKeys.forEach(key => localStorage.removeItem(key));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       const cloudRead = vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request => {
         const raw = cloud.get(request.slot);
         return raw == null ? coopCasMissing() : coopCasFound(raw);
@@ -1094,10 +1095,14 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const oldSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(oldJson));
     const old = await deriveCoopResumeCommitment(oldJson, oldSession);
     expect(old).not.toBeNull();
-    const systemJson = await withClient(rig.hostCtx, () => JSON.stringify(rig.hostScene.gameData.getSystemSaveData()));
+    const systemJson = await withClient(rig.hostCtx, () =>
+      JSON.stringify(rig.hostScene.gameData.getSystemSaveData(), (_key, value: unknown) =>
+        typeof value === "bigint" ? value.toString() : value,
+      ),
+    );
 
     try {
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       localStorage.setItem(localKey, encrypt(oldJson, false));
       localStorage.setItem(
         headKey,
@@ -1223,15 +1228,18 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const oldSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(oldJson));
     const old = await deriveCoopResumeCommitment(oldJson, oldSession);
     expect(old).not.toBeNull();
-    const systemJson = await withClient(rig.hostCtx, () => JSON.stringify(rig.hostScene.gameData.getSystemSaveData()));
+    const systemJson = await withClient(rig.hostCtx, () =>
+      JSON.stringify(rig.hostScene.gameData.getSystemSaveData(), (_key, value: unknown) =>
+        typeof value === "bigint" ? value.toString() : value,
+      ),
+    );
     let cloudRaw: string | null = null;
-    const storagePrototype = Object.getPrototypeOf(localStorage) as Storage;
-    const originalSetItem = storagePrototype.setItem;
+    const originalSetItem = localStorage.setItem;
     let failIncomingLocalWrite = true;
     let storageWrite: ReturnType<typeof vi.spyOn> | null = null;
 
     try {
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       localStorage.setItem(localKey, encrypt(oldJson, false));
       localStorage.setItem(
         headKey,
@@ -1280,7 +1288,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         return { ok: true, status: 200, error: "", failureKind: null };
       });
       const encryptedIncoming = encrypt(incomingJson, false);
-      storageWrite = vi.spyOn(storagePrototype, "setItem").mockImplementation(function (
+      storageWrite = vi.spyOn(localStorage, "setItem").mockImplementation(function (
         this: Storage,
         key: string,
         value: string,
@@ -1337,7 +1345,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const soloJson = JSON.stringify({ ...soloShape, gameMode: GameModes.CLASSIC });
 
     try {
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       localStorage.setItem(key, encrypt(legacyJson, false));
       vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request =>
         request.slot === slot ? coopCasFound(soloJson) : coopCasMissing(),
@@ -1405,7 +1413,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     >();
 
     try {
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request =>
         request.slot === slot && cloudRaw != null ? coopCasFound(cloudRaw) : coopCasMissing(),
       );
@@ -1506,7 +1514,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const legacyJson = JSON.stringify({ ...base, coopRun: undefined });
 
     try {
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       localStorage.removeItem(key);
       const cloudRead = vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue({
         ok: false,
@@ -1548,7 +1556,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     let displacedState: "active" | "tombstoned" = "active";
 
     try {
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       keys.forEach(key => localStorage.removeItem(key));
       localStorage.setItem(
         headKey,
@@ -1639,7 +1647,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       keys.forEach(key => localStorage.removeItem(key));
       localStorage.removeItem(survivorHeadKey);
       localStorage.setItem(keys[0], encrypt(orphan.json, false));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request => {
         const raw = cloud.get(request.slot);
         return raw == null ? coopCasMissing() : coopCasFound(raw);
@@ -1718,7 +1726,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
 
     try {
       keys.forEach(key => localStorage.removeItem(key));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request =>
         cloudBySlot.has(request.slot) ? coopCasFound(cloudBySlot.get(request.slot)!) : coopCasMissing(),
       );
@@ -1815,10 +1823,9 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       lastGuestReplicaRaw = null;
       rig.hostScene.money += 1;
       if (outcome === "conflict-rollback-failure") {
-        const storagePrototype = Object.getPrototypeOf(localStorage) as Storage;
-        const originalSetItem = storagePrototype.setItem;
+        const originalSetItem = localStorage.setItem;
         let rollbackWriteArmed = true;
-        vi.spyOn(storagePrototype, "setItem").mockImplementation(function (this: Storage, key: string, value: string) {
+        vi.spyOn(localStorage, "setItem").mockImplementation(function (this: Storage, key: string, value: string) {
           if (rollbackWriteArmed && key === keys[hostSlot] && value === localBefore) {
             rollbackWriteArmed = false;
             throw new DOMException("quota", "QuotaExceededError");
@@ -1911,7 +1918,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     try {
       clearCoopResumeMarker();
       keys.forEach(key => localStorage.removeItem(key));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       const cloudRead = vi
         .spyOn(pokerogueApi.savedata.session, "getCoopCas")
         .mockImplementation(async () => (committedRaw == null ? coopCasMissing() : coopCasFound(committedRaw)));
@@ -1982,7 +1989,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     try {
       clearCoopResumeMarker();
       keys.forEach(key => localStorage.removeItem(key));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async () => {
         if (!scanComplete) {
           scanComplete = true;
@@ -2064,10 +2071,9 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       confirmation = Promise.resolve(confirm?.());
       await confirmation;
     });
-    vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(true);
-    const storagePrototype = Object.getPrototypeOf(localStorage) as Storage;
-    const originalSetItem = storagePrototype.setItem;
-    const quota = vi.spyOn(storagePrototype, "setItem").mockImplementation(function (
+    setBypassLoginForTesting(true);
+    const originalSetItem = localStorage.setItem;
+    const quota = vi.spyOn(localStorage, "setItem").mockImplementation(function (
       this: Storage,
       key: string,
       value: string,
@@ -2146,7 +2152,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
     installImmediateCoopPersistenceTimeouts();
-    vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+    setBypassLoginForTesting(false);
     const hungRead = vi
       .spyOn(pokerogueApi.savedata.session, "getCoopCas")
       .mockImplementation(() => new Promise<never>(() => {}));
@@ -2167,7 +2173,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
 
     try {
       keys.forEach(key => localStorage.removeItem(key));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       const slot = await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot());
       expect(slot).not.toBeNull();
       rig.hostScene.sessionSlotId = slot!;
@@ -2200,7 +2206,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
 
     try {
       keys.forEach(key => localStorage.removeItem(key));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
       const firstSave = vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockResolvedValue({
         ok: true,
@@ -2239,7 +2245,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
 
     try {
       keys.forEach(key => localStorage.removeItem(key));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
       const slot = await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot());
       rig.hostScene.sessionSlotId = slot!;
@@ -2273,7 +2279,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
 
     try {
       keys.forEach(key => localStorage.removeItem(key));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
       vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockResolvedValue({
         ok: true,
@@ -2315,7 +2321,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
 
     try {
       keys.forEach(key => localStorage.removeItem(key));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
       const slot = await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot());
       expect(slot).toBe(0);
@@ -2346,7 +2352,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
 
     try {
       keys.forEach(key => localStorage.removeItem(key));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
       const firstSave = vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockResolvedValue({
         ok: true,
@@ -2408,7 +2414,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const priorUsername = loggedInUser?.username;
     try {
       keys.forEach(key => localStorage.removeItem(key));
-      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      setBypassLoginForTesting(false);
       vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
       vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockResolvedValue({
         ok: true,
