@@ -17,6 +17,20 @@ const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
 const GUEST_CONTINUATION_ACK = /guest ACK turn stage=continuationReady e=(\d+) wave=(\d+) turn=(\d+) rev=(\d+)/u;
 
+let publicKeyInputTail = Promise.resolve();
+
+function withFocusedPublicKeyInput(page, action) {
+  const focused = publicKeyInputTail.then(async () => {
+    await page.bringToFront();
+    return action();
+  });
+  publicKeyInputTail = focused.then(
+    () => undefined,
+    () => undefined,
+  );
+  return focused;
+}
+
 function comparableSurfaceObservation(observation) {
   return {
     surface: observation.surface,
@@ -173,6 +187,11 @@ export class PublicUiClient {
           description: "new-account public save lookup",
         },
       );
+      await this.evidence.waitFor(/Could not get system savedata! 404 Save data not found\./u, {
+        from: this.pageCursor,
+        timeoutMs: this.config.timeoutMs,
+        description: "exact fresh-account missing-save modal precursor",
+      });
       await delay(this.config.settleDelayMs);
       for (let message = 1; message <= 3; message++) {
         const phase =
@@ -300,17 +319,33 @@ export class PublicUiClient {
   }
 
   async press(key, purpose, { blurInputs = true } = {}) {
-    if (blurInputs) {
-      // Public DOM-only focus cleanup. No scene, UI handler, controller, or relay is accessed.
-      await this.page.evaluate(() => {
-        if (document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur();
-        }
+    await withFocusedPublicKeyInput(this.page, async () => {
+      const [title, focused] = await Promise.all([
+        this.page.title(),
+        this.page.$eval("body", () => document.hasFocus()),
+      ]);
+      this.evidence.record("key-target", {
+        focused,
+        pageGeneration: this.pageGeneration,
+        purpose,
+        target: `${new URL(this.page.url()).origin}${new URL(this.page.url()).pathname}`,
+        title,
       });
-    }
-    this.evidence.record("key", { key, purpose });
-    await this.page.keyboard.press(key, { delay: Math.min(this.config.actionDelayMs, 100) });
-    await delay(this.config.actionDelayMs);
+      if (!focused) {
+        throw new Error(`${this.label}: public key target did not acquire browser focus for ${purpose}`);
+      }
+      if (blurInputs) {
+        // Public DOM-only focus cleanup. No scene, UI handler, controller, or relay is accessed.
+        await this.page.evaluate(() => {
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+        });
+      }
+      this.evidence.record("key", { key, purpose });
+      await this.page.keyboard.press(key, { delay: Math.min(this.config.actionDelayMs, 100) });
+      await delay(this.config.actionDelayMs);
+    });
   }
 
   async sequence(keys, purpose) {
