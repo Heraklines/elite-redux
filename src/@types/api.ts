@@ -1,6 +1,8 @@
 import type { SessionSaveData, SystemSaveData } from "#types/save-data";
 
 export interface UserInfo {
+  /** Opaque immutable server identity; absent only in local/bypass compatibility flows. */
+  accountId?: string;
   username: string;
   lastSessionSlot: number;
   discordId: string;
@@ -15,7 +17,20 @@ export interface TitleStatsResponse {
 
 // #region Account API
 
-export interface AccountInfoResponse extends UserInfo {}
+export interface AccountInfoResponse extends UserInfo {
+  accountId: string;
+}
+
+export interface CoopIdentityTicketResponse {
+  ticket: string;
+  identity: {
+    version: 1;
+    accountId: string;
+    displayName: string;
+    canonicalUsername: string;
+  };
+  expiresAt: number;
+}
 
 export interface AccountLoginRequest {
   username: string;

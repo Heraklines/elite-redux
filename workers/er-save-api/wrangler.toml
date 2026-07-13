@@ -16,6 +16,7 @@ database_id = "b2fae947-6971-45e7-b287-d42648fd0a30"
 
 # Secrets (DO NOT put real values here — set them with `wrangler secret put`):
 #   npx wrangler secret put SESSION_SECRET   # long random string; signs session tokens
+#   npx wrangler secret put COOP_IDENTITY_SECRET # same dedicated secret on er-coop-api
 # SESSION_SECRET is read from the encrypted secret store, not from [vars].
 
 [vars]

@@ -5,6 +5,9 @@ name = "er-save-api-staging"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
 
+# Required before staging co-op matchmaking:
+#   npx wrangler secret put COOP_IDENTITY_SECRET --config wrangler.staging.toml
+
 [[d1_databases]]
 binding = "DB"
 database_name = "er-saves-staging"

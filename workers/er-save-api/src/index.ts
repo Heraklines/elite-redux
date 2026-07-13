@@ -72,6 +72,10 @@ interface Env {
   DB: D1Database;
   /** Secret used to sign/verify session tokens. Set via `wrangler secret put`. */
   SESSION_SECRET: string;
+  /** Shared only with the co-op signaling Worker; signs short-lived identity tickets. */
+  COOP_IDENTITY_SECRET?: string;
+  /** Optional ticket lifetime override in milliseconds (default five minutes). */
+  COOP_IDENTITY_TTL_MS?: string;
   /** Optional comma-separated origin allowlist; "*" / unset = allow all. */
   ALLOWED_ORIGIN?: string;
   MIN_USERNAME_LENGTH?: string;
@@ -104,6 +108,17 @@ interface TokenPayload {
   iat: number;
 }
 
+export interface CoopIdentityTicketV1 {
+  v: 1;
+  /** Opaque, immutable account identity. Consumers must not parse its format. */
+  sub: string;
+  displayName: string;
+  canonicalUsername: string;
+  /** Unix epoch milliseconds. */
+  exp: number;
+  nonce: string;
+}
+
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
@@ -111,6 +126,7 @@ const PBKDF2_ITERATIONS = 100_000;
 const PBKDF2_KEY_LEN = 32;
 /** Max accepted save-blob size (defensive; ER system saves are well under this). */
 const MAX_SAVE_BYTES = 4_000_000;
+const DEFAULT_COOP_IDENTITY_TTL_MS = 5 * 60_000;
 
 // #region helpers — encoding
 
@@ -225,6 +241,12 @@ async function hmacSha256(data: Uint8Array, secret: string): Promise<Uint8Array>
 }
 
 async function signToken(payload: TokenPayload, secret: string): Promise<string> {
+  const body = toBase64Url(enc.encode(JSON.stringify(payload)));
+  const sig = await hmacSha256(enc.encode(body), secret);
+  return `${body}.${toBase64Url(sig)}`;
+}
+
+async function signCoopIdentityTicket(payload: CoopIdentityTicketV1, secret: string): Promise<string> {
   const body = toBase64Url(enc.encode(JSON.stringify(payload)));
   const sig = await hmacSha256(enc.encode(body), secret);
   return `${body}.${toBase64Url(sig)}`;
@@ -391,11 +413,52 @@ async function handleAccountInfo(auth: TokenPayload, env: Env, cors: Record<stri
   const lastSessionSlot = slotRow?.slot ?? -1;
   return json(
     {
+      accountId: `er-account:${user.id}`,
       username: user.username,
       lastSessionSlot,
       discordId: "",
       googleId: "",
       hasAdminRole: user.is_admin === 1,
+    },
+    200,
+    cors,
+  );
+}
+
+async function handleCoopIdentityTicket(auth: TokenPayload, env: Env, cors: Record<string, string>): Promise<Response> {
+  if (typeof env.COOP_IDENTITY_SECRET !== "string" || env.COOP_IDENTITY_SECRET.length < 32) {
+    return text("Co-op identity service unavailable.", 503, cors);
+  }
+  const user = await env.DB.prepare("SELECT id, username, username_lower FROM users WHERE id = ?")
+    .bind(auth.uid)
+    .first<Pick<UserRow, "id" | "username" | "username_lower">>();
+  if (!user) {
+    return text("Account not found.", 404, cors);
+  }
+  const configuredTtl = Number(env.COOP_IDENTITY_TTL_MS);
+  const ttl =
+    Number.isSafeInteger(configuredTtl) && configuredTtl >= 30_000 && configuredTtl <= 15 * 60_000
+      ? configuredTtl
+      : DEFAULT_COOP_IDENTITY_TTL_MS;
+  const now = Date.now();
+  const payload: CoopIdentityTicketV1 = {
+    v: 1,
+    sub: `er-account:${user.id}`,
+    displayName: user.username,
+    canonicalUsername: user.username_lower,
+    exp: now + ttl,
+    nonce: toBase64Url(crypto.getRandomValues(new Uint8Array(16))),
+  };
+  return json(
+    {
+      ticket: await signCoopIdentityTicket(payload, env.COOP_IDENTITY_SECRET),
+      identity: {
+        version: 1,
+        accountId: payload.sub,
+        displayName: payload.displayName,
+        canonicalUsername: payload.canonicalUsername,
+      },
+      expiresAt: payload.exp,
     },
     200,
     cors,
@@ -4788,6 +4851,9 @@ export default {
 
       if (pathname === "/account/info" && method === "GET") {
         return await handleAccountInfo(auth, env, cors);
+      }
+      if (pathname === "/account/coop-ticket" && method === "GET") {
+        return await handleCoopIdentityTicket(auth, env, cors);
       }
       if (pathname === "/account/changepw" && method === "POST") {
         return await handleChangePassword(request, auth, env, cors);

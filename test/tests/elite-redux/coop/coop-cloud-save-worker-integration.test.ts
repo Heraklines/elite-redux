@@ -87,6 +87,7 @@ class SqliteD1Database {
 
 const schema = readFileSync(resolve(process.cwd(), "workers/er-save-api/schema.sql"), "utf8");
 const secret = "worker-integration-secret";
+const coopIdentitySecret = "coop-worker-integration-secret-at-least-32-bytes";
 
 function base64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -225,6 +226,7 @@ describe("co-op save Worker endpoint integration", () => {
 
   afterEach(() => {
     sqlite.close();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -233,8 +235,65 @@ describe("co-op save Worker endpoint integration", () => {
       ...init,
       headers: { Authorization: authorization, "Content-Type": "application/json", ...init.headers },
     });
-    return saveWorker.fetch(request, { DB: database, SESSION_SECRET: secret } as never);
+    return saveWorker.fetch(request, {
+      DB: database,
+      SESSION_SECRET: secret,
+      COOP_IDENTITY_SECRET: coopIdentitySecret,
+      COOP_IDENTITY_TTL_MS: "60000",
+    } as never);
   }
+
+  it("exposes an immutable account ID and mints a signed, bounded co-op identity ticket", async () => {
+    const info = await call("/account/info");
+    expect(info.status).toBe(200);
+    await expect(info.json()).resolves.toMatchObject({ accountId: "er-account:1", username: "Alice" });
+
+    const now = vi.spyOn(Date, "now").mockReturnValue(10_000);
+    const response = await call("/account/coop-ticket");
+    expect(response.status).toBe(200);
+    const result = (await response.json()) as {
+      ticket: string;
+      identity: { version: number; accountId: string; displayName: string; canonicalUsername: string };
+      expiresAt: number;
+    };
+    expect(result.identity).toEqual({
+      version: 1,
+      accountId: "er-account:1",
+      displayName: "Alice",
+      canonicalUsername: "alice",
+    });
+    expect(result.expiresAt).toBe(70_000);
+    const [body, signature] = result.ticket.split(".");
+    const payload = JSON.parse(new TextDecoder().decode(Buffer.from(body, "base64url"))) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      v: 1,
+      sub: "er-account:1",
+      displayName: "Alice",
+      canonicalUsername: "alice",
+      exp: 70_000,
+    });
+    expect(typeof payload.nonce).toBe("string");
+    expect((payload.nonce as string).length).toBeGreaterThanOrEqual(20);
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(coopIdentitySecret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"],
+    );
+    expect(
+      await crypto.subtle.verify("HMAC", key, Buffer.from(signature, "base64url"), new TextEncoder().encode(body)),
+    ).toBe(true);
+    now.mockRestore();
+  });
+
+  it("refuses to mint a ticket without the dedicated shared secret", async () => {
+    const request = new Request("https://save.test/account/coop-ticket", {
+      headers: { Authorization: authorization },
+    });
+    const response = await saveWorker.fetch(request, { DB: database, SESSION_SECRET: secret } as never);
+    expect(response.status).toBe(503);
+  });
 
   async function duplicateDeleteQuery(
     runId: string,

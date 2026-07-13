@@ -20,6 +20,7 @@ describe("account", () => {
       vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
       vi.spyOn(pokerogueApi.account, "getInfo").mockResolvedValue([
         {
+          accountId: "er-account:22",
           username: "test",
           lastSessionSlot: 99,
           discordId: "",
@@ -34,6 +35,7 @@ describe("account", () => {
       expect(success).toBe(true);
       expect(status).toBe(200);
       expect(loggedInUser!.username).toBe("test");
+      expect(loggedInUser!.accountId).toBe("er-account:22");
       expect(loggedInUser!.lastSessionSlot).toBe(99);
     });
 
