@@ -184,6 +184,21 @@ async function driveBattleWave(rig, policy, stats) {
   throw new Error(`[campaign-softlock] wave ${stats.wave} did not reach rewards in ${rig.config.maxTurns} rounds`);
 }
 
+/**
+ * The client that reports ITSELF as owner of `surfaceId` in the v2 semantic mirror
+ * (ownerSeat === its own localSeat), or null. Evidence-derived ownership - never rig.host.
+ */
+function findSemanticOwnerClient(rig, surfaceId, cursors) {
+  for (const client of Object.values(rig.clients)) {
+    const event = client.evidence.findLastSemanticSurface(cursors[client.label] ?? 0, surfaceId);
+    const observation = event?.observation;
+    if (observation && observation.ownerSeat != null && observation.ownerSeat === observation.localSeat) {
+      return client;
+    }
+  }
+  return null;
+}
+
 /** Find the OWNER client + the evidence event that identifies this appearance, or null. */
 function resolveSurfaceOwner(rig, driver, cursors, handledIndex) {
   const clients = Object.values(rig.clients);
@@ -212,6 +227,13 @@ function resolveSurfaceOwner(rig, driver, cursors, handledIndex) {
   }
   if (!presence) {
     return null;
+  }
+  // Prefer the evidence-derived v2 owner (ownerSeat === localSeat) over any role assumption.
+  if (driver.v2SurfaceId) {
+    const v2Owner = findSemanticOwnerClient(rig, driver.v2SurfaceId, cursors);
+    if (v2Owner) {
+      return { client: v2Owner, markerEvent: presence.markerEvent };
+    }
   }
   if (driver.owner.guestMarker) {
     const guest = rig.guest;

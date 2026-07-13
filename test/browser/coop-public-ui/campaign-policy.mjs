@@ -40,6 +40,7 @@ const CROSSROADS_PHASE = /Start Phase ErCrossroadsPhase/u;
 const MYSTERY_PHASE = /Start Phase MysteryEncounterPhase/u;
 const LEARN_MOVE_PHASE = /Start Phase (?:LearnMovePhase|LearnMoveBatchPhase)/u;
 const EGG_LAPSE_PHASE = /Start Phase EggLapsePhase/u;
+const ATTEMPT_CAPTURE_PHASE = /Start Phase AttemptCapturePhase/u;
 
 // Per-client coop role markers (?coopdebug=1). The OWNER drives the real menu; the
 // WATCHER renders a read-only mirror and must NOT be sent input.
@@ -170,10 +171,12 @@ export function loadCampaignPolicy() {
  * from console evidence (never parity math), and the keys the owner presses. Order
  * matters: reward is handled before the boundary surfaces it precedes.
  *
- * `owner` is one of:
+ * `v2SurfaceId` is the preferred, evidence-derived owner source: the driver reads the v2
+ * semantic mirror (`[coop-browser:surface2]`) and picks the client whose own observation
+ * reports it as owner (ownerSeat === its localSeat). `owner` is the fallback used only when
+ * no v2 marker is present, one of:
  *   - `{ marker: RegExp }`  the client whose evidence shows this per-client OWNER line;
- *   - `{ role: "host" }`    a surface whose option owner is always the host (mystery
- *                           encounters: the host is always the option owner);
+ *   - `{ role: "host" }`    last-resort role fallback (v2 ownerSeat is preferred over this);
  *   - `{ guestMarker, role }` guest if the guest-owns marker is present, else `role`.
  */
 export function buildDispatchTable(policy) {
@@ -185,6 +188,7 @@ export function buildDispatchTable(policy) {
       // not (its uiMode is BIOME_SHOP), so require the reward owner marker to avoid
       // colliding with the biome market that shares the SelectModifierPhase name.
       present: REWARD_OWNER,
+      v2SurfaceId: "reward-shop",
       owner: { marker: REWARD_OWNER },
       keys: policy.rewardMode === "pick-first" ? policy.keys.rewardPickFirst : policy.keys.rewardLeave,
     },
@@ -192,6 +196,7 @@ export function buildDispatchTable(policy) {
       name: "biome-shop",
       phase: BIOME_SHOP_ROLES,
       present: BIOME_SHOP_ROLES,
+      v2SurfaceId: "biome-market",
       owner: { marker: BIOME_SHOP_OWNER },
       keys: policy.keys.biomeShopLeave,
     },
@@ -199,6 +204,7 @@ export function buildDispatchTable(policy) {
       name: "crossroads",
       phase: CROSSROADS_PHASE,
       present: CROSSROADS_OWNER,
+      v2SurfaceId: "crossroads",
       owner: { marker: CROSSROADS_OWNER },
       keys: policy.keys.crossroads,
     },
@@ -206,6 +212,7 @@ export function buildDispatchTable(policy) {
       name: "biome-pick",
       phase: BIOME_PICK_PHASE,
       present: BIOME_PICK_OWNER,
+      v2SurfaceId: "biome-select",
       owner: { marker: BIOME_PICK_OWNER },
       keys: policy.keys.biomePick,
     },
@@ -213,13 +220,26 @@ export function buildDispatchTable(policy) {
       name: "mystery-encounter",
       phase: MYSTERY_PHASE,
       present: MYSTERY_PHASE,
-      owner: { role: "host" },
+      // Owner derived from the v2 mirror's ownerSeat, never assumed from rig.host; the ME
+      // host-owner console marker is the fallback when the v2 mirror is absent.
+      v2SurfaceId: "mystery-encounter",
+      owner: { marker: ME_HOST_OWNER },
       keys: policy.keys.mystery,
+    },
+    {
+      name: "catch-full",
+      phase: ATTEMPT_CAPTURE_PHASE,
+      present: ATTEMPT_CAPTURE_PHASE,
+      // Party-full catch prompt: skip / decline. Owner is the capturing client (v2 mirror).
+      v2SurfaceId: "catch-full:confirm",
+      owner: { role: "host" },
+      keys: policy.keys.catchSkip,
     },
     {
       name: "learn-move",
       phase: LEARN_MOVE_PHASE,
       present: LEARN_MOVE_PHASE,
+      v2SurfaceId: "learn-move-batch",
       owner: { guestMarker: LEARN_MOVE_GUEST_OWNER, role: "host" },
       keys: policy.keys.learnMove,
     },
@@ -227,8 +247,8 @@ export function buildDispatchTable(policy) {
       name: "egg",
       phase: EGG_LAPSE_PHASE,
       present: EGG_LAPSE_PHASE,
-      // Egg lapse renders on both clients; the host drives, the guest mirror closes on
-      // the relayed terminal.
+      // Egg lapse renders on both clients; owner derived from the v2 mirror.
+      v2SurfaceId: "egg:lapse",
       owner: { role: "host" },
       keys: policy.keys.egg,
     },
