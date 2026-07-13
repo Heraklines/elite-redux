@@ -32,6 +32,7 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import * as appConstants from "#constants/app-constants";
 import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
+import { enqueueSessionCloudMutation } from "#data/elite-redux/coop/coop-cloud-save-tail";
 import {
   clearCoopResumeMarker,
   deriveCoopResumeCommitment,
@@ -829,6 +830,112 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     logs.flush();
   }, 300_000);
 
+  it("serializes duplicate repair and rechecks the account immediately before destructive delete", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const account = await withClient(rig.hostCtx, () => loggedInUser!.username);
+    const priorUsername = loggedInUser?.username;
+    const keys = await withClient(rig.hostCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
+    const headKeys = [0, 1].map(slot => `er-coop-cloud-head:${account.normalize("NFKC").toLowerCase()}:${slot}`);
+    const trackedKeys = [...keys, ...headKeys];
+    const tracked = trackedKeys.map(key => [key, localStorage.getItem(key)] as const);
+    const baseJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
+    const base = JSON.parse(baseJson) as Record<string, unknown>;
+    const checkpoint = async (revision: number) => {
+      const json = JSON.stringify({
+        ...base,
+        waveIndex: Number(base.waveIndex ?? 1) + revision,
+        timestamp: Number(base.timestamp ?? 1) + revision,
+        coopRun: {
+          version: 1,
+          runId: (base.coopRun as { runId: string }).runId,
+          checkpointRevision: revision,
+        },
+      });
+      const session = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(json));
+      const commitment = await deriveCoopResumeCommitment(json, session);
+      expect(commitment).not.toBeNull();
+      return { json, commitment: commitment! };
+    };
+    const loser = await checkpoint(1);
+    const survivor = await checkpoint(2);
+    const cloud = new Map<number, string>();
+
+    try {
+      trackedKeys.forEach(key => localStorage.removeItem(key));
+      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      const cloudRead = vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request => {
+        const raw = cloud.get(request.slot);
+        return raw == null ? coopCasMissing() : coopCasFound(raw);
+      });
+      const duplicateDelete = vi
+        .spyOn(pokerogueApi.savedata.session, "deleteCoopDuplicateExact")
+        .mockImplementation(async request => {
+          cloud.delete(request.slot);
+          return { ok: true, status: 200, error: "", failureKind: null };
+        });
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopRunStatus").mockResolvedValue({
+        ok: true,
+        status: 200,
+        value: {
+          state: "active",
+          runId: survivor.commitment.runId,
+          slot: 1,
+          checkpointRevision: survivor.commitment.checkpointRevision,
+          digest: survivor.commitment.digest,
+        },
+      });
+
+      const runWithBlockedQueue = async (switchAccount: boolean) => {
+        cloud.clear();
+        cloud.set(0, loser.json);
+        cloud.set(1, survivor.json);
+        cloudRead.mockClear();
+        duplicateDelete.mockClear();
+        let releaseBlocker!: () => void;
+        let blockerStarted!: () => void;
+        const started = new Promise<void>(resolve => {
+          blockerStarted = resolve;
+        });
+        const gate = new Promise<void>(resolve => {
+          releaseBlocker = resolve;
+        });
+        const blocker = enqueueSessionCloudMutation(account, async () => {
+          blockerStarted();
+          await gate;
+        });
+        await started;
+        const scan = withClient(rig.hostCtx, () => rig.hostScene.gameData.getSessionsForCoopResume());
+        await vi.waitFor(() => expect(cloudRead.mock.calls.length).toBeGreaterThanOrEqual(5));
+        await flush();
+        expect(duplicateDelete, "repair cannot bypass the account mutation tail").not.toHaveBeenCalled();
+        if (switchAccount && loggedInUser != null) {
+          loggedInUser.username = `${account}-changed`;
+        }
+        releaseBlocker();
+        await blocker;
+        if (switchAccount) {
+          await expect(scan).rejects.toThrow(/account|runtime/iu);
+          expect(duplicateDelete, "stale account never issues the destructive request").not.toHaveBeenCalled();
+        } else {
+          await expect(scan).resolves.toBeInstanceOf(Map);
+          expect(duplicateDelete).toHaveBeenCalledOnce();
+        }
+      };
+
+      await runWithBlockedQueue(false);
+      await runWithBlockedQueue(true);
+    } finally {
+      if (loggedInUser != null && priorUsername != null) {
+        loggedInUser.username = priorUsername;
+      }
+      tracked.forEach(([key, value]) => {
+        value == null ? localStorage.removeItem(key) : localStorage.setItem(key, value);
+      });
+    }
+    logs.flush();
+  }, 300_000);
+
   it("imports over an exact tombstone with empty CAS and swaps ancestry only after success", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
@@ -958,6 +1065,121 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     logs.flush();
   }, 300_000);
 
+  it("recovers cloud-new/local-tombstoned state after a protected import local write fails", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const account = await withClient(rig.hostCtx, () => loggedInUser!.username);
+    const slot = 0;
+    const localKey = await withClient(rig.hostCtx, () => getSessionDataLocalStorageKey(slot));
+    const headKey = `er-coop-cloud-head:${account.normalize("NFKC").toLowerCase()}:${slot}`;
+    const trackedKeys = [localKey, headKey, "er-coop-deleted-runs", "er-coop-resume", `data_${account}`];
+    const tracked = trackedKeys.map(key => [key, localStorage.getItem(key)] as const);
+    const incomingJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
+    const incomingSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(incomingJson));
+    const incoming = await deriveCoopResumeCommitment(incomingJson, incomingSession);
+    expect(incoming).not.toBeNull();
+    const oldRunId = `failed-import-${"o".repeat(24)}`;
+    const oldJson = JSON.stringify({
+      ...(JSON.parse(incomingJson) as Record<string, unknown>),
+      coopRun: { version: 1, runId: oldRunId, checkpointRevision: 8 },
+    });
+    const oldSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(oldJson));
+    const old = await deriveCoopResumeCommitment(oldJson, oldSession);
+    expect(old).not.toBeNull();
+    const systemJson = await withClient(rig.hostCtx, () => JSON.stringify(rig.hostScene.gameData.getSystemSaveData()));
+    let cloudRaw: string | null = null;
+    const storagePrototype = Object.getPrototypeOf(localStorage) as Storage;
+    const originalSetItem = storagePrototype.setItem;
+    let failIncomingLocalWrite = true;
+    let storageWrite: ReturnType<typeof vi.spyOn> | null = null;
+
+    try {
+      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      localStorage.setItem(localKey, encrypt(oldJson, false));
+      localStorage.setItem(
+        headKey,
+        JSON.stringify({
+          version: 1,
+          runId: old!.runId,
+          checkpointRevision: old!.checkpointRevision,
+          digest: old!.digest,
+        }),
+      );
+      vi.spyOn(pokerogueApi.savedata.system, "update").mockResolvedValue("");
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request =>
+        request.slot === slot && cloudRaw != null ? coopCasFound(cloudRaw) : coopCasMissing(),
+      );
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopRunStatus").mockImplementation(async request => {
+        if (request.coopRunId === oldRunId) {
+          return {
+            ok: true,
+            status: 200,
+            value: {
+              state: "tombstoned",
+              runId: oldRunId,
+              slot,
+              checkpointRevision: old!.checkpointRevision,
+              digest: old!.digest,
+            },
+          };
+        }
+        if (cloudRaw === incomingJson && request.coopRunId === incoming!.runId) {
+          return {
+            ok: true,
+            status: 200,
+            value: {
+              state: "active",
+              runId: incoming!.runId,
+              slot,
+              checkpointRevision: incoming!.checkpointRevision,
+              digest: incoming!.digest,
+            },
+          };
+        }
+        return { ok: true, status: 200, value: { state: "missing", runId: request.coopRunId } };
+      });
+      vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockImplementation(async (_request, raw) => {
+        cloudRaw = raw;
+        return { ok: true, status: 200, error: "", failureKind: null };
+      });
+      const encryptedIncoming = encrypt(incomingJson, false);
+      storageWrite = vi
+        .spyOn(storagePrototype, "setItem")
+        .mockImplementation(function (this: Storage, key: string, value: string) {
+        if (failIncomingLocalWrite && key === localKey && value === encryptedIncoming) {
+          failIncomingLocalWrite = false;
+          throw new DOMException("quota", "QuotaExceededError");
+        }
+        return originalSetItem.call(this, key, value);
+        });
+
+      await expect(
+        withClient(rig.hostCtx, () =>
+          rig.hostScene.gameData.importLocalSaveBundle({
+            system: systemJson,
+            sessions: [{ slot, data: incomingJson }],
+          }),
+        ),
+        "post-CAS storage failure is a false result, never an unhandled rejection",
+      ).resolves.toBe(false);
+      expect(cloudRaw, "the backend exact checkpoint remains committed").toBe(incomingJson);
+      expect(decrypt(localStorage.getItem(localKey)!, false), "old exact local bytes remain intact").toBe(oldJson);
+      expect(JSON.parse(localStorage.getItem(headKey) ?? "null")).toMatchObject({ runId: incoming!.runId });
+
+      const sessions = await withClient(rig.hostCtx, () => rig.hostScene.gameData.getSessionsForCoopResume());
+      expect(sessions.get(slot)?.sessionJson, "next discovery retires old tombstoned local and adopts cloud").toBe(
+        incomingJson,
+      );
+      expect(decrypt(localStorage.getItem(localKey)!, false)).toBe(incomingJson);
+    } finally {
+      storageWrite?.mockRestore();
+      tracked.forEach(([key, value]) => {
+        value == null ? localStorage.removeItem(key) : localStorage.setItem(key, value);
+      });
+    }
+    logs.flush();
+  }, 300_000);
+
   it("never lets a solo cloud replica hide legacy co-op local bytes", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
@@ -1004,6 +1226,133 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     logs.flush();
   }, 300_000);
 
+  it("retires an exact tombstoned local authority before adopting live co-op or solo cloud state", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const slot = 0;
+    const account = await withClient(rig.hostCtx, () => loggedInUser!.username);
+    const localKey = await withClient(rig.hostCtx, () => getSessionDataLocalStorageKey(slot));
+    const headKey = `er-coop-cloud-head:${account.normalize("NFKC").toLowerCase()}:${slot}`;
+    const trackedKeys = [localKey, headKey, "er-coop-deleted-runs", "er-coop-resume", "er-coop-resume-unavailable"];
+    const tracked = trackedKeys.map(key => [key, localStorage.getItem(key)] as const);
+    const base = JSON.parse(await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene))) as Record<
+      string,
+      unknown
+    >;
+    const checkpoint = async (runId: string, revision: number, moneyDelta = 0) => {
+      const json = JSON.stringify({
+        ...base,
+        money: Number(base.money ?? 0) + moneyDelta,
+        timestamp: Number(base.timestamp ?? 1) + revision + moneyDelta,
+        coopRun: { version: 1, runId, checkpointRevision: revision },
+      });
+      const session = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(json));
+      const commitment = await deriveCoopResumeCommitment(json, session);
+      expect(commitment).not.toBeNull();
+      return { json, commitment: commitment! };
+    };
+    const soloJson = JSON.stringify(
+      Object.fromEntries(
+        Object.entries({ ...base, gameMode: GameModes.CLASSIC }).filter(
+          ([key]) => !["coopRun", "coopParticipants", "coopControlPlane"].includes(key),
+        ),
+      ),
+    );
+    let cloudRaw: string | null = null;
+    const statusByRun = new Map<
+      string,
+      | { state: "missing" }
+      | { state: "active" | "tombstoned"; slot: number; checkpointRevision: number; digest: string }
+    >();
+
+    try {
+      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request =>
+        request.slot === slot && cloudRaw != null ? coopCasFound(cloudRaw) : coopCasMissing(),
+      );
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopRunStatus").mockImplementation(async request => {
+        const state = statusByRun.get(request.coopRunId) ?? { state: "missing" as const };
+        return state.state === "missing"
+          ? { ok: true, status: 200, value: { state: "missing", runId: request.coopRunId } }
+          : {
+              ok: true,
+              status: 200,
+              value: { ...state, runId: request.coopRunId },
+            };
+      });
+
+      const adoptCloud = async (cloudKind: "coop" | "solo", suffix: string) => {
+        trackedKeys.forEach(key => localStorage.removeItem(key));
+        const local = await checkpoint(`tomb-local-${suffix}-${"a".repeat(18)}`, 3);
+        const remote = await checkpoint(`live-cloud-${suffix}-${"b".repeat(18)}`, 4, 1);
+        localStorage.setItem(localKey, encrypt(local.json, false));
+        localStorage.setItem(
+          headKey,
+          JSON.stringify({
+            version: 1,
+            runId: local.commitment.runId,
+            checkpointRevision: local.commitment.checkpointRevision,
+            digest: local.commitment.digest,
+          }),
+        );
+        cloudRaw = cloudKind === "coop" ? remote.json : soloJson;
+        statusByRun.clear();
+        statusByRun.set(local.commitment.runId, {
+          state: "tombstoned",
+          slot,
+          checkpointRevision: local.commitment.checkpointRevision,
+          digest: local.commitment.digest,
+        });
+        if (cloudKind === "coop") {
+          statusByRun.set(remote.commitment.runId, {
+            state: "active",
+            slot,
+            checkpointRevision: remote.commitment.checkpointRevision,
+            digest: remote.commitment.digest,
+          });
+        }
+        const sessions = await withClient(rig.hostCtx, () => rig.hostScene.gameData.getSessionsForCoopResume());
+        expect(sessions.get(slot)?.sessionJson).toBe(cloudRaw);
+        expect(decrypt(localStorage.getItem(localKey)!, false), `${cloudKind} cloud becomes the exact local replica`).toBe(
+          cloudRaw,
+        );
+        return { local, remote };
+      };
+
+      await adoptCloud("coop", "coop");
+      await adoptCloud("solo", "solo");
+
+      trackedKeys.forEach(key => localStorage.removeItem(key));
+      const local = await checkpoint(`active-local-${"c".repeat(22)}`, 5);
+      const remote = await checkpoint(`active-cloud-${"d".repeat(22)}`, 6, 2);
+      localStorage.setItem(localKey, encrypt(local.json, false));
+      cloudRaw = remote.json;
+      statusByRun.clear();
+      statusByRun.set(local.commitment.runId, {
+        state: "active",
+        slot,
+        checkpointRevision: local.commitment.checkpointRevision,
+        digest: local.commitment.digest,
+      });
+      statusByRun.set(remote.commitment.runId, {
+        state: "active",
+        slot,
+        checkpointRevision: remote.commitment.checkpointRevision,
+        digest: remote.commitment.digest,
+      });
+      await expect(
+        withClient(rig.hostCtx, () => rig.hostScene.gameData.getSessionsForCoopResume()),
+        "two non-tombstoned authorities remain an explicit conflict",
+      ).rejects.toThrow("distinct non-tombstoned authorities");
+      expect(decrypt(localStorage.getItem(localKey)!, false)).toBe(local.json);
+    } finally {
+      tracked.forEach(([key, value]) => {
+        value == null ? localStorage.removeItem(key) : localStorage.setItem(key, value);
+      });
+    }
+    logs.flush();
+  }, 300_000);
+
   it("requires the account Web Lock before ordinary caching of legacy co-op or opaque bytes", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
@@ -1043,10 +1392,83 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     logs.flush();
   }, 300_000);
 
+  it("never ACKs a local-only guest checkpoint over an unresolved different-run cloud head", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const account = await withClient(rig.guestCtx, () => loggedInUser!.username);
+    const keys = await withClient(rig.guestCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
+    const headKey = `er-coop-cloud-head:${account.normalize("NFKC").toLowerCase()}:0`;
+    const trackedKeys = [...keys, headKey, "er-coop-deleted-runs", "er-coop-resume", "er-coop-resume-unavailable"];
+    const tracked = trackedKeys.map(key => [key, localStorage.getItem(key)] as const);
+    const incomingJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot(rig.hostScene));
+    const incomingSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(incomingJson));
+    const incoming = await deriveCoopResumeCommitment(incomingJson, incomingSession);
+    expect(incoming).not.toBeNull();
+    const displacedRunId = `displaced-head-${"h".repeat(22)}`;
+    let displacedState: "active" | "tombstoned" = "active";
+
+    try {
+      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      keys.forEach(key => localStorage.removeItem(key));
+      localStorage.setItem(
+        headKey,
+        JSON.stringify({
+          version: 1,
+          runId: displacedRunId,
+          checkpointRevision: 9,
+          digest: "e".repeat(64),
+        }),
+      );
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopRunStatus").mockImplementation(async request =>
+        request.coopRunId === displacedRunId
+          ? {
+              ok: true,
+              status: 200,
+              value: {
+                state: displacedState,
+                runId: displacedRunId,
+                slot: 0,
+                checkpointRevision: 9,
+                digest: "e".repeat(64),
+              },
+            }
+          : { ok: true, status: 200, value: { state: "missing", runId: request.coopRunId } },
+      );
+      const cloudWrite = vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas");
+      await withClient(rig.guestCtx, () => rig.guestScene.gameData.armCoopResumeCheckpointPersistence());
+
+      await expect(
+        withClient(rig.guestCtx, () =>
+          rig.guestScene.gameData.persistCurrentCoopResumeCheckpoint(incomingJson, incoming!, false),
+        ),
+        "an active different-run lineage cannot be overlaid by transient local debt",
+      ).resolves.toEqual({ success: false, reason: "cloud-conflict" });
+      expect(localStorage.getItem(keys[0])).toBeNull();
+      expect(cloudWrite).not.toHaveBeenCalled();
+
+      displacedState = "tombstoned";
+      await expect(
+        withClient(rig.guestCtx, () =>
+          rig.guestScene.gameData.persistCurrentCoopResumeCheckpoint(incomingJson, incoming!, false),
+        ),
+        "an exact tombstone permits lineage retirement and local-only durability",
+      ).resolves.toEqual({ success: true });
+      expect(decrypt(localStorage.getItem(keys[0])!, false)).toBe(incomingJson);
+      expect(localStorage.getItem(headKey), "the displaced head is cleared before ACK").toBeNull();
+    } finally {
+      tracked.forEach(([key, value]) => {
+        value == null ? localStorage.removeItem(key) : localStorage.setItem(key, value);
+      });
+    }
+    logs.flush();
+  }, 300_000);
+
   it.each([
     { outcome: "success" as const, expectedSave: true, expectedEvents: ["authority", "guest:true"] },
     { outcome: "transient" as const, expectedSave: true, expectedEvents: ["authority", "guest:false"] },
     { outcome: "conflict" as const, expectedSave: false, expectedEvents: ["authority"] },
+    { outcome: "conflict-rollback-failure" as const, expectedSave: false, expectedEvents: ["authority"] },
   ])("orders an existing authority CAS before guest persistence ($outcome)", async ({
     outcome,
     expectedSave,
@@ -1059,7 +1481,8 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const cloudBySlot = new Map<number, string>();
     let hostSlot = -1;
     let existingSave = false;
-    let authorityOutcome = outcome;
+    let authorityOutcome: "success" | "transient" | "conflict" =
+      outcome === "conflict-rollback-failure" ? "conflict" : outcome;
     let guestPersisting = false;
     let lastGuestReplicaRaw: string | null = null;
     const events: string[] = [];
@@ -1130,21 +1553,42 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       expect(cloudBeforeCommitment).not.toBeNull();
       lastGuestReplicaRaw = null;
       rig.hostScene.money += 1;
+      if (outcome === "conflict-rollback-failure") {
+        const storagePrototype = Object.getPrototypeOf(localStorage) as Storage;
+        const originalSetItem = storagePrototype.setItem;
+        let rollbackWriteArmed = true;
+        vi.spyOn(storagePrototype, "setItem").mockImplementation(function (this: Storage, key: string, value: string) {
+          if (rollbackWriteArmed && key === keys[hostSlot] && value === localBefore) {
+            rollbackWriteArmed = false;
+            throw new DOMException("quota", "QuotaExceededError");
+          }
+          return originalSetItem.call(this, key, value);
+        });
+      }
       await expect(
         withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+        "rollback storage failure is terminal and never rejects the save promise",
       ).resolves.toBe(expectedSave);
       expect(events, "deterministic conflicts never reach the guest; transient debt mirrors locally").toEqual(
         expectedEvents,
       );
-      if (outcome === "conflict") {
+      if (outcome === "conflict" || outcome === "conflict-rollback-failure") {
         expect(
           sendResumeCheckpoint,
           "a deterministic authority conflict sends no resume checkpoint",
         ).not.toHaveBeenCalled();
-        expect(localStorage.getItem(keys[hostSlot]), "the host local row rolls back byte-exactly").toBe(localBefore);
-        evidenceKeys.forEach((key, index) =>
-          expect(localStorage.getItem(key), `${key} rolls back byte-exactly`).toBe(evidenceBefore[index]),
-        );
+        if (outcome === "conflict") {
+          expect(localStorage.getItem(keys[hostSlot]), "the host local row rolls back byte-exactly").toBe(localBefore);
+          evidenceKeys.forEach((key, index) =>
+            expect(localStorage.getItem(key), `${key} rolls back byte-exactly`).toBe(evidenceBefore[index]),
+          );
+        } else {
+          expect(
+            localStorage.getItem(keys[hostSlot]),
+            "failed rollback retains the exact new local debt instead of deleting it",
+          ).not.toBe(localBefore);
+          expect(localStorage.getItem("er-coop-resume-unavailable"), "failed rollback records explicit debt").not.toBeNull();
+        }
         expect(lastGuestReplicaRaw, "the guest never receives the rejected checkpoint").toBeNull();
         expect(cloudBySlot.get(hostSlot), "the frozen authority head remains unchanged").toBe(cloudBefore);
       } else {
