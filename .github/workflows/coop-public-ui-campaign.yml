@@ -166,6 +166,53 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  solo-nav:
+    name: Solo classic navigation-primitive validation (no pairing)
+    needs: browser-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact implementation SHA and assets
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Download the once-built exact-SHA bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: coop-public-ui-campaign-bundle-${{ github.sha }}
+          path: dist-coop-public-ui
+
+      - name: Install isolated Chrome runtime
+        run: pnpm exec puppeteer browsers install chrome
+
+      - name: Prepare an isolated account pair for visible registration
+        run: node test/browser/coop-public-ui/provision-accounts.mjs
+
+      - name: Drive a solo classic run to validate selectOptionById against the v2 mirror
+        env:
+          COOP_UI_BASE_URL: http://127.0.0.1:4175/?coopdebug=1
+          COOP_UI_BROWSER_DIST: dist-coop-public-ui
+          COOP_UI_ASSET_DIR: assets
+          COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
+          COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
+          COOP_UI_ACCOUNT_MODE: register
+          COOP_UI_ACTION_DELAY_MS: 70
+          COOP_UI_SETTLE_DELAY_MS: 300
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: node test/browser/coop-public-ui/run-solo.mjs
+
+      - name: Upload solo navigation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-solo-${{ github.sha }}-${{ github.run_attempt }}
+          path: dev-logs/coop-public-ui/**
+          retention-days: 14
+          if-no-files-found: warn
+
   campaign:
     name: ${{ inputs.campaign_waves || '30' }}-wave co-op campaign / ${{ inputs.cadence || 'fast' }}
     needs: browser-build

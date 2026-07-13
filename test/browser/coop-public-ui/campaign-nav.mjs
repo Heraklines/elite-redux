@@ -56,7 +56,15 @@ async function readSemantic(client, surfaceId, fromCursor, timeoutMs) {
  */
 export async function selectOptionById(
   client,
-  { surfaceId, targetId, navKeys = ["ArrowDown"], submitKey = "Space", maxSteps = 24, timeoutMs = 15_000 },
+  {
+    surfaceId,
+    targetId,
+    navKeys = ["ArrowDown"],
+    submitKey = "Space",
+    submit = true,
+    maxSteps = 24,
+    timeoutMs = 15_000,
+  },
 ) {
   const label = `${surfaceId}->${targetId}`;
   let stalls = 0;
@@ -68,8 +76,15 @@ export async function selectOptionById(
     const observation = event.observation;
     const plan = planNavigationStep(observation, targetId);
     if (plan.kind === "submit") {
-      await client.press(submitKey, `nav-submit-${label}`);
-      client.evidence.record("campaign-nav", { surfaceId, targetId, action: "submit", steps: step });
+      if (submit) {
+        await client.press(submitKey, `nav-submit-${label}`);
+      }
+      client.evidence.record("campaign-nav", {
+        surfaceId,
+        targetId,
+        action: submit ? "submit" : "selected",
+        steps: step,
+      });
       return { steps: step };
     }
     if (plan.kind === "unavailable") {

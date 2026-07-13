@@ -12,7 +12,14 @@
 
 import { readFile } from "node:fs/promises";
 
-const files = ["campaign-policy.mjs", "campaign.mjs", "run-campaign.mjs"];
+const files = [
+  "campaign-policy.mjs",
+  "campaign.mjs",
+  "run-campaign.mjs",
+  "campaign-nav.mjs",
+  "solo-classic.mjs",
+  "run-solo.mjs",
+];
 
 // Mirror of check-public-boundary.mjs's private-state boundary: no game source import, no
 // scene/phase/runtime access, no protocol injection, no persistence mutation.
