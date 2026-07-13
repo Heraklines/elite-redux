@@ -58,6 +58,7 @@ try {
       ? {
           sha: preview.manifest.sha,
           digest: preview.manifest.digest,
+          apiOrigin: preview.manifest.apiOrigin,
           signalOrigin: preview.manifest.signalOrigin,
           entryContract: preview.manifest.entryContract,
         }

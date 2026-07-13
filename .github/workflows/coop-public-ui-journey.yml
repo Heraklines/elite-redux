@@ -73,7 +73,7 @@ concurrency:
 env:
   COOP_BROWSER_ENTRY_CONTRACT: public-ui-v1
   COOP_UI_SIGNAL_ORIGIN: ${{ vars.COOP_UI_SIGNAL_URL || 'https://er-coop-api.heraklines.workers.dev' }}
-  COOP_UI_API_ORIGIN: ${{ vars.COOP_UI_API_URL || 'https://apibeta.pokerogue.net' }}
+  COOP_UI_API_ORIGIN: ${{ vars.COOP_UI_API_URL || vars.STAGING_SERVER_URL || 'https://er-save-api-staging.heraklines.workers.dev' }}
 
 jobs:
   browser-build:
@@ -138,6 +138,7 @@ jobs:
       - name: Seal immutable execution input
         env:
           COOP_BROWSER_DIST: dist-coop-public-ui
+          COOP_BROWSER_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
         run: node scripts/prepare-coop-browser-artifact.mjs
 
@@ -180,6 +181,7 @@ jobs:
           COOP_UI_BASE_URL: http://127.0.0.1:4175/?coopdebug=1
           COOP_UI_BROWSER_DIST: dist-coop-public-ui
           COOP_UI_ASSET_DIR: assets
+          COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           COOP_UI_JOURNEY: ${{ inputs.journey || 'fresh-resume' }}
           COOP_UI_ACCOUNT_MODE: register
@@ -242,6 +244,7 @@ jobs:
           COOP_UI_BASE_URL: http://127.0.0.1:4176/?coopdebug=1
           COOP_UI_BROWSER_DIST: dist-coop-public-ui
           COOP_UI_ASSET_DIR: assets
+          COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           COOP_UI_JOURNEY: reverse-resume
           COOP_UI_REQUESTER_SEAT: host-seat

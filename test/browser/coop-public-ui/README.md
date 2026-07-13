@@ -16,7 +16,7 @@ the same address, digest, and continuation surface. Every battle turn also corre
 
 | Journey | Public actions and required result | Account precondition |
 | --- | --- | --- |
-| `probe` | Open both clients, log in through the visible form, complete first-login gender selection, reach Title | Workflow provisions isolated beta accounts; manual runs supply accounts |
+| `probe` | Open both clients, log in through the visible form, complete first-login gender selection, reach Title | Workflow provisions isolated staging accounts; manual runs supply accounts |
 | `fresh-wave2` | Lobby invite/accept, New Run, starter selection, wave 1 commands, reward leave, wave 2 command UI | Isolated accounts have no title-menu Continue entry unless title keys are configured |
 | `fresh-resume` | `fresh-wave2`, close both pages, reopen/login, pair in the same direction, accept Resume, reach command UI | Same as `fresh-wave2` |
 | `reverse-resume` | Same, but reverse which player sends the lobby request after reopening | Same as `fresh-wave2`; this is the invitation-direction regression |
@@ -29,9 +29,10 @@ the wrong visible route and the resume journey fails.
 ## Run on an isolated machine
 
 Use the opt-in **Co-op Public UI Journey** GitHub workflow for execution. Its primary runner generates a
-unique masked credential pair, then creates both beta accounts through the visible registration form and
+unique masked credential pair, then creates both staging accounts through the visible registration form and
 performs every game/lobby action through the visible application. It uploads evidence even when the journey fails. Do not use real
-player accounts; journeys intentionally create or advance beta-API saves. `COOP_UI_API_URL` and
+player accounts; journeys intentionally create or advance isolated staging-API saves. `COOP_UI_API_URL` (or
+the repository's normal `STAGING_SERVER_URL` fallback) and
 `COOP_UI_SIGNAL_URL` are maintainer-owned repository variables; workflow inputs cannot redirect fixture
 creation or credential entry. The optional
 reverse-resume fan-out uses a separately provisioned `COOP_UI_ALT_*` account pair so concurrent runners
@@ -43,6 +44,7 @@ For an isolated runner with Chrome and an already sealed exact-SHA bundle:
 COOP_UI_BASE_URL=http://127.0.0.1:4175/?coopdebug=1
 COOP_UI_BROWSER_DIST=dist-coop-public-ui
 COOP_UI_ASSET_DIR=assets
+COOP_UI_EXPECTED_API_ORIGIN=https://er-save-api-staging.heraklines.workers.dev
 COOP_UI_EXPECTED_SIGNAL_ORIGIN=https://er-coop-api.heraklines.workers.dev
 COOP_UI_HOST_USERNAME=<staging account A>
 COOP_UI_HOST_PASSWORD=<secret>
@@ -79,12 +81,12 @@ Every run writes `dev-logs/coop-public-ui/<timestamp>-<journey>/` with:
 - sanitized DOM inventories and cookie metadata (never cookie values or passwords);
 - one or more Chrome performance traces when enabled; and
 - `summary.json` with the sealed SHA/digest, duration, journey, requester direction, replacement count, and
-  failure stack.
+  account/save and signaling origins, failure stack.
 
 The run fails on timeouts, page exceptions, unexpected console errors, non-aborted request failures,
 incorrect lobby roles, missing command/reward/replacement surfaces, divergent epoch/wave/turn or mechanical
 digest, a UI handler that is not active on both clients, a guest ACK that releases the wrong retained host
-address, an artifact/SHA/signaling-origin mismatch, or any stale reconnect observation. A screenshot alone
+address, an artifact/SHA/API-origin/signaling-origin mismatch, or any stale reconnect observation. A screenshot alone
 is never treated as proof of progression.
 
 Before changing the driver, run the cheap boundary check:

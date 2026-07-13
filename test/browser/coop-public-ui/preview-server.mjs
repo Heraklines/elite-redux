@@ -58,6 +58,11 @@ function verifyArtifact(config) {
       `browser artifact entry contract mismatch: built=${manifest.entryContract} expected=${config.entryContract}`,
     );
   }
+  if (config.expectedApiOrigin && manifest.apiOrigin !== config.expectedApiOrigin) {
+    throw new Error(
+      `browser artifact account/save API origin mismatch: built=${manifest.apiOrigin} expected=${config.expectedApiOrigin}`,
+    );
+  }
   if (config.expectedSignalOrigin && manifest.signalOrigin !== config.expectedSignalOrigin) {
     throw new Error(
       `browser artifact signaling origin mismatch: built=${manifest.signalOrigin} expected=${config.expectedSignalOrigin}`,
