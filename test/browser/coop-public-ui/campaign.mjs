@@ -93,6 +93,17 @@ async function waitForOutcomeBounded(rig, from, timeoutMs) {
   const clients = Object.values(rig.clients);
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    // A mid-battle wipe / game-over is a real run END, not a driver softlock: classify it
+    // distinctly so the campaign still produces clean evidence instead of a generic hang.
+    if (
+      clients.some(
+        client =>
+          client.evidence.find(GAME_OVER_PHASE, from[client.label])
+          || client.evidence.find(SHARED_SESSION_TERMINAL, from[client.label]),
+      )
+    ) {
+      return { kind: "wipe" };
+    }
     if (clients.every(client => client.evidence.find(REWARD_PHASE, from[client.label]))) {
       return { kind: "reward" };
     }
@@ -112,7 +123,13 @@ async function waitForOutcomeBounded(rig, from, timeoutMs) {
   return null;
 }
 
-/** Drive one battle wave to its reward shop: attack-first per turn, one fallback cycle, faints handled. */
+/**
+ * Drive one battle wave: attack-first per turn, one fallback move-cycle, faints handled.
+ * Returns "reward" when the wave is won and the shop is open, or "wipe" when the shared
+ * session ends (game-over) mid-battle. Throws only on a genuine softlock (no reward, no
+ * wipe, no progress within budget) - named distinctly from a wipe so a lost wave reads as
+ * evidence, not a harness bug.
+ */
 async function driveBattleWave(rig, policy, stats) {
   const clients = Object.values(rig.clients);
   let cursors = fromEach(clients, client => client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0);
@@ -128,19 +145,29 @@ async function driveBattleWave(rig, policy, stats) {
     let outcome = await waitForOutcomeBounded(rig, from, fallbackWindow);
     if (!outcome) {
       // Attack-first did not resolve the turn (no PP / disabled / wrong target). Cycle to
-      // the next move and let the full-budget outcome wait surface a genuine stall.
+      // the next move and wait the full budget before declaring a softlock.
       stats.fallbackTurns += 1;
       await Promise.all(
         clients.map(client => client.sequence(policy.keys.battleFallback, `wave-${stats.wave}-turn-${turn}-fallback`)),
       );
-      outcome = await rig.waitForPostTurnOutcome(from);
+      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs);
+    }
+    if (!outcome) {
+      const parked = latestStartPhase(clients);
+      throw new Error(
+        `[campaign-softlock] wave ${stats.wave} turn ${turn}: attack-first + fallback produced no reward, `
+          + `wipe, faint, or next command within budget; latest phase=${parked?.name ?? "unknown"}`,
+      );
+    }
+    if (outcome.kind === "wipe") {
+      return "wipe";
     }
     if (outcome.kind === "reward") {
       await rig.assertSharedSurface("reward", from, `wave-${stats.wave}-turn-${turn}-reward`, {
         expectedWave: rig.activeBattleWave,
       });
       await rig.assertRetainedContinuation(from, `wave-${stats.wave}-turn-${turn}-reward`);
-      return;
+      return "reward";
     }
     if (outcome.kind === "faint") {
       stats.faints += 1;
@@ -154,7 +181,7 @@ async function driveBattleWave(rig, policy, stats) {
     }
     cursors = from;
   }
-  throw new Error(`Wave ${stats.wave} did not reach rewards in ${rig.config.maxTurns} public command rounds`);
+  throw new Error(`[campaign-softlock] wave ${stats.wave} did not reach rewards in ${rig.config.maxTurns} rounds`);
 }
 
 /** Find the OWNER client + the evidence event that identifies this appearance, or null. */
@@ -359,7 +386,18 @@ export async function runCampaign(rig) {
       // begin here, not after the battle. Next-command/terminal detection uses the
       // post-battle cursor the advancer captures internally.
       const surfaceCursors = fromEach(clients, client => client.evidence.cursor());
-      await driveBattleWave(rig, policy, stats);
+      const battleResult = await driveBattleWave(rig, policy, stats);
+      if (battleResult === "wipe") {
+        status = "wipe";
+        await Promise.all(clients.map(client => client.checkpoint(`wave-${waveNo}-wiped`)));
+        await progress.wave({
+          ...stats,
+          replacementCountTotal: rig.replacementCount,
+          ms: Date.now() - startMs,
+          status,
+        });
+        break;
+      }
       const advanced = await advanceToNextWaveCommand(rig, policy, ordinal, stats, surfaceCursors);
       status = advanced.status;
       wavesCleared += 1;
@@ -385,6 +423,12 @@ export async function runCampaign(rig) {
     await progress.flush();
   }
 
+  if (status === "wipe") {
+    throw new Error(
+      `[campaign-wipe] Party wiped after clearing ${wavesCleared} waves (target ${policy.targetWaves}); `
+        + "the co-op run reached a game-over through public play. Evidence is complete.",
+    );
+  }
   if (status === "terminal") {
     throw new Error(
       `Campaign shared session terminated after ${wavesCleared} cleared waves (target ${policy.targetWaves})`,
