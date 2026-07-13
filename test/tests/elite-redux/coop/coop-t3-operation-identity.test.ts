@@ -65,7 +65,7 @@ describe("T3 operation identity and reconnect ordinals", () => {
     resetCoopColosseumOperationFlag();
   });
 
-  it("re-ACKs only an exact semantic retry of an already-applied operation id", () => {
+  it("re-ACKs the canonical first result at the exact boundary and rejects cross-boundary collisions", () => {
     const host = new CoopOperationHost({ epoch: 3 });
     const original: CoopPendingOperation = {
       id: makeCoopOperationId(3, 1, 88, "ME_SUB"),
@@ -87,7 +87,13 @@ describe("T3 operation identity and reconnect ordinals", () => {
       context(),
       () => ({ ok: true }),
     );
-    expect(changedPayload).toEqual({ kind: "rejected-late", reason: "conflicting-retry" });
+    expect(changedPayload.kind).toBe("reack");
+    if (changedPayload.kind !== "reack") {
+      throw new Error("same-boundary deterministic retry did not return canonical authority");
+    }
+    expect(changedPayload.op.payload, "the first committed value wins; the late payload is never adopted").toEqual(
+      original.payload,
+    );
 
     const changedContext = host.submit(original, context(8, 2), () => ({ ok: true }));
     expect(changedContext).toEqual({ kind: "rejected-late", reason: "conflicting-retry" });

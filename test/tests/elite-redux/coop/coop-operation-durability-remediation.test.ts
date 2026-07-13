@@ -57,6 +57,7 @@ import {
 import { COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { BiomeId } from "#enums/biome-id";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 /** Await several microtask turns so the loopback (queueMicrotask) delivery + ACK round-trips settle. */
@@ -159,12 +160,14 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
     setCoopOperationDurability(hostMgr);
 
-    commitHostOwnedBiome(2, 42);
+    commitHostOwnedBiome(2, BiomeId.LABORATORY);
     await flush();
 
     // The op reached the ONE live-mutation seam carrying the ACTUAL biome target (not just sidecar history).
-    expect(sinkSeen, "the journal carrier must route the committed biome op into the live-mutation sink").toEqual([42]);
-    expect(sinkBiomes()).toEqual([42]);
+    expect(sinkSeen, "the journal carrier must route the committed biome op into the live-mutation sink").toEqual([
+      BiomeId.LABORATORY,
+    ]);
+    expect(sinkBiomes()).toEqual([BiomeId.LABORATORY]);
     hostMgr.dispose();
     guestMgr.dispose();
   });
@@ -183,7 +186,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
     setCoopOperationDurability(hostMgr);
 
-    commitHostOwnedBiome(2, 43);
+    commitHostOwnedBiome(2, BiomeId.ISLAND);
     await flush();
 
     expect(hostMgr.unackedCount(), "no materialization means no ACK").toBe(1);
@@ -334,7 +337,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
     setCoopOperationDurability(hostMgr);
 
-    commitHostOwnedBiome(2, 51);
+    commitHostOwnedBiome(2, BiomeId.END);
     await flush();
     // A redundant resend + a reconnect tail re-deliver the SAME committed op - it must NOT re-route.
     hostMgr.reconnect();
@@ -343,7 +346,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     hostMgr.reconnect();
     await flush();
 
-    expect(sinkSeen, "exactly-once routing across resend + reconnect re-deliveries").toEqual([51]);
+    expect(sinkSeen, "exactly-once routing across resend + reconnect re-deliveries").toEqual([BiomeId.END]);
     hostMgr.dispose();
     guestMgr.dispose();
   });
@@ -368,7 +371,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
 
     // The FIRST post-resume producer op must emit revision N+1 (not 1) so the restored receiver ACCEPTS it
     // (pre-fix: the producer restarts at 0 -> emits revision 1 -> the receiver ledger at N drops it as stale).
-    commitHostOwnedBiome(2, 77);
+    commitHostOwnedBiome(2, BiomeId.VOLCANO);
     await flush();
 
     const applied = getCoopOperationJournalApplied();
@@ -377,7 +380,7 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     expect(
       applied.map(e => (e.pendingOperation?.payload as CoopBiomePickPayload).biomeId),
       "the restored receiver must APPLY the resumed op (not discard it as a stale duplicate)",
-    ).toEqual([77]);
+    ).toEqual([BiomeId.VOLCANO]);
     hostMgr.dispose();
     guestMgr.dispose();
   });

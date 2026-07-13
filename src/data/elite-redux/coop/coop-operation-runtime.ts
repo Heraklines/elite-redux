@@ -80,7 +80,7 @@ function canonicalOperationValue(value: unknown): string {
     .join(",")}}`;
 }
 
-function reackSemanticsMatch(
+function reackBoundaryMatches(
   intent: CoopPendingOperation,
   ctx: CoopCommitContext,
   applied: CoopPendingOperation,
@@ -89,7 +89,6 @@ function reackSemanticsMatch(
   return (
     intent.kind === applied.kind
     && intent.owner === applied.owner
-    && canonicalOperationValue(intent.payload) === canonicalOperationValue(applied.payload)
     && ctx.wave === envelope.wave
     && ctx.turn === envelope.turn
     && ctx.logicalPhase === envelope.logicalPhase
@@ -284,7 +283,10 @@ export class CoopOperationHost {
       const op = this.appliedById.get(intent.id) ?? { ...intent, status: "applied" };
       const envelope =
         this.appliedEnvelopeById.get(intent.id) ?? this.buildEnvelope(ctx, op, this.revisionClock.revision);
-      if (!reackSemanticsMatch(intent, ctx, op, envelope)) {
+      // The deterministic id is the slot's first-writer-wins key. A timeout default and the human's late
+      // value can legitimately differ; re-ACK the immutable ORIGINAL envelope so every peer adopts that
+      // canonical result, never the retry payload. A different boundary is not a retry and stays rejected.
+      if (!reackBoundaryMatches(intent, ctx, op, envelope)) {
         return { kind: "rejected-late", reason: "conflicting-retry" };
       }
       return { kind: "reack", op, envelope };
