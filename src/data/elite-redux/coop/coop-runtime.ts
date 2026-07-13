@@ -3696,6 +3696,7 @@ export function assembleCoopRuntime(
       wave: globalScene.currentBattle?.waveIndex ?? 0,
       turn: globalScene.currentBattle?.turn ?? 0,
     }),
+    onAuthorityTerminal: reason => failCoopSharedSession(reason),
   });
   // Showdown 1v1: the interaction relay disables its #829 seat-map forged-switch check in versus (the
   // guest legitimately relays faint-replacement picks for the host's enemy side). Live predicate so the

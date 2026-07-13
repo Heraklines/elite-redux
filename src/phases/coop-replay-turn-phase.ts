@@ -219,7 +219,20 @@ export class CoopReplayTurnPhase extends Phase {
           if (envelope != null) {
             const currentWave = globalScene.currentBattle?.waveIndex ?? 0;
             const checkpointWave = envelope.authoritativeState?.wave;
-            if (checkpointWave !== currentWave || envelope.turn !== this.turn) {
+            const controller = getCoopController();
+            const sameTurn = envelope.turn === this.turn;
+            const exactNextTurnReplacement =
+              envelope.reason === "replacement"
+              && envelope.turn === this.turn + 1
+              && envelope.epoch === controller?.sessionEpoch
+              && envelope.wave === currentWave
+              && checkpointWave === currentWave;
+            if (
+              envelope.epoch !== controller?.sessionEpoch
+              || envelope.wave !== currentWave
+              || checkpointWave !== currentWave
+              || (!sameTurn && !exactNextTurnReplacement)
+            ) {
               // A replacement carrier can arrive after its turn already advanced through a win tail.
               // It is then obsolete, not an interaction for the next battle. The old unkeyed inbox let
               // that wave-N frame divert wave N+1's replay and skip its real resolution (PP/enemies stayed
@@ -227,7 +240,7 @@ export class CoopReplayTurnPhase extends Phase {
               coopWarn(
                 "checkpoint",
                 `guest discard OUT-OF-BAND checkpoint reason=${envelope.reason} wave=${checkpointWave} `
-                  + `while replaying wave=${currentWave} turn=${this.turn}`,
+                  + `turn=${envelope.turn} while replaying wave=${currentWave} turn=${this.turn}`,
               );
               if (streamer.peekCheckpoint() === envelope) {
                 streamer.consumeCheckpoint();

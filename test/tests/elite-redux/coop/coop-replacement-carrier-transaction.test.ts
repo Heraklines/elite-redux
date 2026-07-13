@@ -196,6 +196,131 @@ describe("production replacement carrier transaction", () => {
     expect(unshiftNew.mock.calls.some(([name, slot]) => name === "CommandPhase" && slot === 1)).toBe(true);
   });
 
+  it("applies and ACKs the exact turn-N+1 replacement while turn N remains delayed, then opens its owner UI", async () => {
+    const runtime = startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
+    runtime.controller.role = "guest";
+    const outbound: CoopMessage[] = [];
+    runtime.partnerTransport?.onMessage(message => outbound.push(message));
+    const checkpointApply = vi
+      .spyOn(coopEngine, "applyCoopCheckpoint")
+      .mockImplementation(value => coopEngine.coopAcceptStateTick(value.tick, "test-n-plus-one-checkpoint"));
+    const authoritativeApply = vi
+      .spyOn(coopEngine, "applyCoopAuthoritativeBattleState")
+      .mockImplementation(value =>
+        value == null ? false : coopEngine.coopAcceptStateTick(value.tick, "test-n-plus-one-state"),
+      );
+    vi.spyOn(coopEngine, "applyCoopFieldSnapshot").mockImplementation(() => {});
+    vi.spyOn(coopEngine, "drainCoopApplyFailures").mockReturnValue([]);
+    vi.spyOn(coopEngine, "captureCoopChecksum").mockReturnValue(checksum);
+
+    // The replay is still waiting for turn N=1 while the host has already opened turn N+1=2 to capture
+    // the replacement that makes the guest-owned slot commandable.
+    phase = new CoopReplayTurnPhase(1);
+    phase.start();
+    runtime.partnerTransport?.send({
+      t: "battleCheckpoint",
+      reason: "replacement",
+      epoch: runtime.controller.sessionEpoch,
+      wave: 4,
+      turn: 2,
+      revision: 20,
+      checkpoint: checkpoint(19),
+      checksum,
+      fullField: fullField(),
+      authoritativeState: state(20),
+    });
+    await flushWire();
+    await flushWire();
+
+    expect(checkpointApply).toHaveBeenCalledOnce();
+    expect(authoritativeApply).toHaveBeenCalledOnce();
+    expect(
+      outbound.some(
+        message =>
+          message.t === "battleCheckpointAck"
+          && message.epoch === runtime.controller.sessionEpoch
+          && message.wave === 4
+          && message.turn === 2
+          && message.revision === 20,
+      ),
+      "the exact N+1 replacement is ACKed only after apply+checksum convergence",
+    ).toBe(true);
+    expect(unshiftNew.mock.calls.some(([name, slot]) => name === "CommandPhase" && slot === 1)).toBe(true);
+    expect(
+      unshiftNew.mock.calls.some(([name, turn]) => name === "CoopReplayTurnPhase" && turn === 1),
+      "the delayed turn-N resolution remains the continuation after the replacement UI",
+    ).toBe(true);
+    expect(unshiftNew.mock.calls.some(([name]) => name === "CoopFinalizeTurnPhase")).toBe(false);
+  });
+
+  it("keeps turn N parked for wrong epoch, wrong wave, N+2, and non-replacement N+1 checkpoints", async () => {
+    const runtime = startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
+    runtime.controller.role = "guest";
+    const checkpointApply = vi.spyOn(coopEngine, "applyCoopCheckpoint");
+    const messages: CoopMessage[] = [
+      {
+        t: "battleCheckpoint",
+        reason: "replacement",
+        epoch: runtime.controller.sessionEpoch + 1,
+        wave: 4,
+        turn: 2,
+        revision: 20,
+        checkpoint: checkpoint(19),
+        checksum,
+        fullField: fullField(),
+        authoritativeState: state(20),
+      },
+      {
+        t: "battleCheckpoint",
+        reason: "replacement",
+        epoch: runtime.controller.sessionEpoch,
+        wave: 5,
+        turn: 2,
+        revision: 20,
+        checkpoint: checkpoint(19),
+        checksum,
+        fullField: fullField(),
+        authoritativeState: { ...state(20), wave: 5 },
+      },
+      {
+        t: "battleCheckpoint",
+        reason: "replacement",
+        epoch: runtime.controller.sessionEpoch,
+        wave: 4,
+        turn: 3,
+        revision: 20,
+        checkpoint: checkpoint(19),
+        checksum,
+        fullField: fullField(),
+        authoritativeState: { ...state(20), turn: 3 },
+      },
+      {
+        t: "battleCheckpoint",
+        reason: "switch",
+        epoch: runtime.controller.sessionEpoch,
+        wave: 4,
+        turn: 2,
+        revision: 20,
+        checkpoint: checkpoint(19),
+        checksum,
+        fullField: fullField(),
+        authoritativeState: state(20),
+      },
+    ];
+
+    phase = new CoopReplayTurnPhase(1);
+    phase.start();
+    for (const message of messages) {
+      runtime.partnerTransport?.send(message);
+    }
+    await flushWire();
+
+    expect(checkpointApply).not.toHaveBeenCalled();
+    expect(unshiftNew.mock.calls.some(([name]) => name === "CommandPhase")).toBe(false);
+    phase.abortPhantom("mismatch coverage cleanup");
+    await flushWire();
+  });
+
   it("bounds a missing retained host frame and routes retry exhaustion to an explicit terminal", async () => {
     const runtime = startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
     runtime.controller.role = "guest";

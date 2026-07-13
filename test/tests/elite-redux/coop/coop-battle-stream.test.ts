@@ -16,7 +16,11 @@ import type {
   CoopMessage,
 } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { COOP_NO_FAULT_PROFILE, wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
+import {
+  COOP_NO_FAULT_PROFILE,
+  faultableTypes,
+  wrapCoopFaultPair,
+} from "#test/tools/coop-fault-transport";
 import { describe, expect, it } from "vitest";
 
 const flushWire = () => new Promise<void>(resolve => queueMicrotask(resolve));
@@ -618,6 +622,88 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("keeps the newest buffered revision, ignores an identical duplicate, and rejects a reordered older one", async () => {
+      const { host, guest } = createLoopbackPair();
+      const guestStream = new CoopBattleStreamer(guest, {
+        authorityContext: () => ({ epoch: 7, wave: 1, turn: 1 }),
+      });
+      let observed = 0;
+      guestStream.onTurnCommit(() => observed++);
+      const complete = (revision: number, text: string): Extract<CoopMessage, { t: "turnResolution" }> => ({
+        t: "turnResolution",
+        epoch: 7,
+        wave: 1,
+        turn: 1,
+        revision,
+        events: [{ k: "message", text }],
+        checkpoint: { ...emptyCheckpoint(), tick: revision - 1 },
+        checksum: revision === 22 ? "2222222222222222" : "2121212121212121",
+        preimage: `{\"revision\":${revision}}`,
+        fullField: emptyFullField(),
+        authoritativeState: emptyAuthoritativeState(1, 1, revision),
+      });
+      const newest = complete(22, "newest");
+
+      host.send(newest);
+      host.send({ ...newest, events: newest.events.map(event => ({ ...event })) });
+      host.send(complete(21, "stale"));
+      await flushWire();
+
+      const resolution = await guestStream.awaitTurn(1);
+      expect(resolution?.revision).toBe(22);
+      expect(resolution?.events).toEqual([{ k: "message", text: "newest" }]);
+      expect(observed, "an identical retransmit is idempotent and the older revision is never routed").toBe(1);
+      guestStream.dispose();
+    });
+
+    it("routes conflicting content for one immutable buffered revision through the shared fatal contract", async () => {
+      const { host, guest } = createLoopbackPair();
+      const terminalReasons: string[] = [];
+      const guestStream = new CoopBattleStreamer(guest, {
+        authorityContext: () => ({ epoch: 7, wave: 1, turn: 1 }),
+        onAuthorityTerminal: reason => terminalReasons.push(reason),
+      });
+      let failures = 0;
+      host.onMessage(message => {
+        if (message.t !== "authorityFailure") {
+          return;
+        }
+        failures++;
+        host.send({
+          t: "authorityFailureAck",
+          failureId: message.failureId,
+          epoch: message.epoch,
+          wave: message.wave,
+          turn: message.turn,
+          revision: message.revision,
+          boundary: message.boundary,
+        });
+      });
+      const base: Extract<CoopMessage, { t: "turnResolution" }> = {
+        t: "turnResolution",
+        epoch: 7,
+        wave: 1,
+        turn: 1,
+        revision: 20,
+        events: [{ k: "message", text: "first" }],
+        checkpoint: emptyCheckpoint(),
+        checksum: "deadbeefdeadbeef",
+        preimage: "{}",
+        fullField: emptyFullField(),
+        authoritativeState: emptyAuthoritativeState(1),
+      };
+
+      host.send(base);
+      host.send({ ...base, events: [{ k: "message", text: "conflict" }] });
+      await flushWire();
+      await flushWire();
+
+      expect(failures).toBe(1);
+      expect(terminalReasons).toEqual([expect.stringContaining("Conflicting turn authority")]);
+      await expect(guestStream.awaitTurn(1), "terminal authority cannot be consumed as gameplay").resolves.toBeNull();
+      guestStream.dispose();
+    });
+
     it("never exposes a buffered replacement checkpoint after its full authority address is no longer current", async () => {
       const { host, guest } = createLoopbackPair();
       const current = { epoch: 7, wave: 4, turn: 2 };
@@ -871,6 +957,107 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.requestReplacementCheckpoint(envelope);
       await flushWire();
       expect(opened, "the successful re-ACK cleared host retention").toBe(1);
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
+    it("bounds permanent turn/replacement ACK loss with one shared terminal and releases every retry", async () => {
+      const pair = wrapCoopFaultPair(
+        createLoopbackPair(),
+        {
+          drop: 1,
+          reorder: 0,
+          delay: 0,
+          faultable: faultableTypes(["turnCommitAck", "battleCheckpointAck"]),
+        },
+        { seed: 0x50333342 },
+      );
+      const current = { epoch: 7, wave: 1, turn: 1 };
+      const timers: { callback: () => void; ms: number; cancelled: boolean; fired: boolean }[] = [];
+      let now = 0;
+      const terminalReasons: string[] = [];
+      const hostStream = new CoopBattleStreamer(pair.host, {
+        authorityContext: () => current,
+        authorityRetentionMs: 100,
+        now: () => now,
+        schedule: (callback, ms) => {
+          const timer = { callback, ms, cancelled: false, fired: false };
+          timers.push(timer);
+          return () => {
+            timer.cancelled = true;
+          };
+        },
+        onAuthorityTerminal: reason => terminalReasons.push(reason),
+      });
+      const guestStream = new CoopBattleStreamer(pair.guest, { authorityContext: () => current });
+      let peerFailures = 0;
+      guestStream.onAuthorityFailure(() => peerFailures++);
+      let rawTurnDeliveries = 0;
+      let rawReplacementDeliveries = 0;
+      pair.guest.onMessage(message => {
+        if (message.t === "turnResolution") {
+          rawTurnDeliveries++;
+        }
+        if (message.t === "battleCheckpoint") {
+          rawReplacementDeliveries++;
+        }
+      });
+
+      const awaited = guestStream.awaitTurn(1);
+      emitCompleteTurn(hostStream, 1, [], emptyCheckpoint(), "deadbeefdeadbeef");
+      const resolution = await awaited;
+      guestStream.acknowledgeTurnCommit(resolution!);
+      const replacement = checkpointEnvelope(
+        "replacement",
+        { ...emptyCheckpoint(), tick: 21 },
+        "2222222222222222",
+        emptyAuthoritativeState(1, 1, 22),
+      );
+      hostStream.sendCheckpoint(
+        replacement.reason,
+        replacement.epoch,
+        replacement.wave,
+        replacement.turn,
+        replacement.checkpoint,
+        replacement.checksum,
+        replacement.fullField,
+        replacement.authoritativeState,
+      );
+      await flushWire();
+      expect(guestStream.consumeCheckpoint()).toEqual(replacement);
+      guestStream.acknowledgeReplacement(replacement);
+      await flushWire();
+      expect(pair.counters.guest.dropped, "both authority ACK classes are permanently faulted").toBeGreaterThanOrEqual(
+        2,
+      );
+
+      now = 100;
+      const commitRetry = timers.find(timer => timer.ms === 2_000 && !timer.cancelled);
+      expect(commitRetry).toBeDefined();
+      commitRetry!.fired = true;
+      commitRetry!.callback();
+      await flushWire();
+      await flushWire();
+
+      expect(peerFailures, "the guest accepted the delayed fatal using its exact ACK proof").toBe(1);
+      expect(terminalReasons).toEqual([expect.stringContaining("retention deadline")]);
+      expect(
+        timers.every(timer => timer.fired || timer.cancelled),
+        "the terminal outcome leaves no live commit/fatal retry timer",
+      ).toBe(true);
+
+      const turnsBeforeTerminalProbe = rawTurnDeliveries;
+      const replacementsBeforeTerminalProbe = rawReplacementDeliveries;
+      guestStream.requestTurnCommit(7, 1, 1, resolution!.revision);
+      guestStream.requestReplacementCheckpoint(replacement);
+      await flushWire();
+      expect(rawTurnDeliveries, "turn authority cannot resume after the terminal outcome").toBe(
+        turnsBeforeTerminalProbe,
+      );
+      expect(
+        rawReplacementDeliveries,
+        "replacement authority also clears only after the same terminal outcome",
+      ).toBe(replacementsBeforeTerminalProbe);
       hostStream.dispose();
       guestStream.dispose();
     });
@@ -1494,7 +1681,10 @@ describe("stale-turn finalize mark (#790 + regression fix)", () => {
     current.epoch = 7;
     expect(stream.isTurnFinalized(1, 2)).toBe(true);
     current.epoch = 8;
-    expect(stream.isTurnFinalized(1, 2), "finalization is scoped to the complete authority address").toBe(false);
+    expect(
+      stream.isTurnFinalized(1, 2),
+      "the current epoch remains finalized after inspecting an independently retained older-epoch mark",
+    ).toBe(true);
     stream.dispose();
   });
 });
