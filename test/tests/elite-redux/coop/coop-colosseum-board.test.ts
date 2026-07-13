@@ -310,6 +310,42 @@ describe("co-op Colosseum guest between-rounds ROUND LOOP (#829)", () => {
     return { ops, state };
   };
 
+  it("P33 CONTINUE delegates round N+1 to the retained terminal instead of consuming the raw boss carrier", async () => {
+    const { seq, guestRelay } = rig(9);
+    setCoopMeOperationEnabled(true);
+    const seqTerm = COOP_ME_TERM_SEQ_BASE + 9;
+    const { ops, state } = makeFakeOps({
+      owned: true,
+      boss: FAKE_BOSS,
+      driveReturns: [COLOSSEUM_CONTINUE],
+    });
+    const loop = runColosseumGuestRoundLoop(9, seqTerm, guestRelay, ops);
+    getCoopInteractionRelay()?.sendInteractionOutcome(seq, "coloBoard", {
+      k: "mePresent",
+      tokens: { coopColosseumRound: "0" },
+      meetsReqs: [],
+      labels: [],
+      subPrompt: { kind: "secondary", labels: [...BOARD_LABELS] },
+    });
+    await tick();
+    expect(state.driveCalls).toHaveLength(1);
+    expect(state.boots, "the complete retained ME_TERMINAL owns round N+1 state + battle boot").toHaveLength(0);
+
+    // End the detached proof without inventing a raw terminal: once the retained boundary clears its pin,
+    // any parked board wait wakes and exits without applying local mechanics.
+    setCoopMeInteractionStart(-1);
+    getCoopInteractionRelay()?.sendInteractionOutcome(seq, "coloBoard", {
+      k: "mePresent",
+      tokens: { coopColosseumRound: "1" },
+      meetsReqs: [],
+      labels: [],
+      subPrompt: { kind: "secondary", labels: [...BOARD_LABELS] },
+    });
+    await loop;
+    expect(state.leaves).toBe(0);
+    guestRelay.dispose();
+  });
+
   it("battle-terminal hot-rejoin supersedes an old parked relay loop and resumes without re-picking", async () => {
     const snapshot = {
       version: 1,

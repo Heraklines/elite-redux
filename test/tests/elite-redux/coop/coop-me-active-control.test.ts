@@ -12,6 +12,7 @@ import {
   restoreCoopActiveMysteryControl,
   restoreCoopMeInteractionStartForHarness,
   setCoopMeActivePresentation,
+  setCoopMeColosseumControl,
   setCoopMeInteractionStart,
   setCoopMeTerminalControl,
   setOnMePinCleared,
@@ -70,6 +71,56 @@ describe("co-op Mystery active-control snapshot/rejoin", () => {
     setCoopMeTerminalControl("leave", undefined, { operationId: terminalOp(41, 1), step: 1, choice: -1 });
     setCoopMeTerminalControl("battle", 99, { operationId: terminalOp(41, 0), step: 0, choice: -1000 });
     expect(captureCoopActiveMysteryControl()?.terminal, "an old handoff cannot rewind the true leave").toBe("leave");
+  });
+
+  it("retains sequential Colosseum battle steps and admits only the exact next rejoin/final-leave address", () => {
+    setCoopMeInteractionStart(47);
+    expect(setCoopMeColosseumControl(47, { expectedRound: 1, boardRound: 1 })).toBe(true);
+    setCoopMeTerminalControl("battle", 4, {
+      operationId: terminalOp(47, 0),
+      step: 0,
+      choice: -1000,
+    });
+    setCoopMeTerminalControl("battle", 9, {
+      operationId: terminalOp(47, 1),
+      step: 1,
+      choice: -1000,
+    });
+    expect(captureCoopActiveMysteryControl()).toMatchObject({
+      interactionCounter: 47,
+      terminal: "battle",
+      terminalStep: 1,
+      hostTurn: 9,
+      colosseum: { expectedRound: 1, boardRound: 1 },
+    });
+
+    const round2 = captureCoopActiveMysteryControl()!;
+    expect(
+      restoreCoopActiveMysteryControl({
+        ...round2,
+        revision: round2.revision + 1,
+        terminalOperationId: terminalOp(47, 3),
+        terminalStep: 3,
+      }),
+      "a rejoin snapshot cannot skip an addressed battle step",
+    ).toBe(false);
+    const finalLeave: CoopActiveMysteryEncounterSnapshotV1 = {
+      ...round2,
+      revision: round2.revision + 1,
+      terminal: "leave",
+      terminalOperationId: terminalOp(47, 2),
+      terminalStep: 2,
+      terminalChoice: -1,
+      hostTurn: undefined,
+    };
+    expect(restoreCoopActiveMysteryControl(finalLeave)).toBe(true);
+    expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "leave", terminalStep: 2 });
+    setCoopMeTerminalControl("battle", 10, {
+      operationId: terminalOp(47, 3),
+      step: 3,
+      choice: -1000,
+    });
+    expect(captureCoopActiveMysteryControl()?.terminal, "final leave remains terminal-final").toBe("leave");
   });
 
   it("a verified rejoin snapshot rebounds pending UI and terminal state exactly; delayed older state is rejected", () => {
