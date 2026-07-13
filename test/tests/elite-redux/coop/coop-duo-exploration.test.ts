@@ -41,7 +41,6 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { BiomeShopPhase, setCoopBiomeMarketTestSkip } from "#phases/biome-shop-phase";
 import { ErAbilityCapsulePhase } from "#phases/er-ability-capsule-phase";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
@@ -53,6 +52,7 @@ import {
   forceItemRewards,
   haltQueueAfterCurrent,
   installDuoLogCapture,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   stubBattleInfo,
   withClient,
@@ -208,7 +208,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     expect(hostShop.phaseName).toBe("SelectModifierPhase");
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
 
     // The unlockable innate slot must be computed on the TARGET mon before the pick (fresh
     // harness mons have no candy unlocks, so every registered innate slot is run-unlockable).
