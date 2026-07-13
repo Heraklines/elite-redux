@@ -24,8 +24,11 @@ import {
   assembleCoopRuntime,
   type CoopRuntime,
   clearCoopRuntime,
+  getCoopSharedTerminalSupervisor,
+  setCoopRuntime,
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
+import { createFreshCoopP33Context } from "#data/elite-redux/coop/coop-session-binding";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import {
   beginCoopUiRelayInput,
@@ -98,6 +101,42 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     const guestRuntime = assembleCoopRuntime(guest, { username: "wiring-guest" });
     assertFullyWired(hostRuntime, "assemble(host)");
     assertFullyWired(guestRuntime, "assemble(guest)");
+  });
+
+  it("the authenticated LIVE factory owns and normally disposes one P33 terminal supervisor", () => {
+    const { host } = createLoopbackPair();
+    const p33 = createFreshCoopP33Context({
+      pairingId: "PAIR33RUNTIME",
+      pairingBearer: "T".repeat(43),
+      transportRole: "answerer",
+      account: {
+        version: 1,
+        accountId: "er-account:10",
+        displayName: "Authority",
+        canonicalUsername: "authority",
+      },
+      peerAccount: {
+        version: 1,
+        accountId: "er-account:20",
+        displayName: "Replica",
+        canonicalUsername: "replica",
+      },
+      connectionGeneration: 2,
+      peerConnectionGeneration: 4,
+    });
+    expect(p33).not.toBeNull();
+    if (p33 == null) {
+      throw new Error("P33 runtime fixture was rejected");
+    }
+    const runtime = assembleCoopRuntime(host, { username: "p33-terminal-runtime", p33 });
+    setCoopRuntime(runtime);
+    expect(getCoopSharedTerminalSupervisor(runtime)).not.toBeNull();
+
+    clearCoopRuntime();
+    expect(
+      getCoopSharedTerminalSupervisor(runtime),
+      "normal teardown disposes and unregisters the supervisor",
+    ).toBeNull();
   });
 
   it("startLocalCoopSession (the DEV factory) produces the SAME wiring", () => {
@@ -245,15 +284,12 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     );
     expect(replay, "an ambient timer cannot fire under another duo client context").not.toContain("setTimeout(");
     const terminal = readFileSync(join(root, "data", "elite-redux", "coop", "coop-authority-terminal.ts"), "utf8");
-    for (const terminalPostcondition of [
-      "membership.terminate()",
-      "scene.ui.showText(",
-      "scene.phaseManager.clearPhaseQueue()",
-      "scene.reset()",
-      'scene.phaseManager.unshiftNew("TitlePhase")',
-    ]) {
-      expect(terminal, `shared authority terminal retains ${terminalPostcondition}`).toContain(terminalPostcondition);
-    }
+    expect(terminal, "authority phases delegate to the one retained runtime terminal contract").toContain(
+      "failCoopSharedSession(reason,",
+    );
+    expect(terminal, "authority phases cannot bypass peer ACK retention with immediate local teardown").not.toContain(
+      "clearCoopRuntime(",
+    );
     expect(replay, "turn and replacement failures route through the shared terminal helper").toContain(
       "terminateCoopAuthoritySession(",
     );

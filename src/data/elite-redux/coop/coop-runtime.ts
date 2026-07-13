@@ -60,7 +60,7 @@ import {
   resetCoopStateTicks,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
-import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
+import { CoopBattleSync, type CoopCommandTimeout } from "#data/elite-redux/coop/coop-battle-sync";
 import {
   isCoopBiomeOperationEnabled,
   preflightCoopBiomeJournalMaterialization,
@@ -222,6 +222,14 @@ import {
 import { coopFieldIndexOf, coopInteractionOwnerSeat, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
 import type { CoopP33AuthenticatedContextV1 } from "#data/elite-redux/coop/coop-session-binding";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
+import type {
+  CoopSharedTerminalStart,
+  CoopSharedTerminalSupervisor,
+} from "#data/elite-redux/coop/coop-shared-terminal";
+import {
+  createCoopRuntimeSharedTerminal,
+  hasBoundCoopSharedTerminal,
+} from "#data/elite-redux/coop/coop-shared-terminal-runtime";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import {
   isCoopStormglassOperationEnabled,
@@ -238,6 +246,8 @@ import type {
   CoopRole,
   CoopSerializedEnemy,
   CoopSessionKind,
+  CoopSharedTerminalBoundary,
+  CoopSharedTerminalReasonCode,
   CoopWaveOutcome,
 } from "#data/elite-redux/coop/coop-transport";
 import {
@@ -1784,36 +1794,113 @@ export function routeShowdownAbandon(runtime: CoopRuntime): void {
   }
 }
 
-/**
- * Fail one binary shared run closed after a bounded authoritative-control recovery could not converge.
- * Never advances a local gameplay branch: both retained waiters are released only as part of terminal
- * teardown, and the resumable session save remains the next entry point.
- */
-export function failCoopSharedSession(reason: string): void {
-  const runtime = getCoopRuntime();
-  if (runtime == null) {
-    return;
+export interface CoopSharedSessionFailureBoundary {
+  boundary?: CoopSharedTerminalBoundary;
+  reasonCode?: CoopSharedTerminalReasonCode;
+  wave?: number;
+  turn?: number;
+  boundaryRevision?: number;
+}
+
+function terminalCoordinate(value: number | undefined, fallback: number): number {
+  if (value !== undefined && Number.isSafeInteger(value) && value >= 0) {
+    return value;
   }
-  coopWarn("runtime", `shared session stopped safely: ${reason}`);
-  runtime.membership.terminate();
+  return Number.isSafeInteger(fallback) && fallback >= 0 ? fallback : 0;
+}
+
+function terminalReason(reason: string): string {
+  const normalized = [...reason]
+    .map(character => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 0x1f || codePoint === 0x7f ? " " : character;
+    })
+    .join("")
+    .trim()
+    .slice(0, 512);
+  return normalized || "Shared co-op control could not continue safely.";
+}
+
+/**
+ * Synchronously fence every gameplay continuation while preserving the transport listener used by the
+ * retained terminal handshake. The flag and battle-command fence are installed before any null waiter is
+ * released; promise continuations therefore cannot infer permission to simulate a local fallback.
+ */
+function prepareCoopSharedTerminal(runtime: CoopRuntime, reason: string): boolean {
+  const state = sharedTerminalState(runtime);
+  if (state.frozen) {
+    return true;
+  }
+  state.frozen = true;
+  state.reason = reason;
+  let prepared = true;
+  try {
+    runtime.membership.terminate();
+  } catch (error) {
+    prepared = false;
+    coopWarn("runtime", "shared terminal could not freeze membership", error);
+  }
+  try {
+    // Load-bearing ordering: freezeForTerminal marks the relay before resolving any retained request.
+    runtime.battleSync.freezeForTerminal();
+  } catch (error) {
+    prepared = false;
+    coopWarn("runtime", "shared terminal could not freeze battle commands", error);
+  }
   try {
     runtime.interactionRelay.cancelWaiters(() => true);
-    runtime.battleSync.cancelPending();
     getShowdownRelay()?.cancelPending();
-  } catch {
-    /* terminal teardown continues */
+  } catch (error) {
+    coopWarn("runtime", "shared terminal waiter release partially failed", error);
+  }
+  if (active === runtime) {
+    try {
+      // Keep the current phase parked even if a released async waiter calls Phase.end(): the manager's
+      // terminal fence blocks shiftPhase/turnStart until exactly-once finalization releases it.
+      globalScene.phaseManager.freezeForCoopTerminal();
+    } catch (error) {
+      prepared = false;
+      coopWarn("runtime", "shared terminal could not freeze phase progression", error);
+    }
+    try {
+      globalScene.ui.showText(
+        "Co-op control recovery could not converge. Both players are leaving shared play safely.",
+        null,
+        undefined,
+        5000,
+      );
+    } catch {
+      /* cosmetic */
+    }
+  }
+  return prepared;
+}
+
+/** Exactly-once terminal UI/control-plane teardown after quorum or the supervisor's absolute deadline. */
+function finalizeCoopSharedTerminal(runtime: CoopRuntime, endAuthenticatedRun: boolean): void {
+  const state = sharedTerminalState(runtime);
+  if (state.finalized) {
+    return;
+  }
+  state.finalized = true;
+  if (endAuthenticatedRun) {
+    // `end()` marks signaling stopped synchronously before its network promise yields. Capture it before
+    // clearCoopRuntime closes the data channel; duplicate terminal frames cannot call it again.
+    try {
+      void runtime.p33Signaling?.end().catch(error => {
+        coopWarn("runtime", "shared terminal signaling end failed", error);
+      });
+    } catch (error) {
+      coopWarn("runtime", "shared terminal signaling end threw", error);
+    }
+  }
+  if (active !== runtime) {
+    // Only the active production runtime owns the scene. A two-engine harness can retain another runtime
+    // in-process; its own driver disposes that control plane after observing this terminal state.
+    return;
   }
   try {
-    globalScene.ui.showText(
-      "Co-op control recovery could not converge. Shared play was stopped safely; reconnect to resume.",
-      null,
-      undefined,
-      5000,
-    );
-  } catch {
-    /* cosmetic */
-  }
-  try {
+    globalScene.phaseManager.releaseCoopTerminalFreeze();
     const interruptedPhase = globalScene.phaseManager.getCurrentPhase();
     globalScene.phaseManager.clearPhaseQueue();
     clearCoopRuntime();
@@ -1828,9 +1915,68 @@ export function failCoopSharedSession(reason: string): void {
   }
 }
 
-function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInteractionRelay, runtime: CoopRuntime): void {
+/**
+ * Fail one shared run closed after bounded recovery could not converge. A bound P33 run retains and
+ * retransmits one addressed terminal until the peer enters it or the absolute deadline expires. Only an
+ * unbound/legacy session uses the immediate local fallback because it has no authenticated seat axes with
+ * which to address an ACK quorum.
+ */
+function failCoopRuntimeSharedSession(
+  runtime: CoopRuntime,
+  reason: string,
+  failure: CoopSharedSessionFailureBoundary = {},
+): void {
+  const safeReason = terminalReason(reason);
+  coopWarn("runtime", `shared session terminal requested: ${safeReason}`);
+  const supervisor = sharedTerminalSupervisors.get(runtime);
+  if (supervisor == null || !hasBoundCoopSharedTerminal(runtime.controller)) {
+    prepareCoopSharedTerminal(runtime, safeReason);
+    finalizeCoopSharedTerminal(runtime, false);
+    return;
+  }
+  const point = readCoopBattlePoint();
+  let defaultRevision = 0;
+  try {
+    defaultRevision = runtime.controller.interactionCounter();
+  } catch {
+    /* retain zero */
+  }
+  const start: CoopSharedTerminalStart = {
+    boundary: failure.boundary ?? "recovery",
+    reasonCode: failure.reasonCode ?? "recovery-exhausted",
+    reason: safeReason,
+    wave: terminalCoordinate(failure.wave, point.wave),
+    turn: terminalCoordinate(failure.turn, point.turn),
+    boundaryRevision: terminalCoordinate(failure.boundaryRevision, defaultRevision),
+  };
+  const terminalStartFailed = (error: unknown): void => {
+    // The binding was checked immediately above; rejection is an internal adapter failure. Preserve the
+    // no-AI invariant and terminate locally rather than allowing a partially failed supervisor to resume.
+    coopWarn("runtime", "bound shared terminal could not begin", error);
+    prepareCoopSharedTerminal(runtime, safeReason);
+    finalizeCoopSharedTerminal(runtime, true);
+  };
+  // begin() calls onPrepare synchronously before returning. A promise is retained only for completion;
+  // repeated local failures return that same transaction instead of inventing another terminal ID. The
+  // transport send inside begin can also throw synchronously if the channel closes between binding proof
+  // and first send, so fence both synchronous and asynchronous failures.
+  try {
+    void supervisor.begin(start).catch(terminalStartFailed);
+  } catch (error) {
+    terminalStartFailed(error);
+  }
+}
+
+export function failCoopSharedSession(reason: string, failure: CoopSharedSessionFailureBoundary = {}): void {
+  const runtime = getCoopRuntime();
+  if (runtime != null) {
+    failCoopRuntimeSharedSession(runtime, reason, failure);
+  }
+}
+
+function wireCoopDisconnectReaction(transport: CoopTransport, runtime: CoopRuntime): void {
   let rejoining = false;
-  const terminateSharedSession = (isActiveRuntime: boolean, recoveryId: string): void => {
+  const terminateSharedSession = (recoveryId: string): void => {
     const point = readCoopBattlePoint();
     recordCoopCausalEvent({
       domain: "recovery",
@@ -1841,41 +1987,20 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
       wave: point.wave,
       turn: point.turn,
     });
-    runtime.membership.terminate();
-    // Ordinary co-op has no committed membership-removal/AI-handoff operation. Pretending the survivor
-    // can continue leaves barriers and controller ownership binary and creates a later softlock/desync.
-    // Release retained waits only now that recovery is terminal and preserve the session save.
-    try {
-      relay.cancelWaiters(() => true);
-      runtime.battleSync.cancelPending();
-      getShowdownRelay()?.cancelPending();
-    } catch {
-      /* terminal teardown continues even if one waiter was already gone */
-    }
-    if (!isActiveRuntime) {
-      return;
-    }
-    try {
-      globalScene.ui.showText(
-        "Your partner didn't reconnect. Shared play was stopped safely; reconnect to resume.",
-        null,
-        undefined,
-        5000,
-      );
-    } catch {
-      /* cosmetic */
-    }
-    const interruptedPhase = globalScene.phaseManager.getCurrentPhase();
-    globalScene.phaseManager.clearPhaseQueue();
-    clearCoopRuntime();
-    globalScene.reset();
-    globalScene.phaseManager.unshiftNew("TitlePhase");
-    if (globalScene.phaseManager.getCurrentPhase() === interruptedPhase) {
-      interruptedPhase?.end();
-    }
+    failCoopRuntimeSharedSession(runtime, "Your partner did not reconnect before the recovery deadline.", {
+      boundary: "disconnect",
+      reasonCode: "peer-lost",
+      wave: point.wave,
+      turn: point.turn,
+    });
   };
   offDisconnectReaction = transport.onStateChange(state => {
     if (state !== "disconnected" && state !== "closed") {
+      return;
+    }
+    if (isCoopSharedTerminalFrozen(runtime)) {
+      // The winning terminal keeps only its own retained listener alive. Closing the gameplay channel
+      // during finalization must never launch a competing hot-rejoin recovery loop.
       return;
     }
     const recoveryId = `rejoin:e${runtime.controller.sessionEpoch}:g${coopSessionGeneration()}:c${transport.connectionGeneration?.() ?? 0}`;
@@ -1911,6 +2036,12 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
           /* cosmetic */
         }
       }
+      failCoopRuntimeSharedSession(runtime, "The authenticated peer binding no longer matches this game build.", {
+        boundary: "protocol",
+        reasonCode: "binding-mismatch",
+        wave: point.wave,
+        turn: point.turn,
+      });
       return;
     }
     // #805 HOT REJOIN: re-dial the same pairing code within the grace window and swap the fresh
@@ -1961,7 +2092,7 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
               routeShowdownAbandon(runtime);
               return;
             }
-            terminateSharedSession(isActiveRuntime, recoveryId);
+            terminateSharedSession(recoveryId);
             return;
           }
           recordCoopCausalEvent({
@@ -2068,7 +2199,7 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
             routeShowdownAbandon(runtime);
             return;
           }
-          terminateSharedSession(isActiveRuntime, recoveryId);
+          terminateSharedSession(recoveryId);
         });
       return;
     }
@@ -2081,21 +2212,12 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
       role: runtime.controller.role,
       epoch: runtime.controller.sessionEpoch,
     });
-    try {
-      runtime.membership.terminate();
-      relay.cancelWaiters(() => true);
-      runtime.battleSync.cancelPending();
-      getShowdownRelay()?.cancelPending();
-    } catch {
-      /* best-effort terminal release */
-    }
-    if (isActiveRuntime) {
-      try {
-        globalScene.ui.showText("Your partner disconnected. Shared play has stopped.", null, undefined, 3000);
-      } catch {
-        /* cosmetic */
-      }
-    }
+    failCoopRuntimeSharedSession(runtime, "Your partner disconnected and no authenticated rejoin path is available.", {
+      boundary: "disconnect",
+      reasonCode: "peer-lost",
+      wave: point.wave,
+      turn: point.turn,
+    });
   });
 }
 
@@ -2283,6 +2405,37 @@ export interface CoopRuntime {
 }
 
 let active: CoopRuntime | null = null;
+
+interface CoopRuntimeSharedTerminalState {
+  frozen: boolean;
+  finalized: boolean;
+  reason: string | null;
+}
+
+/** Runtime-owned P33 terminal supervisors and their synchronous gameplay fences. */
+const sharedTerminalSupervisors = new WeakMap<CoopRuntime, CoopSharedTerminalSupervisor>();
+const sharedTerminalStates = new WeakMap<CoopRuntime, CoopRuntimeSharedTerminalState>();
+
+function sharedTerminalState(runtime: CoopRuntime): CoopRuntimeSharedTerminalState {
+  let state = sharedTerminalStates.get(runtime);
+  if (state == null) {
+    state = { frozen: false, finalized: false, reason: null };
+    sharedTerminalStates.set(runtime, state);
+  }
+  return state;
+}
+
+/** Whether this exact runtime has synchronously entered a shared terminal boundary. */
+export function isCoopSharedTerminalFrozen(runtime: CoopRuntime | null = active): boolean {
+  return runtime != null && sharedTerminalStates.get(runtime)?.frozen === true;
+}
+
+/** Read-only retained terminal commit for causal diagnostics and integration tests. */
+export function getCoopSharedTerminalSupervisor(
+  runtime: CoopRuntime | null = active,
+): CoopSharedTerminalSupervisor | null {
+  return runtime == null ? null : (sharedTerminalSupervisors.get(runtime) ?? null);
+}
 
 /**
  * #808 SESSION GENERATION (same pattern as the transport's wire generation): bumped when a
@@ -4075,7 +4228,22 @@ export function assembleCoopRuntime(
   // in broadcastRunConfig; on the GUEST it is only the pre-runConfig default (the host's
   // value overwrites it on receipt). Default "coop" so co-op stays byte-identical.
   controller.setSessionKind(opts.kind ?? "coop");
-  const battleSync = new CoopBattleSync(transport);
+  let runtime: CoopRuntime;
+  const battleSync = new CoopBattleSync(transport, {
+    onCommandTimeout: (timeout: CoopCommandTimeout) => {
+      failCoopRuntimeSharedSession(
+        runtime,
+        `Partner command exhausted at epoch ${timeout.epoch}, wave ${timeout.wave}, turn ${timeout.turn}, `
+          + `owner ${timeout.owner}, field ${timeout.fieldIndex}, Pokemon ${timeout.pokemonId}.`,
+        {
+          boundary: "surface",
+          reasonCode: "continuation-failed",
+          wave: timeout.wave,
+          turn: timeout.turn,
+        },
+      );
+    },
+  });
   const battleStream = new CoopBattleStreamer(transport, {
     authorityContext: () => ({
       epoch: controller.sessionEpoch,
@@ -4097,7 +4265,6 @@ export function assembleCoopRuntime(
   // resendable end-to-end (no longer a passive scaffold). Its reconnect() is wired into the #805 rejoin
   // below and its journal depth/unacked feed the health line. Absent when the flag is OFF (legacy behavior).
   const operationDurabilityHooks = coopOperationDurabilityHooks();
-  let runtime: CoopRuntime;
   const durability = durabilityEnabled
     ? new CoopDurabilityManager(transport, {
         ...operationDurabilityHooks,
@@ -4126,6 +4293,27 @@ export function assembleCoopRuntime(
     localTransport: transport,
     durability,
   };
+  sharedTerminalStates.set(runtime, { frozen: false, finalized: false, reason: null });
+  if (opts.p33 != null) {
+    const terminal = createCoopRuntimeSharedTerminal(transport, controller, {
+      onPrepare: commit => prepareCoopSharedTerminal(runtime, commit.reason),
+      onFinalize: () => finalizeCoopSharedTerminal(runtime, true),
+      onTrace: event => {
+        const point = readCoopBattlePoint();
+        recordCoopCausalEvent({
+          domain: "recovery",
+          stage: `terminal-${event.stage}`,
+          causalId: event.terminalId ?? `terminal:unaddressed:${controller.role}`,
+          role: controller.role,
+          epoch: controller.sessionEpoch,
+          wave: point.wave,
+          turn: point.turn,
+          ...(event.detail == null ? {} : { detail: event.detail }),
+        });
+      },
+    });
+    sharedTerminalSupervisors.set(runtime, terminal);
+  }
   // A real public command/reward UI is stronger evidence than a retry timer. Let the battle stream retire
   // its own addressed continuation first, then immediately re-run any valid journal transaction waiting on
   // that same surface. Ambiguous phase-owned surfaces (notably ER_MAP) remain covered by deferred polling.
@@ -4165,7 +4353,7 @@ export function assembleCoopRuntime(
   wireCoopLearnMoveBatchForward(interactionRelay);
   wireCoopDexSync(transport);
   wireShowdownResult(transport, controller);
-  wireCoopDisconnectReaction(transport, interactionRelay, runtime);
+  wireCoopDisconnectReaction(transport, runtime);
   wireCoopStallWatchdog(transport, interactionRelay, battleStream, runtime);
   // #812: ownership probe for pre-responder commandRequests (buffer own-slot, decline foreign).
   battleSync.setSlotOwnershipProbe(fieldIndex => {
@@ -4281,12 +4469,22 @@ export function clearCoopRuntime(): void {
   if (active == null) {
     return;
   }
+  try {
+    // Normal title/save teardown may supersede an in-flight terminal. Never leak its phase-manager fence
+    // into the next solo or co-op runtime.
+    globalScene.phaseManager.releaseCoopTerminalFreeze();
+  } catch {
+    /* engine-free/pre-scene teardown */
+  }
   // #808: invalidate every in-flight async continuation scheduled under this session.
   sessionGeneration++;
   coopLog(
     "launch",
     `clearCoopRuntime role=${active.controller.role} netcode=${active.controller.netcodeMode} gen->${sessionGeneration}`,
   );
+  const sharedTerminal = sharedTerminalSupervisors.get(active);
+  sharedTerminal?.dispose();
+  sharedTerminalSupervisors.delete(active);
   active.controller.dispose();
   active.battleSync.dispose();
   active.battleStream.dispose();

@@ -10,6 +10,7 @@ import {
   createFreshCoopP33Context,
 } from "#data/elite-redux/coop/coop-session-binding";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
+import { hasBoundCoopSharedTerminal } from "#data/elite-redux/coop/coop-shared-terminal-runtime";
 import { COOP_PROTOCOL_VERSION, type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it } from "vitest";
 
@@ -114,11 +115,13 @@ describe("P33 authenticated terminal binding adapter", () => {
       fromSeatId: 1,
       connectionGeneration: 0,
     };
+    expect(hasBoundCoopSharedTerminal(legacy)).toBe(false);
     expect(legacy.p33MembershipSnapshot()).toBeNull();
     expect(legacy.validateP33PeerFrameContext(frame, 1)).toBe(false);
 
     const pendingPair = createLoopbackPair();
     const pending = new CoopSessionController(pendingPair.host, { p33: authenticatedContext() });
+    expect(hasBoundCoopSharedTerminal(pending)).toBe(false);
     expect(pending.p33MembershipSnapshot()).toBeNull();
     expect(pending.validateP33PeerFrameContext(frame, 1)).toBe(false);
 
@@ -133,6 +136,7 @@ describe("P33 authenticated terminal binding adapter", () => {
   it("maps stable authenticated seats and rejects every forged frame axis", async () => {
     const fixture = await bindAuthority();
     const { controller, binding } = fixture;
+    expect(hasBoundCoopSharedTerminal(controller)).toBe(true);
     const membership = controller.p33MembershipSnapshot();
     expect(membership).toEqual({
       version: 2,
