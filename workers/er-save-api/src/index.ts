@@ -871,6 +871,13 @@ function hasCoopSessionMaterializationShape(record: Record<string, unknown>): bo
   const party = record.party;
   const enemyParty = record.enemyParty;
   const battleType = record.battleType;
+  const mysteryEncounterType = record.mysteryEncounterType;
+  const hasKnownMysteryEncounterType =
+    isSafeIntegerInRange(mysteryEncounterType, 0) && resumableMysteryEncounterTypes.has(mysteryEncounterType);
+  // A non-combat Mystery Event is the sole legitimate empty-enemy save boundary. It is only
+  // executable when the exact event type is retained; `getMysteryEncounter(undefined)` may
+  // otherwise select no event (or a queued/daily event different from the saved surface).
+  const allowsEmptyEnemyParty = battleType === 3 && hasKnownMysteryEncounterType;
   return (
     typeof record.seed === "string"
     && record.seed.length > 0
@@ -879,7 +886,7 @@ function hasCoopSessionMaterializationShape(record: Record<string, unknown>): bo
     && party.length > 0
     && party.every(mon => isPokemonDataShape(mon, true))
     && Array.isArray(enemyParty)
-    && (enemyParty.length > 0 || battleType === 3)
+    && (enemyParty.length > 0 || allowsEmptyEnemyParty)
     && enemyParty.every(mon => isPokemonDataShape(mon, false))
     && isObjectArray(record.modifiers)
     && isObjectArray(record.enemyModifiers)
@@ -903,9 +910,11 @@ function hasCoopSessionMaterializationShape(record: Record<string, unknown>): bo
     && resumableGameVersionPattern.test(record.gameVersion)
     && Array.isArray(record.challenges)
     && record.challenges.every(isChallengeDataShape)
-    && typeof record.mysteryEncounterType === "number"
-    && Number.isSafeInteger(record.mysteryEncounterType)
-    && (record.mysteryEncounterType === -1 || resumableMysteryEncounterTypes.has(record.mysteryEncounterType))
+    && typeof mysteryEncounterType === "number"
+    && Number.isSafeInteger(mysteryEncounterType)
+    && (battleType === 3
+      ? hasKnownMysteryEncounterType
+      : mysteryEncounterType === -1 || resumableMysteryEncounterTypes.has(mysteryEncounterType))
     && isRecord(mystery)
     && Array.isArray(mystery.encounteredEvents)
     && isFiniteNonNegative(mystery.encounterSpawnChance)
@@ -1684,6 +1693,41 @@ async function handleClassifiedSessionExactDelete(
   }
   if ((await sha256Hex(row.data)) !== expectedDigest) {
     return text(`${label} session changed before exact delete.`, 409, cors);
+  }
+  const strandedRun = expectedProtection === "coop-invalid" ? parseValidCoopRun(row.data) : null;
+  if (strandedRun != null) {
+    // A structurally invalid checkpoint can still carry trustworthy, exact run metadata. Preserve
+    // the same resurrection fence as a fully materializable checkpoint: the tombstone insert and
+    // byte-exact delete execute in one D1 batch, while duplicate live copies make both fail closed.
+    await ensureCoopRunTombstones(env);
+    const now = Date.now();
+    const expected = {
+      slot,
+      checkpointRevision: strandedRun.checkpointRevision,
+      digest: expectedDigest,
+    };
+    await env.DB.batch([
+      env.DB.prepare(COOP_TOMBSTONE_INSERT_SQL).bind(
+        auth.uid,
+        slot,
+        strandedRun.runId,
+        strandedRun.checkpointRevision,
+        expectedDigest,
+        now,
+        row.data,
+      ),
+      env.DB.prepare(COOP_TOMBSTONED_SESSION_DELETE_SQL).bind(
+        auth.uid,
+        slot,
+        row.data,
+        strandedRun.runId,
+        strandedRun.checkpointRevision,
+        expectedDigest,
+      ),
+    ]);
+    return (await exactCoopDeleteSettled(env, auth.uid, strandedRun.runId, expected))
+      ? text("", 200, cors)
+      : text(`${label} session changed during tombstoned exact delete.`, 409, cors);
   }
   const result = await env.DB.prepare("DELETE FROM session_saves WHERE user_id = ?1 AND slot = ?2 AND data = ?3")
     .bind(auth.uid, slot, row.data)

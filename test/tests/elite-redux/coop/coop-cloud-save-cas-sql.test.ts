@@ -23,6 +23,13 @@ import {
 
 const saveApiSchema = readFileSync(resolve(process.cwd(), "workers/er-save-api/schema.sql"), "utf8");
 
+/**
+ * This minimal serialized fixture was traced field-by-field from `GameData.getSessionSaveData()`
+ * and the `PokemonData`, `ArenaData`, `TrainerData`, `ChallengeData`, and
+ * `MysteryEncounterSaveData` constructors it invokes. It deliberately includes every property
+ * this Worker validates or the current load path immediately dereferences. It is not described as
+ * a runtime capture because constructing the real Phaser scene is prohibited locally by AGENTS.md.
+ */
 function capturedPokemonData(id: number, player: boolean, species: number) {
   return {
     id,
@@ -306,6 +313,14 @@ describe("co-op cloud CAS SQL on SQLite", () => {
       ["empty player party", value => (value.party = [])],
       ["object-shaped player placeholder", value => (value.party = [{}])],
       ["empty enemy party outside a non-battle Mystery Event", value => (value.enemyParty = [])],
+      [
+        "Mystery Event without its executable event type",
+        value => {
+          value.battleType = 3;
+          value.mysteryEncounterType = -1;
+          value.enemyParty = [];
+        },
+      ],
       ["object-shaped enemy placeholder", value => (value.enemyParty = [{}])],
       [
         "party entry on the wrong side",

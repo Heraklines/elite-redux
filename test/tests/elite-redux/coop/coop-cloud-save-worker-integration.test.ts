@@ -114,6 +114,13 @@ async function digest(raw: string): Promise<string> {
   return [...new Uint8Array(value)].map(byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * This minimal serialized fixture was traced field-by-field from `GameData.getSessionSaveData()`
+ * and the `PokemonData`, `ArenaData`, `TrainerData`, `ChallengeData`, and
+ * `MysteryEncounterSaveData` constructors it invokes. It includes every property the Worker
+ * validates or the current load path immediately dereferences. We intentionally do not call it a
+ * runtime capture: AGENTS.md reserves real Phaser execution for isolated remote runners.
+ */
 function capturedPokemonData(id: number, player: boolean, species: number) {
   return {
     id,
@@ -292,6 +299,19 @@ describe("co-op save Worker endpoint integration", () => {
       ).status,
       "a trainer load dereferences trainerType and therefore requires trainer data",
     ).toBe(409);
+    const mysteryWithoutType = JSON.parse(checkpoint(runId, 0, 1));
+    mysteryWithoutType.battleType = 3;
+    mysteryWithoutType.mysteryEncounterType = -1;
+    mysteryWithoutType.enemyParty = [];
+    expect(
+      (
+        await call("/savedata/session/coop-cas-update?slot=0&coopCasMode=empty", {
+          method: "POST",
+          body: JSON.stringify(mysteryWithoutType),
+        })
+      ).status,
+      "an empty-enemy Mystery boundary must retain the exact event it will reopen",
+    ).toBe(409);
     expect(
       (
         await call("/savedata/session/coop-cas-update?slot=0&coopCasMode=empty", {
@@ -394,7 +414,7 @@ describe("co-op save Worker endpoint integration", () => {
     expect(sqlite.prepare("SELECT COUNT(*) AS count FROM session_saves").get()).toEqual({ count: 0 });
   });
 
-  it("keeps a truncated checkpoint recoverable through the exact legacy route", async () => {
+  it("tombstones a truncated checkpoint with valid run metadata and fences delayed resurrection", async () => {
     const raw = JSON.stringify({
       gameMode: 6,
       waveIndex: 4,
@@ -410,6 +430,58 @@ describe("co-op save Worker endpoint integration", () => {
     const query = new URLSearchParams({ slot: "3", exactDigest: await digest(raw) });
     expect((await call(`/savedata/session/legacy-coop-exact-delete?${query}`, { method: "POST" })).status).toBe(200);
     expect(sqlite.prepare("SELECT data FROM session_saves WHERE user_id = 1 AND slot = 3").get()).toBeUndefined();
+    expect(
+      sqlite
+        .prepare(
+          `SELECT slot, run_id, checkpoint_revision, digest
+           FROM coop_run_tombstones_v2 WHERE user_id = 1 AND run_id = ?`,
+        )
+        .get("run-truncated-route-123456789"),
+    ).toEqual({
+      slot: 3,
+      run_id: "run-truncated-route-123456789",
+      checkpoint_revision: 1,
+      digest: await digest(raw),
+    });
+    expect(
+      (await call(`/savedata/session/legacy-coop-exact-delete?${query}`, { method: "POST" })).status,
+      "a lost successful response is idempotent after the row is gone",
+    ).toBe(200);
+    expect(
+      (
+        await call("/savedata/session/coop-cas-update?slot=3&coopCasMode=empty", {
+          method: "POST",
+          body: checkpoint("run-truncated-route-123456789", 2, 5),
+        })
+      ).status,
+      "a delayed writer cannot recreate a recovered invalid run",
+    ).toBe(409);
+    const status = await call("/savedata/session/coop-run-status?coopRunId=run-truncated-route-123456789");
+    expect(status.status).toBe(200);
+    await expect(status.json()).resolves.toMatchObject({
+      state: "tombstoned",
+      runId: "run-truncated-route-123456789",
+      slot: 3,
+      checkpointRevision: 1,
+    });
+  });
+
+  it("keeps raw exact recovery for a pre-run-id co-op row", async () => {
+    const raw = JSON.stringify({
+      gameMode: 6,
+      waveIndex: 3,
+      timestamp: 3,
+      coopParticipants: {
+        version: 1,
+        players: ["Alice", "Bob"],
+        seats: { host: "Alice", guest: "Bob" },
+      },
+    });
+    sqlite.prepare("INSERT INTO session_saves (user_id, slot, data, updated_at) VALUES (?, ?, ?, ?)").run(1, 2, raw, 1);
+    const query = new URLSearchParams({ slot: "2", exactDigest: await digest(raw) });
+    expect((await call(`/savedata/session/legacy-coop-exact-delete?${query}`, { method: "POST" })).status).toBe(200);
+    expect(sqlite.prepare("SELECT data FROM session_saves WHERE user_id = 1 AND slot = 2").get()).toBeUndefined();
+    expect(sqlite.prepare("SELECT COUNT(*) AS count FROM coop_run_tombstones_v2").get()).toEqual({ count: 0 });
   });
 
   it("keeps participant accounts and gameplay seats immutable across existing CAS", async () => {
