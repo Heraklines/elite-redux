@@ -10,14 +10,20 @@ import {
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   coopHostStreamMeMessage,
+  getCoopBattleStreamer,
   getCoopController,
   getCoopMePump,
   getCoopNetcodeMode,
   getCoopUiMirror,
+  isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopUiMirrorEngine } from "#data/elite-redux/coop/coop-ui-mirror";
 // #840: the total UiMode co-op classification + the unmirrored-screen tripwire decision.
-import { coopUiClassOf, coopUnmirroredTripwireReason } from "#data/elite-redux/coop/coop-ui-registry";
+import {
+  coopAuthorityContinuationSurface,
+  coopUiClassOf,
+  coopUnmirroredTripwireReason,
+} from "#data/elite-redux/coop/coop-ui-registry";
 import { beginCoopUiRelayInput, endCoopUiRelayInput } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import type { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
@@ -806,6 +812,7 @@ export class UI extends Phaser.GameObjects.Container {
       if (this.mode === mode && !forceTransition) {
         // A newer same-mode winner must still clear an opaque fade left by the superseded attempt.
         this.normalizeTransitionOverlay();
+        this.coopAuthoritySurfaceReady(mode);
         resolve();
         return;
       }
@@ -833,6 +840,7 @@ export class UI extends Phaser.GameObjects.Container {
             touchControls.dataset.uiMode = UiMode[mode];
           }
           this.getHandler().show(args);
+          this.coopAuthoritySurfaceReady(mode);
         }
         resolve();
       };
@@ -894,6 +902,19 @@ export class UI extends Phaser.GameObjects.Container {
     const reason = coopUnmirroredTripwireReason(mode, partnerOwnsMe || partnerOwnsMirror);
     if (reason != null) {
       coopWarn("ui", reason);
+    }
+  }
+
+  /** Publish protocol-33 continuation evidence only after this UI has actually committed its public mode. */
+  private coopAuthoritySurfaceReady(mode: UiMode): void {
+    // The netcode predicate intentionally includes Showdown, which rides this authoritative substrate even
+    // though its game mode is not classic co-op. Hosts have no guest continuation ledger and never publish.
+    if (!isCoopAuthoritativeGuest() || !this.getHandler().active) {
+      return;
+    }
+    const surface = coopAuthorityContinuationSurface(mode);
+    if (surface != null) {
+      getCoopBattleStreamer()?.notifyContinuationSurface(surface);
     }
   }
 
@@ -972,6 +993,7 @@ export class UI extends Phaser.GameObjects.Container {
               touchControls.dataset.uiMode = UiMode[mode];
             }
             this.getHandler().show(args);
+            this.coopAuthoritySurfaceReady(mode);
             finish("forced");
           } catch {
             // The caller's exact phase/operation fence decides whether it may proceed after a failed force.
@@ -1020,6 +1042,7 @@ export class UI extends Phaser.GameObjects.Container {
         if (touchControls) {
           touchControls.dataset.uiMode = UiMode[this.mode];
         }
+        this.coopAuthoritySurfaceReady(this.mode);
         resolve(true);
       };
 

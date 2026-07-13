@@ -58,6 +58,7 @@ import { collectCanonicalDiff, logCanonicalDiff } from "#data/elite-redux/coop/c
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { armCoopFaintSwitchIntentResend } from "#data/elite-redux/coop/coop-faint-switch-operation";
 import { isCoopFaintSwitchSeq, sendCoopFaintSwitchChoice } from "#data/elite-redux/coop/coop-interaction-relay";
+import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-presentation";
 import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   buildCoopWaveAdvancePayload,
@@ -110,6 +111,8 @@ import { decompressFromBase64 } from "lz-string";
 
 /** Generous watchdog: a presentation phase whose anim callback never fires ends after this. */
 const COOP_REPLAY_WATCHDOG_MS = 5000;
+/** Asset/UI projection must either prove ready or enter the shared terminal; it can never park forever. */
+const COOP_AUTHORITY_PRESENTATION_DEADLINE_MS = 15_000;
 
 /**
  * Resolve the live field mon for a streamed battler index, or null if absent (a mon the
@@ -872,6 +875,8 @@ export class CoopFinalizeTurnPhase extends Phase {
   private turnCommitRetryUnsubscribe: (() => void) | null = null;
   private turnCommitRetryCancel: (() => void) | null = null;
   private authorityFailureUnsubscribe: (() => void) | null = null;
+  private presentationDeadlineCancel: (() => void) | null = null;
+  private presentationSettled = false;
   private turnCommitDeadline = 0;
   private ended = false;
   private supersedingCheckpoint: CoopCheckpointEnvelope | null | undefined;
@@ -902,7 +907,7 @@ export class CoopFinalizeTurnPhase extends Phase {
       const streamer = getCoopBattleStreamer();
       const controller = getCoopController();
       const wave = globalScene.currentBattle?.waveIndex ?? 0;
-      const reason = `Turn ${this.turn} arrived without a complete protocol-32 authority address.`;
+      const reason = `Turn ${this.turn} arrived without a complete protocol-33 authority address.`;
       if (streamer == null || controller == null) {
         terminateCoopAuthoritySession(reason);
         return;
@@ -1004,6 +1009,8 @@ export class CoopFinalizeTurnPhase extends Phase {
     this.clearTurnCommitRetry();
     this.authorityFailureUnsubscribe?.();
     this.authorityFailureUnsubscribe = null;
+    this.presentationDeadlineCancel?.();
+    this.presentationDeadlineCancel = null;
     super.end();
   }
 
@@ -1133,7 +1140,7 @@ export class CoopFinalizeTurnPhase extends Phase {
           ? reapplyAcceptedCoopAuthoritativeBattleState(resolution.authoritativeState, isCoopAuthoritativeGuest())
           : applyCoopAuthoritativeBattleState(resolution.authoritativeState, isCoopAuthoritativeGuest()));
       if (stateApplied) {
-        // Protocol 32 treats fullField as a required companion, not an unused fallback. Drain only after both
+        // Protocol 33 treats fullField as a required companion, not an unused fallback. Drain only after both
         // state appliers ran so a per-mon rich failure can never be hidden behind a matching narrow checksum.
         applyCoopFieldSnapshot(resolution.fullField, isCoopAuthoritativeGuest());
       }
@@ -1164,13 +1171,86 @@ export class CoopFinalizeTurnPhase extends Phase {
     resolution: CoopTurnResolution,
   ): void {
     this.clearTurnCommitRetry();
-    streamer.acknowledgeTurnCommit(resolution, this.turnCommitSupersededBy);
-    streamer.markTurnFinalized(resolution.epoch, resolution.wave, resolution.turn);
+    if (!streamer.acknowledgeTurnCommit(resolution, "materialApplied", this.turnCommitSupersededBy)) {
+      return;
+    }
+    // Material convergence is not continuation.  Hold this finalize phase while the actual atlases,
+    // Pokemon sprites, and info bars settle.  The host keeps the commit retained/retransmitting.
     coopLog(
       "checksum",
-      `guest finalize ACK e=${resolution.epoch} wave=${resolution.wave} turn=${resolution.turn} rev=${resolution.revision}`,
+      `guest finalize materialApplied e=${resolution.epoch} wave=${resolution.wave} turn=${resolution.turn} rev=${resolution.revision}`,
     );
-    this.finishTurn();
+    const generation = coopSessionGeneration();
+    this.presentationSettled = false;
+    const cancelPresentationDeadline = streamer.scheduleAuthorityRetry(() => {
+      if (
+        this.presentationSettled
+        || this.ended
+        || generation !== coopSessionGeneration()
+        || getCoopBattleStreamer() !== streamer
+      ) {
+        return;
+      }
+      this.presentationSettled = true;
+      this.presentationDeadlineCancel = null;
+      this.failModernTurnCommit(streamer, `Turn ${this.turn} renderer did not become presentation-ready.`);
+    }, COOP_AUTHORITY_PRESENTATION_DEADLINE_MS);
+    if (this.presentationSettled) {
+      cancelPresentationDeadline();
+    } else {
+      this.presentationDeadlineCancel = cancelPresentationDeadline;
+    }
+    const projectionState = this.turnCommitSupersededBy?.authoritativeState ?? resolution.authoritativeState;
+    void settleCoopAuthoritativeProjection(projectionState).then(
+      ready => {
+        if (
+          this.presentationSettled
+          || this.ended
+          || generation !== coopSessionGeneration()
+          || getCoopBattleStreamer() !== streamer
+          || globalScene.phaseManager.getCurrentPhase() !== this
+        ) {
+          return;
+        }
+        this.presentationSettled = true;
+        this.presentationDeadlineCancel?.();
+        this.presentationDeadlineCancel = null;
+        if (!ready) {
+          this.failModernTurnCommit(streamer, `Turn ${this.turn} renderer projection was incomplete.`);
+          return;
+        }
+        if (!streamer.acknowledgeTurnCommit(resolution, "presentationReady", this.turnCommitSupersededBy)) {
+          return;
+        }
+        const waveEnding = coopWaveAdvanceSignaledFor(resolution.wave) || coopHasPendingWaveAdvance();
+        const meBattleWon = !waveEnding && coopMeHandoffBattleWon();
+        const expectation =
+          waveEnding || meBattleWon
+            ? { kind: "sharedBoundary" as const, epoch: resolution.epoch, wave: resolution.wave, turn: resolution.turn }
+            : { kind: "command" as const, epoch: resolution.epoch, wave: resolution.wave, turn: resolution.turn + 1 };
+        if (!streamer.registerTurnContinuation(resolution, this.turnCommitSupersededBy, expectation)) {
+          return;
+        }
+        // Mark replay consumption now so a detached duplicate cannot reconstruct the same turn while the
+        // real next UI is still opening.  This does NOT release host retention; only continuationReady does.
+        streamer.markTurnFinalized(resolution.epoch, resolution.wave, resolution.turn);
+        coopLog(
+          "checksum",
+          `guest finalize presentationReady e=${resolution.epoch} wave=${resolution.wave} turn=${resolution.turn} rev=${resolution.revision}`,
+        );
+        this.finishTurn();
+      },
+      error => {
+        if (this.presentationSettled || this.ended || generation !== coopSessionGeneration()) {
+          return;
+        }
+        this.presentationSettled = true;
+        this.presentationDeadlineCancel?.();
+        this.presentationDeadlineCancel = null;
+        coopWarn("renderer", `turn=${this.turn} presentation projection rejected`, error);
+        this.failModernTurnCommit(streamer, `Turn ${this.turn} renderer projection failed.`);
+      },
+    );
   }
 
   private clearTurnCommitRetry(): void {
@@ -1254,6 +1334,7 @@ export class CoopFinalizeTurnPhase extends Phase {
         epoch: this.epoch,
         wave: this.wave,
         turn: this.turn,
+        ...(this.revision == null ? {} : { revision: this.revision }),
         boundary: "turnResolution",
         reason,
       })
@@ -1679,6 +1760,8 @@ export class CoopApplyResyncPhase extends Phase {
   private stopCheckpointWake: (() => void) | undefined;
   private stopCheckpointRetry: (() => void) | undefined;
   private stopAuthorityFailure: (() => void) | undefined;
+  private stopPresentationDeadline: (() => void) | undefined;
+  private presentationPending = false;
   private recoveryDeadline = 0;
   private ended = false;
   /** The last fully-verified recovery carrier; failed attempts never advance this floor. */
@@ -1703,6 +1786,8 @@ export class CoopApplyResyncPhase extends Phase {
     this.stopCheckpointRetry = undefined;
     this.stopAuthorityFailure?.();
     this.stopAuthorityFailure = undefined;
+    this.stopPresentationDeadline?.();
+    this.stopPresentationDeadline = undefined;
     super.end();
   }
 
@@ -1805,22 +1890,105 @@ export class CoopApplyResyncPhase extends Phase {
 
   /** Finish a mechanically verified wake only after its retained carrier has been transactionally consumed. */
   private finishSupersedingCheckpoint(envelope: CoopCheckpointEnvelope): void {
-    coopResyncUnhealedChecksum = undefined;
-    coopResyncUnhealedCount = 0;
-    // Deliberately DO NOT change the earlier settle(false): this newer battle frame proves DATA
-    // convergence only. It does not carry the failed stateSync snapshot's membership/control/journal
-    // postconditions, so that snapshot's control marks must remain withheld and be recovered through
-    // their own durable protocol.
-    // If an older delayed finalizer is still queued, let it reassert this already-accepted frame
-    // after its presentation drains instead of clobbering the recovered replacement.
-    getCoopBattleStreamer()?.retainAppliedOutOfBandCheckpoint(envelope);
-    getCoopBattleStreamer()?.acknowledgeReplacement(envelope);
-    try {
-      globalScene.ui.clearText();
-    } catch {
-      // A headless/missing presentation layer cannot invalidate mechanical convergence.
+    const streamer = getCoopBattleStreamer();
+    if (this.presentationPending) {
+      return;
     }
-    this.end();
+    if (streamer == null || !streamer.acknowledgeReplacement(envelope, "materialApplied")) {
+      return;
+    }
+    this.presentationPending = true;
+    const generation = coopSessionGeneration();
+    let settled = false;
+    const fail = (reason: string): void => {
+      if (settled || this.ended) {
+        return;
+      }
+      settled = true;
+      this.presentationPending = false;
+      this.stopPresentationDeadline?.();
+      this.stopPresentationDeadline = undefined;
+      const state = envelope.authoritativeState;
+      void streamer
+        .broadcastAuthorityFailure({
+          epoch: envelope.epoch,
+          wave: state.wave,
+          turn: state.turn,
+          revision: envelope.revision,
+          boundary: "replacement",
+          reason,
+        })
+        .then(() => {
+          if (generation === coopSessionGeneration() && getCoopBattleStreamer() === streamer) {
+            terminateCoopAuthoritySession(reason);
+          }
+        });
+    };
+    const cancelPresentationDeadline = streamer.scheduleAuthorityRetry(
+      () => fail(`Recovered replacement renderer did not become presentation-ready for turn ${envelope.turn}.`),
+      COOP_AUTHORITY_PRESENTATION_DEADLINE_MS,
+    );
+    if (settled) {
+      cancelPresentationDeadline();
+    } else {
+      this.stopPresentationDeadline = cancelPresentationDeadline;
+    }
+    void settleCoopAuthoritativeProjection(envelope.authoritativeState).then(
+      ready => {
+        if (
+          settled
+          || this.ended
+          || generation !== coopSessionGeneration()
+          || getCoopBattleStreamer() !== streamer
+          || globalScene.phaseManager.getCurrentPhase() !== this
+        ) {
+          return;
+        }
+        if (!ready) {
+          fail(`Recovered replacement projection was incomplete for turn ${envelope.turn}.`);
+          return;
+        }
+        settled = true;
+        this.presentationPending = false;
+        this.stopPresentationDeadline?.();
+        this.stopPresentationDeadline = undefined;
+        if (!streamer.acknowledgeReplacement(envelope, "presentationReady")) {
+          return;
+        }
+        const playerField = globalScene.getPlayerField();
+        const ownSlot = isShowdownGuestFlip()
+          ? playerField.findIndex(mon => mon?.isActive() === true)
+          : playerField.findIndex(
+              (mon, slot) => mon?.isActive() === true && coopOwnerOfPlayerFieldSlot(slot) === "guest",
+            );
+        const continuationAccepted =
+          ownSlot >= 0 && globalScene.currentBattle.turnCommands[ownSlot] != null
+            ? streamer.acknowledgeReplacement(envelope, "continuationReady")
+            : streamer.registerReplacementContinuation(envelope, {
+                kind: "command",
+                epoch: envelope.epoch,
+                wave: envelope.wave,
+                turn: envelope.turn,
+              });
+        if (!continuationAccepted) {
+          return;
+        }
+        // Only clear THIS verified carrier after renderer proof. A synchronous newer delivery remains queued.
+        if (streamer.peekCheckpoint() === envelope) {
+          streamer.consumeCheckpoint();
+        }
+        coopResyncUnhealedChecksum = undefined;
+        coopResyncUnhealedCount = 0;
+        streamer.retainAppliedOutOfBandCheckpoint(envelope);
+        try {
+          globalScene.ui.clearText();
+        } catch {
+          // The projection verifier already proved the required Pokemon/UI nodes.
+        }
+        this.end();
+      },
+      () => fail(`Recovered replacement projection failed for turn ${envelope.turn}.`),
+    );
   }
 
   /**
@@ -1844,6 +2012,9 @@ export class CoopApplyResyncPhase extends Phase {
       if (!isCurrent) {
         return false;
       }
+      if (this.presentationPending) {
+        return true;
+      }
       const latest = streamer.peekCheckpoint();
       if (
         latest == null
@@ -1858,11 +2029,8 @@ export class CoopApplyResyncPhase extends Phase {
         streamer.requestReplacementCheckpoint(latest);
         return false;
       }
-      // Only clear THIS envelope after full verification. A synchronous re-entrant delivery may have
-      // installed a newer carrier during the apply; preserve that newer frame for the next replay boundary.
-      if (streamer.peekCheckpoint() === latest) {
-        streamer.consumeCheckpoint();
-      }
+      // The verified carrier remains buffered while its renderer assets/nodes settle. Consumption and
+      // continuation registration happen atomically in finishSupersedingCheckpoint.
       this.finishSupersedingCheckpoint(latest);
       return true;
     };

@@ -203,7 +203,7 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
     expect(msg.checkpoint.field[0].statStages[0]).toBe(1);
   });
 
-  it("protocol-32 request, ACK, and fatal-control frames preserve their exact address", async () => {
+  it("protocol-33 request, staged ACK, and fatal-control frames preserve their exact address", async () => {
     const { host, received } = captureGuestInbox();
     const control: CoopMessage[] = [
       { t: "requestTurnCommit", ...address },
@@ -214,6 +214,7 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
         checkpointTick: 1,
         stateTick: 2,
         checksum: "abcd1234abcd1234",
+        stage: "continuationReady",
         status: "applied",
       },
       {
@@ -230,6 +231,7 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
         checkpointTick: 1,
         stateTick: 2,
         checksum: "abcd1234abcd1234",
+        stage: "continuationReady",
       },
       {
         t: "authorityFailure",

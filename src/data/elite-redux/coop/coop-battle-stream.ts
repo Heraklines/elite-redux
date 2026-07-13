@@ -27,6 +27,7 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import type {
   CoopAuthoritativeBattleStateV1,
+  CoopAuthorityAckStage,
   CoopBattleCheckpoint,
   CoopBattleEvent,
   CoopCapturePresentation,
@@ -129,7 +130,7 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 function isValidBattlerIndex(value: unknown): value is number {
-  // Protocol 32 supports the current single/double/triple topology and leaves room for six seats per side.
+  // Protocol 33 supports the current single/double/triple topology and leaves room for six seats per side.
   // A future topology protocol replaces this conservative ceiling with the negotiated manifest.
   return isSafeAddressPart(value) && value <= 11;
 }
@@ -418,11 +419,76 @@ interface SeenAuthority<T> {
   value: T;
 }
 
+interface AckEvidence<T> {
+  stage: CoopAuthorityAckStage;
+  canonical: string;
+  value: T;
+}
+
+export type CoopAuthorityContinuationSurface = "command" | "sharedInput" | "terminal";
+
+export type CoopAuthorityContinuationExpectation =
+  | { kind: "command"; epoch: number; wave: number; turn: number }
+  | { kind: "sharedBoundary"; epoch: number; wave: number; turn: number };
+
+interface PendingTurnContinuation {
+  resolution: CoopTurnResolution;
+  superseding?: CoopCheckpointEnvelope;
+  expectation: CoopAuthorityContinuationExpectation;
+}
+
+interface PendingReplacementContinuation {
+  envelope: CoopCheckpointEnvelope;
+  expectation: CoopAuthorityContinuationExpectation;
+}
+
 type AuthorityAdmission<T> =
   | { kind: "new"; seen: SeenAuthority<T> }
   | { kind: "older" }
   | { kind: "identical"; seen: SeenAuthority<T> }
   | { kind: "conflict" };
+
+const AUTHORITY_ACK_STAGE_ORDER: Readonly<Record<CoopAuthorityAckStage, number>> = {
+  materialApplied: 0,
+  presentationReady: 1,
+  continuationReady: 2,
+};
+
+function isAuthorityAckStage(value: unknown): value is CoopAuthorityAckStage {
+  return value === "materialApplied" || value === "presentationReady" || value === "continuationReady";
+}
+
+function classifyAckProgress<T>(
+  prior: AckEvidence<T> | undefined,
+  stage: CoopAuthorityAckStage,
+  canonical: string,
+): "advance" | "duplicate" | "invalid" {
+  if (prior == null) {
+    return stage === "materialApplied" ? "advance" : "invalid";
+  }
+  if (stage === prior.stage) {
+    return canonical === prior.canonical ? "duplicate" : "invalid";
+  }
+  return AUTHORITY_ACK_STAGE_ORDER[stage] === AUTHORITY_ACK_STAGE_ORDER[prior.stage] + 1 ? "advance" : "invalid";
+}
+
+/** Keep every in-flight staged transaction plus a bounded tail of completed duplicate proofs. */
+function rememberAckEvidence<T>(map: Map<string, AckEvidence<T>>, key: string, evidence: AckEvidence<T>): void {
+  map.set(key, evidence);
+  let completed = 0;
+  for (const value of map.values()) {
+    completed += value.stage === "continuationReady" ? 1 : 0;
+  }
+  if (completed <= AUTHORITY_ACK_RETENTION) {
+    return;
+  }
+  for (const [candidate, value] of map) {
+    if (candidate !== key && value.stage === "continuationReady") {
+      map.delete(candidate);
+      return;
+    }
+  }
+}
 
 function legacyTurnKey(turn: number): string {
   return `legacy:${turn}`;
@@ -500,7 +566,12 @@ export class CoopBattleStreamer {
   >();
   private readonly turnRequestTimers = new Map<string, () => void>();
   private readonly turnCommitHandlers = new Set<(resolution: CoopTurnResolution) => void>();
-  private readonly ackedTurnCommits = new Map<string, Extract<CoopMessage, { t: "turnCommitAck" }>>();
+  /** GUEST: latest monotonic evidence emitted for each exact immutable turn commit. */
+  private readonly ackedTurnCommits = new Map<string, AckEvidence<Extract<CoopMessage, { t: "turnCommitAck" }>>>();
+  /** HOST: latest accepted evidence. Retention is released only at continuationReady. */
+  private readonly hostTurnAckEvidence = new Map<string, AckEvidence<Extract<CoopMessage, { t: "turnCommitAck" }>>>();
+  /** GUEST: presentation-complete turn commits waiting for their real public continuation surface. */
+  private readonly pendingTurnContinuations = new Map<string, PendingTurnContinuation>();
   /**
    * GUEST: live battle events buffered by turn, keyed inner by `seq` so a duplicate / out-of-order
    * `battleEvent` is de-duped + a stutter (a missing seq) is tolerated (#633, animation layer LIVE).
@@ -586,7 +657,15 @@ export class CoopBattleStreamer {
   private readonly issuedReplacementAuthority = new Set<string>();
   private readonly sentReplacementTimers = new Map<string, () => void>();
   private readonly sentReplacementDeadlines = new Map<string, number>();
-  private readonly ackedReplacementCommits = new Map<string, Extract<CoopMessage, { t: "battleCheckpointAck" }>>();
+  private readonly ackedReplacementCommits = new Map<
+    string,
+    AckEvidence<Extract<CoopMessage, { t: "battleCheckpointAck" }>>
+  >();
+  private readonly hostReplacementAckEvidence = new Map<
+    string,
+    AckEvidence<Extract<CoopMessage, { t: "battleCheckpointAck" }>>
+  >();
+  private readonly pendingReplacementContinuations = new Map<string, PendingReplacementContinuation>();
   /** HOST: bounded proof that a causally newer replacement was ACKed before an old turn is superseded. */
   private readonly hostAppliedReplacementAcks = new Map<string, Extract<CoopMessage, { t: "battleCheckpointAck" }>>();
   private authorityFailureHandlers = new Set<(failure: CoopAuthorityFailure) => void>();
@@ -950,7 +1029,11 @@ export class CoopBattleStreamer {
     this.turnRedeliveryRequests.clear();
     this.replacementRedeliveryRequests.clear();
     this.ackedTurnCommits.clear();
+    this.hostTurnAckEvidence.clear();
+    this.pendingTurnContinuations.clear();
     this.ackedReplacementCommits.clear();
+    this.hostReplacementAckEvidence.clear();
+    this.pendingReplacementContinuations.clear();
     this.hostAppliedReplacementAcks.clear();
     this.inbox.clear();
     this.pendingSince.clear();
@@ -1040,13 +1123,19 @@ export class CoopBattleStreamer {
         + this.issuedTurnAuthority.size
         + this.issuedReplacementAuthority.size,
       acknowledgements:
-        this.ackedTurnCommits.size + this.ackedReplacementCommits.size + this.hostAppliedReplacementAcks.size,
+        this.ackedTurnCommits.size
+        + this.hostTurnAckEvidence.size
+        + this.ackedReplacementCommits.size
+        + this.hostReplacementAckEvidence.size
+        + this.hostAppliedReplacementAcks.size,
       waiters:
         this.pending.size
         + this.enemyPartyWaiters.size
         + this.meBattlePartyWaiters.size
         + this.launchSnapshotWaiters.size
-        + this.stateSyncWaiters.size,
+        + this.stateSyncWaiters.size
+        + this.pendingTurnContinuations.size
+        + this.pendingReplacementContinuations.size,
       fatalPending: this.pendingAuthorityFailure != null,
       terminal: this.authorityTerminalStarted,
     };
@@ -1418,8 +1507,9 @@ export class CoopBattleStreamer {
     if (!hasCompleteAuthorityCompanions(envelope)) {
       throw new Error(`refusing malformed ${reason} commit e=${epoch} wave=${wave} turn=${turn} rev=${revision}`);
     }
-    // Retain every addressed revision until its exact post-apply checksum ACK. The map is intentionally
-    // not "latest only": simultaneous/future multi-seat replacement transactions can overlap.
+    // Retain every addressed revision until its exact continuation-ready ACK. Material and presentation
+    // evidence are diagnostic progress only. The map is intentionally not "latest only": overlapping
+    // replacement transactions remain independently replayable.
     if (reason === "replacement" && !this.retainAndRetryReplacement(envelope)) {
       coopWarn(
         "checkpoint",
@@ -1499,9 +1589,62 @@ export class CoopBattleStreamer {
     return () => this.turnCommitHandlers.delete(handler);
   }
 
-  acknowledgeTurnCommit(resolution: CoopTurnResolution, superseding?: CoopCheckpointEnvelope): void {
-    if (this.authorityTerminalStarted) {
+  private failLocalAckProgression(
+    boundary: "turnResolution" | "replacement",
+    address: { epoch: number; wave: number; turn: number; revision: number },
+    reason: string,
+  ): void {
+    coopWarn("stream", reason);
+    this.beginAuthorityTerminal({
+      ...address,
+      boundary,
+      reason,
+      failureId: `ack-stage:${boundary}:${authorityKey(address)}`,
+    });
+  }
+
+  private failHostAckProgression(
+    boundary: "turnResolution" | "replacement",
+    received: { epoch: number; wave: number; turn: number; revision: number },
+    reason: string,
+  ): void {
+    const fallback =
+      boundary === "turnResolution"
+        ? [...this.sentTurnCommits.values()].at(-1)
+        : [...this.sentReplacementCheckpoints.values()].at(-1);
+    const address =
+      fallback
+      ?? (isSafeAddressPart(received.epoch, false)
+      && isSafeAddressPart(received.wave, false)
+      && isSafeAddressPart(received.turn, false)
+      && isSafeAddressPart(received.revision, false)
+        ? received
+        : this.currentAuthorityAddress() == null
+          ? null
+          : { ...this.currentAuthorityAddress()!, revision: Math.max(1, this.authorityFailureRevision + 1) });
+    if (address == null) {
+      coopWarn("stream", `${reason} (no authentic authority address remained for shared terminal)`);
       return;
+    }
+    coopWarn("stream", reason);
+    this.beginAuthorityTerminal({
+      epoch: address.epoch,
+      wave: address.wave,
+      turn: address.turn,
+      revision: address.revision,
+      boundary,
+      reason,
+      failureId: `ack-stage:${boundary}:${authorityKey(address)}`,
+    });
+  }
+
+  acknowledgeTurnCommit(
+    resolution: CoopTurnResolution,
+    stage: CoopAuthorityAckStage,
+    superseding?: CoopCheckpointEnvelope,
+  ): boolean {
+    if (this.authorityTerminalStarted) {
+      return false;
     }
     const ack: Extract<CoopMessage, { t: "turnCommitAck" }> = {
       t: "turnCommitAck",
@@ -1512,6 +1655,7 @@ export class CoopBattleStreamer {
       checkpointTick: resolution.checkpoint.tick as number,
       stateTick: resolution.authoritativeState.tick,
       checksum: resolution.checksum,
+      stage,
       status: superseding == null ? "applied" : "superseded",
       ...(superseding == null
         ? {}
@@ -1521,22 +1665,75 @@ export class CoopBattleStreamer {
           }),
     };
     const key = authorityKey(resolution);
-    // ACK proof is part of the immutable per-address ledger: a very late exact replay must still be
-    // re-ACKable after more than the generic bounded diagnostic-message window has elapsed.
-    this.ackedTurnCommits.set(key, ack);
-    this.turnRedeliveryRequests.delete(key);
-    const inboxKey = pendingTurnKey(resolution);
-    if (this.inbox.get(inboxKey)?.revision === resolution.revision) {
-      this.inbox.delete(inboxKey);
+    const seen = this.seenTurnAuthority.get(key);
+    if (
+      !isAuthorityAckStage(stage)
+      || seen == null
+      || seen.canonical !== canonicalize(resolution)
+      || (superseding != null
+        && (superseding.reason !== "replacement"
+          || superseding.epoch !== resolution.epoch
+          || superseding.wave !== resolution.wave
+          || (superseding.turn !== resolution.turn && superseding.turn !== resolution.turn + 1)
+          || superseding.revision <= resolution.revision))
+    ) {
+      this.failLocalAckProgression(
+        "turnResolution",
+        resolution,
+        `Turn ACK evidence did not belong to exact admitted authority ${key}.`,
+      );
+      return false;
     }
-    const pendingKey = pendingTurnKey(resolution);
-    this.clearTurnCommitRequest(pendingKey);
+    const canonical = canonicalize(ack);
+    const prior = this.ackedTurnCommits.get(key);
+    if (
+      prior != null
+      && (prior.value.status !== ack.status
+        || prior.value.supersededByRevision !== ack.supersededByRevision
+        || prior.value.supersededByChecksum !== ack.supersededByChecksum)
+    ) {
+      this.failLocalAckProgression(
+        "turnResolution",
+        resolution,
+        `Turn ACK supersession evidence changed between stages at ${key}.`,
+      );
+      return false;
+    }
+    const progress = classifyAckProgress(prior, stage, canonical);
+    if (progress === "invalid") {
+      this.failLocalAckProgression(
+        "turnResolution",
+        resolution,
+        `Turn ACK stage ${stage} skipped/regressed/conflicted at ${key} (prior=${prior?.stage ?? "none"}).`,
+      );
+      return false;
+    }
+    if (progress === "advance") {
+      rememberAckEvidence(this.ackedTurnCommits, key, { stage, canonical, value: ack });
+    }
+    this.turnRedeliveryRequests.delete(key);
+    if (stage === "materialApplied") {
+      // Material evidence suppresses duplicate reconstruction locally, but request/retry/host retention stay
+      // alive until the exact continuation surface proves ready.
+      const inboxKey = pendingTurnKey(resolution);
+      if (this.inbox.get(inboxKey)?.revision === resolution.revision) {
+        this.inbox.delete(inboxKey);
+      }
+    } else if (stage === "continuationReady") {
+      this.pendingTurnContinuations.delete(key);
+      this.clearTurnCommitRequest(pendingTurnKey(resolution));
+    }
     this.transport.send(ack);
+    coopLog(
+      "stream",
+      `guest ACK turn stage=${stage} e=${resolution.epoch} wave=${resolution.wave} turn=${resolution.turn} rev=${resolution.revision}`,
+    );
+    return true;
   }
 
-  acknowledgeReplacement(envelope: CoopCheckpointEnvelope): void {
+  acknowledgeReplacement(envelope: CoopCheckpointEnvelope, stage: CoopAuthorityAckStage): boolean {
     if (this.authorityTerminalStarted) {
-      return;
+      return false;
     }
     const ack: Extract<CoopMessage, { t: "battleCheckpointAck" }> = {
       t: "battleCheckpointAck",
@@ -1548,11 +1745,200 @@ export class CoopBattleStreamer {
       checkpointTick: envelope.checkpoint.tick as number,
       stateTick: envelope.authoritativeState.tick,
       checksum: envelope.checksum,
+      stage,
     };
     const key = authorityKey(envelope);
-    this.ackedReplacementCommits.set(key, ack);
+    const seen = this.seenReplacementAuthority.get(key);
+    if (!isAuthorityAckStage(stage) || seen == null || seen.canonical !== canonicalize(envelope)) {
+      this.failLocalAckProgression(
+        "replacement",
+        envelope,
+        `Replacement ACK evidence did not belong to exact admitted authority ${key}.`,
+      );
+      return false;
+    }
+    const canonical = canonicalize(ack);
+    const prior = this.ackedReplacementCommits.get(key);
+    const progress = classifyAckProgress(prior, stage, canonical);
+    if (progress === "invalid") {
+      this.failLocalAckProgression(
+        "replacement",
+        envelope,
+        `Replacement ACK stage ${stage} skipped/regressed/conflicted at ${key} (prior=${prior?.stage ?? "none"}).`,
+      );
+      return false;
+    }
+    if (progress === "advance") {
+      rememberAckEvidence(this.ackedReplacementCommits, key, { stage, canonical, value: ack });
+    }
     this.replacementRedeliveryRequests.delete(key);
+    if (stage === "continuationReady") {
+      this.pendingReplacementContinuations.delete(key);
+    }
     this.transport.send(ack);
+    coopLog(
+      "stream",
+      `guest ACK replacement stage=${stage} e=${envelope.epoch} wave=${envelope.wave} turn=${envelope.turn} rev=${envelope.revision}`,
+    );
+    return true;
+  }
+
+  registerTurnContinuation(
+    resolution: CoopTurnResolution,
+    superseding: CoopCheckpointEnvelope | undefined,
+    expectation: CoopAuthorityContinuationExpectation,
+  ): boolean {
+    if (this.authorityTerminalStarted) {
+      return false;
+    }
+    const key = authorityKey(resolution);
+    if (this.ackedTurnCommits.get(key)?.stage !== "presentationReady") {
+      this.failLocalAckProgression(
+        "turnResolution",
+        resolution,
+        `Turn continuation registered before presentationReady at ${key}.`,
+      );
+      return false;
+    }
+    const exactExpectation =
+      expectation.epoch === resolution.epoch
+      && expectation.wave === resolution.wave
+      && (expectation.kind === "sharedBoundary"
+        ? expectation.turn === resolution.turn
+        : expectation.turn === resolution.turn + 1);
+    if (!exactExpectation) {
+      this.failLocalAckProgression(
+        "turnResolution",
+        resolution,
+        `Turn continuation registered with a wrong authority address at ${key}.`,
+      );
+      return false;
+    }
+    const pending: PendingTurnContinuation = {
+      resolution,
+      expectation,
+      ...(superseding == null ? {} : { superseding }),
+    };
+    const prior = this.pendingTurnContinuations.get(key);
+    if (prior != null && canonicalize(prior) !== canonicalize(pending)) {
+      this.failLocalAckProgression(
+        "turnResolution",
+        resolution,
+        `Turn continuation expectation changed after registration at ${key}.`,
+      );
+      return false;
+    }
+    this.pendingTurnContinuations.set(key, pending);
+    return true;
+  }
+
+  registerReplacementContinuation(
+    envelope: CoopCheckpointEnvelope,
+    expectation: CoopAuthorityContinuationExpectation,
+  ): boolean {
+    if (this.authorityTerminalStarted) {
+      return false;
+    }
+    const key = authorityKey(envelope);
+    if (this.ackedReplacementCommits.get(key)?.stage !== "presentationReady") {
+      this.failLocalAckProgression(
+        "replacement",
+        envelope,
+        `Replacement continuation registered before presentationReady at ${key}.`,
+      );
+      return false;
+    }
+    if (
+      expectation.kind !== "command"
+      || expectation.epoch !== envelope.epoch
+      || expectation.wave !== envelope.wave
+      || expectation.turn !== envelope.turn
+    ) {
+      this.failLocalAckProgression(
+        "replacement",
+        envelope,
+        `Replacement continuation registered with a wrong authority address at ${key}.`,
+      );
+      return false;
+    }
+    const pending = { envelope, expectation };
+    const prior = this.pendingReplacementContinuations.get(key);
+    if (prior != null && canonicalize(prior) !== canonicalize(pending)) {
+      this.failLocalAckProgression(
+        "replacement",
+        envelope,
+        `Replacement continuation expectation changed after registration at ${key}.`,
+      );
+      return false;
+    }
+    this.pendingReplacementContinuations.set(key, pending);
+    return true;
+  }
+
+  private continuationMatches(
+    expectation: CoopAuthorityContinuationExpectation,
+    surface: CoopAuthorityContinuationSurface,
+    current: CoopTurnAddress,
+  ): boolean {
+    if (current.epoch !== expectation.epoch) {
+      return false;
+    }
+    if (expectation.kind === "command") {
+      return surface === "command" && current.wave === expectation.wave && current.turn === expectation.turn;
+    }
+    if (surface === "terminal") {
+      return current.wave === expectation.wave && current.turn >= expectation.turn;
+    }
+    // A resolved wave may expose a reward/map input on the old battle shell or reach the next command
+    // surface after a no-shop tail.  Within the source wave, reject an earlier turn's still-open UI; in
+    // the immediate successor, only turn 1 is the addressed continuation after the battle turn resets.
+    if (surface !== "sharedInput" && surface !== "command") {
+      return false;
+    }
+    return current.wave === expectation.wave
+      ? current.turn >= expectation.turn
+      : current.wave === expectation.wave + 1 && current.turn === 1;
+  }
+
+  /**
+   * Called only after a real UI handler/terminal phase has opened. Every matching presentation-complete
+   * transaction emits its final stage; an unrelated or early surface cannot release authority retention.
+   */
+  notifyContinuationSurface(surface: CoopAuthorityContinuationSurface): number {
+    if (this.authorityTerminalStarted) {
+      return 0;
+    }
+    const current = this.currentAuthorityAddress();
+    if (current == null) {
+      return 0;
+    }
+    const waiting = this.pendingReplacementContinuations.size + this.pendingTurnContinuations.size;
+    let released = 0;
+    for (const pending of [...this.pendingReplacementContinuations.values()]) {
+      if (!this.continuationMatches(pending.expectation, surface, current)) {
+        continue;
+      }
+      if (this.acknowledgeReplacement(pending.envelope, "continuationReady")) {
+        released++;
+      }
+    }
+    for (const pending of [...this.pendingTurnContinuations.values()]) {
+      if (!this.continuationMatches(pending.expectation, surface, current)) {
+        continue;
+      }
+      if (this.acknowledgeTurnCommit(pending.resolution, "continuationReady", pending.superseding)) {
+        this.markTurnFinalized(pending.resolution.epoch, pending.resolution.wave, pending.resolution.turn);
+        released++;
+      }
+    }
+    if (waiting > 0) {
+      coopLog(
+        "stream",
+        `guest continuation surface=${surface} e=${current.epoch} wave=${current.wave} turn=${current.turn} `
+          + `waiting=${waiting} released=${released}`,
+      );
+    }
+    return released;
   }
 
   onAuthorityFailure(handler: (failure: CoopAuthorityFailure) => void): () => void {
@@ -2586,6 +2972,8 @@ export class CoopBattleStreamer {
     this.sentTurnCommitDeadlines.clear();
     this.turnCommitHandlers.clear();
     this.ackedTurnCommits.clear();
+    this.hostTurnAckEvidence.clear();
+    this.pendingTurnContinuations.clear();
     this.highestSeenTurnAuthority.clear();
     this.seenTurnAuthority.clear();
     this.enemyPartyWaiters.clear();
@@ -2611,6 +2999,8 @@ export class CoopBattleStreamer {
     this.issuedReplacementAuthority.clear();
     this.sentReplacementDeadlines.clear();
     this.ackedReplacementCommits.clear();
+    this.hostReplacementAckEvidence.clear();
+    this.pendingReplacementContinuations.clear();
     this.hostAppliedReplacementAcks.clear();
     this.authorityFailureHandlers.clear();
     this.lastAuthorityFailure = null;
@@ -2817,13 +3207,13 @@ export class CoopBattleStreamer {
         }
         if (admission.kind === "identical") {
           const exactKey = authorityKey(msg);
-          const acked = this.ackedTurnCommits.get(exactKey);
-          if (acked != null) {
+          const evidence = this.ackedTurnCommits.get(exactKey);
+          if (evidence != null) {
             coopLog(
               "replay",
               `guest RE-ACK immutable turn commit e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
             );
-            this.transport.send(acked);
+            this.transport.send(evidence.value);
             return;
           }
           if (this.turnRedeliveryRequests.delete(exactKey)) {
@@ -2974,13 +3364,13 @@ export class CoopBattleStreamer {
         }
         if (admission.kind === "identical") {
           const exactKey = authorityKey(msg);
-          const acked = this.ackedReplacementCommits.get(exactKey);
-          if (acked != null) {
+          const evidence = this.ackedReplacementCommits.get(exactKey);
+          if (evidence != null) {
             coopLog(
               "checkpoint",
               `guest RE-ACK immutable replacement e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
             );
-            this.transport.send(acked);
+            this.transport.send(evidence.value);
             return;
           }
           if (this.replacementRedeliveryRequests.delete(exactKey)) {
@@ -3061,41 +3451,85 @@ export class CoopBattleStreamer {
         if (this.authorityTerminalStarted) {
           return;
         }
-        const retained = this.sentTurnCommits.get(authorityKey(msg));
+        const key = authorityKey(msg);
+        const retained = this.sentTurnCommits.get(key);
+        const prior = this.hostTurnAckEvidence.get(key);
+        const stage = msg.stage;
         const supersedingAck =
           msg.status === "superseded"
-            ? [...this.hostAppliedReplacementAcks.values()].find(
+            ? [...this.hostReplacementAckEvidence.values()].find(
                 // Replacement authority is normally captured after TurnEnd opens N+1, so its exact
-                // converged ACK may prove a delayed N commit superseded. Same-turn recovery is also valid;
+                // staged ACK may prove a delayed N commit superseded. Same-turn recovery is also valid;
                 // anything beyond the immediate successor is unrelated and cannot clear it.
-                ack =>
-                  ack.epoch === msg.epoch
-                  && ack.wave === msg.wave
-                  && (ack.turn === msg.turn || ack.turn === msg.turn + 1)
-                  && ack.revision === msg.supersededByRevision
-                  && ack.checksum === msg.supersededByChecksum
-                  && ack.revision > msg.revision,
+                evidence =>
+                  evidence.value.epoch === msg.epoch
+                  && evidence.value.wave === msg.wave
+                  && (evidence.value.turn === msg.turn || evidence.value.turn === msg.turn + 1)
+                  && evidence.value.revision === msg.supersededByRevision
+                  && evidence.value.checksum === msg.supersededByChecksum
+                  && evidence.value.revision > msg.revision
+                  && isAuthorityAckStage(stage)
+                  && AUTHORITY_ACK_STAGE_ORDER[evidence.stage] >= AUTHORITY_ACK_STAGE_ORDER[stage],
               )
             : undefined;
         if (
           retained == null
+          || !isAuthorityAckStage(stage)
           || retained.checkpoint.tick !== msg.checkpointTick
           || retained.authoritativeState.tick !== msg.stateTick
           || retained.checksum !== msg.checksum
           || (msg.status !== "applied" && msg.status !== "superseded")
           || (msg.status === "superseded" && supersedingAck == null)
         ) {
-          coopWarn(
-            "stream",
-            `host REFUSE mismatched turn ACK e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
+          // A fully committed exact duplicate is harmless; every other missing/wrong-address ACK is a
+          // protocol violation while shared play is live and must converge through the bounded terminal.
+          if (
+            retained == null
+            && prior?.stage === "continuationReady"
+            && isAuthorityAckStage(stage)
+            && prior.canonical === canonicalize(msg)
+          ) {
+            return;
+          }
+          this.failHostAckProgression("turnResolution", msg, `Turn ACK was missing/stale/wrong-address at ${key}.`);
+          return;
+        }
+        const canonical = canonicalize(msg);
+        if (
+          prior != null
+          && (prior.value.status !== msg.status
+            || prior.value.supersededByRevision !== msg.supersededByRevision
+            || prior.value.supersededByChecksum !== msg.supersededByChecksum)
+        ) {
+          this.failHostAckProgression(
+            "turnResolution",
+            msg,
+            `Turn ACK supersession evidence changed between stages at ${key}.`,
           );
           return;
         }
-        const key = authorityKey(msg);
+        const progress = classifyAckProgress(prior, stage, canonical);
+        if (progress === "invalid") {
+          this.failHostAckProgression(
+            "turnResolution",
+            msg,
+            `Turn ACK stage ${String(stage)} skipped/regressed/conflicted at ${key} (prior=${prior?.stage ?? "none"}).`,
+          );
+          return;
+        }
+        if (progress === "advance") {
+          rememberAckEvidence(this.hostTurnAckEvidence, key, { stage, canonical, value: msg });
+        }
+        coopLog("stream", `host ACCEPT turn ACK stage=${stage} key=${key}`);
+        if (stage !== "continuationReady") {
+          // materialApplied/presentationReady may suppress duplicate work, but never release authority.
+          return;
+        }
         this.sentTurnCommits.delete(key);
         this.sentTurnCommitDeadlines.delete(key);
         this.sentTurnCommitTimers.get(key)?.();
         this.sentTurnCommitTimers.delete(key);
+        coopLog("stream", `host RELEASE retained turn after continuationReady key=${key}`);
         return;
       }
       case "requestBattleCheckpoint": {
@@ -3134,18 +3568,43 @@ export class CoopBattleStreamer {
         }
         const key = authorityKey(msg);
         const retained = this.sentReplacementCheckpoints.get(key);
+        const prior = this.hostReplacementAckEvidence.get(key);
+        const stage = msg.stage;
         if (
           retained == null
+          || !isAuthorityAckStage(stage)
           || msg.reason !== "replacement"
           || !sameAuthorityAddress(msg, retained)
           || msg.checkpointTick !== retained.checkpoint.tick
           || msg.stateTick !== retained.authoritativeState.tick
           || msg.checksum !== retained.checksum
         ) {
-          coopWarn(
-            "checkpoint",
-            `host REFUSE mismatched replacement ACK e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
+          if (
+            retained == null
+            && prior?.stage === "continuationReady"
+            && isAuthorityAckStage(stage)
+            && prior.canonical === canonicalize(msg)
+          ) {
+            return;
+          }
+          this.failHostAckProgression("replacement", msg, `Replacement ACK was missing/stale/wrong-address at ${key}.`);
+          return;
+        }
+        const canonical = canonicalize(msg);
+        const progress = classifyAckProgress(prior, stage, canonical);
+        if (progress === "invalid") {
+          this.failHostAckProgression(
+            "replacement",
+            msg,
+            `Replacement ACK stage ${String(stage)} skipped/regressed/conflicted at ${key} (prior=${prior?.stage ?? "none"}).`,
           );
+          return;
+        }
+        if (progress === "advance") {
+          rememberAckEvidence(this.hostReplacementAckEvidence, key, { stage, canonical, value: msg });
+        }
+        coopLog("stream", `host ACCEPT replacement ACK stage=${stage} key=${key}`);
+        if (stage !== "continuationReady") {
           return;
         }
         rememberBounded(this.hostAppliedReplacementAcks, key, msg);
@@ -3153,6 +3612,7 @@ export class CoopBattleStreamer {
         this.sentReplacementDeadlines.delete(key);
         this.sentReplacementTimers.get(key)?.();
         this.sentReplacementTimers.delete(key);
+        coopLog("stream", `host RELEASE retained replacement after continuationReady key=${key}`);
         return;
       }
       case "authorityFailure": {

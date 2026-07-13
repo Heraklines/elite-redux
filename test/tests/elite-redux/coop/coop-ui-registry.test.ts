@@ -18,6 +18,7 @@ import {
   COOP_UI_MIRRORED_MODES,
   COOP_UI_REGISTRY,
   COOP_UI_TRIPWIRE_EXEMPT,
+  coopAuthorityContinuationSurface,
   coopUiClassOf,
   coopUnmirroredTripwireReason,
 } from "#data/elite-redux/coop/coop-ui-registry";
@@ -99,6 +100,30 @@ describe("#840 co-op UI classification registry (unmirrored-screen tripwire)", (
     for (const mode of COOP_UI_TRIPWIRE_EXEMPT) {
       expect(COOP_UI_REGISTRY[mode], `${UiMode[mode]} is exempt so it must be local-only`).toBe("local-only");
     }
+  });
+
+  it("publishes protocol-33 continuation only for real command/shared-input surfaces", () => {
+    expect(coopAuthorityContinuationSurface(UiMode.COMMAND)).toBe("command");
+    expect(coopAuthorityContinuationSurface(UiMode.FIGHT)).toBe("command");
+    expect(coopAuthorityContinuationSurface(UiMode.TARGET_SELECT)).toBe("command");
+    expect(coopAuthorityContinuationSurface(UiMode.MODIFIER_SELECT)).toBe("sharedInput");
+    expect(coopAuthorityContinuationSurface(UiMode.MYSTERY_ENCOUNTER)).toBe("sharedInput");
+    expect(coopAuthorityContinuationSurface(UiMode.BIOME_SHOP)).toBe("sharedInput");
+    expect(
+      coopAuthorityContinuationSurface(UiMode.ER_MAP_PICKER),
+      "the still-unmirrored map picker cannot prove shared continuation",
+    ).toBeNull();
+    expect(
+      coopAuthorityContinuationSurface(UiMode.SUMMARY),
+      "a dual-use local summary cannot prove shared continuation without phase context",
+    ).toBeNull();
+    expect(
+      coopAuthorityContinuationSurface(UiMode.ER_MAP),
+      "the dual-use read-only map cannot prove a route continuation from mode alone",
+    ).toBeNull();
+    expect(coopAuthorityContinuationSurface(UiMode.CONFIRM), "generic local chrome is not proof").toBeNull();
+    expect(coopAuthorityContinuationSurface(UiMode.MESSAGE), "passive dialogue is never continuation proof").toBeNull();
+    expect(coopAuthorityContinuationSurface(UiMode.MENU), "local menu chrome is never continuation proof").toBeNull();
   });
 
   describe("coopUnmirroredTripwireReason (the pure decision half of the ui.ts tripwire)", () => {

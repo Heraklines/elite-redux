@@ -82,11 +82,20 @@ export type CoopRole = "host" | "guest";
 // The parallel protocol-31 authority line additionally requires checkpoint + fullField + state + a
 // non-sentinel checksum; replacement frames are retained and re-requestable before control reopens.
 // The parallel protocol-32 authority line addresses battle events and commits by epoch/wave/turn and
-// retains complete turn/replacement commits until an exact apply+checksum ACK. Fatal capture failures
-// use an acknowledged terminal handshake instead of leaving either peer in a local fallback.
+// retains complete turn/replacement commits through material apply, renderer projection, and exact public
+// continuation evidence. Fatal capture failures use an acknowledged terminal handshake instead of leaving
+// either peer in a local fallback.
 // er-coop-33 is the first compatibility stamp containing BOTH histories. A cached protocol-32 peer is
 // therefore rejected even when it implemented one of the two incompatible protocol-32 branches.
 export const COOP_PROTOCOL_VERSION = "er-coop-33";
+
+/**
+ * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
+ * a renderer has projected the state, and projection is not proof that the next public control surface is
+ * actually usable.  Every turn/replacement ACK carries exactly one mandatory stage; peers reject skips,
+ * regressions, and conflicting duplicates instead of silently treating an early ACK as commit release.
+ */
+export type CoopAuthorityAckStage = "materialApplied" | "presentationReady" | "continuationReady";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -1481,7 +1490,7 @@ export type CoopMessage =
   /** Guest -> host: request the exact retained turn commit, or learn that the host is still resolving it. */
   | { t: "requestTurnCommit"; epoch: number; wave: number; turn: number; revision?: number }
   | { t: "turnCommitPending"; epoch: number; wave: number; turn: number }
-  /** Guest -> host: ACK only after the complete turn commit applied and checksum-converged. */
+  /** Guest -> host: one ordered protocol-33 evidence stage for an exact retained turn commit. */
   | {
       t: "turnCommitAck";
       epoch: number;
@@ -1491,6 +1500,7 @@ export type CoopMessage =
       checkpointTick: number;
       stateTick: number;
       checksum: string;
+      stage: CoopAuthorityAckStage;
       status: "applied" | "superseded";
       supersededByRevision?: number;
       supersededByChecksum?: string;
@@ -1506,7 +1516,7 @@ export type CoopMessage =
       checkpointTick: number;
       stateTick: number;
     }
-  /** Guest -> host: ACK only after the complete replacement applied and checksum-converged. */
+  /** Guest -> host: one ordered protocol-33 evidence stage for an exact retained replacement commit. */
   | {
       t: "battleCheckpointAck";
       reason: "replacement";
@@ -1517,6 +1527,7 @@ export type CoopMessage =
       checkpointTick: number;
       stateTick: number;
       checksum: string;
+      stage: CoopAuthorityAckStage;
     }
   /** Either peer -> peer: a control-critical authority boundary could not be produced/applied safely. */
   | {
@@ -1860,11 +1871,11 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "turnCommitPending":
       return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn}`;
     case "turnCommitAck":
-      return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} checksum=${msg.checksum}`;
+      return `e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} stage=${msg.stage} checksum=${msg.checksum}`;
     case "requestBattleCheckpoint":
       return `reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} checkpointTick=${msg.checkpointTick} stateTick=${msg.stateTick}`;
     case "battleCheckpointAck":
-      return `reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} checksum=${msg.checksum}`;
+      return `reason=${msg.reason} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} stage=${msg.stage} checksum=${msg.checksum}`;
     case "authorityFailure":
       return `id=${msg.failureId} e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision} boundary=${msg.boundary}`;
     case "authorityFailureAck":

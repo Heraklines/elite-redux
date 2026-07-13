@@ -75,6 +75,7 @@ describe("durability §4.1: message classification (authoritative vs cosmetic vs
         checkpointTick: 1,
         stateTick: 2,
         checksum: "deadbeefdeadbeef",
+        stage: "continuationReady",
         status: "applied",
       },
       {
@@ -97,6 +98,7 @@ describe("durability §4.1: message classification (authoritative vs cosmetic vs
         checkpointTick: 1,
         stateTick: 2,
         checksum: "deadbeefdeadbeef",
+        stage: "continuationReady",
       },
       {
         t: "authorityFailure",

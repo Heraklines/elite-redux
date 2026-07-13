@@ -211,7 +211,17 @@ describe.skipIf(!RUN)(
             checkpointApplied && applyCoopAuthoritativeBattleState(envelope.authoritativeState, true);
           if (authoritativeApplied) {
             rig.guestRuntime.battleStream.retainAppliedOutOfBandCheckpoint(envelope);
-            rig.guestRuntime.battleStream.acknowledgeReplacement(envelope);
+            rig.guestRuntime.battleStream.acknowledgeReplacement(envelope, "materialApplied");
+            rig.guestRuntime.battleStream.acknowledgeReplacement(envelope, "presentationReady");
+            expect(
+              rig.guestRuntime.battleStream.registerReplacementContinuation(envelope, {
+                kind: "command",
+                epoch: envelope.epoch,
+                wave: envelope.wave,
+                turn: envelope.turn,
+              }),
+              "the low-level apply cannot release host retention before its later real command UI",
+            ).toBe(true);
           }
         }
       });

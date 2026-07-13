@@ -5,7 +5,12 @@ import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { bypassLogin } from "#constants/app-constants";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
-import { broadcastCoopWaveResolved, clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  broadcastCoopWaveResolved,
+  clearCoopRuntime,
+  getCoopBattleStreamer,
+  isCoopAuthoritativeGuest,
+} from "#data/elite-redux/coop/coop-runtime";
 import { erRecordDailySeedWon } from "#data/elite-redux/er-achievement-detection";
 import { enqueueFounderPublish, recordLocalDraftAttempt } from "#data/elite-redux/er-community-challenges";
 import { getFounderRunState, setFounderRunState } from "#data/elite-redux/er-community-run-state";
@@ -54,6 +59,12 @@ export class GameOverPhase extends BattlePhase {
 
   start() {
     super.start();
+
+    // The game-over phase itself is the registered terminal continuation.  Publish only after start() owns
+    // the live queue; doing this before clearCoopRuntime preserves the exact retained turn evidence.
+    if (isCoopAuthoritativeGuest()) {
+      getCoopBattleStreamer()?.notifyContinuationSurface("terminal");
+    }
 
     // Showdown 1v1 (C3): a versus match NEVER runs the classic game-over (no save / ribbons /
     // achievements / cloud). Route the player's loss (or an unexpected showdown game-over) to the

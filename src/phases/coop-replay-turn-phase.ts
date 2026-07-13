@@ -20,6 +20,7 @@ import {
 } from "#data/elite-redux/coop/coop-battle-engine";
 import type { CoopAuthorityFailure, CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-presentation";
 import {
   coopLocalOwnedPlayerFieldSlot,
   coopSessionGeneration,
@@ -64,6 +65,7 @@ import { coopNarrateMoveUsed } from "#phases/coop-replay-phases";
 let activeCoopReplayTurnPhase: CoopReplayTurnPhase | null = null;
 const REPLACEMENT_RETRY_LIMIT = 3;
 const REPLACEMENT_RETRY_TIMEOUT_MS = 2_000;
+const REPLACEMENT_PRESENTATION_TIMEOUT_MS = 15_000;
 
 export function abortActiveCoopReplayTurnPhase(reason: string): boolean {
   return activeCoopReplayTurnPhase?.abortPhantom(reason) ?? false;
@@ -255,6 +257,22 @@ export class CoopReplayTurnPhase extends Phase {
               this.parkForReplacementRetry(streamer, envelope);
               return;
             }
+            if (!streamer.acknowledgeReplacement(envelope, "materialApplied")) {
+              return;
+            }
+            const presentationReady = await this.awaitReplacementPresentation(streamer, envelope);
+            if (!presentationReady) {
+              this.failAuthority(
+                streamer,
+                "replacement",
+                `Replacement renderer did not become presentation-ready for turn ${envelope.turn}.`,
+                envelope,
+              );
+              return;
+            }
+            if (!streamer.acknowledgeReplacement(envelope, "presentationReady")) {
+              return;
+            }
             if (streamer.peekCheckpoint() !== envelope) {
               coopWarn(
                 "checkpoint",
@@ -265,7 +283,6 @@ export class CoopReplayTurnPhase extends Phase {
             }
             streamer.consumeCheckpoint();
             streamer.retainAppliedOutOfBandCheckpoint(envelope);
-            streamer.acknowledgeReplacement(envelope);
             // Showdown versus (Task F1): the versus guest owns its ENTIRE player field (a 1v1 -> field
             // slot 0). The co-op seat map used by coopLocalOwnedPlayerFieldSlot() resolves the fixed
             // GUEST slot (COOP_GUEST_FIELD_INDEX = 1), which is EMPTY in a 1v1 single battle - so the
@@ -279,11 +296,26 @@ export class CoopReplayTurnPhase extends Phase {
               ? globalScene.getPlayerField().findIndex(m => m?.isActive() === true)
               : coopLocalOwnedPlayerFieldSlot();
             const ownMon = ownSlot < 0 ? undefined : globalScene.getPlayerField()[ownSlot];
-            if (
-              ownSlot >= 0
-              && ownMon?.isActive() === true
-              && globalScene.currentBattle.turnCommands[ownSlot] == null
-            ) {
+            if (ownSlot < 0 || ownMon?.isActive() !== true) {
+              this.failAuthority(
+                streamer,
+                "replacement",
+                `Replacement authority did not project into the local owner's command slot for turn ${envelope.turn}.`,
+                envelope,
+              );
+              return;
+            }
+            if (globalScene.currentBattle.turnCommands[ownSlot] == null) {
+              if (
+                !streamer.registerReplacementContinuation(envelope, {
+                  kind: "command",
+                  epoch: envelope.epoch,
+                  wave: envelope.wave,
+                  turn: envelope.turn,
+                })
+              ) {
+                return;
+              }
               coopLog(
                 "replay",
                 `guest replay turn=${this.turn}: replacement filled OUR slot ${ownSlot} -> opening own CommandPhase`,
@@ -293,6 +325,11 @@ export class CoopReplayTurnPhase extends Phase {
                 ...this.fromHpByBi.entries(),
               ]);
               this.end();
+              return;
+            }
+            // A delayed/rejoined carrier may arrive after this exact owner's public command was already
+            // committed.  The command record is stronger evidence than reopening a duplicate menu.
+            if (!streamer.acknowledgeReplacement(envelope, "continuationReady")) {
               return;
             }
           }
@@ -361,6 +398,7 @@ export class CoopReplayTurnPhase extends Phase {
     streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
     boundary: "turnResolution" | "replacement",
     reason: string,
+    address?: Pick<CoopCheckpointEnvelope, "epoch" | "wave" | "turn" | "revision">,
   ): void {
     // An awaited frame may resolve while teardown is restoring another scene/runtime in the one-process
     // harness (and the same race exists during a real navigation). Never route an obsolete continuation
@@ -376,9 +414,10 @@ export class CoopReplayTurnPhase extends Phase {
     const wave = globalScene?.currentBattle?.waveIndex ?? 0;
     void streamer
       .broadcastAuthorityFailure({
-        epoch: controller.sessionEpoch,
-        wave,
-        turn: this.turn,
+        epoch: address?.epoch ?? controller.sessionEpoch,
+        wave: address?.wave ?? wave,
+        turn: address?.turn ?? this.turn,
+        ...(address == null ? {} : { revision: address.revision }),
         boundary,
         reason,
       })
@@ -400,7 +439,7 @@ export class CoopReplayTurnPhase extends Phase {
    * Keep the failed frame retained and hold the current safe boundary without spinning. A transport
    * retransmission (including the same tick pair) or a newer replacement frame wakes the exact production
    * pump and retries transactionally. The stream scheduler bounds a lost response; exhaustion terminates
-   * shared play visibly. There is intentionally no auto-command fallback; protocol 32 clears only the
+   * shared play visibly. There is intentionally no auto-command fallback; protocol 33 clears only the
    * exact retained replacement revision after its apply+checksum ACK.
    */
   private parkForReplacementRetry(
@@ -416,6 +455,7 @@ export class CoopReplayTurnPhase extends Phase {
     if (this.replacementRetryAttempts >= REPLACEMENT_RETRY_LIMIT) {
       this.terminateReplacementRecovery(
         `replacement authority failed after ${this.replacementRetryAttempts} complete retransmit attempt(s)`,
+        failed,
       );
       return;
     }
@@ -451,7 +491,7 @@ export class CoopReplayTurnPhase extends Phase {
       }
       if (streamer.authorityNow() >= this.replacementRetryDeadline) {
         this.clearReplacementRetryWake();
-        this.failAuthority(streamer, "replacement", `Replacement authority failed for turn ${this.turn}.`);
+        this.failAuthority(streamer, "replacement", `Replacement authority failed for turn ${this.turn}.`, failed);
         return;
       }
       this.clearReplacementRetryWake();
@@ -469,14 +509,14 @@ export class CoopReplayTurnPhase extends Phase {
   }
 
   /** Bound an unreconstructible replacement with a visible terminal, never an indefinite parked phase. */
-  private terminateReplacementRecovery(reason: string): void {
+  private terminateReplacementRecovery(reason: string, failed: CoopCheckpointEnvelope): void {
     this.clearReplacementRetryWake();
     const streamer = getCoopBattleStreamer();
     if (streamer == null) {
       terminateCoopAuthoritySession(reason);
       return;
     }
-    this.failAuthority(streamer, "replacement", reason);
+    this.failAuthority(streamer, "replacement", reason, failed);
   }
 
   /**
@@ -563,6 +603,42 @@ export class CoopReplayTurnPhase extends Phase {
       coopWarn("checkpoint", "guest replacement transaction threw; frame retained", error);
     }
     return false;
+  }
+
+  private awaitReplacementPresentation(
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    envelope: CoopCheckpointEnvelope,
+  ): Promise<boolean> {
+    const generation = coopSessionGeneration();
+    return new Promise(resolve => {
+      let settled = false;
+      let cancelDeadline: () => void = () => {};
+      const finish = (ready: boolean): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cancelDeadline();
+        resolve(
+          ready
+            && !this.aborted
+            && !this.ended
+            && generation === coopSessionGeneration()
+            && getCoopBattleStreamer() === streamer
+            && globalScene.phaseManager.getCurrentPhase() === this,
+        );
+      };
+      const scheduledCancel = streamer.scheduleAuthorityRetry(() => finish(false), REPLACEMENT_PRESENTATION_TIMEOUT_MS);
+      if (settled) {
+        scheduledCancel();
+      } else {
+        cancelDeadline = scheduledCancel;
+      }
+      void settleCoopAuthoritativeProjection(envelope.authoritativeState).then(
+        ready => finish(ready),
+        () => finish(false),
+      );
+    });
   }
 
   /**
