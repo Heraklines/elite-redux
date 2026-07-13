@@ -366,7 +366,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     expect(counterBefore, "the ME opens on interaction counter 1 (guest owns odd)").toBe(1);
 
-    const commitSpy = vi.spyOn(meOp, "commitMeOwnerIntent");
+    const authoritySubmitSpy = vi.spyOn(CoopOperationHost.prototype, "submit");
 
     // STEP A (host): reach MysteryEncounterPhase; the host parks awaiting the guest's relayed index.
     await withClient(rig.hostCtx, async () => {
@@ -412,13 +412,21 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     });
 
     // THE MIGRATED BEHAVIOR: the HOST committed the guest-owned ME_PICK it received (a host-role commit).
-    const hostPickCommits = commitSpy.mock.calls.filter(c => c[0].kind === "ME_PICK" && c[0].localRole === "host");
+    const hostPickCommits = authoritySubmitSpy.mock.calls
+      .map((call, index) => ({ intent: call[0], result: authoritySubmitSpy.mock.results[index] }))
+      .filter(({ intent }) => intent.kind === "ME_PICK" && intent.owner === 1);
     expect(
       hostPickCommits.length,
       "the HOST committed the guest's relayed ME_PICK through the operation primitive (invariant 3)",
     ).toBeGreaterThan(0);
     expect(
-      (hostPickCommits[0][0].payload as { optionIndex: number }).optionIndex,
+      hostPickCommits[0].result.type === "return"
+        ? hostPickCommits[0].result.value.kind
+        : hostPickCommits[0].result.type,
+      "the authority accepted and committed the guest-owned intent",
+    ).toMatch(/^(committed|reack)$/);
+    expect(
+      (hostPickCommits[0].intent.payload as { optionIndex: number }).optionIndex,
       "the committed ME_PICK carries the guest's relayed option index (0)",
     ).toBe(0);
 
