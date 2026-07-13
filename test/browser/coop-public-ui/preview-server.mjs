@@ -71,7 +71,49 @@ function verifyArtifact(config) {
   return manifest;
 }
 
-/** Serve only the sealed bundle and its exact recursive asset checkout; game source is never mounted. */
+function productionAssetRedirects(config) {
+  const redirectsPath = resolve(config.root, "deploy", "cloudflare", "_redirects");
+  const redirects = [];
+  for (const rawLine of readFileSync(redirectsPath, "utf8").split(/\r?\n/gu)) {
+    const line = rawLine.trim();
+    if (line.length === 0 || line.startsWith("#")) {
+      continue;
+    }
+    const [source, target, status, ...extra] = line.split(/\s+/gu);
+    if (
+      extra.length > 0
+      || status !== "302"
+      || !source?.startsWith("/")
+      || !/^https:\/\/cdn\.jsdelivr\.net\/gh\/Heraklines\/er-assets@[0-9a-f]{40}\//u.test(target ?? "")
+    ) {
+      throw new Error(`unsupported production asset redirect: ${line}`);
+    }
+    redirects.push({ source, target });
+  }
+  if (
+    !redirects.some(({ source }) => source === "/images/*")
+    || !redirects.some(({ source }) => source === "/fonts/*")
+  ) {
+    throw new Error("production asset redirects must include the pinned image and font surfaces");
+  }
+  return redirects;
+}
+
+function redirectedAsset(pathname, redirects) {
+  for (const { source, target } of redirects) {
+    if (source.endsWith("/*")) {
+      const prefix = source.slice(0, -1);
+      if (pathname.startsWith(prefix)) {
+        return target.replace(":splat", pathname.slice(prefix.length));
+      }
+    } else if (pathname === source) {
+      return target;
+    }
+  }
+  return null;
+}
+
+/** Serve only the sealed bundle and the exact pinned production assets; game source is never mounted. */
 export async function startSealedPreview(config) {
   if (!config.browserDist) {
     throw new Error("COOP_UI_BROWSER_DIST is required; public-UI journeys refuse an unsealed/deployed bundle");
@@ -86,6 +128,7 @@ export async function startSealedPreview(config) {
     throw new Error("sealed public-UI preview must use an isolated localhost HTTP origin");
   }
   const manifest = verifyArtifact(config);
+  const assetRedirects = productionAssetRedirects(config);
   const server = createServer((request, response) => {
     let pathname;
     try {
@@ -95,16 +138,22 @@ export async function startSealedPreview(config) {
       return;
     }
     const requested = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
-    const absolute = safeStaticFile(config.browserDist, requested) ?? safeStaticFile(config.assetDir, requested);
-    if (absolute == null) {
+    const absolute = safeStaticFile(config.browserDist, requested);
+    const redirected = redirectedAsset(pathname, assetRedirects);
+    if (absolute == null && redirected != null) {
+      response.writeHead(302, { "Cache-Control": "no-store", Location: redirected }).end();
+      return;
+    }
+    const fallbackAsset = absolute ?? safeStaticFile(config.assetDir, requested);
+    if (fallbackAsset == null) {
       response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("not found");
       return;
     }
     response.writeHead(200, {
       "Cache-Control": "no-store",
-      "Content-Type": CONTENT_TYPES[extname(absolute)] ?? "application/octet-stream",
+      "Content-Type": CONTENT_TYPES[extname(fallbackAsset)] ?? "application/octet-stream",
     });
-    createReadStream(absolute).pipe(response);
+    createReadStream(fallbackAsset).pipe(response);
   });
   await new Promise((resolveListen, rejectListen) => {
     server.once("error", rejectListen);

@@ -40,6 +40,15 @@ function parsedUrl(value) {
   }
 }
 
+function isExpectedMissingSystemSaveError(type, text, source, remaining) {
+  return (
+    type === "error"
+    && remaining > 0
+    && parsedUrl(source)?.pathname === "/savedata/system/get"
+    && /status of 404/u.test(text)
+  );
+}
+
 function accountView(body) {
   const account = Array.isArray(body) ? body[0] : body;
   if (!account || typeof account !== "object") {
@@ -136,10 +145,11 @@ function bindingView(text) {
 }
 
 export class EvidenceSink {
-  constructor(label, artifactDir, allowedConsoleErrors = []) {
+  constructor(label, artifactDir, allowedConsoleErrors = [], expectedMissingSystemSaveErrors = 0) {
     this.label = label;
     this.dir = resolve(artifactDir, label);
     this.allowedConsoleErrors = allowedConsoleErrors;
+    this.expectedMissingSystemSaveErrors = expectedMissingSystemSaveErrors;
     this.events = [];
     this.failures = [];
     this.networkState = { account: null, lobby: null };
@@ -232,12 +242,22 @@ export class EvidenceSink {
   attach(page) {
     page.on("console", message => {
       const text = message.text();
+      const source = safeUrl(message.location().url || "");
       const event = this.record("console", {
         level: message.type(),
         text,
-        source: safeUrl(message.location().url || ""),
+        source,
       });
-      if (message.type() === "error" && !this.allowedConsoleErrors.some(pattern => pattern.test(text))) {
+      const expectedMissingSystemSave = isExpectedMissingSystemSaveError(
+        message.type(),
+        text,
+        source,
+        this.expectedMissingSystemSaveErrors,
+      );
+      if (expectedMissingSystemSave) {
+        this.expectedMissingSystemSaveErrors -= 1;
+        this.record("console-error-expected", { source, reason: "fresh account has no system save" });
+      } else if (message.type() === "error" && !this.allowedConsoleErrors.some(pattern => pattern.test(text))) {
         this.failures.push(event);
       }
       try {

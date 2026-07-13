@@ -98,7 +98,12 @@ export class PublicUiClient {
     this.titleNewGameKeys = [
       ...(this.label === "host-seat" ? config.keys.titleNewGame.hostSeat : config.keys.titleNewGame.guestSeat),
     ];
-    this.evidence = new EvidenceSink(this.label, config.artifactDir, config.allowedConsoleErrors);
+    this.evidence = new EvidenceSink(
+      this.label,
+      config.artifactDir,
+      config.allowedConsoleErrors,
+      config.accountMode === "register" ? 1 : 0,
+    );
   }
 
   async init() {

@@ -6,7 +6,9 @@ and keyboard. The driver does not import game source, call scene or phase method
 mirror waves, or apply resyncs. `check-public-boundary.mjs` protects that boundary.
 
 The workflow builds the normal application once, adds only the CI entry's read-only surface observer, seals
-the bundle manifest, and fans runners from that same artifact. The observer emits only after a real UI
+the bundle manifest, and fans runners from that same artifact. Its localhost preview honors the checked-in
+Cloudflare redirect table, so images, audio, battle animations, and fonts come from the same immutable
+`er-assets` commit as staging instead of a partial development-asset checkout. The observer emits only after a real UI
 handler is rendered and active. It reports role, membership generation, epoch/wave/turn, phase/mode, and the
 mechanical digest; it exposes no mutation method. A journey passes a boundary only when both clients report
 the same address, digest, and continuation surface. Every battle turn also correlates the guest's exact

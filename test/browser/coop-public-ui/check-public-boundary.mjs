@@ -61,8 +61,15 @@ const viteConfig = sources.get("vite.config.mjs");
 if (!run?.includes("startSealedPreview(config)")) {
   failures.push("run.mjs: every gameplay journey must start from a verified sealed browser artifact");
 }
-if (!preview?.includes('"--verify"') || /safeStaticFile\([^,]+,\s*["']src/gu.test(preview)) {
-  failures.push("preview-server.mjs: preview must verify the immutable manifest and never mount game source");
+if (
+  !preview?.includes('"--verify"')
+  || !preview.includes('"deploy", "cloudflare", "_redirects"')
+  || !preview.includes("Location: redirected")
+  || /safeStaticFile\([^,]+,\s*["']src/gu.test(preview)
+) {
+  failures.push(
+    "preview-server.mjs: preview must verify the immutable manifest, honor pinned production asset redirects, and never mount game source",
+  );
 }
 if (!viteConfig?.includes("SOURCE_ENTRY") || !viteConfig.includes("sourceEntryReplaced")) {
   failures.push("vite.config.mjs: exact-SHA browser build entry replacement must stay explicit and idempotent");
