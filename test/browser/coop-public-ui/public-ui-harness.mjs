@@ -138,13 +138,7 @@ export class PublicUiClient {
       await this.waitForVisibleInputs({ text: 1, password: 1, purpose: "public login form" });
       await this.fillLoginForm();
     }
-    const entered = await this.evidence.waitForCondition(
-      sink => sink.find(TITLE_PHASE, this.pageCursor) ?? sink.find(SELECT_GENDER_PHASE, this.pageCursor),
-      {
-        timeoutMs: this.config.timeoutMs,
-        description: "TitlePhase or visible first-login gender prompt after authentication",
-      },
-    );
+    const entered = await this.completePostAuthentication();
     if (TITLE_PHASE.test(entered.text ?? "")) {
       await delay(this.config.settleDelayMs);
       return entered;
@@ -158,6 +152,45 @@ export class PublicUiClient {
     });
     await delay(this.config.settleDelayMs);
     return titleAfterOnboarding;
+  }
+
+  async completePostAuthentication() {
+    const account = await this.evidence.waitForCondition(
+      sink => (sink.networkState.account?.username === this.credentials.username ? sink.networkState.account : null),
+      {
+        timeoutMs: this.config.timeoutMs,
+        description: "authenticated public account response",
+      },
+    );
+    if (this.config.accountMode === "register" && account.lastSessionSlot === -1) {
+      await this.evidence.waitForCondition(
+        sink =>
+          sink.events.find(
+            event => event.kind === "response" && event.status === 404 && event.url.endsWith("/savedata/system/get"),
+          ),
+        {
+          timeoutMs: this.config.timeoutMs,
+          description: "new-account public save lookup",
+        },
+      );
+      await delay(this.config.settleDelayMs);
+      for (let message = 1; message <= 3; message++) {
+        const phase =
+          this.evidence.find(TITLE_PHASE, this.pageCursor) ?? this.evidence.find(SELECT_GENDER_PHASE, this.pageCursor);
+        if (phase) {
+          return phase;
+        }
+        await this.press("Space", `dismiss-new-account-message:${message}/3`);
+        await delay(this.config.settleDelayMs);
+      }
+    }
+    return this.evidence.waitForCondition(
+      sink => sink.find(TITLE_PHASE, this.pageCursor) ?? sink.find(SELECT_GENDER_PHASE, this.pageCursor),
+      {
+        timeoutMs: this.config.timeoutMs,
+        description: "TitlePhase or visible first-login gender prompt after authentication",
+      },
+    );
   }
 
   async openRegistrationForm() {
