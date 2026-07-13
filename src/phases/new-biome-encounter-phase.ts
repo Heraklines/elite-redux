@@ -28,6 +28,8 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
   private coopIntroContinued = false;
   private coopEncounterPrepared = false;
   private coopEncounterHooksScheduled = false;
+  private coopMysteryContinuationPending = false;
+  private coopMysteryContinuationQueued = false;
   private coopEndInFlight = false;
   private coopCompleted = false;
   private coopIntroTimer: ReturnType<typeof setTimeout> | null = null;
@@ -145,6 +147,12 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
         return;
       }
       if (this.coopAuthoritativeGuest) {
+        if (this.coopMysteryContinuationPending && !this.coopMysteryContinuationQueued) {
+          // Queue only after the exact permit/destination preflight succeeded. A parked retry therefore
+          // cannot accumulate duplicate Mystery phases behind this still-current NewBiome phase.
+          globalScene.phaseManager.unshiftNew("MysteryEncounterPhase");
+          this.coopMysteryContinuationQueued = true;
+        }
         // Shift first. If it throws, no terminal flag or permit mutation occurs and this exact phase can retry.
         this.shiftCoopAuthoritativeGuestPresentationOnly();
       } else {
@@ -320,11 +328,10 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
     if (!this.coopBoundaryStillLive()) {
       return;
     }
-    if (globalScene.currentBattle.isBattleMysteryEncounter()) {
-      // The presentation-only guest deliberately never constructs or initializes the local encounter
-      // object. CoopReplayMePhase renders the host's retained ME_PRESENT transaction instead.
-      globalScene.phaseManager.unshiftNew("MysteryEncounterPhase");
-    }
+    // The presentation-only guest deliberately never constructs or initializes the local encounter object.
+    // Defer queueing until completeEncounterEnd has revalidated the exact transition permit; the normal
+    // MysteryEncounterPhase divert then replaces local simulation with CoopReplayMePhase.
+    this.coopMysteryContinuationPending = globalScene.currentBattle.isBattleMysteryEncounter();
     this.end();
   }
 

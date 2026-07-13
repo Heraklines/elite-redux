@@ -150,6 +150,13 @@ export function createScheduledCoopPair(options: { automatic?: boolean } = {}): 
     flush(role, limit = Number.POSITIVE_INFINITY): number {
       let delivered = 0;
       while (queues[role].length > 0 && delivered < limit) {
+        // A reconnect invalidates every queued frame from the previous transport generation. Retire that
+        // stale head before a reorder fault considers waiting for a follower, or one lone stale frame could
+        // keep the destination queue artificially non-empty forever.
+        if (queues[role][0].generation !== generation) {
+          queues[role].shift();
+          continue;
+        }
         const reorder = reorders[role].find(
           candidate => candidate.remaining > 0 && candidate.predicate(queues[role][0].message),
         );
@@ -164,7 +171,7 @@ export function createScheduledCoopPair(options: { automatic?: boolean } = {}): 
           reorder.remaining--;
         }
         const frame = queues[role].shift()!;
-        if (frame.generation !== generation || consumeFault(drops[role], frame.message)) {
+        if (consumeFault(drops[role], frame.message)) {
           continue;
         }
         const duplicate = consumeFault(duplicates[role], frame.message);

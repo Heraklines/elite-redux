@@ -198,7 +198,11 @@ describe.skipIf(!RUN)(
       ).toHaveBeenCalled();
       expect(
         hostSend.mock.calls.some(
-          ([message]) => message.t === "envelope" && message.envelope.pendingOperation?.kind === "ME_PICK",
+          ([message]) =>
+            message.t === "envelope"
+            && message.envelope.pendingOperation?.kind === "ME_PICK"
+            && message.envelope.pendingOperation.status === "applied"
+            && message.envelope.pendingOperation.owner === 1,
         ),
         "the host validated the public guest proposal and retained the typed ME_PICK operation",
       ).toBe(true);
@@ -266,7 +270,11 @@ describe.skipIf(!RUN)(
       });
       expect(
         hostSend.mock.calls.some(
-          ([message]) => message.t === "envelope" && message.envelope.pendingOperation?.kind === "REWARD",
+          ([message]) =>
+            message.t === "envelope"
+            && message.envelope.pendingOperation?.kind === "REWARD"
+            && message.envelope.pendingOperation.status === "applied"
+            && message.envelope.pendingOperation.owner === 1,
         ),
         "the host validated the public guest reward proposal and retained the typed REWARD result",
       ).toBe(true);

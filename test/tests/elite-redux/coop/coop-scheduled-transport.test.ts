@@ -66,6 +66,30 @@ describe("co-op production-transition scheduled transport", () => {
     expect(guestRx.mock.calls.map(([message]) => message.ts)).toEqual([2, 2, 3, 5]);
   });
 
+  it("reorders one valid pair without letting a stale reconnect frame block the queue", () => {
+    const pair = createScheduledCoopPair();
+    const guestRx = vi.fn();
+    pair.guest.onMessage(guestRx);
+
+    pair.reorderNext("guest", message => message.t === "ping" && message.ts === 1);
+    pair.host.send(ping(1));
+    expect(pair.flush("guest"), "reorder waits until the selected frame has a follower").toBe(0);
+    pair.host.send(ping(2));
+    expect(pair.flush("guest")).toBe(2);
+    expect(guestRx.mock.calls.map(([message]) => message.ts)).toEqual([2, 1]);
+
+    pair.reorderNext("guest", message => message.t === "ping" && message.ts === 3);
+    pair.host.send(ping(3));
+    pair.disconnect();
+    pair.reconnect();
+    expect(pair.flush("guest"), "old-generation reorder target is discarded without waiting for a follower").toBe(0);
+    expect(pair.pending("guest")).toBe(0);
+
+    pair.host.send(ping(4));
+    expect(pair.flush("guest")).toBe(1);
+    expect(guestRx.mock.calls.map(([message]) => message.ts)).toEqual([2, 1, 4]);
+  });
+
   it("can boot with ordinary microtask delivery, then switch to explicit per-client scheduling", async () => {
     const pair = createScheduledCoopPair({ automatic: true });
     const guestRx = vi.fn();

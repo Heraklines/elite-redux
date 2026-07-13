@@ -316,6 +316,10 @@ async function crossIntoNaturallyCarriedMystery(
     rig.guestScene.currentBattle.mysteryEncounterType,
     "guest adopted the host Mystery descriptor without locally initializing the event engine",
   ).toBe(type);
+  expect(
+    rig.guestScene.currentBattle.mysteryEncounter,
+    "presentation-only guest did not construct a second local Mystery event engine",
+  ).toBeUndefined();
   expect(rig.hostScene.phaseManager.getCurrentPhase()?.phaseName, "host parked on the Mystery selector boundary").toBe(
     "MysteryEncounterPhase",
   );
@@ -541,7 +545,18 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
 
       const operations = distinctCommittedMeOperations(hostSend.mock.calls);
       expect([...operations.values()].filter(kind => kind === "ME_PRESENT")).toHaveLength(journey.picks.length);
+      expect([...operations.values()].filter(kind => kind === "ME_PICK")).toHaveLength(journey.picks.length);
       expect([...operations.values()].filter(kind => kind === "ME_TERMINAL")).toHaveLength(1);
+      expect(
+        hostSend.mock.calls.some(
+          ([message]) =>
+            message.t === "envelope"
+            && message.envelope.pendingOperation?.kind === "REWARD"
+            && message.envelope.pendingOperation.status === "applied"
+            && message.envelope.pendingOperation.owner === 1,
+        ),
+        "host validated and retained the guest-owned embedded reward result",
+      ).toBe(true);
       if (journey.injectTerminalFault) {
         expect(
           hostSend.mock.calls.filter(([message]) => retainedOperationKind(message) === "ME_TERMINAL").length,
@@ -550,15 +565,16 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
       }
       const uiEdges = getCoopUiRelayEdges();
       expect(
-        uiEdges.some(edge => edge.mode === UiMode.MYSTERY_ENCOUNTER && edge.carrier === "operation"),
-        "the public Mystery selector minted a typed operation",
+        uiEdges.some(edge => edge.mode === UiMode.MYSTERY_ENCOUNTER && edge.carrier === "interactionChoice"),
+        "the public guest Mystery selector emitted its operation-backed proposal carrier",
       ).toBe(true);
       expect(
         uiEdges.some(
           edge =>
-            (edge.mode === UiMode.MODIFIER_SELECT || edge.mode === UiMode.CONFIRM) && edge.carrier === "operation",
+            (edge.mode === UiMode.MODIFIER_SELECT || edge.mode === UiMode.CONFIRM)
+            && edge.carrier === "interactionChoice",
         ),
-        "the public embedded reward/confirmation UI minted a typed operation",
+        "the public guest embedded reward UI emitted its operation-backed proposal carrier",
       ).toBe(true);
       logs.flush();
     } finally {
