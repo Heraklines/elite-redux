@@ -184,7 +184,11 @@ function isClientNonce(value: unknown): value is string {
 
 function dependencies(overrides: CoopP33ClientDependencies = {}) {
   return {
-    fetch: overrides.fetch ?? fetch,
+    // Bind the global fetch to its receiver: storing the bare `fetch` and later calling it as
+    // `deps.fetch(...)` (detached-method invocation) makes `this` the deps object, and every real browser
+    // throws "Failed to execute 'fetch' on 'Window': Illegal invocation" at lobby start, before any request
+    // (invisible to co-op vitest, which always passes overrides.fetch). No wire change.
+    fetch: overrides.fetch ?? fetch.bind(globalThis),
     getIdentityTicket: overrides.getIdentityTicket ?? (() => pokerogueApi.account.getCoopIdentityTicket()),
     createClientNonce: overrides.createClientNonce ?? randomClientNonce,
     retryDelay:
