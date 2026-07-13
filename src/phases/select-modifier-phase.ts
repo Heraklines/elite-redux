@@ -1259,9 +1259,9 @@ export class SelectModifierPhase extends BattlePhase {
       return false;
     }
     // Past the co-op + pinned-owner fence: this client OWNS this shop interaction and is the
-    // relay source. Log the exact send (seq + label + choice + payload) so the watcher's apply
-    // can be matched against it in the captured log. Hot-ish (per reward action) - guard the
-    // string build behind isCoopDebug().
+    // relay source. Log the exact preparation (seq + label + choice + payload) so a retained result or
+    // compatibility carrier can be matched against it in the captured log. Hot-ish (per reward action) -
+    // guard the string build behind isCoopDebug().
     // Co-op (#698): for a money-moving pick the owner stashes its POST-spend authoritative money in
     // coopOwnerPostMoney just before this send; append it as a trailing [COOP_MONEY_TAG, money] pair
     // so the watcher sets money verbatim (the watcher strips it before its positional decode). The
@@ -1274,7 +1274,7 @@ export class SelectModifierPhase extends BattlePhase {
     if (isCoopDebug()) {
       coopLog(
         "relay",
-        `OWNER send seq=${this.coopInteractionStart} kind=${label} choice=${choice} data=[${wire?.join(",") ?? ""}] role=${controller.role}`,
+        `OWNER prepare seq=${this.coopInteractionStart} kind=${label} choice=${choice} data=[${wire?.join(",") ?? ""}] role=${controller.role}`,
       );
     }
     // Prepare the typed intent BEFORE publishing its compatibility carrier. In retained-result mode this
@@ -1314,6 +1314,12 @@ export class SelectModifierPhase extends BattlePhase {
         `OWNER retained terminal before continuation seq=${this.coopInteractionStart} id=${prepared.operationId}`,
       );
       return false;
+    }
+    if (isCoopDebug()) {
+      coopLog(
+        "relay",
+        `OWNER send raw seq=${this.coopInteractionStart} kind=${label} choice=${choice} role=${controller.role}`,
+      );
     }
     getCoopInteractionRelay()?.sendInteractionChoice(this.coopInteractionStart, label, choice, wire);
     if (controller.role === "guest" && isCoopRewardRetainedResultMode() && prepared != null) {
