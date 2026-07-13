@@ -59,6 +59,11 @@
 // =============================================================================
 
 import { COOP_CAP_OP_REWARD, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
+import {
+  applyCoopAuthoritativeBattleState,
+  captureCoopAuthoritativeBattleState,
+  reapplyAcceptedCoopAuthoritativeBattleState,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
 import { COOP_INTERACTION_LEAVE, COOP_INTERACTION_REROLL } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -100,8 +105,16 @@ export interface CoopRewardRelayAction {
 
 /** The watcher's adoption verdict for a relayed reward/market action. */
 export type CoopRewardAdoptDecision =
-  /** Adopt this action (apply it against the identical pool exactly as the legacy path would). */
-  | { readonly adopt: true }
+  /**
+   * Adopt this action. In retained-result mode `authoritativeProjection` means the complete host state
+   * has already been applied; the phase may render/continue but must not execute the gameplay mutation.
+   */
+  | {
+      readonly adopt: true;
+      readonly operationId?: string;
+      readonly authoritativeProjection?: boolean;
+      readonly requiresAuthorityCommit?: boolean;
+    }
   /** Do NOT adopt (stale / late / duplicate / rejected / fail-closed): IGNORE it, keep awaiting the terminal. */
   | { readonly adopt: false; readonly reason: string };
 
@@ -137,6 +150,32 @@ const journalLeadingStarts = new Set<number>();
 
 /** Journal-consumed operations waiting for their safe phase-loop materialization. */
 const pendingJournalMaterializations = new Set<string>();
+
+/** Complete result state already installed on this receiver, but not necessarily materialized into its UI yet. */
+const stateAppliedOperations = new Set<string>();
+
+/**
+ * Engine state seam. Production uses the normal atomic battle-state transaction. A focused operation test
+ * can replace it with a plain-state model without importing a second Phaser scene into the same process.
+ */
+export interface CoopRewardAuthorityStateHooks {
+  readonly capture: (turn: number) => CoopAuthoritativeBattleStateV1 | null;
+  readonly apply: (state: CoopAuthoritativeBattleStateV1) => boolean;
+  readonly reapply: (state: CoopAuthoritativeBattleStateV1) => boolean;
+}
+
+const productionAuthorityStateHooks: CoopRewardAuthorityStateHooks = {
+  capture: turn => captureCoopAuthoritativeBattleState(turn),
+  apply: state => applyCoopAuthoritativeBattleState(state, true),
+  reapply: state => reapplyAcceptedCoopAuthoritativeBattleState(state, true),
+};
+
+let authorityStateHooks: CoopRewardAuthorityStateHooks = productionAuthorityStateHooks;
+
+/** Focused-test seam; passing null restores the production atomic capture/apply implementation. */
+export function setCoopRewardAuthorityStateHooksForTest(hooks: CoopRewardAuthorityStateHooks | null): void {
+  authorityStateHooks = hooks ?? productionAuthorityStateHooks;
+}
 
 /**
  * The highest pinned interaction start the local client has ADOPTED any action at AS A WATCHER. A pick
@@ -175,6 +214,28 @@ let ownerOrdinalStart = -1;
 /** Exact once-only identity retained when a terminal must be retried after commit/journal failure. */
 const ownerTerminalOperations = new Map<string, { readonly ordinal: number; readonly operationId: string }>();
 
+interface PreparedRewardIntent {
+  readonly intent: CoopPendingOperation;
+  readonly surface: CoopShopSurface;
+  readonly pinned: number;
+  readonly terminal: boolean;
+  readonly wave: number;
+  readonly turn: number;
+  readonly localRole: CoopRole;
+  readonly watcherState?: RewardWatcherState;
+  executing: boolean;
+  watcherAdvanced: boolean;
+}
+
+/** Proposed peer intents are retained separately per local role (the two-engine harness shares one realm). */
+const preparedIntents = new Map<string, PreparedRewardIntent>();
+/** Exact immutable host results survive a journal failure/retry without recapturing a later state tick. */
+const committedResultEnvelopes = new Map<string, CoopAuthoritativeEnvelopeV1>();
+
+function preparedKey(role: CoopRole, operationId: string): string {
+  return `${role}:${operationId}`;
+}
+
 /** The watcher's per-interaction monotonic action ordinal (for the applied op-id). Reset when the pin changes. */
 
 /**
@@ -193,6 +254,11 @@ let revisionFloor = 0;
  */
 export function isCoopRewardOperationEnabled(): boolean {
   return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_REWARD);
+}
+
+/** Live P33 result mode: choices are intents and only a retained complete host result may author state. */
+export function isCoopRewardRetainedResultMode(): boolean {
+  return isCoopRewardOperationEnabled() && isCoopOperationJournalActive();
 }
 
 /** Select the migrated path (true) or the legacy relay fallback (false). The one-line per-surface rollback (§5.4). */
@@ -229,6 +295,9 @@ export function resetCoopRewardOperationState(): void {
   watchGuest = null;
   journalLeadingStarts.clear();
   pendingJournalMaterializations.clear();
+  stateAppliedOperations.clear();
+  preparedIntents.clear();
+  committedResultEnvelopes.clear();
   watcherStateByRole.host = freshWatcherState();
   watcherStateByRole.guest = freshWatcherState();
   ownerOrdinal = 0;
@@ -310,7 +379,7 @@ function ownerParityValidator(pinned: number): CoopIntentValidator {
  * authoritativeState is a lightweight placeholder the applier never reads (it classifies on the CONTROL
  * fields only). The real adopt-by-id state apply is UNCHANGED (§1.2).
  */
-function controlContext(surface: CoopShopSurface, wave: number, turn: number): CoopCommitContext {
+function legacyControlContext(surface: CoopShopSurface, wave: number, turn: number): CoopCommitContext {
   const placeholder: CoopAuthoritativeBattleStateV1 = {
     version: 1,
     tick: 0,
@@ -330,6 +399,63 @@ function controlContext(surface: CoopShopSurface, wave: number, turn: number): C
     enemyModifiers: [],
   };
   return { wave, turn, logicalPhase: surface === "reward" ? "REWARD_SELECT" : "SHOP", authoritativeState: placeholder };
+}
+
+function authoritativeResultContext(
+  surface: CoopShopSurface,
+  wave: number,
+  turn: number,
+  authoritativeState: CoopAuthoritativeBattleStateV1,
+): CoopCommitContext {
+  return {
+    wave,
+    turn,
+    logicalPhase: surface === "reward" ? "REWARD_SELECT" : "SHOP",
+    authoritativeState,
+  };
+}
+
+/** Reject the old empty control placeholder on every live retained result. */
+function isCompleteRewardAuthorityState(
+  state: CoopAuthoritativeBattleStateV1 | null | undefined,
+  wave: number,
+  turn: number,
+): state is CoopAuthoritativeBattleStateV1 {
+  return (
+    state?.version === 1
+    && Number.isSafeInteger(state.tick)
+    && state.tick > 0
+    && state.wave === wave
+    && state.turn === turn
+    && Array.isArray(state.playerParty)
+    && state.playerParty.length > 0
+    && Array.isArray(state.enemyParty)
+    && Array.isArray(state.field)
+    && Array.isArray(state.arenaTags)
+    && Array.isArray(state.pokeballCounts)
+    && Array.isArray(state.playerModifiers)
+    && Array.isArray(state.enemyModifiers)
+    && Number.isFinite(state.money)
+  );
+}
+
+function samePayload(left: CoopPendingOperation["payload"], right: CoopPendingOperation["payload"]): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function retainPreparedIntent(prepared: PreparedRewardIntent): boolean {
+  const key = preparedKey(prepared.localRole, prepared.intent.id);
+  const existing = preparedIntents.get(key);
+  if (existing != null) {
+    return (
+      existing.surface === prepared.surface
+      && existing.pinned === prepared.pinned
+      && existing.terminal === prepared.terminal
+      && samePayload(existing.intent.payload, prepared.intent.payload)
+    );
+  }
+  preparedIntents.set(key, prepared);
+  return true;
 }
 
 /** Next per-interaction owner action ordinal for `pinned` (resets when the pinned interaction changes). */
@@ -411,12 +537,35 @@ export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): Co
       status: "proposed",
       payload,
     };
-    // The AUTHORITY (coop host) is the sole committer (invariant 3). When the LOCAL owner is the host it
-    // commits its own intent here; when the owner is the guest, the host commits on adopt (watcher seam).
+    const prepared: PreparedRewardIntent = {
+      intent,
+      surface: params.surface,
+      pinned: params.pinned,
+      terminal: params.terminal,
+      wave: params.wave,
+      turn: params.turn ?? 0,
+      localRole: params.localRole,
+      executing: false,
+      watcherAdvanced: false,
+    };
+    if (!retainPreparedIntent(prepared)) {
+      return null;
+    }
+
+    // A live journaled action is deliberately TWO-STAGE: this call retains the typed intent only. The phase
+    // executes on the host at its safe seam, then commitRewardAuthoritativeResult captures the complete
+    // post-action state. Thus no live envelope can carry the historical empty control placeholder.
+    if (isCoopOperationJournalActive()) {
+      coopLog("reward", `${params.surface} op INTENT prepared label=${params.label} id=${opId}`);
+      return { operationId: opId, revision: 0 };
+    }
+
+    // Compatibility when durability is disabled: preserve the former control-only local gate. This context
+    // never reaches the wire, and the legacy relay remains the sole carrier.
     if (params.localRole === "host") {
       const res = host().submit(
         intent,
-        controlContext(params.surface, params.wave, params.turn ?? 0),
+        legacyControlContext(params.surface, params.wave, params.turn ?? 0),
         ownerParityValidator(params.pinned),
       );
       if (res.kind === "committed" || res.kind === "reack") {
@@ -447,6 +596,78 @@ export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): Co
   } catch (e) {
     coopWarn("reward", `${params.surface} op OWNER commit threw (handled - legacy relay is the fallback) (Wave-2d)`, e);
     return null;
+  }
+}
+
+/**
+ * HOST safe seam: commit one previously prepared intent with the complete post-action engine state. The
+ * exact envelope is cached before journal publication, so a failed publication retries the same state tick
+ * and operation id instead of executing or recapturing the action a second time.
+ */
+export function commitRewardAuthoritativeResult(
+  operationId: string,
+  authoritativeState?: CoopAuthoritativeBattleStateV1 | null,
+): CoopRewardOwnerCommitResult | null {
+  if (!isCoopRewardOperationEnabled() || !isCoopOperationJournalActive()) {
+    return null;
+  }
+  const key = preparedKey("host", operationId);
+  const prepared = preparedIntents.get(key);
+  if (prepared == null) {
+    coopWarn("reward", `authoritative reward result has no prepared host intent id=${operationId}`);
+    return null;
+  }
+
+  const retained = committedResultEnvelopes.get(operationId);
+  if (retained != null) {
+    if (!tryJournalCoopCommittedEnvelope(retained)) {
+      return null;
+    }
+    advancePreparedWatcher(prepared);
+    return { operationId, revision: retained.revision };
+  }
+
+  const state = authoritativeState ?? authorityStateHooks.capture(prepared.turn);
+  if (!isCompleteRewardAuthorityState(state, prepared.wave, prepared.turn)) {
+    coopWarn(
+      "reward",
+      `authoritative reward result refused incomplete state id=${operationId} wave=${prepared.wave} turn=${prepared.turn}`,
+    );
+    return null;
+  }
+  const res = host().submit(
+    prepared.intent,
+    authoritativeResultContext(prepared.surface, prepared.wave, prepared.turn, state),
+    ownerParityValidator(prepared.pinned),
+  );
+  if (res.kind !== "committed" && res.kind !== "reack") {
+    coopWarn("reward", `authoritative reward result rejected (${res.kind}) id=${operationId}`);
+    return null;
+  }
+  if (!samePayload(res.kind === "reack" ? res.op.payload : res.envelope.pendingOperation?.payload, prepared.intent.payload)) {
+    return null;
+  }
+  committedResultEnvelopes.set(operationId, res.envelope);
+  if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
+    return null;
+  }
+  advancePreparedWatcher(prepared);
+  coopLog(
+    "reward",
+    `${prepared.surface} authoritative RESULT retained rev=${res.envelope.revision} tick=${state.tick} id=${operationId}`,
+  );
+  return { operationId, revision: res.envelope.revision };
+}
+
+function advancePreparedWatcher(prepared: PreparedRewardIntent): void {
+  if (prepared.watcherState == null || prepared.watcherAdvanced) {
+    return;
+  }
+  prepared.watcherAdvanced = true;
+  prepared.watcherState.ordinal += 1;
+  prepared.watcherState.lastAdoptedStart = Math.max(prepared.watcherState.lastAdoptedStart, prepared.pinned);
+  if (prepared.terminal) {
+    prepared.watcherState.lastLeftStart = Math.max(prepared.watcherState.lastLeftStart, prepared.pinned);
   }
 }
 
@@ -527,12 +748,47 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
       payload,
     };
 
-    // The AUTHORITY (host) is the sole committer: if it is WATCHING a guest-owned action, commit it now
-    // (invariant 3). A rejection (wrong owner) -> do not adopt.
+    // The AUTHORITY (host) watching a guest-owned action first validates and retains the INTENT. The phase
+    // executes it exactly once, then calls commitRewardAuthoritativeResult at the post-action safe seam.
     if (params.localRole === "host") {
+      if (isCoopOperationJournalActive()) {
+        if (!ownerParityValidator(params.pinned)(intent).ok) {
+          return { adopt: false, reason: "host-wrong-owner" };
+        }
+        const key = preparedKey("host", opId);
+        const existing = preparedIntents.get(key);
+        if (existing?.executing || committedResultEnvelopes.has(opId)) {
+          return { adopt: false, reason: "host-intent-in-flight-or-complete" };
+        }
+        const prepared: PreparedRewardIntent = {
+          intent,
+          surface: params.surface,
+          pinned: params.pinned,
+          terminal: params.terminal,
+          wave: params.wave,
+          turn: params.turn ?? 0,
+          localRole: "host",
+          watcherState: state,
+          executing: true,
+          watcherAdvanced: false,
+        };
+        if (!retainPreparedIntent(prepared)) {
+          return { adopt: false, reason: "host-intent-payload-conflict" };
+        }
+        const retainedPrepared = preparedIntents.get(key);
+        if (retainedPrepared != null) {
+          retainedPrepared.executing = true;
+        }
+        return {
+          adopt: true,
+          operationId: opId,
+          authoritativeProjection: false,
+          requiresAuthorityCommit: true,
+        };
+      }
       const res = host().submit(
         intent,
-        controlContext(params.surface, params.wave, params.turn ?? 0),
+        legacyControlContext(params.surface, params.wave, params.turn ?? 0),
         ownerParityValidator(params.pinned),
       );
       if (res.kind === "rejected" || res.kind === "rejected-late") {
@@ -556,7 +812,7 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
         if (params.terminal) {
           state.lastLeftStart = Math.max(state.lastLeftStart, params.pinned);
         }
-        return { adopt: true };
+        return { adopt: true, operationId: opId };
       }
       return { adopt: false, reason: "host-duplicate" };
     }
@@ -581,7 +837,7 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
           "reward",
           `${params.surface} op WATCHER materialize JOURNAL choice=${params.action.choice} terminal=${params.terminal} id=${opId}`,
         );
-        return { adopt: true };
+        return { adopt: true, operationId: opId, authoritativeProjection: true };
       }
       coopWarn("reward", `${params.surface} op WATCHER REJECT duplicate id=${opId} (Wave-2d)`);
       return { adopt: false, reason: "duplicate" };
@@ -602,7 +858,7 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
       turn: params.turn ?? 0,
       logicalPhase: params.surface === "reward" ? "REWARD_SELECT" : "SHOP",
       pendingOperation: appliedOp,
-      authoritativeState: controlContext(params.surface, params.wave, params.turn ?? 0).authoritativeState,
+      authoritativeState: legacyControlContext(params.surface, params.wave, params.turn ?? 0).authoritativeState,
     });
     if (applyRes.kind !== "applied") {
       coopWarn("reward", `${params.surface} op WATCHER guest non-applied (${applyRes.kind}) id=${opId} (Wave-2d)`);
@@ -619,7 +875,7 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
       "reward",
       `${params.surface} op WATCHER adopt choice=${params.action.choice} terminal=${params.terminal} id=${opId} (Wave-2d)`,
     );
-    return { adopt: true };
+    return { adopt: true, operationId: opId };
   } catch (e) {
     coopWarn("reward", `${params.surface} op WATCHER gate threw (handled - legacy apply is the fallback) (Wave-2d)`, e);
     return { adopt: true };
@@ -650,12 +906,34 @@ function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Co
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
   }
+  const inspected = g.inspectEnvelope(envelope);
+  if (inspected.kind !== "applied") {
+    return inspected.kind === "duplicate" ? "duplicate" : "rejected";
+  }
+  if (!isCompleteRewardAuthorityState(envelope.authoritativeState, envelope.wave, envelope.turn)) {
+    coopWarn("reward", `shop result rejected empty/incomplete authoritative state id=${op.id}`);
+    return "rejected";
+  }
+  if (!stateAppliedOperations.has(op.id)) {
+    const stateApplied = authorityStateHooks.apply(envelope.authoritativeState);
+    if (!stateApplied) {
+      return "rejected";
+    }
+    stateAppliedOperations.add(op.id);
+  } else if (!authorityStateHooks.reapply(envelope.authoritativeState)) {
+    // A retry after the state seam succeeded but before the live UI sink accepted must reassert exactly the
+    // same immutable result. It never executes the reward/shop action locally a second time.
+    return "rejected";
+  }
   if (applyCoopOperationEnvelope(g, "op:reward", envelope) !== "applied") {
     return "rejected"; // transient non-applicable (retriable); never a permanent condition (that is a duplicate above).
   }
   // Route the newly-consumed action into the production sink. It feeds the tagged committed choice into the
   // receiver's existing reward/market FIFO; the phase remains the sole safe mutation site.
-  coopLog("reward", `shop op JOURNAL apply kind=${op.kind} id=${op.id} rev=${envelope.revision} (Wave-2e/W2e-R)`);
+  coopLog(
+    "reward",
+    `shop authoritative RESULT applied-before-render kind=${op.kind} id=${op.id} rev=${envelope.revision} tick=${envelope.authoritativeState.tick}`,
+  );
   return "applied";
 }
 

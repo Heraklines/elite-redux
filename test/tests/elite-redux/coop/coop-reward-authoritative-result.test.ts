@@ -1,0 +1,298 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+import { CoopDurabilityManager, setCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
+import { COOP_INTERACTION_LEAVE, COOP_INTERACTION_REROLL } from "#data/elite-redux/coop/coop-interaction-relay";
+import type { CoopRewardActionPayload, CoopShopBuyPayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  coopOperationDurabilityHooks,
+  getCoopOperationJournalApplied,
+  registerCoopOperationLiveSink,
+  resetCoopOperationJournalLog,
+  setCoopOperationDurability,
+} from "#data/elite-redux/coop/coop-operation-journal";
+import {
+  adoptRewardWatcherChoice,
+  commitRewardAuthoritativeResult,
+  commitRewardOwnerIntent,
+  resetCoopRewardOperationState,
+  setCoopRewardAuthorityStateHooksForTest,
+  setCoopRewardOperationEnabled,
+} from "#data/elite-redux/coop/coop-reward-operation";
+import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+async function flushWire(): Promise<void> {
+  for (let i = 0; i < 16; i++) {
+    await Promise.resolve();
+  }
+}
+
+function state(tick: number, money: number, marker: string, wave = 7, turn = 3): CoopAuthoritativeBattleStateV1 {
+  return {
+    version: 1,
+    tick,
+    wave,
+    turn,
+    playerParty: [{ id: 1, marker }],
+    enemyParty: [],
+    field: [],
+    weather: 0,
+    weatherTurnsLeft: 0,
+    terrain: 0,
+    terrainTurnsLeft: 0,
+    arenaTags: [],
+    money,
+    pokeballCounts: [],
+    playerModifiers: [{ typeId: marker }],
+    enemyModifiers: [],
+  };
+}
+
+describe("P33 retained reward/shop authoritative results", () => {
+  let appliedStates: CoopAuthoritativeBattleStateV1[];
+  let applyCalls: number;
+  let reapplyCalls: number;
+
+  beforeEach(() => {
+    setCoopDurabilityEnabled(true);
+    setCoopRewardOperationEnabled(true);
+    resetCoopRewardOperationState();
+    resetCoopOperationJournalLog();
+    setCoopOperationDurability(null);
+    registerCoopOperationLiveSink("op:reward", null);
+    appliedStates = [];
+    applyCalls = 0;
+    reapplyCalls = 0;
+    setCoopRewardAuthorityStateHooksForTest({
+      capture: () => null,
+      apply: authoritative => {
+        applyCalls++;
+        appliedStates.push(structuredClone(authoritative));
+        return true;
+      },
+      reapply: authoritative => {
+        reapplyCalls++;
+        appliedStates[appliedStates.length - 1] = structuredClone(authoritative);
+        return true;
+      },
+    });
+  });
+
+  afterEach(() => {
+    setCoopOperationDurability(null);
+    registerCoopOperationLiveSink("op:reward", null);
+    setCoopRewardAuthorityStateHooksForTest(null);
+    resetCoopOperationJournalLog();
+    resetCoopRewardOperationState();
+  });
+
+  it("host-owned buy/skip/reroll results carry non-empty post-action state and open projection only after apply", async () => {
+    const pair = createLoopbackPair();
+    const hostManager = new CoopDurabilityManager(pair.host);
+    const guestManager = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
+    setCoopOperationDurability(hostManager);
+    const projectionOrder: string[] = [];
+    registerCoopOperationLiveSink("op:reward", envelope => {
+      projectionOrder.push(`render:${envelope.authoritativeState.tick}`);
+      expect(appliedStates.at(-1)?.tick, "state is installed before the result can render/continue").toBe(
+        envelope.authoritativeState.tick,
+      );
+      return true;
+    });
+
+    const actions = [
+      { label: "shop", choice: 0, data: [1, 0, 0, 0], terminal: false, result: state(11, 900, "buy") },
+      {
+        label: "reroll",
+        choice: COOP_INTERACTION_REROLL,
+        data: [0x4d4f, 850],
+        terminal: false,
+        result: state(12, 850, "reroll"),
+      },
+      {
+        label: "skip",
+        choice: COOP_INTERACTION_LEAVE,
+        data: undefined,
+        terminal: true,
+        result: state(13, 850, "leave"),
+      },
+    ] as const;
+
+    for (const action of actions) {
+      const prepared = commitRewardOwnerIntent({
+        surface: "reward",
+        pinned: 2,
+        label: action.label,
+        choice: action.choice,
+        data: action.data == null ? undefined : [...action.data],
+        terminal: action.terminal,
+        localRole: "host",
+        wave: 7,
+        turn: 3,
+      });
+      expect(prepared?.revision, "stage one retains intent but publishes no pre-action result").toBe(0);
+      expect(commitRewardAuthoritativeResult(prepared!.operationId, action.result)).toMatchObject({
+        operationId: prepared!.operationId,
+      });
+      await flushWire();
+    }
+
+    expect(appliedStates.map(value => value.tick)).toEqual([11, 12, 13]);
+    expect(projectionOrder).toEqual(["render:11", "render:12", "render:13"]);
+    expect(
+      getCoopOperationJournalApplied().every(envelope => envelope.authoritativeState.playerParty.length > 0),
+      "no live committed envelope contains the historical empty placeholder",
+    ).toBe(true);
+    expect(hostManager.unackedCount()).toBe(0);
+    hostManager.dispose();
+    guestManager.dispose();
+  });
+
+  it("guest-owned intent executes only on the host; duplicate/reordered raw intent cannot execute twice", async () => {
+    const pair = createLoopbackPair();
+    const hostManager = new CoopDurabilityManager(pair.host);
+    const guestManager = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
+    setCoopOperationDurability(hostManager);
+    registerCoopOperationLiveSink("op:reward", () => true);
+    let hostExecutions = 0;
+    let guestExecutions = 0;
+
+    const guestProposal = commitRewardOwnerIntent({
+      surface: "market",
+      pinned: 1,
+      label: "biomeShop",
+      choice: 4,
+      data: [0, 700],
+      terminal: false,
+      localRole: "guest",
+      wave: 7,
+      turn: 3,
+    });
+    expect(guestProposal).not.toBeNull();
+    expect(guestExecutions, "proposing never mutates the guest engine").toBe(0);
+
+    const first = adoptRewardWatcherChoice({
+      surface: "market",
+      pinned: 1,
+      action: { choice: 4, data: [0, 700] },
+      terminal: false,
+      localRole: "host",
+      wave: 7,
+      turn: 3,
+    });
+    expect(first).toMatchObject({ adopt: true, requiresAuthorityCommit: true });
+    if (!first.adopt) {
+      throw new Error("host rejected valid guest intent");
+    }
+    const duplicateBeforeResult = adoptRewardWatcherChoice({
+      surface: "market",
+      pinned: 1,
+      action: { choice: 4, data: [0, 700] },
+      terminal: false,
+      localRole: "host",
+      wave: 7,
+      turn: 3,
+    });
+    expect(duplicateBeforeResult).toEqual({ adopt: false, reason: "host-intent-in-flight-or-complete" });
+
+    hostExecutions++;
+    expect(commitRewardAuthoritativeResult(first.operationId!, state(21, 700, "guest-buy"))).not.toBeNull();
+    await flushWire();
+    expect(hostExecutions).toBe(1);
+    expect(guestExecutions, "guest applies state/result but never runs the buy implementation").toBe(0);
+    expect(applyCalls, "the complete host state is the guest mutation seam").toBe(1);
+    expect(appliedStates[0].money).toBe(700);
+    hostManager.dispose();
+    guestManager.dispose();
+  });
+
+  it("dropped then retried and duplicated results apply state and project exactly once", async () => {
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      { drop: 0, reorder: 0, delay: 0 },
+      { seed: 0x33a11ce },
+    );
+    pair.armNextDrop("envelope", "host");
+    const hostManager = new CoopDurabilityManager(pair.host);
+    const guestManager = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
+    setCoopOperationDurability(hostManager);
+    let projections = 0;
+    registerCoopOperationLiveSink("op:reward", () => {
+      projections++;
+      return true;
+    });
+
+    const prepared = commitRewardOwnerIntent({
+      surface: "reward",
+      pinned: 4,
+      label: "reward",
+      choice: 2,
+      data: [0],
+      terminal: false,
+      localRole: "host",
+      wave: 7,
+      turn: 3,
+    })!;
+    const complete = state(31, 1_100, "retained-reward");
+    expect(commitRewardAuthoritativeResult(prepared.operationId, complete)).not.toBeNull();
+    await flushWire();
+    expect(pair.faultsInjected(), "the first complete result was actually dropped").toBe(1);
+    expect(applyCalls).toBe(0);
+
+    hostManager.reconnect();
+    await flushWire();
+    expect(applyCalls).toBe(1);
+    expect(projections).toBe(1);
+    expect(commitRewardAuthoritativeResult(prepared.operationId, state(999, 0, "must-not-recapture"))).toEqual({
+      operationId: prepared.operationId,
+      revision: 1,
+    });
+    hostManager.reconnect();
+    guestManager.reconnect();
+    await flushWire();
+    expect(applyCalls, "duplicate retained delivery cannot apply the engine state twice").toBe(1);
+    expect(projections, "duplicate retained delivery cannot reopen continuation twice").toBe(1);
+    expect(reapplyCalls).toBe(0);
+    hostManager.dispose();
+    guestManager.dispose();
+  });
+
+  it("refuses an empty placeholder and retains exact typed market terminal output", async () => {
+    const pair = createLoopbackPair();
+    const hostManager = new CoopDurabilityManager(pair.host);
+    const guestManager = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
+    setCoopOperationDurability(hostManager);
+    registerCoopOperationLiveSink("op:reward", () => true);
+    const prepared = commitRewardOwnerIntent({
+      surface: "market",
+      pinned: 6,
+      label: "biomeShop",
+      choice: COOP_INTERACTION_LEAVE,
+      data: undefined,
+      terminal: true,
+      localRole: "host",
+      wave: 7,
+      turn: 3,
+    })!;
+    const empty = { ...state(41, 500, "empty"), playerParty: [] };
+    expect(commitRewardAuthoritativeResult(prepared.operationId, empty)).toBeNull();
+    expect(hostManager.unackedCount()).toBe(0);
+
+    expect(commitRewardAuthoritativeResult(prepared.operationId, state(42, 500, "terminal"))).not.toBeNull();
+    await flushWire();
+    const envelope = getCoopOperationJournalApplied().at(-1)!;
+    expect(envelope.pendingOperation?.payload as CoopShopBuyPayload).toEqual({
+      slot: COOP_INTERACTION_LEAVE,
+      data: undefined,
+      terminal: true,
+    });
+    expect((envelope.pendingOperation?.payload as CoopRewardActionPayload).terminal).toBe(true);
+    hostManager.dispose();
+    guestManager.dispose();
+  });
+});

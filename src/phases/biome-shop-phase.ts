@@ -33,8 +33,10 @@ import {
 import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   adoptRewardWatcherChoice,
+  commitRewardAuthoritativeResult,
   commitRewardOwnerIntent,
   isCoopRewardOperationEnabled,
+  isCoopRewardRetainedResultMode,
 } from "#data/elite-redux/coop/coop-reward-operation";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
@@ -97,6 +99,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
   /** Invalidates callbacks retained by an older CONFIRM handler on this same phase instance. */
   private coopConfirmAttempt = 0;
   private coopTerminalPromise: Promise<boolean> | null = null;
+  /** Exact prepared market action awaiting its complete host result capture. */
+  private coopPendingAuthorityOperationId: string | null = null;
   /**
    * Co-op (#866): true when THIS phase is a move-learn CONTINUATION copy (queued by
    * {@linkcode SelectModifierPhase.applyModifier} when a TM / Memory Mushroom / Learner's Shroom /
@@ -171,7 +175,9 @@ export class BiomeShopPhase extends SelectModifierPhase {
       // is the sole engine and the only client running the real curated subclass (Exotic / Black-Market /
       // Import), so it is ALWAYS the option owner - the guest opens a plain BiomeShopPhase and ADOPTS the
       // stream. Outside an ME the option owner == the pick owner (wave market, byte-identical to before).
-      const optionOwner = spoofed || (inMe ? coopController.role === "host" : pickOwner);
+      const optionOwner =
+        spoofed
+        || (isCoopRewardRetainedResultMode() ? coopController.role === "host" : inMe ? coopController.role === "host" : pickOwner);
       this.coopBiomeOwner = pickOwner;
       this.coopBiomeOptionOwner = optionOwner;
       coopLog(
@@ -452,6 +458,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
           terminal: true,
           localRole: role,
           wave,
+          turn: globalScene.currentBattle?.turn ?? 0,
         });
         if (!isCoopRewardOperationEnabled() || commit != null) {
           const resend = (): void =>
@@ -505,8 +512,15 @@ export class BiomeShopPhase extends SelectModifierPhase {
                 terminal: true,
                 localRole: role,
                 wave,
+                turn: globalScene.currentBattle?.turn ?? 0,
               }).adopt;
             if (!adopted) {
+              getCoopRuntime()?.durability?.reconnect();
+              continue;
+            }
+          }
+          if (role === "host" && isCoopRewardRetainedResultMode()) {
+            if (commit == null || commitRewardAuthoritativeResult(commit.operationId) == null) {
               getCoopRuntime()?.durability?.reconnect();
               continue;
             }
@@ -682,6 +696,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         terminal,
         localRole: getCoopController()?.role ?? "guest",
         wave: globalScene.currentBattle?.waveIndex ?? -1,
+        turn: globalScene.currentBattle?.turn ?? 0,
       });
       if (!decision.adopt) {
         coopWarn(
@@ -690,7 +705,18 @@ export class BiomeShopPhase extends SelectModifierPhase {
         );
         continue;
       }
+      if (decision.requiresAuthorityCommit) {
+        this.coopPendingAuthorityOperationId = decision.operationId ?? null;
+      }
       if (terminal) {
+        if (
+          decision.authoritativeProjection !== true
+          && decision.operationId != null
+          && commitRewardAuthoritativeResult(decision.operationId) == null
+        ) {
+          failCoopSharedSession(`Biome market terminal result ${decision.operationId} could not be retained`);
+          return;
+        }
         break;
       }
       if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
@@ -706,6 +732,12 @@ export class BiomeShopPhase extends SelectModifierPhase {
         `biome market watcher applies buy slot=${slot} id=${opt?.type?.id ?? "?"} partySlot=${partySlot} money=${money}`,
       );
       try {
+        if (decision.authoritativeProjection === true) {
+          if (slot >= 0 && slot < this.qtys.length) {
+            this.qtys[slot] = Math.max(0, this.qtys[slot] - 1);
+          }
+          continue;
+        }
         if (opt?.type != null) {
           const party = globalScene.getPlayerParty();
           const mon = partySlot >= 0 ? party[partySlot] : undefined;
@@ -719,13 +751,22 @@ export class BiomeShopPhase extends SelectModifierPhase {
       } catch {
         /* one bad relayed buy must never strand the watcher */
       }
-      if (money >= 0) {
+      if (money >= 0 && decision.authoritativeProjection !== true) {
         if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
           return;
         }
         globalScene.money = money;
         globalScene.updateMoneyText();
       }
+      if (
+        decision.requiresAuthorityCommit
+        && decision.operationId != null
+        && commitRewardAuthoritativeResult(decision.operationId) == null
+      ) {
+        failCoopSharedSession(`Biome market buy result ${decision.operationId} could not be retained`);
+        return;
+      }
+      this.coopPendingAuthorityOperationId = null;
     }
     if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
       return;
@@ -765,6 +806,40 @@ export class BiomeShopPhase extends SelectModifierPhase {
     // Co-op (#673) OWNER: capture the buy BEFORE the stock decrement resets pendingIndex,
     // then relay it self-describing: [slotIntoStreamedStock] + data [targetPartySlot, moneyAfter].
     const coopBoughtSlot = this.coopBiomeOwner && cost !== -1 ? this.pendingIndex : -1;
+    let preparedOperationId: string | null = null;
+    if (coopBoughtSlot >= 0) {
+      const party = globalScene.getPlayerParty();
+      const pokemonId = (modifier as unknown as { pokemonId?: number }).pokemonId;
+      const partySlot = typeof pokemonId === "number" ? party.findIndex(p => p?.id === pokemonId) : -1;
+      const resultingMoney = Overrides.WAIVE_ROLL_FEE_OVERRIDE ? globalScene.money : globalScene.money - cost;
+      const prepared = commitRewardOwnerIntent({
+        surface: "market",
+        pinned: this.coopBiomeStart,
+        label: "biomeShop",
+        choice: coopBoughtSlot,
+        data: [partySlot, resultingMoney],
+        terminal: false,
+        localRole: getCoopController()?.role ?? "guest",
+        wave: globalScene.currentBattle?.waveIndex ?? -1,
+        turn: globalScene.currentBattle?.turn ?? 0,
+      });
+      preparedOperationId = prepared?.operationId ?? null;
+      getCoopInteractionRelay()?.sendInteractionChoice(
+        coopBiomeShopSeq(this.coopBiomeStart),
+        "biomeShop",
+        coopBoughtSlot,
+        [partySlot, resultingMoney],
+      );
+      if (
+        getCoopController()?.role === "guest"
+        && isCoopRewardRetainedResultMode()
+        && preparedOperationId != null
+      ) {
+        this.coopPendingAuthorityOperationId = preparedOperationId;
+        void this.coopAwaitAuthoritativeMarketBuy(preparedOperationId, coopBoughtSlot);
+        return;
+      }
+    }
     super.applyModifier(modifier, cost, playSound);
     // catalog-v2 (#900): a completed paid purchase. BLACK_FRIDAY (black market, one credit per run)
     // or BIOME_TOURIST (distinct biome shop types). Fully guarded - never disturbs the buy.
@@ -783,34 +858,70 @@ export class BiomeShopPhase extends SelectModifierPhase {
     } catch {
       /* achievement recording must never disturb the purchase */
     }
-    if (coopBoughtSlot >= 0) {
-      const party = globalScene.getPlayerParty();
-      const pokemonId = (modifier as unknown as { pokemonId?: number }).pokemonId;
-      const partySlot = typeof pokemonId === "number" ? party.findIndex(p => p?.id === pokemonId) : -1;
-      getCoopInteractionRelay()?.sendInteractionChoice(
-        coopBiomeShopSeq(this.coopBiomeStart),
-        "biomeShop",
-        coopBoughtSlot,
-        [partySlot, globalScene.money],
-      );
-      // Wave-2d: DUAL-RUN - COMMIT the typed market-buy intent through the operation primitive (the host
-      // validates + commits exactly once). No-op when the flag is OFF; the legacy relay above is the fallback.
-      commitRewardOwnerIntent({
-        surface: "market",
-        pinned: this.coopBiomeStart,
-        label: "biomeShop",
-        choice: coopBoughtSlot,
-        data: [partySlot, globalScene.money],
-        terminal: false,
-        localRole: getCoopController()?.role ?? "guest",
-        wave: globalScene.currentBattle?.waveIndex ?? -1,
-      });
+    if (
+      preparedOperationId != null
+      && getCoopController()?.role === "host"
+      && isCoopRewardRetainedResultMode()
+      && commitRewardAuthoritativeResult(preparedOperationId) == null
+    ) {
+      failCoopSharedSession(`Biome market buy result ${preparedOperationId} could not be retained`);
+      return;
     }
     if (cost !== -1 && this.pendingIndex >= 0 && this.pendingIndex < this.qtys.length) {
       this.qtys[this.pendingIndex] = Math.max(0, this.qtys[this.pendingIndex] - 1);
       const handler = globalScene.ui.getHandler() as { setStock?: (index: number, remaining: number) => void };
       handler.setStock?.(this.pendingIndex, this.qtys[this.pendingIndex]);
       this.pendingIndex = -1;
+    }
+  }
+
+  /** Guest market owner: project the committed result only after its complete state was atomically applied. */
+  private async coopAwaitAuthoritativeMarketBuy(operationId: string, slot: number): Promise<void> {
+    const generation = coopSessionGeneration();
+    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const pinned = this.coopBiomeStart;
+    const relay = getCoopInteractionRelay();
+    if (relay == null) {
+      failCoopSharedSession(`Biome market buy ${operationId} has no live relay`);
+      return;
+    }
+    for (;;) {
+      const action = await awaitCoopChoiceWithOrphanBackstop(
+        relay,
+        getCoopController(),
+        coopBiomeShopSeq(pinned),
+        pinned,
+        COOP_BIOME_SHOP_CHOICE_KINDS,
+      );
+      if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
+        return;
+      }
+      if (action == null) {
+        getCoopRuntime()?.durability?.reconnect();
+        continue;
+      }
+      const decision = adoptRewardWatcherChoice({
+        surface: "market",
+        pinned,
+        action: { choice: action.choice, data: action.data, operationId: action.operationId },
+        terminal: false,
+        localRole: "guest",
+        wave,
+        turn: globalScene.currentBattle?.turn ?? 0,
+      });
+      if (
+        !decision.adopt
+        || decision.operationId !== operationId
+        || decision.authoritativeProjection !== true
+      ) {
+        continue;
+      }
+      this.qtys[slot] = Math.max(0, (this.qtys[slot] ?? 0) - 1);
+      const handler = globalScene.ui.getHandler() as { setStock?: (index: number, remaining: number) => void };
+      handler.setStock?.(slot, this.qtys[slot]);
+      this.pendingIndex = -1;
+      this.coopPendingAuthorityOperationId = null;
+      return;
     }
   }
 
