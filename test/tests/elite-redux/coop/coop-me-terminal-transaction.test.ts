@@ -8,7 +8,11 @@ import {
   CoopMeTerminalTransactionReceiver,
   isCompleteCoopMeTerminalPayload,
 } from "#data/elite-redux/coop/coop-me-operation";
-import type { CoopMeTerminalPayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  type CoopMeTerminalPayload,
+  makeCoopOperationId,
+} from "#data/elite-redux/coop/coop-operation-envelope";
+import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopInteractionOutcome,
@@ -78,6 +82,15 @@ function battlePayload(
   };
 }
 
+function terminalId(pinned: number, step: number, epoch = 1): string {
+  return makeCoopOperationId(
+    epoch,
+    0,
+    (COOP_ME_TERM_SEQ_BASE + pinned) * 8000 + 4000 + step,
+    "ME_TERMINAL",
+  );
+}
+
 describe("complete retained Mystery terminal transaction", () => {
   it("rejects every old split terminal shape and accepts complete leave/battle destinations", () => {
     expect(isCompleteCoopMeTerminalPayload({ terminal: "leave" })).toBe(false);
@@ -97,7 +110,7 @@ describe("complete retained Mystery terminal transaction", () => {
 
   it("applies DATA once, withholds completion for a late destination receiver, then executes once after reconnect", () => {
     const receiver = new CoopMeTerminalTransactionReceiver();
-    const receipt = { operationId: "1:0:ME_TERMINAL:1", pinned: 7, step: 0, payload: leavePayload(12) };
+    const receipt = { operationId: terminalId(7, 0), pinned: 7, step: 0, payload: leavePayload(12) };
     let materialApplies = 0;
     let destinationAttempts = 0;
     let destinationReady = false;
@@ -135,7 +148,7 @@ describe("complete retained Mystery terminal transaction", () => {
 
     expect(
       receiver.receive(
-        { operationId: "leave-early", pinned, step: 1, payload: leavePayload(20, true) },
+        { operationId: terminalId(pinned, 1), pinned, step: 1, payload: leavePayload(20, true) },
         hooks,
       ),
       "step 1 cannot overtake its battle handoff",
@@ -143,7 +156,7 @@ describe("complete retained Mystery terminal transaction", () => {
     expect(
       receiver.receive(
         {
-          operationId: "battle",
+          operationId: terminalId(pinned, 0),
           pinned,
           step: 0,
           payload: battlePayload(20, { encounterMode: 1, disableSwitch: true }),
@@ -152,7 +165,7 @@ describe("complete retained Mystery terminal transaction", () => {
       ),
     ).toBe("executed");
     expect(
-      receiver.receive({ operationId: "leave", pinned, step: 1, payload: leavePayload(20, true) }, hooks),
+      receiver.receive({ operationId: terminalId(pinned, 1), pinned, step: 1, payload: leavePayload(20, true) }, hooks),
     ).toBe("executed");
   });
 
@@ -172,16 +185,19 @@ describe("complete retained Mystery terminal transaction", () => {
         return destinationReady;
       },
     };
-    const round0 = { operationId: "battle-round-0", pinned, step: 0, payload: battlePayload(20) };
+    const round0 = { operationId: terminalId(pinned, 0), pinned, step: 0, payload: battlePayload(20) };
     const round1 = {
-      operationId: "battle-round-1",
+      operationId: terminalId(pinned, 1),
       pinned,
       step: 1,
       payload: battlePayload(20, { encounterMode: 3, disableSwitch: true }),
     };
 
     expect(
-      receiver.receive({ operationId: "battle-round-2-early", pinned, step: 2, payload: battlePayload(20) }, hooks),
+      receiver.receive(
+        { operationId: terminalId(pinned, 2), pinned, step: 2, payload: battlePayload(20) },
+        hooks,
+      ),
       "a later round cannot overtake either retained battle step",
     ).toBe("rejected");
     expect(receiver.receive(round0, hooks)).toBe("executed");
@@ -200,13 +216,13 @@ describe("complete retained Mystery terminal transaction", () => {
     );
 
     expect(
-      receiver.receive({ operationId: "battle-round-2", pinned, step: 2, payload: battlePayload(20) }, hooks),
+      receiver.receive({ operationId: terminalId(pinned, 2), pinned, step: 2, payload: battlePayload(20) }, hooks),
     ).toBe("executed");
     expect(
-      receiver.receive({ operationId: "final-leave", pinned, step: 3, payload: leavePayload(20, true) }, hooks),
+      receiver.receive({ operationId: terminalId(pinned, 3), pinned, step: 3, payload: leavePayload(20, true) }, hooks),
     ).toBe("executed");
     expect(
-      receiver.receive({ operationId: "battle-after-leave", pinned, step: 4, payload: battlePayload(20) }, hooks),
+      receiver.receive({ operationId: terminalId(pinned, 4), pinned, step: 4, payload: battlePayload(20) }, hooks),
       "the final leave closes the pinned transaction sequence",
     ).toBe("rejected");
     expect(destinationAttempts).toBe(5);
@@ -216,7 +232,7 @@ describe("complete retained Mystery terminal transaction", () => {
     const receiver = new CoopMeTerminalTransactionReceiver();
     let ready = false;
     const hooks = { applyMaterial: () => true, executeDestination: () => ready };
-    const first = { operationId: "terminal", pinned: 13, step: 0, payload: leavePayload(30) };
+    const first = { operationId: terminalId(13, 0), pinned: 13, step: 0, payload: leavePayload(30) };
     expect(receiver.receive(first, hooks)).toBe("retry");
     expect(receiver.receive({ ...first, payload: leavePayload(30, true) }, hooks)).toBe("rejected");
     expect(receiver.receive({ ...first, pinned: 14 }, hooks), "one id cannot be rebound to another pin").toBe(
@@ -226,7 +242,7 @@ describe("complete retained Mystery terminal transaction", () => {
       "rejected",
     );
     expect(
-      receiver.receive({ operationId: "other", pinned: 13, step: 0, payload: leavePayload(30) }, hooks),
+      receiver.receive({ operationId: terminalId(13, 0, 2), pinned: 13, step: 0, payload: leavePayload(30) }, hooks),
     ).toBe("rejected");
     ready = true;
     expect(receiver.receive(first, hooks)).toBe("executed");
@@ -244,7 +260,7 @@ describe("complete retained Mystery terminal transaction", () => {
     const stages: string[] = [];
     const result = receiver.receive(
       {
-        operationId: `terminal-${presentationFamily}`,
+        operationId: terminalId(40, 0),
         pinned: 40,
         step: 0,
         payload: leavePayload(40, presentationFamily === "embedded shop handoff"),

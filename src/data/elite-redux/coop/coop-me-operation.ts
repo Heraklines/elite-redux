@@ -82,7 +82,10 @@ import {
   CoopOperationGuest,
   CoopOperationHost,
 } from "#data/elite-redux/coop/coop-operation-runtime";
-import { COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import {
+  COOP_ME_PUMP_SEQ_BASE,
+  COOP_ME_TERM_SEQ_BASE,
+} from "#data/elite-redux/coop/coop-seq-registry";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type {
   CoopAuthoritativeBattleStateV1,
@@ -205,10 +208,16 @@ export class CoopMeTerminalTransactionReceiver {
   }
 
   public receive(receipt: CoopMeTerminalReceipt, hooks: CoopMeTerminalReceiveHooks): CoopMeTerminalReceiveResult {
+    const parsed = parseCoopOperationId(receipt.operationId);
+    const expectedAddress = (COOP_ME_TERM_SEQ_BASE + receipt.pinned) * 8000 + 4000 + receipt.step;
     if (
       receipt.operationId.length === 0
       || !isSafeNonNegativeInteger(receipt.pinned)
       || !isSafeNonNegativeInteger(receipt.step)
+      || receipt.step >= 1_000
+      || parsed?.owner !== 0
+      || parsed.kind !== "ME_TERMINAL"
+      || parsed.pinnedSeq !== expectedAddress
       || !isCompleteCoopMeTerminalPayload(receipt.payload)
     ) {
       return "rejected";
