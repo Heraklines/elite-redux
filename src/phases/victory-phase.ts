@@ -8,7 +8,10 @@ import {
   getCoopController,
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
-import { resolveCoopVictoryTailControl } from "#data/elite-redux/coop/coop-wave-operation";
+import {
+  resolveCoopBiomeBoundaryFlag,
+  resolveCoopVictoryTailControl,
+} from "#data/elite-redux/coop/coop-wave-operation";
 import { erRecordAchievementWaveWon } from "#data/elite-redux/er-achievement-tracker";
 import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
@@ -109,7 +112,7 @@ export class VictoryPhase extends PokemonPhase {
       const tailControl = resolveCoopVictoryTailControl(authoritativeTransition, {
         trainerWin: () => globalScene.currentBattle.battleType === BattleType.TRAINER,
         runContinues: () => gameMode.isEndless || !gameMode.isWaveFinal(currentWaveIndex),
-        biomeChange: () => globalScene.isNewBiome(),
+        biomeChange: () => resolveCoopBiomeBoundaryFlag(gameMode.hasRandomBiomes, globalScene.isNewBiome()),
       });
       const isTrainerWin = tailControl.trainerWin;
       // DIAGNOSTIC (#633 trainer-victory deadlock): log the win-branch entry on a co-op run so a live
@@ -261,7 +264,7 @@ export class VictoryPhase extends PokemonPhase {
           globalScene.phaseManager.pushNew("PartyHealPhase", false);
         }
 
-        if (gameMode.hasRandomBiomes || biomeEnding) {
+        if (biomeEnding) {
           globalScene.phaseManager.pushNew("SelectBiomePhase");
         } else if (raiseCrossroads) {
           // ER (#486): not a biome end, but a 5-wave Crossroads tick - raise the

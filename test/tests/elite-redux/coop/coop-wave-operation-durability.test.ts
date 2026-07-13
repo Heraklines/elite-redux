@@ -26,8 +26,15 @@ import {
   clearNegotiatedCoopCapabilities,
   setNegotiatedCoopCapabilities,
 } from "#data/elite-redux/coop/coop-capabilities";
-import { CoopDurabilityManager, setCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
-import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  type CoopDurabilityHooks,
+  CoopDurabilityManager,
+  setCoopDurabilityEnabled,
+} from "#data/elite-redux/coop/coop-durability";
+import type {
+  CoopAuthoritativeEnvelopeV1,
+  CoopWaveAdvancePayload,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   coopOperationDurabilityHooks,
   getCoopOperationJournalApplied,
@@ -36,9 +43,13 @@ import {
   resetCoopOperationJournalLog,
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
+import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import {
   commitWaveAdvanceOwnerIntent,
+  isCoopWaveAdvanceTransactionComplete,
+  markCoopWaveAdvanceContinuationReady,
+  markCoopWaveAdvanceDataApplied,
   resetCoopWaveAdvanceOperationFlag,
   resetCoopWaveAdvanceOperationState,
   setCoopWaveAdvanceOperationEnabled,
@@ -54,6 +65,7 @@ async function flush(): Promise<void> {
 }
 
 function waveAdvancePayload(wave: number, over: Partial<CoopWaveAdvancePayload> = {}): CoopWaveAdvancePayload {
+  const outcome = over.outcome ?? "win";
   return {
     wave,
     outcome: "win",
@@ -62,14 +74,107 @@ function waveAdvancePayload(wave: number, over: Partial<CoopWaveAdvancePayload> 
     biomeChange: false,
     eggLapse: false,
     meBoundary: "none",
-    victoryKind: "wild",
+    settledStateTick: wave + 100,
+    ...(outcome === "win" || outcome === "capture" ? { victoryKind: "wild" as const } : {}),
     ...over,
   };
 }
 
+class ManualScheduler {
+  now = 0;
+  private readonly tasks: { at: number; callback: () => void; cancelled: boolean }[] = [];
+
+  readonly schedule = (callback: () => void, ms: number): (() => void) => {
+    const task = { at: this.now + ms, callback, cancelled: false };
+    this.tasks.push(task);
+    return () => {
+      task.cancelled = true;
+    };
+  };
+
+  advance(ms: number): void {
+    const target = this.now + ms;
+    for (;;) {
+      const next = this.tasks.filter(task => !task.cancelled && task.at <= target).sort((a, b) => a.at - b.at)[0];
+      if (next == null) {
+        break;
+      }
+      next.cancelled = true;
+      this.now = next.at;
+      next.callback();
+    }
+    this.now = target;
+  }
+
+  runNext(): boolean {
+    const next = this.tasks.filter(task => !task.cancelled).sort((a, b) => a.at - b.at)[0];
+    if (next == null) {
+      return false;
+    }
+    this.advance(next.at - this.now);
+    return true;
+  }
+}
+
+function waveState(payload: CoopWaveAdvancePayload): CoopAuthoritativeBattleStateV1 {
+  return {
+    version: 1,
+    tick: payload.settledStateTick!,
+    wave: payload.wave,
+    turn: 0,
+    playerParty: [],
+    enemyParty: [],
+    field: [],
+    weather: 0,
+    weatherTurnsLeft: 0,
+    terrain: 0,
+    terrainTurnsLeft: 0,
+    arenaTags: [],
+    money: payload.wave * 100,
+    pokeballCounts: [],
+    playerModifiers: [],
+    enemyModifiers: [],
+  };
+}
+
+function waveEnvelope(wave: number, revision = 1): CoopAuthoritativeEnvelopeV1 {
+  const transition = waveAdvancePayload(wave);
+  const authoritativeState = waveState(transition);
+  return {
+    version: 1,
+    sessionEpoch: 1,
+    revision,
+    wave,
+    turn: authoritativeState.turn,
+    logicalPhase: transition.nextLogicalPhase,
+    pendingOperation: {
+      id: `1:0:WAVE_ADVANCE:${wave}`,
+      kind: "WAVE_ADVANCE",
+      owner: 0,
+      status: "applied",
+      payload: transition,
+    },
+    authoritativeState,
+  };
+}
+
+function completeWaveEnvelope(envelope: { pendingOperation: { payload: unknown } | null }): boolean {
+  const wave = (envelope.pendingOperation?.payload as CoopWaveAdvancePayload).wave;
+  markCoopWaveAdvanceDataApplied(wave);
+  markCoopWaveAdvanceContinuationReady(wave);
+  return true;
+}
+
 /** Commit a host wave-advance through the REAL adapter (the owner/host is the sole committer of a wave-advance). */
 function commitHostWave(wave: number, over: Partial<CoopWaveAdvancePayload> = {}): void {
-  commitWaveAdvanceOwnerIntent({ payload: waveAdvancePayload(wave, over), localRole: "host", wave, turn: 0 });
+  const payload = waveAdvancePayload(wave, over);
+  commitWaveAdvanceOwnerIntent({
+    payload,
+    authoritativeState: waveState(payload),
+    localRole: "host",
+    wave,
+    turn: 0,
+  });
 }
 
 /** The waves the journal carrier routed INTO the live-mutation seam this client (the live-state proxy). */
@@ -102,7 +207,7 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     const seen: CoopWaveAdvancePayload[] = [];
     registerCoopOperationLiveSink("op:wave", env => {
       seen.push(env.pendingOperation?.payload as CoopWaveAdvancePayload);
-      return true; // the real materializer feeds pendingWaveAdvance (coop-runtime); the mock records.
+      return completeWaveEnvelope(env);
     });
 
     const pair = createLoopbackPair();
@@ -125,11 +230,256 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     guestMgr.dispose();
   });
 
+  it("withholds the journal ACK until DATA applied and continuationReady are both proven", async () => {
+    registerCoopOperationLiveSink("op:wave", () => true);
+    const pair = createLoopbackPair();
+    const hostMgr = new CoopDurabilityManager(pair.host);
+    const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
+    setCoopOperationDurability(hostMgr);
+
+    commitHostWave(13);
+    await flush();
+    expect(getCoopOperationJournalApplied(), "a sink callback alone is not ACK eligibility").toHaveLength(0);
+
+    markCoopWaveAdvanceDataApplied(13);
+    hostMgr.reconnect();
+    await flush();
+    expect(getCoopOperationJournalApplied(), "DATA alone still cannot retire the transaction").toHaveLength(0);
+
+    markCoopWaveAdvanceContinuationReady(13);
+    hostMgr.reconnect();
+    await flush();
+    expect(
+      getCoopOperationJournalApplied().map(e => (e.pendingOperation?.payload as CoopWaveAdvancePayload).wave),
+    ).toEqual([13]);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
+  it("rejects control-before-DATA, same-id conflicts, and stale waves while exact re-delivery remains idempotent", () => {
+    const hooks = coopOperationDurabilityHooks();
+    const apply = hooks.apply!;
+    const exact = waveEnvelope(15);
+    const entry = (envelope: CoopAuthoritativeEnvelopeV1) => ({
+      cls: "op:global",
+      seq: envelope.revision,
+      msg: { t: "envelope" as const, envelope },
+    });
+
+    expect(apply(entry(exact)), "a valid envelope stages but waits for its safe boundary").toBe("deferred");
+    expect(markCoopWaveAdvanceContinuationReady(15), "CONTROL cannot latch before DATA").toBe(false);
+    expect(isCoopWaveAdvanceTransactionComplete(15)).toBe(false);
+
+    const conflict: CoopAuthoritativeEnvelopeV1 = {
+      ...exact,
+      authoritativeState: { ...exact.authoritativeState, money: exact.authoritativeState.money + 1 },
+    };
+    expect(apply(entry(conflict)), "same operation id with changed DATA is a conflict").toBe("rejected");
+
+    expect(markCoopWaveAdvanceDataApplied(15)).toBe(true);
+    expect(markCoopWaveAdvanceContinuationReady(15)).toBe(true);
+    registerCoopOperationLiveSink("op:wave", () => true);
+    expect(apply(entry(exact))).toBe("applied");
+    expect(apply(entry(exact)), "the exact completed transaction is idempotent").toBe("duplicate");
+    expect(apply(entry(conflict)), "a conflicting retry cannot borrow the original ACK").toBe("rejected");
+
+    const stale = waveEnvelope(14, 2);
+    expect(apply(entry(stale)), "an earlier wave cannot advance after a later one completed").toBe("rejected");
+  });
+
+  it("treats a legitimate Victory-to-BattleEnd delay beyond 9.1s as deferred, then ACKs exactly once on the real continuation wake", async () => {
+    const scheduler = new ManualScheduler();
+    const failures: unknown[] = [];
+    let battleEndOpen = false;
+    let continuationOpen = false;
+    registerCoopOperationLiveSink("op:wave", envelope => {
+      const wave = (envelope.pendingOperation?.payload as CoopWaveAdvancePayload).wave;
+      if (battleEndOpen) {
+        markCoopWaveAdvanceDataApplied(wave);
+      }
+      if (continuationOpen) {
+        markCoopWaveAdvanceContinuationReady(wave);
+      }
+      return battleEndOpen && continuationOpen;
+    });
+    const pair = createLoopbackPair();
+    let ackCount = 0;
+    pair.host.onMessage(message => {
+      if (message.t === "coopAck" && message.cls === "op:global") {
+        ackCount++;
+      }
+    });
+    const hostMgr = new CoopDurabilityManager(pair.host);
+    const guestMgr = new CoopDurabilityManager(pair.guest, {
+      ...coopOperationDurabilityHooks(),
+      scheduleRecovery: scheduler.schedule,
+      recoveryNow: () => scheduler.now,
+      deferredRetryMs: 100,
+      recoveryInitialMs: 100,
+      recoveryMaxMs: 2_000,
+      recoveryMaxAttempts: 8,
+      recoveryDeadlineMs: 12_000,
+      onRecoveryExhausted: failure => failures.push(failure),
+    });
+    setCoopOperationDurability(hostMgr);
+
+    commitHostWave(14);
+    await flush();
+    scheduler.advance(9_200);
+    await flush();
+
+    expect(failures, "normal phase latency must never consume the bounded recovery budget").toEqual([]);
+    expect(hostMgr.unackedCount(), "the complete transaction remains retained while BattleEnd is closed").toBe(1);
+    expect(guestMgr.appliedMarks(), "no mechanical/UI proof means no receiver advance").toEqual({});
+    expect(ackCount).toBe(0);
+    hostMgr.reconnect();
+    await flush();
+    expect(ackCount, "an exact duplicate resend may re-run readiness but cannot ACK early").toBe(0);
+    expect(failures, "duplicate readiness probes remain outside error recovery").toEqual([]);
+
+    battleEndOpen = true;
+    scheduler.advance(100);
+    await flush();
+    expect(getCoopOperationJournalApplied(), "DATA alone still cannot ACK").toHaveLength(0);
+
+    continuationOpen = true;
+    expect(guestMgr.retryDeferred("op:global"), "the public continuation wake reattempts immediately").toBe(1);
+    await flush();
+    expect(
+      getCoopOperationJournalApplied().map(e => (e.pendingOperation?.payload as CoopWaveAdvancePayload).wave),
+      "the valid retained transaction applies once after both latches",
+    ).toEqual([14]);
+    expect(hostMgr.unackedCount()).toBe(0);
+    expect(guestMgr.appliedMarks()).toEqual({ "op:global": 1 });
+    expect(ackCount, "the successful boundary emits one cumulative ACK").toBe(1);
+    expect(guestMgr.retryDeferred("op:global"), "the wake is one-shot after completion").toBe(0);
+    expect(ackCount).toBe(1);
+    expect(failures).toEqual([]);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
+  it("routes a continuation that never opens through the peer-coherent terminal supervisor after its own deadline", async () => {
+    const scheduler = new ManualScheduler();
+    const failures: Parameters<NonNullable<CoopDurabilityHooks["onRecoveryExhausted"]>>[0][] = [];
+    const pair = createLoopbackPair();
+    const hostMgr = new CoopDurabilityManager(pair.host);
+    const guestMgr = new CoopDurabilityManager(pair.guest, {
+      extractKey: message => (message.t === "waveResolved" ? { cls: "wave", seq: message.wave } : null),
+      apply: () => "deferred",
+      scheduleRecovery: scheduler.schedule,
+      recoveryNow: () => scheduler.now,
+      deferredRetryMs: 100,
+      deferredDeadlineMs: 500,
+      recoveryInitialMs: 1,
+      recoveryMaxMs: 1,
+      recoveryMaxAttempts: 3,
+      recoveryDeadlineMs: 100,
+      onRecoveryExhausted: failure => failures.push(failure),
+    });
+
+    hostMgr.commit("wave", 1, { t: "waveResolved", wave: 1, outcome: "win" });
+    await flush();
+    scheduler.advance(499);
+    await flush();
+    expect(failures, "normal deferred time does not consume the 12s error-recovery budget").toEqual([]);
+
+    scheduler.advance(1);
+    await flush();
+    expect(failures).toEqual([{ cls: "wave", from: 0, blockedSeq: 1, attempts: 5, reason: "deferred-timeout" }]);
+    expect(guestMgr.appliedMarks()).toEqual({});
+    expect(hostMgr.unackedCount()).toBe(1);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
+  it("keeps a genuinely rejected durability apply on the bounded recovery-to-terminal path", async () => {
+    const scheduler = new ManualScheduler();
+    const failures: Parameters<NonNullable<CoopDurabilityHooks["onRecoveryExhausted"]>>[0][] = [];
+    const pair = createLoopbackPair();
+    const hooks: CoopDurabilityHooks = {
+      extractKey: message => (message.t === "waveResolved" ? { cls: "wave", seq: message.wave } : null),
+      apply: () => "rejected",
+      scheduleRecovery: scheduler.schedule,
+      recoveryNow: () => scheduler.now,
+      recoveryInitialMs: 1,
+      recoveryMaxMs: 1,
+      recoveryMaxAttempts: 3,
+      recoveryDeadlineMs: 100,
+      deferredRetryMs: 1,
+      onRecoveryExhausted: failure => failures.push(failure),
+    };
+    const hostMgr = new CoopDurabilityManager(pair.host);
+    const guestMgr = new CoopDurabilityManager(pair.guest, hooks);
+
+    hostMgr.commit("wave", 1, { t: "waveResolved", wave: 1, outcome: "win" });
+    await flush();
+    for (let i = 0; i < 8 && failures.length === 0; i++) {
+      expect(scheduler.runNext()).toBe(true);
+      await flush();
+    }
+
+    expect(failures).toEqual([{ cls: "wave", from: 0, blockedSeq: 1, attempts: 3, reason: "apply-rejected" }]);
+    expect(guestMgr.appliedMarks()).toEqual({});
+    expect(hostMgr.unackedCount()).toBe(1);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
+  it("buffers later global revisions behind a valid deferred head and drains them in order without false gap recovery", async () => {
+    const scheduler = new ManualScheduler();
+    const applied: number[] = [];
+    const failures: unknown[] = [];
+    let headReady = false;
+    const pair = createLoopbackPair();
+    const hooks: CoopDurabilityHooks = {
+      extractKey: message => (message.t === "waveResolved" ? { cls: "wave", seq: message.wave } : null),
+      apply: entry => {
+        if (entry.msg.t !== "waveResolved") {
+          return "rejected";
+        }
+        if (entry.msg.wave === 1 && !headReady) {
+          return "deferred";
+        }
+        applied.push(entry.msg.wave);
+        return "applied";
+      },
+      scheduleRecovery: scheduler.schedule,
+      recoveryNow: () => scheduler.now,
+      deferredRetryMs: 100,
+      recoveryInitialMs: 100,
+      recoveryMaxMs: 2_000,
+      recoveryMaxAttempts: 8,
+      recoveryDeadlineMs: 12_000,
+      onRecoveryExhausted: failure => failures.push(failure),
+    };
+    const hostMgr = new CoopDurabilityManager(pair.host);
+    const guestMgr = new CoopDurabilityManager(pair.guest, hooks);
+
+    hostMgr.commit("wave", 1, { t: "waveResolved", wave: 1, outcome: "win" });
+    hostMgr.commit("wave", 2, { t: "waveResolved", wave: 2, outcome: "win" });
+    await flush();
+    scheduler.advance(9_200);
+    await flush();
+    expect(applied).toEqual([]);
+    expect(failures, "revision 2 is not a missing-frame error while valid revision 1 awaits its boundary").toEqual([]);
+
+    headReady = true;
+    expect(guestMgr.retryDeferred("wave")).toBe(1);
+    await flush();
+    expect(applied, "the buffered follower drains only after the deferred head commits").toEqual([1, 2]);
+    expect(guestMgr.appliedMarks()).toEqual({ wave: 2 });
+    expect(hostMgr.unackedCount()).toBe(0);
+    expect(failures).toEqual([]);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
   it("a flee and a game-over wave-advance both journal + route with their host-stated next phase", async () => {
     const seen: CoopWaveAdvancePayload[] = [];
     registerCoopOperationLiveSink("op:wave", env => {
       seen.push(env.pendingOperation?.payload as CoopWaveAdvancePayload);
-      return true;
+      return completeWaveEnvelope(env);
     });
     const pair = createLoopbackPair();
     const hostMgr = new CoopDurabilityManager(pair.host);
@@ -152,7 +502,7 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
   // EXACTLY-ONCE routing across resend + reconnect re-deliveries (one-ledger dedup, invariant 5).
   // ===========================================================================================
   it("a re-delivered committed wave-advance (resend + reconnect tail) routes to the live sink EXACTLY ONCE", async () => {
-    registerCoopOperationLiveSink("op:wave", () => true);
+    registerCoopOperationLiveSink("op:wave", env => completeWaveEnvelope(env));
     const pair = createLoopbackPair();
     const hostMgr = new CoopDurabilityManager(pair.host);
     const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
@@ -176,7 +526,7 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
   // ===========================================================================================
   it("after a cold resume at revision N, the producer emits N+1 and the restored receiver applies the wave-advance", async () => {
     const N = 4;
-    registerCoopOperationLiveSink("op:wave", () => true);
+    registerCoopOperationLiveSink("op:wave", env => completeWaveEnvelope(env));
     const pair = createLoopbackPair();
     const hostMgr = new CoopDurabilityManager(pair.host);
     const guestMgr = new CoopDurabilityManager(pair.guest, coopOperationDurabilityHooks());
@@ -204,7 +554,7 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
   // ANTI-SPIN: a DUPLICATE journal apply still ACKs (never break this invariant).
   // ===========================================================================================
   it("a re-delivered already-consumed wave-advance ACKs (duplicate), so the committer's resend loop terminates", async () => {
-    registerCoopOperationLiveSink("op:wave", () => true);
+    registerCoopOperationLiveSink("op:wave", env => completeWaveEnvelope(env));
     const sentAcks: string[] = [];
     const pair = createLoopbackPair();
     // Count coopAck frames the guest sends.
@@ -249,9 +599,9 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
   // ===========================================================================================
   it("a peer that does NOT advertise opSurface.wave disables the surface (fail-closed): nothing is committed / routed", async () => {
     let routed = 0;
-    registerCoopOperationLiveSink("op:wave", () => {
+    registerCoopOperationLiveSink("op:wave", env => {
       routed++;
-      return true;
+      return completeWaveEnvelope(env);
     });
     // Negotiate a set WITHOUT the wave capability -> isCoopWaveAdvanceOperationEnabled() is false.
     setNegotiatedCoopCapabilities([COOP_CAP_OP_WAVE], /* peer */ []);
@@ -274,7 +624,7 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     const seen: number[] = [];
     registerCoopOperationLiveSink("op:wave", env => {
       seen.push((env.pendingOperation?.payload as CoopWaveAdvancePayload).wave);
-      return true;
+      return completeWaveEnvelope(env);
     });
     setNegotiatedCoopCapabilities([COOP_CAP_OP_WAVE], [COOP_CAP_OP_WAVE]);
 

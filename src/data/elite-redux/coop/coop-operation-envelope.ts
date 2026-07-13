@@ -358,7 +358,8 @@ export interface CoopQuizAnswerPayload {
 // / SelectBiomePhase / GameOverPhase) by ADOPTION instead of DERIVATION. Committing this makes
 // logicalPhase host-authoritative for the between-wave transition - the keystone that lets §3's renderer
 // allowlist stop DENYING the boundary tails and start OP-SANCTIONING them (§3 strict-tails). The DATA
-// still rides waveResolved/waveEndState (dual-run); this op is the CONTROL statement.
+// plane rides inside the retained P33 envelope as the settled post-BattleEnd state image. The raw
+// waveResolved/waveEndState arms remain negotiated legacy/presentation carriers only.
 // -----------------------------------------------------------------------------
 
 /**
@@ -400,6 +401,13 @@ export interface CoopWaveAdvancePayload {
   readonly meBoundary: CoopWaveMeBoundary;
   /** The victory kind for win/capture (wild vs trainer, drives TrainerVictoryPhase); absent for flee/gameOver. */
   readonly victoryKind?: CoopWaveVictoryKind;
+  /**
+   * Tick of the settled authoritativeState embedded in this exact retained envelope. Absent only on the
+   * early raw waveResolved compatibility hint, which is deliberately insufficient to advance a P33 guest.
+   * A journal receiver requires this value and exact equality with authoritativeState.tick before it may
+   * stage DATA or make the stated continuation executable.
+   */
+  readonly settledStateTick?: number;
 }
 
 // -----------------------------------------------------------------------------

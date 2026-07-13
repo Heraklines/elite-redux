@@ -37,15 +37,16 @@ import {
   resetCoopOperationJournalLog,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
+  broadcastCoopWaveEndState,
   broadcastCoopWaveResolved,
   clearCoopRuntime,
-  consumeCoopPendingWaveAdvance,
-  getCoopActiveWaveTransition,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import * as waveOp from "#data/elite-redux/coop/coop-wave-operation";
 import {
+  markCoopWaveAdvanceContinuationReady,
+  markCoopWaveAdvanceDataApplied,
   resetCoopWaveAdvanceOperationFlag,
   resetCoopWaveAdvanceOperationState,
   setCoopWaveAdvanceOperationEnabled,
@@ -118,7 +119,10 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     // Runtime assembly installs the receiver-bound production sink. Override it only after assembly for
     // this boundary-seam recording test; production materialization is covered by the runtime/soak suites.
     registerCoopOperationLiveSink("op:wave", env => {
-      routed.push(env.pendingOperation?.payload as CoopWaveAdvancePayload);
+      const payload = env.pendingOperation?.payload as CoopWaveAdvancePayload;
+      routed.push(payload);
+      markCoopWaveAdvanceDataApplied(payload.wave);
+      markCoopWaveAdvanceContinuationReady(payload.wave);
       return true;
     });
     return rig;
@@ -142,11 +146,33 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
         rig.hostScene.currentBattle.waveIndex = ctx.waveIndex;
       }
       broadcastCoopWaveResolved(outcome);
+      if (outcome !== "gameOver") {
+        broadcastCoopWaveEndState(outcome === "win" || outcome === "capture");
+      }
     });
     // Pump delivery under the GUEST ctx so its durability manager + live sink run as the guest.
     await withClient(rig.guestCtx, () => drainLoopback());
     return commitSpy.mock.calls.at(-1)?.[0].payload;
   }
+
+  it("still commits and routes the complete transaction when both raw wave carriers are dropped", async () => {
+    const rig = await bootDuo();
+    vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved").mockImplementation(() => {
+      throw new Error("drop raw waveResolved");
+    });
+    vi.spyOn(rig.hostRuntime.battleStream, "sendWaveEndState").mockImplementation(() => {
+      throw new Error("drop raw waveEndState");
+    });
+
+    const committed = await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 2 });
+
+    expect(committed?.settledStateTick, "the raw drop cannot suppress the retained state image").toBeGreaterThan(0);
+    expect(
+      routed.map(payload => payload.wave),
+      "the guest advances from the envelope alone",
+    ).toContain(2);
+    logs.flush();
+  }, 300_000);
 
   // ===========================================================================================
   // CLASS 1 - WILD WIN: VictoryPhase tail, NO trainer, next phase WAVE_VICTORY.
@@ -159,6 +185,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     expect(payload!.outcome).toBe("win");
     expect(payload!.victoryKind, "a WILD win states victoryKind=wild (no TrainerVictoryPhase)").toBe("wild");
     expect(payload!.nextLogicalPhase, "logicalPhase is host-authoritative for the transition").toBe("WAVE_VICTORY");
+    expect(payload!.settledStateTick, "the committed destination is bound to the settled DATA tick").toBeGreaterThan(0);
 
     // Two-engine: the guest routed the SAME host-stated op into its live materializer.
     expect(routed.length, "the guest routed the committed op into its live-mutation sink").toBeGreaterThan(0);
@@ -205,22 +232,15 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     expect(routed.at(-1)!.biomeChange, "the guest received the SAME host-stated biome verdict").toBe(
       payload!.biomeChange,
     );
-    const pending = await withClient(rig.guestCtx, () => consumeCoopPendingWaveAdvance());
-    expect(pending?.transition, "the live guest pending queue retained the full host statement").toEqual(payload);
-    expect(pending?.transition?.biomeChange, "host says map boundary even while the guest locally says no").toBe(true);
     expect(
       guestDerive,
-      "the pending queue never consulted the contradictory guest biome verdict",
+      "the retained transaction never consulted the contradictory guest biome verdict",
     ).not.toHaveBeenCalled();
-    expect(
-      await withClient(rig.guestCtx, () => getCoopActiveWaveTransition(10)),
-      "the exact statement remains active for the guest VictoryPhase queue",
-    ).toEqual(payload);
     if (payload!.biomeChange) {
       const tails = waveOp.coopWaveAdvanceSanctionedTails(payload!);
-      expect(tails, "a biome boundary sanctions the biome-transition tail").toEqual(
-        expect.arrayContaining(["SelectBiomePhase", "NewBiomeEncounterPhase", "SwitchBiomePhase"]),
-      );
+      expect(tails, "WAVE_ADVANCE sanctions entry into the addressed choice boundary").toContain("SelectBiomePhase");
+      expect(tails, "the later BIOME_PICK must authorize the concrete destination").not.toContain("SwitchBiomePhase");
+      expect(tails).not.toContain("NewBiomeEncounterPhase");
     }
     logs.flush();
   }, 300_000);
@@ -242,6 +262,46 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     const tails = waveOp.coopWaveAdvanceSanctionedTails(payload!);
     expect(tails).not.toContain("MysteryEncounterRewardsPhase");
     expect(tails).not.toContain("MysteryEncounterBattlePhase");
+    logs.flush();
+  }, 300_000);
+
+  it("ME BattleEnd never synthesizes a normal WAVE_ADVANCE when the ME transaction owns the terminal", async () => {
+    const rig = await bootDuo();
+    const commitSpy = vi.spyOn(waveOp, "commitWaveAdvanceOwnerIntent");
+    vi.spyOn(rig.hostScene.currentBattle, "isBattleMysteryEncounter").mockReturnValue(true);
+
+    await withClient(rig.hostCtx, () => broadcastCoopWaveEndState(true));
+    await withClient(rig.guestCtx, () => drainLoopback());
+
+    expect(
+      commitSpy,
+      "an ME-spawned battle has its own retained terminal and must not be reclassified as an ordinary win",
+    ).not.toHaveBeenCalled();
+    expect(routed).toEqual([]);
+    logs.flush();
+  }, 300_000);
+
+  it("FINAL VICTORY: retains Victory -> BattleEnd -> GameOver and suppresses the later duplicate terminal echo", async () => {
+    const rig = await bootDuo();
+    vi.spyOn(rig.hostScene.gameMode, "isWaveFinal").mockReturnValue(true);
+    const payload = await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 200 });
+
+    expect(payload?.nextWave, "a final victory cannot invent wave 201").toBe(200);
+    expect(payload?.biomeChange).toBe(false);
+    expect(payload?.eggLapse).toBe(false);
+    expect(waveOp.coopWaveAdvanceSanctionedTails(payload!)).toEqual([
+      "VictoryPhase",
+      "BattleEndPhase",
+      "GameOverPhase",
+    ]);
+
+    const routedBeforeGameOverEcho = routed.length;
+    await withClient(rig.hostCtx, () => broadcastCoopWaveResolved("gameOver"));
+    await withClient(rig.guestCtx, () => drainLoopback());
+    expect(
+      routed,
+      "GameOverPhase cannot commit a conflicting second WAVE_ADVANCE for the already-settled final win",
+    ).toHaveLength(routedBeforeGameOverEcho);
     logs.flush();
   }, 300_000);
 

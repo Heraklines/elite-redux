@@ -24,7 +24,10 @@
 
 import { setCoopAuthoritativeGuestPredicate } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { coopMeTerminalSanctionedTails } from "#data/elite-redux/coop/coop-me-operation";
-import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import type {
+  CoopAuthoritativeEnvelopeV1,
+  CoopWaveAdvancePayload,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   adoptCoopBiomeTransitionSwitchPermit,
   armCoopBiomeTransitionTailPermit,
@@ -41,11 +44,15 @@ import {
   setCoopStrictTailsMode,
   setCoopWaveTailSanction,
 } from "#data/elite-redux/coop/coop-renderer-gate";
+import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import {
   adoptWaveAdvanceWatcherChoice,
   commitWaveAdvanceOwnerIntent,
   coopWaveAdvanceSanctionedTails,
   isCoopWaveAdvanceOperationEnabled,
+  isValidCoopSettledWaveAdvance,
+  isValidCoopWaveAdvancePayload,
+  preflightCoopWaveAdvanceEnvelope,
   resetCoopWaveAdvanceOperationFlag,
   resetCoopWaveAdvanceOperationState,
   resolveCoopBiomeBoundaryFlag,
@@ -66,6 +73,48 @@ function payload(over: Partial<CoopWaveAdvancePayload> & { wave: number }): Coop
     meBoundary: "none",
     ...(isVictory ? { victoryKind: "wild" as const } : {}),
     ...over,
+  };
+}
+
+function settledState(wave: number, turn = 1): CoopAuthoritativeBattleStateV1 {
+  return {
+    version: 1,
+    tick: wave + 100,
+    wave,
+    turn,
+    playerParty: [],
+    enemyParty: [],
+    field: [],
+    weather: 0,
+    weatherTurnsLeft: 0,
+    terrain: 0,
+    terrainTurnsLeft: 0,
+    arenaTags: [],
+    money: 0,
+    pokeballCounts: [],
+    playerModifiers: [],
+    enemyModifiers: [],
+  };
+}
+
+function retainedEnvelope(wave: number): CoopAuthoritativeEnvelopeV1 {
+  const authoritativeState = settledState(wave);
+  const transition = payload({ wave, settledStateTick: authoritativeState.tick });
+  return {
+    version: 1,
+    sessionEpoch: 1,
+    revision: 1,
+    wave,
+    turn: authoritativeState.turn,
+    logicalPhase: transition.nextLogicalPhase,
+    pendingOperation: {
+      id: `1:0:WAVE_ADVANCE:${wave}`,
+      kind: "WAVE_ADVANCE",
+      owner: 0,
+      status: "applied",
+      payload: transition,
+    },
+    authoritativeState,
   };
 }
 
@@ -97,7 +146,72 @@ describe("co-op WAVE-ADVANCE operation - the keystone (Wave-2f)", () => {
     expect(localReads, "no contradictory guest-local tail predicate was evaluated").toBe(0);
   });
 
+  it("represents a final victory as Victory -> BattleEnd -> GameOver without inventing a next wave", () => {
+    const terminal = payload({
+      wave: 200,
+      nextWave: 200,
+      victoryKind: "wild",
+      biomeChange: false,
+      eggLapse: false,
+    });
+    expect(isValidCoopWaveAdvancePayload(terminal)).toBe(true);
+    expect(
+      resolveCoopVictoryTailControl(terminal, {
+        trainerWin: () => true,
+        runContinues: () => true,
+        biomeChange: () => true,
+      }),
+    ).toEqual({ trainerWin: false, runContinues: false, eggLapse: false, biomeChange: false });
+    expect(coopWaveAdvanceSanctionedTails(terminal)).toEqual(["VictoryPhase", "BattleEndPhase", "GameOverPhase"]);
+    expect(
+      isValidCoopWaveAdvancePayload({ ...terminal, biomeChange: true }),
+      "a terminal victory cannot also authorize a biome destination",
+    ).toBe(false);
+  });
+
   // ── WATCHER adoption + stale/dup gating ──────────────────────────────────
+  describe("complete retained transaction preflight", () => {
+    it("admits only an exact epoch/revision/id/wave/turn/state-tick/destination binding", () => {
+      const envelope = retainedEnvelope(10);
+      expect(preflightCoopWaveAdvanceEnvelope(envelope)?.payload.wave).toBe(10);
+
+      const wrongEpoch: CoopAuthoritativeEnvelopeV1 = {
+        ...envelope,
+        sessionEpoch: envelope.sessionEpoch + 1,
+        pendingOperation: {
+          ...envelope.pendingOperation!,
+          id: `2:0:WAVE_ADVANCE:${envelope.wave}`,
+        },
+      };
+      expect(preflightCoopWaveAdvanceEnvelope(wrongEpoch), "a foreign session cannot stage DATA").toBeNull();
+
+      const wrongTick: CoopAuthoritativeEnvelopeV1 = {
+        ...envelope,
+        authoritativeState: { ...envelope.authoritativeState, tick: envelope.authoritativeState.tick + 1 },
+      };
+      expect(preflightCoopWaveAdvanceEnvelope(wrongTick), "state tick cannot detach from its destination").toBeNull();
+
+      const wrongWave: CoopAuthoritativeEnvelopeV1 = {
+        ...envelope,
+        authoritativeState: { ...envelope.authoritativeState, wave: envelope.authoritativeState.wave + 1 },
+      };
+      expect(preflightCoopWaveAdvanceEnvelope(wrongWave), "cross-wave DATA cannot apply").toBeNull();
+
+      const wrongPhase: CoopAuthoritativeEnvelopeV1 = { ...envelope, logicalPhase: "SHOP" };
+      expect(
+        preflightCoopWaveAdvanceEnvelope(wrongPhase),
+        "the envelope phase must equal the stated destination",
+      ).toBeNull();
+    });
+
+    it("accepts a raw compatibility transition but refuses to classify it as settled DATA", () => {
+      const raw = payload({ wave: 3 });
+      const state = settledState(3);
+      expect(isValidCoopWaveAdvancePayload(raw)).toBe(true);
+      expect(isValidCoopSettledWaveAdvance(raw, state)).toBe(false);
+    });
+  });
+
   describe("WATCHER adoption gating (invariants 5, 6)", () => {
     it("adopts a host-stated advance and returns its payload + sanctioned tails", () => {
       expect(isCoopWaveAdvanceOperationEnabled()).toBe(true);
@@ -196,19 +310,40 @@ describe("co-op WAVE-ADVANCE operation - the keystone (Wave-2f)", () => {
   describe("HOST commit seam", () => {
     it("is a no-op when the local client is NOT the host (the guest never commits a wave-advance)", () => {
       // Must not throw; the guest is always the watcher for a host-driven wave-advance.
+      const authoritativeState = settledState(2);
       expect(() =>
-        commitWaveAdvanceOwnerIntent({ payload: payload({ wave: 2 }), localRole: "guest", wave: 2, turn: 1 }),
+        commitWaveAdvanceOwnerIntent({
+          payload: payload({ wave: 2, settledStateTick: authoritativeState.tick }),
+          authoritativeState,
+          localRole: "guest",
+          wave: 2,
+          turn: 1,
+        }),
       ).not.toThrow();
     });
 
     it("is a no-op when the flag is OFF, and never throws on the host path", () => {
+      const authoritativeState = settledState(2);
+      const transition = payload({ wave: 2, settledStateTick: authoritativeState.tick });
       setCoopWaveAdvanceOperationEnabled(false);
       expect(() =>
-        commitWaveAdvanceOwnerIntent({ payload: payload({ wave: 2 }), localRole: "host", wave: 2, turn: 1 }),
+        commitWaveAdvanceOwnerIntent({
+          payload: transition,
+          authoritativeState,
+          localRole: "host",
+          wave: 2,
+          turn: 1,
+        }),
       ).not.toThrow();
       setCoopWaveAdvanceOperationEnabled(true);
       expect(() =>
-        commitWaveAdvanceOwnerIntent({ payload: payload({ wave: 2 }), localRole: "host", wave: 2, turn: 1 }),
+        commitWaveAdvanceOwnerIntent({
+          payload: transition,
+          authoritativeState,
+          localRole: "host",
+          wave: 2,
+          turn: 1,
+        }),
       ).not.toThrow();
     });
   });
