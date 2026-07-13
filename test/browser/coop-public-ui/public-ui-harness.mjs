@@ -669,6 +669,19 @@ export class DuoPublicUiRig {
     await Promise.all(
       Object.values(this.clients).map(client => client.sequence(this.config.keys.starter, "select-default-team")),
     );
+    await this.guest.evidence.waitFor(/\[coop-runconfig\] guest waiting - requesting runConfig from host/u, {
+      from: phaseCursors[this.guest.label],
+      timeoutMs: this.config.timeoutMs,
+      description: "guest bounded wait for the host difficulty decision",
+    });
+    await this.host.checkpoint("difficulty-select-open");
+    const runConfigCursor = this.host.evidence.cursor();
+    await this.host.sequence(this.config.keys.difficulty, "host-select-ace-difficulty");
+    await this.host.evidence.waitFor(/\[coop-runconfig\] startRun role=host willBroadcast=true difficulty=/u, {
+      from: runConfigCursor,
+      timeoutMs: this.config.timeoutMs,
+      description: "host authoritative difficulty/runConfig broadcast",
+    });
     await Promise.all(
       Object.values(this.clients).map(client =>
         client.evidence.waitFor(/local team locked in:/u, {

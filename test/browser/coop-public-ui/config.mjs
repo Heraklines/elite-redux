@@ -133,6 +133,9 @@ export function loadConfig() {
       // public Start bar without turning this baseline journey into a materially different campaign.
       challenge: keySequence("COOP_UI_CHALLENGE_KEYS", defaultCoopChallengeKeys),
       starter: keySequence("COOP_UI_STARTER_KEYS", ["Space", "Space", "Enter", "Space"]),
+      // Team confirmation opens a host-only difficulty picker while the guest waits for runConfig.
+      // Ace is the normal baseline and sits directly below the default Youngster option.
+      difficulty: keySequence("COOP_UI_DIFFICULTY_KEYS", ["ArrowDown", "Space"]),
       battle: keySequence("COOP_UI_BATTLE_KEYS", ["Space", "Space", "Space"]),
       rewardLeave: keySequence("COOP_UI_REWARD_LEAVE_KEYS", ["Backspace", "Space"]),
       replacement: keySequence("COOP_UI_REPLACEMENT_KEYS", ["Space", "Space"]),
