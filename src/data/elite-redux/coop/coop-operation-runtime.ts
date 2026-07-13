@@ -499,4 +499,41 @@ export class CoopOperationGuest {
     this.lastGoodEnvelope = env;
     return { kind: "applied", envelope: env, op };
   }
+
+  /**
+   * Advance ONLY the ORDERING cursor (the global revision clock) for an op that has been RECEIVED and
+   * ordered but whose DATA has NOT yet been applied - a WAVE_ADVANCE whose journal cursor advances at
+   * staging but whose immutable DATA image applies only at the real BattleEnd boundary. This keeps a LATER
+   * same-boundary op (a reward RESULT at rev+1) from being a spurious GAP, WITHOUT recording the op in
+   * `appliedIds`: "ordered" and "applied" are SEPARATE facts (mark the application via
+   * {@linkcode markOperationApplied} when the DATA lands). Crucially this leaves `hasApplied(op.id)` FALSE,
+   * so the relay/watcher adoption path still adopts the exact staged wave-advance instead of rejecting it as
+   * a premature duplicate. Idempotent + monotonic (inspect gates it; the clock never regresses).
+   */
+  public advanceRevisionOrdering(env: CoopAuthoritativeEnvelopeV1): CoopGuestApplyResult {
+    const inspected = this.inspectEnvelope(env);
+    if (inspected.kind !== "applied") {
+      return inspected;
+    }
+    this.revisionClock.revision = env.revision;
+    this.lastGoodEnvelope = env;
+    return { kind: "applied", envelope: env, op: inspected.op };
+  }
+
+  /**
+   * Record that a previously ORDERED-but-deferred op has now APPLIED its DATA (the application ledger),
+   * separate from the ordering cursor above. Used at the real WAVE_ADVANCE boundary once its immutable state
+   * image lands, so a re-delivery of the same op AFTER application is deduped (`hasApplied`) exactly as the
+   * former single-step apply did. Idempotent; never regresses the clock.
+   */
+  public markOperationApplied(env: CoopAuthoritativeEnvelopeV1): void {
+    const op = env.pendingOperation;
+    if (op != null) {
+      this.appliedIds.add(op.id);
+    }
+    if (env.revision > this.revisionClock.revision) {
+      this.revisionClock.revision = env.revision;
+    }
+    this.lastGoodEnvelope = env;
+  }
 }

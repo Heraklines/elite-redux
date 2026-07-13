@@ -658,6 +658,10 @@ export function tryApplyCoopWaveAdvanceDataAtBoundary(wave: number): CoopWaveAdv
   if (!markCoopWaveAdvanceDataApplied(wave)) {
     return "rejected";
   }
+  // The immutable DATA image has now landed at the real boundary: record the APPLICATION fact (separate
+  // from the ordering-cursor advance done at staging), so a re-delivery of this exact wave-advance AFTER
+  // its boundary is deduped via hasApplied - exactly as the former single-step apply did.
+  guest().markOperationApplied(staged.envelope);
   coopLog("runtime", `wave-advance retained DATA boundary admitted wave=${wave}`);
   return "applied";
 }
@@ -929,7 +933,13 @@ function applyJournaledWaveEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Coop
       }
     }
   }
-  if (g.applyEnvelope(envelope).kind !== "applied") {
+  // Advance ONLY the shared ORDERING cursor - NOT the application ledger. Marking the wave-advance
+  // `hasApplied` here (as a full applyEnvelope would) is premature: its DATA lands only at the real
+  // BattleEnd boundary, and a premature `hasApplied` makes adoptWaveAdvanceWatcherChoice reject the exact
+  // staged wave-advance as a duplicate ("WATCHER REJECT stale/dup"), starving the watcher's reward-terminal
+  // flow. The application fact is recorded at the boundary via markOperationApplied (see
+  // tryApplyCoopWaveAdvanceDataAtBoundary). Re-delivery before the boundary is still deduped by the clock.
+  if (g.advanceRevisionOrdering(envelope).kind !== "applied") {
     return "rejected";
   }
   if (preflight.payload.wave > lastAppliedWave) {
