@@ -114,6 +114,49 @@ async function digest(raw: string): Promise<string> {
   return [...new Uint8Array(value)].map(byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function capturedPokemonData(id: number, player: boolean, species: number) {
+  return {
+    id,
+    player,
+    species,
+    nickname: "",
+    formIndex: 0,
+    abilityIndex: 0,
+    passive: false,
+    shiny: false,
+    variant: 0,
+    pokeball: 0,
+    level: 12,
+    exp: 1_000,
+    levelExp: 100,
+    gender: 0,
+    hp: 32,
+    stats: [32, 18, 17, 16, 15, 14],
+    ivs: [31, 30, 29, 28, 27, 26],
+    nature: 0,
+    moveset: [{ moveId: 1, ppUsed: 0, ppUp: 0 }],
+    status: null,
+    friendship: 50,
+    metLevel: 5,
+    metBiome: -1,
+    metSpecies: species,
+    metWave: -1,
+    luck: 0,
+    pauseEvolutions: false,
+    pokerus: false,
+    usedTMs: [],
+    teraType: 0,
+    isTerastallized: false,
+    stellarTypesBoosted: [],
+    boss: false,
+    bossSegments: 0,
+    summonData: {},
+    battleData: {},
+    customPokemonData: {},
+    fusionCustomPokemonData: {},
+  };
+}
+
 function checkpoint(
   runId: string,
   checkpointRevision: number,
@@ -125,8 +168,8 @@ function checkpoint(
     seed: "production-shaped-seed",
     playTime: 120,
     gameMode: 6,
-    party: [],
-    enemyParty: [],
+    party: [capturedPokemonData(101, true, 1), capturedPokemonData(102, true, 4)],
+    enemyParty: [capturedPokemonData(201, false, 7)],
     modifiers: [],
     enemyModifiers: [],
     arena: { biome: 1, weather: null, terrain: null, tags: [], positionalTags: [], playerTerasUsed: 0 },
@@ -136,7 +179,7 @@ function checkpoint(
     waveIndex,
     battleType: 0,
     trainer: null,
-    gameVersion: "test-production",
+    gameVersion: "1.11.19",
     timestamp: 1_000 + waveIndex,
     challenges: [],
     mysteryEncounterType: -1,
@@ -215,6 +258,40 @@ describe("co-op save Worker endpoint integration", () => {
         })
       ).status,
     ).toBe(409);
+    const emptyParty = JSON.parse(checkpoint(runId, 0, 1));
+    emptyParty.party = [];
+    expect(
+      (
+        await call("/savedata/session/coop-cas-update?slot=0&coopCasMode=empty", {
+          method: "POST",
+          body: JSON.stringify(emptyParty),
+        })
+      ).status,
+      "an object that cannot resume a player party never reaches D1",
+    ).toBe(409);
+    const placeholderPokemon = JSON.parse(checkpoint(runId, 0, 1));
+    placeholderPokemon.party = [{}];
+    expect(
+      (
+        await call("/savedata/session/coop-cas-update?slot=0&coopCasMode=empty", {
+          method: "POST",
+          body: JSON.stringify(placeholderPokemon),
+        })
+      ).status,
+      "PokemonData({}) would throw during browser materialization",
+    ).toBe(409);
+    const trainerWithoutData = JSON.parse(checkpoint(runId, 0, 1));
+    trainerWithoutData.battleType = 1;
+    trainerWithoutData.trainer = null;
+    expect(
+      (
+        await call("/savedata/session/coop-cas-update?slot=0&coopCasMode=empty", {
+          method: "POST",
+          body: JSON.stringify(trainerWithoutData),
+        })
+      ).status,
+      "a trainer load dereferences trainerType and therefore requires trainer data",
+    ).toBe(409);
     expect(
       (
         await call("/savedata/session/coop-cas-update?slot=0&coopCasMode=empty", {
@@ -275,6 +352,48 @@ describe("co-op save Worker endpoint integration", () => {
     expect(sqlite.prepare("SELECT COUNT(*) AS count FROM session_saves").get()).toEqual({ count: 0 });
   });
 
+  it("binds checkpoint identity strings and the signed caller name to canonical D1 usernames", async () => {
+    const caseChangedPlayer = checkpoint("run-case-player-route-123456789", 0, 1, ["ALICE", "Bob"], {
+      host: "ALICE",
+      guest: "Bob",
+    });
+    expect(
+      (
+        await call("/savedata/session/coop-cas-update?slot=0&coopCasMode=empty", {
+          method: "POST",
+          body: caseChangedPlayer,
+        })
+      ).status,
+      "case-insensitive lookup may find the account but may not rewrite its durable identity",
+    ).toBe(409);
+
+    const caseChangedSeat = checkpoint("run-case-seat-route-123456789", 0, 1, ["Alice", "Bob"], {
+      host: "ALICE",
+      guest: "Bob",
+    });
+    expect(
+      (
+        await call("/savedata/session/coop-cas-update?slot=0&coopCasMode=empty", {
+          method: "POST",
+          body: caseChangedSeat,
+        })
+      ).status,
+      "seat labels must be the exact canonical account strings too",
+    ).toBe(409);
+
+    authorization = await authToken("ALICE", 1);
+    expect(
+      (
+        await call("/savedata/session/coop-cas-update?slot=0&coopCasMode=empty", {
+          method: "POST",
+          body: checkpoint("run-case-token-route-123456789", 0, 1),
+        })
+      ).status,
+      "a signed token whose display identity no longer matches its uid row is stale",
+    ).toBe(409);
+    expect(sqlite.prepare("SELECT COUNT(*) AS count FROM session_saves").get()).toEqual({ count: 0 });
+  });
+
   it("keeps a truncated checkpoint recoverable through the exact legacy route", async () => {
     const raw = JSON.stringify({
       gameMode: 6,
@@ -318,6 +437,16 @@ describe("co-op save Worker endpoint integration", () => {
     const swappedSeats = checkpoint(runId, 1, 2, ["Alice", "Bob"], { host: "Bob", guest: "Alice" });
     expect(
       (await call(`/savedata/session/coop-cas-update?${query}`, { method: "POST", body: swappedSeats })).status,
+    ).toBe(409);
+    const caseChangedPlayer = checkpoint(runId, 1, 2, ["ALICE", "Bob"], { host: "ALICE", guest: "Bob" });
+    expect(
+      (await call(`/savedata/session/coop-cas-update?${query}`, { method: "POST", body: caseChangedPlayer })).status,
+      "case-only participant rewrites are mutations, not idempotent account aliases",
+    ).toBe(409);
+    const caseChangedSeat = checkpoint(runId, 1, 2, ["Alice", "Bob"], { host: "ALICE", guest: "Bob" });
+    expect(
+      (await call(`/savedata/session/coop-cas-update?${query}`, { method: "POST", body: caseChangedSeat })).status,
+      "case-only seat rewrites are mutations",
     ).toBe(409);
     expect(sqlite.prepare("SELECT data FROM session_saves WHERE user_id = 1 AND slot = 0").get()).toEqual({
       data: initial,

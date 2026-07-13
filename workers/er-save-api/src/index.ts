@@ -29,6 +29,13 @@
 // Workers Paid plan (50M writes/mo) scales to ~40,000.
 // =============================================================================
 
+import { BiomeId } from "../../../src/enums/biome-id";
+import { Challenges } from "../../../src/enums/challenges";
+import { MoveId } from "../../../src/enums/move-id";
+import { MysteryEncounterType } from "../../../src/enums/mystery-encounter-type";
+import { SpeciesId } from "../../../src/enums/species-id";
+import { TrainerType } from "../../../src/enums/trainer-type";
+import { TrainerVariant } from "../../../src/enums/trainer-variant";
 import {
   applyResultReport,
   finalizeExpiredLoneReport,
@@ -737,6 +744,120 @@ function isObjectArray(value: unknown): value is Record<string, unknown>[] {
   return Array.isArray(value) && value.every(isRecord);
 }
 
+function isSafeIntegerInRange(value: unknown, min: number, max = Number.MAX_SAFE_INTEGER): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= min && value <= max;
+}
+
+function isFiniteNumberArray(value: unknown, minimumLength: number): value is number[] {
+  return (
+    Array.isArray(value)
+    && value.length >= minimumLength
+    && value.every(entry => typeof entry === "number" && Number.isFinite(entry))
+  );
+}
+
+function numericEnumValues(value: object): Set<number> {
+  return new Set(Object.values(value).filter((entry): entry is number => typeof entry === "number"));
+}
+
+const resumableSpeciesIds = numericEnumValues(SpeciesId);
+const resumableMoveIds = numericEnumValues(MoveId);
+const resumableTrainerTypes = numericEnumValues(TrainerType);
+const resumableTrainerVariants = numericEnumValues(TrainerVariant);
+const resumableChallengeIds = numericEnumValues(Challenges);
+const resumableMysteryEncounterTypes = numericEnumValues(MysteryEncounterType);
+const resumableBiomeIds = new Set<number>(Object.values(BiomeId));
+
+function isPokemonMoveDataShape(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    isSafeIntegerInRange(value.moveId, 0)
+    && resumableMoveIds.has(value.moveId)
+    && isSafeIntegerInRange(value.ppUsed, 0)
+    && isSafeIntegerInRange(value.ppUp, 0)
+    && (value.maxPpOverride === undefined || isSafeIntegerInRange(value.maxPpOverride, 1))
+  );
+}
+
+/**
+ * Minimum current `PokemonData` surface needed by its constructor and `toPokemon()`. This is not a
+ * gameplay legality validator; it prevents an object-shaped placeholder from becoming a durable
+ * checkpoint that immediately throws at `getPokemonSpecies(undefined)` or constructs unusable stats.
+ */
+function isPokemonDataShape(value: unknown, expectedPlayer: boolean): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    isSafeIntegerInRange(value.id, 0)
+    && value.player === expectedPlayer
+    && isSafeIntegerInRange(value.species, 1)
+    && resumableSpeciesIds.has(value.species)
+    && isSafeIntegerInRange(value.formIndex, 0)
+    && isSafeIntegerInRange(value.abilityIndex, 0)
+    && typeof value.passive === "boolean"
+    && typeof value.shiny === "boolean"
+    && isSafeIntegerInRange(value.variant, 0)
+    && isSafeIntegerInRange(value.level, 1)
+    && isFiniteNonNegative(value.exp)
+    && isFiniteNonNegative(value.levelExp)
+    && isFiniteNonNegative(value.hp)
+    && isFiniteNumberArray(value.stats, 6)
+    && value.stats.every(stat => stat >= 0)
+    && isFiniteNumberArray(value.ivs, 6)
+    && value.ivs.every(iv => Number.isSafeInteger(iv) && iv >= 0 && iv <= 31)
+    && Array.isArray(value.moveset)
+    && value.moveset.every(isPokemonMoveDataShape)
+  );
+}
+
+function isTrainerType(value: unknown): value is number {
+  return isSafeIntegerInRange(value, 0) && resumableTrainerTypes.has(value);
+}
+
+function isTrainerDataShape(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    isTrainerType(value.trainerType)
+    && isSafeIntegerInRange(value.variant, 0)
+    && resumableTrainerVariants.has(value.variant)
+    && (value.partyTemplateIndex === undefined || isSafeIntegerInRange(value.partyTemplateIndex, 0))
+    && (value.nameKey === undefined || typeof value.nameKey === "string")
+    && (value.partnerNameKey === undefined || typeof value.partnerNameKey === "string")
+  );
+}
+
+function isChallengeDataShape(value: unknown): boolean {
+  return (
+    isRecord(value)
+    && isSafeIntegerInRange(value.id, 0)
+    && resumableChallengeIds.has(value.id)
+    && isSafeIntegerInRange(value.value, 0)
+    && isSafeIntegerInRange(value.severity, 0)
+    && (value.startingRoots === undefined
+      || (Array.isArray(value.startingRoots) && value.startingRoots.every(root => isSafeIntegerInRange(root, 0))))
+  );
+}
+
+function isPositionalTagShape(value: unknown): boolean {
+  if (!isRecord(value) || !isSafeIntegerInRange(value.turnCount, 0) || !isSafeIntegerInRange(value.targetIndex, 0, 5)) {
+    return false;
+  }
+  return value.tagType === "DELAYED_ATTACK"
+    ? isSafeIntegerInRange(value.sourceId, 0)
+        && isSafeIntegerInRange(value.sourceMove, 0)
+        && resumableMoveIds.has(value.sourceMove)
+    : value.tagType === "WISH" && isFiniteNonNegative(value.healHp) && typeof value.pokemonName === "string";
+}
+
+// `compare-versions`, invoked during parse, throws on a non-semver string.
+const resumableGameVersionPattern =
+  /^v?\d+(?:\.\d+){0,3}(?:-[\da-z-]+(?:\.[\da-z-]+)*)?(?:\+[\da-z-]+(?:\.[\da-z-]+)*)?$/iu;
+
 /**
  * Top-level fields dereferenced by `GameData.parseSessionData()` / `initSessionFromData()` when a
  * checkpoint is materialized. The Worker deliberately does not reproduce every gameplay schema,
@@ -747,37 +868,44 @@ function hasCoopSessionMaterializationShape(record: Record<string, unknown>): bo
   const pokeballCounts = record.pokeballCounts;
   const trainer = record.trainer;
   const mystery = record.mysteryEncounterSaveData;
+  const party = record.party;
+  const enemyParty = record.enemyParty;
+  const battleType = record.battleType;
   return (
     typeof record.seed === "string"
     && record.seed.length > 0
     && isFiniteNonNegative(record.playTime)
-    && isObjectArray(record.party)
-    && isObjectArray(record.enemyParty)
+    && Array.isArray(party)
+    && party.length > 0
+    && party.every(mon => isPokemonDataShape(mon, true))
+    && Array.isArray(enemyParty)
+    && (enemyParty.length > 0 || battleType === 3)
+    && enemyParty.every(mon => isPokemonDataShape(mon, false))
     && isObjectArray(record.modifiers)
     && isObjectArray(record.enemyModifiers)
     && isRecord(arena)
-    && typeof arena.biome === "number"
-    && Number.isSafeInteger(arena.biome)
-    && arena.biome >= 0
+    && isSafeIntegerInRange(arena.biome, 0)
+    && resumableBiomeIds.has(arena.biome)
     && (arena.weather == null || isRecord(arena.weather))
     && (arena.terrain == null || isRecord(arena.terrain))
     && (arena.tags === undefined || isObjectArray(arena.tags))
     && Array.isArray(arena.positionalTags)
+    && arena.positionalTags.every(isPositionalTagShape)
     && isRecord(pokeballCounts)
     && Object.values(pokeballCounts).every(
       value => typeof value === "number" && Number.isSafeInteger(value) && value >= 0,
     )
     && isFiniteNonNegative(record.money)
     && isFiniteNonNegative(record.score)
-    && typeof record.battleType === "number"
-    && Number.isSafeInteger(record.battleType)
-    && (record.battleType === 0 || record.battleType === 1 || record.battleType === 3)
-    && (trainer == null || isRecord(trainer))
+    && (battleType === 0 || battleType === 1 || battleType === 3)
+    && (trainer == null ? battleType !== 1 : isTrainerDataShape(trainer))
     && typeof record.gameVersion === "string"
-    && record.gameVersion.length > 0
+    && resumableGameVersionPattern.test(record.gameVersion)
     && Array.isArray(record.challenges)
+    && record.challenges.every(isChallengeDataShape)
     && typeof record.mysteryEncounterType === "number"
     && Number.isSafeInteger(record.mysteryEncounterType)
+    && (record.mysteryEncounterType === -1 || resumableMysteryEncounterTypes.has(record.mysteryEncounterType))
     && isRecord(mystery)
     && Array.isArray(mystery.encounteredEvents)
     && isFiniteNonNegative(mystery.encounterSpawnChance)
@@ -790,10 +918,10 @@ function hasCoopSessionMaterializationShape(record: Record<string, unknown>): bo
 
 function sameCoopSessionIdentity(left: CoopSessionRef, right: CoopSessionRef): boolean {
   return (
-    sameCoopAccountIdentity(left.players[0], right.players[0])
-    && sameCoopAccountIdentity(left.players[1], right.players[1])
-    && sameCoopAccountIdentity(left.seats.host, right.seats.host)
-    && sameCoopAccountIdentity(left.seats.guest, right.seats.guest)
+    left.players[0] === right.players[0]
+    && left.players[1] === right.players[1]
+    && left.seats.host === right.seats.host
+    && left.seats.guest === right.seats.guest
   );
 }
 
@@ -912,10 +1040,15 @@ async function validateCoopSessionAccounts(env: Env, auth: TokenPayload, session
     && second != null
     && first.id !== second.id
     && (first.id === actual.id || second.id === actual.id)
+    && auth.u === actual.username
     && isUnambiguousCoopAccount(first)
     && isUnambiguousCoopAccount(second)
     && first.username_lower === firstKey
     && second.username_lower === secondKey
+    && session.players[0] === first.username
+    && session.players[1] === second.username
+    && session.seats.host === (accountIdentityKey(session.seats.host) === firstKey ? first.username : second.username)
+    && session.seats.guest === (accountIdentityKey(session.seats.guest) === firstKey ? first.username : second.username)
   );
 }
 

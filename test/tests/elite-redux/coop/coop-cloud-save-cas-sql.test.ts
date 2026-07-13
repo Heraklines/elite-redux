@@ -23,6 +23,49 @@ import {
 
 const saveApiSchema = readFileSync(resolve(process.cwd(), "workers/er-save-api/schema.sql"), "utf8");
 
+function capturedPokemonData(id: number, player: boolean, species: number) {
+  return {
+    id,
+    player,
+    species,
+    nickname: "",
+    formIndex: 0,
+    abilityIndex: 0,
+    passive: false,
+    shiny: false,
+    variant: 0,
+    pokeball: 0,
+    level: 12,
+    exp: 1_000,
+    levelExp: 100,
+    gender: 0,
+    hp: 32,
+    stats: [32, 18, 17, 16, 15, 14],
+    ivs: [31, 30, 29, 28, 27, 26],
+    nature: 0,
+    moveset: [{ moveId: 1, ppUsed: 0, ppUp: 0 }],
+    status: null,
+    friendship: 50,
+    metLevel: 5,
+    metBiome: -1,
+    metSpecies: species,
+    metWave: -1,
+    luck: 0,
+    pauseEvolutions: false,
+    pokerus: false,
+    usedTMs: [],
+    teraType: 0,
+    isTerastallized: false,
+    stellarTypesBoosted: [],
+    boss: false,
+    bossSegments: 0,
+    summonData: {},
+    battleData: {},
+    customPokemonData: {},
+    fusionCustomPokemonData: {},
+  };
+}
+
 function session(
   runId: string,
   checkpointRevision: number,
@@ -34,8 +77,8 @@ function session(
     seed: "production-shaped-seed",
     playTime: 120,
     gameMode: 6,
-    party: [],
-    enemyParty: [],
+    party: [capturedPokemonData(101, true, 1), capturedPokemonData(102, true, 4)],
+    enemyParty: [capturedPokemonData(201, false, 7)],
     modifiers: [],
     enemyModifiers: [],
     arena: { biome: 1, weather: null, terrain: null, tags: [], positionalTags: [], playerTerasUsed: 0 },
@@ -45,7 +88,7 @@ function session(
     waveIndex: wave,
     battleType: 0,
     trainer: null,
-    gameVersion: "test-production",
+    gameVersion: "1.11.19",
     timestamp: 1,
     challenges: [],
     mysteryEncounterType: -1,
@@ -259,6 +302,76 @@ describe("co-op cloud CAS SQL on SQLite", () => {
       checkpointRevision: 0,
       players: ["Alice", "Bob"],
     });
+    const invalidMaterializationCases: [string, (value: Record<string, any>) => void][] = [
+      ["empty player party", value => (value.party = [])],
+      ["object-shaped player placeholder", value => (value.party = [{}])],
+      ["empty enemy party outside a non-battle Mystery Event", value => (value.enemyParty = [])],
+      ["object-shaped enemy placeholder", value => (value.enemyParty = [{}])],
+      [
+        "party entry on the wrong side",
+        value => {
+          value.party[0].player = false;
+        },
+      ],
+      [
+        "missing Pokemon species",
+        value => {
+          delete value.party[0].species;
+        },
+      ],
+      [
+        "unknown Pokemon species id",
+        value => {
+          value.party[0].species = 999_999;
+        },
+      ],
+      [
+        "short Pokemon stat vector",
+        value => {
+          value.party[0].stats = [1, 2, 3];
+        },
+      ],
+      [
+        "malformed move",
+        value => {
+          value.party[0].moveset = [{}];
+        },
+      ],
+      [
+        "trainer battle without trainer materialization data",
+        value => {
+          value.battleType = 1;
+          value.trainer = null;
+        },
+      ],
+      [
+        "trainer battle with an unknown trainer type",
+        value => {
+          value.battleType = 1;
+          value.trainer = { trainerType: 299, variant: 0 };
+        },
+      ],
+      ["game version that makes compare-versions throw", value => (value.gameVersion = "not-a-version")],
+      ["unknown biome that Arena cannot construct", value => (value.arena.biome = 999)],
+      ["unknown challenge that copyChallenge cannot construct", value => (value.challenges = [{}])],
+      ["unknown positional tag constructor", value => (value.arena.positionalTags = [{}])],
+    ];
+    for (const [label, mutate] of invalidMaterializationCases) {
+      const candidate = JSON.parse(valid) as Record<string, any>;
+      mutate(candidate);
+      expect(parseValidResumableCoopSession(JSON.stringify(candidate), "Alice"), label).toBeNull();
+      expect(classifySessionProtection(JSON.stringify(candidate)), `${label} remains exactly recoverable`).toBe(
+        "coop-invalid",
+      );
+    }
+    const nonBattleMysteryCheckpoint = JSON.parse(valid);
+    nonBattleMysteryCheckpoint.battleType = 3;
+    nonBattleMysteryCheckpoint.mysteryEncounterType = 0;
+    nonBattleMysteryCheckpoint.enemyParty = [];
+    expect(
+      parseValidResumableCoopSession(JSON.stringify(nonBattleMysteryCheckpoint), "Alice"),
+      "a non-battle Mystery Event is the only legitimate empty-enemy materialization boundary",
+    ).toMatchObject({ runId: "run-structural-123456789" });
     expect(parseValidResumableCoopSession(valid, "Mallory"), "the account must own one participant seat").toBeNull();
     expect(
       parseValidResumableCoopSession(
