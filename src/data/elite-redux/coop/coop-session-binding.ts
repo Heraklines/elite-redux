@@ -58,6 +58,24 @@ export interface CoopFrameContextV1 {
   connectionGeneration: number;
 }
 
+/**
+ * Authenticated public-pairing context held by the browser controller. The bearer remains local and is
+ * deliberately absent from every peer wire shape; it authorizes signaling Worker calls only.
+ */
+export interface CoopP33AuthenticatedContextV1 {
+  version: 1;
+  pairingId: string;
+  pairingBearer: string;
+  transportRole: CoopTransportRole;
+  account: CoopAccountIdentityV1;
+  peerAccount: CoopAccountIdentityV1;
+  localSeatId: CoopSeatId;
+  authoritySeatId: CoopSeatId;
+  connectionGeneration: number;
+  peerConnectionGeneration: number;
+  source: "fresh" | "resume" | "showdown";
+}
+
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 
 export function isCoopAccountId(value: unknown): value is CoopAccountId {
@@ -135,6 +153,78 @@ export async function validateCoopRunSeatMap(value: CoopRunSeatMapV1): Promise<b
 
 export function coopSeatForAccount(seatMap: CoopRunSeatMapV1, accountId: CoopAccountId): CoopSeatBindingV1 | null {
   return seatMap.seats.find(seat => seat.accountId === accountId) ?? null;
+}
+
+function validIdentity(identity: CoopAccountIdentityV1): boolean {
+  const safePresentation = (value: string): boolean =>
+    value.length > 0
+    && value.length <= 128
+    && ![...value].some(character => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 0x1f || codePoint === 0x7f;
+    });
+  return (
+    identity.version === 1
+    && isCoopAccountId(identity.accountId)
+    && safePresentation(identity.displayName)
+    && safePresentation(identity.canonicalUsername)
+  );
+}
+
+/**
+ * Build the fresh P33 axes independently of invitation direction. Seat 0 is the deterministic initial
+ * authority; transport offerer/answerer never influences the seat map or authority choice.
+ */
+export function createFreshCoopP33Context(input: {
+  pairingId: string;
+  pairingBearer: string;
+  transportRole: CoopTransportRole;
+  account: CoopAccountIdentityV1;
+  peerAccount: CoopAccountIdentityV1;
+  connectionGeneration: number;
+  peerConnectionGeneration: number;
+}): CoopP33AuthenticatedContextV1 | null {
+  if (
+    !/^[A-Za-z0-9_-]{1,128}$/u.test(input.pairingId)
+    || !/^[A-Za-z0-9_-]{32,256}$/u.test(input.pairingBearer)
+    || (input.transportRole !== "offerer" && input.transportRole !== "answerer")
+    || !validIdentity(input.account)
+    || !validIdentity(input.peerAccount)
+    || input.account.accountId === input.peerAccount.accountId
+    || !Number.isSafeInteger(input.connectionGeneration)
+    || input.connectionGeneration < 0
+    || !Number.isSafeInteger(input.peerConnectionGeneration)
+    || input.peerConnectionGeneration < 0
+  ) {
+    return null;
+  }
+  const accounts = [input.account.accountId, input.peerAccount.accountId].sort();
+  return {
+    version: 1,
+    ...input,
+    localSeatId: accounts.indexOf(input.account.accountId),
+    authoritySeatId: 0,
+    source: "fresh",
+  };
+}
+
+/** Exact hot-rejoin fence: only the local bearer/generation/name may rotate. */
+export function canAdoptCoopP33Rejoin(
+  current: CoopP33AuthenticatedContextV1,
+  next: CoopP33AuthenticatedContextV1,
+): boolean {
+  return (
+    next.version === 1
+    && next.pairingId === current.pairingId
+    && next.transportRole === current.transportRole
+    && next.account.accountId === current.account.accountId
+    && next.peerAccount.accountId === current.peerAccount.accountId
+    && next.localSeatId === current.localSeatId
+    && next.authoritySeatId === current.authoritySeatId
+    && next.source === current.source
+    && next.connectionGeneration === current.connectionGeneration + 1
+    && next.peerConnectionGeneration >= current.peerConnectionGeneration
+  );
 }
 
 /** Frame authorization binds the claimed seat to the authenticated channel account and exact session epoch. */

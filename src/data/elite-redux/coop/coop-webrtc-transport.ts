@@ -132,7 +132,7 @@ export class WebRtcTransport implements CoopTransport {
   private _state: CoopConnectionState;
   private wire: CoopWireChannel;
   /** #805 hot rejoin: increments per {@linkcode replaceChannel}; stale channel events are ignored. */
-  private wireGeneration = 0;
+  private wireGeneration: number;
   private readonly msgHandlers = new Set<(msg: CoopMessage) => void>();
   private readonly stateHandlers = new Set<(state: CoopConnectionState) => void>();
   /** #857 keepalive: cancel handle for the running ping timer (null until {@linkcode startKeepalive}). */
@@ -156,9 +156,13 @@ export class WebRtcTransport implements CoopTransport {
     { readonly total: number; readonly parts: (string | undefined)[]; received: number; bytes: number }
   >();
 
-  constructor(role: CoopRole, wire: CoopWireChannel) {
+  constructor(role: CoopRole, wire: CoopWireChannel, initialConnectionGeneration = 0) {
+    if (!Number.isSafeInteger(initialConnectionGeneration) || initialConnectionGeneration < 0) {
+      throw new Error("invalid co-op connection generation");
+    }
     this.role = role;
     this.wire = wire;
+    this.wireGeneration = initialConnectionGeneration;
     this._state = wire.readyState === "open" ? "connected" : "connecting";
     coopLog("webrtc", `ctor role=${role} readyState=${wire.readyState} state=${this._state}`);
     this.attach(wire);
@@ -663,8 +667,9 @@ export function webRtcTransportFromChannel(
   role: CoopRole,
   channel: RTCDataChannel,
   pc?: RTCPeerConnection,
+  initialConnectionGeneration = 0,
 ): WebRtcTransport {
-  const transport = new WebRtcTransport(role, wireFromRtcChannel(role, channel, pc));
+  const transport = new WebRtcTransport(role, wireFromRtcChannel(role, channel, pc), initialConnectionGeneration);
   // #857: keep the real (live-network) channel warm so a long idle wait can't trip the ICE consent /
   // NAT-binding timeout and start the reconnect flap. The keepalive lives on the transport INSTANCE,
   // so it persists across #805 hot-rejoin replaceChannel swaps and is cancelled on close().
