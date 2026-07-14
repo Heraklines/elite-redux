@@ -53,8 +53,10 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import { coopWaveStartEntryEffectSignature } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
@@ -130,6 +132,24 @@ describe.skipIf(!RUN)("co-op DUO launch-snapshot: guest adopts the host's on-ent
 
   afterAll(() => {
     // best-effort
+  });
+
+  it("treats a post-summon stat-stage mutation as wave-start authority requiring refresh", () => {
+    const base = {
+      version: 1,
+      weather: 0,
+      weatherTurnsLeft: 0,
+      terrain: 0,
+      terrainTurnsLeft: 0,
+      arenaTags: [],
+      playerParty: [{ id: 1, formIndex: 0, summonData: { statStages: [0, 0, 0, 0, 0, 0, 0] } }],
+      enemyParty: [{ id: 2, formIndex: 0, summonData: { statStages: [0, 0, 0, 0, 0, 0, 0] } }],
+    } as unknown as CoopAuthoritativeBattleStateV1;
+    const afterEntry = structuredClone(base);
+    const enemySummon = afterEntry.enemyParty[0].summonData as { statStages: number[] };
+    enemySummon.statStages[1] = 1;
+
+    expect(coopWaveStartEntryEffectSignature(afterEntry)).not.toBe(coopWaveStartEntryEffectSignature(base));
   });
 
   it("guest's launch-snapshot arena terrain equals the host's (GRASSY), no divergence", async () => {
