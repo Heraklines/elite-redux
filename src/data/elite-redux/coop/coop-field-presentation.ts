@@ -9,6 +9,7 @@ import { fieldPositionForSlot } from "#data/battle-format";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { FieldPosition } from "#enums/field-position";
 import { EnemyPokemon, Pokemon } from "#field/pokemon";
+import type { PokeballTray } from "#ui/containers/pokeball-tray";
 import { EnemyBattleInfo } from "#ui/enemy-battle-info";
 
 export type CoopPresentationBoundary =
@@ -192,6 +193,45 @@ export function ensureCoopPokemonPresentationNodes(pokemon: Pokemon): boolean {
   return true;
 }
 
+function coopPokemonPresentationNodesReady(pokemon: Pokemon): boolean {
+  const sprite = pokemon.getSprite();
+  const info = pokemon.getBattleInfo();
+  if (
+    !pokemon.isOnField()
+    || !pokemon.visible
+    || pokemon.alpha <= 0
+    || sprite == null
+    || !sprite.visible
+    || sprite.alpha <= 0
+    || info == null
+    || !info.visible
+    || info.alpha <= 0
+  ) {
+    return false;
+  }
+
+  // In production, the placeholder created by Pokemon.init() is visible but is not the requested battler.
+  // Require both real caches and the live animation/texture key when Phaser exposes those inspectors.
+  const key = pokemon.getBattleSpriteKey();
+  const textures = globalScene.textures as { exists?: (value: string) => boolean } | undefined;
+  const anims = globalScene.anims as { exists?: (value: string) => boolean } | undefined;
+  const projectedSprite = sprite as unknown as {
+    texture?: { key?: string };
+    anims?: { currentAnim?: { key?: string } };
+  };
+  const currentAnimationKey = projectedSprite.anims?.currentAnim?.key;
+  const currentTextureKey = projectedSprite.texture?.key;
+  const productionCachesAvailable = textures?.exists != null || anims?.exists != null;
+  const exactLiveKey =
+    !productionCachesAvailable
+    || (currentAnimationKey == null
+      ? currentTextureKey == null || currentTextureKey === key
+      : currentAnimationKey === key);
+  return (
+    exactLiveKey && (textures?.exists == null || textures.exists(key)) && (anims?.exists == null || anims.exists(key))
+  );
+}
+
 function showPokemonPresentation(pokemon: Pokemon, slot: number, capacity: number, side: "player" | "enemy"): boolean {
   if (pokemon.isFainted()) {
     hidePokemonPresentation(pokemon);
@@ -325,4 +365,88 @@ export function settleCoopFieldPresentation(request: CoopFieldPresentationReques
       + `phase=${globalScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}`,
   );
   return changed;
+}
+
+/**
+ * Materialize one immutable field boundary and do not resolve until every requested visible seat has its
+ * real atlas, animation, sprite, and battle-info surface. Callers use this promise as the launch/transition
+ * continuation gate; a synchronous placeholder is deliberately insufficient.
+ */
+export async function settleCoopFieldPresentationReady(
+  request: CoopFieldPresentationRequest,
+  remainsCurrent: () => boolean = () => true,
+): Promise<number> {
+  const scene = globalScene;
+  const battle = scene.currentBattle;
+  const seats = request.seats.map(seat => ({ pokemon: seat.pokemon, pokemonId: seat.pokemon.id, slot: seat.slot }));
+  const immutableRequest: CoopFieldPresentationRequest = {
+    ...request,
+    seats: seats.map(({ pokemon, slot }) => ({ pokemon, slot })),
+  };
+  const lifetimeIsLive = (): boolean => {
+    if (globalScene !== scene || scene.currentBattle !== battle || !remainsCurrent()) {
+      return false;
+    }
+    const party = request.side === "player" ? scene.getPlayerParty() : scene.getEnemyParty();
+    return seats.every(
+      ({ pokemon, pokemonId }) => pokemon.id === pokemonId && party.some(candidate => candidate === pokemon),
+    );
+  };
+
+  if (!lifetimeIsLive()) {
+    throw new Error(`Co-op ${request.boundary} presentation lifetime was stale before asset materialization`);
+  }
+
+  if (request.desired === "visible") {
+    const visibleSeats = seats.filter(({ pokemon }) => !pokemon.isFainted());
+    for (const { pokemon } of visibleSeats) {
+      ensureCoopPokemonPresentationNodes(pokemon);
+    }
+    const loads = await Promise.allSettled(visibleSeats.map(({ pokemon }) => pokemon.loadAssets(false)));
+    if (loads.some(result => result.status === "rejected")) {
+      throw new Error(`Co-op ${request.boundary} presentation could not load every requested battler atlas`);
+    }
+    if (!lifetimeIsLive()) {
+      throw new Error(`Co-op ${request.boundary} presentation assets arrived after boundary replacement`);
+    }
+  }
+
+  const changed = settleCoopFieldPresentation(immutableRequest);
+  if (!lifetimeIsLive()) {
+    throw new Error(`Co-op ${request.boundary} presentation was superseded while projecting assets`);
+  }
+  if (
+    request.desired === "visible"
+    && seats.some(({ pokemon }) => !pokemon.isFainted() && !coopPokemonPresentationNodesReady(pokemon))
+  ) {
+    throw new Error(`Co-op ${request.boundary} presentation exposed an incomplete battler surface`);
+  }
+  return changed;
+}
+
+function settlePokeballTrayHidden(tray: PokeballTray): boolean {
+  const repaired = tray.shown || tray.visible;
+  if (tray.shown) {
+    // The normal SummonPhase waits for these intro tweens. The authoritative guest skips that phase, so
+    // stop its entrance motion and let the canonical hide path finish its child-coordinate reset offscreen.
+    killTweensOf(compactTargets(tray, ...tray.getAll()));
+    tray.hide().catch(error => coopWarn("renderer", "pokeball tray cleanup failed", error));
+  }
+  // `hide()` deliberately takes 850ms before hiding the container. This boundary opens Command next, so
+  // establish the absolute postcondition now while the harmless offscreen coordinate cleanup completes.
+  tray.setVisible(false);
+  return repaired;
+}
+
+/** Clear both trainer-intro party trays at the exact renderer boundary that replaces SummonPhase. */
+export function settleCoopTrainerIntroTrays(): boolean {
+  const repairedPlayer = settlePokeballTrayHidden(globalScene.pbTray);
+  const repairedEnemy = settlePokeballTrayHidden(globalScene.pbTrayEnemy);
+  if (repairedPlayer || repairedEnemy) {
+    coopLog(
+      "renderer",
+      `authoritative trainer intro cleared pokeball trays player=${repairedPlayer} enemy=${repairedEnemy}`,
+    );
+  }
+  return repairedPlayer || repairedEnemy;
 }
