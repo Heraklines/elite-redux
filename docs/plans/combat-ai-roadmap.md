@@ -173,6 +173,31 @@ it does not decide.
 All of this is **CPU self-play + CPU inference of small checkpoints** = the free **GitHub runner fleet**.
 **GPU is only needed for the fine-tune steps**, not for the generation or the evaluation games.
 
+### Player sentiment as a fun signal (later phase)
+
+**Cart-behind-horse, explicitly.** The core pipeline above (simulate -> balance metrics -> auto-tune ->
+CI) ships FIRST and stands on its own. This is a **future enrichment** that adds a "fun to play against"
+axis once the balance machinery is proven - do not block the core work on it.
+
+The simulator measures balance, not fun (see Honest limits). To close that gap, learn what players actually
+ENJOY facing and feed it back into design:
+
+1. **Explicit signal - sampled micro-ratings.** A lightweight in-game prompt ("how did that feel to play
+   against?") on a **sampled** basis - post-boss, post-ME, or on **first encounter with new content**. One
+   tap, skippable, **never nagging**. Sampling + skippability keep it unobtrusive and keep response bias low.
+2. **Implicit signals (already in telemetry, free + often more honest than ratings).** Quit-rate
+   immediately after facing content X, retry rate, session-end proximity to specific encounters, forfeit
+   patterns. These fall out of the existing event stream (surface/decision/outcome events + session
+   envelopes) with no new UI, and behaviour is frequently a truer fun signal than a self-report.
+3. **Fun model.** Learn a mapping from **content feature-vectors (the same effect-flags)** to sentiment.
+   This becomes an **additional ranking signal in the generative design loop**, sitting next to balance +
+   decision-entropy - so generation is steered toward content that is **fun to play against**, not merely
+   fair.
+4. **Schema note (additive-only).** A sentiment event is a **purely ADDITIVE** schema evolution - a new
+   OPTIONAL event type, fully consistent with the additive-only policy
+   (`docs/plans/player-telemetry-schema-v1.md` section 9). **Reserve the event name now
+   (`content_sentiment`)**; implement the capture later. No `schemaVersion` bump is required to add it.
+
 ## Free-compute inventory
 
 - **Training (GPU/TPU):** Kaggle (~30 h/wk GPU + TPU), Colab free, AWS SageMaker Studio Lab, Modal /
