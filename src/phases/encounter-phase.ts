@@ -15,10 +15,11 @@ import {
   captureCoopAuthoritativeBattleState,
   captureCoopDexBaseline,
   captureCoopEnemies,
+  coopWaveStartEntryEffectSignature,
   normalizeCoopHpBoundsAtAuthorityBoundary,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
-import { coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { settleCoopFieldPresentation } from "#data/elite-redux/coop/coop-field-presentation";
 import { clearCoopAuthoritativeGuestPlayerTrainer } from "#data/elite-redux/coop/coop-presentation";
@@ -235,6 +236,80 @@ export function captureCoopEncounterAuthority(battle: Battle): CoopEncounterAuth
     enemyLevels: [...(battle.enemyLevels ?? [])],
     ...(battle.trainer == null ? {} : { trainer: captureCoopTrainer(battle.trainer) }),
   };
+}
+
+/**
+ * Co-op HOST (#920): RE-BROADCAST the wave-start authoritative state AFTER the on-entry ability chain
+ * (PostSummonPhase) has settled and BEFORE the host's first CommandPhase, so the pure-renderer guest -
+ * which never runs summon/PostSummon and only ADOPTS host state - picks up EVERY on-entry effect (terrain,
+ * weather, entry-hazard/screen arena tags, entry FORM changes) at its own turn-1 belt-and-suspenders adopt
+ * (command-phase `tryCoopCheckpointSync` -> {@linkcode applyCoopAuthoritativeBattleState}) rather than at the
+ * turn-1 END checkpoint - after it already commanded with stale state (#920 wave-1 GRASSY_SURGE desync).
+ *
+ * The wave-start enemyPartySync ({@linkcode broadcastCoopEnemyParty}) captures its authoritativeState at the
+ * PRE-summon encounter boundary, STRICTLY before any entry ability fires, so its terrain/weather/tags/forms
+ * are stale. This reuses the SAME carrier (NO new wire type): re-send the enemyPartySync with a POST-PostSummon
+ * re-capture, and the guest's already-existing arena/form adopt applies it.
+ *
+ * IDEMPOTENT / NO-OP: fires the re-send ONLY when the live post-PostSummon entry-effect signature DIFFERS
+ * from the one already broadcast for this wave (no entry effect -> no re-send at all). A double-battle's
+ * second turn-1 CommandPhase self-latches: the first re-send updated the retained SENT state, so the
+ * signatures then match. Host-only + co-op/showdown-only, gated exactly like {@linkcode broadcastCoopEnemyParty}
+ * (isAuthoritativeBattleSession + host role); solo / guest / non-host are a hard no-op. It does NOT wait on
+ * the interaction counter (plain `transport.send`), so it cannot re-introduce the wave-1 -> wave-2 command
+ * rendezvous deadlock the sole-publication comment in {@linkcode broadcastCoopEnemyParty} warns against.
+ */
+export function rebroadcastCoopWaveStartAuthorityAfterEntryEffects(): void {
+  if (!isAuthoritativeBattleSession()) {
+    return;
+  }
+  const controller = getCoopController();
+  const streamer = getCoopBattleStreamer();
+  if (controller == null || streamer == null || controller.role !== "host") {
+    return;
+  }
+  try {
+    const battle = globalScene.currentBattle;
+    if (battle == null) {
+      return;
+    }
+    const wave = battle.waveIndex;
+    const sentState = streamer.peekSentEnemyPartyAuthoritativeState(wave);
+    if (sentState === undefined) {
+      // No wave-start authoritative state was published for this wave; there is nothing to refresh.
+      return;
+    }
+    const liveSignature = coopWaveStartEntryEffectSignature();
+    if (liveSignature === "" || liveSignature === coopWaveStartEntryEffectSignature(sentState)) {
+      // No on-entry effect mutated arena/forms after the pre-summon capture: a true no-op.
+      return;
+    }
+    const enemies = captureCoopEnemies();
+    const authoritativeState = captureCoopAuthoritativeBattleState(battle.turn);
+    if (authoritativeState == null) {
+      return;
+    }
+    const encounter = captureCoopEncounterAuthority(battle);
+    // Re-publish the SAME carrier with the post-summon re-capture. The encounter descriptor is re-sent so
+    // this passes the monotonic-authority guard (a party-only downgrade would be ignored); the guest's
+    // turn-1 belt-and-suspenders re-consumes the buffers and adopts terrain/weather/tags/forms.
+    streamer.sendEnemyParty(
+      wave,
+      enemies,
+      battle.mysteryEncounter?.encounterType ?? COOP_WAVE_NO_ME,
+      battle.battleType,
+      authoritativeState,
+      encounter,
+    );
+    coopLog(
+      "replay",
+      `host RE-BROADCAST wave-start authority wave=${wave} after post-summon entry effects settled (#920)`,
+    );
+  } catch (error) {
+    // A re-broadcast failure must never break the host's turn; the guest still heals at the turn-1 END
+    // checkpoint (its prior, slower behavior), so this is strictly best-effort.
+    coopWarn("stream", "host failed to re-broadcast post-summon wave-start authority", error);
+  }
 }
 
 function buildAuthoritativeTrainer(data: CoopSerializedTrainer): Trainer {

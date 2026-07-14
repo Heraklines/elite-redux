@@ -59,6 +59,7 @@ import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { getMoveTargets } from "#moves/move-utils";
 import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
+import { rebroadcastCoopWaveStartAuthorityAfterEntryEffects } from "#phases/encounter-phase";
 import { FieldPhase } from "#phases/field-phase";
 import type { MoveTargetSet } from "#types/move-target-set";
 import type { TurnMove } from "#types/turn-move";
@@ -588,6 +589,14 @@ export class CommandPhase extends FieldPhase {
         adoptCoopEnemiesStructural(enemies);
         applyCoopAuthoritativeBattleState(streamer.consumeEnemyPartyState(waveIndex), true);
       }
+    } else if (controller.role === "host" && turn === 1 && this.fieldIndex === 0) {
+      // Co-op HOST (#920): the entry-ability chain (PostSummonPhase) has now settled - terrain, weather,
+      // entry-hazard arena tags and entry form changes are on the arena/field, but the wave-start
+      // enemyPartySync captured its authoritative state BEFORE PostSummon (pre-summon boundary). Re-broadcast
+      // the post-summon re-capture so the guest adopts those on-entry effects at its OWN turn-1 belt-and-
+      // suspenders above, BEFORE it commands, instead of at the turn-1 END checkpoint. Gated to field slot 0
+      // so it evaluates once per wave; a hard no-op unless an entry effect actually changed state (self-latching).
+      rebroadcastCoopWaveStartAuthorityAfterEntryEffects();
     }
   }
 

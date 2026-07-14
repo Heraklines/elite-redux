@@ -32,6 +32,20 @@
 // that END invariant, so it guards whatever the correct fix ends up being (it does NOT hard-code the
 // serialization mechanism).
 //
+// 🔴 GENERALIZED (#920 coordinator requirement): the fix (re-capture the WHOLE authoritative state after the
+// PostSummon entry-ability chain settles and re-broadcast it via the existing enemyPartySync carrier) carries
+// EVERY on-entry effect - terrain, weather, entry-hazard/screen arena tags, AND entry form changes - not
+// terrain alone. So the sibling case below asserts the GENERAL invariant: the guest's wave-start arena
+// entry-effect DIGEST (weather + terrain + tags, from the launch-grade `getSessionSaveData().arena`) EQUALS
+// the host's post-PostSummon digest. It guards the whole class by construction (the comparator includes
+// weather + tags), even though THIS scenario's driver is a terrain innate.
+//
+// HONEST CAVEAT: the duo harness's `mirrorHostBattleToGuest` copies the host's post-encounter arena to the
+// guest DIRECTLY (coop-duo-harness.ts) rather than driving the real SelectStarter->launch handshake, so these
+// END-invariant assertions hold today via that mirror and become a TRUE red->green regression for the
+// production re-broadcast path once the real launch handshake is driven through the harness (Layer B). The
+// end-state form is deliberate: it guards the guest's adopted state regardless of WHICH mechanism delivered it.
+//
 // HOW TO RUN (gated ER_SCENARIO=1, like every ER engine test):
 //   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-duo-launch-terrain.test.ts
 // =============================================================================
@@ -57,6 +71,24 @@ const RUN = process.env.ER_SCENARIO === "1";
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+/**
+ * General wave-start ENTRY-EFFECT digest (#920 generality): the arena state an on-entry ability chain can
+ * mutate between the pre-summon capture and the first CommandPhase - weather (type + turns), terrain (type +
+ * turns), and arena TAGS (entry hazards / screens). Built from the launch-grade `getSessionSaveData().arena`
+ * serializer, so a divergence in weather OR tags fails it too, not just terrain. Stable key/tag order for a
+ * byte comparison. MUST be evaluated under the correct scene's `globalScene` (wrap the guest in withClient).
+ */
+function arenaEntryEffectDigest(scene: BattleScene): string {
+  const arena = scene.gameData.getSessionSaveData().arena;
+  return JSON.stringify({
+    weather: arena.weather ? [arena.weather.weatherType, arena.weather.turnsLeft] : null,
+    terrain: arena.terrain ? [arena.terrain.terrainType, arena.terrain.turnsLeft] : null,
+    tags: (arena.tags ?? [])
+      .map(t => [String(t.tagType), Number(t.side), Number(t.turnCount)] as const)
+      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1])),
+  });
 }
 
 describe.skipIf(!RUN)("co-op DUO launch-snapshot: guest adopts the host's on-entry terrain (#920)", () => {
@@ -139,6 +171,36 @@ describe.skipIf(!RUN)("co-op DUO launch-snapshot: guest adopts the host's on-ent
       guestSnapshotTerrain,
       "guest getSessionSaveData().arena.terrain equals the host's (GRASSY) - the terrain round-trips",
     ).toBe(hostSnapshotTerrain);
+
+    logs.flush();
+  }, 300_000);
+
+  it("guest's wave-start arena entry-effect DIGEST equals the host's post-PostSummon (terrain+weather+tags) (#920)", async () => {
+    // HOST reaches wave-1 / turn-1 command with the enemy's on-entry innate already fired in the PostSummon
+    // chain (GRASSY here). The DIGEST generalizes the guard beyond terrain: it also compares weather and the
+    // entry-hazard/screen arena tags, so ANY on-entry effect the guest fails to adopt (not just terrain) is
+    // caught. This is the coordinator's "general property", not the terrain-only special case above.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const hostScene = game.scene;
+    expect(
+      hostScene.arena.terrain?.terrainType,
+      "precondition: the wave-1 enemy's on-entry innate mutated the HOST arena (GRASSY)",
+    ).toBe(TerrainType.GRASSY);
+
+    // GUEST boots from the host's mirror of the launch snapshot (adopts the host arena).
+    const pair = createLoopbackPair();
+    const rig: DuoRig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+
+    // END INVARIANT (Layer C, generalized): the guest's full wave-start entry-effect digest - weather +
+    // terrain + entry-hazard tags, taken from the launch-grade getSessionSaveData().arena serializer - must
+    // EQUAL the host's post-PostSummon digest. A byte difference is the #920 divergence class (terrain, but
+    // now also weather / hazards / any on-entry arena mutation the guest did not adopt before its first command).
+    const hostDigest = arenaEntryEffectDigest(hostScene);
+    const guestDigest = await withClient(rig.guestCtx, () => arenaEntryEffectDigest(rig.guestScene));
+    expect(
+      guestDigest,
+      "guest adopts the host's FULL on-entry arena state (terrain+weather+tags), no wave-start divergence (#920)",
+    ).toBe(hostDigest);
 
     logs.flush();
   }, 300_000);

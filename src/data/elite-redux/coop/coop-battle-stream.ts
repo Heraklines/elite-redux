@@ -873,7 +873,10 @@ export class CoopBattleStreamer {
           waiter.finish(null);
           continue;
         }
-        coopLog("resync", `guest RE-SEND requestStateSync turn=${waiter.requestTurn} seq=${waiter.seq} after reconnect`);
+        coopLog(
+          "resync",
+          `guest RE-SEND requestStateSync turn=${waiter.requestTurn} seq=${waiter.seq} after reconnect`,
+        );
         this.transport.send({ t: "requestStateSync", turn: waiter.requestTurn, seq: waiter.seq });
       }
     });
@@ -1436,6 +1439,16 @@ export class CoopBattleStreamer {
     const state = this.enemyPartyStateByWave.get(wave);
     this.enemyPartyStateByWave.delete(wave);
     return state;
+  }
+
+  /**
+   * HOST (#920): peek - WITHOUT consuming - the authoritative state this host already SENT with the
+   * wave-start enemy-party handoff for `wave`. Reads the host's retained SENT message (not the guest
+   * inbox), so the post-summon re-broadcast can tell whether an on-entry ability chain mutated
+   * arena/forms after that pre-summon capture and re-send ONLY when something actually changed.
+   */
+  peekSentEnemyPartyAuthoritativeState(wave: number): CoopAuthoritativeBattleStateV1 | undefined {
+    return this.sentEnemyParties.get(wave)?.authoritativeState;
   }
 
   /** GUEST: atomically consume the exact encounter identity paired with this wave's party. */

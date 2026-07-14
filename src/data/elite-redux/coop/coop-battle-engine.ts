@@ -2690,6 +2690,47 @@ export function captureCoopAuthoritativeBattleState(turn: number): CoopAuthorita
   }
 }
 
+/**
+ * Entry-effect SIGNATURE (#920): the minimal projection of authoritative state an on-entry ability chain
+ * (PostSummonPhase) can mutate between the PRE-summon wave-start capture and the first CommandPhase -
+ * weather + terrain (type AND turn budget), entry-hazard/screen arena tags, and entry FORM changes. The
+ * host compares the LIVE post-PostSummon signature against the one it already broadcast in the wave-start
+ * enemyPartySync; a difference means an entry effect fired, which is the sole trigger for the single
+ * post-summon re-broadcast ({@linkcode rebroadcastCoopWaveStartAuthorityAfterEntryEffects}) so the
+ * pure-renderer guest (which never runs summon/PostSummon) adopts terrain/weather/tags/forms BEFORE its
+ * first command instead of at the turn-1 END checkpoint - after it already commanded with stale state.
+ *
+ * Reads live scene when `state` is omitted, else the given carrier. Fully guarded: a read failure returns
+ * "" so the caller treats an empty LIVE signature as "cannot tell -> do NOT re-broadcast" (never a spurious
+ * re-send). The captured state ALREADY snapshots every one of these fields (weather/terrain/arenaTags +
+ * per-mon formIndex), so this compares the SAME serialized shapes on both sides.
+ */
+export function coopWaveStartEntryEffectSignature(state?: CoopAuthoritativeBattleStateV1 | null): string {
+  try {
+    if (state != null) {
+      return JSON.stringify({
+        w: state.weather,
+        wt: state.weatherTurnsLeft,
+        t: state.terrain,
+        tt: state.terrainTurnsLeft,
+        tags: state.arenaTags,
+        forms: state.enemyParty.map(p => [Number(p.id), Number(p.formIndex)]),
+      });
+    }
+    const arena = globalScene.arena;
+    return JSON.stringify({
+      w: arena.weather?.weatherType ?? 0,
+      wt: arena.weather?.turnsLeft ?? 0,
+      t: arena.terrain?.terrainType ?? 0,
+      tt: arena.terrain?.turnsLeft ?? 0,
+      tags: readArenaTagViews(),
+      forms: globalScene.getEnemyParty().map(p => [Number(p.id), Number(p.formIndex)]),
+    });
+  } catch {
+    return "";
+  }
+}
+
 function parseAuthoritativeParty(rawParty: Record<string, unknown>[] | undefined): PokemonData[] | null {
   if (!Array.isArray(rawParty)) {
     return null;
@@ -3250,19 +3291,13 @@ function validateAuthoritativeMonData(data: PokemonData): CoopAuthoritativeApply
   if (Array.isArray(raw.stats) && raw.stats.some(value => !isFiniteNumber(value))) {
     return { section: "monData", monId: data.id, error: "stats must contain only finite numbers" };
   }
-  if (
-    Array.isArray(raw.ivs)
-    && raw.ivs.some(value => !isFiniteNumber(value) || value < 0 || value > 31)
-  ) {
+  if (Array.isArray(raw.ivs) && raw.ivs.some(value => !isFiniteNumber(value) || value < 0 || value > 31)) {
     return { section: "monData", monId: data.id, error: "ivs must contain only values from 0 through 31" };
   }
   if (
     Array.isArray(raw.moveset)
     && raw.moveset.some(
-      move =>
-        move == null
-        || typeof move !== "object"
-        || !isFiniteNumber((move as Record<string, unknown>).moveId),
+      move => move == null || typeof move !== "object" || !isFiniteNumber((move as Record<string, unknown>).moveId),
     )
   ) {
     return { section: "monData", monId: data.id, error: "moveset contains an invalid move" };
@@ -3446,9 +3481,7 @@ function captureCoopAuthoritativeApplyBoundary(): CoopAuthoritativeApplyBoundary
     playerParty: [...(globalScene.getPlayerParty() as Pokemon[])],
     enemyParty: [...(globalScene.getEnemyParty() as Pokemon[])],
     playerModifiers: [...globalScene.modifiers],
-    enemyModifiers: [
-      ...(globalScene as unknown as { enemyModifiers: PersistentModifier[] }).enemyModifiers,
-    ],
+    enemyModifiers: [...(globalScene as unknown as { enemyModifiers: PersistentModifier[] }).enemyModifiers],
     arena: globalScene.arena,
     battleFormat: globalScene.currentBattle?.format,
     rndState,
@@ -3563,11 +3596,7 @@ function applyCoopAuthoritativeBattleStateTransaction(
       return false;
     }
     const plan = prepared.plan;
-    if (
-      !reassertAccepted
-      && plan.state.tick !== undefined
-      && plan.state.tick <= coopLastAppliedStateTick
-    ) {
+    if (!reassertAccepted && plan.state.tick !== undefined && plan.state.tick <= coopLastAppliedStateTick) {
       coopWarn(
         "resync",
         `authoritativeState tick=${plan.state.tick} STALE (lastApplied=${coopLastAppliedStateTick}) -> REJECTED (#807)`,
