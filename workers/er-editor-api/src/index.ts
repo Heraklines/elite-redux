@@ -639,11 +639,10 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
     if (!Array.isArray(t.team) || t.team.length === 0 || t.team.length > 6) {
       return { ok: false, error: `${key}: team must have 1-6 members` };
     }
-    for (const member of t.team) {
-      if (!isPlainObject(member)) {
-        return { ok: false, error: `${key}: each team member must be an object` };
-      }
-      const mm = member as Record<string, unknown>;
+    // Validate ONE flat member object (also used for each weighted variant). The
+    // move NAME check accepts the `RLA`/`RLNA` tokens for free (they match the
+    // `[A-Z0-9_]{1,60}` name charset). `allowWeight` permits a variant's weight.
+    const checkMember = (mm: Record<string, unknown>, allowWeight: boolean): ValidationResult => {
       if (!Number.isInteger(mm.species) || (mm.species as number) < 1) {
         return { ok: false, error: `${key}: member species must be a positive speciesId` };
       }
@@ -661,7 +660,7 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
         mm.moves !== undefined
         && (!Array.isArray(mm.moves) || mm.moves.length > 4 || mm.moves.some(v => !isName(v)))
       ) {
-        return { ok: false, error: `${key}: moves must be up to 4 move NAMEs` };
+        return { ok: false, error: `${key}: moves must be up to 4 move NAMEs (incl. RLA/RLNA tokens)` };
       }
       if (
         mm.fusion !== undefined
@@ -682,6 +681,57 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
       // game-side parser ignores it. Accept it, but keep it a clean boolean.
       if (mm.sanityOff !== undefined && typeof mm.sanityOff !== "boolean") {
         return { ok: false, error: `${key}: sanityOff must be a boolean` };
+      }
+      // Weighted-slot possibility weight: integer >= 1. Only valid inside a
+      // `variants` slot; a bare flat member must not carry one.
+      if (mm.weight !== undefined) {
+        if (!allowWeight) {
+          return { ok: false, error: `${key}: weight is only allowed inside a variants slot` };
+        }
+        if (!(Number.isInteger(mm.weight) && (mm.weight as number) >= 1)) {
+          return { ok: false, error: `${key}: variant weight must be an integer >= 1` };
+        }
+      }
+      return { ok: true };
+    };
+    // Slot-fill chance (slots 2-6): optional integer 1-100 (absent => 100).
+    const checkSlotChance = (v: unknown): ValidationResult =>
+      v === undefined || (Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100)
+        ? { ok: true }
+        : { ok: false, error: `${key}: slotChance must be an integer 1-100` };
+    for (const entry of t.team) {
+      if (!isPlainObject(entry)) {
+        return { ok: false, error: `${key}: each team slot must be an object` };
+      }
+      const e = entry as Record<string, unknown>;
+      if (e.variants === undefined) {
+        // FLAT member (optionally carrying its own slotChance for slots 2-6).
+        const sc = checkSlotChance(e.slotChance);
+        if (!sc.ok) {
+          return sc;
+        }
+        const mr = checkMember(e, false);
+        if (!mr.ok) {
+          return mr;
+        }
+      } else {
+        // WEIGHTED slot: { variants: [member...], slotChance? }.
+        if (!Array.isArray(e.variants) || e.variants.length === 0 || e.variants.length > 12) {
+          return { ok: false, error: `${key}: variants must be an array of 1-12 possibilities` };
+        }
+        const sc = checkSlotChance(e.slotChance);
+        if (!sc.ok) {
+          return sc;
+        }
+        for (const variant of e.variants) {
+          if (!isPlainObject(variant)) {
+            return { ok: false, error: `${key}: each variant must be an object` };
+          }
+          const vr = checkMember(variant as Record<string, unknown>, true);
+          if (!vr.ok) {
+            return vr;
+          }
+        }
       }
     }
   }
