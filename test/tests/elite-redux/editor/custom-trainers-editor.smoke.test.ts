@@ -46,6 +46,10 @@ interface EditorHarness {
   ctrMoveIllegal(m: Record<string, unknown>, move: string): boolean;
   ctrFusedName(a: string, b: string): string;
   ctrLiveToEdit(entry: Record<string, unknown>): Record<string, any>;
+  ctrBuildBaselines(delta: Record<string, unknown>): Record<string, string>;
+  hashCtrTrainerEntry(entry: unknown): string;
+  markCustomTrainersSaved(delta: Record<string, unknown>, data: Record<string, unknown>): void;
+  CTR_LIVE: Record<string, any>;
   ctr: { current: Record<string, any>; baseline: Record<string, any> };
   ctrConfig: {
     current: { windowSize: number; windowChancePct: number };
@@ -120,9 +124,11 @@ beforeAll(() => {
   const shim = `
     ;window.__ct = {
       blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal, ctrFusedName, ctrLiveToEdit,
+      ctrBuildBaselines, hashCtrTrainerEntry, markCustomTrainersSaved,
       render, onCustomTrainerInput, onCustomTrainerChange, onCustomTrainerClick, buildDeltas,
       ctr, ctrConfig, spByConst, spById, trainerClassByName, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
+      get CTR_LIVE(){ return CTR_LIVE; }, set CTR_LIVE(v){ CTR_LIVE = v; },
       setTab(v){ activeTab = v; },
     };`;
   const dom = new JSDOM(HARNESS_HTML, { runScripts: "outside-only", pretendToBeVisual: true });
@@ -138,6 +144,7 @@ beforeEach(() => {
   // Reset editor state between tests (module state is shared across the file).
   ct.ctr.current = {};
   ct.ctr.baseline = {};
+  ct.CTR_LIVE = {};
   ct.ctrConfig.current = { windowSize: 10, windowChancePct: 25 };
   ct.ctrConfig.baseline = { windowSize: 10, windowChancePct: 25 };
   ct.ctrSelected = null;
@@ -361,6 +368,104 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     expect(ct.ctrConfig.current.windowChancePct).toBe(0);
     const cfg2 = ct.buildDeltas().deltas["custom-trainers-config"] as Record<string, number>;
     expect(cfg2.windowChancePct).toBe(0);
+  });
+
+  // ---- MULTI-STAFF SAVE SAFETY (Batch A) -----------------------------------
+  it("builds per-trainer baselines only for MODIFIED (loaded) trainers, not new ones or deletions", () => {
+    // MOD existed at load (in CTR_LIVE); NEW is freshly created; DEL is a deletion.
+    ct.CTR_LIVE = { MOD: { id: 70001, name: "Mod", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] } };
+    const delta = {
+      MOD: { id: 70001, name: "Mod v2", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] },
+      NEW: { id: 70002, name: "New", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] },
+      DEL: null,
+    };
+    const baselines = ct.ctrBuildBaselines(delta);
+    // Only MOD gets a baseline hash (of the LOADED CTR_LIVE version).
+    expect(Object.keys(baselines)).toEqual(["MOD"]);
+    expect(baselines.MOD).toBe(ct.hashCtrTrainerEntry(ct.CTR_LIVE.MOD));
+    expect(baselines.NEW).toBeUndefined();
+    expect(baselines.DEL).toBeUndefined();
+  });
+
+  it("applies the server id remap from a save response so the UI shows the real id (no reload)", () => {
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // The client minted a provisional id; the worker returns the real one.
+    const delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.id).toBeGreaterThanOrEqual(70001);
+    ct.markCustomTrainersSaved({ [key]: delta }, { idRemap: { [key]: 70123 }, conflicts: [] });
+    // Local edit state now reflects the server id...
+    expect(ct.ctr.current[key].id).toBe(70123);
+    // ...its baseline is clean (not dirty) and CTR_LIVE advanced to the saved entry.
+    expect(ct.ctr.baseline[key].id).toBe(70123);
+    expect(ct.CTR_LIVE[key].id).toBe(70123);
+    // Not dirty anymore: buildDeltas emits no custom-trainers change.
+    expect(ct.buildDeltas().deltas["custom-trainers"]).toBeUndefined();
+  });
+
+  it("keeps a per-trainer CONFLICT dirty (baseline NOT advanced) while saving the rest", () => {
+    // Two trainers both loaded + edited; the worker rejects CONFLICT, applies OK.
+    ct.CTR_LIVE = {
+      OK: { id: 70001, name: "Ok", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] },
+      CONFLICT: { id: 70002, name: "Clash", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] },
+    };
+    ct.ctr.current = {
+      OK: {
+        id: 70001,
+        name: "Ok v2",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [{ species: "SPECIES_PIKACHU" }],
+      },
+      CONFLICT: {
+        id: 70002,
+        name: "Clash MINE",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [{ species: "SPECIES_PIKACHU" }],
+      },
+    };
+    // Baselines differ from current -> both start dirty.
+    ct.ctr.baseline = {
+      OK: {
+        id: 70001,
+        name: "Ok",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [{ species: "SPECIES_PIKACHU" }],
+      },
+      CONFLICT: {
+        id: 70002,
+        name: "Clash",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [{ species: "SPECIES_PIKACHU" }],
+      },
+    };
+    const okDelta = { id: 70001, name: "Ok v2", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] };
+    const conflictDelta = { id: 70002, name: "Clash MINE", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] };
+
+    ct.markCustomTrainersSaved(
+      { OK: okDelta, CONFLICT: conflictDelta },
+      {
+        idRemap: {},
+        conflicts: [
+          {
+            key: "CONFLICT",
+            error: "CONFLICT: modified by someone else since you loaded - reload to get their version",
+          },
+        ],
+      },
+    );
+
+    // OK advanced to clean: baseline == current.
+    expect(ct.ctr.baseline.OK).toEqual(ct.ctr.current.OK);
+    expect(ct.CTR_LIVE.OK.name).toBe("Ok v2");
+    // CONFLICT stays DIRTY: baseline is NOT advanced (still "Clash") and CTR_LIVE
+    // is NOT updated, so the author can reload the teammate's version.
+    expect(ct.ctr.baseline.CONFLICT.name).toBe("Clash");
+    expect(ct.ctr.current.CONFLICT.name).toBe("Clash MINE");
+    expect(ct.CTR_LIVE.CONFLICT.name).toBe("Clash");
   });
 
   it("RLA/RLNA are offered atop the datalist and exempt from the legality/unknown-move gate", () => {

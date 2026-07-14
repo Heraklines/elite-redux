@@ -1675,6 +1675,53 @@ function normalizeCtrWindowChance(value) {
   return n >= 0 && n <= 100 ? n : 25;
 }
 
+// --- Multi-staff save safety: per-trainer baseline hashing (mirrors the worker's
+// custom-trainers-merge.ts EXACTLY, so a hash computed here matches the worker's).
+// The editor sends hashCtrTrainerEntry(CTR_LIVE[key]) (the LOAD-time repo version,
+// species by id) per modified trainer; the worker compares it against the CURRENT
+// repo version to detect a teammate's concurrent edit (same-trainer conflict).
+
+/** Deterministic, key-sorted JSON string (mirror of worker `stableStringify`). */
+function ctrStableStringify(value) {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "null";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(ctrStableStringify).join(",")}]`;
+  }
+  const keys = Object.keys(value).sort();
+  return `{${keys.map(k => `${JSON.stringify(k)}:${ctrStableStringify(value[k])}`).join(",")}}`;
+}
+
+/** Stable FNV-1a (32-bit) hex hash of a trainer entry (mirror of worker `hashTrainerEntry`). */
+function hashCtrTrainerEntry(entry) {
+  const s = ctrStableStringify(entry);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16);
+}
+
+/**
+ * Per-trainer load-time baseline hashes for a custom-trainers delta: for each
+ * MODIFIED trainer (a non-null delta entry whose key existed in the loaded file
+ * CTR_LIVE), map key -> hash of the LOADED repo entry. New trainers (absent from
+ * CTR_LIVE) and deletions (null) get no baseline, so the worker treats them as a
+ * new-id allocation / delete respectively. This drives the worker's same-trainer
+ * conflict guard.
+ */
+function ctrBuildBaselines(delta) {
+  const baselines = {};
+  for (const [key, value] of Object.entries(delta || {})) {
+    if (value !== null && CTR_LIVE && Object.hasOwn(CTR_LIVE, key)) {
+      baselines[key] = hashCtrTrainerEntry(CTR_LIVE[key]);
+    }
+  }
+  return baselines;
+}
+
 /** Clamp a variant weight to an integer >= 1 (invalid => 1). */
 function clampCtrWeight(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -4095,15 +4142,22 @@ async function commit({ deploy }) {
 
     const author = $("#author").value;
     let lastSha = "";
+    let ctrConflicts = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       // Only the LAST save triggers the (single) deploy.
       const wantDeploy = deploy && i === files.length - 1;
       setStatus(`Saving ${file} (${i + 1}/${files.length})…`);
+      // Custom trainers carry per-trainer baseline hashes so the worker can detect
+      // a teammate's concurrent edit (same-trainer conflict) and server-assign ids.
+      const body = { password, file, delta: deltas[file], author, deploy: wantDeploy };
+      if (file === "custom-trainers") {
+        body.baselines = ctrBuildBaselines(deltas[file]);
+      }
       const res = await fetch(`${WORKER_URL}/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, file, delta: deltas[file], author, deploy: wantDeploy }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
@@ -4115,15 +4169,34 @@ async function commit({ deploy }) {
         setStatus(`Saved ✓ ${lastSha} but deploy failed: ${data.deployError || "unknown"}`, ERR);
         return;
       }
-      markSaved(file);
+      if (file === "custom-trainers") {
+        // Adopt server-assigned ids + keep any conflicted trainers dirty.
+        markCustomTrainersSaved(deltas[file], data);
+        ctrConflicts = Array.isArray(data.conflicts) ? data.conflicts : [];
+      } else {
+        markSaved(file);
+      }
     }
     render();
-    setStatus(
-      deploy
-        ? `Saved ✓ ${lastSha} — deploy triggered, live in a few minutes.`
-        : `Saved ✓ ${lastSha} — click "Commit & Deploy" to apply it to staging.`,
-      "var(--ok)",
-    );
+    if (ctrConflicts.length > 0) {
+      // Partial success: the non-conflicting rest saved, but these trainers were
+      // edited by someone else since load and stay DIRTY (reload to see theirs).
+      const detail = ctrConflicts
+        .slice(0, 3)
+        .map(c => c.error || c.key)
+        .join("; ");
+      setStatus(
+        `Saved ✓ ${lastSha}, but ${ctrConflicts.length} trainer(s) were rejected as conflicts and kept dirty: ${detail}${ctrConflicts.length > 3 ? "…" : ""}`,
+        ERR,
+      );
+    } else {
+      setStatus(
+        deploy
+          ? `Saved ✓ ${lastSha} — deploy triggered, live in a few minutes.`
+          : `Saved ✓ ${lastSha} — click "Commit & Deploy" to apply it to staging.`,
+        "var(--ok)",
+      );
+    }
   } catch (err) {
     setStatus(`Error: ${err}`, ERR);
   } finally {
@@ -4152,19 +4225,54 @@ function markSaved(file) {
     tms.baseline = JSON.parse(JSON.stringify(tms.current));
   } else if (file === "species-abilities") {
     abil.baseline = JSON.parse(JSON.stringify(abil.current));
-  } else if (file === "custom-trainers") {
-    // Drop deleted (null) keys, then snapshot the rest as the new baseline.
-    for (const k of Object.keys(ctr.current)) {
-      if (ctr.current[k] === null) {
-        delete ctr.current[k];
-      }
-    }
-    ctr.baseline = JSON.parse(JSON.stringify(ctr.current));
-    if (ctrSelected && !ctr.current[ctrSelected]) {
-      ctrSelected = null;
-    }
   } else if (file === "custom-trainers-config") {
     ctrConfig.baseline = JSON.parse(JSON.stringify(ctrConfig.current));
+  }
+}
+
+/**
+ * Adopt the worker's custom-trainers save response (Batch A multi-staff safety):
+ *   - apply `idRemap` (server-assigned real ids) to the local edit state so the UI
+ *     reflects the real id without a reload,
+ *   - for every SAVED (non-conflicted) trainer, advance its baseline AND the
+ *     load-time CTR_LIVE snapshot (so the next save's baseline hash matches the
+ *     new repo state), dropping deleted (null) keys,
+ *   - leave every CONFLICTED trainer untouched: it stays DIRTY so the author can
+ *     reload the teammate's version (or re-save after reconciling).
+ */
+function markCustomTrainersSaved(delta, data) {
+  const idRemap = data && data.idRemap && typeof data.idRemap === "object" ? data.idRemap : {};
+  const conflicted = new Set((Array.isArray(data && data.conflicts) ? data.conflicts : []).map(c => c.key));
+
+  // Apply server-assigned ids to the live edit state.
+  for (const [key, realId] of Object.entries(idRemap)) {
+    if (ctr.current[key] && typeof realId === "number") {
+      ctr.current[key].id = realId;
+    }
+  }
+
+  for (const [key, value] of Object.entries(delta || {})) {
+    if (conflicted.has(key)) {
+      continue; // rejected by the worker -> keep the local edit DIRTY
+    }
+    if (value === null) {
+      // Deletion committed.
+      delete ctr.current[key];
+      delete ctr.baseline[key];
+      delete CTR_LIVE[key];
+      if (ctrSelected === key) {
+        ctrSelected = null;
+      }
+      continue;
+    }
+    // Saved (created/modified): the committed repo entry is the delta with the
+    // final (possibly remapped) id. Advance CTR_LIVE (raw, species by id) so a
+    // later save hashes the NEW repo state, and snapshot the baseline as clean.
+    const finalId = typeof idRemap[key] === "number" ? idRemap[key] : value.id;
+    CTR_LIVE[key] = { ...value, id: finalId };
+    if (ctr.current[key]) {
+      ctr.baseline[key] = JSON.parse(JSON.stringify(ctr.current[key]));
+    }
   }
 }
 
