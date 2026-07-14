@@ -23,6 +23,69 @@ function fromEach(clients, fn) {
   return Object.fromEntries(clients.map(client => [client.label, fn(client)]));
 }
 
+const DIGEST_PARTS = /\[coop-browser:digest-parts\] (\{.*\})/u;
+
+/** The most recent per-mon innate ids ({player, enemy}) a client emitted, or null. */
+function latestInnates(client) {
+  const events = client.evidence.events;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const match = DIGEST_PARTS.exec(events[i].text ?? "");
+    if (match) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (parsed.innates) {
+          return parsed.innates;
+        }
+      } catch {
+        // A malformed diagnostic line is skipped.
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Innate-activation invariant check (maintainer-directed): the passive-digest fix must not disable ER
+ * innates. At the first battle surface assert the ace-difficulty enemy's innates are LIVE and that both
+ * browsers compute IDENTICAL innate ids (the real correctness). Player innates are starterData-gated, so
+ * a fresh account may have none - only cross-browser consistency is required there.
+ */
+function assertInnatesLive(rig) {
+  const clients = Object.values(rig.clients);
+  const perClient = clients.map(client => ({ client, innates: latestInnates(client) }));
+  if (perClient.some(entry => entry.innates == null)) {
+    for (const { client } of perClient) {
+      client.evidence.record("innate-check", { status: "skipped", reason: "no digest-parts innate marker captured" });
+    }
+    return;
+  }
+  const canonical = JSON.stringify(perClient[0].innates);
+  const consistent = perClient.every(entry => JSON.stringify(entry.innates) === canonical);
+  const enemyLive = perClient.map(entry => ({
+    label: entry.client.label,
+    live: (entry.innates.enemy ?? []).some(mon => Array.isArray(mon) && mon.some(id => id !== -1)),
+  }));
+  for (const entry of perClient) {
+    entry.client.evidence.record("innate-check", {
+      crossBrowserConsistent: consistent,
+      enemyInnatesLive: enemyLive.find(e => e.label === entry.client.label)?.live ?? false,
+      enemy: entry.innates.enemy,
+      player: entry.innates.player,
+    });
+  }
+  if (!consistent) {
+    throw new Error(
+      `innate-check: innate ids DIVERGE between browsers (regression): ${perClient.map(e => `${e.client.label}=${JSON.stringify(e.innates)}`).join(" | ")}`,
+    );
+  }
+  const dead = enemyLive.filter(e => !e.live);
+  if (dead.length > 0) {
+    throw new Error(
+      `innate-check: ace-difficulty enemy innates NOT live on ${dead.map(e => e.label).join(",")}; enemy innates=${JSON.stringify(perClient[0].innates.enemy)}`,
+    );
+  }
+}
+
 /** Structured per-wave campaign progress log written next to the harness evidence. */
 class CampaignProgress {
   constructor(artifactDir) {
@@ -398,6 +461,9 @@ export async function runCampaign(rig) {
   }
   await rig.pair(rig.config.requesterSeat);
   await rig.startFreshRun();
+  // Verify the layer-8 passive-digest fix did not disable ER innates (maintainer-directed invariant).
+  assertInnatesLive(rig);
+  await progress.note("innate-activation invariant checked at wave-1 command surface");
 
   let wavesCleared = 0;
   let status = "continue";

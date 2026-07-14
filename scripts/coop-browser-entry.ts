@@ -43,13 +43,34 @@ const BINDING_PREFIX = "[coop-browser:binding] ";
 const DIGEST_PARTS_PREFIX = "[coop-browser:digest-parts] ";
 const CHECKSUM_SENTINEL = "0000000000000000";
 
+/**
+ * The ER 3-slot innate ability ids (index 0..2; -1 = empty slot), read-only. Included so innate
+ * activation is TRACKED by the digest (a divergence self-identifies) and assertable at the first
+ * battle surface. Never mutates: it only reads the passive-ability projection.
+ */
+function safeInnateIds(pokemon: Pokemon): number[] {
+  try {
+    return pokemon
+      .getPassiveAbilities()
+      .slice(0, 3)
+      .map(ability => (ability == null ? -1 : ability.id));
+  } catch {
+    return [];
+  }
+}
+
 function observedPokemon(pokemon: Pokemon, slot: number) {
   return {
     slot,
     species: pokemon.species.speciesId,
     form: pokemon.formIndex,
     ability: pokemon.abilityIndex,
-    passive: pokemon.passive,
+    // Normalize the legacy `passive` flag to a boolean: the host's fresh party carries `undefined`
+    // and the guest's snapshot-booted party carries `false` (game-mechanically equal) - the layer-8
+    // digest divergence. Read-only projection normalization; never writes pokemon.passive and never
+    // touches the ER 3-slot innate model (getPassiveAbilities / pokemon.ts hasPassive).
+    passive: pokemon.passive ?? false,
+    passiveAbilities: safeInnateIds(pokemon),
     shiny: pokemon.shiny,
     variant: pokemon.variant,
     level: pokemon.level,
@@ -104,7 +125,20 @@ function mechanicalDigestComponents(): Record<string, unknown> {
  * hash breakdown (incl. a per-mon-field split of playerParty/enemyParty) so a two-browser digest
  * divergence self-identifies the exact field rather than only the opaque combined hash.
  */
-function computeMechanicalDigest(): { digest: string; parts: Record<string, string> } {
+function partyInnates(party: unknown): number[][] {
+  return Array.isArray(party)
+    ? party.map(mon => {
+        const value = (mon as Record<string, unknown> | null)?.passiveAbilities;
+        return Array.isArray(value) ? (value as number[]) : [];
+      })
+    : [];
+}
+
+function computeMechanicalDigest(): {
+  digest: string;
+  parts: Record<string, string>;
+  innates: { player: number[][]; enemy: number[][] };
+} {
   const components = mechanicalDigestComponents();
   const digest = fnv1a64(canonicalize(components));
   const parts: Record<string, string> = {};
@@ -120,7 +154,9 @@ function computeMechanicalDigest(): { digest: string; parts: Record<string, stri
       }
     }
   }
-  return { digest, parts };
+  // Raw per-mon innate ids so the driver can assert enemy innates are LIVE (and both browsers agree).
+  const innates = { player: partyInnates(components.playerParty), enemy: partyInnates(components.enemyParty) };
+  return { digest, parts, innates };
 }
 
 function classifyContinuationSurface(phase: string, uiMode: string): BrowserContinuationSurface | null {
@@ -214,16 +250,17 @@ function observeContinuationSurface(): void {
     }
     lastProbedAddress = addressKey;
     lastProbeAt = now;
-    const { digest: stateDigest, parts: digestParts } = computeMechanicalDigest();
+    const { digest: stateDigest, parts: digestParts, innates } = computeMechanicalDigest();
     const observationKey = `${addressKey}:${stateDigest}`;
     if (observationKey === lastObservedSurface) {
       return;
     }
     lastObservedSurface = observationKey;
-    // Read-only diagnostic: the per-component digest breakdown, so a two-browser digest divergence
-    // self-identifies the exact diverging field when the driver aborts on it.
+    // Read-only diagnostic: the per-component digest breakdown (so a two-browser digest divergence
+    // self-identifies the exact field) plus the raw per-mon innate ids (so the driver can assert the
+    // ace-difficulty enemy's innates are LIVE and both browsers agree - the innate-activation invariant).
     console.info(
-      `${DIGEST_PARTS_PREFIX}${JSON.stringify({ address: `${runtime.controller.sessionEpoch}:${battle.waveIndex}:${battle.turn}`, surface, digest: stateDigest, parts: digestParts })}`,
+      `${DIGEST_PARTS_PREFIX}${JSON.stringify({ address: `${runtime.controller.sessionEpoch}:${battle.waveIndex}:${battle.turn}`, surface, digest: stateDigest, parts: digestParts, innates })}`,
     );
     const observation: CoopBrowserSurfaceObservationV1 = {
       version: 1,
