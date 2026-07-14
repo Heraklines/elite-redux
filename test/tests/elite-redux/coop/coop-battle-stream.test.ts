@@ -554,6 +554,43 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("accepts an exact-address reward surface when wave-end authority arrives after the next-command prediction", async () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 1, turn: 3 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+
+      const awaited = guestStream.awaitTurn(3);
+      emitCompleteTurn(hostStream, 3, [], emptyCheckpoint(), "deadbeefdeadbeef");
+      const resolution = await awaited;
+      expect(resolution).not.toBeNull();
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "materialApplied")).toBe(true);
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "presentationReady")).toBe(true);
+      expect(
+        guestStream.registerTurnContinuation(resolution!, undefined, {
+          kind: "command",
+          epoch: 7,
+          wave: 1,
+          turn: 4,
+        }),
+        "the guest predicts command before the delayed wave-end signal is visible",
+      ).toBe(true);
+
+      expect(
+        guestStream.notifyContinuationSurface("sharedInput"),
+        "the old turn's reward surface cannot release the retained turn",
+      ).toBe(0);
+      current.turn = 4;
+      expect(
+        guestStream.notifyContinuationSurface("sharedInput"),
+        "the renderer-active reward surface at the exact predicted address is valid continuation proof",
+      ).toBe(1);
+      expect(guestStream.notifyContinuationSurface("sharedInput"), "continuation releases exactly once").toBe(0);
+
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
     it("keeps the immutable admission ledger separate from a renderer-mutated working copy", async () => {
       const { host, guest } = createLoopbackPair();
       const authorityContext = () => ({ epoch: 7, wave: 1, turn: 1 });
