@@ -8,15 +8,9 @@ import {
   CoopMeTerminalTransactionReceiver,
   isCompleteCoopMeTerminalPayload,
 } from "#data/elite-redux/coop/coop-me-operation";
-import {
-  type CoopMeTerminalPayload,
-  makeCoopOperationId,
-} from "#data/elite-redux/coop/coop-operation-envelope";
+import { type CoopMeTerminalPayload, makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
-import type {
-  CoopAuthoritativeBattleStateV1,
-  CoopInteractionOutcome,
-} from "#data/elite-redux/coop/coop-transport";
+import type { CoopAuthoritativeBattleStateV1, CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it } from "vitest";
 
 type MeOutcome = Extract<CoopInteractionOutcome, { k: "meResync" }>;
@@ -28,10 +22,7 @@ function authoritativeState(wave: number, enemies = 0): CoopAuthoritativeBattleS
     wave,
     turn: 3,
     playerParty: [],
-    enemyParty:
-      enemies === 0
-        ? []
-        : ([{ id: 9001 }] as unknown as CoopAuthoritativeBattleStateV1["enemyParty"]),
+    enemyParty: enemies === 0 ? [] : ([{ id: 9001 }] as unknown as CoopAuthoritativeBattleStateV1["enemyParty"]),
     field: [],
     weather: 0,
     weatherTurnsLeft: 0,
@@ -83,12 +74,7 @@ function battlePayload(
 }
 
 function terminalId(pinned: number, step: number, epoch = 1): string {
-  return makeCoopOperationId(
-    epoch,
-    0,
-    (COOP_ME_TERM_SEQ_BASE + pinned) * 8000 + 4000 + step,
-    "ME_TERMINAL",
-  );
+  return makeCoopOperationId(epoch, 0, (COOP_ME_TERM_SEQ_BASE + pinned) * 8000 + 4000 + step, "ME_TERMINAL");
 }
 
 describe("complete retained Mystery terminal transaction", () => {
@@ -103,9 +89,7 @@ describe("complete retained Mystery terminal transaction", () => {
       }),
     ).toBe(false);
     expect(isCompleteCoopMeTerminalPayload(leavePayload(12, true))).toBe(true);
-    expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 3, disableSwitch: true }))).toBe(
-      true,
-    );
+    expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 3, disableSwitch: true }))).toBe(true);
   });
 
   it("applies DATA once, withholds completion for a late destination receiver, then executes once after reconnect", () => {
@@ -133,7 +117,9 @@ describe("complete retained Mystery terminal transaction", () => {
     expect(destinationAttempts).toBe(1);
 
     destinationReady = true; // same receiver survives the channel reconnect
-    expect(receiver.receive(receipt, hooks), "exact redelivery executes only the pending control stage").toBe("executed");
+    expect(receiver.receive(receipt, hooks), "exact redelivery executes only the pending control stage").toBe(
+      "executed",
+    );
     expect(materialApplies).toBe(1);
     expect(destinationAttempts).toBe(2);
     expect(receiver.receive(receipt, hooks), "duplicate delivery is an exact no-op").toBe("duplicate");
@@ -147,10 +133,7 @@ describe("complete retained Mystery terminal transaction", () => {
     const pinned = 11;
 
     expect(
-      receiver.receive(
-        { operationId: terminalId(pinned, 1), pinned, step: 1, payload: leavePayload(20, true) },
-        hooks,
-      ),
+      receiver.receive({ operationId: terminalId(pinned, 1), pinned, step: 1, payload: leavePayload(20, true) }, hooks),
       "step 1 cannot overtake its battle handoff",
     ).toBe("rejected");
     expect(
@@ -194,10 +177,7 @@ describe("complete retained Mystery terminal transaction", () => {
     };
 
     expect(
-      receiver.receive(
-        { operationId: terminalId(pinned, 2), pinned, step: 2, payload: battlePayload(20) },
-        hooks,
-      ),
+      receiver.receive({ operationId: terminalId(pinned, 2), pinned, step: 2, payload: battlePayload(20) }, hooks),
       "a later round cannot overtake either retained battle step",
     ).toBe("rejected");
     expect(receiver.receive(round0, hooks)).toBe("executed");
@@ -238,9 +218,7 @@ describe("complete retained Mystery terminal transaction", () => {
     expect(receiver.receive({ ...first, pinned: 14 }, hooks), "one id cannot be rebound to another pin").toBe(
       "rejected",
     );
-    expect(receiver.receive({ ...first, step: 1 }, hooks), "one id cannot be rebound to another step").toBe(
-      "rejected",
-    );
+    expect(receiver.receive({ ...first, step: 1 }, hooks), "one id cannot be rebound to another step").toBe("rejected");
     expect(
       receiver.receive({ operationId: terminalId(13, 0, 2), pinned: 13, step: 0, payload: leavePayload(30) }, hooks),
     ).toBe("rejected");

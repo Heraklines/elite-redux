@@ -305,11 +305,11 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
         await withClient(rig.hostCtx, async () => {
           await game.phaseInterceptor.to("CommandPhase", false);
         });
-          await withClient(rig.guestCtx, () =>
-            driveClientPhaseQueueTo(rig.guestScene, `wave ${w + 1} CommandPhase`, {
-              matches: phase => phase.phaseName === "CommandPhase" && rig.guestScene.currentBattle.waveIndex === w + 1,
-            }),
-          );
+        await withClient(rig.guestCtx, () =>
+          driveClientPhaseQueueTo(rig.guestScene, `wave ${w + 1} CommandPhase`, {
+            matches: phase => phase.phaseName === "CommandPhase" && rig.guestScene.currentBattle.waveIndex === w + 1,
+          }),
+        );
         expect(rig.hostScene.currentBattle.waveIndex, `wave ${w}: host opened wave ${w + 1}`).toBe(w + 1);
         expect(rig.guestScene.currentBattle.waveIndex, `wave ${w}: guest adopted wave ${w + 1}`).toBe(w + 1);
       }

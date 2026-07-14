@@ -20,12 +20,12 @@
 // author state or advance its ordinal.
 // =============================================================================
 
-import { COOP_CAP_OP_REWARD, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import {
   applyCoopAuthoritativeBattleState,
   captureCoopAuthoritativeBattleState,
   reapplyAcceptedCoopAuthoritativeBattleState,
 } from "#data/elite-redux/coop/coop-battle-engine";
+import { COOP_CAP_OP_REWARD, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
 import { COOP_INTERACTION_LEAVE, COOP_INTERACTION_REROLL } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -606,7 +606,12 @@ export function commitRewardAuthoritativeResult(
     coopWarn("reward", `authoritative reward result rejected (${res.kind}) id=${operationId}`);
     return null;
   }
-  if (!samePayload(res.kind === "reack" ? res.op.payload : res.envelope.pendingOperation?.payload, prepared.intent.payload)) {
+  if (
+    !samePayload(
+      res.kind === "reack" ? res.op.payload : res.envelope.pendingOperation?.payload,
+      prepared.intent.payload,
+    )
+  ) {
     return null;
   }
   committedResultEnvelopes.set(operationId, res.envelope);

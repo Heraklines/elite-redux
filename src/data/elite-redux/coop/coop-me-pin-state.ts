@@ -14,10 +14,7 @@
 // existing consumers.
 // =============================================================================
 
-import {
-  parseCoopOperationId,
-  type CoopMeTerminalPayload,
-} from "#data/elite-redux/coop/coop-operation-envelope";
+import { type CoopMeTerminalPayload, parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type {
   CoopActiveMysteryEncounterSnapshotV1,
@@ -41,12 +38,8 @@ export interface CoopMeCommittedTerminalTransaction {
   readonly payload: CoopMeTerminalPayload;
 }
 
-let onMeCommittedTerminal:
-  | ((transaction: CoopMeCommittedTerminalTransaction) => boolean)
-  | null = null;
-let onMeCommittedTerminalReady:
-  | ((transaction: CoopMeCommittedTerminalTransaction) => boolean)
-  | null = null;
+let onMeCommittedTerminal: ((transaction: CoopMeCommittedTerminalTransaction) => boolean) | null = null;
+let onMeCommittedTerminalReady: ((transaction: CoopMeCommittedTerminalTransaction) => boolean) | null = null;
 
 type CoopMePresentation = Extract<CoopInteractionOutcome, { k: "mePresent" }>;
 
@@ -320,13 +313,11 @@ export function canRestoreCoopActiveMysteryControl(
     && snapshot.terminalChoice === coopMeActiveControl.terminalChoice;
   if (sameTerminal) {
     return (
-      snapshot.hostTurn === coopMeActiveControl.hostTurn
-      && snapshot.handoffWave === coopMeActiveControl.handoffWave
+      snapshot.hostTurn === coopMeActiveControl.hostTurn && snapshot.handoffWave === coopMeActiveControl.handoffWave
     );
   }
   return (
-    coopMeActiveControl.terminal === "battle"
-    && snapshot.terminalStep === (coopMeActiveControl.terminalStep ?? -1) + 1
+    coopMeActiveControl.terminal === "battle" && snapshot.terminalStep === (coopMeActiveControl.terminalStep ?? -1) + 1
   );
 }
 
@@ -511,8 +502,7 @@ export function setCoopMeTerminalControl(
   if (identity == null || identity.operationId.length === 0 || !isSafeNonNegative(identity.step)) {
     return;
   }
-  const prior =
-    coopMeActiveControl?.interactionCounter === coopMeInteractionStart ? coopMeActiveControl : undefined;
+  const prior = coopMeActiveControl?.interactionCounter === coopMeInteractionStart ? coopMeActiveControl : undefined;
   if (prior?.terminal !== undefined && prior.terminal !== "pending") {
     const exactDuplicate =
       prior.terminal === terminal
@@ -672,16 +662,12 @@ export function setOnMeCommittedTerminal(
 }
 
 /** Preflight the live replay/scene boundary before a comprehensive state image is applied. */
-export function canMaterializeCoopMeCommittedTerminal(
-  transaction: CoopMeCommittedTerminalTransaction,
-): boolean {
+export function canMaterializeCoopMeCommittedTerminal(transaction: CoopMeCommittedTerminalTransaction): boolean {
   return onMeCommittedTerminalReady?.(transaction) === true;
 }
 
 /** Synchronously materialize terminal control; true means the exact destination is now executable. */
-export function materializeCoopMeCommittedTerminal(
-  transaction: CoopMeCommittedTerminalTransaction,
-): boolean {
+export function materializeCoopMeCommittedTerminal(transaction: CoopMeCommittedTerminalTransaction): boolean {
   return onMeCommittedTerminal?.(transaction) === true;
 }
 

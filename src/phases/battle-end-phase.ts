@@ -36,10 +36,7 @@ registerCoopWaveAdvanceBoundaryDataApplier(envelope => {
     return "deferred";
   }
   const payload = envelope.pendingOperation?.payload;
-  if (
-    envelope.pendingOperation?.kind !== "WAVE_ADVANCE"
-    || !isValidCoopWaveAdvancePayload(payload)
-  ) {
+  if (envelope.pendingOperation?.kind !== "WAVE_ADVANCE" || !isValidCoopWaveAdvancePayload(payload)) {
     return "rejected";
   }
   const sourceWave = payload.wave;
@@ -56,9 +53,7 @@ registerCoopWaveAdvanceBoundaryDataApplier(envelope => {
   try {
     const handlerActive = globalScene.ui.getHandler()?.active === true;
     const surface = handlerActive ? coopAuthorityContinuationSurface(globalScene.ui.getMode()) : null;
-    const phaseOwnsPostBattleSharedInput =
-      phaseName === "SelectModifierPhase"
-      || phaseName === "BiomeShopPhase";
+    const phaseOwnsPostBattleSharedInput = phaseName === "SelectModifierPhase" || phaseName === "BiomeShopPhase";
     publicSourceBoundary =
       (surface === "sharedInput" && phaseOwnsPostBattleSharedInput)
       || (payload.biomeChange === true && phaseName === "SelectBiomePhase" && handlerActive)
