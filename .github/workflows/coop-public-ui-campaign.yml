@@ -286,6 +286,11 @@ jobs:
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
           COOP_UI_ACTION_DELAY_MS: ${{ (inputs.cadence == 'slow' && '420') || (inputs.cadence == 'normal' && '180') || '70' }}
           COOP_UI_SETTLE_DELAY_MS: ${{ (inputs.cadence == 'slow' && '1300') || (inputs.cadence == 'normal' && '750') || '300' }}
+          # CPU headroom for two 10x co-op engines on one shared runner: skip the Chrome devtools
+          # performance trace (records both browsers for the whole run). The mandatory JSONL evidence
+          # + the per-press latency instrumentation are unaffected; only the heavy combined-trace
+          # artifact is dropped. Solo-nav keeps it on (one browser, no starvation).
+          COOP_UI_CHROME_TRACE: "0"
           NODE_OPTIONS: --max-old-space-size=4096
         run: node test/browser/coop-public-ui/run-campaign.mjs
 

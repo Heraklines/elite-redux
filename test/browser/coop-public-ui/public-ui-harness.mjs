@@ -58,11 +58,13 @@ function withFocusedPublicKeyInput(page, action) {
     // wrong (focus was stolen), the caller's focus check calls forceFront() and re-verifies, so
     // the skip can never press into an unfocused page.
     let bringToFrontMs = 0;
+    let didFront = false;
     if (lastFrontedPublicPage !== page) {
       const startedAt = Date.now();
       await page.bringToFront();
       bringToFrontMs = Date.now() - startedAt;
       lastFrontedPublicPage = page;
+      didFront = true;
     }
     const forceFront = async () => {
       const startedAt = Date.now();
@@ -70,7 +72,10 @@ function withFocusedPublicKeyInput(page, action) {
       lastFrontedPublicPage = page;
       return Date.now() - startedAt;
     };
-    return action({ queueWaitMs, bringToFrontMs, forceFront });
+    // didFront is true exactly when another page held the front since this page's last press -
+    // i.e. the ONLY case its focus could have changed. The caller pays the main-thread focus
+    // check / input blur only then; a same-page consecutive press provably keeps focus.
+    return action({ queueWaitMs, bringToFrontMs, didFront, forceFront });
   });
   publicKeyInputTail = focused.then(
     () => undefined,
@@ -391,7 +396,8 @@ export class PublicUiClient {
       await passwordInput.click({ clickCount: 3 });
       await this.page.keyboard.type(this.credentials.password, { delay: 20 });
     }
-    await this.press("Enter", "submit-registration-form", { blurInputs: false });
+    await this.press("Enter", "submit-registration-form");
+    await this.clearDomInputFocus();
   }
 
   async fillLoginForm() {
@@ -407,7 +413,21 @@ export class PublicUiClient {
     await passwordInput.click({ clickCount: 3 });
     await this.page.keyboard.press("Control+A");
     await this.page.keyboard.type(this.credentials.password, { delay: 20 });
-    await this.press("Enter", "submit-login-form", { blurInputs: false });
+    await this.press("Enter", "submit-login-form");
+    await this.clearDomInputFocus();
+  }
+
+  /**
+   * Explicitly blur any focused DOM input after credential entry. Per-press blur is gated to
+   * (re)fronts (see press), so the credential forms - the only place a DOM input gains focus -
+   * clear it deterministically here instead of relying on the next game keystroke to do it.
+   */
+  async clearDomInputFocus() {
+    await this.page.evaluate(() => {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    });
   }
 
   async visibleInputHandles(selector) {
@@ -436,17 +456,27 @@ export class PublicUiClient {
     );
   }
 
-  async press(key, purpose, { blurInputs = true } = {}) {
-    await withFocusedPublicKeyInput(this.page, async ({ queueWaitMs, bringToFrontMs, forceFront }) => {
-      const focusCheckStart = Date.now();
-      let [title, focused] = await Promise.all([this.page.title(), this.page.$eval("body", () => document.hasFocus())]);
-      const focusCheckMs = Date.now() - focusCheckStart;
-      // Fallback for the skipped-bringToFront optimization: this page was assumed still fronted
-      // but is not focused, so force it forward and re-verify before pressing.
+  async press(key, purpose) {
+    await withFocusedPublicKeyInput(this.page, async ({ queueWaitMs, bringToFrontMs, didFront, forceFront }) => {
+      // The focus check (page.title() + $eval hasFocus) is a MAIN-THREAD call that blocks behind
+      // the game loop - measured ~5.5s under 10x CPU load, the dominant per-press cost that starves
+      // command input (turn-1 softlock root cause). It is only needed when focus could have changed,
+      // i.e. when this page was just (re)fronted. On a same-page consecutive press (didFront ===
+      // false) focus provably held, so skip it. DOM inputs are blurred at the credential-entry site
+      // (clearDomInputFocus), never per keystroke, so no blur is needed here.
+      let focused = true;
+      let title = null;
+      let focusCheckMs = 0;
       let refrontMs = 0;
-      if (!focused) {
-        refrontMs = await forceFront();
+      if (didFront) {
+        const focusCheckStart = Date.now();
         [title, focused] = await Promise.all([this.page.title(), this.page.$eval("body", () => document.hasFocus())]);
+        focusCheckMs = Date.now() - focusCheckStart;
+        // Fallback: this page was fronted but did not acquire focus - force it and re-verify.
+        if (!focused) {
+          refrontMs = await forceFront();
+          [title, focused] = await Promise.all([this.page.title(), this.page.$eval("body", () => document.hasFocus())]);
+        }
       }
       this.evidence.record("key-target", {
         focused,
@@ -454,24 +484,16 @@ export class PublicUiClient {
         purpose,
         target: `${new URL(this.page.url()).origin}${new URL(this.page.url()).pathname}`,
         title,
-        // Per-press latency diagnostics (the ~5.6s pairing-accept lag investigation): time spent
-        // waiting on the shared input tail, bringing the tab to front, checking focus, and any
-        // fallback re-front. The next relaunch's trace pinpoints which sub-step dominates.
+        // Per-press latency diagnostics: time on the shared input tail, bringToFront, the focus
+        // check, and any fallback re-front. didFront marks whether the costly checks ran at all.
         queueWaitMs,
         bringToFrontMs,
         focusCheckMs,
         refrontMs,
+        didFront,
       });
       if (!focused) {
         throw new Error(`${this.label}: public key target did not acquire browser focus for ${purpose}`);
-      }
-      if (blurInputs) {
-        // Public DOM-only focus cleanup. No scene, UI handler, controller, or relay is accessed.
-        await this.page.evaluate(() => {
-          if (document.activeElement instanceof HTMLElement) {
-            document.activeElement.blur();
-          }
-        });
       }
       this.evidence.record("key", { key, purpose });
       await this.page.keyboard.press(key, { delay: Math.min(this.config.actionDelayMs, 100) });
@@ -607,6 +629,15 @@ export class DuoPublicUiRig {
         "--disable-setuid-sandbox",
         "--autoplay-policy=no-user-gesture-required",
         "--use-fake-ui-for-media-stream",
+        // CPU headroom for two 10x co-op engines on one shared runner (the turn-1 input-starvation
+        // finding). Mute the audio pipeline outright, and stop Chrome from throttling the
+        // non-fronted client - both co-op engines must keep running in lockstep, or the backgrounded
+        // guest's turn replay lags and deepens the commit stall. Standard Puppeteer perf flags; no
+        // GPU flag (the game needs WebGL and software GL would be slower).
+        "--mute-audio",
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding",
       ],
     });
     const rig = new DuoPublicUiRig(browser, config);
