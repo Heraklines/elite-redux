@@ -193,23 +193,29 @@ export function ensureCoopPokemonPresentationNodes(pokemon: Pokemon): boolean {
   return true;
 }
 
-function coopPokemonPresentationNodesReady(pokemon: Pokemon): boolean {
+interface CoopPokemonPresentationReadiness {
+  ready: boolean;
+  pokemonId: number;
+  expectedKey: string;
+  onField: boolean;
+  pokemonVisible: boolean;
+  pokemonAlpha: number;
+  spritePresent: boolean;
+  spriteVisible: boolean;
+  spriteAlpha: number | null;
+  infoPresent: boolean;
+  infoVisible: boolean;
+  infoAlpha: number | null;
+  textureKey: string | null;
+  animationKey: string | null;
+  textureCached: boolean;
+  animationCached: boolean;
+  exactLiveKey: boolean;
+}
+
+function inspectCoopPokemonPresentationReadiness(pokemon: Pokemon): CoopPokemonPresentationReadiness {
   const sprite = pokemon.getSprite();
   const info = pokemon.getBattleInfo();
-  if (
-    !pokemon.isOnField()
-    || !pokemon.visible
-    || pokemon.alpha <= 0
-    || sprite == null
-    || !sprite.visible
-    || sprite.alpha <= 0
-    || info == null
-    || !info.visible
-    || info.alpha <= 0
-  ) {
-    return false;
-  }
-
   // In production, the placeholder created by Pokemon.init() is visible but is not the requested battler.
   // Require both real caches and the live animation/texture key when Phaser exposes those inspectors.
   const key = pokemon.getBattleSpriteKey();
@@ -227,12 +233,51 @@ function coopPokemonPresentationNodesReady(pokemon: Pokemon): boolean {
     || (currentAnimationKey == null
       ? currentTextureKey == null || currentTextureKey === key
       : currentAnimationKey === key);
-  return (
-    exactLiveKey && (textures?.exists == null || textures.exists(key)) && (anims?.exists == null || anims.exists(key))
-  );
+  const textureCached = textures?.exists == null || textures.exists(key);
+  const animationCached = anims?.exists == null || anims.exists(key);
+  const readiness = {
+    pokemonId: pokemon.id,
+    expectedKey: key,
+    onField: pokemon.isOnField(),
+    pokemonVisible: pokemon.visible,
+    pokemonAlpha: pokemon.alpha,
+    spritePresent: sprite != null,
+    spriteVisible: sprite?.visible ?? false,
+    spriteAlpha: sprite?.alpha ?? null,
+    infoPresent: info != null,
+    infoVisible: info?.visible ?? false,
+    infoAlpha: info?.alpha ?? null,
+    textureKey: currentTextureKey ?? null,
+    animationKey: currentAnimationKey ?? null,
+    textureCached,
+    animationCached,
+    exactLiveKey,
+  };
+  return {
+    ...readiness,
+    ready:
+      readiness.onField
+      && readiness.pokemonVisible
+      && readiness.pokemonAlpha > 0
+      && readiness.spritePresent
+      && readiness.spriteVisible
+      && (readiness.spriteAlpha ?? 0) > 0
+      && readiness.infoPresent
+      && readiness.infoVisible
+      && (readiness.infoAlpha ?? 0) > 0
+      && readiness.exactLiveKey
+      && readiness.textureCached
+      && readiness.animationCached,
+  };
 }
 
-function showPokemonPresentation(pokemon: Pokemon, slot: number, capacity: number, side: "player" | "enemy"): boolean {
+function showPokemonPresentation(
+  pokemon: Pokemon,
+  slot: number,
+  capacity: number,
+  side: "player" | "enemy",
+  assetsAlreadyLoaded: boolean,
+): boolean {
   if (pokemon.isFainted()) {
     hidePokemonPresentation(pokemon);
     return false;
@@ -288,7 +333,7 @@ function showPokemonPresentation(pokemon: Pokemon, slot: number, capacity: numbe
       /* headless */
     }
   }
-  if (newlyInitialized || newlySeated) {
+  if (!assetsAlreadyLoaded && (newlyInitialized || newlySeated)) {
     // `init()` creates the safe substitute placeholders synchronously. Load the real atlas without blocking
     // checkpoint application, and never use a summon/fieldSetup phase as an asset-loading side channel.
     void pokemon.loadAssets(false).catch(error => {
@@ -326,11 +371,29 @@ function settleFieldScaleImmediately(): void {
   }
 }
 
+function settleRequestedPresentationSeat(
+  request: CoopFieldPresentationRequest,
+  seat: CoopPresentationSeat,
+  assetsAlreadyLoaded: boolean,
+): number {
+  if (request.desired === "visible") {
+    return showPokemonPresentation(seat.pokemon, seat.slot, request.capacity, request.side, assetsAlreadyLoaded)
+      ? 1
+      : 0;
+  }
+  const wasOnField = isActuallyInFieldContainer(seat.pokemon);
+  hidePokemonPresentation(seat.pokemon);
+  return wasOnField ? 1 : 0;
+}
+
 /**
  * Settle one explicit authoritative field-presentation boundary. This adapter is intentionally visual only:
  * it never calls fieldSetup/resetSummonData/updateModifiers, applies abilities/tags/forms, or consumes RNG.
  */
-export function settleCoopFieldPresentation(request: CoopFieldPresentationRequest): number {
+function settleCoopFieldPresentationInternal(
+  request: CoopFieldPresentationRequest,
+  assetsAlreadyLoaded: boolean,
+): number {
   const wanted = new Set(request.seats.map(seat => seat.pokemon.id));
   if (request.hideStale) {
     for (const stale of getActuallyFieldedCoopPokemon(request.side)) {
@@ -342,13 +405,7 @@ export function settleCoopFieldPresentation(request: CoopFieldPresentationReques
 
   let changed = 0;
   for (const seat of request.seats) {
-    if (request.desired === "visible") {
-      changed += showPokemonPresentation(seat.pokemon, seat.slot, request.capacity, request.side) ? 1 : 0;
-    } else {
-      const wasOnField = isActuallyInFieldContainer(seat.pokemon);
-      hidePokemonPresentation(seat.pokemon);
-      changed += wasOnField ? 1 : 0;
-    }
+    changed += settleRequestedPresentationSeat(request, seat, assetsAlreadyLoaded);
   }
 
   if (request.trainerDisposition === "hide-player" || request.trainerDisposition === "hide-both") {
@@ -365,6 +422,10 @@ export function settleCoopFieldPresentation(request: CoopFieldPresentationReques
       + `phase=${globalScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}`,
   );
   return changed;
+}
+
+export function settleCoopFieldPresentation(request: CoopFieldPresentationRequest): number {
+  return settleCoopFieldPresentationInternal(request, false);
 }
 
 /**
@@ -411,15 +472,22 @@ export async function settleCoopFieldPresentationReady(
     }
   }
 
-  const changed = settleCoopFieldPresentation(immutableRequest);
+  // The awaited loader above already owns this boundary's atlas work. Do not launch a second unretained
+  // load merely because the projection is seating a newly reconstructed object.
+  const changed = settleCoopFieldPresentationInternal(immutableRequest, true);
   if (!lifetimeIsLive()) {
     throw new Error(`Co-op ${request.boundary} presentation was superseded while projecting assets`);
   }
-  if (
-    request.desired === "visible"
-    && seats.some(({ pokemon }) => !pokemon.isFainted() && !coopPokemonPresentationNodesReady(pokemon))
-  ) {
-    throw new Error(`Co-op ${request.boundary} presentation exposed an incomplete battler surface`);
+  if (request.desired === "visible") {
+    const incomplete = seats
+      .filter(({ pokemon }) => !pokemon.isFainted())
+      .map(({ pokemon }) => inspectCoopPokemonPresentationReadiness(pokemon))
+      .filter(readiness => !readiness.ready);
+    if (incomplete.length > 0) {
+      throw new Error(
+        `Co-op ${request.boundary} presentation exposed an incomplete battler surface: ${JSON.stringify(incomplete)}`,
+      );
+    }
   }
   return changed;
 }
