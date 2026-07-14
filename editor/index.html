@@ -196,6 +196,22 @@
       .ctr-fusion-sprites { display: flex; gap: 6px; align-items: center; }
       .ctr-fusion-plus { color: var(--muted); font-size: 16px; }
       .ctr-fusion-name { font-size: 12px; margin-top: 2px; }
+      /* Two-column layout: form on the left, sticky preview panel on the right.
+         Degrades to a single column under ~1100px (panel drops below the form). */
+      .ctr-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+      .ctr-layout-main { min-width: 0; }
+      .ctr-preview-panel { position: sticky; top: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); padding: 10px 12px; align-self: start; }
+      .ctr-preview-sec { padding: 8px 0; border-bottom: 1px solid var(--line); }
+      .ctr-preview-sec:last-child { border-bottom: none; }
+      .ctr-preview-h { color: var(--muted); font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+      .ctr-preview-mon { min-height: 40px; }
+      .ctr-preview-shiny { margin-top: 6px; }
+      .ctr-preview-bgm { font-size: 12px; }
+      .ctr-bgm-live { color: var(--accent); font-size: 11px; }
+      @media (max-width: 1100px) {
+        .ctr-layout { grid-template-columns: minmax(0, 1fr); }
+        .ctr-preview-panel { position: static; }
+      }
       /* Trainer-class Browse modal (visual sprite picker). */
       .ctr-modal-overlay {
         position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.6);

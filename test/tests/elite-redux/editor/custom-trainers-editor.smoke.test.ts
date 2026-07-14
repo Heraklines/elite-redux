@@ -460,6 +460,36 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     expect(expectedName.length).toBeGreaterThan(0);
   });
 
+  it("two-column layout: form + sticky preview panel; panel tracks the focused member", () => {
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // The two-column container + the right preview panel both render.
+    expect(q(".ctr-layout")).not.toBeNull();
+    expect(q(".ctr-layout-main")).not.toBeNull();
+    const panel = q(".ctr-preview-panel");
+    expect(panel).not.toBeNull();
+    // The trainer-sprite preview moved INTO the panel (round-2 inline preview relocated).
+    expect(panel!.querySelector("#ctr-sprite-preview")).not.toBeNull();
+    // The panel's member section (slot header) shows the focused member (Pikachu)
+    // + its species sprite. The section header text is "Slot N: <name>".
+    const memberHeader = () => {
+      const p = q(".ctr-preview-panel")!;
+      return [...p.querySelectorAll(".ctr-preview-h")].map(h => h.textContent).find(x => /Slot \d/.test(x || "")) || "";
+    };
+    expect(memberHeader()).toContain("Pikachu");
+    expect(panel!.querySelector(".ctr-preview-mon img")).not.toBeNull();
+
+    // Add a 2nd member -> it becomes the focused one; the panel follows.
+    ct.onCustomTrainerClick({ target: q("#ctr-add-member")! });
+    setSpecies(1, "SPECIES_SNORLAX");
+    expect(memberHeader()).toContain("Snorlax");
+
+    // Clicking slot 1's summary refocuses the panel back to Pikachu.
+    ct.onCustomTrainerClick({ target: q('.ctr-mem-sum[data-idx="0"]')! });
+    expect(memberHeader()).toContain("Pikachu");
+    expect(ct.ctrSelected).toBe(key);
+  });
+
   it("prior-surface smoke still holds: member collapse/expand + the battle-music picker render", () => {
     newTrainer();
     const key = ct.ctrSelected!;

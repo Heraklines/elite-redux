@@ -65,6 +65,7 @@ let ctrSelected = null; // open trainer key, or null
 // are keyed by team-slot index and reset when the open trainer changes.
 const ctrOpenMembers = new Set(); // expanded team-slot indices
 const ctrSetSel = new Map(); // team-slot index → selected set index
+let ctrFocusIdx = 0; // team-slot index whose preview shows in the right panel
 
 // Battle-music catalog (editor/data/bgm.json): [{ key, battle }]. Battle themes
 // are listed first in the picker. One SHARED Audio element previews a track;
@@ -2321,8 +2322,7 @@ function ctrMemberHtml(m, i) {
         fus
           ? `<input class="ctr-fusion-species" list="species-list" data-idx="${i}" value="${esc(fus.species || "")}" placeholder="fusion SPECIES_…" spellcheck="false" style="width:170px" />
           <label>Form <input type="number" class="ctr-fusion-form" data-idx="${i}" value="${fus.formIndex || 0}" min="0" max="60" style="width:56px" /></label>
-          <label>Ability slot <select class="ctr-fusion-abil" data-idx="${i}">${ctrAbilOptions(fus.species, fus.abilitySlot)}</select></label>
-          ${ctrFusionPreviewHtml(m)}`
+          <label>Ability slot <select class="ctr-fusion-abil" data-idx="${i}">${ctrAbilOptions(fus.species, fus.abilitySlot)}</select></label>`
           : ""
       }
     </div>
@@ -2537,6 +2537,45 @@ function openTrainerClassModal() {
   filter.focus();
 }
 
+/** The sticky RIGHT-column preview panel: the trainer sprite (selected gender
+ *  variant), the currently-focused member's species sprite + shiny swatch + fusion
+ *  preview, and the battle-music now-playing indicator. Pure markup; the trainer
+ *  sprite frame is painted after mount by updateCtrSpritePreview (reads #ctr-class). */
+function ctrPreviewPanelHtml(t) {
+  const team = Array.isArray(t.team) ? t.team : [];
+  const idx = Math.max(0, Math.min(ctrFocusIdx, team.length - 1));
+  const m = team[idx] || null;
+  const spName = m && m.species ? spByConst.get(m.species)?.name || m.species : "(empty)";
+  const spriteUrl = m ? ctrSpeciesSpriteUrl(m.species) : "";
+  const memberSprite = spriteUrl
+    ? `<img src="${esc(spriteUrl)}" style="width:64px;height:64px;image-rendering:pixelated" onerror="this.style.visibility='hidden'" />`
+    : '<span class="dyn">no sprite</span>';
+  const shiny = m ? ctrNormShiny(m.shiny) : ctrNormShiny(null);
+  const fusionPreview = m ? ctrFusionPreviewHtml(m) : "";
+  // Battle-music now-playing indicator: the chosen track + a live "playing" tag.
+  const bgmKey = t.battleBgm || "";
+  const playing = bgmPreviewKey && bgmPreviewAudio && !bgmPreviewAudio.paused ? bgmPreviewKey : "";
+  const bgmLine = bgmKey
+    ? `♪ <b>${esc(bgmKey)}</b>${playing === bgmKey ? ' <span class="ctr-bgm-live">▶ playing</span>' : ""}`
+    : '<span class="dyn">default class theme</span>';
+  return `<aside class="ctr-preview-panel">
+    <div class="ctr-preview-sec">
+      <div class="ctr-preview-h">Trainer sprite</div>
+      <div id="ctr-sprite-preview" class="ctr-sprite-preview"></div>
+    </div>
+    <div class="ctr-preview-sec">
+      <div class="ctr-preview-h">Slot ${idx + 1}: ${esc(spName)}</div>
+      <div class="ctr-preview-mon">${memberSprite}</div>
+      <div class="ctr-preview-shiny">${ctrShinySwatchHtml(shiny)}</div>
+      ${fusionPreview}
+    </div>
+    <div class="ctr-preview-sec">
+      <div class="ctr-preview-h">Battle music</div>
+      <div class="ctr-preview-bgm">${bgmLine}</div>
+    </div>
+  </aside>`;
+}
+
 function renderCustomTrainers(root) {
   const keys = Object.keys(ctr.current)
     .filter(k => ctr.current[k])
@@ -2551,8 +2590,10 @@ function renderCustomTrainers(root) {
     })
     .join("");
   let form = '<p class="hint">Pick a trainer to edit, or add a new one.</p>';
+  let panel = "";
   if (ctrSelected && ctr.current[ctrSelected]) {
     const t = ctr.current[ctrSelected];
+    panel = ctrPreviewPanelHtml(t);
     const { warnings, notes } = ctrWarnings(t);
     const diffChecks = DIFFICULTY_OPTIONS.map(
       d =>
@@ -2573,7 +2614,6 @@ function renderCustomTrainers(root) {
         <label>Sprite / class <input type="text" id="ctr-class" list="trainerclass-list" value="${esc(t.trainerClass || "")}" style="width:170px" spellcheck="false" /></label>
         <button type="button" id="ctr-browse-class" title="Browse trainer classes by sprite">Browse…</button>
         ${ctrGenderPickerHtml(t)}
-        <div id="ctr-sprite-preview" class="ctr-sprite-preview"></div>
         <div class="ctr-bgm-row">
           <label title="Music that plays for THIS trainer's battle only (er-assets audio/bgm). '(default)' keeps the trainer class's normal theme.">Battle music
             <select id="ctr-bgm">${bgmSel}</select>
@@ -2615,7 +2655,12 @@ function renderCustomTrainers(root) {
       <p class="hint">Staff-authored trainers that spawn in real runs, gated by difficulty, floor range and challenge mode. The team is fielded EXACTLY as authored (the #419 BST cap is bypassed).</p>
       <div class="mon-list">${list || '<span class="dyn">none yet</span>'}<button type="button" id="ctr-new" class="primary">＋ New trainer</button></div>
     </div>
-    <div class="section">${form}</div>`;
+    <div class="section">
+      <div class="ctr-layout">
+        <div class="ctr-layout-main">${form}</div>
+        ${panel}
+      </div>
+    </div>`;
   // The sprite preview reads the live CDN atlas, so paint it after the DOM exists.
   updateCtrSpritePreview();
 }
@@ -2632,6 +2677,9 @@ function onCustomTrainerInput(el) {
   }
   const idx = el.dataset.idx === undefined ? -1 : Number(el.dataset.idx);
   const m = idx >= 0 ? t.team[idx] : null;
+  if (idx >= 0) {
+    ctrFocusIdx = idx; // this member's preview shows in the right panel
+  }
   if (el.id === "ctr-name") {
     t.name = el.value;
   } else if (el.id === "ctr-intro") {
@@ -2708,6 +2756,9 @@ function onCustomTrainerChange(el) {
   }
   const idx = el.dataset.idx === undefined ? -1 : Number(el.dataset.idx);
   const m = idx >= 0 ? t.team[idx] : null;
+  if (idx >= 0) {
+    ctrFocusIdx = idx; // this member's preview shows in the right panel
+  }
   if (el.id === "ctr-battletype") {
     t.battleType = el.value;
   } else if (el.id === "ctr-class") {
@@ -2825,10 +2876,11 @@ function onCustomTrainerChange(el) {
   return true;
 }
 
-/** Reset the per-member transient UI state (collapse + set selection). */
+/** Reset the per-member transient UI state (collapse + set selection + panel focus). */
 function ctrResetMemberUiState() {
   ctrOpenMembers.clear();
   ctrSetSel.clear();
+  ctrFocusIdx = 0;
 }
 
 function onCustomTrainerClick(e) {
@@ -2862,6 +2914,7 @@ function onCustomTrainerClick(e) {
   const memSum = e.target.closest(".ctr-mem-sum");
   if (memSum) {
     const mi = Number(memSum.dataset.idx);
+    ctrFocusIdx = mi; // focus this member's preview in the right panel
     if (ctrOpenMembers.has(mi)) {
       ctrOpenMembers.delete(mi);
     } else {
@@ -2887,6 +2940,7 @@ function onCustomTrainerClick(e) {
     if (t.team.length < 6) {
       t.team.push(blankCtrMember());
       ctrOpenMembers.add(t.team.length - 1); // new member starts expanded
+      ctrFocusIdx = t.team.length - 1; // focus the new member in the preview panel
     }
     render();
     return true;
