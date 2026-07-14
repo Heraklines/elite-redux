@@ -45,7 +45,16 @@ interface EditorHarness {
   buildDeltas(): { deltas: Record<string, unknown>; bad: string[] };
   ctrMoveIllegal(m: Record<string, unknown>, move: string): boolean;
   ctrFusedName(a: string, b: string): string;
+  ctrLiveToEdit(entry: Record<string, unknown>): Record<string, any>;
+  ctrBuildBaselines(delta: Record<string, unknown>): Record<string, string>;
+  hashCtrTrainerEntry(entry: unknown): string;
+  markCustomTrainersSaved(delta: Record<string, unknown>, data: Record<string, unknown>): void;
+  CTR_LIVE: Record<string, any>;
   ctr: { current: Record<string, any>; baseline: Record<string, any> };
+  ctrConfig: {
+    current: { windowSize: number; windowChancePct: number };
+    baseline: { windowSize: number; windowChancePct: number };
+  };
   spByConst: Map<string, unknown>;
   spById: Map<number, unknown>;
   trainerClassByName: Map<string, { name: string; sprite: string; genders: boolean }>;
@@ -114,10 +123,12 @@ beforeAll(() => {
   const stripped = appSrc.replace(/\ninit\(\);\s*$/, "\n");
   const shim = `
     ;window.__ct = {
-      blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal, ctrFusedName,
+      blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal, ctrFusedName, ctrLiveToEdit,
+      ctrBuildBaselines, hashCtrTrainerEntry, markCustomTrainersSaved,
       render, onCustomTrainerInput, onCustomTrainerChange, onCustomTrainerClick, buildDeltas,
-      ctr, spByConst, spById, trainerClassByName, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
+      ctr, ctrConfig, spByConst, spById, trainerClassByName, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
+      get CTR_LIVE(){ return CTR_LIVE; }, set CTR_LIVE(v){ CTR_LIVE = v; },
       setTab(v){ activeTab = v; },
     };`;
   const dom = new JSDOM(HARNESS_HTML, { runScripts: "outside-only", pretendToBeVisual: true });
@@ -133,6 +144,9 @@ beforeEach(() => {
   // Reset editor state between tests (module state is shared across the file).
   ct.ctr.current = {};
   ct.ctr.baseline = {};
+  ct.CTR_LIVE = {};
+  ct.ctrConfig.current = { windowSize: 10, windowChancePct: 25 };
+  ct.ctrConfig.baseline = { windowSize: 10, windowChancePct: 25 };
   ct.ctrSelected = null;
   ct.ctrOpenMembers.clear();
   ct.ctrSetSel.clear();
@@ -256,6 +270,202 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     sc.value = "0";
     ct.onCustomTrainerInput(sc);
     expect(t.team[1].slotChance).toBe(100);
+  });
+
+  it("weight field renders, serializes (always written), and migrates a legacy spawnChance on load", () => {
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // The Weight input renders (replacing the old Spawn chance % field) at default 100.
+    const w = q("#ctr-weight") as HTMLInputElement;
+    expect(w).not.toBeNull();
+    expect(Number(w.value)).toBe(100);
+    // Old field is gone.
+    expect(q("#ctr-spawnchance")).toBeNull();
+
+    // Default weight 100 serializes as `weight` (always written); no spawnChance.
+    let delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.weight).toBe(100);
+    expect(delta.spawnChance).toBeUndefined();
+
+    // Edit the weight; it serializes the new value.
+    w.value = "250";
+    ct.onCustomTrainerInput(w);
+    ct.onCustomTrainerChange(w);
+    expect(ct.ctr.current[key].weight).toBe(250);
+    delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.weight).toBe(250);
+
+    // Out-of-range/blank normalizes to >= 1 (0 -> 1).
+    w.value = "0";
+    ct.onCustomTrainerInput(w);
+    expect(ct.ctr.current[key].weight).toBe(1);
+
+    // Migration: a live entry carrying only a legacy spawnChance loads as weight.
+    const migrated = ct.ctrLiveToEdit({
+      id: 70099,
+      name: "Legacy",
+      trainerClass: "ACE_TRAINER",
+      spawnChance: 40,
+      team: [{ species: 25 }],
+    });
+    expect(migrated.weight).toBe(40);
+    expect(migrated.spawnChance).toBeUndefined();
+    // weight present wins over a co-present spawnChance.
+    expect(
+      ct.ctrLiveToEdit({
+        id: 70098,
+        name: "W",
+        trainerClass: "ACE_TRAINER",
+        weight: 7,
+        spawnChance: 40,
+        team: [{ species: 25 }],
+      }).weight,
+    ).toBe(7);
+    // Neither present -> default 100.
+    expect(
+      ct.ctrLiveToEdit({ id: 70097, name: "N", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] }).weight,
+    ).toBe(100);
+  });
+
+  it("spawn density panel renders (no trainer needed), edits config, and serializes only when changed", () => {
+    ct.setTab("customtrainers");
+    ct.render();
+    // The panel renders ABOVE the list, with no trainer selected.
+    const chance = q("#ctr-density-chance") as HTMLInputElement;
+    const window = q("#ctr-density-window") as HTMLInputElement;
+    expect(chance).not.toBeNull();
+    expect(window).not.toBeNull();
+    expect(Number(chance.value)).toBe(25); // shipped default
+    expect(Number(window.value)).toBe(10);
+
+    // Untouched default == baseline -> no config delta (byte-clean).
+    expect(ct.buildDeltas().deltas["custom-trainers-config"]).toBeUndefined();
+
+    // Edit the per-window chance; state updates without a selected trainer.
+    chance.value = "40";
+    expect(ct.onCustomTrainerInput(chance)).toBe(true);
+    expect(ct.ctrConfig.current.windowChancePct).toBe(40);
+    // Edit the window size.
+    window.value = "5";
+    expect(ct.onCustomTrainerInput(window)).toBe(true);
+    expect(ct.ctrConfig.current.windowSize).toBe(5);
+
+    // Now it differs from baseline -> a whole-config delta is emitted.
+    const cfg = ct.buildDeltas().deltas["custom-trainers-config"] as Record<string, number>;
+    expect(cfg).toEqual({ windowSize: 5, windowChancePct: 40 });
+
+    // Out-of-range normalizes: chance 200 -> 25, window 0 -> 10.
+    chance.value = "200";
+    ct.onCustomTrainerInput(chance);
+    expect(ct.ctrConfig.current.windowChancePct).toBe(25);
+    window.value = "0";
+    ct.onCustomTrainerInput(window);
+    expect(ct.ctrConfig.current.windowSize).toBe(10);
+
+    // 0% chance is a VALID, distinct value (disables custom trainers) and serializes.
+    chance.value = "0";
+    ct.onCustomTrainerInput(chance);
+    expect(ct.ctrConfig.current.windowChancePct).toBe(0);
+    const cfg2 = ct.buildDeltas().deltas["custom-trainers-config"] as Record<string, number>;
+    expect(cfg2.windowChancePct).toBe(0);
+  });
+
+  // ---- MULTI-STAFF SAVE SAFETY (Batch A) -----------------------------------
+  it("builds per-trainer baselines only for MODIFIED (loaded) trainers, not new ones or deletions", () => {
+    // MOD existed at load (in CTR_LIVE); NEW is freshly created; DEL is a deletion.
+    ct.CTR_LIVE = { MOD: { id: 70001, name: "Mod", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] } };
+    const delta = {
+      MOD: { id: 70001, name: "Mod v2", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] },
+      NEW: { id: 70002, name: "New", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] },
+      DEL: null,
+    };
+    const baselines = ct.ctrBuildBaselines(delta);
+    // Only MOD gets a baseline hash (of the LOADED CTR_LIVE version).
+    expect(Object.keys(baselines)).toEqual(["MOD"]);
+    expect(baselines.MOD).toBe(ct.hashCtrTrainerEntry(ct.CTR_LIVE.MOD));
+    expect(baselines.NEW).toBeUndefined();
+    expect(baselines.DEL).toBeUndefined();
+  });
+
+  it("applies the server id remap from a save response so the UI shows the real id (no reload)", () => {
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // The client minted a provisional id; the worker returns the real one.
+    const delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.id).toBeGreaterThanOrEqual(70001);
+    ct.markCustomTrainersSaved({ [key]: delta }, { idRemap: { [key]: 70123 }, conflicts: [] });
+    // Local edit state now reflects the server id...
+    expect(ct.ctr.current[key].id).toBe(70123);
+    // ...its baseline is clean (not dirty) and CTR_LIVE advanced to the saved entry.
+    expect(ct.ctr.baseline[key].id).toBe(70123);
+    expect(ct.CTR_LIVE[key].id).toBe(70123);
+    // Not dirty anymore: buildDeltas emits no custom-trainers change.
+    expect(ct.buildDeltas().deltas["custom-trainers"]).toBeUndefined();
+  });
+
+  it("keeps a per-trainer CONFLICT dirty (baseline NOT advanced) while saving the rest", () => {
+    // Two trainers both loaded + edited; the worker rejects CONFLICT, applies OK.
+    ct.CTR_LIVE = {
+      OK: { id: 70001, name: "Ok", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] },
+      CONFLICT: { id: 70002, name: "Clash", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] },
+    };
+    ct.ctr.current = {
+      OK: {
+        id: 70001,
+        name: "Ok v2",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [{ species: "SPECIES_PIKACHU" }],
+      },
+      CONFLICT: {
+        id: 70002,
+        name: "Clash MINE",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [{ species: "SPECIES_PIKACHU" }],
+      },
+    };
+    // Baselines differ from current -> both start dirty.
+    ct.ctr.baseline = {
+      OK: {
+        id: 70001,
+        name: "Ok",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [{ species: "SPECIES_PIKACHU" }],
+      },
+      CONFLICT: {
+        id: 70002,
+        name: "Clash",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [{ species: "SPECIES_PIKACHU" }],
+      },
+    };
+    const okDelta = { id: 70001, name: "Ok v2", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] };
+    const conflictDelta = { id: 70002, name: "Clash MINE", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] };
+
+    ct.markCustomTrainersSaved(
+      { OK: okDelta, CONFLICT: conflictDelta },
+      {
+        idRemap: {},
+        conflicts: [
+          {
+            key: "CONFLICT",
+            error: "CONFLICT: modified by someone else since you loaded - reload to get their version",
+          },
+        ],
+      },
+    );
+
+    // OK advanced to clean: baseline == current.
+    expect(ct.ctr.baseline.OK).toEqual(ct.ctr.current.OK);
+    expect(ct.CTR_LIVE.OK.name).toBe("Ok v2");
+    // CONFLICT stays DIRTY: baseline is NOT advanced (still "Clash") and CTR_LIVE
+    // is NOT updated, so the author can reload the teammate's version.
+    expect(ct.ctr.baseline.CONFLICT.name).toBe("Clash");
+    expect(ct.ctr.current.CONFLICT.name).toBe("Clash MINE");
+    expect(ct.CTR_LIVE.CONFLICT.name).toBe("Clash");
   });
 
   it("RLA/RLNA are offered atop the datalist and exempt from the legality/unknown-move gate", () => {

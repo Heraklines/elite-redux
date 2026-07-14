@@ -58,6 +58,13 @@ let ABILITY_NAMES = [];
 // spById) so the picker matches every other tab, converting back on save.
 let CTR_LIVE = {}; // key → entry (species by numeric id, as stored)
 const ctr = { current: {}, baseline: {} }; // key → entry (species by CONST)
+// Global custom-trainer spawn-density config (sibling er-custom-trainers-config.json):
+// how OFTEN a custom-trainer encounter happens at all, independent of trainer count.
+// { windowSize, windowChancePct }. Saved as its own whitelisted file.
+const ctrConfig = {
+  current: { windowSize: 10, windowChancePct: 25 },
+  baseline: { windowSize: 10, windowChancePct: 25 },
+};
 let ctrSelected = null; // open trainer key, or null
 // Per-member TRANSIENT UI state (NOT saved, NOT part of the dirty diff): which
 // member fieldsets are expanded, and which authored set a member's dropdown
@@ -292,6 +299,10 @@ function dirtyCounts() {
     if (!jsonEq(ctr.current[key], ctr.baseline[key])) {
       ctrN++;
     }
+  }
+  // The global spawn-density config counts toward the Custom Trainers tab dot.
+  if (!jsonEq(ctrConfig.current, ctrConfig.baseline)) {
+    ctrN++;
   }
   return {
     eggN,
@@ -1615,6 +1626,102 @@ function normalizeCtrSlotChance(value) {
   return normalizeCtrSpawnChance(value);
 }
 
+/**
+ * Resolve a trainer pick WEIGHT with spawnChance back-compat migration (mirrors
+ * resolveErCustomTrainerWeight in er-custom-trainers.ts): a present weight clamps
+ * to an integer >= 1; else a legacy spawnChance migrates (clamped >= 1); else 100.
+ */
+function resolveCtrWeight(weight, spawnChance) {
+  const clampAtLeastOne = v => {
+    if (typeof v !== "number" || !Number.isFinite(v)) {
+      return 1;
+    }
+    const n = Math.floor(v);
+    return n >= 1 ? n : 1;
+  };
+  if (weight !== undefined && weight !== null) {
+    return clampAtLeastOne(weight);
+  }
+  if (spawnChance !== undefined && spawnChance !== null) {
+    return clampAtLeastOne(spawnChance);
+  }
+  return 100;
+}
+
+/** Normalize a spawn WEIGHT to an integer >= 1 (absent/invalid => 100). */
+function normalizeCtrWeight(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 100;
+  }
+  const n = Math.floor(value);
+  return n >= 1 ? n : 1;
+}
+
+/** Normalize the spawn-density window size to an integer 1-100 (invalid => 10). */
+function normalizeCtrWindowSize(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 10;
+  }
+  const n = Math.floor(value);
+  return n >= 1 && n <= 100 ? n : 10;
+}
+
+/** Normalize the spawn-density per-window chance to an integer 0-100 (invalid => 25). */
+function normalizeCtrWindowChance(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 25;
+  }
+  const n = Math.floor(value);
+  return n >= 0 && n <= 100 ? n : 25;
+}
+
+// --- Multi-staff save safety: per-trainer baseline hashing (mirrors the worker's
+// custom-trainers-merge.ts EXACTLY, so a hash computed here matches the worker's).
+// The editor sends hashCtrTrainerEntry(CTR_LIVE[key]) (the LOAD-time repo version,
+// species by id) per modified trainer; the worker compares it against the CURRENT
+// repo version to detect a teammate's concurrent edit (same-trainer conflict).
+
+/** Deterministic, key-sorted JSON string (mirror of worker `stableStringify`). */
+function ctrStableStringify(value) {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "null";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(ctrStableStringify).join(",")}]`;
+  }
+  const keys = Object.keys(value).sort();
+  return `{${keys.map(k => `${JSON.stringify(k)}:${ctrStableStringify(value[k])}`).join(",")}}`;
+}
+
+/** Stable FNV-1a (32-bit) hex hash of a trainer entry (mirror of worker `hashTrainerEntry`). */
+function hashCtrTrainerEntry(entry) {
+  const s = ctrStableStringify(entry);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16);
+}
+
+/**
+ * Per-trainer load-time baseline hashes for a custom-trainers delta: for each
+ * MODIFIED trainer (a non-null delta entry whose key existed in the loaded file
+ * CTR_LIVE), map key -> hash of the LOADED repo entry. New trainers (absent from
+ * CTR_LIVE) and deletions (null) get no baseline, so the worker treats them as a
+ * new-id allocation / delete respectively. This drives the worker's same-trainer
+ * conflict guard.
+ */
+function ctrBuildBaselines(delta) {
+  const baselines = {};
+  for (const [key, value] of Object.entries(delta || {})) {
+    if (value !== null && CTR_LIVE && Object.hasOwn(CTR_LIVE, key)) {
+      baselines[key] = hashCtrTrainerEntry(CTR_LIVE[key]);
+    }
+  }
+  return baselines;
+}
+
 /** Clamp a variant weight to an integer >= 1 (invalid => 1). */
 function clampCtrWeight(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -1786,7 +1893,7 @@ function blankCtrTrainer() {
     minWave: 20,
     maxWave: 80,
     endless: false,
-    spawnChance: 100,
+    weight: 100,
     challenge: "none",
     battleBgm: "",
     introDialogue: "",
@@ -1809,9 +1916,10 @@ function ctrLiveToEdit(entry) {
     minWave: Number.isInteger(entry.minWave) ? entry.minWave : 20,
     maxWave: Number.isInteger(entry.maxWave) ? entry.maxWave : 80,
     endless: entry.endless === true,
-    // Absent/invalid spawnChance normalizes to 100 (guaranteed once per run) -
-    // keeps pre-feature saved entries behaving exactly as before.
-    spawnChance: normalizeCtrSpawnChance(entry.spawnChance),
+    // Pick weight (spawnChance -> weight migration): a saved entry with a legacy
+    // spawnChance and no weight migrates to weight = spawnChance (clamped >= 1);
+    // absent both => 100. New saves always write `weight`.
+    weight: resolveCtrWeight(entry.weight, entry.spawnChance),
     challenge: entry.challenge ?? "none",
     // Trimmed bgm key; anything not [a-z0-9_] (or absent) normalizes to "" (none).
     battleBgm: normalizeCtrBattleBgm(entry.battleBgm),
@@ -2684,10 +2792,10 @@ function renderCustomTrainers(root) {
         <label>Min wave <input type="number" id="ctr-minwave" value="${t.minWave}" min="1" max="5000" style="width:72px" /></label>
         <label>Max wave <input type="number" id="ctr-maxwave" value="${t.maxWave}" min="1" max="5000" ${t.endless ? "disabled" : ""} style="width:72px" /></label>
         <label title="Any floor >= min wave (endless)"><input type="checkbox" id="ctr-endless"${t.endless ? " checked" : ""} /> Endless (any floor ≥ min)</label>
-        <label title="Per-run chance this trainer appears at all. 100 = guaranteed once per run.">Spawn chance % <input type="number" id="ctr-spawnchance" value="${normalizeCtrSpawnChance(t.spawnChance)}" min="1" max="100" style="width:64px" /></label>
+        <label title="Relative odds this trainer is the one fielded when a spawn window fires (weight / total weight among eligible trainers). Higher = more likely. Default 100.">Weight <input type="number" id="ctr-weight" value="${normalizeCtrWeight(t.weight)}" min="1" step="1" style="width:72px" /></label>
         <br /><label>Battle type <select id="ctr-battletype">${battleSel}</select></label>
         <label>Challenge exclusivity <select id="ctr-challenge">${challSel}</select></label>
-        <p class="hint" style="margin:6px 0 0">Spawn chance is ONE roll per run: 100 = guaranteed. If it hits, the trainer appears ONCE at a random floor in its wave range, sliding forward past boss/fixed/mystery waves.</p>
+        <p class="hint" style="margin:6px 0 0">Spawning is capped GLOBALLY by the Spawn density panel above (how often ANY custom trainer appears). When a window fires, ONE trainer is picked by weight among the eligible not-yet-used trainers, then it appears once at a wave in its range, sliding forward past boss/fixed/mystery waves. No repeats per run.</p>
       </fieldset>
       <fieldset class="full ctr-sec"><legend>Team (1-6)</legend>
         ${t.team.map((m, i) => ctrMemberHtml(m, i)).join("")}
@@ -2701,10 +2809,17 @@ function renderCustomTrainers(root) {
       </div>
     </div>`;
   }
+  const cfg = ctrConfig.current;
+  const cfgDirty = !jsonEq(ctrConfig.current, ctrConfig.baseline);
   root.innerHTML = `
     <div class="section">
       <h2>Custom Trainers</h2>
       <p class="hint">Staff-authored trainers that spawn in real runs, gated by difficulty, floor range and challenge mode. The team is fielded EXACTLY as authored (the #419 BST cap is bypassed).</p>
+      <fieldset class="ctr-density${cfgDirty ? " dirty" : ""}"><legend>Spawn density${cfgDirty ? " ●" : ""}</legend>
+        <p class="hint" style="margin:0 0 6px">How OFTEN a custom trainer appears at all, INDEPENDENT of how many you author. The run is diced into windows of this many waves; each window has this percent chance to field ONE custom trainer.</p>
+        <label title="Percent chance (0-100) that a given window fields a custom trainer at all. 0 disables custom trainers entirely.">Chance % per window <input type="number" id="ctr-density-chance" value="${normalizeCtrWindowChance(cfg.windowChancePct)}" min="0" max="100" step="1" style="width:72px" /></label>
+        <label title="How many waves make up one spawn window (1-100). Default 10 = at most one custom trainer per 10 waves.">Window size (waves) <input type="number" id="ctr-density-window" value="${normalizeCtrWindowSize(cfg.windowSize)}" min="1" max="100" step="1" style="width:72px" /></label>
+      </fieldset>
       <div class="mon-list">${list || '<span class="dyn">none yet</span>'}<button type="button" id="ctr-new" class="primary">＋ New trainer</button></div>
     </div>
     <div class="section">
@@ -2723,6 +2838,16 @@ function ctrCur() {
 }
 
 function onCustomTrainerInput(el) {
+  // Global spawn-density inputs live ABOVE the trainer list, so they must be
+  // handled with NO trainer selected (before the ctrCur guard below).
+  if (el.id === "ctr-density-chance") {
+    ctrConfig.current.windowChancePct = normalizeCtrWindowChance(Number(el.value));
+    return true;
+  }
+  if (el.id === "ctr-density-window") {
+    ctrConfig.current.windowSize = normalizeCtrWindowSize(Number(el.value));
+    return true;
+  }
   const t = ctrCur();
   if (!t) {
     return false;
@@ -2749,9 +2874,9 @@ function onCustomTrainerInput(el) {
     t.minWave = Number(el.value) || 1;
   } else if (el.id === "ctr-maxwave") {
     t.maxWave = Number(el.value) || 1;
-  } else if (el.id === "ctr-spawnchance") {
-    // Clamp to 1-100; a blank/invalid entry normalizes back to 100.
-    t.spawnChance = normalizeCtrSpawnChance(Number(el.value));
+  } else if (el.id === "ctr-weight") {
+    // Pick weight (integer >= 1); a blank/invalid entry normalizes back to 100.
+    t.weight = normalizeCtrWeight(Number(el.value));
   } else if (el.classList.contains("ctr-slotchance") && m) {
     // Slot-fill chance (slots 2-6); clamp 1-100, blank/invalid -> 100.
     m.slotChance = normalizeCtrSlotChance(Number(el.value));
@@ -2806,6 +2931,17 @@ function onCustomTrainerInput(el) {
 }
 
 function onCustomTrainerChange(el) {
+  // Global spawn-density inputs (above the list) blur/normalize with no trainer.
+  if (el.id === "ctr-density-chance") {
+    ctrConfig.current.windowChancePct = normalizeCtrWindowChance(Number(el.value));
+    render();
+    return true;
+  }
+  if (el.id === "ctr-density-window") {
+    ctrConfig.current.windowSize = normalizeCtrWindowSize(Number(el.value));
+    render();
+    return true;
+  }
   const t = ctrCur();
   if (!t) {
     return false;
@@ -3930,7 +4066,9 @@ function buildDeltas() {
       minWave: t.minWave,
       maxWave: t.maxWave,
       endless: t.endless === true,
-      spawnChance: normalizeCtrSpawnChance(t.spawnChance),
+      // Always write `weight` (never the legacy spawnChance): the game migrates
+      // any old spawnChance on load, but new saves are weight-only.
+      weight: normalizeCtrWeight(t.weight),
       challenge: t.challenge || "none",
       ...(normalizeCtrBattleBgm(t.battleBgm) ? { battleBgm: normalizeCtrBattleBgm(t.battleBgm) } : {}),
       // Intro blurb: trimmed + 200-char cap; omit when empty (byte-clean default).
@@ -3947,6 +4085,16 @@ function buildDeltas() {
   }
   if (Object.keys(ctrDelta).length > 0) {
     deltas["custom-trainers"] = ctrDelta;
+  }
+
+  // Global spawn-density config (its own whitelisted file). Emitted whole (only
+  // two normalized fields) when it differs from the loaded baseline.
+  const cfgOut = {
+    windowSize: normalizeCtrWindowSize(ctrConfig.current.windowSize),
+    windowChancePct: normalizeCtrWindowChance(ctrConfig.current.windowChancePct),
+  };
+  if (!jsonEq(cfgOut, ctrConfig.baseline)) {
+    deltas["custom-trainers-config"] = cfgOut;
   }
 
   return { deltas, bad };
@@ -3994,15 +4142,22 @@ async function commit({ deploy }) {
 
     const author = $("#author").value;
     let lastSha = "";
+    let ctrConflicts = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       // Only the LAST save triggers the (single) deploy.
       const wantDeploy = deploy && i === files.length - 1;
       setStatus(`Saving ${file} (${i + 1}/${files.length})…`);
+      // Custom trainers carry per-trainer baseline hashes so the worker can detect
+      // a teammate's concurrent edit (same-trainer conflict) and server-assign ids.
+      const body = { password, file, delta: deltas[file], author, deploy: wantDeploy };
+      if (file === "custom-trainers") {
+        body.baselines = ctrBuildBaselines(deltas[file]);
+      }
       const res = await fetch(`${WORKER_URL}/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, file, delta: deltas[file], author, deploy: wantDeploy }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
@@ -4014,15 +4169,34 @@ async function commit({ deploy }) {
         setStatus(`Saved ✓ ${lastSha} but deploy failed: ${data.deployError || "unknown"}`, ERR);
         return;
       }
-      markSaved(file);
+      if (file === "custom-trainers") {
+        // Adopt server-assigned ids + keep any conflicted trainers dirty.
+        markCustomTrainersSaved(deltas[file], data);
+        ctrConflicts = Array.isArray(data.conflicts) ? data.conflicts : [];
+      } else {
+        markSaved(file);
+      }
     }
     render();
-    setStatus(
-      deploy
-        ? `Saved ✓ ${lastSha} — deploy triggered, live in a few minutes.`
-        : `Saved ✓ ${lastSha} — click "Commit & Deploy" to apply it to staging.`,
-      "var(--ok)",
-    );
+    if (ctrConflicts.length > 0) {
+      // Partial success: the non-conflicting rest saved, but these trainers were
+      // edited by someone else since load and stay DIRTY (reload to see theirs).
+      const detail = ctrConflicts
+        .slice(0, 3)
+        .map(c => c.error || c.key)
+        .join("; ");
+      setStatus(
+        `Saved ✓ ${lastSha}, but ${ctrConflicts.length} trainer(s) were rejected as conflicts and kept dirty: ${detail}${ctrConflicts.length > 3 ? "…" : ""}`,
+        ERR,
+      );
+    } else {
+      setStatus(
+        deploy
+          ? `Saved ✓ ${lastSha} — deploy triggered, live in a few minutes.`
+          : `Saved ✓ ${lastSha} — click "Commit & Deploy" to apply it to staging.`,
+        "var(--ok)",
+      );
+    }
   } catch (err) {
     setStatus(`Error: ${err}`, ERR);
   } finally {
@@ -4051,16 +4225,53 @@ function markSaved(file) {
     tms.baseline = JSON.parse(JSON.stringify(tms.current));
   } else if (file === "species-abilities") {
     abil.baseline = JSON.parse(JSON.stringify(abil.current));
-  } else if (file === "custom-trainers") {
-    // Drop deleted (null) keys, then snapshot the rest as the new baseline.
-    for (const k of Object.keys(ctr.current)) {
-      if (ctr.current[k] === null) {
-        delete ctr.current[k];
-      }
+  } else if (file === "custom-trainers-config") {
+    ctrConfig.baseline = JSON.parse(JSON.stringify(ctrConfig.current));
+  }
+}
+
+/**
+ * Adopt the worker's custom-trainers save response (Batch A multi-staff safety):
+ *   - apply `idRemap` (server-assigned real ids) to the local edit state so the UI
+ *     reflects the real id without a reload,
+ *   - for every SAVED (non-conflicted) trainer, advance its baseline AND the
+ *     load-time CTR_LIVE snapshot (so the next save's baseline hash matches the
+ *     new repo state), dropping deleted (null) keys,
+ *   - leave every CONFLICTED trainer untouched: it stays DIRTY so the author can
+ *     reload the teammate's version (or re-save after reconciling).
+ */
+function markCustomTrainersSaved(delta, data) {
+  const idRemap = data && data.idRemap && typeof data.idRemap === "object" ? data.idRemap : {};
+  const conflicted = new Set((Array.isArray(data && data.conflicts) ? data.conflicts : []).map(c => c.key));
+
+  // Apply server-assigned ids to the live edit state.
+  for (const [key, realId] of Object.entries(idRemap)) {
+    if (ctr.current[key] && typeof realId === "number") {
+      ctr.current[key].id = realId;
     }
-    ctr.baseline = JSON.parse(JSON.stringify(ctr.current));
-    if (ctrSelected && !ctr.current[ctrSelected]) {
-      ctrSelected = null;
+  }
+
+  for (const [key, value] of Object.entries(delta || {})) {
+    if (conflicted.has(key)) {
+      continue; // rejected by the worker -> keep the local edit DIRTY
+    }
+    if (value === null) {
+      // Deletion committed.
+      delete ctr.current[key];
+      delete ctr.baseline[key];
+      delete CTR_LIVE[key];
+      if (ctrSelected === key) {
+        ctrSelected = null;
+      }
+      continue;
+    }
+    // Saved (created/modified): the committed repo entry is the delta with the
+    // final (possibly remapped) id. Advance CTR_LIVE (raw, species by id) so a
+    // later save hashes the NEW repo state, and snapshot the baseline as clean.
+    const finalId = typeof idRemap[key] === "number" ? idRemap[key] : value.id;
+    CTR_LIVE[key] = { ...value, id: finalId };
+    if (ctr.current[key]) {
+      ctr.baseline[key] = JSON.parse(JSON.stringify(ctr.current[key]));
     }
   }
 }
@@ -4098,6 +4309,7 @@ async function init() {
       allSpeciesData,
       evosData,
       ctrLive,
+      ctrConfigLive,
       trainerClassesData,
       bgmData,
       shinyEffectsData,
@@ -4131,6 +4343,8 @@ async function init() {
       fetchJson("./data/evolutions.json", {}),
       // Live custom-trainers override file (resilient: missing on the branch → empty).
       fetchJson(`${RAW_BASE}/er-custom-trainers.json${bust}`, {}),
+      // Live custom-trainer spawn-density config (resilient: missing → defaults).
+      fetchJson(`${RAW_BASE}/er-custom-trainers-config.json${bust}`, {}),
       // Trainer-class sprite catalog (generated). Fallback → static list below.
       fetchJson("./data/trainer-classes.json", []),
       // Battle-music catalog (generated). Fallback → empty (picker offers "(default)").
@@ -4269,6 +4483,14 @@ async function init() {
       }
     }
     ctr.baseline = JSON.parse(JSON.stringify(ctr.current));
+
+    // Seed the global spawn-density config (normalized; missing file => defaults).
+    const cfgLive = ctrConfigLive && typeof ctrConfigLive === "object" ? ctrConfigLive : {};
+    ctrConfig.current = {
+      windowSize: normalizeCtrWindowSize(cfgLive.windowSize),
+      windowChancePct: normalizeCtrWindowChance(cfgLive.windowChancePct),
+    };
+    ctrConfig.baseline = JSON.parse(JSON.stringify(ctrConfig.current));
 
     // Seed species tuning: snapshot values overlaid with any live override.
     for (const s of SPECIES) {
