@@ -1111,6 +1111,8 @@ function installCoverageTaps(rig: DuoRig, hits: SoakHitSet): void {
     }
   };
   for (const runtime of [rig.hostRuntime, rig.guestRuntime]) {
+    // Observe the final transport carrier rather than a phase-owned relay method: detached async tails can
+    // still send a valid frame after their initiating relay call stack has unwound.
     const transport = runtime.localTransport;
     const realSend = transport.send.bind(transport);
     transport.send = (message: CoopMessage): void => {
