@@ -22,3 +22,7 @@ database_id = "e75604f0-bef9-49ef-aba7-d93779e48b8f"   # set after `wrangler d1 
 [vars]
 # Optional: restrict which site origin may post telemetry. "*" (or unset) allows any origin.
 ALLOWED_ORIGIN = "*"
+# Showdown Tournament (P1): comma-separated list of ADMIN account uids (the token `uid`,
+# a stable numeric account id) allowed to create/close/cancel/resolve tournaments. Empty
+# / unset = no admins (creation locked). Set the maintainer's account uid here.
+TOURNAMENT_ADMIN_UIDS = "2"   # staging uid of Heraklines1 (maintainer): tournament create/close/cancel/resolve

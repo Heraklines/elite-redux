@@ -28,6 +28,11 @@ import {
 } from "#data/elite-redux/showdown/showdown-outcome";
 import { reportShowdownRankResult } from "#data/elite-redux/showdown/showdown-rank-client";
 import { sealShowdownTelemetry } from "#data/elite-redux/showdown/showdown-telemetry";
+import { reportTournamentResult } from "#data/elite-redux/showdown/tournament-client";
+import {
+  clearTournamentMatchContext,
+  getTournamentMatchContext,
+} from "#data/elite-redux/showdown/tournament-match-context";
 import { UiMode } from "#enums/ui-mode";
 import { BattlePhase } from "#phases/battle-phase";
 
@@ -127,6 +132,24 @@ export class ShowdownResultPhase extends BattlePhase {
     } else if (matchId != null && this.voided) {
       // I4: a VOIDED staked match releases both escrow holds server-side (no winner to attest).
       void reportShowdownVoid(matchId).catch(() => {});
+    }
+
+    // TOURNAMENT match (prize-only, escrow matchId always null): report the decisive outcome to the
+    // tournament worker via dual attestation so it advances the bracket server-side. BOTH clients
+    // report (the winner USERNAME); a void never advances a bracket. Fire-and-forget + fully guarded —
+    // the round trip must never block or strand the return to title. Context is cleared afterward so it
+    // can't leak into the next plain match.
+    const tournamentCtx = getTournamentMatchContext();
+    if (tournamentCtx != null && !this.silent) {
+      if (!this.voided) {
+        const localName = getCoopRuntime()?.controller.localName() ?? "";
+        const partnerName = getCoopRuntime()?.controller.partnerName ?? "";
+        const winnerName = this.localWon ? localName : partnerName;
+        if (winnerName) {
+          void reportTournamentResult(tournamentCtx.tournamentId, tournamentCtx.matchId, winnerName).catch(() => {});
+        }
+      }
+      clearTournamentMatchContext();
     }
 
     // RANKED (dual attestation): report the decisive outcome to /showdown/rank/result so the server

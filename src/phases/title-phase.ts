@@ -41,6 +41,12 @@ import {
 } from "#data/elite-redux/showdown/showdown-manifest";
 import { validateShowdownTeam } from "#data/elite-redux/showdown/showdown-team";
 import { buildTeamMenuPresetViews, runShowdownPresetBuild } from "#data/elite-redux/showdown/showdown-team-menu-flow";
+import {
+  getTournamentBracket,
+  listTournaments,
+  registerForTournament,
+} from "#data/elite-redux/showdown/tournament-client";
+import { setTournamentMatchContext } from "#data/elite-redux/showdown/tournament-match-context";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -201,6 +207,15 @@ export class TitlePhase extends Phase {
               label: GameMode.getModeName(GameModes.SHOWDOWN),
               handler: () => {
                 this.openShowdownTeamMenu(setModeAndEnd);
+                return true;
+              },
+            });
+            // Showdown TOURNAMENTS (beside the Team Menu path): async single-elim brackets. Opens the
+            // tournament LIST (worker-backed); register / view bracket / play a bracket match from there.
+            options.push({
+              label: "Showdown Tournaments",
+              handler: () => {
+                this.openShowdownTournaments(setModeAndEnd);
                 return true;
               },
             });
@@ -505,6 +520,101 @@ export class TitlePhase extends Phase {
       await globalScene.ui.setMode(UiMode.MESSAGE);
       globalScene.ui.resetModeChain();
       showMenu();
+    })();
+  }
+
+  /**
+   * Showdown TOURNAMENTS (P1): the worker-backed tournament LIST -> BRACKET -> play flow. Opened via the
+   * SAME clobber-safe deferral as the Team Menu (await setMode(MESSAGE) + resetModeChain, then open the
+   * screen directly - no unreliable empty-text hop). List/bracket are no-transition full-screen modes, so
+   * the inter-screen hops are instant. A worker fetch failure (offline / unconfigured endpoint) drops to a
+   * message and back to the title - it never strands a blank screen.
+   */
+  private openShowdownTournaments(setModeAndEnd: (gameMode: GameModes) => void): void {
+    const { gameData } = globalScene;
+    const ownName = loggedInUser?.username ?? "Player";
+
+    const backToTitle = (): void => {
+      void globalScene.ui.revertModes().then(() => {
+        globalScene.phaseManager.toTitleScreen();
+        super.end();
+      });
+    };
+
+    // A message hop that returns to a follow-up (used for offline / no-preset notices).
+    const notice = (message: string, then: () => void): void => {
+      void (async () => {
+        await globalScene.ui.setMode(UiMode.MESSAGE);
+        globalScene.ui.resetModeChain();
+        globalScene.ui.showText(message, null, then, null, true);
+      })();
+    };
+
+    const enterMatch = (tournamentId: string, matchId: string, opponent: string): void => {
+      const presets = gameData.listShowdownTeamPresets();
+      if (presets.length === 0) {
+        // A saved team preset is REQUIRED - route to the Team Menu to build one.
+        notice("You need a saved team preset first. Build one in the Showdown menu.", () => backToTitle());
+        return;
+      }
+      // P1: field the first saved preset (P2 adds a per-match preset picker). The registered team is not
+      // locked - the player may re-pick presets per match.
+      setPendingShowdownPresetStarters(presets[0].mons.map(manifestToStarter));
+      setTournamentMatchContext({ tournamentId, matchId, expectedOpponent: opponent });
+      this.openCoopLobby(setModeAndEnd, "authoritative", "versus", GameModes.SHOWDOWN);
+    };
+
+    const openBracket = async (id: string): Promise<void> => {
+      const res = await getTournamentBracket(id);
+      if (!res.ok) {
+        notice(res.error, () => void showList());
+        return;
+      }
+      const t = res.data.tournament;
+      void globalScene.ui.setMode(UiMode.TOURNAMENT_BRACKET, {
+        tournament: t,
+        ownParticipant: ownName,
+        now: Date.now(),
+        onPlayMatch: (matchId: string, opponent: string) => enterMatch(t.id, matchId, opponent),
+        onBack: () => void showList(),
+      });
+    };
+
+    const register = (id: string): void => {
+      const presets = gameData.listShowdownTeamPresets();
+      if (presets.length === 0) {
+        notice("You need a saved team preset to register. Build one in the Showdown menu.", () => void showList());
+        return;
+      }
+      void registerForTournament(id, presets[0].name).then(res => {
+        if (res.ok) {
+          void showList();
+        } else {
+          notice(res.error, () => void showList());
+        }
+      });
+    };
+
+    const showList = async (): Promise<void> => {
+      const res = await listTournaments();
+      if (!res.ok) {
+        notice(res.error, () => backToTitle());
+        return;
+      }
+      void globalScene.ui.setMode(UiMode.TOURNAMENT_LIST, {
+        tournaments: res.data.tournaments,
+        ownParticipant: ownName,
+        now: Date.now(),
+        onOpen: (id: string) => void openBracket(id),
+        onRegister: (id: string) => register(id),
+        onExit: () => backToTitle(),
+      });
+    };
+
+    void (async () => {
+      await globalScene.ui.setMode(UiMode.MESSAGE);
+      globalScene.ui.resetModeChain();
+      await showList();
     })();
   }
 

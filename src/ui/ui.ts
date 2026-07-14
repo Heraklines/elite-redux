@@ -104,6 +104,8 @@ import { TargetSelectUiHandler } from "#ui/target-select-ui-handler";
 import { TestDialogueUiHandler } from "#ui/test-dialogue-ui-handler";
 import { addTextObject } from "#ui/text";
 import { TitleUiHandler } from "#ui/title-ui-handler";
+import { TournamentBracketUiHandler } from "#ui/tournament-bracket-ui-handler";
+import { TournamentListUiHandler } from "#ui/tournament-list-ui-handler";
 import type { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 import { UnavailableModalUiHandler } from "#ui/unavailable-modal-ui-handler";
@@ -175,6 +177,12 @@ const noTransitionModes = [
   // added nothing anyway. Every OTHER offline-flow edge is already instant (editor overlay + revert;
   // COMMUNITY_CHALLENGE_TEXT name modal), so the whole offline screen graph is now fade-free.
   UiMode.SHOWDOWN_TEAM_MENU,
+  // Showdown Tournament screens (list + bracket). Entered FROM the Team Menu (itself a
+  // no-transition full-screen panel over the STARTER_SELECT grid), and the bracket <-> list
+  // hop is between two full-screen panels — an instant swap keeps the offline screen graph
+  // fade-free and avoids the same stuck-black-overlay strand class as the two modes above.
+  UiMode.TOURNAMENT_LIST,
+  UiMode.TOURNAMENT_BRACKET,
 ];
 
 // biome-ignore lint/style/useNamingConvention: a unique case (only 2 letters)
@@ -275,6 +283,8 @@ export class UI extends Phaser.GameObjects.Container {
       new ShowdownWagerUiHandler(),
       new ShowdownSetEditorUiHandler(),
       new ShowdownTeamMenuUiHandler(),
+      new TournamentListUiHandler(),
+      new TournamentBracketUiHandler(),
     ];
   }
 

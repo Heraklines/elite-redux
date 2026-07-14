@@ -144,6 +144,7 @@ export const SettingKeys = {
   EXP_Gains_Speed: "EXP_GAINS_SPEED",
   EXP_Party_Display: "EXP_PARTY_DISPLAY",
   Skip_Seen_Dialogues: "SKIP_SEEN_DIALOGUES",
+  Skip_Custom_Trainer_Intros: "SKIP_CUSTOM_TRAINER_INTROS",
   Egg_Skip: "EGG_SKIP",
   Battle_Style: "BATTLE_STYLE",
   Enable_Retries: "ENABLE_RETRIES",
@@ -310,6 +311,13 @@ export const Setting: Setting[] = [
   {
     key: SettingKeys.Skip_Seen_Dialogues,
     label: i18next.t("settings:skipSeenDialogues"),
+    options: OFF_ON,
+    default: 0,
+    type: SettingType.GENERAL,
+  },
+  {
+    key: SettingKeys.Skip_Custom_Trainer_Intros,
+    label: i18next.t("settings:skipCustomTrainerIntros"),
     options: OFF_ON,
     default: 0,
     type: SettingType.GENERAL,
@@ -831,6 +839,9 @@ export function setSetting(setting: string, value: number): boolean {
       break;
     case SettingKeys.Skip_Seen_Dialogues:
       globalScene.skipSeenDialogues = Setting[index].options[value].value === "On";
+      break;
+    case SettingKeys.Skip_Custom_Trainer_Intros:
+      globalScene.skipCustomTrainerIntros = Setting[index].options[value].value === "On";
       break;
     case SettingKeys.Egg_Skip:
       globalScene.eggSkipPreference = value;

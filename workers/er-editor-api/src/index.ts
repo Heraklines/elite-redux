@@ -445,6 +445,11 @@ const EDITABLE_FILES: Record<string, EditableFile> = {
     label: "custom mons",
     validate: validateCustomMonsDelta,
   },
+  "custom-trainers": {
+    path: "src/data/elite-redux/er-custom-trainers.json",
+    label: "custom trainers",
+    validate: validateCustomTrainersDelta,
+  },
   learnsets: {
     path: "src/data/elite-redux/er-learnsets.json",
     label: "learnsets",
@@ -544,6 +549,241 @@ function validateCustomMonsDelta(delta: unknown): ValidationResult {
       && (!Array.isArray(m.eggMoves) || m.eggMoves.length > 4 || m.eggMoves.some(v => !isName(v)))
     ) {
       return { ok: false, error: `${key}: eggMoves must be up to 4 move names` };
+    }
+  }
+  return { ok: true };
+}
+
+/** trainerKey -> editor-created custom-trainer entry (null deletes the trainer). */
+function validateCustomTrainersDelta(delta: unknown): ValidationResult {
+  if (!isPlainObject(delta)) {
+    return { ok: false, error: "delta must be an object" };
+  }
+  const isName = (v: unknown): boolean => typeof v === "string" && /^[A-Z0-9_]{1,60}$/.test(v);
+  const validBattleTypes = new Set(["single", "double", "triple"]);
+  const validChallenges = new Set([
+    "none",
+    "inverse",
+    "monocolor",
+    "monogen",
+    "doubles",
+    "ghost",
+    "monotype",
+    "maxcost",
+    "points",
+    "freshstart",
+    "flipstat",
+    "limitedcatch",
+    "limitedsupport",
+    "hardcore",
+    "passives",
+    "usagetier",
+    "triples",
+  ]);
+  const validDifficulties = new Set(["youngster", "ace", "elite", "hell", "mystery"]);
+  // Ghost Trainer FX aura ids (TRAINER_AURA_EFFECTS in er-trainer-fx.ts) — the ONLY
+  // valid `trainerEffect` values, mirroring the runtime `isKnownTrainerAuraId` whitelist.
+  const validTrainerEffects = new Set([
+    "smoke",
+    "embers",
+    "frost",
+    "shadowaura",
+    "goldenglow",
+    "holyrays",
+    "cosmos",
+    "sparkstorm",
+  ]);
+  for (const [key, tr] of Object.entries(delta)) {
+    if (!/^[A-Z0-9_]{1,40}$/.test(key)) {
+      return { ok: false, error: `bad trainer key: ${key}` };
+    }
+    if (tr === null) {
+      continue;
+    }
+    if (!isPlainObject(tr)) {
+      return { ok: false, error: `${key}: must be an object or null` };
+    }
+    const t = tr as Record<string, unknown>;
+    if (!Number.isInteger(t.id) || (t.id as number) < 70000 || (t.id as number) > 79999) {
+      return { ok: false, error: `${key}: id must be 70000-79999` };
+    }
+    if (typeof t.name !== "string" || t.name.trim().length === 0 || t.name.length > 24) {
+      return { ok: false, error: `${key}: name must be 1-24 chars` };
+    }
+    if (!isName(t.trainerClass)) {
+      return { ok: false, error: `${key}: trainerClass must be a TrainerType NAME` };
+    }
+    if (t.gender !== undefined && t.gender !== "m" && t.gender !== "f") {
+      return { ok: false, error: `${key}: gender must be "m" or "f"` };
+    }
+    if (t.battleType !== undefined && !validBattleTypes.has(t.battleType as string)) {
+      return { ok: false, error: `${key}: battleType must be single/double/triple` };
+    }
+    if (t.challenge !== undefined && !validChallenges.has(t.challenge as string)) {
+      return { ok: false, error: `${key}: challenge must be a known challenge key (see ErCustomTrainerChallenge)` };
+    }
+    if (
+      t.difficulties !== undefined
+      && (!Array.isArray(t.difficulties) || t.difficulties.some(d => !validDifficulties.has(d as string)))
+    ) {
+      return { ok: false, error: `${key}: difficulties must be youngster/ace/elite/hell` };
+    }
+    for (const field of ["minWave", "maxWave"]) {
+      if (
+        t[field] !== undefined
+        && !(Number.isInteger(t[field]) && (t[field] as number) >= 1 && (t[field] as number) <= 5000)
+      ) {
+        return { ok: false, error: `${key}: ${field} must be 1-5000` };
+      }
+    }
+    if (t.endless !== undefined && typeof t.endless !== "boolean") {
+      return { ok: false, error: `${key}: endless must be a boolean` };
+    }
+    if (
+      t.spawnChance !== undefined
+      && !(Number.isInteger(t.spawnChance) && (t.spawnChance as number) >= 1 && (t.spawnChance as number) <= 100)
+    ) {
+      return { ok: false, error: `${key}: spawnChance must be an integer 1-100` };
+    }
+    if (
+      t.battleBgm !== undefined
+      && !(typeof t.battleBgm === "string" && t.battleBgm.length <= 64 && /^[a-z0-9_]+$/.test(t.battleBgm))
+    ) {
+      return { ok: false, error: `${key}: battleBgm must be a bgm key ([a-z0-9_], up to 64 chars)` };
+    }
+    if (t.introDialogue !== undefined && !(typeof t.introDialogue === "string" && t.introDialogue.length <= 200)) {
+      return { ok: false, error: `${key}: introDialogue must be a string up to 200 chars` };
+    }
+    if (
+      t.victoryDialogue !== undefined
+      && !(typeof t.victoryDialogue === "string" && t.victoryDialogue.length <= 200)
+    ) {
+      return { ok: false, error: `${key}: victoryDialogue must be a string up to 200 chars` };
+    }
+    if (t.defeatDialogue !== undefined && !(typeof t.defeatDialogue === "string" && t.defeatDialogue.length <= 200)) {
+      return { ok: false, error: `${key}: defeatDialogue must be a string up to 200 chars` };
+    }
+    if (
+      t.trainerEffect !== undefined
+      && !(typeof t.trainerEffect === "string" && validTrainerEffects.has(t.trainerEffect))
+    ) {
+      return { ok: false, error: `${key}: trainerEffect must be a known aura id (see TRAINER_AURA_EFFECTS)` };
+    }
+    if (!Array.isArray(t.team) || t.team.length === 0 || t.team.length > 6) {
+      return { ok: false, error: `${key}: team must have 1-6 members` };
+    }
+    // Validate ONE flat member object (also used for each weighted variant). The
+    // move NAME check accepts the `RLA`/`RLNA` tokens for free (they match the
+    // `[A-Z0-9_]{1,60}` name charset). `allowWeight` permits a variant's weight.
+    const checkMember = (mm: Record<string, unknown>, allowWeight: boolean): ValidationResult => {
+      if (!Number.isInteger(mm.species) || (mm.species as number) < 1) {
+        return { ok: false, error: `${key}: member species must be a positive speciesId` };
+      }
+      if (
+        mm.level !== undefined
+        && mm.level !== null
+        && !(Number.isInteger(mm.level) && (mm.level as number) >= 1 && (mm.level as number) <= 200)
+      ) {
+        return { ok: false, error: `${key}: member level must be 1-200 or null` };
+      }
+      if (mm.abilitySlot !== undefined && ![0, 1, 2].includes(mm.abilitySlot as number)) {
+        return { ok: false, error: `${key}: abilitySlot must be 0/1/2` };
+      }
+      if (
+        mm.moves !== undefined
+        && (!Array.isArray(mm.moves) || mm.moves.length > 4 || mm.moves.some(v => !isName(v)))
+      ) {
+        return { ok: false, error: `${key}: moves must be up to 4 move NAMEs (incl. RLA/RLNA tokens)` };
+      }
+      if (
+        mm.fusion !== undefined
+        && mm.fusion !== null
+        && (!isPlainObject(mm.fusion) || !Number.isInteger((mm.fusion as Record<string, unknown>).species))
+      ) {
+        return { ok: false, error: `${key}: fusion must be { species, formIndex?, abilitySlot? } or null` };
+      }
+      if (
+        mm.heldItems !== undefined
+        && (!Array.isArray(mm.heldItems)
+          || mm.heldItems.length > 6
+          || mm.heldItems.some(h => !isPlainObject(h) || !isName((h as Record<string, unknown>).item)))
+      ) {
+        return { ok: false, error: `${key}: heldItems must be up to 6 { item NAME, count? }` };
+      }
+      // `sanityOff` is EDITOR metadata (move-legality enforcement toggle): the
+      // game-side parser ignores it. Accept it, but keep it a clean boolean.
+      if (mm.sanityOff !== undefined && typeof mm.sanityOff !== "boolean") {
+        return { ok: false, error: `${key}: sanityOff must be a boolean` };
+      }
+      // Shiny Lab look: optional { palette?, surface?, around?, name? }. Effect ids
+      // are lowercase-alnum registry keys; name is a short prefix. The game drops
+      // any unknown id at load, so we only shape-check here.
+      if (mm.shiny !== undefined && mm.shiny !== null) {
+        if (!isPlainObject(mm.shiny)) {
+          return { ok: false, error: `${key}: shiny must be { palette?, surface?, around?, name? } or null` };
+        }
+        const sh = mm.shiny as Record<string, unknown>;
+        for (const cat of ["palette", "surface", "around"]) {
+          const v = sh[cat];
+          if (v !== undefined && !(typeof v === "string" && v.length <= 40 && /^[a-z0-9]+$/.test(v))) {
+            return { ok: false, error: `${key}: shiny.${cat} must be a shiny-effect id ([a-z0-9], up to 40 chars)` };
+          }
+        }
+        if (sh.name !== undefined && !(typeof sh.name === "string" && sh.name.length <= 24)) {
+          return { ok: false, error: `${key}: shiny.name must be a string up to 24 chars` };
+        }
+      }
+      // Weighted-slot possibility weight: integer >= 1. Only valid inside a
+      // `variants` slot; a bare flat member must not carry one.
+      if (mm.weight !== undefined) {
+        if (!allowWeight) {
+          return { ok: false, error: `${key}: weight is only allowed inside a variants slot` };
+        }
+        if (!(Number.isInteger(mm.weight) && (mm.weight as number) >= 1)) {
+          return { ok: false, error: `${key}: variant weight must be an integer >= 1` };
+        }
+      }
+      return { ok: true };
+    };
+    // Slot-fill chance (slots 2-6): optional integer 1-100 (absent => 100).
+    const checkSlotChance = (v: unknown): ValidationResult =>
+      v === undefined || (Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100)
+        ? { ok: true }
+        : { ok: false, error: `${key}: slotChance must be an integer 1-100` };
+    for (const entry of t.team) {
+      if (!isPlainObject(entry)) {
+        return { ok: false, error: `${key}: each team slot must be an object` };
+      }
+      const e = entry as Record<string, unknown>;
+      if (e.variants === undefined) {
+        // FLAT member (optionally carrying its own slotChance for slots 2-6).
+        const sc = checkSlotChance(e.slotChance);
+        if (!sc.ok) {
+          return sc;
+        }
+        const mr = checkMember(e, false);
+        if (!mr.ok) {
+          return mr;
+        }
+      } else {
+        // WEIGHTED slot: { variants: [member...], slotChance? }.
+        if (!Array.isArray(e.variants) || e.variants.length === 0 || e.variants.length > 12) {
+          return { ok: false, error: `${key}: variants must be an array of 1-12 possibilities` };
+        }
+        const sc = checkSlotChance(e.slotChance);
+        if (!sc.ok) {
+          return sc;
+        }
+        for (const variant of e.variants) {
+          if (!isPlainObject(variant)) {
+            return { ok: false, error: `${key}: each variant must be an object` };
+          }
+          const vr = checkMember(variant as Record<string, unknown>, true);
+          if (!vr.ok) {
+            return vr;
+          }
+        }
+      }
     }
   }
   return { ok: true };

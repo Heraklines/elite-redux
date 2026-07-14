@@ -214,6 +214,13 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // at the TITLE before any session exists, so it can never be a partner-owned interaction. Only the
   // chosen preset's team manifests cross the wire later (the negotiate step), never this menu UI.
   [UiMode.SHOWDOWN_TEAM_MENU]: "local-only",
+
+  // Showdown Tournament LIST + BRACKET: LOCAL-ONLY by construction - they open at the TITLE (from the
+  // Team Menu) before any session exists, rendering the tournament WORKER's authoritative state. No
+  // co-op/versus interaction rides these screens; entering a tournament match just launches the normal
+  // constrained lobby afterward.
+  [UiMode.TOURNAMENT_LIST]: "local-only",
+  [UiMode.TOURNAMENT_BRACKET]: "local-only",
 };
 
 /**

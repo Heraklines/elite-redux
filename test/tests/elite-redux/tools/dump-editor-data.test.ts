@@ -145,7 +145,14 @@ describe("tools — dump editor SPA data", () => {
     // EVERY registered species (not just starters), so the Pokedex Editor can
     // select + edit the learnset/TM/abilities of evolutions and forms too. Other
     // tabs keep the starter-only species.json above.
-    const allSpeciesIndex: { const: string; name: string; slug: string | null; id: number; dex: number | null }[] = [];
+    const allSpeciesIndex: {
+      const: string;
+      name: string;
+      slug: string | null;
+      id: number;
+      dex: number | null;
+      bst: number;
+    }[] = [];
     for (const sp of allSpecies) {
       const id = sp.speciesId;
       const speciesConst = constById.get(id);
@@ -158,6 +165,8 @@ describe("tools — dump editor SPA data", () => {
         slug: slugByConst.get(speciesConst) ?? null,
         id,
         dex: resolveDex(id, sp.name),
+        // Base-stat total powers the Custom Trainers tab's BST warning (never a block).
+        bst: sp.getBaseStatTotal(),
       });
     }
     allSpeciesIndex.sort((a, b) => a.name.localeCompare(b.name));
