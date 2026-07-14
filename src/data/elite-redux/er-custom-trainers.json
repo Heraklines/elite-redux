@@ -245,5 +245,137 @@
     ],
     "trainerClass": "BROCK",
     "weight": 100
+  },
+  "TRAINER_70003": {
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "Whoa, you're tough!",
+    "difficulties": [
+      "hell"
+    ],
+    "endless": false,
+    "id": 70003,
+    "introDialogue": "Some say I'm not ready. Look at me now, I'm Calvin, and I'm a wall before the League! Ready for a real challenge?",
+    "maxWave": 180,
+    "minWave": 180,
+    "name": "Calvin",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "MULTI_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "GROWL",
+          "AURORA_BEAM",
+          "FLASH_FREEZE",
+          "FLIP_TURN"
+        ],
+        "shiny": {
+          "around": "shadowfire"
+        },
+        "species": 10684
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SCOPE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "GIGATON_HAMMER",
+          "BONK",
+          "EARTHQUAKE",
+          "PARTING_SHOT"
+        ],
+        "slotChance": 50,
+        "species": 959
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "SHELL_BELL"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "THROAT_CHOP",
+          "LOVELY_BITE",
+          "IRON_FANGS",
+          "SUCKER_PUNCH"
+        ],
+        "sanityOff": true,
+        "slotChance": 50,
+        "species": 10035
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "BATON"
+          },
+          {
+            "count": 3,
+            "item": "FOCUS_BAND"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "REVIVAL_BLESSING",
+          "SHELL_SMASH",
+          "BATON_PASS",
+          "SPORE"
+        ],
+        "slotChance": 50,
+        "species": 235
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "MIRROR_COAT",
+          "ENCORE",
+          "COUNTER",
+          "SLEEP_TALK"
+        ],
+        "species": 202
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "LAST_RESPECTS",
+          "METAL_CLAW",
+          "FURY_CUTTER",
+          "SHADOW_SNEAK"
+        ],
+        "species": 10518
+      }
+    ],
+    "trainerClass": "YOUNGSTER",
+    "victoryDialogue": "Throughout Heaven and Earth, I alone am the Honored One...",
+    "weight": 20
   }
 }
