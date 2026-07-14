@@ -55,6 +55,7 @@ import {
   drainLoopback,
   driveGuestReplayTurn,
   installDuoLogCapture,
+  pumpDuoDestinations,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -302,13 +303,24 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
         let drove = false;
         ui.setModeBoundedWhen = (...args: unknown[]): Promise<"completed"> => {
           if (args[0] === UiMode.BIOME_SHOP && !drove) {
-            drove = true; // drive the buy-then-leave ONCE (the re-shown grid on re-open is inert here)
+            drove = true;
             // Production opens the market through the bounded transition seam:
             // mode, timeout, liveness fence, stock, biome, public selection callback, quantities.
             const cb = args[5] as (index: number) => boolean;
             queueMicrotask(() => {
               cb(0); // buy the TM
-              queueMicrotask(() => cb(-1)); // then leave
+              // A human cannot leave until the party pick has applied and the continuation grid is
+              // available again. Wait for that exact production queue evidence instead of issuing a
+              // second synthetic click in the buy's unresolved microtask.
+              let attempts = 0;
+              const leaveAfterContinuation = (): void => {
+                if (queuedContinuation.length > 0 || attempts++ >= 8) {
+                  cb(-1);
+                  return;
+                }
+                setTimeout(leaveAfterContinuation, 0);
+              };
+              setTimeout(leaveAfterContinuation, 0);
             });
           }
           return Promise.resolve("completed");
@@ -372,6 +384,7 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
         await drainLoopback();
       }
     });
+    await pumpDuoDestinations(rig);
 
     // Both engines advanced the alternating interaction exactly once - lockstep, no asymmetric drift.
     expect(rig.guestRuntime.controller.interactionCounter(), "watcher advanced the interaction once (lockstep)").toBe(

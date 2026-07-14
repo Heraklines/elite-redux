@@ -52,6 +52,7 @@ import {
   forceItemRewards,
   haltQueueAfterCurrent,
   installDuoLogCapture,
+  pumpDuoDestinations,
   reachQueuedRewardShop,
   type ShopPhaseSeam,
   stubBattleInfo,
@@ -258,6 +259,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       }
       return true;
     });
+    await pumpDuoDestinations(rig);
     expect(watcherDrove, "the watcher capsule phase ran (directly or via fallback)").toBe(true);
     expect(
       guestTarget.customPokemonData.erRunUnlockedAbilitySlots,
@@ -400,6 +402,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         await drainLoopback();
       }
     });
+    await pumpDuoDestinations(rig);
     expect(rig.guestScene.modifiers.length, "WATCHER applied the same buy (one new modifier)").toBe(
       guestModsBefore + 1,
     );
@@ -1048,6 +1051,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         await drainLoopback();
       }
     });
+    await pumpDuoDestinations(rig);
     expect(watchDone, "watcher converged and ended").toBe(true);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced the bargain interaction").toBe(
       counterBefore + 1,
