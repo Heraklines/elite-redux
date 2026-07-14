@@ -1630,12 +1630,15 @@ export class CoopFinalizeTurnPhase extends Phase {
         // here runs it AFTER they drain (the in-flight turn finishes first, per the Oracle ordering).
         CoopFinalizeTurnPhase.runPendingWaveAdvanceTail();
       }
-    } catch {
-      // The turn-end queue / wave-advance is best-effort; a failure here must never hang the turn.
+    } catch (error) {
+      // A retained terminal is one-shot. Swallowing any failure after consume strands the peer forever;
+      // surface the precise cause and enter the bounded shared terminal instead.
       coopWarn(
         "replay",
-        `guest finalize turn=${this.turn}: finishTurn (queue turn-end / wave-advance) threw (handled)`,
+        `guest finalize turn=${this.turn}: finishTurn (queue turn-end / wave-advance) threw (terminal)`,
+        error,
       );
+      failCoopSharedSession(`Could not finalize authoritative turn ${this.turn}.`);
     }
     coopLog("replay", `guest finalize turn=${this.turn}: END (checkpoint applied, turn-end queued)`);
     this.end();

@@ -194,6 +194,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     field[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
     // Flip the local controller to GUEST - the local engine now plays the renderer side.
     getCoopController()!.role = "guest";
+    // Protocol 33 owns operation cursors by runtime role as well as controller role. This legacy single-
+    // process fixture deliberately changes seats after assembly, so move its test-only op-state ownership
+    // with the controller; real peers assemble directly in their stable seat.
+    (getCoopRuntime()!.opState as { localRole: "host" | "guest" | null }).localRole = "guest";
     return field;
   };
 

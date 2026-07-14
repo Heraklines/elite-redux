@@ -37,6 +37,7 @@ import {
   drainLoopback,
   emptyGhostSnapshot,
   installDuoLogCapture,
+  installHeadlessPlayerAtlasCompletionModel,
   mirrorHostBattleToGuest,
   withClient,
 } from "#test/tools/coop-duo-harness";
@@ -200,6 +201,9 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     };
     await withClient(guestCtx, () => {
       mirrorHostBattleToGuest(hostScene, guestScene);
+      // This older hand-assembled spike bypasses buildDuo, so wire the same HEADLESS-only Phaser cache/live
+      // key completion model explicitly. The production projection path below remains otherwise unchanged.
+      installHeadlessPlayerAtlasCompletionModel(guestScene);
       const gf = guestScene.getPlayerField();
       gf[COOP_HOST_FIELD_INDEX].coopOwner = "host";
       gf[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";

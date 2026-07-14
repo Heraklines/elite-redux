@@ -1174,8 +1174,9 @@ export function installHeadlessPlayerAtlasCompletionModel(scene: BattleScene): v
     );
   }
 
-  const capacity = scene.currentBattle.arrangement.playerCapacity;
-  for (const pokemon of scene.getPlayerParty().slice(0, capacity)) {
+  // Wrap every currently materialized party object, not only the opening player leads. Turn-finalize
+  // readiness also awaits live enemy atlases, and later presentation boundaries may promote a bench mon.
+  for (const pokemon of [...scene.getPlayerParty(), ...scene.getEnemyParty()]) {
     if (model.wrappedPokemon.has(pokemon)) {
       continue;
     }
