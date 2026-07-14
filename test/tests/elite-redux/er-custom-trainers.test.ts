@@ -124,7 +124,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // addEnemyPokemon (incl. buildErCustomTrainerMember) to that species/level,
     // masking the exact-party build.
     game.override.battleStyle("single").startingLevel(50);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
   });
 
   afterEach(() => {
