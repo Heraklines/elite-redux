@@ -14,7 +14,10 @@ import baseConfig from "../vite.config.ts";
 
 // Fast-path exact match for this branch's `<script type="module" src="./src/main.ts">`.
 const SOURCE_ENTRY = /(<script\b[^>]*\bsrc=["'])(?:\.\/|\/)?src\/main\.ts(["'][^>]*>)/iu;
-const BROWSER_ENTRY = "./scripts/coop-browser-entry.ts";
+// Keep the programmatic transport connector out of the human-fidelity bundle. This config is used only
+// by the transport checkpoint; public-UI journeys inject the separate read-only observer entry through
+// test/browser/coop-public-ui/vite.config.mjs.
+const BROWSER_ENTRY = "./scripts/coop-browser-transport-entry.ts";
 // Structural fallback so the build survives a different index.html (integration branch): any
 // <script> whose src is a `src/` module AND either declares type="module" or looks like a
 // `main.*` entry, regardless of attribute order, quote style, path prefix, or ?query/#hash.

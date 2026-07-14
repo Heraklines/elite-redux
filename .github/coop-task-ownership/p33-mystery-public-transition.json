@@ -7,10 +7,13 @@
   "allowedFiles": [
     ".github/coop-task-ownership/p33-mystery-public-transition.json",
     ".github/workflows/coop-focused-branch.yml",
+    ".github/workflows/coop-gate-sharded.yml",
     ".github/workflows/coop-public-ui-campaign.yml",
     "AGENTS.md",
     "scripts/coop-browser-entry.ts",
+    "scripts/coop-browser-transport-entry.ts",
     "scripts/prepare-coop-browser-artifact.mjs",
+    "scripts/vite.coop-browser.config.mjs",
     "src/data/elite-redux/coop/coop-ability-operation.ts",
     "src/data/elite-redux/coop/coop-ability-picker-relay.ts",
     "src/data/elite-redux/coop/coop-battle-engine.ts",

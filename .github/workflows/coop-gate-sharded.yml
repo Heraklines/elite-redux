@@ -22,6 +22,7 @@ on:
       - "patches/**"
       - "public/**"
       - "scripts/coop-browser-entry.ts"
+      - "scripts/coop-browser-transport-entry.ts"
       - "scripts/coop-gate-timings.json"
       - "scripts/prepare-coop-browser-artifact.mjs"
       - "scripts/run-coop-gate.mjs"
