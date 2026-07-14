@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   clientsAwaitingTurnProgress,
+  createAnimationProgressBudget,
   createBattlePromptAdvancer,
   driveBattleFallback,
   waitForOutcomeBounded,
@@ -38,6 +39,10 @@ class FakeEvidence {
 
   pushConsole(text) {
     this.events.push({ index: this.events.length, text });
+  }
+
+  pushPhase(text, at, monotonicMs = 0) {
+    this.events.push({ index: this.events.length, text, at, monotonicMs });
   }
 
   pushBattleReadiness(surfaceId, phase, awaitingActionInput, phaseInstance) {
@@ -138,4 +143,42 @@ test("fallback input is sent only to the client whose command never entered the 
       purpose: "fallback-renderer",
     },
   ]);
+});
+
+test("real animation progress extends the outcome wait but never crosses its hard ceiling", () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  let nowMs = 1_000;
+  const budget = createAnimationProgressBudget(rig, { authority: 0, renderer: 0 }, 100, {
+    now: () => nowMs,
+    animationAllowanceMs: 200,
+    hardCeilingMs: 500,
+  });
+
+  assert.equal(budget.deadline(), 1_100);
+  authority.evidence.pushPhase("Start Phase MessagePhase", new Date(1_050).toISOString(), 50);
+  assert.equal(budget.observe(), 1_100, "ordinary phases must not refresh the animation budget");
+
+  authority.evidence.pushPhase("Start Phase MoveEffectPhase", new Date(1_080).toISOString(), 80);
+  assert.equal(budget.observe(), 1_280);
+  nowMs = 1_400;
+  renderer.evidence.pushPhase("Start Phase CoopMoveAnimReplayPhase", new Date(1_450).toISOString(), 450);
+  assert.equal(budget.observe(), 1_500, "a replay animation refresh is clamped to the immutable hard ceiling");
+  authority.evidence.pushPhase("Start Phase MoveAnimPhase", new Date(1_490).toISOString(), 490);
+  assert.equal(budget.observe(), 1_500, "later activity cannot push the ceiling forward");
+
+  const records = [...authority.evidence.events, ...renderer.evidence.events].filter(
+    event => event.kind === "campaign-animation-budget",
+  );
+  assert.equal(records.length, 3);
+  assert.deepEqual(
+    records.map(event => [event.phase, event.extensionApplied, event.hardCeilingReached]),
+    [
+      ["MoveEffectPhase", true, false],
+      ["MoveAnimPhase", false, true],
+      ["CoopMoveAnimReplayPhase", true, true],
+    ],
+  );
+  assert.ok(records.every(event => event.phaseObservedAt && event.hardDeadlineAt));
 });
