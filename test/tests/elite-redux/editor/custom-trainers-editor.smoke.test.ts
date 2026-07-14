@@ -63,6 +63,11 @@ interface EditorHarness {
   TRAINER_FX: { id: string; label: string; accent: string }[];
   trainerFxById: Map<string, { id: string; label: string; accent: string }>;
   MOVE_SET: Set<string>;
+  moveNameToEnumKey(name: string): string;
+  legalMovesFor(speciesConst: string): Set<string>;
+  learn: { current: Record<string, [number, number][]>; baseline: Record<string, unknown> };
+  tms: { current: Record<string, number[]>; baseline: Record<string, unknown> };
+  moveById: Map<number, { id: number; name: string }>;
   ctrOpenMembers: Set<number>;
   ctrSetSel: Map<number, number>;
   legalMovesCache: Map<string, unknown>;
@@ -126,7 +131,7 @@ beforeAll(() => {
       blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal, ctrFusedName, ctrLiveToEdit,
       ctrBuildBaselines, hashCtrTrainerEntry, markCustomTrainersSaved,
       render, onCustomTrainerInput, onCustomTrainerChange, onCustomTrainerClick, buildDeltas,
-      ctr, ctrConfig, spByConst, spById, trainerClassByName, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
+      ctr, ctrConfig, spByConst, spById, trainerClassByName, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
       get CTR_LIVE(){ return CTR_LIVE; }, set CTR_LIVE(v){ CTR_LIVE = v; },
       setTab(v){ activeTab = v; },
@@ -152,6 +157,9 @@ beforeEach(() => {
   ct.ctrSetSel.clear();
   ct.legalMovesCache.clear();
   ct.egg.current = {};
+  ct.learn.current = {};
+  ct.tms.current = {};
+  ct.moveById.clear();
   ct.spByConst.clear();
   ct.spById.clear();
   ct.MOVE_SET.clear();
@@ -511,6 +519,60 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     expect(bad.some(b => /\bRLA\b|\bRLNA\b/.test(b))).toBe(false);
   });
 
+  it("move legality: numeric learnset -> enum keys (learned move passes); two-word input normalizes; nonsense flagged; RLA/RLNA exempt", () => {
+    // moves-rich ships DISPLAY names keyed by numeric move id; learnsets/tm are
+    // numeric-id keyed. The bug: legalMovesFor held the DISPLAY names, so NOTHING
+    // ever matched the enum-name inputs. Seed the real shapes to prove the fix.
+    ct.moveById.set(58, { id: 58, name: "Ice Beam" });
+    ct.moveById.set(85, { id: 85, name: "Thunderbolt" });
+    ct.MOVE_SET.add("ICE_BEAM");
+    ct.MOVE_SET.add("THUNDERBOLT");
+    ct.learn.current.SPECIES_PIKACHU = [[1, 58]]; // Pikachu's level-up learns Ice Beam
+    ct.tms.current.SPECIES_PIKACHU = [85]; // TM: Thunderbolt
+    ct.legalMovesCache.clear();
+
+    // The legal pool is now ENUM KEYS, not the display names (the root-cause fix).
+    const pool = ct.legalMovesFor("SPECIES_PIKACHU");
+    expect(pool.has("ICE_BEAM")).toBe(true);
+    expect(pool.has("THUNDERBOLT")).toBe(true);
+    expect(pool.has("Ice Beam")).toBe(false); // never the raw display name
+
+    // moveNameToEnumKey is the single normalization both sides use.
+    expect(ct.moveNameToEnumKey("Ice Beam")).toBe("ICE_BEAM");
+    expect(ct.moveNameToEnumKey("ice beam")).toBe("ICE_BEAM");
+    expect(ct.moveNameToEnumKey("THUNDERBOLT")).toBe("THUNDERBOLT");
+
+    newTrainer();
+    const key = ct.ctrSelected!;
+    const t = ct.ctr.current[key];
+    setSpecies(0, "SPECIES_PIKACHU");
+    const m = t.team[0];
+    expect(m.sanityOff).toBe(false); // enforcement ON (default)
+
+    const typeMove = (slot: number, val: string) => {
+      const el = q(`.ctr-move[data-idx="0"][data-slot="${slot}"]`) as HTMLInputElement;
+      el.value = val;
+      ct.onCustomTrainerInput(el);
+      return el;
+    };
+
+    // Sanity ON: typing a LOWERCASE TWO-WORD move normalizes to ICE_BEAM (spaces ->
+    // "_"), then PASSES legality. Before the fix it kept "ICE BEAM" and was flagged.
+    const el0 = typeMove(0, "ice beam");
+    expect(el0.value).toBe("ICE_BEAM");
+    expect(m.moves[0]).toBe("ICE_BEAM");
+    expect(el0.style.borderColor).toBe(""); // legal -> no red border
+    expect(ct.ctrMoveIllegal(m, "ICE_BEAM")).toBe(false);
+    expect(ct.ctrMoveIllegal(m, "THUNDERBOLT")).toBe(false); // TM move also legal
+
+    // A nonsense move IS flagged (pool is non-empty, so enforcement is live).
+    expect(ct.ctrMoveIllegal(m, "NONSENSE_MOVE")).toBe(true);
+
+    // RLA/RLNA remain exempt even with sanity ON.
+    expect(ct.ctrMoveIllegal(m, "RLA")).toBe(false);
+    expect(ct.ctrMoveIllegal(m, "RLNA")).toBe(false);
+  });
+
   it("save payload: 1 possibility -> flat member; >1 -> variants array; slotChance serialized", () => {
     const key = newTrainer();
     // Slot 1 (index 0): flat Snorlax.
@@ -791,6 +853,56 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     ct.onCustomTrainerClick({ target: q('.ctr-mem-sum[data-idx="0"]')! });
     expect(memberHeader()).toContain("Pikachu");
     expect(ct.ctrSelected).toBe(key);
+  });
+
+  it("list card shows the trainer sprite + one team-member icon per member (no 'Nmon' count)", () => {
+    const key = newTrainer("Team Card");
+    // 3-member team: Pikachu, Snorlax, Gengar.
+    setSpecies(0, "SPECIES_PIKACHU");
+    ct.onCustomTrainerClick({ target: q("#ctr-add-member")! });
+    setSpecies(1, "SPECIES_SNORLAX");
+    ct.onCustomTrainerClick({ target: q("#ctr-add-member")! });
+    setSpecies(2, "SPECIES_GENGAR");
+    ct.render();
+
+    const card = q(`[data-ctropen="${key}"]`)!;
+    expect(card).not.toBeNull();
+    // Header still carries the name + #id.
+    expect(card.querySelector(".ctr-card-head")!.textContent).toContain("Team Card");
+    expect(card.querySelector(".ctr-card-head")!.textContent).toContain(`#${ct.ctr.current[key].id}`);
+    // The old "Nmon" member COUNT is gone.
+    expect(card.textContent).not.toMatch(/\dmon\b/);
+
+    // One member ICON per team member, each an <img> (species resolved -> a sprite).
+    const icons = card.querySelectorAll(".ctr-card-mon");
+    expect(icons.length).toBe(3);
+    expect(card.querySelectorAll(".ctr-card-mon img").length).toBe(3);
+    // The trainer's own sprite node is present (ACE_TRAINER ships gendered sprites,
+    // so it carries the atlas file to paint lazily).
+    const sprite = card.querySelector(".ctr-card-sprite") as HTMLElement;
+    expect(sprite).not.toBeNull();
+    expect(sprite.dataset.ctrsprite).toBe("ace_trainer_m");
+
+    // A WEIGHTED lead shows the FIRST possibility's icon (title carries its species).
+    const cb = q('.ctr-weighted[data-idx="0"]') as HTMLInputElement;
+    cb.checked = true;
+    ct.onCustomTrainerChange(cb);
+    ct.onCustomTrainerClick({ target: q('.ctr-var-add[data-idx="0"]')! });
+    setSpecies(0, "SPECIES_RAICHU"); // 2nd possibility
+    ct.render();
+    const firstIcon = q(`[data-ctropen="${key}"] .ctr-card-mon`) as HTMLElement;
+    expect(firstIcon.title).toBe("SPECIES_PIKACHU"); // possibility 0, not the edited cur
+  });
+
+  it("empty-species slot renders a neutral icon box with NO img (never a broken image)", () => {
+    const key = newTrainer("Blank Slot");
+    // Leave the lead's species empty (blank trainer default).
+    ct.render();
+    const card = q(`[data-ctropen="${key}"]`)!;
+    const icons = card.querySelectorAll(".ctr-card-mon");
+    expect(icons.length).toBe(1);
+    // No <img> for an unresolvable species: the box stands in as the placeholder.
+    expect(card.querySelectorAll(".ctr-card-mon img").length).toBe(0);
   });
 
   it("prior-surface smoke still holds: member collapse/expand + the battle-music picker render", () => {
