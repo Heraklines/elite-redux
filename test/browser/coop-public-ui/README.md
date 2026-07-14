@@ -136,6 +136,12 @@ trustworthy (all lossless - they never change what is asserted):
   the identical source, so the exact-SHA seal is preserved (a bad reuse fails loudly at the
   gameplay job's manifest verification). Inter-job handoff is compressed; solo + campaign legs
   run as parallel jobs off one build.
+- **CDN-only artifact pruning**: the beta Vite plugin copies vendored images, audio, battle
+  animations, and fonts into its output even though staging serves those exact paths through
+  immutable `er-assets@<sha>` redirects. Before sealing, the artifact builder removes only paths
+  validated by `_redirects`. This prevents local files from masking CDN failures and avoids
+  transferring the measured 34,203-file / 522.5 MB duplicate asset payload to every fan-out runner;
+  application chunks and all non-redirected runtime data remain digest-sealed.
 - **Runner sizing (note for the maintainer):** two Chromium contexts + the localhost preview on
   the default 2-vCPU `ubuntu-latest` are CPU-starved, which inflates WebRTC ICE (~33s observed to
   open the data channel) and the guest's real-cloud persist RTTs. Moving the gameplay jobs to a

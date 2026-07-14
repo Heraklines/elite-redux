@@ -451,7 +451,11 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
       };
     }
   }
-  const listOptions = (handler as unknown as { options?: Array<{ label?: unknown }> }).options;
+  const optionHandler = handler as unknown as {
+    options?: Array<{ label?: unknown }>;
+    config?: { options?: Array<{ label?: unknown }> } | null;
+  };
+  const listOptions = optionHandler.options ?? optionHandler.config?.options;
   if (Array.isArray(listOptions) && listOptions.length > 0 && typeof listOptions[0]?.label === "string") {
     const optionIds = listOptions.map((option, index) =>
       typeof option?.label === "string" ? normalizeOptionId(option.label) || `slot:${index}` : `slot:${index}`,
