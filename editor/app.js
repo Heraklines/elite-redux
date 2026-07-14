@@ -58,6 +58,13 @@ let ABILITY_NAMES = [];
 // spById) so the picker matches every other tab, converting back on save.
 let CTR_LIVE = {}; // key → entry (species by numeric id, as stored)
 const ctr = { current: {}, baseline: {} }; // key → entry (species by CONST)
+// Global custom-trainer spawn-density config (sibling er-custom-trainers-config.json):
+// how OFTEN a custom-trainer encounter happens at all, independent of trainer count.
+// { windowSize, windowChancePct }. Saved as its own whitelisted file.
+const ctrConfig = {
+  current: { windowSize: 10, windowChancePct: 25 },
+  baseline: { windowSize: 10, windowChancePct: 25 },
+};
 let ctrSelected = null; // open trainer key, or null
 // Per-member TRANSIENT UI state (NOT saved, NOT part of the dirty diff): which
 // member fieldsets are expanded, and which authored set a member's dropdown
@@ -292,6 +299,10 @@ function dirtyCounts() {
     if (!jsonEq(ctr.current[key], ctr.baseline[key])) {
       ctrN++;
     }
+  }
+  // The global spawn-density config counts toward the Custom Trainers tab dot.
+  if (!jsonEq(ctrConfig.current, ctrConfig.baseline)) {
+    ctrN++;
   }
   return {
     eggN,
@@ -1615,6 +1626,55 @@ function normalizeCtrSlotChance(value) {
   return normalizeCtrSpawnChance(value);
 }
 
+/**
+ * Resolve a trainer pick WEIGHT with spawnChance back-compat migration (mirrors
+ * resolveErCustomTrainerWeight in er-custom-trainers.ts): a present weight clamps
+ * to an integer >= 1; else a legacy spawnChance migrates (clamped >= 1); else 100.
+ */
+function resolveCtrWeight(weight, spawnChance) {
+  const clampAtLeastOne = v => {
+    if (typeof v !== "number" || !Number.isFinite(v)) {
+      return 1;
+    }
+    const n = Math.floor(v);
+    return n >= 1 ? n : 1;
+  };
+  if (weight !== undefined && weight !== null) {
+    return clampAtLeastOne(weight);
+  }
+  if (spawnChance !== undefined && spawnChance !== null) {
+    return clampAtLeastOne(spawnChance);
+  }
+  return 100;
+}
+
+/** Normalize a spawn WEIGHT to an integer >= 1 (absent/invalid => 100). */
+function normalizeCtrWeight(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 100;
+  }
+  const n = Math.floor(value);
+  return n >= 1 ? n : 1;
+}
+
+/** Normalize the spawn-density window size to an integer 1-100 (invalid => 10). */
+function normalizeCtrWindowSize(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 10;
+  }
+  const n = Math.floor(value);
+  return n >= 1 && n <= 100 ? n : 10;
+}
+
+/** Normalize the spawn-density per-window chance to an integer 0-100 (invalid => 25). */
+function normalizeCtrWindowChance(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 25;
+  }
+  const n = Math.floor(value);
+  return n >= 0 && n <= 100 ? n : 25;
+}
+
 /** Clamp a variant weight to an integer >= 1 (invalid => 1). */
 function clampCtrWeight(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -1786,7 +1846,7 @@ function blankCtrTrainer() {
     minWave: 20,
     maxWave: 80,
     endless: false,
-    spawnChance: 100,
+    weight: 100,
     challenge: "none",
     battleBgm: "",
     introDialogue: "",
@@ -1809,9 +1869,10 @@ function ctrLiveToEdit(entry) {
     minWave: Number.isInteger(entry.minWave) ? entry.minWave : 20,
     maxWave: Number.isInteger(entry.maxWave) ? entry.maxWave : 80,
     endless: entry.endless === true,
-    // Absent/invalid spawnChance normalizes to 100 (guaranteed once per run) -
-    // keeps pre-feature saved entries behaving exactly as before.
-    spawnChance: normalizeCtrSpawnChance(entry.spawnChance),
+    // Pick weight (spawnChance -> weight migration): a saved entry with a legacy
+    // spawnChance and no weight migrates to weight = spawnChance (clamped >= 1);
+    // absent both => 100. New saves always write `weight`.
+    weight: resolveCtrWeight(entry.weight, entry.spawnChance),
     challenge: entry.challenge ?? "none",
     // Trimmed bgm key; anything not [a-z0-9_] (or absent) normalizes to "" (none).
     battleBgm: normalizeCtrBattleBgm(entry.battleBgm),
@@ -2684,10 +2745,10 @@ function renderCustomTrainers(root) {
         <label>Min wave <input type="number" id="ctr-minwave" value="${t.minWave}" min="1" max="5000" style="width:72px" /></label>
         <label>Max wave <input type="number" id="ctr-maxwave" value="${t.maxWave}" min="1" max="5000" ${t.endless ? "disabled" : ""} style="width:72px" /></label>
         <label title="Any floor >= min wave (endless)"><input type="checkbox" id="ctr-endless"${t.endless ? " checked" : ""} /> Endless (any floor ≥ min)</label>
-        <label title="Per-run chance this trainer appears at all. 100 = guaranteed once per run.">Spawn chance % <input type="number" id="ctr-spawnchance" value="${normalizeCtrSpawnChance(t.spawnChance)}" min="1" max="100" style="width:64px" /></label>
+        <label title="Relative odds this trainer is the one fielded when a spawn window fires (weight / total weight among eligible trainers). Higher = more likely. Default 100.">Weight <input type="number" id="ctr-weight" value="${normalizeCtrWeight(t.weight)}" min="1" step="1" style="width:72px" /></label>
         <br /><label>Battle type <select id="ctr-battletype">${battleSel}</select></label>
         <label>Challenge exclusivity <select id="ctr-challenge">${challSel}</select></label>
-        <p class="hint" style="margin:6px 0 0">Spawn chance is ONE roll per run: 100 = guaranteed. If it hits, the trainer appears ONCE at a random floor in its wave range, sliding forward past boss/fixed/mystery waves.</p>
+        <p class="hint" style="margin:6px 0 0">Spawning is capped GLOBALLY by the Spawn density panel above (how often ANY custom trainer appears). When a window fires, ONE trainer is picked by weight among the eligible not-yet-used trainers, then it appears once at a wave in its range, sliding forward past boss/fixed/mystery waves. No repeats per run.</p>
       </fieldset>
       <fieldset class="full ctr-sec"><legend>Team (1-6)</legend>
         ${t.team.map((m, i) => ctrMemberHtml(m, i)).join("")}
@@ -2701,10 +2762,17 @@ function renderCustomTrainers(root) {
       </div>
     </div>`;
   }
+  const cfg = ctrConfig.current;
+  const cfgDirty = !jsonEq(ctrConfig.current, ctrConfig.baseline);
   root.innerHTML = `
     <div class="section">
       <h2>Custom Trainers</h2>
       <p class="hint">Staff-authored trainers that spawn in real runs, gated by difficulty, floor range and challenge mode. The team is fielded EXACTLY as authored (the #419 BST cap is bypassed).</p>
+      <fieldset class="ctr-density${cfgDirty ? " dirty" : ""}"><legend>Spawn density${cfgDirty ? " ●" : ""}</legend>
+        <p class="hint" style="margin:0 0 6px">How OFTEN a custom trainer appears at all, INDEPENDENT of how many you author. The run is diced into windows of this many waves; each window has this percent chance to field ONE custom trainer.</p>
+        <label title="Percent chance (0-100) that a given window fields a custom trainer at all. 0 disables custom trainers entirely.">Chance % per window <input type="number" id="ctr-density-chance" value="${normalizeCtrWindowChance(cfg.windowChancePct)}" min="0" max="100" step="1" style="width:72px" /></label>
+        <label title="How many waves make up one spawn window (1-100). Default 10 = at most one custom trainer per 10 waves.">Window size (waves) <input type="number" id="ctr-density-window" value="${normalizeCtrWindowSize(cfg.windowSize)}" min="1" max="100" step="1" style="width:72px" /></label>
+      </fieldset>
       <div class="mon-list">${list || '<span class="dyn">none yet</span>'}<button type="button" id="ctr-new" class="primary">＋ New trainer</button></div>
     </div>
     <div class="section">
@@ -2723,6 +2791,16 @@ function ctrCur() {
 }
 
 function onCustomTrainerInput(el) {
+  // Global spawn-density inputs live ABOVE the trainer list, so they must be
+  // handled with NO trainer selected (before the ctrCur guard below).
+  if (el.id === "ctr-density-chance") {
+    ctrConfig.current.windowChancePct = normalizeCtrWindowChance(Number(el.value));
+    return true;
+  }
+  if (el.id === "ctr-density-window") {
+    ctrConfig.current.windowSize = normalizeCtrWindowSize(Number(el.value));
+    return true;
+  }
   const t = ctrCur();
   if (!t) {
     return false;
@@ -2749,9 +2827,9 @@ function onCustomTrainerInput(el) {
     t.minWave = Number(el.value) || 1;
   } else if (el.id === "ctr-maxwave") {
     t.maxWave = Number(el.value) || 1;
-  } else if (el.id === "ctr-spawnchance") {
-    // Clamp to 1-100; a blank/invalid entry normalizes back to 100.
-    t.spawnChance = normalizeCtrSpawnChance(Number(el.value));
+  } else if (el.id === "ctr-weight") {
+    // Pick weight (integer >= 1); a blank/invalid entry normalizes back to 100.
+    t.weight = normalizeCtrWeight(Number(el.value));
   } else if (el.classList.contains("ctr-slotchance") && m) {
     // Slot-fill chance (slots 2-6); clamp 1-100, blank/invalid -> 100.
     m.slotChance = normalizeCtrSlotChance(Number(el.value));
@@ -2806,6 +2884,17 @@ function onCustomTrainerInput(el) {
 }
 
 function onCustomTrainerChange(el) {
+  // Global spawn-density inputs (above the list) blur/normalize with no trainer.
+  if (el.id === "ctr-density-chance") {
+    ctrConfig.current.windowChancePct = normalizeCtrWindowChance(Number(el.value));
+    render();
+    return true;
+  }
+  if (el.id === "ctr-density-window") {
+    ctrConfig.current.windowSize = normalizeCtrWindowSize(Number(el.value));
+    render();
+    return true;
+  }
   const t = ctrCur();
   if (!t) {
     return false;
@@ -3930,7 +4019,9 @@ function buildDeltas() {
       minWave: t.minWave,
       maxWave: t.maxWave,
       endless: t.endless === true,
-      spawnChance: normalizeCtrSpawnChance(t.spawnChance),
+      // Always write `weight` (never the legacy spawnChance): the game migrates
+      // any old spawnChance on load, but new saves are weight-only.
+      weight: normalizeCtrWeight(t.weight),
       challenge: t.challenge || "none",
       ...(normalizeCtrBattleBgm(t.battleBgm) ? { battleBgm: normalizeCtrBattleBgm(t.battleBgm) } : {}),
       // Intro blurb: trimmed + 200-char cap; omit when empty (byte-clean default).
@@ -3947,6 +4038,16 @@ function buildDeltas() {
   }
   if (Object.keys(ctrDelta).length > 0) {
     deltas["custom-trainers"] = ctrDelta;
+  }
+
+  // Global spawn-density config (its own whitelisted file). Emitted whole (only
+  // two normalized fields) when it differs from the loaded baseline.
+  const cfgOut = {
+    windowSize: normalizeCtrWindowSize(ctrConfig.current.windowSize),
+    windowChancePct: normalizeCtrWindowChance(ctrConfig.current.windowChancePct),
+  };
+  if (!jsonEq(cfgOut, ctrConfig.baseline)) {
+    deltas["custom-trainers-config"] = cfgOut;
   }
 
   return { deltas, bad };
@@ -4062,6 +4163,8 @@ function markSaved(file) {
     if (ctrSelected && !ctr.current[ctrSelected]) {
       ctrSelected = null;
     }
+  } else if (file === "custom-trainers-config") {
+    ctrConfig.baseline = JSON.parse(JSON.stringify(ctrConfig.current));
   }
 }
 
@@ -4098,6 +4201,7 @@ async function init() {
       allSpeciesData,
       evosData,
       ctrLive,
+      ctrConfigLive,
       trainerClassesData,
       bgmData,
       shinyEffectsData,
@@ -4131,6 +4235,8 @@ async function init() {
       fetchJson("./data/evolutions.json", {}),
       // Live custom-trainers override file (resilient: missing on the branch → empty).
       fetchJson(`${RAW_BASE}/er-custom-trainers.json${bust}`, {}),
+      // Live custom-trainer spawn-density config (resilient: missing → defaults).
+      fetchJson(`${RAW_BASE}/er-custom-trainers-config.json${bust}`, {}),
       // Trainer-class sprite catalog (generated). Fallback → static list below.
       fetchJson("./data/trainer-classes.json", []),
       // Battle-music catalog (generated). Fallback → empty (picker offers "(default)").
@@ -4269,6 +4375,14 @@ async function init() {
       }
     }
     ctr.baseline = JSON.parse(JSON.stringify(ctr.current));
+
+    // Seed the global spawn-density config (normalized; missing file => defaults).
+    const cfgLive = ctrConfigLive && typeof ctrConfigLive === "object" ? ctrConfigLive : {};
+    ctrConfig.current = {
+      windowSize: normalizeCtrWindowSize(cfgLive.windowSize),
+      windowChancePct: normalizeCtrWindowChance(cfgLive.windowChancePct),
+    };
+    ctrConfig.baseline = JSON.parse(JSON.stringify(ctrConfig.current));
 
     // Seed species tuning: snapshot values overlaid with any live override.
     for (const s of SPECIES) {
