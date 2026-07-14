@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "taskId": "p33-duo-fault-atlas",
+  "branch": "ci/coop/p33-duo-fault-atlas",
+  "trainRef": "ci/coop/p33-mystery-public-transition",
+  "baseSha": "4c98322741a25d50649d0bac225c42be6e0999ec",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-duo-fault-atlas.json",
+    ".github/workflows/coop-focused-branch.yml",
+    "test/scripts/coop-focused-static-workflow.test.mjs",
+    "test/tests/elite-redux/coop/coop-duo-fault.test.ts"
+  ]
+}

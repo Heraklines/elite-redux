@@ -74,6 +74,44 @@ function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
 }
 
+/**
+ * Phaser HEADLESS runs the real player-atlas loader but does not populate the texture/animation caches
+ * or advance the live sprite from its substitute key. Model only those renderer side effects after the
+ * real promise settles, so the strict production launch gate remains load- and final-key-dependent.
+ */
+function modelHeadlessPlayerAtlasCompletion(scene: BattleScene): void {
+  const releasedKeys = new Set<string>();
+  const originalTextureExists = scene.textures.exists.bind(scene.textures);
+  const originalAnimationExists = scene.anims.exists.bind(scene.anims);
+  vi.spyOn(scene.textures, "exists").mockImplementation(
+    key => releasedKeys.has(String(key)) || originalTextureExists(key),
+  );
+  vi.spyOn(scene.anims, "exists").mockImplementation(
+    key => releasedKeys.has(String(key)) || originalAnimationExists(key),
+  );
+
+  const capacity = scene.currentBattle.arrangement.playerCapacity;
+  for (const pokemon of scene.getPlayerParty().slice(0, capacity)) {
+    const original = pokemon.loadAssets.bind(pokemon);
+    vi.spyOn(pokemon, "loadAssets").mockImplementation(async (ignoreOverride = true, useIllusion = false) => {
+      await original(ignoreOverride, useIllusion);
+      const key = pokemon.getBattleSpriteKey();
+      releasedKeys.add(key);
+      for (const sprite of [pokemon.getSprite(), pokemon.getTintSprite()]) {
+        if (sprite == null) {
+          continue;
+        }
+        const live = sprite as unknown as {
+          texture: { key: string };
+          anims: { currentAnim?: { key: string } };
+        };
+        live.texture.key = key;
+        live.anims.currentAnim = { key };
+      }
+    });
+  }
+}
+
 // #827: the continuation-aware replay driver now lives in the shared harness ({@linkcode driveGuestReplayTurn}
 // + the exported {@linkcode REPLAY_DRAIN_PHASES}, which folds in the #782 CONTINUATION CoopReplayTurnPhase and
 // uses phase-IDENTITY stall detection). Fault injection makes the cue stream split across arrivals the common
@@ -192,6 +230,7 @@ describe.skipIf(!RUN)(
      */
     async function driveFaultRun(faultPair: CoopFaultPair, WAVES: number): Promise<FaultRunResult> {
       const rig = await buildDuo(game, faultPair, setCoopRuntime, toCoop);
+      modelHeadlessPlayerAtlasCompletion(rig.guestScene);
       wireGuestCommand(rig);
 
       // Count the guest's auto-resyncs: a converged run under CUE-ONLY faults should force NONE (the
