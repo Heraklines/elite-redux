@@ -779,6 +779,146 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("retains same-turn revisions at exact class-prefixed addresses and hands off only the newest", async () => {
+      const { host, guest } = createLoopbackPair();
+      const guestStream = new CoopBattleStreamer(guest, {
+        authorityContext: () => ({ epoch: 7, wave: 1, turn: 1 }),
+      });
+      let observed = 0;
+      guestStream.onTurnCommit(() => observed++);
+      const complete = (revision: number, text: string): Extract<CoopMessage, { t: "turnResolution" }> => ({
+        t: "turnResolution",
+        epoch: 7,
+        wave: 1,
+        turn: 1,
+        revision,
+        events: [{ k: "message", text }],
+        checkpoint: { ...emptyCheckpoint(), tick: revision - 1 },
+        checksum: revision === 22 ? "2222222222222222" : "2121212121212121",
+        preimage: `{"revision":${revision}}`,
+        fullField: emptyFullField(),
+        authoritativeState: emptyAuthoritativeState(1, 1, revision),
+      });
+      const older = complete(21, "older");
+      const newest = complete(22, "newest");
+
+      host.send(older);
+      host.send(newest);
+      await flushWire();
+
+      expect(
+        guestStream.retainedAuthorityDiagnostics().bufferedAuthority,
+        "two immutable revisions coexist instead of overwriting one epoch/wave/turn slot",
+      ).toBe(2);
+      const resolution = await guestStream.awaitTurn(1);
+      expect(resolution).toMatchObject({ revision: 22, events: [{ k: "message", text: "newest" }] });
+      expect(
+        guestStream.retainedAuthorityDiagnostics().bufferedAuthority,
+        "newest handoff atomically prunes superseded same-address deliveries",
+      ).toBe(0);
+      acknowledgeTurnThroughContinuation(guestStream, resolution!);
+
+      host.send({ ...newest, events: newest.events.map(event => ({ ...event })) });
+      await flushWire();
+      expect(observed, "an identical exact retransmission is re-ACKed without a second delivery").toBe(2);
+      expect(guestStream.retainedAuthorityDiagnostics().bufferedAuthority).toBe(0);
+      guestStream.dispose();
+    });
+
+    it("keeps turn and replacement deliveries independent at the same numeric address and revision", async () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 4, turn: 2 };
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+      let replacementOpens = 0;
+      guestStream.onCheckpointEnvelope(() => replacementOpens++);
+      const state = emptyAuthoritativeState(4, 2, 22);
+      const checkpoint = { ...emptyCheckpoint(), tick: 21 };
+      const turn: Extract<CoopMessage, { t: "turnResolution" }> = {
+        t: "turnResolution",
+        ...current,
+        revision: 22,
+        events: [{ k: "message", text: "turn" }],
+        checkpoint,
+        checksum: "2222222222222222",
+        preimage: "{}",
+        fullField: emptyFullField(),
+        authoritativeState: state,
+      };
+      const replacement: Extract<CoopMessage, { t: "battleCheckpoint" }> = {
+        t: "battleCheckpoint",
+        reason: "replacement",
+        ...current,
+        revision: 22,
+        checkpoint,
+        checksum: "3333333333333333",
+        fullField: emptyFullField(),
+        authoritativeState: state,
+      };
+
+      host.send(turn);
+      host.send(replacement);
+      await flushWire();
+      expect(
+        guestStream.retainedAuthorityDiagnostics().bufferedAuthority,
+        "message class is part of the receiver address",
+      ).toBe(2);
+
+      const resolution = await guestStream.awaitTurn(2);
+      expect(resolution?.events).toEqual([{ k: "message", text: "turn" }]);
+      expect(guestStream.peekCheckpoint()).toMatchObject({ reason: "replacement", revision: 22 });
+      expect(guestStream.retainedAuthorityDiagnostics().bufferedAuthority).toBe(1);
+
+      host.send({ ...replacement, fullField: replacement.fullField.map(mon => ({ ...mon })) });
+      await flushWire();
+      expect(replacementOpens, "an identical replacement retransmission cannot reopen its surface").toBe(1);
+      const handedOff = guestStream.consumeCheckpoint();
+      expect(handedOff).toMatchObject({ reason: "replacement", revision: 22 });
+      expect(guestStream.retainedAuthorityDiagnostics().bufferedAuthority).toBe(0);
+      acknowledgeTurnThroughContinuation(guestStream, resolution!);
+      acknowledgeReplacementThroughContinuation(guestStream, handedOff!);
+      guestStream.dispose();
+    });
+
+    it("retains distinct replacement revisions without allowing an older or duplicate replay to reopen", async () => {
+      const { host, guest } = createLoopbackPair();
+      const guestStream = new CoopBattleStreamer(guest, {
+        authorityContext: () => ({ epoch: 7, wave: 4, turn: 2 }),
+      });
+      const older = checkpointEnvelope();
+      const newest = checkpointEnvelope(
+        "replacement",
+        { ...emptyCheckpoint(), tick: 21 },
+        "2222222222222222",
+        emptyAuthoritativeState(4, 2, 22),
+      );
+      let opened = 0;
+      guestStream.onCheckpointEnvelope(() => opened++);
+
+      host.send({ t: "battleCheckpoint", ...older });
+      host.send({ t: "battleCheckpoint", ...newest });
+      await flushWire();
+      expect(
+        guestStream.retainedAuthorityDiagnostics().bufferedAuthority,
+        "each immutable replacement revision owns an exact receiver slot",
+      ).toBe(2);
+      expect(guestStream.peekCheckpoint()?.revision).toBe(22);
+
+      host.send({ t: "battleCheckpoint", ...older });
+      host.send({ t: "battleCheckpoint", ...newest, fullField: newest.fullField.map(mon => ({ ...mon })) });
+      await flushWire();
+      expect(opened, "reordered older and identical exact traffic cannot reopen either surface").toBe(2);
+      expect(guestStream.retainedAuthorityDiagnostics().bufferedAuthority).toBe(2);
+
+      const handedOff = guestStream.consumeCheckpoint();
+      expect(handedOff?.revision).toBe(22);
+      expect(
+        guestStream.retainedAuthorityDiagnostics().bufferedAuthority,
+        "newest replacement handoff prunes the older same-address delivery to prevent rollback",
+      ).toBe(0);
+      acknowledgeReplacementThroughContinuation(guestStream, handedOff!);
+      guestStream.dispose();
+    });
+
     it("never lets delayed prior-epoch frames resolve or wake the new epoch's exact waiter", async () => {
       const { host, guest } = createLoopbackPair();
       const current = { epoch: 7, wave: 1, turn: 1 };
