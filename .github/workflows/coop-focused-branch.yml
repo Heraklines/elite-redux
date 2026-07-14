@@ -84,6 +84,13 @@ jobs:
           fi
           git fetch --no-tags --depth=1 origin "$COOP_DECLARED_BASE"
           git cat-file -e "${COOP_DECLARED_BASE}^{commit}"
+          # A depth-limited checkout records its oldest commit as a synthetic root. Fetching the base
+          # object alone does not remove that shallow boundary, so ancestry checks can reject a valid
+          # train push. Fetch commit/tree history without historical blobs before proving lineage.
+          shallow_file="$(git rev-parse --git-path shallow)"
+          if [ -s "$shallow_file" ]; then
+            git fetch --no-tags --filter=blob:none --unshallow origin "$COOP_TASK_BRANCH"
+          fi
           echo "resolved train $COOP_TRAIN_REF tip=$train_tip task-base=$expected_base (declared $COOP_DECLARED_BASE)"
           echo "expected_base=$expected_base" >> "$GITHUB_OUTPUT"
           echo "train_tip=$train_tip" >> "$GITHUB_OUTPUT"
