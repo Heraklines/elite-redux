@@ -21,6 +21,15 @@ class FakeEvidence {
     return this.events.slice(from).find(event => pattern.test(event.text ?? ""));
   }
 
+  findLastSemanticSurface(from = 0, surfaceId = null) {
+    return this.events
+      .slice(from)
+      .toReversed()
+      .find(
+        event => event.kind === "browser-surface2" && (surfaceId == null || event.observation.surfaceId === surfaceId),
+      );
+  }
+
   record(kind, detail = {}) {
     const event = { index: this.events.length, kind, ...detail };
     this.events.push(event);
@@ -29,6 +38,19 @@ class FakeEvidence {
 
   pushConsole(text) {
     this.events.push({ index: this.events.length, text });
+  }
+
+  pushExpReadiness(awaitingActionInput) {
+    this.events.push({
+      index: this.events.length,
+      kind: "browser-surface2",
+      observation: {
+        surfaceId: "battle:exp",
+        phase: "ExpPhase",
+        uiMode: "MESSAGE",
+        ready: { awaitingActionInput },
+      },
+    });
   }
 }
 
@@ -47,16 +69,22 @@ function fakeClient(label, texts = []) {
   };
 }
 
-test("repeated ExpPhase instances advance once each on the public authority only", async () => {
+test("repeated ExpPhase instances wait for actionable readiness and advance once each on the authority", async () => {
   const authority = fakeClient("authority", ["Start Phase ExpPhase"]);
   const renderer = fakeClient("renderer");
   const rig = { host: authority, clients: { authority, renderer } };
   const stats = { postBattleExpPrompts: 0 };
   const advance = createPostBattleExpAdvancer(rig, { authority: 0, renderer: 0 }, stats, "wave-1-turn-1");
 
+  assert.equal(await advance(), false, "a phase-start marker alone is not actionable readiness");
+  authority.evidence.pushExpReadiness(false);
+  assert.equal(await advance(), false, "typewriter-in-progress readiness must not consume the phase marker");
+  authority.evidence.pushExpReadiness(true);
   assert.equal(await advance(), true);
   assert.equal(await advance(), false);
   authority.evidence.pushConsole("Start Phase ExpPhase");
+  assert.equal(await advance(), false, "the prior prompt's ready event must not authorize the next phase instance");
+  authority.evidence.pushExpReadiness(true);
   assert.equal(await advance(), true);
   assert.equal(await advance(), false);
 
@@ -66,12 +94,10 @@ test("repeated ExpPhase instances advance once each on the public authority only
   );
   assert.equal(renderer.presses.length, 0);
   assert.equal(stats.postBattleExpPrompts, 2);
-  assert.deepEqual(
-    authority.evidence.events
-      .filter(event => event.kind === "campaign-post-battle-advance")
-      .map(event => event.phaseEventIndex),
-    [0, 2],
-  );
+  const advances = authority.evidence.events.filter(event => event.kind === "campaign-post-battle-advance");
+  assert.equal(advances.length, 2);
+  assert.ok(advances.every(event => event.readyEventIndex > event.phaseEventIndex));
+  assert.equal(new Set(advances.map(event => event.phaseEventIndex)).size, 2);
 });
 
 test("the short outcome wait names a fully submitted turn as progress", async () => {

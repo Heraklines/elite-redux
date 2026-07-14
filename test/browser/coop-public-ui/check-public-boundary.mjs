@@ -89,6 +89,13 @@ if (
 ) {
   failures.push("coop-browser-entry.ts: missing the read-only rendered-surface/address/digest observer contract");
 }
+if (
+  !browserEntry.includes('phase === "ExpPhase"')
+  || !browserEntry.includes('surfaceId: "battle:exp"')
+  || !browserEntry.includes("isAwaitingPromptAction")
+) {
+  failures.push("coop-browser-entry.ts: EXP prompts must expose complete actionable readiness to the public driver");
+}
 
 if (failures.length > 0) {
   console.error(failures.join("\n"));

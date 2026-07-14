@@ -393,6 +393,9 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
       }
       return { surfaceId: `confirm:${phase}`, operationClass: "confirm", ownerModel: "interaction" };
     case "MESSAGE":
+      if (phase === "ExpPhase") {
+        return { surfaceId: "battle:exp", operationClass: "battle-progress", ownerModel: "local" };
+      }
       return inMe
         ? { surfaceId: "mystery-encounter:message", operationClass: "encounter-prompt", ownerModel: "interaction" }
         : null;
@@ -521,8 +524,18 @@ function observeSemanticSurface(): void {
     }
 
     const selection = readSelection(handler, uiMode);
+    const promptReady = (handler as unknown as { isAwaitingPromptAction?: () => boolean }).isAwaitingPromptAction;
     const awaitingRaw = (handler as unknown as { awaitingActionInput?: unknown }).awaitingActionInput;
-    const awaitingActionInput = typeof awaitingRaw === "boolean" ? awaitingRaw : null;
+    // MessageUiHandler keeps its raw `awaitingActionInput` bit set after an action has consumed
+    // `onActionInput`. Its public readiness method proves the complete actionable contract and
+    // therefore prevents a read-only browser observer from publishing a stale ready=true between
+    // repeated ExpPhase prompts. Non-message handlers keep the established raw-field projection.
+    const awaitingActionInput =
+      typeof promptReady === "function"
+        ? promptReady.call(handler)
+        : typeof awaitingRaw === "boolean"
+          ? awaitingRaw
+          : null;
 
     const probeKey = [
       semantic.surfaceId,

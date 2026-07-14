@@ -182,16 +182,28 @@ export function createPostBattleExpAdvancer(rig, from, stats, purpose) {
     throw new Error(`${purpose}: post-battle EXP advancement requires the authenticated public host`);
   }
   let cursor = from[authority.label] ?? 0;
+  let pendingPhaseEvent = null;
   return async () => {
-    const phaseEvent = authority.evidence.find(EXP_PHASE, cursor);
+    const phaseEvent = pendingPhaseEvent ?? authority.evidence.find(EXP_PHASE, cursor);
     if (!phaseEvent) {
       return false;
     }
+    pendingPhaseEvent = phaseEvent;
+    const readyEvent = authority.evidence.findLastSemanticSurface(phaseEvent.index + 1, "battle:exp");
+    if (
+      readyEvent?.observation.phase !== "ExpPhase"
+      || readyEvent.observation.uiMode !== "MESSAGE"
+      || readyEvent.observation.ready?.awaitingActionInput !== true
+    ) {
+      return false;
+    }
     cursor = phaseEvent.index + 1;
+    pendingPhaseEvent = null;
     stats.postBattleExpPrompts += 1;
     authority.evidence.record("campaign-post-battle-advance", {
       phase: "ExpPhase",
       phaseEventIndex: phaseEvent.index,
+      readyEventIndex: readyEvent.index,
       promptOrdinal: stats.postBattleExpPrompts,
       authoritySeat: authority.label,
     });
