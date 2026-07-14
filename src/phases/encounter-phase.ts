@@ -25,9 +25,11 @@ import { settleCoopFieldPresentation } from "#data/elite-redux/coop/coop-field-p
 import { clearCoopAuthoritativeGuestPlayerTrainer } from "#data/elite-redux/coop/coop-presentation";
 import {
   coopSessionGeneration,
+  failCoopSharedSession,
   getCoopBattleStreamer,
   getCoopController,
   getCoopNetcodeMode,
+  getCoopRuntime,
   isAuthoritativeBattleSession,
   isCoopAuthoritativeGuest,
   isVersusSession,
@@ -198,6 +200,14 @@ function buildDevEnemy(spec: DevEnemyMonSpec, fallbackLevel: number, trainerBatt
  * after a human clears its save-slot screen, which can take a while.
  */
 const COOP_ENEMY_PARTY_WAIT_MS = 120_000;
+const COOP_ENEMY_PARTY_CONFIRM_WAIT_MS = 180_000;
+/**
+ * `awaitEnemyPartyWithRetry` already performs six addressed re-requests before it rejects. Permit one
+ * explicit reconnect-and-confirm retry after that bounded recovery, then move both peers to the shared
+ * terminal supervisor. This is deliberately finite: a synchronous/headless confirmation callback must
+ * never recurse forever after teardown, and a live client must never remain parked on this surface forever.
+ */
+const COOP_ENEMY_PARTY_CONFIRM_RETRIES = 1;
 
 function captureCoopTrainer(trainer: Trainer): CoopSerializedTrainer {
   return {
@@ -433,6 +443,20 @@ export class EncounterPhase extends BattlePhase {
    */
   private coopEnemyAuthority: CoopSerializedEnemy[] | null = null;
 
+  /** Immutable lifetime of the ordinary authoritative carrier wait. */
+  private coopEnemyAdoptionBoundary: {
+    readonly generation: number;
+    readonly scene: typeof globalScene;
+    readonly battle: Battle;
+    readonly runtime: NonNullable<ReturnType<typeof getCoopRuntime>>;
+    readonly streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>;
+  } | null = null;
+  private coopEnemyAdoptionInFlight = false;
+  private coopEnemyAdoptionComplete = false;
+  private coopEnemyAdoptionFailures = 0;
+  private coopEnemyRecoveryPromptOpen = false;
+  private coopEnemyRecoveryPromptTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor(loaded = false) {
     super();
 
@@ -518,19 +542,146 @@ export class EncounterPhase extends BattlePhase {
     return battle.battleType === BattleType.WILD || battle.battleType === BattleType.TRAINER;
   }
 
+  private bindCoopEnemyAdoptionBoundary(): NonNullable<typeof this.coopEnemyAdoptionBoundary> | null {
+    if (this.coopEnemyAdoptionBoundary != null) {
+      return this.coopEnemyAdoptionBoundary;
+    }
+    const runtime = getCoopRuntime();
+    const streamer = getCoopBattleStreamer();
+    const battle = globalScene.currentBattle;
+    if (runtime == null || streamer == null || battle == null) {
+      return null;
+    }
+    this.coopEnemyAdoptionBoundary = {
+      generation: coopSessionGeneration(),
+      scene: globalScene,
+      battle,
+      runtime,
+      streamer,
+    };
+    return this.coopEnemyAdoptionBoundary;
+  }
+
+  private isCoopEnemyAdoptionBoundaryLive(): boolean {
+    const boundary = this.coopEnemyAdoptionBoundary;
+    return (
+      boundary != null
+      && coopSessionGeneration() === boundary.generation
+      && getCoopRuntime() === boundary.runtime
+      && getCoopBattleStreamer() === boundary.streamer
+      && globalScene === boundary.scene
+      && boundary.scene.currentBattle === boundary.battle
+      && boundary.scene.phaseManager.getCurrentPhase() === this
+    );
+  }
+
   /** Co-op guest: wait for + adopt the host's enemy party, then run the encounter. */
   private async runEncounterAfterCoopAdopt(): Promise<void> {
+    if (this.coopEnemyAdoptionComplete || this.coopEnemyAdoptionInFlight || this.coopEnemyRecoveryPromptOpen) {
+      return;
+    }
+    const boundary = this.bindCoopEnemyAdoptionBoundary();
+    if (boundary == null) {
+      coopWarn("stream", "ordinary-wave authoritative enemy adoption had no immutable runtime boundary");
+      failCoopSharedSession("The next encounter lost its authoritative battle carrier.");
+      return;
+    }
+    if (!this.isCoopEnemyAdoptionBoundaryLive()) {
+      coopWarn("stream", `ignored stale ordinary-wave carrier callback for wave ${boundary.battle.waveIndex}`);
+      return;
+    }
+
+    this.coopEnemyAdoptionInFlight = true;
+    let failure: unknown = null;
     try {
-      await this.adoptCoopHostEnemyParty();
-      this.runEncounter();
+      await this.adoptCoopHostEnemyParty(() => this.isCoopEnemyAdoptionBoundaryLive());
+      if (!this.isCoopEnemyAdoptionBoundaryLive()) {
+        return;
+      }
+      try {
+        this.runEncounter();
+        this.coopEnemyAdoptionComplete = true;
+      } catch (error) {
+        coopWarn("stream", "ordinary-wave authoritative encounter materialization failed closed", error);
+        failCoopSharedSession(`Could not materialize the authoritative encounter at wave ${boundary.battle.waveIndex}.`, {
+          boundary: "surface",
+          reasonCode: "continuation-failed",
+          wave: boundary.battle.waveIndex,
+        });
+        return;
+      }
     } catch (error) {
-      coopWarn("stream", "ordinary-wave authoritative enemy adoption failed closed", error);
-      globalScene.ui.showText(
+      failure = error;
+    } finally {
+      this.coopEnemyAdoptionInFlight = false;
+    }
+
+    // A teardown, phase replacement, battle replacement, or runtime swap owns this late continuation now.
+    // Do not open UI on another scene and, critically, do not let a synchronous test confirmation recurse.
+    if (failure == null || !this.isCoopEnemyAdoptionBoundaryLive()) {
+      if (failure != null) {
+        coopWarn("stream", `ignored superseded ordinary-wave carrier failure for wave ${boundary.battle.waveIndex}`);
+      }
+      return;
+    }
+
+    this.coopEnemyAdoptionFailures++;
+    coopWarn("stream", "ordinary-wave authoritative enemy adoption failed closed", failure);
+    if (this.coopEnemyAdoptionFailures > COOP_ENEMY_PARTY_CONFIRM_RETRIES) {
+      failCoopSharedSession(`Could not recover the authoritative enemy party for wave ${boundary.battle.waveIndex}.`, {
+        boundary: "recovery",
+        reasonCode: "recovery-exhausted",
+        wave: boundary.battle.waveIndex,
+      });
+      return;
+    }
+
+    this.coopEnemyRecoveryPromptOpen = true;
+    this.coopEnemyRecoveryPromptTimer = setTimeout(() => {
+      this.coopEnemyRecoveryPromptTimer = null;
+      if (!this.coopEnemyRecoveryPromptOpen || !this.isCoopEnemyAdoptionBoundaryLive()) {
+        return;
+      }
+      this.coopEnemyRecoveryPromptOpen = false;
+      failCoopSharedSession(`Recovery confirmation expired for the enemy party at wave ${boundary.battle.waveIndex}.`, {
+        boundary: "recovery",
+        reasonCode: "recovery-exhausted",
+        wave: boundary.battle.waveIndex,
+      });
+    }, COOP_ENEMY_PARTY_CONFIRM_WAIT_MS);
+    // Node-based engine runners must not be kept alive solely by a superseded human-confirmation timer.
+    (this.coopEnemyRecoveryPromptTimer as unknown as { unref?: () => void }).unref?.();
+    try {
+      boundary.scene.ui.showText(
         "Could not recover your partner's battle state. Reconnect, then confirm to retry.",
         null,
-        () => void this.runEncounterAfterCoopAdopt(),
+        () => {
+          if (this.coopEnemyRecoveryPromptTimer != null) {
+            clearTimeout(this.coopEnemyRecoveryPromptTimer);
+            this.coopEnemyRecoveryPromptTimer = null;
+          }
+          this.coopEnemyRecoveryPromptOpen = false;
+          if (this.isCoopEnemyAdoptionBoundaryLive()) {
+            void this.runEncounterAfterCoopAdopt();
+          }
+        },
         null,
         true,
+      );
+    } catch (error) {
+      if (this.coopEnemyRecoveryPromptTimer != null) {
+        clearTimeout(this.coopEnemyRecoveryPromptTimer);
+        this.coopEnemyRecoveryPromptTimer = null;
+      }
+      this.coopEnemyRecoveryPromptOpen = false;
+      coopWarn("stream", "ordinary-wave recovery prompt could not open", error);
+      failCoopSharedSession(
+        `Could not open recovery for the authoritative enemy party at wave ${boundary.battle.waveIndex}.`,
+        {
+          boundary: "recovery",
+          reasonCode: "recovery-exhausted",
+          wave: boundary.battle.waveIndex,
+        },
       );
     }
   }
@@ -542,14 +693,20 @@ export class EncounterPhase extends BattlePhase {
    * save, dex, or shared modifier hooks run here.
    */
   protected async prepareCoopAuthoritativeGuestPresentationOnly(onReady: () => void | Promise<void>): Promise<void> {
+    const scene = globalScene;
+    const runtime = getCoopRuntime();
+    const streamer = getCoopBattleStreamer();
     const generation = coopSessionGeneration();
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
-    const battle = globalScene.currentBattle;
+    const wave = scene.currentBattle?.waveIndex ?? -1;
+    const battle = scene.currentBattle;
     const stillCurrent = (): boolean =>
-      coopSessionGeneration() === generation
-      && globalScene.currentBattle === battle
-      && globalScene.currentBattle?.waveIndex === wave
-      && globalScene.phaseManager.getCurrentPhase() === this;
+      globalScene === scene
+      && getCoopRuntime() === runtime
+      && getCoopBattleStreamer() === streamer
+      && coopSessionGeneration() === generation
+      && scene.currentBattle === battle
+      && scene.currentBattle?.waveIndex === wave
+      && scene.phaseManager.getCurrentPhase() === this;
     super.start();
     if (battle == null || !stillCurrent()) {
       throw new Error("Authoritative encounter presentation boundary was already stale");
@@ -596,7 +753,8 @@ export class EncounterPhase extends BattlePhase {
    */
   private async adoptCoopHostEnemyParty(isCurrent?: () => boolean): Promise<void> {
     const streamer = getCoopBattleStreamer();
-    const battle = globalScene.currentBattle;
+    const scene = globalScene;
+    const battle = scene.currentBattle;
     if (streamer == null || battle == null) {
       throw new Error("Authoritative enemy carrier unavailable");
     }
@@ -610,14 +768,14 @@ export class EncounterPhase extends BattlePhase {
     if (enemies == null) {
       throw new Error(`Authoritative enemy party unavailable for wave ${battle.waveIndex}; refusing local derivation`);
     }
-    if ((isCurrent != null && !isCurrent()) || globalScene.currentBattle !== battle) {
+    if ((isCurrent != null && !isCurrent()) || scene.currentBattle !== battle) {
       throw new Error(`Authoritative enemy carrier for wave ${battle.waveIndex} arrived after phase replacement`);
     }
     const encounter = streamer.consumeEnemyPartyEncounter(battle.waveIndex);
     if (encounter == null) {
       throw new Error(`Authoritative encounter descriptor unavailable for wave ${battle.waveIndex}`);
     }
-    if ((isCurrent != null && !isCurrent()) || globalScene.currentBattle !== battle) {
+    if ((isCurrent != null && !isCurrent()) || scene.currentBattle !== battle) {
       throw new Error(`Authoritative encounter descriptor for wave ${battle.waveIndex} became stale`);
     }
     applyCoopEncounterAuthority(battle, encounter);
