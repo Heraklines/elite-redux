@@ -481,6 +481,41 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     expect(devolved!.species.speciesId).not.toBe(SpeciesId.GARCHOMP);
   });
 
+  // ---- ROUND 5 / FEATURE 1: trainer sprite gender ---------------------------
+  it("gender resolves: 'f' kept, 'm'/absent/garbage default to 'm'", () => {
+    const G = {
+      FEM: {
+        id: 70040,
+        name: "Fem",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        gender: "f",
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+      MASC: {
+        id: 70041,
+        name: "Masc",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        gender: "m",
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+      DEFAULTED: {
+        id: 70042,
+        name: "Plain",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        // no gender field -> defaults to "m"
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+    };
+    setErCustomTrainersForTesting(G as never);
+    const byKey = new Map(getErCustomTrainers().map(t => [t.key, t]));
+    expect(byKey.get("FEM")!.gender).toBe("f");
+    expect(byKey.get("MASC")!.gender).toBe("m");
+    expect(byKey.get("DEFAULTED")!.gender).toBe("m");
+  });
+
   // ---- FEATURE 1: weighted slot variants -----------------------------------
   it("flat member is back-compat: 1 variant weight 1, slotChance 100 (representative == variant 0)", () => {
     const FLAT = {

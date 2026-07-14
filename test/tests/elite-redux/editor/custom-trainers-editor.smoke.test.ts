@@ -47,6 +47,7 @@ interface EditorHarness {
   ctr: { current: Record<string, any>; baseline: Record<string, any> };
   spByConst: Map<string, unknown>;
   spById: Map<number, unknown>;
+  trainerClassByName: Map<string, { name: string; sprite: string; genders: boolean }>;
   MOVE_SET: Set<string>;
   ctrOpenMembers: Set<number>;
   ctrSetSel: Map<number, number>;
@@ -110,7 +111,7 @@ beforeAll(() => {
     ;window.__ct = {
       blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal,
       render, onCustomTrainerInput, onCustomTrainerChange, onCustomTrainerClick, buildDeltas,
-      ctr, spByConst, spById, MOVE_SET, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
+      ctr, spByConst, spById, trainerClassByName, MOVE_SET, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
       setTab(v){ activeTab = v; },
     };`;
@@ -142,6 +143,10 @@ beforeEach(() => {
   for (const mv of ["THUNDERBOLT", "BODY_SLAM", "SHADOW_BALL", "THUNDER", "SURF"]) {
     ct.MOVE_SET.add(mv);
   }
+  // Trainer-class sprite catalog: ACE_TRAINER ships both m/f sprites; HIKER a single one.
+  ct.trainerClassByName.clear();
+  ct.trainerClassByName.set("ACE_TRAINER", { name: "ACE_TRAINER", sprite: "ace_trainer", genders: true });
+  ct.trainerClassByName.set("HIKER", { name: "HIKER", sprite: "hiker", genders: false });
 });
 
 describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
@@ -319,6 +324,33 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     ct.onCustomTrainerChange(sc);
     const again = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].team;
     expect(again[1].slotChance).toBeUndefined();
+  });
+
+  it("gender picker shows only for a gendered class; selecting F serializes gender:'f'", () => {
+    const key = newTrainer();
+    const t = ct.ctr.current[key];
+    setSpecies(0, "SPECIES_PIKACHU");
+    // ACE_TRAINER has gendered sprites -> the M/F radio renders, default "m".
+    expect(t.trainerClass).toBe("ACE_TRAINER");
+    expect(q(".ctr-gender-radio")).not.toBeNull();
+    expect(t.gender).toBe("m");
+    // Default "m" is byte-clean: no gender field serialized.
+    expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].gender).toBeUndefined();
+
+    // Pick F -> the trainer fields the female variant; it serializes as gender:'f'.
+    const fRadio = q('.ctr-gender-radio[value="f"]') as HTMLInputElement;
+    fRadio.checked = true;
+    ct.onCustomTrainerChange(fRadio);
+    expect(t.gender).toBe("f");
+    expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].gender).toBe("f");
+
+    // Switch to a SINGLE-sprite class (HIKER) -> the gender picker disappears and
+    // gender never serializes (no gendered sprite to pick).
+    const classInput = q("#ctr-class") as HTMLInputElement;
+    classInput.value = "HIKER";
+    ct.onCustomTrainerChange(classInput);
+    expect(q(".ctr-gender-radio")).toBeNull();
+    expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].gender).toBeUndefined();
   });
 
   it("prior-surface smoke still holds: member collapse/expand + the battle-music picker render", () => {

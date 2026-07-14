@@ -1743,6 +1743,7 @@ function blankCtrTrainer() {
     id: max + 1,
     name: "",
     trainerClass: "ACE_TRAINER",
+    gender: "m",
     battleType: "single",
     difficulties: ["ace", "elite", "hell"],
     minWave: 20,
@@ -1761,6 +1762,7 @@ function ctrLiveToEdit(entry) {
     id: entry.id,
     name: entry.name ?? "",
     trainerClass: entry.trainerClass ?? "ACE_TRAINER",
+    gender: entry.gender === "f" ? "f" : "m",
     battleType: entry.battleType ?? "single",
     difficulties: Array.isArray(entry.difficulties) ? entry.difficulties.slice() : ["ace", "elite", "hell"],
     minWave: Number.isInteger(entry.minWave) ? entry.minWave : 20,
@@ -2196,7 +2198,28 @@ function renderTrainerFrame(file, el) {
     });
 }
 
-/** Refresh the trainer-class sprite preview from the current #ctr-class value. */
+/** True when the CURRENT trainer's class ships both `_m`/`_f` sprites (hasGenders). */
+function ctrClassHasGenders() {
+  const t = ctrCur();
+  const entry = t ? trainerClassByName.get((t.trainerClass || "").trim().toUpperCase()) : null;
+  return !!(entry && entry.genders);
+}
+
+/** M/F radio for gendered classes (which sprite the trainer fields). Hidden for
+ *  single-sprite classes (gender has no effect there). */
+function ctrGenderPickerHtml(t) {
+  if (!ctrClassHasGenders()) {
+    return "";
+  }
+  const g = t.gender === "f" ? "f" : "m";
+  return `<span class="ctr-gender" title="Which gendered sprite this trainer fields (classes with an M and F sprite).">Sprite gender:
+    <label><input type="radio" name="ctr-gender" class="ctr-gender-radio" value="m"${g === "m" ? " checked" : ""} /> M</label>
+    <label><input type="radio" name="ctr-gender" class="ctr-gender-radio" value="f"${g === "f" ? " checked" : ""} /> F</label></span>`;
+}
+
+/** Refresh the trainer-class sprite preview from the current #ctr-class value. For
+ *  a gendered class, show ONLY the selected variant; for an unknown class, nothing;
+ *  a single-sprite class shows its one sprite. */
 function updateCtrSpritePreview() {
   const box = document.getElementById("ctr-sprite-preview");
   if (!box) {
@@ -2210,7 +2233,10 @@ function updateCtrSpritePreview() {
     box.innerHTML = '<span class="dyn">no sprite for this class</span>';
     return;
   }
-  const files = entry.genders ? [`${entry.sprite}_m`, `${entry.sprite}_f`] : [entry.sprite];
+  const t = ctrCur();
+  // Gendered class: field ONLY the selected variant (default "m"); single-sprite
+  // class: its lone sprite (gender has no meaning).
+  const files = entry.genders ? [`${entry.sprite}_${t && t.gender === "f" ? "f" : "m"}`] : [entry.sprite];
   for (const f of files) {
     const frame = document.createElement("div");
     frame.className = "ctr-sprite-frame";
@@ -2319,8 +2345,8 @@ function openTrainerClassModal() {
       input.value = cell.dataset.tcname;
     }
     closeTrainerClassModal();
-    updateCtrSpritePreview();
-    refreshChrome();
+    // Re-render so the gender picker (in)appears for the newly-chosen class.
+    render();
   });
 
   overlay.querySelector(".ctr-modal-close").addEventListener("click", closeTrainerClassModal);
@@ -2367,6 +2393,7 @@ function renderCustomTrainers(root) {
         <label>Id <input type="number" value="${t.id}" readonly style="width:80px;opacity:.6" /></label>
         <label>Sprite / class <input type="text" id="ctr-class" list="trainerclass-list" value="${esc(t.trainerClass || "")}" style="width:170px" spellcheck="false" /></label>
         <button type="button" id="ctr-browse-class" title="Browse trainer classes by sprite">Browse…</button>
+        ${ctrGenderPickerHtml(t)}
         <div id="ctr-sprite-preview" class="ctr-sprite-preview"></div>
         <div class="ctr-bgm-row">
           <label title="Music that plays for THIS trainer's battle only (er-assets audio/bgm). '(default)' keeps the trainer class's normal theme.">Battle music
@@ -2494,6 +2521,16 @@ function onCustomTrainerChange(el) {
   const m = idx >= 0 ? t.team[idx] : null;
   if (el.id === "ctr-battletype") {
     t.battleType = el.value;
+  } else if (el.id === "ctr-class") {
+    // Blur: a class change can flip whether the gender picker applies, so re-render.
+    t.trainerClass = el.value.trim().toUpperCase();
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-gender-radio")) {
+    t.gender = el.value === "f" ? "f" : "m";
+    updateCtrSpritePreview();
+    refreshChrome();
+    return true;
   } else if (el.id === "ctr-challenge") {
     t.challenge = el.value;
   } else if (el.id === "ctr-bgm") {
@@ -3553,10 +3590,15 @@ function buildDeltas() {
     if (memberBad) {
       continue;
     }
+    // Serialize gender ONLY when the class has gendered sprites AND "f" is picked
+    // (default "m" is omitted so unaffected entries stay byte-clean).
+    const classEntry = trainerClassByName.get(t.trainerClass);
+    const genderF = classEntry && classEntry.genders && t.gender === "f";
     ctrDelta[key] = {
       id: t.id,
       name: t.name.trim(),
       trainerClass: t.trainerClass,
+      ...(genderF ? { gender: "f" } : {}),
       battleType: t.battleType || "single",
       difficulties: t.difficulties.length > 0 ? t.difficulties : ["ace", "elite", "hell"],
       minWave: t.minWave,

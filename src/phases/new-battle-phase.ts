@@ -121,7 +121,12 @@ export class NewBattlePhase extends BattlePhase {
         battle.trainer.destroy();
         battle.trainer = null;
       }
-      const trainer = new Trainer(resolved.trainerType as TrainerType, TrainerVariant.DEFAULT);
+      // Field the authored gendered sprite: FEMALE for a class that ships both an
+      // `_m`/`_f` sprite (`hasGenders`); the Trainer ctor silently demotes FEMALE
+      // to the base sprite for a single-sprite class, so a bad pairing never breaks.
+      // The authored name (assigned next) survives the variant (see getName).
+      const variant = resolved.gender === "f" ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT;
+      const trainer = new Trainer(resolved.trainerType as TrainerType, variant);
       trainer.name = resolved.name;
       // Per-trainer BATTLE MUSIC (this battle only). trainerConfigs[type] is a
       // SHARED singleton, so we must NOT mutate config.battleBgm — instead we

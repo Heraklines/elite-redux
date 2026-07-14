@@ -212,6 +212,13 @@ export interface ErCustomTrainer {
   name: string;
   /** TrainerType enum NAME (sprite); resolved to a numeric `TrainerType`. */
   trainerClass: string;
+  /**
+   * Which gendered sprite the trainer fields, for classes that ship both an `_m`
+   * and `_f` sprite (see `hasGenders`). "f" fields the female sprite; "m"/absent
+   * the male/default. Ignored (no effect) for a class with a single sprite — the
+   * game silently keeps the base sprite. The authored `name` always wins.
+   */
+  gender?: "m" | "f";
   battleType?: ErCustomTrainerBattleType;
   difficulties?: readonly string[];
   minWave?: number;
@@ -280,6 +287,8 @@ export interface ErCustomTrainerResolved {
   id: number;
   name: string;
   trainerType: number;
+  /** "f" fields the female sprite variant (classes with `hasGenders`); "m" otherwise. */
+  gender: "m" | "f";
   /** Whether the encounter should be a double (also true for a pending triple). */
   isDouble: boolean;
   /** Authored as a triple but rendered as a double until #902 lands triples support. */
@@ -557,6 +566,7 @@ function resolveEntry(key: string, entry: ErCustomTrainer): ErCustomTrainerResol
     id: entry.id,
     name: entry.name.trim(),
     trainerType,
+    gender: entry.gender === "f" ? "f" : "m",
     // A triple falls back to a double until #902 lands triples support.
     isDouble: battleType === "double" || battleType === "triple",
     isTriplePending: battleType === "triple",

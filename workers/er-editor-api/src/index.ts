@@ -601,6 +601,9 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
     if (!isName(t.trainerClass)) {
       return { ok: false, error: `${key}: trainerClass must be a TrainerType NAME` };
     }
+    if (t.gender !== undefined && t.gender !== "m" && t.gender !== "f") {
+      return { ok: false, error: `${key}: gender must be "m" or "f"` };
+    }
     if (t.battleType !== undefined && !validBattleTypes.has(t.battleType as string)) {
       return { ok: false, error: `${key}: battleType must be single/double/triple` };
     }
