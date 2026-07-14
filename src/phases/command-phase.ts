@@ -36,6 +36,7 @@ import {
   isCoopAuthoritativeGuest,
   isCoopSharedTerminalFrozen,
   isVersusSession,
+  notifyCoopWaveContinuationSurfaceReady,
   recordCoopOwnSlotCommand,
   recordCoopPartnerSlotCommand,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -1001,14 +1002,32 @@ export class CommandPhase extends FieldPhase {
 
   /** Open THIS client's own-slot command UI (FIGHT for a skip-to-fight ME, else the COMMAND menu). */
   private openOwnCommandUi(): void {
-    if (
-      globalScene.currentBattle.isBattleMysteryEncounter()
-      && globalScene.currentBattle.mysteryEncounter?.skipToFightInput
-    ) {
-      globalScene.ui.clearText();
-      globalScene.ui.setMode(UiMode.FIGHT, this.fieldIndex);
+    const scene = globalScene;
+    const battle = scene.currentBattle;
+    let targetMode: UiMode;
+    let commandUiReady: Promise<void>;
+    if (battle.isBattleMysteryEncounter() && battle.mysteryEncounter?.skipToFightInput) {
+      targetMode = UiMode.FIGHT;
+      scene.ui.clearText();
+      commandUiReady = scene.ui.setMode(targetMode, this.fieldIndex);
     } else {
-      globalScene.ui.setMode(UiMode.COMMAND, this.fieldIndex);
+      targetMode = UiMode.COMMAND;
+      commandUiReady = scene.ui.setMode(targetMode, this.fieldIndex);
+    }
+    if (isCoopAuthoritativeGuest()) {
+      void commandUiReady.then(() => {
+        // The retained post-battle transaction may use the next wave's first command menu as its public
+        // continuation. The setMode promise is only a candidate: reject a superseded phase/UI transition
+        // and let the runtime helper re-check DATA, wave/turn, and transaction ownership before latching.
+        if (
+          globalScene === scene
+          && scene.currentBattle === battle
+          && scene.ui.getMode() === targetMode
+          && scene.ui.getHandler().active
+        ) {
+          notifyCoopWaveContinuationSurfaceReady();
+        }
+      });
     }
     this.startShowdownTurnClock();
   }

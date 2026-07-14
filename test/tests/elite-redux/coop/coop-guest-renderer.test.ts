@@ -329,6 +329,31 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     }
   });
 
+  it("publishes retained wave readiness only after the real guest command handler is active", async () => {
+    await startCoopGuest();
+    globalScene.currentBattle.turnCommands = {};
+    // Re-enter the same real mode so setMode commits synchronously and its Promise gives us a precise
+    // post-commit microtask boundary without depending on headless fade-tween timing.
+    await globalScene.ui.setMode(UiMode.COMMAND, COOP_GUEST_FIELD_INDEX);
+    const runtimeModule = await import("#data/elite-redux/coop/coop-runtime");
+    const observed: { mode: UiMode; active: boolean }[] = [];
+    const notifier = vi.spyOn(runtimeModule, "notifyCoopWaveContinuationSurfaceReady").mockImplementation(() => {
+      observed.push({ mode: globalScene.ui.getMode(), active: globalScene.ui.getHandler().active });
+      return false;
+    });
+    try {
+      const phase = game.scene.phaseManager.create("CommandPhase", COOP_GUEST_FIELD_INDEX);
+      phase.start();
+      expect(notifier, "requesting setMode is not yet continuation evidence").not.toHaveBeenCalled();
+      await Promise.resolve();
+      expect(observed, "the hook runs only from the committed destination handler").toEqual([
+        { mode: UiMode.COMMAND, active: true },
+      ]);
+    } finally {
+      notifier.mockRestore();
+    }
+  });
+
   it.each([
     "queued",
     "skip",
@@ -386,21 +411,33 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
         skip: true,
       };
     }
+    const waveNotifier = vi
+      .spyOn(await import("#data/elite-redux/coop/coop-runtime"), "notifyCoopWaveContinuationSurfaceReady")
+      .mockReturnValue(false);
     const setModeSpy = vi.spyOn(globalScene.ui, "setMode");
-    const phase = game.scene.phaseManager.create("CommandPhase", COOP_GUEST_FIELD_INDEX);
-    phase.start();
-    await new Promise(resolve => setTimeout(resolve, 0));
+    try {
+      const phase = game.scene.phaseManager.create("CommandPhase", COOP_GUEST_FIELD_INDEX);
+      phase.start();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
-    expect(globalScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX]).toBeDefined();
-    expect(
-      setModeSpy.mock.calls.some(([mode]) =>
-        [UiMode.COMMAND, UiMode.FIGHT, UiMode.TARGET_SELECT].includes(mode as UiMode),
-      ),
-      "a forced command record cannot masquerade as a public continuation surface",
-    ).toBe(false);
-    expect(acknowledgements).toEqual(["materialApplied", "presentationReady", "continuationReady"]);
-    expect(runtime.battleStream.retainedAuthorityDiagnostics().waiters).toBe(0);
-    expect(runtime.battleStream.retainedAuthorityDiagnostics().terminal).toBe(false);
+      expect(globalScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX]).toBeDefined();
+      expect(
+        setModeSpy.mock.calls.some(([mode]) =>
+          [UiMode.COMMAND, UiMode.FIGHT, UiMode.TARGET_SELECT].includes(mode as UiMode),
+        ),
+        "a forced command record cannot masquerade as a public continuation surface",
+      ).toBe(false);
+      expect(
+        waveNotifier,
+        "a committed command that immediately advances is not a retained-wave public surface",
+      ).not.toHaveBeenCalled();
+      expect(acknowledgements).toEqual(["materialApplied", "presentationReady", "continuationReady"]);
+      expect(runtime.battleStream.retainedAuthorityDiagnostics().waiters).toBe(0);
+      expect(runtime.battleStream.retainedAuthorityDiagnostics().terminal).toBe(false);
+    } finally {
+      setModeSpy.mockRestore();
+      waveNotifier.mockRestore();
+    }
   });
 
   it("clears the gated guest's player trainer before the next-encounter authority wait", async () => {
