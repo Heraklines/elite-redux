@@ -1078,9 +1078,7 @@ export class CoopBattleStreamer {
       }
       return newestAuthorityAtAddress(this.inbox, current);
     }
-    return [...this.inbox.entries()]
-      .filter(([, resolution]) => resolution.turn === turn)
-      .sort((left, right) => right[1].revision - left[1].revision)[0];
+    return [...this.inbox.entries()].reverse().find(([, resolution]) => resolution.turn === turn);
   }
 
   private liveTurnEntry(turn: number): [string, LiveTurnBuffer] | undefined {
@@ -1104,7 +1102,7 @@ export class CoopBattleStreamer {
       }
       return newestAuthorityAtAddress(this.pendingCheckpoints, current);
     }
-    return [...this.pendingCheckpoints.entries()].sort((left, right) => right[1].revision - left[1].revision)[0];
+    return [...this.pendingCheckpoints.entries()].at(-1);
   }
 
   private checkpointCanWakeTurn(
