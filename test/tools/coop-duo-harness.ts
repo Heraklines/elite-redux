@@ -1546,7 +1546,6 @@ export async function buildDuo(
   setCoopRuntimeFn: (r: CoopRuntime) => void,
   toCoopGameMode: (scene: BattleScene) => void,
 ): Promise<DuoRig> {
-  installHeadlessCoopSemanticProjectionOracle();
   const hostScene = hostGame.scene;
   // Headless best-effort UI: neutralize the host's achievement candy-bar UI (see neutralizeCoopCandyBar)
   // so a won wave's REALISTIC_FLASH candy grant on an evolved starter can't throw an unhandled rejection.
@@ -1584,6 +1583,7 @@ export async function buildDuo(
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
   const guestScene = buildGuestScene(hostGame);
+  installHeadlessCoopSemanticProjectionOracle(guestScene);
   // BattleScene construction resets process-global ER module state. Production clients are separate
   // processes, so creating the guest must not clobber the already-running host's authoritative state.
   restoreModuleLets(hostCtx.moduleLets!);
@@ -2453,7 +2453,6 @@ export async function buildDuoForMe(
   setCoopRuntimeFn: (r: CoopRuntime) => void,
   toCoopGameMode: (scene: BattleScene) => void,
 ): Promise<DuoRig> {
-  installHeadlessCoopSemanticProjectionOracle();
   const hostScene = hostGame.scene;
   // Headless best-effort UI: neutralize the host's achievement candy-bar UI (see neutralizeCoopCandyBar)
   // so a won wave's REALISTIC_FLASH candy grant on an evolved starter can't throw an unhandled rejection.
@@ -2483,6 +2482,7 @@ export async function buildDuoForMe(
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
   const guestScene = buildGuestScene(hostGame);
+  installHeadlessCoopSemanticProjectionOracle(guestScene);
   const guestCtx: ClientCtx = {
     label: "guest",
     scene: guestScene,
@@ -3306,6 +3306,7 @@ export async function buildShowdownDuo(
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
   const guestScene = buildGuestScene(hostGame);
+  installHeadlessCoopSemanticProjectionOracle(guestScene);
   const guestCtx: ClientCtx = {
     label: "guest",
     scene: guestScene,

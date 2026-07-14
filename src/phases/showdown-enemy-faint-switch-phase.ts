@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import {
@@ -47,18 +48,19 @@ export class ShowdownEnemyFaintSwitchPhase extends BattlePhase {
   start(): void {
     super.start();
 
+    const scene = globalScene;
     const relay = getCoopInteractionRelay();
     if (relay == null) {
       // No relay wired (should not happen in a live versus match): fall straight to the AI pick so
       // the enemy side never sits on an empty slot.
-      this.unshiftSummon(-1);
-      this.end();
+      this.unshiftSummon(scene, -1);
+      scene.phaseManager.shiftPhase();
       return;
     }
 
     const faintSeq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
     coopLog("replay", `versus host awaiting opponent replacement pick slot=${this.fieldIndex} seq=${faintSeq}`);
-    globalScene.ui.showText("Waiting for the opponent to choose their next Pokemon...");
+    scene.ui.showText("Waiting for the opponent to choose their next Pokemon...");
     // Suppress the stall watchdog for the whole await: a slow-but-alive opponent parks BOTH engines in
     // network waits (this relay pick + the guest's replay), which the mutual-wait watchdog would otherwise
     // misread as a deadlock ~20s in and "recover" by cancelling this pick + pulling a stateSync. Paired
@@ -67,8 +69,14 @@ export class ShowdownEnemyFaintSwitchPhase extends BattlePhase {
     beginCoopFaintSwitchWindow();
     void relay.awaitInteractionChoice(faintSeq, getCoopFaintSwitchWaitMs(), COOP_SWITCH_CHOICE_KINDS).then(res => {
       endCoopFaintSwitchWindow();
+      // Transport delivery and promise resumption can occur while another in-process client is active.
+      // This continuation owns the scene whose host phase opened the waiter; a stale phase never mutates a
+      // later battle, while a valid completion uses only that captured scene/phase manager.
+      if (scene.phaseManager.getCurrentPhase() !== this) {
+        return;
+      }
       let slotIndex = res?.choice ?? -1;
-      const party = globalScene.getEnemyParty();
+      const party = scene.getEnemyParty();
       // #799 identity resolution: the pick carries the chosen mon's SPECIES (data[1]); if the two
       // clients' party orders diverged, the blind slot index points at a DIFFERENT mon here - re-find
       // the picked species among the benched enemy mons and log the drift.
@@ -98,16 +106,21 @@ export class ShowdownEnemyFaintSwitchPhase extends BattlePhase {
           "replay",
           `versus host applies opponent replacement slot=${this.fieldIndex} -> enemyParty[${slotIndex}]`,
         );
-        this.unshiftSummon(slotIndex);
+        this.unshiftSummon(scene, slotIndex);
       } else {
         coopLog(
           "replay",
           `versus opponent replacement pick seq=${faintSeq} ${res == null ? "TIMED OUT" : `illegal (${slotIndex})`} -> AI auto-pick`,
         );
         // -1 lets SwitchSummonPhase resolve the enemy trainer AI's pick via `getNextSummonIndex`.
-        this.unshiftSummon(-1);
+        this.unshiftSummon(scene, -1);
       }
-      void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => this.end());
+      const finish = (): void => {
+        if (scene.phaseManager.getCurrentPhase() === this) {
+          scene.phaseManager.shiftPhase();
+        }
+      };
+      void Promise.resolve(scene.ui.setMode(UiMode.MESSAGE)).then(finish, finish);
     });
   }
 
@@ -120,15 +133,8 @@ export class ShowdownEnemyFaintSwitchPhase extends BattlePhase {
    * after) mirror the co-op host's `SwitchSummonPhase` + `CoopPushReplacementCheckpointPhase` pair, so
    * the checkpoint captures the freshly-summoned mon.
    */
-  private unshiftSummon(slotIndex: number): void {
-    globalScene.phaseManager.unshiftNew(
-      "SwitchSummonPhase",
-      SwitchType.SWITCH,
-      this.fieldIndex,
-      slotIndex,
-      false,
-      false,
-    );
-    globalScene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+  private unshiftSummon(scene: BattleScene, slotIndex: number): void {
+    scene.phaseManager.unshiftNew("SwitchSummonPhase", SwitchType.SWITCH, this.fieldIndex, slotIndex, false, false);
+    scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
   }
 }
