@@ -78,11 +78,19 @@ if (!provision?.includes("randomBytes") || /fetch\s*\(|["'`]\/coop\//u.test(prov
   failures.push("provision-accounts.mjs: fixture setup may generate credentials but must not call any API");
 }
 if (
-  !harness?.includes('findLastSemanticSurface(from, "command:command")')
+  !harness?.includes("function findOwnedCommandOrTerminal(client, from)")
+  || !harness.includes("findOwnedCommandOrTerminal(this, from)")
+  || !harness.includes('findLastSemanticSurface(from, "command:command")')
   || !harness.includes('semantic.observation.uiMode === "COMMAND"')
-  || !harness.includes("semantic.observation.seatsWithInput?.includes(this.publicSeat)")
+  || !harness.includes("semantic.observation.seatsWithInput?.includes(client.publicSeat)")
 ) {
   failures.push("public-ui-harness.mjs: command readiness must use the owned public semantic surface");
+}
+if (
+  !harness?.includes("createPublicBattleProgressBudget(")
+  || !harness.includes("event ??= findOwnedCommandOrTerminal(this, from)")
+) {
+  failures.push("public-ui-harness.mjs: command readiness must retain bounded progress and drain buffered evidence");
 }
 if (!harness?.includes("createBattlePromptAdvancer(this, from") || !harness.includes("await advanceBattlePrompt()")) {
   failures.push("public-ui-harness.mjs: post-turn waits must drive readiness-proven public battle prompts");

@@ -5,7 +5,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createPostTurnProgressBudget } from "./public-ui-harness.mjs";
+import { createPublicBattleProgressBudget, PublicUiClient } from "./public-ui-harness.mjs";
 
 class FakeEvidence {
   constructor(label) {
@@ -20,6 +20,19 @@ class FakeEvidence {
   record(kind, detail) {
     this.events.push({ index: this.events.length, kind, ...detail });
   }
+
+  find(pattern, from = 0) {
+    return this.events.slice(from).find(event => pattern.test(event.text ?? ""));
+  }
+
+  findLastSemanticSurface(from = 0, surfaceId = null) {
+    return this.events
+      .slice(from)
+      .toReversed()
+      .find(
+        event => event.kind === "browser-surface2" && (surfaceId == null || event.observation.surfaceId === surfaceId),
+      );
+  }
 }
 
 function at(ms) {
@@ -31,7 +44,7 @@ test("post-turn progress extends the soft deadline but never the immutable hard 
   const authority = { label: "authority", evidence: new FakeEvidence("authority") };
   const renderer = { label: "renderer", evidence: new FakeEvidence("renderer") };
   const rig = { clients: { authority, renderer } };
-  const budget = createPostTurnProgressBudget(rig, { authority: 0, renderer: 0 }, 100, {
+  const budget = createPublicBattleProgressBudget(rig, { authority: 0, renderer: 0 }, 100, {
     now: () => nowMs,
     progressAllowanceMs: 80,
     hardCeilingMs: 300,
@@ -83,4 +96,26 @@ test("post-turn progress extends the soft deadline but never the immutable hard 
   });
   assert.equal(budget.observe(), 1_300);
   assert.equal(budget.hardDeadline(), 1_300);
+});
+
+test("command wait drains an owned semantic surface buffered as its deadline callback resumes", async () => {
+  const evidence = new FakeEvidence("authority");
+  const commandSurface = {
+    at: at(1_100),
+    kind: "browser-surface2",
+    observation: {
+      operationClass: "command",
+      surfaceId: "command:command",
+      phase: "CommandPhase",
+      uiMode: "COMMAND",
+      localSeat: 0,
+      seatsWithInput: [0],
+      ready: { handlerActive: true },
+    },
+  };
+  evidence.push(commandSurface);
+  const client = { label: "authority", publicSeat: 0, evidence, config: { timeoutMs: 0 } };
+
+  const result = await PublicUiClient.prototype.waitForLocalCommand.call(client, 0);
+  assert.equal(result, evidence.events[0]);
 });

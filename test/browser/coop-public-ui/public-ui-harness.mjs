@@ -32,7 +32,7 @@ const POST_TURN_HARD_CEILING_MS = 360_000;
 const LOBBY_REQUEST_REISSUE_MS = 5_000;
 
 function classifyPostTurnProgress(event) {
-  if (event.kind === "browser-surface2" && event.observation?.operationClass === "battle-progress") {
+  if (event.kind === "browser-surface2" && ["battle-progress", "command"].includes(event.observation?.operationClass)) {
     const observation = event.observation;
     return `${observation.surfaceId}:phase-${observation.phaseInstance}:ready-${
       observation.ready?.awaitingActionInput === true
@@ -86,14 +86,14 @@ function recordPostTurnBudgetExtension(progress, previousDeadlineMs, deadlineMs,
 }
 
 /**
- * Keep a post-turn public-input wait alive only while the real addressed battle is making causal
- * progress. Two Chromium game loops can heavily dilate animations on the standard four-core runner;
- * run 29330330915 reached FaintPhase and an actionable guest narration after the ordinary timeout.
- * Phase transitions, new authoritative turn events, renderer sequence increments, and semantic
- * battle-prompt instances may extend the soft deadline, but signaling heartbeats/retries may not.
- * The immutable hard deadline still makes every wait terminate.
+ * Keep public command/post-turn waits alive only while the real addressed battle is making causal
+ * progress. Two Chromium game loops can heavily dilate launch and animations on the standard
+ * four-core runner; runs 29330330915 and 29332163279 reached real command/narration surfaces after
+ * the ordinary timeout. Phase transitions, new authoritative turn events, renderer sequence
+ * increments, and semantic command/battle-prompt instances may extend the soft deadline, but
+ * signaling heartbeats/retries may not. The immutable hard deadline still makes every wait terminate.
  */
-export function createPostTurnProgressBudget(
+export function createPublicBattleProgressBudget(
   rig,
   from,
   baseTimeoutMs,
@@ -135,6 +135,24 @@ export function createPostTurnProgressBudget(
     deadline: () => deadlineMs,
     hardDeadline: () => hardDeadlineMs,
   });
+}
+
+function findOwnedCommandOrTerminal(client, from) {
+  const semantic = client.evidence.findLastSemanticSurface(from, "command:command");
+  const ownedSemantic =
+    semantic?.observation.ready?.handlerActive === true
+    && semantic.observation.phase === "CommandPhase"
+    && semantic.observation.uiMode === "COMMAND"
+    && semantic.observation.localSeat === client.publicSeat
+    && semantic.observation.seatsWithInput?.includes(client.publicSeat)
+      ? semantic
+      : null;
+  return (
+    ownedSemantic
+    ?? client.evidence.find(LOCAL_COMMAND, from)
+    ?? client.evidence.find(SHARED_SESSION_TERMINAL, from)
+    ?? client.evidence.find(LAUNCH_SNAPSHOT_ABORT, from)
+  );
 }
 
 /**
@@ -699,29 +717,23 @@ export class PublicUiClient {
   }
 
   async waitForLocalCommand(from = 0) {
-    const event = await this.evidence.waitForCondition(
-      sink => {
-        const semantic = sink.findLastSemanticSurface(from, "command:command");
-        const ownedSemantic =
-          semantic?.observation.ready?.handlerActive === true
-          && semantic.observation.phase === "CommandPhase"
-          && semantic.observation.uiMode === "COMMAND"
-          && semantic.observation.localSeat === this.publicSeat
-          && semantic.observation.seatsWithInput?.includes(this.publicSeat)
-            ? semantic
-            : null;
-        return (
-          ownedSemantic
-          ?? sink.find(LOCAL_COMMAND, from)
-          ?? sink.find(SHARED_SESSION_TERMINAL, from)
-          ?? sink.find(LAUNCH_SNAPSHOT_ABORT, from)
-        );
-      },
-      {
-        timeoutMs: this.config.timeoutMs,
-        description: "owned semantic command surface or bounded shared terminal",
-      },
-    );
+    const clients = { [this.label]: this };
+    const progressBudget = createPublicBattleProgressBudget({ clients }, { [this.label]: from }, this.config.timeoutMs);
+    let event = null;
+    while (Date.now() < progressBudget.observe()) {
+      event = findOwnedCommandOrTerminal(this, from);
+      if (event != null) {
+        break;
+      }
+      await delay(100);
+    }
+    // Drain once after the soft/hard deadline check. Under severe browser CPU contention the
+    // semantic event can already be buffered when the timer callback finally resumes; discarding
+    // that real public surface solely because the nominal timer elapsed caused run 29332163279.
+    event ??= findOwnedCommandOrTerminal(this, from);
+    if (event == null) {
+      throw new Error(`${this.label}: timed out waiting for owned semantic command surface or bounded shared terminal`);
+    }
     if (event.kind !== "browser-surface2" && !LOCAL_COMMAND.test(event.text ?? "")) {
       throw new Error(`${this.label}: shared session terminated before owned CommandPhase: ${event.text}`);
     }
@@ -1159,7 +1171,7 @@ export class DuoPublicUiRig {
 
   async waitForPostTurnOutcome(from) {
     const advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, "public-ui-post-turn");
-    const progressBudget = createPostTurnProgressBudget(this, from, this.config.timeoutMs);
+    const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs);
     while (Date.now() < progressBudget.observe()) {
       const values = Object.values(this.clients);
       const rewards = values.map(client => client.evidence.find(REWARD_PHASE, from[client.label]));
