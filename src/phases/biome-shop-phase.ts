@@ -546,11 +546,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
             role === "host"
             && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
             && (commit == null
-              || commitRewardAuthoritativeResult(
-                  commit.operationId,
-                  undefined,
-                  this.coopRewardOperationBinding,
-                ) == null)
+              || commitRewardAuthoritativeResult(commit.operationId, undefined, this.coopRewardOperationBinding)
+                == null)
           ) {
             getCoopRuntime()?.durability?.reconnect();
             continue;
@@ -746,11 +743,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         if (
           decision.authoritativeProjection !== true
           && decision.operationId != null
-          && commitRewardAuthoritativeResult(
-              decision.operationId!,
-              undefined,
-              this.coopRewardOperationBinding,
-            ) == null
+          && commitRewardAuthoritativeResult(decision.operationId!, undefined, this.coopRewardOperationBinding) == null
         ) {
           failCoopSharedSession(`Biome market terminal result ${decision.operationId} could not be retained`);
           return;
@@ -805,11 +798,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       if (
         decision.requiresAuthorityCommit
         && decision.operationId != null
-        && commitRewardAuthoritativeResult(
-            decision.operationId!,
-            undefined,
-            this.coopRewardOperationBinding,
-          ) == null
+        && commitRewardAuthoritativeResult(decision.operationId!, undefined, this.coopRewardOperationBinding) == null
       ) {
         failCoopSharedSession(`Biome market buy result ${decision.operationId} could not be retained`);
         return;
@@ -922,11 +911,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       preparedOperationId != null
       && getCoopController()?.role === "host"
       && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
-      && commitRewardAuthoritativeResult(
-          preparedOperationId,
-          undefined,
-          this.coopRewardOperationBinding,
-        ) == null
+      && commitRewardAuthoritativeResult(preparedOperationId, undefined, this.coopRewardOperationBinding) == null
     ) {
       failCoopSharedSession(`Biome market buy result ${preparedOperationId} could not be retained`);
       return;
