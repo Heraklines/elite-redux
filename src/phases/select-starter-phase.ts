@@ -5,7 +5,9 @@ import Overrides from "#app/overrides";
 import { Phase } from "#app/phase";
 import { allMoves, modifierTypes } from "#data/data-lists";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
+import { isErCustomTrainerDevForceArmed } from "#data/elite-redux/er-custom-trainers";
 import { PokemonMove } from "#moves/pokemon-move";
+import { installErCustomTrainerForCurrentWave } from "#phases/er-custom-trainer-install";
 
 /** Throwaway save slot used by dev test-scenarios so they don't clobber slot 0. */
 const DEV_SCENARIO_SLOT = 4;
@@ -794,6 +796,15 @@ export class SelectStarterPhase extends Phase {
         globalScene.gameData.gameStats.endlessSessionsPlayed++;
       }
       globalScene.newBattle();
+      // ER (dev-tools only): a staff tester picking a custom trainer from the
+      // in-game Dev Scenarios picker arms a one-shot dev force. The FIRST wave of a
+      // run never runs NewBattlePhase (which normally installs custom trainers), so
+      // install here too when a force is armed - otherwise the forced pick would
+      // drop into a normal wild/trainer battle instead of the chosen trainer. Inert
+      // in prod (the force read is gated to dev tools) and on any un-forced run.
+      if (isErCustomTrainerDevForceArmed()) {
+        installErCustomTrainerForCurrentWave();
+      }
       // ER #439: the biome Map is a DEFAULT item on every run, all difficulties -
       // players can always choose their next biome from the start (daily runs
       // already grant it in TitlePhase; this covers classic/endless/challenge +
