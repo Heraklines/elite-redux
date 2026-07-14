@@ -70,7 +70,7 @@ import {
 } from "#test/tools/coop-duo-harness";
 import { generateStarters } from "#test/utils/game-manager-utils";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -126,6 +126,46 @@ function advanceGuestDialogue(scene: BattleScene): boolean {
     return true;
   }
   return false;
+}
+
+/**
+ * Model the three Phaser effects the HEADLESS scene's no-op atlas loader cannot produce: cache admission,
+ * the live sprite texture, and the live animation key. The real Pokemon.loadAssets call still runs first;
+ * this adapter only completes its visual side effects after that promise settles. Recompute the final key
+ * after loading because the versus guest's side swap replaces the temporary substitute with a dynamic back
+ * key (`pkmn__back__<species>`).
+ */
+function modelHeadlessPlayerAtlasCompletion(scene: BattleScene): void {
+  const releasedKeys = new Set<string>();
+  const originalTextureExists = scene.textures.exists.bind(scene.textures);
+  const originalAnimationExists = scene.anims.exists.bind(scene.anims);
+  vi.spyOn(scene.textures, "exists").mockImplementation(
+    key => releasedKeys.has(String(key)) || originalTextureExists(key),
+  );
+  vi.spyOn(scene.anims, "exists").mockImplementation(
+    key => releasedKeys.has(String(key)) || originalAnimationExists(key),
+  );
+
+  const capacity = scene.currentBattle.arrangement.playerCapacity;
+  for (const pokemon of scene.getPlayerParty().slice(0, capacity)) {
+    const original = pokemon.loadAssets.bind(pokemon);
+    vi.spyOn(pokemon, "loadAssets").mockImplementation(async (ignoreOverride = true, useIllusion = false) => {
+      await original(ignoreOverride, useIllusion);
+      const key = pokemon.getBattleSpriteKey();
+      releasedKeys.add(key);
+      for (const sprite of [pokemon.getSprite(), pokemon.getTintSprite()]) {
+        if (sprite == null) {
+          continue;
+        }
+        const live = sprite as unknown as {
+          texture: { key: string };
+          anims: { currentAnim?: { key: string } };
+        };
+        live.texture.key = key;
+        live.anims.currentAnim = { key };
+      }
+    });
+  }
 }
 
 /** The observations the pump collects while draining the guest's REAL launch chain (asserted outside). */
@@ -259,6 +299,11 @@ describe.skipIf(!RUN)("Showdown versus - guest REAL launch pipeline (regression 
     const result = await withClient<GuestBootResult>(rig.guestCtx, async () => {
       const booted = await rig.guestScene.gameData.applyCoopLaunchSession(hostJson);
       expect(booted, "applyCoopLaunchSession returned true (the F1 swap fired under the live flip gate)").toBe(true);
+
+      // The loaded session creates fresh battlers after buildShowdownDuo installed its ordinary headless
+      // stubs. Preserve the production atlas wait while teaching this fixture what a completed Phaser atlas
+      // load looks like; otherwise strict launch readiness correctly rejects the permanent substitute key.
+      modelHeadlessPlayerAtlasCompletion(rig.guestScene);
 
       // Queue the LOADED EncounterPhase exactly as production's tryCoopGuestSnapshotBoot does
       // (select-starter-phase.ts: pushNew("EncounterPhase", true)). Clear the guest's stale queue
