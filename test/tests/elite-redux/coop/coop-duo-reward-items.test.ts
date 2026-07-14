@@ -33,9 +33,9 @@ import { SpeciesId } from "#enums/species-id";
 import { BerryModifier } from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
 import {
-  arriveGuestCommandBoundary,
   buildDuo,
   type DuoRig,
+  driveClientPhaseQueueTo,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostPartyRewardOwner,
@@ -43,7 +43,6 @@ import {
   installDuoLogCapture,
   pumpDuoDestinations,
   reachQueuedRewardShop,
-  remirrorWave,
   type ShopPhaseSeam,
   withClient,
 } from "#test/tools/coop-duo-harness";
@@ -176,12 +175,19 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
 
     // ===== Cross to wave 2 (LEFTOVERS triggers no level-up -> no LearnMovePhase -> clean cross). =====
     forceItemRewards(game.override, [{ name: "RARE_CANDY" }]);
-    await arriveGuestCommandBoundary(rig, 2);
     await withClient(rig.hostCtx, async () => {
-      await game.phaseInterceptor.to("CommandPhase");
+      // Run the real host transition first so NextEncounterPhase publishes the immutable wave-2
+      // enemy carrier. Stop before CommandPhase starts: neither peer may satisfy the reciprocal
+      // command rendezvous until the guest has consumed its own queued transition.
+      await game.phaseInterceptor.to("CommandPhase", false);
     });
     expect(rig.hostScene.currentBattle.waveIndex, "host advanced to wave 2").toBe(2);
-    await remirrorWave(rig);
+    await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, "wave 2 CommandPhase", {
+        matches: phase => phase.phaseName === "CommandPhase" && rig.guestScene.currentBattle.waveIndex === 2,
+      }),
+    );
+    expect(rig.guestScene.currentBattle.waveIndex, "guest consumed the real wave-2 carrier").toBe(2);
 
     // ===== WAVE 2 (guest-owned, odd counter): a party-target RARE_CANDY (the live desync). =====
     {
