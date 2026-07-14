@@ -171,7 +171,6 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
 
   beforeEach(() => {
     setCoopHarnessModuleLetIsolation(true);
-    setCoopBiomeMarketTestSkip(false);
     setCoopBiomePickerDrivenByTest();
     setCoopWaveBarrierMs(10_000);
     setCoopRendezvousWaitMs(10_000);
@@ -180,6 +179,9 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     resetObservedCoopGuestPhases();
     setCoopWaveTailSanction(null);
     game = new GameManager(phaserGame);
+    // GameManager deliberately defaults legacy co-op tests to skipping the x0 market. This journey
+    // owns the real queued market/UI boundary, so opt back in only after that constructor default runs.
+    setCoopBiomeMarketTestSkip(false);
     logs = installDuoLogCapture(`transition-t2-biome-${Date.now()}`);
     game.override
       .battleStyle("double")
