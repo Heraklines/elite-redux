@@ -592,6 +592,69 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     guestSync.dispose();
   });
 
+  it("buffers same-turn seat/entity commands independently and never lets a stale epoch unblock the live actor", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const firstAddress = { epoch: 8, wave: 3, pokemonId: 101 };
+    const secondAddress = { epoch: 8, wave: 3, pokemonId: 202 };
+
+    guest.send({
+      t: "command",
+      fieldIndex: 0,
+      turn: 5,
+      owner: "host",
+      ...firstAddress,
+      command: { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] },
+    });
+    guest.send({
+      t: "command",
+      fieldIndex: 0,
+      turn: 5,
+      owner: "guest",
+      ...secondAddress,
+      command: { command: Command.POKEMON, cursor: 4 },
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    await expect(hostSync.requestPartnerCommand(0, 5, [1], "host", undefined, firstAddress)).resolves.toMatchObject(
+      { command: Command.FIGHT, moveId: 55 },
+    );
+    await expect(
+      hostSync.requestPartnerCommand(0, 5, [1], "guest", undefined, secondAddress),
+    ).resolves.toMatchObject({ command: Command.POKEMON, cursor: 4 });
+
+    const currentAddress = { epoch: 9, wave: 3, pokemonId: 303 };
+    guest.send({
+      t: "command",
+      fieldIndex: 1,
+      turn: 5,
+      owner: "guest",
+      epoch: 8,
+      wave: 3,
+      pokemonId: 303,
+      command: { command: Command.FIGHT, cursor: 0, moveId: 44, targets: [2] },
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    let settled = false;
+    const current = hostSync.requestPartnerCommand(1, 5, [1], "guest", legalOffer, currentAddress).then(command => {
+      settled = true;
+      return command;
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(settled, "same wave/turn/entity from a stale epoch cannot satisfy the current exact wait").toBe(false);
+
+    guest.send({
+      t: "command",
+      fieldIndex: 1,
+      turn: 5,
+      owner: "guest",
+      ...currentAddress,
+      command: { command: Command.FIGHT, cursor: 1, moveId: 55, targets: [2] },
+    });
+    await expect(current).resolves.toMatchObject({ command: Command.FIGHT, moveId: 55 });
+    hostSync.dispose();
+  });
+
   it("rejects a live illegal reply and immediately commits the host-authored legal default", async () => {
     const { host, guest } = createLoopbackPair();
     const hostSync = new CoopBattleSync(host);

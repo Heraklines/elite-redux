@@ -392,6 +392,20 @@ function authorityKey(address: { epoch: number; wave: number; turn: number; revi
   return `${address.epoch}:${address.wave}:${address.turn}:${address.revision}`;
 }
 
+type BufferedAuthorityClass = "turnResolution" | "replacement";
+
+/**
+ * Receiver delivery buffers are deliberately namespaced by message class as well as the complete immutable
+ * wire address. Turn and replacement commits can legitimately share every numeric address component; they
+ * are independent transactions and must never overwrite or satisfy one another.
+ */
+function bufferedAuthorityKey(
+  boundary: BufferedAuthorityClass,
+  address: { epoch: number; wave: number; turn: number; revision: number },
+): string {
+  return `${boundary}:${authorityKey(address)}`;
+}
+
 function pendingTurnKey(address: { epoch: number; wave: number; turn: number }): string {
   return `${address.epoch}:${address.wave}:${address.turn}`;
 }
@@ -542,6 +556,31 @@ function sameTurnAddress(left: CoopTurnAddress, right: CoopTurnAddress): boolean
   return left.epoch === right.epoch && left.wave === right.wave && left.turn === right.turn;
 }
 
+function newestAuthorityAtAddress<T extends { epoch: number; wave: number; turn: number; revision: number }>(
+  entries: ReadonlyMap<string, T>,
+  address: { epoch: number; wave: number; turn: number },
+): [string, T] | undefined {
+  return [...entries.entries()]
+    .filter(([, value]) => sameTurnAddress(value, address))
+    .sort((left, right) => right[1].revision - left[1].revision)[0];
+}
+
+/**
+ * Once an exact revision is handed off, older revisions at that same address are causally superseded. Remove
+ * them together so a second consumer can never roll mechanics back, while preserving newer revisions and
+ * every other epoch/wave/turn.
+ */
+function discardAuthorityThrough<T extends { epoch: number; wave: number; turn: number; revision: number }>(
+  entries: Map<string, T>,
+  selected: T,
+): void {
+  for (const [key, value] of entries) {
+    if (sameTurnAddress(value, selected) && value.revision <= selected.revision) {
+      entries.delete(key);
+    }
+  }
+}
+
 function sameAuthorityAddress(
   left: { epoch: number; wave: number; turn: number; revision: number },
   right: { epoch: number; wave: number; turn: number; revision: number },
@@ -585,7 +624,7 @@ export class CoopBattleStreamer {
   private readonly pending = new Map<string, PendingTurnWaiter>();
   /** #806 stall watchdog: when each parked turn wait began (same keys as `pending`). */
   private readonly pendingSince = new Map<string, number>();
-  /** Complete turn address -> a resolution that arrived before its waiter (race buffer). */
+  /** Message class + complete immutable turn address -> a resolution that arrived before its waiter. */
   private readonly inbox = new Map<string, CoopTurnResolution>();
   /** Immutable history survives buffer handoff and ACK; one highest record per complete turn address. */
   private readonly highestSeenTurnAuthority = new Map<string, SeenAuthority<CoopTurnResolution>>();
@@ -686,7 +725,7 @@ export class CoopBattleStreamer {
   private readonly meBattlePartyInbox = new Map<string, CoopSerializedEnemy[]>();
   /** HOST: retained authoritative ME parties, re-answerable by exact interaction key after loss/reconnect. */
   private readonly sentMeBattleParties = new Map<string, CoopSerializedEnemy[]>();
-  /** Complete turn address -> latest authoritative checkpoint the guest has not yet applied. */
+  /** Message class + complete immutable replacement address -> checkpoints not yet handed to an applier. */
   private readonly pendingCheckpoints = new Map<string, CoopCheckpointEnvelope>();
   /** Immutable replacement history persists across buffer, handoff, applied-OOB, and ACK states. */
   private readonly highestSeenReplacementAuthority = new Map<string, SeenAuthority<CoopCheckpointEnvelope>>();
@@ -1037,11 +1076,11 @@ export class CoopBattleStreamer {
       if (current == null) {
         return;
       }
-      const key = pendingTurnKey(current);
-      const resolution = this.inbox.get(key);
-      return resolution === undefined ? undefined : [key, resolution];
+      return newestAuthorityAtAddress(this.inbox, current);
     }
-    return [...this.inbox.entries()].reverse().find(([, resolution]) => resolution.turn === turn);
+    return [...this.inbox.entries()]
+      .filter(([, resolution]) => resolution.turn === turn)
+      .sort((left, right) => right[1].revision - left[1].revision)[0];
   }
 
   private liveTurnEntry(turn: number): [string, LiveTurnBuffer] | undefined {
@@ -1063,11 +1102,9 @@ export class CoopBattleStreamer {
       if (current == null) {
         return;
       }
-      const key = pendingTurnKey(current);
-      const checkpoint = this.pendingCheckpoints.get(key);
-      return checkpoint === undefined ? undefined : [key, checkpoint];
+      return newestAuthorityAtAddress(this.pendingCheckpoints, current);
     }
-    return [...this.pendingCheckpoints.entries()].at(-1);
+    return [...this.pendingCheckpoints.entries()].sort((left, right) => right[1].revision - left[1].revision)[0];
   }
 
   private checkpointCanWakeTurn(
@@ -1820,10 +1857,7 @@ export class CoopBattleStreamer {
     if (stage === "materialApplied") {
       // Material evidence suppresses duplicate reconstruction locally, but request/retry/host retention stay
       // alive until the exact continuation surface proves ready.
-      const inboxKey = pendingTurnKey(resolution);
-      if (this.inbox.get(inboxKey)?.revision === resolution.revision) {
-        this.inbox.delete(inboxKey);
-      }
+      discardAuthorityThrough(this.inbox, resolution);
     } else if (stage === "continuationReady") {
       this.pendingTurnContinuations.delete(key);
       this.clearTurnCommitRequest(pendingTurnKey(resolution));
@@ -2696,7 +2730,7 @@ export class CoopBattleStreamer {
     if (entry == null) {
       return null;
     }
-    this.pendingCheckpoints.delete(entry[0]);
+    discardAuthorityThrough(this.pendingCheckpoints, entry[1]);
     return entry[1];
   }
 
@@ -2707,12 +2741,10 @@ export class CoopBattleStreamer {
 
   /** Record an out-of-band envelope only after its numeric/full state applied successfully. */
   retainAppliedOutOfBandCheckpoint(checkpoint: CoopCheckpointEnvelope): void {
-    const key = pendingTurnKey(checkpoint);
-    const previous = this.appliedOutOfBandCheckpoints.get(key);
-    if (previous != null && previous.revision >= checkpoint.revision) {
+    const key = bufferedAuthorityKey("replacement", checkpoint);
+    if (this.appliedOutOfBandCheckpoints.has(key)) {
       return;
     }
-    this.appliedOutOfBandCheckpoints.delete(key);
     rememberBounded(this.appliedOutOfBandCheckpoints, key, checkpoint);
   }
 
@@ -2747,7 +2779,7 @@ export class CoopBattleStreamer {
     if (selected == null) {
       return null;
     }
-    this.appliedOutOfBandCheckpoints.delete(selected[0]);
+    discardAuthorityThrough(this.appliedOutOfBandCheckpoints, selected[1]);
     return selected[1];
   }
 
@@ -2898,7 +2930,7 @@ export class CoopBattleStreamer {
         // waiter must be REBUFFERED so the pump's next race consumes it (never lost).
         if (res != null) {
           coopLog("replay", `guest live-pump rebuffer turnResolution turn=${turn} (raced out)`);
-          rememberBounded(this.inbox, pendingTurnKey(res), res);
+          rememberBounded(this.inbox, bufferedAuthorityKey("turnResolution", res), res);
         }
       });
     });
@@ -2951,8 +2983,8 @@ export class CoopBattleStreamer {
     }
     const bufferedEntry = this.bufferedTurnEntry(turn);
     if (bufferedEntry !== undefined) {
-      const [bufferedKey, buffered] = bufferedEntry;
-      this.inbox.delete(bufferedKey);
+      const [, buffered] = bufferedEntry;
+      discardAuthorityThrough(this.inbox, buffered);
       if (this.authorityContext != null) {
         this.requestTurnCommit(buffered.epoch, buffered.wave, buffered.turn, buffered.revision);
       }
@@ -3367,9 +3399,9 @@ export class CoopBattleStreamer {
           return;
         }
         const address: CoopTurnAddress = { epoch: msg.epoch, wave: msg.wave, turn: msg.turn };
-        const key = pendingTurnKey(address);
-        const buffered = this.inbox.get(key);
-        const exactPending = this.pending.get(key);
+        const waitKey = pendingTurnKey(address);
+        const bufferKey = bufferedAuthorityKey("turnResolution", res);
+        const exactPending = this.pending.get(waitKey);
         const legacyPending = this.authorityContext == null ? this.pending.get(legacyTurnKey(msg.turn)) : undefined;
         const resolver = exactPending ?? legacyPending;
         coopLog(
@@ -3380,16 +3412,9 @@ export class CoopBattleStreamer {
         if (resolver) {
           resolver.finish(res);
         } else {
-          // No waiter yet - buffer the newly admitted highest revision at this exact authority address.
-          if (buffered != null) {
-            coopWarn(
-              "stream",
-              `guest RECV turnResolution e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} `
-                + "superseding earlier buffered revision",
-            );
-            this.inbox.delete(key);
-          }
-          rememberBounded(this.inbox, key, res);
+          // No waiter yet: retain this exact immutable revision. A later revision at the same turn gets
+          // its own slot; handoff chooses the newest and atomically prunes its superseded predecessors.
+          rememberBounded(this.inbox, bufferKey, res);
         }
         for (const handler of [...this.turnCommitHandlers]) {
           try {
@@ -3512,8 +3537,7 @@ export class CoopBattleStreamer {
             // Re-open the same safe-boundary consumer as a first delivery. Observers wake the replay
             // pump, but consumeCheckpoint() is the transaction handoff; omitting this buffer made a
             // requested retry observable yet impossible to apply.
-            const key = pendingTurnKey(retained);
-            this.pendingCheckpoints.delete(key);
+            const key = bufferedAuthorityKey("replacement", retained);
             rememberBounded(this.pendingCheckpoints, key, structuredClone(retained));
             this.notifyCheckpointEnvelope(retained);
             this.checkpointWaiter?.(retained);
@@ -3526,11 +3550,10 @@ export class CoopBattleStreamer {
           );
           return;
         }
-        const key = pendingTurnKey(msg);
+        const key = bufferedAuthorityKey("replacement", envelope);
         // Buffer for the guest's next consumeCheckpoint() (applied at a turn boundary),
         // carrying the host's checksum so the guest can verify convergence after applying.
         coopLog("checksum", `guest RECV battleCheckpoint reason=${msg.reason} checksum=${msg.checksum}`);
-        this.pendingCheckpoints.delete(key);
         rememberBounded(this.pendingCheckpoints, key, envelope);
         this.notifyCheckpointEnvelope(envelope);
         this.checkpointWaiter?.(envelope);

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "taskId": "p33-full-address-buffers-ddbaa",
+  "branch": "ci/coop/p33-full-address-buffers-ddbaa",
+  "trainRef": "ci/coop/p33-mystery-public-transition",
+  "baseSha": "ddbaa0284473381c811381394f0c35856c1f8757",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-full-address-buffers-ddbaa.json",
+    "src/data/elite-redux/coop/coop-battle-stream.ts",
+    "test/tests/elite-redux/coop/coop-battle-stream.test.ts",
+    "test/tests/elite-redux/coop/coop-battle-sync.test.ts"
+  ]
+}
