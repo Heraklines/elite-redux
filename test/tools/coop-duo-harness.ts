@@ -699,6 +699,14 @@ function safeStr(a: unknown): string {
 export function buildGuestScene(hostGame: GameManager): BattleScene {
   const savedRnd = Phaser.Math.RND.state();
   const guestScene = new BattleScene(); // ctor calls initGlobalScene(this) - steals globalScene.
+  // Install the cooperative scheduler BEFORE create(). BattleScene.create() seeds the title/login phase
+  // queue and may otherwise start an asynchronous LoginPhase immediately. In the one-process harness that
+  // late login can mutate the shared account module while an authenticated host/guest persistence
+  // transaction is awaiting cloud I/O. Real browsers finish their own login before pairing; this synthetic
+  // guest is reconstructed directly into the paired battle and must never run an independent boot flow.
+  guestScene.phaseManager["startCurrentPhase"] = () => {
+    /* inert: the cooperative scheduler calls phase.start() explicitly */
+  };
   // Re-run the SAME mock injection the host wrapper did, but on the guest scene, WITHOUT
   // re-seeding the RND (GameWrapper's ctor sow is the only re-seed; setScene/injectMandatory
   // does not sow). We call the private injectMandatory + preload + create via setScene.
@@ -716,8 +724,7 @@ export function buildGuestScene(hostGame: GameManager): BattleScene {
   neutralizeCoopCandyBar(guestScene);
   // Restore the RND cursor the ctor/injection may have touched.
   Phaser.Math.RND.state(savedRnd);
-  // Make the guest scene's phase pump MANUAL (the cooperative scheduler drives it). Without
-  // this, phase.end() -> shiftPhase() -> startCurrentPhase() would auto-run the whole queue.
+  // Reassert the manual pump in case create() replaced phase-manager wiring while initializing the scene.
   guestScene.phaseManager["startCurrentPhase"] = () => {
     /* inert: the cooperative scheduler calls phase.start() explicitly */
   };

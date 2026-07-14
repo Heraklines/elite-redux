@@ -139,6 +139,7 @@ jobs:
             scripts/coop-browser-entry.ts \
             scripts/prepare-coop-browser-artifact.mjs \
             test/browser/coop-public-ui/browser-artifact-prune.test.mjs \
+            test/browser/coop-public-ui/browser-workflow-fanout.test.mjs \
             test/browser/coop-public-ui/campaign-policy.mjs \
             test/browser/coop-public-ui/campaign.mjs \
             test/browser/coop-public-ui/campaign-exp-phase.test.mjs \
@@ -159,6 +160,7 @@ jobs:
         run: >-
           node --test
           test/browser/coop-public-ui/browser-artifact-prune.test.mjs
+          test/browser/coop-public-ui/browser-workflow-fanout.test.mjs
           test/browser/coop-public-ui/campaign-exp-phase.test.mjs
           test/browser/coop-public-ui/campaign-render-profile.test.mjs
 
@@ -215,10 +217,11 @@ jobs:
     runs-on: ${{ vars.COOP_UI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
-      - name: Check out exact implementation SHA and assets
+      - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
         with:
-          submodules: recursive
+          fetch-depth: 1
+          submodules: false
 
       - uses: ./.github/actions/setup-deps
 
@@ -238,7 +241,7 @@ jobs:
         env:
           COOP_UI_BASE_URL: http://127.0.0.1:4175/?coopdebug=1
           COOP_UI_BROWSER_DIST: dist-coop-public-ui
-          COOP_UI_ASSET_DIR: assets
+          COOP_UI_ASSET_DIR: .coop-no-local-asset-fallback
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           COOP_UI_ACCOUNT_MODE: register
@@ -272,10 +275,11 @@ jobs:
             artifact: depth
             waves: ${{ inputs.campaign_waves || (github.event_name == 'push' && '8') || '30' }}
     steps:
-      - name: Check out exact implementation SHA and assets
+      - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
         with:
-          submodules: recursive
+          fetch-depth: 1
+          submodules: false
 
       - uses: ./.github/actions/setup-deps
 
@@ -318,7 +322,7 @@ jobs:
         env:
           COOP_UI_BASE_URL: http://127.0.0.1:4175/?coopdebug=1
           COOP_UI_BROWSER_DIST: dist-coop-public-ui
-          COOP_UI_ASSET_DIR: assets
+          COOP_UI_ASSET_DIR: .coop-no-local-asset-fallback
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           COOP_UI_ACCOUNT_MODE: register

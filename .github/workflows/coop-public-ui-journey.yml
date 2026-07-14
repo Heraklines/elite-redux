@@ -128,6 +128,7 @@ jobs:
             .github/workflows/coop-public-ui-journey.yml \
             scripts/coop-browser-entry.ts \
             scripts/prepare-coop-browser-artifact.mjs \
+            test/browser/coop-public-ui/browser-workflow-fanout.test.mjs \
             test/browser/coop-public-ui/check-public-boundary.mjs \
             test/browser/coop-public-ui/config.mjs \
             test/browser/coop-public-ui/evidence.mjs \
@@ -140,6 +141,9 @@ jobs:
 
       - name: Enforce public-driver boundary
         run: node test/browser/coop-public-ui/check-public-boundary.mjs
+
+      - name: Verify browser fan-out checkout isolation
+        run: node --test test/browser/coop-public-ui/browser-workflow-fanout.test.mjs
 
       - name: Build normal application with CI-only read-only observer
         env:
@@ -173,10 +177,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
-      - name: Check out exact implementation SHA and assets
+      - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
         with:
-          submodules: recursive
+          fetch-depth: 1
+          submodules: false
 
       - uses: ./.github/actions/setup-deps
 
@@ -196,7 +201,7 @@ jobs:
         env:
           COOP_UI_BASE_URL: http://127.0.0.1:4175/?coopdebug=1
           COOP_UI_BROWSER_DIST: dist-coop-public-ui
-          COOP_UI_ASSET_DIR: assets
+          COOP_UI_ASSET_DIR: .coop-no-local-asset-fallback
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           COOP_UI_JOURNEY: ${{ inputs.journey || 'fresh-resume' }}
@@ -241,10 +246,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
-      - name: Check out exact implementation SHA and assets
+      - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
         with:
-          submodules: recursive
+          fetch-depth: 1
+          submodules: false
 
       - uses: ./.github/actions/setup-deps
 
@@ -274,7 +280,7 @@ jobs:
         env:
           COOP_UI_BASE_URL: http://127.0.0.1:4176/?coopdebug=1
           COOP_UI_BROWSER_DIST: dist-coop-public-ui
-          COOP_UI_ASSET_DIR: assets
+          COOP_UI_ASSET_DIR: .coop-no-local-asset-fallback
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           COOP_UI_JOURNEY: reverse-resume
