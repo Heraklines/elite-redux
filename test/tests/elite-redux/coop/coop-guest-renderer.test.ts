@@ -183,6 +183,19 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   }
 
   /** Start a co-op double, then flip the LOCAL engine into the GUEST role. */
+  const setFixtureRole = (role: "host" | "guest"): void => {
+    const controller = getCoopController();
+    const runtime = getCoopRuntime();
+    if (controller == null || runtime == null) {
+      throw new Error(`cannot move the legacy renderer fixture to ${role} without a live runtime`);
+    }
+    controller.role = role;
+    // Protocol 33 owns operation cursors by runtime role as well as controller role. This legacy
+    // single-process fixture deliberately changes seats after assembly, so move both identities as
+    // one operation; real peers assemble directly in their stable seat.
+    (runtime.opState as { localRole: "host" | "guest" | null }).localRole = role;
+  };
+
   const startCoopGuest = async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     // The pure-renderer behavior is the AUTHORITATIVE netcode; opt in explicitly since the
@@ -193,11 +206,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     field[COOP_HOST_FIELD_INDEX].coopOwner = "host";
     field[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
     // Flip the local controller to GUEST - the local engine now plays the renderer side.
-    getCoopController()!.role = "guest";
-    // Protocol 33 owns operation cursors by runtime role as well as controller role. This legacy single-
-    // process fixture deliberately changes seats after assembly, so move its test-only op-state ownership
-    // with the controller; real peers assemble directly in their stable seat.
-    (getCoopRuntime()!.opState as { localRole: "host" | "guest" | null }).localRole = "guest";
+    setFixtureRole("guest");
     return field;
   };
 
@@ -707,7 +716,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   it("PLAYER REPLACEMENT (#786): the host awaits the guest's pick, then auto-picks a guest bench replacement on timeout", async () => {
     const field = await startCoopGuest();
     // This is the HOST simulating the turn (the watcher of the guest-owned slot 1). Flip local role.
-    getCoopController()!.role = "host";
+    setFixtureRole("host");
 
     // Tag field ownership: bi0 = host's mon, bi1 = guest's (partner) mon.
     field[COOP_HOST_FIELD_INDEX].coopOwner = "host";
@@ -764,7 +773,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   // (B2) The auto-pick honors OWNERSHIP: it never pulls the HOST's bench into the guest's slot.
   it("PLAYER REPLACEMENT (#633, HALF B): the auto-pick refuses a host-owned bench for a guest slot", async () => {
     const field = await startCoopGuest();
-    getCoopController()!.role = "host";
+    setFixtureRole("host");
     field[COOP_HOST_FIELD_INDEX].coopOwner = "host";
     field[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
 

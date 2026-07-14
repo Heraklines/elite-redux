@@ -3716,6 +3716,7 @@ export class GameData {
                 ? ({ kind: "absent" } as const)
                 : this.readKnownCoopCloudHead(selected.slot, accountIdentity);
             if (selectedHead.kind === "invalid") {
+              coopWarn("launch", `guest checkpoint ancestry invalid slot=${selected.slot}`);
               return { success: false, reason: "cloud-conflict" };
             }
             if (
@@ -3741,6 +3742,7 @@ export class GameData {
                 || !recordCoopDeletedRun(accountIdentity, displacedHead.head.runId)
                 || !this.clearKnownCoopCloudHead(selected.slot, accountIdentity, displacedHead.head.runId)
               ) {
+                coopWarn("launch", `guest checkpoint displaced ancestry not tombstoned slot=${selected.slot}`);
                 return { success: false, reason: "cloud-conflict" };
               }
               selectedHead = { kind: "absent" };
@@ -3750,6 +3752,10 @@ export class GameData {
               // tombstoned displaced lineage above first; a non-cloud cadence message still may not ACK
               // a physically empty/orphan slot as durable state.
               if (!mirrorCloud || accountIdentity == null || selectedHead.kind !== "absent") {
+                coopWarn(
+                  "launch",
+                  `guest checkpoint empty ancestry rejected slot=${selected.slot} mirror=${mirrorCloud} head=${selectedHead.kind}`,
+                );
                 return { success: false, reason: "cloud-conflict" };
               }
               const incomingStatus = await this.readCoopRunStatus({
@@ -3763,6 +3769,7 @@ export class GameData {
                 || !incomingStatus.ok
                 || incomingStatus.value.state !== "missing"
               ) {
+                coopWarn("launch", `guest checkpoint empty ancestry status changed slot=${selected.slot}`);
                 return { success: false, reason: "cloud-conflict" };
               }
             }
@@ -3780,6 +3787,10 @@ export class GameData {
                     || (selectedHead.head.checkpointRevision === observedCloudHead.checkpointRevision
                       && selectedHead.head.digest !== observedCloudHead.digest)))
               ) {
+                coopWarn(
+                  "launch",
+                  `guest checkpoint observed ancestry mismatch slot=${selected.slot} observed=${observedCloudHead.checkpointRevision} known=${selectedHead.kind === "valid" ? selectedHead.head.checkpointRevision : "absent"}`,
+                );
                 return { success: false, reason: "cloud-conflict" };
               }
               if (
@@ -3787,6 +3798,7 @@ export class GameData {
                   || selectedHead.head.checkpointRevision < observedCloudHead.checkpointRevision)
                 && !this.recordKnownCoopCloudHead(selected.slot, accountIdentity, observedCloudHead, selectedHead)
               ) {
+                coopWarn("launch", `guest checkpoint could not freeze observed ancestry slot=${selected.slot}`);
                 return { success: false, reason: "cloud-conflict" };
               }
               selectedHead = this.readKnownCoopCloudHead(selected.slot, accountIdentity);

@@ -42,7 +42,7 @@ import {
   readCoopResumeMarker,
   recordCoopResumeMarker,
 } from "#data/elite-redux/coop/coop-resume-marker";
-import { clearCoopRuntime, getCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { GameDataType } from "#enums/game-data-type";
 import { GameModes } from "#enums/game-modes";
@@ -52,6 +52,7 @@ import { setCoopPersistenceClockForTesting } from "#system/game-data";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo as buildDuoHarness,
+  buildRuntime,
   type ClientCtx,
   type DuoRig,
   drainLoopback,
@@ -2024,6 +2025,9 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
 
       existingSave = true;
       const sendResumeCheckpoint = vi.spyOn(rig.hostRuntime.controller, "sendResumeCheckpointDetailed");
+      // buildDuo already wraps this method to count transport rendezvous. Re-spying returns that same mock,
+      // including the fresh-save checkpoint call above; this assertion window begins only now.
+      sendResumeCheckpoint.mockClear();
       const localBefore = localStorage.getItem(keys[hostSlot]);
       const cloudBefore = cloudBySlot.get(hostSlot);
       const evidenceKeys = ["er-coop-resume", "er-coop-resume-unavailable"];
@@ -2606,7 +2610,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   }, 300_000);
 
   it.each([
-    "runtime-generation",
+    "runtime-identity",
     "local-bytes",
     "account",
   ] as const)("cannot cache a same-wave launch release from a stale guest persistence ACK after %s changes", async invalidation => {
@@ -2624,6 +2628,10 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       releaseGuest = resolve;
     });
     const hostReset = vi.spyOn(rig.hostScene, "reset");
+    const replacementRuntime =
+      invalidation === "runtime-identity"
+        ? buildRuntime(createLoopbackPair().host, "Replacement", "authoritative")
+        : null;
 
     const priorUsername = loggedInUser?.username;
     try {
@@ -2643,6 +2651,26 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         await guestGate;
         return { success: true };
       });
+      // Apply the invalidation in the authority browser after the guest's ACK resolves but before saveAll
+      // consumes that ACK. Mutating process globals while the helper has the guest browser installed is not
+      // representative: its context restoration correctly restores the host account/runtime and erases the
+      // supposed race before the authority continuation observes it.
+      const countedSend = vi.mocked(rig.hostRuntime.controller.sendResumeCheckpointDetailed);
+      const sendImplementation = countedSend.getMockImplementation();
+      if (sendImplementation == null) {
+        throw new Error("resume fixture lost its counted checkpoint sender");
+      }
+      countedSend.mockImplementation(async (...args) => {
+        const delivery = await sendImplementation(...args);
+        if (invalidation === "runtime-identity") {
+          setCoopRuntime(replacementRuntime!);
+        } else if (invalidation === "local-bytes") {
+          localStorage.setItem(keys[slot!], "newer-local-writer");
+        } else if (loggedInUser != null) {
+          loggedInUser.username = `${loggedInUser.username}-changed`;
+        }
+        return delivery;
+      });
       const slot = await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot());
       rig.hostScene.sessionSlotId = slot!;
       const saving = withPeerPumpingClient(rig.hostCtx, () =>
@@ -2653,27 +2681,17 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         interval: 10,
       });
       await guestStarted;
-      if (invalidation === "runtime-generation") {
-        setCoopRuntime(rig.guestRuntime);
-        expect(getCoopRuntime(), "the replacement runtime owns the scene before the stale ACK resolves").toBe(
-          rig.guestRuntime,
-        );
-      } else if (invalidation === "local-bytes") {
-        localStorage.setItem(keys[slot!], "newer-local-writer");
-      } else if (loggedInUser != null) {
-        loggedInUser.username = `${loggedInUser.username}-changed`;
-      }
       releaseGuest();
       await expect(saving, "stale ACK cannot authorize launch release").resolves.toBe(false);
       await expect(
         withClient(rig.hostCtx, () => rig.hostScene.gameData.consumeCommittedFreshCoopLaunchSession(1)),
       ).resolves.toEqual({ kind: "not-fresh" });
-      if (invalidation === "runtime-generation") {
+      if (invalidation === "runtime-identity") {
         expect(
           hostReset,
           "the stale checkpoint completion cannot reset the scene now owned by a replacement runtime",
         ).not.toHaveBeenCalled();
-        expect(rig.guestRuntime.localTransport.state, "the replacement transport remains usable").toBe("connected");
+        expect(replacementRuntime!.localTransport.state, "the replacement transport remains usable").toBe("connected");
       }
     } finally {
       releaseGuest?.();

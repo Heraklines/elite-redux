@@ -19,6 +19,7 @@
     "src/data/elite-redux/showdown/**",
     "src/enums/ui-mode.ts",
     "src/phases/**",
+    "src/system/game-data.ts",
     "src/system/settings/settings.ts",
     "src/ui/**",
     "test/tests/elite-redux/coop/**",
