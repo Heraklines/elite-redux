@@ -5,7 +5,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
@@ -16,8 +16,8 @@ const entryContract = process.env.COOP_BROWSER_ENTRY_CONTRACT?.trim() || "transp
 const assetShaPattern = /^[0-9a-f]{40}$/u;
 const assetTargetPattern = /^https:\/\/cdn\.jsdelivr\.net\/gh\/Heraklines\/er-assets@([0-9a-f]{40})\//u;
 
-function productionAssetPins(contents) {
-  const pins = [];
+function productionAssetRules(contents) {
+  const rules = [];
   const sources = new Set();
   for (const rawLine of contents.split(/\r?\n/gu)) {
     const line = rawLine.trim();
@@ -30,12 +30,46 @@ function productionAssetPins(contents) {
       throw new Error(`unsupported production asset redirect: ${line}`);
     }
     sources.add(source);
-    pins.push(targetMatch[1]);
+    rules.push({ source, pin: targetMatch[1] });
   }
-  if (pins.length === 0 || !sources.has("/images/*") || !sources.has("/fonts/*")) {
+  if (rules.length === 0 || !sources.has("/images/*") || !sources.has("/fonts/*")) {
     throw new Error("production asset redirects must include pinned image and font surfaces");
   }
-  return pins;
+  return rules;
+}
+
+function productionAssetPins(contents) {
+  return productionAssetRules(contents).map(rule => rule.pin);
+}
+
+/**
+ * The beta Vite plugin copies the full vendored asset tree even though this sealed browser
+ * surface deliberately exercises staging's immutable CDN redirects. Keeping those duplicate
+ * files made each fan-out runner transfer 522 MB and caused the local preview to serve them
+ * instead of the CDN. Remove only paths validated by the production redirect contract; all
+ * hashed application chunks and non-redirected runtime data remain sealed in the artifact.
+ */
+function pruneRedirectedProductionAssets(rules) {
+  const pruned = [];
+  for (const { source } of rules) {
+    const relativePath = source.endsWith("/*") ? source.slice(1, -2) : source.slice(1);
+    if (
+      relativePath.length === 0
+      || relativePath.includes("..")
+      || relativePath.includes("\\")
+      || relativePath.includes("*")
+    ) {
+      throw new Error(`unsafe production asset redirect source: ${source}`);
+    }
+    const target = resolve(dist, relativePath);
+    const inside = relative(dist, target).replaceAll("\\", "/");
+    if (inside !== relativePath) {
+      throw new Error(`production asset redirect escapes browser artifact: ${source}`);
+    }
+    rmSync(target, { recursive: true, force: true });
+    pruned.push(relativePath);
+  }
+  process.stdout.write(`pruned ${pruned.length} production-CDN path(s): ${pruned.join(", ")}\n`);
 }
 
 function preparePublicUiProductionSurface() {
@@ -44,11 +78,12 @@ function preparePublicUiProductionSurface() {
     throw new Error(`COOP_BROWSER_ASSET_SHA must be a 40-character lowercase hex SHA, got "${assetSha}"`);
   }
   const redirectTemplate = readFileSync(resolve(root, "deploy", "cloudflare", "_redirects"), "utf8");
-  productionAssetPins(redirectTemplate);
+  const redirectRules = productionAssetRules(redirectTemplate);
   const redirects = redirectTemplate.replace(/er-assets@[0-9a-f]{40}/gu, `er-assets@${assetSha}`);
   if (productionAssetPins(redirects).some(pin => pin !== assetSha)) {
     throw new Error("failed to rewrite every production asset redirect to the resolved asset SHA");
   }
+  pruneRedirectedProductionAssets(redirectRules);
   writeFileSync(resolve(dist, "_redirects"), redirects);
   writeFileSync(resolve(dist, "manifest.json"), '{"manifest":{}}\n');
   return assetSha;

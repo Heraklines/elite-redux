@@ -137,6 +137,8 @@ jobs:
           pnpm exec biome check \
             .github/workflows/coop-public-ui-campaign.yml \
             scripts/coop-browser-entry.ts \
+            scripts/prepare-coop-browser-artifact.mjs \
+            test/browser/coop-public-ui/browser-artifact-prune.test.mjs \
             test/browser/coop-public-ui/campaign-policy.mjs \
             test/browser/coop-public-ui/campaign.mjs \
             test/browser/coop-public-ui/campaign-exp-phase.test.mjs \
@@ -156,6 +158,7 @@ jobs:
       - name: Verify campaign wait and rendering-profile contracts
         run: >-
           node --test
+          test/browser/coop-public-ui/browser-artifact-prune.test.mjs
           test/browser/coop-public-ui/campaign-exp-phase.test.mjs
           test/browser/coop-public-ui/campaign-render-profile.test.mjs
 

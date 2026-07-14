@@ -110,6 +110,7 @@ if (
 if (
   !browserEntry.includes("semanticBattleAddress(battle)")
   || !browserEntry.includes("address: { epoch, wave, turn }")
+  || !browserEntry.includes("optionHandler.config?.options")
 ) {
   failures.push("coop-browser-entry.ts: setup option surfaces must remain observable before Battle construction");
 }
