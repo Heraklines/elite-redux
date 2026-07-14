@@ -28,6 +28,7 @@
 //
 // HOW TO RUN (gated ER_SCENARIO=1, like every ER engine test):
 //   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/showdown/showdown-versus-summon-desync.test.ts
+// CI base probe: this comment-only delta preserves ddbaa0284 scenario semantics.
 //   (PowerShell: $env:ER_SCENARIO="1"; npx vitest run <path>)
 // =============================================================================
 
