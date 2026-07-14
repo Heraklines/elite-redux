@@ -36,6 +36,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   adoptRewardWatcherChoice,
   isCoopRewardOperationEnabled,
@@ -122,6 +123,12 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
       moveId: MoveId.TACKLE,
       targets: [BattlerIndex.ENEMY_2],
     }));
+  }
+
+  /** Install the one logical guest runtime modeled by the direct watcher-gate adversarial cases. */
+  function installDirectGuestRewardRuntime(): void {
+    setActiveCoopRuntimeOpState(createCoopRuntimeOpState("guest"));
+    resetCoopRewardOperationState();
   }
 
   /** Drive ONE host wave to a win (both player slots FIGHT the frail enemies) under the host ctx. */
@@ -237,8 +244,24 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
   //    rejections/adoptions below are proof the primitive is gating adoption (invariants 5, 6, §1.6).
   //    Host-owned EVEN interactions -> the GUEST watches (localRole "guest").
   // =====================================================================================
+  it("ADVERSARIAL runtime guard: a watcher without its owning runtime fails loud instead of falling back", () => {
+    setActiveCoopRuntimeOpState(null);
+
+    expect(() =>
+      adoptRewardWatcherChoice({
+        surface: "reward",
+        pinned: 2,
+        action: { choice: 0, data: [1, 0, 0, 0] },
+        terminal: false,
+        localRole: "guest",
+        wave: 11,
+      }),
+    ).toThrow(/no runtime installed for surface=reward/);
+    logs.flush();
+  });
+
   it("ADVERSARIAL a: a STALE buffered pick from a strictly-EARLIER interaction is REJECTED (#861 shape)", () => {
-    resetCoopRewardOperationState();
+    installDirectGuestRewardRuntime();
     const LATER = 6; // even -> host owns, guest watches
     const EARLIER = 4; // an EARLIER host-owned interaction
 
@@ -270,7 +293,7 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
   });
 
   it("ADVERSARIAL b: a LATE choice for an interaction the watcher already LEFT is REJECTED", () => {
-    resetCoopRewardOperationState();
+    installDirectGuestRewardRuntime();
     const START = 8; // even -> host owns, guest watches
 
     // Adopt a buy, then the LEAVE terminal for interaction START.
@@ -310,7 +333,7 @@ describe.skipIf(!RUN)("co-op DUO reward shop via the operation primitive (Wave-2
   });
 
   it("ADVERSARIAL c: a CONTINUATION action on the SAME pinned interaction KEEPS its operation identity (#866)", () => {
-    resetCoopRewardOperationState();
+    installDirectGuestRewardRuntime();
     const START = 10; // even -> host owns, guest watches
 
     // The owner buys a TM (a continuation-class reward): the watcher adopts the first action...
