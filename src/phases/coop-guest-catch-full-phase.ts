@@ -6,7 +6,10 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import { armCoopCatchFullIntentResend } from "#data/elite-redux/coop/coop-catch-full-operation";
+import {
+  armCoopCatchFullIntentResend,
+  captureCoopCatchFullOperationBinding,
+} from "#data/elite-redux/coop/coop-catch-full-operation";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_CATCH_FULL_SEQ } from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
@@ -56,6 +59,9 @@ export class CoopGuestCatchFullPhase extends Phase {
       this.end();
       return;
     }
+    // Bind before either UI callback can outlive this client's ambient runtime selection. The callback sends
+    // only a proposal carrier; the host's retained decision remains the sole terminal authority.
+    const operationBinding = captureCoopCatchFullOperationBinding();
     const seq = COOP_CATCH_FULL_SEQ;
     coopLog("replay", `guest catch-full picker OPEN sp=${this.speciesId} seq=${seq} (choose keep/release)`);
     try {
@@ -69,12 +75,15 @@ export class CoopGuestCatchFullPhase extends Phase {
           const turn = globalScene.currentBattle?.turn ?? 0;
           const resend = () => relay.sendInteractionChoice(seq, "catchFull", partySlot);
           resend();
-          armCoopCatchFullIntentResend({
-            payload: { type: "decision", speciesId: this.speciesId, partySlot },
-            wave,
-            turn,
-            resend,
-          });
+          armCoopCatchFullIntentResend(
+            {
+              payload: { type: "decision", speciesId: this.speciesId, partySlot },
+              wave,
+              turn,
+              resend,
+            },
+            operationBinding,
+          );
           void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => this.end());
         });
       });

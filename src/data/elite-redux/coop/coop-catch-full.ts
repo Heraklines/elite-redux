@@ -23,12 +23,13 @@
 
 import { globalScene } from "#app/global-scene";
 import {
+  captureCoopCatchFullOperationBinding,
   commitCoopCatchFullAuthorityDecision,
   sendCoopCatchFullPrompt,
 } from "#data/elite-redux/coop/coop-catch-full-operation";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_CATCH_FULL_SEQ, getCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import { failCoopSharedSession, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_CATCH_FULL_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 
 /**
@@ -49,20 +50,35 @@ export function coopHostAwaitWildCatchFullSlot(pokemonName: string, speciesId: n
   });
   const wave = globalScene.currentBattle?.waveIndex ?? 0;
   const turn = globalScene.currentBattle?.turn ?? 0;
-  sendCoopCatchFullPrompt(relay, pokemonName, speciesId, { localRole: "host", wave, turn });
+  // Promise continuations in the two-engine harness can resume after its guest became ambient. Capture the
+  // scheduling host's op-state + durability manager before opening the prompt/await and use only this stable
+  // binding for both retained commits.
+  const operationBinding = captureCoopCatchFullOperationBinding();
+  if (!sendCoopCatchFullPrompt(relay, pokemonName, speciesId, { localRole: "host", wave, turn }, operationBinding)) {
+    failCoopSharedSession(`Catch-full prompt for species ${speciesId} could not enter durable authority`);
+    return Promise.resolve(null);
+  }
   return relay
     .awaitInteractionChoice(COOP_CATCH_FULL_SEQ, getCoopFaintSwitchWaitMs(), COOP_CATCH_FULL_CHOICE_KINDS)
     .then(pick => {
       const slot = pick?.choice ?? null;
       const partySize = globalScene.getPlayerParty().length;
       if (slot == null || slot < 0 || slot >= partySize) {
-        commitCoopCatchFullAuthorityDecision({
-          payload: { type: "decision", speciesId, partySlot: -1 },
-          ownerRole: "guest",
-          localRole: "host",
-          wave,
-          turn,
-        });
+        if (
+          !commitCoopCatchFullAuthorityDecision(
+            {
+              payload: { type: "decision", speciesId, partySlot: -1 },
+              ownerRole: "guest",
+              localRole: "host",
+              wave,
+              turn,
+            },
+            operationBinding,
+          )
+        ) {
+          failCoopSharedSession(`Catch-full decline for species ${speciesId} could not enter durable authority`);
+          return null;
+        }
         coopWarn(
           "replay",
           "host: catch-full catcher declined/out-of-range/timeout; the caught mon is NOT kept (#856)",
@@ -75,13 +91,21 @@ export function coopHostAwaitWildCatchFullSlot(pokemonName: string, speciesId: n
         );
         return null;
       }
-      commitCoopCatchFullAuthorityDecision({
-        payload: { type: "decision", speciesId, partySlot: slot },
-        ownerRole: "guest",
-        localRole: "host",
-        wave,
-        turn,
-      });
+      if (
+        !commitCoopCatchFullAuthorityDecision(
+          {
+            payload: { type: "decision", speciesId, partySlot: slot },
+            ownerRole: "guest",
+            localRole: "host",
+            wave,
+            turn,
+          },
+          operationBinding,
+        )
+      ) {
+        failCoopSharedSession(`Catch-full decision for species ${speciesId} could not enter durable authority`);
+        return null;
+      }
       coopLog("replay", "host received catcher catch-full replace slot (#856)", { seq: COOP_CATCH_FULL_SEQ, slot });
       return slot;
     });

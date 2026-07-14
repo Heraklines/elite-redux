@@ -25,6 +25,12 @@
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { coopHostAwaitWildCatchFullSlot } from "#data/elite-redux/coop/coop-catch-full";
+import {
+  captureCoopCatchFullOperationBinding,
+  commitCoopCatchFullAuthorityDecision,
+  resetCoopCatchFullRetryMs,
+  setCoopCatchFullRetryMs,
+} from "#data/elite-redux/coop/coop-catch-full-operation";
 import { COOP_CATCH_FULL_SEQ, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   assembleCoopRuntime,
@@ -50,6 +56,7 @@ describe("co-op wild-catch FULL-party keep/release owner-pick relay (#856)", () 
   });
 
   afterEach(() => {
+    resetCoopCatchFullRetryMs();
     clearCoopRuntime();
     // Citizenship (#710): restore the real scene so the NEXT ER_SCENARIO file's GameManager does not reuse
     // one of this file's stubs. Order-robust: each stub file restores before the next file's beforeEach.
@@ -115,6 +122,32 @@ describe("co-op wild-catch FULL-party keep/release owner-pick relay (#856)", () 
     expect(await coopHostAwaitWildCatchFullSlot("Rattata", 19)).toBeNull();
   });
 
+  it("HOST ASYNC BINDING: its real await tail stays on the host ledger while the guest is ambient", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostRuntime = assembleCoopRuntime(host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(guest, { username: "Guest", netcodeMode: "authoritative" });
+    setCoopRuntime(hostRuntime);
+    initGlobalScene({
+      gameMode: { isCoop: true },
+      getPlayerParty: () => new Array(6).fill({}),
+    } as unknown as BattleScene);
+
+    const hostAwait = coopHostAwaitWildCatchFullSlot("Rattata", 19);
+    // Resolve the real helper's await after the harness has installed the peer. The decision commit must use
+    // the host binding captured before the await, never this ambient guest selector.
+    setCoopRuntime(guestRuntime);
+    guestRuntime.interactionRelay.sendInteractionChoice(COOP_CATCH_FULL_SEQ, "catchFull", 2);
+    expect(await hostAwait).toBe(2);
+    await flush();
+
+    expect(hostRuntime.durability?.highWaterMarks()["op:global"], "prompt + decision stayed host-owned").toBe(2);
+    expect(
+      guestRuntime.durability?.highWaterMarks()["op:global"],
+      "the ambient guest did not become a second committer",
+    ).toBeUndefined();
+    expect(guestRuntime.durability?.appliedMarks()["op:global"], "the guest applied the same dense order").toBe(2);
+  });
+
   it("HOST resolves null when there is no relay (defensive: no active runtime)", async () => {
     // No runtime installed -> getCoopInteractionRelay() is null -> the helper declines rather than hangs.
     initGlobalScene({
@@ -165,6 +198,69 @@ describe("co-op wild-catch FULL-party keep/release owner-pick relay (#856)", () 
     const relayed = await relayedP;
     expect(relayed?.choice, "guest relayed the chosen replace slot to the host").toBe(2);
     expect(relayed?.kind, "the relayed pick carries the catchFull kind").toBe("catchFull");
+  });
+
+  it("GUEST ASYNC UI BINDING: a picker callback keeps its retry on the guest while the host is ambient", async () => {
+    setCoopCatchFullRetryMs(10);
+    const { host, guest } = createLoopbackPair();
+    const hostRuntime = assembleCoopRuntime(host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(guest, { username: "Guest", netcodeMode: "authoritative" });
+    setCoopRuntime(hostRuntime);
+    const hostBinding = captureCoopCatchFullOperationBinding();
+    setCoopRuntime(guestRuntime);
+
+    let textCallback: (() => void) | null = null;
+    let pickerCallback: ((slot: number) => void) | null = null;
+    initGlobalScene({
+      gameMode: { isCoop: true },
+      ui: {
+        getMode: () => UiMode.MESSAGE,
+        showText: (_t: string, _d: unknown, cb?: () => void) => {
+          textCallback = cb ?? null;
+        },
+        setMode: (...args: unknown[]) => {
+          if (args[0] === UiMode.PARTY) {
+            pickerCallback = args.find(a => typeof a === "function") as (slot: number) => void;
+          }
+          if (args[0] === UiMode.MESSAGE) {
+            return new Promise(() => {});
+          }
+          return Promise.resolve();
+        },
+      },
+    } as unknown as BattleScene);
+    let delivered = 0;
+    const offCount = host.onMessage(msg => {
+      if (msg.t === "interactionChoice" && msg.kind === "catchFull") {
+        delivered++;
+      }
+    });
+
+    // start() captures the guest binding before either UI callback. Resume both callbacks after swapping the
+    // process-global runtime to the host, exactly the adversarial shared-process schedule that used to bleed.
+    new CoopGuestCatchFullPhase("Rattata", 19).start();
+    setCoopRuntime(hostRuntime);
+    expect(textCallback).not.toBeNull();
+    textCallback!();
+    expect(pickerCallback).not.toBeNull();
+    pickerCallback!(2);
+    expect(
+      commitCoopCatchFullAuthorityDecision(
+        {
+          payload: { type: "decision", speciesId: 19, partySlot: 2 },
+          ownerRole: "guest",
+          localRole: "host",
+          wave: 1,
+          turn: 0,
+        },
+        hostBinding,
+      ),
+    ).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 30));
+
+    setCoopRuntime(guestRuntime);
+    expect(delivered, "the retained host decision cancelled the callback's exact guest retry").toBe(1);
+    offCount();
   });
 
   it("the catchFullPrompt wire shape is pure JSON (survives a serialize round-trip byte-identical)", () => {
