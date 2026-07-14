@@ -1361,6 +1361,13 @@ export interface DuoRig {
 }
 
 /**
+ * A guest command boundary reached through the real queued between-wave transition. The next replay must
+ * replace that live command surface through the phase manager, rather than start a detached replay object
+ * whose `end()` would shift an unrelated queue.
+ */
+const realGuestCommandBoundaries = new WeakMap<object, { wave: number; turn: number }>();
+
+/**
  * Drain retained-operation follow-ups under each destination's complete client context.
  *
  * One pass delivers the result and may enqueue an exact ACK or an authority response in the opposite
@@ -1619,14 +1626,20 @@ export async function buildDuo(
 }
 
 /**
- * Re-mirror the host's CURRENT (freshly-rolled, post-shop) battle onto the guest scene for the next
- * wave. In production the guest reaches wave N+1 through its own NewBattlePhase -> EncounterPhase ->
- * adoptCoopHostEnemyParty; the duo harness instead re-applies {@linkcode mirrorHostBattleToGuest}
- * per wave (the spike's wave-1 technique, looped) so the guest's REAL replay pipeline runs against
- * each wave's host-authoritative field without driving the full launch handshake. Runs inside
- * withClient(guestCtx) so globalScene is the guest while the clone is built.
+ * Re-mirror a deliberately abbreviated/bootstrapped guest fixture. A guest that already crossed the real
+ * queued NewBattle -> Encounter -> Command boundary must retain the state it adopted from the carrier;
+ * overwriting it here would turn a production-transition test back into a state-clone test.
  */
 export async function remirrorWave(rig: DuoRig, opts?: { preserveGuestPlayerParty?: boolean }): Promise<void> {
+  const materialized = realGuestCommandBoundaries.get(rig.guestScene);
+  if (
+    materialized != null
+    && materialized.wave === rig.hostScene.currentBattle.waveIndex
+    && materialized.wave === rig.guestScene.currentBattle.waveIndex
+    && materialized.turn === rig.guestScene.currentBattle.turn
+  ) {
+    return;
+  }
   await withClient(rig.guestCtx, () => {
     mirrorHostBattleToGuest(rig.hostScene, rig.guestScene, opts);
     const gf = rig.guestScene.getPlayerField();
@@ -1643,12 +1656,49 @@ export async function remirrorWave(rig: DuoRig, opts?: { preserveGuestPlayerPart
 }
 
 /**
- * Materialize the command-boundary arrival omitted by {@linkcode remirrorWave}'s abbreviated guest
- * transition. Call this AFTER both reward terminals and BEFORE awaiting the host's next CommandPhase:
- * the host phase is fail-closed and therefore cannot finish first so a later remirror can rescue it.
- * This sends a real rendezvous frame and drains the loopback; it never authorizes a unilateral cross.
+ * Bring the two-engine fixture to a reciprocal command boundary.
+ *
+ * For an ordinary next-turn rendezvous, the already-materialized guest only needs to announce arrival.
+ * For a between-wave boundary, first drive the HOST's real post-shop queue until its Encounter publishes
+ * the retained enemy carrier, then drive the GUEST's real CoopPartnerSync -> NewBattle -> Encounter queue
+ * until it consumes that carrier and reaches CommandPhase. Only after both engines have materialized the
+ * exact wave/turn does the harness announce the guest command arrival. This preserves the production
+ * ordering while leaving the host CommandPhase unstarted for the test framework's public driver.
  */
 export async function arriveGuestCommandBoundary(rig: DuoRig, wave: number, turn = 1): Promise<void> {
+  if (rig.hostScene.currentBattle.waveIndex < wave || rig.guestScene.currentBattle.waveIndex < wave) {
+    await withClient(rig.hostCtx, () =>
+      driveClientPhaseQueueTo(rig.hostScene, `host wave ${wave} CommandPhase`, {
+        matches: phase =>
+          phase.phaseName === "CommandPhase"
+          && rig.hostScene.currentBattle.waveIndex === wave
+          && rig.hostScene.currentBattle.turn === turn,
+      }),
+    );
+    await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, `guest wave ${wave} CommandPhase`, {
+        matches: phase =>
+          phase.phaseName === "CommandPhase"
+          && rig.guestScene.currentBattle.waveIndex === wave
+          && rig.guestScene.currentBattle.turn === turn,
+      }),
+    );
+    realGuestCommandBoundaries.set(rig.guestScene, { wave, turn });
+  }
+
+  if (
+    rig.hostScene.currentBattle.waveIndex !== wave
+    || rig.guestScene.currentBattle.waveIndex !== wave
+    || rig.hostScene.currentBattle.turn !== turn
+    || rig.guestScene.currentBattle.turn !== turn
+  ) {
+    throw new Error(
+      `command boundary ${wave}:${turn} was not materialized on both clients `
+        + `(host=${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn}, `
+        + `guest=${rig.guestScene.currentBattle.waveIndex}:${rig.guestScene.currentBattle.turn})`,
+    );
+  }
+
   await withClient(rig.guestCtx, () => {
     rig.guestRuntime.rendezvous.arrive(`cmd:${wave}:${turn}`);
   });
@@ -1714,10 +1764,14 @@ export const REPLAY_DRAIN_PHASES = new Set([
 
 /** Minimal phase-manager surface the guest replay pump needs (the guest scene satisfies it). */
 interface ReplayPumpScene {
+  currentBattle: { waveIndex: number; turn: number };
   phaseManager: {
+    clearPhaseQueue: () => void;
     create: (n: "CoopReplayTurnPhase", t: number) => Phase;
     getCurrentPhase(): Phase;
     getQueuedPhaseNames?: () => string[];
+    shiftPhase: () => void;
+    unshiftPhase: (phase: Phase) => void;
   };
 }
 
@@ -1738,11 +1792,33 @@ export async function driveGuestReplayTurn(
   // tree (Victory/reward/NewBattle tails cannot be stranded behind an unrelated constructor phase). Legacy
   // focused repros that deliberately invoke the replay seam still get a detached freshly-created phase.
   const current = guestScene.phaseManager.getCurrentPhase();
-  const replay =
-    current?.phaseName === "CoopReplayTurnPhase"
-      ? current
-      : guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
-  replay.start();
+  const realBoundary = realGuestCommandBoundaries.get(guestScene);
+  let replay: Phase;
+  let replayStarted = false;
+  if (current?.phaseName === "CoopReplayTurnPhase") {
+    replay = current;
+  } else {
+    replay = guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
+    if (
+      realBoundary?.wave === guestScene.currentBattle.waveIndex
+      && realBoundary.turn === turn
+      && current?.phaseName === "CommandPhase"
+    ) {
+      // The production guest reaches CoopReplayTurnPhase through TurnStart after public commands. These
+      // engine-focused tests supply commands to the host relay directly, so replace the now-proven guest
+      // command surface with the authoritative replay through the REAL phase manager. Clearing the local
+      // command-resolution tail is the same structural diversion TurnStart performs in production; most
+      // importantly, replay.end() now advances ITS OWN queue instead of an unrelated stale NewBattle tail.
+      guestScene.phaseManager.clearPhaseQueue();
+      guestScene.phaseManager.unshiftPhase(replay);
+      guestScene.phaseManager.shiftPhase();
+      replayStarted = true;
+      realGuestCommandBoundaries.delete(guestScene);
+    }
+  }
+  if (!replayStarted) {
+    replay.start();
+  }
   await drainLoopback();
   // Stall detection by phase IDENTITY (#827): the #782 instant-streaming continuation re-enters as a NEW
   // CoopReplayTurnPhase object each increment, so a real advance resets the counter; only the SAME object
