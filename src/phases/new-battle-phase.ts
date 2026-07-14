@@ -3,6 +3,8 @@ import {
   buildErCustomTrainerMember,
   erCustomTrainerHeldModifierConfigs,
   markErCustomTrainerUsed,
+  resolveErCustomTrainerMoveIds,
+  resolveErCustomTrainerParty,
   selectErCustomTrainerForWave,
   setErCustomTrainerBstBypass,
 } from "#data/elite-redux/er-custom-trainers";
@@ -119,39 +121,84 @@ export class NewBattlePhase extends BattlePhase {
         battle.trainer.destroy();
         battle.trainer = null;
       }
-      const trainer = new Trainer(resolved.trainerType as TrainerType, TrainerVariant.DEFAULT);
+      // Field the authored gendered sprite: FEMALE for a class that ships both an
+      // `_m`/`_f` sprite (`hasGenders`); the Trainer ctor silently demotes FEMALE
+      // to the base sprite for a single-sprite class, so a bad pairing never breaks.
+      // The authored name (assigned next) survives the variant (see getName).
+      const variant = resolved.gender === "f" ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT;
+      const trainer = new Trainer(resolved.trainerType as TrainerType, variant);
       trainer.name = resolved.name;
+      // Per-trainer BATTLE MUSIC (this battle only). trainerConfigs[type] is a
+      // SHARED singleton, so we must NOT mutate config.battleBgm — instead we
+      // shadow the INSTANCE getters (exactly how a ghost battle overrides its
+      // theme to the Cynthia piano; see markTrainerAsGhost in er-ghost-teams.ts).
+      // playBgm lazily loads an unknown key from audio/bgm/<key>.mp3. Because a
+      // fresh Trainer is built every wave, the override never leaks to the next
+      // wave — same clean-reset discipline as the #419 BST-bypass flag below.
+      // BOTH getters: getBattleBgm serves only the GEN-5 music preference; the
+      // DEFAULT preference routes through getMixedBattleBgm (the #403 lesson).
+      if (resolved.battleBgm) {
+        const bgm = resolved.battleBgm;
+        trainer.getBattleBgm = () => bgm;
+        trainer.getMixedBattleBgm = () => bgm;
+      }
+      // Per-trainer INTRO BLURB (this battle only): shown as the encounter line at
+      // battle start via the instance-level encounterMessagesOverride seam (the same
+      // one the LLM director uses), so it never mutates the shared class config. The
+      // player-facing "Skip custom trainer intros" setting suppresses it entirely,
+      // in which case the trainer keeps its default class encounter line.
+      if (resolved.introDialogue && !globalScene.skipCustomTrainerIntros) {
+        trainer.encounterMessagesOverride = [resolved.introDialogue];
+      }
       globalScene.field.add(trainer);
       battle.trainer = trainer;
       battle.battleType = BattleType.TRAINER;
       battle.enemyParty = [];
       battle.setDouble(resolved.isDouble);
 
+      // Resolve the FINAL fielded party for this run (seed-deterministic): per
+      // authored slot roll slot-fill (slot 1 always fills), and for a filled slot
+      // pick one weighted variant. An empty-rolled slot is simply omitted, so the
+      // party can shrink below the authored size — enemyLevels + the party template
+      // size below must both match this FINAL fielded count.
+      const seed = globalScene.seed ?? "";
+      const fielded = resolveErCustomTrainerParty(seed, resolved);
+      // Per-fielded-member moves resolved once (seeded RLA/RLNA tokens -> concrete
+      // legal moves), keyed by the AUTHORED slot index so the salt is stable.
+      const fieldedMoveIds = fielded.map(f => resolveErCustomTrainerMoveIds(seed, resolved.key, f.slotIndex, f.member));
+
       // Per-index levels: authored explicit level, else the wave curve baseline.
       const baseLevels = battle.enemyLevels ?? [];
       const baseLevel = baseLevels[0] ?? Math.max(5, wave);
-      const members = resolved.members;
-      const finalLevels = members.map((m, i) => m.level ?? baseLevels[i] ?? baseLevel);
+      const finalLevels = fielded.map((f, i) => f.member.level ?? baseLevels[i] ?? baseLevel);
       battle.enemyLevels = finalLevels;
 
-      // Resize the party template so genPartyMember stops at the authored size.
+      // Resize the party template so genPartyMember stops at the fielded size.
       const template = trainer.getPartyTemplate();
-      template.size = members.length;
+      template.size = fielded.length;
 
       // Field the exact authored party. The BST-cap bypass is on for the whole
       // battle (set below) so the EnemyPokemon constructor won't devolve them.
       trainer.config.partyMemberFuncs = {};
-      members.forEach((member, idx) => {
+      fielded.forEach((f, idx) => {
         trainer.config.partyMemberFuncs[idx] = (level, _strength) => {
-          const enemy = buildErCustomTrainerMember(member, idx, member.level ?? level, resolved.isDouble);
+          const enemy = buildErCustomTrainerMember(
+            f.member,
+            idx,
+            f.member.level ?? level,
+            resolved.isDouble,
+            fieldedMoveIds[idx],
+          );
           // Fallback: an unresolvable species yields a vanilla-rolled slot mon
           // rather than a crash (validation already dropped bad entries).
-          return enemy ?? globalScene.addEnemyPokemon(getPokemonSpecies(1), member.level ?? level, TrainerSlot.TRAINER);
+          return (
+            enemy ?? globalScene.addEnemyPokemon(getPokemonSpecies(1), f.member.level ?? level, TrainerSlot.TRAINER)
+          );
         };
       });
 
       // Attach the authored held items per slot (enemy-legal pool).
-      const heldByIndex = members.map(m => erCustomTrainerHeldModifierConfigs(m));
+      const heldByIndex = fielded.map(f => erCustomTrainerHeldModifierConfigs(f.member));
       trainer.config.genModifiersFunc = (party: readonly EnemyPokemon[]): PersistentModifier[] => {
         const out: PersistentModifier[] = [];
         party.forEach((enemy, i) => {
@@ -178,7 +225,7 @@ export class NewBattlePhase extends BattlePhase {
       // a triple falls back to a DOUBLE here until triples support lands.
       const tripleNote = resolved.isTriplePending ? " (triple pending #902 -> double)" : "";
       console.info(
-        `[er-custom-trainers] installed "${resolved.name}" (${resolved.key}) wave=${wave} type=${resolved.trainerType} double=${resolved.isDouble} team=${members.length}${tripleNote}`,
+        `[er-custom-trainers] installed "${resolved.name}" (${resolved.key}) wave=${wave} type=${resolved.trainerType} double=${resolved.isDouble} team=${fielded.length}/${resolved.slots.length}${tripleNote}`,
       );
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);

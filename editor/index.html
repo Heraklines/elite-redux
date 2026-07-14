@@ -167,6 +167,79 @@
       .ctr-sprite-frame { background-color: var(--panel2); border: 1px solid var(--line); border-radius: 4px; image-rendering: pixelated; color: var(--muted); font-size: 12px; display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; }
       .ctr-warn { color: var(--warn, #d68910); font-size: 12px; margin-top: 8px; line-height: 1.5; }
       .ctr-note { color: var(--muted); font-size: 12px; margin-top: 6px; line-height: 1.5; }
+      /* Major-section separators (Identity / Spawn gates / Team). */
+      .ctr-form fieldset.ctr-sec { border-top: 2px solid var(--accent); }
+      .ctr-form fieldset.ctr-sec legend { color: var(--text); font-weight: 700; font-size: 13px; }
+      /* Battle-music picker row. */
+      .ctr-bgm-row { margin-top: 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+      .ctr-bgm-row select { max-width: 260px; }
+      #ctr-bgm-play, #ctr-bgm-stop { padding: 6px 10px; }
+      /* Collapsible team members. */
+      .ctr-member { margin: 8px 0; border: 1px solid var(--line); border-left: 3px solid var(--accent); }
+      .ctr-member + .ctr-member { margin-top: 12px; }
+      .ctr-mem-sum { cursor: pointer; user-select: none; }
+      .ctr-mem-sum:hover { color: var(--accent); }
+      .ctr-mem-caret { display: inline-block; width: 14px; color: var(--muted); }
+      .ctr-mem-sum small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+      .ctr-moves-head { margin-top: 8px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+      .ctr-moves-head select { max-width: 240px; }
+      .ctr-move-err { color: #e0556a; font-size: 12px; margin-top: 5px; line-height: 1.45; }
+      /* Per-member Shiny Lab effect picker + swatch approximation. */
+      .ctr-shiny { margin-top: 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+      .ctr-shiny-lbl { color: var(--muted); font-size: 12px; }
+      .ctr-shiny select { max-width: 150px; }
+      .ctr-shiny-swatch { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      .ctr-shiny-chip { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); }
+      .ctr-shiny-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--line); }
+      /* Fusion preview (two sprites + the generated fused name). */
+      .ctr-fusion-preview { margin-top: 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel2); }
+      .ctr-fusion-sprites { display: flex; gap: 6px; align-items: center; }
+      .ctr-fusion-plus { color: var(--muted); font-size: 16px; }
+      .ctr-fusion-name { font-size: 12px; margin-top: 2px; }
+      /* Two-column layout: form on the left, sticky preview panel on the right.
+         Degrades to a single column under ~1100px (panel drops below the form). */
+      .ctr-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+      .ctr-layout-main { min-width: 0; }
+      .ctr-preview-panel { position: sticky; top: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); padding: 10px 12px; align-self: start; }
+      .ctr-preview-sec { padding: 8px 0; border-bottom: 1px solid var(--line); }
+      .ctr-preview-sec:last-child { border-bottom: none; }
+      .ctr-preview-h { color: var(--muted); font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+      .ctr-preview-mon { min-height: 40px; }
+      .ctr-preview-shiny { margin-top: 6px; }
+      .ctr-preview-bgm { font-size: 12px; }
+      .ctr-bgm-live { color: var(--accent); font-size: 11px; }
+      @media (max-width: 1100px) {
+        .ctr-layout { grid-template-columns: minmax(0, 1fr); }
+        .ctr-preview-panel { position: static; }
+      }
+      /* Trainer-class Browse modal (visual sprite picker). */
+      .ctr-modal-overlay {
+        position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.6);
+        display: flex; align-items: center; justify-content: center; padding: 24px;
+      }
+      .ctr-modal {
+        background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+        width: min(900px, 100%); max-height: 86vh; display: flex; flex-direction: column; overflow: hidden;
+      }
+      .ctr-modal-head {
+        display: flex; gap: 10px; align-items: center; padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+      }
+      .ctr-modal-head b { font-size: 14px; }
+      .ctr-modal-filter { flex: 1; min-width: 120px; }
+      .ctr-modal-close { padding: 5px 10px; }
+      .ctr-modal-grid {
+        overflow-y: auto; padding: 12px; display: grid; gap: 8px;
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      }
+      .ctr-modal-cell {
+        display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: flex-end;
+        padding: 8px 6px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+        color: var(--text); text-align: center; min-height: 96px; cursor: pointer;
+      }
+      .ctr-modal-cell:hover { border-color: var(--accent); }
+      .ctr-modal-cell .ctr-sprite-frame { min-width: 32px; min-height: 40px; background: #0d0d14; }
+      .ctr-cell-name { font-size: 11px; color: var(--muted); word-break: break-word; }
       /* ---- Pokedex Editor (Learnsets / TMs / Abilities) ---- */
       .pd { display: grid; grid-template-columns: 280px 1fr; gap: 0; height: calc(100vh - 132px); }
       .pd-list { overflow-y: auto; border-right: 1px solid var(--line); padding: 8px; display: flex; flex-direction: column; gap: 3px; }

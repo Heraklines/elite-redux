@@ -59,6 +59,30 @@ let ABILITY_NAMES = [];
 let CTR_LIVE = {}; // key → entry (species by numeric id, as stored)
 const ctr = { current: {}, baseline: {} }; // key → entry (species by CONST)
 let ctrSelected = null; // open trainer key, or null
+// Per-member TRANSIENT UI state (NOT saved, NOT part of the dirty diff): which
+// member fieldsets are expanded, and which authored set a member's dropdown
+// currently points at (member index → set index; absent/-1 = "(custom)"). Both
+// are keyed by team-slot index and reset when the open trainer changes.
+const ctrOpenMembers = new Set(); // expanded team-slot indices
+const ctrSetSel = new Map(); // team-slot index → selected set index
+let ctrFocusIdx = 0; // team-slot index whose preview shows in the right panel
+
+// Battle-music catalog (editor/data/bgm.json): [{ key, battle }]. Battle themes
+// are listed first in the picker. One SHARED Audio element previews a track;
+// picking/previewing another (or ■ stop) halts the previous playback.
+let BGM_LIST = [];
+const BGM_AUDIO_BASE = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/audio/bgm";
+let bgmPreviewAudio = null; // the single shared HTMLAudioElement
+let bgmPreviewKey = null; // the key currently playing, or null
+
+// Live egg-move source (er-egg-moves.json, keyed by species CONST → move NAMEs),
+// used by the per-member move-legality helper (levelup ∪ TM ∪ egg).
+let EGG_MOVES_LIVE = {};
+// Factory sets keyed by species CONST (from trainers.json factorySpecies): the
+// per-species authored sets powering the "Use set" move-default dropdown.
+const factoryByConst = new Map(); // CONST → [{moves:[names], abilitySlot}]
+// Memoized legal-move sets per species CONST (levelup ∪ TM ∪ egg move NAMEs).
+const legalMovesCache = new Map(); // CONST → Set<move NAME>
 
 // Usage tiers (fetched at runtime; graceful "unranked" fallback when missing).
 const usage = { loaded: false, lines: {} };
@@ -86,6 +110,11 @@ const abilById = new Map(); // abilityId → rich ability
 // TRAINER_CLASS_OPTIONS list if the generated file is missing.
 let TRAINER_CLASSES = []; // [{name, sprite, genders}]
 const trainerClassByName = new Map(); // TrainerType NAME → {name, sprite, genders}
+// Shiny Lab effect registry (editor/data/shiny-effects.json): the per-category
+// effect option lists for the per-mon shiny-effect picker. Each entry is
+// {id, label, accent}; id→entry lookups power the picker + preview swatch.
+let SHINY_EFFECTS = { palette: [], surface: [], around: [] };
+const shinyEffectById = new Map(); // effect id → {id, label, accent, category}
 // Cache of fetched TexturePacker atlas jsons (CDN url → parsed json | null on fail).
 const trainerAtlasCache = new Map();
 // Edit state keyed by species CONST (joined to data via SPECIES[i].id), so the
@@ -1563,8 +1592,74 @@ function bstOfConst(speciesConst) {
   return spByConst.get(speciesConst)?.bst ?? 0;
 }
 
-/** A fresh blank team member (species by CONST). */
-function blankCtrMember() {
+/**
+ * Normalize a spawnChance to an integer 1-100. Absent/invalid => 100 (mirrors
+ * normalizeSpawnChance in er-custom-trainers.ts): 100 = guaranteed once per run.
+ */
+function normalizeCtrSpawnChance(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 100;
+  }
+  const n = Math.floor(value);
+  return n >= 1 && n <= 100 ? n : 100;
+}
+
+/** Normalize a slotChance to an integer 1-100 (absent/invalid => 100). Mirrors
+ *  normalizeSlotChance in er-custom-trainers.ts (100 = slot always filled). */
+function normalizeCtrSlotChance(value) {
+  return normalizeCtrSpawnChance(value);
+}
+
+/** Clamp a variant weight to an integer >= 1 (invalid => 1). */
+function clampCtrWeight(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 1;
+  }
+  const n = Math.floor(value);
+  return n >= 1 ? n : 1;
+}
+
+// The two literal move tokens (resolved to a seeded legal move in-game); they are
+// EXEMPT from the move-legality/unknown-move gates and offered at the top of the
+// per-member move datalist.
+const CTR_MOVE_TOKENS = new Set(["RLA", "RLNA"]);
+const CTR_MOVE_TOKEN_LABEL = {
+  RLA: "RLA — random legal attacking move",
+  RLNA: "RLNA — random legal non-attacking move",
+};
+function ctrIsMoveToken(v) {
+  return CTR_MOVE_TOKENS.has((v || "").trim().toUpperCase());
+}
+
+/** The member-FIELD keys that make up ONE weighted possibility (excludes slot meta:
+ *  slotChance / weighted / variants / cur). */
+const CTR_MEMBER_FIELDS = [
+  "species",
+  "formIndex",
+  "level",
+  "moves",
+  "abilitySlot",
+  "fusion",
+  "heldItems",
+  "shiny",
+  "sanityOff",
+];
+
+/** Coerce a raw/edit shiny value into the editor shape { palette, surface, around, name }
+ *  (strings; empty = none). Accepts null/undefined and the saved JSON shape alike. */
+function ctrNormShiny(s) {
+  const o = s && typeof s === "object" ? s : {};
+  const str = v => (typeof v === "string" ? v : "");
+  return { palette: str(o.palette), surface: str(o.surface), around: str(o.around), name: str(o.name) };
+}
+
+/** True when a shiny edit value carries at least one effect (empties = renders normally). */
+function ctrShinyActive(s) {
+  return !!(s && (s.palette || s.surface || s.around));
+}
+
+/** A fresh blank set of member fields (one possibility), species by CONST. */
+function blankCtrMemberFields() {
   return {
     species: "",
     formIndex: 0,
@@ -1573,7 +1668,94 @@ function blankCtrMember() {
     abilitySlot: 0,
     fusion: null,
     heldItems: [],
+    // Shiny Lab visual effect the mon fields with (empty = none).
+    shiny: ctrNormShiny(null),
+    // Editor metadata: when true, this member's moves are NOT legality-checked.
+    // Persisted only when true; absent in saved JSON = enforced.
+    sanityOff: false,
   };
+}
+
+/** Deep-copy one possibility's fields (for snapshotting into/out of `variants`). */
+function ctrCopyMemberFields(src) {
+  return {
+    species: src.species || "",
+    formIndex: src.formIndex || 0,
+    level: typeof src.level === "number" ? src.level : null,
+    moves: [...(src.moves || []), "", "", "", ""].slice(0, 4),
+    abilitySlot: [0, 1, 2].includes(src.abilitySlot) ? src.abilitySlot : 0,
+    fusion: src.fusion ? { ...src.fusion } : null,
+    heldItems: (src.heldItems || []).map(h => ({ item: h.item || "", count: Number.isInteger(h.count) ? h.count : 1 })),
+    shiny: ctrNormShiny(src.shiny),
+    sanityOff: src.sanityOff === true,
+  };
+}
+
+/**
+ * A fresh blank team SLOT (species by CONST). A slot is a member-fields object
+ * (the CURRENT possibility, edited live by the field handlers) PLUS slot metadata:
+ *   slotChance : 1-100 fill chance (slots 2-6; slot 1 ignores it)
+ *   weighted   : editor flag — save as a variants array vs a flat member
+ *   variants   : [{ ...memberFields, weight }] (length >= 1; variants[cur] mirrors
+ *                the live top-level fields, synced at discrete events)
+ *   cur        : index of the currently-shown/edited possibility
+ */
+function blankCtrMember() {
+  const fields = blankCtrMemberFields();
+  return {
+    ...fields,
+    slotChance: 100,
+    weighted: false,
+    cur: 0,
+    variants: [{ ...ctrCopyMemberFields(fields), weight: 1 }],
+  };
+}
+
+/** Ensure a slot has valid weighted-variant metadata (repairs a legacy/edited slot). */
+function ctrEnsureSlot(m) {
+  if (typeof m.slotChance !== "number") {
+    m.slotChance = 100;
+  }
+  if (!Array.isArray(m.variants) || m.variants.length === 0) {
+    m.variants = [{ ...ctrCopyMemberFields(m), weight: 1 }];
+  }
+  if (!Number.isInteger(m.cur) || m.cur < 0 || m.cur >= m.variants.length) {
+    m.cur = 0;
+  }
+  if (typeof m.weighted !== "boolean") {
+    m.weighted = m.variants.length > 1;
+  }
+  for (const v of m.variants) {
+    v.weight = clampCtrWeight(v.weight);
+  }
+}
+
+/** Write the live top-level member fields back into the current possibility (variants[cur]). */
+function ctrSyncCurrentVariant(m) {
+  ctrEnsureSlot(m);
+  const weight = clampCtrWeight(m.variants[m.cur].weight);
+  m.variants[m.cur] = { ...ctrCopyMemberFields(m), weight };
+}
+
+/** Load possibility `idx` onto the live top-level member fields (weight stays on the variant). */
+function ctrLoadVariant(m, idx) {
+  const v = m.variants[idx];
+  for (const k of CTR_MEMBER_FIELDS) {
+    m[k] = ctrCopyMemberFields(v)[k];
+  }
+  m.cur = idx;
+}
+
+/** The total weight across a slot's possibilities (each clamped to >= 1). */
+function ctrTotalWeight(m) {
+  return (m.variants || []).reduce((s, v) => s + clampCtrWeight(v.weight), 0) || 1;
+}
+
+/** Human "30/100 = 30%" pick-odds string for the CURRENT possibility. */
+function ctrSlotOdds(m) {
+  const w = clampCtrWeight(m.variants[m.cur].weight);
+  const total = ctrTotalWeight(m);
+  return `${w}/${total} = ${Math.round((w / total) * 100)}%`;
 }
 
 /** A fresh blank trainer, with the next free id in the 70000-79999 band. */
@@ -1593,49 +1775,104 @@ function blankCtrTrainer() {
     id: max + 1,
     name: "",
     trainerClass: "ACE_TRAINER",
+    gender: "m",
     battleType: "single",
     difficulties: ["ace", "elite", "hell"],
     minWave: 20,
     maxWave: 80,
     endless: false,
+    spawnChance: 100,
     challenge: "none",
+    battleBgm: "",
+    introDialogue: "",
     team: [blankCtrMember()],
   };
 }
 
 /** Convert a LIVE entry (species by id) to an edit entry (species by CONST). */
 function ctrLiveToEdit(entry) {
-  const idToConst = id => spById.get(id)?.const ?? "";
   return {
     id: entry.id,
     name: entry.name ?? "",
     trainerClass: entry.trainerClass ?? "ACE_TRAINER",
+    gender: entry.gender === "f" ? "f" : "m",
     battleType: entry.battleType ?? "single",
     difficulties: Array.isArray(entry.difficulties) ? entry.difficulties.slice() : ["ace", "elite", "hell"],
     minWave: Number.isInteger(entry.minWave) ? entry.minWave : 20,
     maxWave: Number.isInteger(entry.maxWave) ? entry.maxWave : 80,
     endless: entry.endless === true,
+    // Absent/invalid spawnChance normalizes to 100 (guaranteed once per run) -
+    // keeps pre-feature saved entries behaving exactly as before.
+    spawnChance: normalizeCtrSpawnChance(entry.spawnChance),
     challenge: entry.challenge ?? "none",
-    team: (Array.isArray(entry.team) ? entry.team : []).map(m => ({
-      species: idToConst(m.species),
-      formIndex: Number.isInteger(m.formIndex) ? m.formIndex : 0,
-      level: typeof m.level === "number" ? m.level : null,
-      moves: [...(m.moves || []), "", "", "", ""].slice(0, 4),
-      abilitySlot: [0, 1, 2].includes(m.abilitySlot) ? m.abilitySlot : 0,
-      fusion:
-        m.fusion && Number.isInteger(m.fusion.species)
-          ? {
-              species: idToConst(m.fusion.species),
-              formIndex: Number.isInteger(m.fusion.formIndex) ? m.fusion.formIndex : 0,
-              abilitySlot: [0, 1, 2].includes(m.fusion.abilitySlot) ? m.fusion.abilitySlot : 0,
-            }
-          : null,
-      heldItems: (Array.isArray(m.heldItems) ? m.heldItems : []).map(h => ({
-        item: h.item || "",
-        count: Number.isInteger(h.count) ? h.count : 1,
-      })),
-    })),
+    // Trimmed bgm key; anything not [a-z0-9_] (or absent) normalizes to "" (none).
+    battleBgm: normalizeCtrBattleBgm(entry.battleBgm),
+    introDialogue: typeof entry.introDialogue === "string" ? entry.introDialogue.slice(0, 200) : "",
+    team: (Array.isArray(entry.team) ? entry.team : []).map(ctrLiveSlotToEdit),
   };
+}
+
+/** Map ONE live member's fields (species by id) to edit fields (species by CONST). */
+function ctrLiveMemberFieldsToEdit(m) {
+  const idToConst = id => spById.get(id)?.const ?? "";
+  return {
+    species: idToConst(m.species),
+    formIndex: Number.isInteger(m.formIndex) ? m.formIndex : 0,
+    level: typeof m.level === "number" ? m.level : null,
+    moves: [...(m.moves || []), "", "", "", ""].slice(0, 4),
+    abilitySlot: [0, 1, 2].includes(m.abilitySlot) ? m.abilitySlot : 0,
+    fusion:
+      m.fusion && Number.isInteger(m.fusion.species)
+        ? {
+            species: idToConst(m.fusion.species),
+            formIndex: Number.isInteger(m.fusion.formIndex) ? m.fusion.formIndex : 0,
+            abilitySlot: [0, 1, 2].includes(m.fusion.abilitySlot) ? m.fusion.abilitySlot : 0,
+          }
+        : null,
+    heldItems: (Array.isArray(m.heldItems) ? m.heldItems : []).map(h => ({
+      item: h.item || "",
+      count: Number.isInteger(h.count) ? h.count : 1,
+    })),
+    shiny: ctrNormShiny(m.shiny),
+    sanityOff: m.sanityOff === true,
+  };
+}
+
+/** Map ONE live team slot (flat member OR `{ variants, slotChance }`) to an edit slot. */
+function ctrLiveSlotToEdit(entry) {
+  // Weighted slot: several possibilities + an optional fill chance.
+  if (entry && Array.isArray(entry.variants)) {
+    const variants = entry.variants.map(v => ({ ...ctrLiveMemberFieldsToEdit(v), weight: clampCtrWeight(v.weight) }));
+    if (variants.length === 0) {
+      variants.push({ ...blankCtrMemberFields(), weight: 1 });
+    }
+    const slot = {
+      ...ctrCopyMemberFields(variants[0]), // current = variant 0
+      slotChance: normalizeCtrSlotChance(entry.slotChance),
+      weighted: variants.length > 1,
+      cur: 0,
+      variants,
+    };
+    return slot;
+  }
+  // Flat member: one possibility (weight 1), optional slotChance on the member.
+  const fields = ctrLiveMemberFieldsToEdit(entry || {});
+  return {
+    ...fields,
+    slotChance: normalizeCtrSlotChance(entry ? entry.slotChance : undefined),
+    weighted: false,
+    cur: 0,
+    variants: [{ ...ctrCopyMemberFields(fields), weight: 1 }],
+  };
+}
+
+/** Normalize a bgm key for editing: trim + [a-z0-9_] + 64 cap; else "" (none). */
+function normalizeCtrBattleBgm(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const key = value.trim();
+  return key.length > 0 && key.length <= 64 && /^[a-z0-9_]+$/.test(key) ? key : "";
 }
 
 /** Compute BST warnings + the Ace/custom informational note for a trainer (never blocks). */
@@ -1694,14 +1931,367 @@ function ctrAbilOptions(speciesConst, selected) {
     .join("");
 }
 
+/** The authored factory sets for a species CONST (empty when the species has none). */
+function factorySetsFor(speciesConst) {
+  return speciesConst ? factoryByConst.get(speciesConst) || [] : [];
+}
+
+/** A short "MOVE_A / MOVE_B / …" summary of a set's moves (for the option tooltip). */
+function setMovesSummary(set) {
+  return (set.moves || []).filter(Boolean).map(prettify).join(" / ");
+}
+
+/**
+ * Legal move NAMEs for a species CONST = levelup ∪ TM ∪ egg moves, from the data
+ * the editor already loaded (learnsets / tm-learnsets / er-egg-moves). Memoized.
+ * An empty set means "no data for this species" (treated as: enforce nothing so a
+ * data gap never blocks a save — the illegal check below skips an empty pool).
+ */
+function legalMovesFor(speciesConst) {
+  if (!speciesConst) {
+    return new Set();
+  }
+  const cached = legalMovesCache.get(speciesConst);
+  if (cached) {
+    return cached;
+  }
+  const out = new Set();
+  for (const [, moveId] of learn.current[speciesConst] || []) {
+    const nm = moveById.get(moveId)?.name;
+    if (nm) {
+      out.add(nm);
+    }
+  }
+  for (const moveId of tms.current[speciesConst] || []) {
+    const nm = moveById.get(moveId)?.name;
+    if (nm) {
+      out.add(nm);
+    }
+  }
+  const eggNames = (egg.current[speciesConst] ?? EGG_MOVES_LIVE[speciesConst] ?? []).filter(Boolean);
+  for (const nm of eggNames) {
+    out.add(String(nm).toUpperCase());
+  }
+  legalMovesCache.set(speciesConst, out);
+  return out;
+}
+
+/** True when enforcement is ON for this member AND `move` is not in its legal pool.
+ *  The RLA/RLNA tokens are ALWAYS legal (resolved to a legal move at install). */
+function ctrMoveIllegal(m, move) {
+  if (m.sanityOff || !move || ctrIsMoveToken(move)) {
+    return false;
+  }
+  const legal = legalMovesFor(m.species);
+  // An empty pool = no legality data for this species; don't flag (never blocks).
+  return legal.size > 0 && !legal.has(move);
+}
+
+/** Every illegal move on an enforced member (names), for the error line + save gate.
+ *  RLA/RLNA tokens are exempt (never counted illegal). */
+function ctrIllegalMoves(m) {
+  if (m.sanityOff) {
+    return [];
+  }
+  const legal = legalMovesFor(m.species);
+  if (legal.size === 0) {
+    return [];
+  }
+  return (m.moves || [])
+    .map(x => (x || "").trim().toUpperCase())
+    .filter(mv => mv && !ctrIsMoveToken(mv) && !legal.has(mv));
+}
+
+// ---- Battle-music preview (one shared Audio element) ------------------------
+/** Stop any in-flight preview and clear the "now playing" marker. */
+function bgmStop() {
+  if (bgmPreviewAudio) {
+    bgmPreviewAudio.pause();
+    bgmPreviewAudio.currentTime = 0;
+  }
+  bgmPreviewKey = null;
+  const btn = document.getElementById("ctr-bgm-play");
+  if (btn) {
+    btn.textContent = "▶";
+  }
+}
+
+/** Preview a bgm key through the single shared Audio element (toggles on repeat). */
+function bgmPlay(key) {
+  if (!key) {
+    return;
+  }
+  // Clicking the same track again while it plays stops it (toggle).
+  if (bgmPreviewKey === key && bgmPreviewAudio && !bgmPreviewAudio.paused) {
+    bgmStop();
+    return;
+  }
+  if (!bgmPreviewAudio) {
+    bgmPreviewAudio = new Audio();
+    bgmPreviewAudio.addEventListener("ended", bgmStop);
+  }
+  bgmPreviewAudio.pause();
+  bgmPreviewAudio.src = `${BGM_AUDIO_BASE}/${key}.mp3`;
+  bgmPreviewKey = key;
+  bgmPreviewAudio.currentTime = 0;
+  bgmPreviewAudio.play().catch(() => {
+    /* autoplay/network failure: leave the marker cleared */
+    bgmStop();
+  });
+  const btn = document.getElementById("ctr-bgm-play");
+  if (btn) {
+    btn.textContent = "⏸";
+  }
+}
+
+/** The <option>s for the battle-music picker: "(default)" + battle themes + rest. */
+function ctrBgmOptions(selected) {
+  const opt = b => `<option value="${esc(b.key)}"${selected === b.key ? " selected" : ""}>${esc(b.key)}</option>`;
+  const battle = BGM_LIST.filter(b => b.battle);
+  const other = BGM_LIST.filter(b => !b.battle);
+  let html = `<option value=""${selected ? "" : " selected"}>(default)</option>`;
+  if (battle.length > 0) {
+    html += `<optgroup label="Battle themes">${battle.map(opt).join("")}</optgroup>`;
+  }
+  if (other.length > 0) {
+    html += `<optgroup label="Other tracks">${other.map(opt).join("")}</optgroup>`;
+  }
+  // A saved key that is no longer in the catalog still shows as selected.
+  if (selected && !BGM_LIST.some(b => b.key === selected)) {
+    html += `<option value="${esc(selected)}" selected>${esc(selected)} (missing)</option>`;
+  }
+  return html;
+}
+
+/** The always-visible header controls for a slot: slot-fill probability (slots
+ *  2-6) + the "Weighted slot?" toggle and, when weighted, the possibility stepper,
+ *  weight editor, pick-odds and +/✕ possibility buttons (mockup header row). */
+function ctrSlotControlsHtml(m, i) {
+  const slotProb =
+    i > 0
+      ? `<label class="ctr-slotprob" title="Chance this slot is FILLED this run (slots 2-6). 100 = always; a failed roll omits the slot and the party shrinks.">Slot&nbsp;Probability <input type="number" class="ctr-slotchance" data-idx="${i}" value="${normalizeCtrSlotChance(m.slotChance)}" min="1" max="100" style="width:56px" /></label>`
+      : "";
+  const weightedToggle = `<label class="ctr-weighted-lbl" title="Weighted slot: several Pokémon possibilities, ONE picked per run by weight. Unchecking keeps ONLY the currently-shown possibility."><input type="checkbox" class="ctr-weighted" data-idx="${i}"${m.weighted ? " checked" : ""} /> Weighted slot?</label>`;
+  let weightedCtrls = "";
+  if (m.weighted) {
+    const n = m.variants.length;
+    const curWeight = clampCtrWeight(m.variants[m.cur].weight);
+    weightedCtrls = `<span class="ctr-var-ctrls">Pokémon
+      <button type="button" class="ctr-var-prev" data-idx="${i}" title="Previous possibility">◂</button>
+      <span class="ctr-var-n"><b>${m.cur + 1}</b>/${n}</span>
+      <button type="button" class="ctr-var-next" data-idx="${i}" title="Next possibility">▸</button>
+      weight <input type="number" class="ctr-var-weight" data-idx="${i}" value="${curWeight}" min="1" max="999" style="width:52px" />
+      <span class="ctr-var-odds" title="Pick odds for this possibility this run">${esc(ctrSlotOdds(m))}</span>
+      <button type="button" class="ctr-var-add" data-idx="${i}" title="Add a possibility">＋ possibility</button>
+      ${n > 1 ? `<button type="button" class="ctr-var-del" data-idx="${i}" title="Remove this possibility">✕ possibility</button>` : ""}
+    </span>`;
+  }
+  return `<div class="ctr-slot-ctrls">${slotProb}${weightedToggle}${weightedCtrls}</div>`;
+}
+
+/** The <option>s for one shiny-effect category select: "(none)" + the registry. */
+function ctrShinyOptions(category, selected) {
+  const list = SHINY_EFFECTS[category] || [];
+  let html = `<option value=""${selected ? "" : " selected"}>(none)</option>`;
+  for (const e of list) {
+    html += `<option value="${esc(e.id)}"${selected === e.id ? " selected" : ""}>${esc(e.label)}</option>`;
+  }
+  // A saved id no longer in the registry still shows selected (never silently drop).
+  if (selected && !list.some(e => e.id === selected)) {
+    html += `<option value="${esc(selected)}" selected>${esc(selected)} (missing)</option>`;
+  }
+  return html;
+}
+
+/** A rough color-chip approximation of a shiny look (the REAL effect renders in-game). */
+function ctrShinySwatchHtml(s) {
+  const chips = [];
+  for (const cat of ["palette", "surface", "around"]) {
+    const id = s[cat];
+    if (!id) {
+      continue;
+    }
+    const e = shinyEffectById.get(id);
+    const accent = e ? e.accent : "#888";
+    const label = e ? e.label : id;
+    chips.push(
+      `<span class="ctr-shiny-chip" title="${esc(cat)}"><span class="ctr-shiny-dot" style="background:${esc(accent)}"></span>${esc(label)}</span>`,
+    );
+  }
+  return chips.length > 0
+    ? `<span class="ctr-shiny-swatch">${chips.join("")}</span>`
+    : '<span class="dyn">no effect (renders normally)</span>';
+}
+
+/** Per-member Shiny Lab effect picker: a palette/surface/aura select + name prefix
+ *  + an honest color-swatch approximation. Empty selects = the mon renders normally. */
+function ctrShinyPickerHtml(m, i) {
+  const s = ctrNormShiny(m.shiny);
+  return `<div class="ctr-shiny" data-idx="${i}">
+    <span class="ctr-shiny-lbl" title="Shiny Lab visual effect this Pokémon fields with in battle. The swatch is a rough approximation; the animated effect renders in-game.">Shiny effect:</span>
+    <label>Palette <select class="ctr-shiny-sel" data-idx="${i}" data-cat="palette">${ctrShinyOptions("palette", s.palette)}</select></label>
+    <label>Surface <select class="ctr-shiny-sel" data-idx="${i}" data-cat="surface">${ctrShinyOptions("surface", s.surface)}</select></label>
+    <label>Aura <select class="ctr-shiny-sel" data-idx="${i}" data-cat="around">${ctrShinyOptions("around", s.around)}</select></label>
+    <label>Name <input class="ctr-shiny-name" data-idx="${i}" maxlength="16" value="${esc(s.name || "")}" placeholder="name prefix" spellcheck="false" style="width:120px" /></label>
+    ${ctrShinySwatchHtml(s)}
+  </div>`;
+}
+
+/** Verbatim port of getFusedSpeciesName (src/utils/pokemon-utils.ts): the NAME the
+ *  game generates for a fusion of two species display names. Kept byte-for-byte so
+ *  the editor preview matches the in-game fused name exactly. */
+function ctrFusedName(speciesAName, speciesBName) {
+  const fragAPattern = /([a-z]{2}.*?[aeiou(?:y$)\-']+)(.*?)$/i;
+  const fragBPattern = /([a-z]{2}.*?[aeiou(?:y$)\-'])(.*?)$/i;
+  const [speciesAPrefixMatch, speciesBPrefixMatch] = [speciesAName, speciesBName].map(n => /^(?:[^ ]+) /.exec(n));
+  const [speciesAPrefix, speciesBPrefix] = [speciesAPrefixMatch, speciesBPrefixMatch].map(m => (m ? m[0] : ""));
+  if (speciesAPrefix) {
+    speciesAName = speciesAName.slice(speciesAPrefix.length);
+  }
+  if (speciesBPrefix) {
+    speciesBName = speciesBName.slice(speciesBPrefix.length);
+  }
+  const [speciesASuffixMatch, speciesBSuffixMatch] = [speciesAName, speciesBName].map(n => / (?:[^ ]+)$/.exec(n));
+  const [speciesASuffix, speciesBSuffix] = [speciesASuffixMatch, speciesBSuffixMatch].map(m => (m ? m[0] : ""));
+  if (speciesASuffix) {
+    speciesAName = speciesAName.slice(0, -speciesASuffix.length);
+  }
+  if (speciesBSuffix) {
+    speciesBName = speciesBName.slice(0, -speciesBSuffix.length);
+  }
+  const splitNameA = speciesAName.split(/ /g);
+  const splitNameB = speciesBName.split(/ /g);
+  const fragAMatch = fragAPattern.exec(speciesAName);
+  const fragBMatch = fragBPattern.exec(speciesBName);
+  let fragA;
+  let fragB;
+  fragA = splitNameA.length === 1 ? (fragAMatch ? fragAMatch[1] : speciesAName) : splitNameA.at(-1);
+  if (splitNameB.length === 1) {
+    if (fragBMatch) {
+      const lastCharA = fragA.slice(fragA.length - 1);
+      const prevCharB = fragBMatch[1].slice(fragBMatch.length - 1);
+      fragB = (/[-']/.test(prevCharB) ? prevCharB : "") + fragBMatch[2] || prevCharB;
+      if (lastCharA === fragB[0]) {
+        if (/[aiu]/.test(lastCharA)) {
+          fragB = fragB.slice(1);
+        } else {
+          const newCharMatch = new RegExp(`[^${lastCharA}]`).exec(fragB);
+          if (newCharMatch?.index !== undefined && newCharMatch.index > 0) {
+            fragB = fragB.slice(newCharMatch.index);
+          }
+        }
+      }
+    } else {
+      fragB = speciesBName;
+    }
+  } else {
+    fragB = splitNameB.at(-1);
+  }
+  if (splitNameA.length > 1) {
+    fragA = `${splitNameA.slice(0, splitNameA.length - 1).join(" ")} ${fragA}`;
+  }
+  fragB = `${fragB.slice(0, 1).toLowerCase()}${fragB.slice(1)}`;
+  if (fragA === "Rapi") {
+    fragA = "Rapid";
+    if (fragB === "ng") {
+      fragB = speciesBName.slice(speciesBName.length - 3);
+    }
+  }
+  return `${speciesAPrefix || speciesBPrefix}${fragA}${fragB}${speciesBSuffix || speciesASuffix}`;
+}
+
+/** A species CONST's front-sprite CDN url (same slug path the game/editor mon
+ *  previews use), or "" when the species/slug can't be resolved. */
+function ctrSpeciesSpriteUrl(speciesConst) {
+  const s = speciesConst ? spByConst.get(speciesConst) : null;
+  return s && s.slug ? `${SPRITE_BASE}/${s.slug}/front.png` : "";
+}
+
+/** Fusion preview: the two base + fusion battle sprites side by side + the fused
+ *  NAME the game would generate. Approximation label: in-game blends palettes too.
+ *  Returns "" when the member has no (complete) fusion configured. */
+function ctrFusionPreviewHtml(m) {
+  const fus = m && m.fusion;
+  if (!fus || !m.species || !fus.species) {
+    return "";
+  }
+  const base = spByConst.get(m.species);
+  const other = spByConst.get(fus.species);
+  if (!base || !other) {
+    return "";
+  }
+  const fused = ctrFusedName(base.name || m.species, other.name || fus.species);
+  const img = url =>
+    url
+      ? `<img src="${esc(url)}" style="width:56px;height:56px;image-rendering:pixelated" onerror="this.style.visibility='hidden'" />`
+      : '<span class="dyn">?</span>';
+  return `<div class="ctr-fusion-preview">
+    <div class="ctr-fusion-sprites">${img(ctrSpeciesSpriteUrl(m.species))}<span class="ctr-fusion-plus">+</span>${img(ctrSpeciesSpriteUrl(fus.species))}</div>
+    <div class="ctr-fusion-name">Fused name: <b>${esc(fused)}</b></div>
+    <div class="hint">Approximation: in-game fusion also blends palettes.</div>
+  </div>`;
+}
+
 function ctrMemberHtml(m, i) {
-  const moveInputs = [0, 1, 2, 3]
-    .map(
-      s =>
-        `<input class="ctr-move" list="moves-list" data-idx="${i}" data-slot="${s}" value="${esc(m.moves[s] || "")}" placeholder="move ${s + 1}" spellcheck="false" style="width:130px" />`,
-    )
-    .join(" ");
+  ctrEnsureSlot(m); // repair weighted-variant metadata on a legacy/edited slot
+  const open = ctrOpenMembers.has(i);
   const scale = m.level === null;
+  const sets = factorySetsFor(m.species);
+  const selSet = ctrSetSel.has(i) ? ctrSetSel.get(i) : -1;
+  const spName = m.species ? spByConst.get(m.species)?.name || m.species : "(empty)";
+  // Collapsed summary: slot, species, level, set name if any (task #9). A weighted
+  // slot tags the current possibility (e.g. "· 2/3").
+  const setTag = selSet >= 0 && sets[selSet] ? ` · Set ${selSet + 1}` : "";
+  const varTag = m.weighted && m.variants.length > 1 ? ` · ${m.cur + 1}/${m.variants.length}` : "";
+  const summary = `<span class="ctr-mem-sum" data-idx="${i}" role="button" title="Click to ${open ? "collapse" : "expand"}">
+    <span class="ctr-mem-caret">${open ? "▾" : "▸"}</span> Slot ${i + 1}: <b>${esc(spName)}</b>
+    <small>${scale ? "wave-scaled" : `Lv ${m.level}`}${setTag}${varTag}${m.sanityOff ? " · sanity off" : ""}</small></span>`;
+  const slotCtrls = ctrSlotControlsHtml(m, i);
+  if (!open) {
+    return `<fieldset class="ctr-member">
+      <legend>${summary} <button type="button" class="ctr-mem-del" data-idx="${i}" title="Remove this member">✕</button></legend>
+      ${slotCtrls}
+    </fieldset>`;
+  }
+  // Move-legality: enforce unless sanity is off. A per-member datalist always
+  // offers the RLA/RLNA tokens FIRST, then the legal pool when we HAVE data (else
+  // the full move set so a data gap never traps the user; matches the save gate).
+  const enforce = !m.sanityOff;
+  const legal = enforce ? legalMovesFor(m.species) : null;
+  const useLegalList = enforce && legal && legal.size > 0;
+  const poolNames = useLegalList ? [...legal].sort() : [...MOVE_SET].sort();
+  const tokenOpts = ["RLA", "RLNA"]
+    .map(tk => `<option value="${tk}">${esc(CTR_MOVE_TOKEN_LABEL[tk])}</option>`)
+    .join("");
+  const listId = `ctr-moves-${i}`;
+  const legalDatalist = `<datalist id="${listId}">${tokenOpts}${poolNames
+    .map(mv => `<option value="${mv}">${prettify(mv)}</option>`)
+    .join("")}</datalist>`;
+  const moveInputs = [0, 1, 2, 3]
+    .map(s => {
+      const bad = ctrMoveIllegal(m, (m.moves[s] || "").trim().toUpperCase());
+      return `<input class="ctr-move" list="${listId}" data-idx="${i}" data-slot="${s}" value="${esc(m.moves[s] || "")}" placeholder="move ${s + 1}" spellcheck="false" style="width:130px${bad ? `;border-color:${ERR}` : ""}" />`;
+    })
+    .join(" ");
+  const illegal = ctrIllegalMoves(m);
+  const errLine =
+    illegal.length > 0
+      ? `<div class="ctr-move-err">✗ illegal move${illegal.length > 1 ? "s" : ""} for ${esc(spName)}: ${illegal
+          .map(esc)
+          .join(", ")} — not in its level-up/TM/egg pool. Fix it, or tick “Move sanity off”.</div>`
+      : "";
+  const setDropdown =
+    sets.length === 0
+      ? `<select class="ctr-set" data-idx="${i}" disabled title="This species has no authored factory sets"><option>(no sets)</option></select>`
+      : `<select class="ctr-set" data-idx="${i}" title="Fill the 4 moves + ability from an authored set">
+          <option value="-1"${selSet === -1 ? " selected" : ""}>(custom)</option>
+          ${sets
+            .map(
+              (set, si) =>
+                `<option value="${si}"${selSet === si ? " selected" : ""} title="${esc(setMovesSummary(set))}">Set ${si + 1} · ${esc(setMovesSummary(set))}</option>`,
+            )
+            .join("")}
+        </select>`;
   const heldRows = m.heldItems
     .map(
       (h, hi) =>
@@ -1711,14 +2301,21 @@ function ctrMemberHtml(m, i) {
     )
     .join("");
   const fus = m.fusion;
-  return `<fieldset class="ctr-member">
-    <legend>Slot ${i + 1} <button type="button" class="ctr-mem-del" data-idx="${i}" title="Remove this member">✕</button></legend>
+  return `<fieldset class="ctr-member open">
+    <legend>${summary} <button type="button" class="ctr-mem-del" data-idx="${i}" title="Remove this member">✕</button></legend>
+    ${slotCtrls}
     <label>Species <input class="ctr-species" list="species-list" data-idx="${i}" value="${esc(m.species || "")}" placeholder="SPECIES_…" spellcheck="false" style="width:170px" /></label>
     <label>Form <input type="number" class="ctr-form" data-idx="${i}" value="${m.formIndex || 0}" min="0" max="60" style="width:56px" /></label>
     <label>Ability slot <select class="ctr-abil" data-idx="${i}">${ctrAbilOptions(m.species, m.abilitySlot)}</select></label>
     <label title="Uncheck to set an explicit level">Wave-scale level <input type="checkbox" class="ctr-scale" data-idx="${i}"${scale ? " checked" : ""} /></label>
     <label>Level <input type="number" class="ctr-level" data-idx="${i}" value="${scale ? "" : m.level}" min="1" max="200" ${scale ? "disabled" : ""} style="width:64px" /></label>
-    <div class="ctr-moves">${moveInputs}</div>
+    <div class="ctr-moves-head">
+      <label>Use set <span>${setDropdown}</span></label>
+      <label title="Skip move-legality checks for this member (saved as sanityOff)"><input type="checkbox" class="ctr-sanity" data-idx="${i}"${m.sanityOff ? " checked" : ""} /> Move sanity off</label>
+    </div>
+    <div class="ctr-moves">${moveInputs}${legalDatalist}</div>
+    <div class="hint ctr-move-hint">Tokens: type <b>RLA</b> (random legal attacking) or <b>RLNA</b> (random legal non-attacking) as a move — resolved to a seeded random legal move of this species in-game (exempt from the legality check).</div>
+    ${errLine}
     <div class="ctr-fusion">
       <label>Fusion <input type="checkbox" class="ctr-fusion-on" data-idx="${i}"${fus ? " checked" : ""} /></label>
       ${
@@ -1730,6 +2327,7 @@ function ctrMemberHtml(m, i) {
       }
     </div>
     <div class="ctr-held">Held items: ${heldRows}<button type="button" class="ctr-held-add" data-idx="${i}">＋ item</button></div>
+    ${ctrShinyPickerHtml(m, i)}
   </fieldset>`;
 }
 
@@ -1779,7 +2377,28 @@ function renderTrainerFrame(file, el) {
     });
 }
 
-/** Refresh the trainer-class sprite preview from the current #ctr-class value. */
+/** True when the CURRENT trainer's class ships both `_m`/`_f` sprites (hasGenders). */
+function ctrClassHasGenders() {
+  const t = ctrCur();
+  const entry = t ? trainerClassByName.get((t.trainerClass || "").trim().toUpperCase()) : null;
+  return !!(entry && entry.genders);
+}
+
+/** M/F radio for gendered classes (which sprite the trainer fields). Hidden for
+ *  single-sprite classes (gender has no effect there). */
+function ctrGenderPickerHtml(t) {
+  if (!ctrClassHasGenders()) {
+    return "";
+  }
+  const g = t.gender === "f" ? "f" : "m";
+  return `<span class="ctr-gender" title="Which gendered sprite this trainer fields (classes with an M and F sprite).">Sprite gender:
+    <label><input type="radio" name="ctr-gender" class="ctr-gender-radio" value="m"${g === "m" ? " checked" : ""} /> M</label>
+    <label><input type="radio" name="ctr-gender" class="ctr-gender-radio" value="f"${g === "f" ? " checked" : ""} /> F</label></span>`;
+}
+
+/** Refresh the trainer-class sprite preview from the current #ctr-class value. For
+ *  a gendered class, show ONLY the selected variant; for an unknown class, nothing;
+ *  a single-sprite class shows its one sprite. */
 function updateCtrSpritePreview() {
   const box = document.getElementById("ctr-sprite-preview");
   if (!box) {
@@ -1793,13 +2412,168 @@ function updateCtrSpritePreview() {
     box.innerHTML = '<span class="dyn">no sprite for this class</span>';
     return;
   }
-  const files = entry.genders ? [`${entry.sprite}_m`, `${entry.sprite}_f`] : [entry.sprite];
+  const t = ctrCur();
+  // Gendered class: field ONLY the selected variant (default "m"); single-sprite
+  // class: its lone sprite (gender has no meaning).
+  const files = entry.genders ? [`${entry.sprite}_${t && t.gender === "f" ? "f" : "m"}`] : [entry.sprite];
   for (const f of files) {
     const frame = document.createElement("div");
     frame.className = "ctr-sprite-frame";
     box.appendChild(frame);
     renderTrainerFrame(f, frame);
   }
+}
+
+// ---- Trainer-class Browse modal (visual sprite picker, task #6) -------------
+let trainerClassModalEl = null;
+
+/** Tear down the class-browse modal (and its IntersectionObserver). */
+function closeTrainerClassModal() {
+  if (trainerClassModalEl) {
+    if (trainerClassModalEl._io) {
+      trainerClassModalEl._io.disconnect();
+    }
+    trainerClassModalEl.remove();
+    trainerClassModalEl = null;
+  }
+}
+
+/**
+ * Open an in-page modal grid of EVERY sprite-bearing trainer class
+ * (trainer-classes.json). Each cell shows the lazy CDN atlas-crop sprite (reusing
+ * renderTrainerFrame + the shared trainerAtlasCache) + the prettified name. Cells
+ * paint their sprite ONLY when scrolled into view (IntersectionObserver), so
+ * opening the modal doesn't fire 249 fetches at once. A text filter narrows the
+ * grid. Clicking a cell fills #ctr-class, closes, and refreshes the inline preview.
+ */
+function openTrainerClassModal() {
+  closeTrainerClassModal();
+  const overlay = document.createElement("div");
+  overlay.className = "ctr-modal-overlay";
+  overlay.innerHTML = `
+    <div class="ctr-modal" role="dialog" aria-label="Browse trainer classes">
+      <div class="ctr-modal-head">
+        <b>Browse trainer classes</b>
+        <input type="search" class="ctr-modal-filter" placeholder="Filter by name…" autocomplete="off" spellcheck="false" />
+        <button type="button" class="ctr-modal-close" title="Close">✕</button>
+      </div>
+      <div class="ctr-modal-grid"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  trainerClassModalEl = overlay;
+
+  const grid = overlay.querySelector(".ctr-modal-grid");
+  const io = new IntersectionObserver(
+    entries => {
+      for (const ent of entries) {
+        if (ent.isIntersecting) {
+          const cell = ent.target;
+          const frame = cell.querySelector(".ctr-sprite-frame");
+          if (frame && !frame.dataset.painted) {
+            frame.dataset.painted = "1";
+            renderTrainerFrame(cell.dataset.file, frame);
+          }
+          io.unobserve(cell);
+        }
+      }
+    },
+    { root: grid, rootMargin: "120px" },
+  );
+  overlay._io = io;
+
+  for (const c of TRAINER_CLASSES) {
+    const file = c.genders ? `${c.sprite}_m` : c.sprite;
+    const cell = document.createElement("button");
+    cell.type = "button";
+    cell.className = "ctr-modal-cell";
+    cell.dataset.tcname = c.name;
+    cell.dataset.file = file;
+    cell.dataset.hay = `${c.name} ${prettify(c.name)}`.toLowerCase();
+    cell.innerHTML = `<div class="ctr-sprite-frame"></div><span class="ctr-cell-name">${esc(prettify(c.name))}</span>`;
+    grid.appendChild(cell);
+    io.observe(cell);
+  }
+
+  const filter = overlay.querySelector(".ctr-modal-filter");
+  filter.addEventListener("input", () => {
+    const q = filter.value.trim().toLowerCase();
+    for (const cell of grid.children) {
+      const show = q === "" || cell.dataset.hay.includes(q);
+      cell.style.display = show ? "" : "none";
+      // Paint a newly-revealed cell that scrolled past the observer while hidden.
+      if (show) {
+        const frame = cell.querySelector(".ctr-sprite-frame");
+        if (frame && !frame.dataset.painted) {
+          io.observe(cell);
+        }
+      }
+    }
+  });
+
+  grid.addEventListener("click", e => {
+    const cell = e.target.closest(".ctr-modal-cell");
+    if (!cell) {
+      return;
+    }
+    const t = ctrCur();
+    if (t) {
+      t.trainerClass = cell.dataset.tcname;
+    }
+    const input = document.getElementById("ctr-class");
+    if (input) {
+      input.value = cell.dataset.tcname;
+    }
+    closeTrainerClassModal();
+    // Re-render so the gender picker (in)appears for the newly-chosen class.
+    render();
+  });
+
+  overlay.querySelector(".ctr-modal-close").addEventListener("click", closeTrainerClassModal);
+  overlay.addEventListener("click", e => {
+    if (e.target === overlay) {
+      closeTrainerClassModal();
+    }
+  });
+  filter.focus();
+}
+
+/** The sticky RIGHT-column preview panel: the trainer sprite (selected gender
+ *  variant), the currently-focused member's species sprite + shiny swatch + fusion
+ *  preview, and the battle-music now-playing indicator. Pure markup; the trainer
+ *  sprite frame is painted after mount by updateCtrSpritePreview (reads #ctr-class). */
+function ctrPreviewPanelHtml(t) {
+  const team = Array.isArray(t.team) ? t.team : [];
+  const idx = Math.max(0, Math.min(ctrFocusIdx, team.length - 1));
+  const m = team[idx] || null;
+  const spName = m && m.species ? spByConst.get(m.species)?.name || m.species : "(empty)";
+  const spriteUrl = m ? ctrSpeciesSpriteUrl(m.species) : "";
+  const memberSprite = spriteUrl
+    ? `<img src="${esc(spriteUrl)}" style="width:64px;height:64px;image-rendering:pixelated" onerror="this.style.visibility='hidden'" />`
+    : '<span class="dyn">no sprite</span>';
+  const shiny = m ? ctrNormShiny(m.shiny) : ctrNormShiny(null);
+  const fusionPreview = m ? ctrFusionPreviewHtml(m) : "";
+  // Battle-music now-playing indicator: the chosen track + a live "playing" tag.
+  const bgmKey = t.battleBgm || "";
+  const playing = bgmPreviewKey && bgmPreviewAudio && !bgmPreviewAudio.paused ? bgmPreviewKey : "";
+  const bgmLine = bgmKey
+    ? `♪ <b>${esc(bgmKey)}</b>${playing === bgmKey ? ' <span class="ctr-bgm-live">▶ playing</span>' : ""}`
+    : '<span class="dyn">default class theme</span>';
+  return `<aside class="ctr-preview-panel">
+    <div class="ctr-preview-sec">
+      <div class="ctr-preview-h">Trainer sprite</div>
+      <div id="ctr-sprite-preview" class="ctr-sprite-preview"></div>
+    </div>
+    <div class="ctr-preview-sec">
+      <div class="ctr-preview-h">Slot ${idx + 1}: ${esc(spName)}</div>
+      <div class="ctr-preview-mon">${memberSprite}</div>
+      <div class="ctr-preview-shiny">${ctrShinySwatchHtml(shiny)}</div>
+      ${fusionPreview}
+    </div>
+    <div class="ctr-preview-sec">
+      <div class="ctr-preview-h">Battle music</div>
+      <div class="ctr-preview-bgm">${bgmLine}</div>
+    </div>
+  </aside>`;
 }
 
 function renderCustomTrainers(root) {
@@ -1816,8 +2590,10 @@ function renderCustomTrainers(root) {
     })
     .join("");
   let form = '<p class="hint">Pick a trainer to edit, or add a new one.</p>';
+  let panel = "";
   if (ctrSelected && ctr.current[ctrSelected]) {
     const t = ctr.current[ctrSelected];
+    panel = ctrPreviewPanelHtml(t);
     const { warnings, notes } = ctrWarnings(t);
     const diffChecks = DIFFICULTY_OPTIONS.map(
       d =>
@@ -1830,22 +2606,38 @@ function renderCustomTrainers(root) {
     const challSel = CHALLENGE_OPTIONS.map(
       c => `<option value="${c}"${t.challenge === c ? " selected" : ""}>${CHALLENGE_LABELS[c]}</option>`,
     ).join("");
+    const bgmSel = ctrBgmOptions(t.battleBgm || "");
     form = `<div class="ctr-form">
-      <fieldset><legend>Identity</legend>
+      <fieldset class="ctr-sec"><legend>Identity</legend>
         <label>Name <input type="text" id="ctr-name" maxlength="24" value="${esc(t.name || "")}" style="width:200px" /></label>
         <label>Id <input type="number" value="${t.id}" readonly style="width:80px;opacity:.6" /></label>
         <label>Sprite / class <input type="text" id="ctr-class" list="trainerclass-list" value="${esc(t.trainerClass || "")}" style="width:170px" spellcheck="false" /></label>
-        <div id="ctr-sprite-preview" class="ctr-sprite-preview"></div>
+        <button type="button" id="ctr-browse-class" title="Browse trainer classes by sprite">Browse…</button>
+        ${ctrGenderPickerHtml(t)}
+        <div class="ctr-bgm-row">
+          <label title="Music that plays for THIS trainer's battle only (er-assets audio/bgm). '(default)' keeps the trainer class's normal theme.">Battle music
+            <select id="ctr-bgm">${bgmSel}</select>
+          </label>
+          <button type="button" id="ctr-bgm-play" title="Preview the selected track">▶</button>
+          <button type="button" id="ctr-bgm-stop" title="Stop preview">■</button>
+        </div>
+        <div class="ctr-intro-row">
+          <label title="Line shown when this trainer's battle starts (up to 200 chars). Players can turn these off with the 'Skip custom trainer intros' setting.">Intro blurb
+            <input type="text" id="ctr-intro" maxlength="200" value="${esc(t.introDialogue || "")}" placeholder="Shown at battle start (optional)" style="width:320px" />
+          </label>
+        </div>
       </fieldset>
-      <fieldset><legend>Spawn gates</legend>
+      <fieldset class="ctr-sec"><legend>Spawn gates</legend>
         <div>Difficulties: ${diffChecks}</div>
         <label>Min wave <input type="number" id="ctr-minwave" value="${t.minWave}" min="1" max="5000" style="width:72px" /></label>
         <label>Max wave <input type="number" id="ctr-maxwave" value="${t.maxWave}" min="1" max="5000" ${t.endless ? "disabled" : ""} style="width:72px" /></label>
         <label title="Any floor >= min wave (endless)"><input type="checkbox" id="ctr-endless"${t.endless ? " checked" : ""} /> Endless (any floor ≥ min)</label>
+        <label title="Per-run chance this trainer appears at all. 100 = guaranteed once per run.">Spawn chance % <input type="number" id="ctr-spawnchance" value="${normalizeCtrSpawnChance(t.spawnChance)}" min="1" max="100" style="width:64px" /></label>
         <br /><label>Battle type <select id="ctr-battletype">${battleSel}</select></label>
         <label>Challenge exclusivity <select id="ctr-challenge">${challSel}</select></label>
+        <p class="hint" style="margin:6px 0 0">Spawn chance is ONE roll per run: 100 = guaranteed. If it hits, the trainer appears ONCE at a random floor in its wave range, sliding forward past boss/fixed/mystery waves.</p>
       </fieldset>
-      <fieldset class="full"><legend>Team (1-6)</legend>
+      <fieldset class="full ctr-sec"><legend>Team (1-6)</legend>
         ${t.team.map((m, i) => ctrMemberHtml(m, i)).join("")}
         ${t.team.length < 6 ? '<button type="button" id="ctr-add-member">＋ Add member</button>' : ""}
       </fieldset>
@@ -1863,7 +2655,12 @@ function renderCustomTrainers(root) {
       <p class="hint">Staff-authored trainers that spawn in real runs, gated by difficulty, floor range and challenge mode. The team is fielded EXACTLY as authored (the #419 BST cap is bypassed).</p>
       <div class="mon-list">${list || '<span class="dyn">none yet</span>'}<button type="button" id="ctr-new" class="primary">＋ New trainer</button></div>
     </div>
-    <div class="section">${form}</div>`;
+    <div class="section">
+      <div class="ctr-layout">
+        <div class="ctr-layout-main">${form}</div>
+        ${panel}
+      </div>
+    </div>`;
   // The sprite preview reads the live CDN atlas, so paint it after the DOM exists.
   updateCtrSpritePreview();
 }
@@ -1880,8 +2677,13 @@ function onCustomTrainerInput(el) {
   }
   const idx = el.dataset.idx === undefined ? -1 : Number(el.dataset.idx);
   const m = idx >= 0 ? t.team[idx] : null;
+  if (idx >= 0) {
+    ctrFocusIdx = idx; // this member's preview shows in the right panel
+  }
   if (el.id === "ctr-name") {
     t.name = el.value;
+  } else if (el.id === "ctr-intro") {
+    t.introDialogue = el.value;
   } else if (el.id === "ctr-class") {
     t.trainerClass = el.value.trim().toUpperCase();
     el.value = t.trainerClass;
@@ -1891,6 +2693,16 @@ function onCustomTrainerInput(el) {
     t.minWave = Number(el.value) || 1;
   } else if (el.id === "ctr-maxwave") {
     t.maxWave = Number(el.value) || 1;
+  } else if (el.id === "ctr-spawnchance") {
+    // Clamp to 1-100; a blank/invalid entry normalizes back to 100.
+    t.spawnChance = normalizeCtrSpawnChance(Number(el.value));
+  } else if (el.classList.contains("ctr-slotchance") && m) {
+    // Slot-fill chance (slots 2-6); clamp 1-100, blank/invalid -> 100.
+    m.slotChance = normalizeCtrSlotChance(Number(el.value));
+  } else if (el.classList.contains("ctr-var-weight") && m) {
+    // Current possibility's weight (integer >= 1); odds refresh on blur (render).
+    ctrEnsureSlot(m);
+    m.variants[m.cur].weight = clampCtrWeight(Number(el.value));
   } else if (el.classList.contains("ctr-species") && m) {
     m.species = el.value.trim().toUpperCase();
     el.value = m.species;
@@ -1903,7 +2715,13 @@ function onCustomTrainerInput(el) {
     const v = el.value.trim().toUpperCase();
     el.value = v;
     m.moves[Number(el.dataset.slot)] = v;
-    el.style.borderColor = v === "" || MOVE_SET.has(v) ? "" : ERR;
+    // A manual move edit flips the member's "Use set" dropdown back to (custom).
+    ctrSetSel.set(idx, -1);
+    // Red border for an unknown move name OR (enforcing) an illegal move. The
+    // RLA/RLNA tokens are always valid (resolved to a legal move in-game). The
+    // error line + dropdown refresh on blur (onCustomTrainerChange -> render).
+    const bad = v !== "" && !ctrIsMoveToken(v) && (!MOVE_SET.has(v) || ctrMoveIllegal(m, v));
+    el.style.borderColor = bad ? ERR : "";
   } else if (el.classList.contains("ctr-held-item") && m) {
     const h = m.heldItems[Number(el.dataset.heldidx)];
     if (h) {
@@ -1915,6 +2733,9 @@ function onCustomTrainerInput(el) {
     if (h) {
       h.count = Number(el.value) || 1;
     }
+  } else if (el.classList.contains("ctr-shiny-name") && m) {
+    m.shiny = ctrNormShiny(m.shiny);
+    m.shiny.name = el.value;
   } else if (el.classList.contains("ctr-fusion-species") && m && m.fusion) {
     m.fusion.species = el.value.trim().toUpperCase();
     el.value = m.fusion.species;
@@ -1935,12 +2756,84 @@ function onCustomTrainerChange(el) {
   }
   const idx = el.dataset.idx === undefined ? -1 : Number(el.dataset.idx);
   const m = idx >= 0 ? t.team[idx] : null;
+  if (idx >= 0) {
+    ctrFocusIdx = idx; // this member's preview shows in the right panel
+  }
   if (el.id === "ctr-battletype") {
     t.battleType = el.value;
+  } else if (el.id === "ctr-class") {
+    // Blur: a class change can flip whether the gender picker applies, so re-render.
+    t.trainerClass = el.value.trim().toUpperCase();
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-gender-radio")) {
+    t.gender = el.value === "f" ? "f" : "m";
+    updateCtrSpritePreview();
+    refreshChrome();
+    return true;
   } else if (el.id === "ctr-challenge") {
     t.challenge = el.value;
+  } else if (el.id === "ctr-bgm") {
+    // Picking a track stops any current preview (a new pick supersedes it).
+    t.battleBgm = normalizeCtrBattleBgm(el.value);
+    bgmStop();
+    refreshChrome();
+    return true;
   } else if (el.id === "ctr-endless") {
     t.endless = el.checked;
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-weighted") && m) {
+    // Toggle a weighted slot. Turning OFF with >1 possibilities keeps ONLY the
+    // currently-shown possibility (the others are dropped — the tooltip warns).
+    ctrSyncCurrentVariant(m);
+    if (el.checked) {
+      m.weighted = true;
+    } else {
+      m.weighted = false;
+      const keep = m.variants[m.cur];
+      m.variants = [keep];
+      m.cur = 0;
+      ctrLoadVariant(m, 0);
+    }
+    ctrSetSel.set(idx, -1);
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-slotchance") && m) {
+    // Blur: normalize + re-render (the border/label reflect the clamped value).
+    m.slotChance = normalizeCtrSlotChance(Number(el.value));
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-var-weight") && m) {
+    // Blur: normalize the weight + re-render so the pick-odds update.
+    ctrEnsureSlot(m);
+    m.variants[m.cur].weight = clampCtrWeight(Number(el.value));
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-set") && m) {
+    // Apply an authored set: fill the 4 moves + abilitySlot, mark the dropdown.
+    const si = Number(el.value);
+    ctrSetSel.set(idx, si);
+    const set = si >= 0 ? factorySetsFor(m.species)[si] : null;
+    if (set) {
+      m.moves = [...(set.moves || []), "", "", "", ""].slice(0, 4);
+      m.abilitySlot = [0, 1, 2].includes(set.abilitySlot) ? set.abilitySlot : 0;
+    }
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-shiny-sel") && m) {
+    // Pick a shiny effect for one category; re-render so the swatch updates.
+    m.shiny = ctrNormShiny(m.shiny);
+    m.shiny[el.dataset.cat] = el.value;
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-sanity") && m) {
+    m.sanityOff = el.checked;
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-move") && m) {
+    // Blur after a manual move edit: re-render so the error line + set dropdown
+    // reflect the change (the live red border already updated on input).
     render();
     return true;
   } else if (el.classList.contains("ctr-diff")) {
@@ -1954,12 +2847,18 @@ function onCustomTrainerChange(el) {
     render();
     return true;
   } else if ((el.classList.contains("ctr-species") || el.classList.contains("ctr-fusion-species")) && m) {
-    // Species changed (pick/blur): re-render so the ability-slot labels for the
-    // new species resolve to their real names.
+    // Species changed (pick/blur): the authored-set list + legal pool differ, so
+    // reset this member's set selection to (custom) and re-render (also refreshes
+    // the ability-slot labels for the new species).
+    if (el.classList.contains("ctr-species")) {
+      ctrSetSel.set(idx, -1);
+    }
     render();
     return true;
   } else if (el.classList.contains("ctr-abil") && m) {
     m.abilitySlot = Number(el.value);
+    // A manual ability pick flips the "Use set" dropdown back to (custom).
+    ctrSetSel.set(idx, -1);
   } else if (el.classList.contains("ctr-fusion-abil") && m && m.fusion) {
     m.fusion.abilitySlot = Number(el.value);
   } else if (el.classList.contains("ctr-scale") && m) {
@@ -1977,10 +2876,19 @@ function onCustomTrainerChange(el) {
   return true;
 }
 
+/** Reset the per-member transient UI state (collapse + set selection + panel focus). */
+function ctrResetMemberUiState() {
+  ctrOpenMembers.clear();
+  ctrSetSel.clear();
+  ctrFocusIdx = 0;
+}
+
 function onCustomTrainerClick(e) {
   const open = e.target.closest("[data-ctropen]");
   if (open) {
     ctrSelected = open.dataset.ctropen;
+    ctrResetMemberUiState();
+    bgmStop();
     render();
     return true;
   }
@@ -1992,6 +2900,9 @@ function onCustomTrainerClick(e) {
     }
     ctr.current[key] = t;
     ctrSelected = key;
+    ctrResetMemberUiState();
+    ctrOpenMembers.add(0); // the fresh member starts expanded
+    bgmStop();
     render();
     return true;
   }
@@ -1999,9 +2910,37 @@ function onCustomTrainerClick(e) {
   if (!t) {
     return false;
   }
+  // Collapse/expand a team member (task #9). Ignore clicks on the delete button.
+  const memSum = e.target.closest(".ctr-mem-sum");
+  if (memSum) {
+    const mi = Number(memSum.dataset.idx);
+    ctrFocusIdx = mi; // focus this member's preview in the right panel
+    if (ctrOpenMembers.has(mi)) {
+      ctrOpenMembers.delete(mi);
+    } else {
+      ctrOpenMembers.add(mi);
+    }
+    render();
+    return true;
+  }
+  if (e.target.closest("#ctr-browse-class")) {
+    openTrainerClassModal();
+    return true;
+  }
+  if (e.target.closest("#ctr-bgm-play")) {
+    const sel = document.getElementById("ctr-bgm");
+    bgmPlay(sel ? sel.value : t.battleBgm);
+    return true;
+  }
+  if (e.target.closest("#ctr-bgm-stop")) {
+    bgmStop();
+    return true;
+  }
   if (e.target.closest("#ctr-add-member")) {
     if (t.team.length < 6) {
       t.team.push(blankCtrMember());
+      ctrOpenMembers.add(t.team.length - 1); // new member starts expanded
+      ctrFocusIdx = t.team.length - 1; // focus the new member in the preview panel
     }
     render();
     return true;
@@ -2010,6 +2949,55 @@ function onCustomTrainerClick(e) {
   if (memDel) {
     if (t.team.length > 1) {
       t.team.splice(Number(memDel.dataset.idx), 1);
+      // Team indices shifted; drop the (now-stale) per-index UI state.
+      ctrResetMemberUiState();
+    }
+    render();
+    return true;
+  }
+  // Weighted-slot possibility stepper (◂ ▸): CYCLE the shown possibility (never
+  // creates one — N stays fixed). Sync the live fields into the current
+  // possibility first, then load the target possibility onto the form.
+  const varStep = e.target.closest(".ctr-var-prev, .ctr-var-next");
+  if (varStep) {
+    const mi = Number(varStep.dataset.idx);
+    const m = t.team[mi];
+    if (m) {
+      ctrSyncCurrentVariant(m);
+      const n = m.variants.length;
+      const delta = varStep.classList.contains("ctr-var-next") ? 1 : -1;
+      ctrLoadVariant(m, (m.cur + delta + n) % n);
+      ctrSetSel.set(mi, -1);
+    }
+    render();
+    return true;
+  }
+  // + possibility: sync current, append a fresh blank possibility (weight 1),
+  // switch to it. Explicit — cycling past the end never creates one.
+  const varAdd = e.target.closest(".ctr-var-add");
+  if (varAdd) {
+    const mi = Number(varAdd.dataset.idx);
+    const m = t.team[mi];
+    if (m) {
+      ctrSyncCurrentVariant(m);
+      m.weighted = true;
+      m.variants.push({ ...blankCtrMemberFields(), weight: 1 });
+      ctrLoadVariant(m, m.variants.length - 1);
+      ctrSetSel.set(mi, -1);
+    }
+    render();
+    return true;
+  }
+  // ✕ possibility: drop the current possibility (N >= 1 always kept), show the
+  // previous one. At N==1 the button isn't rendered.
+  const varDel = e.target.closest(".ctr-var-del");
+  if (varDel) {
+    const mi = Number(varDel.dataset.idx);
+    const m = t.team[mi];
+    if (m && m.variants.length > 1) {
+      m.variants.splice(m.cur, 1);
+      ctrLoadVariant(m, Math.max(0, m.cur - 1));
+      ctrSetSel.set(mi, -1);
     }
     render();
     return true;
@@ -2771,7 +3759,11 @@ function buildDeltas() {
       continue;
     }
     let memberBad = false;
-    const team = t.team.map(m => {
+    // Validate + serialize ONE possibility's member fields (species by CONST -> id,
+    // move NAMEs incl. RLA/RLNA tokens, fusion, held items, sanityOff). Pushes any
+    // problems into `bad` and flips `memberBad`. Reused for a flat member AND for
+    // each weighted variant.
+    const buildPossibility = m => {
       const id = spByConst.get(m.species)?.id;
       if (typeof id !== "number") {
         bad.push(`${t.name}: unknown species "${m.species}"`);
@@ -2780,8 +3772,20 @@ function buildDeltas() {
       }
       const moves = (m.moves || []).map(x => (x || "").trim().toUpperCase()).filter(Boolean);
       for (const mv of moves) {
-        if (!MOVE_SET.has(mv)) {
+        // RLA/RLNA tokens are legal move NAMEs (resolved in-game); not "unknown".
+        if (!ctrIsMoveToken(mv) && !MOVE_SET.has(mv)) {
           bad.push(`${t.name}: unknown move "${mv}"`);
+          memberBad = true;
+        }
+      }
+      // Move-legality gate: a member with sanity ENFORCED (sanityOff not set)
+      // must not carry an illegal move. Members with sanity off (and the RLA/RLNA
+      // tokens) are exempt. Never silently strip — surface a clear error.
+      if (!m.sanityOff) {
+        for (const mv of ctrIllegalMoves(m)) {
+          bad.push(
+            `${t.name}: illegal move "${mv}" for ${m.species} (not in level-up/TM/egg pool; tick "Move sanity off" to allow it)`,
+          );
           memberBad = true;
         }
       }
@@ -2808,21 +3812,68 @@ function buildDeltas() {
       if (held.length > 0) {
         out.heldItems = held;
       }
+      // Shiny Lab look: serialize only the non-empty categories (+ trimmed name)
+      // when at least one effect is picked; otherwise omit (renders normally).
+      const shiny = ctrNormShiny(m.shiny);
+      if (ctrShinyActive(shiny)) {
+        const sh = {};
+        for (const cat of ["palette", "surface", "around"]) {
+          if (shiny[cat]) {
+            sh[cat] = shiny[cat];
+          }
+        }
+        const nm = (shiny.name || "").trim();
+        if (nm) {
+          sh.name = nm;
+        }
+        out.shiny = sh;
+      }
+      // Editor metadata: persist sanityOff ONLY when the check is turned off.
+      if (m.sanityOff) {
+        out.sanityOff = true;
+      }
       return out;
+    };
+    const team = t.team.map((slot, i) => {
+      ctrEnsureSlot(slot);
+      ctrSyncCurrentVariant(slot); // fold the live edits into the current possibility
+      // slotChance applies to slots 2-6 only (slot 1 always fills); serialize it
+      // only when it differs from the 100 default (keeps flat members byte-clean).
+      const sc = i > 0 ? normalizeCtrSlotChance(slot.slotChance) : 100;
+      const withSlotChance = obj => (i > 0 && sc !== 100 ? { ...obj, slotChance: sc } : obj);
+      // Weighted form (variants array) only when there is MORE than one possibility;
+      // a single possibility always saves as a flat member (back-compat).
+      if (slot.weighted && slot.variants.length > 1) {
+        const variants = slot.variants.map(v => {
+          const out = buildPossibility(v);
+          return out ? { ...out, weight: clampCtrWeight(v.weight) } : null;
+        });
+        return withSlotChance({ variants });
+      }
+      return withSlotChance(buildPossibility(slot));
     });
     if (memberBad) {
       continue;
     }
+    // Serialize gender ONLY when the class has gendered sprites AND "f" is picked
+    // (default "m" is omitted so unaffected entries stay byte-clean).
+    const classEntry = trainerClassByName.get(t.trainerClass);
+    const genderF = classEntry && classEntry.genders && t.gender === "f";
     ctrDelta[key] = {
       id: t.id,
       name: t.name.trim(),
       trainerClass: t.trainerClass,
+      ...(genderF ? { gender: "f" } : {}),
       battleType: t.battleType || "single",
       difficulties: t.difficulties.length > 0 ? t.difficulties : ["ace", "elite", "hell"],
       minWave: t.minWave,
       maxWave: t.maxWave,
       endless: t.endless === true,
+      spawnChance: normalizeCtrSpawnChance(t.spawnChance),
       challenge: t.challenge || "none",
+      ...(normalizeCtrBattleBgm(t.battleBgm) ? { battleBgm: normalizeCtrBattleBgm(t.battleBgm) } : {}),
+      // Intro blurb: trimmed + 200-char cap; omit when empty (byte-clean default).
+      ...((t.introDialogue || "").trim() ? { introDialogue: (t.introDialogue || "").trim().slice(0, 200) } : {}),
       team,
     };
   }
@@ -2980,6 +4031,8 @@ async function init() {
       evosData,
       ctrLive,
       trainerClassesData,
+      bgmData,
+      shinyEffectsData,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
@@ -3011,6 +4064,10 @@ async function init() {
       fetchJson(`${RAW_BASE}/er-custom-trainers.json${bust}`, {}),
       // Trainer-class sprite catalog (generated). Fallback → static list below.
       fetchJson("./data/trainer-classes.json", []),
+      // Battle-music catalog (generated). Fallback → empty (picker offers "(default)").
+      fetchJson("./data/bgm.json", []),
+      // Shiny Lab effect registry (generated). Fallback → empty (picker offers "(none)").
+      fetchJson("./data/shiny-effects.json", { palette: [], surface: [], around: [] }),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -3089,6 +4146,40 @@ async function init() {
     trainerClassByName.clear();
     for (const c of TRAINER_CLASSES) {
       trainerClassByName.set(c.name, c);
+    }
+
+    // Battle-music catalog: battle_* themes first, then everything else (each
+    // group alpha-sorted) so the picker surfaces battle tracks up top.
+    BGM_LIST = (Array.isArray(bgmData) ? bgmData : [])
+      .filter(b => b && typeof b.key === "string")
+      .map(b => ({ key: b.key, battle: b.battle === true }))
+      .sort((a, b) => (a.battle === b.battle ? a.key.localeCompare(b.key) : a.battle ? -1 : 1));
+
+    // Shiny Lab effect registry: build the per-category lists + an id→entry index
+    // (with its category) for the per-mon shiny picker and the preview swatch.
+    const sd = shinyEffectsData && typeof shinyEffectsData === "object" ? shinyEffectsData : {};
+    SHINY_EFFECTS = {
+      palette: Array.isArray(sd.palette) ? sd.palette : [],
+      surface: Array.isArray(sd.surface) ? sd.surface : [],
+      around: Array.isArray(sd.around) ? sd.around : [],
+    };
+    shinyEffectById.clear();
+    for (const category of ["palette", "surface", "around"]) {
+      for (const e of SHINY_EFFECTS[category]) {
+        if (e && typeof e.id === "string") {
+          shinyEffectById.set(e.id, { ...e, category });
+        }
+      }
+    }
+
+    // Egg-move source + factory-set index for the per-member legality/set helpers.
+    EGG_MOVES_LIVE = eggLive && typeof eggLive === "object" ? eggLive : {};
+    factoryByConst.clear();
+    legalMovesCache.clear();
+    for (const s of FACTORY_SPECIES) {
+      if (s && s.const) {
+        factoryByConst.set(s.const, Array.isArray(s.setsDetail) ? s.setsDetail : []);
+      }
     }
 
     // Seed custom trainers from the live file (species id → CONST for editing).
