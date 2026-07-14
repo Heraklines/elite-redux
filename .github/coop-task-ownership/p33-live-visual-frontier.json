@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "taskId": "p33-live-visual-frontier",
+  "branch": "ci/coop/p33-live-visual-frontier",
+  "trainRef": "ci/coop/p33-mystery-public-transition",
+  "baseSha": "8600b960d081b52e61b74502509c27e7b8770fae",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-live-visual-frontier.json",
+    "src/data/elite-redux/coop/coop-field-presentation.ts",
+    "src/phases/encounter-phase.ts",
+    "test/tests/elite-redux/coop/coop-duo-launch-snapshot.test.ts"
+  ]
+}

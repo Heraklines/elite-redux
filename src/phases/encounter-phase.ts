@@ -21,7 +21,11 @@ import {
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
-import { settleCoopFieldPresentation } from "#data/elite-redux/coop/coop-field-presentation";
+import {
+  settleCoopFieldPresentation,
+  settleCoopFieldPresentationReady,
+  settleCoopTrainerIntroTrays,
+} from "#data/elite-redux/coop/coop-field-presentation";
 import { clearCoopAuthoritativeGuestPlayerTrainer } from "#data/elite-redux/coop/coop-presentation";
 import {
   coopSessionGeneration,
@@ -124,6 +128,36 @@ export function materializeCoopLoadedPlayerField(): number {
 }
 
 /**
+ * Launch/next-wave continuation gate for the authoritative renderer. Unlike the synchronous repair seam,
+ * this does not resolve until every active player seat is backed by its real loaded atlas and UI surface.
+ */
+export async function materializeCoopLoadedPlayerFieldReady(
+  remainsCurrent: () => boolean = () => true,
+): Promise<number> {
+  const battle = globalScene.currentBattle;
+  if (battle == null) {
+    return 0;
+  }
+  const capacity = battle.arrangement.playerCapacity;
+  const seats = globalScene
+    .getPlayerParty()
+    .slice(0, capacity)
+    .map((pokemon, slot) => ({ pokemon, slot }));
+  return settleCoopFieldPresentationReady(
+    {
+      side: "player",
+      seats,
+      capacity,
+      boundary: "launch-ready",
+      desired: "visible",
+      hideStale: true,
+      trainerDisposition: "hide-player",
+    },
+    remainsCurrent,
+  );
+}
+
+/**
  * Transitional field containment for the authoritative guest's adopted trainer party. Trainer
  * encounters normally reveal enemies through SummonPhase, but that phase also runs fieldSetup and
  * post-summon resolution and is therefore correctly blocked by the renderer allowlist. The old path
@@ -147,6 +181,9 @@ export function materializeCoopAdoptedEnemyField(): number {
     .getEnemyParty()
     .slice(0, capacity)
     .map((pokemon, slot) => ({ pokemon, slot }));
+  // The guest intentionally replaces the two SummonPhase instances that normally hide these trainer-intro
+  // trays. Establish that omitted phase's visual postcondition here, before EncounterPhase can open Command.
+  settleCoopTrainerIntroTrays();
   return settleCoopFieldPresentation({
     side: "enemy",
     seats,
@@ -456,6 +493,8 @@ export class EncounterPhase extends BattlePhase {
   private coopEnemyAdoptionFailures = 0;
   private coopEnemyRecoveryPromptOpen = false;
   private coopEnemyRecoveryPromptTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Prevent duplicate encounter tails while the authoritative launch presentation awaits real assets. */
+  private coopPresentationEndStarted = false;
 
   constructor(loaded = false) {
     super();
@@ -603,11 +642,14 @@ export class EncounterPhase extends BattlePhase {
         this.coopEnemyAdoptionComplete = true;
       } catch (error) {
         coopWarn("stream", "ordinary-wave authoritative encounter materialization failed closed", error);
-        failCoopSharedSession(`Could not materialize the authoritative encounter at wave ${boundary.battle.waveIndex}.`, {
-          boundary: "surface",
-          reasonCode: "continuation-failed",
-          wave: boundary.battle.waveIndex,
-        });
+        failCoopSharedSession(
+          `Could not materialize the authoritative encounter at wave ${boundary.battle.waveIndex}.`,
+          {
+            boundary: "surface",
+            reasonCode: "continuation-failed",
+            wave: boundary.battle.waveIndex,
+          },
+        );
         return;
       }
     } catch (error) {
@@ -730,7 +772,7 @@ export class EncounterPhase extends BattlePhase {
     if (!stillCurrent()) {
       throw new Error("Authoritative encounter assets arrived after boundary replacement");
     }
-    materializeCoopLoadedPlayerField();
+    await materializeCoopLoadedPlayerFieldReady(stillCurrent);
     materializeCoopAdoptedEnemyField();
     globalScene.updateGameInfo();
     if (!stillCurrent()) {
@@ -1582,6 +1624,24 @@ export class EncounterPhase extends BattlePhase {
   }
 
   end() {
+    const authoritativeGuest = isCoopAuthoritativeGuest();
+    if (authoritativeGuest) {
+      if (this.coopPresentationEndStarted) {
+        return;
+      }
+      this.coopPresentationEndStarted = true;
+    }
+    const presentationScene = globalScene;
+    const presentationBattle = presentationScene.currentBattle;
+    const presentationRuntime = getCoopRuntime();
+    const presentationGeneration = coopSessionGeneration();
+    const presentationBoundaryIsLive = (): boolean =>
+      globalScene === presentationScene
+      && presentationScene.currentBattle === presentationBattle
+      && getCoopRuntime() === presentationRuntime
+      && coopSessionGeneration() === presentationGeneration
+      && presentationScene.phaseManager.getCurrentPhase() === this;
+    let playerPresentationReady: Promise<number> | null = null;
     const enemyField = globalScene.getEnemyField();
 
     enemyField.forEach((enemyPokemon, e) => {
@@ -1626,8 +1686,8 @@ export class EncounterPhase extends BattlePhase {
       // renderer must never repair this by running SummonPhase/ToggleDoublePositionPhase because their tails
       // derive abilities, hazards and battle RNG. Materialize the already-adopted active seats for every
       // authoritative guest; the versus launch ingress has already flipped the parties into local orientation.
-      if (isCoopAuthoritativeGuest()) {
-        materializeCoopLoadedPlayerField();
+      if (authoritativeGuest) {
+        playerPresentationReady = materializeCoopLoadedPlayerFieldReady(presentationBoundaryIsLive);
       } else {
         for (let i = 1; i < playerCapacity && i < party.length; i++) {
           const pokemon = party[i];
@@ -1641,13 +1701,13 @@ export class EncounterPhase extends BattlePhase {
           pokemon.showInfo();
         }
       }
-    } else if (isCoopAuthoritativeGuest() && !isVersusSession()) {
+    } else if (authoritativeGuest && !isVersusSession()) {
       // Later waves enter with `loaded=false`, but the replayable encounter carrier has already installed the
       // host's party/topology. Re-running the ordinary summon/recenter/return/check-switch branch creates
       // renderer-denied structural phases (the exact two ToggleDoublePositionPhase leaks in the three-wave
       // journey) and can derive local mechanics. Reassert only the adopted co-op field projection. Showdown
       // keeps its fresh-versus intro path; its loaded launch still uses the presentation-only branch above.
-      materializeCoopLoadedPlayerField();
+      playerPresentationReady = materializeCoopLoadedPlayerFieldReady(presentationBoundaryIsLive);
     } else {
       const availablePartyMembers = globalScene.getPokemonAllowedInBattle();
       // Multi-format: the local player side's capacity drives how many leads summon /
@@ -1699,11 +1759,33 @@ export class EncounterPhase extends BattlePhase {
         }
       }
     }
-    handleTutorial(Tutorial.ACCESS_MENU).then(() => this.completeEncounterEnd());
+    const tutorialReady = handleTutorial(Tutorial.ACCESS_MENU);
+    if (playerPresentationReady == null) {
+      tutorialReady.then(() => this.completeEncounterEnd());
+    } else {
+      void Promise.all([tutorialReady, playerPresentationReady])
+        .then(() => {
+          if (presentationBoundaryIsLive()) {
+            this.completeEncounterEnd();
+          }
+        })
+        .catch(error => {
+          if (!presentationBoundaryIsLive()) {
+            coopWarn("renderer", "ignored superseded authoritative launch presentation failure", error);
+            return;
+          }
+          coopWarn("renderer", "authoritative player launch presentation failed closed", error);
+          failCoopSharedSession("Could not render both co-op player battlers before opening commands.", {
+            boundary: "surface",
+            reasonCode: "continuation-failed",
+            wave: presentationBattle?.waveIndex,
+          });
+        });
+    }
 
     // InitEncounterPhase derives PostSummon effects. The authoritative guest rendered the adopted launch
     // above and must wait for host state instead; constructing it only trips the default-deny renderer gate.
-    if (!isCoopAuthoritativeGuest()) {
+    if (!authoritativeGuest) {
       globalScene.phaseManager.pushNew("InitEncounterPhase");
     }
   }
