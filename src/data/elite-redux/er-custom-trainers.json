@@ -1,5 +1,6 @@
 {
   "TRAINER_70001": {
+    "battleBgm": "battle_rival",
     "battleType": "single",
     "challenge": "none",
     "defeatDialogue": "I'll see you later after my training arc!",
