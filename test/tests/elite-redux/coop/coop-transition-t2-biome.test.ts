@@ -140,6 +140,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
   let phaserGame: Phaser.Game;
   let game: GameManager;
   let logs: ReturnType<typeof installDuoLogCapture>;
+  const syntheticBoundaries = new Set<{ live: boolean }>();
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
@@ -169,6 +170,12 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
   });
 
   afterEach(() => {
+    // Direct fault probes intentionally hold a synthetic phase at one boundary. Fence every retained UI
+    // callback before test teardown so a parked mismatch cannot retry in the next test's scene/runtime.
+    for (const boundary of syntheticBoundaries) {
+      boundary.live = false;
+    }
+    syntheticBoundaries.clear();
     setCoopBiomeMarketTestSkip(true);
     resetCoopBiomePickerDrivenByTest();
     setCoopWaveBarrierMs(60_000);
@@ -192,14 +199,18 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
   /** Direct fault/permit probes bypass the queue only after explicitly installing a live-boundary seam. */
   function liveSwitch(nextBiome: BiomeId): SwitchBiomePhase {
     const phase = new SwitchBiomePhase(nextBiome);
-    (phase as unknown as { coopBoundaryStillLive(): boolean }).coopBoundaryStillLive = () => true;
+    const boundary = { live: true };
+    syntheticBoundaries.add(boundary);
+    (phase as unknown as { coopBoundaryStillLive(): boolean }).coopBoundaryStillLive = () => boundary.live;
     return phase;
   }
 
   function liveNewBiome(): NewBiomeEncounterPhase {
     const phase = new NewBiomeEncounterPhase();
+    const boundary = { live: true };
+    syntheticBoundaries.add(boundary);
     (phase as unknown as { coopBoundaryStillLive(requirePermit?: boolean): boolean }).coopBoundaryStillLive = () =>
-      true;
+      boundary.live;
     return phase;
   }
 
