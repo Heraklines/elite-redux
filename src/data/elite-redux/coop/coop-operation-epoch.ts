@@ -14,14 +14,17 @@ import { setCoopMeOperationEpoch } from "#data/elite-redux/coop/coop-me-operatio
 import { setCoopRevivalOperationEpoch } from "#data/elite-redux/coop/coop-revival-operation";
 import { setCoopRewardOperationEpoch } from "#data/elite-redux/coop/coop-reward-operation";
 import { setCoopStormglassOperationEpoch } from "#data/elite-redux/coop/coop-stormglass-operation";
-import { setCoopWaveAdvanceOperationEpoch } from "#data/elite-redux/coop/coop-wave-operation";
+import {
+  type CoopWaveAdvanceOperationBinding,
+  setCoopWaveAdvanceOperationEpoch,
+} from "#data/elite-redux/coop/coop-wave-operation";
 
 /**
  * One fan-out for the session controller's host-negotiated epoch. Every migrated operation surface must
  * reject prior-run ids under the same value; keeping the fan-out centralized prevents a newly added adapter
  * from silently remaining on epoch 1.
  */
-export function applyCoopOperationEpoch(epoch: number): void {
+export function applyCoopOperationEpoch(epoch: number, waveBinding?: CoopWaveAdvanceOperationBinding | null): void {
   if (!Number.isSafeInteger(epoch) || epoch <= 0) {
     return;
   }
@@ -36,5 +39,5 @@ export function applyCoopOperationEpoch(epoch: number): void {
   setCoopRevivalOperationEpoch(epoch);
   setCoopRewardOperationEpoch(epoch);
   setCoopStormglassOperationEpoch(epoch);
-  setCoopWaveAdvanceOperationEpoch(epoch);
+  setCoopWaveAdvanceOperationEpoch(epoch, waveBinding);
 }

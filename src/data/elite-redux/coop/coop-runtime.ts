@@ -180,6 +180,7 @@ import { applyCoopOperationEpoch } from "#data/elite-redux/coop/coop-operation-e
 import {
   coopOperationDurabilityHooks,
   isCoopOperationJournalActive,
+  isCoopOperationJournalActiveFor,
   registerCoopOperationLiveSink,
   resetCoopOperationJournalLog,
   setCoopOperationDurability,
@@ -266,6 +267,7 @@ import { coopAuthorityContinuationSurface } from "#data/elite-redux/coop/coop-ui
 import { resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import {
   type CoopStagedWaveAdvanceTransaction,
+  type CoopWaveAdvanceOperationBinding,
   commitWaveAdvanceOwnerIntent,
   getCoopStagedWaveAdvanceTransaction,
   isCoopWaveAdvanceOperationEnabled,
@@ -1060,11 +1062,12 @@ const pendingRawWavePresentations = new Map<number, CoopCapturePresentation>();
 /** A retained guest BattleEnd waiting for its exact immutable DATA image to apply. */
 let pendingSettledWaveBoundary: { wave: number; release: () => void; released: boolean } | null = null;
 
-function usesRetainedCoopWaveTransaction(): boolean {
+function usesRetainedCoopWaveTransaction(runtime: CoopRuntime | null = active): boolean {
   return (
-    isCoopWaveAdvanceOperationEnabled()
+    runtime != null
+    && isCoopWaveAdvanceOperationEnabled()
     && isCoopCapabilityNegotiated(COOP_CAP_OP_WAVE)
-    && isCoopOperationJournalActive()
+    && isCoopOperationJournalActiveFor(runtime.waveOperationBinding.durability)
   );
 }
 
@@ -1104,8 +1107,8 @@ export function consumeCoopPendingWaveEndState(): CoopAuthoritativeBattleStateV1
 }
 
 /** Apply a defensive copy of the staged DATA exactly once at a safe post-battle boundary. */
-function tryApplyCoopSettledWaveData(wave: number): boolean {
-  const staged = getCoopStagedWaveAdvanceTransaction(wave);
+function tryApplyCoopSettledWaveData(wave: number, binding: CoopWaveAdvanceOperationBinding): boolean {
+  const staged = getCoopStagedWaveAdvanceTransaction(wave, binding);
   if (staged == null) {
     return false;
   }
@@ -1127,7 +1130,7 @@ function tryApplyCoopSettledWaveData(wave: number): boolean {
   if (!applied && coopAppliedStateTick() === immutableState.tick) {
     applied = reapplyAcceptedCoopAuthoritativeBattleState(immutableState, true);
   }
-  if (!applied || !markCoopWaveAdvanceDataApplied(wave)) {
+  if (!applied || !markCoopWaveAdvanceDataApplied(wave, binding)) {
     coopWarn("progression", `retained WAVE_ADVANCE DATA apply rejected wave=${wave}`);
     failCoopSharedSession(`Could not apply the complete retained state for wave ${wave}.`);
     return false;
@@ -1145,7 +1148,8 @@ function tryApplyCoopSettledWaveData(wave: number): boolean {
  * contains those mutations, so the guest then releases the queued continuation without dual-running them.
  */
 export function awaitCoopSettledWaveAdvanceAtBattleEnd(release: () => void): boolean {
-  if (!isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction()) {
+  const runtime = active;
+  if (runtime == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
     return false;
   }
   // A Mystery battle is the continuation of an already-retained ME terminal transaction. Its BattleEnd
@@ -1160,7 +1164,7 @@ export function awaitCoopSettledWaveAdvanceAtBattleEnd(release: () => void): boo
     return true;
   }
   pendingSettledWaveBoundary = { wave, release, released: false };
-  tryApplyCoopSettledWaveData(wave);
+  tryApplyCoopSettledWaveData(wave, runtime.waveOperationBinding);
   return true;
 }
 
@@ -1199,16 +1203,16 @@ function retainedWaveContinuationIsPublic(staged: CoopStagedWaveAdvanceTransacti
   }
 }
 
-function maybeMarkCoopWaveContinuationReady(wave: number): boolean {
-  const staged = getCoopStagedWaveAdvanceTransaction(wave);
+function maybeMarkCoopWaveContinuationReady(wave: number, binding: CoopWaveAdvanceOperationBinding): boolean {
+  const staged = getCoopStagedWaveAdvanceTransaction(wave, binding);
   if (staged == null) {
     return false;
   }
   if (!staged.continuationReady && retainedWaveContinuationIsPublic(staged)) {
-    markCoopWaveAdvanceContinuationReady(wave);
+    markCoopWaveAdvanceContinuationReady(wave, binding);
     coopLog("progression", `retained WAVE_ADVANCE continuationReady wave=${wave}`);
   }
-  return isCoopWaveAdvanceTransactionComplete(wave);
+  return isCoopWaveAdvanceTransactionComplete(wave, binding);
 }
 
 /**
@@ -1248,7 +1252,7 @@ export function consumeCoopPendingWaveAdvance(): {
   if (
     pending.outcome === "gameOver"
     && pending.transition?.settledStateTick !== undefined
-    && !tryApplyCoopSettledWaveData(pending.wave)
+    && (active == null || !tryApplyCoopSettledWaveData(pending.wave, active.waveOperationBinding))
   ) {
     pendingWaveAdvance = pending;
     return null;
@@ -2617,6 +2621,8 @@ export interface CoopRuntime {
    * ({@linkcode createCoopRuntimeOpState}); installed as the active op-state by {@linkcode setCoopRuntime}.
    */
   opState: CoopRuntimeOpState;
+  /** Stable wave-transaction selector captured from this runtime, including its exact durability owner. */
+  readonly waveOperationBinding: CoopWaveAdvanceOperationBinding;
 }
 
 let active: CoopRuntime | null = null;
@@ -2684,6 +2690,13 @@ export function setCoopRuntime(runtime: CoopRuntime): void {
 /** The live co-op session, or null when not in a co-op run. */
 export function getCoopRuntime(): CoopRuntime | null {
   return active;
+}
+
+/** Exact runtime-owned WAVE_ADVANCE state used by delayed phase, replay, save, and recovery callbacks. */
+export function getCoopWaveAdvanceRuntimeBinding(
+  runtime: CoopRuntime | null = active,
+): CoopWaveAdvanceOperationBinding | null {
+  return runtime?.waveOperationBinding ?? null;
 }
 
 /** Convenience: the live session controller, or null when not in a co-op run. */
@@ -2771,7 +2784,7 @@ export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | u
     setCoopMeOperationRevisionFloor(marks["op:me"] ?? 0);
     // Wave-2f KEYSTONE (W2e-R P0-3): floor the wave-advance producer + guest so a resumed run continues the
     // committed-op revision stream at N+1 and the restored receiver ledger accepts it.
-    setCoopWaveAdvanceOperationRevisionFloor(marks["op:wave"] ?? 0);
+    setCoopWaveAdvanceOperationRevisionFloor(marks["op:wave"] ?? 0, runtime.waveOperationBinding);
   } catch {
     /* control-plane restore is best-effort; a resume must never hard-fail on it */
   }
@@ -3205,7 +3218,8 @@ function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, envelope: CoopAu
       return false;
     }
     const payload = operation.payload as CoopWaveAdvancePayload;
-    const staged = getCoopStagedWaveAdvanceTransaction(payload.wave);
+    const binding = runtime.waveOperationBinding;
+    const staged = getCoopStagedWaveAdvanceTransaction(payload.wave, binding);
     if (staged == null || staged.operationId !== operation.id) {
       return false;
     }
@@ -3223,7 +3237,7 @@ function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, envelope: CoopAu
         pendingRawWavePresentations.get(payload.wave),
         payload,
       );
-      if (merged == null || !markCoopWaveAdvanceBootstrapProjected(payload.wave)) {
+      if (merged == null || !markCoopWaveAdvanceBootstrapProjected(payload.wave, binding)) {
         return false;
       }
       pendingWaveAdvance = merged;
@@ -3235,11 +3249,11 @@ function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, envelope: CoopAu
     }
     if (
       globalScene.phaseManager?.getCurrentPhase()?.phaseName === "BattleEndPhase"
-      && !tryApplyCoopSettledWaveData(payload.wave)
+      && !tryApplyCoopSettledWaveData(payload.wave, binding)
     ) {
       return false;
     }
-    return maybeMarkCoopWaveContinuationReady(payload.wave);
+    return maybeMarkCoopWaveContinuationReady(payload.wave, binding);
   } catch (e) {
     coopWarn("runtime", "wave-advance JOURNAL materialize threw (handled)", e);
     return false;
@@ -3795,13 +3809,14 @@ function commitCoopSettledWaveAdvance(
   transition: CoopWaveAdvancePayload,
   capturedState?: CoopAuthoritativeBattleStateV1,
 ): CoopAuthoritativeBattleStateV1 | null {
-  if (active == null || active.controller.role !== "host") {
+  const runtime = active;
+  if (runtime == null || runtime.controller.role !== "host") {
     return null;
   }
   const state = capturedState ?? captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
   if (state == null || state.wave !== wave) {
     coopWarn("runtime", `settled WAVE_ADVANCE capture rejected wave=${wave}`);
-    if (usesRetainedCoopWaveTransaction()) {
+    if (usesRetainedCoopWaveTransaction(runtime)) {
       failCoopSharedSession(`Could not capture the complete settled state for wave ${wave}.`);
     }
     return null;
@@ -3810,14 +3825,17 @@ function commitCoopSettledWaveAdvance(
     ...transition,
     settledStateTick: state.tick,
   };
-  const envelope = commitWaveAdvanceOwnerIntent({
-    payload: settledTransition,
-    authoritativeState: state,
-    localRole: active.controller.role,
-    wave,
-    turn: state.turn,
-  });
-  if (usesRetainedCoopWaveTransaction() && envelope == null) {
+  const envelope = commitWaveAdvanceOwnerIntent(
+    {
+      payload: settledTransition,
+      authoritativeState: state,
+      localRole: runtime.controller.role,
+      wave,
+      turn: state.turn,
+    },
+    runtime.waveOperationBinding,
+  );
+  if (usesRetainedCoopWaveTransaction(runtime) && envelope == null) {
     failCoopSharedSession(`Could not retain the complete authoritative transition for wave ${wave}.`);
     return null;
   }
@@ -4396,9 +4414,8 @@ export function assembleCoopRuntime(
   // Mystery-operation state is per-runtime: createCoopRuntimeOpState below constructs the new run's fresh
   // receipt ledger/cursors. Resetting here would mutate the previously active runtime during duo assembly.
   resetCoopActiveMysteryControl();
-  // Wave-2f: same fresh-control-plane reset for the post-battle wave-advance operation state (THE KEYSTONE) -
-  // a new run's wave index restarts, so drop any leftover host/guest applier + last-applied wave pin.
-  resetCoopWaveAdvanceOperationState();
+  // Wave state follows the same rule: createCoopRuntimeOpState owns its fresh wave record. An ambient reset
+  // here would erase whichever peer the two-engine harness most recently installed, not the runtime below.
   pendingHostWaveTransitions.clear();
   settledHostWaveTransitions.clear();
   pendingRawWavePresentations.clear();
@@ -4408,6 +4425,7 @@ export function assembleCoopRuntime(
   // re-assemble (it pulls a snapshot in place), so this never clears a live negotiation on a flap.
   clearNegotiatedCoopCapabilities();
   const durabilityEnabled = isCoopDurabilityEnabled();
+  let waveOperationBinding: CoopWaveAdvanceOperationBinding;
   const controller = new CoopSessionController(transport, {
     username: opts.username,
     version: COOP_PROTOCOL_VERSION,
@@ -4418,7 +4436,9 @@ export function assembleCoopRuntime(
     // delivery capabilities would strand SelectBiome by construction, so compatibility must fail closed.
     requiredCapabilities: [COOP_CAP_OP_BIOME, COOP_CAP_OP_ME, COOP_CAP_DURABILITY_JOURNAL],
     requireFunctionalFingerprint: true,
-    onEpochNegotiated: applyCoopOperationEpoch,
+    // The callback runs after assembly, on handshake/rejoin. Its stable binding cannot drift to the other
+    // in-process engine while the peer's transport is being pumped.
+    onEpochNegotiated: epoch => applyCoopOperationEpoch(epoch, waveOperationBinding),
     p33: opts.p33,
   });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
@@ -4461,6 +4481,7 @@ export function assembleCoopRuntime(
   const mePump = new CoopMePump(interactionRelay);
   const rendezvous = new CoopRendezvous(transport, { getEpoch: () => controller.sessionEpoch });
   const membership = new CoopMembershipController(() => controller.role);
+  const opState = createCoopRuntimeOpState(controller.role);
   // W2b/W2e (§4/§5): the application-level durability engine, flag-gated. Wave-2e plugs the operation
   // envelope in via the journal bridge's extractKey/apply hooks, so a committed op is journaled + ACKed +
   // resendable end-to-end (no longer a passive scaffold). Its reconnect() is wired into the #805 rejoin
@@ -4474,9 +4495,9 @@ export function assembleCoopRuntime(
         // (or between withClient swaps with none installed), so the ACTIVE op-state at apply time is NOT
         // reliably this receiver's - a migrated surface (bargain) would then write its cursor/aux onto the
         // sender's record (or fail-loud throw when nothing is installed), and the receiver's watcher-adopt
-        // reads its own empty record and never converges. Installing runtime.opState here lands the apply on
-        // the receiver's own record. Production has one runtime, so active == runtime already => no-op there.
-        apply: entry => withActiveCoopRuntimeOpState(runtime.opState, () => operationDurabilityHooks.apply?.(entry)),
+        // reads its own empty record and never converges. Installing the assembly-owned opState here lands
+        // the apply on the receiver's own record. Production has one runtime, so this scope is a no-op there.
+        apply: entry => withActiveCoopRuntimeOpState(opState, () => operationDurabilityHooks.apply?.(entry)),
         sendFullSnapshot: (cls, headRevision, controlHighWater) =>
           sendCoopDurabilitySnapshot(runtime, cls, headRevision, controlHighWater),
         onRecoveryExhausted: failure =>
@@ -4486,6 +4507,7 @@ export function assembleCoopRuntime(
           ),
       })
     : undefined;
+  waveOperationBinding = Object.freeze({ opState, durability: durability ?? null });
   // Install the active manager so the migrated surface adapters' commit path journals into it (Wave-2e).
   // null when durability is OFF -> journalCoopCommittedEnvelope is a no-op (pure legacy dual-run).
   setCoopOperationDurability(durability ?? null);
@@ -4504,7 +4526,8 @@ export function assembleCoopRuntime(
     // Per-runtime op-state (layer-B): fresh guest/host cursors + per-surface records for THIS runtime, so
     // the two-engine harness's clients no longer share module-global apply state. Installed active by
     // setCoopRuntime; the migrated surfaces (bargain/stormglass, more to follow) read it fail-loud.
-    opState: createCoopRuntimeOpState(controller.role),
+    opState,
+    waveOperationBinding,
   };
   sharedTerminalStates.set(runtime, { frozen: false, finalized: false, reason: null });
   if (opts.p33 != null) {
@@ -4745,7 +4768,7 @@ export function clearCoopRuntime(): void {
   // Wave-2c: same teardown for the mystery-encounter operation surface.
   resetCoopMeOperationState();
   // Wave-2f: same teardown for the post-battle wave-advance operation surface (THE KEYSTONE).
-  resetCoopWaveAdvanceOperationState();
+  resetCoopWaveAdvanceOperationState(active.waveOperationBinding);
   learnMoveForwardInFlight.clear();
   learnMoveBatchForwardInFlight.clear();
   active.localTransport.close();

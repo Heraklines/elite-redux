@@ -117,13 +117,20 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   async function bootDuo(): Promise<DuoRig> {
     await game.classicMode.startBattle(SpeciesId.MAGIKARP, SpeciesId.MAGIKARP);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    expect(rig.hostRuntime.waveOperationBinding.opState).toBe(rig.hostRuntime.opState);
+    expect(rig.hostRuntime.waveOperationBinding.durability).toBe(rig.hostRuntime.durability);
+    expect(Object.isFrozen(rig.hostRuntime.waveOperationBinding)).toBe(true);
+    expect(rig.guestRuntime.waveOperationBinding.opState).toBe(rig.guestRuntime.opState);
+    expect(rig.guestRuntime.waveOperationBinding.durability).toBe(rig.guestRuntime.durability);
+    expect(Object.isFrozen(rig.guestRuntime.waveOperationBinding)).toBe(true);
+    expect(rig.guestRuntime.waveOperationBinding.opState).not.toBe(rig.hostRuntime.waveOperationBinding.opState);
     // Runtime assembly installs the receiver-bound production sink. Override it only after assembly for
     // this boundary-seam recording test; production materialization is covered by the runtime/soak suites.
     registerCoopOperationLiveSink("op:wave", env => {
       const payload = env.pendingOperation?.payload as CoopWaveAdvancePayload;
       routed.push(payload);
-      markCoopWaveAdvanceDataApplied(payload.wave);
-      markCoopWaveAdvanceContinuationReady(payload.wave);
+      markCoopWaveAdvanceDataApplied(payload.wave, rig.guestRuntime.waveOperationBinding);
+      markCoopWaveAdvanceContinuationReady(payload.wave, rig.guestRuntime.waveOperationBinding);
       return true;
     });
     return rig;
@@ -151,6 +158,10 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
         broadcastCoopWaveEndState(outcome === "win" || outcome === "capture");
       }
     });
+    expect(
+      commitSpy.mock.calls.at(-1)?.[1],
+      "the host commit retains against the host runtime even while a second engine exists",
+    ).toBe(rig.hostRuntime.waveOperationBinding);
     // Pump delivery under the GUEST ctx so its durability manager + live sink run as the guest.
     await withClient(rig.guestCtx, () => drainLoopback());
     return commitSpy.mock.calls.at(-1)?.[0].payload;
