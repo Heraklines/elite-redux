@@ -30,6 +30,10 @@
 //                                      // ghost, monotype, maxcost, points, freshstart,
 //                                      // flipstat, limitedcatch, limitedsupport,
 //                                      // hardcore, passives, usagetier, triples)
+//     "battleBgm": "battle_ghost_piano", // optional er-assets audio/bgm key
+//                                      // (filename without .mp3). Plays for THIS
+//                                      // battle ONLY. Trimmed; empty/absent = the
+//                                      // trainer's default theme. See bgm.json.
 //     "team": [
 //       {
 //         "species": 445,              // pokerogue speciesId (vanilla + ER customs)
@@ -153,6 +157,12 @@ export interface ErCustomTrainer {
   /** Per-run appearance chance, integer 1-100. Absent/invalid => 100 (guaranteed). */
   spawnChance?: number;
   challenge?: ErCustomTrainerChallenge;
+  /**
+   * er-assets `audio/bgm/<key>.mp3` key (filename without `.mp3`) that plays for
+   * THIS battle only. Trimmed; empty/absent/invalid => the trainer's default
+   * theme. Charset `[a-z0-9_]+` (mirrors the editor + worker validator).
+   */
+  battleBgm?: string;
   team?: readonly ErCustomTrainerMember[];
 }
 
@@ -187,6 +197,8 @@ export interface ErCustomTrainerResolved {
   /** Per-run appearance chance, normalized to an integer 1-100 (100 = guaranteed). */
   spawnChance: number;
   challenge: ErCustomTrainerChallenge;
+  /** er-assets bgm key to play for this battle only, or "" for the default theme. */
+  battleBgm: string;
   members: readonly ErCustomTrainerMemberResolved[];
 }
 
@@ -252,6 +264,25 @@ function moveByName(): Map<string, number> {
 
 function clampSlot(value: unknown): number {
   return value === 1 || value === 2 ? value : 0;
+}
+
+/** Valid er-assets bgm key charset (mirrors the editor + worker validator). */
+const BATTLE_BGM_RE = /^[a-z0-9_]+$/;
+
+/**
+ * Normalize an authored `battleBgm`: trim, lowercase-charset-check, length cap.
+ * A non-string, empty-after-trim, over-long, or bad-charset value => "" (no
+ * override, the trainer keeps its default theme).
+ */
+export function normalizeBattleBgm(value: unknown): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const key = value.trim();
+  if (key.length === 0 || key.length > 64 || !BATTLE_BGM_RE.test(key)) {
+    return "";
+  }
+  return key;
 }
 
 /**
@@ -348,6 +379,7 @@ function resolveEntry(key: string, entry: ErCustomTrainer): ErCustomTrainerResol
     endless: entry.endless === true,
     spawnChance: normalizeSpawnChance(entry.spawnChance),
     challenge,
+    battleBgm: normalizeBattleBgm(entry.battleBgm),
     members,
   };
 }

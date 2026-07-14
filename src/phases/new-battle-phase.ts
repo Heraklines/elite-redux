@@ -121,6 +121,20 @@ export class NewBattlePhase extends BattlePhase {
       }
       const trainer = new Trainer(resolved.trainerType as TrainerType, TrainerVariant.DEFAULT);
       trainer.name = resolved.name;
+      // Per-trainer BATTLE MUSIC (this battle only). trainerConfigs[type] is a
+      // SHARED singleton, so we must NOT mutate config.battleBgm — instead we
+      // shadow the INSTANCE getters (exactly how a ghost battle overrides its
+      // theme to the Cynthia piano; see markTrainerAsGhost in er-ghost-teams.ts).
+      // playBgm lazily loads an unknown key from audio/bgm/<key>.mp3. Because a
+      // fresh Trainer is built every wave, the override never leaks to the next
+      // wave — same clean-reset discipline as the #419 BST-bypass flag below.
+      // BOTH getters: getBattleBgm serves only the GEN-5 music preference; the
+      // DEFAULT preference routes through getMixedBattleBgm (the #403 lesson).
+      if (resolved.battleBgm) {
+        const bgm = resolved.battleBgm;
+        trainer.getBattleBgm = () => bgm;
+        trainer.getMixedBattleBgm = () => bgm;
+      }
       globalScene.field.add(trainer);
       battle.trainer = trainer;
       battle.battleType = BattleType.TRAINER;

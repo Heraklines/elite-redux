@@ -630,6 +630,12 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
     ) {
       return { ok: false, error: `${key}: spawnChance must be an integer 1-100` };
     }
+    if (
+      t.battleBgm !== undefined
+      && !(typeof t.battleBgm === "string" && t.battleBgm.length <= 64 && /^[a-z0-9_]+$/.test(t.battleBgm))
+    ) {
+      return { ok: false, error: `${key}: battleBgm must be a bgm key ([a-z0-9_], up to 64 chars)` };
+    }
     if (!Array.isArray(t.team) || t.team.length === 0 || t.team.length > 6) {
       return { ok: false, error: `${key}: team must have 1-6 members` };
     }
@@ -671,6 +677,11 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
           || mm.heldItems.some(h => !isPlainObject(h) || !isName((h as Record<string, unknown>).item)))
       ) {
         return { ok: false, error: `${key}: heldItems must be up to 6 { item NAME, count? }` };
+      }
+      // `sanityOff` is EDITOR metadata (move-legality enforcement toggle): the
+      // game-side parser ignores it. Accept it, but keep it a clean boolean.
+      if (mm.sanityOff !== undefined && typeof mm.sanityOff !== "boolean") {
+        return { ok: false, error: `${key}: sanityOff must be a boolean` };
       }
     }
   }

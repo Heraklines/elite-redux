@@ -29,6 +29,7 @@ import {
   type ErCustomTrainerMemberResolved,
   getErCustomTrainers,
   markErCustomTrainerUsed,
+  normalizeBattleBgm,
   resetErCustomTrainerTracking,
   rollErCustomTrainerAppearance,
   selectErCustomTrainerForWave,
@@ -391,6 +392,60 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // Fusion constructed on the enemy side.
     expect(enemy!.isFusion()).toBe(true);
     expect(enemy!.fusionSpecies?.speciesId).toBe(SpeciesId.RAYQUAZA);
+  });
+
+  it("battleBgm normalizes: valid key kept, garbage/absent -> '' (no override)", () => {
+    // Pure normalizer: trim + lowercase-charset + length cap; anything else -> "".
+    expect(normalizeBattleBgm("battle_ghost_piano")).toBe("battle_ghost_piano");
+    expect(normalizeBattleBgm("  battle_rival  ")).toBe("battle_rival");
+    expect(normalizeBattleBgm("")).toBe("");
+    expect(normalizeBattleBgm("   ")).toBe("");
+    expect(normalizeBattleBgm(undefined)).toBe("");
+    expect(normalizeBattleBgm(42)).toBe("");
+    expect(normalizeBattleBgm("Battle_Ghost")).toBe(""); // uppercase not allowed
+    expect(normalizeBattleBgm("bad name!")).toBe(""); // space + punctuation
+    expect(normalizeBattleBgm("../evil")).toBe(""); // path traversal
+    expect(normalizeBattleBgm("a".repeat(65))).toBe(""); // over the length cap
+  });
+
+  it("battleBgm resolves onto the trainer (valid kept, garbage/absent cleared)", () => {
+    const BGM = {
+      WITH_BGM: {
+        id: 70020,
+        name: "Themed",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        battleBgm: "battle_ghost_piano",
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+      BAD_BGM: {
+        id: 70021,
+        name: "Garbage",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        battleBgm: "NOT VALID!!",
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+      NO_BGM: {
+        id: 70022,
+        name: "Plain",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        // no battleBgm field at all
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+    };
+    setErCustomTrainersForTesting(BGM as never);
+    const byKey = new Map(getErCustomTrainers().map(t => [t.key, t]));
+    expect(byKey.get("WITH_BGM")!.battleBgm).toBe("battle_ghost_piano");
+    // Garbage and absent both resolve to "" (no override) — the trainer keeps
+    // its default theme. This is the "next plain wave clears it" semantics at the
+    // resolved layer: the game-side seam shadows the getters ONLY when battleBgm
+    // is a non-empty string, and each wave builds a fresh Trainer instance (the
+    // shared trainerConfigs singleton is never mutated), so "" leaves the theme
+    // untouched and nothing leaks across waves.
+    expect(byKey.get("BAD_BGM")!.battleBgm).toBe("");
+    expect(byKey.get("NO_BGM")!.battleBgm).toBe("");
   });
 
   it("#419 BST cap is BYPASSED for staff trainers (fielded as authored, not devolved)", () => {
