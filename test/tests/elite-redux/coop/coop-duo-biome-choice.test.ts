@@ -631,10 +631,14 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         await drainLoopback();
       });
       expect(
-        getCoopBiomeTransitionCommitReceipt({
-          sourceWave: 11,
-          interactivePinned: pinAfterLeave,
-        })?.payload,
+        withClientSync(
+          rig.hostCtx,
+          () =>
+            getCoopBiomeTransitionCommitReceipt({
+              sourceWave: 11,
+              interactivePinned: pinAfterLeave,
+            })?.payload,
+        ),
         "the retained interactive terminal names the owner's exact non-default route",
       ).toMatchObject({ biomeId: chosen, nodeIndex: 1, nextWave: 12 });
       setCoopBiomeInteractionStart(pinAfterLeave); // the watcher engine's own chained pin
@@ -931,7 +935,10 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       await drainLoopback();
     });
     expect(
-      getCoopBiomeTransitionCommitReceipt({ sourceWave: 11, interactivePinned: counterBefore })?.payload,
+      withClientSync(
+        rig.hostCtx,
+        () => getCoopBiomeTransitionCommitReceipt({ sourceWave: 11, interactivePinned: counterBefore })?.payload,
+      ),
       "the host retained the exact deterministic boundary terminal",
     ).toMatchObject({ biomeId: destination, nodeIndex: -1, nextWave: 12 });
     await withClient(rig.guestCtx, async () => {
@@ -1041,7 +1048,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         await drainLoopback();
       });
       expect(
-        getCoopBiomeTransitionCommitReceipt({ sourceWave: 13 })?.payload,
+        withClientSync(rig.hostCtx, () => getCoopBiomeTransitionCommitReceipt({ sourceWave: 13 })?.payload),
         "the host retained the natural single-node terminal before renderer projection",
       ).toMatchObject({ biomeId: hostBiome, nodeIndex: -1, nextWave: 14 });
       expect(
