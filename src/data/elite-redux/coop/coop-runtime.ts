@@ -1856,11 +1856,8 @@ export function wireCoopStallWatchdog(
           /* cosmetic */
         }
       }
-      const localMs = Math.max(
-        relay.oldestNetworkWaitMs(),
-        battleStream.oldestNetworkWaitMs(),
-        oldestCoopMachineWaitMs(),
-      );
+      const machineWaitMs = oldestCoopMachineWaitMs();
+      const localMs = Math.max(relay.oldestNetworkWaitMs(), battleStream.oldestNetworkWaitMs(), machineWaitMs);
       // #808 HEALTH LINE: one compact self-describing line every ~30s so every log capture
       // carries a session-health timeline for free (zero extra timers).
       if (Date.now() - lastHealthAt >= 30_000) {
@@ -1887,7 +1884,11 @@ export function wireCoopStallWatchdog(
       // recovery a bounded number of times, then route BOTH clients into the shared terminal (never continue
       // unilaterally) so a dead-partner / non-converging hold can't park forever.
       const asymAction = asymEscalator.assess({
-        localMs,
+        // A plain one-sided NETWORK wait is normal: the other player may be browsing a shop,
+        // choosing a move, or reading a modal. Only an explicitly registered MACHINE wait is
+        // evidence that this side cannot advance without protocol progress. Feeding the folded
+        // `localMs` here made every ordinary one-sided wait look asymmetric after 20 seconds.
+        localMs: machineWaitMs,
         peerBeatMs: peerBeat?.ms ?? null,
         peerBeatAgeMs: peerBeat == null ? null : Date.now() - peerBeat.at,
         transportConnected: transport.state === "connected",
