@@ -3,9 +3,15 @@
   "taskId": "p33-mystery-public-transition-integration",
   "branch": "ci/coop/p33-mystery-public-transition",
   "trainRef": "ci/coop/p33-mystery-public-transition",
-  "baseSha": "9d0b0362d648d3cdd592a9b6eeaf88c477c29fbf",
+  "baseSha": "c267efaf4d134a75c87e772775fea528487aa410",
   "allowedFiles": [
     ".github/coop-task-ownership/p33-mystery-public-transition.json",
+    "src/data/elite-redux/coop/coop-ability-operation.ts",
+    "src/data/elite-redux/coop/coop-ability-picker-relay.ts",
+    "src/phases/er-ability-capsule-phase.ts",
+    "src/phases/er-greater-ability-capsule-phase.ts",
+    "src/phases/er-greater-ability-randomizer-phase.ts",
+    "test/tests/elite-redux/coop/coop-ability-picker-relay.test.ts",
     "test/tools/coop-duo-harness.ts",
     "test/tools/coop-soak-coverage.ts",
     "test/tools/coop-soak-driver.ts"
