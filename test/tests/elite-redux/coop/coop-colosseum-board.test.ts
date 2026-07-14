@@ -249,6 +249,31 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
     expect(await hostDecision, "the retry reached the host authority").toBe(COLOSSEUM_CONTINUE);
   });
 
+  it("HOT RECOVERY: an exact-round duplicate decision unblocks the retained host waiter", async () => {
+    setCoopColosseumOperationEnabled(true);
+    const pinned = 5; // guest-owned decision, adopted by the host authority
+    const { seq, guestRelay } = rig(pinned);
+    expect(coopColosseumStreamBoard([...BOARD_LABELS]), "the exact board round was committed first").toBe(true);
+    expect(
+      commitColosseumDecision({
+        pinned,
+        round: 0,
+        index: COLOSSEUM_CONTINUE,
+        localRole: "host",
+        wave: 10,
+      }).kind,
+      "the authority already retained the decision before the owner retransmitted it",
+    ).toBe("committed");
+
+    const recovered = coopColosseumAwaitDecision(100, 0);
+    guestRelay.sendInteractionChoice(seq, "coloPick", COLOSSEUM_CONTINUE, [0]);
+
+    expect(
+      await recovered,
+      "the idempotent exact-round retransmit is authoritative progress, not an orphan to wait past",
+    ).toBe(COLOSSEUM_CONTINUE);
+  });
+
   it("keeps identical Colosseum authority receipts isolated across two operation runtimes", () => {
     setCoopColosseumOperationEnabled(true);
     const runtimeA = createCoopRuntimeOpState();
