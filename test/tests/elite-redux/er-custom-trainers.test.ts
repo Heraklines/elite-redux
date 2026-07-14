@@ -23,16 +23,20 @@
 // Gated behind ER_SCENARIO=1.
 // =============================================================================
 
+import { planErCustomTrainerLaunch, summarizeErCustomTrainer } from "#app/dev-tools/test-suite/custom-trainer-picker";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import {
   applyErCustomTrainerPresentation,
   buildErCustomTrainerMember,
+  clearErCustomTrainerDevForce,
   type ErCustomTrainerMemberResolved,
   erCustomTrainerWindowIndex,
   erCustomTrainerWindowWave,
+  getErCustomTrainerDevForce,
   getErCustomTrainerSpawnConfig,
   getErCustomTrainers,
+  isErCustomTrainerDevForceArmed,
   markErCustomTrainerUsed,
   normalizeBattleBgm,
   normalizeDialogueLine,
@@ -525,6 +529,147 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     expect(picks.length).toBe(1);
     expect(picks[0].key).toBe("TARGET");
     expect(picks[0].wave).toBe(25);
+  });
+
+  // ---- ROUND 9: in-game Dev Scenarios "Custom Trainers" picker --------------
+  // The staff picker force-fields ONE named trainer with the full feature set.
+  // WAVE-ELIGIBILITY DECISION (documented): the picker FORCE-ADJUSTS the run
+  // difficulty (to one the trainer allows) and the launch wave (inside its range,
+  // skipping boss %10 + fixed-battle waves the install seam rejects), and the dev
+  // force BYPASSES the challenge-exclusivity gate (the picker can't start a
+  // challenge run, but the authored party still fields identically). Only a
+  // trainer with NO valid difficulty, or whose whole range is boss/fixed waves,
+  // is cleanly REPORTED (a readable message) instead of a silent wild battle.
+  it("dev force bypasses the challenge gate: a challenge-gated trainer is still force-fielded", () => {
+    const GATED = {
+      GHOSTY: {
+        id: 70090,
+        name: "Ghosty",
+        trainerClass: "PSYCHIC",
+        difficulties: ["ace"],
+        minWave: 25,
+        maxWave: 200,
+        challenge: "ghost", // only spawns naturally under the Ghost challenge
+        team: [{ species: SpeciesId.HAUNTER }],
+      },
+    };
+    setErCustomTrainersForTesting(GATED as never);
+    globalScene.seed = "RUNSEED";
+    setErCustomTrainerSpawnConfigForTesting({ windowSize: 10, windowChancePct: 0 }); // density off
+    resetErCustomTrainerTracking();
+    setErDifficulty("ace");
+
+    // No challenge active + density off: the trainer never appears on its own.
+    expect(playRun(1, 200).some(p => p.key === "GHOSTY")).toBe(false);
+    resetErCustomTrainerTracking();
+
+    // Force it: it spawns at its first eligible wave (25) EVEN without the Ghost
+    // challenge active, because the dev force bypasses the challenge gate.
+    setErCustomTrainerDevForce("GHOSTY");
+    expect(selectErCustomTrainerForWave(24)).toBeNull(); // below minWave -> still gated by floor
+    const picks = playRun(1, 100);
+    expect(picks.length).toBe(1);
+    expect(picks[0].key).toBe("GHOSTY");
+    expect(picks[0].wave).toBe(25);
+  });
+
+  it("dev force helpers: arm reports armed, and clear (one-shot) disarms both layers", () => {
+    setErCustomTrainerDevForce(null);
+    expect(isErCustomTrainerDevForceArmed()).toBe(false);
+    expect(getErCustomTrainerDevForce()).toBeNull();
+    setErCustomTrainerDevForce("target"); // normalized to upper-case
+    expect(isErCustomTrainerDevForceArmed()).toBe(true);
+    expect(getErCustomTrainerDevForce()).toBe("TARGET");
+    clearErCustomTrainerDevForce();
+    expect(isErCustomTrainerDevForceArmed()).toBe(false);
+    expect(getErCustomTrainerDevForce()).toBeNull();
+  });
+
+  it("planErCustomTrainerLaunch force-adjusts difficulty + skips boss/fixed waves; reports the ungateable", () => {
+    const PLAN = {
+      HELLGUY: {
+        id: 70091,
+        name: "Hell Guy",
+        trainerClass: "VETERAN",
+        difficulties: ["hell", "elite"], // first authored difficulty is picked
+        minWave: 30,
+        maxWave: 60,
+        team: [{ species: SpeciesId.SNORLAX }, { species: SpeciesId.GENGAR }],
+      },
+      BOSSONLY: {
+        id: 70092,
+        name: "Boss Only",
+        trainerClass: "VETERAN",
+        difficulties: ["ace"],
+        minWave: 40, // a single-wave range on a boss wave (40) -> no eligible wave
+        maxWave: 40,
+        team: [{ species: SpeciesId.SNORLAX }],
+      },
+      NODIFF: {
+        id: 70093,
+        name: "No Diff",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["notreal"], // filtered out -> empty difficulties
+        minWave: 5,
+        maxWave: 20,
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+    };
+    setErCustomTrainersForTesting(PLAN as never);
+    const byKey = new Map(getErCustomTrainers().map(t => [t.key, t]));
+
+    // Force-adjusts difficulty to the trainer's first, and picks wave 31: minWave
+    // 30 is a boss wave (%10) so it is skipped; 31 is in range, not boss, not fixed.
+    const hell = planErCustomTrainerLaunch(byKey.get("HELLGUY")!, () => false);
+    expect(hell.ok).toBe(true);
+    if (hell.ok) {
+      expect(hell.plan.difficulty).toBe("hell");
+      expect(hell.plan.wave).toBe(31);
+      expect(hell.plan.wave % 10).not.toBe(0);
+    }
+
+    // A whole range that is boss/fixed only -> cleanly reported, not launched.
+    const boss = planErCustomTrainerLaunch(byKey.get("BOSSONLY")!, () => false);
+    expect(boss.ok).toBe(false);
+    if (!boss.ok) {
+      expect(boss.reason).toContain("no non-boss");
+    }
+
+    // Injected fixed-battle predicate is honored: wave 31 marked fixed -> slides to 32.
+    const hellFixed = planErCustomTrainerLaunch(byKey.get("HELLGUY")!, w => w === 30 || w === 31);
+    expect(hellFixed.ok).toBe(true);
+    if (hellFixed.ok) {
+      expect(hellFixed.plan.wave).toBe(32);
+    }
+
+    // No valid difficulty authored -> reported.
+    const nodiff = planErCustomTrainerLaunch(byKey.get("NODIFF")!, () => false);
+    expect(nodiff.ok).toBe(false);
+    if (!nodiff.ok) {
+      expect(nodiff.reason).toContain("difficulty");
+    }
+  });
+
+  it("summarizeErCustomTrainer renders name, #id and the first team species (no em dash)", () => {
+    const SUM = {
+      SUMMER: {
+        id: 70094,
+        name: "Summer",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [
+          { species: SpeciesId.PIKACHU },
+          { species: SpeciesId.SNORLAX },
+          { species: SpeciesId.GENGAR },
+          { species: SpeciesId.HAUNTER }, // 4th -> elided
+        ],
+      },
+    };
+    setErCustomTrainersForTesting(SUM as never);
+    const trainer = getErCustomTrainers().find(t => t.key === "SUMMER")!;
+    const summary = summarizeErCustomTrainer(trainer, id => `S${id}`);
+    expect(summary).toBe(`Summer #70094: S${SpeciesId.PIKACHU}, S${SpeciesId.SNORLAX}, S${SpeciesId.GENGAR}…`);
+    expect(summary).not.toContain("—"); // staff-facing text: no em dash
   });
 
   it("builds the EXACT authored party (species / level / moveset / ability / fusion)", () => {

@@ -120,7 +120,7 @@ import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
-import type { EnemyPokemon } from "#field/pokemon";
+import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
 import { PokemonMove } from "#moves/pokemon-move";
 import { resolveHeldItemKey } from "#system/llm-director/held-item-resolver";
@@ -1170,11 +1170,18 @@ function challengeActive(challenge: ErCustomTrainerChallenge): boolean {
  * this run, the active difficulty allows it, `waveIndex` is inside its floor range
  * (or endless: any floor >= minWave) and its challenge-exclusivity holds. The
  * shared gate for both the density selector and the dev force path.
+ *
+ * `ignoreChallenge` (dev force only): the staff picker explicitly chooses ONE
+ * trainer to battle-test and pins a matching difficulty + in-range wave, but it
+ * cannot start a challenge run, so the challenge-exclusivity gate is skipped for a
+ * forced pick (the authored party still fields identically). The used-key + floor
+ * gates always apply so a forced pick still fires exactly once, inside its range.
  */
 function isErCustomTrainerEligible(
   trainer: ErCustomTrainerResolved,
   waveIndex: number,
   difficulty: string,
+  ignoreChallenge = false,
 ): boolean {
   if (USED_CUSTOM_TRAINER_KEYS.has(trainer.key)) {
     return false;
@@ -1185,7 +1192,7 @@ function isErCustomTrainerEligible(
   if (waveIndex < trainer.minWave || (!trainer.endless && waveIndex > trainer.maxWave)) {
     return false;
   }
-  return challengeActive(trainer.challenge);
+  return ignoreChallenge || challengeActive(trainer.challenge);
 }
 
 // --- DEV-ONLY force path (staff testing) -------------------------------------
@@ -1210,6 +1217,23 @@ export function setErCustomTrainerDevForce(key: string | null): void {
   devForcedCustomTrainerKeyOverride = key && key.trim() ? key.trim().toUpperCase() : null;
 }
 
+/**
+ * DEV-ONLY: clear a forced custom-trainer spawn from BOTH the module override AND
+ * the localStorage key, so a one-shot forced install (see
+ * `installErCustomTrainerForCurrentWave`) leaves the rest of the run fielding
+ * normal (density-driven) battles. Inert/harmless in prod (localStorage guarded).
+ */
+export function clearErCustomTrainerDevForce(): void {
+  devForcedCustomTrainerKeyOverride = null;
+  try {
+    (globalThis as { localStorage?: { removeItem(k: string): void } }).localStorage?.removeItem(
+      ER_DEV_FORCE_CUSTOM_TRAINER_KEY,
+    );
+  } catch {
+    /* storage may be blocked; the module override is already cleared */
+  }
+}
+
 /** The armed dev-force trainer key (module override first, then localStorage), or null in prod. */
 function readDevForcedCustomTrainerKey(): string | null {
   if (!isDevToolsEnabled()) {
@@ -1225,6 +1249,16 @@ function readDevForcedCustomTrainerKey(): string | null {
   } catch {
     return null;
   }
+}
+
+/** DEV-ONLY: the currently armed dev-force trainer key (or null: unarmed / prod). */
+export function getErCustomTrainerDevForce(): string | null {
+  return readDevForcedCustomTrainerKey();
+}
+
+/** DEV-ONLY: whether a custom-trainer dev force is armed (staff picked a trainer to fight). */
+export function isErCustomTrainerDevForceArmed(): boolean {
+  return readDevForcedCustomTrainerKey() !== null;
 }
 
 /**
@@ -1252,7 +1286,10 @@ export function selectErCustomTrainerForWave(waveIndex: number): ErCustomTrainer
   if (forcedKey) {
     const forced = all.find(t => t.key === forcedKey);
     if (forced) {
-      return isErCustomTrainerEligible(forced, waveIndex, difficulty) ? forced : null;
+      // Force bypasses the challenge-exclusivity gate: the staff picker pins a
+      // matching difficulty + in-range wave but cannot start a challenge run, so a
+      // challenge-gated trainer is still force-fielded (used-key + floor gates hold).
+      return isErCustomTrainerEligible(forced, waveIndex, difficulty, true) ? forced : null;
     }
     // Unknown key (typo) => fall through to normal density selection.
   }
@@ -1299,8 +1336,15 @@ export { isErCustomTrainerBstBypassActive, setErCustomTrainerBstBypass } from "#
 // Enemy construction (the exact-party guarantee).
 // -----------------------------------------------------------------------------
 
-/** Apply an authored fusion onto a freshly built enemy (mirrors generateFusionSpecies). */
-function applyCustomFusion(enemy: EnemyPokemon, fusion: { speciesId: number; formIndex: number; abilitySlot: number }): void {
+/**
+ * Apply an authored fusion onto a built Pokemon (mirrors generateFusionSpecies).
+ * Works for either side: the enemy build path uses it, and the dev "Use as my
+ * team" picker applies it to the player copy of an authored member.
+ */
+export function applyErCustomTrainerFusion(
+  enemy: Pokemon,
+  fusion: { speciesId: number; formIndex: number; abilitySlot: number },
+): void {
   const fusionSpecies = getPokemonSpecies(fusion.speciesId);
   if (!fusionSpecies) {
     return;
@@ -1358,7 +1402,7 @@ export function buildErCustomTrainerMember(
     enemy.customPokemonData.erShinyLabName = member.shinyName || undefined;
   }
   if (member.fusion) {
-    applyCustomFusion(enemy, member.fusion);
+    applyErCustomTrainerFusion(enemy, member.fusion);
   }
   if (moveIds.length > 0) {
     const moves = moveIds.map(id => new PokemonMove(id));

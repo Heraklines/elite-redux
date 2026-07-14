@@ -110,13 +110,105 @@ describe("custom-trainers merge core (worker)", () => {
     expect((merged.A as { name: string }).name).toBe("Alpha v2");
   });
 
-  it("rejects a NEW trainer whose key was created by someone else (collision)", () => {
-    // Client thinks NEW is new (no baseline) but the repo already has that key
-    // (a teammate created it). Reject rather than clobber their trainer.
-    const existing = { NEW: trainer(70003, "Theirs") };
-    const { merged, conflicts } = mergeCustomTrainersDelta(existing, { NEW: trainer(70001, "Mine") }, {});
-    expect(conflicts.map(c => c.key)).toEqual(["NEW"]);
-    expect((merged.NEW as { name: string }).name).toBe("Theirs");
+  it("RE-KEYS a NEW trainer whose key collides with a teammate's (never rejects a new trainer)", () => {
+    // Client thinks TRAINER_70002 is new (no baseline) but the repo already has that
+    // key (a teammate saved their new trainer under the same provisional key first).
+    // The worker must NOT reject: it re-keys the newcomer to TRAINER_<realId> and
+    // BOTH survive (the live-reported bug: "1 trainer(s) were rejected as conflicts").
+    const existing = { TRAINER_70002: trainer(70002, "Theirs") };
+    const delta = { TRAINER_70002: trainer(70002, "Mine") };
+    const { merged, idRemap, keyRemap, conflicts } = mergeCustomTrainersDelta(existing, delta, {});
+    // No conflict; both trainers present.
+    expect(conflicts).toEqual([]);
+    expect((merged.TRAINER_70002 as { name: string }).name).toBe("Theirs"); // teammate untouched
+    // The newcomer got a fresh id (70003) and a matching fresh key TRAINER_70003.
+    expect(idRemap.TRAINER_70002).toBe(70003);
+    expect(keyRemap.TRAINER_70002).toBe("TRAINER_70003");
+    expect((merged.TRAINER_70003 as { id: number; name: string }).id).toBe(70003);
+    expect((merged.TRAINER_70003 as { name: string }).name).toBe("Mine");
+  });
+
+  it("re-keys a colliding NEW trainer while a non-colliding NEW one keeps its key", () => {
+    const existing = { TRAINER_70001: trainer(70001, "Theirs") };
+    const delta = {
+      TRAINER_70001: trainer(70001, "Collides"), // same key as repo -> re-key
+      TRAINER_70009: trainer(70009, "Fresh"), // no repo collision -> keep key, new id
+    };
+    const { merged, idRemap, keyRemap, conflicts } = mergeCustomTrainersDelta(existing, delta, {});
+    expect(conflicts).toEqual([]);
+    // Colliding one re-keyed.
+    expect(keyRemap.TRAINER_70001).toBe(`TRAINER_${idRemap.TRAINER_70001}`);
+    expect(merged[keyRemap.TRAINER_70001]).toBeDefined();
+    // Non-colliding one keeps its original key, gets a server id, no keyRemap entry.
+    expect(keyRemap.TRAINER_70009).toBeUndefined();
+    expect((merged.TRAINER_70009 as { id: number }).id).toBe(idRemap.TRAINER_70009);
+    // Two distinct new ids allocated.
+    expect(idRemap.TRAINER_70001).not.toBe(idRemap.TRAINER_70009);
+  });
+
+  it("still rejects a full window even for a colliding NEW trainer (never clobbers)", () => {
+    const existing = { TRAINER_79999: trainer(ER_CUSTOM_TRAINER_ID_MAX, "Theirs") };
+    const { merged, idRemap, keyRemap, conflicts } = mergeCustomTrainersDelta(
+      existing,
+      { TRAINER_79999: trainer(70001, "Mine") },
+      {},
+    );
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].error).toMatch(/window/);
+    expect(idRemap.TRAINER_79999).toBeUndefined();
+    expect(keyRemap.TRAINER_79999).toBeUndefined();
+    expect((merged.TRAINER_79999 as { name: string }).name).toBe("Theirs"); // teammate untouched
+  });
+
+  // ---- editor-side key adoption (smoke) ------------------------------------
+  // Mirrors markCustomTrainersSaved in editor/app.js (a browser script that can't
+  // be imported into vitest): applying the worker's idRemap + keyRemap must rename
+  // the local entry, re-point the selection, and snapshot the baseline under the
+  // NEW key. Kept in lockstep with app.js by asserting the same contract.
+  it("editor adoption contract: keyRemap renames the local entry + selection + baseline", () => {
+    // Simulate the local edit state (mirrors ctr.current / ctr.baseline / CTR_LIVE).
+    const ctrCurrent: Record<string, { id: number; name: string }> = { TRAINER_70002: { id: 70002, name: "Mine" } };
+    const ctrBaseline: Record<string, unknown> = {};
+    const ctrLive: Record<string, unknown> = {};
+    let selected: string | null = "TRAINER_70002";
+
+    const existing = { TRAINER_70002: trainer(70002, "Theirs") };
+    const delta = { TRAINER_70002: { id: 70002, name: "Mine" } };
+    const { idRemap, keyRemap } = mergeCustomTrainersDelta(existing, delta, {});
+
+    // --- adoption algorithm (same steps as markCustomTrainersSaved) ---
+    for (const [key, realId] of Object.entries(idRemap)) {
+      if (ctrCurrent[key]) {
+        ctrCurrent[key].id = realId as number;
+      }
+    }
+    for (const [origKey, newKey] of Object.entries(keyRemap)) {
+      if (ctrCurrent[origKey]) {
+        ctrCurrent[newKey] = ctrCurrent[origKey];
+        delete ctrCurrent[origKey];
+      }
+      delete ctrBaseline[origKey];
+      delete ctrLive[origKey];
+      if (selected === origKey) {
+        selected = newKey;
+      }
+    }
+    for (const [key, value] of Object.entries(delta)) {
+      const targetKey = typeof keyRemap[key] === "string" ? keyRemap[key] : key;
+      const finalId = typeof idRemap[key] === "number" ? idRemap[key] : (value as { id: number }).id;
+      ctrLive[targetKey] = { ...value, id: finalId };
+      if (ctrCurrent[targetKey]) {
+        ctrBaseline[targetKey] = JSON.parse(JSON.stringify(ctrCurrent[targetKey]));
+      }
+    }
+
+    // Local state is now consistent with the committed repo under the NEW key.
+    expect(ctrCurrent.TRAINER_70002).toBeUndefined();
+    expect(ctrCurrent.TRAINER_70003).toEqual({ id: 70003, name: "Mine" });
+    expect(selected).toBe("TRAINER_70003");
+    expect(ctrBaseline.TRAINER_70003).toEqual({ id: 70003, name: "Mine" });
+    expect(ctrLive.TRAINER_70003).toEqual({ id: 70003, name: "Mine" });
+    expect(ctrLive.TRAINER_70002).toBeUndefined();
   });
 
   // ---- sha-conditional retry loop -----------------------------------------

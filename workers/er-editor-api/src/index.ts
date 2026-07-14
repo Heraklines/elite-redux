@@ -1034,6 +1034,7 @@ async function handleSaveCustomTrainers(body: SaveBody, target: EditableFile, en
       url: committedUrl,
       committed: result.committed,
       idRemap: result.idRemap,
+      keyRemap: result.keyRemap,
       conflicts: result.conflicts as CustomTrainerConflict[],
       deployed,
       deployError,

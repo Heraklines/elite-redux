@@ -689,6 +689,25 @@ drops into the configured battle with a context banner pinned top-left.
 - **Send Logs** (top-right) prompts for an optional comment, then writes a full
   capture. Results/logs land under `dev-logs/` (see below).
 
+#### How staff test custom trainers
+Title → **🛠 Dev Scenarios** → **👤 Custom Trainers** (top of the list, under the
+Scenario Builder) → pick any staff-authored trainer → drop straight into a forced
+battle against it with the FULL resolved feature set (sprite + gender, aura, battle
+music, intro/victory/defeat lines, weighted-slot + slot-fill rolls, RLA/RLNA moves,
+shiny-lab looks, BST bypass) - exactly as a real run fields it. The full loop:
+1. Author + **save** the trainer in the balancing editor's Custom Trainers tab -
+   that commits the entry into `er-custom-trainers.json`.
+2. A **staging deploy** bakes the updated JSON into the game bundle.
+3. In-game **Dev Scenarios → Custom Trainers → pick** to fight it. The picker
+   force-adjusts the run difficulty + starting wave so the trainer is eligible
+   (skipping boss `%10` + fixed-battle waves the install seam rejects) and the dev
+   force bypasses the challenge-exclusivity gate; a trainer whose whole floor range
+   is boss/fixed waves is reported with a readable message, never a silent wild
+   battle. The force is a one-shot (clears on install), so the rest of the run is
+   normal. Reuses the round-7 dev force seam (`setErCustomTrainerDevForce`).
+4. **Production** only ships the trainer on the MANUAL prod patch - the dev tools
+   (incl. this picker) are dead in prod builds.
+
 ### Shared progress across the team (cross-account / cross-browser)
 So one tester's passes are visible to everyone (nobody re-runs a scenario a
 teammate already passed), Pass/Fail/Send-Logs are mirrored to the **save-API

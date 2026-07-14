@@ -4344,6 +4344,9 @@ function markSaved(file) {
  * Adopt the worker's custom-trainers save response (Batch A multi-staff safety):
  *   - apply `idRemap` (server-assigned real ids) to the local edit state so the UI
  *     reflects the real id without a reload,
+ *   - apply `keyRemap` (a NEW trainer whose provisional key collided with a
+ *     teammate's was re-keyed to TRAINER_<realId> instead of rejected): rename the
+ *     local entry's key so it stays in sync with the committed repo state,
  *   - for every SAVED (non-conflicted) trainer, advance its baseline AND the
  *     load-time CTR_LIVE snapshot (so the next save's baseline hash matches the
  *     new repo state), dropping deleted (null) keys,
@@ -4352,12 +4355,32 @@ function markSaved(file) {
  */
 function markCustomTrainersSaved(delta, data) {
   const idRemap = data && data.idRemap && typeof data.idRemap === "object" ? data.idRemap : {};
+  const keyRemap = data && data.keyRemap && typeof data.keyRemap === "object" ? data.keyRemap : {};
   const conflicted = new Set((Array.isArray(data && data.conflicts) ? data.conflicts : []).map(c => c.key));
 
-  // Apply server-assigned ids to the live edit state.
+  // Apply server-assigned ids to the live edit state (keyed by the ORIGINAL key,
+  // which is still the local key at this point - re-keying happens next).
   for (const [key, realId] of Object.entries(idRemap)) {
     if (ctr.current[key] && typeof realId === "number") {
       ctr.current[key].id = realId;
+    }
+  }
+
+  // Re-key any collided NEW trainer: rename origKey -> newKey in the live edit
+  // state + keep the selection pointed at it. The baseline / CTR_LIVE snapshots are
+  // (re)written under the NEW key by the delta loop below.
+  for (const [origKey, newKey] of Object.entries(keyRemap)) {
+    if (typeof newKey !== "string" || origKey === newKey) {
+      continue;
+    }
+    if (ctr.current[origKey]) {
+      ctr.current[newKey] = ctr.current[origKey];
+      delete ctr.current[origKey];
+    }
+    delete ctr.baseline[origKey];
+    delete CTR_LIVE[origKey];
+    if (ctrSelected === origKey) {
+      ctrSelected = newKey;
     }
   }
 
@@ -4376,12 +4399,14 @@ function markCustomTrainersSaved(delta, data) {
       continue;
     }
     // Saved (created/modified): the committed repo entry is the delta with the
-    // final (possibly remapped) id. Advance CTR_LIVE (raw, species by id) so a
-    // later save hashes the NEW repo state, and snapshot the baseline as clean.
+    // final (possibly remapped) id, under the (possibly remapped) key. Advance
+    // CTR_LIVE (raw, species by id) so a later save hashes the NEW repo state, and
+    // snapshot the baseline as clean.
+    const targetKey = typeof keyRemap[key] === "string" ? keyRemap[key] : key;
     const finalId = typeof idRemap[key] === "number" ? idRemap[key] : value.id;
-    CTR_LIVE[key] = { ...value, id: finalId };
-    if (ctr.current[key]) {
-      ctr.baseline[key] = JSON.parse(JSON.stringify(ctr.current[key]));
+    CTR_LIVE[targetKey] = { ...value, id: finalId };
+    if (ctr.current[targetKey]) {
+      ctr.baseline[targetKey] = JSON.parse(JSON.stringify(ctr.current[targetKey]));
     }
   }
 }

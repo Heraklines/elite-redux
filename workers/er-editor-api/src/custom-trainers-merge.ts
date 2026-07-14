@@ -74,9 +74,16 @@ export interface CustomTrainerConflict {
 export interface CustomTrainersMergeResult {
   /** The merged map to commit (unmentioned trainers preserved verbatim). */
   merged: Record<string, unknown>;
-  /** trainerKey -> SERVER-assigned real id, for the NEW trainers the worker minted. */
+  /** ORIGINAL client trainerKey -> SERVER-assigned real id, for the NEW trainers the worker minted. */
   idRemap: Record<string, number>;
-  /** Per-trainer rejections (stale-baseline conflict, key collision, or full window). */
+  /**
+   * ORIGINAL client trainerKey -> the NEW key the worker committed it under, for a
+   * NEW trainer whose key COLLIDED with a teammate's existing trainer. The worker
+   * re-keys such a trainer to `TRAINER_<realId>` (never rejects a NEW trainer on a
+   * same-key collision); the editor adopts the new key into local state.
+   */
+  keyRemap: Record<string, string>;
+  /** Per-trainer rejections (stale-baseline conflict on a MODIFICATION, or full window). */
   conflicts: CustomTrainerConflict[];
 }
 
@@ -104,8 +111,11 @@ function highestInWindowId(existing: Record<string, unknown>): number {
  *     if the repo version's hash != the baseline (someone else changed it since
  *     the client loaded), else applied verbatim keeping the REPO id,
  *   - a key with NO baseline => NEW trainer: gets a server-assigned id = max
- *     existing id + 1 within the window (rejected if the window is full, or if a
- *     colliding key already exists in the repo — a teammate created it meanwhile).
+ *     existing id + 1 within the window (rejected only if the window is full). If
+ *     its key already exists in the repo (a teammate created a trainer under the
+ *     same provisional `TRAINER_<id>` key meanwhile), it is RE-KEYED to
+ *     `TRAINER_<realId>` and BOTH survive — a NEW trainer is never rejected on a
+ *     same-key collision.
  * Trainers absent from the delta are preserved. Pure; deterministic.
  */
 export function mergeCustomTrainersDelta(
@@ -115,6 +125,7 @@ export function mergeCustomTrainersDelta(
 ): CustomTrainersMergeResult {
   const merged: Record<string, unknown> = { ...existing };
   const idRemap: Record<string, number> = {};
+  const keyRemap: Record<string, string> = {};
   const conflicts: CustomTrainerConflict[] = [];
   const base = baselines ?? {};
   let maxId = highestInWindowId(existing);
@@ -151,14 +162,9 @@ export function mergeCustomTrainersDelta(
       continue;
     }
 
-    // NEW trainer (client had no baseline for it).
-    if (inRepo) {
-      conflicts.push({
-        key,
-        error: `${key}: a trainer with this key was created by someone else - rename yours and retry`,
-      });
-      continue;
-    }
+    // NEW trainer (client had no baseline for it): mint a server id. A same-key
+    // collision with a teammate's trainer NEVER rejects - the trainer is re-keyed
+    // to TRAINER_<realId> so both survive.
     if (maxId + 1 > ER_CUSTOM_TRAINER_ID_MAX) {
       conflicts.push({
         key,
@@ -167,11 +173,36 @@ export function mergeCustomTrainersDelta(
       continue;
     }
     maxId += 1;
-    idRemap[key] = maxId;
-    merged[key] = { ...(value as Record<string, unknown>), id: maxId };
+    const newId = maxId;
+    let targetKey = key;
+    if (inRepo) {
+      // Derive a fresh key from the allocated id. Guard against the (astronomically
+      // unlikely) case the derived key is itself already taken by advancing the id.
+      targetKey = `TRAINER_${newId}`;
+      let windowFull = false;
+      while (Object.hasOwn(merged, targetKey)) {
+        if (maxId + 1 > ER_CUSTOM_TRAINER_ID_MAX) {
+          windowFull = true;
+          break;
+        }
+        maxId += 1;
+        targetKey = `TRAINER_${maxId}`;
+      }
+      if (windowFull) {
+        conflicts.push({
+          key,
+          error: `${key}: custom-trainer id window ${ER_CUSTOM_TRAINER_ID_MIN}-${ER_CUSTOM_TRAINER_ID_MAX} is full`,
+        });
+        continue;
+      }
+      keyRemap[key] = targetKey;
+    }
+    const committedId = maxId;
+    idRemap[key] = committedId;
+    merged[targetKey] = { ...(value as Record<string, unknown>), id: committedId };
   }
 
-  return { merged, idRemap, conflicts };
+  return { merged, idRemap, keyRemap, conflicts };
 }
 
 // --- sha-conditional read -> merge -> write with bounded retry ---------------
@@ -198,7 +229,13 @@ export interface CommitWithRetryOptions {
 }
 
 export type CommitWithRetryResult =
-  | { ok: true; idRemap: Record<string, number>; conflicts: CustomTrainerConflict[]; committed: boolean }
+  | {
+      ok: true;
+      idRemap: Record<string, number>;
+      keyRemap: Record<string, string>;
+      conflicts: CustomTrainerConflict[];
+      committed: boolean;
+    }
   | { ok: false; error: string };
 
 /**
@@ -216,15 +253,15 @@ export async function commitCustomTrainersWithRetry(opts: CommitWithRetryOptions
     if ("error" in read) {
       return { ok: false, error: read.error };
     }
-    const { merged, idRemap, conflicts } = opts.merge(read.existing);
+    const { merged, idRemap, keyRemap, conflicts } = opts.merge(read.existing);
     if (opts.isUnchanged?.(merged, read.existing)) {
       // Nothing to commit (e.g. every touched trainer conflicted). Surface the
       // conflicts without a pointless empty commit.
-      return { ok: true, idRemap, conflicts, committed: false };
+      return { ok: true, idRemap, keyRemap, conflicts, committed: false };
     }
     const write = await opts.write(opts.serialize(merged), read.sha);
     if (write.ok) {
-      return { ok: true, idRemap, conflicts, committed: true };
+      return { ok: true, idRemap, keyRemap, conflicts, committed: true };
     }
     if (!write.conflict) {
       return { ok: false, error: write.error };
