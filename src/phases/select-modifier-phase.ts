@@ -25,6 +25,7 @@ import {
   getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
+  withActiveCoopRuntimeScope,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REWARD_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import {
@@ -1360,6 +1361,12 @@ export class SelectModifierPhase extends BattlePhase {
     this.coopAwaitingAuthorityResults.add(operationId);
     this.coopEndMirror();
     void globalScene.ui.setMode(UiMode.MESSAGE);
+    // Capture the OWNING runtime NOW (schedule time, under the installed client context). Each loop body
+    // below resumes after an `await` - in the two-engine harness the ambient active runtime is then NOT
+    // reliably this guest's (the loopback resumed under whichever client sent last / the withClient scope
+    // already restored), so the reward-op reads must run under the captured runtime, not the ambient one
+    // (#922: else adoptRewardWatcherChoice reads the wrong record -> never mirrors, or fail-loud throws).
+    const runtime = getCoopRuntime();
     void (async () => {
       try {
         const relay = getCoopInteractionRelay();
@@ -1379,20 +1386,26 @@ export class SelectModifierPhase extends BattlePhase {
             return;
           }
           const terminal = action.choice === COOP_INTERACTION_LEAVE;
-          const decision = adoptRewardWatcherChoice({
-            surface: "reward",
-            pinned: this.coopInteractionStart,
-            action: { choice: action.choice, data: action.data, operationId: action.operationId },
-            terminal,
-            localRole: "guest",
-            wave: globalScene.currentBattle?.waveIndex ?? -1,
-            turn: globalScene.currentBattle?.turn ?? 0,
-          });
-          if (!decision.adopt || decision.operationId !== operationId || decision.authoritativeProjection !== true) {
-            continue;
+          const applyRelayedResult = (): boolean => {
+            const decision = adoptRewardWatcherChoice({
+              surface: "reward",
+              pinned: this.coopInteractionStart,
+              action: { choice: action.choice, data: action.data, operationId: action.operationId },
+              terminal,
+              localRole: "guest",
+              wave: globalScene.currentBattle?.waveIndex ?? -1,
+              turn: globalScene.currentBattle?.turn ?? 0,
+            });
+            if (!decision.adopt || decision.operationId !== operationId || decision.authoritativeProjection !== true) {
+              return false;
+            }
+            this.applyRelayedRewardAction(action, decision);
+            return true;
+          };
+          const done = runtime == null ? applyRelayedResult() : withActiveCoopRuntimeScope(runtime, applyRelayedResult);
+          if (done) {
+            return;
           }
-          this.applyRelayedRewardAction(action, decision);
-          return;
         }
       } finally {
         this.coopAwaitingAuthorityResults.delete(operationId);
@@ -1820,6 +1833,10 @@ export class SelectModifierPhase extends BattlePhase {
     // it mid-interaction) move our await seq off the owner's send seq -> we'd stop receiving
     // the owner's picks and hang ("watcher stuck / cursor at the wrong spots").
     const seq = this.coopInteractionStart;
+    // Capture the OWNING runtime NOW (schedule time), so each post-`await` adopt/apply below runs under THIS
+    // client's op-state + durability, not the ambient active runtime the harness may have swapped after the
+    // await resumes (#922 - the reward-mirror desync + the swallowed fail-loud that broke previously-green tests).
+    const runtime = getCoopRuntime();
     for (;;) {
       const action = await relay.awaitInteractionChoice(seq, COOP_REWARD_WAIT_MS, COOP_REWARD_CHOICE_KINDS);
       if (action == null) {
@@ -1833,23 +1850,27 @@ export class SelectModifierPhase extends BattlePhase {
       // stale-/late-rejecting a pick from an earlier interaction or after this one left - the #861 shape).
       // When the flag is OFF this passes through verbatim (legacy). A reject IGNORES the action + keeps
       // awaiting the authoritative terminal, exactly like the existing #854 out-of-range guard.
-      const decision = adoptRewardWatcherChoice({
-        surface: "reward",
-        pinned: this.coopInteractionStart,
-        action: { choice: action.choice, data: action.data, operationId: action.operationId },
-        terminal: action.choice === COOP_INTERACTION_LEAVE,
-        localRole: controller.role,
-        wave: globalScene.currentBattle?.waveIndex ?? -1,
-        turn: globalScene.currentBattle?.turn ?? 0,
-      });
-      if (!decision.adopt) {
-        coopWarn(
-          "reward",
-          `WATCHER op-gate rejected relayed action (${decision.reason}) seq=${seq} choice=${action.choice} - keep awaiting terminal (Wave-2d)`,
-        );
-        continue;
-      }
-      if (this.applyRelayedRewardAction(action, decision)) {
+      const adoptAndApply = (): boolean => {
+        const decision = adoptRewardWatcherChoice({
+          surface: "reward",
+          pinned: this.coopInteractionStart,
+          action: { choice: action.choice, data: action.data, operationId: action.operationId },
+          terminal: action.choice === COOP_INTERACTION_LEAVE,
+          localRole: controller.role,
+          wave: globalScene.currentBattle?.waveIndex ?? -1,
+          turn: globalScene.currentBattle?.turn ?? 0,
+        });
+        if (!decision.adopt) {
+          coopWarn(
+            "reward",
+            `WATCHER op-gate rejected relayed action (${decision.reason}) seq=${seq} choice=${action.choice} - keep awaiting terminal (Wave-2d)`,
+          );
+          return false;
+        }
+        return this.applyRelayedRewardAction(action, decision);
+      };
+      const done = runtime == null ? adoptAndApply() : withActiveCoopRuntimeScope(runtime, adoptAndApply);
+      if (done) {
         return;
       }
     }
