@@ -1,4 +1,11 @@
 import { globalScene } from "#app/global-scene";
+import {
+  buildErCustomTrainerMember,
+  erCustomTrainerHeldModifierConfigs,
+  markErCustomTrainerUsed,
+  selectErCustomTrainerForWave,
+  setErCustomTrainerBstBypass,
+} from "#data/elite-redux/er-custom-trainers";
 import { BattleType } from "#enums/battle-type";
 import type { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
@@ -7,7 +14,10 @@ import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
 import { TrainerVariant } from "#enums/trainer-variant";
 import { UiMode } from "#enums/ui-mode";
+import type { EnemyPokemon } from "#field/pokemon";
 import { Trainer } from "#field/trainer";
+import type { PersistentModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
+import { PokemonHeldItemModifierType } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
 import { BattlePhase } from "#phases/battle-phase";
 import { applyOverrideToBattle } from "#phases/llm-director-beat-utils";
@@ -27,6 +37,11 @@ export class NewBattlePhase extends BattlePhase {
     globalScene.phaseManager.removeAllPhasesOfType("NewBattlePhase");
 
     globalScene.newBattle();
+
+    // Elite Redux: staff-authored custom trainers (er-custom-trainers.json).
+    // Runs after newBattle() has built the wave but before EncounterPhase's
+    // genPartyMember, so we can convert the wave into the authored trainer.
+    this.maybeInstallErCustomTrainer();
 
     // After newBattle has populated the upcoming wave's enemy levels, consume
     // any pending LLM Director inter-beat override for that wave. v1 applies
@@ -55,6 +70,121 @@ export class NewBattlePhase extends BattlePhase {
     }
 
     this.end();
+  }
+
+  /**
+   * Elite Redux: if a staff-authored custom trainer (er-custom-trainers.json)
+   * is eligible for the upcoming wave, install it — convert the wave into a
+   * trainer battle with the authored sprite/name and field the EXACT authored
+   * party (species/form/level/moveset/ability/fusion + held items), bypassing
+   * the #419 elite BST cap. Gated by the active difficulty, floor range/endless
+   * and challenge-exclusivity in `selectErCustomTrainerForWave`.
+   *
+   * SOLO PATH ONLY. Co-op sessions are skipped: custom-trainer adoption into a
+   * co-op run needs the host-authoritative selection/relay seam and must not
+   * touch `src/data/elite-redux/coop/**`. That is a documented future seam.
+   *
+   * The bypass flag is always reset here first, so a wave WITHOUT a custom
+   * trainer never leaks a previous wave's bypass.
+   */
+  private maybeInstallErCustomTrainer(): void {
+    // Clear any prior wave's BST-cap bypass before deciding this wave.
+    setErCustomTrainerBstBypass(false);
+    const battle = globalScene.currentBattle;
+    if (!battle) {
+      return;
+    }
+    // Solo path only — co-op adoption is a documented future seam.
+    if (globalScene.gameMode.isCoop) {
+      return;
+    }
+    const wave = battle.waveIndex;
+    // Never hijack scripted content: mystery encounters, fixed battles, or the
+    // canonical boss waves (`% 10 === 0`) keep their vanilla/ER progression.
+    if (
+      battle.battleType === BattleType.MYSTERY_ENCOUNTER
+      || globalScene.gameMode.isFixedBattle(wave)
+      || wave % 10 === 0
+    ) {
+      return;
+    }
+    const resolved = selectErCustomTrainerForWave(wave);
+    if (!resolved) {
+      return;
+    }
+    try {
+      // Tear down any pre-rolled trainer / wild party; we rebuild from scratch.
+      if (battle.battleType === BattleType.TRAINER && battle.trainer) {
+        globalScene.field.remove(battle.trainer, false);
+        battle.trainer.destroy();
+        battle.trainer = null;
+      }
+      const trainer = new Trainer(resolved.trainerType as TrainerType, TrainerVariant.DEFAULT);
+      trainer.name = resolved.name;
+      globalScene.field.add(trainer);
+      battle.trainer = trainer;
+      battle.battleType = BattleType.TRAINER;
+      battle.enemyParty = [];
+      battle.setDouble(resolved.isDouble);
+
+      // Per-index levels: authored explicit level, else the wave curve baseline.
+      const baseLevels = battle.enemyLevels ?? [];
+      const baseLevel = baseLevels[0] ?? Math.max(5, wave);
+      const members = resolved.members;
+      const finalLevels = members.map((m, i) => m.level ?? baseLevels[i] ?? baseLevel);
+      battle.enemyLevels = finalLevels;
+
+      // Resize the party template so genPartyMember stops at the authored size.
+      const template = trainer.getPartyTemplate();
+      template.size = members.length;
+
+      // Field the exact authored party. The BST-cap bypass is on for the whole
+      // battle (set below) so the EnemyPokemon constructor won't devolve them.
+      trainer.config.partyMemberFuncs = {};
+      members.forEach((member, idx) => {
+        trainer.config.partyMemberFuncs[idx] = (level, _strength) => {
+          const enemy = buildErCustomTrainerMember(member, idx, member.level ?? level, resolved.isDouble);
+          // Fallback: an unresolvable species yields a vanilla-rolled slot mon
+          // rather than a crash (validation already dropped bad entries).
+          return enemy ?? globalScene.addEnemyPokemon(getPokemonSpecies(1), member.level ?? level, TrainerSlot.TRAINER);
+        };
+      });
+
+      // Attach the authored held items per slot (enemy-legal pool).
+      const heldByIndex = members.map(m => erCustomTrainerHeldModifierConfigs(m));
+      trainer.config.genModifiersFunc = (party: readonly EnemyPokemon[]): PersistentModifier[] => {
+        const out: PersistentModifier[] = [];
+        party.forEach((enemy, i) => {
+          for (const cfg of heldByIndex[i] ?? []) {
+            let modifier: PokemonHeldItemModifier;
+            if (cfg.modifier instanceof PokemonHeldItemModifierType) {
+              modifier = cfg.modifier.newModifier(enemy);
+            } else {
+              modifier = cfg.modifier;
+              modifier.pokemonId = enemy.id;
+            }
+            modifier.stackCount = cfg.stackCount ?? 1;
+            modifier.isTransferable = cfg.isTransferable ?? modifier.isTransferable;
+            out.push(modifier);
+          }
+        });
+        return out;
+      };
+
+      // Staff intent wins: exempt this whole battle from the #419 BST cap.
+      setErCustomTrainerBstBypass(true);
+      markErCustomTrainerUsed(resolved.key);
+      // TODO(#902): triple battles are not yet supported; a trainer authored as
+      // a triple falls back to a DOUBLE here until triples support lands.
+      const tripleNote = resolved.isTriplePending ? " (triple pending #902 -> double)" : "";
+      console.info(
+        `[er-custom-trainers] installed "${resolved.name}" (${resolved.key}) wave=${wave} type=${resolved.trainerType} double=${resolved.isDouble} team=${members.length}${tripleNote}`,
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      console.warn(`[er-custom-trainers] install failed wave=${wave} reason=${reason}`);
+      setErCustomTrainerBstBypass(false);
+    }
   }
 
   /**

@@ -25,6 +25,7 @@ import { matchesAbilityText } from "#data/elite-redux/er-ability-search";
 import { resetErAchievementRunState } from "#data/elite-redux/er-achievement-run-state";
 import { ER_BLACK_SHINY_TINT } from "#data/elite-redux/er-black-shinies";
 import { clearForcedCommunityDifficulty, getForcedCommunityDifficulty } from "#data/elite-redux/er-community-run-state";
+import { resetErCustomTrainerTracking } from "#data/elite-redux/er-custom-trainers";
 import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes } from "#data/elite-redux/er-map-nodes";
@@ -7319,6 +7320,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 });
               }
               resetErRunTrainerTracking();
+              resetErCustomTrainerTracking();
               resetErGhostRunState();
               resetErMapNodes();
               // ER (#486): dev/testing seed - pre-stock Treasure-Map fragments

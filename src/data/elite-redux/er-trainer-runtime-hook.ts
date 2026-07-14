@@ -43,6 +43,7 @@ import {
 import { erRivalWaveOrdinal, erRivalWaveSequence } from "#data/elite-redux/er-battle-frequency";
 import { ER_FACTORY_SETS } from "#data/elite-redux/er-factory-sets";
 import { erBalanceMap, erBalanceNum, erBalancePairs } from "#data/elite-redux/er-balance-tuning";
+import { isErCustomTrainerBstBypassActive } from "#data/elite-redux/er-custom-trainer-bst-flag";
 import { modifierTypes } from "#data/data-lists";
 import { getErBiomeItemFlavor } from "#data/elite-redux/er-biome-item-flavor";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
@@ -1132,10 +1133,14 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
     // to be fielded EXACTLY as built - the wave-1 BST ladder would swap/devolve it. Exempt it
     // like the other curated-content paths (daily / colosseum / ME). Showdown-only -> no other
     // mode's curve is touched.
+    // Staff-authored custom trainers (er-custom-trainers.json) are curated
+    // content fielded EXACTLY as authored - the wave-ladder cap must never
+    // devolve/swap their mons (maintainer directive: staff intent wins).
     if (
       globalScene.gameMode?.isDaily ||
       globalScene.gameMode?.isShowdown ||
       erColosseumBattleActive ||
+      isErCustomTrainerBstBypassActive() ||
       (globalScene.currentBattle?.isBattleMysteryEncounter?.() ?? false)
     ) {
       return;
