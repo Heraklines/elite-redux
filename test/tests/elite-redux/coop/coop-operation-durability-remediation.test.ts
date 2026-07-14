@@ -112,8 +112,8 @@ function sinkBiomes(): number[] {
 
 describe("W2e-R P0 remediation: the operation<->durability seam mutates (or declines to ACK), never a phantom ACK", () => {
   beforeEach(() => {
-    // The reward surface's apply state is now per-runtime (fail-loud without an installed runtime). Install a
-    // single op-state for this engine-free realm so the reward record exists (biome stays module-global here).
+    // Biome and reward apply state are per-runtime (fail-loud without an installed runtime). Install one
+    // op-state for this engine-free realm so both surface records exist.
     setActiveCoopRuntimeOpState(createCoopRuntimeOpState());
     setCoopDurabilityEnabled(true);
     setCoopBiomeOperationEnabled(true);
