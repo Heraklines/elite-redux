@@ -60,6 +60,8 @@ function keySequence(name, fallback) {
 
 const allowedJourneys = new Set(["probe", "fresh-wave2", "fresh-resume", "reverse-resume", "faint-replacement"]);
 const allowedSeats = new Set(["host-seat", "guest-seat"]);
+const allowedAccountModes = new Set(["login", "register"]);
+const defaultCoopChallengeKeys = [...Array.from({ length: 10 }, () => "ArrowDown"), "ArrowRight", "Space", "Space"];
 
 export function loadConfig() {
   const journey = process.env.COOP_UI_JOURNEY?.trim() || "probe";
@@ -74,11 +76,15 @@ export function loadConfig() {
   }
   const requesterSeat = process.env.COOP_UI_REQUESTER_SEAT?.trim() || "guest-seat";
   const faintOwnerSeat = process.env.COOP_UI_FAINT_OWNER_SEAT?.trim() || "guest-seat";
+  const accountMode = process.env.COOP_UI_ACCOUNT_MODE?.trim() || "login";
   if (!allowedSeats.has(requesterSeat)) {
     throw new Error(`COOP_UI_REQUESTER_SEAT must be one of ${[...allowedSeats].join(", ")}`);
   }
   if (!allowedSeats.has(faintOwnerSeat)) {
     throw new Error(`COOP_UI_FAINT_OWNER_SEAT must be one of ${[...allowedSeats].join(", ")}`);
+  }
+  if (!allowedAccountModes.has(accountMode)) {
+    throw new Error(`COOP_UI_ACCOUNT_MODE must be one of ${[...allowedAccountModes].join(", ")}`);
   }
 
   return {
@@ -86,9 +92,17 @@ export function loadConfig() {
     runId,
     journey,
     baseUrl: baseUrl.href,
+    browserDist: process.env.COOP_UI_BROWSER_DIST?.trim()
+      ? resolve(ROOT, process.env.COOP_UI_BROWSER_DIST.trim())
+      : null,
+    assetDir: resolve(ROOT, process.env.COOP_UI_ASSET_DIR?.trim() || "assets"),
+    expectedApiOrigin: process.env.COOP_UI_EXPECTED_API_ORIGIN?.trim() || null,
+    expectedSignalOrigin: process.env.COOP_UI_EXPECTED_SIGNAL_ORIGIN?.trim() || null,
+    entryContract: process.env.COOP_BROWSER_ENTRY_CONTRACT?.trim() || "public-ui-v1",
     artifactDir: resolve(ROOT, "dev-logs", "coop-public-ui", runId),
     headless: boolean("COOP_UI_HEADLESS", true),
     chromeTrace: boolean("COOP_UI_CHROME_TRACE", true),
+    bootTimeoutMs: integer("COOP_UI_BOOT_TIMEOUT_MS", 300_000),
     timeoutMs: integer("COOP_UI_TIMEOUT_MS", 120_000),
     actionDelayMs: integer("COOP_UI_ACTION_DELAY_MS", 180),
     settleDelayMs: integer("COOP_UI_SETTLE_DELAY_MS", 750),
@@ -114,13 +128,21 @@ export function loadConfig() {
         hostSeat: keySequence("COOP_UI_HOST_TITLE_NEW_GAME_KEYS", []),
         guestSeat: keySequence("COOP_UI_GUEST_TITLE_NEW_GAME_KEYS", []),
       },
+      // The co-op host alone visits challenge selection. Doubles Only is the eleventh row and is
+      // mechanically redundant with co-op's mandatory double battles, so selecting it unlocks the
+      // public Start bar without turning this baseline journey into a materially different campaign.
+      challenge: keySequence("COOP_UI_CHALLENGE_KEYS", defaultCoopChallengeKeys),
       starter: keySequence("COOP_UI_STARTER_KEYS", ["Space", "Space", "Enter", "Space"]),
+      // Team confirmation opens a host-only difficulty picker while the guest waits for runConfig.
+      // Ace is the normal baseline and sits directly below the default Youngster option.
+      difficulty: keySequence("COOP_UI_DIFFICULTY_KEYS", ["ArrowDown", "Space"]),
       battle: keySequence("COOP_UI_BATTLE_KEYS", ["Space", "Space", "Space"]),
       rewardLeave: keySequence("COOP_UI_REWARD_LEAVE_KEYS", ["Backspace", "Space"]),
       replacement: keySequence("COOP_UI_REPLACEMENT_KEYS", ["Space", "Space"]),
     },
     requesterSeat,
     faintOwnerSeat,
+    accountMode,
     allowedConsoleErrors: (process.env.COOP_UI_ALLOWED_CONSOLE_ERRORS ?? "")
       .split("||")
       .map(value => value.trim())

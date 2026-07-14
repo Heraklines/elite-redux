@@ -26,13 +26,13 @@ async function freshWave2(rig) {
 async function freshResume(rig) {
   await freshThroughWave2(rig);
   await rig.coldReopenAndPair(rig.config.requesterSeat);
-  await rig.resumeRun();
+  await rig.resumeRun({ expectedWave: 2 });
 }
 
 async function reverseResume(rig) {
   await freshThroughWave2(rig);
   await rig.coldReopenAndPair(oppositeSeat(rig.config.requesterSeat));
-  await rig.resumeRun();
+  await rig.resumeRun({ expectedWave: 2 });
 }
 
 async function faintReplacement(rig) {

@@ -1,0 +1,126 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+/**
+ * Solo classic-run journey that validates the state-aware navigation primitive
+ * (`selectOptionById`) end to end against the read-only v2 semantic mirror, with NO
+ * co-op pairing. A single browser context needs no lobby, so this proves the primitive
+ * independent of co-op signaling - it is the foundation the co-op journey matrix reuses.
+ */
+
+import { selectOptionById } from "./campaign-nav.mjs";
+import { delay } from "./evidence.mjs";
+
+const TITLE_PHASE = /Start Phase TitlePhase/u;
+const STARTER_PHASE = /Start Phase SelectStarterPhase/u;
+const CHALLENGE_PHASE = /Start Phase SelectChallengePhase/u;
+const COMMAND_SURFACE = "command:command";
+const FIGHT_SURFACE = "command:fight";
+
+async function waitForSemantic(client, surfaceId, timeoutMs) {
+  return client.evidence.waitForCondition(sink => sink.findLastSemanticSurface(0, surfaceId), {
+    timeoutMs,
+    description: `v2 semantic surface ${surfaceId}`,
+  });
+}
+
+/** Assert a single nav keypress changes the v2 selectedOptionId (proves the mirror is live). */
+async function assertMirrorReactsToInput(client) {
+  const before = client.evidence.findLastSemanticSurface(0, COMMAND_SURFACE);
+  const beforeId = before?.observation.selectedOptionId ?? null;
+  const beforeIndex = before?.index ?? -1;
+  await client.press("ArrowRight", "solo-mirror-probe");
+  const deadline = Date.now() + client.config.timeoutMs;
+  while (Date.now() < deadline) {
+    const now = client.evidence.findLastSemanticSurface(0, COMMAND_SURFACE);
+    if (now && now.index > beforeIndex && now.observation.selectedOptionId !== beforeId) {
+      client.evidence.record("solo-mirror-live", { before: beforeId, after: now.observation.selectedOptionId });
+      return;
+    }
+    await delay(80);
+  }
+  throw new Error(`${client.label}: v2 command mirror did not react to a nav keypress (was ${beforeId})`);
+}
+
+export async function runSoloClassic(client) {
+  await client.loginOrReuseSession();
+  await client.evidence.waitFor(TITLE_PHASE, {
+    from: client.pageCursor,
+    timeoutMs: client.config.timeoutMs,
+    description: "solo TitlePhase",
+  });
+  await client.checkpoint("solo-title");
+
+  // Open New Game -> Classic (index 0; co-op sits one row BELOW classic in the same menu).
+  await client.sequence(client.titleNewGameKeys, "solo-title-select-new-game");
+  await client.press("Space", "solo-open-new-game");
+  await client.press("Space", "solo-select-classic-mode");
+
+  // Classic solo may show a challenge screen before starter select; take the default start.
+  const entry = await client.evidence.waitForCondition(
+    sink => sink.find(CHALLENGE_PHASE, client.pageCursor) ?? sink.find(STARTER_PHASE, client.pageCursor),
+    { timeoutMs: client.config.timeoutMs, description: "solo challenge or starter surface" },
+  );
+  if (CHALLENGE_PHASE.test(entry.text ?? "")) {
+    await client.checkpoint("solo-challenge");
+    await client.sequence(client.config.keys.challenge, "solo-challenge-start");
+  }
+  await client.evidence.waitFor(STARTER_PHASE, {
+    from: client.pageCursor,
+    timeoutMs: client.config.timeoutMs,
+    description: "solo SelectStarterPhase",
+  });
+  await client.checkpoint("solo-starter-select");
+  await client.sequence(client.config.keys.starter, "solo-select-default-team");
+
+  // Launching a run needs the post-starter difficulty/confirm step (co-op drives the same
+  // picker via its host difficulty keys). Press it, then adaptively re-try once if the
+  // wave-1 command surface has not appeared yet, so a slightly different launch layout
+  // still starts the run instead of hanging.
+  await client.sequence(client.config.keys.difficulty, "solo-select-difficulty");
+  let reachedCommand = await client.evidence
+    .waitForCondition(sink => sink.findLastSemanticSurface(0, COMMAND_SURFACE), {
+      timeoutMs: Math.min(client.config.timeoutMs, 45_000),
+      description: "solo wave-1 command surface",
+    })
+    .catch(() => null);
+  if (!reachedCommand) {
+    await client.press("Space", "solo-launch-confirm-retry");
+    reachedCommand = await waitForSemantic(client, COMMAND_SURFACE, client.config.timeoutMs);
+  }
+  await client.checkpoint("solo-wave1-command");
+
+  // Validate the primitive against the LIVE mirror:
+  //  1. a nav keypress changes the observed selection;
+  //  2. selectOptionById navigates back to Fight (cursor:0), verifying each press moved the
+  //     cursor, then submits - opening the real Fight move menu.
+  await assertMirrorReactsToInput(client);
+  await selectOptionById(client, {
+    surfaceId: COMMAND_SURFACE,
+    targetId: "cursor:0",
+    navKeys: ["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"],
+    submit: true,
+  });
+
+  // The Fight move menu is a real option surface; pick the first move by id and submit.
+  await waitForSemantic(client, FIGHT_SURFACE, client.config.timeoutMs);
+  await client.checkpoint("solo-fight-menu");
+  await selectOptionById(client, {
+    surfaceId: FIGHT_SURFACE,
+    targetId: "cursor:0",
+    navKeys: ["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"],
+    submit: true,
+  });
+
+  // Best-effort: capture the next interactive surface (next command or reward) as evidence.
+  // The primitive itself is already validated above, so this wait never fails the journey.
+  const reachedNext = await client.evidence
+    .waitForCondition(
+      sink => sink.findLastSemanticSurface(0, COMMAND_SURFACE) ?? sink.findLastSemanticSurface(0, "reward-shop"),
+      { timeoutMs: Math.min(client.config.timeoutMs, 30_000), description: "post-move interactive surface" },
+    )
+    .catch(() => null);
+  await client.checkpoint(reachedNext ? "solo-post-move-surface" : "solo-final");
+}

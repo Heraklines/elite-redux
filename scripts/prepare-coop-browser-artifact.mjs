@@ -12,6 +12,47 @@ const root = resolve(import.meta.dirname, "..");
 const dist = resolve(root, process.env.COOP_BROWSER_DIST ?? "dist-coop-browser");
 const manifestPath = resolve(dist, "coop-browser-artifact.json");
 const verifyOnly = process.argv.includes("--verify");
+const entryContract = process.env.COOP_BROWSER_ENTRY_CONTRACT?.trim() || "transport-v1";
+const assetShaPattern = /^[0-9a-f]{40}$/u;
+const assetTargetPattern = /^https:\/\/cdn\.jsdelivr\.net\/gh\/Heraklines\/er-assets@([0-9a-f]{40})\//u;
+
+function productionAssetPins(contents) {
+  const pins = [];
+  const sources = new Set();
+  for (const rawLine of contents.split(/\r?\n/gu)) {
+    const line = rawLine.trim();
+    if (line.length === 0 || line.startsWith("#")) {
+      continue;
+    }
+    const [source, target, status, ...extra] = line.split(/\s+/gu);
+    const targetMatch = assetTargetPattern.exec(target ?? "");
+    if (extra.length > 0 || status !== "302" || !source?.startsWith("/") || targetMatch == null) {
+      throw new Error(`unsupported production asset redirect: ${line}`);
+    }
+    sources.add(source);
+    pins.push(targetMatch[1]);
+  }
+  if (pins.length === 0 || !sources.has("/images/*") || !sources.has("/fonts/*")) {
+    throw new Error("production asset redirects must include pinned image and font surfaces");
+  }
+  return pins;
+}
+
+function preparePublicUiProductionSurface() {
+  const assetSha = process.env.COOP_BROWSER_ASSET_SHA?.trim() ?? "";
+  if (!assetShaPattern.test(assetSha)) {
+    throw new Error(`COOP_BROWSER_ASSET_SHA must be a 40-character lowercase hex SHA, got "${assetSha}"`);
+  }
+  const redirectTemplate = readFileSync(resolve(root, "deploy", "cloudflare", "_redirects"), "utf8");
+  productionAssetPins(redirectTemplate);
+  const redirects = redirectTemplate.replace(/er-assets@[0-9a-f]{40}/gu, `er-assets@${assetSha}`);
+  if (productionAssetPins(redirects).some(pin => pin !== assetSha)) {
+    throw new Error("failed to rewrite every production asset redirect to the resolved asset SHA");
+  }
+  writeFileSync(resolve(dist, "_redirects"), redirects);
+  writeFileSync(resolve(dist, "manifest.json"), '{"manifest":{}}\n');
+  return assetSha;
+}
 
 function filesBelow(directory) {
   const files = [];
@@ -43,6 +84,7 @@ function aggregateDigest(records) {
   return hash.digest("hex");
 }
 
+const assetSha = !verifyOnly && entryContract === "public-ui-v1" ? preparePublicUiProductionSurface() : null;
 const files = filesBelow(dist).map(fileRecord);
 if (files.length === 0 || !files.some(file => file.path === "index.html")) {
   throw new Error(`co-op browser artifact at ${dist} is empty or lacks index.html`);
@@ -54,12 +96,32 @@ if (verifyOnly) {
   if (expected.version !== 1 || expected.digest !== actualDigest) {
     throw new Error(`co-op browser artifact digest mismatch: expected ${expected.digest}, got ${actualDigest}`);
   }
+  if (expected.entryContract !== entryContract) {
+    throw new Error(
+      `co-op browser artifact entry contract mismatch: expected ${expected.entryContract}, got ${entryContract}`,
+    );
+  }
+  if (entryContract === "public-ui-v1") {
+    if (!assetShaPattern.test(expected.assetSha ?? "")) {
+      throw new Error(`sealed public-UI artifact has invalid asset SHA: ${expected.assetSha}`);
+    }
+    const redirects = readFileSync(resolve(dist, "_redirects"), "utf8");
+    if (productionAssetPins(redirects).some(pin => pin !== expected.assetSha)) {
+      throw new Error("sealed public-UI redirects do not all match the artifact asset SHA");
+    }
+    if (readFileSync(resolve(dist, "manifest.json"), "utf8") !== '{"manifest":{}}\n') {
+      throw new Error("sealed public-UI artifact does not contain staging's inert manifest.json");
+    }
+  }
   process.stdout.write(`verified immutable co-op browser artifact ${actualDigest} (${files.length} files)\n`);
 } else {
   const manifest = {
     version: 1,
     sha: process.env.GITHUB_SHA ?? "local",
+    apiOrigin: process.env.COOP_BROWSER_API_ORIGIN ?? process.env.VITE_SERVER_URL ?? null,
     signalOrigin: process.env.VITE_COOP_SERVER_URL ?? "http://127.0.0.1:4174",
+    entryContract,
+    assetSha,
     digest: aggregateDigest(files),
     files,
   };

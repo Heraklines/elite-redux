@@ -1,0 +1,310 @@
+name: Co-op Public UI Campaign
+
+on:
+  workflow_dispatch:
+    inputs:
+      campaign_waves:
+        description: Minimum number of co-op waves to play through public UI only
+        required: true
+        type: string
+        default: "30"
+      cadence:
+        description: Human input cadence (fast keeps 30 waves inside the CI budget)
+        required: true
+        type: choice
+        default: fast
+        options:
+          - fast
+          - normal
+          - slow
+      reward_mode:
+        description: Reward shop policy each wave (owner leaves, or takes the first option)
+        required: true
+        type: choice
+        default: leave
+        options:
+          - leave
+          - pick-first
+      auto_first:
+        description: Press through any UNKNOWN interactive surface (logs [auto-first] <phase>) instead of failing loudly
+        required: true
+        type: boolean
+        default: false
+      raise_speed:
+        description: Drive Game Speed to 10x through the real Settings UI early in the run
+        required: true
+        type: boolean
+        default: true
+      speed_keys:
+        description: Override Settings key sequence; blank uses the built-in 10x path, "[]" leaves speed unchanged
+        required: true
+        type: string
+        default: ""
+      requester_seat:
+        description: Seat that sends the first lobby invitation
+        required: true
+        type: choice
+        default: guest-seat
+        options:
+          - guest-seat
+          - host-seat
+  push:
+    # Narrowly scoped to this campaign branch so pushes run a cheap live shakedown
+    # (8 waves, auto-first ON) without needing the workflow on the default branch.
+    branches:
+      - "ci/coop/p33-campaign-30w"
+  schedule:
+    # Nightly full campaign soak.
+    - cron: "0 4 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coop-public-ui-campaign-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  COOP_BROWSER_ENTRY_CONTRACT: public-ui-v1
+  # Isolated P33 staging workers (deployed from the integration tip, same COOP_IDENTITY_SECRET
+  # so the save-API-minted identity tickets validate on the signal worker). Both hardcoded so a
+  # stale repo var cannot split the ticket-issuer from the signal origin.
+  COOP_UI_SIGNAL_ORIGIN: https://er-coop-api-staging.heraklines.workers.dev
+  COOP_UI_API_ORIGIN: https://er-save-api-staging.heraklines.workers.dev
+
+jobs:
+  staging-health:
+    name: Staging health precheck (skip gameplay if the workers are down)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      healthy: ${{ steps.check.outputs.healthy }}
+    steps:
+      - name: Probe the signal + save workers
+        id: check
+        shell: bash
+        run: |
+          set +e
+          SIG=$(curl -s -m 20 -o /dev/null -w "%{http_code}" "$COOP_UI_SIGNAL_ORIGIN/coop/health")
+          API=$(curl -s -m 20 -o /dev/null -w "%{http_code}" "$COOP_UI_API_ORIGIN/account/info")
+          set -e
+          echo "signal $COOP_UI_SIGNAL_ORIGIN/coop/health -> $SIG"
+          echo "save   $COOP_UI_API_ORIGIN/account/info -> $API"
+          # Signal must be 200; save must answer at all and not 404/5xx (401/400 = up + auth-gated).
+          if [ "$SIG" = "200" ] && [ -n "$API" ] && [ "$API" != "000" ] && [ "$API" != "404" ] && [ "$API" -lt 500 ]; then
+            echo "healthy=true" >> "$GITHUB_OUTPUT"
+            echo "Staging is healthy; gameplay jobs will run."
+          else
+            echo "healthy=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Staging unhealthy::signal=$SIG save=$API - skipping build + gameplay (no doomed run)."
+          fi
+
+  browser-build:
+    name: Build and seal exact-SHA browser bundle once
+    needs: staging-health
+    if: needs.staging-health.outputs.healthy == 'true'
+    runs-on: ${{ vars.COOP_UI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact implementation SHA
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Resolve exact production asset SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          SHA="$(gh api repos/Heraklines/er-assets/commits/main --jq .sha)"
+          echo "$SHA" | grep -Eq '^[0-9a-f]{40}$' || { echo "Invalid er-assets SHA: $SHA"; exit 1; }
+          echo "COOP_BROWSER_ASSET_SHA=$SHA" >> "$GITHUB_ENV"
+          echo "Sealing er-assets pin $SHA into the public-UI bundle"
+
+      - name: Run owned-file format gate for the campaign additions
+        shell: bash
+        run: |
+          pnpm exec biome check \
+            .github/workflows/coop-public-ui-campaign.yml \
+            test/browser/coop-public-ui/campaign-policy.mjs \
+            test/browser/coop-public-ui/campaign.mjs \
+            test/browser/coop-public-ui/run-campaign.mjs \
+            test/browser/coop-public-ui/check-campaign-boundary.mjs
+
+      - name: Enforce public-driver boundary (original harness files)
+        run: node test/browser/coop-public-ui/check-public-boundary.mjs
+
+      - name: Enforce public-driver boundary (new campaign files)
+        run: node test/browser/coop-public-ui/check-campaign-boundary.mjs
+
+      # Cache the built bundle keyed on the GAME-SOURCE inputs only (src/public/lockfile/
+      # entry/sealer/vite-config/workflow-env) - NOT the harness driver. A harness-only push
+      # therefore reuses the identical-source bundle and skips the ~build. The seal step below
+      # ALWAYS re-runs, re-stamping the manifest with the current commit SHA + recomputing the
+      # digest from the (identical) source, so the exact-SHA seal semantics are preserved and a
+      # bad reuse fails loudly at the gameplay job's manifest verification.
+      - name: Restore source-keyed browser bundle
+        id: bundle-cache
+        uses: actions/cache@v4
+        with:
+          path: dist-coop-public-ui
+          key: >-
+            coop-ui-bundle-v1-${{ hashFiles('src/**', 'public/**', 'pnpm-lock.yaml',
+            'scripts/coop-browser-entry.ts', 'scripts/prepare-coop-browser-artifact.mjs',
+            'test/browser/coop-public-ui/vite.config.mjs', '.github/workflows/coop-public-ui-campaign.yml') }}
+
+      - name: Build normal application with CI-only read-only observer
+        if: steps.bundle-cache.outputs.cache-hit != 'true'
+        env:
+          COOP_BROWSER_OUT_DIR: dist-coop-public-ui
+          VITE_BYPASS_LOGIN: 0
+          VITE_BYPASS_TUTORIAL: 0
+          VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
+          VITE_COOP_SIGNALING_PROTOCOL: p33
+          VITE_SERVER_URL: ${{ env.COOP_UI_API_ORIGIN }}
+        run: pnpm exec vite build --mode beta --config test/browser/coop-public-ui/vite.config.mjs
+
+      - name: Seal immutable execution input (always, re-stamps the current commit SHA)
+        env:
+          COOP_BROWSER_DIST: dist-coop-public-ui
+          COOP_BROWSER_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
+          VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
+        run: |
+          rm -f dist-coop-public-ui/coop-browser-artifact.json
+          node scripts/prepare-coop-browser-artifact.mjs
+          echo "bundle-source-cache-hit=${{ steps.bundle-cache.outputs.cache-hit == 'true' }}"
+
+      - name: Publish exact bundle for the isolated campaign runner
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-campaign-bundle-${{ github.sha }}
+          path: dist-coop-public-ui/**
+          include-hidden-files: true
+          compression-level: 9
+          retention-days: 1
+          if-no-files-found: error
+
+  solo-nav:
+    name: Solo classic navigation-primitive validation (no pairing)
+    needs: browser-build
+    runs-on: ${{ vars.COOP_UI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact implementation SHA and assets
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Download the once-built exact-SHA bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: coop-public-ui-campaign-bundle-${{ github.sha }}
+          path: dist-coop-public-ui
+
+      - name: Install isolated Chrome runtime
+        run: pnpm exec puppeteer browsers install chrome
+
+      - name: Prepare an isolated account pair for visible registration
+        run: node test/browser/coop-public-ui/provision-accounts.mjs
+
+      - name: Drive a solo classic run to validate selectOptionById against the v2 mirror
+        env:
+          COOP_UI_BASE_URL: http://127.0.0.1:4175/?coopdebug=1
+          COOP_UI_BROWSER_DIST: dist-coop-public-ui
+          COOP_UI_ASSET_DIR: assets
+          COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
+          COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
+          COOP_UI_ACCOUNT_MODE: register
+          COOP_UI_ACTION_DELAY_MS: 70
+          COOP_UI_SETTLE_DELAY_MS: 300
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: node test/browser/coop-public-ui/run-solo.mjs
+
+      - name: Upload solo navigation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-solo-${{ github.sha }}-${{ github.run_attempt }}
+          path: dev-logs/coop-public-ui/**
+          retention-days: 14
+          if-no-files-found: warn
+
+  campaign:
+    name: ${{ inputs.campaign_waves || '30' }}-wave co-op campaign / ${{ inputs.cadence || 'fast' }}
+    needs: browser-build
+    runs-on: ${{ vars.COOP_UI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 55
+    steps:
+      - name: Check out exact implementation SHA and assets
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Download the once-built exact-SHA bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: coop-public-ui-campaign-bundle-${{ github.sha }}
+          path: dist-coop-public-ui
+
+      - name: Install isolated Chrome runtime
+        run: pnpm exec puppeteer browsers install chrome
+
+      - name: Prepare an isolated account pair for visible registration
+        run: node test/browser/coop-public-ui/provision-accounts.mjs
+
+      - name: Drive two isolated built clients through a full public-UI campaign
+        env:
+          COOP_UI_BASE_URL: http://127.0.0.1:4175/?coopdebug=1
+          COOP_UI_BROWSER_DIST: dist-coop-public-ui
+          COOP_UI_ASSET_DIR: assets
+          COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
+          COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
+          COOP_UI_ACCOUNT_MODE: register
+          # push = cheap shakedown (8 waves, auto-first ON); dispatch = inputs; cron = 30-wave soak.
+          COOP_UI_CAMPAIGN_WAVES: ${{ inputs.campaign_waves || (github.event_name == 'push' && '8') || '30' }}
+          # Only a shakedown may press through unknown surfaces; nightly + gating dispatch loud-fail.
+          COOP_UI_CAMPAIGN_MODE: ${{ (github.event_name == 'push' && 'shakedown') || (github.event_name == 'schedule' && 'nightly') || (inputs.auto_first && 'shakedown') || 'gating' }}
+          COOP_UI_REWARD_MODE: ${{ inputs.reward_mode || 'leave' }}
+          COOP_UI_AUTO_FIRST: ${{ (github.event_name == 'push' && '1') || (inputs.auto_first && '1') || '0' }}
+          # Default ON for push/schedule; only an explicit dispatch raise_speed=false turns it off.
+          # (A bare `inputs.raise_speed == false` is TRUE on push, where inputs is null -> would wrongly skip.)
+          COOP_UI_RAISE_SPEED: ${{ (github.event_name != 'workflow_dispatch' || inputs.raise_speed) && '1' || '0' }}
+          # Blank -> the driver's built-in 10x Settings-UI path (default everywhere, incl. nightly).
+          COOP_UI_SPEED_KEYS: ${{ inputs.speed_keys }}
+          COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
+          COOP_UI_ACTION_DELAY_MS: ${{ (inputs.cadence == 'slow' && '420') || (inputs.cadence == 'normal' && '180') || '70' }}
+          COOP_UI_SETTLE_DELAY_MS: ${{ (inputs.cadence == 'slow' && '1300') || (inputs.cadence == 'normal' && '750') || '300' }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: node test/browser/coop-public-ui/run-campaign.mjs
+
+      - name: Upload compact campaign diagnosis first
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-campaign-compact-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            dev-logs/coop-public-ui/**/summary.json
+            dev-logs/coop-public-ui/**/campaign-progress.jsonl
+            dev-logs/coop-public-ui/**/*.jsonl
+            dev-logs/coop-public-ui/**/*.png
+            dev-logs/coop-public-ui/**/*.dom.json
+            dev-logs/coop-public-ui/**/*.cookies.json
+          compression-level: 9
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload full campaign evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-campaign-${{ github.sha }}-${{ github.run_attempt }}
+          path: dev-logs/coop-public-ui/**
+          retention-days: 14
+          if-no-files-found: warn
