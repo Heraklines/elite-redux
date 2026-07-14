@@ -45,7 +45,7 @@
 
 import { COOP_CAP_OP_BIOME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
+import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
 import {
   type CoopAuthoritativeEnvelopeV1,
   type CoopBiomePickPayload,
@@ -57,15 +57,25 @@ import {
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
+  getActiveCoopOperationDurability,
   isCoopOperationJournalActive,
+  isCoopOperationJournalActiveFor,
   registerCoopOperationApplier,
   tryJournalCoopCommittedEnvelope,
+  tryJournalCoopCommittedEnvelopeFor,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
   type CoopIntentValidator,
   CoopOperationGuest,
   CoopOperationHost,
+  type CoopRuntimeOpState,
+  getActiveCoopRuntimeOpState,
+  maybeCoopOpSurfaceState,
+  registerCoopOpSurfaceState,
+  requireCoopOpSurfaceState,
+  requireCoopOpSurfaceStateFor,
+  resetActiveCoopRuntimeClocks,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   armCoopBiomeTransitionTailPermit,
@@ -119,13 +129,10 @@ let enabled = DEFAULT_ENABLED;
  * clearCoopRuntime; the full launch/resume epoch mint is a later, cross-surface piece (§2.4). An epoch
  * change still bumps it here so a cross-epoch operationId is dropped structurally (invariant 6).
  */
-let epoch = 1;
 
 /** The authority (coop host) commit log for biome-travel ops. Lazily created; null until first use / on a non-host. */
-let authorityHost: CoopOperationHost | null = null;
 
 /** The watcher applier that gates adoption of a relayed pick. Lazily created; null until first use. */
-let watchGuest: CoopOperationGuest | null = null;
 
 /**
  * Journal-consumed operationIds whose production live sink has fed the committed choice into the real
@@ -135,7 +142,6 @@ let watchGuest: CoopOperationGuest | null = null;
  * deterministic (potentially wrong-biome) fallback. The phase releases it only after its terminal mutation,
  * so a lost async UI callback can re-adopt the same operation while a post-terminal duplicate cannot.
  */
-const pendingJournalMaterializations = new Set<string>();
 
 /** The exact committed envelope receipt a guest-side biome phase is parked on. */
 export interface CoopBiomeCommitReceipt {
@@ -157,8 +163,6 @@ export interface CoopBiomeTransitionReceiptAddress {
   readonly interactivePinned?: number | undefined;
 }
 
-const committedReceipts = new Map<string, CoopBiomeCommitReceipt>();
-const receiptWaiters = new Map<string, Set<(receipt: CoopBiomeCommitReceipt | null) => void>>();
 let biomeCommitWaitMs = 60_000;
 let biomeIntentRetryMs = 1_000;
 interface CoopBiomeIntentRetry {
@@ -170,7 +174,80 @@ interface CoopBiomeIntentRetry {
   readonly resend: () => void;
   timer: ReturnType<typeof setTimeout>;
 }
-const biomeIntentRetries = new Map<string, CoopBiomeIntentRetry>();
+/**
+ * Every mutable biome-operation cursor belongs to one runtime. In particular, receipts and retry timers are
+ * not process-global: the two-engine harness deliberately hosts both peers in one JS realm, while production
+ * hosts one runtime per realm. Keeping these cells together gives both environments the same ownership model.
+ */
+interface BiomeOpState {
+  epoch: number;
+  revisionFloor: number;
+  authorityHost: CoopOperationHost | null;
+  watchGuest: CoopOperationGuest | null;
+  readonly pendingJournalMaterializations: Set<string>;
+  readonly committedReceipts: Map<string, CoopBiomeCommitReceipt>;
+  readonly receiptWaiters: Map<string, Set<(receipt: CoopBiomeCommitReceipt | null) => void>>;
+  readonly biomeIntentRetries: Map<string, CoopBiomeIntentRetry>;
+  lastAppliedPinned: number;
+}
+
+registerCoopOpSurfaceState(
+  "biome",
+  (): BiomeOpState => ({
+    epoch: 1,
+    revisionFloor: 0,
+    authorityHost: null,
+    watchGuest: null,
+    pendingJournalMaterializations: new Set(),
+    committedReceipts: new Map(),
+    receiptWaiters: new Map(),
+    biomeIntentRetries: new Map(),
+    lastAppliedPinned: -1,
+  }),
+);
+
+/** Stable selectors captured before a SelectBiome await or UI callback can outlive its ambient client. */
+export interface CoopBiomeOperationBinding {
+  readonly opState: CoopRuntimeOpState;
+  readonly durability: CoopDurabilityManager | null;
+}
+
+/** Capture the scheduling runtime; a missing runtime is never permission to share a process-global ledger. */
+export function captureCoopBiomeOperationBinding(): CoopBiomeOperationBinding {
+  const opState = getActiveCoopRuntimeOpState();
+  if (opState == null) {
+    throw new Error("[coop-op] no runtime installed for surface=biome (cannot capture continuation binding)");
+  }
+  return { opState, durability: getActiveCoopOperationDurability() };
+}
+
+function state(binding?: CoopBiomeOperationBinding | null): BiomeOpState {
+  return binding == null
+    ? requireCoopOpSurfaceState<BiomeOpState>("biome")
+    : requireCoopOpSurfaceStateFor<BiomeOpState>(binding.opState, "biome");
+}
+
+function journalActive(binding?: CoopBiomeOperationBinding | null): boolean {
+  return binding == null ? isCoopOperationJournalActive() : isCoopOperationJournalActiveFor(binding.durability);
+}
+
+function retainEnvelope(envelope: CoopAuthoritativeEnvelopeV1, binding?: CoopBiomeOperationBinding | null): boolean {
+  return binding == null
+    ? tryJournalCoopCommittedEnvelope(envelope)
+    : tryJournalCoopCommittedEnvelopeFor(binding.durability, envelope);
+}
+
+function isCoopOpRuntimeError(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith("[coop-op]");
+}
+
+function assertBindingRole(binding: CoopBiomeOperationBinding | null | undefined, role: CoopRole): void {
+  if (binding?.opState.localRole != null && binding.opState.localRole !== role) {
+    throw new Error(
+      `[coop-op] surface=biome binding role=${binding.opState.localRole} cannot execute localRole=${role}`,
+    );
+  }
+}
 const VALID_BIOME_IDS: ReadonlySet<number> = new Set(
   Object.values(BiomeId).filter((value): value is BiomeId => typeof value === "number"),
 );
@@ -200,25 +277,29 @@ export function resetCoopBiomeIntentRetryMs(): void {
 }
 
 /** Guest owner: resend the same exact-boundary intent until commit, replacement, or session teardown. */
-export function armCoopBiomeIntentResend(params: {
-  readonly operationId: string;
-  readonly wave: number;
-  readonly phaseName: "SelectBiomePhase" | "ErCrossroadsPhase";
-  readonly sessionGeneration: number;
-  readonly isCurrent: () => boolean;
-  readonly resend: () => void;
-}): boolean {
+export function armCoopBiomeIntentResend(
+  params: {
+    readonly operationId: string;
+    readonly wave: number;
+    readonly phaseName: "SelectBiomePhase" | "ErCrossroadsPhase";
+    readonly sessionGeneration: number;
+    readonly isCurrent: () => boolean;
+    readonly resend: () => void;
+  },
+  binding?: CoopBiomeOperationBinding | null,
+): boolean {
+  const s = state(binding);
   const parsed = parseCoopOperationId(params.operationId);
   if (
     !isCoopBiomeOperationEnabled()
-    || parsed?.epoch !== epoch
+    || parsed?.epoch !== s.epoch
     || !Number.isSafeInteger(params.wave)
     || params.wave < 0
     || !Number.isSafeInteger(params.sessionGeneration)
   ) {
     return false;
   }
-  const existing = biomeIntentRetries.get(params.operationId);
+  const existing = s.biomeIntentRetries.get(params.operationId);
   if (existing != null) {
     return (
       existing.wave === params.wave
@@ -227,12 +308,12 @@ export function armCoopBiomeIntentResend(params: {
     );
   }
   const tick = (): void => {
-    const retry = biomeIntentRetries.get(params.operationId);
+    const retry = s.biomeIntentRetries.get(params.operationId);
     if (retry == null) {
       return;
     }
-    if (parseCoopOperationId(retry.operationId)?.epoch !== epoch || !retry.isCurrent()) {
-      cancelCoopBiomeIntentResend(retry.operationId);
+    if (parseCoopOperationId(retry.operationId)?.epoch !== s.epoch || !retry.isCurrent()) {
+      cancelCoopBiomeIntentResend(retry.operationId, binding);
       return;
     }
     try {
@@ -240,39 +321,49 @@ export function armCoopBiomeIntentResend(params: {
     } catch (e) {
       coopWarn("reward", `biome op intent resend threw id=${retry.operationId}; retry remains armed`, e);
     }
-    if (biomeIntentRetries.has(retry.operationId)) {
+    if (s.biomeIntentRetries.has(retry.operationId)) {
       retry.timer = setTimeout(tick, biomeIntentRetryMs);
     }
   };
   const retry: CoopBiomeIntentRetry = { ...params, timer: setTimeout(tick, biomeIntentRetryMs) };
-  biomeIntentRetries.set(params.operationId, retry);
+  s.biomeIntentRetries.set(params.operationId, retry);
   return true;
 }
 
-export function cancelCoopBiomeIntentResend(operationId: string): void {
-  const retry = biomeIntentRetries.get(operationId);
+export function cancelCoopBiomeIntentResend(operationId: string, binding?: CoopBiomeOperationBinding | null): void {
+  const s = state(binding);
+  const retry = s.biomeIntentRetries.get(operationId);
   if (retry != null) {
     clearTimeout(retry.timer);
-    biomeIntentRetries.delete(operationId);
+    s.biomeIntentRetries.delete(operationId);
   }
 }
 
 /** Stable operation identity shared by the relay and journal paths. */
-export function coopBiomeOperationId(kind: CoopBiomeOperationKind, seq: number, pinned: number): string {
-  return makeCoopOperationId(epoch, coopInteractionOwnerSeat(pinned), seq, kind);
+export function coopBiomeOperationId(
+  kind: CoopBiomeOperationKind,
+  seq: number,
+  pinned: number,
+  binding?: CoopBiomeOperationBinding | null,
+): string {
+  return makeCoopOperationId(state(binding).epoch, coopInteractionOwnerSeat(pinned), seq, kind);
 }
 
 /** Stable host-owned identity for a deterministic biome transition with no human picker. */
-export function coopAuthoritativeBiomeTransitionOperationId(sourceWave: number): string | null {
+export function coopAuthoritativeBiomeTransitionOperationId(
+  sourceWave: number,
+  binding?: CoopBiomeOperationBinding | null,
+): string | null {
   if (!Number.isSafeInteger(sourceWave) || sourceWave < 0 || sourceWave >= COOP_MAX_REACHABLE_COUNTER) {
     return null;
   }
-  return makeCoopOperationId(epoch, 0, COOP_BIOME_TRANSITION_SEQ_BASE + sourceWave, "BIOME_PICK");
+  return makeCoopOperationId(state(binding).epoch, 0, COOP_BIOME_TRANSITION_SEQ_BASE + sourceWave, "BIOME_PICK");
 }
 
 /** True when this guest must wait for the authority's journaled commit before mutating. */
-export function coopBiomeCommitRequired(localRole: CoopRole): boolean {
-  return localRole === "guest" && isCoopBiomeOperationEnabled() && isCoopOperationJournalActive();
+export function coopBiomeCommitRequired(localRole: CoopRole, binding?: CoopBiomeOperationBinding | null): boolean {
+  assertBindingRole(binding, localRole);
+  return localRole === "guest" && isCoopBiomeOperationEnabled() && journalActive(binding);
 }
 
 function isValidBiomeCommitAddress(envelope: CoopAuthoritativeEnvelopeV1): boolean {
@@ -327,14 +418,16 @@ function isValidCrossroadsPickPayload(payload: CoopCrossroadsPickPayload): boole
  */
 export function preflightCoopBiomeJournalMaterialization(
   envelope: CoopAuthoritativeEnvelopeV1,
+  binding?: CoopBiomeOperationBinding | null,
 ): CoopBiomeJournalMaterializationPlan | null {
+  const s = state(binding);
   const op = envelope.pendingOperation;
   const parsed = op == null ? null : parseCoopOperationId(op.id);
   if (
     op == null
     || parsed == null
     || parsed.epoch !== envelope.sessionEpoch
-    || parsed.epoch !== epoch
+    || parsed.epoch !== s.epoch
     || parsed.kind !== op.kind
     || parsed.owner !== op.owner
     || op.status !== "applied"
@@ -404,16 +497,20 @@ export function preflightCoopBiomeJournalMaterialization(
 }
 
 /** Publish a preflighted receipt only after the relay mutation succeeded. */
-export function publishCoopBiomeJournalMaterialization(plan: CoopBiomeJournalMaterializationPlan): boolean {
+export function publishCoopBiomeJournalMaterialization(
+  plan: CoopBiomeJournalMaterializationPlan,
+  binding?: CoopBiomeOperationBinding | null,
+): boolean {
+  const s = state(binding);
   if (plan.permit != null && !armCoopBiomeTransitionTailPermit(plan.permit)) {
     return false;
   }
   const { receipt } = plan;
-  pendingJournalMaterializations.add(receipt.operationId);
-  committedReceipts.set(receipt.operationId, receipt);
-  const waiters = receiptWaiters.get(receipt.operationId);
+  s.pendingJournalMaterializations.add(receipt.operationId);
+  s.committedReceipts.set(receipt.operationId, receipt);
+  const waiters = s.receiptWaiters.get(receipt.operationId);
   if (waiters != null) {
-    receiptWaiters.delete(receipt.operationId);
+    s.receiptWaiters.delete(receipt.operationId);
     for (const resolve of waiters) {
       resolve(receipt);
     }
@@ -422,19 +519,26 @@ export function publishCoopBiomeJournalMaterialization(plan: CoopBiomeJournalMat
 }
 
 /** Backward-compatible atomic helper for non-relay callers. */
-export function armCoopBiomeJournalMaterialization(envelope: CoopAuthoritativeEnvelopeV1): boolean {
-  const plan = preflightCoopBiomeJournalMaterialization(envelope);
-  return plan != null && publishCoopBiomeJournalMaterialization(plan);
+export function armCoopBiomeJournalMaterialization(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  binding?: CoopBiomeOperationBinding | null,
+): boolean {
+  const plan = preflightCoopBiomeJournalMaterialization(envelope, binding);
+  return plan != null && publishCoopBiomeJournalMaterialization(plan, binding);
 }
 
 /** Park on one exact operation until the host-committed envelope reaches this guest. */
-export async function awaitCoopBiomeCommitReceipt(operationId: string): Promise<CoopBiomeCommitReceipt | null> {
-  const existing = committedReceipts.get(operationId);
+export async function awaitCoopBiomeCommitReceipt(
+  operationId: string,
+  binding?: CoopBiomeOperationBinding | null,
+): Promise<CoopBiomeCommitReceipt | null> {
+  const s = state(binding);
+  const existing = s.committedReceipts.get(operationId);
   if (existing != null) {
     return existing;
   }
   return await new Promise(resolve => {
-    const waiters = receiptWaiters.get(operationId) ?? new Set<(receipt: CoopBiomeCommitReceipt | null) => void>();
+    const waiters = s.receiptWaiters.get(operationId) ?? new Set<(receipt: CoopBiomeCommitReceipt | null) => void>();
     let settled = false;
     let timer: ReturnType<typeof setTimeout>;
     const accept = (receipt: CoopBiomeCommitReceipt | null): void => {
@@ -447,7 +551,7 @@ export async function awaitCoopBiomeCommitReceipt(operationId: string): Promise<
       resolve(receipt);
     };
     waiters.add(accept);
-    receiptWaiters.set(operationId, waiters);
+    s.receiptWaiters.set(operationId, waiters);
     timer = setTimeout(() => {
       if (settled) {
         return;
@@ -455,15 +559,18 @@ export async function awaitCoopBiomeCommitReceipt(operationId: string): Promise<
       settled = true;
       waiters.delete(accept);
       if (waiters.size === 0) {
-        receiptWaiters.delete(operationId);
+        s.receiptWaiters.delete(operationId);
       }
       resolve(null);
     }, biomeCommitWaitMs);
   });
 }
 
-function biomeTransitionReceiptOperationIds(address: CoopBiomeTransitionReceiptAddress): string[] {
-  const deterministic = coopAuthoritativeBiomeTransitionOperationId(address.sourceWave);
+function biomeTransitionReceiptOperationIds(
+  address: CoopBiomeTransitionReceiptAddress,
+  binding?: CoopBiomeOperationBinding | null,
+): string[] {
+  const deterministic = coopAuthoritativeBiomeTransitionOperationId(address.sourceWave, binding);
   if (deterministic == null) {
     return [];
   }
@@ -479,15 +586,20 @@ function biomeTransitionReceiptOperationIds(address: CoopBiomeTransitionReceiptA
         "BIOME_PICK",
         COOP_BIOME_PICK_SEQ_BASE + address.interactivePinned,
         address.interactivePinned,
+        binding,
       ),
     );
   }
   return ids;
 }
 
-function existingBiomeTransitionReceipts(operationIds: readonly string[]): CoopBiomeCommitReceipt[] {
+function existingBiomeTransitionReceipts(
+  operationIds: readonly string[],
+  binding?: CoopBiomeOperationBinding | null,
+): CoopBiomeCommitReceipt[] {
+  const s = state(binding);
   return operationIds.flatMap(operationId => {
-    const receipt = committedReceipts.get(operationId);
+    const receipt = s.committedReceipts.get(operationId);
     return receipt == null ? [] : [receipt];
   });
 }
@@ -500,9 +612,10 @@ function existingBiomeTransitionReceipts(operationIds: readonly string[]): CoopB
  */
 export function getCoopBiomeTransitionCommitReceipt(
   address: CoopBiomeTransitionReceiptAddress,
+  binding?: CoopBiomeOperationBinding | null,
 ): CoopBiomeCommitReceipt | null {
-  const operationIds = biomeTransitionReceiptOperationIds(address);
-  const receipts = existingBiomeTransitionReceipts(operationIds);
+  const operationIds = biomeTransitionReceiptOperationIds(address, binding);
+  const receipts = existingBiomeTransitionReceipts(operationIds, binding);
   if (receipts.length > 1) {
     coopWarn(
       "reward",
@@ -520,12 +633,14 @@ export function getCoopBiomeTransitionCommitReceipt(
  */
 export function awaitCoopBiomeTransitionCommitReceipt(
   address: CoopBiomeTransitionReceiptAddress,
+  binding?: CoopBiomeOperationBinding | null,
 ): Promise<CoopBiomeCommitReceipt | null> {
-  const operationIds = biomeTransitionReceiptOperationIds(address);
+  const s = state(binding);
+  const operationIds = biomeTransitionReceiptOperationIds(address, binding);
   if (operationIds.length === 0) {
     return Promise.resolve(null);
   }
-  const existing = existingBiomeTransitionReceipts(operationIds);
+  const existing = existingBiomeTransitionReceipts(operationIds, binding);
   if (existing.length > 1) {
     coopWarn(
       "reward",
@@ -547,10 +662,10 @@ export function awaitCoopBiomeTransitionCommitReceipt(
       settled = true;
       clearTimeout(timer);
       for (const [operationId, listener] of listeners) {
-        const waiters = receiptWaiters.get(operationId);
+        const waiters = s.receiptWaiters.get(operationId);
         waiters?.delete(listener);
         if (waiters?.size === 0) {
-          receiptWaiters.delete(operationId);
+          s.receiptWaiters.delete(operationId);
         }
       }
       resolve(receipt == null ? null : cloneBiomeCommitReceipt(receipt));
@@ -561,7 +676,7 @@ export function awaitCoopBiomeTransitionCommitReceipt(
           finish(null);
           return;
         }
-        const now = existingBiomeTransitionReceipts(operationIds);
+        const now = existingBiomeTransitionReceipts(operationIds, binding);
         if (now.length !== 1 || now[0].operationId !== receipt.operationId) {
           coopWarn(
             "reward",
@@ -573,19 +688,20 @@ export function awaitCoopBiomeTransitionCommitReceipt(
         finish(receipt);
       };
       listeners.set(operationId, listener);
-      const waiters = receiptWaiters.get(operationId) ?? new Set<(receipt: CoopBiomeCommitReceipt | null) => void>();
+      const waiters = s.receiptWaiters.get(operationId) ?? new Set<(receipt: CoopBiomeCommitReceipt | null) => void>();
       waiters.add(listener);
-      receiptWaiters.set(operationId, waiters);
+      s.receiptWaiters.set(operationId, waiters);
     }
     timer = setTimeout(() => finish(null), biomeCommitWaitMs);
   });
 }
 
 /** Release receipt/marker bookkeeping after the phase has consumed its committed result. */
-export function releaseCoopBiomeCommitReceipt(operationId: string): void {
-  cancelCoopBiomeIntentResend(operationId);
-  committedReceipts.delete(operationId);
-  pendingJournalMaterializations.delete(operationId);
+export function releaseCoopBiomeCommitReceipt(operationId: string, binding?: CoopBiomeOperationBinding | null): void {
+  const s = state(binding);
+  cancelCoopBiomeIntentResend(operationId, binding);
+  s.committedReceipts.delete(operationId);
+  s.pendingJournalMaterializations.delete(operationId);
 }
 
 /**
@@ -594,7 +710,6 @@ export function releaseCoopBiomeCommitReceipt(operationId: string): void {
  * from an earlier interaction, §1.6). Advanced ONLY by a watcher adoption - never by the owner's own commit,
  * so the owner-commit + watcher-adopt of the SAME interaction never contaminate each other. -1 = none yet.
  */
-let lastAppliedPinned = -1;
 
 /**
  * The surface-local revision FLOOR (W2e-R P0-3). On a COLD resume the durability receiver ledger is restored
@@ -605,7 +720,6 @@ let lastAppliedPinned = -1;
  * MONOTONIC across the save boundary (§4.6 - the same monotonic-continue contract the counter/high-water use;
  * the epoch is unchanged, so the restored receiver marks stay valid). 0 = fresh session (no resume).
  */
-let revisionFloor = 0;
 
 /**
  * True iff the migrated (envelope-gated) biome-travel path is active; else pure legacy fallback (§5.1).
@@ -630,7 +744,7 @@ export function resetCoopBiomeOperationFlag(): void {
 
 /** The current biome-travel operation epoch (§1.4). */
 export function getCoopBiomeOperationEpoch(): number {
-  return epoch;
+  return maybeCoopOpSurfaceState<BiomeOpState>("biome")?.epoch ?? 1;
 }
 
 /**
@@ -638,33 +752,38 @@ export function getCoopBiomeOperationEpoch(): number {
  * prior epoch can never satisfy a live op (invariant 6). Idempotent for the same epoch.
  */
 export function setCoopBiomeOperationEpoch(next: number): void {
-  if (next === epoch) {
+  const s = maybeCoopOpSurfaceState<BiomeOpState>("biome");
+  if (s == null || !Number.isSafeInteger(next) || next <= 0 || next === s.epoch) {
     return;
   }
-  epoch = next;
+  s.epoch = next;
   resetCoopBiomeOperationState();
 }
 
 /** Tear down all per-session operation state (called from clearCoopRuntime + tests). Keeps the flag. */
 export function resetCoopBiomeOperationState(): void {
-  CoopOperationHost.resetGlobalOrder();
-  for (const retry of biomeIntentRetries.values()) {
+  const s = maybeCoopOpSurfaceState<BiomeOpState>("biome");
+  if (s == null) {
+    return;
+  }
+  resetActiveCoopRuntimeClocks();
+  for (const retry of s.biomeIntentRetries.values()) {
     clearTimeout(retry.timer);
   }
-  biomeIntentRetries.clear();
-  authorityHost = null;
-  watchGuest = null;
-  pendingJournalMaterializations.clear();
-  committedReceipts.clear();
-  for (const waiters of receiptWaiters.values()) {
+  s.biomeIntentRetries.clear();
+  s.authorityHost = null;
+  s.watchGuest = null;
+  s.pendingJournalMaterializations.clear();
+  s.committedReceipts.clear();
+  for (const waiters of s.receiptWaiters.values()) {
     for (const resolve of waiters) {
       resolve(null);
     }
   }
-  receiptWaiters.clear();
+  s.receiptWaiters.clear();
   clearCoopBiomeTransitionTailPermit();
-  lastAppliedPinned = -1;
-  revisionFloor = 0;
+  s.lastAppliedPinned = -1;
+  s.revisionFloor = 0;
 }
 
 /**
@@ -674,31 +793,36 @@ export function resetCoopBiomeOperationState(): void {
  * A no-op for a fresh session (floor 0). Idempotent for the same value.
  */
 export function setCoopBiomeOperationRevisionFloor(hw: number): void {
-  if (!Number.isFinite(hw) || hw <= 0 || hw === revisionFloor) {
+  const s = maybeCoopOpSurfaceState<BiomeOpState>("biome");
+  if (s == null || !Number.isFinite(hw) || hw <= 0 || hw === s.revisionFloor) {
     return;
   }
-  revisionFloor = hw;
+  s.revisionFloor = hw;
   // Recreate the host + guests so the new floor takes effect on next use (they were created at the old floor).
-  authorityHost = null;
-  watchGuest = null;
+  s.authorityHost = null;
+  s.watchGuest = null;
 }
 
 // -----------------------------------------------------------------------------
 // Internals.
 // -----------------------------------------------------------------------------
 
-function host(): CoopOperationHost {
-  if (authorityHost == null) {
-    authorityHost = CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
-  }
-  return authorityHost;
+function host(binding?: CoopBiomeOperationBinding | null): CoopOperationHost {
+  const s = state(binding);
+  s.authorityHost ??=
+    binding == null
+      ? CoopOperationHost.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor })
+      : CoopOperationHost.forRuntime(binding.opState, { epoch: s.epoch, initialRevision: s.revisionFloor });
+  return s.authorityHost;
 }
 
-function guest(): CoopOperationGuest {
-  if (watchGuest == null) {
-    watchGuest = CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
-  }
-  return watchGuest;
+function guest(binding?: CoopBiomeOperationBinding | null): CoopOperationGuest {
+  const s = state(binding);
+  s.watchGuest ??=
+    binding == null
+      ? CoopOperationGuest.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor })
+      : CoopOperationGuest.forRuntime(binding.opState, { epoch: s.epoch, initialRevision: s.revisionFloor });
+  return s.watchGuest;
 }
 
 /**
@@ -843,9 +967,13 @@ function hostBiomeTailSlotAvailable(operationId: string, payload: CoopBiomePickP
 /**
  * OWNER TERMINAL: mint + (on the authority) COMMIT the typed biome-travel intent through the operation
  * primitive (§1.3). ADDITIVE + dual-run: the phase still fires the legacy relay send; this records the
- * authoritative operation. No-op when the flag is OFF. Never throws (the legacy relay is the fallback).
+ * authoritative operation. No-op when the flag is OFF. Gameplay validation failures retain the legacy
+ * fallback; a missing/mismatched runtime binding throws fail-loud so the shared surface cannot advance.
  */
-export function commitBiomeOwnerIntent(params: CoopBiomeOwnerCommitParams): CoopBiomeOwnerCommitResult | null {
+export function commitBiomeOwnerIntent(
+  params: CoopBiomeOwnerCommitParams,
+  binding?: CoopBiomeOperationBinding | null,
+): CoopBiomeOwnerCommitResult | null {
   if (!isCoopBiomeOperationEnabled()) {
     return null;
   }
@@ -865,10 +993,12 @@ export function commitBiomeOwnerIntent(params: CoopBiomeOwnerCommitParams): Coop
     return null;
   }
   try {
+    assertBindingRole(binding, params.localRole);
+    const s = state(binding);
     const ownerSeat = params.authorityOwned ? 0 : coopInteractionOwnerSeat(params.pinned);
     const operationId = params.authorityOwned
-      ? makeCoopOperationId(epoch, 0, params.seq, params.kind)
-      : coopBiomeOperationId(params.kind, params.seq, params.pinned);
+      ? makeCoopOperationId(s.epoch, 0, params.seq, params.kind)
+      : coopBiomeOperationId(params.kind, params.seq, params.pinned, binding);
     const intent: CoopPendingOperation = {
       id: operationId,
       kind: params.kind,
@@ -898,7 +1028,7 @@ export function commitBiomeOwnerIntent(params: CoopBiomeOwnerCommitParams): Coop
       ) {
         return null;
       }
-      const res = host().submit(intent, controlContext(params.wave, params.turn), validate);
+      const res = host(binding).submit(intent, controlContext(params.wave, params.turn), validate);
       if (res.kind === "committed") {
         // COMMIT -> JOURNAL (Wave-2e, §4.1/§4.2): register the committed op with the durability journal so
         // a resend / reconnect tail can replay it. Rides ALONGSIDE the legacy relay (dual-run); no-op when
@@ -909,7 +1039,7 @@ export function commitBiomeOwnerIntent(params: CoopBiomeOwnerCommitParams): Coop
           revision: res.envelope.revision,
           wave: res.envelope.wave,
         };
-        if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
+        if (!retainEnvelope(res.envelope, binding)) {
           return null;
         }
         if (
@@ -917,7 +1047,7 @@ export function commitBiomeOwnerIntent(params: CoopBiomeOwnerCommitParams): Coop
           && params.armLocalTail === true
           && !armCoopBiomeTransitionTailPermit({
             operationId,
-            sessionEpoch: epoch,
+            sessionEpoch: s.epoch,
             revision: committed.revision,
             wave: committed.wave,
             sourceBiomeId: (committed.payload as CoopBiomePickPayload).sourceBiomeId,
@@ -943,7 +1073,7 @@ export function commitBiomeOwnerIntent(params: CoopBiomeOwnerCommitParams): Coop
             revision: res.envelope.revision,
             wave: res.envelope.wave,
           };
-          if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
+          if (!retainEnvelope(res.envelope, binding)) {
             return null;
           }
           if (
@@ -951,7 +1081,7 @@ export function commitBiomeOwnerIntent(params: CoopBiomeOwnerCommitParams): Coop
             && params.armLocalTail === true
             && !armCoopBiomeTransitionTailPermit({
               operationId,
-              sessionEpoch: epoch,
+              sessionEpoch: s.epoch,
               revision: committed.revision,
               wave: committed.wave,
               sourceBiomeId: (committed.payload as CoopBiomePickPayload).sourceBiomeId,
@@ -975,6 +1105,9 @@ export function commitBiomeOwnerIntent(params: CoopBiomeOwnerCommitParams): Coop
     // doc). The owner knows its own pick; only an adopted RELAY needs the stale-ordering guard.
     return { operationId, payload: params.payload, revision: 0, wave: params.wave };
   } catch (e) {
+    if (isCoopOpRuntimeError(e)) {
+      throw e;
+    }
     coopWarn("reward", "biome op OWNER commit threw (handled - legacy relay is the fallback) (Wave-2a)", e);
     return null;
   }
@@ -985,13 +1118,16 @@ export function commitBiomeOwnerIntent(params: CoopBiomeOwnerCommitParams): Coop
  * disjoint from interaction-counter picks, so every deterministic SelectBiome terminal still arms one exact
  * Switch/NewBiome permit without consuming or perturbing the alternation counter.
  */
-export function commitAuthoritativeBiomeTransition(params: {
-  readonly sourceWave: number;
-  readonly sourceBiomeId: number;
-  readonly destinationBiomeId: number;
-  readonly turn: number;
-  readonly localRole: CoopRole;
-}): CoopBiomeOwnerCommitResult | null {
+export function commitAuthoritativeBiomeTransition(
+  params: {
+    readonly sourceWave: number;
+    readonly sourceBiomeId: number;
+    readonly destinationBiomeId: number;
+    readonly turn: number;
+    readonly localRole: CoopRole;
+  },
+  binding?: CoopBiomeOperationBinding | null,
+): CoopBiomeOwnerCommitResult | null {
   if (
     params.localRole !== "host"
     || !Number.isSafeInteger(params.sourceWave)
@@ -1001,27 +1137,30 @@ export function commitAuthoritativeBiomeTransition(params: {
     return null;
   }
   const seq = COOP_BIOME_TRANSITION_SEQ_BASE + params.sourceWave;
-  return commitBiomeOwnerIntent({
-    kind: "BIOME_PICK",
-    seq,
-    pinned: params.sourceWave,
-    choice: -1,
-    payload: {
-      sourceBiomeId: params.sourceBiomeId,
-      biomeId: params.destinationBiomeId,
-      nodeIndex: -1,
-      nextWave: params.sourceWave + 1,
+  return commitBiomeOwnerIntent(
+    {
+      kind: "BIOME_PICK",
+      seq,
+      pinned: params.sourceWave,
+      choice: -1,
+      payload: {
+        sourceBiomeId: params.sourceBiomeId,
+        biomeId: params.destinationBiomeId,
+        nodeIndex: -1,
+        nextWave: params.sourceWave + 1,
+      },
+      localRole: params.localRole,
+      wave: params.sourceWave,
+      turn: params.turn,
+      boundarySourceBiomeId: params.sourceBiomeId,
+      boundaryNextWave: params.sourceWave + 1,
+      allowedRoutes: [],
+      deterministicDestination: params.destinationBiomeId,
+      authorityOwned: true,
+      armLocalTail: true,
     },
-    localRole: params.localRole,
-    wave: params.sourceWave,
-    turn: params.turn,
-    boundarySourceBiomeId: params.sourceBiomeId,
-    boundaryNextWave: params.sourceWave + 1,
-    allowedRoutes: [],
-    deterministicDestination: params.destinationBiomeId,
-    authorityOwned: true,
-    armLocalTail: true,
-  });
+    binding,
+  );
 }
 
 // -----------------------------------------------------------------------------
@@ -1053,9 +1192,12 @@ export interface CoopBiomeWatcherAdoptParams {
  *   - gate application idempotently by operationId + the pinned order (invariants 5, 6): a stale pick from
  *     an earlier interaction, a duplicate re-delivery, or a cross-epoch leftover is REJECTED, never applied
  *     (the #861 shape). The caller falls back to the deterministic backstop on a reject.
- * Never throws (a throw would fall to the legacy fallback via `adopt:false`).
+ * Gameplay validation failures return `adopt:false`; a missing/mismatched runtime binding throws fail-loud.
  */
-export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): CoopBiomeAdoptDecision {
+export function adoptBiomeWatcherChoice(
+  params: CoopBiomeWatcherAdoptParams,
+  binding?: CoopBiomeOperationBinding | null,
+): CoopBiomeAdoptDecision {
   // Legacy / fallback: adopt iff the relay landed, no operation gating.
   if (!isCoopBiomeOperationEnabled()) {
     return params.res == null
@@ -1066,8 +1208,10 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
     return { adopt: false, reason: "no-relay" };
   }
   try {
+    assertBindingRole(binding, params.localRole);
+    const s = state(binding);
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
-    const opId = coopBiomeOperationId(params.kind, params.seq, params.pinned);
+    const opId = coopBiomeOperationId(params.kind, params.seq, params.pinned, binding);
     const payload: CoopBiomePickPayload | CoopCrossroadsPickPayload =
       params.kind === "BIOME_PICK"
         ? {
@@ -1101,7 +1245,7 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
       ) {
         return { adopt: false, reason: "host-permit-slot-busy" };
       }
-      const res = host().submit(intent, controlContext(params.wave, params.turn), validate);
+      const res = host(binding).submit(intent, controlContext(params.wave, params.turn), validate);
       if (res.kind === "rejected" || res.kind === "rejected-late") {
         coopWarn("reward", `biome op WATCHER(host) commit REJECTED (${res.kind}) id=${opId} -> fallback (Wave-2a)`);
         return { adopt: false, reason: `host-${res.kind}` };
@@ -1112,7 +1256,7 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
         // The host is the authority and has just validated+committed this guest-owned intent. Its live
         // phase may apply immediately; only the remote guest must wait for the committed envelope.
         const committed = res.envelope.pendingOperation?.payload as CoopBiomePickPayload | CoopCrossroadsPickPayload;
-        if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
+        if (!retainEnvelope(res.envelope, binding)) {
           return { adopt: false, reason: "host-journal-not-retained" };
         }
         if (
@@ -1120,7 +1264,7 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
           && params.armLocalTail === true
           && !armCoopBiomeTransitionTailPermit({
             operationId: opId,
-            sessionEpoch: epoch,
+            sessionEpoch: s.epoch,
             revision: res.envelope.revision,
             wave: res.envelope.wave,
             sourceBiomeId: (committed as CoopBiomePickPayload).sourceBiomeId,
@@ -1130,7 +1274,7 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
         ) {
           return { adopt: false, reason: "host-permit-conflict" };
         }
-        lastAppliedPinned = params.pinned;
+        s.lastAppliedPinned = params.pinned;
         return params.kind === "BIOME_PICK"
           ? {
               adopt: true,
@@ -1147,7 +1291,7 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
           return { adopt: false, reason: `host-reack-${verdict.reason}` };
         }
         const canonical = res.op.payload as CoopBiomePickPayload | CoopCrossroadsPickPayload;
-        if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
+        if (!retainEnvelope(res.envelope, binding)) {
           return { adopt: false, reason: "host-reack-journal-not-retained" };
         }
         if (
@@ -1155,7 +1299,7 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
           && params.armLocalTail === true
           && !armCoopBiomeTransitionTailPermit({
             operationId: opId,
-            sessionEpoch: epoch,
+            sessionEpoch: s.epoch,
             revision: res.envelope.revision,
             wave: res.envelope.wave,
             sourceBiomeId: (canonical as CoopBiomePickPayload).sourceBiomeId,
@@ -1165,7 +1309,7 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
         ) {
           return { adopt: false, reason: "host-reack-permit-conflict" };
         }
-        lastAppliedPinned = params.pinned;
+        s.lastAppliedPinned = params.pinned;
         return params.kind === "BIOME_PICK"
           ? {
               adopt: true,
@@ -1181,10 +1325,10 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
     // adopted (a leftover from an earlier interaction), or a re-delivery of an already-applied op (same
     // operationId), can NEVER overwrite the live decision. The pinned counter is monotonic across all
     // interactions, so a legitimate current pick is always >= the last adopted one.
-    if (params.pinned < lastAppliedPinned) {
+    if (params.pinned < s.lastAppliedPinned) {
       coopWarn(
         "reward",
-        `biome op WATCHER REJECT stale/dup id=${opId} pinned=${params.pinned} lastApplied=${lastAppliedPinned} (Wave-2a)`,
+        `biome op WATCHER REJECT stale/dup id=${opId} pinned=${params.pinned} lastApplied=${s.lastAppliedPinned} (Wave-2a)`,
       );
       return { adopt: false, reason: "stale-or-duplicate" };
     }
@@ -1193,29 +1337,29 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
     // real phase resumed. Its live sink fed the authoritative choice into the local relay and armed this
     // marker. Keep it durable until the phase reports a successful terminal and releases the receipt; this
     // lets a lost UI/tween callback re-adopt safely. An ordinary relay duplicate after release remains a no-op.
-    if (guest().hasApplied(opId)) {
-      if (!pendingJournalMaterializations.has(opId)) {
+    if (guest(binding).hasApplied(opId)) {
+      if (!s.pendingJournalMaterializations.has(opId)) {
         coopWarn(
           "reward",
-          `biome op WATCHER REJECT duplicate id=${opId} pinned=${params.pinned} lastApplied=${lastAppliedPinned} (Wave-2a)`,
+          `biome op WATCHER REJECT duplicate id=${opId} pinned=${params.pinned} lastApplied=${s.lastAppliedPinned} (Wave-2a)`,
         );
         return { adopt: false, reason: "stale-or-duplicate" };
       }
-      lastAppliedPinned = params.pinned;
+      s.lastAppliedPinned = params.pinned;
       coopLog("reward", `biome op WATCHER materialize JOURNAL choice kind=${params.kind} id=${opId}`);
       return { adopt: true, choice: params.res.choice, data: params.res.data };
     }
 
-    if (isCoopOperationJournalActive()) {
+    if (journalActive(binding)) {
       return { adopt: false, reason: "await-authoritative-envelope" };
     }
 
     // Apply through the guest applier (surface-local dense revision; classifies + records the op).
     const appliedOp: CoopPendingOperation = { ...intent, status: "applied" };
-    const g = guest();
+    const g = guest(binding);
     const applyRes = g.applyEnvelope({
       version: 1,
-      sessionEpoch: epoch,
+      sessionEpoch: s.epoch,
       revision: g.getLastAppliedRevision() + 1,
       wave: params.wave,
       turn: params.turn,
@@ -1227,10 +1371,13 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
       coopWarn("reward", `biome op WATCHER guest non-applied (${applyRes.kind}) id=${opId} -> fallback (Wave-2a)`);
       return { adopt: false, reason: `guest-${applyRes.kind}` };
     }
-    lastAppliedPinned = params.pinned;
+    s.lastAppliedPinned = params.pinned;
     coopLog("reward", `biome op WATCHER adopt kind=${params.kind} choice=${params.res.choice} id=${opId} (Wave-2a)`);
     return { adopt: true, choice: params.res.choice, data: params.res.data };
   } catch (e) {
+    if (isCoopOpRuntimeError(e)) {
+      throw e;
+    }
     coopWarn("reward", "biome op WATCHER gate threw (handled - deterministic fallback) (Wave-2a)", e);
     return { adopt: false, reason: "threw" };
   }

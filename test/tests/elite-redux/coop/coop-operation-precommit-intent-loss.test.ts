@@ -52,9 +52,11 @@ import {
   type CoopCommitContext,
   type CoopIntentValidator,
   CoopOperationHost,
+  createCoopRuntimeOpState,
+  setActiveCoopRuntimeOpState,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** A minimal, complete authoritative DATA plane (§1.2) - the envelope embeds it unchanged. */
 function makeState(wave = 3, turn = 1): CoopAuthoritativeBattleStateV1 {
@@ -99,6 +101,15 @@ const GUEST_OWNER = 1; // an odd seat = guest-owned interaction (guest->host rel
 const PIN = 9_700_100;
 
 describe("W2e-R2 I5: pre-commit intent loss - owner re-send with the deterministic id is committed exactly once", () => {
+  beforeEach(() => {
+    setActiveCoopRuntimeOpState(createCoopRuntimeOpState());
+  });
+
+  afterEach(() => {
+    resetCoopBiomeOperationState();
+    setActiveCoopRuntimeOpState(null);
+  });
+
   it("the biome adapter repeats one deterministic intent until committed receipt consumption cancels it", async () => {
     vi.useFakeTimers();
     setCoopBiomeOperationEnabled(true);

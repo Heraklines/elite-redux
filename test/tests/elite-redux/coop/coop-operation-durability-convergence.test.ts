@@ -49,6 +49,7 @@ import {
   resetCoopOperationJournalLog,
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
+import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   armCoopBiomeTransitionTailPermit,
   clearCoopBiomeTransitionTailPermit,
@@ -136,6 +137,7 @@ function assertNoSelfHeal(...gates: ChannelGate[]): void {
 
 describe("Wave-2e operation<->durability convergence: a cut committed op is repaired by the journal, not a self-heal", () => {
   beforeEach(() => {
+    setActiveCoopRuntimeOpState(createCoopRuntimeOpState());
     setCoopDurabilityEnabled(true);
     setCoopBiomeOperationEnabled(true);
     resetCoopBiomeOperationState();
@@ -154,6 +156,7 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
     resetCoopBiomeOperationState();
     resetCoopBiomeOperationFlag();
     setCoopDurabilityEnabled(true);
+    setActiveCoopRuntimeOpState(null);
   });
 
   /** Commit a HOST-OWNED biome pick (even pin -> host seat) through the real owner seam; it journals. */

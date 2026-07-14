@@ -31,6 +31,7 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import {
   adoptBiomeWatcherChoice,
+  captureCoopBiomeOperationBinding,
   isCoopBiomeOperationEnabled,
   resetCoopBiomeOperationFlag,
   resetCoopBiomeOperationState,
@@ -245,66 +246,110 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
     // prove a STALE buffered pick from a PREVIOUS operation can NEVER overwrite a newer one (invariant 6),
     // and a duplicate re-delivery is a no-op (invariant 5). With the flag OFF every one of these would adopt
     // verbatim (legacy pass-through), so the rejections are proof the primitive is gating adoption. =====
-    resetCoopBiomeOperationState();
-    // This sub-proof exercises the pure adapter directly, outside a transport/journal delivery. The
-    // production legs above/below separately prove envelope gating and durable materialization.
-    setCoopOperationDurability(null);
-    const HOST_OWNED_LATER = 4; // even counter -> host owns, guest watches
-    const HOST_OWNED_EARLIER = 2; // an EARLIER interaction (also host-owned)
+    await withClient(watcherCtx, () => {
+      resetCoopBiomeOperationState();
+      // This sub-proof exercises the pure adapter directly against the WATCHER runtime's own state, outside a
+      // transport/journal delivery. The production legs above/below prove durable routing separately.
+      setCoopOperationDurability(null);
+      const HOST_OWNED_LATER = 4; // even counter -> host owns, guest watches
+      const HOST_OWNED_EARLIER = 2; // an EARLIER interaction (also host-owned)
 
-    // A fresh, newer interaction resolves on the watcher first.
-    const fresh = adoptBiomeWatcherChoice({
-      kind: "BIOME_PICK",
-      seq: COOP_BIOME_PICK_SEQ_BASE + HOST_OWNED_LATER,
-      pinned: HOST_OWNED_LATER,
-      res: { choice: 0, data: [BiomeId.VOLCANO] },
-      localRole: "guest",
-      wave: 11,
-      turn: 0,
-      sourceBiomeId: BiomeId.PLAINS,
-      nextWave: 12,
-      allowedRoutes: [BiomeId.VOLCANO],
-      deterministicDestination: null,
-    });
-    expect(fresh.adopt, "the newer interaction's pick is adopted").toBe(true);
+      // A fresh, newer interaction resolves on the watcher first.
+      const fresh = adoptBiomeWatcherChoice({
+        kind: "BIOME_PICK",
+        seq: COOP_BIOME_PICK_SEQ_BASE + HOST_OWNED_LATER,
+        pinned: HOST_OWNED_LATER,
+        res: { choice: 0, data: [BiomeId.VOLCANO] },
+        localRole: "guest",
+        wave: 11,
+        turn: 0,
+        sourceBiomeId: BiomeId.PLAINS,
+        nextWave: 12,
+        allowedRoutes: [BiomeId.VOLCANO],
+        deterministicDestination: null,
+      });
+      expect(fresh.adopt, "the newer interaction's pick is adopted").toBe(true);
 
-    // The STALE pick from the EARLIER operation now arrives late - it must be REJECTED, not applied.
-    const stale = adoptBiomeWatcherChoice({
-      kind: "BIOME_PICK",
-      seq: COOP_BIOME_PICK_SEQ_BASE + HOST_OWNED_EARLIER,
-      pinned: HOST_OWNED_EARLIER,
-      res: { choice: 0, data: [BiomeId.SWAMP] }, // a DIFFERENT biome
-      localRole: "guest",
-      wave: 11,
-      turn: 0,
-      sourceBiomeId: BiomeId.PLAINS,
-      nextWave: 12,
-      allowedRoutes: [BiomeId.SWAMP],
-      deterministicDestination: null,
-    });
-    expect(stale.adopt, "the stale previous-op pick is REJECTED, not applied (#861 shape)").toBe(false);
-    if (stale.adopt === false) {
-      expect(stale.reason).toBe("stale-or-duplicate");
-    }
+      // The STALE pick from the EARLIER operation now arrives late - it must be REJECTED, not applied.
+      const stale = adoptBiomeWatcherChoice({
+        kind: "BIOME_PICK",
+        seq: COOP_BIOME_PICK_SEQ_BASE + HOST_OWNED_EARLIER,
+        pinned: HOST_OWNED_EARLIER,
+        res: { choice: 0, data: [BiomeId.SWAMP] }, // a DIFFERENT biome
+        localRole: "guest",
+        wave: 11,
+        turn: 0,
+        sourceBiomeId: BiomeId.PLAINS,
+        nextWave: 12,
+        allowedRoutes: [BiomeId.SWAMP],
+        deterministicDestination: null,
+      });
+      expect(stale.adopt, "the stale previous-op pick is REJECTED, not applied (#861 shape)").toBe(false);
+      if (stale.adopt === false) {
+        expect(stale.reason).toBe("stale-or-duplicate");
+      }
 
-    // A DUPLICATE re-delivery of the already-applied newer interaction is also a no-op (idempotency).
-    const dup = adoptBiomeWatcherChoice({
-      kind: "BIOME_PICK",
-      seq: COOP_BIOME_PICK_SEQ_BASE + HOST_OWNED_LATER,
-      pinned: HOST_OWNED_LATER,
-      res: { choice: 0, data: [BiomeId.VOLCANO] },
-      localRole: "guest",
-      wave: 11,
-      turn: 0,
-      sourceBiomeId: BiomeId.PLAINS,
-      nextWave: 12,
-      allowedRoutes: [BiomeId.VOLCANO],
-      deterministicDestination: null,
+      // A DUPLICATE re-delivery of the already-applied newer interaction is also a no-op (idempotency).
+      const dup = adoptBiomeWatcherChoice({
+        kind: "BIOME_PICK",
+        seq: COOP_BIOME_PICK_SEQ_BASE + HOST_OWNED_LATER,
+        pinned: HOST_OWNED_LATER,
+        res: { choice: 0, data: [BiomeId.VOLCANO] },
+        localRole: "guest",
+        wave: 11,
+        turn: 0,
+        sourceBiomeId: BiomeId.PLAINS,
+        nextWave: 12,
+        allowedRoutes: [BiomeId.VOLCANO],
+        deterministicDestination: null,
+      });
+      expect(dup.adopt, "a duplicate re-delivery of an already-applied op is a no-op (invariant 5)").toBe(false);
     });
-    expect(dup.adopt, "a duplicate re-delivery of an already-applied op is a no-op (invariant 5)").toBe(false);
 
     logs.flush();
   }, 300_000);
+
+  it("keeps reciprocal watcher cursors isolated and rejects a role-mismatched captured runtime", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+
+    const hostBinding = await withClient(rig.hostCtx, () => {
+      setCoopOperationDurability(null);
+      return captureCoopBiomeOperationBinding();
+    });
+    const guestBinding = await withClient(rig.guestCtx, () => {
+      setCoopOperationDurability(null);
+      return captureCoopBiomeOperationBinding();
+    });
+
+    const decision = (pinned: number, localRole: "host" | "guest", biomeId: BiomeId, binding: typeof hostBinding) =>
+      adoptBiomeWatcherChoice(
+        {
+          kind: "BIOME_PICK",
+          seq: COOP_BIOME_PICK_SEQ_BASE + pinned,
+          pinned,
+          res: { choice: 0, data: [biomeId] },
+          localRole,
+          wave: 11,
+          turn: 0,
+          sourceBiomeId: BiomeId.PLAINS,
+          nextWave: 12,
+          allowedRoutes: [biomeId],
+          deterministicDestination: null,
+        },
+        binding,
+      );
+
+    expect(decision(5, "host", BiomeId.SWAMP, hostBinding).adopt).toBe(true);
+    expect(
+      decision(2, "guest", BiomeId.VOLCANO, guestBinding).adopt,
+      "the host watcher's later pin cannot make the guest runtime reject its own earlier valid pin",
+    ).toBe(true);
+    expect(
+      () => decision(7, "host", BiomeId.LAKE, guestBinding),
+      "a callback cannot execute host authority against a captured guest runtime",
+    ).toThrow(/binding role=guest.*localRole=host/);
+  });
 
   it("DURABILITY: dropping only biomePick still materializes the committed op through the real guest travel path", async () => {
     expect(isCoopBiomeOperationEnabled(), "the migrated biome-operation path is active for this test").toBe(true);
