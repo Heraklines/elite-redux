@@ -386,14 +386,13 @@ try {
       }
       originalSend(data);
     };
-    const { GameModes } = await import("/src/enums/game-modes.ts");
     transport.send({
       t: "resumeCheckpoint",
       checkpointId: "browser-midchunk-checkpoint",
       commitment: {
         version: 1,
         digest,
-        gameMode: GameModes.COOP,
+        gameMode: globalThis.__coopBrowserBridge.gameModeCoop,
         wave: 77,
         revision: 0,
         runId: runtime.controller.runId,

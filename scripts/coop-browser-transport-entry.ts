@@ -4,6 +4,7 @@
  */
 
 import type { CoopRole } from "../src/data/elite-redux/coop/coop-transport";
+import { GameModes } from "../src/enums/game-modes";
 
 // CI-only transport entry. The sharded browser checkpoint needs a narrow programmatic connector to
 // exercise the production WebRTC stack without the lobby. Public-UI journeys use coop-browser-entry.ts
@@ -21,6 +22,7 @@ Object.defineProperty(globalThis, "__coopBrowserBridge", {
   writable: false,
   value: Object.freeze({
     ready: () => globalScene?.gameData != null,
+    gameModeCoop: GameModes.COOP,
     connect: (code: string, role: CoopRole, opts?: Parameters<typeof connectCoopWithCode>[2]) =>
       connectCoopWithCode(code, role, opts),
   }),
