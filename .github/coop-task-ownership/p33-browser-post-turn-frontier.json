@@ -6,6 +6,7 @@
   "baseSha": "8600b960d081b52e61b74502509c27e7b8770fae",
   "allowedFiles": [
     ".github/coop-task-ownership/p33-browser-post-turn-frontier.json",
+    ".github/workflows/coop-focused-branch.yml",
     "src/data/elite-redux/coop/coop-durability.ts",
     "src/data/elite-redux/coop/coop-operation-journal.ts",
     "src/data/elite-redux/coop/coop-runtime.ts",
@@ -14,6 +15,7 @@
     "test/browser/coop-public-ui/check-public-boundary.mjs",
     "test/browser/coop-public-ui/public-ui-harness.mjs",
     "test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs",
+    "test/scripts/coop-focused-static-workflow.test.mjs",
     "test/tests/elite-redux/coop/coop-operation-continuation-ready.test.ts",
     "test/tests/elite-redux/coop/coop-reward-authoritative-result.test.ts"
   ]
