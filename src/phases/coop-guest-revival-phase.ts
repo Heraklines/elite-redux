@@ -9,8 +9,8 @@ import { Phase } from "#app/phase";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_REVIVAL_SEQ_BASE, sendCoopRevivalChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
-  type CoopRevivalOperationBinding,
   armCoopRevivalIntentResend,
+  type CoopRevivalOperationBinding,
   captureCoopRevivalOperationBinding,
 } from "#data/elite-redux/coop/coop-revival-operation";
 import { failCoopSharedSession, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
