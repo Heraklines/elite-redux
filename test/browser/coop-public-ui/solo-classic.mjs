@@ -10,7 +10,7 @@
  * independent of co-op signaling - it is the foundation the co-op journey matrix reuses.
  */
 
-import { selectOptionById } from "./campaign-nav.mjs";
+import { confirmDefaultStarterTeam, selectOptionById, waitForSemanticSurface } from "./campaign-nav.mjs";
 import { delay } from "./evidence.mjs";
 
 const TITLE_PHASE = /Start Phase TitlePhase/u;
@@ -80,23 +80,18 @@ export async function runSoloClassic(client) {
     description: "solo SelectStarterPhase",
   });
   await client.checkpoint("solo-starter-select");
-  await client.sequence(client.config.keys.starter, "solo-select-default-team");
-
-  // Launching a run needs the post-starter difficulty/confirm step (co-op drives the same
-  // picker via its host difficulty keys). Press it, then adaptively re-try once if the
-  // wave-1 command surface has not appeared yet, so a slightly different launch layout
-  // still starts the run instead of hanging.
-  await client.sequence(client.config.keys.difficulty, "solo-select-difficulty");
-  let reachedCommand = await client.evidence
-    .waitForCondition(sink => sink.findLastSemanticSurface(0, COMMAND_SURFACE), {
-      timeoutMs: Math.min(client.config.timeoutMs, 45_000),
-      description: "solo wave-1 command surface",
-    })
-    .catch(() => null);
-  if (!reachedCommand) {
-    await client.press("Space", "solo-launch-confirm-retry");
-    reachedCommand = await waitForSemantic(client, COMMAND_SURFACE, client.config.timeoutMs);
-  }
+  const { launchCursor } = await confirmDefaultStarterTeam(client, { timeoutMs: client.config.timeoutMs });
+  await waitForSemanticSurface(client, "option-select:SelectStarterPhase", {
+    fromCursor: launchCursor,
+    timeoutMs: client.config.timeoutMs,
+  });
+  await selectOptionById(client, {
+    surfaceId: "option-select:SelectStarterPhase",
+    targetId: "ace",
+    navKeys: ["ArrowUp", "ArrowDown"],
+    timeoutMs: client.config.timeoutMs,
+  });
+  await waitForSemantic(client, COMMAND_SURFACE, client.config.timeoutMs);
   await client.checkpoint("solo-wave1-command");
 
   // Validate the primitive against the LIVE mirror:

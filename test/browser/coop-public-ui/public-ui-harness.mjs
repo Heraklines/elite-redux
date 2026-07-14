@@ -5,6 +5,7 @@
 
 import puppeteer from "puppeteer";
 import { createBattlePromptAdvancer } from "./campaign.mjs";
+import { confirmDefaultStarterTeam, selectOptionById, waitForSemanticSurface } from "./campaign-nav.mjs";
 import { delay, EvidenceSink } from "./evidence.mjs";
 
 const TITLE_PHASE = /Start Phase TitlePhase/u;
@@ -1024,9 +1025,19 @@ export class DuoPublicUiRig {
     const deadline = Date.now() + this.config.timeoutMs;
     let acceptedForLiveRequest = false;
     let nextReissueAt = Date.now() + LOBBY_REQUEST_REISSUE_MS;
+    let supersededRequestFailure = null;
     while (Date.now() < deadline) {
       for (const client of Object.values(this.clients)) {
-        assertNoDriverApiFailure(client.evidence, "co-op lobby");
+        const failure = client.evidence.networkState.apiFailure;
+        if (failure?.status === 401 && failure.pathname === "/coop/v3/lobby/request") {
+          // Reciprocal requests can cross: one request consumes the lobby credential and creates
+          // the match while the other in-flight request receives 401. Do not call that a pass;
+          // keep driving until the public stable-seat binding proves the match won the race. If no
+          // binding arrives by the deadline, surface this exact failure below.
+          supersededRequestFailure = { client: client.label, ...failure };
+        } else {
+          assertNoDriverApiFailure(client.evidence, "co-op lobby");
+        }
         const binding = client.evidence.findBinding(roleCursors[client.label]);
         if (binding) {
           client.publicRole = binding.observation.role;
@@ -1050,6 +1061,12 @@ export class DuoPublicUiRig {
         }
       }
       await delay(150);
+    }
+    if (supersededRequestFailure != null) {
+      throw new Error(
+        `${supersededRequestFailure.client}: lobby request credential failed without a later stable-seat binding `
+          + `(${supersededRequestFailure.status} ${supersededRequestFailure.pathname})`,
+      );
     }
     throw new Error("Co-op host never reached a stable-seat session binding after lobby pairing");
   }
@@ -1262,17 +1279,31 @@ export class DuoPublicUiRig {
       ),
     );
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("starter-select-open")));
-    await Promise.all(
-      Object.values(this.clients).map(client => client.sequence(this.config.keys.starter, "select-default-team")),
+    const starterLaunchCursors = Object.fromEntries(
+      await Promise.all(
+        Object.values(this.clients).map(async client => {
+          const result = await confirmDefaultStarterTeam(client, { timeoutMs: this.config.timeoutMs });
+          return [client.label, result.launchCursor];
+        }),
+      ),
     );
     await this.guest.evidence.waitFor(/\[coop-runconfig\] guest waiting - requesting runConfig from host/u, {
-      from: phaseCursors[this.guest.label],
+      from: starterLaunchCursors[this.guest.label],
       timeoutMs: this.config.timeoutMs,
       description: "guest bounded wait for the host difficulty decision",
     });
+    await waitForSemanticSurface(this.host, "option-select:SelectStarterPhase", {
+      fromCursor: starterLaunchCursors[this.host.label],
+      timeoutMs: this.config.timeoutMs,
+    });
     await this.host.checkpoint("difficulty-select-open");
     const runConfigCursor = this.host.evidence.cursor();
-    await this.host.sequence(this.config.keys.difficulty, "host-select-ace-difficulty");
+    await selectOptionById(this.host, {
+      surfaceId: "option-select:SelectStarterPhase",
+      targetId: "ace",
+      navKeys: ["ArrowUp", "ArrowDown"],
+      timeoutMs: this.config.timeoutMs,
+    });
     await this.host.evidence.waitFor(/\[coop-runconfig\] startRun role=host willBroadcast=true difficulty=/u, {
       from: runConfigCursor,
       timeoutMs: this.config.timeoutMs,

@@ -22,6 +22,7 @@
     "src/system/game-data.ts",
     "src/system/settings/settings.ts",
     "src/ui/**",
+    "test/browser/coop-public-ui/**",
     "test/tests/elite-redux/coop/**",
     "test/tests/elite-redux/editor/**",
     "test/tests/elite-redux/er-custom-trainers.test.ts",

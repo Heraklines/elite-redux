@@ -47,6 +47,47 @@ async function readSemantic(client, surfaceId, fromCursor, timeoutMs) {
   return null;
 }
 
+/** Wait for a real semantic surface emitted after `fromCursor`. */
+export async function waitForSemanticSurface(client, surfaceId, { fromCursor = 0, timeoutMs = 15_000 } = {}) {
+  const event = await readSemantic(client, surfaceId, fromCursor, timeoutMs);
+  if (event == null) {
+    throw new Error(`${client.label}: timed out waiting for semantic surface ${surfaceId}`);
+  }
+  return event;
+}
+
+/**
+ * Select the visible starter, add it through its option menu, submit the team, and confirm.
+ * Every transition is observed before the next public key is sent, so text animation or a slow
+ * browser cannot reinterpret a later key on the previous screen.
+ */
+export async function confirmDefaultStarterTeam(client, { timeoutMs = 15_000 } = {}) {
+  const optionCursor = client.evidence.cursor();
+  await client.press("Space", "starter-open-selected-options");
+  await waitForSemanticSurface(client, "option-select:SelectStarterPhase", {
+    fromCursor: optionCursor,
+    timeoutMs,
+  });
+  const starterCursor = client.evidence.cursor();
+  await selectOptionById(client, {
+    surfaceId: "option-select:SelectStarterPhase",
+    targetId: "add-to-party",
+    navKeys: ["ArrowUp", "ArrowDown"],
+    timeoutMs,
+  });
+
+  await waitForSemanticSurface(client, "starter-select", { fromCursor: starterCursor, timeoutMs });
+  const confirmCursor = client.evidence.cursor();
+  await client.press("Enter", "starter-submit-team");
+  await waitForSemanticSurface(client, "confirm:SelectStarterPhase", {
+    fromCursor: confirmCursor,
+    timeoutMs,
+  });
+  const launchCursor = client.evidence.cursor();
+  await client.press("Space", "starter-confirm-team");
+  return { launchCursor };
+}
+
 /**
  * Drive `client` to select the option with stable id `targetId` on `surfaceId`, verifying
  * that each navigation keypress actually changed the selected id (a press that does not move
