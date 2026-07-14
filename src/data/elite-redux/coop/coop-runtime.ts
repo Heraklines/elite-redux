@@ -4520,7 +4520,7 @@ export function assembleCoopRuntime(
     // Per-runtime op-state (layer-B): fresh guest/host cursors + per-surface records for THIS runtime, so
     // the two-engine harness's clients no longer share module-global apply state. Installed active by
     // setCoopRuntime; the migrated surfaces (bargain/stormglass, more to follow) read it fail-loud.
-    opState: createCoopRuntimeOpState(),
+    opState: createCoopRuntimeOpState(controller.role),
   };
   sharedTerminalStates.set(runtime, { frozen: false, finalized: false, reason: null });
   if (opts.p33 != null) {

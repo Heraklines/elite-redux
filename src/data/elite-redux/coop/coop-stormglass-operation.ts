@@ -15,8 +15,8 @@ import {
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
-  journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
+  tryJournalCoopCommittedEnvelope,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   CoopOperationGuest,
@@ -143,7 +143,7 @@ export function commitCoopStormglassDecision(
   weatherIndex: number,
   weather: number,
   params: { localRole: CoopRole; wave: number; turn: number },
-): void {
+): boolean {
   if (isCoopStormglassOperationEnabled() && params.localRole === "host") {
     try {
       const s = state();
@@ -158,14 +158,20 @@ export function commitCoopStormglassDecision(
       const result = host().submit(operation, context(params.wave, params.turn), intent =>
         intent.owner === owner ? { ok: true } : { ok: false, reason: "wrong-owner" },
       );
-      if (result.kind === "committed") {
-        journalCoopCommittedEnvelope(result.envelope);
+      if (result.kind !== "committed" && result.kind !== "reack") {
+        return false;
+      }
+      if (!tryJournalCoopCommittedEnvelope(result.envelope)) {
+        coopWarn("reward", `stormglass op could not retain rev=${result.envelope.revision} id=${operation.id}`);
+        return false;
       }
     } catch (error) {
-      coopWarn("reward", "stormglass op commit threw; legacy carrier remains active", error);
+      coopWarn("reward", "stormglass op commit threw; refusing the unretained carrier", error);
+      return false;
     }
   }
   relay.sendInteractionChoice(COOP_STORMGLASS_SEQ, "stormglass", weatherIndex);
+  return true;
 }
 
 function validPayload(value: unknown): value is CoopStormglassPayload {
