@@ -51,6 +51,8 @@ interface EditorHarness {
   trainerClassByName: Map<string, { name: string; sprite: string; genders: boolean }>;
   SHINY_EFFECTS: { palette: any[]; surface: any[]; around: any[] };
   shinyEffectById: Map<string, { id: string; label: string; accent: string; category: string }>;
+  TRAINER_FX: { id: string; label: string; accent: string }[];
+  trainerFxById: Map<string, { id: string; label: string; accent: string }>;
   MOVE_SET: Set<string>;
   ctrOpenMembers: Set<number>;
   ctrSetSel: Map<number, number>;
@@ -114,7 +116,7 @@ beforeAll(() => {
     ;window.__ct = {
       blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal, ctrFusedName,
       render, onCustomTrainerInput, onCustomTrainerChange, onCustomTrainerClick, buildDeltas,
-      ctr, spByConst, spById, trainerClassByName, SHINY_EFFECTS, shinyEffectById, MOVE_SET, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
+      ctr, spByConst, spById, trainerClassByName, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
       setTab(v){ activeTab = v; },
     };`;
@@ -163,6 +165,16 @@ beforeEach(() => {
   seedShiny("palette", "inferno", "Inferno", "#ff6a24");
   seedShiny("surface", "holofoil", "Holo Foil", "#7fe0ff");
   seedShiny("around", "zaps", "Zaps", "#ffd27a");
+  // Ghost Trainer FX aura catalog fixture (the per-trainer sprite-effect picker).
+  ct.TRAINER_FX.length = 0;
+  ct.trainerFxById.clear();
+  for (const e of [
+    { id: "smoke", label: "Smoke", accent: "#cccccc" },
+    { id: "shadowaura", label: "Shadow Aura", accent: "#9b6cff" },
+  ]) {
+    ct.TRAINER_FX.push(e);
+    ct.trainerFxById.set(e.id, e);
+  }
 });
 
 describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
@@ -429,6 +441,87 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     intro.value = "a".repeat(250);
     ct.onCustomTrainerInput(intro);
     expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].introDialogue.length).toBe(200);
+  });
+
+  it("victory/defeat lines + sprite-effect picker render, edit and serialize (omitted when empty)", () => {
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // The Identity victory/defeat inputs + the sprite-effect select all render.
+    const victory = q("#ctr-victory") as HTMLInputElement;
+    const defeat = q("#ctr-defeat") as HTMLInputElement;
+    const effect = q("#ctr-effect") as HTMLSelectElement;
+    expect(victory).not.toBeNull();
+    expect(defeat).not.toBeNull();
+    expect(effect).not.toBeNull();
+    // The effect picker offers "(none)" + the seeded auras.
+    const opts = [...effect.querySelectorAll("option")].map(o => (o as HTMLOptionElement).value);
+    expect(opts[0]).toBe(""); // "(none)"
+    expect(opts).toContain("smoke");
+    expect(opts).toContain("shadowaura");
+
+    // Empty -> none of the three fields serialize.
+    let delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.victoryDialogue).toBeUndefined();
+    expect(delta.defeatDialogue).toBeUndefined();
+    expect(delta.trainerEffect).toBeUndefined();
+
+    // Fill victory + defeat (trimmed) and pick an aura.
+    victory.value = "  Well fought.  ";
+    ct.onCustomTrainerInput(victory);
+    defeat.value = "  Better luck next time!  ";
+    ct.onCustomTrainerInput(defeat);
+    effect.value = "shadowaura";
+    ct.onCustomTrainerChange(effect);
+    const t = ct.ctr.current[key];
+    expect(t.trainerEffect).toBe("shadowaura");
+
+    delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.victoryDialogue).toBe("Well fought.");
+    expect(delta.defeatDialogue).toBe("Better luck next time!");
+    expect(delta.trainerEffect).toBe("shadowaura");
+
+    // The preview panel shows the effect swatch (one dot for the picked aura).
+    expect(q(".ctr-preview-effect")).not.toBeNull();
+    expect(q(".ctr-preview-effect .ctr-shiny-dot")).not.toBeNull();
+
+    // An unknown aura id normalizes away (never serialized).
+    effect.value = "notarealaura";
+    ct.onCustomTrainerChange(effect);
+    expect(ct.ctr.current[key].trainerEffect).toBe("");
+    expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].trainerEffect).toBeUndefined();
+
+    // A 250-char victory line caps to 200 in the payload.
+    victory.value = "z".repeat(250);
+    ct.onCustomTrainerInput(victory);
+    expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].victoryDialogue.length).toBe(200);
+  });
+
+  it("clicking the readonly trainer Id field never clears the team (BUG regression)", () => {
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_SNORLAX");
+    // Add a 2nd member so there is a team to (not) lose.
+    ct.onCustomTrainerClick({ target: q("#ctr-add-member")! });
+    setSpecies(1, "SPECIES_GENGAR");
+    const teamBefore = ct.ctr.current[key].team.length;
+    const markupBefore = win.document.querySelectorAll(".ctr-mem-sum").length;
+    expect(teamBefore).toBe(2);
+
+    // The Id field is a readonly TEXT input with an explicit id (no number spinner).
+    const idEl = q("#ctr-id") as HTMLInputElement;
+    expect(idEl).not.toBeNull();
+    expect(idEl.type).toBe("text");
+    expect(idEl.readOnly).toBe(true);
+
+    // Drive click / input / change through the delegated ctr handlers: all inert.
+    ct.onCustomTrainerClick({ target: idEl });
+    ct.onCustomTrainerInput(idEl);
+    ct.onCustomTrainerChange(idEl);
+
+    // The selected trainer, its team, and the rendered team markup all survive.
+    expect(ct.ctrSelected).toBe(key);
+    expect(ct.ctr.current[key].team.length).toBe(teamBefore);
+    ct.render();
+    expect(win.document.querySelectorAll(".ctr-mem-sum").length).toBe(markupBefore);
   });
 
   it("fusion preview renders sprites + the generated fused name for a fused member", () => {
