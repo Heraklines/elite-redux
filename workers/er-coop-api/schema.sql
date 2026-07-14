@@ -75,9 +75,13 @@ CREATE TABLE IF NOT EXISTS coop_lobby_p33 (
   created_at INTEGER NOT NULL,
   req_from TEXT,
   req_at INTEGER,
-  declined_name TEXT
+  declined_name TEXT,
+  room TEXT NOT NULL DEFAULT 'default'  -- per-run lobby namespace (#920); '' room-less clients share 'default'
 );
 CREATE INDEX IF NOT EXISTS idx_coop_lobby_p33_seen ON coop_lobby_p33 (seen_at);
+-- Existing deployments migrate additively (the worker's ensureP33SignalingSchema also runs this;
+-- ADD COLUMN throws if it already exists and is swallowed):
+--   ALTER TABLE coop_lobby_p33 ADD COLUMN room TEXT NOT NULL DEFAULT 'default';
 
 CREATE TABLE IF NOT EXISTS coop_runs_p33 (
   code TEXT PRIMARY KEY,

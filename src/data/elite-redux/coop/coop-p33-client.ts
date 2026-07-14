@@ -77,6 +77,13 @@ export interface CoopP33ClientDependencies {
   createClientNonce?: () => string;
   retryDelay?: (attempt: number) => Promise<void>;
   serverBase?: () => string;
+  /**
+   * Optional per-run lobby room/namespace (P33 audit #920). When set, this client only
+   * announces into and lists from that room, so concurrent CI runs never see each other's
+   * accounts. Omitted (the production default) => no room field is sent and the server places
+   * the client in the single shared default room, i.e. exactly today's behavior.
+   */
+  room?: string;
 }
 
 export class CoopP33HttpError extends Error {
@@ -312,7 +319,13 @@ export async function announceToP33Lobby(overrides: CoopP33ClientDependencies = 
   if (!isClientNonce(clientNonce)) {
     throw new CoopP33HttpError("could not create a valid co-op client nonce", 0, "/coop/v3/lobby/announce");
   }
-  const body = JSON.stringify({ ticket: ticket.ticket, clientNonce });
+  const announceBody: Record<string, unknown> = { ticket: ticket.ticket, clientNonce };
+  // Additive room namespace: omit the field entirely when no room is set so a production
+  // (room-less) announce is byte-identical to today's request.
+  if (overrides.room != null && overrides.room.length > 0) {
+    announceBody.room = overrides.room;
+  }
+  const body = JSON.stringify(announceBody);
   const response = await exactRetryRequest(
     "/coop/v3/lobby/announce",
     { method: "POST", headers: { "Content-Type": "application/json" }, body },
@@ -342,7 +355,12 @@ export async function fetchP33Lobby(
   credential: CoopP33LobbyCredentialV1,
   overrides: CoopP33ClientDependencies = {},
 ): Promise<CoopP33LobbySnapshot> {
-  const path = `/coop/v3/lobby?self=${encodeURIComponent(credential.presenceId)}`;
+  // Additive room namespace: append `&room=` only when a room is set, so a production
+  // (room-less) list request is byte-identical to today's request.
+  const path =
+    overrides.room != null && overrides.room.length > 0
+      ? `/coop/v3/lobby?self=${encodeURIComponent(credential.presenceId)}&room=${encodeURIComponent(overrides.room)}`
+      : `/coop/v3/lobby?self=${encodeURIComponent(credential.presenceId)}`;
   const body = await authenticatedJson(credential, path, "GET", undefined, overrides);
   const pairing = body.pairing == null ? null : parseCoopP33Pairing(body.pairing);
   if (body.pairing != null && pairing == null) {

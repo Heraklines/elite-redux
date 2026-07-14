@@ -60,6 +60,8 @@ interface P33LobbyRow {
   req_from: string | null;
   req_at: number | null;
   declined_name: string | null;
+  /** Per-run lobby namespace (P33 audit #920). Defaults to the shared DEFAULT_LOBBY_ROOM. */
+  room: string;
 }
 
 interface P33RunRow {
@@ -98,6 +100,13 @@ interface P33TicketCredential {
 const DEFAULT_PRESENCE_WINDOW_MS = 30_000;
 const DEFAULT_REJOIN_GRACE_MS = 2 * 60_000;
 const LOBBY_PRESENCE_MS = 12_000;
+/**
+ * Lobby room namespace (P33 audit #920). A room-less client (production) is placed in this
+ * single shared room, so filtering by it returns exactly today's behavior. CI runs pass the
+ * GitHub run id as the room to isolate concurrent lobbies.
+ */
+const DEFAULT_LOBBY_ROOM = "default";
+const MAX_ROOM_LENGTH = 64;
 const MAX_JSON_BYTES = 1_100_000;
 const MAX_SIGNAL_BYTES = 1_000_000;
 const PAIRING_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -149,6 +158,15 @@ function safeIdentifier(value: unknown, maxLength = 256): value is string {
       return codePoint <= 0x1f || codePoint === 0x7f;
     })
   );
+}
+
+/**
+ * Resolve the lobby room from a request field (announce body or list query). An absent,
+ * malformed, or over-long value falls back to DEFAULT_LOBBY_ROOM, so a room-less production
+ * client always lands in the single shared default room (behavior unchanged).
+ */
+function normalizeRoom(value: unknown): string {
+  return safeIdentifier(value, MAX_ROOM_LENGTH) ? value : DEFAULT_LOBBY_ROOM;
 }
 
 function sameString(left: string, right: string): boolean {
@@ -213,7 +231,8 @@ export async function ensureP33SignalingSchema(env: P33SignalingEnv): Promise<vo
       created_at INTEGER NOT NULL,
       req_from TEXT,
       req_at INTEGER,
-      declined_name TEXT
+      declined_name TEXT,
+      room TEXT NOT NULL DEFAULT 'default'
     )`),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_coop_lobby_p33_seen ON coop_lobby_p33(seen_at)"),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS coop_runs_p33 (
@@ -251,6 +270,16 @@ export async function ensureP33SignalingSchema(env: P33SignalingEnv): Promise<vo
       PRIMARY KEY (code, from_role)
     )`),
   ]);
+  // Per-run lobby room namespace (P33 audit #920): additive column for lobbies created before
+  // room isolation shipped. ADD COLUMN throws when the column already exists - swallowed - so an
+  // existing production deployment migrates forward without dropping rows; a single-line ALTER is
+  // safe through prepare() (unlike D1's newline-splitting exec()). Pre-existing rows default to the
+  // shared 'default' room, preserving today's single-pool behavior. Mirrors index.ts's ALTER pattern.
+  try {
+    await env.DB.prepare("ALTER TABLE coop_lobby_p33 ADD COLUMN room TEXT NOT NULL DEFAULT 'default'").run();
+  } catch {
+    // column already exists
+  }
 }
 
 /** Hourly cleanup for credentials, abandoned lobby entries, signals, and expired P33 runs. */
@@ -436,6 +465,7 @@ async function handleAnnounce(request: Request, env: P33SignalingEnv, now: numbe
   }
   await releaseExpiredGrace(env, now);
   const { payload, clientNonce, credential } = identity;
+  const room = normalizeRoom(body.room);
   await env.DB.prepare(
     `DELETE FROM coop_lobby_p33
      WHERE account_id = ? AND presence_id <> ? AND paired_code IS NULL AND seen_at < ?`,
@@ -446,12 +476,13 @@ async function handleAnnounce(request: Request, env: P33SignalingEnv, now: numbe
     await env.DB.prepare(
       `INSERT INTO coop_lobby_p33
         (presence_id, account_id, display_name, canonical_username, ticket_nonce, client_nonce,
-         bearer_hash, seen_at, paired_code, transport_role, created_at, req_from, req_at, declined_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, NULL)
+         bearer_hash, seen_at, paired_code, transport_role, created_at, req_from, req_at, declined_name, room)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, NULL, ?)
        ON CONFLICT(presence_id) DO UPDATE SET
          display_name = excluded.display_name,
          canonical_username = excluded.canonical_username,
-         seen_at = excluded.seen_at
+         seen_at = excluded.seen_at,
+         room = excluded.room
        WHERE account_id = excluded.account_id
          AND ticket_nonce = excluded.ticket_nonce
          AND client_nonce = excluded.client_nonce
@@ -467,6 +498,7 @@ async function handleAnnounce(request: Request, env: P33SignalingEnv, now: numbe
         credential.bearerHash,
         now,
         now,
+        room,
       )
       .run();
   } catch {
@@ -510,13 +542,17 @@ async function handleLobbyList(request: Request, env: P33SignalingEnv, url: URL,
   if ((heartbeat.meta.changes ?? 0) !== 1) {
     return error(env, "stale lobby credential", 409);
   }
+  // Room isolation (P33 audit #920): only list players in the SAME room. A room-less caller
+  // resolves to DEFAULT_LOBBY_ROOM and sees only default-room players (production unchanged);
+  // a caller in room A can never see a room-B announcement.
+  const room = normalizeRoom(url.searchParams.get("room"));
   const { results = [] } = await env.DB.prepare(
     `SELECT presence_id, account_id, display_name, seen_at
      FROM coop_lobby_p33
-     WHERE presence_id <> ? AND paired_code IS NULL AND seen_at >= ?
+     WHERE presence_id <> ? AND paired_code IS NULL AND seen_at >= ? AND room = ?
      ORDER BY created_at ASC LIMIT 50`,
   )
-    .bind(self, now - LOBBY_PRESENCE_MS)
+    .bind(self, now - LOBBY_PRESENCE_MS, room)
     .all<{ presence_id: string; account_id: string; display_name: string; seen_at: number }>();
   let incoming: { id: string; accountId: string; name: string } | null = null;
   if (row.req_from != null && row.req_at != null && now - row.req_at <= LOBBY_PRESENCE_MS) {
