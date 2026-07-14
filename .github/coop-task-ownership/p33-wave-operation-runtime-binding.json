@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "taskId": "p33-wave-operation-runtime-binding",
+  "branch": "ci/coop/p33-wave-operation-runtime-binding",
+  "trainRef": "ci/coop/p33-mystery-public-transition",
+  "baseSha": "278db51217b3cfcca4f05f1a1099a162ea9546df",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-wave-operation-runtime-binding.json",
+    "src/data/elite-redux/coop/coop-wave-operation.ts",
+    "test/tests/elite-redux/coop/coop-wave-operation-durability.test.ts",
+    "test/tests/elite-redux/coop/coop-wave-operation.test.ts"
+  ]
+}

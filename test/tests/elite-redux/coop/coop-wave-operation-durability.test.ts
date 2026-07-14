@@ -43,9 +43,12 @@ import {
   resetCoopOperationJournalLog,
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
+import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import {
+  applyCoopWaveAdvanceEnvelopeForBinding,
+  captureCoopWaveAdvanceOperationBinding,
   commitWaveAdvanceOwnerIntent,
   getCoopStagedWaveAdvanceTransaction,
   isCoopWaveAdvanceTransactionComplete,
@@ -189,6 +192,7 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
   let restoreBoundaryApplier: (() => void) | null;
 
   beforeEach(() => {
+    setActiveCoopRuntimeOpState(createCoopRuntimeOpState());
     restoreBoundaryApplier = null;
     setCoopWaveAdvanceOperationEnabled(true);
     resetCoopWaveAdvanceOperationState();
@@ -204,12 +208,98 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     resetCoopOperationJournalLog();
     resetCoopWaveAdvanceOperationFlag();
     resetCoopWaveAdvanceOperationState();
+    setActiveCoopRuntimeOpState(null);
     clearNegotiatedCoopCapabilities();
   });
 
   // ===========================================================================================
   // KEYSTONE PROOF - the journal carrier ROUTES INTO the live-mutation seam (the reviewer's demand).
   // ===========================================================================================
+  it("keeps captured authority durability and receiver receipts isolated across two runtimes", () => {
+    const hostState = createCoopRuntimeOpState("host");
+    const ambientState = createCoopRuntimeOpState("host");
+    const hostPair = createLoopbackPair();
+    const ambientPair = createLoopbackPair();
+    const hostManager = new CoopDurabilityManager(hostPair.host);
+    const ambientManager = new CoopDurabilityManager(ambientPair.host);
+
+    setActiveCoopRuntimeOpState(hostState);
+    setCoopOperationDurability(hostManager);
+    const hostBinding = captureCoopWaveAdvanceOperationBinding("host");
+    setActiveCoopRuntimeOpState(ambientState);
+    setCoopOperationDurability(ambientManager);
+    const transition = waveAdvancePayload(9);
+
+    expect(
+      commitWaveAdvanceOwnerIntent(
+        {
+          payload: transition,
+          authoritativeState: waveState(transition),
+          localRole: "host",
+          wave: 9,
+          turn: 0,
+        },
+        hostBinding,
+      ),
+      "a delayed host callback still commits through its captured runtime",
+    ).not.toBeNull();
+    expect(hostState.hostClock?.revision).toBe(1);
+    expect(ambientState.hostClock, "the ambient peer's authority cursor remains untouched").toBeNull();
+    expect(hostManager.unackedCount(), "the retained result belongs to the captured durability manager").toBe(1);
+    expect(ambientManager.unackedCount(), "the ambient manager cannot borrow that result").toBe(0);
+
+    hostManager.dispose();
+    ambientManager.dispose();
+    setCoopOperationDurability(null);
+
+    const guestAState = createCoopRuntimeOpState("guest");
+    const guestBState = createCoopRuntimeOpState("guest");
+    setActiveCoopRuntimeOpState(guestAState);
+    const guestA = captureCoopWaveAdvanceOperationBinding("guest");
+    setActiveCoopRuntimeOpState(guestBState);
+    const guestB = captureCoopWaveAdvanceOperationBinding("guest");
+    const appliedBy: string[] = [];
+    const boundaryReady = new Set<string>();
+    registerCoopWaveAdvanceBoundaryDataApplier(() => {
+      if (!boundaryReady.has("A")) {
+        return "deferred";
+      }
+      appliedBy.push("A");
+      return "applied";
+    }, guestA);
+    registerCoopWaveAdvanceBoundaryDataApplier(() => {
+      if (!boundaryReady.has("B")) {
+        return "deferred";
+      }
+      appliedBy.push("B");
+      return "applied";
+    }, guestB);
+    const envelope = waveEnvelope(15);
+
+    expect(
+      applyCoopWaveAdvanceEnvelopeForBinding(envelope, guestA),
+      "runtime A admits its own retained receipt while runtime B is ambient",
+    ).toBe("applied");
+    expect(getCoopStagedWaveAdvanceTransaction(15, guestA)?.dataApplied).toBe(false);
+    expect(getCoopStagedWaveAdvanceTransaction(15, guestB), "runtime B cannot see A's retained receipt").toBeNull();
+    expect(guestAState.guestClock?.revision).toBe(1);
+    expect(guestBState.guestClock).toBeNull();
+    expect(tryApplyCoopWaveAdvanceDataAtBoundary(15, guestB), "B cannot apply a transaction it never received").toBe(
+      "deferred",
+    );
+    boundaryReady.add("A");
+    expect(tryApplyCoopWaveAdvanceDataAtBoundary(15, guestA)).toBe("applied");
+    expect(appliedBy).toEqual(["A"]);
+
+    expect(
+      applyCoopWaveAdvanceEnvelopeForBinding(envelope, guestB),
+      "the same addressed result remains new to the independent receiver",
+    ).toBe("applied");
+    boundaryReady.add("B");
+    expect(tryApplyCoopWaveAdvanceDataAtBoundary(15, guestB)).toBe("applied");
+    expect(appliedBy).toEqual(["A", "B"]);
+  });
+
   it("a journal-delivered WAVE_ADVANCE op ROUTES INTO the live-mutation sink carrying the host-stated transition", async () => {
     const seen: CoopWaveAdvancePayload[] = [];
     registerCoopOperationLiveSink("op:wave", env => {
