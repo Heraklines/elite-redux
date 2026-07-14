@@ -16,6 +16,7 @@ import {
 import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   adoptRewardWatcherChoice,
+  captureCoopRewardOperationBinding,
   commitRewardAuthoritativeResult,
   commitRewardOwnerIntent,
   resetCoopRewardOperationState,
@@ -393,5 +394,65 @@ describe("P33 retained reward/shop authoritative results", () => {
     expect((envelope.pendingOperation?.payload as CoopRewardActionPayload).terminal).toBe(true);
     hostManager.dispose();
     guestManager.dispose();
+  });
+
+  it("publishes an async continuation through its captured runtime, never the ambient peer", async () => {
+    const pairA = createLoopbackPair();
+    const pairB = createLoopbackPair();
+    const managerA = new CoopDurabilityManager(pairA.host);
+    const managerB = new CoopDurabilityManager(pairB.host);
+    const receivedA: CoopAuthoritativeBattleStateV1[] = [];
+    const receivedB: CoopAuthoritativeBattleStateV1[] = [];
+    pairA.guest.onMessage(message => {
+      if (message.t === "envelope") {
+        receivedA.push(message.envelope.authoritativeState);
+      }
+    });
+    pairB.guest.onMessage(message => {
+      if (message.t === "envelope") {
+        receivedB.push(message.envelope.authoritativeState);
+      }
+    });
+
+    const runtimeA = createCoopRuntimeOpState();
+    setActiveCoopRuntimeOpState(runtimeA);
+    setCoopOperationDurability(managerA);
+    const bindingA = captureCoopRewardOperationBinding()!;
+    const runtimeB = createCoopRuntimeOpState();
+    setActiveCoopRuntimeOpState(runtimeB);
+    setCoopOperationDurability(managerB);
+    const bindingB = captureCoopRewardOperationBinding()!;
+
+    // B remains ambient while A's simulated async callback runs. Both use the same logical identity and
+    // revision, which is valid in separate client runtimes; neither cursor/journal may consume the other.
+    const params = {
+      surface: "reward" as const,
+      pinned: 0,
+      label: "reward",
+      choice: 0,
+      data: [0],
+      terminal: false,
+      localRole: "host" as const,
+      wave: 7,
+      turn: 3,
+    };
+    const preparedA = commitRewardOwnerIntent(params, bindingA)!;
+    const preparedB = commitRewardOwnerIntent(params, bindingB)!;
+    expect(commitRewardAuthoritativeResult(preparedA.operationId, state(61, 700, "runtime-a"), bindingA)).toEqual({
+      operationId: preparedA.operationId,
+      revision: 1,
+    });
+    expect(commitRewardAuthoritativeResult(preparedB.operationId, state(62, 600, "runtime-b"), bindingB)).toEqual({
+      operationId: preparedB.operationId,
+      revision: 1,
+    });
+    await flushWire();
+
+    expect(receivedA.map(result => result.tick)).toEqual([61]);
+    expect(receivedB.map(result => result.tick)).toEqual([62]);
+    expect(managerA.unackedCount()).toBe(1);
+    expect(managerB.unackedCount()).toBe(1);
+    managerA.dispose();
+    managerB.dispose();
   });
 });

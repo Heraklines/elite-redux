@@ -11,8 +11,10 @@ import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   adoptRewardWatcherChoice,
+  captureCoopRewardOperationBinding,
   commitRewardAuthoritativeResult,
   commitRewardOwnerIntent,
+  type CoopRewardOperationBinding,
   isCoopRewardRetainedResultMode,
 } from "#data/elite-redux/coop/coop-reward-operation";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
@@ -25,7 +27,6 @@ import {
   getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
-  withActiveCoopRuntimeScope,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REWARD_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import {
@@ -230,6 +231,8 @@ export class SelectModifierPhase extends BattlePhase {
    * redeclaring a same-name private (TS2415) - it is the SAME runtime slot the base reads via
    * applyModifier -> coopCommitPendingAuthorityResult, so sharing it is behavior-identical. */
   protected coopPendingAuthorityOperationId: string | null = null;
+  /** Runtime captured while this phase is installed; survives async UI callbacks without ambient rebinding. */
+  protected coopRewardOperationBinding: CoopRewardOperationBinding | null = null;
   /** Prevents duplicate durable-result wait loops when a retained intent is re-clicked/replayed. */
   private readonly coopAwaitingAuthorityResults = new Set<string>();
   /** Live owner callback reused after a retained paid result temporarily parks the interactive shop. */
@@ -266,6 +269,9 @@ export class SelectModifierPhase extends BattlePhase {
     // own identical pool (same seed -> identical options/prices/money). Resolved once
     // here; solo / non-coop keeps the original flow untouched.
     const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
+    if (coopController != null && this.coopRewardOperationBinding == null) {
+      this.coopRewardOperationBinding = captureCoopRewardOperationBinding();
+    }
     // Capture the alternation counter this shop opened on, so its terminal advance is
     // idempotent (both clients advance locally now; this stops a double-count) (#633).
     if (coopController != null && this.coopInteractionStart < 0) {
@@ -1202,6 +1208,7 @@ export class SelectModifierPhase extends BattlePhase {
     // no-ops - so the partner DEFERS the broadcast and lags N-behind, wedging the next battle. Pinned
     // here, the copy's terminal advance is from-pinned + idempotent (a duplicate no-ops on both sides).
     copied.coopInteractionStart = this.coopInteractionStart;
+    copied.coopRewardOperationBinding = this.coopRewardOperationBinding;
     return copied;
   }
 
@@ -1283,17 +1290,21 @@ export class SelectModifierPhase extends BattlePhase {
     }
     // Prepare the typed intent BEFORE publishing its compatibility carrier. In retained-result mode this
     // does not commit state; the host executes once and captures the complete post-action result later.
-    const prepared = commitRewardOwnerIntent({
-      surface: "reward",
-      pinned: this.coopInteractionStart,
-      label,
-      choice,
-      data: wire,
-      terminal: choice === COOP_INTERACTION_LEAVE,
-      localRole: controller.role,
-      wave: globalScene.currentBattle?.waveIndex ?? -1,
-      turn: globalScene.currentBattle?.turn ?? 0,
-    });
+    this.coopRewardOperationBinding ??= captureCoopRewardOperationBinding();
+    const prepared = commitRewardOwnerIntent(
+      {
+        surface: "reward",
+        pinned: this.coopInteractionStart,
+        label,
+        choice,
+        data: wire,
+        terminal: choice === COOP_INTERACTION_LEAVE,
+        localRole: controller.role,
+        wave: globalScene.currentBattle?.waveIndex ?? -1,
+        turn: globalScene.currentBattle?.turn ?? 0,
+      },
+      this.coopRewardOperationBinding,
+    );
     this.coopPendingAuthorityOperationId = prepared?.operationId ?? null;
     // A host-owned LEAVE has no gameplay mutation after this seam: the next statement in every caller is
     // phase teardown / interaction-counter advancement. Commit its complete retained result HERE, before
@@ -1305,7 +1316,11 @@ export class SelectModifierPhase extends BattlePhase {
     // so a second raw host LEAVE would be both redundant and dangerous: it can remain buffered behind the
     // tagged terminal and poison a continuation that reuses the pinned interaction. Guest-owned terminals
     // still publish their raw intent so the host can validate, execute, and commit it.
-    if (choice === COOP_INTERACTION_LEAVE && controller.role === "host" && isCoopRewardRetainedResultMode()) {
+    if (
+      choice === COOP_INTERACTION_LEAVE
+      && controller.role === "host"
+      && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
+    ) {
       if (prepared == null) {
         failCoopSharedSession("Host reward terminal could not retain its authoritative intent");
         return true;
@@ -1326,7 +1341,11 @@ export class SelectModifierPhase extends BattlePhase {
       );
     }
     getCoopInteractionRelay()?.sendInteractionChoice(this.coopInteractionStart, label, choice, wire);
-    if (controller.role === "guest" && isCoopRewardRetainedResultMode() && prepared != null) {
+    if (
+      controller.role === "guest"
+      && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
+      && prepared != null
+    ) {
       this.coopAwaitAuthoritativeResult(prepared.operationId);
       return true;
     }
@@ -1335,13 +1354,13 @@ export class SelectModifierPhase extends BattlePhase {
 
   /** HOST: publish the complete post-action result before any continuation surface opens. */
   private coopCommitPendingAuthorityResult(operationId = this.coopPendingAuthorityOperationId): boolean {
-    if (operationId == null || !isCoopRewardRetainedResultMode()) {
+    if (operationId == null || !isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)) {
       return true;
     }
     if (getCoopController()?.role !== "host") {
       return false;
     }
-    const committed = commitRewardAuthoritativeResult(operationId);
+    const committed = commitRewardAuthoritativeResult(operationId, undefined, this.coopRewardOperationBinding);
     if (committed == null) {
       getCoopRuntime()?.durability?.reconnect();
       failCoopSharedSession(`Reward result ${operationId} could not capture/retain complete host state`);
@@ -1361,12 +1380,7 @@ export class SelectModifierPhase extends BattlePhase {
     this.coopAwaitingAuthorityResults.add(operationId);
     this.coopEndMirror();
     void globalScene.ui.setMode(UiMode.MESSAGE);
-    // Capture the OWNING runtime NOW (schedule time, under the installed client context). Each loop body
-    // below resumes after an `await` - in the two-engine harness the ambient active runtime is then NOT
-    // reliably this guest's (the loopback resumed under whichever client sent last / the withClient scope
-    // already restored), so the reward-op reads must run under the captured runtime, not the ambient one
-    // (#922: else adoptRewardWatcherChoice reads the wrong record -> never mirrors, or fail-loud throws).
-    const runtime = getCoopRuntime();
+    this.coopRewardOperationBinding ??= captureCoopRewardOperationBinding();
     void (async () => {
       try {
         const relay = getCoopInteractionRelay();
@@ -1386,8 +1400,8 @@ export class SelectModifierPhase extends BattlePhase {
             return;
           }
           const terminal = action.choice === COOP_INTERACTION_LEAVE;
-          const applyRelayedResult = (): boolean => {
-            const decision = adoptRewardWatcherChoice({
+          const decision = adoptRewardWatcherChoice(
+            {
               surface: "reward",
               pinned: this.coopInteractionStart,
               action: { choice: action.choice, data: action.data, operationId: action.operationId },
@@ -1395,15 +1409,13 @@ export class SelectModifierPhase extends BattlePhase {
               localRole: "guest",
               wave: globalScene.currentBattle?.waveIndex ?? -1,
               turn: globalScene.currentBattle?.turn ?? 0,
-            });
-            if (!decision.adopt || decision.operationId !== operationId || decision.authoritativeProjection !== true) {
-              return false;
-            }
-            this.applyRelayedRewardAction(action, decision);
-            return true;
-          };
-          const done = runtime == null ? applyRelayedResult() : withActiveCoopRuntimeScope(runtime, applyRelayedResult);
-          if (done) {
+            },
+            this.coopRewardOperationBinding,
+          );
+          if (!decision.adopt || decision.operationId !== operationId || decision.authoritativeProjection !== true) {
+            continue;
+          }
+          if (this.applyRelayedRewardAction(action, decision)) {
             return;
           }
         }
@@ -1833,10 +1845,7 @@ export class SelectModifierPhase extends BattlePhase {
     // it mid-interaction) move our await seq off the owner's send seq -> we'd stop receiving
     // the owner's picks and hang ("watcher stuck / cursor at the wrong spots").
     const seq = this.coopInteractionStart;
-    // Capture the OWNING runtime NOW (schedule time), so each post-`await` adopt/apply below runs under THIS
-    // client's op-state + durability, not the ambient active runtime the harness may have swapped after the
-    // await resumes (#922 - the reward-mirror desync + the swallowed fail-loud that broke previously-green tests).
-    const runtime = getCoopRuntime();
+    this.coopRewardOperationBinding ??= captureCoopRewardOperationBinding();
     for (;;) {
       const action = await relay.awaitInteractionChoice(seq, COOP_REWARD_WAIT_MS, COOP_REWARD_CHOICE_KINDS);
       if (action == null) {
@@ -1850,8 +1859,8 @@ export class SelectModifierPhase extends BattlePhase {
       // stale-/late-rejecting a pick from an earlier interaction or after this one left - the #861 shape).
       // When the flag is OFF this passes through verbatim (legacy). A reject IGNORES the action + keeps
       // awaiting the authoritative terminal, exactly like the existing #854 out-of-range guard.
-      const adoptAndApply = (): boolean => {
-        const decision = adoptRewardWatcherChoice({
+      const decision = adoptRewardWatcherChoice(
+        {
           surface: "reward",
           pinned: this.coopInteractionStart,
           action: { choice: action.choice, data: action.data, operationId: action.operationId },
@@ -1859,18 +1868,17 @@ export class SelectModifierPhase extends BattlePhase {
           localRole: controller.role,
           wave: globalScene.currentBattle?.waveIndex ?? -1,
           turn: globalScene.currentBattle?.turn ?? 0,
-        });
-        if (!decision.adopt) {
-          coopWarn(
-            "reward",
-            `WATCHER op-gate rejected relayed action (${decision.reason}) seq=${seq} choice=${action.choice} - keep awaiting terminal (Wave-2d)`,
-          );
-          return false;
-        }
-        return this.applyRelayedRewardAction(action, decision);
-      };
-      const done = runtime == null ? adoptAndApply() : withActiveCoopRuntimeScope(runtime, adoptAndApply);
-      if (done) {
+        },
+        this.coopRewardOperationBinding,
+      );
+      if (!decision.adopt) {
+        coopWarn(
+          "reward",
+          `WATCHER op-gate rejected relayed action (${decision.reason}) seq=${seq} choice=${action.choice} - keep awaiting terminal (Wave-2d)`,
+        );
+        continue;
+      }
+      if (this.applyRelayedRewardAction(action, decision)) {
         return;
       }
     }

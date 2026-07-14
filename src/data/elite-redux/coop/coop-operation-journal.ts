@@ -198,6 +198,11 @@ export function isCoopOperationJournalActive(): boolean {
   return activeDurability != null;
 }
 
+/** Explicit-runtime sibling for a callback that captured its owning durability manager. */
+export function isCoopOperationJournalActiveFor(manager: CoopDurabilityManager | null): boolean {
+  return manager != null;
+}
+
 /**
  * Publish final operation-continuation evidence from the same public-UI chokepoint as battle authority.
  * Material application alone never reaches this function and therefore cannot retire host retention.
@@ -217,7 +222,18 @@ export function notifyCoopOperationContinuationSurface(
  * conflicting same-revision payload. Never throws. Terminal callers must remain closed on false.
  */
 export function tryJournalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelopeV1): boolean {
-  const manager = activeDurability;
+  return tryJournalCoopCommittedEnvelopeFor(activeDurability, envelope);
+}
+
+/**
+ * Retain through the supplied runtime's manager instead of the ambient process selector. Async Phaser/UI
+ * callbacks in the two-engine harness can resume after another client was installed; binding publication
+ * explicitly prevents a host result from being committed into its peer's journal.
+ */
+export function tryJournalCoopCommittedEnvelopeFor(
+  manager: CoopDurabilityManager | null,
+  envelope: CoopAuthoritativeEnvelopeV1,
+): boolean {
   if (manager == null) {
     return true;
   }
