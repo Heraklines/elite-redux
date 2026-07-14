@@ -11,6 +11,7 @@ import {
   broadcastCoopWaveEndState,
   consumeCoopPendingWaveEndState,
   failCoopSharedSession,
+  getCoopWaveAdvanceRuntimeBinding,
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopAuthorityContinuationSurface } from "#data/elite-redux/coop/coop-ui-registry";
@@ -100,7 +101,12 @@ export class BattleEndPhase extends BattlePhase {
     // but correctness no longer depends on a retry timer happening to fire while this short phase is live.
     if (isCoopAuthoritativeGuest()) {
       const wave = globalScene.currentBattle?.waveIndex ?? -1;
-      const dataOutcome = tryApplyCoopWaveAdvanceDataAtBoundary(wave);
+      const binding = getCoopWaveAdvanceRuntimeBinding();
+      if (binding == null) {
+        failCoopSharedSession(`The retained wave ${wave} BattleEnd had no owning runtime.`);
+        return;
+      }
+      const dataOutcome = tryApplyCoopWaveAdvanceDataAtBoundary(wave, binding);
       if (dataOutcome === "rejected") {
         failCoopSharedSession(`Could not apply the complete retained state at wave ${wave} BattleEnd.`);
         return;

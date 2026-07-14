@@ -18,9 +18,10 @@
 // multi-turn wave whose advance had already signaled. Protocol 32 has no gameplay fallback on a missing
 // commit; that condition terminates visibly instead of manufacturing a local turn.
 //
-// The pending advance is set through the REAL wired receive path: startLocalCoopSession exposes the
-// spoof partner's transport endpoint, so sending a genuine host->guest `waveResolved` over it fires the
-// runtime's own onWaveResolved handler (the production code that sets the module's pendingWaveAdvance).
+// The pending advance is set through the REAL wired receive path: a runtime assembled on the guest
+// transport endpoint receives a genuine host->guest `waveResolved`, firing the production handler that
+// sets the module's pendingWaveAdvance. The runtime's operation state therefore owns the guest role from
+// assembly onward; the test never mutates a host runtime into a synthetic guest after its bindings exist.
 // No test-only production surface is added. The scene is a minimal stub injected via the REAL
 // initGlobalScene, so no Phaser / GameManager boot is needed.
 
@@ -28,13 +29,19 @@ import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  assembleCoopRuntime,
   type CoopRuntime,
   clearCoopRuntime,
   coopHasPendingWaveAdvance,
   getCoopController,
-  startLocalCoopSession,
+  setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopAuthoritativeBattleStateV1, CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
+import {
+  type CoopAuthoritativeBattleStateV1,
+  type CoopBattleCheckpoint,
+  type CoopTransport,
+  createLoopbackPair,
+} from "#data/elite-redux/coop/coop-transport";
 import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -94,24 +101,19 @@ function makeStubScene(): BattleScene {
 }
 
 /**
- * Start a REAL authoritative local session, flip the local controller to GUEST (so the production
- * isCoopAuthoritativeGuest() and the onWaveResolved guest-gate read true), and deliver a genuine
- * host->guest `waveResolved("win")` over the spoof partner's transport so the runtime's wired handler
+ * Start a REAL authoritative runtime on the pair's guest endpoint and deliver a genuine
+ * host->guest `waveResolved("win")` over its peer transport so the runtime's wired handler
  * sets the module's pendingWaveAdvance for THIS wave. Returns once the loopback has drained.
  */
 async function startGuestWithPendingWin(): Promise<CoopRuntime> {
-  const runtime = startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
+  const { runtime, peer } = startGuestRuntime();
   const controller = getCoopController();
   if (controller == null) {
-    throw new Error("expected a live co-op controller after startLocalCoopSession");
+    throw new Error("expected a live guest co-op controller");
   }
-  controller.role = "guest";
-  if (runtime.partnerTransport == null) {
-    throw new Error("expected a spoof partner transport in a local session");
-  }
-  // The spoof (host end) sends both the compatibility cue and the authoritative committed envelope.
+  // The host endpoint sends both the compatibility cue and the authoritative committed envelope.
   // Under durability the raw cue alone must not advance; the envelope is the one mutation authority.
-  runtime.partnerTransport.send({ t: "waveResolved", wave: WAVE, outcome: "win" });
+  peer.send({ t: "waveResolved", wave: WAVE, outcome: "win" });
   const epoch = controller.sessionEpoch;
   const authoritativeState: CoopAuthoritativeBattleStateV1 = {
     version: 1,
@@ -131,7 +133,7 @@ async function startGuestWithPendingWin(): Promise<CoopRuntime> {
     playerModifiers: [],
     enemyModifiers: [],
   };
-  runtime.partnerTransport.send({
+  peer.send({
     t: "envelope",
     envelope: {
       version: 1,
@@ -162,6 +164,19 @@ async function startGuestWithPendingWin(): Promise<CoopRuntime> {
   });
   await flush();
   return runtime;
+}
+
+let guestPeer: CoopTransport | null = null;
+
+/** Assemble with a genuinely guest-owned runtime state; mutating a host controller after assembly is invalid. */
+function startGuestRuntime(): { runtime: CoopRuntime; peer: CoopTransport } {
+  clearCoopRuntime();
+  const { host, guest } = createLoopbackPair();
+  const runtime = assembleCoopRuntime(guest, { username: "Guest", netcodeMode: "authoritative" });
+  setCoopRuntime(runtime);
+  runtime.controller.connect();
+  guestPeer = host;
+  return { runtime, peer: host };
 }
 
 /** Invoke a phase's private method by name without `as any` (cast through `unknown` to a callable). */
@@ -197,6 +212,8 @@ describe("#698 - single-turn-win finalize must not start a phantom next turn", (
 
   afterEach(() => {
     clearCoopRuntime();
+    guestPeer?.close();
+    guestPeer = null;
     // Citizenship (#710): this engine-free file replaces globalScene with a reset-less stub. Restore
     // the prior scene so the NEXT ER_SCENARIO file's `new GameManager` reuses a real scene instead of
     // crashing on `stub.reset is not a function`. Order-robust: each stub file restores before the
@@ -230,11 +247,7 @@ describe("#698 - single-turn-win finalize must not start a phantom next turn", (
 
   it("CoopFinalizeTurnPhase.finishTurn(): with NO pending advance the guest still advances the turn minimally (BUG1 path intact)", async () => {
     // Authoritative guest session but NO waveResolved delivered -> no pending advance.
-    startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
-    const controller = getCoopController();
-    if (controller != null) {
-      controller.role = "guest";
-    }
+    startGuestRuntime();
     expect(coopHasPendingWaveAdvance()).toBe(false);
 
     const phase = makeFinalizePhase(1);

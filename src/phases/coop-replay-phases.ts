@@ -76,6 +76,7 @@ import {
   getCoopController,
   getCoopInteractionRelay,
   getCoopRuntime,
+  getCoopWaveAdvanceRuntimeBinding,
   isCoopAuthoritativeGuest,
   isShowdownGuestFlip,
   isVersusSession,
@@ -1686,12 +1687,20 @@ export class CoopFinalizeTurnPhase extends Phase {
     const reconstructed = resolveCoopPendingWaveTransition(pending, () =>
       buildCoopWaveAdvancePayload(pending.outcome, pending.wave),
     );
-    const decision = adoptWaveAdvanceWatcherChoice({
-      payload: reconstructed,
-      localRole: getCoopController()?.role ?? "guest",
-      wave: globalScene.currentBattle.waveIndex,
-      turn: globalScene.currentBattle.turn,
-    });
+    const waveBinding = getCoopWaveAdvanceRuntimeBinding();
+    if (isCoopWaveAdvanceOperationEnabled() && waveBinding == null) {
+      failCoopSharedSession(`The retained wave ${pending.wave} continuation had no owning runtime.`);
+      return;
+    }
+    const decision = adoptWaveAdvanceWatcherChoice(
+      {
+        payload: reconstructed,
+        localRole: getCoopController()?.role ?? "guest",
+        wave: globalScene.currentBattle.waveIndex,
+        turn: globalScene.currentBattle.turn,
+      },
+      waveBinding,
+    );
     if (isCoopWaveAdvanceOperationEnabled() && !decision.adopt && !decision.stale) {
       // FAIL LOUD (§2.5 item 4): a flag-ON guest with an unadoptable op (fail-closed unknown kind / applier
       // gap) must NOT silently derive the tail. The #859 phantom-dissolve + resync backstops recover.
