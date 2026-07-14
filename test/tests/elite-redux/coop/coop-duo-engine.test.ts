@@ -50,14 +50,15 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
   let phaserGame: Phaser.Game;
   let game: GameManager;
   let logs: ReturnType<typeof installDuoLogCapture>;
+  let restoreProjection: (() => void) | undefined;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
   });
 
   beforeEach(() => {
-    installHeadlessCoopSemanticProjectionOracle();
     game = new GameManager(phaserGame);
+    restoreProjection = installHeadlessCoopSemanticProjectionOracle(game.scene);
     logs = installDuoLogCapture(`spike-${Date.now()}`);
     game.override
       .battleStyle("double")
@@ -70,6 +71,8 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
   });
 
   afterEach(() => {
+    restoreProjection?.();
+    restoreProjection = undefined;
     logs.dispose();
     clearCoopRuntime();
     // #710 harness-citizenship: buildGuestScene() constructs a 2nd BattleScene (the guest), whose

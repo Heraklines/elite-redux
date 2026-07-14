@@ -96,14 +96,15 @@ function completeTurnCarrier(turn: number) {
 describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 Phase B)", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
+  let restoreProjection: (() => void) | undefined;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
   });
 
   beforeEach(() => {
-    installHeadlessCoopSemanticProjectionOracle();
     game = new GameManager(phaserGame);
+    restoreProjection = installHeadlessCoopSemanticProjectionOracle(game.scene);
     game.override
       .battleStyle("double")
       .enemySpecies(SpeciesId.MAGIKARP)
@@ -112,6 +113,8 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   });
 
   afterEach(() => {
+    restoreProjection?.();
+    restoreProjection = undefined;
     setCoopWaveTailSanction(null);
     clearCoopRuntime();
   });
