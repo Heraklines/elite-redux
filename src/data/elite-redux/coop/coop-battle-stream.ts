@@ -20,6 +20,7 @@
 // testable headlessly over a LoopbackTransport - the same protocol then runs
 // unchanged over the real WebRTC transport. The engine-coupled serialize/apply of
 // a checkpoint lives in `coop-battle-checkpoint.ts`; this file is just the wire.
+// CI base probe: this comment-only delta preserves ddbaa0284 runtime semantics.
 // =============================================================================
 
 import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
