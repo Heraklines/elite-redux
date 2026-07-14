@@ -1994,7 +1994,15 @@ export class CoopBattleStreamer {
       return false;
     }
     if (expectation.kind === "command") {
-      return surface === "command" && current.wave === expectation.wave && current.turn === expectation.turn;
+      // Turn finalization can finish before the host's wave-end carrier reaches the guest. In that race the
+      // best prediction is "next command", but the battle can subsequently open the reward UI at that exact
+      // next address. Both are real, renderer-active public continuation surfaces; the full address—not the
+      // early prediction—must decide whether authority retention can be released.
+      return (
+        (surface === "command" || surface === "sharedInput")
+        && current.wave === expectation.wave
+        && current.turn === expectation.turn
+      );
     }
     if (surface === "terminal") {
       return current.wave === expectation.wave && current.turn >= expectation.turn;
