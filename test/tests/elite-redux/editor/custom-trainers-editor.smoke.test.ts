@@ -793,6 +793,56 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     expect(ct.ctrSelected).toBe(key);
   });
 
+  it("list card shows the trainer sprite + one team-member icon per member (no 'Nmon' count)", () => {
+    const key = newTrainer("Team Card");
+    // 3-member team: Pikachu, Snorlax, Gengar.
+    setSpecies(0, "SPECIES_PIKACHU");
+    ct.onCustomTrainerClick({ target: q("#ctr-add-member")! });
+    setSpecies(1, "SPECIES_SNORLAX");
+    ct.onCustomTrainerClick({ target: q("#ctr-add-member")! });
+    setSpecies(2, "SPECIES_GENGAR");
+    ct.render();
+
+    const card = q(`[data-ctropen="${key}"]`)!;
+    expect(card).not.toBeNull();
+    // Header still carries the name + #id.
+    expect(card.querySelector(".ctr-card-head")!.textContent).toContain("Team Card");
+    expect(card.querySelector(".ctr-card-head")!.textContent).toContain(`#${ct.ctr.current[key].id}`);
+    // The old "Nmon" member COUNT is gone.
+    expect(card.textContent).not.toMatch(/\dmon\b/);
+
+    // One member ICON per team member, each an <img> (species resolved -> a sprite).
+    const icons = card.querySelectorAll(".ctr-card-mon");
+    expect(icons.length).toBe(3);
+    expect(card.querySelectorAll(".ctr-card-mon img").length).toBe(3);
+    // The trainer's own sprite node is present (ACE_TRAINER ships gendered sprites,
+    // so it carries the atlas file to paint lazily).
+    const sprite = card.querySelector(".ctr-card-sprite") as HTMLElement;
+    expect(sprite).not.toBeNull();
+    expect(sprite.dataset.ctrsprite).toBe("ace_trainer_m");
+
+    // A WEIGHTED lead shows the FIRST possibility's icon (title carries its species).
+    const cb = q('.ctr-weighted[data-idx="0"]') as HTMLInputElement;
+    cb.checked = true;
+    ct.onCustomTrainerChange(cb);
+    ct.onCustomTrainerClick({ target: q('.ctr-var-add[data-idx="0"]')! });
+    setSpecies(0, "SPECIES_RAICHU"); // 2nd possibility
+    ct.render();
+    const firstIcon = q(`[data-ctropen="${key}"] .ctr-card-mon`) as HTMLElement;
+    expect(firstIcon.title).toBe("SPECIES_PIKACHU"); // possibility 0, not the edited cur
+  });
+
+  it("empty-species slot renders a neutral icon box with NO img (never a broken image)", () => {
+    const key = newTrainer("Blank Slot");
+    // Leave the lead's species empty (blank trainer default).
+    ct.render();
+    const card = q(`[data-ctropen="${key}"]`)!;
+    const icons = card.querySelectorAll(".ctr-card-mon");
+    expect(icons.length).toBe(1);
+    // No <img> for an unresolvable species: the box stands in as the placeholder.
+    expect(card.querySelectorAll(".ctr-card-mon img").length).toBe(0);
+  });
+
   it("prior-surface smoke still holds: member collapse/expand + the battle-music picker render", () => {
     newTrainer();
     const key = ct.ctrSelected!;

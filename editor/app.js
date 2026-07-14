@@ -129,6 +129,9 @@ let TRAINER_FX = [];
 const trainerFxById = new Map(); // aura id → {id, label, accent}
 // Cache of fetched TexturePacker atlas jsons (CDN url → parsed json | null on fail).
 const trainerAtlasCache = new Map();
+// In-flight atlas fetches (CDN url → Promise), so N cards/cells sharing a class
+// fire ONE fetch, not N concurrent ones (caps concurrency on the trainer list).
+const trainerAtlasInflight = new Map();
 // Edit state keyed by species CONST (joined to data via SPECIES[i].id), so the
 // committed override JSON is human-readable and consistent with the other tabs.
 const learn = { current: {}, baseline: {} }; // const → [[level, moveId], ...]
@@ -2488,8 +2491,29 @@ function firstAtlasFrame(atlas) {
   return { crop: fr.frame, sheet: tx.size };
 }
 
-/** Crop one trainer sprite's first frame into `el` via CSS background (scaled 2x). */
-function renderTrainerFrame(file, el) {
+/** Fetch (and cache) a trainer atlas json, sharing ONE in-flight request per url. */
+function fetchTrainerAtlas(url) {
+  if (trainerAtlasCache.has(url)) {
+    return Promise.resolve(trainerAtlasCache.get(url));
+  }
+  if (trainerAtlasInflight.has(url)) {
+    return trainerAtlasInflight.get(url);
+  }
+  const p = fetch(url)
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null)
+    .then(atlas => {
+      trainerAtlasCache.set(url, atlas);
+      trainerAtlasInflight.delete(url);
+      return atlas;
+    });
+  trainerAtlasInflight.set(url, p);
+  return p;
+}
+
+/** Crop one trainer sprite's first frame into `el` via CSS background. Scaled 2x by
+ *  default; pass `{ targetH }` to fit a specific pixel height (e.g. the list card). */
+function renderTrainerFrame(file, el, opts) {
   const url = `${TRAINER_SPRITE_BASE}/${file}.json`;
   const paint = atlas => {
     if (!el.isConnected) {
@@ -2501,8 +2525,8 @@ function renderTrainerFrame(file, el) {
       el.title = "sprite atlas unavailable";
       return;
     }
-    const scale = 2;
     const { crop, sheet } = info;
+    const scale = opts && opts.targetH ? opts.targetH / crop.h : 2;
     el.style.width = `${crop.w * scale}px`;
     el.style.height = `${crop.h * scale}px`;
     el.style.backgroundImage = `url("${TRAINER_SPRITE_BASE}/${file}.png")`;
@@ -2515,13 +2539,7 @@ function renderTrainerFrame(file, el) {
     paint(trainerAtlasCache.get(url));
     return;
   }
-  fetch(url)
-    .then(r => (r.ok ? r.json() : null))
-    .catch(() => null)
-    .then(atlas => {
-      trainerAtlasCache.set(url, atlas);
-      paint(atlas);
-    });
+  fetchTrainerAtlas(url).then(paint);
 }
 
 /** True when the CURRENT trainer's class ships both `_m`/`_f` sprites (hasGenders). */
@@ -2724,6 +2742,26 @@ function ctrPreviewPanelHtml(t) {
   </aside>`;
 }
 
+/** The trainer-sprite atlas file for a list card (selected gender variant), or ""
+ *  when the class ships no sprite (unknown class -> neutral placeholder box). */
+function ctrCardSpriteFile(t) {
+  const entry = trainerClassByName.get((t.trainerClass || "").trim().toUpperCase());
+  if (!entry) {
+    return "";
+  }
+  return entry.genders ? `${entry.sprite}_${t.gender === "f" ? "f" : "m"}` : entry.sprite;
+}
+
+/** One small team-member icon for a list card: the downscaled front sprite (same
+ *  slug resolution the fusion preview uses). Weighted slot -> the FIRST possibility.
+ *  Empty/unresolvable species -> an empty neutral box (never a broken image). */
+function ctrCardMonIcon(m) {
+  const sp = (Array.isArray(m.variants) && m.variants[0] && m.variants[0].species) || m.species || "";
+  const url = ctrSpeciesSpriteUrl(sp);
+  const img = url ? `<img src="${esc(url)}" alt="" loading="lazy" onerror="this.style.display='none'" />` : "";
+  return `<span class="ctr-card-mon" title="${esc(sp || "empty slot")}">${img}</span>`;
+}
+
 function renderCustomTrainers(root) {
   const keys = Object.keys(ctr.current)
     .filter(k => ctr.current[k])
@@ -2732,8 +2770,14 @@ function renderCustomTrainers(root) {
     .map(k => {
       const t = ctr.current[k];
       const dirty = !jsonEq(ctr.current[k], ctr.baseline[k]);
+      const spriteFile = ctrCardSpriteFile(t);
+      const monIcons = (Array.isArray(t.team) ? t.team : []).map(ctrCardMonIcon).join("");
       return `<button type="button" class="ctr-open${k === ctrSelected ? " on" : ""}${dirty ? " dirty" : ""}" data-ctropen="${esc(k)}">
-        ${esc(t.name || k)} <small style="color:var(--muted)">#${t.id} · ${t.team.length}mon</small>
+        <span class="ctr-card-head">${esc(t.name || k)} <small>#${t.id}</small></span>
+        <span class="ctr-card-body">
+          <span class="ctr-card-sprite"${spriteFile ? ` data-ctrsprite="${esc(spriteFile)}"` : ""}></span>
+          <span class="ctr-card-team">${monIcons}</span>
+        </span>
       </button>`;
     })
     .join("");
@@ -2830,6 +2874,11 @@ function renderCustomTrainers(root) {
     </div>`;
   // The sprite preview reads the live CDN atlas, so paint it after the DOM exists.
   updateCtrSpritePreview();
+  // Paint each list card's trainer sprite (lazy CDN atlas crop, ~44px tall). The
+  // per-url in-flight cache means many cards sharing a class fire ONE fetch.
+  for (const el of root.querySelectorAll("[data-ctrsprite]")) {
+    renderTrainerFrame(el.dataset.ctrsprite, el, { targetH: 44 });
+  }
 }
 
 // ---- Custom Trainers: input + click handling -------------------------------
