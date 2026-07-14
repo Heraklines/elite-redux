@@ -15,8 +15,8 @@ import {
 import {
   applyCoopOperationEnvelope,
   isCoopOperationJournalActive,
-  journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
+  tryJournalCoopCommittedEnvelope,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   CoopOperationGuest,
@@ -162,15 +162,20 @@ function intentFor(pinned: number, outcome: CoopInteractionOutcome): CoopPending
   };
 }
 
-function commit(pinned: number, outcome: CoopInteractionOutcome, wave: number, turn: number): void {
+function commit(pinned: number, outcome: CoopInteractionOutcome, wave: number, turn: number): boolean {
   const intent = intentFor(pinned, outcome);
   const result = host().submit(intent, controlContext(wave, turn), proposed =>
     proposed.owner === coopInteractionOwnerSeat(pinned) ? { ok: true } : { ok: false, reason: "wrong-owner" },
   );
-  if (result.kind === "committed") {
-    journalCoopCommittedEnvelope(result.envelope);
+  if (result.kind === "committed" || result.kind === "reack") {
+    if (!tryJournalCoopCommittedEnvelope(result.envelope)) {
+      coopWarn("reward", `bargain op could not retain rev=${result.envelope.revision} id=${intent.id}`);
+      return false;
+    }
     coopLog("reward", `bargain op commit rev=${result.envelope.revision} id=${intent.id}`);
+    return true;
   }
+  return false;
 }
 
 /** Owner-side commit. Guest-owned outcomes are committed when the host watcher receives the proposal. */
@@ -180,14 +185,23 @@ export function commitBargainOwnerOutcome(params: {
   localRole: CoopRole;
   wave: number;
   turn?: number;
-}): void {
-  if (!isCoopBargainOperationEnabled() || params.pinned < 0 || params.localRole !== "host") {
-    return;
+}): boolean {
+  if (!isCoopBargainOperationEnabled()) {
+    return true;
+  }
+  if (params.pinned < 0) {
+    return false;
+  }
+  // A guest-owned bargain uses the raw typed outcome only as its proposal carrier; the host watcher is the
+  // sole authority that commits it when that carrier arrives.
+  if (params.localRole !== "host") {
+    return true;
   }
   try {
-    commit(params.pinned, params.outcome, params.wave, params.turn ?? 0);
+    return commit(params.pinned, params.outcome, params.wave, params.turn ?? 0);
   } catch (error) {
-    coopWarn("reward", "bargain owner op commit threw; legacy outcome remains active", error);
+    coopWarn("reward", "bargain owner op commit threw; refusing the unretained terminal", error);
+    return false;
   }
 }
 
@@ -209,8 +223,7 @@ export function adoptBargainWatcherOutcome(params: {
     const id = bargainOperationId(params.pinned);
     if (params.localRole === "host") {
       // Guest owner -> host authority: the legacy outcome is the typed proposal carrier.
-      commit(params.pinned, params.outcome, params.wave, params.turn ?? 0);
-      return true;
+      return commit(params.pinned, params.outcome, params.wave, params.turn ?? 0);
     }
     const s = state();
     const g = guest();

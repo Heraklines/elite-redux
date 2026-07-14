@@ -30,6 +30,9 @@ import {
   type CoopIntentValidator,
   CoopOperationGuest,
   CoopOperationHost,
+  createCoopRuntimeOpState,
+  resetCoopGlobalOperationOrder,
+  setActiveCoopRuntimeOpState,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it, vi } from "vitest";
@@ -422,6 +425,42 @@ describe("CoopOperationGuest: idempotent applier (§1.6, §1.7)", () => {
 
 // =============================================================================
 describe("host + guest end-to-end: revision totally orders the run (§1.5, §1.6)", () => {
+  it("keeps legacy and per-runtime surfaces on one dense role-owned revision clock", () => {
+    const hostState = createCoopRuntimeOpState("host");
+    const guestState = createCoopRuntimeOpState("guest");
+    resetCoopGlobalOperationOrder();
+    try {
+      setActiveCoopRuntimeOpState(hostState);
+      const legacyHost = CoopOperationHost.global({ epoch: 1 });
+      const runtimeHost = CoopOperationHost.forRuntime(hostState, { epoch: 1 });
+      const wave = legacyHost.submit(
+        makeIntent(1, 0, 1, "WAVE_ADVANCE", { wave: 1 }),
+        makeCtx("WAVE_VICTORY", 1, 1),
+        ACCEPT,
+      );
+      const reward = runtimeHost.submit(
+        makeIntent(1, 0, 2, "REWARD", { slot: 0 }),
+        makeCtx("REWARD_SELECT", 1, 1),
+        ACCEPT,
+      );
+      if (wave.kind !== "committed" || reward.kind !== "committed") {
+        throw new Error("fixture");
+      }
+      expect([wave.envelope.revision, reward.envelope.revision]).toEqual([1, 2]);
+
+      setActiveCoopRuntimeOpState(guestState);
+      const legacyGuest = CoopOperationGuest.global({ epoch: 1 });
+      const runtimeGuest = CoopOperationGuest.forRuntime(guestState, { epoch: 1 });
+      expect(legacyGuest.applyEnvelope(wave.envelope).kind).toBe("applied");
+      expect(runtimeGuest.applyEnvelope(reward.envelope).kind).toBe("applied");
+      expect(legacyGuest.getLastAppliedRevision()).toBe(2);
+      expect(runtimeGuest.getLastAppliedRevision()).toBe(2);
+    } finally {
+      setActiveCoopRuntimeOpState(null);
+      resetCoopGlobalOperationOrder();
+    }
+  });
+
   it("never invokes a live sink before untouched epoch and global revision validation", () => {
     const host = new CoopOperationHost({ epoch: 2 });
     const guest = new CoopOperationGuest({ epoch: 2 });

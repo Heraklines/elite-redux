@@ -43,7 +43,7 @@ import {
   isKnownCoopOperationKind,
   parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
-import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
+import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 // -----------------------------------------------------------------------------
 // HOST commit log (§1.3-§1.5).
@@ -141,16 +141,29 @@ function globalClock(
   epoch: CoopSessionEpoch,
   initialRevision: CoopRevision,
 ): CoopOperationRevisionClock {
+  const ownedRuntime = activeOpState?.localRole === side ? activeOpState : null;
+  const ownedClock = ownedRuntime == null ? null : side === "host" ? ownedRuntime.hostClock : ownedRuntime.guestClock;
   let clock = side === "host" ? globalHostClock : globalGuestClock;
-  if (clock == null || clock.epoch !== epoch) {
-    clock = { epoch, revision: initialRevision };
-    if (side === "host") {
-      globalHostClock = clock;
-    } else {
-      globalGuestClock = clock;
+  if (ownedClock != null && ownedClock.epoch === epoch) {
+    clock = ownedClock;
+    if (initialRevision > clock.revision) {
+      clock.revision = initialRevision;
     }
+  } else if (clock == null || clock.epoch !== epoch) {
+    clock = { epoch, revision: initialRevision };
   } else if (initialRevision > clock.revision) {
     clock.revision = initialRevision;
+  }
+  if (side === "host") {
+    globalHostClock = clock;
+    if (ownedRuntime != null) {
+      ownedRuntime.hostClock = clock;
+    }
+  } else {
+    globalGuestClock = clock;
+    if (ownedRuntime != null) {
+      ownedRuntime.guestClock = clock;
+    }
   }
   return clock;
 }
@@ -208,6 +221,12 @@ export function resetCoopGlobalOperationOrder(): void {
 
 /** One runtime's authoritative-operation state: the shared clocks + every surface's per-client record. */
 export interface CoopRuntimeOpState {
+  /**
+   * Transport role owned by this runtime. Only the authority's host clock and the renderer's guest clock
+   * bridge to the legacy module-global clock while the remaining operation surfaces are migrated. `null`
+   * keeps engine-free/multi-session tests deliberately isolated.
+   */
+  readonly localRole: CoopRole | null;
   /** Shared host commit clock for THIS runtime (re-keyed on an epoch change, mirroring the old global clock). */
   hostClock: CoopOperationRevisionClock | null;
   /** Shared guest receive clock for THIS runtime. */
@@ -229,12 +248,12 @@ export function registerCoopOpSurfaceState(surface: string, factory: () => unkno
 }
 
 /** Build a fresh op-state container for a runtime under construction (clocks lazily keyed on first use). */
-export function createCoopRuntimeOpState(): CoopRuntimeOpState {
+export function createCoopRuntimeOpState(localRole: CoopRole | null = null): CoopRuntimeOpState {
   const surfaces = new Map<string, unknown>();
   for (const [surface, factory] of opSurfaceFactories) {
     surfaces.set(surface, factory());
   }
-  return { hostClock: null, guestClock: null, surfaces };
+  return { localRole, hostClock: null, guestClock: null, surfaces };
 }
 
 /** The op-state of the currently-installed runtime, set by setCoopRuntime; null when no run is active. */
@@ -322,6 +341,38 @@ function runtimeClock(
   initialRevision: CoopRevision,
 ): CoopOperationRevisionClock {
   let clock = side === "host" ? state.hostClock : state.guestClock;
+  const legacyClock = side === "host" ? globalHostClock : globalGuestClock;
+
+  // Migration bridge: `op:global` has one dense order, but not every surface is per-runtime yet. The sole
+  // authority runtime therefore shares its host cell with legacy CoopOperationHost.global callers, and the
+  // sole renderer runtime shares its guest cell with legacy CoopOperationGuest.global callers. Role-less
+  // test runtimes remain independent, preserving the two-runtime isolation contract.
+  if (state.localRole === side) {
+    if (clock != null && clock.epoch === epoch) {
+      if (legacyClock != null && legacyClock.epoch === epoch && legacyClock.revision > clock.revision) {
+        clock.revision = legacyClock.revision;
+      }
+      if (initialRevision > clock.revision) {
+        clock.revision = initialRevision;
+      }
+    } else if (legacyClock != null && legacyClock.epoch === epoch) {
+      clock = legacyClock;
+      if (initialRevision > clock.revision) {
+        clock.revision = initialRevision;
+      }
+    } else {
+      clock = { epoch, revision: initialRevision };
+    }
+    if (side === "host") {
+      state.hostClock = clock;
+      globalHostClock = clock;
+    } else {
+      state.guestClock = clock;
+      globalGuestClock = clock;
+    }
+    return clock;
+  }
+
   if (clock == null || clock.epoch !== epoch) {
     clock = { epoch, revision: initialRevision };
     if (side === "host") {
@@ -440,6 +491,16 @@ export class CoopOperationHost {
 
   public getRevision(): CoopRevision {
     return this.revisionClock.revision;
+  }
+
+  /** Adopt a proven dense journal frontier before the next commit; never regresses the shared clock. */
+  public adoptRevisionFloor(revision: CoopRevision): void {
+    if (!Number.isSafeInteger(revision) || revision < 0) {
+      throw new Error("CoopOperationHost revision floor must be a non-negative safe integer");
+    }
+    if (revision > this.revisionClock.revision) {
+      this.revisionClock.revision = revision;
+    }
   }
 
   public getPendingOperation(): CoopPendingOperation | null {
@@ -704,6 +765,16 @@ export class CoopOperationGuest {
 
   public getLastAppliedRevision(): CoopRevision {
     return this.revisionClock.revision;
+  }
+
+  /** Adopt a proven prior applied frontier before classifying the next dense operation. */
+  public adoptRevisionFloor(revision: CoopRevision): void {
+    if (!Number.isSafeInteger(revision) || revision < 0) {
+      throw new Error("CoopOperationGuest revision floor must be a non-negative safe integer");
+    }
+    if (revision > this.revisionClock.revision) {
+      this.revisionClock.revision = revision;
+    }
   }
 
   public hasApplied(id: CoopOperationId): boolean {
