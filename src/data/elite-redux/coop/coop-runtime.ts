@@ -4398,15 +4398,14 @@ export function assembleCoopRuntime(
   // pulls a snapshot without re-assembling), so this never wipes a live pending op.
   resetCoopBiomeOperationState();
   resetCoopAbilityOperationState();
-  // bargain + stormglass are per-runtime (layer-B): their fresh records come from createCoopRuntimeOpState
-  // below, so the old reset-at-assembly call sites are removed (a fresh runtime's records ARE the reset).
+  // bargain + stormglass + reward are per-runtime (layer-B): their fresh records come from
+  // createCoopRuntimeOpState below, so the old reset-at-assembly call sites are removed (a fresh runtime's
+  // records ARE the reset; calling reset here would touch the PREVIOUS runtime's record, not this one's).
   resetCoopCatchFullOperationState();
   resetCoopColosseumOperationState();
   resetCoopFaintSwitchOperationState();
   resetCoopLearnMoveOperationState();
   resetCoopRevivalOperationState();
-  // Wave-2d: same fresh-control-plane reset for the reward-shop + biome-market operation state (SURFACE 3).
-  resetCoopRewardOperationState();
   // Wave-2c: the mystery-encounter operation surface shares the same fresh-control-plane discipline (§8
   // step 5) - drop any leftover ME op state so a new run's re-init-from-0 interaction counter can never
   // collide with a prior run's already-applied ME operationIds.
