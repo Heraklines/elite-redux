@@ -128,10 +128,12 @@ import {
   mirrorHostMeToGuest,
   pumpDuoDestinations,
   relayGuestMeOptionIndexOnly,
+  relayGuestMeShopLeaveSync,
   remirrorWave,
   type ShopPhaseSeam,
   startGuestMeOutcomeRace,
   startGuestMeReplay,
+  startGuestMeShopOwner,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -2511,16 +2513,32 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           setDestinationDelivery(false);
         }
       }
-      await withClient(rig.hostCtx, async () => {
-        await game.phaseInterceptor.to(noRewardShop ? "PostMysteryEncounterPhase" : "SelectModifierPhase", false);
-        if (!noRewardShop) {
-          const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-          if (hostShop.phaseName === "SelectModifierPhase") {
-            await driveHostRewardShopOwner(hostShop, { takeReward: false });
+      if (noRewardShop) {
+        await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
+      } else {
+        // The host is the sole option engine but the odd-counter GUEST owns the embedded reward PICK. Start
+        // the host's real shop as watcher, let the guest adopt those exact options and relay its terminal,
+        // then resume the host watcher under the host context. Calling the owner helper on `hostShop` used to
+        // advance only the host (21 -> 22) and strand it in CoopPartnerSync while the guest stayed at 21.
+        let hostShop!: ShopPhaseSeam;
+        await withClient(rig.hostCtx, async () => {
+          await game.phaseInterceptor.to("SelectModifierPhase", false);
+          hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+          hostShop.start();
+          await drainLoopback();
+        });
+        const guestShop = await withClient(rig.guestCtx, () => startGuestMeShopOwner(rig.guestScene));
+        withClientSync(rig.guestCtx, () => relayGuestMeShopLeaveSync(guestShop));
+        await withClient(rig.hostCtx, async () => {
+          for (let i = 0; i < 16; i++) {
+            await drainLoopback();
+            if (rig.hostScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase") {
+              break;
+            }
           }
-        }
-        await game.phaseInterceptor.to("PostMysteryEncounterPhase");
-      });
+          await game.phaseInterceptor.to("PostMysteryEncounterPhase");
+        });
+      }
       await withClient(rig.guestCtx, async () => {
         // Nested MEs armed this race before alternating the real public party/secondary captures. A flat
         // guest-owned ME keeps the original split: arm only after the host buffered its full outcome/terminal.
