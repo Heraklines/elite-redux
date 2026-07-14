@@ -23,7 +23,6 @@ import { initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createScheduledCoopPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { BerryType } from "#enums/berry-type";
 import { GameModes } from "#enums/game-modes";
@@ -31,6 +30,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { BerryModifier } from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import {
   beginRewardShopWatch,
   buildDuo,
