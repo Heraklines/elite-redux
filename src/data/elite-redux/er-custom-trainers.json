@@ -135,7 +135,7 @@
             ],
             "sanityOff": true,
             "species": 74,
-            "weight": 3
+            "weight": 4
           },
           {
             "abilitySlot": 0,
@@ -149,6 +149,25 @@
             "sanityOff": true,
             "species": 2074,
             "weight": 1
+          },
+          {
+            "abilitySlot": 0,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "FLAME_ORB"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "SANDSTORM",
+              "CRUNCH",
+              "PROTECT",
+              "RLA"
+            ],
+            "sanityOff": true,
+            "species": 246,
+            "weight": 3
           }
         ]
       },
