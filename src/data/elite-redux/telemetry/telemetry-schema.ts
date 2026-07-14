@@ -18,6 +18,18 @@
 // Design bars mirrored from the replay recorder (`replay-trace.ts` / `replay-recorder.ts`): pure types,
 // small shallow objects, numbers/ids (not display strings) wherever a stable id exists, additive
 // versioning (bump {@link TELEMETRY_SCHEMA_VERSION} on an incompatible shape change).
+//
+// 🔴 FUTURE-PROOFING (audited): every collection here is a VARIABLE-LENGTH array with NO fixed-size
+// assumption anywhere in the schema, the snapshot code, or the tests - because the game breaks every
+// "obvious" cap:
+//   - `moves` can exceed 4 (a 5th-move-slot item), so it is never a 4-tuple.
+//   - `innates` can exceed the usual ER four-ability set (Black Shinies carry 5; future Prismatic Shinies
+//     add special ones), so it is an open array, not a fixed slot count.
+//   - `heldItems` is already multi and open-ended.
+//   - `statStages` is whatever the engine reports (7 today), captured with a spread, never index-hardcoded.
+// ADDITIVE-ONLY EVOLUTION POLICY: new fields are OPTIONAL, existing fields are NEVER repurposed, a breaking
+// reshape bumps {@link TELEMETRY_SCHEMA_VERSION}, and every consumer must tolerate unknown fields. See
+// `docs/plans/player-telemetry-schema-v1.md` section 9.
 // =============================================================================
 
 /** Bump on an incompatible wire-shape change. Stamped into every session envelope + the R2 object metadata. */
@@ -68,11 +80,15 @@ export interface TelemetryMonState {
   statStages: number[];
   /** Active {@link AbilityId}. */
   ability: number;
-  /** ER innate/passive ability set ({@link AbilityId} per slot; null = empty slot). */
+  /**
+   * ER innate/passive ability set ({@link AbilityId} per slot; null = empty slot). VARIABLE-LENGTH: the ER
+   * four-ability set is the common case, but Black Shinies carry 5 and future Prismatic Shinies add more -
+   * never assume a fixed slot count.
+   */
   innates: (number | null)[];
-  /** Held-item type ids on this mon ({@link ModifierType} id strings). */
+  /** Held-item type ids on this mon ({@link ModifierType} id strings). Open-ended (multi). */
   heldItems: string[];
-  /** The mon's moveset, featurized. */
+  /** The mon's moveset, featurized. VARIABLE-LENGTH: can exceed 4 (a 5th-move-slot item) - never a 4-tuple. */
   moves: TelemetryMoveState[];
   /** True when this mon is the active battler on its slot. */
   active: boolean;
