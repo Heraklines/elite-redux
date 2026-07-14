@@ -157,15 +157,6 @@
       /* ---- Custom Trainers ---- */
       .ctr-open.on { border-color: var(--accent); background: var(--panel2); font-weight: 600; }
       .ctr-open.dirty { border-color: var(--accent); }
-      /* Two-line list card: header (name + #id) over a content row (trainer sprite + team icons). */
-      .mon-list .ctr-open { display: flex; flex-direction: column; align-items: stretch; gap: 5px; }
-      .ctr-card-head { display: flex; align-items: baseline; gap: 6px; }
-      .ctr-card-head small { color: var(--muted); font-weight: 400; }
-      .ctr-card-body { display: flex; align-items: center; gap: 8px; min-height: 46px; }
-      .ctr-card-sprite { flex: none; display: inline-flex; align-items: flex-end; justify-content: center; min-width: 20px; min-height: 44px; image-rendering: pixelated; color: var(--muted); font-size: 11px; }
-      .ctr-card-team { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
-      .ctr-card-mon { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: #0d0d14; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; flex: none; }
-      .ctr-card-mon img { width: 26px; height: 26px; image-rendering: pixelated; object-fit: contain; }
       .ctr-form fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 8px 0; min-width: 0; }
       .ctr-form legend { color: var(--muted); font-size: 12px; padding: 0 6px; }
       .ctr-form label { font-size: 12px; margin-right: 10px; display: inline-block; }
@@ -188,8 +179,7 @@
       .ctr-member + .ctr-member { margin-top: 12px; }
       .ctr-mem-sum { cursor: pointer; user-select: none; }
       .ctr-mem-sum:hover { color: var(--accent); }
-      .ctr-mem-sum:hover .ctr-mem-caret { color: var(--accent); border-color: var(--accent); }
-      .ctr-mem-caret { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; font-size: 14px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; margin-right: 4px; vertical-align: middle; }
+      .ctr-mem-caret { display: inline-block; width: 14px; color: var(--muted); }
       .ctr-mem-sum small { color: var(--muted); font-weight: 400; margin-left: 6px; }
       .ctr-moves-head { margin-top: 8px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
       .ctr-moves-head select { max-width: 240px; }
