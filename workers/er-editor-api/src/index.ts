@@ -685,6 +685,24 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
       if (mm.sanityOff !== undefined && typeof mm.sanityOff !== "boolean") {
         return { ok: false, error: `${key}: sanityOff must be a boolean` };
       }
+      // Shiny Lab look: optional { palette?, surface?, around?, name? }. Effect ids
+      // are lowercase-alnum registry keys; name is a short prefix. The game drops
+      // any unknown id at load, so we only shape-check here.
+      if (mm.shiny !== undefined && mm.shiny !== null) {
+        if (!isPlainObject(mm.shiny)) {
+          return { ok: false, error: `${key}: shiny must be { palette?, surface?, around?, name? } or null` };
+        }
+        const sh = mm.shiny as Record<string, unknown>;
+        for (const cat of ["palette", "surface", "around"]) {
+          const v = sh[cat];
+          if (v !== undefined && !(typeof v === "string" && v.length <= 40 && /^[a-z0-9]+$/.test(v))) {
+            return { ok: false, error: `${key}: shiny.${cat} must be a shiny-effect id ([a-z0-9], up to 40 chars)` };
+          }
+        }
+        if (sh.name !== undefined && !(typeof sh.name === "string" && sh.name.length <= 24)) {
+          return { ok: false, error: `${key}: shiny.name must be a string up to 24 chars` };
+        }
+      }
       // Weighted-slot possibility weight: integer >= 1. Only valid inside a
       // `variants` slot; a bare flat member must not carry one.
       if (mm.weight !== undefined) {

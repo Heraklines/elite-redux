@@ -86,6 +86,14 @@ import { allMoves } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import {
+  encodeErShinyLabPreset,
+  ER_SHINY_LAB_DEFAULT_PARAMS,
+  type ErShinyLabSavedLook,
+  getErShinyLabDefinition,
+  normalizeErShinyLabSavedLook,
+  sanitizeErShinyLabPresetName,
+} from "#data/elite-redux/er-shiny-lab-effects";
 import { collectShowdownFreeMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
 import { Challenges } from "#enums/challenges";
 import { Gender } from "#data/gender";
@@ -147,6 +155,25 @@ export interface ErCustomTrainerFusion {
   abilitySlot?: number;
 }
 
+/**
+ * Editor-authored Shiny Lab look one team member (or weighted possibility) fields
+ * with. Effects are picked per category by their registry id (see
+ * `ER_SHINY_LAB_EFFECTS_BY_CATEGORY`); the game encodes them (with default
+ * params) into the same serialized `ErShinyLabSavedLook` tuple ghost/co-op mons
+ * carry (#785), then renders it on the fielded enemy. An empty/unknown effect in
+ * a category is dropped; a member with no valid effect fields normally (not shiny).
+ */
+export interface ErCustomTrainerShiny {
+  /** Palette-effect registry id (recolors the whole sprite), or absent/"". */
+  palette?: string;
+  /** Surface-effect registry id (overlay on the sprite), or absent/"". */
+  surface?: string;
+  /** Around-effect registry id (aura behind/around the sprite), or absent/"". */
+  around?: string;
+  /** Optional name-prefix carried by the look (sanitized, capped). */
+  name?: string;
+}
+
 /** One held item on a team member. */
 export interface ErCustomTrainerHeldItem {
   /** `modifierTypes` key (e.g. "LEFTOVERS"), resolved via `resolveHeldItemKey`. */
@@ -172,6 +199,8 @@ export interface ErCustomTrainerMember {
   abilitySlot?: number;
   fusion?: ErCustomTrainerFusion | null;
   heldItems?: readonly ErCustomTrainerHeldItem[];
+  /** Shiny Lab visual effect the mon fields with (see {@linkcode ErCustomTrainerShiny}). */
+  shiny?: ErCustomTrainerShiny | null;
   /**
    * WEIGHTED-SLOT possibility weight (integer >= 1). Only meaningful inside a
    * `variants` slot; ignored (treated as 1) on a bare flat member. Invalid
@@ -257,6 +286,10 @@ export interface ErCustomTrainerMemberResolved {
   abilitySlot: number;
   fusion: { speciesId: number; formIndex: number; abilitySlot: number } | null;
   heldItemKeys: readonly { key: string; count: number }[];
+  /** Serialized Shiny Lab look this member fields with, or `null` (renders normally). */
+  shinyLook: ErShinyLabSavedLook | null;
+  /** Sanitized name-prefix carried by the shiny look ("" when none). */
+  shinyName: string;
 }
 
 /** One weighted possibility of a resolved team slot. */
@@ -453,6 +486,35 @@ function parseMoveSpecs(rawMoves: readonly string[] | undefined): {
   return { specs, ids };
 }
 
+/**
+ * Resolve an authored Shiny Lab look into the serialized tuple the enemy renders.
+ * Each category's effect id is validated against the registry (unknown => dropped);
+ * with no valid effect the member renders normally (returns `null`). The loadout is
+ * encoded with DEFAULT params — the same `ErShinyLabSavedLook` representation ghost
+ * and co-op mons serialize (#785) — so the look is reproduced identically in battle.
+ */
+function resolveShinyLook(raw: ErCustomTrainerShiny | null | undefined): { look: ErShinyLabSavedLook; name: string } | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const pick = (category: "palette" | "surface" | "around", value: unknown): string | null =>
+    typeof value === "string" && getErShinyLabDefinition(category, value) ? value : null;
+  const loadout = {
+    palette: pick("palette", raw.palette),
+    surface: pick("surface", raw.surface),
+    around: pick("around", raw.around),
+  };
+  if (!loadout.palette && !loadout.surface && !loadout.around) {
+    return null;
+  }
+  const preset = encodeErShinyLabPreset({ loadout, params: ER_SHINY_LAB_DEFAULT_PARAMS });
+  const look = normalizeErShinyLabSavedLook(preset);
+  if (!look) {
+    return null;
+  }
+  return { look, name: sanitizeErShinyLabPresetName(typeof raw.name === "string" ? raw.name : "") };
+}
+
 /** Resolve one raw member; returns `null` when the species id is invalid (drops the trainer). */
 function resolveMember(m: ErCustomTrainerMember): ErCustomTrainerMemberResolved | null {
   if (!Number.isInteger(m.species) || (m.species as number) < 1) {
@@ -470,6 +532,7 @@ function resolveMember(m: ErCustomTrainerMember): ErCustomTrainerMemberResolved 
   const heldItemKeys = (m.heldItems ?? [])
     .filter(h => h && typeof h.item === "string" && h.item.length > 0)
     .map(h => ({ key: h.item, count: Number.isInteger(h.count) && (h.count as number) > 0 ? (h.count as number) : 1 }));
+  const shiny = resolveShinyLook(m.shiny);
   return {
     speciesId: m.species,
     formIndex: Number.isInteger(m.formIndex) ? (m.formIndex as number) : 0,
@@ -479,6 +542,8 @@ function resolveMember(m: ErCustomTrainerMember): ErCustomTrainerMemberResolved 
     abilitySlot: clampSlot(m.abilitySlot),
     fusion,
     heldItemKeys,
+    shinyLook: shiny ? shiny.look : null,
+    shinyName: shiny ? shiny.name : "",
   };
 }
 
@@ -974,6 +1039,17 @@ export function buildErCustomTrainerMember(
     enemy.formIndex = member.formIndex;
   }
   enemy.abilityIndex = member.abilitySlot;
+  // Shiny Lab visual effect the mon fields with. Mirrors the ghost-adoption path
+  // (er-ghost-teams.ts): force shiny + variant 0 (the palette rebase base), suppress
+  // the local per-run roll, and stamp the serialized look + name-prefix so the
+  // fielded enemy renders EXACTLY the authored effect. `null` => renders normally.
+  if (member.shinyLook) {
+    enemy.shiny = true;
+    enemy.variant = 0;
+    enemy.customPokemonData.erShinyLabSuppressLocal = true;
+    enemy.customPokemonData.erShinyLab = member.shinyLook;
+    enemy.customPokemonData.erShinyLabName = member.shinyName || undefined;
+  }
   if (member.fusion) {
     applyCustomFusion(enemy, member.fusion);
   }

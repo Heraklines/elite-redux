@@ -48,6 +48,8 @@ interface EditorHarness {
   spByConst: Map<string, unknown>;
   spById: Map<number, unknown>;
   trainerClassByName: Map<string, { name: string; sprite: string; genders: boolean }>;
+  SHINY_EFFECTS: { palette: any[]; surface: any[]; around: any[] };
+  shinyEffectById: Map<string, { id: string; label: string; accent: string; category: string }>;
   MOVE_SET: Set<string>;
   ctrOpenMembers: Set<number>;
   ctrSetSel: Map<number, number>;
@@ -111,7 +113,7 @@ beforeAll(() => {
     ;window.__ct = {
       blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal,
       render, onCustomTrainerInput, onCustomTrainerChange, onCustomTrainerClick, buildDeltas,
-      ctr, spByConst, spById, trainerClassByName, MOVE_SET, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
+      ctr, spByConst, spById, trainerClassByName, SHINY_EFFECTS, shinyEffectById, MOVE_SET, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
       setTab(v){ activeTab = v; },
     };`;
@@ -147,6 +149,19 @@ beforeEach(() => {
   ct.trainerClassByName.clear();
   ct.trainerClassByName.set("ACE_TRAINER", { name: "ACE_TRAINER", sprite: "ace_trainer", genders: true });
   ct.trainerClassByName.set("HIKER", { name: "HIKER", sprite: "hiker", genders: false });
+  // Shiny Lab effect registry fixture (a couple per category).
+  ct.SHINY_EFFECTS.palette.length = 0;
+  ct.SHINY_EFFECTS.surface.length = 0;
+  ct.SHINY_EFFECTS.around.length = 0;
+  ct.shinyEffectById.clear();
+  const seedShiny = (category: "palette" | "surface" | "around", id: string, label: string, accent: string) => {
+    ct.SHINY_EFFECTS[category].push({ id, label, accent });
+    ct.shinyEffectById.set(id, { id, label, accent, category });
+  };
+  seedShiny("palette", "glacier", "Glacier", "#7fd8ff");
+  seedShiny("palette", "inferno", "Inferno", "#ff6a24");
+  seedShiny("surface", "holofoil", "Holo Foil", "#7fe0ff");
+  seedShiny("around", "zaps", "Zaps", "#ffd27a");
 });
 
 describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
@@ -351,6 +366,47 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     ct.onCustomTrainerChange(classInput);
     expect(q(".ctr-gender-radio")).toBeNull();
     expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].gender).toBeUndefined();
+  });
+
+  it("shiny picker: per-category selects render, swatch shows, and payload serializes", () => {
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    const t = ct.ctr.current[key];
+    // The three category selects render for the (open) member.
+    expect(q('.ctr-shiny-sel[data-cat="palette"][data-idx="0"]')).not.toBeNull();
+    expect(q('.ctr-shiny-sel[data-cat="surface"][data-idx="0"]')).not.toBeNull();
+    expect(q('.ctr-shiny-sel[data-cat="around"][data-idx="0"]')).not.toBeNull();
+    // No effect yet -> nothing serialized.
+    expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].team[0].shiny).toBeUndefined();
+
+    // Pick a palette + aura effect and a name prefix.
+    const pal = q('.ctr-shiny-sel[data-cat="palette"][data-idx="0"]') as HTMLSelectElement;
+    pal.value = "inferno";
+    ct.onCustomTrainerChange(pal);
+    const aura = q('.ctr-shiny-sel[data-cat="around"][data-idx="0"]') as HTMLSelectElement;
+    aura.value = "zaps";
+    ct.onCustomTrainerChange(aura);
+    expect(t.team[0].shiny.palette).toBe("inferno");
+    expect(t.team[0].shiny.around).toBe("zaps");
+    // The swatch chips render (one per active category).
+    expect(q(".ctr-shiny-swatch")).not.toBeNull();
+    expect([...q(".ctr-shiny-swatch")!.querySelectorAll(".ctr-shiny-dot")].length).toBe(2);
+
+    const nameInput = q('.ctr-shiny-name[data-idx="0"]') as HTMLInputElement;
+    nameInput.value = "Prism";
+    ct.onCustomTrainerInput(nameInput);
+
+    // Payload: only the picked categories + trimmed name; surface omitted.
+    const shiny = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].team[0].shiny;
+    expect(shiny).toEqual({ palette: "inferno", around: "zaps", name: "Prism" });
+    expect(shiny.surface).toBeUndefined();
+
+    // Clearing all effects drops the shiny field entirely.
+    pal.value = "";
+    ct.onCustomTrainerChange(pal);
+    aura.value = "";
+    ct.onCustomTrainerChange(aura);
+    expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].team[0].shiny).toBeUndefined();
   });
 
   it("prior-surface smoke still holds: member collapse/expand + the battle-music picker render", () => {

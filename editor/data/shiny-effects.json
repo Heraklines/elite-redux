@@ -1,0 +1,1853 @@
+{
+  "palette": [
+    {
+      "id": "glacier",
+      "label": "Glacier",
+      "accent": "#7fd8ff"
+    },
+    {
+      "id": "aurum",
+      "label": "Aurum",
+      "accent": "#ffcf52"
+    },
+    {
+      "id": "obsidian",
+      "label": "Obsidian",
+      "accent": "#2a2a3a"
+    },
+    {
+      "id": "chrome",
+      "label": "Chrome",
+      "accent": "#d7e2f0"
+    },
+    {
+      "id": "amethyst",
+      "label": "Amethyst",
+      "accent": "#b06cff"
+    },
+    {
+      "id": "inferno",
+      "label": "Inferno",
+      "accent": "#ff6a24"
+    },
+    {
+      "id": "toxic",
+      "label": "Toxic",
+      "accent": "#9bff4a"
+    },
+    {
+      "id": "rosequartz",
+      "label": "Rose Quartz",
+      "accent": "#ff9ac8"
+    },
+    {
+      "id": "verdigris",
+      "label": "Verdigris",
+      "accent": "#72d0a8"
+    },
+    {
+      "id": "spectral",
+      "label": "Spectral",
+      "accent": "#9fefff"
+    },
+    {
+      "id": "negative",
+      "label": "Negative",
+      "accent": "#e6e6f2"
+    },
+    {
+      "id": "void",
+      "label": "Void Bloom",
+      "accent": "#ff6ad5"
+    },
+    {
+      "id": "shadowflame",
+      "label": "Shadowflame",
+      "accent": "#ff52d9"
+    },
+    {
+      "id": "iridescent",
+      "label": "Iridescent",
+      "accent": "#a0e0ff"
+    },
+    {
+      "id": "thermal",
+      "label": "Thermal",
+      "accent": "#ff7a3a"
+    },
+    {
+      "id": "sepia",
+      "label": "Sepia",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "copper",
+      "label": "Copper",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "emerald",
+      "label": "Emerald",
+      "accent": "#3affa0"
+    },
+    {
+      "id": "sapphire",
+      "label": "Sapphire",
+      "accent": "#4a8dff"
+    },
+    {
+      "id": "comic",
+      "label": "Cel Comic",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "synthwave",
+      "label": "Synthwave",
+      "accent": "#ff2a8a"
+    },
+    {
+      "id": "onyxgold",
+      "label": "Onyx Gold",
+      "accent": "#ffdc72"
+    },
+    {
+      "id": "ultraviolet",
+      "label": "Ultraviolet",
+      "accent": "#ba6cff"
+    },
+    {
+      "id": "acid",
+      "label": "Acid",
+      "accent": "#caff3a"
+    },
+    {
+      "id": "bubblegum",
+      "label": "Bubblegum",
+      "accent": "#ff8ad0"
+    },
+    {
+      "id": "blood",
+      "label": "Blood",
+      "accent": "#e8404a"
+    },
+    {
+      "id": "abyss",
+      "label": "Abyss",
+      "accent": "#1f9ad0"
+    },
+    {
+      "id": "antique",
+      "label": "Antique",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "frostfire",
+      "label": "Frostfire",
+      "accent": "#ff8a2a"
+    },
+    {
+      "id": "camo",
+      "label": "Camo",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "jade",
+      "label": "Jade",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "rosegold",
+      "label": "Rose Gold",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "mono",
+      "label": "Monochrome",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "prismarine",
+      "label": "Prismarine",
+      "accent": "#5fe0c0"
+    },
+    {
+      "id": "nebula",
+      "label": "Nebula",
+      "accent": "#d04ad0"
+    },
+    {
+      "id": "venom",
+      "label": "Venom",
+      "accent": "#6ad020"
+    },
+    {
+      "id": "solarflare",
+      "label": "Solar Flare",
+      "accent": "#ffd040"
+    },
+    {
+      "id": "royal",
+      "label": "Royal",
+      "accent": "#d0a030"
+    },
+    {
+      "id": "deepsea",
+      "label": "Deep Sea",
+      "accent": "#1fb0d0"
+    },
+    {
+      "id": "sakura",
+      "label": "Sakura",
+      "accent": "#ffd0e0"
+    },
+    {
+      "id": "mythril",
+      "label": "Mythril",
+      "accent": "#c0d8f0"
+    },
+    {
+      "id": "cursed",
+      "label": "Cursed",
+      "accent": "#9aff3a"
+    },
+    {
+      "id": "pearl",
+      "label": "Pearl",
+      "accent": "#f0f8ff"
+    },
+    {
+      "id": "rust",
+      "label": "Rust",
+      "accent": "#b56a2a"
+    },
+    {
+      "id": "moonstone",
+      "label": "Moonstone",
+      "accent": "#dbe8ff"
+    },
+    {
+      "id": "oilspill",
+      "label": "Oil Spill",
+      "accent": "#70d0ff"
+    },
+    {
+      "id": "plasmatic",
+      "label": "Plasmatic",
+      "accent": "#ff8a00"
+    },
+    {
+      "id": "duoink",
+      "label": "Duo Ink",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "duoneon",
+      "label": "Duo Neon",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "duomono",
+      "label": "Duo Mono",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "duoblood",
+      "label": "Duo Blood",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "duomint",
+      "label": "Duo Mint",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "duosunset",
+      "label": "Duo Sunset",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "duomecha",
+      "label": "Duo Mecha",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "trisunset",
+      "label": "Tri Sunset",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "triforest",
+      "label": "Tri Forest",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "quadvapor",
+      "label": "Quad Vapor",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "pentacandy",
+      "label": "Penta Candy",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "pentajewel",
+      "label": "Penta Jewel",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "synthwavesun",
+      "label": "Synthwave Sun",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "sunset",
+      "label": "Sunset",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "gameboy",
+      "label": "Gameboy",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "retro",
+      "label": "Retro",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "blueprint",
+      "label": "Blueprint",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "whosthat",
+      "label": "Who's That...?",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "lavender",
+      "label": "Lavender Ghost",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "overexposed",
+      "label": "Overexposed",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "hyperpigment",
+      "label": "Hyperpigment",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "popart",
+      "label": "Pop Art",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "platinum",
+      "label": "Platinum",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "brass",
+      "label": "Brass",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "agedbronze",
+      "label": "Patina Bronze",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "ivory",
+      "label": "Ivory",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "emberash",
+      "label": "Ember Ash",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "lapis",
+      "label": "Lapis Lazuli",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "vermilion",
+      "label": "Vermilion",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "periwinkle",
+      "label": "Twilight Neon",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "wine",
+      "label": "Velvet Noir",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "honeyamber",
+      "label": "Honey Amber",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "stormcloud",
+      "label": "Stormcloud",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "peacock",
+      "label": "Peacock",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "flamingo",
+      "label": "Flamingo",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "cyberpunk",
+      "label": "Cyberpunk",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "matrixgreen",
+      "label": "Matrix",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "opal",
+      "label": "Opal",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "dragonfruit",
+      "label": "Dragonfruit",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "lagoon",
+      "label": "Tidepool",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "mirage",
+      "label": "Heat Mirage",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "eclipse",
+      "label": "Eclipse",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "midnightoil",
+      "label": "Midnight Oil",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "terracotta",
+      "label": "Terracotta",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "porcelaindelft",
+      "label": "Porcelain",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "seafoam",
+      "label": "Seafoam",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "glowworm",
+      "label": "Glowworm",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "voidfire",
+      "label": "Voidfire",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "petrol",
+      "label": "Petrol Sheen",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "duststorm",
+      "label": "Sandstone",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "watermelon",
+      "label": "Watermelon",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "cyanotype",
+      "label": "Cyanotype",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "coralreef",
+      "label": "Coral Reef",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "grape",
+      "label": "Ultra Grape",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "mintchoco",
+      "label": "Mint Choc",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "sherbet",
+      "label": "Sherbet",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "gunmetal",
+      "label": "Gunmetal",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "arcticnight",
+      "label": "Arctic Night",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "blackice",
+      "label": "Frozen Abyss",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "meadow",
+      "label": "Sunlit Grove",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "complement",
+      "label": "Complement",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "hueplus",
+      "label": "Hue +90",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "hueminus",
+      "label": "Hue -90",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "xenoswap",
+      "label": "Xeno Swap",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "splitteal",
+      "label": "Teal & Orange",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "splitroyal",
+      "label": "Royal Grade",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "pastelize",
+      "label": "Pastel",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "noir",
+      "label": "Noir",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "infraredfilm",
+      "label": "Infrared Film",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "virtualboy",
+      "label": "Virtual Boy",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "cga",
+      "label": "CGA",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "poster",
+      "label": "Posterize",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "glassbody",
+      "label": "Glass",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "phantom",
+      "label": "Phantom",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "heatmap",
+      "label": "Heat Map",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "hueglide",
+      "label": "Hue Glide",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "stencil",
+      "label": "Stencil",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "duoice",
+      "label": "Duo Ice",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "creamsicle",
+      "label": "Creamsicle",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "duoviolet",
+      "label": "Duo Clash",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "duogold",
+      "label": "Duo Regal",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "bumblebee",
+      "label": "Bumblebee",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "duosakura",
+      "label": "Duo Sakura",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "trinebula",
+      "label": "Tri Nebula",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "triocean",
+      "label": "Tri Ocean",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "triember",
+      "label": "Tri Ember",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "tripoison",
+      "label": "Tri Poison",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "quadautumn",
+      "label": "Quad Autumn",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "quadcyber",
+      "label": "Quad Cyber",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "pentaretro",
+      "label": "Penta Retro",
+      "accent": "#5ad1ff"
+    },
+    {
+      "id": "pentagalaxy",
+      "label": "Penta Galaxy",
+      "accent": "#5ad1ff"
+    }
+  ],
+  "surface": [
+    {
+      "id": "rainbow",
+      "label": "Rainbow",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "aurora",
+      "label": "Aurora",
+      "accent": "#5affc0"
+    },
+    {
+      "id": "holofoil",
+      "label": "Holo Foil",
+      "accent": "#7fe0ff"
+    },
+    {
+      "id": "prismatic",
+      "label": "Prismatic",
+      "accent": "#d0e8ff"
+    },
+    {
+      "id": "frostbite",
+      "label": "Frostbite",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "glitch",
+      "label": "Glitch",
+      "accent": "#36e6ff"
+    },
+    {
+      "id": "hologram",
+      "label": "Hologram",
+      "accent": "#74c8ff"
+    },
+    {
+      "id": "galaxy",
+      "label": "Galaxy",
+      "accent": "#9b6cff"
+    },
+    {
+      "id": "plasma",
+      "label": "Plasma",
+      "accent": "#ff6ad9"
+    },
+    {
+      "id": "molten",
+      "label": "Molten",
+      "accent": "#ff7a3a"
+    },
+    {
+      "id": "electric",
+      "label": "Electric",
+      "accent": "#ffe85a"
+    },
+    {
+      "id": "dissolve",
+      "label": "Dissolve",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "mercury",
+      "label": "Mercury",
+      "accent": "#dfe6f2"
+    },
+    {
+      "id": "lavacracks",
+      "label": "Lava Cracks",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "frozenice",
+      "label": "Frozen Ice",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "crystalfacets",
+      "label": "Crystal Facets",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "stainedglass",
+      "label": "Stained Glass",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "marble",
+      "label": "Marble",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "bioluminescent",
+      "label": "Bioluminescent",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "constellation",
+      "label": "Constellation",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "aurorawings",
+      "label": "Aurora Wings",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "gildededges",
+      "label": "Gilded Edges",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "rimlight",
+      "label": "Rim Light",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "vaporwave",
+      "label": "Vaporwave",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "halftone",
+      "label": "Halftone",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "sparkle",
+      "label": "Sparkle",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "lightningveins",
+      "label": "Lightning Veins",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "dripgold",
+      "label": "Dripping Gold",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "spectrumsplit",
+      "label": "Prism Split",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "ripple",
+      "label": "Ripple",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "circuit",
+      "label": "Circuit",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "scales",
+      "label": "Scales",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "tvstatic",
+      "label": "TV Static",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "scansweep",
+      "label": "Scan Sweep",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "poison",
+      "label": "Toxic Bubbles",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "kaleido",
+      "label": "Kaleido",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "fractalflow",
+      "label": "Fractal Flow",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "wormhole",
+      "label": "Wormhole",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "shatter",
+      "label": "Shatter",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "heatshimmer",
+      "label": "Heat Shimmer",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "caustics",
+      "label": "Caustics",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "oilfilm",
+      "label": "Oil Film",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "pixelpulse",
+      "label": "Pixel Pulse",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "neonwire",
+      "label": "Neon Wire",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "starmap",
+      "label": "Star Map",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "synthscan",
+      "label": "Synth Scan",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "rainbowedge",
+      "label": "Rainbow Edge",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "sunsetsun",
+      "label": "Sunset Sun",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "crosshatch",
+      "label": "Crosshatch",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "tron",
+      "label": "Tron",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "neonsign",
+      "label": "Neon Sign",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "mistveil",
+      "label": "Mist Veil",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "mistfeet",
+      "label": "Rising Mist",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "bloom",
+      "label": "Bloom",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "softshade",
+      "label": "HD Lighting",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "glasswarp",
+      "label": "Glass Warp",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "unlined",
+      "label": "No Outline",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "sundered",
+      "label": "Pulled Apart",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "livingshadow",
+      "label": "Living Shadow",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "waterline",
+      "label": "Waterline",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "firecreep",
+      "label": "Fire Creep",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "snowcap",
+      "label": "Snowcap",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "discoball",
+      "label": "Disco Glints",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "lensflare",
+      "label": "Lens Flare",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "oldfilm",
+      "label": "Old Film",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "vhs",
+      "label": "VHS Tape",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "pixelsort",
+      "label": "Pixel Sort",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "moire",
+      "label": "Hypno Rings",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "contours",
+      "label": "Contours",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "coderain",
+      "label": "Code Rain",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "honeyplate",
+      "label": "Honeycomb Plate",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "carbonweave",
+      "label": "Carbon Fiber",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "brushedmetal",
+      "label": "Brushed Metal",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "lavalamp",
+      "label": "Lava Lamp",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "soapswirl",
+      "label": "Soap Film",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "xray",
+      "label": "X-Ray",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "blueprintscan",
+      "label": "Blueprint Scan",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "stitchwork",
+      "label": "Knitted",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "mosaictile",
+      "label": "Mosaic",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "papercut",
+      "label": "Papercraft",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "inkwash",
+      "label": "Ink Wash",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "goldleaf",
+      "label": "Gold Leaf",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "rustcreep",
+      "label": "Rust Creep",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "petrified",
+      "label": "Petrified",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "slimecoat",
+      "label": "Slime Coat",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "bubblewrap",
+      "label": "Soul Siphon",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "candycane",
+      "label": "Candy Cane",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "embermotes",
+      "label": "Ember Motes",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "fairydust",
+      "label": "Fairy Dust",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "glitterstorm",
+      "label": "Glitter Storm",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "fireflyglade",
+      "label": "Firefly Glade",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "starfall",
+      "label": "Starfall",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "astral",
+      "label": "Astral Form",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "smolder",
+      "label": "Smolder",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "frostcore",
+      "label": "Frost Core",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "shockwave",
+      "label": "Shockwave",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "runes",
+      "label": "Runic Etch",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "staticcharge",
+      "label": "Static Charge",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "cmykprint",
+      "label": "CMYK Print",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "binarybody",
+      "label": "Binary Body",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "origami",
+      "label": "Origami",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "crackleglaze",
+      "label": "Crackle Glaze",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "kintsugi",
+      "label": "Kintsugi",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "activecamo",
+      "label": "Active Camo",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "watercolor",
+      "label": "Watercolor",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "spiritflame",
+      "label": "Spirit Flame",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "datacorrupt",
+      "label": "Data Corruption",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "doubleexposure",
+      "label": "Double Exposure",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "paperburn",
+      "label": "Paper Burn",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "mossgrow",
+      "label": "Overgrowth",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "gemplate",
+      "label": "Gem Plate",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "tiedye",
+      "label": "Tie-Dye",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "checkerflip",
+      "label": "Checker Flip",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "polkadot",
+      "label": "Polka Dots",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "graffiti",
+      "label": "Graffiti",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "innerstorm",
+      "label": "Inner Storm",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "meltdown",
+      "label": "Meltdown",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "sequins",
+      "label": "Sequins",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "tvbars",
+      "label": "Color Bars",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "revealscan",
+      "label": "Reveal Scan",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "spotlight",
+      "label": "Spotlight",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "demake",
+      "label": "Demake",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "genone",
+      "label": "Gen 1",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "marchingants",
+      "label": "Marching Ants",
+      "accent": "#ff7ad9"
+    },
+    {
+      "id": "phosphor",
+      "label": "Phosphor",
+      "accent": "#ff7ad9"
+    }
+  ],
+  "around": [
+    {
+      "id": "outline",
+      "label": "Outline Glow",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "halo",
+      "label": "Soft Halo",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "flame",
+      "label": "Flame",
+      "accent": "#ff7a3a"
+    },
+    {
+      "id": "shadowfire",
+      "label": "Shadow Fire",
+      "accent": "#9b6cff"
+    },
+    {
+      "id": "frost",
+      "label": "Frost",
+      "accent": "#a6f0ff"
+    },
+    {
+      "id": "efield",
+      "label": "Electric Field",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "rings",
+      "label": "Energy Rings",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "orbit",
+      "label": "Orbiting Sparks",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "auroraveil",
+      "label": "Aurora Veil",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "holyrays",
+      "label": "Holy Light",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "cosmos",
+      "label": "Cosmic Backdrop",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "smoke",
+      "label": "Smoke",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "radiant",
+      "label": "Radiant Burst",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "embers",
+      "label": "Embers",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "snow",
+      "label": "Snow",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "bubbles",
+      "label": "Bubbles",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "wingflame",
+      "label": "Wing Flame",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "footfrost",
+      "label": "Foot Frost",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "crown",
+      "label": "Crown",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "underlight",
+      "label": "Underlight",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "uprising",
+      "label": "Uprising",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "topbeam",
+      "label": "Top Beam",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "sideaura",
+      "label": "Side Aura",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "magiccircle",
+      "label": "Magic Circle",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "vortex",
+      "label": "Vortex",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "galaxyspiral",
+      "label": "Galaxy Spiral",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "fireflies",
+      "label": "Fireflies",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "petals",
+      "label": "Petals",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "rain",
+      "label": "Rain",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "sparkstorm",
+      "label": "Spark Storm",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "prismburst",
+      "label": "Prism Burst",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "icespikes",
+      "label": "Ice Spikes",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "rainbowglitter",
+      "label": "Rainbow Glitter",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "luminous",
+      "label": "Luminous",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "cursedaura",
+      "label": "Cursed Aura",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "goldenglow",
+      "label": "Golden Glow",
+      "accent": "#ffcf52"
+    },
+    {
+      "id": "shadowaura",
+      "label": "Shadow Aura",
+      "accent": "#9b6cff"
+    },
+    {
+      "id": "rainbowoutline",
+      "label": "Rainbow Outline",
+      "accent": "#a0e0ff"
+    },
+    {
+      "id": "triangles",
+      "label": "Triangles",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "hexagons",
+      "label": "Hexagons",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "hearts",
+      "label": "Hearts",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "staticfield",
+      "label": "Static Field",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "helix",
+      "label": "Energy Helix",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "atomrings",
+      "label": "Atomic Orbit",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "nuclearwinter",
+      "label": "Nuclear Winter",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "sinistersun",
+      "label": "Sinister Sun",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "hdstars",
+      "label": "HD Stars",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "echoes",
+      "label": "Double Team",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "triecho",
+      "label": "Double Team Tri",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "lowmist",
+      "label": "Ground Mist",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "meteors",
+      "label": "Meteor Shower",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "stormstrikes",
+      "label": "Thunderstorm",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "rainbowarc",
+      "label": "Rainbow Arc",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "autumnleaves",
+      "label": "Autumn Gust",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "musicnotes",
+      "label": "Music Notes",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "butterflies",
+      "label": "Butterflies",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "batswarm",
+      "label": "Bat Swarm",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "moonrise",
+      "label": "Moonrise",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "geyser",
+      "label": "Geyser",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "whirlpool",
+      "label": "Whirlpool",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "windribbons",
+      "label": "Wind Ribbons",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "ribbonloop",
+      "label": "Ribbon Dancer",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "slashes",
+      "label": "Blade Flurry",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "planets",
+      "label": "Tiny Planets",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "clockwork",
+      "label": "Clockwork",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "fireworks",
+      "label": "Fireworks",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "sandgust",
+      "label": "Sand Gust",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "spotlights",
+      "label": "Stage Lights",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "lightcage",
+      "label": "Cage of Light",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "chains",
+      "label": "Chained",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "featherfall",
+      "label": "Feather Fall",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "spiritorbs",
+      "label": "Will-o-Wisps",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "eventhorizon",
+      "label": "Event Horizon",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "cardstorm",
+      "label": "Card Storm",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "coinrain",
+      "label": "Coin Rain",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "shardlevitate",
+      "label": "Shard Levitation",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "smokerings",
+      "label": "Smoke Rings",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "radarsweep",
+      "label": "Radar Sweep",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "hellsigil",
+      "label": "Hell Sigil",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "lasershow",
+      "label": "Laser Show",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "glyphrain",
+      "label": "Glyph Rain",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "firering",
+      "label": "Ring of Fire",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "creepingshadow",
+      "label": "Creeping Shadow",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "equalizer",
+      "label": "Equalizer",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "confetti",
+      "label": "Confetti",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "raincloud",
+      "label": "Personal Raincloud",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "portal",
+      "label": "Portal",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "speedlines",
+      "label": "Manga Burst",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "lockon",
+      "label": "Lock-On",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "hexdome",
+      "label": "Hex Barrier",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "guardianwings",
+      "label": "Guardian Wings",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "snowglobe",
+      "label": "Snow Globe",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "orbitdebris",
+      "label": "Orbit Debris",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "starcircle",
+      "label": "Star Ring",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "fallingstar",
+      "label": "Falling Star",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "gravitylift",
+      "label": "Zero-G Lift",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "shockpulse",
+      "label": "Shock Pulse",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "fogbank",
+      "label": "Fog Bank",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "cometorbit",
+      "label": "Comet Orbit",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "petalvortex",
+      "label": "Petal Vortex",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "emberspiral",
+      "label": "Ember Spiral",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "runeorbit",
+      "label": "Rune Orbit",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "prismrain",
+      "label": "Prism Rain",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "zaps",
+      "label": "Lightning Zaps",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "blossoms",
+      "label": "Sakura Blossoms",
+      "accent": "#ffd27a"
+    },
+    {
+      "id": "paperlanterns",
+      "label": "Paper Lanterns",
+      "accent": "#ffd27a"
+    }
+  ]
+}

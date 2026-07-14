@@ -109,6 +109,11 @@ const abilById = new Map(); // abilityId → rich ability
 // TRAINER_CLASS_OPTIONS list if the generated file is missing.
 let TRAINER_CLASSES = []; // [{name, sprite, genders}]
 const trainerClassByName = new Map(); // TrainerType NAME → {name, sprite, genders}
+// Shiny Lab effect registry (editor/data/shiny-effects.json): the per-category
+// effect option lists for the per-mon shiny-effect picker. Each entry is
+// {id, label, accent}; id→entry lookups power the picker + preview swatch.
+let SHINY_EFFECTS = { palette: [], surface: [], around: [] };
+const shinyEffectById = new Map(); // effect id → {id, label, accent, category}
 // Cache of fetched TexturePacker atlas jsons (CDN url → parsed json | null on fail).
 const trainerAtlasCache = new Map();
 // Edit state keyed by species CONST (joined to data via SPECIES[i].id), so the
@@ -1627,7 +1632,30 @@ function ctrIsMoveToken(v) {
 
 /** The member-FIELD keys that make up ONE weighted possibility (excludes slot meta:
  *  slotChance / weighted / variants / cur). */
-const CTR_MEMBER_FIELDS = ["species", "formIndex", "level", "moves", "abilitySlot", "fusion", "heldItems", "sanityOff"];
+const CTR_MEMBER_FIELDS = [
+  "species",
+  "formIndex",
+  "level",
+  "moves",
+  "abilitySlot",
+  "fusion",
+  "heldItems",
+  "shiny",
+  "sanityOff",
+];
+
+/** Coerce a raw/edit shiny value into the editor shape { palette, surface, around, name }
+ *  (strings; empty = none). Accepts null/undefined and the saved JSON shape alike. */
+function ctrNormShiny(s) {
+  const o = s && typeof s === "object" ? s : {};
+  const str = v => (typeof v === "string" ? v : "");
+  return { palette: str(o.palette), surface: str(o.surface), around: str(o.around), name: str(o.name) };
+}
+
+/** True when a shiny edit value carries at least one effect (empties = renders normally). */
+function ctrShinyActive(s) {
+  return !!(s && (s.palette || s.surface || s.around));
+}
 
 /** A fresh blank set of member fields (one possibility), species by CONST. */
 function blankCtrMemberFields() {
@@ -1639,6 +1667,8 @@ function blankCtrMemberFields() {
     abilitySlot: 0,
     fusion: null,
     heldItems: [],
+    // Shiny Lab visual effect the mon fields with (empty = none).
+    shiny: ctrNormShiny(null),
     // Editor metadata: when true, this member's moves are NOT legality-checked.
     // Persisted only when true; absent in saved JSON = enforced.
     sanityOff: false,
@@ -1655,6 +1685,7 @@ function ctrCopyMemberFields(src) {
     abilitySlot: [0, 1, 2].includes(src.abilitySlot) ? src.abilitySlot : 0,
     fusion: src.fusion ? { ...src.fusion } : null,
     heldItems: (src.heldItems || []).map(h => ({ item: h.item || "", count: Number.isInteger(h.count) ? h.count : 1 })),
+    shiny: ctrNormShiny(src.shiny),
     sanityOff: src.sanityOff === true,
   };
 }
@@ -1799,6 +1830,7 @@ function ctrLiveMemberFieldsToEdit(m) {
       item: h.item || "",
       count: Number.isInteger(h.count) ? h.count : 1,
     })),
+    shiny: ctrNormShiny(m.shiny),
     sanityOff: m.sanityOff === true,
   };
 }
@@ -2054,6 +2086,54 @@ function ctrSlotControlsHtml(m, i) {
   return `<div class="ctr-slot-ctrls">${slotProb}${weightedToggle}${weightedCtrls}</div>`;
 }
 
+/** The <option>s for one shiny-effect category select: "(none)" + the registry. */
+function ctrShinyOptions(category, selected) {
+  const list = SHINY_EFFECTS[category] || [];
+  let html = `<option value=""${selected ? "" : " selected"}>(none)</option>`;
+  for (const e of list) {
+    html += `<option value="${esc(e.id)}"${selected === e.id ? " selected" : ""}>${esc(e.label)}</option>`;
+  }
+  // A saved id no longer in the registry still shows selected (never silently drop).
+  if (selected && !list.some(e => e.id === selected)) {
+    html += `<option value="${esc(selected)}" selected>${esc(selected)} (missing)</option>`;
+  }
+  return html;
+}
+
+/** A rough color-chip approximation of a shiny look (the REAL effect renders in-game). */
+function ctrShinySwatchHtml(s) {
+  const chips = [];
+  for (const cat of ["palette", "surface", "around"]) {
+    const id = s[cat];
+    if (!id) {
+      continue;
+    }
+    const e = shinyEffectById.get(id);
+    const accent = e ? e.accent : "#888";
+    const label = e ? e.label : id;
+    chips.push(
+      `<span class="ctr-shiny-chip" title="${esc(cat)}"><span class="ctr-shiny-dot" style="background:${esc(accent)}"></span>${esc(label)}</span>`,
+    );
+  }
+  return chips.length > 0
+    ? `<span class="ctr-shiny-swatch">${chips.join("")}</span>`
+    : '<span class="dyn">no effect (renders normally)</span>';
+}
+
+/** Per-member Shiny Lab effect picker: a palette/surface/aura select + name prefix
+ *  + an honest color-swatch approximation. Empty selects = the mon renders normally. */
+function ctrShinyPickerHtml(m, i) {
+  const s = ctrNormShiny(m.shiny);
+  return `<div class="ctr-shiny" data-idx="${i}">
+    <span class="ctr-shiny-lbl" title="Shiny Lab visual effect this Pokémon fields with in battle. The swatch is a rough approximation; the animated effect renders in-game.">Shiny effect:</span>
+    <label>Palette <select class="ctr-shiny-sel" data-idx="${i}" data-cat="palette">${ctrShinyOptions("palette", s.palette)}</select></label>
+    <label>Surface <select class="ctr-shiny-sel" data-idx="${i}" data-cat="surface">${ctrShinyOptions("surface", s.surface)}</select></label>
+    <label>Aura <select class="ctr-shiny-sel" data-idx="${i}" data-cat="around">${ctrShinyOptions("around", s.around)}</select></label>
+    <label>Name <input class="ctr-shiny-name" data-idx="${i}" maxlength="16" value="${esc(s.name || "")}" placeholder="name prefix" spellcheck="false" style="width:120px" /></label>
+    ${ctrShinySwatchHtml(s)}
+  </div>`;
+}
+
 function ctrMemberHtml(m, i) {
   ctrEnsureSlot(m); // repair weighted-variant metadata on a legacy/edited slot
   const open = ctrOpenMembers.has(i);
@@ -2149,6 +2229,7 @@ function ctrMemberHtml(m, i) {
       }
     </div>
     <div class="ctr-held">Held items: ${heldRows}<button type="button" class="ctr-held-add" data-idx="${i}">＋ item</button></div>
+    ${ctrShinyPickerHtml(m, i)}
   </fieldset>`;
 }
 
@@ -2499,6 +2580,9 @@ function onCustomTrainerInput(el) {
     if (h) {
       h.count = Number(el.value) || 1;
     }
+  } else if (el.classList.contains("ctr-shiny-name") && m) {
+    m.shiny = ctrNormShiny(m.shiny);
+    m.shiny.name = el.value;
   } else if (el.classList.contains("ctr-fusion-species") && m && m.fusion) {
     m.fusion.species = el.value.trim().toUpperCase();
     el.value = m.fusion.species;
@@ -2579,6 +2663,12 @@ function onCustomTrainerChange(el) {
       m.moves = [...(set.moves || []), "", "", "", ""].slice(0, 4);
       m.abilitySlot = [0, 1, 2].includes(set.abilitySlot) ? set.abilitySlot : 0;
     }
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-shiny-sel") && m) {
+    // Pick a shiny effect for one category; re-render so the swatch updates.
+    m.shiny = ctrNormShiny(m.shiny);
+    m.shiny[el.dataset.cat] = el.value;
     render();
     return true;
   } else if (el.classList.contains("ctr-sanity") && m) {
@@ -3563,6 +3653,22 @@ function buildDeltas() {
       if (held.length > 0) {
         out.heldItems = held;
       }
+      // Shiny Lab look: serialize only the non-empty categories (+ trimmed name)
+      // when at least one effect is picked; otherwise omit (renders normally).
+      const shiny = ctrNormShiny(m.shiny);
+      if (ctrShinyActive(shiny)) {
+        const sh = {};
+        for (const cat of ["palette", "surface", "around"]) {
+          if (shiny[cat]) {
+            sh[cat] = shiny[cat];
+          }
+        }
+        const nm = (shiny.name || "").trim();
+        if (nm) {
+          sh.name = nm;
+        }
+        out.shiny = sh;
+      }
       // Editor metadata: persist sanityOff ONLY when the check is turned off.
       if (m.sanityOff) {
         out.sanityOff = true;
@@ -3765,6 +3871,7 @@ async function init() {
       ctrLive,
       trainerClassesData,
       bgmData,
+      shinyEffectsData,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
@@ -3798,6 +3905,8 @@ async function init() {
       fetchJson("./data/trainer-classes.json", []),
       // Battle-music catalog (generated). Fallback → empty (picker offers "(default)").
       fetchJson("./data/bgm.json", []),
+      // Shiny Lab effect registry (generated). Fallback → empty (picker offers "(none)").
+      fetchJson("./data/shiny-effects.json", { palette: [], surface: [], around: [] }),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -3884,6 +3993,23 @@ async function init() {
       .filter(b => b && typeof b.key === "string")
       .map(b => ({ key: b.key, battle: b.battle === true }))
       .sort((a, b) => (a.battle === b.battle ? a.key.localeCompare(b.key) : a.battle ? -1 : 1));
+
+    // Shiny Lab effect registry: build the per-category lists + an id→entry index
+    // (with its category) for the per-mon shiny picker and the preview swatch.
+    const sd = shinyEffectsData && typeof shinyEffectsData === "object" ? shinyEffectsData : {};
+    SHINY_EFFECTS = {
+      palette: Array.isArray(sd.palette) ? sd.palette : [],
+      surface: Array.isArray(sd.surface) ? sd.surface : [],
+      around: Array.isArray(sd.around) ? sd.around : [],
+    };
+    shinyEffectById.clear();
+    for (const category of ["palette", "surface", "around"]) {
+      for (const e of SHINY_EFFECTS[category]) {
+        if (e && typeof e.id === "string") {
+          shinyEffectById.set(e.id, { ...e, category });
+        }
+      }
+    }
 
     // Egg-move source + factory-set index for the per-member legality/set helpers.
     EGG_MOVES_LIVE = eggLive && typeof eggLive === "object" ? eggLive : {};

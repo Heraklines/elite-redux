@@ -466,6 +466,8 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
       abilitySlot: 0,
       fusion: null,
       heldItemKeys: [],
+      shinyLook: null,
+      shinyName: "",
     };
 
     // Bypass ON: constructor + explicit curve pass both leave Garchomp intact.
@@ -514,6 +516,54 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     expect(byKey.get("FEM")!.gender).toBe("f");
     expect(byKey.get("MASC")!.gender).toBe("m");
     expect(byKey.get("DEFAULTED")!.gender).toBe("m");
+  });
+
+  // ---- ROUND 5 / FEATURE 2: shiny-lab effect per mon ------------------------
+  it("shiny effect resolves onto the built enemy (shiny + serialized look + name)", () => {
+    const SH = {
+      SHINYMON: {
+        id: 70043,
+        name: "Glimmer",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [
+          {
+            species: SpeciesId.PIKACHU,
+            shiny: { palette: "glacier", around: "zaps", name: "Prism" },
+          },
+          // A plain mon (no shiny) renders normally.
+          { species: SpeciesId.SNORLAX },
+          // An entirely-unknown effect id resolves to no shiny (dropped).
+          { species: SpeciesId.GENGAR, shiny: { palette: "notarealeffect" } },
+        ],
+      },
+    };
+    setErCustomTrainersForTesting(SH as never);
+    const resolved = getErCustomTrainers().find(t => t.key === "SHINYMON")!;
+    // Slot 1: the look resolved to a serialized tuple + sanitized name.
+    const shinyMember = resolved.members[0];
+    expect(shinyMember.shinyLook).not.toBeNull();
+    expect(Array.isArray(shinyMember.shinyLook)).toBe(true);
+    expect(shinyMember.shinyLook!.length).toBe(14);
+    expect(shinyMember.shinyName).toBe("Prism");
+    // Slot 2 (no shiny) + slot 3 (unknown effect) resolve to null.
+    expect(resolved.members[1].shinyLook).toBeNull();
+    expect(resolved.members[2].shinyLook).toBeNull();
+
+    // Built enemy carries the effect: shiny flag, variant 0, the serialized look
+    // + name stamped onto customPokemonData (mirrors the ghost-adoption path).
+    setErCustomTrainerBstBypass(true);
+    const enemy = buildErCustomTrainerMember(shinyMember, 0, 50, false);
+    expect(enemy).not.toBeNull();
+    expect(enemy!.shiny).toBe(true);
+    expect(enemy!.variant).toBe(0);
+    expect(enemy!.customPokemonData.erShinyLab).toEqual(shinyMember.shinyLook);
+    expect(enemy!.customPokemonData.erShinyLabName).toBe("Prism");
+    expect(enemy!.customPokemonData.erShinyLabSuppressLocal).toBe(true);
+
+    // A plain mon stays non-forced (no erShinyLab stamped).
+    const plain = buildErCustomTrainerMember(resolved.members[1], 1, 50, false);
+    expect(plain!.customPokemonData.erShinyLab).toBeUndefined();
   });
 
   // ---- FEATURE 1: weighted slot variants -----------------------------------
