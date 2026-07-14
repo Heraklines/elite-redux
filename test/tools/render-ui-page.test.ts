@@ -88,6 +88,8 @@ import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
 import { buildShowdownEditorDemoConfig, EditorField } from "#ui/showdown-set-editor-ui-handler";
 import { buildShowdownTeamMenuDemoConfig } from "#ui/showdown-team-menu-ui-handler";
 import type { ShowdownWagerArgs } from "#ui/showdown-wager-ui-handler";
+import { buildTournamentBracketDemoConfig } from "#ui/tournament-bracket-ui-handler";
+import { buildTournamentListDemoConfig } from "#ui/tournament-list-ui-handler";
 import { getModifierType } from "#utils/modifier-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
@@ -921,6 +923,44 @@ const RECIPES: Record<string, Recipe> = {
     // DOWN x2 walks onto a staked option (its "You: ..." offer + tier-match row change); ACTION on a
     // STAKED row surfaces the escrow-unavailable notice (no lock). The final -stepN shows that path.
     steps: [Button.DOWN, Button.DOWN, Button.ACTION],
+  },
+  // Showdown TOURNAMENT list (PWT-themed): a mix of open-for-registration, in-progress and finished
+  // tournaments, with the "you are registered" flag and entrant counts. Data-driven demo config.
+  "tournament-list": {
+    mode: UiMode.TOURNAMENT_LIST,
+    prepare: () => [buildTournamentListDemoConfig()],
+    diffTolerance: 0,
+  },
+  // Bracket tree (8-field, round-1 settled): the your-next-match card is PLAYABLE (opponent + deadline
+  // + Play hint).
+  "tournament-bracket-8": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 8, advancedRounds: 1, card: "playable" })],
+    diffTolerance: 0,
+  },
+  // Bracket tree (16-field, two rounds settled): a deeper tree, mid-round state.
+  "tournament-bracket-16": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 16, advancedRounds: 2, card: "playable" })],
+    diffTolerance: 0,
+  },
+  // Bracket with BYES (5-field padded to 8): top seeds auto-advance, "(bye)" slots shown.
+  "tournament-bracket-byes": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 8, byes: true, advancedRounds: 0, card: "waiting" })],
+    diffTolerance: 0,
+  },
+  // Next-match card: DEADLINE SOON (red countdown, still playable).
+  "tournament-bracket-duesoon": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 8, advancedRounds: 1, card: "dueSoon" })],
+    diffTolerance: 0,
+  },
+  // Champion screen: the final decided, champion banner.
+  "tournament-bracket-champion": {
+    mode: UiMode.TOURNAMENT_BRACKET,
+    prepare: () => [buildTournamentBracketDemoConfig({ size: 8, advancedRounds: 3, card: "champion" })],
+    diffTolerance: 0,
   },
   // Showdown SET EDITOR (P1 layout core). The full-screen teambuilder Layer-3 editor for one
   // team slot: top team strip + validity chips, the left identity column (sprite / stage strip /

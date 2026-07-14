@@ -82,4 +82,8 @@ export enum UiMode {
   SHOWDOWN_SET_EDITOR,
   /** Showdown 1v1: the TEAM PRESET MENU - the new pre-pairing entry screen (build/select before lobby). */
   SHOWDOWN_TEAM_MENU,
+  /** Showdown Tournament: the tournament LIST (open / in-progress / finished; register). */
+  TOURNAMENT_LIST,
+  /** Showdown Tournament: the single-elim BRACKET tree + your-next-match card. */
+  TOURNAMENT_BRACKET,
 }
