@@ -37,15 +37,21 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { clearCoopRuntime, getCoopUiMirror, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REWARD_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { BattlerIndex } from "#enums/battler-index";
+import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
   beginRewardShopWatch,
   buildDuo,
+  type DuoRig,
   drainLoopback,
+  driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveRewardShopOwnerLeaveViaUi,
   installDuoLogCapture,
@@ -65,6 +71,25 @@ function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
 }
 
+function wireGuestCommand(rig: DuoRig): void {
+  rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
+    command: Command.FIGHT,
+    cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
+    moveId: MoveId.TACKLE,
+    targets: [BattlerIndex.ENEMY_2],
+  }));
+}
+
+async function playOneAuthoritativeWave(game: GameManager, rig: DuoRig): Promise<void> {
+  const turn = rig.hostScene.currentBattle.turn;
+  await withClient(rig.hostCtx, async () => {
+    game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
+    game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
+    await game.phaseInterceptor.to("TurnEndPhase");
+  });
+  await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+}
+
 describe.skipIf(!RUN)(
   "co-op DUO post-ME reward shop: an out-of-range relayed reward cursor never crashes the watcher (#854)",
   () => {
@@ -79,7 +104,13 @@ describe.skipIf(!RUN)(
     beforeEach(() => {
       game = new GameManager(phaserGame);
       logs = installDuoLogCapture(`me-reward-oob-${Date.now()}`);
-      game.override.battleStyle("double").startingLevel(50).disableTrainerWaves();
+      game.override
+        .battleStyle("double")
+        .enemyLevel(1)
+        .enemyMoveset(MoveId.SPLASH)
+        .startingLevel(50)
+        .moveset([MoveId.TACKLE])
+        .disableTrainerWaves();
     });
 
     afterEach(() => {
@@ -95,6 +126,7 @@ describe.skipIf(!RUN)(
       // loopback pair. The reward interaction opens on counter 0 -> host owns (even), guest WATCHES. =====
       await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
       const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+      wireGuestCommand(rig);
 
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       expect(counterBefore, "the reward shop opens on interaction counter 0 (host owns even -> guest watches)").toBe(0);
@@ -102,6 +134,7 @@ describe.skipIf(!RUN)(
 
       // ===== Reach both REAL queued production shops. Detached phases are no longer a valid authority
       // fixture: their terminal callback correctly detects that they do not own the live phase boundary. =====
+      await playOneAuthoritativeWave(game, rig);
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectModifierPhase", false));
       const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));

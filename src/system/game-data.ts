@@ -3688,6 +3688,23 @@ export class GameData {
                 ? null
                 : ((markerInspection?.kind === "empty" ? markerInspection : null)
                   ?? remainingInspections.find(inspection => inspection.kind === "empty"))));
+          if (selected?.kind === "empty" && allInspections.some(inspection => inspection.kind === "occupied")) {
+            const summary = allInspections
+              .map(inspection => {
+                if (inspection.kind !== "occupied") {
+                  return `${inspection.slot}:${inspection.kind}`;
+                }
+                return (
+                  `${inspection.slot}:occupied`
+                  + `:run=${inspection.stored.commitment.runId === commitment.runId}`
+                  + `:seats=${coopSeatMapMatches(inspection.stored.session.coopParticipants, controller.localName(), partner, controller.role)}`
+                  + `:cloud=${inspection.cloudCas?.mode ?? "none"}`
+                  + `:cloudRun=${inspection.cloudCas?.mode === "existing" ? inspection.cloudCas.runId === commitment.runId : false}`
+                );
+              })
+              .join(",");
+            coopWarn("launch", `guest checkpoint selected empty slot=${selected.slot} inspections=[${summary}]`);
+          }
           if (selected == null || !exactRuntimeIsCurrent()) {
             if (exactRuntimeIsCurrent()) {
               recordCoopResumeUnavailableEvidence(

@@ -562,6 +562,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const commitment = await deriveCoopResumeCommitment(hostJson, hostSession);
     expect(commitment).not.toBeNull();
     const priorGameplaySlot = rig.guestScene.sessionSlotId;
+    const guestKeys = await withClient(rig.guestCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
 
     setBypassLoginForTesting(false);
     // An ordinary non-cloud cadence checkpoint may advance only an already cloud-backed replica.
@@ -591,6 +592,11 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         completedCloudBytes.push(raw);
         return { ok: true, status: 200, error: "", failureKind: null };
       });
+
+    // startBattle may leave a pre-pair account's ordinary local slot behind. This scenario claims slot 0
+    // is already the guest account's exact cloud-backed replica, so remove any unrelated local row first;
+    // production correctly refuses to overwrite an unproved local-only save merely because cloud differs.
+    guestKeys.forEach(key => localStorage.removeItem(key));
 
     await withClient(rig.guestCtx, () => {
       rig.guestScene.gameData.armCoopResumeCheckpointPersistence();
@@ -1929,6 +1935,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const keys = await withClient(rig.hostCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
     const prior = keys.map(key => localStorage.getItem(key));
     const cloudBySlot = new Map<number, string>();
+    const guestCloudBySlot = new Map<number, string>();
     let hostSlot = -1;
     let existingSave = false;
     let authorityOutcome: "success" | "transient" | "transient-diverged" | "conflict" =
@@ -1941,11 +1948,13 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     try {
       keys.forEach(key => localStorage.removeItem(key));
       setBypassLoginForTesting(false);
-      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request =>
-        cloudBySlot.has(request.slot) ? coopCasFound(cloudBySlot.get(request.slot)!) : coopCasMissing(),
-      );
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockImplementation(async request => {
+        const accountCloud = guestPersisting ? guestCloudBySlot : cloudBySlot;
+        return accountCloud.has(request.slot) ? coopCasFound(accountCloud.get(request.slot)!) : coopCasMissing();
+      });
       vi.mocked(pokerogueApi.savedata.session.getCoopRunStatus).mockImplementation(async request => {
-        for (const [slot, raw] of cloudBySlot) {
+        const accountCloud = guestPersisting ? guestCloudBySlot : cloudBySlot;
+        for (const [slot, raw] of accountCloud) {
           const parsed = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(raw));
           const cloudCommitment = await deriveCoopResumeCommitment(raw, parsed);
           if (cloudCommitment?.runId === request.coopRunId) {
@@ -1965,10 +1974,12 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         return { ok: true, status: 200, value: { state: "missing", runId: request.coopRunId } };
       });
       vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockImplementation(async (request, raw) => {
-        if (!existingSave || guestPersisting) {
-          if (!guestPersisting) {
-            expect(request.coopCasMode).toBe("empty");
-          }
+        if (guestPersisting) {
+          guestCloudBySlot.set(request.slot, raw);
+          return { ok: true, status: 200, error: "", failureKind: null };
+        }
+        if (!existingSave) {
+          expect(request.coopCasMode).toBe("empty");
           cloudBySlot.set(request.slot, raw);
           return { ok: true, status: 200, error: "", failureKind: null };
         }
