@@ -22,6 +22,7 @@ import {
   setCoopBiomePickerDrivenByTest,
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import { CoopInteractionRelay, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { makeCoopOperationId, parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   adoptCoopBiomeTransitionSwitchPermit,
   armCoopBiomeTransitionTailPermit,
@@ -370,7 +371,15 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         rig.guestScene.currentBattle.waveIndex = 10;
         const deterministicOperationId = coopAuthoritativeBiomeTransitionOperationId(10);
         expect(deterministicOperationId).not.toBeNull();
-        const wrongOwnerOperationId = deterministicOperationId!.replace(/^1:0:/u, "1:1:");
+        const deterministicAddress = parseCoopOperationId(deterministicOperationId!);
+        expect(deterministicAddress).not.toBeNull();
+        const sessionEpoch = deterministicAddress!.epoch;
+        const wrongOwnerOperationId = makeCoopOperationId(
+          sessionEpoch,
+          1,
+          deterministicAddress!.pinnedSeq,
+          "BIOME_PICK",
+        );
         const sourceBiomeId = rig.guestScene.arena.biomeId;
         const beforeArena = rig.guestScene.arena;
         const beforeNodes = getErPendingNodes().map(node => ({ ...node }));
@@ -381,8 +390,8 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         setErPendingNodes(beforeNodes);
         expect(
           armCoopBiomeTransitionTailPermit({
-            operationId: wrongOwnerOperationId,
-            sessionEpoch: 1,
+            operationId: deterministicOperationId!,
+            sessionEpoch,
             revision: 1,
             wave: 10,
             sourceBiomeId: -1,
@@ -393,8 +402,8 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         ).toBe(false);
         expect(
           armCoopBiomeTransitionTailPermit({
-            operationId: wrongOwnerOperationId,
-            sessionEpoch: 1,
+            operationId: deterministicOperationId!,
+            sessionEpoch,
             revision: 1,
             wave: 10,
             sourceBiomeId,
@@ -406,7 +415,19 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         expect(
           armCoopBiomeTransitionTailPermit({
             operationId: wrongOwnerOperationId,
-            sessionEpoch: 1,
+            sessionEpoch,
+            revision: 1,
+            wave: 10,
+            sourceBiomeId,
+            destinationBiomeId: BiomeId.VOLCANO,
+            nextWave: 11,
+          }),
+          "a forged owner cannot authorize a deterministic host-owned transition",
+        ).toBe(false);
+        expect(
+          armCoopBiomeTransitionTailPermit({
+            operationId: deterministicOperationId!,
+            sessionEpoch,
             revision: 1,
             wave: 10,
             sourceBiomeId,
@@ -433,7 +454,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         expect(
           armCoopBiomeTransitionTailPermit({
             operationId: deterministicOperationId!,
-            sessionEpoch: 1,
+            sessionEpoch,
             revision: 2,
             wave: 10,
             sourceBiomeId,
@@ -501,7 +522,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         expect(
           armCoopBiomeTransitionTailPermit({
             operationId: deterministicOperationId!,
-            sessionEpoch: 1,
+            sessionEpoch,
             revision: 2,
             wave: 10,
             sourceBiomeId,

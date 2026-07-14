@@ -1051,6 +1051,15 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         guestSwitch.mock.calls.find(c => c[0] === "SwitchBiomePhase"),
         "the renderer has not projected the pre-delivered terminal yet",
       ).toBeUndefined();
+      expect(
+        withClientSync(rig.guestCtx, () => getCoopBiomeTransitionCommitReceipt({ sourceWave: 13 })?.payload),
+        "the renderer retains the pre-delivered exact terminal in its own runtime before opening SelectBiome",
+      ).toMatchObject({
+        sourceBiomeId: rig.guestScene.arena.biomeId,
+        biomeId: hostBiome,
+        nodeIndex: -1,
+        nextWave: 14,
+      });
       await withClient(rig.guestCtx, async () => {
         // NOT chained (no setCoopBiomeInteractionStart): the natural single-node deterministic terminal.
         liveSelectBiome().start();

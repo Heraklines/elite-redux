@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "taskId": "p33-biome-transition-frontier",
+  "branch": "ci/coop/p33-biome-transition-frontier",
+  "trainRef": "ci/coop/p33-biome-transition-frontier",
+  "baseSha": "e73bc775919324263da21d3f20af426dea9d0b6b",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-biome-transition-frontier.json",
+    "src/data/elite-redux/coop/coop-biome-operation.ts",
+    "src/phases/select-biome-phase.ts",
+    "test/tests/elite-redux/coop/coop-duo-biome-boundary.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-biome-choice.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-biome-market-continuation.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-biome-operation.test.ts",
+    "test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts"
+  ]
+}
