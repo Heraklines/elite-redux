@@ -1336,11 +1336,15 @@ export class SelectModifierPhase extends BattlePhase {
         "reward",
         `OWNER retained terminal before continuation seq=${this.coopInteractionStart} id=${prepared.operationId}`,
       );
-      // Preserve the historical replay decision point, but park phase teardown/counter advance until the
-      // guest proves this exact canonical result was materially applied. Journal retention continues beyond
-      // that proof until the guest's addressed public continuation emits continuationReady.
+      // Preserve the replay decision point. A real peer owns an independent renderer and must materially
+      // apply this exact canonical result before this phase may tear down or advance the shared counter.
+      // The local-dev SpoofGuest has no scene on which to apply/ACK the result, so it deliberately keeps the
+      // historical fall-through contract and lets the caller finish locally after the retained commit.
       recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
-      this.coopAwaitTerminalMaterialApplied(prepared.operationId);
+      if (getCoopRuntime()?.spoof == null) {
+        this.coopAwaitTerminalMaterialApplied(prepared.operationId);
+        return true;
+      }
       return false;
     }
     if (isCoopDebug()) {
@@ -1363,9 +1367,9 @@ export class SelectModifierPhase extends BattlePhase {
 
   /** HOST: publish the complete post-action result before any continuation surface opens. */
   private coopCommitPendingAuthorityResult(operationId = this.coopPendingAuthorityOperationId): boolean {
-    // A host-owned terminal already committed at the relay seam and armed its peer-material barrier. Preserve
-    // the historical `coopRelaySend() === false` contract for direct drivers, but stop its ordinary caller
-    // here before teardown/counter advance. The barrier callback owns that exact continuation now.
+    // A host-owned terminal already committed at the relay seam and armed its peer-material barrier. Stop a
+    // following legacy caller before teardown/counter advance; the barrier callback owns that continuation.
+    // Local SpoofGuest sessions never arm this set and therefore retain their synchronous fall-through.
     if (operationId == null && this.coopAwaitingMaterialResults.size > 0) {
       return false;
     }
