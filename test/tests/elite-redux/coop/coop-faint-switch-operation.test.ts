@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { clearNegotiatedCoopCapabilities } from "#data/elite-redux/coop/coop-capabilities";
 import {
   armCoopFaintSwitchIntentResend,
   captureCoopFaintSwitchOperationBinding,
@@ -21,9 +22,14 @@ import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/eli
 import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("co-op faint-switch operation migration", () => {
+  beforeEach(() => {
+    clearNegotiatedCoopCapabilities();
+    setCoopFaintSwitchOperationEnabled(true);
+  });
+
   afterEach(() => {
     resetCoopFaintSwitchRetryMs();
     resetCoopFaintSwitchOperationFlag();
@@ -31,6 +37,7 @@ describe("co-op faint-switch operation migration", () => {
     clearCoopRuntime();
     setCoopOperationDurability(null);
     setActiveCoopRuntimeOpState(null);
+    clearNegotiatedCoopCapabilities();
   });
 
   it("addresses repeated same-turn replacements by the authoritative party slot", () => {
