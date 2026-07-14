@@ -52,6 +52,11 @@ import {
 import { buildShowdownStakePool } from "#data/elite-redux/showdown/showdown-stake-pool";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { beginShowdownTelemetry } from "#data/elite-redux/showdown/showdown-telemetry";
+import {
+  clearTournamentMatchContext,
+  getTournamentMatchContext,
+  isTournamentPeerAllowed,
+} from "#data/elite-redux/showdown/tournament-match-context";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
 import { ChallengeType } from "#enums/challenge-type";
@@ -463,6 +468,20 @@ export class SelectStarterPhase extends Phase {
       );
       return;
     }
+    // TOURNAMENT constrained pairing: a tournament match may ONLY be played against the bracket
+    // opponent. BOTH clients run this flow, so both verify the negotiated peer identity and reject a
+    // mismatch (a stray lobby pairing / spoof can never start a tournament match against the wrong
+    // person). Prize-only: a tournament match never touches escrow (see the empty stake pool below).
+    const tournamentCtx = getTournamentMatchContext();
+    if (tournamentCtx != null && !isTournamentPeerAllowed(runtime.controller.partnerName ?? "")) {
+      disposePendingShowdownSession();
+      disposePendingShowdownRelay();
+      this.abortShowdown(
+        `This is not your tournament opponent. You can only play ${tournamentCtx.expectedOpponent} in this match.`,
+      );
+      return;
+    }
+
     // Keep the shared rendezvous alive (ownsRendezvous=false) for the wager-commit barrier; drop the
     // session's own team/ready listeners (their job is done) via the pending slot.
     disposePendingShowdownSession();
@@ -475,7 +494,10 @@ export class SelectStarterPhase extends Phase {
       transport: runtime.localTransport,
       rendezvous: runtime.rendezvous,
       // D3b: the FULL wagerable collection + the two players' account identities (escrow participants).
-      stakePool: buildShowdownStakePool(globalScene.gameData),
+      // TOURNAMENT (prize-only): an EMPTY stake pool makes the wager screen Friendly-only — it renders
+      // as team-preview + confirm, the player can only commit Friendly, matchId stays null, and every
+      // escrow call site no-ops. Nobody's collection is at risk in a tournament match.
+      stakePool: tournamentCtx == null ? buildShowdownStakePool(globalScene.gameData) : [],
       ownUsername: runtime.controller.localName(),
       opponentUsername: runtime.controller.partnerName ?? "",
       onCommit: (matchId: string | null, ranked) => {
@@ -550,6 +572,8 @@ export class SelectStarterPhase extends Phase {
   /** Showdown 1v1 (D0): tear the versus session down and return to the title with a message. */
   private abortShowdown(message: string): void {
     endShowdownBattle();
+    // A tournament match that aborts must not leak its context into a later plain match.
+    clearTournamentMatchContext();
     // Dispose a still-pending pre-battle session + relay (a negotiate-window abort never fired onCommit,
     // so neither was adopted into the match state - endShowdownBattle can't have reached them). B7 item 8:
     // the session's transport listener MUST be torn down or it keeps buffering on a dead flow.
