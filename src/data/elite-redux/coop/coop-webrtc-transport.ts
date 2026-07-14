@@ -67,6 +67,8 @@ const COOP_WIRE_MAX_CHUNKS = 2_048;
 const COOP_WIRE_MAX_REASSEMBLED_BYTES = 16 * 1024 * 1024;
 const COOP_LOGICAL_QUEUE_MAX_BYTES = 32 * 1024 * 1024;
 const COOP_LOGICAL_QUEUE_MAX_COUNT = 512;
+/** Bounded whole-transfer replay fence. Transfer ids are unique for one transport session. */
+export const COOP_WIRE_COMPLETED_TRANSFER_RETENTION = 512;
 
 interface CoopWireChunkFrame {
   __coopChunk: 1;
@@ -172,10 +174,18 @@ export class WebRtcTransport implements CoopTransport {
   private logicalOutboundBytes = 0;
   private drainingLogicalOutbound = false;
   private blockedSendGeneration: number | null = null;
+  /** A connected-path durable refusal lost exact bytes and therefore owes retained recovery/full resync. */
+  private logicalOutboundNeedsResync = false;
+  /** Prevent more than one recovery transition for the same failed channel generation. */
+  private logicalRecoveryGeneration: number | null = null;
+  /** Self-identifying local transport failure surfaced through the existing disconnect diagnostics. */
+  private transportFailureReason: string | undefined;
   private readonly inboundChunks = new Map<
     string,
     { readonly total: number; readonly parts: (string | undefined)[]; received: number; bytes: number }
   >();
+  /** Recently completed chunk ids remain terminal so replaying an entire group cannot deliver twice. */
+  private readonly completedInboundChunkIds = new Set<string>();
 
   constructor(role: CoopRole, wire: CoopWireChannel, initialConnectionGeneration = 0) {
     if (!Number.isSafeInteger(initialConnectionGeneration) || initialConnectionGeneration < 0) {
@@ -238,6 +248,8 @@ export class WebRtcTransport implements CoopTransport {
     this.wireGeneration++;
     this.inboundChunks.clear();
     this.blockedSendGeneration = null;
+    this.logicalRecoveryGeneration = null;
+    this.transportFailureReason = undefined;
     for (const logical of this.logicalOutbound) {
       logical.attempt = null;
     }
@@ -268,7 +280,7 @@ export class WebRtcTransport implements CoopTransport {
    * reconnect banner can tell the player WHY the channel dropped instead of a bare "connection lost".
    */
   disconnectReason(): string | undefined {
-    return this.wire.lastError;
+    return this.transportFailureReason ?? this.wire.lastError;
   }
 
   connectionGeneration(): number {
@@ -403,7 +415,10 @@ export class WebRtcTransport implements CoopTransport {
       // pings (internal) are never queued - they are time-sensitive. With the flag OFF this is the legacy
       // drop-on-not-open path unchanged.
       if (isCoopDurabilityEnabled() && classifyCoopMessage(msg) === "durable") {
-        const queue = this.outboundQueue ?? (this.outboundQueue = new CoopOutboundQueue());
+        if (this.outboundQueue == null) {
+          this.outboundQueue = new CoopOutboundQueue();
+        }
+        const queue = this.outboundQueue;
         const outcome = queue.offer(msg, new TextEncoder().encode(JSON.stringify(msg)).byteLength);
         if (isCoopDebug()) {
           coopWarn(
@@ -440,10 +455,15 @@ export class WebRtcTransport implements CoopTransport {
       || this.logicalOutbound.length >= COOP_LOGICAL_QUEUE_MAX_COUNT
       || this.logicalOutboundBytes + byteLength > COOP_LOGICAL_QUEUE_MAX_BYTES
     ) {
+      const reason =
+        byteLength > COOP_WIRE_MAX_REASSEMBLED_BYTES
+          ? `oversized logical frame bytes=${byteLength} max=${COOP_WIRE_MAX_REASSEMBLED_BYTES}`
+          : `logical FIFO exhausted depth=${this.logicalOutbound.length}/${COOP_LOGICAL_QUEUE_MAX_COUNT} bytes=${this.logicalOutboundBytes}/${COOP_LOGICAL_QUEUE_MAX_BYTES}`;
       coopWarn(
         "webrtc",
-        `raw send REFUSED role=${this.role} t=${msg.t} bytes=${byteLength} queue=${this.logicalOutbound.length}/${this.logicalOutboundBytes} (bounded FIFO limit)`,
+        `raw send REFUSED role=${this.role} t=${msg.t} bytes=${byteLength} queue=${this.logicalOutbound.length}/${this.logicalOutboundBytes} (${reason})`,
       );
+      this.escalateDurableRefusal(msg, reason);
       return;
     }
     this.logicalOutbound.push({ msg, json, byteLength, attempt: null });
@@ -464,10 +484,12 @@ export class WebRtcTransport implements CoopTransport {
     }
     const total = Math.ceil(bytes.byteLength / COOP_WIRE_CHUNK_RAW_BYTES);
     if (total > COOP_WIRE_MAX_CHUNKS) {
+      const reason = `logical frame needs ${total} chunks; max=${COOP_WIRE_MAX_CHUNKS}`;
       coopWarn(
         "webrtc",
-        `raw send REFUSED role=${this.role} t=${logical.msg.t} bytes=${bytes.byteLength} chunks=${total} (bounded framing limit)`,
+        `raw send REFUSED role=${this.role} t=${logical.msg.t} bytes=${bytes.byteLength} chunks=${total} (${reason})`,
       );
+      this.escalateDurableRefusal(logical.msg, reason);
       return null;
     }
     const id = `${this.role}-${this.wireGeneration}-${++this.outboundChunkSeq}`;
@@ -495,6 +517,7 @@ export class WebRtcTransport implements CoopTransport {
    * Drain the logical FIFO while the channel is open and below its byte watermark. A mid-attempt
    * exception leaves the logical item at the head; replacement builds a new id and restarts at chunk 0.
    */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: framing, generation, and backpressure guards form one atomic drain state machine
   private drainLogicalOutbound(): void {
     if (
       this.drainingLogicalOutbound
@@ -513,7 +536,9 @@ export class WebRtcTransport implements CoopTransport {
           if (logical.attempt == null) {
             this.logicalOutbound.shift();
             this.logicalOutboundBytes -= logical.byteLength;
-            continue;
+            // A durable refusal transitions the transport into the existing shared rejoin/resync path.
+            // Never continue draining the superseded channel generation after that fail-closed boundary.
+            return;
           }
         }
         const attempt = logical.attempt;
@@ -563,12 +588,50 @@ export class WebRtcTransport implements CoopTransport {
 
   /** W2b (§4.3): whether the outbound queue overflowed + dropped its backlog (a reconnect resync is owed). */
   outboundQueueNeedsResync(): boolean {
-    return this.outboundQueue?.needsResync() ?? false;
+    return this.logicalOutboundNeedsResync || (this.outboundQueue?.needsResync() ?? false);
   }
 
   /** W2b (§4.3): clear the resync-owed flag once the caller has issued the reconnect-from-revision request. */
   clearOutboundQueueResync(): void {
     this.outboundQueue?.clearResync();
+    this.logicalOutboundNeedsResync = false;
+  }
+
+  /**
+   * A connected-path REFUSED durable frame cannot be silently dropped. Mark retained recovery owed, close
+   * the current peer channel so BOTH endpoints enter the existing bounded hot-rejoin path, and let its
+   * durability tail/full snapshot reconstruct the lost logical frame. Cosmetic frames remain shed-able.
+   */
+  private escalateDurableRefusal(msg: CoopMessage, reason: string): void {
+    if (classifyCoopMessage(msg) !== "durable") {
+      return;
+    }
+    this.logicalOutboundNeedsResync = true;
+    this.transportFailureReason = `durable transport refusal (${msg.t}): ${reason}`;
+    if (this._state !== "connected" || this.logicalRecoveryGeneration === this.wireGeneration) {
+      return;
+    }
+    this.logicalRecoveryGeneration = this.wireGeneration;
+    this.blockedSendGeneration = this.wireGeneration;
+    coopWarn(
+      "webrtc",
+      `durable refusal -> shared channel recovery role=${this.role} gen=${this.wireGeneration} t=${msg.t} reason=${reason}`,
+    );
+    // Notify this endpoint immediately, then close the real RTCDataChannel so the peer observes the same
+    // channel-loss boundary and joins the symmetric re-dial. The runtime's established disconnect reaction
+    // retains waits, reconnects durability, requests a full snapshot, and terminates coherently on exhaustion.
+    // Capture the refused generation's carrier before notifying: a synchronous state listener is allowed to
+    // install a replacement, and must never have that fresh carrier closed by the refusal cleanup below.
+    const refusedWire = this.wire;
+    this.setState("disconnected");
+    try {
+      refusedWire.close();
+    } catch (error) {
+      coopWarn(
+        "webrtc",
+        `durable refusal channel close threw role=${this.role}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   onMessage(handler: (msg: CoopMessage) => void): () => void {
@@ -592,9 +655,12 @@ export class WebRtcTransport implements CoopTransport {
     this.setState("closed");
     this.wire.close();
     this.inboundChunks.clear();
+    this.completedInboundChunkIds.clear();
     this.logicalOutbound.length = 0;
     this.logicalOutboundBytes = 0;
     this.blockedSendGeneration = null;
+    this.logicalRecoveryGeneration = null;
+    this.transportFailureReason = undefined;
     this.msgHandlers.clear();
     this.stateHandlers.clear();
   }
@@ -617,6 +683,7 @@ export class WebRtcTransport implements CoopTransport {
     return this.lastRxAt === 0 ? undefined : Date.now() - this.lastRxAt;
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: validation and transport-internal control dispatch intentionally share one parse boundary
   private receive(data: string): void {
     // #diagnostics: stamp the last-received-frame time for ANY inbound frame (BEFORE the ping/pong
     // swallow + the JSON parse) so a live-but-idle tab - which still receives ~5s keepalives - reads a
@@ -681,7 +748,14 @@ export class WebRtcTransport implements CoopTransport {
     );
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: adversarial chunk validation must fail closed before mutating one assembly
   private receiveChunk(chunk: CoopWireChunkFrame): void {
+    if (this.completedInboundChunkIds.has(chunk.id)) {
+      // The transfer id is terminal for this transport session. This fences a looped/duplicated carrier
+      // that replays every chunk after the first complete delivery, not merely duplicates within assembly.
+      coopLog("webrtc", `raw rx completed chunk replay DROPPED role=${this.role} id=${chunk.id}`);
+      return;
+    }
     if (
       chunk.total <= 0
       || chunk.total > COOP_WIRE_MAX_CHUNKS
@@ -768,8 +842,21 @@ export class WebRtcTransport implements CoopTransport {
       coopWarn("webrtc", `raw rx invalid UTF-8 assembly role=${this.role} id=${chunk.id}`);
       return;
     }
+    this.rememberCompletedInboundChunkId(chunk.id);
     coopLog("webrtc", `raw rx REASSEMBLED role=${this.role} bytes=${assembly.bytes} chunks=${assembly.total}`);
     this.receive(complete);
+  }
+
+  /** Retain a bounded insertion-ordered fence for completed logical transfer ids. */
+  private rememberCompletedInboundChunkId(id: string): void {
+    this.completedInboundChunkIds.add(id);
+    while (this.completedInboundChunkIds.size > COOP_WIRE_COMPLETED_TRANSFER_RETENTION) {
+      const oldest = this.completedInboundChunkIds.values().next().value;
+      if (typeof oldest !== "string") {
+        break;
+      }
+      this.completedInboundChunkIds.delete(oldest);
+    }
   }
 }
 
