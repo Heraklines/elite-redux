@@ -2539,7 +2539,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           // window as the T2 journey while continuing to fail loudly on a genuine no-progress state.
           const nestedDriveDeadline = Date.now() + 10_000;
           while (!hostReachedNestedDestination && Date.now() < nestedDriveDeadline) {
-            await pumpDuoDestinations(rig, 1);
+            // Alternate destinations only while the guest still needs to receive and answer another
+            // retained sub-prompt. Once its final public callback has queued ME_SUB, drain the host only:
+            // the authoritative option callback is async, and entering guest context while it resolves can
+            // make Phase.end() shift the guest queue (the intermittent host-Rewards / guest-Inert strand).
+            if (pendingSubPicks.length > 0) {
+              await pumpDuoDestinations(rig, 1);
+            } else {
+              await withClient(rig.hostCtx, () => drainLoopback());
+            }
             if (scriptedDriveError != null) {
               throw scriptedDriveError;
             }
