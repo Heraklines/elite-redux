@@ -115,13 +115,13 @@ describe("TypeDamageBoostAbAttr archetype (C1)", () => {
     expect(result.finalPower).toBe(150);
   });
 
-  it("uses the high-HP multiplier when subject HP is exactly at the threshold", () => {
+  it("uses the low-HP multiplier when subject HP is exactly at the threshold (boundary-inclusive)", () => {
     const attr = new TypeDamageBoostAbAttr({
       type: PokemonType.GRASS,
       multiplier: 1.2,
       lowHpMultiplier: 1.5,
     });
-    // ratio === threshold → NOT strictly below → high-HP branch
+    // ratio === threshold → ER "1/3 HP or lower" is inclusive → low-HP branch
     const result = runBoost({
       attr,
       pokemon: makeStubPokemon({ hpRatio: 1 / 3 }),
@@ -129,7 +129,7 @@ describe("TypeDamageBoostAbAttr archetype (C1)", () => {
       initialPower: 100,
     });
     expect(result.fired).toBe(true);
-    expect(result.finalPower).toBeCloseTo(120, 5);
+    expect(result.finalPower).toBeCloseTo(150, 5);
   });
 
   it("respects a custom lowHpThreshold", () => {
@@ -147,14 +147,14 @@ describe("TypeDamageBoostAbAttr archetype (C1)", () => {
       initialPower: 100,
     });
     expect(low.finalPower).toBe(200);
-    // ratio 0.5 === threshold → high-HP branch (which is 1.0× → no change)
+    // ratio 0.5 === threshold → boundary-inclusive → low-HP branch (2.0×)
     const high = runBoost({
       attr,
       pokemon: makeStubPokemon({ hpRatio: 0.5 }),
       move: makeStubMove(PokemonType.ELECTRIC),
       initialPower: 100,
     });
-    expect(high.finalPower).toBe(100);
+    expect(high.finalPower).toBe(200);
   });
 
   it("never invokes the low-HP branch when lowHpMultiplier is not configured", () => {

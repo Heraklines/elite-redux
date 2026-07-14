@@ -108,7 +108,9 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_STRENGTH", { power: 110, pp: 5, chance: 100 }],
   ["MOVE_ABSORB", { chance: 0 }],
   ["MOVE_MEGA_DRAIN", { power: 50, pp: 15 }],
-  ["MOVE_RAZOR_LEAF", { pp: 25, chance: 100 }],
+  // ER dex effectChance 10 (10% Bleed secondary), not 100 — the vanilla 100 here
+  // made the grafted ER_BLEED rider a guaranteed proc. pp 25 clamps to dex 20.
+  ["MOVE_RAZOR_LEAF", { pp: 25, chance: 10 }],
   ["MOVE_POISON_POWDER", { pp: 35 }],
   ["MOVE_PETAL_DANCE", { pp: 10 }],
   // Dragon Rage: ER (er-moves.ts id 82) is a regular 80-BP Dragon move — the

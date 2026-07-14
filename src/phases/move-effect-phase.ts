@@ -22,6 +22,7 @@ import { erApplyReactiveOnHit } from "#data/elite-redux/er-reactive-items";
 import { applyErLifeOrbRecoil, applyErRockyHelmet } from "#data/elite-redux/er-recreated-items";
 import { SpeciesFormChangePostMoveTrigger } from "#data/form-change-triggers";
 import type { TypeDamageMultiplier } from "#data/type";
+import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
@@ -822,7 +823,12 @@ export class MoveEffectPhase extends PokemonPhase {
 
     // ER recreated held items: Life Orb recoil on the attacker, Rocky Helmet
     // contact damage from the target. Both gated on damage actually dealt.
-    applyErLifeOrbRecoil(user, finalDmg);
+    // ER Sheer Force (125): moves it power-boosts (those with a secondary effect,
+    // move.chance >= 1) do NOT incur Life Orb recoil.
+    const sheerForceSuppressesRecoil = user.hasAbility(AbilityId.SHEER_FORCE) && this.move.chance >= 1;
+    if (!sheerForceSuppressesRecoil) {
+      applyErLifeOrbRecoil(user, finalDmg);
+    }
     applyErRockyHelmet(user, target, this.move, finalDmg);
 
     target.turnData.attacksReceived.unshift({

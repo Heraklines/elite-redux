@@ -155,6 +155,7 @@ import {
   PreSwitchOutResetStatusAbAttr,
   PreventBerryUseAbAttr,
   PreventBypassSpeedChanceAbAttr,
+  PreventItemUseAbAttr,
   ProtectStatAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
   ReceivedTypeDamageMultiplierAbAttr,
@@ -971,7 +972,13 @@ export function initAbilities() {
       .ignorable()
       .build(),
     new AbBuilder(AbilityId.UNNERVE, 5, 1) //
+      // ER (ability 127): the dex says Unnerve "prevents opposing Pokemon from
+      // consuming their held items" — ALL consumables, not just berries. The
+      // berry block stays (PreventBerryUse, enforced in berry-phase); the
+      // PreventItemUse marker extends the block to NON-berry single-use
+      // consumables (ER reactive items), mirroring the bespoke As-One 266/267.
       .attr(PreventBerryUseAbAttr)
+      .attr(PreventItemUseAbAttr)
       .build(),
     new AbBuilder(AbilityId.DEFIANT, 5) //
       .attr(PostStatStageChangeStatStageChangeAbAttr, (_target, _statsChanged, stages) => stages < 0, [Stat.ATK], 2)
@@ -1040,7 +1047,9 @@ export function initAbilities() {
         // Rate is doubled when under sun, cf https://dex.pokemonshowdown.com/abilities/harvest
         pokemon => (getWeatherCondition(WeatherType.SUNNY, WeatherType.HARSH_SUN)(pokemon) ? 1 : 0.5),
       )
-      .edgeCase() // Cannot recover berries used up by fling or natural gift (unimplemented)
+      // ER (ability 139): berries consumed via Fling / Natural Gift are now
+      // ledgered to battleData.berriesEaten (ErFlingConsumeBerryAttr), so Harvest
+      // regrows them like eaten berries. Vanilla's `.edgeCase()` is dropped.
       .build(),
     new AbBuilder(AbilityId.TELEPATHY, 5) //
       .attr(MoveImmunityAbAttr, (pokemon, attacker, move) => pokemon.getAlly() === attacker && move.is("AttackMove"))
@@ -1422,9 +1431,18 @@ export function initAbilities() {
     new AbBuilder(AbilityId.SHIELDS_DOWN, 7, -1) //
       // Change into Meteor Form on switch-in or turn end if HP >= 50%,
       // or Core Form if HP <= 50%.
+      // ER: once in Core Form (formIndex >= 7) the Minior CANNOT revert to
+      // Meteor Form during the battle (dex: "Cannot revert to Meteor Form once
+      // transformed during battle") — so healing back above 50%, or a Shell
+      // Smash forced Core, keeps it Core. PostBattleInit resets to Meteor at the
+      // start of each new battle (color = formIndex % 7).
       .attr(PostBattleInitFormChangeAbAttr, p => p.formIndex % 7)
-      .attr(PostSummonFormChangeAbAttr, p => (p.formIndex % 7) + (p.getHpRatio() <= 0.5 ? 7 : 0))
-      .attr(PostTurnFormChangeAbAttr, p => (p.formIndex % 7) + (p.getHpRatio() <= 0.5 ? 7 : 0))
+      .attr(PostSummonFormChangeAbAttr, p =>
+        p.formIndex >= 7 ? p.formIndex : (p.formIndex % 7) + (p.getHpRatio() <= 0.5 ? 7 : 0),
+      )
+      .attr(PostTurnFormChangeAbAttr, p =>
+        p.formIndex >= 7 ? p.formIndex : (p.formIndex % 7) + (p.getHpRatio() <= 0.5 ? 7 : 0),
+      )
       // All variants of Meteor Form are immune to status effects & Yawn
       .conditionalAttr(p => p.formIndex < 7, StatusEffectImmunityAbAttr)
       .conditionalAttr(p => p.formIndex < 7, BattlerTagImmunityAbAttr, BattlerTagType.DROWSY)

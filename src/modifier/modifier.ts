@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { FusionSpeciesFormEvolution, pokemonEvolutions } from "#balance/pokemon-evolutions";
+import { isMagicRoomActive } from "#data/arena-tag";
 import { erIsHeldItemDisabled } from "#data/battler-tags";
 import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
@@ -702,6 +703,14 @@ export abstract class PokemonHeldItemModifier extends PersistentModifier {
     // suppress THIS item's effect only when it is the locked one. Mega Stones /
     // form-change items are never the locked target ("does not prevent Mega Stones").
     if (erIsHeldItemDisabled(pokemon, this.type?.id)) {
+      return false;
+    }
+    // ER Magic Room (move 478): while active, the effects of ALL held items on
+    // the field are suppressed for 5 turns. Scoped to TRANSFERABLE held items
+    // (the ones with an in-battle effect); permanent non-transferable items
+    // (base-stat vitamins, evo trackers, Mega Stones) are left alone so a mon's
+    // stats never shift mid-battle. See {@linkcode MagicRoomTag}.
+    if (this.isTransferable && isMagicRoomActive()) {
       return false;
     }
     return true;

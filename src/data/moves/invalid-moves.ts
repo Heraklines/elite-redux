@@ -382,3 +382,25 @@ export const invalidInstructMoves: ReadonlySet<MoveId> = new Set([
   MoveId.STRUGGLE,
   // NB: Add Max/G-Max/Z-Move blockage if or when they are implemented
 ]);
+
+/**
+ * Set of moves that {@linkcode MoveId.ME_FIRST | Me First} cannot copy. Me First
+ * already only copies DAMAGING moves the target has queued but not yet used; this
+ * additionally bans counter-style moves (which need an incoming hit), charge/2-turn
+ * moves, and the move-calling moves themselves.
+ */
+export const invalidMeFirstMoves: ReadonlySet<MoveId> = new Set([
+  ...moveCallingMoves,
+  MoveId.COUNTER,
+  MoveId.MIRROR_COAT,
+  MoveId.METAL_BURST,
+  MoveId.COMEUPPANCE,
+  MoveId.FOCUS_PUNCH,
+  MoveId.BEAK_BLAST,
+  MoveId.SHELL_TRAP,
+  MoveId.CHATTER,
+  MoveId.STRUGGLE,
+  MoveId.THIEF,
+  MoveId.COVET,
+  MoveId.INSTRUCT,
+]);

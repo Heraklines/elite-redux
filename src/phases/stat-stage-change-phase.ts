@@ -143,7 +143,10 @@ export class StatStageChangePhase extends PokemonPhase {
     const filteredStats = this.stats.filter(stat => {
       const cancelled = new BooleanHolder(false);
 
-      if (!this.selfTarget && stages.value < 0) {
+      // ignoreAbilities also bypasses Mist / ProtectStat (Clear Body, Full Metal
+      // Body): ER Mirror Armor's reflected drop lands through the attacker's
+      // stat-drop immunities.
+      if (!this.ignoreAbilities && !this.selfTarget && stages.value < 0) {
         globalScene.arena.applyTagsForSide(
           ArenaTagType.MIST,
           pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY,
@@ -154,7 +157,7 @@ export class StatStageChangePhase extends PokemonPhase {
         );
       }
 
-      if (!cancelled.value && !this.selfTarget && stages.value < 0) {
+      if (!this.ignoreAbilities && !cancelled.value && !this.selfTarget && stages.value < 0) {
         const abAttrParams: PreStatStageChangeAbAttrParams & ConditionalUserFieldProtectStatAbAttrParams = {
           pokemon,
           stat,

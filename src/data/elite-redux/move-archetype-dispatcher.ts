@@ -48,6 +48,7 @@
 import { globalScene } from "#app/global-scene";
 import { ER_CLASSIFIER_FLAG_TO_MOVE_FLAG } from "#data/elite-redux/er-flag-mapping";
 import type { ErMoveArchetypeKind } from "#data/elite-redux/er-move-archetypes";
+import { erArmSafePassage } from "#data/elite-redux/safe-passage";
 import {
   AddArenaTagAttr,
   AddArenaTrapTagAttr,
@@ -59,6 +60,7 @@ import {
   ErStatusEffectIgnoreImmunityAttr,
   ErSuperEffectiveVsTypeAttr,
   ErSuppressAbilitiesInFogAttr,
+  ErTransmuteRegenOnKoAttr,
   FlinchAttr,
   ForceSwitchOutAttr,
   HealUserAndAllyAttr,
@@ -89,7 +91,7 @@ import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
 import { MultiHitType } from "#enums/multi-hit-type";
 import { PokemonType } from "#enums/pokemon-type";
-import { Stat } from "#enums/stat";
+import { type EffectiveStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
@@ -498,23 +500,53 @@ export class MoveConditionAttr extends MoveAttr {
  * `StatStageChangePhase`.
  */
 export class RaiseHighestOffenseDefenseStatAttr extends MoveEffectAttr {
-  constructor() {
+  private readonly candidates: readonly EffectiveStat[];
+
+  /**
+   * @param candidates - which stats to consider; the highest is raised by 1.
+   *   Defaults to all four (Atk/Def/SpAtk/SpDef) for Mystical Power (#985); ER
+   *   Sharpen (137) passes only the two attacking stats ("Raises highest Attack").
+   */
+  constructor(candidates: readonly EffectiveStat[] = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF]) {
     super(true); // selfTarget
+    this.candidates = candidates;
   }
 
   override apply(user: Pokemon, target: Pokemon, move: Move, args?: any[]): boolean {
     if (!super.apply(user, target, move, args)) {
       return false;
     }
-    const candidates = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF] as const;
-    let best: (typeof candidates)[number] = candidates[0];
-    for (const s of candidates) {
+    let best: EffectiveStat = this.candidates[0];
+    for (const s of this.candidates) {
       if (user.getStat(s, false) > user.getStat(best, false)) {
         best = s;
       }
     }
     globalScene.phaseManager.unshiftNew("StatStageChangePhase", user.getBattlerIndex(), true, [best], 1);
     return true;
+  }
+}
+
+/**
+ * ER Safe Passage (move 979) self-switch rider. A {@linkcode ForceSwitchOutAttr}
+ * that, when its self-switch actually fires, ARMS the per-side "protect the
+ * switch-in" latch so the replacement Pokemon gets a one-turn -35% damage-taken
+ * tag on send-out (see `safe-passage.ts` and {@linkcode
+ * BattlerTagType.ER_SAFE_PASSAGE}).
+ */
+export class ErSafePassageSwitchAttr extends ForceSwitchOutAttr {
+  constructor() {
+    super(true); // selfSwitch — Safe Passage switches its OWN user out
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    const switched = super.apply(user, target, move, args);
+    // Only arm when the forced self-switch is actually queued (super returns
+    // true) — an aborted switch (no eligible bench mon) leaves no dangling flag.
+    if (switched) {
+      erArmSafePassage(user.isPlayer());
+    }
+    return switched;
   }
 }
 
@@ -623,7 +655,17 @@ function dispatchTypeConversion(params: Record<string, unknown>): MoveDispatchRe
   if (candidates.length === 0) {
     return skip("type-conversion: no valid types after resolution");
   }
-  const attrs: MoveAttr[] = [new BestEffectivenessTypeAttr(candidates)];
+  // BestEffectivenessTypeAttr sets the displayed/movegen/item-spawn type, but it
+  // can only morph the type via getMoveType (always called with a NULL target),
+  // so in real combat it falls back to candidates[0] and never picks the more
+  // effective type. BestEffectivenessChartOverrideAttr overrides the
+  // type-effectiveness MULTIPLIER at damage time (WITH the real defender) to the
+  // best of the candidates, so the hit actually lands as the more effective type
+  // (e.g. Scorched Earth #766 vs Water/Steel deals the better of Fire/Ground).
+  const attrs: MoveAttr[] = [
+    new BestEffectivenessTypeAttr(candidates),
+    new BestEffectivenessChartOverrideAttr(candidates),
+  ];
   if (isObject(params.statusChance)) {
     const statusName = params.statusChance.status;
     if (typeof statusName === "string") {
@@ -878,12 +920,11 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // aren't ledgered in this engine — see ErRetrieveConsumedItemAttr's note.
       return ok(0, [new ErRetrieveConsumedItemAttr(), new ForceSwitchOutAttr(true)]);
     case 970:
-      // Transmute — power 80 psychic move that "remakes the user's item on KO".
-      // Pokerogue's modifier/item system doesn't surface a clean "regenerate
-      // consumed item on KO" primitive (RIPEN, PLUCK, INCINERATE etc. all
-      // consume the FOE's item). Deferred until an ER item-regen primitive
-      // exists; the 80 BP body from the draft remains.
-      return skip("Transmute (er id 970): requires custom on-KO item-regen primitive in modifier system");
+      // Transmute — 80-BP Psychic attack that "Recovers a used item if this
+      // attack knocks out the opponent." ErTransmuteRegenOnKoAttr reuses the
+      // Fetch regen path (the `lostItems` ledger, then a consumed-berry
+      // fallback) gated on the target being KO'd by this strike.
+      return ok(0, [new ErTransmuteRegenOnKoAttr()]);
     case 971:
       // Clear Skies — "Clears the current weather AND prevents new weather from
       // being set for 5 turns." A ClearWeatherAttr per weather type clears
@@ -913,11 +954,12 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // PLUS ER_BLEED), deployed on the foe side.
       return ok(0, [new AddArenaTrapTagAttr(ArenaTagType.CREEPING_THORNS, 0, false, false)]);
     case 979:
-      // Safe Passage — self-switch that protects the incoming ally with a
-      // -35% damage reduction this turn. The damage-reduction piece is bespoke
-      // (no vanilla "incoming-mon damage-shield" primitive); first-pass:
-      // self-switch only.
-      return ok(0, [new ForceSwitchOutAttr(true)]);
+      // Safe Passage — self-switch that protects the incoming ally with a -35%
+      // damage reduction for the remainder of the turn. ErSafePassageSwitchAttr
+      // force-switches the user out AND arms the per-side latch (safe-passage.ts)
+      // that tags the replacement with ER_SAFE_PASSAGE on send-out; the -35% is
+      // read in Pokemon.getAttackDamage.
+      return ok(0, [new ErSafePassageSwitchAttr()]);
     case 989:
       // Showtime — sets Magic Room then switches the user out. There's no
       // ArenaTagType.MAGIC_ROOM in vanilla (only TRICK_ROOM). First-pass:

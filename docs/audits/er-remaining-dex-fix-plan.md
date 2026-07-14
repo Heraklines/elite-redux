@@ -50,7 +50,104 @@ numeric runtime id (`ER_ID_MAP.abilities[erId]` / `.moves[erId]`).
 Append one line per committed fix batch: `Batch N (commit <hash>): <er_ids> — <note>`.
 An agent resuming should skip er_ids already listed here.
 
+- **Batch 6 (UNCOMMITTED — working tree)** — Section B move gaps B, FINAL (21). FIXED
+  (19): 379 Power Trick, 380 Gastro Acid, 388 Worry Seed, 404 X-Scissor, 510 Incinerate,
+  524 Frost Breath, 532 Horn Leech, 563 Rototiller, 570 Parabolic Charge, 577 Draining
+  Kiss, 580 Grassy Terrain, 581 Misty Terrain, 604 Electric Terrain, 641 Psychic Terrain,
+  798 Diamond Blade, 824 Headlong Rush, 843 Aqua Cutter, 911 Supercell Slam, 979 Safe
+  Passage. BLOCKED: 502 Ally Switch, 507 Sky Drop (both inherited vanilla-pokerogue
+  unimplemented/partial gaps). 19/19 vitest; NOT committed. → ALL 42 Section-B MOVE gaps
+  now handled. **Section B genuine gaps: COMPLETE** (all fixed or tracked below).
+- **Batch 5 (UNCOMMITTED — working tree)** — Section B move gaps A (21). FIXED (18):
+  19 Fly, 23 Stomp, 73 Leech Seed, 75 Razor Leaf, 96 Meditate, 120 Self-Destruct, 137
+  Glare, 180 Spite, 184 Scary Face (→Fear), 186 Sweet Kiss, 201 Sandstorm, 215 Heal
+  Bell, 224 Megahorn, 258 Hail, 312 Aromatherapy, 329 Sheer Cold, 336 Howl, 343 Covet.
+  PARTIAL: 159 Sharpen (highest-stat + crit done; "sets Cutthroat on a non-holder"
+  deferred). 357 Miracle Eye = verified OK/no-op (garbled dex text; runtime already
+  correct). BLOCKED: 228 Pursuit (move-form switch-out interception primitive).
+  19/19 vitest; NOT committed.
+- **Batch 4 (UNCOMMITTED — working tree)** — Section B remaining ability gaps (22).
+  FIXED (20): 226 Electro Surge, 240 Mirror Armor, 242 Stalwart, 268 Chloroplast, 284
+  Exploit Weakness, 300 Fighting Spirit, 314 Mountaineer, 320 Air Blower, 322 Short
+  Circuit, 335 Haunted Spirit, 344 Poison Absorb, 354 Weather Control, 379 Ice Dew,
+  402 Toxic Debris, 438 Jaws of Carnage, 477 Generator, 478 Moon Spirit, 553 Guard
+  Dog, 570 Ill Will, 606 Aerialist, 834 Toxic Surge. PARTIAL: 305 Dreamcatcher
+  (Comatose exclusion fixed; pursuit-on-sleeping-switch deferred). 19/19 vitest;
+  NOT committed. → ALL 50 Section-B ABILITY gaps now handled.
+- **Batch 3 (UNCOMMITTED — working tree)** — Section B ability effect gaps (first ~28).
+  FIXED: 1 Stench, 7 Limber, 9 Static, 19 Shield Dust, 53 Pickup, 61 Shed Skin, 85
+  Heatproof, 88 Download, 90 Poison Heal, 94 Solar Power, 101 Technician, 117 Snow
+  Warning, 125 Sheer Force, 131 Healer, 143 Poison Touch, 155 Rattled, 164 Teravolt,
+  165 Aroma Veil, 174 Refrigerate, 182 Pixilate, 200 Steelworker, 206 Galvanize.
+  PARTIAL: 108 Forewarn (BP/always-hit clauses), 138 Flare Boost (fog self-ignite),
+  184 Aerilate (+10% speed secondary), 127 Unnerve (left berries-only, dex loose).
+  BLOCKED (new primitive): 139 Harvest (consumed-berry tracking), 197 Shields Down
+  (form hook). Verified 9/9 vitest + green scenarios; NOT committed per maintainer.
+- **Batch 2 (commit cf2eb86ff)** — Section A numeric conflicts (dex wins). Removed the
+  conflicting power/PP/accuracy/effect-chance keys from the `c-source-corrections`
+  entries so the `er-moves.ts` dex value wins (non-numeric keys preserved). Covers
+  ~160 moves (all the `c-source-corrections`-based numeric conflicts); validated by
+  `er-section-a-numeric-dex.test.ts`. NOTE: the agent hit the account weekly limit
+  before producing its full before→after table — the commit diff + data test are the
+  record. **Still open in Section A/B:** any numeric conflict NOT driven by
+  `c-source-corrections` (a handful in the rebalance numeric pass), and Psywave (149)'s
+  separate effect bug (RandomLevelDamageAttr subclass not stripped — that's a Section B
+  effect gap, not numeric).
 - **Batch 1 (commit 3450e90f0)** — systemic Overgrow/Blaze/Torrent/Swarm (ability 65/66/67/68) + WRONG/ORPHANED gaps. FIXED: ability 352 (Sage Power), 809 (Blur), 810 (Elude); move 65 (Drill Peck), 66 (Submission), 112 (Barrier), 148 (Flash), 168 (Thief), 181 (Powder Snow), 264 (Focus Punch), 445 (Captivate), 513 (Reflect Type), 597 (Aromatic Mist), 669 (Tearful Look), 895 (Barb Barrage), 906 (Hard Press), 950 (Eerie Fog move). **Still BLOCKED (need new engine primitives — leave for later):** move 271 (Trick), 289 (Snatch), 382 (Me First), 472 (Wonder Room), 478 (Magic Room), 970 (Transmute).
+
+## 🟢 STILL OPEN — RESOLVED (as of the residual pass, all UNCOMMITTED)
+
+**Everything below is now fixed** — the 18 blocked/partial items (Batches A/B/C/D) and
+their residuals (Batches R1/R2) are all implemented + headless-verified. Remaining
+non-fixes are intentional no-ops or documented, minor edge-omissions:
+- 🔴 **Magic Room 478 — WRONG, NEEDS RE-FIX.** ER dex is *"Prevents passive damage and
+  disables mega stones for 5 turns"* — NOT vanilla held-item suppression. Batch A
+  mistakenly implemented vanilla Magic Room (a `MAGIC_ROOM` ArenaTag suppressing held
+  items). The real effect is a field-wide **"prevent passive/indirect damage for 5
+  turns"** (repurpose the tag to gate the `HitResult.INDIRECT` / `BlockNonDirectDamage`
+  path field-wide). The "disable mega stones" half IS a genuine battle no-op (ER megas
+  are permanent forms). TODO: rewrite the MAGIC_ROOM tag effect.
+- **Aerilate 184 "10% faster"** — the ER ROM implements this as ×1.1 DAMAGE, not speed
+  (a per-move-type speed boost is structurally impossible — turn order queries SPD with
+  MoveId.NONE); done as the ROM's 1.1×.
+- **Sky Drop 507** — the held target isn't given its own semi-invuln (deliberate: avoids
+  the linked-move self-miss).
+- **Section A** — 7 of the 12 "residual numeric" findings were audit false positives
+  (runtime already correct).
+
+Original consolidated list follows (entries struck through = done). Update this
+whenever a batch reports a PARTIAL or BLOCKED.
+
+### Blocked — need a new engine primitive
+- ✅ **DONE (Batch A)** ~~Move 271 Trick / Switcheroo~~ — `ErSwapHeldItemAttr` held-item swap (residual: Sticky-Hold-on-user corner).
+- ✅ **DONE (Batch B)** ~~Move 289 Snatch~~ — SnatchTag + `MovePhase.checkSnatch` steals a foe's self-targeting status move (verified Swords Dance / Recover stolen).
+- ✅ **DONE (Batch B)** ~~Move 382 Me First~~ — `MeFirstAttr` reads `turnCommands`, copies the foe's queued attack at ×1.5 and goes first; fails on a status move.
+- ✅ **DONE (Batch C)** ~~Move 472 Wonder Room~~ — `WONDER_ROOM` ArenaTag swaps ATK↔SpAtk (raw base, stages ignored, 5 turns, both sides) via a `getEffectiveStat` hook. (Dex verified: ATK↔SpAtk, not vanilla Def↔SpDef.)
+- 🔴 **WRONG — Move 478 Magic Room** — Batch A built VANILLA Magic Room (item-suppress `MAGIC_ROOM` ArenaTag), but the ER dex is "Prevents passive damage and disables mega stones for 5 turns". Needs re-fix to a field-wide prevent-passive-damage tag (mega-stone half is a battle no-op). See STILL OPEN header.
+- ✅ **DONE (Batch A)** ~~Move 970 Transmute~~ — on-KO regen via the `lostItems` ledger.
+- ✅ **DONE (Batch A)** ~~Ability 139 Harvest~~ — Fling/Natural-Gift berry recovery (berry case; the full Fling item / Natural Gift type tables remain a separate move-mechanic gap).
+- ✅ **DONE (Batch C)** ~~Ability 197 Shields Down~~ — Shell Smash forces Core form + no-revert latch (corrected the vanilla shields-down test's revert assertions to ER's no-revert rule).
+- ✅ **DONE (Batch C)** ~~Move 502 Ally Switch~~ — `AllySwitchAttr` swaps party slot + field position in doubles (battler index follows the swap); fails in singles.
+- ✅ **DONE (Batch C + R2)** ~~Move 507 Sky Drop~~ — 2-turn charge + user semi-invuln + target immobilized + slam damage (C); R2 added the residuals: fails vs ≥200kg / Flying targets, hazards trigger on the drop, redirection cleared on lift. (Only the held target's own semi-invuln is intentionally omitted to avoid a linked-move self-miss.)
+- ✅ **DONE (Batch B)** ~~Move 228 Pursuit~~ — `TurnStartPhase` defers the pursued foe's SwitchSummon after the move phases; Pursuit strikes the outgoing foe at ×2 first (verified 50→100). Residual: only MENU (`Command.POKEMON`) switches are intercepted, not move-switches (U-turn/Volt Switch).
+
+### Partial — main clause done, a sub-clause missing
+- ✅ **DONE (UNCOMMITTED)** ~~Ability 108 Forewarn~~ — the entry-effect now casts a dedicated 80-BP always-hit Future Sight variant (`FOREWARN_FUTURE_SIGHT_ID`, a registered clone of the real move with power 80 / accuracy -1, distinct from the 120-BP move). No-repeat is honored by the DelayedAttack slot guard; the real Future Sight is unchanged.
+- ✅ **DONE (UNCOMMITTED)** ~~Ability 138 Flare Boost~~ — added the fog self-ignite: `FlareBoostSelfBurnOn{Summon,WeatherChange}AbAttr` (mirrors Toxic Boost's Toxic-Terrain self-poison) burns the holder on switch-in under fog AND the instant fog is set. Uses `isFogWeather()` (Eerie Fog + vanilla FOG).
+- ✅ **DONE (UNCOMMITTED)** ~~Ability 184 Aerilate~~ — added the Flying-user branch: a 1.1× Flying-move damage boost gated to Flying-type users, matching the ER ROM (`battle_util.c` `MulModifier(1.1)` — every sibling -ate does the same). The dex "10% faster" is garbled flavor for the ROM's 1.1× damage; a per-move-type SPEED boost is structurally impossible here (turn order queries SPD with MoveId.NONE).
+- ✅ **DONE (Batch A)** ~~Ability 127 Unnerve~~ — added `PreventItemUseAbAttr` (blocks all foe consumables, mirrors As-One).
+- ✅ **DONE (Batch B + R2)** ~~Ability 305 Dreamcatcher~~ — switch-strike on a sleeping outgoing foe (B); R2 added the mid-switch signal so the strike is 1× (the any-asleep ×2 boost is suppressed for that specific strike), matching the dex. 859 Dreamscape composite unbroken.
+- ✅ **DONE (UNCOMMITTED)** ~~Move 159 Sharpen~~ — added `ErSetUserCutthroatAttr` (grant-ability-on-move-use, reuses `AbilityChangeAttr`/`setTempAbility` self-targeted). Sets the user's ability to Cutthroat; silent no-op for an existing holder, and its always-true condition keeps Sharpen usable by anyone.
+- ✅ **DONE (UNCOMMITTED)** ~~Move 149 Psywave~~ — the strip list now names the concrete subclass `RandomLevelDamageAttr` (removeAttrsByName matches exact constructor.name), so it's stripped and the 40-BP scalar drives the normal special formula; 10% confuse retained.
+
+### Section A residual (numeric) — ✅ DONE (Batch R1, UNCOMMITTED)
+- The 12 non-`c-source` numeric residuals were checked against runtime: 7 were already
+  correct (ER rebalance had applied; audit false positives), 5 fixed — Normalize 96
+  (×1.1 not ×1.32), Violent Rush 350 (first-turn ATK ×1.2), Scorched Earth 766 +
+  Wildbolt/etc. (best-of-[FIRE,GROUND] via BestEffectivenessChartOverrideAttr), Black
+  Magic 801 (highest-offense category), Opportunist 370 verified matching. 20/20 vitest.
+
+_(Batch 4 abilities + Batch 5/6 moves will add their partial/blocked here as they report.)_
 
 ## Section A — Numeric conflicts (dex `er-moves.ts` wins) — 173 findings
 

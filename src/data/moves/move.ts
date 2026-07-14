@@ -13,8 +13,8 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
-import type { EntryHazardTag, PendingHealTag } from "#data/arena-tag";
-import { WeakenMoveTypeTag } from "#data/arena-tag";
+import type { PendingHealTag } from "#data/arena-tag";
+import { EntryHazardTag, WeakenMoveTypeTag } from "#data/arena-tag";
 import { MoveChargeAnim } from "#data/battle-anims";
 import {
   CommandedTag,
@@ -94,6 +94,7 @@ import {
   invalidAssistMoves,
   invalidCopycatMoves,
   invalidInstructMoves,
+  invalidMeFirstMoves,
   invalidMetronomeMoves,
   invalidMirrorMoveMoves,
   invalidSketchMoves,
@@ -1321,6 +1322,13 @@ export abstract class Move implements Localizable {
     // (see ErEmpoweredSwitchInTag; the tag lapses at TURN_END so only that turn's
     // move is boosted).
     if (source.getTag(BattlerTagType.ER_EMPOWERED_SWITCH_IN)) {
+      power.value *= 1.5;
+    }
+
+    // Me First (382): the copied move is used at x1.5 power. The tag is added to
+    // the Me First user just before the copied move is called (as a FOLLOW_UP),
+    // and lapses at TURN_END so only that single copied cast is boosted.
+    if (source.getTag(BattlerTagType.ME_FIRST)) {
       power.value *= 1.5;
     }
 
@@ -2982,13 +2990,20 @@ export abstract class WeatherHealAttr extends HealAttr {
     super(0.5);
   }
 
-  apply(user: Pokemon, _target: Pokemon, _move: Move, _args: any[]): boolean {
+  apply(user: Pokemon, _target: Pokemon, move: Move, _args: any[]): boolean {
     let healRatio = 0.5;
     if (globalScene.arena.weather?.isEffectSuppressed()) {
       healRatio = this.getWeatherHealRatio(WeatherType.NONE, user);
     } else {
       const weatherType = globalScene.arena.weather?.weatherType || WeatherType.NONE;
       healRatio = this.getWeatherHealRatio(weatherType, user);
+    }
+    // ER Moon Spirit (478): "When using Moonlight, recovery increases to 75% max
+    // HP instead of the normal amount." Move-specific override, gated on the user
+    // holding Moon Spirit and the move being Moonlight (mirrors the Chloroplast
+    // userActsInSun special-case in PlantHealAttr).
+    if (move.id === MoveId.MOONLIGHT && user.hasAbility(ErAbilityId.MOON_SPIRIT as unknown as AbilityId)) {
+      healRatio = Math.max(healRatio, 0.75);
     }
     this.addHealPhase(user, healRatio);
     return true;
@@ -3618,6 +3633,119 @@ export class StealHeldItemChanceAttr extends MoveEffectAttr {
 }
 
 /**
+ * Elite Redux — Trick (er move 271, and by extension Switcheroo): the user
+ * SWAPS its held item(s) with the target's. Vanilla PokeRogue leaves both moves
+ * `.unimplemented()`; this attr exchanges the two mons' transferable held-item
+ * modifiers via the sanctioned {@linkcode BattleScene.tryTransferHeldItemModifier}
+ * path (the same path Thief/Covet use).
+ *
+ * Untradeable items — Mega Stones, form-change items, Z-crystals, base-stat
+ * vitamins, evo trackers — carry `isTransferable = false` and are excluded from
+ * the swap (they stay on their owner). Sticky Hold (BlockItemTheftAbAttr) on the
+ * TARGET blocks the whole swap, matching item-theft behaviour.
+ *
+ * Both sides' item lists are snapshotted (with their original stack counts)
+ * BEFORE any transfer, and the recorded count is passed to each transfer, so a
+ * same-item merge during the first pass can never inflate what the second pass
+ * moves back — the swap stays 1:1 for distinct items.
+ *
+ * RESIDUAL (documented): Sticky Hold on the USER would (via the transfer path's
+ * own theft guard) stop the user handing its item over, yielding a partial swap;
+ * this is a rare corner and left as-is.
+ */
+export class ErSwapHeldItemAttr extends MoveEffectAttr {
+  constructor() {
+    super(false); // targets the foe
+  }
+
+  private getTransferableItems(pokemon: Pokemon): PokemonHeldItemModifier[] {
+    return globalScene.findModifiers(
+      m => m instanceof PokemonHeldItemModifier && m.pokemonId === pokemon.id && m.isTransferable,
+      pokemon.isPlayer(),
+    ) as PokemonHeldItemModifier[];
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (!super.apply(user, target, move, args)) {
+      return false;
+    }
+
+    // Sticky Hold (and other theft-blockers) on EITHER side make the swap fail
+    // entirely — Trick is all-or-nothing, never a partial swap. A blocker on the
+    // target keeps its item; a blocker on the USER keeps the user's item; either
+    // one aborts the whole exchange before any item moves.
+    const cancelled = new BooleanHolder(false);
+    applyAbAttrs("BlockItemTheftAbAttr", { pokemon: target, cancelled });
+    if (!cancelled.value) {
+      applyAbAttrs("BlockItemTheftAbAttr", { pokemon: user, cancelled });
+    }
+    if (cancelled.value) {
+      return false;
+    }
+
+    // Snapshot both sides' transferable items with their original counts BEFORE
+    // any transfer (a merge in pass 1 must not feed pass 2).
+    const userItems = this.getTransferableItems(user).map(mod => ({ mod, count: mod.stackCount }));
+    const targetItems = this.getTransferableItems(target).map(mod => ({ mod, count: mod.stackCount }));
+
+    if (userItems.length === 0 && targetItems.length === 0) {
+      return false;
+    }
+
+    // itemLost=false: a swap is not a loss (the mon receives a replacement), so
+    // Unburden-style "item lost" hooks must not fire. instant + ignoreUpdate
+    // suppress per-transfer churn; modifiers are refreshed once at the end.
+    for (const { mod, count } of targetItems) {
+      globalScene.tryTransferHeldItemModifier(mod, user, false, count, true, true, false);
+    }
+    for (const { mod, count } of userItems) {
+      globalScene.tryTransferHeldItemModifier(mod, target, false, count, true, true, false);
+    }
+
+    globalScene.updateModifiers(true);
+    globalScene.updateModifiers(false);
+
+    globalScene.phaseManager.queueMessage(
+      i18next.t("moveTriggers:erSwappedItems", {
+        pokemonName: getPokemonNameWithAffix(user),
+        targetName: getPokemonNameWithAffix(target),
+      }),
+    );
+    return true;
+  }
+}
+
+/**
+ * Elite Redux — Sky Drop (move 507) release-turn effect. Fires on the SLAM turn
+ * (a plain {@linkcode MoveEffectAttr} on a {@linkcode ChargingAttackMove} runs
+ * only on the release turn, never the charge turn), AFTER the slam damage. When
+ * the held foe is dropped back down, any entry hazards on ITS side of the field
+ * trigger against it — mirroring the switch-in hazard path
+ * (`arena.applyTags(EntryHazardTag, …)` in {@linkcode PostSummonPhase}). The
+ * takeoff-turn effects (target immobilization, redirection clear) live on
+ * {@linkcode SkyDropHeldTag}; this is only the drop-turn hazard trigger.
+ */
+export class ErSkyDropReleaseAttr extends MoveEffectAttr {
+  constructor() {
+    super(false); // targets the foe
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (!super.apply(user, target, move, args)) {
+      return false;
+    }
+    // Only a still-active target can land on hazards; a fainted/fled target skips.
+    if (!target.isActive(true)) {
+      return false;
+    }
+    // Same call the switch-in path uses: both-side EntryHazardTags, each of which
+    // self-gates via `canAffect` so only the target's own side hits it.
+    globalScene.arena.applyTags(EntryHazardTag, false, target);
+    return true;
+  }
+}
+
+/**
  * Removes a random held item (or berry) from target.
  * Used for Incinerate and Knock Off.
  * Not Implemented Cases: (Same applies for Thief)
@@ -3661,7 +3789,7 @@ export class RemoveHeldItemAttr extends MoveEffectAttr {
     let heldItems = this.getTargetHeldItems(target).filter(i => i.isTransferable);
 
     if (this.berriesOnly) {
-      heldItems = heldItems.filter(m => m instanceof BerryModifier && m.pokemonId === target.id, target.isPlayer());
+      heldItems = heldItems.filter(m => this.isBerriesOnlyRemovable(m, target));
     }
 
     if (heldItems.length === 0) {
@@ -3693,6 +3821,16 @@ export class RemoveHeldItemAttr extends MoveEffectAttr {
     }
 
     return true;
+  }
+
+  /**
+   * Predicate for the `berriesOnly` pool (Incinerate). Vanilla removes only
+   * berries; ER's Incinerate override widens this to also shatter ER elemental
+   * Gems. Extracted so the ER subclass can broaden the pool without duplicating
+   * the ability/message/removal logic in {@linkcode apply}.
+   */
+  protected isBerriesOnlyRemovable(m: PokemonHeldItemModifier, target: Pokemon): boolean {
+    return m instanceof BerryModifier && m.pokemonId === target.id;
   }
 
   getTargetHeldItems(target: Pokemon): PokemonHeldItemModifier[] {
@@ -3790,6 +3928,183 @@ export class EatBerryAttr extends MoveEffectAttr {
     applyAbAttrs("PostItemLostAbAttr", { pokemon: berryOwner });
     applyAbAttrs("HealFromBerryUseAbAttr", { pokemon: consumer });
     consumer.recordEatenBerry(this.chosenBerry.berryType, updateHarvest);
+  }
+}
+
+/**
+ * True when `user` is currently holding at least one berry. Used to gate the
+ * berry-only ER Natural Gift implementation (it flings a held berry).
+ */
+export function erUserHoldsBerry(user: Pokemon): boolean {
+  return (
+    globalScene.findModifiers(m => m instanceof BerryModifier && m.pokemonId === user.id, user.isPlayer()).length > 0
+  );
+}
+
+// =============================================================================
+// Elite Redux — Fling item→power table + Natural Gift berry→type/power table.
+//
+// Mainline PokeRogue leaves Fling / Natural Gift `.unimplemented()`; ER wires
+// them for real. Fling's base power depends on the flung item; Natural Gift's
+// type AND power depend on the consumed berry. The moves pick ONE held item /
+// berry DETERMINISTICALLY (the heaviest / highest-power one, tie-broken by id)
+// so the power attr, type attr, and consume attr all agree on the same item —
+// PokeRogue mons can hold several items where the mainline games allow one.
+// =============================================================================
+
+/** Fling BP for a held item with no table entry (mainline's generic value). */
+const ER_FLING_DEFAULT_POWER = 30;
+/** Fling BP for any berry (mainline: all berries fling for 10). */
+const ER_FLING_BERRY_POWER = 10;
+
+/**
+ * Fling base power keyed by modifier type id. Values mirror the mainline Fling
+ * power of the equivalent item; ids not present here (and any berry) fall back
+ * to {@linkcode ER_FLING_DEFAULT_POWER} / {@linkcode ER_FLING_BERRY_POWER}. Both
+ * the plain and `ER_`-prefixed ids are listed where ER ships its own variant.
+ */
+const ER_FLING_POWER_TABLE: Readonly<Record<string, number>> = {
+  HARD_STONE: 100,
+  GRIP_CLAW: 90,
+  QUICK_CLAW: 80,
+  ASSAULT_VEST: 80,
+  ER_ASSAULT_VEST: 80,
+  ROCKY_HELMET: 60,
+  ER_ROCKY_HELMET: 60,
+  EVIOLITE: 40,
+  KINGS_ROCK: 30,
+  SCOPE_LENS: 30,
+  SHELL_BELL: 30,
+  SOUL_DEW: 30,
+  TOXIC_ORB: 30,
+  FLAME_ORB: 30,
+  FROSTBITE_ORB: 30,
+  LIGHT_BALL: 30,
+  LUCKY_EGG: 30,
+  LIFE_ORB: 30,
+  ER_LIFE_ORB: 30,
+  WIDE_LENS: 10,
+  MULTI_LENS: 10,
+  METAL_POWDER: 10,
+  LEFTOVERS: 10,
+  FOCUS_BAND: 10,
+  SOOTHE_BELL: 10,
+};
+
+/** The Fling BP of a specific held-item modifier. */
+function erFlingPowerOf(mod: PokemonHeldItemModifier): number {
+  if (mod instanceof BerryModifier) {
+    return ER_FLING_BERRY_POWER;
+  }
+  return ER_FLING_POWER_TABLE[mod.type?.id ?? ""] ?? ER_FLING_DEFAULT_POWER;
+}
+
+/** All flingable (transferable) held items on `user`. */
+function erFlingableItems(user: Pokemon): PokemonHeldItemModifier[] {
+  return globalScene.findModifiers(
+    m => m instanceof PokemonHeldItemModifier && m.pokemonId === user.id && m.isTransferable,
+    user.isPlayer(),
+  ) as PokemonHeldItemModifier[];
+}
+
+/**
+ * The single item `user` flings: the highest-BP flingable item, ties broken by
+ * type id (stable). Returns `undefined` when the user holds nothing flingable.
+ * Deterministic so the power attr and the consume attr fling the SAME item.
+ */
+function erSelectFlungItem(user: Pokemon): PokemonHeldItemModifier | undefined {
+  const items = erFlingableItems(user);
+  if (items.length === 0) {
+    return;
+  }
+  return items.reduce((best, cur) => {
+    const bp = erFlingPowerOf(cur);
+    const bestBp = erFlingPowerOf(best);
+    if (bp !== bestBp) {
+      return bp > bestBp ? cur : best;
+    }
+    return (cur.type?.id ?? "") < (best.type?.id ?? "") ? cur : best;
+  });
+}
+
+/** True when `user` holds at least one flingable item (Fling's condition). */
+export function erUserCanFling(user: Pokemon): boolean {
+  return erFlingableItems(user).length > 0;
+}
+
+/**
+ * Natural Gift type + power per berry. Mirrors the mainline Natural Gift table
+ * for the 11 berries PokeRogue defines. Power is 80 for the "healing" berries
+ * (Sitrus/Lum/Leppa) and 100 for the stat/pinch berries.
+ */
+const ER_NATURAL_GIFT_TABLE: Readonly<Record<BerryType, { type: PokemonType; power: number }>> = {
+  [BerryType.SITRUS]: { type: PokemonType.PSYCHIC, power: 80 },
+  [BerryType.LUM]: { type: PokemonType.FLYING, power: 80 },
+  [BerryType.LEPPA]: { type: PokemonType.FIGHTING, power: 80 },
+  [BerryType.ENIGMA]: { type: PokemonType.BUG, power: 100 },
+  [BerryType.LIECHI]: { type: PokemonType.GRASS, power: 100 },
+  [BerryType.GANLON]: { type: PokemonType.ICE, power: 100 },
+  [BerryType.PETAYA]: { type: PokemonType.POISON, power: 100 },
+  [BerryType.APICOT]: { type: PokemonType.GROUND, power: 100 },
+  [BerryType.SALAC]: { type: PokemonType.FIGHTING, power: 100 },
+  [BerryType.LANSAT]: { type: PokemonType.FLYING, power: 100 },
+  [BerryType.STARF]: { type: PokemonType.PSYCHIC, power: 100 },
+};
+
+/**
+ * The single berry Natural Gift consumes: the highest-power berry, ties broken
+ * by {@linkcode BerryType} (stable). Deterministic so the type attr, power attr,
+ * and consume attr all reference the SAME berry.
+ */
+function erSelectNaturalGiftBerry(user: Pokemon): BerryModifier | undefined {
+  const berries = globalScene.findModifiers(
+    m => m instanceof BerryModifier && m.pokemonId === user.id,
+    user.isPlayer(),
+  ) as BerryModifier[];
+  if (berries.length === 0) {
+    return;
+  }
+  return berries.reduce((best, cur) => {
+    const cp = ER_NATURAL_GIFT_TABLE[cur.berryType].power;
+    const bp = ER_NATURAL_GIFT_TABLE[best.berryType].power;
+    if (cp !== bp) {
+      return cp > bp ? cur : best;
+    }
+    return cur.berryType < best.berryType ? cur : best;
+  });
+}
+
+/**
+ * Elite Redux — Natural Gift's berry consume + Harvest ledger. Removes the berry
+ * Natural Gift fired off ({@linkcode erSelectNaturalGiftBerry} — the SAME berry
+ * the type/power attrs read) and ledgers it so {@linkcode AbilityId.HARVEST} can
+ * regrow it. (Fling's own consume is {@linkcode ErFlingConsumeItemAttr}.)
+ *
+ * 🔴 The berry is ledgered to {@linkcode PokemonBattleData.berriesEaten} ONLY
+ * (Harvest's store) — NOT via `recordEatenBerry` / `turnData.berriesEaten`. A
+ * flung/gifted berry is THROWN, not eaten, so Cud Chew
+ * ({@linkcode PokemonSummonData.berriesEatenLast}) must never regurgitate it
+ * (maintainer ruling).
+ */
+export class ErFlingConsumeBerryAttr extends MoveEffectAttr {
+  constructor() {
+    super(true); // selfTarget: the user consumes ITS OWN held berry
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (!super.apply(user, target, move, args)) {
+      return false;
+    }
+    const flung = erSelectNaturalGiftBerry(user);
+    if (!flung) {
+      return false;
+    }
+    const berryType = flung.berryType;
+    user.loseHeldItem(flung);
+    globalScene.updateModifiers(user.isPlayer());
+    // Harvest ledger ONLY — a thrown berry is not eaten (no Cud Chew).
+    user.battleData.berriesEaten.push(berryType);
+    return true;
   }
 }
 
@@ -3933,6 +4248,26 @@ export class ErRetrieveConsumedItemAttr extends MoveEffectAttr {
       }),
     );
     return true;
+  }
+}
+
+/**
+ * Elite Redux — Transmute (er move 970): an 80-BP Psychic attack that
+ * "Recovers a used item if this attack knocks out the opponent." Reuses
+ * {@linkcode ErRetrieveConsumedItemAttr}'s regen (the `lostItems` ledger, then a
+ * consumed-berry fallback), gated on the target being KO'd by this strike.
+ *
+ * A POST_APPLY selfTarget effect: it runs after damage is dealt (so the target's
+ * HP already reflects the KO), receives the real foe as `target`, and — being
+ * self-targeting — is not skipped by the base "target fainted" `canApply` guard.
+ */
+export class ErTransmuteRegenOnKoAttr extends ErRetrieveConsumedItemAttr {
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    // Only regenerate when THIS attack knocked the target out.
+    if (!target?.isFainted()) {
+      return false;
+    }
+    return super.apply(user, target, move, args);
   }
 }
 
@@ -6310,6 +6645,82 @@ export class VariableMoveTypeAttr extends MoveAttr {
   }
 }
 
+// =============================================================================
+// Elite Redux — Fling (543) / Natural Gift (363) power + type attrs. Defined
+// here (below VariablePowerAttr / VariableMoveTypeAttr) so the `extends` bases
+// are initialized; the tables + selectors they call live near erUserHoldsBerry.
+// =============================================================================
+
+/**
+ * ER Fling (move 543): base power scales with the flung item's Fling BP (the
+ * heaviest flingable item — see {@linkcode erSelectFlungItem}). Berries fling
+ * for 10 and are ledgered for Harvest by {@linkcode ErFlingConsumeItemAttr}.
+ */
+export class ErFlingPowerAttr extends VariablePowerAttr {
+  override apply(user: Pokemon, _target: Pokemon, _move: Move, args: any[]): boolean {
+    const item = erSelectFlungItem(user);
+    if (!item) {
+      return false;
+    }
+    (args[0] as NumberHolder).value = erFlingPowerOf(item);
+    return true;
+  }
+}
+
+/**
+ * ER Fling consume: removes the flung item ({@linkcode erSelectFlungItem}) after
+ * the hit. A flung BERRY is ledgered to {@linkcode PokemonBattleData.berriesEaten}
+ * (Harvest's store) but NOT to Cud Chew — a flung berry is thrown, not eaten
+ * (mirrors {@linkcode ErFlingConsumeBerryAttr}).
+ */
+export class ErFlingConsumeItemAttr extends MoveEffectAttr {
+  constructor() {
+    super(true); // selfTarget: the user flings ITS OWN held item
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (!super.apply(user, target, move, args)) {
+      return false;
+    }
+    const item = erSelectFlungItem(user);
+    if (!item) {
+      return false;
+    }
+    const berryType = item instanceof BerryModifier ? item.berryType : undefined;
+    user.loseHeldItem(item);
+    globalScene.updateModifiers(user.isPlayer());
+    if (berryType !== undefined) {
+      // Harvest ledger ONLY — a flung berry is thrown, not eaten (no Cud Chew).
+      user.battleData.berriesEaten.push(berryType);
+    }
+    return true;
+  }
+}
+
+/** ER Natural Gift (move 363): the move's type becomes the consumed berry's NG type. */
+export class ErNaturalGiftTypeAttr extends VariableMoveTypeAttr {
+  override apply(user: Pokemon, _target: Pokemon, _move: Move, args: any[]): boolean {
+    const berry = erSelectNaturalGiftBerry(user);
+    if (!berry || !(args[0] instanceof NumberHolder)) {
+      return false;
+    }
+    args[0].value = ER_NATURAL_GIFT_TABLE[berry.berryType].type;
+    return true;
+  }
+}
+
+/** ER Natural Gift (move 363): base power comes from the consumed berry's NG power. */
+export class ErNaturalGiftPowerAttr extends VariablePowerAttr {
+  override apply(user: Pokemon, _target: Pokemon, _move: Move, args: any[]): boolean {
+    const berry = erSelectNaturalGiftBerry(user);
+    if (!berry) {
+      return false;
+    }
+    (args[0] as NumberHolder).value = ER_NATURAL_GIFT_TABLE[berry.berryType].power;
+    return true;
+  }
+}
+
 export class FormChangeItemTypeAttr extends VariableMoveTypeAttr {
   apply(user: Pokemon, _target: Pokemon, move: Move, args: any[]): boolean {
     const moveType = args[0];
@@ -7054,11 +7465,22 @@ export const crashDamageFunc: UserMoveConditionFunc = (user: Pokemon, _move: Mov
     return false;
   }
 
-  user.damageAndUpdate(toDmgValue(user.getMaxHp() / 2), { result: HitResult.INDIRECT });
+  // ER: ability-driven recoil multiplier — Limber (7) "halves ALL recoil,
+  // including crash damage like Jump Kick." Scan the user's attrs for the
+  // ER-specific RecoilDamageMultiplierAbAttr (same path RecoilAttr.apply uses).
+  const recoilMult = new NumberHolder(1);
+  for (const attr of user.getAllActiveAbilityAttrs()) {
+    if (attr && attr.constructor.name === "RecoilDamageMultiplierAbAttr") {
+      (attr as unknown as { fire: (mult: NumberHolder) => void }).fire(recoilMult);
+    }
+  }
+  const crashDamage = toDmgValue((user.getMaxHp() / 2) * recoilMult.value);
+
+  user.damageAndUpdate(crashDamage, { result: HitResult.INDIRECT });
   globalScene.phaseManager.queueMessage(
     i18next.t("moveTriggers:keptGoingAndCrashed", { pokemonName: getPokemonNameWithAffix(user) }),
   );
-  user.turnData.damageTaken += toDmgValue(user.getMaxHp() / 2);
+  user.turnData.damageTaken += crashDamage;
 
   return true;
 };
@@ -8203,6 +8625,11 @@ export class ForceSwitchOutAttr extends MoveEffectAttr {
     return this.switchType === SwitchType.BATON_PASS;
   }
 
+  /** Whether this switches the USER out (U-turn / Volt Switch / Flip Turn / Parting Shot), not the target. */
+  public isSelfSwitch(): boolean {
+    return this.selfSwitch;
+  }
+
   apply(user: Pokemon, target: Pokemon, move: Move, _args: any[]): boolean {
     // Check if the move category is not STATUS or if the switch out condition is not met
     if (!this.getSwitchOutCondition()(user, target, move)) {
@@ -9121,6 +9548,117 @@ export class CopyMoveAttr extends CallMoveAttr {
 }
 
 /**
+ * Me First (382): the user copies the target's INTENDED move (the one the target
+ * has queued this turn but not yet used) and performs it first at x1.5 power.
+ *
+ * Dex (ER 2.65): "The foe's intended move is stolen and used first, with greater
+ * power." Fails if the target has already acted this turn, has not queued a FIGHT
+ * command, or queued a status move.
+ *
+ * Reads {@linkcode Battle.turnCommands} for the target's queued command — the same
+ * turn-command inspection {@linkcode TurnStartPhase} uses to order the turn — then
+ * defers to {@linkcode CallMoveAttr} to unshift a FOLLOW_UP {@linkcode MovePhase}
+ * for the copied move with {@linkcode MovePhaseTimingModifier.FIRST}. The x1.5 is
+ * carried by {@linkcode BattlerTagType.ME_FIRST} on the user (read in
+ * {@linkcode Move.getPower}), added just before the copied cast and lapsing at
+ * TURN_END so only the single copied move is boosted.
+ */
+export class MeFirstAttr extends CallMoveAttr {
+  constructor() {
+    super();
+    this.invalidMoves = invalidMeFirstMoves;
+  }
+
+  /**
+   * @returns the target's queued, copyable move id, or `null` if Me First should fail.
+   */
+  private getCopyableMove(target: Pokemon): MoveId | null {
+    // The target must not have moved yet — Me First fails if the target already acted.
+    if (target.turnData.acted) {
+      return null;
+    }
+    const command = globalScene.currentBattle.turnCommands[target.getBattlerIndex()];
+    if (!command || command.skip || command.command !== Command.FIGHT) {
+      return null;
+    }
+    const moveId = command.move?.move;
+    if (moveId == null || moveId === MoveId.NONE || this.invalidMoves.has(moveId)) {
+      return null;
+    }
+    // Me First only copies attacking moves — it fails on a queued status move.
+    if (allMoves[moveId].category === MoveCategory.STATUS) {
+      return null;
+    }
+    return moveId;
+  }
+
+  override apply(user: Pokemon, target: Pokemon, _move: Move, args: any[]): boolean {
+    const copiedMove = this.getCopyableMove(target);
+    if (copiedMove == null) {
+      return false;
+    }
+    this.hasTarget = true;
+    // x1.5 power for the copied cast (read in getPower; lapses at TURN_END).
+    user.addTag(BattlerTagType.ME_FIRST);
+    return super.apply(user, target, allMoves[copiedMove], args);
+  }
+
+  getCondition(): MoveConditionFunc {
+    return (_user, target, _move) => this.getCopyableMove(target) != null;
+  }
+}
+
+/**
+ * Pursuit (228): x2 power when the target is switching out this turn.
+ *
+ * Dex (ER 2.65): "An attack move that works especially well on a foe that is
+ * switching out." The switch-out interception itself (making Pursuit act BEFORE
+ * the foe's SwitchSummonPhase) is handled in {@linkcode TurnStartPhase}, which
+ * defers the pursued foe's switch until after this move resolves. By the time
+ * Pursuit runs, the foe is still on the field and its queued `POKEMON` (switch)
+ * command is still present in {@linkcode Battle.turnCommands}, which is what this
+ * attr reads to decide the doubling.
+ */
+/**
+ * Whether `moveId` switches its OWN user out (U-turn / Volt Switch / Flip Turn /
+ * Parting Shot …) — i.e. it carries a self-switching {@linkcode ForceSwitchOutAttr}.
+ */
+export function erIsSelfSwitchMove(moveId: MoveId | undefined): boolean {
+  if (moveId == null) {
+    return false;
+  }
+  return allMoves[moveId]?.getAttrs("ForceSwitchOutAttr").some(a => a.isSelfSwitch()) ?? false;
+}
+
+/**
+ * Whether `target` is switching out this turn — either a queued MENU switch
+ * (`Command.POKEMON`) or a queued self-switching MOVE (U-turn / Volt Switch,
+ * `Command.FIGHT` with a self-switch move). Pursuit (228) intercepts BOTH:
+ * {@linkcode TurnStartPhase} orders Pursuit to strike the still-on-field
+ * switcher first, and this predicate drives the x2 power.
+ */
+export function erTargetIsSwitchingOut(target: Pokemon): boolean {
+  const command = globalScene.currentBattle.turnCommands[target.getBattlerIndex()];
+  if (!command || command.skip) {
+    return false;
+  }
+  if (command.command === Command.POKEMON) {
+    return true;
+  }
+  return command.command === Command.FIGHT && erIsSelfSwitchMove(command.move?.move);
+}
+
+export class PursuitPowerAttr extends VariablePowerAttr {
+  override apply(_user: Pokemon, target: Pokemon, _move: Move, args: any[]): boolean {
+    if (erTargetIsSwitchingOut(target)) {
+      (args[0] as NumberHolder).value *= 2;
+      return true;
+    }
+    return false;
+  }
+}
+
+/**
  * Attribute used for moves that cause the target to repeat their last used move.
  *
  * Used by {@linkcode MoveId.INSTRUCT | Instruct}.
@@ -9974,6 +10512,52 @@ export class ForceLastAttr extends MoveEffectAttr {
   }
 }
 
+/**
+ * ER (move 502 Ally Switch): the user swaps field positions with its ally in a
+ * double battle. Implemented as a live slot swap — the two front party slots are
+ * exchanged (so {@linkcode Pokemon.getFieldIndex}/{@linkcode Pokemon.getBattlerIndex}
+ * swap for the rest of the battle) and their on-field positions (LEFT ↔ RIGHT)
+ * are exchanged (updating each mon's battle-info slot). Because battler indices
+ * are resolved live from party order, a move that later targets a swapped slot
+ * follows the mon that now stands there.
+ */
+export class AllySwitchAttr extends MoveEffectAttr {
+  constructor() {
+    super(true);
+  }
+
+  override apply(user: Pokemon, _target: Pokemon, _move: Move, _args?: any[]): boolean {
+    const ally = user.getAlly();
+    if (!ally || ally === user) {
+      return false;
+    }
+
+    const party: Pokemon[] = user.isPlayer() ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
+    const userIdx = party.indexOf(user);
+    const allyIdx = party.indexOf(ally);
+    if (userIdx < 0 || allyIdx < 0) {
+      return false;
+    }
+
+    // Swap the two front party slots so their field/battler indices swap.
+    [party[userIdx], party[allyIdx]] = [party[allyIdx], party[userIdx]];
+
+    // Swap their on-field positions (and battle-info slots). Fire-and-forget:
+    // the position transition is cosmetic and must not block move resolution.
+    const userFieldPosition = user.fieldPosition;
+    void user.setFieldPosition(ally.fieldPosition);
+    void ally.setFieldPosition(userFieldPosition);
+
+    globalScene.phaseManager.queueMessage(
+      i18next.t("moveTriggers:switchedPositionWithTarget", {
+        pokemonName: getPokemonNameWithAffix(user),
+        targetName: getPokemonNameWithAffix(ally),
+      }),
+    );
+    return true;
+  }
+}
+
 const failOnBossCondition: MoveConditionFunc = (_user, target, _move) => !target.isBossImmune();
 
 // Multi-battle-only moves (Helping Hand, Follow Me, Ally Switch, ...). NB `double` is
@@ -10323,6 +10907,8 @@ const MoveAttrs = Object.freeze({
   RandomMovesetMoveAttr,
   NaturePowerAttr,
   CopyMoveAttr,
+  MeFirstAttr,
+  PursuitPowerAttr,
   RepeatMoveAttr,
   ReducePpMoveAttr,
   AttackReducePpMoveAttr,
@@ -11095,7 +11681,10 @@ export function initMoves() {
       // TODO: Verify if Encore's duration decreases during status based move failures
       .edgeCase(),
     new AttackMove(MoveId.PURSUIT, PokemonType.DARK, MoveCategory.PHYSICAL, 40, 100, 20, -1, 0, 2) //
-      .partial(), // No effect implemented
+      // x2 power vs a switching-out foe. The switch-out interception (Pursuit acting
+      // before the foe's SwitchSummonPhase) is handled by TurnStartPhase, which defers
+      // the pursued foe's switch until after Pursuit resolves. See PursuitPowerAttr.
+      .attr(PursuitPowerAttr),
     new AttackMove(MoveId.RAPID_SPIN, PokemonType.NORMAL, MoveCategory.PHYSICAL, 50, 100, 40, 100, 0, 2)
       .attr(StatStageChangeAttr, [Stat.SPD], 1, true)
       .attr(
@@ -11352,7 +11941,10 @@ export function initMoves() {
       // NB: failing on overlap is meaningless since Grudge wears off before the user's next move
       .attr(AddBattlerTagAttr, BattlerTagType.GRUDGE, true, false, 1),
     new SelfStatusMove(MoveId.SNATCH, PokemonType.DARK, -1, 10, -1, 4, 3) //
-      .unimplemented(),
+      // Primes the user to steal the next snatchable self-targeting status/heal/stat
+      // move used by another Pokemon this turn (intercepted in move-phase.ts). The
+      // SNATCH tag is single-turn and additionally consumed the moment it snatches.
+      .attr(AddBattlerTagAttr, BattlerTagType.SNATCH, true, false, 1),
     new AttackMove(MoveId.SECRET_POWER, PokemonType.NORMAL, MoveCategory.PHYSICAL, 70, 100, 20, 30, 0, 3)
       .makesContact(false)
       .attr(SecretPowerAttr),
@@ -11615,12 +12207,13 @@ export function initMoves() {
       .attr(MovePowerMultiplierAttr, (_user, target, _move) => (target.getHpRatio() < 0.5 ? 2 : 1)),
     new AttackMove(MoveId.NATURAL_GIFT, PokemonType.NORMAL, MoveCategory.PHYSICAL, -1, 100, 15, -1, 0, 4)
       .makesContact(false)
-      /*
-      NOTE: To whoever tries to implement this, reminder to push to battleData.berriesEaten
-      and enable the harvest test..
-      Do NOT push to berriesEatenLast or else cud chew will puke the berry.
-      */
-      .unimplemented(),
+      // ER: consumes a held berry; its TYPE and POWER come from the berry's
+      // Natural Gift table entry (ER_NATURAL_GIFT_TABLE). The berry is ledgered
+      // to battleData.berriesEaten (Harvest), NOT berriesEatenLast (Cud Chew).
+      .attr(ErNaturalGiftTypeAttr)
+      .attr(ErNaturalGiftPowerAttr)
+      .attr(ErFlingConsumeBerryAttr)
+      .condition(user => erUserHoldsBerry(user)),
     new AttackMove(MoveId.FEINT, PokemonType.NORMAL, MoveCategory.PHYSICAL, 30, 100, 10, -1, 2, 4)
       .attr(RemoveBattlerTagAttr, [BattlerTagType.PROTECTED])
       .attr(
@@ -11664,7 +12257,12 @@ export function initMoves() {
       .unimplemented(),
     new AttackMove(MoveId.FLING, PokemonType.DARK, MoveCategory.PHYSICAL, -1, 100, 10, -1, 0, 4)
       .makesContact(false)
-      .unimplemented(),
+      // ER: flings the user's heaviest held item; base power comes from the
+      // item's Fling BP (ER_FLING_POWER_TABLE — e.g. Grip Claw 90, Iron-ball-tier
+      // 100+, berries 10). A flung berry is ledgered so Harvest can regrow it.
+      .attr(ErFlingPowerAttr)
+      .attr(ErFlingConsumeItemAttr)
+      .condition(user => erUserCanFling(user)),
     new StatusMove(MoveId.PSYCHO_SHIFT, PokemonType.PSYCHIC, 100, 10, -1, 0, 4)
       .attr(PsychoShiftEffectAttr)
       // TODO: Verify status applied if a statused pokemon obtains Comatose (via Transform) and uses Psycho Shift
@@ -11690,7 +12288,9 @@ export function initMoves() {
     new StatusMove(MoveId.ME_FIRST, PokemonType.NORMAL, -1, 20, -1, 0, 4)
       .ignoresSubstitute()
       .target(MoveTarget.NEAR_ENEMY)
-      .unimplemented(),
+      // Copies the target's queued attacking move and uses it first at x1.5 power.
+      // Fails if the target already moved or queued a status move. See MeFirstAttr.
+      .attr(MeFirstAttr),
     new SelfStatusMove(MoveId.COPYCAT, PokemonType.NORMAL, -1, 20, -1, 0, 4) //
       .attr(CopyMoveAttr, false, invalidCopycatMoves),
     new StatusMove(MoveId.POWER_SWAP, PokemonType.PSYCHIC, -1, 10, 100, 0, 4)
@@ -11972,9 +12572,11 @@ export function initMoves() {
     // TODO: Enable / remove once balance reaches a consensus on imprison interaction during the final boss fight
     // .condition(failAgainstFinalBossCondition, 2)
     new StatusMove(MoveId.WONDER_ROOM, PokemonType.PSYCHIC, -1, 10, -1, 0, 5)
+      // ER (move 472): swap ATK and SpAtk field-wide for 5 turns, ignoring their
+      // stat stages. Room-style tag (re-cast ends it) applied to both sides.
       .ignoresProtect()
       .target(MoveTarget.BOTH_SIDES)
-      .unimplemented(),
+      .attr(AddArenaTagAttr, ArenaTagType.WONDER_ROOM, 5),
     new AttackMove(MoveId.PSYSHOCK, PokemonType.PSYCHIC, MoveCategory.SPECIAL, 80, 100, 10, -1, 0, 5) //
       .attr(DefDefAttr),
     new AttackMove(MoveId.VENOSHOCK, PokemonType.POISON, MoveCategory.SPECIAL, 65, 100, 10, -1, 0, 5) //
@@ -12094,8 +12696,11 @@ export function initMoves() {
       .attr(AddArenaTagAttr, ArenaTagType.QUICK_GUARD, 1, true, true)
       .condition(failIfLastCondition, 3),
     new SelfStatusMove(MoveId.ALLY_SWITCH, PokemonType.PSYCHIC, -1, 15, -1, 2, 5) //
+      // ER (move 502): swap field positions with the ally (doubles only).
       .ignoresProtect()
-      .unimplemented(),
+      .condition(failIfSingleBattle)
+      .condition((user, _target, _move) => !!user.getAlly())
+      .attr(AllySwitchAttr),
     new AttackMove(MoveId.SCALD, PokemonType.WATER, MoveCategory.SPECIAL, 80, 100, 15, 30, 0, 5)
       .attr(HealStatusEffectAttr, false, StatusEffect.FREEZE)
       .attr(HealStatusEffectAttr, true, StatusEffect.FREEZE)
@@ -12115,17 +12720,26 @@ export function initMoves() {
       ),
     new ChargingAttackMove(MoveId.SKY_DROP, PokemonType.FLYING, MoveCategory.PHYSICAL, 60, 100, 10, -1, 0, 5)
       .chargeText(i18next.t("moveTriggers:tookTargetIntoSky", { pokemonName: "{USER}", targetName: "{TARGET}" }))
+      // Turn 1: the user becomes semi-invulnerable (FLYING) and takes the target
+      // into the sky. ER: the target is IMMOBILIZED while held (its move is
+      // cancelled) until the slam on turn 2 (SkyDropHeldTag on the target).
       .chargeAttr(SemiInvulnerableAttr, BattlerTagType.FLYING)
+      .chargeAttr(AddBattlerTagAttr, BattlerTagType.SKY_DROP, false, false, 2, 2)
       .affectedByGravity()
       .condition((_user, target, _move) => !target.getTag(BattlerTagType.SUBSTITUTE))
-      /*
-       * Cf https://bulbapedia.bulbagarden.net/wiki/Sky_Drop_(move) and https://www.smogon.com/dex/sv/moves/sky-drop/:
-       * Should immobilize and give target semi-invulnerability
-       * Flying types should take no damage
-       * Should fail on targets above a certain weight threshold
-       * Should remove all redirection effects on successful takeoff (Rage Poweder, etc.)
-       */
-      .partial(),
+      // ER (residuals): the lift FAILS entirely if the target is too heavy
+      // (>= 200 kg — it can't be carried up) or is a Flying type (it can't be
+      // lifted). A failed condition aborts on the charge turn, so no takeoff.
+      .condition((_user, target, _move) => target.getWeight() < 200)
+      .condition((_user, target, _move) => !target.isOfType(PokemonType.FLYING))
+      // ER (residual): entry hazards on the target's side trigger when it is
+      // dropped back down on the slam turn (see ErSkyDropReleaseAttr).
+      .attr(ErSkyDropReleaseAttr),
+    // Cf https://bulbapedia.bulbagarden.net/wiki/Sky_Drop_(move):
+    // IMPLEMENTED: 2-turn charge, user semi-invulnerable on the charge turn,
+    //   target immobilized while held, damage on the slam turn, fails on
+    //   >=200kg / Flying targets, redirection cleared on takeoff
+    //   (SkyDropHeldTag.onAdd), hazards on drop (ErSkyDropReleaseAttr).
     new SelfStatusMove(MoveId.SHIFT_GEAR, PokemonType.STEEL, -1, 10, -1, 0, 5)
       .attr(StatStageChangeAttr, [Stat.ATK], 1, true)
       .attr(StatStageChangeAttr, [Stat.SPD], 2, true),

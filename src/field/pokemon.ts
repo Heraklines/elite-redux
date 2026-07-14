@@ -33,7 +33,7 @@ import {
 import { tmSpecies } from "#balance/tm-species-map";
 import { reverseCompatibleTms, speciesTmMoves } from "#balance/tms";
 import type { SuppressAbilitiesTag } from "#data/arena-tag";
-import { EntryHazardTag, NoCritTag, WeakenMoveScreenTag } from "#data/arena-tag";
+import { EntryHazardTag, isWonderRoomActive, NoCritTag, WeakenMoveScreenTag } from "#data/arena-tag";
 import { fieldSpriteOffset } from "#data/battle-format";
 import {
   AutotomizedTag,
@@ -1912,7 +1912,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     simulated = true,
     ignoreHeldItems = false,
   ): number {
-    const statVal = new NumberHolder(this.getStat(stat, false));
+    // ER Wonder Room (move 472): while active, ATK and SpAtk are swapped
+    // field-wide, and their stat stages ("buffs") are ignored. The swap reads
+    // the OTHER offensive stat's RAW base value; the stat-stage multiplier is
+    // skipped for the swapped stat below. Ability/held-item multipliers stay
+    // keyed to the requested offensive slot (they are not stat "buffs").
+    const wonderRoomSwapped = (stat === Stat.ATK || stat === Stat.SPATK) && isWonderRoomActive();
+    const baseStat = wonderRoomSwapped ? (stat === Stat.ATK ? Stat.SPATK : Stat.ATK) : stat;
+    const statVal = new NumberHolder(this.getStat(baseStat, false));
     if (!ignoreHeldItems) {
       globalScene.applyModifiers(StatBoosterModifier, this.isPlayer(), this, stat, statVal);
     }
@@ -1973,7 +1980,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     let ret =
       statVal.value
-      * this.getStatStageMultiplier(stat, opponent, move, ignoreOppAbility, isCritical, simulated, ignoreHeldItems);
+      * (wonderRoomSwapped
+        ? 1 // ER Wonder Room: swapped ATK/SpAtk ignore stat stages ("buffs")
+        : this.getStatStageMultiplier(stat, opponent, move, ignoreOppAbility, isCritical, simulated, ignoreHeldItems));
 
     switch (stat) {
       case Stat.ATK:
@@ -1989,11 +1998,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         break;
       case Stat.DEF:
         // Ice-types gain +50% Def in snow — and in ER's Snowy Wrath (er 666), a
-        // damaging snow that carries the same Ice Defense boost.
+        // damaging snow that carries the same Ice Defense boost. ER Snow Warning
+        // (117) summons HAIL, which the dex says also grants Ice types the +50%
+        // Def boost, so HAIL is included here too.
         if (
           this.isOfType(PokemonType.ICE)
           && (globalScene.arena.weather?.weatherType === WeatherType.SNOW
-            || globalScene.arena.weather?.weatherType === WeatherType.SNOWY_WRATH)
+            || globalScene.arena.weather?.weatherType === WeatherType.SNOWY_WRATH
+            || globalScene.arena.weather?.weatherType === WeatherType.HAIL)
         ) {
           ret *= 1.5;
         }
@@ -4958,6 +4970,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         statHolder: defensiveStatHolder,
       });
     }
+    // Elite Redux: Exploit Weakness (284) retargets the defender's WEAKER
+    // defensive stat when the defender is statused. Source-side; gated on the
+    // cheap status check so the hot path only fires the dispatch vs statused foes.
+    if (this.status != null && this.status.effect !== StatusEffect.NONE && !ignoreSourceAbility) {
+      applyAbAttrs("LowerDefensiveStatVsStatusedFoeAbAttr", {
+        pokemon: source,
+        simulated,
+        defender: this,
+        statHolder: defensiveStatHolder,
+      });
+    }
     const targetDef = new NumberHolder(
       this.getEffectiveStat(
         defensiveStatHolder.value,
@@ -5348,6 +5371,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     /** ER FEAR: the feared target takes 50% more damage (ROM). */
     const fearMultiplier = this.getTag(BattlerTagType.ER_FEAR) ? 1.5 : 1;
 
+    /** ER Safe Passage (979): the guided switch-in takes -35% damage this turn. */
+    const safePassageMultiplier = this.getTag(BattlerTagType.ER_SAFE_PASSAGE) ? 0.65 : 1;
+
     /** Reduces damage if this Pokemon has a relevant screen (e.g. Light Screen for special attacks) */
     const screenMultiplier = new NumberHolder(1);
 
@@ -5416,6 +5442,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         * burnMultiplier
         * frostbiteMultiplier
         * fearMultiplier
+        * safePassageMultiplier
         * screenMultiplier.value
         * hitsTagMultiplier.value
         * mistyTerrainMultiplier
@@ -6687,7 +6714,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         });
         break;
       case StatusEffect.PARALYSIS:
-        isImmune = this.isOfType(PokemonType.ELECTRIC);
+        // ER Glare (er move 137, effect 41 "Paralyze Ignore Type"): its status
+        // attr sets `ignoreTypeImmunity`, letting it paralyze Electric types for
+        // that move ONLY. Every other paralysis source keeps the Electric immunity.
+        isImmune = !ignoreTypeImmunity && this.isOfType(PokemonType.ELECTRIC);
         break;
       case StatusEffect.SLEEP:
         isImmune = this.isGrounded() && globalScene.arena.terrainType === TerrainType.ELECTRIC;

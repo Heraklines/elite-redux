@@ -19,6 +19,7 @@ import { endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyFieldMedic } from "#data/elite-redux/er-relics";
 import { TerrainType } from "#data/terrain";
+import { AbilityId } from "#enums/ability-id";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { HitResult } from "#enums/hit-result";
 import { PokemonType } from "#enums/pokemon-type";
@@ -69,9 +70,12 @@ export class TurnEndPhase extends FieldPhase {
 
         // ER Toxic Terrain — grounded non-Poison Pokémon take 1/16 max HP each
         // turn (Magic Guard / Block-non-direct-damage abilities exempt them).
+        // Poison Heal (ER 2.65 dex: "Also prevents damage from Toxic terrain.")
+        // is likewise immune to the chip.
         if (
           globalScene.arena.terrain?.terrainType === TerrainType.TOXIC
           && pokemon.isGrounded()
+          && !pokemon.hasAbility(AbilityId.POISON_HEAL)
           && !pokemon.getTypes(true, true).some(t => globalScene.arena.terrain?.isTypeDamageImmune(t))
         ) {
           const cancelled = new BooleanHolder(false);
@@ -154,8 +158,17 @@ export class TurnEndPhase extends FieldPhase {
       globalScene.arena.triggerWeatherBasedFormChangesToNormal();
     }
 
-    if (globalScene.arena.terrain && !globalScene.arena.terrain.lapse()) {
-      globalScene.arena.trySetTerrain(TerrainType.NONE);
+    // ER Stench (1): Toxic Terrain turns do NOT decrease while a Stench holder is
+    // on the field (the terrain can still be removed/displaced by another setter).
+    // Freeze the lapse for TOXIC terrain in that case; everything else lapses.
+    const activeTerrain = globalScene.arena.terrain;
+    if (activeTerrain) {
+      const stenchFreezesToxic =
+        activeTerrain.terrainType === TerrainType.TOXIC
+        && globalScene.getField(true).some(p => p?.hasAbility(AbilityId.STENCH));
+      if (!stenchFreezesToxic && !activeTerrain.lapse()) {
+        globalScene.arena.trySetTerrain(TerrainType.NONE);
+      }
     }
 
     this.erAutoShiftNonAdjacentSurvivors();
