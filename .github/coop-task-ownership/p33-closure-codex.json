@@ -26,6 +26,7 @@
     "test/tests/elite-redux/er-custom-trainers.test.ts",
     "test/tests/elite-redux/showdown/**",
     "test/tests/elite-redux/tools/dump-editor-data.test.ts",
+    "test/tools/coop-duo-harness.ts",
     "test/tools/render-ui-page.test.ts",
     "test/tools/ui-baselines/**",
     "workers/er-editor-api/src/index.ts",
