@@ -38,3 +38,16 @@ This smart-sharded workflow is the standing default for all future co-op checkpo
 - Deploy only to staging unless the user explicitly authorizes production. Keep intermediate staging checkpoints functional for multiplayer testers.
 
 When changing the lane composition or shard count, preserve deterministic, exhaustive file assignment and verify with `--list` that every file appears in exactly one shard. Use historical-duration balancing when timing data is available, fall back to stable deterministic weighting when it is not, and keep the resulting assignment reproducible. Optimize the slowest shard rather than merely increasing concurrency, and do not weaken assertions or omit scenarios to make a shard faster.
+
+## Critical rules (mirror of CLAUDE.md)
+
+`CLAUDE.md` at the repo root is the authoritative project brief; this file mirrors the rules most likely to bite non-Claude (e.g. Codex) agents. When the two disagree, CLAUDE.md wins. Read it.
+
+## Kaggle / ML training compute (combat-AI program)
+
+Context for the combat-AI work fed by the player-telemetry pipeline. Full plan: `docs/plans/combat-ai-roadmap.md` (+ the telemetry design in `docs/plans/player-telemetry-schema-v1.md`).
+
+- **Kaggle is the training substrate** (~30h/wk free GPU + TPU) where model training / fine-tuning runs. Self-play GAME GENERATION is CPU-only and runs on free GitHub Actions public-repo runners (the engine is CPU-only), not on Kaggle.
+- **Credential = pointer only.** The Kaggle API token lives at `~/.kaggle/kaggle.json` (also noted in `Desktop/api-keys.md`). Reference it by PATH; **never copy the key into the repo, a notebook, a commit, or any log.**
+- **Notebooks are ephemeral** — their filesystem is wiped between sessions. Persistence is via **Kaggle Datasets**: inputs (telemetry exports, per-build data dictionaries) and outputs (**checkpoints saved as new dataset VERSIONS**) live there; resume from the latest checkpoint version each weekly quota window.
+- 🔴 **HARD RULE — bulk data NEVER routes through the maintainer's machine or connection.** All large transfers are **cloud-to-cloud only**: R2 <-> Kaggle over S3-compatible R2 keys stored as **Kaggle secrets** (not in the repo); generation + upload happen on GitHub runners. Do not download a telemetry/self-play corpus locally to re-upload it — wire the two clouds directly.
