@@ -2650,7 +2650,7 @@ function renderCustomTrainers(root) {
     form = `<div class="ctr-form">
       <fieldset class="ctr-sec"><legend>Identity</legend>
         <label>Name <input type="text" id="ctr-name" maxlength="24" value="${esc(t.name || "")}" style="width:200px" /></label>
-        <label>Id <input type="number" value="${t.id}" readonly style="width:80px;opacity:.6" /></label>
+        <label>Id <input type="text" id="ctr-id" value="${t.id}" readonly tabindex="-1" style="width:80px;opacity:.6" /></label>
         <label>Sprite / class <input type="text" id="ctr-class" list="trainerclass-list" value="${esc(t.trainerClass || "")}" style="width:170px" spellcheck="false" /></label>
         <button type="button" id="ctr-browse-class" title="Browse trainer classes by sprite">Browse…</button>
         ${ctrGenderPickerHtml(t)}
