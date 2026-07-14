@@ -42,6 +42,7 @@ const SURFACE_PREFIX = "[coop-browser:surface] ";
 const SURFACE2_PREFIX = "[coop-browser:surface2] ";
 const BINDING_PREFIX = "[coop-browser:binding] ";
 const DIGEST_PARTS_PREFIX = "[coop-browser:digest-parts] ";
+const RENDER_PROFILE_PREFIX = "[coop-browser:render-profile] ";
 const CHECKSUM_SENTINEL = "0000000000000000";
 
 /**
@@ -473,6 +474,37 @@ let lastSemanticProbe = "";
 let lastSemanticProbeAt = 0;
 let lastSemanticPhase: object | null = null;
 let semanticPhaseInstance = 0;
+let lastObservedRenderProfile = "";
+
+/**
+ * Attest the real Display-settings value while that visible menu is open. The campaign
+ * reaches this handler only through public keys; this probe is read-only and lets an
+ * animations-skipped depth result remain visibly distinct from animations-on coverage.
+ */
+function observeRenderProfile(): void {
+  try {
+    const handler = globalScene?.ui?.getHandler();
+    if (!handler?.active || handler.constructor?.name !== "SettingsDisplayUiHandler") {
+      // A later Settings visit must emit a fresh attestation even when the saved value
+      // did not change (the speed setup opens Settings before the render-profile pass).
+      lastObservedRenderProfile = "";
+      return;
+    }
+    const observation = {
+      version: 1,
+      moveAnimations: globalScene.moveAnimations,
+      handler: "SettingsDisplayUiHandler",
+    } as const;
+    const canonical = JSON.stringify(observation);
+    if (canonical === lastObservedRenderProfile) {
+      return;
+    }
+    lastObservedRenderProfile = canonical;
+    console.info(`${RENDER_PROFILE_PREFIX}${canonical}`);
+  } catch {
+    // Settings are changing mode or the page is tearing down.
+  }
+}
 
 function observeSemanticSurface(): void {
   try {
@@ -603,6 +635,7 @@ setInterval(() => {
   observeBoundSession();
   observeContinuationSurface();
   observeSemanticSurface();
+  observeRenderProfile();
 }, 100);
 
 // Strictly read-only observer bridge. `ready` is a non-mutating probe; the former

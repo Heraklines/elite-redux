@@ -20,6 +20,9 @@ const ANIMATION_PROGRESS_PHASE = /Start Phase (MoveEffectPhase|MoveAnimPhase|Coo
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
 const TURN_PROGRESS = /Start Phase TurnStartPhase|host recorder: begin turn=/u;
+const AUTHORITY_MOVE_EFFECT = /Start Phase MoveEffectPhase/u;
+const RENDERER_MOVE_REPLAY = /Start Phase CoopMoveAnimReplayPhase/u;
+const RENDERER_MOVE_SKIPPED = /present move .* NO-OP end \(user=.* anims=false\)/u;
 const BATTLE_PROMPT_PHASES = new Map([
   ["battle:message", "MessagePhase"],
   ["battle:exp", "ExpPhase"],
@@ -155,6 +158,79 @@ async function raiseGameSpeed(rig, policy, progress) {
     await client.checkpoint("speed-raised");
   }
   await progress.note("speed-raise applied (Game Speed -> 10x via Settings UI)", { keys });
+}
+
+/**
+ * Select and attest one of the two explicit rendering-fidelity profiles through the real
+ * Display Settings UI. The browser observer only reports the applied value; every change
+ * is still a public keyboard action and both clients leave a screenshot on the selected row.
+ */
+async function configureRenderProfile(rig, policy, progress) {
+  const clients = Object.values(rig.clients);
+  const expected = policy.moveAnimationsExpected;
+  for (const client of clients) {
+    const openCursor = client.evidence.cursor();
+    await client.sequence(policy.keys.renderProfileOpen, `open-render-profile-${policy.renderProfile}`);
+    let attestation = await client.evidence.waitForCondition(
+      sink => sink.findRenderProfile(true, openCursor) ?? sink.findRenderProfile(false, openCursor),
+      {
+        timeoutMs: rig.config.timeoutMs,
+        description: "visible Display Settings move-animation attestation",
+      },
+    );
+    if (attestation.observation.moveAnimations !== expected) {
+      const toggleCursor = client.evidence.cursor();
+      await client.sequence(policy.keys.renderProfileToggle, `toggle-render-profile-${policy.renderProfile}`);
+      attestation = await client.evidence.waitForCondition(sink => sink.findRenderProfile(expected, toggleCursor), {
+        timeoutMs: rig.config.timeoutMs,
+        description: `Move Animations=${expected ? "On" : "Off"} after visible Settings toggle`,
+      });
+    }
+    await delay(client.config.settleDelayMs);
+    client.evidence.record("campaign-render-profile", {
+      profile: policy.renderProfile,
+      moveAnimations: attestation.observation.moveAnimations,
+      fidelity: expected
+        ? "move-animation rendering covered"
+        : "move-animation rendering intentionally skipped; mechanics/network/public UI retained",
+    });
+    await client.checkpoint(`render-profile-${policy.renderProfile}-selected`);
+    await client.sequence(policy.keys.renderProfileClose, `close-render-profile-${policy.renderProfile}`);
+  }
+  await progress.note("render profile visibly selected and observer-attested", {
+    renderProfile: policy.renderProfile,
+    moveAnimations: expected,
+    fidelity: expected
+      ? "move-animation rendering covered"
+      : "move-animation rendering intentionally skipped; mechanics/network/public UI retained",
+  });
+}
+
+/** Prove the selected profile actually governed at least one authoritative/replayed move. */
+async function assertRenderProfileExecution(rig, policy, progress) {
+  const authorityMove = rig.host.evidence.find(AUTHORITY_MOVE_EFFECT);
+  if (!authorityMove) {
+    throw new Error(`${policy.renderProfile}: no authoritative MoveEffectPhase was observed`);
+  }
+  const rendererEvidence = policy.moveAnimationsExpected
+    ? rig.guest.evidence.find(RENDERER_MOVE_REPLAY)
+    : rig.guest.evidence.find(RENDERER_MOVE_SKIPPED);
+  if (!rendererEvidence) {
+    throw new Error(
+      policy.moveAnimationsExpected
+        ? "animations-on-surface: renderer never ran a CoopMoveAnimReplayPhase"
+        : "animations-skipped-depth: renderer never attested a move-animation NO-OP with anims=false",
+    );
+  }
+  const proof = {
+    renderProfile: policy.renderProfile,
+    moveAnimations: policy.moveAnimationsExpected,
+    authorityMoveEventIndex: authorityMove.index,
+    rendererMoveEventIndex: rendererEvidence.index,
+  };
+  rig.host.evidence.record("campaign-render-profile-proof", proof);
+  rig.guest.evidence.record("campaign-render-profile-proof", proof);
+  await progress.note("render profile governed real battle execution", proof);
 }
 
 /** Clients whose submitted command has not yet opened the real turn/replay path. */
@@ -661,12 +737,17 @@ export async function runCampaign(rig) {
   const policy = loadCampaignPolicy();
   const progress = new CampaignProgress(rig.config.artifactDir);
   const clients = Object.values(rig.clients);
-  await progress.note("campaign start", { targetWaves: policy.targetWaves, rewardMode: policy.rewardMode });
+  await progress.note("campaign start", {
+    targetWaves: policy.targetWaves,
+    rewardMode: policy.rewardMode,
+    renderProfile: policy.renderProfile,
+  });
 
   await rig.loginBoth();
   if (policy.raiseSpeed) {
     await raiseGameSpeed(rig, policy, progress);
   }
+  await configureRenderProfile(rig, policy, progress);
   await rig.pair(rig.config.requesterSeat);
   await rig.startFreshRun();
   // Verify the layer-8 passive-digest fix did not disable ER innates (maintainer-directed invariant).
@@ -721,9 +802,14 @@ export async function runCampaign(rig) {
         break;
       }
     }
+    if (status === "continue" && wavesCleared >= policy.targetWaves) {
+      await assertRenderProfileExecution(rig, policy, progress);
+    }
   } finally {
     await progress.summary({
       targetWaves: policy.targetWaves,
+      renderProfile: policy.renderProfile,
+      moveAnimations: policy.moveAnimationsExpected,
       wavesCleared,
       finalWave: rig.activeBattleWave,
       lastStatus: status,

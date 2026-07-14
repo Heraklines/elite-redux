@@ -103,12 +103,17 @@ function envKeys(name, fallback) {
 
 const allowedRewardModes = new Set(["leave", "pick-first"]);
 const allowedModes = new Set(["gating", "shakedown", "nightly"]);
+const allowedRenderProfiles = new Set(["animations-on-surface", "animations-skipped-depth"]);
 
 /** Read every campaign-only knob (base gameplay config still comes from loadConfig). */
 export function loadCampaignPolicy() {
   const rewardMode = envTrim("COOP_UI_REWARD_MODE") || "leave";
   if (!allowedRewardModes.has(rewardMode)) {
     throw new Error(`COOP_UI_REWARD_MODE must be one of ${[...allowedRewardModes].join(", ")}`);
+  }
+  const renderProfile = envTrim("COOP_UI_RENDER_PROFILE") || "animations-on-surface";
+  if (!allowedRenderProfiles.has(renderProfile)) {
+    throw new Error(`COOP_UI_RENDER_PROFILE must be one of ${[...allowedRenderProfiles].join(", ")}`);
   }
   // Run mode gates the loud-fail contract. autoFirst (press-through of an UNKNOWN surface) is
   // ONLY permitted under an explicitly-labelled "shakedown"; in any gating/nightly config an
@@ -132,6 +137,8 @@ export function loadCampaignPolicy() {
     autoFirst: autoFirstRequested && mode === "shakedown",
     stallMs: envInteger("COOP_UI_CAMPAIGN_STALL_MS", 8_000),
     rewardMode,
+    renderProfile,
+    moveAnimationsExpected: renderProfile === "animations-on-surface",
     raiseSpeed: envBoolean("COOP_UI_RAISE_SPEED", true),
     keys: {
       // Drive the in-game Game Speed setting to 10x (Ludicrous) through the REAL Settings
@@ -157,6 +164,24 @@ export function loadCampaignPolicy() {
         "ArrowUp",
         "ArrowUp",
       ]),
+      // Re-open Settings after the speed pass, switch from General to Display with the
+      // normal R/CYCLE_SHINY binding, and select the Move Animations row (index 5). The
+      // campaign then reads the CI observer's actual value and toggles once through the
+      // visible row only when it differs from the requested render profile.
+      renderProfileOpen: envKeys("COOP_UI_RENDER_PROFILE_OPEN_KEYS", [
+        "ArrowDown",
+        "ArrowDown",
+        "ArrowDown",
+        "Space",
+        "r",
+        "ArrowDown",
+        "ArrowDown",
+        "ArrowDown",
+        "ArrowDown",
+        "ArrowDown",
+      ]),
+      renderProfileToggle: envKeys("COOP_UI_RENDER_PROFILE_TOGGLE_KEYS", ["ArrowRight"]),
+      renderProfileClose: envKeys("COOP_UI_RENDER_PROFILE_CLOSE_KEYS", ["Backspace", "ArrowUp", "ArrowUp", "ArrowUp"]),
       // Attack-first: FIGHT -> first move -> confirm target. Same default as the harness.
       battle: envKeys("COOP_UI_BATTLE_KEYS", ["Space", "Space", "Space"]),
       // Fallback when the first move does not resolve the turn (no PP / disabled): reopen
