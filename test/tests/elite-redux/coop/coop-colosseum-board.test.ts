@@ -349,7 +349,9 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
     const envelope = retainedBoardEnvelope(pinned);
     const entry = { cls: "op:global", seq: 1, msg: { t: "envelope" as const, envelope } };
     const apply = coopOperationDurabilityHooks().apply!;
-    const runtime = createCoopRuntimeOpState("guest");
+    // Role-less keeps this operation-level proof off the temporary process-global guest-clock bridge; the
+    // production role guard still accepts it as an explicitly captured guest binding.
+    const runtime = createCoopRuntimeOpState();
     setActiveCoopRuntimeOpState(runtime);
     const binding = captureCoopColosseumOperationBinding("guest");
     setCoopMeInteractionStart(pinned);
@@ -386,7 +388,8 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
     const envelope = retainedBoardEnvelope(53);
     const entry = { cls: "op:global", seq: 1, msg: { t: "envelope" as const, envelope } };
     const apply = coopOperationDurabilityHooks().apply!;
-    const runtime = createCoopRuntimeOpState("guest");
+    // Role-less keeps this operation-level proof off the temporary process-global guest-clock bridge.
+    const runtime = createCoopRuntimeOpState();
     setActiveCoopRuntimeOpState(runtime);
     const binding = captureCoopColosseumOperationBinding("guest");
     setCoopMeInteractionStart(55);
