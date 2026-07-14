@@ -38,8 +38,14 @@ export class ArenaData {
 
     if (source instanceof Arena) {
       this.biome = source.biomeId;
-      this.weather = source.weather;
-      this.terrain = source.terrain;
+      // Default to null, never leave undefined: a live Arena can hold weather/terrain as `undefined`
+      // (declared `| null` but assigned only by trySetWeather/trySetTerrain), and JSON.stringify DROPS
+      // an undefined key entirely. The co-op launch snapshot the guest BOOTS from is this serialization,
+      // so a dropped terrain/weather key means the guest boots terrain-less while the host's on-entry
+      // innate (e.g. a Grassy-Surge-class enemy at wave 1) set it - a real battle-math desync (#920).
+      // The loader already restores both (game-data.ts:4677/4687); the gap was serialization-side only.
+      this.weather = source.weather ?? null;
+      this.terrain = source.terrain ?? null;
       // The assertion here is ok - we ensure that all tags are inside the `posTagConstructorMap` map,
       // and that all `PositionalTags` will become their respective interfaces when serialized and de-serialized.
       this.positionalTags = (source.positionalTagManager.tags as unknown as SerializedPositionalTag[]) ?? [];
