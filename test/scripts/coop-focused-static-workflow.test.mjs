@@ -39,6 +39,21 @@ test("focused static checks the planner's exact declared train base", () => {
   assert.match(staticJob, /if: failure\(\)[\s\S]*coop-focused-static\.log/u);
 });
 
+test("focused planner deepens only task/train lineages before its full-history fallback", () => {
+  const planJob = job("plan", "static");
+  assert.match(planJob, /--filter=blob:none --depth=64 origin "\$train_refspec"/u);
+  assert.match(planJob, /for deepen in 32 128 512 2048/u);
+  assert.match(planJob, /--filter=blob:none --deepen="\$deepen" origin "\$refspec"/u);
+  assert.match(
+    planJob,
+    /if \[ "\$needs_full_history" -eq 1 \]; then[\s\S]*--unshallow origin "\$\{full_refspecs\[@\]\}"/u,
+  );
+  assert.equal([...planJob.matchAll(/--unshallow/gu)].length, 1, "full history is one last-resort fallback");
+  assert.doesNotMatch(planJob, /--unshallow origin "\$COOP_TASK_BRANCH"/u);
+  assert.match(planJob, /git merge-base --is-ancestor "\$COOP_DECLARED_BASE" HEAD/u);
+  assert.match(planJob, /git merge-base --is-ancestor "\$COOP_DECLARED_BASE" "\$train_tip"/u);
+});
+
 test("focused static accepts ignored-only metadata after the non-vacuous type ratchet", () => {
   assert.match(staticGate, /"biome",\s+"check",\s+"--no-errors-on-unmatched"/u);
   assert.match(staticGate, /"--diagnostic-level=error"/u);

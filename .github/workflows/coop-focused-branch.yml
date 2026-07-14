@@ -70,6 +70,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          task_refspec="+refs/heads/$COOP_TASK_BRANCH:refs/remotes/origin/coop-task-history"
+          train_refspec=""
           if [ "$COOP_TASK_BRANCH" = "$COOP_TRAIN_REF" ]; then
             if [[ -z "$COOP_PUSH_BASE" || "$COOP_PUSH_BASE" =~ ^0+$ ]]; then
               echo "integration-train pushes require a real github.event.before SHA" >&2
@@ -79,20 +81,60 @@ jobs:
             git fetch --no-tags --depth=1 origin "$expected_base"
             train_tip="$(git rev-parse HEAD)"
           else
-            # No depth cap: the task checkout already contains its fork commit, so Git negotiates only the
-            # train commits needed to prove that the declared base remains in the train's unrebased lineage.
-            git fetch --no-tags origin "+refs/heads/$COOP_TRAIN_REF:refs/remotes/origin/coop-declared-train"
+            # Start with only the recent train lineage. The bounded ancestry resolver below deepens this
+            # exact ref when an older fork point is genuinely needed; it does not download unrelated history.
+            train_refspec="+refs/heads/$COOP_TRAIN_REF:refs/remotes/origin/coop-declared-train"
+            git fetch --no-tags --filter=blob:none --depth=64 origin "$train_refspec"
             train_tip="$(git rev-parse refs/remotes/origin/coop-declared-train)"
             expected_base="$COOP_DECLARED_BASE"
           fi
           git fetch --no-tags --depth=1 origin "$COOP_DECLARED_BASE"
           git cat-file -e "${COOP_DECLARED_BASE}^{commit}"
-          # A depth-limited checkout records its oldest commit as a synthetic root. Fetching the base
-          # object alone does not remove that shallow boundary, so ancestry checks can reject a valid
-          # train push. Fetch commit/tree history without historical blobs before proving lineage.
-          shallow_file="$(git rev-parse --git-path shallow)"
-          if [ -s "$shallow_file" ]; then
-            git fetch --no-tags --filter=blob:none --unshallow origin "$COOP_TASK_BRANCH"
+
+          # A depth-one checkout marks HEAD as a synthetic root, so fetching the declared base object alone
+          # cannot prove ancestry. Deepen only the relevant task/train refs, exponentially and without blobs.
+          # A full history fetch remains a last-resort correctness fallback for unusually old branches.
+          git fetch --no-tags --filter=blob:none --depth=2 origin "$task_refspec"
+          deepen_until_ancestor() {
+            local ancestor="$1"
+            local descendant="$2"
+            local refspec="$3"
+            local label="$4"
+            if git merge-base --is-ancestor "$ancestor" "$descendant"; then
+              return 0
+            fi
+            for deepen in 32 128 512 2048; do
+              echo "deepening $label lineage by $deepen commits"
+              git fetch --no-tags --filter=blob:none --deepen="$deepen" origin "$refspec"
+              if git merge-base --is-ancestor "$ancestor" "$descendant"; then
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          needs_full_history=0
+          if ! deepen_until_ancestor "$COOP_DECLARED_BASE" HEAD "$task_refspec" task; then
+            needs_full_history=1
+          fi
+          if [ -n "$train_refspec" ] \
+            && ! deepen_until_ancestor "$COOP_DECLARED_BASE" "$train_tip" "$train_refspec" train; then
+            needs_full_history=1
+          fi
+          if [ "$needs_full_history" -eq 1 ]; then
+            shallow_file="$(git rev-parse --git-path shallow)"
+            if [ -s "$shallow_file" ]; then
+              full_refspecs=("$task_refspec")
+              if [ -n "$train_refspec" ]; then
+                full_refspecs+=("$train_refspec")
+              fi
+              echo "bounded lineage deepening exhausted; fetching full blobless task/train history"
+              git fetch --no-tags --filter=blob:none --unshallow origin "${full_refspecs[@]}"
+            fi
+          fi
+          git merge-base --is-ancestor "$COOP_DECLARED_BASE" HEAD
+          if [ -n "$train_refspec" ]; then
+            git merge-base --is-ancestor "$COOP_DECLARED_BASE" "$train_tip"
           fi
           echo "resolved train $COOP_TRAIN_REF tip=$train_tip task-base=$expected_base (declared $COOP_DECLARED_BASE)"
           echo "expected_base=$expected_base" >> "$GITHUB_OUTPUT"
