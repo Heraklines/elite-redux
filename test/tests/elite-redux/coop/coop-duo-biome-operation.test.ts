@@ -233,6 +233,7 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
       await withClient(ownerCtx, async () => {
         setCoopBiomeInteractionStart(counterBefore);
         liveSelectBiome().start();
+        await Promise.resolve();
         ownerCap.selectMap(ownerBiome);
         await drainLoopback();
       });
@@ -416,6 +417,7 @@ describe.skipIf(!RUN)("co-op DUO biome travel via the operation primitive (Wave-
       await withClient(rig.hostCtx, async () => {
         setCoopBiomeInteractionStart(pinned);
         liveSelectBiome().start();
+        await Promise.resolve();
         ownerCap.selectMap(ownerBiome);
         await drainLoopback();
       });
