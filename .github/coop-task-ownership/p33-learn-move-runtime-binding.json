@@ -12,6 +12,7 @@
     "src/phases/learn-move-batch-phase.ts",
     "src/phases/learn-move-phase.ts",
     "test/tests/elite-redux/coop/coop-duo-learn-move.test.ts",
-    "test/tests/elite-redux/coop/coop-learn-move-operation.test.ts"
+    "test/tests/elite-redux/coop/coop-learn-move-operation.test.ts",
+    "test/tests/elite-redux/coop/coop-shop-continuation-orphan.test.ts"
   ]
 }
