@@ -71,6 +71,7 @@
     "test/tests/elite-redux/coop/coop-duo-launch-terrain.test.ts",
     "test/tests/elite-redux/coop/coop-duo-learn-move.test.ts",
     "test/tests/elite-redux/coop/coop-duo-me-operation.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-reward-operation.test.ts",
     "test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts",
     "test/tests/elite-redux/coop/coop-faint-switch-operation.test.ts",
     "test/tests/elite-redux/coop/coop-learn-move-operation.test.ts",
