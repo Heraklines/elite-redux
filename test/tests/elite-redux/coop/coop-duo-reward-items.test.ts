@@ -41,6 +41,7 @@ import {
   driveHostPartyRewardOwner,
   forceItemRewards,
   installDuoLogCapture,
+  pumpDuoDestinations,
   reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
@@ -134,6 +135,7 @@ describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across 
       await withClient(rig.guestCtx, () => driveHostPartyRewardOwner(guestShop, { slot }));
       await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
     }
+    await pumpDuoDestinations(rig);
     // The alternating-interaction counter advanced exactly once on BOTH engines (lockstep).
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once").toBe(counterBefore + 1);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced the counter once").toBe(counterBefore + 1);

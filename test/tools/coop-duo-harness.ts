@@ -111,6 +111,8 @@ import {
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import {
   type CoopActiveMysteryEncounterSnapshotV1,
+  type CoopMessage,
+  type CoopRole,
   type CoopTransport,
   createLoopbackPair,
   type SerializedCommand,
@@ -1130,6 +1132,105 @@ export function buildRuntime(endpoint: CoopTransport, username: string, netcodeM
 // Cooperative scheduler.
 // ---------------------------------------------------------------------------
 
+/** A pair whose retained operation envelopes can be pumped only under their destination ClientCtx. */
+interface DestinationEnvelopePumpPair {
+  host: CoopTransport;
+  guest: CoopTransport;
+  flush(role: CoopRole, limit?: number): number;
+}
+
+/**
+ * Test-only adapter for the ordinary microtask loopback used by the legacy duo harness.
+ *
+ * A retained operation result is applied from the inbound `envelope` handler. Letting the ordinary
+ * loopback deliver that handler while the sender's {@linkcode withClient} scope is still installed
+ * applies the destination runtime's result against the sender's `globalScene`, then records it as
+ * already applied. The later watcher can therefore materialize the journal entry without ever mutating
+ * its own scene. Real clients cannot do this because each browser owns an independent global context.
+ *
+ * Queue ONLY `envelope` frames here. Handshake, command/request, relay, checkpoint, and state traffic
+ * retains the legacy automatic loopback behavior, so existing command-response tests cannot deadlock.
+ * `drainLoopback()` flushes this queue through the active destination ClientCtx. Callers that already
+ * provide a full scheduled pair bypass this adapter entirely.
+ */
+function destinationPumpOperationEnvelopes(pair: {
+  host: CoopTransport;
+  guest: CoopTransport;
+}): DestinationEnvelopePumpPair {
+  const queues: Record<CoopRole, CoopMessage[]> = { host: [], guest: [] };
+
+  const wrap = (inner: CoopTransport): { transport: CoopTransport; deliverEnvelope(message: CoopMessage): void } => {
+    const handlers = new Set<(message: CoopMessage) => void>();
+    const unsubscribe = inner.onMessage(message => {
+      if (message.t === "envelope") {
+        queues[inner.role].push(message);
+        return;
+      }
+      for (const handler of [...handlers]) {
+        handler(message);
+      }
+    });
+
+    const transport: CoopTransport = {
+      get role(): CoopRole {
+        return inner.role;
+      },
+      get state() {
+        return inner.state;
+      },
+      send: message => inner.send(message),
+      onMessage(handler): () => void {
+        handlers.add(handler);
+        return () => handlers.delete(handler);
+      },
+      onStateChange: handler => inner.onStateChange(handler),
+      close(): void {
+        unsubscribe();
+        handlers.clear();
+        queues[inner.role].length = 0;
+        inner.close();
+      },
+      ...(typeof inner.disconnectReason === "function" ? { disconnectReason: () => inner.disconnectReason!() } : {}),
+      ...(typeof inner.connectionGeneration === "function"
+        ? { connectionGeneration: () => inner.connectionGeneration!() }
+        : {}),
+      ...(typeof inner.lastRxMs === "function" ? { lastRxMs: () => inner.lastRxMs!() } : {}),
+      ...(typeof inner.outboundQueueDepth === "function"
+        ? { outboundQueueDepth: () => inner.outboundQueueDepth!() }
+        : {}),
+      ...(typeof inner.outboundQueueNeedsResync === "function"
+        ? { outboundQueueNeedsResync: () => inner.outboundQueueNeedsResync!() }
+        : {}),
+    };
+
+    return {
+      transport,
+      deliverEnvelope(message): void {
+        for (const handler of [...handlers]) {
+          handler(message);
+        }
+      },
+    };
+  };
+
+  const host = wrap(pair.host);
+  const guest = wrap(pair.guest);
+  const endpoints: Record<CoopRole, ReturnType<typeof wrap>> = { host, guest };
+  const wrapped: DestinationEnvelopePumpPair = {
+    host: host.transport,
+    guest: guest.transport,
+    flush(role, limit = Number.POSITIVE_INFINITY): number {
+      let delivered = 0;
+      while (queues[role].length > 0 && delivered < limit) {
+        endpoints[role].deliverEnvelope(queues[role].shift()!);
+        delivered++;
+      }
+      return delivered;
+    },
+  };
+  return wrapped;
+}
+
 /** Drain the loopback microtask queue (LoopbackTransport delivers on queueMicrotask). */
 /**
  * #792 exploration: HALT the active client's phase queue after the phase-under-test ends. A manual
@@ -1236,6 +1337,20 @@ export interface DuoRig {
   guestCtx: ClientCtx;
   /** The loopback pair both runtimes ride (raw endpoints exposed for assertion taps). */
   pair: { host: CoopTransport; guest: CoopTransport };
+}
+
+/**
+ * Drain retained-operation follow-ups under each destination's complete client context.
+ *
+ * One pass delivers the result and may enqueue an exact ACK or an authority response in the opposite
+ * direction. A second pass therefore closes the round trip without ever installing the wrong scene for
+ * an inbound envelope. Scheduled and ordinary envelope-pumped rigs share this same primitive.
+ */
+export async function pumpDuoDestinations(rig: DuoRig, rounds = 2): Promise<void> {
+  for (let round = 0; round < rounds; round++) {
+    await withClient(rig.hostCtx, () => drainLoopback());
+    await withClient(rig.guestCtx, () => drainLoopback());
+  }
 }
 
 /**
@@ -1415,9 +1530,15 @@ export async function buildDuo(
   // Headless best-effort UI: neutralize the host's achievement candy-bar UI (see neutralizeCoopCandyBar)
   // so a won wave's REALISTIC_FLASH candy grant on an evolved starter can't throw an unhandled rejection.
   neutralizeCoopCandyBar(hostScene);
-  const hostRuntime = buildRuntime(pair.host, "Host", "authoritative");
-  const guestRuntime = buildRuntime(pair.guest, "Guest", "authoritative");
-  const scheduledPair = pair as typeof pair & { flush?: (role: "host" | "guest", limit?: number) => number };
+  const suppliedPair = pair as typeof pair & { flush?: (role: CoopRole, limit?: number) => number };
+  // Full scheduled (including fault-wrapped scheduled) pairs already own destination delivery. Ordinary
+  // loopback/fault pairs gain only the retained-envelope pump; all other traffic remains automatic.
+  const runtimePair: DestinationEnvelopePumpPair =
+    typeof suppliedPair.flush === "function"
+      ? (suppliedPair as DestinationEnvelopePumpPair)
+      : destinationPumpOperationEnvelopes(suppliedPair);
+  const hostRuntime = buildRuntime(runtimePair.host, "Host", "authoritative");
+  const guestRuntime = buildRuntime(runtimePair.guest, "Guest", "authoritative");
   hostRuntime.controller.role = "host";
   guestRuntime.controller.role = "guest";
 
@@ -1437,7 +1558,7 @@ export async function buildDuo(
     // starts identical and thereafter keeps its OWN money-streak / overstay / relic state.
     moduleLets: snapshotModuleLets(),
     mePins: { ...IDLE_ME_PINS },
-    ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("host") } : {}),
+    pumpInbound: () => runtimePair.flush("host"),
   };
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
@@ -1453,7 +1574,7 @@ export async function buildDuo(
     ghost: emptyGhostSnapshot(),
     moduleLets: structuredClone(hostCtx.moduleLets!),
     mePins: { ...IDLE_ME_PINS },
-    ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("guest") } : {}),
+    pumpInbound: () => runtimePair.flush("guest"),
   };
   await withClient(guestCtx, () => {
     toCoopGameMode(guestScene);
@@ -1471,7 +1592,7 @@ export async function buildDuo(
   guestRuntime.controller.connect();
   await drainLoopback();
 
-  const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair };
+  const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair: runtimePair };
   liveDuoRigs.add(rig);
   return rig;
 }
@@ -2863,12 +2984,20 @@ function restoreCoopReplayCheckpoint(scene: BattleScene, checkpoint: NonNullable
  * `game` is the host {@linkcode GameManager} (already constructed, with overrides stageable). `trace`
  * is validated first (a malformed trace THROWS with the precise reason). `resyncSpy` is an optional
  * counter (a vi spy's call count) the caller wires onto `CoopBattleStreamer.requestStateSync` so the
- * result can report the resync count.
+ * result can report the resync count. `pairFactory` and the two boundary hooks are test-only seams for
+ * a fully scheduled transport: boot/battle traffic may remain automatic, then the caller disables it
+ * immediately before each retained reward interaction and re-enables it only before the next battle.
+ * Their absence preserves the ordinary loopback path exactly.
  */
 export async function replayCoopTrace(
   game: ReplayGameManager,
   trace: ReplayTrace,
-  opts: { resyncCount?: () => number } = {},
+  opts: {
+    resyncCount?: () => number;
+    pairFactory?: () => { host: CoopTransport; guest: CoopTransport };
+    beforeRewardBoundary?: () => void;
+    afterRewardBoundary?: () => void;
+  } = {},
 ): Promise<ReplayResult> {
   const validation = validateReplayTrace(trace);
   if (!validation.ok) {
@@ -2913,7 +3042,7 @@ export async function replayCoopTrace(
 
   // ===== Flip to co-op + stand up the guest engine over one loopback pair (host owns EVEN interaction
   // counters, guest owns ODD - the production parity rule buildDuo wires). =====
-  const pair = createLoopbackPair();
+  const pair = opts.pairFactory?.() ?? createLoopbackPair();
   const rig = await buildDuo(game as unknown as Parameters<typeof buildDuo>[0], pair, setCoopRuntime, replayToCoop);
   if (checkpoint != null) {
     // `buildDuo` constructs a second scene while test overrides are live. Reassert the checkpoint on the
@@ -2971,6 +3100,7 @@ export async function replayCoopTrace(
 
     // ===== The reward shop interaction for this wave: the OWNER (by counter parity) drives, the WATCHER
     // mirrors. Apply the captured interaction for this wave's reward seq (a leave / non-party pick). =====
+    opts.beforeRewardBoundary?.();
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
     const waveInteraction = interactionEvents.find(e => e.seq === counterBefore);
@@ -2989,6 +3119,7 @@ export async function replayCoopTrace(
         await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward }));
         await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
       }
+      await pumpDuoDestinations(rig);
       if (waveInteraction != null) {
         interactionsApplied++;
       }
@@ -3008,6 +3139,7 @@ export async function replayCoopTrace(
 
     // ===== Host crosses into the next wave's battle (real EncounterPhase rolls wave w+1). =====
     if (wavesReplayed < waves.length) {
+      opts.afterRewardBoundary?.();
       await arriveGuestCommandBoundary(rig, wave + 1);
       await withClient(rig.hostCtx, async () => {
         await game.phaseInterceptor.to("CommandPhase");
