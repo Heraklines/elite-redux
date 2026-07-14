@@ -273,7 +273,9 @@ jobs:
           COOP_UI_CAMPAIGN_MODE: ${{ (github.event_name == 'push' && 'shakedown') || (github.event_name == 'schedule' && 'nightly') || (inputs.auto_first && 'shakedown') || 'gating' }}
           COOP_UI_REWARD_MODE: ${{ inputs.reward_mode || 'leave' }}
           COOP_UI_AUTO_FIRST: ${{ (github.event_name == 'push' && '1') || (inputs.auto_first && '1') || '0' }}
-          COOP_UI_RAISE_SPEED: ${{ (inputs.raise_speed == false && '0') || '1' }}
+          # Default ON for push/schedule; only an explicit dispatch raise_speed=false turns it off.
+          # (A bare `inputs.raise_speed == false` is TRUE on push, where inputs is null -> would wrongly skip.)
+          COOP_UI_RAISE_SPEED: ${{ (github.event_name != 'workflow_dispatch' || inputs.raise_speed) && '1' || '0' }}
           # Blank -> the driver's built-in 10x Settings-UI path (default everywhere, incl. nightly).
           COOP_UI_SPEED_KEYS: ${{ inputs.speed_keys }}
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
