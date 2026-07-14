@@ -106,6 +106,39 @@ mkdirSync("editor/data", { recursive: true });
   );
 }
 
+// Ghost Trainer FX aura catalog (editor/data/trainer-fx.json): the aura effects the
+// Custom Trainers editor offers as a per-trainer SPRITE effect picker. Parsed
+// STATICALLY from TRAINER_AURA_EFFECTS in er-trainer-fx.ts (id + label), with the
+// swatch accent pulled from the Shiny Lab ACCENTS map (each aura id is also an
+// AROUND shiny id). Same "no TS import" style as the lists above, so the editor
+// picker never diverges from the ghost FX catalog / isKnownTrainerAuraId whitelist.
+{
+  const fxSrc = read("src/data/elite-redux/er-trainer-fx.ts");
+  const m = fxSrc.match(/TRAINER_AURA_EFFECTS[^=]*=\s*\[([\s\S]*?)\]\s*as const/);
+  const auras = [];
+  if (m) {
+    for (const e of m[1].matchAll(/\{\s*id:\s*"([^"]+)",\s*label:\s*"([^"]+)"/g)) {
+      auras.push({ id: e[1], label: e[2] });
+    }
+  }
+  if (auras.length === 0) {
+    throw new Error("gen-editor-data: parsed 0 trainer aura effects — er-trainer-fx.ts format changed?");
+  }
+  // Reuse the Shiny Lab ACCENTS map for the swatch colour (aura ids are AROUND ids).
+  const shinySrc = read("src/data/elite-redux/er-shiny-lab-effects.ts");
+  const accents = {};
+  const accMatch = shinySrc.match(/const ACCENTS:\s*Record<string, string>\s*=\s*\{([\s\S]*?)\n\};/);
+  if (accMatch) {
+    for (const p of accMatch[1].matchAll(/([A-Za-z0-9_]+):\s*"([^"]*)"/g)) {
+      accents[p[1]] = p[2];
+    }
+  }
+  const AROUND_ACCENT_FALLBACK = "#ffd27a";
+  const trainerFx = auras.map(a => ({ id: a.id, label: a.label, accent: accents[a.id] ?? AROUND_ACCENT_FALLBACK }));
+  writeFileSync("editor/data/trainer-fx.json", `${JSON.stringify(trainerFx, null, 2)}\n`);
+  console.log(`trainer-fx: ${trainerFx.length} aura effects.`);
+}
+
 writeFileSync("editor/data/moves.json", `${JSON.stringify(uniqueMoves, null, 2)}\n`);
 console.log(`moves: ${uniqueMoves.length} (incl. ${erMoveCount} ER custom names)`);
 console.log("species/items/trainers: run the dump tool (see header) — they come from the live runtime tables.");

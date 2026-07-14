@@ -26,12 +26,15 @@
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import {
+  applyErCustomTrainerPresentation,
   buildErCustomTrainerMember,
   type ErCustomTrainerMemberResolved,
   getErCustomTrainers,
   markErCustomTrainerUsed,
   normalizeBattleBgm,
+  normalizeDialogueLine,
   normalizeIntroDialogue,
+  normalizeTrainerEffect,
   pickErCustomTrainerVariant,
   resetErCustomTrainerTracking,
   resolveErCustomTrainerMoveIds,
@@ -48,6 +51,7 @@ import { Challenges } from "#enums/challenges";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import type { Trainer } from "#field/trainer";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -552,6 +556,108 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     const byKey = new Map(getErCustomTrainers().map(t => [t.key, t]));
     expect(byKey.get("TALKER")!.introDialogue).toBe("Prepare yourself!");
     expect(byKey.get("QUIET")!.introDialogue).toBe("");
+  });
+
+  // ---- ROUND 5b / VICTORY + DEFEAT lines (ghost dialogue seam) --------------
+  it("victory/defeat lines normalize + resolve, and apply onto the installed trainer via the ghost seams", () => {
+    // Shared line normalizer: trim, control chars stripped, 200 cap.
+    expect(normalizeDialogueLine("  Well fought.  ")).toBe("Well fought.");
+    expect(normalizeDialogueLine("a\nb\tc")).toBe("abc");
+    expect(normalizeDialogueLine(42)).toBe("");
+    expect(normalizeDialogueLine(undefined)).toBe("");
+    expect(normalizeDialogueLine("x".repeat(250)).length).toBe(200);
+
+    const D = {
+      CHATTY: {
+        id: 70050,
+        name: "Chatty",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        victoryDialogue: "  Well fought.  ",
+        defeatDialogue: "  Better luck next time!  ",
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+      SILENT: {
+        id: 70051,
+        name: "Silent",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        // no victory/defeat lines -> "" (default class lines)
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+    };
+    setErCustomTrainersForTesting(D as never);
+    const byKey = new Map(getErCustomTrainers().map(t => [t.key, t]));
+    expect(byKey.get("CHATTY")!.victoryDialogue).toBe("Well fought.");
+    expect(byKey.get("CHATTY")!.defeatDialogue).toBe("Better luck next time!");
+    expect(byKey.get("SILENT")!.victoryDialogue).toBe("");
+    expect(byKey.get("SILENT")!.defeatDialogue).toBe("");
+
+    // Applied onto a Trainer INSTANCE via the SAME getVictory/getDefeat overrides
+    // markTrainerAsGhost uses for a ghost's dialogue (er-ghost-teams.ts).
+    const trainer = {} as Trainer;
+    applyErCustomTrainerPresentation(trainer, byKey.get("CHATTY")!);
+    expect(trainer.getVictoryMessages()).toEqual(["Well fought."]); // player beats the trainer
+    expect(trainer.getDefeatMessages()).toEqual(["Better luck next time!"]); // trainer beats the player
+
+    // No lines -> the getters are left untouched (the trainer keeps its class lines).
+    const plain = {} as Trainer;
+    applyErCustomTrainerPresentation(plain, byKey.get("SILENT")!);
+    expect(plain.getVictoryMessages).toBeUndefined();
+    expect(plain.getDefeatMessages).toBeUndefined();
+  });
+
+  // ---- ROUND 5b / TRAINER-SPRITE effect (ghost aura seam) ------------------
+  it("trainerEffect resolves (known aura kept, unknown dropped) + applies as trainer.erGhostAura", () => {
+    // Normalizer: only a known ghost-FX aura id survives.
+    expect(normalizeTrainerEffect("smoke")).toBe("smoke");
+    expect(normalizeTrainerEffect("shadowaura")).toBe("shadowaura");
+    expect(normalizeTrainerEffect("notarealaura")).toBe("");
+    expect(normalizeTrainerEffect(42)).toBe("");
+    expect(normalizeTrainerEffect(undefined)).toBe("");
+
+    const E = {
+      SPOOKY: {
+        id: 70052,
+        name: "Spooky",
+        trainerClass: "PSYCHIC",
+        difficulties: ["ace"],
+        trainerEffect: "shadowaura",
+        team: [{ species: SpeciesId.HAUNTER }],
+      },
+      BADFX: {
+        id: 70053,
+        name: "Badfx",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        trainerEffect: "notarealaura", // unknown -> dropped
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+      NOFX: {
+        id: 70054,
+        name: "Nofx",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        // no trainerEffect -> "" (plain sprite)
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+    };
+    setErCustomTrainersForTesting(E as never);
+    const byKey = new Map(getErCustomTrainers().map(t => [t.key, t]));
+    expect(byKey.get("SPOOKY")!.trainerEffect).toBe("shadowaura");
+    expect(byKey.get("BADFX")!.trainerEffect).toBe("");
+    expect(byKey.get("NOFX")!.trainerEffect).toBe("");
+
+    // Applied onto a Trainer via the SAME aura seam markTrainerAsGhost uses: the
+    // aura id is stamped as trainer.erGhostAura (rendered by applyErGhostAuraFx).
+    const trainer = {} as Trainer;
+    applyErCustomTrainerPresentation(trainer, byKey.get("SPOOKY")!);
+    expect(trainer.erGhostAura).toBe("shadowaura");
+
+    // No effect -> erGhostAura stays unset (the plain trainer sprite).
+    const plain = {} as Trainer;
+    applyErCustomTrainerPresentation(plain, byKey.get("NOFX")!);
+    expect(plain.erGhostAura).toBeUndefined();
   });
 
   // ---- ROUND 5 / FEATURE 2: shiny-lab effect per mon ------------------------
