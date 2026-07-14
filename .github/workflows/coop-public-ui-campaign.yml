@@ -31,15 +31,15 @@ on:
         type: boolean
         default: false
       raise_speed:
-        description: Attempt the early Settings game-speed raise (requires a verified speed_keys sequence)
+        description: Drive Game Speed to 10x through the real Settings UI early in the run
         required: true
         type: boolean
         default: true
       speed_keys:
-        description: JSON keys for Title->Settings->GameSpeed->back; empty skips the speed raise
+        description: Override Settings key sequence; blank uses the built-in 10x path, "[]" leaves speed unchanged
         required: true
         type: string
-        default: "[]"
+        default: ""
       requester_seat:
         description: Seat that sends the first lobby invitation
         required: true
@@ -103,7 +103,7 @@ jobs:
     name: Build and seal exact-SHA browser bundle once
     needs: staging-health
     if: needs.staging-health.outputs.healthy == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.COOP_UI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - name: Check out exact implementation SHA
@@ -190,7 +190,7 @@ jobs:
   solo-nav:
     name: Solo classic navigation-primitive validation (no pairing)
     needs: browser-build
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.COOP_UI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - name: Check out exact implementation SHA and assets
@@ -237,7 +237,7 @@ jobs:
   campaign:
     name: ${{ inputs.campaign_waves || '30' }}-wave co-op campaign / ${{ inputs.cadence || 'fast' }}
     needs: browser-build
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.COOP_UI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 55
     steps:
       - name: Check out exact implementation SHA and assets
@@ -274,7 +274,8 @@ jobs:
           COOP_UI_REWARD_MODE: ${{ inputs.reward_mode || 'leave' }}
           COOP_UI_AUTO_FIRST: ${{ (github.event_name == 'push' && '1') || (inputs.auto_first && '1') || '0' }}
           COOP_UI_RAISE_SPEED: ${{ (inputs.raise_speed == false && '0') || '1' }}
-          COOP_UI_SPEED_KEYS: ${{ inputs.speed_keys || '[]' }}
+          # Blank -> the driver's built-in 10x Settings-UI path (default everywhere, incl. nightly).
+          COOP_UI_SPEED_KEYS: ${{ inputs.speed_keys }}
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
           COOP_UI_ACTION_DELAY_MS: ${{ (inputs.cadence == 'slow' && '420') || (inputs.cadence == 'normal' && '180') || '70' }}
           COOP_UI_SETTLE_DELAY_MS: ${{ (inputs.cadence == 'slow' && '1300') || (inputs.cadence == 'normal' && '750') || '300' }}

@@ -15,7 +15,6 @@ import {
 } from "./campaign-policy.mjs";
 import { delay } from "./evidence.mjs";
 
-const TITLE_PHASE = /Start Phase TitlePhase/u;
 const START_PHASE = /Start Phase (\w+)/u;
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
@@ -75,17 +74,16 @@ async function raiseGameSpeed(rig, policy, progress) {
     return;
   }
   for (const client of clients) {
-    const cursor = client.evidence.cursor();
-    await client.sequence(keys, "raise-game-speed");
-    // Close any residual submenu so we return to the Title surface (Cancel = Backspace).
-    for (let i = 0; i < 6 && !client.evidence.find(TITLE_PHASE, cursor); i++) {
-      await client.press("Backspace", `speed-return-to-title-${i + 1}`);
-      await delay(client.config.settleDelayMs);
-    }
+    // Drive Title -> Settings -> Game Speed 10x -> back through the real menus. The sequence
+    // itself resets the Title cursor to New Game; Settings is an overlay so TitlePhase does
+    // not re-log, and a wrong sequence fails loudly at the subsequent pairing (which re-waits
+    // Title). A trailing settle lets the last menu transition land before pairing.
+    await client.sequence(keys, "raise-game-speed-to-10x");
+    await delay(client.config.settleDelayMs);
     client.evidence.record("campaign-speed", { status: "applied", keys });
     await client.checkpoint("speed-raised");
   }
-  await progress.note("speed-raise applied", { keys });
+  await progress.note("speed-raise applied (Game Speed -> 10x via Settings UI)", { keys });
 }
 
 /** Poll the post-turn outcome markers for a bounded window; null on timeout (no throw). */

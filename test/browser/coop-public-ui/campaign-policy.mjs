@@ -134,11 +134,29 @@ export function loadCampaignPolicy() {
     rewardMode,
     raiseSpeed: envBoolean("COOP_UI_RAISE_SPEED", true),
     keys: {
-      // Title -> Settings -> Game Speed -> back-to-Title, run once early. Left EMPTY by
-      // default: the exact Settings navigation cannot be verified blind, so a run only
-      // drives it when the maintainer supplies a verified sequence. When empty the run
-      // records a skip note and relies on the workflow's fast input cadence instead.
-      speed: envKeys("COOP_UI_SPEED_KEYS", []),
+      // Drive the in-game Game Speed setting to 10x (Ludicrous) through the REAL Settings
+      // UI, once, early in the run - the maintainer's players overwhelmingly play at 10x, so
+      // it is the MORE representative default (not an opt-in). Derived from the live menu
+      // structure: Title menu is New Game(0)/Load Game(1)/Profile(2)/Settings(3); Game Speed
+      // is the first settings row and WRAPS (clamp:false) over values [2,3,4,5,7,10] from the
+      // fresh-account default index 1, so exactly 4 RIGHT presses land on index 5 = 10x.
+      //   ArrowDown x3 -> Settings ; Space -> open ; ArrowRight x4 -> 10x ; Backspace -> close
+      //   ; ArrowUp x3 -> reset the Title cursor to New Game for pairing.
+      // Override with COOP_UI_SPEED_KEYS (e.g. "[]" to keep the account's speed unchanged).
+      speed: envKeys("COOP_UI_SPEED_KEYS", [
+        "ArrowDown",
+        "ArrowDown",
+        "ArrowDown",
+        "Space",
+        "ArrowRight",
+        "ArrowRight",
+        "ArrowRight",
+        "ArrowRight",
+        "Backspace",
+        "ArrowUp",
+        "ArrowUp",
+        "ArrowUp",
+      ]),
       // Attack-first: FIGHT -> first move -> confirm target. Same default as the harness.
       battle: envKeys("COOP_UI_BATTLE_KEYS", ["Space", "Space", "Space"]),
       // Fallback when the first move does not resolve the turn (no PP / disabled): reopen

@@ -143,21 +143,17 @@ trustworthy (all lossless - they never change what is asserted):
   maintainer decides on the paid runner separately; it would materially cut ICE + RTT (and may on
   its own let the guest durability ACK land inside the host's budget).
 
-### Fidelity profiles (opt-in `fast`, default OFF)
+### In-game speed and assets
 
-The **nightly** launcher runs the FULL-FIDELITY profile: real 1x game speed and the pinned
-jsDelivr production asset CDN - the same surfaces a player hits. A **`fast` iteration profile** is
-available for quick dev loops and trades some fidelity for speed:
-
-- `COOP_UI_SPEED_KEYS` (JSON key sequence): drive the in-game **Game Speed** setting to a high
-  value through the REAL Settings UI early in the run (a legitimate player flow) so battle
-  animations play faster. Empty by default (full fidelity); the maintainer supplies a verified
-  Title->Settings->GameSpeed sequence to enable it.
-- Optional local `er-assets` serving instead of jsDelivr for iteration runs (lower asset latency).
-
-🔴 A green under the `fast` profile is NOT full-fidelity assurance - it can pass while a real
-1x-speed / production-CDN issue would fail. Only a green NIGHTLY (1x + real CDN) is the fidelity
-gate. Never gate a release on a fast-profile green.
+- **Game Speed 10x is the DEFAULT** (every profile, incl. nightly). The driver walks the REAL
+  Settings menu early in the run - Title menu -> Settings -> Game Speed -> RIGHT x4 to 10x
+  (Ludicrous) -> back - which is a legitimate player flow and MORE representative than 1x (the
+  overwhelming majority of players run 10x). It is a persisted account setting, so it applies to
+  the whole run. Override the key path with `COOP_UI_SPEED_KEYS` (JSON), or pass `"[]"` to leave
+  the account's speed unchanged; `COOP_UI_RAISE_SPEED=0` skips the step entirely.
+- **Assets always load from the real jsDelivr production CDN** in every profile - local asset
+  serving is deliberately NOT offered, so a CDN/asset regression can still surface. There is no
+  reduced-fidelity "fast" profile: the run is full-fidelity (real CDN, real menus) at 10x speed.
 
 ## Known future-proofing TODO (do not do now)
 
