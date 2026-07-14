@@ -111,7 +111,11 @@ import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { ModifierOverride } from "#modifiers/modifier-type";
 import { getCoopMeHostPresentation } from "#phases/coop-replay-me-phase";
-import { coopClearMePinForGuest, coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
+import {
+  coopClearMePinForGuest,
+  coopMeInteractionStartValue,
+  coopSetMePinForGuest,
+} from "#phases/mystery-encounter-phases";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { TheBargainPhase } from "#phases/the-bargain-phase";
 import type { GameManager } from "#test/framework/game-manager";
@@ -2523,6 +2527,16 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         if (noRewardShop) {
           await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
         } else {
+          // The nested host interceptor necessarily overlaps guest destination pumps in this single-process
+          // harness. Its final context restoration can save the outer process's `-1` ME pin into hostCtx even
+          // though the real host browser remains pinned for the whole encounter. Rehydrate that one module-let
+          // boundary before starting the embedded shop; withClient persists it back into hostCtx for every
+          // later host delivery. This is the counterpart to the existing post-ME guest pin cleanup below.
+          const interactionCounter = rig.hostRuntime.controller.interactionCounter();
+          await withClient(rig.hostCtx, async () => {
+            coopSetMePinForGuest(interactionCounter);
+          });
+
           // Keep every reward carrier on its destination client. The guest Replay phase receives the host's
           // streamed stock under guestCtx, performs its production embedded-shop handoff, and opens the real
           // SelectModifierPhase. Its public CANCEL -> CONFIRM -> ACTION path proposes LEAVE; the host watcher
