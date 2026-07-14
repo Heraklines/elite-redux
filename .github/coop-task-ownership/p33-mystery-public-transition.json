@@ -3,7 +3,7 @@
   "taskId": "p33-mystery-public-transition-integration",
   "branch": "ci/coop/p33-mystery-public-transition",
   "trainRef": "ci/coop/p33-mystery-public-transition",
-  "baseSha": "4c02b918f6164de56d0e16e3bc681ba8dde191d3",
+  "baseSha": "feb6793c09c22063c2249689420b4b7386cac0c7",
   "allowedFiles": [
     ".github/coop-task-ownership/p33-mystery-public-transition.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -107,6 +107,7 @@
     "test/tests/elite-redux/showdown/showdown-duo.test.ts",
     "test/tests/elite-redux/showdown/showdown-guest-real-boot.test.ts",
     "test/tests/elite-redux/showdown/showdown-versus-faint.test.ts",
+    "test/tests/elite-redux/showdown/showdown-versus-summon-desync.test.ts",
     "test/tools/coop-duo-harness.ts",
     "test/tools/coop-semantic-presentation.ts",
     "test/tools/coop-soak-coverage.ts",
