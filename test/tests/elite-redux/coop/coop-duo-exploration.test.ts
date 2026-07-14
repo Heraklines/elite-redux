@@ -327,11 +327,13 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         };
         const ui = globalScene.ui as unknown as {
           setMode: (...args: unknown[]) => unknown;
+          setModeBoundedWhen: (...args: unknown[]) => Promise<"completed" | "forced" | "superseded">;
           setModeWithoutClear: (...args: unknown[]) => unknown;
           setOverlayMode: (...args: unknown[]) => unknown;
           showText: (...args: unknown[]) => unknown;
         };
         const realSetMode = ui.setMode.bind(ui);
+        const realSetModeBoundedWhen = ui.setModeBoundedWhen.bind(ui);
         const realSetModeWC = ui.setModeWithoutClear.bind(ui);
         const realSetOverlay = ui.setOverlayMode.bind(ui);
         const realShowText = ui.showText.bind(ui);
@@ -339,6 +341,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         restoreHostUi = () => {
           uiAny.getHandler = realGetHandler;
           ui.setMode = realSetMode;
+          ui.setModeBoundedWhen = realSetModeBoundedWhen;
           ui.setModeWithoutClear = realSetModeWC;
           ui.setOverlayMode = realSetOverlay;
           ui.showText = realShowText;
@@ -351,16 +354,11 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
           }
           return Promise.resolve(true);
         };
-        ui.setMode = (...args: unknown[]): unknown => {
-          if (args[0] === UiMode.BIOME_SHOP) {
-            const options = args[1] as { type?: { id?: string } }[];
-            // Signature: (BIOME_SHOP, shopOptions, biomeId, onSelect, qtys) - the callback is [3].
-            const cb = args[3] as (index: number) => boolean;
-            if (bought) {
-              // A human leaves only after the completed buy re-opens the public market screen.
-              queueMicrotask(() => cb(-1));
-              return Promise.resolve(true);
-            }
+        const driveBiomeShop = (
+          options: { type?: { id?: string } }[],
+          cb: (index: number) => boolean,
+        ): void => {
+          if (!bought) {
             // Buy a KNOWN NON-party item (balls/lures apply directly, no party sub-menu) so the
             // probe stays deterministic; the relay path is identical for party-target goods.
             // LURE: non-party AND lands in scene.modifiers (balls only bump the ball inventory,
@@ -371,7 +369,20 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
             }
             boughtTypeId = options[idx]?.type?.id ?? "";
             bought = true;
-            queueMicrotask(() => cb(idx));
+            // A paid non-party purchase keeps the same public grid open. Issue the leave click on the
+            // next task only after the buy callback has synchronously applied and retained its result.
+            queueMicrotask(() => {
+              cb(idx);
+              setTimeout(() => cb(-1), 0);
+            });
+          }
+        };
+        ui.setMode = (...args: unknown[]): unknown => {
+          if (args[0] === UiMode.BIOME_SHOP) {
+            driveBiomeShop(
+              args[1] as { type?: { id?: string } }[],
+              args[3] as (index: number) => boolean,
+            );
             return Promise.resolve(true);
           }
           if (args[0] === UiMode.PARTY) {
@@ -384,6 +395,23 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
             return Promise.resolve(true);
           }
           return Promise.resolve(true);
+        };
+        ui.setModeBoundedWhen = (...args: unknown[]): Promise<"completed" | "superseded"> => {
+          const stillLive = args[2] as (() => boolean) | undefined;
+          if (!(stillLive?.() ?? true)) {
+            return Promise.resolve("superseded");
+          }
+          if (args[0] === UiMode.BIOME_SHOP) {
+            // Production co-op opens the market only through the bounded transition seam:
+            // mode, timeout, liveness fence, stock, biome, public selection callback, quantities.
+            driveBiomeShop(
+              args[3] as { type?: { id?: string } }[],
+              args[5] as (index: number) => boolean,
+            );
+          } else if (args[0] === UiMode.CONFIRM) {
+            queueMicrotask(args[3] as () => void); // YES: leave the market
+          }
+          return Promise.resolve("completed");
         };
         ui.showText = (...args: unknown[]): unknown => {
           const cb = args[2] as (() => void) | undefined;
