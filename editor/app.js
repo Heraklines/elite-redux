@@ -51,6 +51,14 @@ const expandedFactory = new Set(); // species consts with an open set panel
 let MONS_LIVE = {};
 let ABILITY_NAMES = [];
 
+// Custom Trainers: live er-custom-trainers.json + edit state. In the LIVE file
+// each team member's species (and fusion species) is a numeric pokerogue
+// speciesId; for editing we swap to the species CONST (joined via spByConst /
+// spById) so the picker matches every other tab, converting back on save.
+let CTR_LIVE = {}; // key → entry (species by numeric id, as stored)
+const ctr = { current: {}, baseline: {} }; // key → entry (species by CONST)
+let ctrSelected = null; // open trainer key, or null
+
 // Usage tiers (fetched at runtime; graceful "unranked" fallback when missing).
 const usage = { loaded: false, lines: {} };
 
@@ -237,11 +245,28 @@ function dirtyCounts() {
       balN++;
     }
   }
-  return { eggN, spN, itemN, trN, balN, lsN, tmN, abN, total: eggN + spN + itemN + trN + balN + lsN + tmN + abN };
+  let ctrN = 0;
+  for (const key of new Set([...Object.keys(ctr.current), ...Object.keys(ctr.baseline)])) {
+    if (!jsonEq(ctr.current[key], ctr.baseline[key])) {
+      ctrN++;
+    }
+  }
+  return {
+    eggN,
+    spN,
+    itemN,
+    trN,
+    balN,
+    lsN,
+    tmN,
+    abN,
+    ctrN,
+    total: eggN + spN + itemN + trN + balN + lsN + tmN + abN + ctrN,
+  };
 }
 
 function refreshChrome() {
-  const { eggN, spN, itemN, trN, balN, lsN, tmN, abN, total } = dirtyCounts();
+  const { eggN, spN, itemN, trN, balN, lsN, tmN, abN, ctrN, total } = dirtyCounts();
   saveBtn.textContent = `Save ${total} change${total === 1 ? "" : "s"}`;
   saveBtn.disabled = total === 0;
   const dots = {
@@ -249,6 +274,7 @@ function refreshChrome() {
     species: spN,
     items: itemN,
     trainers: trN,
+    customtrainers: ctrN,
     game: balN,
     learnsets: lsN,
     tms: tmN,
@@ -1346,6 +1372,537 @@ function closeAbilDrops() {
   document.querySelectorAll(".abil-drop.open").forEach(d => d.classList.remove("open"));
 }
 
+// =============================================================================
+// Custom Trainers tab — staff-authored trainer teams that spawn in real runs.
+// Mirrors the JSON schema in src/data/elite-redux/er-custom-trainers.ts. Team
+// members store the species CONST while editing (joined via spByConst/spById),
+// converted to numeric speciesId on save.
+// =============================================================================
+
+// Trainer-class sprite picker: a curated set of TrainerType enum NAMES known to
+// ship a BW sprite (images/trainer/<name>.png in er-assets). Free text is also
+// accepted; the game falls back to a default sprite for an unknown class.
+const TRAINER_CLASS_OPTIONS = [
+  "ACE_TRAINER",
+  "BEAUTY",
+  "BLACK_BELT",
+  "BREEDER",
+  "CLERK",
+  "CYCLIST",
+  "DEPOT_AGENT",
+  "DOCTOR",
+  "FISHERMAN",
+  "GUITARIST",
+  "HARLEQUIN",
+  "HIKER",
+  "HOOLIGANS",
+  "HOOPSTER",
+  "INFIELDER",
+  "JANITOR",
+  "LADY",
+  "LASS",
+  "LINEBACKER",
+  "MAID",
+  "MUSICIAN",
+  "NURSE",
+  "NURSERY_AIDE",
+  "OFFICER",
+  "PARASOL_LADY",
+  "PILOT",
+  "POKEFAN",
+  "PRESCHOOLER",
+  "PSYCHIC",
+  "RANGER",
+  "RICH_BOY",
+  "ROUGHNECK",
+  "SAILOR",
+  "SCIENTIST",
+  "SMASHER",
+  "SNOW_WORKER",
+  "STRIKER",
+  "SCHOOL_KID",
+  "SWIMMER",
+  "TWINS",
+  "VETERAN",
+  "WAITER",
+  "WORKER",
+  "YOUNGSTER",
+  "ROCKET_GRUNT",
+  "MAGMA_GRUNT",
+  "AQUA_GRUNT",
+  "GALACTIC_GRUNT",
+  "PLASMA_GRUNT",
+  "FLARE_GRUNT",
+  "BROCK",
+  "MISTY",
+  "BLUE",
+  "RED",
+  "CYNTHIA",
+  "STEVEN",
+  "WALLACE",
+  "LANCE",
+  "GIOVANNI",
+  "SABRINA",
+  "BLAINE",
+  "ERIKA",
+  "KOGA",
+  "SURGE",
+];
+
+// Enemy-legal held-item pool: `modifierTypes` keys resolvable by
+// resolveHeldItemKey (src/system/llm-director/held-item-resolver.ts). Curated to
+// the per-Pokemon held items that make sense on an enemy team.
+const HELD_ITEM_OPTIONS = [
+  "LEFTOVERS",
+  "SHELL_BELL",
+  "FOCUS_BAND",
+  "QUICK_CLAW",
+  "KINGS_ROCK",
+  "WIDE_LENS",
+  "SCOPE_LENS",
+  "GRIP_CLAW",
+  "TOXIC_ORB",
+  "FLAME_ORB",
+  "BATON",
+  "SOOTHE_BELL",
+  "SOUL_DEW",
+  "MYSTICAL_ROCK",
+  "GOLDEN_PUNCH",
+  "BERRY_POUCH",
+  "SILK_SCARF",
+  "EVIOLITE",
+  "LUCKY_EGG",
+  "GOLDEN_EGG",
+  "REVIVER_SEED",
+  "MULTI_LENS",
+];
+
+// BST curve (defaults from er-balance-knobs: er.elite.bstCaps / er.hell.bstCaps,
+// #418/#419). Pairs are [up-to-wave, cap]; past the last wave there is no cap.
+const BST_CAPS = {
+  elite: [
+    [20, 420],
+    [40, 480],
+    [60, 540],
+    [80, 580],
+    [100, 600],
+  ],
+  hell: [
+    [20, 460],
+    [40, 520],
+    [60, 580],
+    [80, 620],
+    [100, 660],
+  ],
+};
+const DIFFICULTY_OPTIONS = ["youngster", "ace", "elite", "hell"];
+const BATTLE_TYPE_OPTIONS = ["single", "double", "triple"];
+const CHALLENGE_OPTIONS = ["none", "inverse", "monocolor", "monogen", "doubles", "ghost"];
+const CHALLENGE_LABELS = {
+  none: "None",
+  inverse: "Inverse",
+  monocolor: "Monocolor",
+  monogen: "Mono-gen",
+  doubles: "Doubles Only",
+  ghost: "Ghost",
+};
+
+/** BST cap for a wave on a ladder (elite/hell); null = past the ladder (no cap). */
+function bstCapFor(wave, ladderKey) {
+  const ladder = BST_CAPS[ladderKey] || BST_CAPS.elite;
+  for (const [upTo, cap] of ladder) {
+    if (wave <= upTo) {
+      return cap;
+    }
+  }
+  return null;
+}
+
+/** Species base-stat total for a CONST (0 when unknown). */
+function bstOfConst(speciesConst) {
+  return spByConst.get(speciesConst)?.bst ?? 0;
+}
+
+/** A fresh blank team member (species by CONST). */
+function blankCtrMember() {
+  return {
+    species: "",
+    formIndex: 0,
+    level: null,
+    moves: ["", "", "", ""],
+    abilitySlot: 0,
+    fusion: null,
+    heldItems: [],
+  };
+}
+
+/** A fresh blank trainer, with the next free id in the 70000-79999 band. */
+function blankCtrTrainer() {
+  let max = 70000;
+  for (const t of Object.values(ctr.current)) {
+    if (t && Number.isInteger(t.id) && t.id > max) {
+      max = t.id;
+    }
+  }
+  for (const t of Object.values(CTR_LIVE)) {
+    if (t && Number.isInteger(t.id) && t.id > max) {
+      max = t.id;
+    }
+  }
+  return {
+    id: max + 1,
+    name: "",
+    trainerClass: "ACE_TRAINER",
+    battleType: "single",
+    difficulties: ["ace", "elite", "hell"],
+    minWave: 20,
+    maxWave: 80,
+    endless: false,
+    challenge: "none",
+    team: [blankCtrMember()],
+  };
+}
+
+/** Convert a LIVE entry (species by id) to an edit entry (species by CONST). */
+function ctrLiveToEdit(entry) {
+  const idToConst = id => spById.get(id)?.const ?? "";
+  return {
+    id: entry.id,
+    name: entry.name ?? "",
+    trainerClass: entry.trainerClass ?? "ACE_TRAINER",
+    battleType: entry.battleType ?? "single",
+    difficulties: Array.isArray(entry.difficulties) ? entry.difficulties.slice() : ["ace", "elite", "hell"],
+    minWave: Number.isInteger(entry.minWave) ? entry.minWave : 20,
+    maxWave: Number.isInteger(entry.maxWave) ? entry.maxWave : 80,
+    endless: entry.endless === true,
+    challenge: entry.challenge ?? "none",
+    team: (Array.isArray(entry.team) ? entry.team : []).map(m => ({
+      species: idToConst(m.species),
+      formIndex: Number.isInteger(m.formIndex) ? m.formIndex : 0,
+      level: typeof m.level === "number" ? m.level : null,
+      moves: [...(m.moves || []), "", "", "", ""].slice(0, 4),
+      abilitySlot: [0, 1, 2].includes(m.abilitySlot) ? m.abilitySlot : 0,
+      fusion:
+        m.fusion && Number.isInteger(m.fusion.species)
+          ? {
+              species: idToConst(m.fusion.species),
+              formIndex: Number.isInteger(m.fusion.formIndex) ? m.fusion.formIndex : 0,
+              abilitySlot: [0, 1, 2].includes(m.fusion.abilitySlot) ? m.fusion.abilitySlot : 0,
+            }
+          : null,
+      heldItems: (Array.isArray(m.heldItems) ? m.heldItems : []).map(h => ({
+        item: h.item || "",
+        count: Number.isInteger(h.count) ? h.count : 1,
+      })),
+    })),
+  };
+}
+
+/** Compute BST warnings + the Ace/custom informational note for a trainer (never blocks). */
+function ctrWarnings(t) {
+  const warnings = [];
+  const notes = [];
+  const diffs = t.difficulties.length > 0 ? t.difficulties : ["ace"];
+  // Ace convention (#345): ER customs / fusions marked Ace are informational.
+  if (t.difficulties.includes("ace")) {
+    const hasCustomOrFusion = t.team.some(m => (spByConst.get(m.species)?.id ?? 0) >= 10000 || m.fusion);
+    if (hasCustomOrFusion) {
+      notes.push("Ace is a pure-vanilla region by convention (#345); this team includes an ER custom or a fusion.");
+    }
+  }
+  for (const diff of diffs) {
+    // Ace/Youngster have no in-game BST ladder; use the Elite curve as the
+    // region reference so staff still get a warning (maintainer directive).
+    const ladderKey = diff === "hell" ? "hell" : "elite";
+    // Strictest at the earliest floor the trainer can appear.
+    const cap = bstCapFor(t.minWave, ladderKey);
+    if (cap === null) {
+      continue;
+    }
+    t.team.forEach((m, i) => {
+      if (!m.species) {
+        return;
+      }
+      const base = bstOfConst(m.species);
+      const bst = m.fusion ? Math.ceil((base + bstOfConst(m.fusion.species)) / 2) : base;
+      if (bst > cap) {
+        warnings.push(
+          `${diff}: slot ${i + 1} (${spByConst.get(m.species)?.name || m.species}) BST ${bst} exceeds the ~${cap} cap around wave ${t.minWave}.`,
+        );
+      }
+    });
+  }
+  return { warnings, notes };
+}
+
+function ctrMemberHtml(m, i) {
+  const moveInputs = [0, 1, 2, 3]
+    .map(
+      s =>
+        `<input class="ctr-move" list="moves-list" data-idx="${i}" data-slot="${s}" value="${esc(m.moves[s] || "")}" placeholder="move ${s + 1}" spellcheck="false" style="width:130px" />`,
+    )
+    .join(" ");
+  const scale = m.level === null;
+  const heldRows = m.heldItems
+    .map(
+      (h, hi) =>
+        `<span class="ctr-held-row"><input class="ctr-held-item" list="helditems-list" data-idx="${i}" data-heldidx="${hi}" value="${esc(h.item || "")}" placeholder="held item" spellcheck="false" style="width:150px" />
+        <input type="number" class="ctr-held-count" data-idx="${i}" data-heldidx="${hi}" value="${h.count || 1}" min="1" max="99" style="width:52px" />
+        <button type="button" class="ctr-held-del" data-idx="${i}" data-heldidx="${hi}">✕</button></span>`,
+    )
+    .join("");
+  const fus = m.fusion;
+  return `<fieldset class="ctr-member">
+    <legend>Slot ${i + 1} <button type="button" class="ctr-mem-del" data-idx="${i}" title="Remove this member">✕</button></legend>
+    <label>Species <input class="ctr-species" list="species-list" data-idx="${i}" value="${esc(m.species || "")}" placeholder="SPECIES_…" spellcheck="false" style="width:170px" /></label>
+    <label>Form <input type="number" class="ctr-form" data-idx="${i}" value="${m.formIndex || 0}" min="0" max="60" style="width:56px" /></label>
+    <label>Ability slot <select class="ctr-abil" data-idx="${i}">${[0, 1, 2].map(s => `<option value="${s}"${m.abilitySlot === s ? " selected" : ""}>${s}</option>`).join("")}</select></label>
+    <label title="Uncheck to set an explicit level">Wave-scale level <input type="checkbox" class="ctr-scale" data-idx="${i}"${scale ? " checked" : ""} /></label>
+    <label>Level <input type="number" class="ctr-level" data-idx="${i}" value="${scale ? "" : m.level}" min="1" max="200" ${scale ? "disabled" : ""} style="width:64px" /></label>
+    <div class="ctr-moves">${moveInputs}</div>
+    <div class="ctr-fusion">
+      <label>Fusion <input type="checkbox" class="ctr-fusion-on" data-idx="${i}"${fus ? " checked" : ""} /></label>
+      ${
+        fus
+          ? `<input class="ctr-fusion-species" list="species-list" data-idx="${i}" value="${esc(fus.species || "")}" placeholder="fusion SPECIES_…" spellcheck="false" style="width:170px" />
+          <label>Form <input type="number" class="ctr-fusion-form" data-idx="${i}" value="${fus.formIndex || 0}" min="0" max="60" style="width:56px" /></label>
+          <label>Ability slot <select class="ctr-fusion-abil" data-idx="${i}">${[0, 1, 2].map(s => `<option value="${s}"${fus.abilitySlot === s ? " selected" : ""}>${s}</option>`).join("")}</select></label>`
+          : ""
+      }
+    </div>
+    <div class="ctr-held">Held items: ${heldRows}<button type="button" class="ctr-held-add" data-idx="${i}">＋ item</button></div>
+  </fieldset>`;
+}
+
+function renderCustomTrainers(root) {
+  const keys = Object.keys(ctr.current)
+    .filter(k => ctr.current[k])
+    .sort();
+  const list = keys
+    .map(k => {
+      const t = ctr.current[k];
+      const dirty = !jsonEq(ctr.current[k], ctr.baseline[k]);
+      return `<button type="button" class="ctr-open${k === ctrSelected ? " on" : ""}${dirty ? " dirty" : ""}" data-ctropen="${esc(k)}">
+        ${esc(t.name || k)} <small style="color:var(--muted)">#${t.id} · ${t.team.length}mon</small>
+      </button>`;
+    })
+    .join("");
+  let form = '<p class="hint">Pick a trainer to edit, or add a new one.</p>';
+  if (ctrSelected && ctr.current[ctrSelected]) {
+    const t = ctr.current[ctrSelected];
+    const { warnings, notes } = ctrWarnings(t);
+    const diffChecks = DIFFICULTY_OPTIONS.map(
+      d =>
+        `<label><input type="checkbox" class="ctr-diff" data-diff="${d}"${t.difficulties.includes(d) ? " checked" : ""} /> ${d[0].toUpperCase() + d.slice(1)}</label>`,
+    ).join(" ");
+    const battleSel = BATTLE_TYPE_OPTIONS.map(
+      b =>
+        `<option value="${b}"${t.battleType === b ? " selected" : ""}>${b === "triple" ? "Triple (pending #902 → double)" : b[0].toUpperCase() + b.slice(1)}</option>`,
+    ).join("");
+    const challSel = CHALLENGE_OPTIONS.map(
+      c => `<option value="${c}"${t.challenge === c ? " selected" : ""}>${CHALLENGE_LABELS[c]}</option>`,
+    ).join("");
+    form = `<div class="ctr-form">
+      <fieldset><legend>Identity</legend>
+        <label>Name <input type="text" id="ctr-name" maxlength="24" value="${esc(t.name || "")}" style="width:200px" /></label>
+        <label>Id <input type="number" value="${t.id}" readonly style="width:80px;opacity:.6" /></label>
+        <label>Sprite / class <input type="text" id="ctr-class" list="trainerclass-list" value="${esc(t.trainerClass || "")}" style="width:170px" spellcheck="false" /></label>
+      </fieldset>
+      <fieldset><legend>Spawn gates</legend>
+        <div>Difficulties: ${diffChecks}</div>
+        <label>Min wave <input type="number" id="ctr-minwave" value="${t.minWave}" min="1" max="5000" style="width:72px" /></label>
+        <label>Max wave <input type="number" id="ctr-maxwave" value="${t.maxWave}" min="1" max="5000" ${t.endless ? "disabled" : ""} style="width:72px" /></label>
+        <label title="Any floor >= min wave (endless)"><input type="checkbox" id="ctr-endless"${t.endless ? " checked" : ""} /> Endless (any floor ≥ min)</label>
+        <br /><label>Battle type <select id="ctr-battletype">${battleSel}</select></label>
+        <label>Challenge exclusivity <select id="ctr-challenge">${challSel}</select></label>
+      </fieldset>
+      <fieldset class="full"><legend>Team (1-6)</legend>
+        ${t.team.map((m, i) => ctrMemberHtml(m, i)).join("")}
+        ${t.team.length < 6 ? '<button type="button" id="ctr-add-member">＋ Add member</button>' : ""}
+      </fieldset>
+      ${warnings.length > 0 ? `<div class="ctr-warn">⚠ ${warnings.map(esc).join("<br>⚠ ")}</div>` : ""}
+      ${notes.length > 0 ? `<div class="ctr-note">ℹ ${notes.map(esc).join("<br>ℹ ")}</div>` : ""}
+      <div class="full" style="display:flex;gap:10px;align-items:center;margin-top:8px">
+        <button type="button" id="ctr-delete" style="color:var(--err,#c0392b)">🗑 Delete trainer</button>
+        <span class="dyn">Changes save with the global “Save”/“Commit & Deploy” buttons.</span>
+      </div>
+    </div>`;
+  }
+  root.innerHTML = `
+    <div class="section">
+      <h2>Custom Trainers</h2>
+      <p class="hint">Staff-authored trainers that spawn in real runs, gated by difficulty, floor range and challenge mode. The team is fielded EXACTLY as authored (the #419 BST cap is bypassed). Warnings never block — staff intent wins.</p>
+      <div class="mon-list">${list || '<span class="dyn">none yet</span>'}<button type="button" id="ctr-new" class="primary">＋ New trainer</button></div>
+    </div>
+    <div class="section">${form}</div>`;
+}
+
+// ---- Custom Trainers: input + click handling -------------------------------
+function ctrCur() {
+  return ctrSelected ? ctr.current[ctrSelected] : null;
+}
+
+function onCustomTrainerInput(el) {
+  const t = ctrCur();
+  if (!t) {
+    return false;
+  }
+  const idx = el.dataset.idx === undefined ? -1 : Number(el.dataset.idx);
+  const m = idx >= 0 ? t.team[idx] : null;
+  if (el.id === "ctr-name") {
+    t.name = el.value;
+  } else if (el.id === "ctr-class") {
+    t.trainerClass = el.value.trim().toUpperCase();
+    el.value = t.trainerClass;
+  } else if (el.id === "ctr-minwave") {
+    t.minWave = Number(el.value) || 1;
+  } else if (el.id === "ctr-maxwave") {
+    t.maxWave = Number(el.value) || 1;
+  } else if (el.classList.contains("ctr-species") && m) {
+    m.species = el.value.trim().toUpperCase();
+    el.value = m.species;
+    el.style.borderColor = m.species === "" || spByConst.has(m.species) ? "" : ERR;
+  } else if (el.classList.contains("ctr-form") && m) {
+    m.formIndex = Number(el.value) || 0;
+  } else if (el.classList.contains("ctr-level") && m) {
+    m.level = el.value === "" ? null : Number(el.value);
+  } else if (el.classList.contains("ctr-move") && m) {
+    const v = el.value.trim().toUpperCase();
+    el.value = v;
+    m.moves[Number(el.dataset.slot)] = v;
+    el.style.borderColor = v === "" || MOVE_SET.has(v) ? "" : ERR;
+  } else if (el.classList.contains("ctr-held-item") && m) {
+    const h = m.heldItems[Number(el.dataset.heldidx)];
+    if (h) {
+      h.item = el.value.trim().toUpperCase();
+      el.value = h.item;
+    }
+  } else if (el.classList.contains("ctr-held-count") && m) {
+    const h = m.heldItems[Number(el.dataset.heldidx)];
+    if (h) {
+      h.count = Number(el.value) || 1;
+    }
+  } else if (el.classList.contains("ctr-fusion-species") && m && m.fusion) {
+    m.fusion.species = el.value.trim().toUpperCase();
+    el.value = m.fusion.species;
+    el.style.borderColor = m.fusion.species === "" || spByConst.has(m.fusion.species) ? "" : ERR;
+  } else if (el.classList.contains("ctr-fusion-form") && m && m.fusion) {
+    m.fusion.formIndex = Number(el.value) || 0;
+  } else {
+    return false;
+  }
+  refreshChrome();
+  return true;
+}
+
+function onCustomTrainerChange(el) {
+  const t = ctrCur();
+  if (!t) {
+    return false;
+  }
+  const idx = el.dataset.idx === undefined ? -1 : Number(el.dataset.idx);
+  const m = idx >= 0 ? t.team[idx] : null;
+  if (el.id === "ctr-battletype") {
+    t.battleType = el.value;
+  } else if (el.id === "ctr-challenge") {
+    t.challenge = el.value;
+  } else if (el.id === "ctr-endless") {
+    t.endless = el.checked;
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-diff")) {
+    const set = new Set(t.difficulties);
+    if (el.checked) {
+      set.add(el.dataset.diff);
+    } else {
+      set.delete(el.dataset.diff);
+    }
+    t.difficulties = DIFFICULTY_OPTIONS.filter(d => set.has(d));
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-abil") && m) {
+    m.abilitySlot = Number(el.value);
+  } else if (el.classList.contains("ctr-fusion-abil") && m && m.fusion) {
+    m.fusion.abilitySlot = Number(el.value);
+  } else if (el.classList.contains("ctr-scale") && m) {
+    m.level = el.checked ? null : 50;
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-fusion-on") && m) {
+    m.fusion = el.checked ? { species: "", formIndex: 0, abilitySlot: 0 } : null;
+    render();
+    return true;
+  } else {
+    return false;
+  }
+  render();
+  return true;
+}
+
+function onCustomTrainerClick(e) {
+  const open = e.target.closest("[data-ctropen]");
+  if (open) {
+    ctrSelected = open.dataset.ctropen;
+    render();
+    return true;
+  }
+  if (e.target.closest("#ctr-new")) {
+    const t = blankCtrTrainer();
+    let key = `TRAINER_${t.id}`;
+    while (ctr.current[key]) {
+      key += "_2";
+    }
+    ctr.current[key] = t;
+    ctrSelected = key;
+    render();
+    return true;
+  }
+  const t = ctrCur();
+  if (!t) {
+    return false;
+  }
+  if (e.target.closest("#ctr-add-member")) {
+    if (t.team.length < 6) {
+      t.team.push(blankCtrMember());
+    }
+    render();
+    return true;
+  }
+  const memDel = e.target.closest(".ctr-mem-del");
+  if (memDel) {
+    if (t.team.length > 1) {
+      t.team.splice(Number(memDel.dataset.idx), 1);
+    }
+    render();
+    return true;
+  }
+  const heldAdd = e.target.closest(".ctr-held-add");
+  if (heldAdd) {
+    t.team[Number(heldAdd.dataset.idx)].heldItems.push({ item: "", count: 1 });
+    render();
+    return true;
+  }
+  const heldDel = e.target.closest(".ctr-held-del");
+  if (heldDel) {
+    t.team[Number(heldDel.dataset.idx)].heldItems.splice(Number(heldDel.dataset.heldidx), 1);
+    render();
+    return true;
+  }
+  if (e.target.closest("#ctr-delete")) {
+    // A trainer that exists in the live file is marked for deletion (delta
+    // sends null); a never-saved trainer is just dropped locally.
+    if (ctr.baseline[ctrSelected] === undefined) {
+      delete ctr.current[ctrSelected];
+    } else {
+      ctr.current[ctrSelected] = null;
+    }
+    ctrSelected = null;
+    render();
+    return true;
+  }
+  return false;
+}
+
 function render() {
   const root = $("#content");
   if (activeTab === "eggmoves") {
@@ -1362,6 +1919,8 @@ function render() {
     renderItems(root);
   } else if (activeTab === "trainers") {
     renderTrainers(root);
+  } else if (activeTab === "customtrainers") {
+    renderCustomTrainers(root);
   } else if (activeTab === "addmon") {
     renderAddMon(root);
   } else {
@@ -1408,6 +1967,9 @@ function onPokedexInput(el) {
 function onInput(e) {
   const el = e.target;
   if (POKEDEX_TABS.has(activeTab) && onPokedexInput(el)) {
+    return;
+  }
+  if (activeTab === "customtrainers" && onCustomTrainerInput(el)) {
     return;
   }
   if (el.classList.contains("slot")) {
@@ -1623,6 +2185,9 @@ function onPokedexClick(e) {
 // Click targets on the Trainers tab (toggle cards, knob resets, filter chips).
 function onClick(e) {
   if (POKEDEX_TABS.has(activeTab) && onPokedexClick(e)) {
+    return;
+  }
+  if (activeTab === "customtrainers" && onCustomTrainerClick(e)) {
     return;
   }
   const facToggle = e.target.closest(".toggle[data-facconst]");
@@ -2043,6 +2608,90 @@ function buildDeltas() {
     deltas["species-abilities"] = abDelta;
   }
 
+  // Custom trainers: changed keys only. Edit entries store species by CONST;
+  // convert to numeric speciesId. A key set to null (deleted) sends null.
+  const ctrDelta = {};
+  for (const key of Object.keys(ctr.current)) {
+    if (jsonEq(ctr.current[key], ctr.baseline[key])) {
+      continue;
+    }
+    const t = ctr.current[key];
+    if (t === null) {
+      ctrDelta[key] = null; // delete
+      continue;
+    }
+    if (!t.name || t.name.trim() === "") {
+      bad.push(`${key}: trainer needs a name`);
+      continue;
+    }
+    if (!t.trainerClass) {
+      bad.push(`${key}: trainer needs a sprite/class`);
+      continue;
+    }
+    if (!Array.isArray(t.team) || t.team.length === 0 || t.team.length > 6) {
+      bad.push(`${t.name}: team must have 1-6 members`);
+      continue;
+    }
+    let memberBad = false;
+    const team = t.team.map(m => {
+      const id = spByConst.get(m.species)?.id;
+      if (typeof id !== "number") {
+        bad.push(`${t.name}: unknown species "${m.species}"`);
+        memberBad = true;
+        return null;
+      }
+      const moves = (m.moves || []).map(x => (x || "").trim().toUpperCase()).filter(Boolean);
+      for (const mv of moves) {
+        if (!MOVE_SET.has(mv)) {
+          bad.push(`${t.name}: unknown move "${mv}"`);
+          memberBad = true;
+        }
+      }
+      const out = { species: id, abilitySlot: m.abilitySlot || 0 };
+      if (m.formIndex) {
+        out.formIndex = m.formIndex;
+      }
+      out.level = typeof m.level === "number" ? m.level : null;
+      if (moves.length > 0) {
+        out.moves = moves;
+      }
+      if (m.fusion && m.fusion.species) {
+        const fid = spByConst.get(m.fusion.species)?.id;
+        if (typeof fid === "number") {
+          out.fusion = { species: fid, formIndex: m.fusion.formIndex || 0, abilitySlot: m.fusion.abilitySlot || 0 };
+        } else {
+          bad.push(`${t.name}: unknown fusion species "${m.fusion.species}"`);
+          memberBad = true;
+        }
+      }
+      const held = (m.heldItems || [])
+        .filter(h => h && h.item)
+        .map(h => ({ item: h.item.trim().toUpperCase(), count: h.count || 1 }));
+      if (held.length > 0) {
+        out.heldItems = held;
+      }
+      return out;
+    });
+    if (memberBad) {
+      continue;
+    }
+    ctrDelta[key] = {
+      id: t.id,
+      name: t.name.trim(),
+      trainerClass: t.trainerClass,
+      battleType: t.battleType || "single",
+      difficulties: t.difficulties.length > 0 ? t.difficulties : ["ace", "elite", "hell"],
+      minWave: t.minWave,
+      maxWave: t.maxWave,
+      endless: t.endless === true,
+      challenge: t.challenge || "none",
+      team,
+    };
+  }
+  if (Object.keys(ctrDelta).length > 0) {
+    deltas["custom-trainers"] = ctrDelta;
+  }
+
   return { deltas, bad };
 }
 
@@ -2145,6 +2794,17 @@ function markSaved(file) {
     tms.baseline = JSON.parse(JSON.stringify(tms.current));
   } else if (file === "species-abilities") {
     abil.baseline = JSON.parse(JSON.stringify(abil.current));
+  } else if (file === "custom-trainers") {
+    // Drop deleted (null) keys, then snapshot the rest as the new baseline.
+    for (const k of Object.keys(ctr.current)) {
+      if (ctr.current[k] === null) {
+        delete ctr.current[k];
+      }
+    }
+    ctr.baseline = JSON.parse(JSON.stringify(ctr.current));
+    if (ctrSelected && !ctr.current[ctrSelected]) {
+      ctrSelected = null;
+    }
   }
 }
 
@@ -2180,6 +2840,7 @@ async function init() {
       abLive,
       allSpeciesData,
       evosData,
+      ctrLive,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
@@ -2207,6 +2868,8 @@ async function init() {
       // Pokedex editor: the FULL species universe (evolutions/forms) + evo graph.
       fetchJson("./data/all-species.json", []),
       fetchJson("./data/evolutions.json", {}),
+      // Live custom-trainers override file (resilient: missing on the branch → empty).
+      fetchJson(`${RAW_BASE}/er-custom-trainers.json${bust}`, {}),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -2276,6 +2939,16 @@ async function init() {
     tms.baseline = JSON.parse(JSON.stringify(tms.current));
     abil.baseline = JSON.parse(JSON.stringify(abil.current));
 
+    // Seed custom trainers from the live file (species id → CONST for editing).
+    // Requires spById to be populated (the POKEDEX_SPECIES loop above).
+    CTR_LIVE = ctrLive && typeof ctrLive === "object" ? ctrLive : {};
+    for (const [key, entry] of Object.entries(CTR_LIVE)) {
+      if (entry && typeof entry === "object") {
+        ctr.current[key] = ctrLiveToEdit(entry);
+      }
+    }
+    ctr.baseline = JSON.parse(JSON.stringify(ctr.current));
+
     // Seed species tuning: snapshot values overlaid with any live override.
     for (const s of SPECIES) {
       const o = spLive[s.const] || {};
@@ -2332,6 +3005,19 @@ async function init() {
     adl.id = "abilities-list";
     adl.innerHTML = ABILITY_NAMES.map(a => `<option value="${esc(a)}"></option>`).join("");
     document.body.appendChild(adl);
+    // Custom Trainers: species picker (full universe), trainer-class + held-item pickers.
+    const sdl = document.createElement("datalist");
+    sdl.id = "species-list";
+    sdl.innerHTML = POKEDEX_SPECIES.map(s => `<option value="${s.const}">${esc(s.name)}</option>`).join("");
+    document.body.appendChild(sdl);
+    const tcdl = document.createElement("datalist");
+    tcdl.id = "trainerclass-list";
+    tcdl.innerHTML = TRAINER_CLASS_OPTIONS.map(t => `<option value="${t}">${prettify(t)}</option>`).join("");
+    document.body.appendChild(tcdl);
+    const hidl = document.createElement("datalist");
+    hidl.id = "helditems-list";
+    hidl.innerHTML = HELD_ITEM_OPTIONS.map(k => `<option value="${k}">${prettify(k)}</option>`).join("");
+    document.body.appendChild(hidl);
 
     render();
     setStatus(`${SPECIES.length} species, ${ITEMS.length} items loaded.`);
@@ -2353,6 +3039,9 @@ async function init() {
     // `change` fires once per completed edit (blur / pick from list) → one undo step,
     // and on the Trainers tab it refreshes the default/overridden badges.
     content.addEventListener("change", e => {
+      if (activeTab === "customtrainers" && onCustomTrainerChange(e.target)) {
+        return;
+      }
       if (e.target.classList.contains("slot")) {
         pushUndoIfChanged(e.target.dataset.const);
       } else if (e.target.id === "mon-file-front") {
