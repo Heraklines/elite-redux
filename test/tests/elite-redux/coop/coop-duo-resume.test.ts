@@ -50,7 +50,14 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { setCoopPersistenceClockForTesting } from "#system/game-data";
 import { GameManager } from "#test/framework/game-manager";
-import { buildDuo as buildDuoHarness, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
+import {
+  buildDuo as buildDuoHarness,
+  type ClientCtx,
+  drainLoopback,
+  type DuoRig,
+  installDuoLogCapture,
+  withClient as withClientHarness,
+} from "#test/tools/coop-duo-harness";
 import { decrypt, encrypt } from "#utils/data";
 import { AES } from "crypto-js";
 import Phaser from "phaser";
@@ -78,9 +85,50 @@ function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
 }
 
-/** Flush the loopback's microtask delivery (a sent message reaches the peer's handler). */
-function flush(): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, 0));
+let activeResumeRig: DuoRig | null = null;
+
+/** Deliver every frame only while its destination's complete browser-equivalent context is installed. */
+async function pumpResumeDestinations(rig: DuoRig, rounds = 2): Promise<void> {
+  for (let round = 0; round < rounds; round++) {
+    await withClientHarness(rig.hostCtx, () => drainLoopback());
+    await withClientHarness(rig.guestCtx, () => drainLoopback());
+  }
+}
+
+/**
+ * Authenticated persistence may await a peer checkpoint ACK. Keep alternating the two isolated client
+ * contexts while that operation is pending, just as two browsers continue servicing their own event loops.
+ */
+async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): Promise<T> {
+  const operation = withClientHarness(ctx, fn);
+  const rig = activeResumeRig;
+  if (rig == null) {
+    return operation;
+  }
+  let settled = false;
+  void operation.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    },
+  );
+  for (let round = 0; round < 64 && !settled; round++) {
+    const peer = ctx === rig.hostCtx ? rig.guestCtx : rig.hostCtx;
+    await withClientHarness(peer, () => drainLoopback());
+    await withClientHarness(ctx, () => drainLoopback());
+  }
+  return operation;
+}
+
+/** Flush controller transactions through both browser-equivalent event loops. */
+async function flush(): Promise<void> {
+  if (activeResumeRig != null) {
+    await pumpResumeDestinations(activeResumeRig, 2);
+    return;
+  }
+  await new Promise<void>(resolve => setTimeout(resolve, 0));
 }
 
 /**
@@ -124,6 +172,8 @@ async function buildDuo(...args: Parameters<typeof buildDuoHarness>) {
   const rig = await buildDuoHarness(...args);
   rig.hostCtx.accountIdentity = rig.hostRuntime.controller.localName();
   rig.guestCtx.accountIdentity = rig.guestRuntime.controller.localName();
+  rig.pair.setDestinationContextDelivery?.(true);
+  activeResumeRig = rig;
   return rig;
 }
 
@@ -138,7 +188,9 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   });
 
   beforeEach(() => {
-    setBypassLoginForTesting(false);
+    // Keep fixture boot local/deterministic. The wrapper below disables bypass immediately after each
+    // battle starts, so every save/reconcile assertion still exercises authenticated AES + cloud CAS.
+    setBypassLoginForTesting(true);
     priorLocksDescriptor = Object.getOwnPropertyDescriptor(globalThis.navigator, "locks");
     Object.defineProperty(globalThis.navigator, "locks", {
       configurable: true,
@@ -146,13 +198,18 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         request: async <T>(_name: string, _options: { mode: "exclusive" }, callback: () => Promise<T>) => callback(),
       },
     });
-    // This suite exercises the authenticated local+cloud persistence contract.  The
-    // GameManager default installs a getter spy that permanently forces
-    // `bypassLogin=true` for the lifetime of the test, overriding the explicit
-    // setBypassLoginForTesting(false) seam above and making AES rows look like the
-    // local-development codec.  Construct the fixture in authenticated mode so
-    // individual tests can still opt into bypass mode through the real seam.
+    // Do not install GameManager's permanent bypass getter: persistence must follow the real mutable seam.
     game = new GameManager(phaserGame, false);
+    const startBattle = game.classicMode.startBattle.bind(game.classicMode);
+    vi.spyOn(game.classicMode, "startBattle").mockImplementation(async (...args) => {
+      setBypassLoginForTesting(true);
+      try {
+        return await startBattle(...args);
+      } finally {
+        setBypassLoginForTesting(false);
+      }
+    });
+    setBypassLoginForTesting(false);
     logs = installDuoLogCapture(`resume-${Date.now()}`);
     clearCoopResumeMarker();
     vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
@@ -173,6 +230,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   });
 
   afterEach(() => {
+    activeResumeRig = null;
     setBypassLoginForTesting(null);
     setCoopPersistenceClockForTesting(null);
     clearCoopResumeMarker();
