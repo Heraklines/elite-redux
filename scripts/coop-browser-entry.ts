@@ -468,6 +468,8 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
 let lastSemanticObservation = "";
 let lastSemanticProbe = "";
 let lastSemanticProbeAt = 0;
+let lastSemanticPhase: object | null = null;
+let semanticPhaseInstance = 0;
 
 function observeSemanticSurface(): void {
   try {
@@ -475,7 +477,8 @@ function observeSemanticSurface(): void {
     // state-aware navigation primitive is provable against a single-context classic run.
     const runtime = getCoopRuntime();
     const battle = globalScene?.currentBattle;
-    const phase = globalScene?.phaseManager?.getCurrentPhase()?.phaseName;
+    const currentPhase = globalScene?.phaseManager?.getCurrentPhase();
+    const phase = currentPhase?.phaseName;
     const ui = globalScene?.ui;
     if (battle == null || phase == null || ui == null) {
       return;
@@ -488,6 +491,14 @@ function observeSemanticSurface(): void {
     const semantic = classifySemanticSurface(phase, uiMode);
     if (semantic == null) {
       return;
+    }
+    // Two adjacent ExpPhase objects can expose the same surface/address and can both become
+    // ready between 100 ms observer samples at 10x speed. Object identity is read-only and
+    // gives every observed phase instance a monotonic discriminator, preventing the second
+    // actionable prompt from being deduplicated as an identical observation.
+    if (currentPhase !== lastSemanticPhase) {
+      lastSemanticPhase = currentPhase;
+      semanticPhaseInstance += 1;
     }
 
     let coop = false;
@@ -540,6 +551,7 @@ function observeSemanticSurface(): void {
     const probeKey = [
       semantic.surfaceId,
       uiMode,
+      semanticPhaseInstance,
       `${epoch}:${battle.waveIndex}:${battle.turn}`,
       selection.selectedOptionId ?? "",
       ownerSeat ?? "?",
@@ -570,6 +582,7 @@ function observeSemanticSurface(): void {
       optionCount: selection.optionCount,
       ready: { handlerActive: true, awaitingActionInput },
       phase,
+      phaseInstance: semanticPhaseInstance,
       uiMode,
     };
     const canonical = JSON.stringify(observation);

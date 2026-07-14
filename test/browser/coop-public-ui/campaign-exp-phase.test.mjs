@@ -40,13 +40,14 @@ class FakeEvidence {
     this.events.push({ index: this.events.length, text });
   }
 
-  pushExpReadiness(awaitingActionInput) {
+  pushExpReadiness(awaitingActionInput, phaseInstance) {
     this.events.push({
       index: this.events.length,
       kind: "browser-surface2",
       observation: {
         surfaceId: "battle:exp",
         phase: "ExpPhase",
+        phaseInstance,
         uiMode: "MESSAGE",
         ready: { awaitingActionInput },
       },
@@ -77,14 +78,14 @@ test("repeated ExpPhase instances wait for actionable readiness and advance once
   const advance = createPostBattleExpAdvancer(rig, { authority: 0, renderer: 0 }, stats, "wave-1-turn-1");
 
   assert.equal(await advance(), false, "a phase-start marker alone is not actionable readiness");
-  authority.evidence.pushExpReadiness(false);
+  authority.evidence.pushExpReadiness(false, 1);
   assert.equal(await advance(), false, "typewriter-in-progress readiness must not consume the phase marker");
-  authority.evidence.pushExpReadiness(true);
+  authority.evidence.pushExpReadiness(true, 1);
   assert.equal(await advance(), true);
   assert.equal(await advance(), false);
   authority.evidence.pushConsole("Start Phase ExpPhase");
   assert.equal(await advance(), false, "the prior prompt's ready event must not authorize the next phase instance");
-  authority.evidence.pushExpReadiness(true);
+  authority.evidence.pushExpReadiness(true, 2);
   assert.equal(await advance(), true);
   assert.equal(await advance(), false);
 
@@ -98,6 +99,10 @@ test("repeated ExpPhase instances wait for actionable readiness and advance once
   assert.equal(advances.length, 2);
   assert.ok(advances.every(event => event.readyEventIndex > event.phaseEventIndex));
   assert.equal(new Set(advances.map(event => event.phaseEventIndex)).size, 2);
+  assert.deepEqual(
+    advances.map(event => event.phaseInstance),
+    [1, 2],
+  );
 });
 
 test("the short outcome wait names a fully submitted turn as progress", async () => {
