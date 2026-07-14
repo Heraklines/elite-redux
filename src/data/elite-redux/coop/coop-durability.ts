@@ -610,6 +610,8 @@ interface PendingHostOperationContinuation {
   expectedSurface: "sharedBoundary" | "terminal";
   /** One matching authority surface may start the peer-convergence budget; duplicates can never extend it. */
   authoritySurfaceRearmed: boolean;
+  /** Exact host phase barriers waiting only for the peer's ordered materialApplied proof. */
+  materialWaiters: Set<(applied: boolean) => void>;
 }
 
 /** Identity is load-bearing: a cancelled first-stage callback must not exhaust a newly rearmed deadline. */
@@ -942,6 +944,7 @@ export class CoopDurabilityManager {
         this.pendingHostOperationContinuations.set(key, {
           ...operation,
           authoritySurfaceRearmed: false,
+          materialWaiters: new Set(),
         });
       }
       this.armOperationContinuationDeadline(operation.authority);
@@ -952,6 +955,40 @@ export class CoopDurabilityManager {
       coopWarn("durability", `commit send THREW cls=${cls} seq=${seq} (op stays journaled + retriable)`, e);
     }
     return true;
+  }
+
+  /**
+   * Host phase barrier for one exact retained operation. This proves only that the peer installed the
+   * canonical material state; it deliberately does NOT release the journal. The retained entry survives
+   * until the later, independently addressed `continuationReady` proof opens the peer's real public UI.
+   */
+  waitForOperationMaterialApplied(operationId: string): Promise<boolean> {
+    if (
+      this.disposed
+      || this.transport.role !== "host"
+      || typeof operationId !== "string"
+      || operationId.length === 0
+    ) {
+      return Promise.resolve(false);
+    }
+    const matches = [...this.pendingHostOperationContinuations.entries()].filter(
+      ([, candidate]) => candidate.authority.operationId === operationId,
+    );
+    if (matches.length !== 1) {
+      return Promise.resolve(false);
+    }
+    const [key, pending] = matches[0];
+    const evidence = this.hostOperationAckEvidence.get(key);
+    if (evidence != null && OPERATION_ACK_STAGE_ORDER[evidence.stage] >= OPERATION_ACK_STAGE_ORDER.materialApplied) {
+      return Promise.resolve(true);
+    }
+    if (
+      this.exhaustedOperationContinuations.has(key)
+      || this.journal.ackedThrough(pending.authority.cls) >= pending.authority.seq
+    ) {
+      return Promise.resolve(false);
+    }
+    return new Promise<boolean>(resolve => pending.materialWaiters.add(resolve));
   }
 
   /** Handle an inbound wire message: the ACK/reconnect arms, plus (if wired) the durable op stream. */
@@ -1498,6 +1535,9 @@ export class CoopDurabilityManager {
       }
     }
     this.hostOperationAckEvidence.set(key, { stage: msg.stage, canonical, value: msg });
+    if (msg.stage === "materialApplied" || msg.stage === "continuationReady") {
+      this.settleOperationMaterialWaiters(key, true);
+    }
     if (msg.stage !== "continuationReady") {
       return;
     }
@@ -1541,6 +1581,7 @@ export class CoopDurabilityManager {
         }
         this.operationContinuationTimers.get(key)?.cancel();
         this.operationContinuationTimers.delete(key);
+        this.settleOperationMaterialWaiters(key, true);
         this.pendingHostOperationContinuations.delete(key);
       } else if (entry.seq > cumulativeThrough) {
         break;
@@ -1628,6 +1669,11 @@ export class CoopDurabilityManager {
       const separator = remainder.indexOf(":");
       const seq = Number(separator < 0 ? remainder : remainder.slice(0, separator));
       if (Number.isSafeInteger(seq) && seq <= through) {
+        const evidence = this.hostOperationAckEvidence.get(key);
+        this.settleOperationMaterialWaiters(
+          key,
+          evidence != null && OPERATION_ACK_STAGE_ORDER[evidence.stage] >= OPERATION_ACK_STAGE_ORDER.materialApplied,
+        );
         deadline.cancel();
         this.operationContinuationTimers.delete(key);
         this.pendingHostOperationContinuations.delete(key);
@@ -1656,6 +1702,7 @@ export class CoopDurabilityManager {
         return;
       }
       this.exhaustedOperationContinuations.add(key);
+      this.settleOperationMaterialWaiters(key, false);
       this.pendingHostOperationContinuations.delete(key);
       coopWarn("durability", `operation continuation EXHAUSTED key=${key}`);
       try {
@@ -1671,6 +1718,19 @@ export class CoopDurabilityManager {
       }
     }, this.operationContinuationDeadlineMs);
     this.operationContinuationTimers.set(key, deadline);
+  }
+
+  /** Resolve and forget every exact phase waiter once; promise continuations run outside this wire stack. */
+  private settleOperationMaterialWaiters(key: string, applied: boolean): void {
+    const pending = this.pendingHostOperationContinuations.get(key);
+    if (pending == null || pending.materialWaiters.size === 0) {
+      return;
+    }
+    const waiters = [...pending.materialWaiters];
+    pending.materialWaiters.clear();
+    for (const resolve of waiters) {
+      resolve(applied);
+    }
   }
 
   /** Engine-free diagnostics used by staging traces and exact lifecycle tests. */
@@ -2030,6 +2090,9 @@ export class CoopDurabilityManager {
     }
     this.operationContinuationTimers.clear();
     this.pendingOperationContinuations.clear();
+    for (const [key] of this.pendingHostOperationContinuations) {
+      this.settleOperationMaterialWaiters(key, false);
+    }
     this.pendingHostOperationContinuations.clear();
     this.pendingCumulativeAcks.clear();
     this.retainedSnapshotFrontiers.clear();

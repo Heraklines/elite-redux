@@ -20,6 +20,7 @@ import {
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
   coopMeInProgress,
+  coopSessionGeneration,
   failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
@@ -27,6 +28,7 @@ import {
   getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
+  runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REWARD_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import {
@@ -235,6 +237,8 @@ export class SelectModifierPhase extends BattlePhase {
   protected coopRewardOperationBinding: CoopRewardOperationBinding | null = null;
   /** Prevents duplicate durable-result wait loops when a retained intent is re-clicked/replayed. */
   private readonly coopAwaitingAuthorityResults = new Set<string>();
+  /** Host terminal results parked until the guest proves the exact material state was installed. */
+  private readonly coopAwaitingMaterialResults = new Set<string>();
   /** Live owner callback reused after a retained paid result temporarily parks the interactive shop. */
   private coopModifierSelectCallback: ModifierSelectCallback | null = null;
   /** The interaction-turn counter observed when THIS shop opened (#633). Makes the
@@ -1332,7 +1336,12 @@ export class SelectModifierPhase extends BattlePhase {
         "reward",
         `OWNER retained terminal before continuation seq=${this.coopInteractionStart} id=${prepared.operationId}`,
       );
-      return false;
+      // Preserve the historical replay decision point, but park phase teardown/counter advance until the
+      // guest proves this exact canonical result was materially applied. Journal retention continues beyond
+      // that proof until the guest's addressed public continuation emits continuationReady.
+      recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
+      this.coopAwaitTerminalMaterialApplied(prepared.operationId);
+      return true;
     }
     if (isCoopDebug()) {
       coopLog(
@@ -1370,6 +1379,68 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopPendingAuthorityOperationId = null;
     }
     return true;
+  }
+
+  /** HOST terminal: wait for exact peer material without weakening the later continuation-ready gate. */
+  private coopAwaitTerminalMaterialApplied(operationId: string): void {
+    if (this.coopAwaitingMaterialResults.has(operationId)) {
+      return;
+    }
+    const runtime = getCoopRuntime();
+    const durability = runtime?.durability;
+    if (runtime == null || durability == null || runtime.controller.role !== "host") {
+      failCoopSharedSession(`Reward terminal ${operationId} has no host material-apply barrier`);
+      return;
+    }
+    const generation = coopSessionGeneration();
+    this.coopAwaitingMaterialResults.add(operationId);
+    void durability
+      .waitForOperationMaterialApplied(operationId)
+      .then(applied => {
+        if (!applied) {
+          this.coopAwaitingMaterialResults.delete(operationId);
+          if (coopSessionGeneration() === generation && getCoopRuntime() === runtime) {
+            failCoopSharedSession(`Reward terminal ${operationId} exhausted before peer material apply`);
+          }
+          return;
+        }
+        runWhenCoopRuntimeActive(runtime, () =>
+          this.coopFinishTerminalAfterMaterialApplied(operationId, runtime, generation),
+        );
+      })
+      .catch(error => {
+        this.coopAwaitingMaterialResults.delete(operationId);
+        coopWarn("reward", `Reward terminal ${operationId} material barrier rejected`, error);
+        if (coopSessionGeneration() === generation && getCoopRuntime() === runtime) {
+          failCoopSharedSession(`Reward terminal ${operationId} material barrier failed`);
+        }
+      });
+  }
+
+  /** Resume under the captured host runtime only; a replaced session/phase callback has no mutation right. */
+  private coopFinishTerminalAfterMaterialApplied(
+    operationId: string,
+    runtime: NonNullable<ReturnType<typeof getCoopRuntime>>,
+    generation: number,
+  ): void {
+    this.coopAwaitingMaterialResults.delete(operationId);
+    if (coopSessionGeneration() !== generation || getCoopRuntime() !== runtime) {
+      return;
+    }
+    if (
+      runtime.controller.role !== "host"
+      || globalScene.currentBattle == null
+      || globalScene.phaseManager.getCurrentPhase() !== this
+    ) {
+      failCoopSharedSession(`Reward terminal ${operationId} materialized after its host phase was replaced`);
+      return;
+    }
+    coopLog(
+      "reward",
+      `OWNER peer material applied; release terminal engine barrier seq=${this.coopInteractionStart} id=${operationId}`,
+    );
+    super.end();
+    this.coopAdvanceInteraction();
   }
 
   /** GUEST intent owner: remain parked until the retained host result has applied, then project its UI tail. */
@@ -1934,11 +2005,27 @@ export class SelectModifierPhase extends BattlePhase {
       `WATCHER applying relayed action seq=${this.coopInteractionStart} act=${actName} choice=${action.choice} data=${action.data === undefined ? "-" : `[${action.data.join(",")}]`}`,
     );
     if (action.choice === COOP_INTERACTION_LEAVE) {
-      if (!projectionOnly && !this.coopCommitPendingAuthorityResult(decision?.operationId)) {
-        return true;
+      const operationId = decision?.operationId ?? this.coopPendingAuthorityOperationId;
+      const hostRetainedTerminal =
+        !projectionOnly
+        && getCoopController()?.role === "host"
+        && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding);
+      if (!projectionOnly) {
+        if (hostRetainedTerminal && operationId == null) {
+          failCoopSharedSession("Host reward watcher terminal had no retained operation identity");
+          return true;
+        }
+        if (!this.coopCommitPendingAuthorityResult(operationId)) {
+          return true;
+        }
       }
       this.coopRelayedMoney = -1;
       this.coopEndMirror();
+      if (hostRetainedTerminal) {
+        void globalScene.ui.setMode(UiMode.MESSAGE);
+        this.coopAwaitTerminalMaterialApplied(operationId!);
+        return true;
+      }
       globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
       this.coopAdvanceInteraction();
       return true;

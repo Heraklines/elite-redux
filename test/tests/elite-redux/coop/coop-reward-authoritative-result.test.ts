@@ -172,6 +172,54 @@ describe("P33 retained reward/shop authoritative results", () => {
     guestManager.dispose();
   });
 
+  it("parks host terminal advance at material apply while retaining through public continuation", async () => {
+    const pair = createLoopbackPair();
+    const hostManager = new CoopDurabilityManager(pair.host);
+    const guestHooks = coopOperationDurabilityHooks();
+    let permitMaterialApply = false;
+    const guestManager = new CoopDurabilityManager(pair.guest, {
+      ...guestHooks,
+      apply: entry => (permitMaterialApply ? guestHooks.apply?.(entry) : "deferred"),
+    });
+    setCoopOperationDurability(hostManager);
+    registerCoopOperationLiveSink("op:reward", () => true);
+
+    const prepared = commitRewardOwnerIntent({
+      surface: "reward",
+      pinned: 2,
+      label: "skip",
+      choice: COOP_INTERACTION_LEAVE,
+      terminal: true,
+      localRole: "host",
+      wave: 7,
+      turn: 3,
+    })!;
+    expect(commitRewardAuthoritativeResult(prepared.operationId, state(14, 850, "terminal-material"))).not.toBeNull();
+    let materialSettled = false;
+    const material = hostManager.waitForOperationMaterialApplied(prepared.operationId).then(applied => {
+      materialSettled = true;
+      return applied;
+    });
+    await flushWire();
+
+    expect(materialSettled, "the host engine barrier cannot release before guest state application").toBe(false);
+    expect(applyCalls).toBe(0);
+    expect(hostManager.unackedCount(), "the immutable terminal remains retained while apply is deferred").toBe(1);
+
+    permitMaterialApply = true;
+    expect(guestManager.retryDeferred("op:global"), "destination-runtime activation retries the exact head").toBe(1);
+    await flushWire();
+    expect(await material, "the exact materialApplied proof releases only the host engine barrier").toBe(true);
+    expect(appliedStates.at(-1)?.tick).toBe(14);
+    expect(hostManager.unackedCount(), "material apply alone cannot discard the retained terminal").toBe(1);
+
+    expect(guestManager.notifyOperationContinuationSurface("sharedInput", latestAppliedOperationAddress())).toBe(1);
+    await flushWire();
+    expect(hostManager.unackedCount(), "only the addressed public continuation retires the journal entry").toBe(0);
+    hostManager.dispose();
+    guestManager.dispose();
+  });
+
   it("guest-owned intent executes only on the host; duplicate/reordered raw intent cannot execute twice", async () => {
     const pair = createLoopbackPair();
     const hostManager = new CoopDurabilityManager(pair.host);
