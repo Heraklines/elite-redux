@@ -28,6 +28,7 @@ import type {
   CoopAuthoritativeEnvelopeV1,
   CoopWaveAdvancePayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
+import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   adoptCoopBiomeTransitionSwitchPermit,
   armCoopBiomeTransitionTailPermit,
@@ -47,6 +48,7 @@ import {
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import {
   adoptWaveAdvanceWatcherChoice,
+  captureCoopWaveAdvanceOperationBinding,
   commitWaveAdvanceOwnerIntent,
   coopWaveAdvanceSanctionedTails,
   isCoopWaveAdvanceOperationEnabled,
@@ -120,6 +122,7 @@ function retainedEnvelope(wave: number): CoopAuthoritativeEnvelopeV1 {
 
 describe("co-op WAVE-ADVANCE operation - the keystone (Wave-2f)", () => {
   beforeEach(() => {
+    setActiveCoopRuntimeOpState(createCoopRuntimeOpState());
     clearCoopBiomeTransitionTailPermit();
     setCoopWaveAdvanceOperationEnabled(true);
     resetCoopWaveAdvanceOperationState();
@@ -128,6 +131,7 @@ describe("co-op WAVE-ADVANCE operation - the keystone (Wave-2f)", () => {
     clearCoopBiomeTransitionTailPermit();
     resetCoopWaveAdvanceOperationFlag();
     resetCoopWaveAdvanceOperationState();
+    setActiveCoopRuntimeOpState(null);
   });
 
   it("concrete VictoryPhase control uses the host boundary statement and never evaluates guest derivations", () => {
@@ -213,6 +217,35 @@ describe("co-op WAVE-ADVANCE operation - the keystone (Wave-2f)", () => {
   });
 
   describe("WATCHER adoption gating (invariants 5, 6)", () => {
+    it("fails closed on missing or role-mismatched continuation bindings", () => {
+      const hostState = createCoopRuntimeOpState("host");
+      const guestState = createCoopRuntimeOpState("guest");
+      setActiveCoopRuntimeOpState(hostState);
+      const hostBinding = captureCoopWaveAdvanceOperationBinding("host");
+      setActiveCoopRuntimeOpState(guestState);
+      const guestBinding = captureCoopWaveAdvanceOperationBinding("guest");
+      const authoritativeState = settledState(5);
+      const transition = payload({ wave: 5, settledStateTick: authoritativeState.tick });
+
+      expect(() =>
+        commitWaveAdvanceOwnerIntent(
+          {
+            payload: transition,
+            authoritativeState,
+            localRole: "host",
+            wave: 5,
+            turn: 1,
+          },
+          guestBinding,
+        ),
+      ).toThrow(/binding role=guest cannot execute localRole=host/);
+      expect(() =>
+        adoptWaveAdvanceWatcherChoice({ payload: transition, localRole: "guest", wave: 5, turn: 1 }, hostBinding),
+      ).toThrow(/binding role=host cannot execute localRole=guest/);
+      setActiveCoopRuntimeOpState(null);
+      expect(() => captureCoopWaveAdvanceOperationBinding("guest")).toThrow(/no runtime installed/);
+    });
+
     it("adopts a host-stated advance and returns its payload + sanctioned tails", () => {
       expect(isCoopWaveAdvanceOperationEnabled()).toBe(true);
       const d = adoptWaveAdvanceWatcherChoice({
