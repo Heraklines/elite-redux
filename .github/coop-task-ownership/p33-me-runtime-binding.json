@@ -8,6 +8,7 @@
     ".github/coop-task-ownership/p33-me-runtime-binding.json",
     "src/data/elite-redux/coop/coop-me-operation.ts",
     "src/data/elite-redux/coop/coop-runtime.ts",
+    "test/tests/elite-redux/coop/coop-duo-me-operation.test.ts",
     "test/tests/elite-redux/coop/coop-me-terminal-transaction.test.ts",
     "test/tests/elite-redux/coop/coop-operation-precommit-intent-loss.test.ts"
   ]
