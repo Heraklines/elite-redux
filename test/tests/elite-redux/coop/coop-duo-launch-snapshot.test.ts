@@ -43,7 +43,12 @@ import {
 } from "#phases/encounter-phase";
 import { ShowTrainerPhase } from "#phases/show-trainer-phase";
 import { GameManager } from "#test/framework/game-manager";
-import { buildDuo, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
+import {
+  buildDuo,
+  installDuoLogCapture,
+  installHeadlessPlayerAtlasCompletionModel,
+  withClient,
+} from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -217,6 +222,9 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
       withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(hostJson)),
       "guest boots the exact host launch carrier",
     ).resolves.toBe(true);
+    // Snapshot materialization replaces the guest party objects that buildDuo initially wrapped. Install
+    // the HEADLESS cache-completion model on the reconstructed objects that this launch boundary will load.
+    await withClient(rig.guestCtx, () => installHeadlessPlayerAtlasCompletionModel(rig.guestScene));
 
     await withClient(rig.guestCtx, async () => {
       // This proof isolates the atlas/surface prerequisite. EncounterPhase still awaits the real tutorial

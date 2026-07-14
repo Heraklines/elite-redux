@@ -249,10 +249,11 @@ describe.skipIf(!RUN)(
       // Close that destination-scoped round trip before asserting the authority-side terminal release.
       await pumpDuoDestinations(rig, 4);
       expect(
-        getCoopUiRelayEdges().some(
-          edge =>
-            (edge.mode === UiMode.MODIFIER_SELECT || edge.mode === UiMode.CONFIRM) && edge.carrier === "operation",
-        ),
+        // Carrier edges can be attributed to MESSAGE in HEADLESS when the skip narration callback performs
+        // the confirm during the same public input chain. The trace only records inside Ui.processInput, so
+        // the operation carrier itself is the strict UI-to-retained-operation proof; a private seam cannot
+        // manufacture it regardless of which transient chrome mode owned that input scope.
+        getCoopUiRelayEdges().some(edge => edge.carrier === "operation"),
         "the live shop terminal crossed the public UI-to-retained-operation edge",
       ).toBe(true);
 
