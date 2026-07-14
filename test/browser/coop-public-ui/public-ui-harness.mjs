@@ -20,6 +20,22 @@ const GUEST_CONTINUATION_ACK = /guest ACK turn stage=continuationReady e=(\d+) w
 const SHARED_SESSION_TERMINAL = /\[coop:runtime\] shared session stopped safely: /u;
 const LAUNCH_SNAPSHOT_ABORT = /launchSnapshotAbort wave=\d+ reason=/u;
 
+/**
+ * Loud-fail on a failed response from an endpoint the harness DRIVES navigation from (the
+ * co-op lobby / account view). A non-2xx there means the lobby the player would see never
+ * rendered; masking it as a generic "timed out waiting for the lobby list" hides the real
+ * cause. Called from every lobby waiter predicate so the run stops on the FIRST failed call.
+ */
+function assertNoDriverApiFailure(sink, context) {
+  const failure = sink.networkState.apiFailure;
+  if (failure != null) {
+    throw new Error(
+      `${sink.label}: ${context} driver API failed (${failure.status} ${failure.pathname}); `
+        + "refusing to keep polling a surface the player never saw.",
+    );
+  }
+}
+
 let publicKeyInputTail = Promise.resolve();
 
 function withFocusedPublicKeyInput(page, action) {
@@ -453,6 +469,7 @@ export class PublicUiClient {
   async waitForLobbyPlayer(username) {
     return this.evidence.waitForCondition(
       sink => {
+        assertNoDriverApiFailure(sink, "co-op lobby");
         const players = sink.networkState.lobby?.players ?? [];
         const index = players.indexOf(username);
         return index >= 0 ? { players, index } : null;
@@ -476,10 +493,16 @@ export class PublicUiClient {
   }
 
   async acceptRequest(username) {
-    await this.evidence.waitForCondition(sink => sink.networkState.lobby?.request === username, {
-      timeoutMs: this.config.timeoutMs,
-      description: `visible incoming request from ${username}`,
-    });
+    await this.evidence.waitForCondition(
+      sink => {
+        assertNoDriverApiFailure(sink, "co-op lobby");
+        return sink.networkState.lobby?.request === username;
+      },
+      {
+        timeoutMs: this.config.timeoutMs,
+        description: `visible incoming request from ${username}`,
+      },
+    );
     await this.press("Space", `lobby-accept-${username}`);
   }
 
