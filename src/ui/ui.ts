@@ -8,7 +8,10 @@ import {
   coopMeInProgress,
   coopMeInteractionStartValue,
 } from "#data/elite-redux/coop/coop-me-pin-state";
-import { notifyCoopOperationContinuationSurface } from "#data/elite-redux/coop/coop-operation-journal";
+import {
+  notifyCoopOperationAuthorityContinuationSurface,
+  notifyCoopOperationContinuationSurface,
+} from "#data/elite-redux/coop/coop-operation-journal";
 import {
   coopHostStreamMeMessage,
   getCoopBattleStreamer,
@@ -909,21 +912,27 @@ export class UI extends Phaser.GameObjects.Container {
   /** Publish protocol-33 continuation evidence only after this UI has actually committed its public mode. */
   private coopAuthoritySurfaceReady(mode: UiMode): void {
     // The netcode predicate intentionally includes Showdown, which rides this authoritative substrate even
-    // though its game mode is not classic co-op. Hosts have no guest continuation ledger and never publish.
-    if (!isCoopAuthoritativeGuest() || !this.getHandler().active) {
+    // though its game mode is not classic co-op. Both roles report through this post-commit chokepoint: the
+    // guest publishes ordered evidence, while the host can rearm one bounded peer-convergence stage.
+    if (!this.getHandler().active) {
       return;
     }
     const surface = coopAuthorityContinuationSurface(mode);
     if (surface != null) {
-      getCoopBattleStreamer()?.notifyContinuationSurface(surface);
       const controller = getCoopController();
       const battle = globalScene.currentBattle;
       if (controller != null && battle != null) {
-        notifyCoopOperationContinuationSurface(surface, {
+        const address = {
           epoch: controller.sessionEpoch,
           wave: battle.waveIndex,
           turn: battle.turn,
-        });
+        };
+        if (isCoopAuthoritativeGuest()) {
+          getCoopBattleStreamer()?.notifyContinuationSurface(surface);
+          notifyCoopOperationContinuationSurface(surface, address);
+        } else if (controller.role === "host") {
+          notifyCoopOperationAuthorityContinuationSurface(surface, address);
+        }
       }
     }
   }

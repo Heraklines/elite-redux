@@ -2656,6 +2656,57 @@ export interface CoopRuntime {
 
 let active: CoopRuntime | null = null;
 
+/**
+ * Async phase continuations captured by one runtime but resolved while the other in-process harness client
+ * is ambient. Production has one runtime and executes immediately; the harness flushes the callback only
+ * after installing the destination scene, durability manager, and operation state together.
+ */
+const pendingRuntimeActivations = new WeakMap<CoopRuntime, Set<() => void>>();
+/** Last scene installed alongside each runtime; direct engine-free tests intentionally share one scene. */
+const runtimeSceneBindings = new WeakMap<CoopRuntime, object>();
+
+export function runWhenCoopRuntimeActive(runtime: CoopRuntime, callback: () => void): () => void {
+  let live = true;
+  let queued: Set<() => void> | null = null;
+  const invoke = (): void => {
+    if (!live) {
+      return;
+    }
+    live = false;
+    queued?.delete(invoke);
+    callback();
+  };
+  if (active === runtime) {
+    invoke();
+    return () => {};
+  }
+  queued = pendingRuntimeActivations.get(runtime) ?? new Set<() => void>();
+  queued.add(invoke);
+  pendingRuntimeActivations.set(runtime, queued);
+  return () => {
+    live = false;
+    queued?.delete(invoke);
+    if (queued?.size === 0) {
+      pendingRuntimeActivations.delete(runtime);
+    }
+  };
+}
+
+function flushPendingRuntimeActivations(runtime: CoopRuntime): void {
+  const callbacks = pendingRuntimeActivations.get(runtime);
+  if (callbacks == null) {
+    return;
+  }
+  pendingRuntimeActivations.delete(runtime);
+  for (const callback of [...callbacks]) {
+    try {
+      callback();
+    } catch (error) {
+      coopWarn("runtime", "destination-runtime continuation threw after activation", error);
+    }
+  }
+}
+
 interface CoopRuntimeSharedTerminalState {
   frozen: boolean;
   finalized: boolean;
@@ -2701,6 +2752,7 @@ export function coopSessionGeneration(): number {
 /** Register the live co-op session (called when a co-op run is being set up). */
 export function setCoopRuntime(runtime: CoopRuntime): void {
   active = runtime;
+  runtimeSceneBindings.set(runtime, globalScene);
   // Wave-2e: point the operation journal at THIS runtime's durability manager. Load-bearing in the duo
   // harness, where two runtimes coexist in-process and `withClient` swaps the active one per pumped client -
   // the migrated adapters' commit path must journal into the ACTIVE client's manager, not a stale global.
@@ -2708,6 +2760,10 @@ export function setCoopRuntime(runtime: CoopRuntime): void {
   // Layer-B: install THIS runtime's per-surface op-state as the active one, so the migrated surfaces read
   // the pumped client's own cursors/clock (never the other engine's) across a `withClient` swap.
   setActiveCoopRuntimeOpState(runtime.opState);
+  // A receiver may have retained this exact global operation while the sender/no client was ambient. Apply
+  // it now, under the destination scene + runtime, before any later client phase can publish a newer tick.
+  runtime.durability?.retryDeferred("op:global");
+  flushPendingRuntimeActivations(runtime);
   // Install the cycle-free authoritative-guest predicate (#633 B6) so `field/pokemon.ts` can gate the
   // Shedinja party-add without importing this module (which would close a value-level import cycle).
   setCoopAuthoritativeGuestPredicate(isCoopAuthoritativeGuest);
@@ -4538,7 +4594,16 @@ export function assembleCoopRuntime(
         // sender's record (or fail-loud throw when nothing is installed), and the receiver's watcher-adopt
         // reads its own empty record and never converges. Installing the assembly-owned opState here lands
         // the apply on the receiver's own record. Production has one runtime, so this scope is a no-op there.
-        apply: entry => withActiveCoopRuntimeOpState(opState, () => operationDurabilityHooks.apply?.(entry)),
+        apply: entry => {
+          const receiverScene = runtimeSceneBindings.get(runtime);
+          // The in-process engine harness owns distinct scenes, so a known destination scene mismatch is a
+          // valid deferred boundary. Engine-free operation tests intentionally share one scene (or never
+          // install a receiver scene); their stable runtime bindings remain safe and synchronous.
+          if (receiverScene != null && receiverScene !== globalScene) {
+            return "deferred";
+          }
+          return withActiveCoopRuntimeOpState(opState, () => operationDurabilityHooks.apply?.(entry));
+        },
         sendFullSnapshot: (cls, headRevision, controlHighWater) =>
           sendCoopDurabilitySnapshot(runtime, cls, headRevision, controlHighWater),
         onRecoveryExhausted: failure =>
