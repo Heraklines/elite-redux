@@ -122,18 +122,17 @@ import {
   type DuoRig,
   drainGuestMeReplayToSettle,
   drainLoopback,
+  driveClientPhaseQueueTo,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
   mirrorHostMeToGuest,
   pumpDuoDestinations,
   relayGuestMeOptionIndexOnly,
-  relayGuestMeShopLeaveSync,
   remirrorWave,
   type ShopPhaseSeam,
   startGuestMeOutcomeRace,
   startGuestMeReplay,
-  startGuestMeShopOwner,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -2404,6 +2403,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         if (setDestinationDelivery == null) {
           fail("no-park", wave, "guest-owned nested ME requires destination-context transport scheduling");
         }
+        const deliverInDestinationContext = setDestinationDelivery as (enabled: boolean) => void;
 
         type BoundedModeResult = "completed" | "forced" | "superseded";
         type ScriptableGuestUi = {
@@ -2458,7 +2458,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           return realSetModeBoundedWhen(mode, timeoutMs, isCurrent, ...args);
         };
 
-        setDestinationDelivery(true);
+        deliverInDestinationContext(true);
         let hostReachedNestedDestination = false;
         let hostNestedDriveError: unknown;
         try {
@@ -2510,43 +2510,74 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           }
         } finally {
           ui.setModeBoundedWhen = originalSetModeBoundedWhen;
-          setDestinationDelivery(false);
+          deliverInDestinationContext(false);
         }
       }
-      if (noRewardShop) {
-        await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
-      } else {
-        // The host is the sole option engine but the odd-counter GUEST owns the embedded reward PICK. Start
-        // the host's real shop as watcher, let the guest adopt those exact options and relay its terminal,
-        // then resume the host watcher under the host context. Calling the owner helper on `hostShop` used to
-        // advance only the host (21 -> 22) and strand it in CoopPartnerSync while the guest stayed at 21.
-        let hostShop!: ShopPhaseSeam;
-        await withClient(rig.hostCtx, async () => {
-          await game.phaseInterceptor.to("SelectModifierPhase", false);
-          hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-          hostShop.start();
-          await drainLoopback();
-        });
-        const guestShop = await withClient(rig.guestCtx, () => startGuestMeShopOwner(rig.guestScene));
-        withClientSync(rig.guestCtx, () => relayGuestMeShopLeaveSync(guestShop));
-        await withClient(rig.hostCtx, async () => {
-          for (let i = 0; i < 16; i++) {
+      const setRewardDestinationDelivery = noRewardShop ? null : rig.pair.setDestinationContextDelivery;
+      if (!noRewardShop && setRewardDestinationDelivery == null) {
+        fail("no-park", wave, "guest-owned embedded ME reward requires destination-context transport scheduling");
+      }
+      const deliverRewardInDestinationContext = setRewardDestinationDelivery as ((enabled: boolean) => void) | null;
+      deliverRewardInDestinationContext?.(true);
+      try {
+        if (noRewardShop) {
+          await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
+        } else {
+          // Keep every reward carrier on its destination client. The guest Replay phase receives the host's
+          // streamed stock under guestCtx, performs its production embedded-shop handoff, and opens the real
+          // SelectModifierPhase. Its public CANCEL -> CONFIRM -> ACTION path proposes LEAVE; the host watcher
+          // validates that proposal and retains the authoritative result. Delivering that result under hostCtx
+          // used to clear the ME pin on the wrong engine, so the shop consumed interaction 21 and parked the
+          // host at CoopPartnerSync while the guest remained at 21.
+          let hostShop!: ShopPhaseSeam;
+          await withClient(rig.hostCtx, async () => {
+            await game.phaseInterceptor.to("SelectModifierPhase", false);
+            hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+            hostShop.start();
             await drainLoopback();
-            if (rig.hostScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase") {
-              break;
-            }
+          });
+          await pumpDuoDestinations(rig, 2);
+
+          const guestShop = (await withClient(rig.guestCtx, async () => {
+            const phase = await driveClientPhaseQueueTo(rig.guestScene, "SelectModifierPhase");
+            phase.start();
+            await drainLoopback();
+            return phase;
+          })) as unknown as ShopPhaseSeam;
+          if (guestShop.coopWatcher) {
+            fail("desync", wave, "guest-owned embedded ME reward opened the guest as watcher instead of owner");
           }
-          await game.phaseInterceptor.to("PostMysteryEncounterPhase");
-        });
-      }
-      await withClient(rig.guestCtx, async () => {
-        // Nested MEs armed this race before alternating the real public party/secondary captures. A flat
-        // guest-owned ME keeps the original split: arm only after the host buffered its full outcome/terminal.
-        if (scriptedSubPicks.length === 0) {
-          startGuestMeOutcomeRace(replay);
+          await withClient(rig.guestCtx, async () => {
+            const handler = rig.guestScene.ui.getHandler() as unknown as { unblockInput?: () => void };
+            handler.unblockInput?.();
+            if (!rig.guestScene.ui.processInput(Button.CANCEL)) {
+              fail("no-park", wave, "guest embedded ME reward public CANCEL input was rejected");
+            }
+            await drainLoopback();
+            if (rig.guestScene.ui.getMode() !== UiMode.CONFIRM) {
+              fail("no-park", wave, "guest embedded ME reward did not open its public confirmation surface");
+            }
+            if (!rig.guestScene.ui.processInput(Button.ACTION)) {
+              fail("no-park", wave, "guest embedded ME reward public confirmation input was rejected");
+            }
+          });
+          actionScript.push(`wave ${wave}: ME ${MysteryEncounterType[type]} public embedded reward leave`);
+
+          await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
+          await pumpDuoDestinations(rig, 2);
+          await withClient(rig.hostCtx, () => game.phaseInterceptor.to("PostMysteryEncounterPhase"));
         }
-        await drainGuestMeReplayToSettle(replay);
-      });
+        await withClient(rig.guestCtx, async () => {
+          // Nested MEs armed this race before alternating the real public party/secondary captures. A flat
+          // guest-owned ME keeps the original split: arm only after the host buffered its full outcome/terminal.
+          if (scriptedSubPicks.length === 0) {
+            startGuestMeOutcomeRace(replay);
+          }
+          await drainGuestMeReplayToSettle(replay);
+        });
+      } finally {
+        deliverRewardInDestinationContext?.(false);
+      }
       mePath = "guest-owned";
     }
 
