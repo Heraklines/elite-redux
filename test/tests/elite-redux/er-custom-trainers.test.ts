@@ -31,6 +31,7 @@ import {
   getErCustomTrainers,
   markErCustomTrainerUsed,
   normalizeBattleBgm,
+  normalizeIntroDialogue,
   pickErCustomTrainerVariant,
   resetErCustomTrainerTracking,
   resolveErCustomTrainerMoveIds,
@@ -516,6 +517,41 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     expect(byKey.get("FEM")!.gender).toBe("f");
     expect(byKey.get("MASC")!.gender).toBe("m");
     expect(byKey.get("DEFAULTED")!.gender).toBe("m");
+  });
+
+  // ---- ROUND 5 / FEATURE 3: intro blurb -------------------------------------
+  it("introDialogue normalizes (trim, control-chars stripped, 200 cap) and resolves onto the trainer", () => {
+    // Pure normalizer.
+    expect(normalizeIntroDialogue("  You dare challenge me?  ")).toBe("You dare challenge me?");
+    expect(normalizeIntroDialogue("line1\nline2\tend")).toBe("line1line2end"); // control chars stripped
+    expect(normalizeIntroDialogue("")).toBe("");
+    expect(normalizeIntroDialogue(undefined)).toBe("");
+    expect(normalizeIntroDialogue(42)).toBe("");
+    const long = "a".repeat(250);
+    expect(normalizeIntroDialogue(long).length).toBe(200);
+
+    const INTRO = {
+      TALKER: {
+        id: 70044,
+        name: "Talker",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        introDialogue: "  Prepare yourself!  ",
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+      QUIET: {
+        id: 70045,
+        name: "Quiet",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        // no introDialogue -> ""
+        team: [{ species: SpeciesId.PIKACHU }],
+      },
+    };
+    setErCustomTrainersForTesting(INTRO as never);
+    const byKey = new Map(getErCustomTrainers().map(t => [t.key, t]));
+    expect(byKey.get("TALKER")!.introDialogue).toBe("Prepare yourself!");
+    expect(byKey.get("QUIET")!.introDialogue).toBe("");
   });
 
   // ---- ROUND 5 / FEATURE 2: shiny-lab effect per mon ------------------------

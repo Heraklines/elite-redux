@@ -639,6 +639,9 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
     ) {
       return { ok: false, error: `${key}: battleBgm must be a bgm key ([a-z0-9_], up to 64 chars)` };
     }
+    if (t.introDialogue !== undefined && !(typeof t.introDialogue === "string" && t.introDialogue.length <= 200)) {
+      return { ok: false, error: `${key}: introDialogue must be a string up to 200 chars` };
+    }
     if (!Array.isArray(t.team) || t.team.length === 0 || t.team.length > 6) {
       return { ok: false, error: `${key}: team must have 1-6 members` };
     }

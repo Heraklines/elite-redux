@@ -1783,6 +1783,7 @@ function blankCtrTrainer() {
     spawnChance: 100,
     challenge: "none",
     battleBgm: "",
+    introDialogue: "",
     team: [blankCtrMember()],
   };
 }
@@ -1805,6 +1806,7 @@ function ctrLiveToEdit(entry) {
     challenge: entry.challenge ?? "none",
     // Trimmed bgm key; anything not [a-z0-9_] (or absent) normalizes to "" (none).
     battleBgm: normalizeCtrBattleBgm(entry.battleBgm),
+    introDialogue: typeof entry.introDialogue === "string" ? entry.introDialogue.slice(0, 200) : "",
     team: (Array.isArray(entry.team) ? entry.team : []).map(ctrLiveSlotToEdit),
   };
 }
@@ -2483,6 +2485,11 @@ function renderCustomTrainers(root) {
           <button type="button" id="ctr-bgm-play" title="Preview the selected track">▶</button>
           <button type="button" id="ctr-bgm-stop" title="Stop preview">■</button>
         </div>
+        <div class="ctr-intro-row">
+          <label title="Line shown when this trainer's battle starts (up to 200 chars). Players can turn these off with the 'Skip custom trainer intros' setting.">Intro blurb
+            <input type="text" id="ctr-intro" maxlength="200" value="${esc(t.introDialogue || "")}" placeholder="Shown at battle start (optional)" style="width:320px" />
+          </label>
+        </div>
       </fieldset>
       <fieldset class="ctr-sec"><legend>Spawn gates</legend>
         <div>Difficulties: ${diffChecks}</div>
@@ -2531,6 +2538,8 @@ function onCustomTrainerInput(el) {
   const m = idx >= 0 ? t.team[idx] : null;
   if (el.id === "ctr-name") {
     t.name = el.value;
+  } else if (el.id === "ctr-intro") {
+    t.introDialogue = el.value;
   } else if (el.id === "ctr-class") {
     t.trainerClass = el.value.trim().toUpperCase();
     el.value = t.trainerClass;
@@ -3713,6 +3722,8 @@ function buildDeltas() {
       spawnChance: normalizeCtrSpawnChance(t.spawnChance),
       challenge: t.challenge || "none",
       ...(normalizeCtrBattleBgm(t.battleBgm) ? { battleBgm: normalizeCtrBattleBgm(t.battleBgm) } : {}),
+      // Intro blurb: trimmed + 200-char cap; omit when empty (byte-clean default).
+      ...((t.introDialogue || "").trim() ? { introDialogue: (t.introDialogue || "").trim().slice(0, 200) } : {}),
       team,
     };
   }

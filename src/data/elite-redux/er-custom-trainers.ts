@@ -262,10 +262,21 @@ export interface ErCustomTrainer {
    * theme. Charset `[a-z0-9_]+` (mirrors the editor + worker validator).
    */
   battleBgm?: string;
+  /**
+   * Optional encounter line shown when this trainer's battle starts (the "intro
+   * blurb"). Trimmed, control-chars stripped, capped at
+   * {@linkcode ER_CUSTOM_TRAINER_INTRO_MAX} chars. Empty/absent => the trainer's
+   * default class encounter line. Players can suppress it entirely with the
+   * "Skip custom trainer intros" setting.
+   */
+  introDialogue?: string;
   team?: readonly ErCustomTrainerTeamEntry[];
 }
 
 export type ErCustomTrainers = Record<string, ErCustomTrainer>;
+
+/** Max length of a custom trainer's intro blurb (kept short for the dialogue box). */
+export const ER_CUSTOM_TRAINER_INTRO_MAX = 200;
 
 /**
  * One move slot on a resolved member: a concrete move id, or an `RLA`/`RLNA`
@@ -335,6 +346,8 @@ export interface ErCustomTrainerResolved {
   challenge: ErCustomTrainerChallenge;
   /** er-assets bgm key to play for this battle only, or "" for the default theme. */
   battleBgm: string;
+  /** Normalized intro blurb shown at battle start, or "" for the default class line. */
+  introDialogue: string;
   /**
    * The REPRESENTATIVE members (variant 0 of each slot, slot-fill ignored) — the
    * authored default view. The FIELDED party for a run is derived per-seed via
@@ -426,6 +439,27 @@ export function normalizeBattleBgm(value: unknown): string {
     return "";
   }
   return key;
+}
+
+/**
+ * Normalize an authored `introDialogue`: strip control chars (so it stays on the
+ * dialogue line), collapse to a single trimmed string, and cap at
+ * {@linkcode ER_CUSTOM_TRAINER_INTRO_MAX}. A non-string or empty-after-trim value
+ * => "" (no blurb; the trainer keeps its default class encounter line).
+ */
+export function normalizeIntroDialogue(value: unknown): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  let cleaned = "";
+  for (const ch of value) {
+    const code = ch.charCodeAt(0);
+    // Drop control chars (incl. newlines/tabs) so the blurb renders on one line.
+    if (code >= 0x20 && code !== 0x7f) {
+      cleaned += ch;
+    }
+  }
+  return cleaned.trim().slice(0, ER_CUSTOM_TRAINER_INTRO_MAX);
 }
 
 /**
@@ -642,6 +676,7 @@ function resolveEntry(key: string, entry: ErCustomTrainer): ErCustomTrainerResol
     spawnChance: normalizeSpawnChance(entry.spawnChance),
     challenge,
     battleBgm: normalizeBattleBgm(entry.battleBgm),
+    introDialogue: normalizeIntroDialogue(entry.introDialogue),
     members,
     slots,
   };

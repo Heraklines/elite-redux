@@ -142,6 +142,14 @@ export class NewBattlePhase extends BattlePhase {
         trainer.getBattleBgm = () => bgm;
         trainer.getMixedBattleBgm = () => bgm;
       }
+      // Per-trainer INTRO BLURB (this battle only): shown as the encounter line at
+      // battle start via the instance-level encounterMessagesOverride seam (the same
+      // one the LLM director uses), so it never mutates the shared class config. The
+      // player-facing "Skip custom trainer intros" setting suppresses it entirely,
+      // in which case the trainer keeps its default class encounter line.
+      if (resolved.introDialogue && !globalScene.skipCustomTrainerIntros) {
+        trainer.encounterMessagesOverride = [resolved.introDialogue];
+      }
       globalScene.field.add(trainer);
       battle.trainer = trainer;
       battle.battleType = BattleType.TRAINER;

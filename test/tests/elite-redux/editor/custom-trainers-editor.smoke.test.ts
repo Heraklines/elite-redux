@@ -409,6 +409,27 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].team[0].shiny).toBeUndefined();
   });
 
+  it("intro blurb: one-line input serializes trimmed + 200-capped, omitted when empty", () => {
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // The Identity intro input renders.
+    const intro = q("#ctr-intro") as HTMLInputElement;
+    expect(intro).not.toBeNull();
+    // Empty -> not serialized.
+    expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].introDialogue).toBeUndefined();
+
+    intro.value = "  You dare challenge me?  ";
+    ct.onCustomTrainerInput(intro);
+    expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].introDialogue).toBe(
+      "You dare challenge me?",
+    );
+
+    // A 250-char blurb caps to 200 in the payload.
+    intro.value = "a".repeat(250);
+    ct.onCustomTrainerInput(intro);
+    expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].introDialogue.length).toBe(200);
+  });
+
   it("prior-surface smoke still holds: member collapse/expand + the battle-music picker render", () => {
     newTrainer();
     const key = ct.ctrSelected!;
