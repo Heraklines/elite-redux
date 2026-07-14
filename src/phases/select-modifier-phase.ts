@@ -11,10 +11,10 @@ import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   adoptRewardWatcherChoice,
+  type CoopRewardOperationBinding,
   captureCoopRewardOperationBinding,
   commitRewardAuthoritativeResult,
   commitRewardOwnerIntent,
-  type CoopRewardOperationBinding,
   isCoopRewardRetainedResultMode,
 } from "#data/elite-redux/coop/coop-reward-operation";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";

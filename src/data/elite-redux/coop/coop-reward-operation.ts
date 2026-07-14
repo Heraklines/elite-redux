@@ -259,15 +259,10 @@ function state(binding?: CoopRewardOperationBinding | null): RewardOpState {
 }
 
 function journalActive(binding?: CoopRewardOperationBinding | null): boolean {
-  return binding == null
-    ? isCoopOperationJournalActive()
-    : isCoopOperationJournalActiveFor(binding.durability);
+  return binding == null ? isCoopOperationJournalActive() : isCoopOperationJournalActiveFor(binding.durability);
 }
 
-function retainEnvelope(
-  envelope: CoopAuthoritativeEnvelopeV1,
-  binding?: CoopRewardOperationBinding | null,
-): boolean {
+function retainEnvelope(envelope: CoopAuthoritativeEnvelopeV1, binding?: CoopRewardOperationBinding | null): boolean {
   return binding == null
     ? tryJournalCoopCommittedEnvelope(envelope)
     : tryJournalCoopCommittedEnvelopeFor(binding.durability, envelope);
@@ -377,17 +372,19 @@ export function setCoopRewardOperationRevisionFloor(hw: number): void {
 
 function host(binding?: CoopRewardOperationBinding | null): CoopOperationHost {
   const s = state(binding);
-  s.authorityHost ??= binding == null
-    ? CoopOperationHost.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor })
-    : CoopOperationHost.forRuntime(binding.opState, { epoch: s.epoch, initialRevision: s.revisionFloor });
+  s.authorityHost ??=
+    binding == null
+      ? CoopOperationHost.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor })
+      : CoopOperationHost.forRuntime(binding.opState, { epoch: s.epoch, initialRevision: s.revisionFloor });
   return s.authorityHost;
 }
 
 function guest(binding?: CoopRewardOperationBinding | null): CoopOperationGuest {
   const s = state(binding);
-  s.watchGuest ??= binding == null
-    ? CoopOperationGuest.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor })
-    : CoopOperationGuest.forRuntime(binding.opState, { epoch: s.epoch, initialRevision: s.revisionFloor });
+  s.watchGuest ??=
+    binding == null
+      ? CoopOperationGuest.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor })
+      : CoopOperationGuest.forRuntime(binding.opState, { epoch: s.epoch, initialRevision: s.revisionFloor });
   return s.watchGuest;
 }
 
