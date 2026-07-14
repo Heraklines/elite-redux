@@ -616,12 +616,14 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     });
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    await expect(hostSync.requestPartnerCommand(0, 5, [1], "host", undefined, firstAddress)).resolves.toMatchObject(
-      { command: Command.FIGHT, moveId: 55 },
-    );
-    await expect(
-      hostSync.requestPartnerCommand(0, 5, [1], "guest", undefined, secondAddress),
-    ).resolves.toMatchObject({ command: Command.POKEMON, cursor: 4 });
+    await expect(hostSync.requestPartnerCommand(0, 5, [1], "host", undefined, firstAddress)).resolves.toMatchObject({
+      command: Command.FIGHT,
+      moveId: 55,
+    });
+    await expect(hostSync.requestPartnerCommand(0, 5, [1], "guest", undefined, secondAddress)).resolves.toMatchObject({
+      command: Command.POKEMON,
+      cursor: 4,
+    });
 
     const currentAddress = { epoch: 9, wave: 3, pokemonId: 303 };
     guest.send({
