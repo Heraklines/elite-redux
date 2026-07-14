@@ -173,6 +173,27 @@ function findOwnedReadyReward(client, from) {
     : null;
 }
 
+function sameAddress(left, right) {
+  return left?.epoch === right?.epoch && left?.wave === right?.wave && left?.turn === right?.turn;
+}
+
+function findRewardConfirmProjection(client, from, ownerSeat, expectedAddress) {
+  const semantic = client.evidence.findLastSemanticSurface(from);
+  return semantic?.observation.surfaceId === "reward:confirm"
+    && semantic.observation.operationClass === "reward"
+    && semantic.observation.ownerModel === "interaction"
+    && semantic.observation.phase === "SelectModifierPhase"
+    && semantic.observation.uiMode === "CONFIRM"
+    && semantic.observation.localSeat === client.publicSeat
+    && semantic.observation.ownerSeat === ownerSeat
+    && semantic.observation.seatsWithInput?.includes(ownerSeat)
+    && semantic.observation.selectedOptionId === "yes"
+    && semantic.observation.ready?.handlerActive === true
+    && sameAddress(semantic.observation.address, expectedAddress)
+    ? semantic
+    : null;
+}
+
 async function waitForProgressBoundedEvidence(client, from, findEvidence, description) {
   const clients = { [client.label]: client };
   const progressBudget = createPublicBattleProgressBudget(
@@ -781,6 +802,24 @@ export class PublicUiClient {
     );
   }
 
+  async waitForRewardConfirm(from, ownerSeat, expectedAddress) {
+    return waitForProgressBoundedEvidence(
+      this,
+      from,
+      () => {
+        const terminal =
+          this.evidence.find(SHARED_SESSION_TERMINAL, from) ?? this.evidence.find(LAUNCH_SNAPSHOT_ABORT, from);
+        if (terminal != null) {
+          throw new Error(
+            `${this.label}: shared session terminated while waiting for reward confirmation: ${terminal.text}`,
+          );
+        }
+        return findRewardConfirmProjection(this, from, ownerSeat, expectedAddress);
+      },
+      `actionable reward confirmation at ${expectedAddress.epoch}/${expectedAddress.wave}/${expectedAddress.turn}`,
+    );
+  }
+
   async waitForObservedSurface(surface, from = 0) {
     return this.evidence.waitForSurface(surface, { from, timeoutMs: this.config.timeoutMs });
   }
@@ -1269,10 +1308,31 @@ export class DuoPublicUiRig {
       () => values.find(client => client.evidence.find(REWARD_OWNER, ownerCursors[client.label])),
       { timeoutMs: this.config.timeoutMs, description: "reward owner public UI" },
     );
-    await owner.waitForOwnedReward(ownerCursors[owner.label]);
+    const ownedReward = await owner.waitForOwnedReward(ownerCursors[owner.label]);
+    const expectedRewardAddress = ownedReward.observation.address;
     await owner.checkpoint("reward-owner-screen");
     const commandCursors = Object.fromEntries(values.map(client => [client.label, client.evidence.cursor()]));
-    await owner.sequence(this.config.keys.rewardLeave, "leave-reward-screen");
+    const [openConfirmKey, ...confirmKeys] = this.config.keys.rewardLeave;
+    if (openConfirmKey == null || confirmKeys.length === 0) {
+      throw new Error("public reward-leave journey requires keys to open and accept the reward confirmation");
+    }
+    const rewardConfirmCursors = Object.fromEntries(values.map(client => [client.label, client.evidence.cursor()]));
+    await owner.press(openConfirmKey, `leave-reward-screen:1/${this.config.keys.rewardLeave.length}`);
+    const confirmations = await Promise.all(
+      values.map(client =>
+        client.waitForRewardConfirm(rewardConfirmCursors[client.label], owner.publicSeat, expectedRewardAddress),
+      ),
+    );
+    for (const [index, client] of values.entries()) {
+      client.evidence.record("shared-reward-confirm-proof", {
+        peer: values[(index + 1) % values.length].label,
+        address: confirmations[index].observation.address,
+        ownerSeat: owner.publicSeat,
+      });
+    }
+    for (const [index, key] of confirmKeys.entries()) {
+      await owner.press(key, `leave-reward-screen:${index + 2}/${this.config.keys.rewardLeave.length}`);
+    }
     await Promise.all(values.map(client => client.waitForLocalCommand(commandCursors[client.label])));
     const expectedWave = this.activeBattleWave == null ? null : this.activeBattleWave + 1;
     const boundary = await this.assertSharedSurface("command", commandCursors, "wave-2-command", {

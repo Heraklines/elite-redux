@@ -94,8 +94,24 @@ if (
   || !harness.includes("semantic.observation.ready.awaitingActionInput === true")
   || !harness.includes("semantic.observation.ownerSeat === client.publicSeat")
   || !harness.includes("await owner.waitForOwnedReward(ownerCursors[owner.label])")
+  || !harness.includes("findLastSemanticSurface(from)")
+  || !harness.includes('semantic?.observation.surfaceId === "reward:confirm"')
+  || !harness.includes('semantic.observation.uiMode === "CONFIRM"')
+  || !harness.includes('semantic.observation.selectedOptionId === "yes"')
+  || !harness.includes("sameAddress(semantic.observation.address, expectedAddress)")
+  || !harness.includes("client.waitForRewardConfirm(rewardConfirmCursors[client.label]")
+  || !harness.includes("this.evidence.find(SHARED_SESSION_TERMINAL, from)")
+  || !harness.includes('client.evidence.record("shared-reward-confirm-proof"')
 ) {
-  failures.push("public-ui-harness.mjs: reward leave must wait for the owned actionable public surface");
+  failures.push(
+    "public-ui-harness.mjs: reward leave must wait for the owned actionable shop and confirmation surfaces",
+  );
+}
+const rewardConfirmOpen = harness?.indexOf("await owner.press(openConfirmKey") ?? -1;
+const rewardConfirmReady = harness?.indexOf("client.waitForRewardConfirm(rewardConfirmCursors[client.label]") ?? -1;
+const rewardConfirmAccept = harness?.indexOf("for (const [index, key] of confirmKeys.entries())") ?? -1;
+if (rewardConfirmOpen < 0 || rewardConfirmReady <= rewardConfirmOpen || rewardConfirmAccept <= rewardConfirmReady) {
+  failures.push("public-ui-harness.mjs: reward confirmation must open, converge at one address, then accept");
 }
 if (!harness?.includes("createBattlePromptAdvancer(this, from") || !harness.includes("await advanceBattlePrompt()")) {
   failures.push("public-ui-harness.mjs: post-turn waits must drive readiness-proven public battle prompts");

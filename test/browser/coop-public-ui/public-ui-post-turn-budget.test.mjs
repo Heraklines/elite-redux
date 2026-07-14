@@ -142,3 +142,39 @@ test("reward leave waits for the exact owned actionable semantic shop surface", 
 
   assert.equal(await PublicUiClient.prototype.waitForOwnedReward.call(owner, 0), evidence.events[1]);
 });
+
+test("reward leave confirms only after each client projects the exact addressed confirmation surface", async () => {
+  const evidence = new FakeEvidence("watcher");
+  const address = { epoch: 73, wave: 1, turn: 4 };
+  const confirmObservation = {
+    operationClass: "reward",
+    surfaceId: "reward:confirm",
+    ownerModel: "interaction",
+    phase: "SelectModifierPhase",
+    uiMode: "CONFIRM",
+    address,
+    localSeat: 1,
+    ownerSeat: 0,
+    seatsWithInput: [0],
+    selectedOptionId: "yes",
+    ready: { handlerActive: true, awaitingActionInput: null },
+  };
+  evidence.push({ kind: "browser-surface2", observation: confirmObservation });
+  const watcher = { label: "watcher", publicSeat: 1, evidence, config: { timeoutMs: 0 } };
+
+  assert.equal(await PublicUiClient.prototype.waitForRewardConfirm.call(watcher, 0, 0, address), evidence.events[0]);
+});
+
+test("reward confirmation wait aborts on a bounded shared terminal", async () => {
+  const evidence = new FakeEvidence("watcher");
+  evidence.push({
+    kind: "console",
+    text: "[coop:runtime] shared session stopped safely: reward projection could not converge",
+  });
+  const watcher = { label: "watcher", publicSeat: 1, evidence, config: { timeoutMs: 0 } };
+
+  await assert.rejects(
+    PublicUiClient.prototype.waitForRewardConfirm.call(watcher, 0, 0, { epoch: 73, wave: 1, turn: 4 }),
+    /shared session terminated while waiting for reward confirmation/u,
+  );
+});
