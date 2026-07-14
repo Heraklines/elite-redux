@@ -14,6 +14,7 @@ const workflow = readFileSync(resolve(root, ".github/workflows/coop-focused-bran
   "\r\n",
   "\n",
 );
+const staticGate = readFileSync(resolve(root, "scripts/run-coop-static-gate.mjs"), "utf8").replaceAll("\r\n", "\n");
 
 function job(name, nextName) {
   const start = workflow.indexOf(`\n  ${name}:\n`);
@@ -36,6 +37,10 @@ test("focused static checks the planner's exact declared train base", () => {
   assert.match(staticJob, /node scripts\/run-coop-static-gate\.mjs/u);
   assert.match(staticJob, /if: success\(\)[\s\S]*coop-focused-static-status\.json/u);
   assert.match(staticJob, /if: failure\(\)[\s\S]*coop-focused-static\.log/u);
+});
+
+test("focused static accepts ignored-only metadata after the non-vacuous type ratchet", () => {
+  assert.match(staticGate, /biome", "check", "--no-errors-on-unmatched"/u);
 });
 
 test("focused aggregate requires static and isolated shard evidence", () => {

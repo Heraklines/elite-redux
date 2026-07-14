@@ -3,7 +3,7 @@
   "taskId": "p33-mystery-public-transition-integration",
   "branch": "ci/coop/p33-mystery-public-transition",
   "trainRef": "ci/coop/p33-mystery-public-transition",
-  "baseSha": "8c73a2e32662436f1d9ee4506cad20ac3f9646a9",
+  "baseSha": "8adf7b5ab5320ae9bfcc90bd963c6546aeb77d2f",
   "allowedFiles": [
     ".github/coop-task-ownership/p33-mystery-public-transition.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -13,6 +13,7 @@
     "scripts/coop-browser-entry.ts",
     "scripts/coop-browser-transport-entry.ts",
     "scripts/prepare-coop-browser-artifact.mjs",
+    "scripts/run-coop-static-gate.mjs",
     "scripts/vite.coop-browser.config.mjs",
     "src/data/elite-redux/coop/coop-ability-operation.ts",
     "src/data/elite-redux/coop/coop-ability-picker-relay.ts",

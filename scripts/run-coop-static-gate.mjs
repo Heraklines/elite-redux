@@ -106,12 +106,16 @@ if (typecheck.status !== 0) {
 // Enforce it on every file introduced or changed by this checkpoint; applying it to all
 // historical files would make unrelated legacy style debt block every architecture fix.
 // TypeScript remains stricter above: every co-op diagnostic blocks, changed or not.
-// Markdown is intentionally ignored by this repository's Biome configuration. Passing a docs-only
-// checkpoint to `biome check` makes Biome exit non-zero with "No files were processed", even though the
-// non-vacuous diff and full TypeScript ratchet above both ran. Restrict this list to formats Biome owns.
+// Markdown and some repository metadata are intentionally ignored by this repository's Biome configuration.
+// Passing an ignored-only checkpoint to `biome check` normally exits non-zero with "No files were processed",
+// even though the non-vacuous diff and full TypeScript ratchet above both ran. Keep ignored-only checkpoints
+// valid while still making every file Biome does process fail closed on diagnostics.
 const biomeFiles = [...changed].filter(file => /\.(?:[cm]?[jt]sx?|jsonc?|ya?ml)$/.test(file));
 if (biomeFiles.length > 0) {
-  const biome = run(command, ["exec", "biome", "check", ...biomeFiles], { stdio: "inherit", encoding: undefined });
+  const biome = run(command, ["exec", "biome", "check", "--no-errors-on-unmatched", ...biomeFiles], {
+    stdio: "inherit",
+    encoding: undefined,
+  });
   if (biome.status !== 0) {
     process.exit(biome.status ?? 1);
   }
