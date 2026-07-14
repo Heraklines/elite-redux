@@ -2386,13 +2386,131 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // resuming under the harness's later host context.
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("MysteryEncounterPhase"));
       const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
-      withClientSync(rig.guestCtx, () => {
-        relayGuestMeOptionIndexOnly(replay, option - 1);
-        const seam = replay as unknown as { relayGuestSubPick(value: number): void };
-        for (const value of opts.meSubPicks?.get(wave) ?? []) {
-          seam.relayGuestSubPick(value);
+      const scriptedSubPicks = [...(opts.meSubPicks?.get(wave) ?? [])];
+
+      if (scriptedSubPicks.length === 0) {
+        // The shared-process split remains useful for MEs without nested input: send the owner intent now,
+        // let the host finish, then arm the guest's already-buffered outcome/terminal race below.
+        withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, option - 1));
+      } else {
+        // A nested PARTY/OPTION_SELECT cannot be pre-sent. CoopReplayMePhase deliberately accepts a sub-pick
+        // only after the exact retained ME_PRESENT has armed its one-shot presentation ticket. The old driver
+        // called relayGuestSubPick([0, 0]) before either presentation existed; both calls correctly returned
+        // false, then the host waited forever for meSub while the driver kept retransmitting the top-level
+        // `me` pick. Drive the same public capture callbacks a browser uses, in destination context, instead.
+        const setDestinationDelivery = rig.pair.setDestinationContextDelivery;
+        if (setDestinationDelivery == null) {
+          fail("no-park", wave, "guest-owned nested ME requires destination-context transport scheduling");
         }
-      });
+
+        type BoundedModeResult = "completed" | "forced" | "superseded";
+        type ScriptableGuestUi = {
+          setModeBoundedWhen: (
+            mode: UiMode,
+            timeoutMs: number,
+            isCurrent: (() => boolean) | undefined,
+            ...args: unknown[]
+          ) => Promise<BoundedModeResult>;
+        };
+        const ui = rig.guestScene.ui as unknown as ScriptableGuestUi;
+        const originalSetModeBoundedWhen = ui.setModeBoundedWhen;
+        const realSetModeBoundedWhen = originalSetModeBoundedWhen.bind(ui);
+        const pendingSubPicks = [...scriptedSubPicks];
+        let scriptedDriveError: Error | undefined;
+
+        ui.setModeBoundedWhen = (
+          mode: UiMode,
+          timeoutMs: number,
+          isCurrent: (() => boolean) | undefined,
+          ...args: unknown[]
+        ): Promise<BoundedModeResult> => {
+          if (mode === UiMode.PARTY) {
+            const callback = args[2];
+            const value = pendingSubPicks.shift();
+            if (typeof callback !== "function" || value == null) {
+              scriptedDriveError = new Error(
+                `wave ${wave} ${MysteryEncounterType[type]} PARTY sub-prompt had no scripted public callback/value`,
+              );
+              return Promise.resolve("superseded");
+            }
+            hitMode(UiMode.PARTY);
+            actionScript.push(`wave ${wave}: ME ${MysteryEncounterType[type]} public PARTY pick=${value}`);
+            queueMicrotask(() => (callback as (slot: number) => void)(value));
+            return Promise.resolve("completed");
+          }
+          if (mode === UiMode.OPTION_SELECT) {
+            const config = args[0] as { options?: { handler?: () => unknown }[] } | undefined;
+            const value = pendingSubPicks.shift();
+            const handler = value == null ? undefined : config?.options?.[value]?.handler;
+            if (typeof handler !== "function") {
+              scriptedDriveError = new Error(
+                `wave ${wave} ${MysteryEncounterType[type]} OPTION_SELECT sub-prompt had no scripted handler at ${value ?? "missing"}`,
+              );
+              return Promise.resolve("superseded");
+            }
+            hitMode(UiMode.OPTION_SELECT);
+            actionScript.push(`wave ${wave}: ME ${MysteryEncounterType[type]} public OPTION_SELECT pick=${value}`);
+            queueMicrotask(() => handler());
+            return Promise.resolve("completed");
+          }
+          return realSetModeBoundedWhen(mode, timeoutMs, isCurrent, ...args);
+        };
+
+        setDestinationDelivery(true);
+        let hostReachedNestedDestination = false;
+        let hostNestedDriveError: unknown;
+        try {
+          // Keep the host's async interceptor scope alive while each queued carrier is delivered only under
+          // the destination client's full scene/runtime/module context. This models two browser processes:
+          // host receives ME_PICK -> guest receives PARTY -> host receives ME_SUB -> guest receives SECONDARY
+          // -> host receives ME_SUB. No direct sub-pick seam and no terminal shortcut is involved.
+          const hostNestedDrive = withClient(rig.hostCtx, () =>
+            game.phaseInterceptor.to(noRewardShop ? "PostMysteryEncounterPhase" : "SelectModifierPhase", false),
+          ).then(
+            () => {
+              hostReachedNestedDestination = true;
+            },
+            error => {
+              hostNestedDriveError = error;
+            },
+          );
+
+          await withClient(rig.guestCtx, async () => {
+            relayGuestMeOptionIndexOnly(replay, option - 1);
+            startGuestMeOutcomeRace(replay);
+            await drainLoopback();
+          });
+
+          for (let round = 0; round < 24 && !hostReachedNestedDestination; round++) {
+            await pumpDuoDestinations(rig, 1);
+            if (scriptedDriveError != null) {
+              throw scriptedDriveError;
+            }
+            if (hostNestedDriveError != null) {
+              throw hostNestedDriveError;
+            }
+          }
+          if (hostNestedDriveError != null) {
+            throw hostNestedDriveError;
+          }
+          if (!hostReachedNestedDestination) {
+            throw new Error(
+              `wave ${wave} ${MysteryEncounterType[type]} nested public drive did not reach its continuation; `
+                + `host=${rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"} `
+                + `remainingSubPicks=[${pendingSubPicks.join(",")}]`,
+            );
+          }
+          await hostNestedDrive;
+          if (pendingSubPicks.length > 0) {
+            throw new Error(
+              `wave ${wave} ${MysteryEncounterType[type]} left ${pendingSubPicks.length} scripted public sub-pick(s) unused`,
+            );
+          }
+        } finally {
+          ui.setModeBoundedWhen = originalSetModeBoundedWhen;
+          setDestinationDelivery(false);
+        }
+      }
       await withClient(rig.hostCtx, async () => {
         await game.phaseInterceptor.to(noRewardShop ? "PostMysteryEncounterPhase" : "SelectModifierPhase", false);
         if (!noRewardShop) {
@@ -2404,37 +2522,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         await game.phaseInterceptor.to("PostMysteryEncounterPhase");
       });
       await withClient(rig.guestCtx, async () => {
-        const scriptedSubPicks = [...(opts.meSubPicks?.get(wave) ?? [])];
-        const ui = rig.guestScene.ui as unknown as {
-          setMode: (...args: unknown[]) => Promise<unknown>;
-          setModeWithoutClear: (...args: unknown[]) => Promise<unknown>;
-        };
-        const realSetMode = ui.setMode.bind(ui);
-        const realSetModeWithoutClear = ui.setModeWithoutClear.bind(ui);
-        ui.setMode = (...args: unknown[]): Promise<unknown> => {
-          if (args[0] === UiMode.PARTY && typeof args[3] === "function") {
-            const value = scriptedSubPicks.shift() ?? 0;
-            queueMicrotask(() => (args[3] as (slot: number) => void)(value));
-            return Promise.resolve();
-          }
-          return realSetMode(...args);
-        };
-        ui.setModeWithoutClear = (...args: unknown[]): Promise<unknown> => {
-          if (args[0] === UiMode.OPTION_SELECT) {
-            const value = scriptedSubPicks.shift() ?? 0;
-            const config = args[1] as { options?: { handler?: () => unknown }[] } | undefined;
-            queueMicrotask(() => config?.options?.[value]?.handler?.());
-            return Promise.resolve();
-          }
-          return realSetModeWithoutClear(...args);
-        };
-        try {
+        // Nested MEs armed this race before alternating the real public party/secondary captures. A flat
+        // guest-owned ME keeps the original split: arm only after the host buffered its full outcome/terminal.
+        if (scriptedSubPicks.length === 0) {
           startGuestMeOutcomeRace(replay);
-          await drainGuestMeReplayToSettle(replay);
-        } finally {
-          ui.setMode = realSetMode;
-          ui.setModeWithoutClear = realSetModeWithoutClear;
         }
+        await drainGuestMeReplayToSettle(replay);
       });
       mePath = "guest-owned";
     }
