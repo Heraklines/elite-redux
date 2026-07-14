@@ -140,6 +140,60 @@ function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
   return { promise, resolve };
 }
 
+function installHeadlessPlayerAtlasCompletion(scene: BattleScene): {
+  productionLoadsCompleted(): number;
+  restore(): void;
+} {
+  // The shared HEADLESS fixture deliberately replaces Phaser's atlas population and Sprite.play effects
+  // with no-ops. Model only those missing cache/live-key effects after the real production loader resolves;
+  // the transition still awaits Pokemon.loadAssets(false) and still exercises every fail-closed production
+  // presentation assertion before command continuation can open.
+  const releasedKeys = new Set<string>();
+  const originalTextureExists = scene.textures.exists.bind(scene.textures);
+  const originalAnimationExists = scene.anims.exists.bind(scene.anims);
+  const textureExists = vi
+    .spyOn(scene.textures, "exists")
+    .mockImplementation(key => releasedKeys.has(String(key)) || originalTextureExists(key));
+  const animationExists = vi
+    .spyOn(scene.anims, "exists")
+    .mockImplementation(key => releasedKeys.has(String(key)) || originalAnimationExists(key));
+  let productionLoadsCompleted = 0;
+  const assetLoads = scene.getPlayerParty().map(pokemon => {
+    const original = pokemon.loadAssets.bind(pokemon);
+    return vi.spyOn(pokemon, "loadAssets").mockImplementation(async (ignoreOverride = true, useIllusion = false) => {
+      await original(ignoreOverride, useIllusion);
+      const key = pokemon.getBattleSpriteKey();
+      releasedKeys.add(key);
+      const sprite = pokemon.getSprite() as unknown as
+        | {
+            texture?: { key: string };
+            anims?: { currentAnim?: { key: string } };
+          }
+        | undefined;
+      if (sprite?.texture) {
+        sprite.texture.key = key;
+      }
+      if (sprite?.anims) {
+        sprite.anims.currentAnim = { key };
+      }
+      if (!ignoreOverride) {
+        productionLoadsCompleted++;
+      }
+    });
+  });
+
+  return {
+    productionLoadsCompleted: () => productionLoadsCompleted,
+    restore: () => {
+      for (const assetLoad of assetLoads) {
+        assetLoad.mockRestore();
+      }
+      textureExists.mockRestore();
+      animationExists.mockRestore();
+    },
+  };
+}
+
 const OPERATION_SURFACES = [
   "ability",
   "bargain",
@@ -1221,6 +1275,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       rig.guestScene.phaseManager.shiftPhase();
     });
     pair.setAutomaticDelivery(false);
+    const headlessAtlas = withClientSync(rig.guestCtx, () => installHeadlessPlayerAtlasCompletion(rig.guestScene));
 
     const sourceBiome = rig.hostScene.arena.biomeId;
     const routes: ErRouteNode[] = [
@@ -1252,6 +1307,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       await driveRealBiomeMarketLeave(rig);
       await driveRealCrossroads(rig, leave);
       const guestApplyModifiers = leave ? vi.spyOn(rig.guestScene, "applyModifiers") : null;
+      let guestSelectBiomeApplyModifierCalls: number | null = null;
       const guestInitSession = leave ? vi.spyOn(rig.guestScene, "initSession") : null;
       const guestEncounterEvent = leave ? vi.spyOn(rig.guestScene.eventTarget, "dispatchEvent") : null;
       const guestTailQueue = leave ? vi.spyOn(rig.guestScene.phaseManager, "unshiftNew") : null;
@@ -1263,13 +1319,58 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         : [];
       if (leave) {
         await driveRealGuestOwnedMapPick(rig, BiomeId.VOLCANO);
+        // Scope this guard to the SelectBiome renderer itself. The later post-summon authoritative
+        // carrier intentionally uses applyModifiers while adopting/recalculating host state; counting
+        // that required apply as a map-owned MoneyInterest mutation would be a false positive.
+        guestSelectBiomeApplyModifierCalls = guestApplyModifiers?.mock.calls.length ?? null;
+        guestApplyModifiers?.mockRestore();
       }
       const guestMeChanceBeforeNewBiome = rig.guestScene.mysteryEncounterSaveData.encounterSpawnChance;
 
-      // Host constructs/publishes wave 11 first; guest runs its own actual Switch/NewBiome/encounter tail and
-      // adopts the carrier. No remirror or manual state write occurs after the UI choices.
+      // First drive the host through its real encounter/PostSummon queue to the CommandPhase boundary
+      // without starting that phase. This makes the pre-summon wave carrier available, while deliberately
+      // withholding the command-start refresh and rendezvous arrival. Then let the renderer reach and START
+      // its own real CommandPhase first: it consumes that initial carrier, arrives at the reciprocal command
+      // barrier, and must keep public input closed. Starting the already-current host CommandPhase publishes
+      // the refreshed complete state and arrives at the same barrier. Ordered delivery puts that refresh before the arrival;
+      // the guest's crossed-barrier continuation must re-consume it before opening COMMAND. This is the
+      // production guest-first schedule that exposed the entry-stage split; stopping before CommandPhase
+      // start would inspect an intentionally pre-continuation boundary and bypass the recovery seam.
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase", false));
-      await withClient(rig.guestCtx, () => driveClientPhaseQueueTo(rig.guestScene, "CommandPhase"));
+      const guestCommand = await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "guest-owned CommandPhase", {
+          matches: phase =>
+            phase.phaseName === "CommandPhase"
+            && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+        }),
+      );
+      await withClient(rig.guestCtx, async () => {
+        guestCommand.start();
+        await drainLoopback();
+        expect(
+          rig.guestScene.ui.getMode(),
+          "guest-first command remains closed until host post-summon authority is available",
+        ).not.toBe(UiMode.COMMAND);
+      });
+      await withClient(rig.hostCtx, async () => {
+        const hostCommand = rig.hostScene.phaseManager.getCurrentPhase();
+        expect(hostCommand.phaseName, "host is parked immediately before command-start authority publication").toBe(
+          "CommandPhase",
+        );
+        hostCommand.start();
+        await drainLoopback();
+      });
+      const hostCommandReadyState = withClientSync(rig.hostCtx, () => captureCoopChecksumState());
+      await withClient(rig.guestCtx, async () => {
+        await drainLoopback();
+        expect(
+          captureCoopChecksumState(),
+          "the post-summon refresh is applied before the guest command continuation opens",
+        ).toEqual(hostCommandReadyState);
+        expect(rig.guestScene.ui.getMode(), "guest command opens only after settled authority is applied").toBe(
+          UiMode.COMMAND,
+        );
+      });
 
       const expectedBiome = leave ? BiomeId.VOLCANO : sourceBiome;
       expect(rig.hostScene.currentBattle.waveIndex).toBe(11);
@@ -1292,15 +1393,19 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         withClientSync(rig.guestCtx, () => captureCoopChecksumState()),
         "every structured battle component converges before the opaque checksum",
       ).toEqual(withClientSync(rig.hostCtx, () => captureCoopChecksumState()));
+      expect(
+        headlessAtlas.productionLoadsCompleted(),
+        "the renderer completes both real production player-atlas loads before command readiness",
+      ).toBeGreaterThanOrEqual(2);
       expect(withClientSync(rig.guestCtx, () => captureCoopChecksum())).toBe(
         withClientSync(rig.hostCtx, () => captureCoopChecksum()),
       );
       expect(resync.count(), "the UI-driven boundary requires no forced recovery").toBe(0);
       if (leave) {
         expect(
-          guestApplyModifiers,
+          guestSelectBiomeApplyModifierCalls,
           "SelectBiome renderer skips MoneyInterest and every modifier mutation",
-        ).not.toHaveBeenCalled();
+        ).toBe(0);
         expect(
           guestTailQueue?.mock.calls.some(call => call[0] === "PartyHealPhase" || call[0] === "SelectModifierPhase"),
           "SelectBiome renderer cannot queue local heal/challenge rewards",
@@ -1353,7 +1458,10 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       }
       logs.flush();
     } finally {
+      headlessAtlas.restore();
       resync.restore();
     }
   }, 300_000);
+
+  it.todo("P33 debt: retain/address/ACK the post-PostSummon refresh before command continuation readiness");
 });

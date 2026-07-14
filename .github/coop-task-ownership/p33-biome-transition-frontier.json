@@ -3,7 +3,7 @@
   "taskId": "p33-biome-transition-frontier",
   "branch": "ci/coop/p33-biome-transition-frontier",
   "trainRef": "ci/coop/p33-mystery-public-transition",
-  "baseSha": "8600b960d081b52e61b74502509c27e7b8770fae",
+  "baseSha": "ddbaa0284473381c811381394f0c35856c1f8757",
   "allowedFiles": [
     ".github/coop-task-ownership/p33-biome-transition-frontier.json",
     "src/battle-scene.ts",
