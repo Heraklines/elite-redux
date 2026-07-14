@@ -245,6 +245,7 @@ describe.skipIf(!RUN)(
         expect(rig.guestScene.ui.processInput(Button.CANCEL), "guest requests embedded reward leave via UI").toBe(true);
         await drainLoopback();
         expect(rig.guestScene.ui.getMode(), "embedded reward leave opened public confirmation").toBe(UiMode.CONFIRM);
+        (rig.guestScene.ui.getHandler() as unknown as { unblockInput?: () => void }).unblockInput?.();
         expect(rig.guestScene.ui.processInput(Button.ACTION), "guest confirms embedded reward leave via UI").toBe(true);
         await drainLoopback();
       });
@@ -257,8 +258,18 @@ describe.skipIf(!RUN)(
         "the public guest reward UI emitted its operation-backed proposal carrier",
       ).toBe(true);
 
-      // STEP C3 (host): flush the guest owner's LEAVE -> host watcher applies it, the shop ends, and the option
-      // chain runs to PostMysteryEncounterPhase (streams meResync + LEAVE into the guest's buffer; advances once).
+      // STEP C3: host commits the guest proposal, guest materializes the retained result and returns its
+      // proof, then host can release the reciprocal shop barrier and enter the ME terminal.
+      await withClient(rig.hostCtx, async () => {
+        for (let i = 0; i < 8; i++) {
+          await drainLoopback();
+        }
+      });
+      await withClient(rig.guestCtx, async () => {
+        for (let i = 0; i < 16; i++) {
+          await drainLoopback();
+        }
+      });
       await withClient(rig.hostCtx, async () => {
         for (let i = 0; i < 16; i++) {
           await drainLoopback();

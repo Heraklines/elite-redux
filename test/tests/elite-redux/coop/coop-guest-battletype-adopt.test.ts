@@ -82,10 +82,13 @@ describe.skipIf(!RUN)("co-op GUEST newBattle adopts the host's battleType verdic
     const nextWave = rig.guestScene.currentBattle.waveIndex + 1;
     // The HOST states its authoritative verdict for the next wave (the production enemyPartySync path).
     rig.hostRuntime.battleStream.sendEnemyParty(nextWave, [], COOP_WAVE_NO_ME, hostVerdict);
-    // Let the loopback deliver the sync so the guest streamer records the verdict.
-    await new Promise(resolve => setTimeout(resolve, 20));
-
-    return withClient(rig.guestCtx, () => {
+    // Deliver the destination-owned carrier only while the guest scene/runtime is installed, exactly as
+    // the independent browser does before constructing its next battle.
+    return withClient(rig.guestCtx, async () => {
+      for (let i = 0; i < 4; i++) {
+        await rig.guestCtx.pumpInbound?.();
+        await Promise.resolve();
+      }
       // Force the guest's LOCAL wave-type roll to the OPPOSITE of the host verdict, so a passing test can
       // ONLY be the adoption (never the local roll happening to agree).
       rig.guestScene.gameMode.isWaveTrainer = () => localRoll;

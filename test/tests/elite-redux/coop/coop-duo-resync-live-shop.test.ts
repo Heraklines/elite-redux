@@ -233,6 +233,7 @@ describe.skipIf(!RUN)(
         expect(rig.hostScene.ui.processInput(Button.CANCEL), "host requests reward leave through public UI").toBe(true);
         await drainLoopback();
         expect(rig.hostScene.ui.getMode(), "public reward leave opened confirmation").toBe(UiMode.CONFIRM);
+        (rig.hostScene.ui.getHandler() as unknown as { unblockInput?: () => void }).unblockInput?.();
         expect(rig.hostScene.ui.processInput(Button.ACTION), "host confirms reward leave through public UI").toBe(true);
         await drainLoopback();
       });

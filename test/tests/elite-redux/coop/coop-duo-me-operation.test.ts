@@ -210,7 +210,13 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       0,
     );
 
-    const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(guestReplayPhase));
+    const guestReplay = await withClient(rig.guestCtx, async () => {
+      // The guest replay is already live so starting it no longer supplies the old implicit reconnect.
+      // Reannounce the receiver's journal cursor exactly as a transport recovery does; the host must replay
+      // the one dropped immutable terminal and the guest must materialize it once.
+      rig.guestRuntime.durability?.reconnect();
+      return drainGuestMeReplayToSettle(guestReplayPhase);
+    });
     expect(guestReplay.settled, "the durable ME_TERMINAL must settle the real guest replay phase").toBe(true);
     expect(applyOutcomeSpy, "redelivery applies the retained state image once").toHaveBeenCalledTimes(1);
     expect(rig.guestRuntime.controller.interactionCounter()).toBe(counterBefore + 1);

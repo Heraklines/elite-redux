@@ -215,7 +215,7 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 import fs from "node:fs";
 import path from "node:path";
 import Phaser from "phaser";
-import { afterEach, expect, vi } from "vitest";
+import { afterEach, expect } from "vitest";
 
 /**
  * The PROCESS-GLOBAL mystery-encounter pins/control that are NOT carried on the `active` runtime and
@@ -1156,31 +1156,45 @@ export function stubBattleInfo(mon: Pokemon): void {
  * after the real promise settles. This keeps the production launch gate dependent on a completed load,
  * cache residency, and the exact final live key instead of weakening any of those assertions for CI.
  */
-const headlessAtlasModels = new WeakMap<BattleScene, { releasedKeys: Set<string>; wrappedPokemon: WeakSet<object> }>();
+const headlessTextureKeys = new WeakMap<object, Set<string>>();
+const headlessAnimationKeys = new WeakMap<object, Set<string>>();
+const headlessWrappedPokemon = new WeakMap<BattleScene, WeakSet<object>>();
 
 export function installHeadlessPlayerAtlasCompletionModel(scene: BattleScene): void {
-  let model = headlessAtlasModels.get(scene);
-  if (model == null) {
-    model = { releasedKeys: new Set<string>(), wrappedPokemon: new WeakSet<object>() };
-    headlessAtlasModels.set(scene, model);
-    const releasedKeys = model.releasedKeys;
+  let textureKeys = headlessTextureKeys.get(scene.textures);
+  if (textureKeys == null) {
+    textureKeys = new Set<string>();
+    headlessTextureKeys.set(scene.textures, textureKeys);
     const originalTextureExists = scene.textures.exists.bind(scene.textures);
+    const releasedTextureKeys = textureKeys;
+    // Phaser shares cache managers across the BattleScenes created by one HEADLESS game. A per-scene
+    // vi.spyOn therefore spies on an existing spy in the next duo test and can recurse. Install one plain,
+    // manager-scoped adapter and share its released-key model across every scene using that manager.
+    scene.textures.exists = key => releasedTextureKeys.has(String(key)) || originalTextureExists(key);
+  }
+  let animationKeys = headlessAnimationKeys.get(scene.anims);
+  if (animationKeys == null) {
+    animationKeys = new Set<string>();
+    headlessAnimationKeys.set(scene.anims, animationKeys);
     const originalAnimationExists = scene.anims.exists.bind(scene.anims);
-    vi.spyOn(scene.textures, "exists").mockImplementation(
-      key => releasedKeys.has(String(key)) || originalTextureExists(key),
-    );
-    vi.spyOn(scene.anims, "exists").mockImplementation(
-      key => releasedKeys.has(String(key)) || originalAnimationExists(key),
-    );
+    const releasedAnimationKeys = animationKeys;
+    scene.anims.exists = key => releasedAnimationKeys.has(String(key)) || originalAnimationExists(key);
+  }
+  const releasedTextureKeys = textureKeys;
+  const releasedAnimationKeys = animationKeys;
+  let wrappedPokemon = headlessWrappedPokemon.get(scene);
+  if (wrappedPokemon == null) {
+    wrappedPokemon = new WeakSet<object>();
+    headlessWrappedPokemon.set(scene, wrappedPokemon);
   }
 
   // Wrap every currently materialized party object, not only the opening player leads. Turn-finalize
   // readiness also awaits live enemy atlases, and later presentation boundaries may promote a bench mon.
   for (const pokemon of [...scene.getPlayerParty(), ...scene.getEnemyParty()]) {
-    if (model.wrappedPokemon.has(pokemon)) {
+    if (wrappedPokemon.has(pokemon)) {
       continue;
     }
-    model.wrappedPokemon.add(pokemon);
+    wrappedPokemon.add(pokemon);
     const original = pokemon.loadAssets.bind(pokemon);
     // Install a plain per-instance adapter, not a Vitest spy. Renderer proofs legitimately layer their
     // own delay/count spy around this model; spying on an existing spy makes the captured "original"
@@ -1188,7 +1202,8 @@ export function installHeadlessPlayerAtlasCompletionModel(scene: BattleScene): v
     pokemon.loadAssets = async (ignoreOverride = true, useIllusion = false) => {
       await original(ignoreOverride, useIllusion);
       const key = pokemon.getBattleSpriteKey();
-      model.releasedKeys.add(key);
+      releasedTextureKeys.add(key);
+      releasedAnimationKeys.add(key);
       for (const sprite of [pokemon.getSprite(), pokemon.getTintSprite()]) {
         if (sprite == null) {
           continue;
