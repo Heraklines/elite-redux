@@ -16,7 +16,6 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -40,6 +39,7 @@ import {
   type ShopPhaseSeam,
   withClient,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair, type ScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -100,9 +100,13 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
   }
 
   /** Drive ONE alternating reward interaction where the OWNER TAKES the forced (non-party) ball reward. */
-  async function driveBallReward(rig: DuoRig): Promise<{ hostOwns: boolean }> {
+  async function driveBallReward(rig: DuoRig, pair: ScheduledCoopPair): Promise<{ hostOwns: boolean }> {
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
+    // Command request/reply uses ordinary automatic delivery. At the reward boundary, queue every frame
+    // until its destination ClientCtx is installed: a real browser can never resume the host watcher's
+    // await against the guest's global scene (or vice versa).
+    pair.setAutomaticDelivery(false);
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("SelectModifierPhase", false);
     });
@@ -127,7 +131,8 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
     // A guest-owned TAKE is an intent: the host watcher commits it, then the retained result must return
     // to the guest owner before either scene is inspected. Real browsers receive that final hop in the
     // guest process; the one-realm harness closes it explicitly under each destination context.
-    await pumpDuoDestinations(rig, 2);
+    await pumpDuoDestinations(rig, 8);
+    pair.setAutomaticDelivery(true);
     return { hostOwns };
   }
 
@@ -135,7 +140,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
     const ballCount = (s: BattleScene): number => (s.pokeballCounts as Record<number, number>)[PokeballType.GREAT_BALL];
     forceItemRewards(game.override, [{ name: "GREAT_BALL" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
 
@@ -150,7 +155,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn);
       });
-      const { hostOwns } = await driveBallReward(rig);
+      const { hostOwns } = await driveBallReward(rig, pair);
       expect(hostOwns, "wave 1 reward is host-owned").toBe(true);
       expect(ballCount(rig.hostScene), "wave 1: host granted +5 great balls").toBe(hostBase + 5);
       expect(ballCount(rig.guestScene), "wave 1: guest (watcher) mirrored the SAME +5 (no drift)").toBe(guestBase + 5);
@@ -175,7 +180,7 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn);
       });
-      const { hostOwns } = await driveBallReward(rig);
+      const { hostOwns } = await driveBallReward(rig, pair);
       expect(hostOwns, "wave 2 reward is guest-owned").toBe(false);
       expect(ballCount(rig.guestScene), "wave 2: guest (owner) granted +5 great balls").toBe(guestBefore + 5);
       expect(ballCount(rig.hostScene), "wave 2: host (watcher) mirrored the SAME +5 (no drift)").toBe(hostBefore + 5);
