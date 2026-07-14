@@ -1598,8 +1598,39 @@ function normalizeCtrSpawnChance(value) {
   return n >= 1 && n <= 100 ? n : 100;
 }
 
-/** A fresh blank team member (species by CONST). */
-function blankCtrMember() {
+/** Normalize a slotChance to an integer 1-100 (absent/invalid => 100). Mirrors
+ *  normalizeSlotChance in er-custom-trainers.ts (100 = slot always filled). */
+function normalizeCtrSlotChance(value) {
+  return normalizeCtrSpawnChance(value);
+}
+
+/** Clamp a variant weight to an integer >= 1 (invalid => 1). */
+function clampCtrWeight(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 1;
+  }
+  const n = Math.floor(value);
+  return n >= 1 ? n : 1;
+}
+
+// The two literal move tokens (resolved to a seeded legal move in-game); they are
+// EXEMPT from the move-legality/unknown-move gates and offered at the top of the
+// per-member move datalist.
+const CTR_MOVE_TOKENS = new Set(["RLA", "RLNA"]);
+const CTR_MOVE_TOKEN_LABEL = {
+  RLA: "RLA — random legal attacking move",
+  RLNA: "RLNA — random legal non-attacking move",
+};
+function ctrIsMoveToken(v) {
+  return CTR_MOVE_TOKENS.has((v || "").trim().toUpperCase());
+}
+
+/** The member-FIELD keys that make up ONE weighted possibility (excludes slot meta:
+ *  slotChance / weighted / variants / cur). */
+const CTR_MEMBER_FIELDS = ["species", "formIndex", "level", "moves", "abilitySlot", "fusion", "heldItems", "sanityOff"];
+
+/** A fresh blank set of member fields (one possibility), species by CONST. */
+function blankCtrMemberFields() {
   return {
     species: "",
     formIndex: 0,
@@ -1612,6 +1643,87 @@ function blankCtrMember() {
     // Persisted only when true; absent in saved JSON = enforced.
     sanityOff: false,
   };
+}
+
+/** Deep-copy one possibility's fields (for snapshotting into/out of `variants`). */
+function ctrCopyMemberFields(src) {
+  return {
+    species: src.species || "",
+    formIndex: src.formIndex || 0,
+    level: typeof src.level === "number" ? src.level : null,
+    moves: [...(src.moves || []), "", "", "", ""].slice(0, 4),
+    abilitySlot: [0, 1, 2].includes(src.abilitySlot) ? src.abilitySlot : 0,
+    fusion: src.fusion ? { ...src.fusion } : null,
+    heldItems: (src.heldItems || []).map(h => ({ item: h.item || "", count: Number.isInteger(h.count) ? h.count : 1 })),
+    sanityOff: src.sanityOff === true,
+  };
+}
+
+/**
+ * A fresh blank team SLOT (species by CONST). A slot is a member-fields object
+ * (the CURRENT possibility, edited live by the field handlers) PLUS slot metadata:
+ *   slotChance : 1-100 fill chance (slots 2-6; slot 1 ignores it)
+ *   weighted   : editor flag — save as a variants array vs a flat member
+ *   variants   : [{ ...memberFields, weight }] (length >= 1; variants[cur] mirrors
+ *                the live top-level fields, synced at discrete events)
+ *   cur        : index of the currently-shown/edited possibility
+ */
+function blankCtrMember() {
+  const fields = blankCtrMemberFields();
+  return {
+    ...fields,
+    slotChance: 100,
+    weighted: false,
+    cur: 0,
+    variants: [{ ...ctrCopyMemberFields(fields), weight: 1 }],
+  };
+}
+
+/** Ensure a slot has valid weighted-variant metadata (repairs a legacy/edited slot). */
+function ctrEnsureSlot(m) {
+  if (typeof m.slotChance !== "number") {
+    m.slotChance = 100;
+  }
+  if (!Array.isArray(m.variants) || m.variants.length === 0) {
+    m.variants = [{ ...ctrCopyMemberFields(m), weight: 1 }];
+  }
+  if (!Number.isInteger(m.cur) || m.cur < 0 || m.cur >= m.variants.length) {
+    m.cur = 0;
+  }
+  if (typeof m.weighted !== "boolean") {
+    m.weighted = m.variants.length > 1;
+  }
+  for (const v of m.variants) {
+    v.weight = clampCtrWeight(v.weight);
+  }
+}
+
+/** Write the live top-level member fields back into the current possibility (variants[cur]). */
+function ctrSyncCurrentVariant(m) {
+  ctrEnsureSlot(m);
+  const weight = clampCtrWeight(m.variants[m.cur].weight);
+  m.variants[m.cur] = { ...ctrCopyMemberFields(m), weight };
+}
+
+/** Load possibility `idx` onto the live top-level member fields (weight stays on the variant). */
+function ctrLoadVariant(m, idx) {
+  const v = m.variants[idx];
+  for (const k of CTR_MEMBER_FIELDS) {
+    m[k] = ctrCopyMemberFields(v)[k];
+  }
+  m.cur = idx;
+}
+
+/** The total weight across a slot's possibilities (each clamped to >= 1). */
+function ctrTotalWeight(m) {
+  return (m.variants || []).reduce((s, v) => s + clampCtrWeight(v.weight), 0) || 1;
+}
+
+/** Human "30/100 = 30%" pick-odds string for the CURRENT possibility. */
+function ctrSlotOdds(m) {
+  const w = clampCtrWeight(m.variants[m.cur].weight);
+  const total = ctrTotalWeight(m);
+  return `${w}/${total} = ${Math.round((w / total) * 100)}%`;
 }
 
 /** A fresh blank trainer, with the next free id in the 70000-79999 band. */
@@ -1645,7 +1757,6 @@ function blankCtrTrainer() {
 
 /** Convert a LIVE entry (species by id) to an edit entry (species by CONST). */
 function ctrLiveToEdit(entry) {
-  const idToConst = id => spById.get(id)?.const ?? "";
   return {
     id: entry.id,
     name: entry.name ?? "",
@@ -1661,26 +1772,60 @@ function ctrLiveToEdit(entry) {
     challenge: entry.challenge ?? "none",
     // Trimmed bgm key; anything not [a-z0-9_] (or absent) normalizes to "" (none).
     battleBgm: normalizeCtrBattleBgm(entry.battleBgm),
-    team: (Array.isArray(entry.team) ? entry.team : []).map(m => ({
-      species: idToConst(m.species),
-      formIndex: Number.isInteger(m.formIndex) ? m.formIndex : 0,
-      level: typeof m.level === "number" ? m.level : null,
-      moves: [...(m.moves || []), "", "", "", ""].slice(0, 4),
-      abilitySlot: [0, 1, 2].includes(m.abilitySlot) ? m.abilitySlot : 0,
-      fusion:
-        m.fusion && Number.isInteger(m.fusion.species)
-          ? {
-              species: idToConst(m.fusion.species),
-              formIndex: Number.isInteger(m.fusion.formIndex) ? m.fusion.formIndex : 0,
-              abilitySlot: [0, 1, 2].includes(m.fusion.abilitySlot) ? m.fusion.abilitySlot : 0,
-            }
-          : null,
-      heldItems: (Array.isArray(m.heldItems) ? m.heldItems : []).map(h => ({
-        item: h.item || "",
-        count: Number.isInteger(h.count) ? h.count : 1,
-      })),
-      sanityOff: m.sanityOff === true,
+    team: (Array.isArray(entry.team) ? entry.team : []).map(ctrLiveSlotToEdit),
+  };
+}
+
+/** Map ONE live member's fields (species by id) to edit fields (species by CONST). */
+function ctrLiveMemberFieldsToEdit(m) {
+  const idToConst = id => spById.get(id)?.const ?? "";
+  return {
+    species: idToConst(m.species),
+    formIndex: Number.isInteger(m.formIndex) ? m.formIndex : 0,
+    level: typeof m.level === "number" ? m.level : null,
+    moves: [...(m.moves || []), "", "", "", ""].slice(0, 4),
+    abilitySlot: [0, 1, 2].includes(m.abilitySlot) ? m.abilitySlot : 0,
+    fusion:
+      m.fusion && Number.isInteger(m.fusion.species)
+        ? {
+            species: idToConst(m.fusion.species),
+            formIndex: Number.isInteger(m.fusion.formIndex) ? m.fusion.formIndex : 0,
+            abilitySlot: [0, 1, 2].includes(m.fusion.abilitySlot) ? m.fusion.abilitySlot : 0,
+          }
+        : null,
+    heldItems: (Array.isArray(m.heldItems) ? m.heldItems : []).map(h => ({
+      item: h.item || "",
+      count: Number.isInteger(h.count) ? h.count : 1,
     })),
+    sanityOff: m.sanityOff === true,
+  };
+}
+
+/** Map ONE live team slot (flat member OR `{ variants, slotChance }`) to an edit slot. */
+function ctrLiveSlotToEdit(entry) {
+  // Weighted slot: several possibilities + an optional fill chance.
+  if (entry && Array.isArray(entry.variants)) {
+    const variants = entry.variants.map(v => ({ ...ctrLiveMemberFieldsToEdit(v), weight: clampCtrWeight(v.weight) }));
+    if (variants.length === 0) {
+      variants.push({ ...blankCtrMemberFields(), weight: 1 });
+    }
+    const slot = {
+      ...ctrCopyMemberFields(variants[0]), // current = variant 0
+      slotChance: normalizeCtrSlotChance(entry.slotChance),
+      weighted: variants.length > 1,
+      cur: 0,
+      variants,
+    };
+    return slot;
+  }
+  // Flat member: one possibility (weight 1), optional slotChance on the member.
+  const fields = ctrLiveMemberFieldsToEdit(entry || {});
+  return {
+    ...fields,
+    slotChance: normalizeCtrSlotChance(entry ? entry.slotChance : undefined),
+    weighted: false,
+    cur: 0,
+    variants: [{ ...ctrCopyMemberFields(fields), weight: 1 }],
   };
 }
 
@@ -1794,9 +1939,10 @@ function legalMovesFor(speciesConst) {
   return out;
 }
 
-/** True when enforcement is ON for this member AND `move` is not in its legal pool. */
+/** True when enforcement is ON for this member AND `move` is not in its legal pool.
+ *  The RLA/RLNA tokens are ALWAYS legal (resolved to a legal move at install). */
 function ctrMoveIllegal(m, move) {
-  if (m.sanityOff || !move) {
+  if (m.sanityOff || !move || ctrIsMoveToken(move)) {
     return false;
   }
   const legal = legalMovesFor(m.species);
@@ -1804,7 +1950,8 @@ function ctrMoveIllegal(m, move) {
   return legal.size > 0 && !legal.has(move);
 }
 
-/** Every illegal move on an enforced member (names), for the error line + save gate. */
+/** Every illegal move on an enforced member (names), for the error line + save gate.
+ *  RLA/RLNA tokens are exempt (never counted illegal). */
 function ctrIllegalMoves(m) {
   if (m.sanityOff) {
     return [];
@@ -1813,7 +1960,9 @@ function ctrIllegalMoves(m) {
   if (legal.size === 0) {
     return [];
   }
-  return (m.moves || []).map(x => (x || "").trim().toUpperCase()).filter(mv => mv && !legal.has(mv));
+  return (m.moves || [])
+    .map(x => (x || "").trim().toUpperCase())
+    .filter(mv => mv && !ctrIsMoveToken(mv) && !legal.has(mv));
 }
 
 // ---- Battle-music preview (one shared Audio element) ------------------------
@@ -1877,35 +2026,67 @@ function ctrBgmOptions(selected) {
   return html;
 }
 
+/** The always-visible header controls for a slot: slot-fill probability (slots
+ *  2-6) + the "Weighted slot?" toggle and, when weighted, the possibility stepper,
+ *  weight editor, pick-odds and +/✕ possibility buttons (mockup header row). */
+function ctrSlotControlsHtml(m, i) {
+  const slotProb =
+    i > 0
+      ? `<label class="ctr-slotprob" title="Chance this slot is FILLED this run (slots 2-6). 100 = always; a failed roll omits the slot and the party shrinks.">Slot&nbsp;Probability <input type="number" class="ctr-slotchance" data-idx="${i}" value="${normalizeCtrSlotChance(m.slotChance)}" min="1" max="100" style="width:56px" /></label>`
+      : "";
+  const weightedToggle = `<label class="ctr-weighted-lbl" title="Weighted slot: several Pokémon possibilities, ONE picked per run by weight. Unchecking keeps ONLY the currently-shown possibility."><input type="checkbox" class="ctr-weighted" data-idx="${i}"${m.weighted ? " checked" : ""} /> Weighted slot?</label>`;
+  let weightedCtrls = "";
+  if (m.weighted) {
+    const n = m.variants.length;
+    const curWeight = clampCtrWeight(m.variants[m.cur].weight);
+    weightedCtrls = `<span class="ctr-var-ctrls">Pokémon
+      <button type="button" class="ctr-var-prev" data-idx="${i}" title="Previous possibility">◂</button>
+      <span class="ctr-var-n"><b>${m.cur + 1}</b>/${n}</span>
+      <button type="button" class="ctr-var-next" data-idx="${i}" title="Next possibility">▸</button>
+      weight <input type="number" class="ctr-var-weight" data-idx="${i}" value="${curWeight}" min="1" max="999" style="width:52px" />
+      <span class="ctr-var-odds" title="Pick odds for this possibility this run">${esc(ctrSlotOdds(m))}</span>
+      <button type="button" class="ctr-var-add" data-idx="${i}" title="Add a possibility">＋ possibility</button>
+      ${n > 1 ? `<button type="button" class="ctr-var-del" data-idx="${i}" title="Remove this possibility">✕ possibility</button>` : ""}
+    </span>`;
+  }
+  return `<div class="ctr-slot-ctrls">${slotProb}${weightedToggle}${weightedCtrls}</div>`;
+}
+
 function ctrMemberHtml(m, i) {
+  ctrEnsureSlot(m); // repair weighted-variant metadata on a legacy/edited slot
   const open = ctrOpenMembers.has(i);
   const scale = m.level === null;
   const sets = factorySetsFor(m.species);
   const selSet = ctrSetSel.has(i) ? ctrSetSel.get(i) : -1;
   const spName = m.species ? spByConst.get(m.species)?.name || m.species : "(empty)";
-  // Collapsed summary: slot, species, level, set name if any (task #9).
+  // Collapsed summary: slot, species, level, set name if any (task #9). A weighted
+  // slot tags the current possibility (e.g. "· 2/3").
   const setTag = selSet >= 0 && sets[selSet] ? ` · Set ${selSet + 1}` : "";
+  const varTag = m.weighted && m.variants.length > 1 ? ` · ${m.cur + 1}/${m.variants.length}` : "";
   const summary = `<span class="ctr-mem-sum" data-idx="${i}" role="button" title="Click to ${open ? "collapse" : "expand"}">
     <span class="ctr-mem-caret">${open ? "▾" : "▸"}</span> Slot ${i + 1}: <b>${esc(spName)}</b>
-    <small>${scale ? "wave-scaled" : `Lv ${m.level}`}${setTag}${m.sanityOff ? " · sanity off" : ""}</small></span>`;
+    <small>${scale ? "wave-scaled" : `Lv ${m.level}`}${setTag}${varTag}${m.sanityOff ? " · sanity off" : ""}</small></span>`;
+  const slotCtrls = ctrSlotControlsHtml(m, i);
   if (!open) {
     return `<fieldset class="ctr-member">
       <legend>${summary} <button type="button" class="ctr-mem-del" data-idx="${i}" title="Remove this member">✕</button></legend>
+      ${slotCtrls}
     </fieldset>`;
   }
-  // Move-legality: enforce unless sanity is off. Use a per-member datalist of the
-  // legal pool when we HAVE data; otherwise fall back to the full move list so a
-  // data gap never traps the user (matches the never-block save gate).
+  // Move-legality: enforce unless sanity is off. A per-member datalist always
+  // offers the RLA/RLNA tokens FIRST, then the legal pool when we HAVE data (else
+  // the full move set so a data gap never traps the user; matches the save gate).
   const enforce = !m.sanityOff;
   const legal = enforce ? legalMovesFor(m.species) : null;
   const useLegalList = enforce && legal && legal.size > 0;
-  const listId = useLegalList ? `ctr-legal-${i}` : "moves-list";
-  const legalDatalist = useLegalList
-    ? `<datalist id="ctr-legal-${i}">${[...legal]
-        .sort()
-        .map(mv => `<option value="${mv}">${prettify(mv)}</option>`)
-        .join("")}</datalist>`
-    : "";
+  const poolNames = useLegalList ? [...legal].sort() : [...MOVE_SET].sort();
+  const tokenOpts = ["RLA", "RLNA"]
+    .map(tk => `<option value="${tk}">${esc(CTR_MOVE_TOKEN_LABEL[tk])}</option>`)
+    .join("");
+  const listId = `ctr-moves-${i}`;
+  const legalDatalist = `<datalist id="${listId}">${tokenOpts}${poolNames
+    .map(mv => `<option value="${mv}">${prettify(mv)}</option>`)
+    .join("")}</datalist>`;
   const moveInputs = [0, 1, 2, 3]
     .map(s => {
       const bad = ctrMoveIllegal(m, (m.moves[s] || "").trim().toUpperCase());
@@ -1942,6 +2123,7 @@ function ctrMemberHtml(m, i) {
   const fus = m.fusion;
   return `<fieldset class="ctr-member open">
     <legend>${summary} <button type="button" class="ctr-mem-del" data-idx="${i}" title="Remove this member">✕</button></legend>
+    ${slotCtrls}
     <label>Species <input class="ctr-species" list="species-list" data-idx="${i}" value="${esc(m.species || "")}" placeholder="SPECIES_…" spellcheck="false" style="width:170px" /></label>
     <label>Form <input type="number" class="ctr-form" data-idx="${i}" value="${m.formIndex || 0}" min="0" max="60" style="width:56px" /></label>
     <label>Ability slot <select class="ctr-abil" data-idx="${i}">${ctrAbilOptions(m.species, m.abilitySlot)}</select></label>
@@ -1952,6 +2134,7 @@ function ctrMemberHtml(m, i) {
       <label title="Skip move-legality checks for this member (saved as sanityOff)"><input type="checkbox" class="ctr-sanity" data-idx="${i}"${m.sanityOff ? " checked" : ""} /> Move sanity off</label>
     </div>
     <div class="ctr-moves">${moveInputs}${legalDatalist}</div>
+    <div class="hint ctr-move-hint">Tokens: type <b>RLA</b> (random legal attacking) or <b>RLNA</b> (random legal non-attacking) as a move — resolved to a seeded random legal move of this species in-game (exempt from the legality check).</div>
     ${errLine}
     <div class="ctr-fusion">
       <label>Fusion <input type="checkbox" class="ctr-fusion-on" data-idx="${i}"${fus ? " checked" : ""} /></label>
@@ -2252,6 +2435,13 @@ function onCustomTrainerInput(el) {
   } else if (el.id === "ctr-spawnchance") {
     // Clamp to 1-100; a blank/invalid entry normalizes back to 100.
     t.spawnChance = normalizeCtrSpawnChance(Number(el.value));
+  } else if (el.classList.contains("ctr-slotchance") && m) {
+    // Slot-fill chance (slots 2-6); clamp 1-100, blank/invalid -> 100.
+    m.slotChance = normalizeCtrSlotChance(Number(el.value));
+  } else if (el.classList.contains("ctr-var-weight") && m) {
+    // Current possibility's weight (integer >= 1); odds refresh on blur (render).
+    ctrEnsureSlot(m);
+    m.variants[m.cur].weight = clampCtrWeight(Number(el.value));
   } else if (el.classList.contains("ctr-species") && m) {
     m.species = el.value.trim().toUpperCase();
     el.value = m.species;
@@ -2267,8 +2457,9 @@ function onCustomTrainerInput(el) {
     // A manual move edit flips the member's "Use set" dropdown back to (custom).
     ctrSetSel.set(idx, -1);
     // Red border for an unknown move name OR (enforcing) an illegal move. The
+    // RLA/RLNA tokens are always valid (resolved to a legal move in-game). The
     // error line + dropdown refresh on blur (onCustomTrainerChange -> render).
-    const bad = (v !== "" && !MOVE_SET.has(v)) || ctrMoveIllegal(m, v);
+    const bad = v !== "" && !ctrIsMoveToken(v) && (!MOVE_SET.has(v) || ctrMoveIllegal(m, v));
     el.style.borderColor = bad ? ERR : "";
   } else if (el.classList.contains("ctr-held-item") && m) {
     const h = m.heldItems[Number(el.dataset.heldidx)];
@@ -2313,6 +2504,33 @@ function onCustomTrainerChange(el) {
     return true;
   } else if (el.id === "ctr-endless") {
     t.endless = el.checked;
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-weighted") && m) {
+    // Toggle a weighted slot. Turning OFF with >1 possibilities keeps ONLY the
+    // currently-shown possibility (the others are dropped — the tooltip warns).
+    ctrSyncCurrentVariant(m);
+    if (el.checked) {
+      m.weighted = true;
+    } else {
+      m.weighted = false;
+      const keep = m.variants[m.cur];
+      m.variants = [keep];
+      m.cur = 0;
+      ctrLoadVariant(m, 0);
+    }
+    ctrSetSel.set(idx, -1);
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-slotchance") && m) {
+    // Blur: normalize + re-render (the border/label reflect the clamped value).
+    m.slotChance = normalizeCtrSlotChance(Number(el.value));
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-var-weight") && m) {
+    // Blur: normalize the weight + re-render so the pick-odds update.
+    ctrEnsureSlot(m);
+    m.variants[m.cur].weight = clampCtrWeight(Number(el.value));
     render();
     return true;
   } else if (el.classList.contains("ctr-set") && m) {
@@ -2447,6 +2665,53 @@ function onCustomTrainerClick(e) {
       t.team.splice(Number(memDel.dataset.idx), 1);
       // Team indices shifted; drop the (now-stale) per-index UI state.
       ctrResetMemberUiState();
+    }
+    render();
+    return true;
+  }
+  // Weighted-slot possibility stepper (◂ ▸): CYCLE the shown possibility (never
+  // creates one — N stays fixed). Sync the live fields into the current
+  // possibility first, then load the target possibility onto the form.
+  const varStep = e.target.closest(".ctr-var-prev, .ctr-var-next");
+  if (varStep) {
+    const mi = Number(varStep.dataset.idx);
+    const m = t.team[mi];
+    if (m) {
+      ctrSyncCurrentVariant(m);
+      const n = m.variants.length;
+      const delta = varStep.classList.contains("ctr-var-next") ? 1 : -1;
+      ctrLoadVariant(m, (m.cur + delta + n) % n);
+      ctrSetSel.set(mi, -1);
+    }
+    render();
+    return true;
+  }
+  // + possibility: sync current, append a fresh blank possibility (weight 1),
+  // switch to it. Explicit — cycling past the end never creates one.
+  const varAdd = e.target.closest(".ctr-var-add");
+  if (varAdd) {
+    const mi = Number(varAdd.dataset.idx);
+    const m = t.team[mi];
+    if (m) {
+      ctrSyncCurrentVariant(m);
+      m.weighted = true;
+      m.variants.push({ ...blankCtrMemberFields(), weight: 1 });
+      ctrLoadVariant(m, m.variants.length - 1);
+      ctrSetSel.set(mi, -1);
+    }
+    render();
+    return true;
+  }
+  // ✕ possibility: drop the current possibility (N >= 1 always kept), show the
+  // previous one. At N==1 the button isn't rendered.
+  const varDel = e.target.closest(".ctr-var-del");
+  if (varDel) {
+    const mi = Number(varDel.dataset.idx);
+    const m = t.team[mi];
+    if (m && m.variants.length > 1) {
+      m.variants.splice(m.cur, 1);
+      ctrLoadVariant(m, Math.max(0, m.cur - 1));
+      ctrSetSel.set(mi, -1);
     }
     render();
     return true;
@@ -3208,7 +3473,11 @@ function buildDeltas() {
       continue;
     }
     let memberBad = false;
-    const team = t.team.map(m => {
+    // Validate + serialize ONE possibility's member fields (species by CONST -> id,
+    // move NAMEs incl. RLA/RLNA tokens, fusion, held items, sanityOff). Pushes any
+    // problems into `bad` and flips `memberBad`. Reused for a flat member AND for
+    // each weighted variant.
+    const buildPossibility = m => {
       const id = spByConst.get(m.species)?.id;
       if (typeof id !== "number") {
         bad.push(`${t.name}: unknown species "${m.species}"`);
@@ -3217,14 +3486,15 @@ function buildDeltas() {
       }
       const moves = (m.moves || []).map(x => (x || "").trim().toUpperCase()).filter(Boolean);
       for (const mv of moves) {
-        if (!MOVE_SET.has(mv)) {
+        // RLA/RLNA tokens are legal move NAMEs (resolved in-game); not "unknown".
+        if (!ctrIsMoveToken(mv) && !MOVE_SET.has(mv)) {
           bad.push(`${t.name}: unknown move "${mv}"`);
           memberBad = true;
         }
       }
       // Move-legality gate: a member with sanity ENFORCED (sanityOff not set)
-      // must not carry an illegal move. Members with sanity off are exempt.
-      // Never silently strip — surface a clear error and refuse the trainer.
+      // must not carry an illegal move. Members with sanity off (and the RLA/RLNA
+      // tokens) are exempt. Never silently strip — surface a clear error.
       if (!m.sanityOff) {
         for (const mv of ctrIllegalMoves(m)) {
           bad.push(
@@ -3261,6 +3531,24 @@ function buildDeltas() {
         out.sanityOff = true;
       }
       return out;
+    };
+    const team = t.team.map((slot, i) => {
+      ctrEnsureSlot(slot);
+      ctrSyncCurrentVariant(slot); // fold the live edits into the current possibility
+      // slotChance applies to slots 2-6 only (slot 1 always fills); serialize it
+      // only when it differs from the 100 default (keeps flat members byte-clean).
+      const sc = i > 0 ? normalizeCtrSlotChance(slot.slotChance) : 100;
+      const withSlotChance = obj => (i > 0 && sc !== 100 ? { ...obj, slotChance: sc } : obj);
+      // Weighted form (variants array) only when there is MORE than one possibility;
+      // a single possibility always saves as a flat member (back-compat).
+      if (slot.weighted && slot.variants.length > 1) {
+        const variants = slot.variants.map(v => {
+          const out = buildPossibility(v);
+          return out ? { ...out, weight: clampCtrWeight(v.weight) } : null;
+        });
+        return withSlotChance({ variants });
+      }
+      return withSlotChance(buildPossibility(slot));
     });
     if (memberBad) {
       continue;
