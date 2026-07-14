@@ -19,6 +19,7 @@ const files = [
   "campaign-nav.mjs",
   "solo-classic.mjs",
   "run-solo.mjs",
+  "terminal-watchdog.mjs",
 ];
 
 // Mirror of check-public-boundary.mjs's private-state boundary: no game source import, no

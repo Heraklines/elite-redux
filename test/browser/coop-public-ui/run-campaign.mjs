@@ -11,6 +11,7 @@ import { loadCampaignPolicy } from "./campaign-policy.mjs";
 import { loadConfig } from "./config.mjs";
 import { startSealedPreview } from "./preview-server.mjs";
 import { DuoPublicUiRig } from "./public-ui-harness.mjs";
+import { raceJourneyWithTerminal } from "./terminal-watchdog.mjs";
 
 // The campaign reuses the exact sealed-artifact + two-context boot the journeys use;
 // only the driven surface set differs (a full >=30-wave co-op run vs. the wave-2 probes).
@@ -26,7 +27,8 @@ let failure = null;
 try {
   preview = await startSealedPreview(config);
   rig = await DuoPublicUiRig.launch(config);
-  await runCampaign(rig);
+  // Fast-abort on a known-fatal terminal marker instead of riding out generic timeouts.
+  await raceJourneyWithTerminal(Object.values(rig.clients), runCampaign(rig));
   rig.assertClean();
 } catch (error) {
   failure = error instanceof Error ? error : new Error(String(error));

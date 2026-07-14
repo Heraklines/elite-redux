@@ -11,6 +11,7 @@ import { loadConfig } from "./config.mjs";
 import { startSealedPreview } from "./preview-server.mjs";
 import { PublicUiClient } from "./public-ui-harness.mjs";
 import { runSoloClassic } from "./solo-classic.mjs";
+import { raceJourneyWithTerminal } from "./terminal-watchdog.mjs";
 
 // Single-context solo classic run: proves the state-aware navigation primitive against the
 // v2 semantic mirror with NO co-op pairing (independent of co-op signaling). Reuses the exact
@@ -38,7 +39,7 @@ try {
   const context = await browser.createBrowserContext();
   client = new PublicUiClient(context, config.credentials.hostSeat, config);
   await client.init();
-  await runSoloClassic(client);
+  await raceJourneyWithTerminal([client], runSoloClassic(client));
   client.evidence.assertClean();
 } catch (error) {
   failure = error instanceof Error ? error : new Error(String(error));
