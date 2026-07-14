@@ -184,6 +184,15 @@ export function setCoopOperationDurability(manager: CoopDurabilityManager | null
   activeDurability = manager;
 }
 
+/**
+ * The currently-installed durability manager (null when durability is OFF / idle). Exposed so a scoping
+ * helper can SAVE and RESTORE it around an async reward continuation that must journal into its OWNING
+ * runtime's manager rather than whatever ambient one happens to be installed at continuation time.
+ */
+export function getActiveCoopOperationDurability(): CoopDurabilityManager | null {
+  return activeDurability;
+}
+
 /** Whether the operation commit path currently journals (durability manager installed). */
 export function isCoopOperationJournalActive(): boolean {
   return activeDurability != null;
