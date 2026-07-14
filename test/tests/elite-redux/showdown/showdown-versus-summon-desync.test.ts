@@ -66,7 +66,7 @@ import {
 import { createScheduledCoopPair, type ScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import { generateStarters } from "#test/utils/game-manager-utils";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -151,6 +151,47 @@ function advanceGuestDialogue(scene: BattleScene): boolean {
     return true;
   }
   return false;
+}
+
+/**
+ * Complete only the visual cache effects missing from Phaser HEADLESS after the real atlas load runs.
+ * Strict launch readiness must still await each production `Pokemon.loadAssets` promise and verify the
+ * final dynamic sprite key; this fixture models the cache/texture/animation effects that Chromium creates.
+ */
+function modelHeadlessPlayerAtlasCompletion(scene: BattleScene): { expected: number; completed: () => number } {
+  const releasedKeys = new Set<string>();
+  let completed = 0;
+  const originalTextureExists = scene.textures.exists.bind(scene.textures);
+  const originalAnimationExists = scene.anims.exists.bind(scene.anims);
+  vi.spyOn(scene.textures, "exists").mockImplementation(
+    key => releasedKeys.has(String(key)) || originalTextureExists(key),
+  );
+  vi.spyOn(scene.anims, "exists").mockImplementation(
+    key => releasedKeys.has(String(key)) || originalAnimationExists(key),
+  );
+
+  const capacity = scene.currentBattle.arrangement.playerCapacity;
+  for (const pokemon of scene.getPlayerParty().slice(0, capacity)) {
+    const original = pokemon.loadAssets.bind(pokemon);
+    vi.spyOn(pokemon, "loadAssets").mockImplementation(async (ignoreOverride = true, useIllusion = false) => {
+      await original(ignoreOverride, useIllusion);
+      completed++;
+      const key = pokemon.getBattleSpriteKey();
+      releasedKeys.add(key);
+      for (const sprite of [pokemon.getSprite(), pokemon.getTintSprite()]) {
+        if (sprite == null) {
+          continue;
+        }
+        const live = sprite as unknown as {
+          texture: { key: string };
+          anims: { currentAnim?: { key: string } };
+        };
+        live.texture.key = key;
+        live.anims.currentAnim = { key };
+      }
+    });
+  }
+  return { expected: capacity, completed: () => completed };
 }
 
 /** PUMP the guest's REAL loaded-launch chain to CommandPhase (the same pump the real-boot proof uses). */
@@ -262,10 +303,14 @@ describe.skipIf(!RUN)("Showdown versus - turn-1 initial-summon ability desync (t
     const guestResult = await withClient(rig.guestCtx, async () => {
       const booted = await rig.guestScene.gameData.applyCoopLaunchSession(hostJson);
       expect(booted, "applyCoopLaunchSession returned true").toBe(true);
+      const atlas = modelHeadlessPlayerAtlasCompletion(rig.guestScene);
       rig.guestScene.phaseManager.clearPhaseQueue();
       rig.guestScene.phaseManager.pushNew("EncounterPhase", true);
       rig.guestScene.phaseManager.shiftPhase();
       const reached = await pumpGuestLaunchChain(rig.guestScene);
+      expect(atlas.completed(), "strict readiness awaited every real production player-atlas load").toBeGreaterThanOrEqual(
+        atlas.expected,
+      );
       return { reached, weather: rig.guestScene.arena.weather?.weatherType ?? WeatherType.NONE };
     });
 

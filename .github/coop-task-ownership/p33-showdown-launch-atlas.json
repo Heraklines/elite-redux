@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "taskId": "p33-showdown-launch-atlas",
+  "branch": "ci/coop/p33-showdown-launch-atlas",
+  "trainRef": "ci/coop/p33-mystery-public-transition",
+  "baseSha": "4c02b918f6164de56d0e16e3bc681ba8dde191d3",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-showdown-launch-atlas.json",
+    "test/tests/elite-redux/showdown/showdown-versus-summon-desync.test.ts"
+  ]
+}
