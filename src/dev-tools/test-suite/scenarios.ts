@@ -33,13 +33,23 @@ import { coopOwnedCount } from "#data/elite-redux/coop/coop-session";
 import { erRunUnlockAbilitySlot, erRunUnlockableInnateSlots } from "#data/elite-redux/er-ability-capsule";
 import type { ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { setCommunityAllowedSpecies } from "#data/elite-redux/er-community-run-state";
-import { type ErCustomTrainerResolved, setErCustomTrainerDevForce } from "#data/elite-redux/er-custom-trainers";
+import {
+  applyErCustomTrainerFusion,
+  type ErCustomTrainerResolved,
+  erCustomTrainerHeldModifierConfigs,
+  resolveErCustomTrainerMoveIds,
+  setErCustomTrainerDevForce,
+} from "#data/elite-redux/er-custom-trainers";
 import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
 import { seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
-import { setErDifficulty, setErDifficulty as setErDifficultyForScenario } from "#data/elite-redux/er-run-difficulty";
+import {
+  type ErDifficulty,
+  setErDifficulty,
+  setErDifficulty as setErDifficultyForScenario,
+} from "#data/elite-redux/er-run-difficulty";
 import {
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
   encodeErShinyLabLoadout,
@@ -65,7 +75,7 @@ import { TimeOfDay } from "#enums/time-of-day";
 import { WeatherType } from "#enums/weather-type";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { ModifierOverride } from "#modifiers/modifier-type";
-import { erCommunityItemModifierType } from "#modifiers/modifier-type";
+import { erCommunityItemModifierType, PokemonHeldItemModifierType } from "#modifiers/modifier-type";
 import type { Variant } from "#sprites/variant";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter, StarterMoveset } from "#types/save-data";
@@ -316,6 +326,97 @@ export function buildErCustomTrainerDevScenario(
     },
   };
   return { scenario };
+}
+
+/**
+ * Build a {@linkcode DevScenario} that hands the PLAYER a copy of a custom
+ * trainer's authored team (the "Use as my team" picker action) - a fast way to
+ * drop into a battle with a ready team instead of hand-picking starters. The
+ * opposing side is a normal wave-appropriate battle (no dev force armed).
+ *
+ * The player copy uses the REPRESENTATIVE members (variant 0 of every slot, ALL
+ * slots, slot-fill ignored). Faithful fields: species / form, ability slot,
+ * resolved moveset (incl. seeded RLA / RLNA tokens), shiny-lab looks (carried onto
+ * the starter -> customPokemonData at launch), fusions and held items (applied on
+ * battle start). KNOWN GAPS honestly noted: the Starter shape carries no per-mon
+ * LEVEL (one STARTING_LEVEL for all - we use the max authored level or 60) and
+ * fusion is stamped on battle start rather than at generation (stats fold in, but
+ * the pre-battle summary sprite may not show the fusion until refreshed).
+ */
+export function buildErCustomTrainerTeamScenario(trainer: ErCustomTrainerResolved): DevScenario {
+  const members = trainer.members;
+  const difficulty: ErDifficulty = (trainer.difficulties[0] as ErDifficulty | undefined) ?? "ace";
+  const mode = getGameMode(GameModes.CLASSIC);
+  const plan = planErCustomTrainerLaunch(trainer, w => mode.isFixedBattle(w));
+  const wave = plan.ok ? plan.plan.wave : Math.min(50, Math.max(1, trainer.minWave));
+  const authoredLevels = members.map(m => m.level).filter((l): l is number => typeof l === "number");
+  const level = authoredLevels.length > 0 ? Math.max(...authoredLevels) : 60;
+  // A stable salt for the RLA / RLNA player-copy rolls (seed may be unset pre-launch).
+  const seed = "custom-trainer-team";
+  return {
+    label: `Team: ${trainer.name}`,
+    description:
+      `USE AS MY TEAM - the authored party of #${trainer.id} "${trainer.name}"\n`
+      + `is fielded as YOUR team (wave ${wave}, level ${level}, difficulty ${difficulty}).\n`
+      + "A quick way into a battle with a ready team; the opposing side is a\n"
+      + "normal wave. Species / form / ability / moves + shiny-lab / fusion /\n"
+      + "held items carry; per-mon levels do not (one level for the whole team).",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty(difficulty);
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: wave,
+        STARTING_LEVEL_OVERRIDE: level,
+      });
+      return members.slice(0, 6).map((member, i) => {
+        const moveIds = resolveErCustomTrainerMoveIds(seed, trainer.key, i, member);
+        const starter = makeStarter(member.speciesId as SpeciesId, {
+          formIndex: member.formIndex,
+          abilityIndex: member.abilitySlot,
+          moveset: moveIds.slice(0, 4) as MoveId[],
+        });
+        // Shiny-lab look: carried on the Starter -> customPokemonData at launch
+        // (the same #785 representation player/ghost/co-op mons already use).
+        if (member.shinyLook) {
+          starter.shiny = true;
+          starter.variant = 0;
+          starter.erShinyLab = member.shinyLook;
+          if (member.shinyName) {
+            starter.erShinyLabName = member.shinyName;
+          }
+        }
+        return starter;
+      });
+    },
+    onBattleStart: () => {
+      // Fusions + held items can't ride the Starter shape, so apply them onto the
+      // built player party once both sides are summoned.
+      const party = globalScene.getPlayerParty();
+      party.forEach((mon, i) => {
+        const member = members[i];
+        if (!member) {
+          return;
+        }
+        if (member.fusion) {
+          applyErCustomTrainerFusion(mon, member.fusion);
+          mon.calculateStats();
+          mon.generateName();
+        }
+        for (const cfg of erCustomTrainerHeldModifierConfigs(member)) {
+          let modifier: PokemonHeldItemModifier;
+          if (cfg.modifier instanceof PokemonHeldItemModifierType) {
+            modifier = cfg.modifier.newModifier(mon) as PokemonHeldItemModifier;
+          } else {
+            modifier = cfg.modifier;
+            modifier.pokemonId = mon.id;
+          }
+          modifier.stackCount = cfg.stackCount ?? 1;
+          globalScene.addModifier(modifier, true);
+        }
+      });
+      globalScene.updateModifiers(true);
+    },
+  };
 }
 
 /**

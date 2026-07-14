@@ -65,7 +65,13 @@ import { formatConsoleSnapshot } from "#utils/console-ring-buffer";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { openScenarioBuilder } from "./builder";
 import { summarizeErCustomTrainer } from "./custom-trainer-picker";
-import { buildErCustomTrainerDevScenario, DEV_SCENARIOS, type DevScenario, resetDevOverrides } from "./scenarios";
+import {
+  buildErCustomTrainerDevScenario,
+  buildErCustomTrainerTeamScenario,
+  DEV_SCENARIOS,
+  type DevScenario,
+  resetDevOverrides,
+} from "./scenarios";
 
 /** er-editor-api Worker — the remote log sink (commits logs to the dev-logs branch). */
 const REMOTE_LOG_URL = "https://er-editor-api.heraklines.workers.dev/devlog";
@@ -719,9 +725,9 @@ function clampCustomTrainerLabel(label: string): string {
 /**
  * The CUSTOM TRAINERS sub-list (opened from the "Custom Trainers" entry at the top
  * of the picker, under the Scenario Builder). One row per RESOLVED authored
- * trainer (name, #id, first species). Picking one drops straight into a forced
- * battle against it. Empty state shows a single "(no custom trainers authored
- * yet)" line. Same single-OPTION_SELECT + scroll behavior as the scenario list.
+ * trainer (name, #id, first species). Picking one opens a small action menu
+ * (Fight / Use as my team). Empty state shows a single "(no custom trainers
+ * authored yet)" line. Same single-OPTION_SELECT + scroll behavior as the list.
  */
 function openCustomTrainerList(ctx: DevMenuCtx): void {
   const trainers = getErCustomTrainers();
@@ -740,7 +746,10 @@ function openCustomTrainerList(ctx: DevMenuCtx): void {
       const summary = summarizeErCustomTrainer(trainer, id => getPokemonSpecies(id)?.name ?? `#${id}`);
       options.push({
         label: clampCustomTrainerLabel(summary),
-        handler: () => launchCustomTrainer(ctx, trainer),
+        handler: () => {
+          openCustomTrainerActions(ctx, trainer);
+          return true;
+        },
       });
     }
   }
@@ -753,9 +762,40 @@ function openCustomTrainerList(ctx: DevMenuCtx): void {
     },
   });
   const header =
-    trainers.length > 0 ? `Select a custom trainer to fight (${trainers.length})` : "No custom trainers authored yet";
+    trainers.length > 0 ? `Select a custom trainer (${trainers.length})` : "No custom trainers authored yet";
   globalScene.ui.showText(header, null, () =>
     globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options, maxOptions: 6 }),
+  );
+}
+
+/**
+ * The per-trainer action menu: FIGHT the trainer (forced battle against it) or USE
+ * AS MY TEAM (drop into a normal battle with the authored party as YOUR team - a
+ * fast way into a fight without hand-picking starters).
+ */
+function openCustomTrainerActions(ctx: DevMenuCtx, trainer: ErCustomTrainerResolved): void {
+  const options = [
+    {
+      label: `⚔ Fight ${trainer.name}`,
+      handler: () => launchCustomTrainer(ctx, trainer),
+    },
+    {
+      label: "👥 Use as my team",
+      handler: () => {
+        activeShareCode = null;
+        return launchScenario(ctx, buildErCustomTrainerTeamScenario(trainer));
+      },
+    },
+    {
+      label: "Back",
+      handler: () => {
+        openCustomTrainerList(ctx);
+        return true;
+      },
+    },
+  ];
+  globalScene.ui.showText(`${trainer.name} #${trainer.id}`, null, () =>
+    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options }),
   );
 }
 
