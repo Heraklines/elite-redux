@@ -10,7 +10,10 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("../..", import.meta.url)));
-const workflow = readFileSync(resolve(root, ".github/workflows/coop-focused-branch.yml"), "utf8");
+const workflow = readFileSync(resolve(root, ".github/workflows/coop-focused-branch.yml"), "utf8").replaceAll(
+  "\r\n",
+  "\n",
+);
 
 function job(name, nextName) {
   const start = workflow.indexOf(`\n  ${name}:\n`);
