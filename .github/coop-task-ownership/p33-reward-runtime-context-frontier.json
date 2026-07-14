@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "taskId": "p33-reward-runtime-context-frontier",
+  "branch": "ci/coop/p33-reward-runtime-context-frontier",
+  "trainRef": "ci/coop/p33-mystery-public-transition",
+  "baseSha": "54b16eb25e577965de43825ea9c91063c01def33",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-reward-runtime-context-frontier.json",
+    "src/data/elite-redux/coop/coop-reward-operation.ts",
+    "test/tests/elite-redux/coop/coop-duo-reward-operation.test.ts",
+    "test/tests/elite-redux/coop/coop-reward-options.test.ts"
+  ]
+}
