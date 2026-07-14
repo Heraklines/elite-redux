@@ -79,8 +79,14 @@ import {
 import {
   type CoopCommitContext,
   type CoopIntentValidator,
+  type CoopRuntimeOpState,
   CoopOperationGuest,
   CoopOperationHost,
+  maybeCoopOpSurfaceState,
+  registerCoopOpSurfaceState,
+  requireCoopOpSurfaceState,
+  requireCoopOpSurfaceStateFor,
+  resetActiveCoopRuntimeClocks,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
@@ -161,14 +167,14 @@ export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMe
 
 export type CoopMeTerminalReceiveResult = "executed" | "duplicate" | "retry" | "rejected";
 
-interface CoopMeTerminalReceiveHooks {
+export interface CoopMeTerminalReceiveHooks {
   /** Shadow-atomic comprehensive state apply. False leaves the operation unacknowledged and retriable. */
   readonly applyMaterial: () => boolean;
   /** Open the exact terminal surface. False retains the already-applied DATA and retries only control. */
   readonly executeDestination: () => boolean;
 }
 
-interface CoopMeTerminalReceipt {
+export interface CoopMeTerminalReceipt {
   readonly operationId: string;
   readonly pinned: number;
   readonly step: number;
@@ -341,30 +347,70 @@ const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_ME
 let enabled = DEFAULT_ENABLED;
 
 /**
- * The session epoch (§1.4). Wave-2c keeps it constant (1) per session and resets the surface state on
- * session boundaries; the full launch/resume epoch mint is a later cross-surface piece (§2.4). An epoch
- * change still bumps it here so a cross-epoch operationId is dropped structurally (invariant 6).
+ * Every mutable ME operation cursor belongs to one concrete runtime. Production still has one runtime per
+ * process; the two-engine harness has two, so a host commit can no longer poison the guest's applied-id cursor,
+ * proposal retry set, presentation ordinal, or terminal receipt simply because both clients share one module
+ * graph. The rollback flag stays process configuration; all session state lives in this registered record.
  */
-let epoch = 1;
+interface MeOpState {
+  epoch: number;
+  revisionFloor: number;
+  authorityHost: CoopOperationHost | null;
+  watchGuest: CoopOperationGuest | null;
+  readonly ownerPresentationSteps: Map<number, number>;
+  readonly authoritySubPickSteps: Map<number, number>;
+  readonly authorityPickSteps: Map<number, number>;
+  readonly retainedTerminalPayloads: Map<string, CoopMeTerminalPayload>;
+  lastAppliedPinned: number;
+  readonly pendingOwnerIntentRetries: Map<string, ReturnType<typeof setTimeout>>;
+  readonly terminalTransactions: CoopMeTerminalTransactionReceiver;
+}
 
-/** The authority (coop host) commit log for ME ops. Lazily created; null until first use / on a non-host. */
-let authorityHost: CoopOperationHost | null = null;
+registerCoopOpSurfaceState(
+  "me",
+  (): MeOpState => ({
+    epoch: 1,
+    revisionFloor: 0,
+    authorityHost: null,
+    watchGuest: null,
+    ownerPresentationSteps: new Map<number, number>(),
+    authoritySubPickSteps: new Map<number, number>(),
+    authorityPickSteps: new Map<number, number>(),
+    retainedTerminalPayloads: new Map<string, CoopMeTerminalPayload>(),
+    lastAppliedPinned: -1,
+    pendingOwnerIntentRetries: new Map<string, ReturnType<typeof setTimeout>>(),
+    terminalTransactions: new CoopMeTerminalTransactionReceiver(),
+  }),
+);
 
-/** The watcher applier that gates adoption of a relayed decision. Lazily created; null until first use. */
-let watchGuest: CoopOperationGuest | null = null;
+function state(): MeOpState {
+  return requireCoopOpSurfaceState<MeOpState>("me");
+}
 
-/** Next host presentation ordinal, scoped to one pinned ME and advanced only after durable commit. */
-const ownerPresentationSteps = new Map<number, number>();
-/** Next accepted guest-owned sub-pick ordinal, scoped to one pinned ME. */
-const authoritySubPickSteps = new Map<number, number>();
-/** Next accepted top-level/Delve/Safari pick ordinal, scoped to one pinned ME. */
-const authorityPickSteps = new Map<number, number>();
-/** First exact terminal payload per deterministic operation id, retained across journal handoff retries. */
-const retainedTerminalPayloads = new Map<string, CoopMeTerminalPayload>();
+/** Execute/continue one complete terminal transaction against the receiving runtime's own receipt ledger. */
+export function receiveCoopMeTerminalTransaction(
+  receipt: CoopMeTerminalReceipt,
+  hooks: CoopMeTerminalReceiveHooks,
+): CoopMeTerminalReceiveResult {
+  return state().terminalTransactions.receive(receipt, hooks);
+}
+
+/** Explicit-runtime sibling for durability callbacks that already know the addressed receiving runtime. */
+export function receiveCoopMeTerminalTransactionFor(
+  opState: CoopRuntimeOpState,
+  receipt: CoopMeTerminalReceipt,
+  hooks: CoopMeTerminalReceiveHooks,
+): CoopMeTerminalReceiveResult {
+  return requireCoopOpSurfaceStateFor<MeOpState>(opState, "me").terminalTransactions.receive(receipt, hooks);
+}
+
+function isCoopOpRuntimeError(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith("[coop-op]");
+}
 
 /** Allocate the next durable ME_PRESENT address step in host emission order. */
 export function nextCoopMePresentationStep(pinned: number): number {
-  return ownerPresentationSteps.get(pinned) ?? 0;
+  return state().ownerPresentationSteps.get(pinned) ?? 0;
 }
 
 /**
@@ -374,20 +420,11 @@ export function nextCoopMePresentationStep(pinned: number): number {
  * owner's own commit, and never by a mid-ME step (a whole ME shares ONE pinned counter, so the guard must
  * NOT trip between an ME's own present/pick/sub/terminal). -1 = none yet.
  */
-let lastAppliedPinned = -1;
-
-/**
- * The surface-local revision FLOOR (W2e-R P0-3): seeded from the persisted per-class high-water on a COLD
- * resume so the producer continues at floor+1 (matching the restored durability receiver), keeping the
- * committed-op revision stream monotonic across the save boundary. See the biome adapter for the rationale.
- */
-let revisionFloor = 0;
-
 /** Guest proposals are not journaled until the host commits them, so retry the legacy relay payload. */
 const ME_OWNER_INTENT_RETRY_MS = 1_000;
-const pendingOwnerIntentRetries = new Map<string, ReturnType<typeof setTimeout>>();
 
 function cancelOwnerIntentRetry(operationId: string): void {
+  const pendingOwnerIntentRetries = state().pendingOwnerIntentRetries;
   const timer = pendingOwnerIntentRetries.get(operationId);
   if (timer != null) {
     clearTimeout(timer);
@@ -402,6 +439,7 @@ function cancelOwnerIntentRetry(operationId: string): void {
  * frames into a later encounter; there is never more than one live ME per client.
  */
 export function settleCoopMeOwnerIntentRetries(): void {
+  const pendingOwnerIntentRetries = state().pendingOwnerIntentRetries;
   if (pendingOwnerIntentRetries.size === 0) {
     return;
   }
@@ -415,12 +453,17 @@ export function settleCoopMeOwnerIntentRetries(): void {
 /** Release the host's first-capture terminal image only after its local close/advance transaction succeeds. */
 export function releaseCoopMeRetainedTerminal(operationId: string | null): void {
   if (operationId != null) {
-    retainedTerminalPayloads.delete(operationId);
+    state().retainedTerminalPayloads.delete(operationId);
   }
 }
 
 function armOwnerIntentRetry(operationId: string, resend: () => void): void {
-  cancelOwnerIntentRetry(operationId);
+  const pendingOwnerIntentRetries = state().pendingOwnerIntentRetries;
+  const existing = pendingOwnerIntentRetries.get(operationId);
+  if (existing != null) {
+    clearTimeout(existing);
+    pendingOwnerIntentRetries.delete(operationId);
+  }
   const retry = (): void => {
     if (!pendingOwnerIntentRetries.has(operationId)) {
       return;
@@ -465,7 +508,7 @@ export function resetCoopMeOperationFlag(): void {
 
 /** The current ME operation epoch (§1.4). */
 export function getCoopMeOperationEpoch(): number {
-  return epoch;
+  return maybeCoopOpSurfaceState<MeOpState>("me")?.epoch ?? 1;
 }
 
 /**
@@ -473,28 +516,34 @@ export function getCoopMeOperationEpoch(): number {
  * prior epoch can never satisfy a live op (invariant 6). Idempotent for the same epoch.
  */
 export function setCoopMeOperationEpoch(next: number): void {
-  if (next === epoch) {
+  const s = maybeCoopOpSurfaceState<MeOpState>("me");
+  if (s == null || next === s.epoch) {
     return;
   }
-  epoch = next;
+  s.epoch = next;
   resetCoopMeOperationState();
 }
 
-/** Tear down all per-session operation state (called from assembleCoopRuntime + clearCoopRuntime + tests). Keeps the flag. */
+/** Tear down the active runtime's per-session operation state. Safe no-op when no runtime is installed. */
 export function resetCoopMeOperationState(): void {
-  CoopOperationHost.resetGlobalOrder();
-  for (const timer of pendingOwnerIntentRetries.values()) {
+  const s = maybeCoopOpSurfaceState<MeOpState>("me");
+  if (s == null) {
+    return;
+  }
+  resetActiveCoopRuntimeClocks();
+  for (const timer of s.pendingOwnerIntentRetries.values()) {
     clearTimeout(timer);
   }
-  pendingOwnerIntentRetries.clear();
-  authorityHost = null;
-  watchGuest = null;
-  ownerPresentationSteps.clear();
-  authoritySubPickSteps.clear();
-  authorityPickSteps.clear();
-  retainedTerminalPayloads.clear();
-  lastAppliedPinned = -1;
-  revisionFloor = 0;
+  s.pendingOwnerIntentRetries.clear();
+  s.authorityHost = null;
+  s.watchGuest = null;
+  s.ownerPresentationSteps.clear();
+  s.authoritySubPickSteps.clear();
+  s.authorityPickSteps.clear();
+  s.retainedTerminalPayloads.clear();
+  s.lastAppliedPinned = -1;
+  s.revisionFloor = 0;
+  s.terminalTransactions.reset();
 }
 
 /**
@@ -503,12 +552,13 @@ export function resetCoopMeOperationState(): void {
  * guests so the producer continues at floor+1 and the guests accept it. No-op for a fresh session.
  */
 export function setCoopMeOperationRevisionFloor(hw: number): void {
-  if (!Number.isFinite(hw) || hw <= 0 || hw === revisionFloor) {
+  const s = maybeCoopOpSurfaceState<MeOpState>("me");
+  if (s == null || !Number.isFinite(hw) || hw <= 0 || hw === s.revisionFloor) {
     return;
   }
-  revisionFloor = hw;
-  authorityHost = null;
-  watchGuest = null;
+  s.revisionFloor = hw;
+  s.authorityHost = null;
+  s.watchGuest = null;
 }
 
 // -----------------------------------------------------------------------------
@@ -516,17 +566,15 @@ export function setCoopMeOperationRevisionFloor(hw: number): void {
 // -----------------------------------------------------------------------------
 
 function host(): CoopOperationHost {
-  if (authorityHost == null) {
-    authorityHost = CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
-  }
-  return authorityHost;
+  const s = state();
+  s.authorityHost ??= CoopOperationHost.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor });
+  return s.authorityHost;
 }
 
 function guest(): CoopOperationGuest {
-  if (watchGuest == null) {
-    watchGuest = CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
-  }
-  return watchGuest;
+  const s = state();
+  s.watchGuest ??= CoopOperationGuest.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor });
+  return s.watchGuest;
 }
 
 /**
@@ -670,6 +718,7 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
     return null;
   }
   try {
+    const s = state();
     if (params.kind === "ME_TERMINAL" && !isCompleteCoopMeTerminalPayload(params.payload)) {
       coopWarn("me", "ME_TERMINAL commit rejected: terminal transaction is incomplete");
       return null;
@@ -689,20 +738,20 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
     }
     const step = params.step ?? 0;
     if (params.localRole === "host" && params.kind === "ME_PRESENT") {
-      const expected = ownerPresentationSteps.get(params.pinned) ?? 0;
+      const expected = s.ownerPresentationSteps.get(params.pinned) ?? 0;
       if (step !== expected) {
         coopWarn("me", `ME_PRESENT step ${step} did not match pinned ${params.pinned} expected ${expected}`);
         return null;
       }
     }
     const addr = meOpAddr(params.kind, params.seq, step);
-    const operationId = makeCoopOperationId(epoch, ownerSeat, addr, params.kind);
+    const operationId = makeCoopOperationId(s.epoch, ownerSeat, addr, params.kind);
     let payload = params.payload;
     if (params.localRole === "host" && params.kind === "ME_TERMINAL") {
-      const retained = retainedTerminalPayloads.get(operationId);
+      const retained = s.retainedTerminalPayloads.get(operationId);
       if (retained == null) {
         const exact = JSON.parse(JSON.stringify(params.payload)) as CoopMeTerminalPayload;
-        retainedTerminalPayloads.set(operationId, exact);
+        s.retainedTerminalPayloads.set(operationId, exact);
         payload = exact;
       } else {
         payload = retained;
@@ -729,7 +778,7 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
           return null;
         }
         if (params.kind === "ME_PRESENT") {
-          ownerPresentationSteps.set(params.pinned, step + 1);
+          s.ownerPresentationSteps.set(params.pinned, step + 1);
         }
         coopLog(
           "me",
@@ -749,6 +798,9 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
     // doc). The owner knows its own decision; only an adopted RELAY needs the stale-ordering guard.
     return intent.id;
   } catch (e) {
+    if (isCoopOpRuntimeError(e)) {
+      throw e;
+    }
     coopWarn("me", "ME op OWNER commit threw (handled - legacy relay is the fallback) (Wave-2c)", e);
     return null;
   }
@@ -776,7 +828,8 @@ export interface CoopMeAuthorityGuestIntentParams {
  * is malformed. The ordinal advances only after the exact host commit and journal handoff succeed.
  */
 export function commitMeAuthorityGuestIntent(params: CoopMeAuthorityGuestIntentParams): CoopMeAuthorityIntentResult {
-  const steps = params.kind === "ME_PICK" ? authorityPickSteps : authoritySubPickSteps;
+  const s = state();
+  const steps = params.kind === "ME_PICK" ? s.authorityPickSteps : s.authoritySubPickSteps;
   const expected = steps.get(params.pinned) ?? 0;
   if (!Number.isSafeInteger(params.step) || params.step < 0 || params.step > 999) {
     return { kind: "gap" };
@@ -817,7 +870,8 @@ export function commitMeAuthorityLocalPick(params: {
   readonly wave: number;
   readonly turn: number;
 }): string | null {
-  const step = authorityPickSteps.get(params.pinned) ?? 0;
+  const s = state();
+  const step = s.authorityPickSteps.get(params.pinned) ?? 0;
   const operationId = commitMeOwnerIntent({
     kind: "ME_PICK",
     seq: params.seq,
@@ -829,7 +883,7 @@ export function commitMeAuthorityLocalPick(params: {
     turn: params.turn,
   });
   if (operationId != null) {
-    authorityPickSteps.set(params.pinned, step + 1);
+    s.authorityPickSteps.set(params.pinned, step + 1);
     setCoopMeOwnerIntentOrdinals(params.pinned, step + 1);
   }
   return operationId;
@@ -889,15 +943,16 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
         };
   }
   try {
+    const s = state();
     const ownerSeat = ownerSeatFor(params.kind, params.pinned);
     const addr = meOpAddr(params.kind, params.seq, params.step ?? 0);
-    const derivedOpId = makeCoopOperationId(epoch, ownerSeat, addr, params.kind);
+    const derivedOpId = makeCoopOperationId(s.epoch, ownerSeat, addr, params.kind);
     const relayedOp = params.res.operationId == null ? null : parseCoopOperationId(params.res.operationId);
     const addrBase = meOpAddr(params.kind, params.seq, 0);
     if (
       params.res.operationId != null
       && (relayedOp == null
-        || relayedOp.epoch !== epoch
+        || relayedOp.epoch !== s.epoch
         || relayedOp.owner !== ownerSeat
         || relayedOp.pinnedSeq < addrBase
         || relayedOp.pinnedSeq >= addrBase + 1000
@@ -925,7 +980,7 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
         }
         // The sole authority may apply the intent it just validated at this safe phase seam. The
         // non-authoritative peer remains strictly gated on the committed envelope.
-        lastAppliedPinned = params.pinned;
+        s.lastAppliedPinned = params.pinned;
         return {
           adopt: true,
           kind: params.kind,
@@ -941,10 +996,10 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
     // applied op (same operationId), can NEVER overwrite the live decision. The pinned counter is
     // monotonic across MEs; within one ME every step shares the pinned counter, so the `<` guard never
     // trips between an ME's own steps (it only rejects a decision from a strictly-earlier interaction).
-    if (params.pinned < lastAppliedPinned) {
+    if (params.pinned < s.lastAppliedPinned) {
       coopWarn(
         "me",
-        `ME op WATCHER REJECT stale/dup kind=${params.kind} id=${opId} pinned=${params.pinned} lastApplied=${lastAppliedPinned} (Wave-2c)`,
+        `ME op WATCHER REJECT stale/dup kind=${params.kind} id=${opId} pinned=${params.pinned} lastApplied=${s.lastAppliedPinned} (Wave-2c)`,
       );
       return { adopt: false, reason: "stale-or-duplicate" };
     }
@@ -963,7 +1018,7 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
     const g = guest();
     const applyRes = g.applyEnvelope({
       version: 1,
-      sessionEpoch: epoch,
+      sessionEpoch: s.epoch,
       revision: g.getLastAppliedRevision() + 1,
       wave: params.wave,
       turn: params.turn,
@@ -978,6 +1033,9 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
     coopLog("me", `ME op WATCHER adopt kind=${params.kind} choice=${params.res.choice} id=${opId} (Wave-2c)`);
     return { adopt: true, kind: params.kind };
   } catch (e) {
+    if (isCoopOpRuntimeError(e)) {
+      throw e;
+    }
     coopWarn("me", "ME op WATCHER gate threw (handled - deterministic fallback) (Wave-2c)", e);
     return { adopt: false, reason: "threw" };
   }

@@ -6,9 +6,19 @@
 
 import {
   CoopMeTerminalTransactionReceiver,
+  commitMeOwnerIntent,
   isCompleteCoopMeTerminalPayload,
+  nextCoopMePresentationStep,
+  receiveCoopMeTerminalTransaction,
+  resetCoopMeOperationFlag,
+  resetCoopMeOperationState,
+  setCoopMeOperationEnabled,
 } from "#data/elite-redux/coop/coop-me-operation";
 import { type CoopMeTerminalPayload, makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  createCoopRuntimeOpState,
+  setActiveCoopRuntimeOpState,
+} from "#data/elite-redux/coop/coop-operation-runtime";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopAuthoritativeBattleStateV1, CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it } from "vitest";
@@ -78,6 +88,85 @@ function terminalId(pinned: number, step: number, epoch = 1): string {
 }
 
 describe("complete retained Mystery terminal transaction", () => {
+  it("keeps host presentation ordinals and commit logs isolated per runtime", () => {
+    const runtimeA = createCoopRuntimeOpState("host");
+    const runtimeB = createCoopRuntimeOpState("guest");
+    const pinned = 7;
+    const seq = 8_000_000 + pinned;
+    const params = {
+      kind: "ME_PRESENT" as const,
+      seq,
+      pinned,
+      step: 0,
+      payload: {
+        present: true,
+        presentation: { k: "mePresent" as const, tokens: {}, meetsReqs: [], labels: [] },
+      },
+      localRole: "host" as const,
+      wave: 12,
+      turn: 0,
+    };
+
+    setCoopMeOperationEnabled(true);
+    try {
+      setActiveCoopRuntimeOpState(runtimeA);
+      expect(nextCoopMePresentationStep(pinned)).toBe(0);
+      expect(commitMeOwnerIntent(params)).not.toBeNull();
+      expect(nextCoopMePresentationStep(pinned)).toBe(1);
+
+      setActiveCoopRuntimeOpState(runtimeB);
+      expect(nextCoopMePresentationStep(pinned), "the renderer did not inherit the host's ordinal").toBe(0);
+      expect(commitMeOwnerIntent(params), "the same deterministic id is independent in the second runtime").not.toBeNull();
+      expect(nextCoopMePresentationStep(pinned)).toBe(1);
+
+      setActiveCoopRuntimeOpState(runtimeA);
+      expect(nextCoopMePresentationStep(pinned)).toBe(1);
+    } finally {
+      for (const runtime of [runtimeA, runtimeB]) {
+        setActiveCoopRuntimeOpState(runtime);
+        resetCoopMeOperationState();
+      }
+      setActiveCoopRuntimeOpState(null);
+      resetCoopMeOperationFlag();
+    }
+  });
+
+  it("keeps terminal receipts isolated on the exact receiving runtime", () => {
+    const runtimeA = createCoopRuntimeOpState("guest");
+    const runtimeB = createCoopRuntimeOpState("guest");
+    const receipt = { operationId: terminalId(7, 0), pinned: 7, step: 0, payload: leavePayload(12) };
+    let materialApplies = 0;
+    let destinationExecutions = 0;
+    const hooks = {
+      applyMaterial: () => {
+        materialApplies++;
+        return true;
+      },
+      executeDestination: () => {
+        destinationExecutions++;
+        return true;
+      },
+    };
+
+    try {
+      setActiveCoopRuntimeOpState(runtimeA);
+      expect(receiveCoopMeTerminalTransaction(receipt, hooks)).toBe("executed");
+
+      setActiveCoopRuntimeOpState(runtimeB);
+      expect(
+        receiveCoopMeTerminalTransaction(receipt, hooks),
+        "the second client owns a distinct receipt ledger even for the same deterministic id",
+      ).toBe("executed");
+
+      setActiveCoopRuntimeOpState(runtimeA);
+      expect(receiveCoopMeTerminalTransaction(receipt, hooks)).toBe("duplicate");
+      expect(materialApplies).toBe(2);
+      expect(destinationExecutions).toBe(2);
+    } finally {
+      setActiveCoopRuntimeOpState(null);
+    }
+  });
+
   it("rejects every old split terminal shape and accepts complete leave/battle destinations", () => {
     expect(isCompleteCoopMeTerminalPayload({ terminal: "leave" })).toBe(false);
     expect(isCompleteCoopMeTerminalPayload({ terminal: "battle", hostTurn: 3 })).toBe(false);

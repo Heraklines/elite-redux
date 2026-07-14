@@ -125,10 +125,10 @@ import {
 import { COOP_DISCONNECT_GRACE_MS } from "#data/elite-redux/coop/coop-lifecycle";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import {
-  CoopMeTerminalTransactionReceiver,
   commitMeOwnerIntent,
   isCompleteCoopMeTerminalPayload,
   isCoopMeOperationEnabled,
+  receiveCoopMeTerminalTransactionFor,
   resetCoopMeOperationState,
   setCoopMeOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-me-operation";
@@ -3641,9 +3641,6 @@ function materializeCoopColosseumActionFromOp(runtime: CoopRuntime, envelope: Co
   return false;
 }
 
-/** Per-session two-stage terminal receiver: retain DATA success until the exact destination executes. */
-const coopMeTerminalTransactions = new CoopMeTerminalTransactionReceiver();
-
 /** Materialize journal ME presentation and complete terminal transactions on the authoritative guest. */
 function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
   if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
@@ -3735,7 +3732,7 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
   if (!canMaterializeCoopMeCommittedTerminal(transaction)) {
     return false;
   }
-  const receive = coopMeTerminalTransactions.receive(transaction, {
+  const receive = receiveCoopMeTerminalTransactionFor(runtime.opState, transaction, {
     applyMaterial: () => {
       if (applyCoopMeOutcome(payload.outcome)) {
         return true;
@@ -4398,12 +4395,9 @@ export function assembleCoopRuntime(
   // records ARE the reset; calling reset here would touch the PREVIOUS runtime's record, not this one's).
   resetCoopColosseumOperationState();
   resetCoopRevivalOperationState();
-  // Wave-2c: the mystery-encounter operation surface shares the same fresh-control-plane discipline (§8
-  // step 5) - drop any leftover ME op state so a new run's re-init-from-0 interaction counter can never
-  // collide with a prior run's already-applied ME operationIds.
-  resetCoopMeOperationState();
+  // Mystery-operation state is per-runtime: createCoopRuntimeOpState below constructs the new run's fresh
+  // receipt ledger/cursors. Resetting here would mutate the previously active runtime during duo assembly.
   resetCoopActiveMysteryControl();
-  coopMeTerminalTransactions.reset();
   // Wave-2f: same fresh-control-plane reset for the post-battle wave-advance operation state (THE KEYSTONE) -
   // a new run's wave index restarts, so drop any leftover host/guest applier + last-applied wave pin.
   resetCoopWaveAdvanceOperationState();
@@ -4752,7 +4746,6 @@ export function clearCoopRuntime(): void {
   resetCoopRewardOperationState();
   // Wave-2c: same teardown for the mystery-encounter operation surface.
   resetCoopMeOperationState();
-  coopMeTerminalTransactions.reset();
   // Wave-2f: same teardown for the post-battle wave-advance operation surface (THE KEYSTONE).
   resetCoopWaveAdvanceOperationState();
   learnMoveForwardInFlight.clear();

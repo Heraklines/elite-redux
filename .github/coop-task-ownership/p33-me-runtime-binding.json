@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "taskId": "p33-me-runtime-binding",
+  "branch": "ci/coop/p33-me-runtime-binding",
+  "trainRef": "ci/coop/p33-mystery-public-transition",
+  "baseSha": "28b72b51549ec4db25f83f45cfc8fa0755bbf912",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-me-runtime-binding.json",
+    "src/data/elite-redux/coop/coop-me-operation.ts",
+    "src/data/elite-redux/coop/coop-runtime.ts",
+    "test/tests/elite-redux/coop/coop-me-terminal-transaction.test.ts",
+    "test/tests/elite-redux/coop/coop-operation-precommit-intent-loss.test.ts"
+  ]
+}

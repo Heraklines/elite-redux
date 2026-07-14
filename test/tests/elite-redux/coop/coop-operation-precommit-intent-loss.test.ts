@@ -40,6 +40,7 @@ import {
   resetCoopMeOperationState,
   setCoopMeOperationEnabled,
   setCoopMeOperationEpoch,
+  settleCoopMeOwnerIntentRetries,
 } from "#data/elite-redux/coop/coop-me-operation";
 import type {
   CoopLogicalPhase,
@@ -108,6 +109,48 @@ describe("W2e-R2 I5: pre-commit intent loss - owner re-send with the determinist
   afterEach(() => {
     resetCoopBiomeOperationState();
     setActiveCoopRuntimeOpState(null);
+  });
+
+  it("keeps identical guest proposal retry ids isolated per runtime", async () => {
+    vi.useFakeTimers();
+    const runtimeA = createCoopRuntimeOpState("guest");
+    const runtimeB = createCoopRuntimeOpState("guest");
+    const resendA = vi.fn();
+    const resendB = vi.fn();
+    const params = {
+      kind: "ME_PICK" as const,
+      seq: 8_000_003,
+      pinned: 3,
+      payload: { optionIndex: 1 },
+      localRole: "guest" as const,
+      wave: 12,
+      turn: 0,
+    };
+    try {
+      setCoopMeOperationEnabled(true);
+      setActiveCoopRuntimeOpState(runtimeA);
+      expect(commitMeOwnerIntent({ ...params, resend: resendA })).not.toBeNull();
+
+      setActiveCoopRuntimeOpState(runtimeB);
+      expect(commitMeOwnerIntent({ ...params, resend: resendB })).not.toBeNull();
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(resendA).toHaveBeenCalledOnce();
+      expect(resendB).toHaveBeenCalledOnce();
+
+      setActiveCoopRuntimeOpState(runtimeA);
+      settleCoopMeOwnerIntentRetries();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(resendA, "settling A cancels only A's retry ledger").toHaveBeenCalledOnce();
+      expect(resendB, "B's same deterministic id remains live in B's ledger").toHaveBeenCalledTimes(2);
+    } finally {
+      for (const runtime of [runtimeA, runtimeB]) {
+        setActiveCoopRuntimeOpState(runtime);
+        resetCoopMeOperationState();
+      }
+      resetCoopMeOperationFlag();
+      vi.useRealTimers();
+    }
   });
 
   it("the biome adapter repeats one deterministic intent until committed receipt consumption cancels it", async () => {
