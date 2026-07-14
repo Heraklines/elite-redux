@@ -92,7 +92,8 @@
             "sanityOff": true,
             "shiny": {
               "around": "zaps",
-              "name": "Top 0.1%"
+              "name": "Top 0.1%",
+              "palette": "hyperpigment"
             },
             "species": 19,
             "weight": 1
