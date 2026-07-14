@@ -77,6 +77,58 @@ dataset the rest of this stands on.
 - This is WHY the featurization principle works end to end: events reference ids; the per-build dictionary
   turns them into the attribute/effect-flag vectors + description text the model consumes.
 
+## Evaluation design
+
+How we know a checkpoint is actually BETTER - without a human-eval bottleneck and without the self-play
+circularity that lets a policy "improve" against nothing but its own blind spots.
+
+### Primary eval = the environment gauntlet (the PvE advantage)
+
+Unlike a PvP ladder, this is a roguelike: **the game itself is a fixed, non-self-referential opponent.**
+The primary metric is a **gauntlet** - N **fixed-seed** runs per difficulty, policy-driven, measuring
+**clear rate + average wave reached**. The opponent distribution is set by the game, not by us, so the
+number is objective and can't be gamed by co-evolving against a weak sparring partner. Runs **nightly on
+the CPU fleet**.
+
+### Frozen anchor pool vs the self-play Elo trap
+
+**Self-play win-rate is a TRAINING signal, never an eval.** A checkpoint that beats its own recent
+ancestors may just be exploiting shared blind spots. Eval Elo is measured **only against a frozen,
+versioned ANCHOR set**:
+
+- Scripted game AI per difficulty (the built-in trainers).
+- A **fixed sample of ~hundreds of real ghost teams from prod** (human-built team diversity - 20k+ runs
+  are already available to sample from).
+- **Permanently frozen past checkpoints** (a few milestone versions).
+
+The anchors **never change**, so anchor Elo is **comparable across months**. Use **SPRT** sequential
+testing (fishtest-style) for checkpoint gating instead of fixed game counts - stop as soon as the result
+is statistically decided, which is compute-optimal.
+
+### Leading indicator = held-out human prediction
+
+Cross-entropy + **top-k legal-action accuracy** on telemetry splits, **split BY PLAYER AND TIME WINDOW,
+never randomly** (adjacent decisions within one run leak - a random split inflates the score). This is an
+early-warning gauge: **anchor Elo up + human-prediction down = the policy is drifting** away from
+human-like play (over-fitting to self-play quirks); tighten the KL leash to the imitation prior.
+
+### Passive human eval in prod (the unfair advantage)
+
+Ship candidate checkpoints as **low-frequency AI trainers / ghost-trainer drivers in prod.** Every player
+battle against one is a **recorded human-vs-model game** via telemetry - **zero-recruitment human eval at
+scale.** Track the **correlation of offline metrics (anchor Elo, held-out CE) with real human win-rate**;
+once that correlation is established, the offline metrics become **trusted proxies** and most iteration
+never needs to touch prod.
+
+### Promotion gate
+
+- **Cheap pass, every checkpoint:** held-out CE + an **SPRT** anchor-game run.
+- **Nightly:** the full environment gauntlet.
+- **Promote only if** the gauntlet **improves** AND **neither** held-out human-prediction **nor** anchor
+  Elo **regresses**.
+- **Hygiene:** private, **rotating eval seeds** (so a checkpoint can't be tuned to the eval set); the eval
+  ghost sample is **never trained on** (strict train/eval separation).
+
 ## New-content adaptation
 
 - Attribute / effect-flag featurization -> zero-shot understanding of new abilities composed from existing
