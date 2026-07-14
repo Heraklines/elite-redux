@@ -9,8 +9,15 @@
 // from the LIVE runtime tables via the dump tool:
 //   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/tools/dump-editor-data.test.ts
 //
+// Also generates:
+//   editor/data/trainer-classes.json — every TrainerType enum name that ships a
+//   BW sprite in the er-assets trainer dir ({name, sprite, genders}). Excludes
+//   names with no sprite (they would render broken in-game). The er-assets dir
+//   is resolved from $ER_ASSETS_DIR, then ../er-assets, then the local checkout.
+//
 // Run: node scripts/gen-editor-data.mjs   (re-run when moves change)
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const read = p => readFileSync(p, "utf8");
 
@@ -56,3 +63,49 @@ mkdirSync("editor/data", { recursive: true });
 writeFileSync("editor/data/moves.json", `${JSON.stringify(uniqueMoves, null, 2)}\n`);
 console.log(`moves: ${uniqueMoves.length} (incl. ${erMoveCount} ER custom names)`);
 console.log("species/items/trainers: run the dump tool (see header) — they come from the live runtime tables.");
+
+// Trainer-class sprite catalog: every TrainerType enum name that ships a BW
+// sprite in the er-assets trainer dir. `<lower>.png` → genders:false;
+// `<lower>_m.png` → genders:true; neither → excluded (no sprite in-game).
+{
+  const ASSETS_DIR = (() => {
+    const candidates = [
+      process.env.ER_ASSETS_DIR,
+      resolve(process.cwd(), "../er-assets"),
+      "C:/Users/Hafida/pokerogue/.worktrees/er-assets",
+    ].filter(Boolean);
+    for (const c of candidates) {
+      if (existsSync(resolve(c, "images/trainer"))) {
+        return resolve(c, "images/trainer");
+      }
+    }
+    return null;
+  })();
+
+  if (ASSETS_DIR) {
+    const pngs = new Set(readdirSync(ASSETS_DIR).filter(f => f.endsWith(".png")));
+    // Parse the TrainerType enum member names (skip the numeric reverse map).
+    const tt = read("src/enums/trainer-type.ts");
+    const body = tt.slice(tt.indexOf("{") + 1, tt.lastIndexOf("}"));
+    const names = [];
+    for (const line of body.split("\n")) {
+      const m = line.match(/^\s*([A-Z][A-Z0-9_]+)\s*(?:=|,)/);
+      if (m && m[1] !== "UNKNOWN") {
+        names.push(m[1]);
+      }
+    }
+    const classes = [];
+    for (const name of names) {
+      const lower = name.toLowerCase();
+      if (pngs.has(`${lower}.png`)) {
+        classes.push({ name, sprite: lower, genders: false });
+      } else if (pngs.has(`${lower}_m.png`)) {
+        classes.push({ name, sprite: lower, genders: true });
+      }
+    }
+    writeFileSync("editor/data/trainer-classes.json", `${JSON.stringify(classes, null, 2)}\n`);
+    console.log(`trainer-classes: ${classes.length} of ${names.length} TrainerType names have a sprite.`);
+  } else {
+    console.log("trainer-classes: SKIPPED — er-assets trainer dir not found (set ER_ASSETS_DIR).");
+  }
+}

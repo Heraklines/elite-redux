@@ -1,0 +1,1247 @@
+[
+  {
+    "name": "ACE_TRAINER",
+    "sprite": "ace_trainer",
+    "genders": true
+  },
+  {
+    "name": "AROMA_LADY",
+    "sprite": "aroma_lady",
+    "genders": false
+  },
+  {
+    "name": "ARTIST",
+    "sprite": "artist",
+    "genders": false
+  },
+  {
+    "name": "BACKERS",
+    "sprite": "backers",
+    "genders": true
+  },
+  {
+    "name": "BACKPACKER",
+    "sprite": "backpacker",
+    "genders": true
+  },
+  {
+    "name": "BAKER",
+    "sprite": "baker",
+    "genders": false
+  },
+  {
+    "name": "BEAUTY",
+    "sprite": "beauty",
+    "genders": false
+  },
+  {
+    "name": "BIKER",
+    "sprite": "biker",
+    "genders": false
+  },
+  {
+    "name": "BIRD_KEEPER",
+    "sprite": "bird_keeper",
+    "genders": true
+  },
+  {
+    "name": "BLACK_BELT",
+    "sprite": "black_belt",
+    "genders": true
+  },
+  {
+    "name": "BREEDER",
+    "sprite": "breeder",
+    "genders": true
+  },
+  {
+    "name": "BUG_CATCHER",
+    "sprite": "bug_catcher",
+    "genders": false
+  },
+  {
+    "name": "CAMPER",
+    "sprite": "camper",
+    "genders": true
+  },
+  {
+    "name": "CLERK",
+    "sprite": "clerk",
+    "genders": true
+  },
+  {
+    "name": "COLLECTOR",
+    "sprite": "collector",
+    "genders": false
+  },
+  {
+    "name": "CYCLIST",
+    "sprite": "cyclist",
+    "genders": true
+  },
+  {
+    "name": "DANCER",
+    "sprite": "dancer",
+    "genders": false
+  },
+  {
+    "name": "DEPOT_AGENT",
+    "sprite": "depot_agent",
+    "genders": false
+  },
+  {
+    "name": "DOCTOR",
+    "sprite": "doctor",
+    "genders": true
+  },
+  {
+    "name": "DRAGON_TAMER",
+    "sprite": "dragon_tamer",
+    "genders": false
+  },
+  {
+    "name": "FAIRY_TALE_GIRL",
+    "sprite": "fairy_tale_girl",
+    "genders": false
+  },
+  {
+    "name": "FIREBREATHER",
+    "sprite": "firebreather",
+    "genders": false
+  },
+  {
+    "name": "FISHERMAN",
+    "sprite": "fisherman",
+    "genders": false
+  },
+  {
+    "name": "GUITARIST",
+    "sprite": "guitarist",
+    "genders": false
+  },
+  {
+    "name": "HARLEQUIN",
+    "sprite": "harlequin",
+    "genders": false
+  },
+  {
+    "name": "HEX_MANIAC",
+    "sprite": "hex_maniac",
+    "genders": false
+  },
+  {
+    "name": "HIKER",
+    "sprite": "hiker",
+    "genders": false
+  },
+  {
+    "name": "HOOLIGANS",
+    "sprite": "hooligans",
+    "genders": false
+  },
+  {
+    "name": "HOOPSTER",
+    "sprite": "hoopster",
+    "genders": false
+  },
+  {
+    "name": "INFIELDER",
+    "sprite": "infielder",
+    "genders": false
+  },
+  {
+    "name": "INTERVIEWERS",
+    "sprite": "interviewers",
+    "genders": false
+  },
+  {
+    "name": "JANITOR",
+    "sprite": "janitor",
+    "genders": false
+  },
+  {
+    "name": "LINEBACKER",
+    "sprite": "linebacker",
+    "genders": false
+  },
+  {
+    "name": "MAID",
+    "sprite": "maid",
+    "genders": false
+  },
+  {
+    "name": "MUSICIAN",
+    "sprite": "musician",
+    "genders": false
+  },
+  {
+    "name": "MYSTERIOUS_SISTERS",
+    "sprite": "mysterious_sisters",
+    "genders": false
+  },
+  {
+    "name": "NURSERY_AIDE",
+    "sprite": "nursery_aide",
+    "genders": false
+  },
+  {
+    "name": "OFFICER",
+    "sprite": "officer",
+    "genders": false
+  },
+  {
+    "name": "PARASOL_LADY",
+    "sprite": "parasol_lady",
+    "genders": false
+  },
+  {
+    "name": "PILOT",
+    "sprite": "pilot",
+    "genders": false
+  },
+  {
+    "name": "POKEFAN",
+    "sprite": "pokefan",
+    "genders": true
+  },
+  {
+    "name": "PRESCHOOLER",
+    "sprite": "preschooler",
+    "genders": true
+  },
+  {
+    "name": "PSYCHIC",
+    "sprite": "psychic",
+    "genders": true
+  },
+  {
+    "name": "RANGER",
+    "sprite": "ranger",
+    "genders": true
+  },
+  {
+    "name": "RICH",
+    "sprite": "rich",
+    "genders": true
+  },
+  {
+    "name": "RICH_KID",
+    "sprite": "rich_kid",
+    "genders": true
+  },
+  {
+    "name": "ROUGHNECK",
+    "sprite": "roughneck",
+    "genders": false
+  },
+  {
+    "name": "RUIN_MANIAC",
+    "sprite": "ruin_maniac",
+    "genders": false
+  },
+  {
+    "name": "SAILOR",
+    "sprite": "sailor",
+    "genders": false
+  },
+  {
+    "name": "SCIENTIST",
+    "sprite": "scientist",
+    "genders": true
+  },
+  {
+    "name": "SCUBA_DIVER",
+    "sprite": "scuba_diver",
+    "genders": true
+  },
+  {
+    "name": "SMASHER",
+    "sprite": "smasher",
+    "genders": false
+  },
+  {
+    "name": "SNOW_ACE_TRAINER",
+    "sprite": "snow_ace_trainer",
+    "genders": true
+  },
+  {
+    "name": "SNOW_WORKER",
+    "sprite": "snow_worker",
+    "genders": false
+  },
+  {
+    "name": "STRIKER",
+    "sprite": "striker",
+    "genders": false
+  },
+  {
+    "name": "SCHOOL_KID",
+    "sprite": "school_kid",
+    "genders": true
+  },
+  {
+    "name": "SWIMMER",
+    "sprite": "swimmer",
+    "genders": true
+  },
+  {
+    "name": "TWINS",
+    "sprite": "twins",
+    "genders": false
+  },
+  {
+    "name": "VETERAN",
+    "sprite": "veteran",
+    "genders": true
+  },
+  {
+    "name": "WAITER",
+    "sprite": "waiter",
+    "genders": true
+  },
+  {
+    "name": "WORKER",
+    "sprite": "worker",
+    "genders": true
+  },
+  {
+    "name": "YOUNG_COUPLE",
+    "sprite": "young_couple",
+    "genders": false
+  },
+  {
+    "name": "YOUNGSTER",
+    "sprite": "youngster",
+    "genders": true
+  },
+  {
+    "name": "ROCKET_GRUNT",
+    "sprite": "rocket_grunt",
+    "genders": true
+  },
+  {
+    "name": "ARCHER",
+    "sprite": "archer",
+    "genders": false
+  },
+  {
+    "name": "ARIANA",
+    "sprite": "ariana",
+    "genders": false
+  },
+  {
+    "name": "PROTON",
+    "sprite": "proton",
+    "genders": false
+  },
+  {
+    "name": "PETREL",
+    "sprite": "petrel",
+    "genders": false
+  },
+  {
+    "name": "MAGMA_GRUNT",
+    "sprite": "magma_grunt",
+    "genders": true
+  },
+  {
+    "name": "TABITHA",
+    "sprite": "tabitha",
+    "genders": false
+  },
+  {
+    "name": "COURTNEY",
+    "sprite": "courtney",
+    "genders": false
+  },
+  {
+    "name": "AQUA_GRUNT",
+    "sprite": "aqua_grunt",
+    "genders": true
+  },
+  {
+    "name": "MATT",
+    "sprite": "matt",
+    "genders": false
+  },
+  {
+    "name": "SHELLY",
+    "sprite": "shelly",
+    "genders": false
+  },
+  {
+    "name": "GALACTIC_GRUNT",
+    "sprite": "galactic_grunt",
+    "genders": true
+  },
+  {
+    "name": "JUPITER",
+    "sprite": "jupiter",
+    "genders": false
+  },
+  {
+    "name": "MARS",
+    "sprite": "mars",
+    "genders": false
+  },
+  {
+    "name": "SATURN",
+    "sprite": "saturn",
+    "genders": false
+  },
+  {
+    "name": "PLASMA_GRUNT",
+    "sprite": "plasma_grunt",
+    "genders": true
+  },
+  {
+    "name": "ZINZOLIN",
+    "sprite": "zinzolin",
+    "genders": false
+  },
+  {
+    "name": "COLRESS",
+    "sprite": "colress",
+    "genders": false
+  },
+  {
+    "name": "FLARE_GRUNT",
+    "sprite": "flare_grunt",
+    "genders": true
+  },
+  {
+    "name": "BRYONY",
+    "sprite": "bryony",
+    "genders": false
+  },
+  {
+    "name": "XEROSIC",
+    "sprite": "xerosic",
+    "genders": false
+  },
+  {
+    "name": "ALIANA",
+    "sprite": "aliana",
+    "genders": false
+  },
+  {
+    "name": "CELOSIA",
+    "sprite": "celosia",
+    "genders": false
+  },
+  {
+    "name": "MABLE",
+    "sprite": "mable",
+    "genders": false
+  },
+  {
+    "name": "AETHER_GRUNT",
+    "sprite": "aether_grunt",
+    "genders": true
+  },
+  {
+    "name": "FABA",
+    "sprite": "faba",
+    "genders": false
+  },
+  {
+    "name": "SKULL_GRUNT",
+    "sprite": "skull_grunt",
+    "genders": true
+  },
+  {
+    "name": "PLUMERIA",
+    "sprite": "plumeria",
+    "genders": false
+  },
+  {
+    "name": "MACRO_GRUNT",
+    "sprite": "macro_grunt",
+    "genders": true
+  },
+  {
+    "name": "OLEANA",
+    "sprite": "oleana",
+    "genders": false
+  },
+  {
+    "name": "STAR_GRUNT",
+    "sprite": "star_grunt",
+    "genders": true
+  },
+  {
+    "name": "GIACOMO",
+    "sprite": "giacomo",
+    "genders": false
+  },
+  {
+    "name": "MELA",
+    "sprite": "mela",
+    "genders": false
+  },
+  {
+    "name": "ATTICUS",
+    "sprite": "atticus",
+    "genders": false
+  },
+  {
+    "name": "ORTEGA",
+    "sprite": "ortega",
+    "genders": false
+  },
+  {
+    "name": "ERI",
+    "sprite": "eri",
+    "genders": false
+  },
+  {
+    "name": "ROCKET_BOSS_GIOVANNI_1",
+    "sprite": "rocket_boss_giovanni_1",
+    "genders": false
+  },
+  {
+    "name": "MAXIE",
+    "sprite": "maxie",
+    "genders": false
+  },
+  {
+    "name": "ARCHIE",
+    "sprite": "archie",
+    "genders": false
+  },
+  {
+    "name": "CYRUS",
+    "sprite": "cyrus",
+    "genders": false
+  },
+  {
+    "name": "GHETSIS",
+    "sprite": "ghetsis",
+    "genders": false
+  },
+  {
+    "name": "LYSANDRE",
+    "sprite": "lysandre",
+    "genders": false
+  },
+  {
+    "name": "LUSAMINE",
+    "sprite": "lusamine",
+    "genders": false
+  },
+  {
+    "name": "GUZMA",
+    "sprite": "guzma",
+    "genders": false
+  },
+  {
+    "name": "ROSE",
+    "sprite": "rose",
+    "genders": false
+  },
+  {
+    "name": "PENNY",
+    "sprite": "penny",
+    "genders": false
+  },
+  {
+    "name": "BUCK",
+    "sprite": "buck",
+    "genders": false
+  },
+  {
+    "name": "CHERYL",
+    "sprite": "cheryl",
+    "genders": false
+  },
+  {
+    "name": "MARLEY",
+    "sprite": "marley",
+    "genders": false
+  },
+  {
+    "name": "MIRA",
+    "sprite": "mira",
+    "genders": false
+  },
+  {
+    "name": "RILEY",
+    "sprite": "riley",
+    "genders": false
+  },
+  {
+    "name": "VICTOR",
+    "sprite": "victor",
+    "genders": false
+  },
+  {
+    "name": "VICTORIA",
+    "sprite": "victoria",
+    "genders": false
+  },
+  {
+    "name": "VIVI",
+    "sprite": "vivi",
+    "genders": false
+  },
+  {
+    "name": "VICKY",
+    "sprite": "vicky",
+    "genders": false
+  },
+  {
+    "name": "VITO",
+    "sprite": "vito",
+    "genders": false
+  },
+  {
+    "name": "BUG_TYPE_SUPERFAN",
+    "sprite": "bug_type_superfan",
+    "genders": false
+  },
+  {
+    "name": "EXPERT_POKEMON_BREEDER",
+    "sprite": "expert_pokemon_breeder",
+    "genders": false
+  },
+  {
+    "name": "PLAYER_M_ALTERNATE",
+    "sprite": "player_m_alternate",
+    "genders": false
+  },
+  {
+    "name": "PLAYER_F_ALTERNATE",
+    "sprite": "player_f_alternate",
+    "genders": false
+  },
+  {
+    "name": "PRIVATE_EYE",
+    "sprite": "private_eye",
+    "genders": false
+  },
+  {
+    "name": "BROCK",
+    "sprite": "brock",
+    "genders": false
+  },
+  {
+    "name": "MISTY",
+    "sprite": "misty",
+    "genders": false
+  },
+  {
+    "name": "LT_SURGE",
+    "sprite": "lt_surge",
+    "genders": false
+  },
+  {
+    "name": "ERIKA",
+    "sprite": "erika",
+    "genders": false
+  },
+  {
+    "name": "JANINE",
+    "sprite": "janine",
+    "genders": false
+  },
+  {
+    "name": "SABRINA",
+    "sprite": "sabrina",
+    "genders": false
+  },
+  {
+    "name": "BLAINE",
+    "sprite": "blaine",
+    "genders": false
+  },
+  {
+    "name": "GIOVANNI",
+    "sprite": "giovanni",
+    "genders": false
+  },
+  {
+    "name": "FALKNER",
+    "sprite": "falkner",
+    "genders": false
+  },
+  {
+    "name": "BUGSY",
+    "sprite": "bugsy",
+    "genders": false
+  },
+  {
+    "name": "WHITNEY",
+    "sprite": "whitney",
+    "genders": false
+  },
+  {
+    "name": "MORTY",
+    "sprite": "morty",
+    "genders": false
+  },
+  {
+    "name": "CHUCK",
+    "sprite": "chuck",
+    "genders": false
+  },
+  {
+    "name": "JASMINE",
+    "sprite": "jasmine",
+    "genders": false
+  },
+  {
+    "name": "PRYCE",
+    "sprite": "pryce",
+    "genders": false
+  },
+  {
+    "name": "CLAIR",
+    "sprite": "clair",
+    "genders": false
+  },
+  {
+    "name": "ROXANNE",
+    "sprite": "roxanne",
+    "genders": false
+  },
+  {
+    "name": "BRAWLY",
+    "sprite": "brawly",
+    "genders": false
+  },
+  {
+    "name": "WATTSON",
+    "sprite": "wattson",
+    "genders": false
+  },
+  {
+    "name": "FLANNERY",
+    "sprite": "flannery",
+    "genders": false
+  },
+  {
+    "name": "NORMAN",
+    "sprite": "norman",
+    "genders": false
+  },
+  {
+    "name": "WINONA",
+    "sprite": "winona",
+    "genders": false
+  },
+  {
+    "name": "TATE",
+    "sprite": "tate",
+    "genders": false
+  },
+  {
+    "name": "LIZA",
+    "sprite": "liza",
+    "genders": false
+  },
+  {
+    "name": "JUAN",
+    "sprite": "juan",
+    "genders": false
+  },
+  {
+    "name": "ROARK",
+    "sprite": "roark",
+    "genders": false
+  },
+  {
+    "name": "GARDENIA",
+    "sprite": "gardenia",
+    "genders": false
+  },
+  {
+    "name": "MAYLENE",
+    "sprite": "maylene",
+    "genders": false
+  },
+  {
+    "name": "CRASHER_WAKE",
+    "sprite": "crasher_wake",
+    "genders": false
+  },
+  {
+    "name": "FANTINA",
+    "sprite": "fantina",
+    "genders": false
+  },
+  {
+    "name": "BYRON",
+    "sprite": "byron",
+    "genders": false
+  },
+  {
+    "name": "CANDICE",
+    "sprite": "candice",
+    "genders": false
+  },
+  {
+    "name": "VOLKNER",
+    "sprite": "volkner",
+    "genders": false
+  },
+  {
+    "name": "CILAN",
+    "sprite": "cilan",
+    "genders": false
+  },
+  {
+    "name": "CHILI",
+    "sprite": "chili",
+    "genders": false
+  },
+  {
+    "name": "CRESS",
+    "sprite": "cress",
+    "genders": false
+  },
+  {
+    "name": "CHEREN",
+    "sprite": "cheren",
+    "genders": false
+  },
+  {
+    "name": "LENORA",
+    "sprite": "lenora",
+    "genders": false
+  },
+  {
+    "name": "ROXIE",
+    "sprite": "roxie",
+    "genders": false
+  },
+  {
+    "name": "BURGH",
+    "sprite": "burgh",
+    "genders": false
+  },
+  {
+    "name": "ELESA",
+    "sprite": "elesa",
+    "genders": false
+  },
+  {
+    "name": "CLAY",
+    "sprite": "clay",
+    "genders": false
+  },
+  {
+    "name": "SKYLA",
+    "sprite": "skyla",
+    "genders": false
+  },
+  {
+    "name": "BRYCEN",
+    "sprite": "brycen",
+    "genders": false
+  },
+  {
+    "name": "DRAYDEN",
+    "sprite": "drayden",
+    "genders": false
+  },
+  {
+    "name": "MARLON",
+    "sprite": "marlon",
+    "genders": false
+  },
+  {
+    "name": "VIOLA",
+    "sprite": "viola",
+    "genders": false
+  },
+  {
+    "name": "GRANT",
+    "sprite": "grant",
+    "genders": false
+  },
+  {
+    "name": "KORRINA",
+    "sprite": "korrina",
+    "genders": false
+  },
+  {
+    "name": "RAMOS",
+    "sprite": "ramos",
+    "genders": false
+  },
+  {
+    "name": "CLEMONT",
+    "sprite": "clemont",
+    "genders": false
+  },
+  {
+    "name": "VALERIE",
+    "sprite": "valerie",
+    "genders": false
+  },
+  {
+    "name": "OLYMPIA",
+    "sprite": "olympia",
+    "genders": false
+  },
+  {
+    "name": "WULFRIC",
+    "sprite": "wulfric",
+    "genders": false
+  },
+  {
+    "name": "MILO",
+    "sprite": "milo",
+    "genders": false
+  },
+  {
+    "name": "NESSA",
+    "sprite": "nessa",
+    "genders": false
+  },
+  {
+    "name": "KABU",
+    "sprite": "kabu",
+    "genders": false
+  },
+  {
+    "name": "BEA",
+    "sprite": "bea",
+    "genders": false
+  },
+  {
+    "name": "ALLISTER",
+    "sprite": "allister",
+    "genders": false
+  },
+  {
+    "name": "OPAL",
+    "sprite": "opal",
+    "genders": false
+  },
+  {
+    "name": "BEDE",
+    "sprite": "bede",
+    "genders": false
+  },
+  {
+    "name": "GORDIE",
+    "sprite": "gordie",
+    "genders": false
+  },
+  {
+    "name": "MELONY",
+    "sprite": "melony",
+    "genders": false
+  },
+  {
+    "name": "PIERS",
+    "sprite": "piers",
+    "genders": false
+  },
+  {
+    "name": "MARNIE",
+    "sprite": "marnie",
+    "genders": false
+  },
+  {
+    "name": "RAIHAN",
+    "sprite": "raihan",
+    "genders": false
+  },
+  {
+    "name": "KATY",
+    "sprite": "katy",
+    "genders": false
+  },
+  {
+    "name": "BRASSIUS",
+    "sprite": "brassius",
+    "genders": false
+  },
+  {
+    "name": "IONO",
+    "sprite": "iono",
+    "genders": false
+  },
+  {
+    "name": "KOFU",
+    "sprite": "kofu",
+    "genders": false
+  },
+  {
+    "name": "LARRY",
+    "sprite": "larry",
+    "genders": false
+  },
+  {
+    "name": "RYME",
+    "sprite": "ryme",
+    "genders": false
+  },
+  {
+    "name": "TULIP",
+    "sprite": "tulip",
+    "genders": false
+  },
+  {
+    "name": "GRUSHA",
+    "sprite": "grusha",
+    "genders": false
+  },
+  {
+    "name": "LORELEI",
+    "sprite": "lorelei",
+    "genders": false
+  },
+  {
+    "name": "BRUNO",
+    "sprite": "bruno",
+    "genders": false
+  },
+  {
+    "name": "AGATHA",
+    "sprite": "agatha",
+    "genders": false
+  },
+  {
+    "name": "LANCE",
+    "sprite": "lance",
+    "genders": false
+  },
+  {
+    "name": "WILL",
+    "sprite": "will",
+    "genders": false
+  },
+  {
+    "name": "KOGA",
+    "sprite": "koga",
+    "genders": false
+  },
+  {
+    "name": "KAREN",
+    "sprite": "karen",
+    "genders": false
+  },
+  {
+    "name": "SIDNEY",
+    "sprite": "sidney",
+    "genders": false
+  },
+  {
+    "name": "PHOEBE",
+    "sprite": "phoebe",
+    "genders": false
+  },
+  {
+    "name": "GLACIA",
+    "sprite": "glacia",
+    "genders": false
+  },
+  {
+    "name": "DRAKE",
+    "sprite": "drake",
+    "genders": false
+  },
+  {
+    "name": "AARON",
+    "sprite": "aaron",
+    "genders": false
+  },
+  {
+    "name": "BERTHA",
+    "sprite": "bertha",
+    "genders": false
+  },
+  {
+    "name": "FLINT",
+    "sprite": "flint",
+    "genders": false
+  },
+  {
+    "name": "LUCIAN",
+    "sprite": "lucian",
+    "genders": false
+  },
+  {
+    "name": "SHAUNTAL",
+    "sprite": "shauntal",
+    "genders": false
+  },
+  {
+    "name": "MARSHAL",
+    "sprite": "marshal",
+    "genders": false
+  },
+  {
+    "name": "GRIMSLEY",
+    "sprite": "grimsley",
+    "genders": false
+  },
+  {
+    "name": "CAITLIN",
+    "sprite": "caitlin",
+    "genders": false
+  },
+  {
+    "name": "MALVA",
+    "sprite": "malva",
+    "genders": false
+  },
+  {
+    "name": "SIEBOLD",
+    "sprite": "siebold",
+    "genders": false
+  },
+  {
+    "name": "WIKSTROM",
+    "sprite": "wikstrom",
+    "genders": false
+  },
+  {
+    "name": "DRASNA",
+    "sprite": "drasna",
+    "genders": false
+  },
+  {
+    "name": "HALA",
+    "sprite": "hala",
+    "genders": false
+  },
+  {
+    "name": "MOLAYNE",
+    "sprite": "molayne",
+    "genders": false
+  },
+  {
+    "name": "OLIVIA",
+    "sprite": "olivia",
+    "genders": false
+  },
+  {
+    "name": "ACEROLA",
+    "sprite": "acerola",
+    "genders": false
+  },
+  {
+    "name": "KAHILI",
+    "sprite": "kahili",
+    "genders": false
+  },
+  {
+    "name": "RIKA",
+    "sprite": "rika",
+    "genders": false
+  },
+  {
+    "name": "POPPY",
+    "sprite": "poppy",
+    "genders": false
+  },
+  {
+    "name": "HASSEL",
+    "sprite": "hassel",
+    "genders": false
+  },
+  {
+    "name": "CRISPIN",
+    "sprite": "crispin",
+    "genders": false
+  },
+  {
+    "name": "AMARYS",
+    "sprite": "amarys",
+    "genders": false
+  },
+  {
+    "name": "LACEY",
+    "sprite": "lacey",
+    "genders": false
+  },
+  {
+    "name": "DRAYTON",
+    "sprite": "drayton",
+    "genders": false
+  },
+  {
+    "name": "BLUE",
+    "sprite": "blue",
+    "genders": false
+  },
+  {
+    "name": "RED",
+    "sprite": "red",
+    "genders": false
+  },
+  {
+    "name": "STEVEN",
+    "sprite": "steven",
+    "genders": false
+  },
+  {
+    "name": "WALLACE",
+    "sprite": "wallace",
+    "genders": false
+  },
+  {
+    "name": "CYNTHIA",
+    "sprite": "cynthia",
+    "genders": false
+  },
+  {
+    "name": "ALDER",
+    "sprite": "alder",
+    "genders": false
+  },
+  {
+    "name": "IRIS",
+    "sprite": "iris",
+    "genders": false
+  },
+  {
+    "name": "DIANTHA",
+    "sprite": "diantha",
+    "genders": false
+  },
+  {
+    "name": "KUKUI",
+    "sprite": "kukui",
+    "genders": false
+  },
+  {
+    "name": "HAU",
+    "sprite": "hau",
+    "genders": false
+  },
+  {
+    "name": "LEON",
+    "sprite": "leon",
+    "genders": false
+  },
+  {
+    "name": "MUSTARD",
+    "sprite": "mustard",
+    "genders": false
+  },
+  {
+    "name": "GEETA",
+    "sprite": "geeta",
+    "genders": false
+  },
+  {
+    "name": "NEMONA",
+    "sprite": "nemona",
+    "genders": false
+  },
+  {
+    "name": "KIERAN",
+    "sprite": "kieran",
+    "genders": false
+  },
+  {
+    "name": "RIVAL",
+    "sprite": "rival",
+    "genders": true
+  }
+]
