@@ -40,7 +40,9 @@ test("focused static checks the planner's exact declared train base", () => {
 });
 
 test("focused static accepts ignored-only metadata after the non-vacuous type ratchet", () => {
-  assert.match(staticGate, /biome", "check", "--no-errors-on-unmatched"/u);
+  assert.match(staticGate, /"biome",\s+"check",\s+"--no-errors-on-unmatched"/u);
+  assert.match(staticGate, /"--diagnostic-level=error"/u);
+  assert.match(staticGate, /"--max-diagnostics=none"/u);
 });
 
 test("focused aggregate requires static and isolated shard evidence", () => {
