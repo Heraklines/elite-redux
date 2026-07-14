@@ -38,11 +38,18 @@ export class VictoryPhase extends PokemonPhase {
   public readonly phaseName = "VictoryPhase";
   /** If true, indicates that the phase is intended for EXP purposes only, and not to continue a battle to next phase */
   isExpOnly: boolean;
+  /**
+   * Source wave of an authoritative guest continuation. The retained transaction is addressed to the
+   * wave that just ended; by the time this legacy phase runs, NewBattlePhase may already have installed
+   * the next Battle object. Never let that mutable ambient object re-address the retained tail.
+   */
+  private readonly coopSourceWave: number | null;
 
-  constructor(battlerIndex: BattlerIndex | number, isExpOnly = false) {
+  constructor(battlerIndex: BattlerIndex | number, isExpOnly = false, coopSourceWave: number | null = null) {
     super(battlerIndex);
 
     this.isExpOnly = isExpOnly;
+    this.coopSourceWave = coopSourceWave;
   }
 
   start() {
@@ -107,7 +114,10 @@ export class VictoryPhase extends PokemonPhase {
       broadcastCoopWaveResolved("win");
 
       const gameMode = globalScene.gameMode;
-      const currentWaveIndex = globalScene.currentBattle.waveIndex;
+      const currentWaveIndex =
+        isCoopAuthoritativeGuest() && this.coopSourceWave != null
+          ? this.coopSourceWave
+          : globalScene.currentBattle.waveIndex;
       const authoritativeTransition = isCoopAuthoritativeGuest() ? getCoopActiveWaveTransition(currentWaveIndex) : null;
       const tailControl = resolveCoopVictoryTailControl(authoritativeTransition, {
         trainerWin: () => globalScene.currentBattle.battleType === BattleType.TRAINER,
@@ -121,11 +131,11 @@ export class VictoryPhase extends PokemonPhase {
       // not stamped FAINT, this whole branch is skipped and the guest deadlocks the host's reward WATCHER.
       if (globalScene.gameMode.isCoop) {
         const willSelectModifier =
-          (globalScene.gameMode.isEndless || !globalScene.gameMode.isWaveFinal(globalScene.currentBattle.waveIndex))
-          && globalScene.currentBattle.waveIndex % 10 !== 0;
+          (globalScene.gameMode.isEndless || !globalScene.gameMode.isWaveFinal(currentWaveIndex))
+          && currentWaveIndex % 10 !== 0;
         const coopRole = getCoopController()?.role ?? "none";
         console.info(
-          `[coop-diag] VictoryPhase win-branch role=${coopRole} battleType=${BattleType[globalScene.currentBattle.battleType]} queuesTrainerVictory=${isTrainerWin} queuesSelectModifier=${willSelectModifier} wave=${globalScene.currentBattle.waveIndex}`,
+          `[coop-diag] VictoryPhase win-branch role=${coopRole} battleType=${BattleType[globalScene.currentBattle.battleType]} queuesTrainerVictory=${isTrainerWin} queuesSelectModifier=${willSelectModifier} wave=${currentWaveIndex}`,
         );
       }
 

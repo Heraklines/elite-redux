@@ -30,7 +30,6 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { BerryModifier } from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
-import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import {
   beginRewardShopWatch,
   buildDuo,
@@ -47,6 +46,7 @@ import {
   type ShopPhaseSeam,
   withClient,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 

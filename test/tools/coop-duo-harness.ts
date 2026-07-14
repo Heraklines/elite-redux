@@ -1156,24 +1156,35 @@ export function stubBattleInfo(mon: Pokemon): void {
  * after the real promise settles. This keeps the production launch gate dependent on a completed load,
  * cache residency, and the exact final live key instead of weakening any of those assertions for CI.
  */
+const headlessAtlasModels = new WeakMap<BattleScene, { releasedKeys: Set<string>; wrappedPokemon: WeakSet<object> }>();
+
 export function installHeadlessPlayerAtlasCompletionModel(scene: BattleScene): void {
-  const releasedKeys = new Set<string>();
-  const originalTextureExists = scene.textures.exists.bind(scene.textures);
-  const originalAnimationExists = scene.anims.exists.bind(scene.anims);
-  vi.spyOn(scene.textures, "exists").mockImplementation(
-    key => releasedKeys.has(String(key)) || originalTextureExists(key),
-  );
-  vi.spyOn(scene.anims, "exists").mockImplementation(
-    key => releasedKeys.has(String(key)) || originalAnimationExists(key),
-  );
+  let model = headlessAtlasModels.get(scene);
+  if (model == null) {
+    model = { releasedKeys: new Set<string>(), wrappedPokemon: new WeakSet<object>() };
+    headlessAtlasModels.set(scene, model);
+    const releasedKeys = model.releasedKeys;
+    const originalTextureExists = scene.textures.exists.bind(scene.textures);
+    const originalAnimationExists = scene.anims.exists.bind(scene.anims);
+    vi.spyOn(scene.textures, "exists").mockImplementation(
+      key => releasedKeys.has(String(key)) || originalTextureExists(key),
+    );
+    vi.spyOn(scene.anims, "exists").mockImplementation(
+      key => releasedKeys.has(String(key)) || originalAnimationExists(key),
+    );
+  }
 
   const capacity = scene.currentBattle.arrangement.playerCapacity;
   for (const pokemon of scene.getPlayerParty().slice(0, capacity)) {
+    if (model.wrappedPokemon.has(pokemon)) {
+      continue;
+    }
+    model.wrappedPokemon.add(pokemon);
     const original = pokemon.loadAssets.bind(pokemon);
     vi.spyOn(pokemon, "loadAssets").mockImplementation(async (ignoreOverride = true, useIllusion = false) => {
       await original(ignoreOverride, useIllusion);
       const key = pokemon.getBattleSpriteKey();
-      releasedKeys.add(key);
+      model.releasedKeys.add(key);
       for (const sprite of [pokemon.getSprite(), pokemon.getTintSprite()]) {
         if (sprite == null) {
           continue;
@@ -1674,6 +1685,10 @@ export async function buildDuo(
   await withClient(guestCtx, () => {
     toCoopGameMode(guestScene);
     mirrorHostBattleToGuest(hostScene, guestScene);
+    // The real-browser loader populates Phaser's texture/animation caches and advances the live sprite key.
+    // HEADLESS deliberately omits those renderer effects. Install their faithful completion model for every
+    // two-engine rig, rather than relying on individual tests to remember a non-gameplay wiring step.
+    installHeadlessPlayerAtlasCompletionModel(guestScene);
     const gf = guestScene.getPlayerField();
     gf[0].coopOwner = "host";
     gf[1].coopOwner = "guest";

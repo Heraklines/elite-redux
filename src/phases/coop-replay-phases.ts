@@ -1697,7 +1697,10 @@ export class CoopFinalizeTurnPhase extends Phase {
       {
         payload: reconstructed,
         localRole: getCoopController()?.role ?? "guest",
-        wave: globalScene.currentBattle.waveIndex,
+        // The retained transaction owns its source address. The ambient Battle may already be the next
+        // wave when a delayed continuation materializes; feeding that mutable value into the op ledger
+        // turns an exact wave-N commit into a wave-(N+1) envelope.
+        wave: pending.wave,
         turn: globalScene.currentBattle.turn,
       },
       waveBinding,
@@ -1753,7 +1756,7 @@ export class CoopFinalizeTurnPhase extends Phase {
           // (e.g. a capture that cleared the slot), so getPokemon() always resolves a live mon.
           const lastEnemy = globalScene.getEnemyParty().at(-1);
           const battlerArg = lastEnemy == null ? BattlerIndex.PLAYER : lastEnemy.id;
-          globalScene.phaseManager.pushNew("VictoryPhase", battlerArg);
+          globalScene.phaseManager.pushNew("VictoryPhase", battlerArg, false, pending.wave);
           break;
         }
         case "flee": {
@@ -1775,12 +1778,16 @@ export class CoopFinalizeTurnPhase extends Phase {
           break;
         }
       }
-    } catch {
-      // The post-battle tail is best-effort; a failure here must never hang the guest's run.
+    } catch (error) {
+      // A consumed retained transaction has no legal retry path once its continuation throws. Freezing both
+      // peers is the bounded failure mode; merely logging and returning strands the guest after the one-shot
+      // consume while the host waits forever on the next shared surface.
       coopWarn(
         "replay",
-        `guest wave-advance outcome=${pending.outcome} wave=${pending.wave}: post-battle tail queue threw (handled)`,
+        `guest wave-advance outcome=${pending.outcome} wave=${pending.wave}: post-battle tail queue threw (terminal)`,
+        error,
       );
+      failCoopSharedSession(`Could not materialize the retained wave ${pending.wave} continuation.`);
     }
   }
 }
