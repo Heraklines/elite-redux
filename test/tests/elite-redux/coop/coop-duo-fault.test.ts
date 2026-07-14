@@ -51,6 +51,7 @@ import {
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
   installDuoLogCapture,
+  installHeadlessPlayerAtlasCompletionModel,
   reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
@@ -192,6 +193,7 @@ describe.skipIf(!RUN)(
      */
     async function driveFaultRun(faultPair: CoopFaultPair, WAVES: number): Promise<FaultRunResult> {
       const rig = await buildDuo(game, faultPair, setCoopRuntime, toCoop);
+      installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
       wireGuestCommand(rig);
 
       // Count the guest's auto-resyncs: a converged run under CUE-ONLY faults should force NONE (the
@@ -359,6 +361,7 @@ describe.skipIf(!RUN)(
       const faultPair = wrapCoopFaultPair(createLoopbackPair(), burst, { seed });
 
       const rig = await buildDuo(game, faultPair, setCoopRuntime, toCoop);
+      installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
       wireGuestCommand(rig);
       const resyncSpy = vi.spyOn(CoopBattleStreamer.prototype, "requestStateSync");
 
@@ -487,6 +490,7 @@ describe.skipIf(!RUN)(
       await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
       const faultPair = wrapCoopFaultPair(createLoopbackPair(), COOP_NO_FAULT_PROFILE, { seed: 0xa07 });
       const rig = await buildDuo(game, faultPair, setCoopRuntime, toCoop);
+      installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
       wireGuestCommand(rig);
       const resyncSpy = vi.spyOn(CoopBattleStreamer.prototype, "requestStateSync");
 

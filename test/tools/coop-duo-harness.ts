@@ -214,7 +214,7 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 import fs from "node:fs";
 import path from "node:path";
 import Phaser from "phaser";
-import { afterEach, expect } from "vitest";
+import { afterEach, expect, vi } from "vitest";
 
 /**
  * The PROCESS-GLOBAL mystery-encounter pins/control that are NOT carried on the `active` runtime and
@@ -1120,6 +1120,45 @@ export function stubBattleInfo(mon: Pokemon): void {
   const tintSprite = makeHeadlessSprite(key, false);
   (mon as unknown as { getSprite: () => Phaser.GameObjects.Sprite }).getSprite = () => sprite;
   (mon as unknown as { getTintSprite: () => Phaser.GameObjects.Sprite }).getTintSprite = () => tintSprite;
+}
+
+/**
+ * Phaser HEADLESS executes the real player-atlas loader but does not populate the texture/animation
+ * caches or advance the live sprite from its substitute key. Model only those renderer side effects
+ * after the real promise settles. This keeps the production launch gate dependent on a completed load,
+ * cache residency, and the exact final live key instead of weakening any of those assertions for CI.
+ */
+export function installHeadlessPlayerAtlasCompletionModel(scene: BattleScene): void {
+  const releasedKeys = new Set<string>();
+  const originalTextureExists = scene.textures.exists.bind(scene.textures);
+  const originalAnimationExists = scene.anims.exists.bind(scene.anims);
+  vi.spyOn(scene.textures, "exists").mockImplementation(
+    key => releasedKeys.has(String(key)) || originalTextureExists(key),
+  );
+  vi.spyOn(scene.anims, "exists").mockImplementation(
+    key => releasedKeys.has(String(key)) || originalAnimationExists(key),
+  );
+
+  const capacity = scene.currentBattle.arrangement.playerCapacity;
+  for (const pokemon of scene.getPlayerParty().slice(0, capacity)) {
+    const original = pokemon.loadAssets.bind(pokemon);
+    vi.spyOn(pokemon, "loadAssets").mockImplementation(async (ignoreOverride = true, useIllusion = false) => {
+      await original(ignoreOverride, useIllusion);
+      const key = pokemon.getBattleSpriteKey();
+      releasedKeys.add(key);
+      for (const sprite of [pokemon.getSprite(), pokemon.getTintSprite()]) {
+        if (sprite == null) {
+          continue;
+        }
+        const live = sprite as unknown as {
+          texture: { key: string };
+          anims: { currentAnim?: { key: string } };
+        };
+        live.texture.key = key;
+        live.anims.currentAnim = { key };
+      }
+    });
+  }
 }
 
 /**

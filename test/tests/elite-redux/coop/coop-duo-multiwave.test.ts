@@ -70,6 +70,7 @@ import {
   forceItemRewards,
   forceNextMysteryEncounter,
   installDuoLogCapture,
+  installHeadlessPlayerAtlasCompletionModel,
   reachQueuedRewardShop,
   type ShopPhaseSeam,
   withClient,
@@ -161,6 +162,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     // installed ClientCtx, so those transition continuations cannot use the other engine's globalScene.
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
     // The direct guest BattleScene constructor begins at TitlePhase. Align only this initial harness boot
     // to the real battle turn boundary; shiftPhase() on an empty queue selects production TurnInitPhase,
     // which then builds the actual command/enemy/TurnStart queue under the guest renderer gate.
@@ -359,6 +361,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
     wireGuestCommand(rig);
 
     // Play wave 1 to a win + replay on the guest (reach the post-battle reward shop, counter 0 = host owns).
@@ -426,6 +429,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
 
     // buildDuo tags field slot 1 coopOwner="guest" on BOTH scenes - the "partner's mon" the reporter
     // owns. Its moveset is the forced [TACKLE, SPLASH] (2 moves) so an EMPTY slot exists (the reported
@@ -495,6 +499,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.CHARIZARD);
     const pair = createLoopbackPair();
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
 
     const BENCH_SLOT = 2;
     const TM_MOVE = MoveId.SURF;

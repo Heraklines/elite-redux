@@ -54,6 +54,7 @@ import {
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
   installDuoLogCapture,
+  installHeadlessPlayerAtlasCompletionModel,
   reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
@@ -165,6 +166,7 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
     wireGuestCommand(rig);
 
     const WAVES = 3;
