@@ -1163,7 +1163,7 @@ export class DuoPublicUiRig {
       throw new Error("host emitted malformed retained reward terminal evidence");
     }
     const [, revision, tick, operationId] = retainedMatch;
-    const expectedOperationPrefix = `${expectedAddress.epoch}:${ownerSeat}:REWARD_PICK:`;
+    const expectedOperationPrefix = `${expectedAddress.epoch}:${ownerSeat}:REWARD:`;
     if (!operationId.startsWith(expectedOperationPrefix)) {
       throw new Error(`reward terminal operation ${operationId} is not addressed to ${expectedOperationPrefix}`);
     }
@@ -1179,7 +1179,7 @@ export class DuoPublicUiRig {
       ),
       this.guest.evidence.waitFor(
         new RegExp(
-          `shop authoritative RESULT applied-before-render kind=REWARD_PICK id=${escapedOperationId} rev=${revision} tick=${tick}`,
+          `shop authoritative RESULT applied-before-render kind=REWARD id=${escapedOperationId} rev=${revision} tick=${tick}`,
           "u",
         ),
         {

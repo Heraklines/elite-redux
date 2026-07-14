@@ -241,7 +241,7 @@ test("reward watcher wait aborts on a bounded shared terminal", async () => {
 test("reward terminal proof binds host retention to guest application and materialization", async () => {
   const hostEvidence = new FakeEvidence("host");
   const guestEvidence = new FakeEvidence("guest");
-  const operationId = "73:0:REWARD_PICK:0";
+  const operationId = "73:0:REWARD:0";
   hostEvidence.push({
     kind: "console",
     text: `[coop:reward] reward authoritative RESULT retained rev=7 tick=11 id=${operationId}`,
@@ -252,7 +252,7 @@ test("reward terminal proof binds host retention to guest application and materi
   });
   guestEvidence.push({
     kind: "console",
-    text: `[coop:reward] shop authoritative RESULT applied-before-render kind=REWARD_PICK id=${operationId} rev=7 tick=11`,
+    text: `[coop:reward] shop authoritative RESULT applied-before-render kind=REWARD id=${operationId} rev=7 tick=11`,
   });
   guestEvidence.push({
     kind: "console",
