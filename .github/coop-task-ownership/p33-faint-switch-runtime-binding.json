@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "taskId": "p33-faint-switch-runtime-binding",
+  "branch": "ci/coop/p33-faint-switch-runtime-binding",
+  "trainRef": "ci/coop/p33-mystery-public-transition",
+  "baseSha": "28b72b51549ec4db25f83f45cfc8fa0755bbf912",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-faint-switch-runtime-binding.json",
+    "src/data/elite-redux/coop/coop-faint-switch-operation.ts",
+    "src/phases/coop-guest-faint-switch-phase.ts",
+    "src/phases/coop-replay-phases.ts",
+    "src/phases/switch-phase.ts",
+    "test/tests/elite-redux/coop/coop-duo-faint-switch.test.ts",
+    "test/tests/elite-redux/coop/coop-faint-switch-operation.test.ts"
+  ]
+}

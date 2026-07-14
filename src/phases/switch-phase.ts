@@ -1,6 +1,10 @@
+import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { commitFaintSwitchAuthorityIntent } from "#data/elite-redux/coop/coop-faint-switch-operation";
+import {
+  captureCoopFaintSwitchOperationBinding,
+  commitFaintSwitchAuthorityIntent,
+} from "#data/elite-redux/coop/coop-faint-switch-operation";
 import {
   beginCoopFaintSwitchWindow,
   COOP_FAINT_SWITCH_SEQ_BASE,
@@ -9,6 +13,7 @@ import {
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   coopOwnerOfPlayerFieldSlot,
+  failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
@@ -104,6 +109,23 @@ export class SwitchPhase extends BattlePhase {
     const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
     const coopRelay = coopController == null ? null : getCoopInteractionRelay();
     if (coopController != null && coopRelay != null) {
+      const scene = globalScene;
+      const authoritative = getCoopNetcodeMode() === "authoritative";
+      const operationBinding = (() => {
+        if (!authoritative) {
+          return null;
+        }
+        try {
+          return captureCoopFaintSwitchOperationBinding(coopController.role);
+        } catch (error) {
+          coopWarn("replay", `replacement slot=${this.fieldIndex} could not bind its runtime`, error);
+          failCoopSharedSession("The replacement flow lost its co-op runtime binding.");
+          return;
+        }
+      })();
+      if (operationBinding === undefined) {
+        return;
+      }
       const seq = (globalScene.currentBattle.turn ?? 0) * 4 + this.fieldIndex;
       if (coopOwnerOfPlayerFieldSlot(this.fieldIndex) !== coopController.role) {
         // AUTHORITATIVE netcode (#633 partner-death sync, HALF B): the WATCHER here is the HOST
@@ -114,13 +136,13 @@ export class SwitchPhase extends BattlePhase {
         // from the owner's party half and apply it LOCALLY, so the host's post-turn checkpoint shows
         // the new mon at this slot - which HALF A's reconcileCoopPlayerField then renders on the guest.
         // (LOCKSTEP is unchanged: both clients run the real SwitchPhase and fall through to the relay.)
-        if (getCoopNetcodeMode() === "authoritative") {
+        if (authoritative) {
           // #786: the slot's OWNER (the guest) chooses its OWN replacement. Its renderer opens
           // a party picker off the faint presentation (CoopGuestFaintSwitchPhase) and relays the
           // pick under this same turn+slot seq; await it here, falling back to the old auto-pick
           // when no (or an illegal) pick arrives in time - the run never stalls on a
           // disconnected or idle partner.
-          globalScene.ui.showText("Waiting for your partner to choose their next Pokemon...");
+          scene.ui.showText("Waiting for your partner to choose their next Pokemon...");
           const faintSeq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
           // Suppress the stall watchdog while awaiting the partner's HUMAN pick (see
           // ShowdownEnemyFaintSwitchPhase for the rationale): a slow-but-alive partner must not be misread as
@@ -130,16 +152,16 @@ export class SwitchPhase extends BattlePhase {
             .awaitInteractionChoice(faintSeq, getCoopFaintSwitchWaitMs(), COOP_SWITCH_CHOICE_KINDS)
             .then(res => {
               endCoopFaintSwitchWindow();
-              const battlerCount = globalScene.currentBattle.getBattlerCount();
+              const battlerCount = scene.currentBattle.getBattlerCount();
               let slotIndex = res?.choice ?? -1;
               // #799 (live Wingull/Chinchou wrong-mon summon): the pick carries the chosen mon's
               // SPECIES (data[1]). If the two clients' party orders diverged, the blind slot index
               // points at a DIFFERENT mon here - resolve by IDENTITY instead and log the drift.
               const pickedSpecies = res?.data?.[1] ?? 0;
               if (pickedSpecies > 0 && slotIndex >= 0) {
-                const atSlot = globalScene.getPlayerParty()[slotIndex];
+                const atSlot = scene.getPlayerParty()[slotIndex];
                 if (atSlot?.species?.speciesId !== pickedSpecies) {
-                  const bySpecies = globalScene
+                  const bySpecies = scene
                     .getPlayerParty()
                     .findIndex((p, i) => i >= battlerCount && i < 6 && p?.species?.speciesId === pickedSpecies);
                   if (bySpecies >= 0) {
@@ -151,7 +173,7 @@ export class SwitchPhase extends BattlePhase {
                   }
                 }
               }
-              const picked = globalScene.getPlayerParty()[slotIndex];
+              const picked = scene.getPlayerParty()[slotIndex];
               const legal =
                 slotIndex >= battlerCount
                 && slotIndex < 6
@@ -162,22 +184,29 @@ export class SwitchPhase extends BattlePhase {
                   "replay",
                   `partner replacement pick seq=${faintSeq} ${res == null ? "TIMED OUT" : `illegal (${slotIndex})`} -> auto-pick`,
                 );
-                slotIndex = this.coopAutoPickReplacement();
+                slotIndex = this.coopAutoPickReplacement(scene);
               }
-              const authoritativePick = globalScene.getPlayerParty()[slotIndex];
-              commitFaintSwitchAuthorityIntent({
-                payload: {
-                  fieldIndex: this.fieldIndex,
-                  partySlot: slotIndex,
-                  data: [0, authoritativePick?.species?.speciesId ?? 0],
+              const authoritativePick = scene.getPlayerParty()[slotIndex];
+              const retained = commitFaintSwitchAuthorityIntent(
+                {
+                  payload: {
+                    fieldIndex: this.fieldIndex,
+                    partySlot: slotIndex,
+                    data: [0, authoritativePick?.species?.speciesId ?? 0],
+                  },
+                  ownerRole: coopOwnerOfPlayerFieldSlot(this.fieldIndex),
+                  localRole: coopController.role,
+                  wave: scene.currentBattle.waveIndex,
+                  turn: scene.currentBattle.turn ?? 0,
                 },
-                ownerRole: coopOwnerOfPlayerFieldSlot(this.fieldIndex),
-                localRole: coopController.role,
-                wave: globalScene.currentBattle.waveIndex,
-                turn: globalScene.currentBattle.turn ?? 0,
-              });
+                operationBinding,
+              );
+              if (!retained) {
+                failCoopSharedSession("The authoritative replacement choice could not be retained.");
+                return;
+              }
               if (slotIndex >= battlerCount && slotIndex < 6) {
-                globalScene.phaseManager.unshiftNew(
+                scene.phaseManager.unshiftNew(
                   "SwitchSummonPhase",
                   this.switchType,
                   fieldIndex,
@@ -187,23 +216,23 @@ export class SwitchPhase extends BattlePhase {
                 // #633 guest-faint deadlock: push an OUT-OF-BAND checkpoint AFTER the summon
                 // (FIFO on this level) so the guest materializes the replacement NOW and can
                 // command it - the next turn resolution can never arrive without that command.
-                globalScene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+                scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
               }
-              void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => super.end());
+              void Promise.resolve(scene.ui.setMode(UiMode.MESSAGE)).then(() => scene.phaseManager.shiftPhase());
             });
           return;
         }
         // LOCKSTEP WATCHER: do not open the picker; apply the owner's relayed replacement.
         void coopRelay.awaitInteractionChoice(seq, COOP_SWITCH_WAIT_MS, COOP_SWITCH_CHOICE_KINDS).then(res => {
           const slotIndex = res?.choice ?? -1;
-          if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
+          if (slotIndex >= scene.currentBattle.getBattlerCount() && slotIndex < 6) {
             // Co-op (#633 Fix #4g): carry the BATON_PASS flag relayed in data[0]. Without it the
             // watcher always applied a PLAIN switch, dropping the owner's Baton Pass (stat changes
             // not passed) -> the two engines diverged the moment a baton switch happened.
             const switchType = res?.data?.[0] === 1 ? SwitchType.BATON_PASS : this.switchType;
-            globalScene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
+            scene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
           }
-          globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+          scene.ui.setMode(UiMode.MESSAGE).then(() => scene.phaseManager.shiftPhase());
         });
         return;
       }
@@ -215,44 +244,58 @@ export class SwitchPhase extends BattlePhase {
       // continues with the surviving partner (asymmetric field, #828). If BOTH halves are wiped the modal
       // impossibility guard above (getPokemonAllowedInBattle().every(onField)) already ended without a
       // picker and the faint flow reaches game-over. Only a FORCED (modal) faint switch is closed this way.
-      if (this.isModal && this.coopAutoPickReplacement() < 0) {
+      if (this.isModal && this.coopAutoPickReplacement(scene) < 0) {
         coopLog(
           "replay",
           `owner slot=${this.fieldIndex}: no legal same-owner replacement (half wiped) -> close picker, slot stays empty`,
         );
-        coopRelay.sendInteractionChoice(seq, "switch", -1, [0]);
-        if (getCoopNetcodeMode() === "authoritative") {
-          commitFaintSwitchAuthorityIntent({
-            payload: { fieldIndex: this.fieldIndex, partySlot: -1, data: [0] },
-            ownerRole: coopController.role,
-            localRole: coopController.role,
-            wave: globalScene.currentBattle.waveIndex,
-            turn: globalScene.currentBattle.turn ?? 0,
-          });
+        if (authoritative) {
+          const retained = commitFaintSwitchAuthorityIntent(
+            {
+              payload: { fieldIndex: this.fieldIndex, partySlot: -1, data: [0] },
+              ownerRole: coopController.role,
+              localRole: coopController.role,
+              wave: scene.currentBattle.waveIndex,
+              turn: scene.currentBattle.turn ?? 0,
+            },
+            operationBinding,
+          );
+          if (!retained) {
+            failCoopSharedSession("The authoritative no-replacement choice could not be retained.");
+            return;
+          }
         }
+        coopRelay.sendInteractionChoice(seq, "switch", -1, [0]);
         return super.end();
       }
       // OWNER: pick normally, and relay the chosen slot (+ baton flag) so the watcher mirrors it.
-      globalScene.ui.setMode(
+      scene.ui.setMode(
         UiMode.PARTY,
         this.isModal ? PartyUiMode.FAINT_SWITCH : PartyUiMode.POST_BATTLE_SWITCH,
         fieldIndex,
         (slotIndex: number, option: PartyOption) => {
           const isBaton = option === PartyOption.PASS_BATON;
           const data = isBaton ? [1] : [0];
-          coopRelay.sendInteractionChoice(seq, "switch", slotIndex, data);
-          if (getCoopNetcodeMode() === "authoritative") {
-            commitFaintSwitchAuthorityIntent({
-              payload: { fieldIndex: this.fieldIndex, partySlot: slotIndex, data },
-              ownerRole: coopController.role,
-              localRole: coopController.role,
-              wave: globalScene.currentBattle.waveIndex,
-              turn: globalScene.currentBattle.turn ?? 0,
-            });
+          if (authoritative) {
+            const retained = commitFaintSwitchAuthorityIntent(
+              {
+                payload: { fieldIndex: this.fieldIndex, partySlot: slotIndex, data },
+                ownerRole: coopController.role,
+                localRole: coopController.role,
+                wave: scene.currentBattle.waveIndex,
+                turn: scene.currentBattle.turn ?? 0,
+              },
+              operationBinding,
+            );
+            if (!retained) {
+              failCoopSharedSession("The authoritative replacement choice could not be retained.");
+              return;
+            }
           }
-          if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
+          coopRelay.sendInteractionChoice(seq, "switch", slotIndex, data);
+          if (slotIndex >= scene.currentBattle.getBattlerCount() && slotIndex < 6) {
             const switchType = isBaton ? SwitchType.BATON_PASS : this.switchType;
-            globalScene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
+            scene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
             // #836 (live wave-5 party-order transposition): the host's SwitchSummonPhase SWAPS the party
             // array (`party[slotIndex] = fainted; party[fieldIndex] = replacement`), but the WATCHER (the
             // guest) mirrors a HOST-OWNED faint only at the NEXT turn resolution - so between the faint and
@@ -265,11 +308,11 @@ export class SwitchPhase extends BattlePhase {
             // a HOST-owned faint so both engines' party order stays byte-identical from the moment of the
             // swap. Authoritative-only (the pure-renderer guest never reaches this branch; lockstep both run
             // their own SwitchSummonPhase); the phase itself is a host-role-gated no-op besides.
-            if (getCoopNetcodeMode() === "authoritative") {
-              globalScene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+            if (authoritative) {
+              scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
             }
           }
-          globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+          scene.ui.setMode(UiMode.MESSAGE).then(() => scene.phaseManager.shiftPhase());
         },
         PartyUiHandler.FilterNonFainted,
       );
@@ -317,9 +360,9 @@ export class SwitchPhase extends BattlePhase {
    * bench replacement (the caller then leaves the slot empty exactly as a no-reply relay would).
    * No await, no menu, no RNG.
    */
-  private coopAutoPickReplacement(): number {
-    const battlerCount = globalScene.currentBattle.getBattlerCount();
-    const party = globalScene.getPlayerParty();
+  private coopAutoPickReplacement(scene: BattleScene = globalScene): number {
+    const battlerCount = scene.currentBattle.getBattlerCount();
+    const party = scene.getPlayerParty();
     // Ownership is keyed off the ORIGINAL slot (this.fieldIndex), matching the watcher gate above -
     // the override-to-0 `fieldIndex` only affects where the summon lands, not whose half is legal.
     // M5 (#633): the slot's owner is resolved from the mon's tag (N-ready), hoisted out of the scan.

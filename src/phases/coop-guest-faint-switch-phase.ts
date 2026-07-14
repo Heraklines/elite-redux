@@ -7,7 +7,10 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { armCoopFaintSwitchIntentResend } from "#data/elite-redux/coop/coop-faint-switch-operation";
+import {
+  armCoopFaintSwitchIntentResend,
+  captureCoopFaintSwitchOperationBinding,
+} from "#data/elite-redux/coop/coop-faint-switch-operation";
 import {
   beginCoopFaintSwitchWindow,
   COOP_FAINT_SWITCH_SEQ_BASE,
@@ -15,7 +18,7 @@ import {
   getCoopFaintSwitchWaitMs,
   sendCoopFaintSwitchChoice,
 } from "#data/elite-redux/coop/coop-interaction-relay";
-import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import { failCoopSharedSession, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import { UiMode } from "#enums/ui-mode";
 import { PartyUiHandler, PartyUiMode } from "#ui/handlers/party-ui-handler";
 
@@ -56,6 +59,19 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       this.end();
       return;
     }
+    const scene = globalScene;
+    const operationBinding = (() => {
+      try {
+        return captureCoopFaintSwitchOperationBinding("guest");
+      } catch (error) {
+        coopWarn("replay", "guest own-faint picker could not bind its runtime", error);
+        failCoopSharedSession("The replacement picker lost its co-op runtime binding.");
+        return null;
+      }
+    })();
+    if (operationBinding == null) {
+      return;
+    }
     const seq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
     coopLog("replay", `guest own-faint picker OPEN slot=${this.fieldIndex} seq=${seq} (choose your replacement)`);
     // Suppress the stall watchdog while THIS human's replacement picker is open: the guest's replay is
@@ -65,14 +81,14 @@ export class CoopGuestFaintSwitchPhase extends Phase {
     // failure (the catch) - exactly one of the two runs.
     beginCoopFaintSwitchWindow();
     try {
-      globalScene.ui.setMode(
+      scene.ui.setMode(
         UiMode.PARTY,
         PartyUiMode.FAINT_SWITCH,
         this.fieldIndex,
         (slotIndex: number) => {
           endCoopFaintSwitchWindow();
-          const battlerCount = globalScene.currentBattle?.getBattlerCount() ?? 0;
-          const picked = globalScene.getPlayerParty()[slotIndex];
+          const battlerCount = scene.currentBattle?.getBattlerCount() ?? 0;
+          const picked = scene.getPlayerParty()[slotIndex];
           // DEFENSIVE guard (guest-faint desync, seed EW0gvphu5Ps8dmWDaUKqgr8x): never RELAY a bench
           // mon this client's LOCAL state believes is FAINTED (hp<=0 or not battle-allowed). The
           // FAINT_SWITCH picker already filters fainted mons, but a party-state desync (a stale bench
@@ -90,12 +106,16 @@ export class CoopGuestFaintSwitchPhase extends Phase {
             const pickedSpecies = picked.species?.speciesId ?? 0;
             const data = [0, pickedSpecies];
             sendCoopFaintSwitchChoice(relay, this.fieldIndex, slotIndex, data);
-            armCoopFaintSwitchIntentResend({
-              payload: { fieldIndex: this.fieldIndex, partySlot: slotIndex, data },
-              wave: globalScene.currentBattle?.waveIndex ?? 0,
-              turn: globalScene.currentBattle?.turn ?? 0,
-              resend: () => sendCoopFaintSwitchChoice(relay, this.fieldIndex, slotIndex, data),
-            });
+            armCoopFaintSwitchIntentResend(
+              {
+                payload: { fieldIndex: this.fieldIndex, partySlot: slotIndex, data },
+                localRole: controller.role,
+                wave: scene.currentBattle?.waveIndex ?? 0,
+                turn: scene.currentBattle?.turn ?? 0,
+                resend: () => sendCoopFaintSwitchChoice(relay, this.fieldIndex, slotIndex, data),
+              },
+              operationBinding,
+            );
           } else if (slotIndex >= battlerCount && slotIndex < 6) {
             coopWarn(
               "replay",
@@ -103,7 +123,7 @@ export class CoopGuestFaintSwitchPhase extends Phase {
                 + `(hp=${picked?.hp ?? "-"}) -> NOT relayed, host auto-picks (guard)`,
             );
           }
-          void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => this.end());
+          void Promise.resolve(scene.ui.setMode(UiMode.MESSAGE)).then(() => scene.phaseManager.shiftPhase());
         },
         PartyUiHandler.FilterNonFainted,
       );
@@ -111,7 +131,7 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       // A UI failure must never hang the guest's replay; the host auto-picks after its wait.
       endCoopFaintSwitchWindow();
       coopWarn("replay", `guest own-faint picker slot=${this.fieldIndex} failed to open (handled, host auto-picks)`);
-      this.end();
+      scene.phaseManager.shiftPhase();
     }
   }
 }
