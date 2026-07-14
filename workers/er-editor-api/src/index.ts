@@ -445,6 +445,11 @@ const EDITABLE_FILES: Record<string, EditableFile> = {
     label: "custom mons",
     validate: validateCustomMonsDelta,
   },
+  "custom-trainers": {
+    path: "src/data/elite-redux/er-custom-trainers.json",
+    label: "custom trainers",
+    validate: validateCustomTrainersDelta,
+  },
   learnsets: {
     path: "src/data/elite-redux/er-learnsets.json",
     label: "learnsets",
@@ -544,6 +549,105 @@ function validateCustomMonsDelta(delta: unknown): ValidationResult {
       && (!Array.isArray(m.eggMoves) || m.eggMoves.length > 4 || m.eggMoves.some(v => !isName(v)))
     ) {
       return { ok: false, error: `${key}: eggMoves must be up to 4 move names` };
+    }
+  }
+  return { ok: true };
+}
+
+/** trainerKey -> editor-created custom-trainer entry (null deletes the trainer). */
+function validateCustomTrainersDelta(delta: unknown): ValidationResult {
+  if (!isPlainObject(delta)) {
+    return { ok: false, error: "delta must be an object" };
+  }
+  const isName = (v: unknown): boolean => typeof v === "string" && /^[A-Z0-9_]{1,60}$/.test(v);
+  const validBattleTypes = new Set(["single", "double", "triple"]);
+  const validChallenges = new Set(["none", "inverse", "monocolor", "monogen", "doubles", "ghost"]);
+  const validDifficulties = new Set(["youngster", "ace", "elite", "hell", "mystery"]);
+  for (const [key, tr] of Object.entries(delta)) {
+    if (!/^[A-Z0-9_]{1,40}$/.test(key)) {
+      return { ok: false, error: `bad trainer key: ${key}` };
+    }
+    if (tr === null) {
+      continue;
+    }
+    if (!isPlainObject(tr)) {
+      return { ok: false, error: `${key}: must be an object or null` };
+    }
+    const t = tr as Record<string, unknown>;
+    if (!Number.isInteger(t.id) || (t.id as number) < 70000 || (t.id as number) > 79999) {
+      return { ok: false, error: `${key}: id must be 70000-79999` };
+    }
+    if (typeof t.name !== "string" || t.name.trim().length === 0 || t.name.length > 24) {
+      return { ok: false, error: `${key}: name must be 1-24 chars` };
+    }
+    if (!isName(t.trainerClass)) {
+      return { ok: false, error: `${key}: trainerClass must be a TrainerType NAME` };
+    }
+    if (t.battleType !== undefined && !validBattleTypes.has(t.battleType as string)) {
+      return { ok: false, error: `${key}: battleType must be single/double/triple` };
+    }
+    if (t.challenge !== undefined && !validChallenges.has(t.challenge as string)) {
+      return { ok: false, error: `${key}: challenge must be one of none/inverse/monocolor/monogen/doubles/ghost` };
+    }
+    if (
+      t.difficulties !== undefined
+      && (!Array.isArray(t.difficulties) || t.difficulties.some(d => !validDifficulties.has(d as string)))
+    ) {
+      return { ok: false, error: `${key}: difficulties must be youngster/ace/elite/hell` };
+    }
+    for (const field of ["minWave", "maxWave"]) {
+      if (
+        t[field] !== undefined
+        && !(Number.isInteger(t[field]) && (t[field] as number) >= 1 && (t[field] as number) <= 5000)
+      ) {
+        return { ok: false, error: `${key}: ${field} must be 1-5000` };
+      }
+    }
+    if (t.endless !== undefined && typeof t.endless !== "boolean") {
+      return { ok: false, error: `${key}: endless must be a boolean` };
+    }
+    if (!Array.isArray(t.team) || t.team.length === 0 || t.team.length > 6) {
+      return { ok: false, error: `${key}: team must have 1-6 members` };
+    }
+    for (const member of t.team) {
+      if (!isPlainObject(member)) {
+        return { ok: false, error: `${key}: each team member must be an object` };
+      }
+      const mm = member as Record<string, unknown>;
+      if (!Number.isInteger(mm.species) || (mm.species as number) < 1) {
+        return { ok: false, error: `${key}: member species must be a positive speciesId` };
+      }
+      if (
+        mm.level !== undefined
+        && mm.level !== null
+        && !(Number.isInteger(mm.level) && (mm.level as number) >= 1 && (mm.level as number) <= 200)
+      ) {
+        return { ok: false, error: `${key}: member level must be 1-200 or null` };
+      }
+      if (mm.abilitySlot !== undefined && ![0, 1, 2].includes(mm.abilitySlot as number)) {
+        return { ok: false, error: `${key}: abilitySlot must be 0/1/2` };
+      }
+      if (
+        mm.moves !== undefined
+        && (!Array.isArray(mm.moves) || mm.moves.length > 4 || mm.moves.some(v => !isName(v)))
+      ) {
+        return { ok: false, error: `${key}: moves must be up to 4 move NAMEs` };
+      }
+      if (
+        mm.fusion !== undefined
+        && mm.fusion !== null
+        && (!isPlainObject(mm.fusion) || !Number.isInteger((mm.fusion as Record<string, unknown>).species))
+      ) {
+        return { ok: false, error: `${key}: fusion must be { species, formIndex?, abilitySlot? } or null` };
+      }
+      if (
+        mm.heldItems !== undefined
+        && (!Array.isArray(mm.heldItems)
+          || mm.heldItems.length > 6
+          || mm.heldItems.some(h => !isPlainObject(h) || !isName((h as Record<string, unknown>).item)))
+      ) {
+        return { ok: false, error: `${key}: heldItems must be up to 6 { item NAME, count? }` };
+      }
     }
   }
   return { ok: true };

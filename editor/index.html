@@ -154,6 +154,17 @@
       .sprite-slot canvas { width: 96px; height: 96px; image-rendering: pixelated; background: #0d0d14; border: 1px solid var(--line); border-radius: 6px; }
       .mon-list { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); margin-top: 8px; }
       .mon-list button { display: flex; gap: 8px; align-items: center; text-align: left; }
+      /* ---- Custom Trainers ---- */
+      .ctr-open.on { border-color: var(--accent); background: var(--panel2); font-weight: 600; }
+      .ctr-open.dirty { border-color: var(--accent); }
+      .ctr-form fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 8px 0; min-width: 0; }
+      .ctr-form legend { color: var(--muted); font-size: 12px; padding: 0 6px; }
+      .ctr-form label { font-size: 12px; margin-right: 10px; display: inline-block; }
+      .ctr-member { background: var(--panel2); }
+      .ctr-member .ctr-moves, .ctr-member .ctr-fusion, .ctr-member .ctr-held { margin-top: 6px; }
+      .ctr-held-row { display: inline-flex; gap: 3px; align-items: center; margin-right: 8px; }
+      .ctr-warn { color: var(--warn, #d68910); font-size: 12px; margin-top: 8px; line-height: 1.5; }
+      .ctr-note { color: var(--muted); font-size: 12px; margin-top: 6px; line-height: 1.5; }
       /* ---- Pokedex Editor (Learnsets / TMs / Abilities) ---- */
       .pd { display: grid; grid-template-columns: 280px 1fr; gap: 0; height: calc(100vh - 132px); }
       .pd-list { overflow-y: auto; border-right: 1px solid var(--line); padding: 8px; display: flex; flex-direction: column; gap: 3px; }
@@ -256,6 +267,7 @@
       <button type="button" data-tab="abilities">✨ Abilities</button>
       <button type="button" data-tab="items">🎒 Items</button>
       <button type="button" data-tab="trainers">🤺 Trainers</button>
+      <button type="button" data-tab="customtrainers">🧑‍🏫 Custom Trainers</button>
       <button type="button" data-tab="game">🎛 Game</button>
       <button type="button" data-tab="addmon">➕ Add a Mon</button>
     </nav>
