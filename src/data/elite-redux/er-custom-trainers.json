@@ -105,5 +105,145 @@
     "trainerClass": "YOUNGSTER",
     "victoryDialogue": "Told ya!",
     "weight": 100
+  },
+  "TRAINER_70002": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70002,
+    "maxWave": 20,
+    "minWave": 10,
+    "name": "Brock",
+    "team": [
+      {
+        "variants": [
+          {
+            "abilitySlot": 2,
+            "level": null,
+            "moves": [
+              "STEALTH_ROCK",
+              "ROCK_SLIDE",
+              "RLA",
+              "RLNA"
+            ],
+            "sanityOff": true,
+            "species": 74,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "WILD_CHARGE",
+              "AUTOTOMIZE",
+              "HARD_PRESS",
+              "RLNA"
+            ],
+            "sanityOff": true,
+            "species": 2074,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              },
+              {
+                "count": 1,
+                "item": "EVIOLITE"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "WRAP",
+              "THUNDER_WAVE",
+              "TAUNT",
+              "EARTHQUAKE"
+            ],
+            "sanityOff": true,
+            "species": 95,
+            "weight": 4
+          },
+          {
+            "abilitySlot": 2,
+            "level": null,
+            "moves": [
+              "DRAGON_DANCE",
+              "COUNTER",
+              "SEISMIC_SLAM",
+              "ROCK_SLIDE"
+            ],
+            "sanityOff": true,
+            "shiny": {
+              "palette": "glassbody",
+              "surface": "glasswarp"
+            },
+            "species": 95,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "slotChance": 50,
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "ACCELEROCK",
+              "SUBSTITUTE",
+              "DIG",
+              "SECRET_POWER"
+            ],
+            "sanityOff": true,
+            "species": 744,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 1,
+            "fusion": {
+              "abilitySlot": 1,
+              "formIndex": 0,
+              "species": 4
+            },
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "BATON"
+              },
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "FIRE_FANG",
+              "BELLY_DRUM",
+              "JAGGED_FANGS",
+              "RLNA"
+            ],
+            "sanityOff": true,
+            "species": 744,
+            "weight": 1
+          }
+        ]
+      }
+    ],
+    "trainerClass": "BROCK",
+    "weight": 100
   }
 }
