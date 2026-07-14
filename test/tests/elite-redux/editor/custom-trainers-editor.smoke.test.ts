@@ -45,7 +45,16 @@ interface EditorHarness {
   buildDeltas(): { deltas: Record<string, unknown>; bad: string[] };
   ctrMoveIllegal(m: Record<string, unknown>, move: string): boolean;
   ctrFusedName(a: string, b: string): string;
+  ctrLiveToEdit(entry: Record<string, unknown>): Record<string, any>;
+  ctrBuildBaselines(delta: Record<string, unknown>): Record<string, string>;
+  hashCtrTrainerEntry(entry: unknown): string;
+  markCustomTrainersSaved(delta: Record<string, unknown>, data: Record<string, unknown>): void;
+  CTR_LIVE: Record<string, any>;
   ctr: { current: Record<string, any>; baseline: Record<string, any> };
+  ctrConfig: {
+    current: { windowSize: number; windowChancePct: number };
+    baseline: { windowSize: number; windowChancePct: number };
+  };
   spByConst: Map<string, unknown>;
   spById: Map<number, unknown>;
   trainerClassByName: Map<string, { name: string; sprite: string; genders: boolean }>;
@@ -54,6 +63,11 @@ interface EditorHarness {
   TRAINER_FX: { id: string; label: string; accent: string }[];
   trainerFxById: Map<string, { id: string; label: string; accent: string }>;
   MOVE_SET: Set<string>;
+  moveNameToEnumKey(name: string): string;
+  legalMovesFor(speciesConst: string): Set<string>;
+  learn: { current: Record<string, [number, number][]>; baseline: Record<string, unknown> };
+  tms: { current: Record<string, number[]>; baseline: Record<string, unknown> };
+  moveById: Map<number, { id: number; name: string }>;
   ctrOpenMembers: Set<number>;
   ctrSetSel: Map<number, number>;
   legalMovesCache: Map<string, unknown>;
@@ -114,10 +128,12 @@ beforeAll(() => {
   const stripped = appSrc.replace(/\ninit\(\);\s*$/, "\n");
   const shim = `
     ;window.__ct = {
-      blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal, ctrFusedName,
+      blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal, ctrFusedName, ctrLiveToEdit,
+      ctrBuildBaselines, hashCtrTrainerEntry, markCustomTrainersSaved,
       render, onCustomTrainerInput, onCustomTrainerChange, onCustomTrainerClick, buildDeltas,
-      ctr, spByConst, spById, trainerClassByName, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
+      ctr, ctrConfig, spByConst, spById, trainerClassByName, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
+      get CTR_LIVE(){ return CTR_LIVE; }, set CTR_LIVE(v){ CTR_LIVE = v; },
       setTab(v){ activeTab = v; },
     };`;
   const dom = new JSDOM(HARNESS_HTML, { runScripts: "outside-only", pretendToBeVisual: true });
@@ -133,11 +149,17 @@ beforeEach(() => {
   // Reset editor state between tests (module state is shared across the file).
   ct.ctr.current = {};
   ct.ctr.baseline = {};
+  ct.CTR_LIVE = {};
+  ct.ctrConfig.current = { windowSize: 10, windowChancePct: 25 };
+  ct.ctrConfig.baseline = { windowSize: 10, windowChancePct: 25 };
   ct.ctrSelected = null;
   ct.ctrOpenMembers.clear();
   ct.ctrSetSel.clear();
   ct.legalMovesCache.clear();
   ct.egg.current = {};
+  ct.learn.current = {};
+  ct.tms.current = {};
+  ct.moveById.clear();
   ct.spByConst.clear();
   ct.spById.clear();
   ct.MOVE_SET.clear();
@@ -258,6 +280,202 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     expect(t.team[1].slotChance).toBe(100);
   });
 
+  it("weight field renders, serializes (always written), and migrates a legacy spawnChance on load", () => {
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // The Weight input renders (replacing the old Spawn chance % field) at default 100.
+    const w = q("#ctr-weight") as HTMLInputElement;
+    expect(w).not.toBeNull();
+    expect(Number(w.value)).toBe(100);
+    // Old field is gone.
+    expect(q("#ctr-spawnchance")).toBeNull();
+
+    // Default weight 100 serializes as `weight` (always written); no spawnChance.
+    let delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.weight).toBe(100);
+    expect(delta.spawnChance).toBeUndefined();
+
+    // Edit the weight; it serializes the new value.
+    w.value = "250";
+    ct.onCustomTrainerInput(w);
+    ct.onCustomTrainerChange(w);
+    expect(ct.ctr.current[key].weight).toBe(250);
+    delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.weight).toBe(250);
+
+    // Out-of-range/blank normalizes to >= 1 (0 -> 1).
+    w.value = "0";
+    ct.onCustomTrainerInput(w);
+    expect(ct.ctr.current[key].weight).toBe(1);
+
+    // Migration: a live entry carrying only a legacy spawnChance loads as weight.
+    const migrated = ct.ctrLiveToEdit({
+      id: 70099,
+      name: "Legacy",
+      trainerClass: "ACE_TRAINER",
+      spawnChance: 40,
+      team: [{ species: 25 }],
+    });
+    expect(migrated.weight).toBe(40);
+    expect(migrated.spawnChance).toBeUndefined();
+    // weight present wins over a co-present spawnChance.
+    expect(
+      ct.ctrLiveToEdit({
+        id: 70098,
+        name: "W",
+        trainerClass: "ACE_TRAINER",
+        weight: 7,
+        spawnChance: 40,
+        team: [{ species: 25 }],
+      }).weight,
+    ).toBe(7);
+    // Neither present -> default 100.
+    expect(
+      ct.ctrLiveToEdit({ id: 70097, name: "N", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] }).weight,
+    ).toBe(100);
+  });
+
+  it("spawn density panel renders (no trainer needed), edits config, and serializes only when changed", () => {
+    ct.setTab("customtrainers");
+    ct.render();
+    // The panel renders ABOVE the list, with no trainer selected.
+    const chance = q("#ctr-density-chance") as HTMLInputElement;
+    const window = q("#ctr-density-window") as HTMLInputElement;
+    expect(chance).not.toBeNull();
+    expect(window).not.toBeNull();
+    expect(Number(chance.value)).toBe(25); // shipped default
+    expect(Number(window.value)).toBe(10);
+
+    // Untouched default == baseline -> no config delta (byte-clean).
+    expect(ct.buildDeltas().deltas["custom-trainers-config"]).toBeUndefined();
+
+    // Edit the per-window chance; state updates without a selected trainer.
+    chance.value = "40";
+    expect(ct.onCustomTrainerInput(chance)).toBe(true);
+    expect(ct.ctrConfig.current.windowChancePct).toBe(40);
+    // Edit the window size.
+    window.value = "5";
+    expect(ct.onCustomTrainerInput(window)).toBe(true);
+    expect(ct.ctrConfig.current.windowSize).toBe(5);
+
+    // Now it differs from baseline -> a whole-config delta is emitted.
+    const cfg = ct.buildDeltas().deltas["custom-trainers-config"] as Record<string, number>;
+    expect(cfg).toEqual({ windowSize: 5, windowChancePct: 40 });
+
+    // Out-of-range normalizes: chance 200 -> 25, window 0 -> 10.
+    chance.value = "200";
+    ct.onCustomTrainerInput(chance);
+    expect(ct.ctrConfig.current.windowChancePct).toBe(25);
+    window.value = "0";
+    ct.onCustomTrainerInput(window);
+    expect(ct.ctrConfig.current.windowSize).toBe(10);
+
+    // 0% chance is a VALID, distinct value (disables custom trainers) and serializes.
+    chance.value = "0";
+    ct.onCustomTrainerInput(chance);
+    expect(ct.ctrConfig.current.windowChancePct).toBe(0);
+    const cfg2 = ct.buildDeltas().deltas["custom-trainers-config"] as Record<string, number>;
+    expect(cfg2.windowChancePct).toBe(0);
+  });
+
+  // ---- MULTI-STAFF SAVE SAFETY (Batch A) -----------------------------------
+  it("builds per-trainer baselines only for MODIFIED (loaded) trainers, not new ones or deletions", () => {
+    // MOD existed at load (in CTR_LIVE); NEW is freshly created; DEL is a deletion.
+    ct.CTR_LIVE = { MOD: { id: 70001, name: "Mod", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] } };
+    const delta = {
+      MOD: { id: 70001, name: "Mod v2", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] },
+      NEW: { id: 70002, name: "New", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] },
+      DEL: null,
+    };
+    const baselines = ct.ctrBuildBaselines(delta);
+    // Only MOD gets a baseline hash (of the LOADED CTR_LIVE version).
+    expect(Object.keys(baselines)).toEqual(["MOD"]);
+    expect(baselines.MOD).toBe(ct.hashCtrTrainerEntry(ct.CTR_LIVE.MOD));
+    expect(baselines.NEW).toBeUndefined();
+    expect(baselines.DEL).toBeUndefined();
+  });
+
+  it("applies the server id remap from a save response so the UI shows the real id (no reload)", () => {
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // The client minted a provisional id; the worker returns the real one.
+    const delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.id).toBeGreaterThanOrEqual(70001);
+    ct.markCustomTrainersSaved({ [key]: delta }, { idRemap: { [key]: 70123 }, conflicts: [] });
+    // Local edit state now reflects the server id...
+    expect(ct.ctr.current[key].id).toBe(70123);
+    // ...its baseline is clean (not dirty) and CTR_LIVE advanced to the saved entry.
+    expect(ct.ctr.baseline[key].id).toBe(70123);
+    expect(ct.CTR_LIVE[key].id).toBe(70123);
+    // Not dirty anymore: buildDeltas emits no custom-trainers change.
+    expect(ct.buildDeltas().deltas["custom-trainers"]).toBeUndefined();
+  });
+
+  it("keeps a per-trainer CONFLICT dirty (baseline NOT advanced) while saving the rest", () => {
+    // Two trainers both loaded + edited; the worker rejects CONFLICT, applies OK.
+    ct.CTR_LIVE = {
+      OK: { id: 70001, name: "Ok", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] },
+      CONFLICT: { id: 70002, name: "Clash", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] },
+    };
+    ct.ctr.current = {
+      OK: {
+        id: 70001,
+        name: "Ok v2",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [{ species: "SPECIES_PIKACHU" }],
+      },
+      CONFLICT: {
+        id: 70002,
+        name: "Clash MINE",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [{ species: "SPECIES_PIKACHU" }],
+      },
+    };
+    // Baselines differ from current -> both start dirty.
+    ct.ctr.baseline = {
+      OK: {
+        id: 70001,
+        name: "Ok",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [{ species: "SPECIES_PIKACHU" }],
+      },
+      CONFLICT: {
+        id: 70002,
+        name: "Clash",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [{ species: "SPECIES_PIKACHU" }],
+      },
+    };
+    const okDelta = { id: 70001, name: "Ok v2", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] };
+    const conflictDelta = { id: 70002, name: "Clash MINE", trainerClass: "ACE_TRAINER", team: [{ species: 25 }] };
+
+    ct.markCustomTrainersSaved(
+      { OK: okDelta, CONFLICT: conflictDelta },
+      {
+        idRemap: {},
+        conflicts: [
+          {
+            key: "CONFLICT",
+            error: "CONFLICT: modified by someone else since you loaded - reload to get their version",
+          },
+        ],
+      },
+    );
+
+    // OK advanced to clean: baseline == current.
+    expect(ct.ctr.baseline.OK).toEqual(ct.ctr.current.OK);
+    expect(ct.CTR_LIVE.OK.name).toBe("Ok v2");
+    // CONFLICT stays DIRTY: baseline is NOT advanced (still "Clash") and CTR_LIVE
+    // is NOT updated, so the author can reload the teammate's version.
+    expect(ct.ctr.baseline.CONFLICT.name).toBe("Clash");
+    expect(ct.ctr.current.CONFLICT.name).toBe("Clash MINE");
+    expect(ct.CTR_LIVE.CONFLICT.name).toBe("Clash");
+  });
+
   it("RLA/RLNA are offered atop the datalist and exempt from the legality/unknown-move gate", () => {
     // Give Pikachu a legal pool so an ordinary illegal move (SURF) IS flagged,
     // proving the tokens are treated differently (never flagged).
@@ -299,6 +517,60 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     const { bad } = ct.buildDeltas();
     expect(bad.some(b => /SURF/.test(b))).toBe(true);
     expect(bad.some(b => /\bRLA\b|\bRLNA\b/.test(b))).toBe(false);
+  });
+
+  it("move legality: numeric learnset -> enum keys (learned move passes); two-word input normalizes; nonsense flagged; RLA/RLNA exempt", () => {
+    // moves-rich ships DISPLAY names keyed by numeric move id; learnsets/tm are
+    // numeric-id keyed. The bug: legalMovesFor held the DISPLAY names, so NOTHING
+    // ever matched the enum-name inputs. Seed the real shapes to prove the fix.
+    ct.moveById.set(58, { id: 58, name: "Ice Beam" });
+    ct.moveById.set(85, { id: 85, name: "Thunderbolt" });
+    ct.MOVE_SET.add("ICE_BEAM");
+    ct.MOVE_SET.add("THUNDERBOLT");
+    ct.learn.current.SPECIES_PIKACHU = [[1, 58]]; // Pikachu's level-up learns Ice Beam
+    ct.tms.current.SPECIES_PIKACHU = [85]; // TM: Thunderbolt
+    ct.legalMovesCache.clear();
+
+    // The legal pool is now ENUM KEYS, not the display names (the root-cause fix).
+    const pool = ct.legalMovesFor("SPECIES_PIKACHU");
+    expect(pool.has("ICE_BEAM")).toBe(true);
+    expect(pool.has("THUNDERBOLT")).toBe(true);
+    expect(pool.has("Ice Beam")).toBe(false); // never the raw display name
+
+    // moveNameToEnumKey is the single normalization both sides use.
+    expect(ct.moveNameToEnumKey("Ice Beam")).toBe("ICE_BEAM");
+    expect(ct.moveNameToEnumKey("ice beam")).toBe("ICE_BEAM");
+    expect(ct.moveNameToEnumKey("THUNDERBOLT")).toBe("THUNDERBOLT");
+
+    newTrainer();
+    const key = ct.ctrSelected!;
+    const t = ct.ctr.current[key];
+    setSpecies(0, "SPECIES_PIKACHU");
+    const m = t.team[0];
+    expect(m.sanityOff).toBe(false); // enforcement ON (default)
+
+    const typeMove = (slot: number, val: string) => {
+      const el = q(`.ctr-move[data-idx="0"][data-slot="${slot}"]`) as HTMLInputElement;
+      el.value = val;
+      ct.onCustomTrainerInput(el);
+      return el;
+    };
+
+    // Sanity ON: typing a LOWERCASE TWO-WORD move normalizes to ICE_BEAM (spaces ->
+    // "_"), then PASSES legality. Before the fix it kept "ICE BEAM" and was flagged.
+    const el0 = typeMove(0, "ice beam");
+    expect(el0.value).toBe("ICE_BEAM");
+    expect(m.moves[0]).toBe("ICE_BEAM");
+    expect(el0.style.borderColor).toBe(""); // legal -> no red border
+    expect(ct.ctrMoveIllegal(m, "ICE_BEAM")).toBe(false);
+    expect(ct.ctrMoveIllegal(m, "THUNDERBOLT")).toBe(false); // TM move also legal
+
+    // A nonsense move IS flagged (pool is non-empty, so enforcement is live).
+    expect(ct.ctrMoveIllegal(m, "NONSENSE_MOVE")).toBe(true);
+
+    // RLA/RLNA remain exempt even with sanity ON.
+    expect(ct.ctrMoveIllegal(m, "RLA")).toBe(false);
+    expect(ct.ctrMoveIllegal(m, "RLNA")).toBe(false);
   });
 
   it("save payload: 1 possibility -> flat member; >1 -> variants array; slotChance serialized", () => {
@@ -581,6 +853,56 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     ct.onCustomTrainerClick({ target: q('.ctr-mem-sum[data-idx="0"]')! });
     expect(memberHeader()).toContain("Pikachu");
     expect(ct.ctrSelected).toBe(key);
+  });
+
+  it("list card shows the trainer sprite + one team-member icon per member (no 'Nmon' count)", () => {
+    const key = newTrainer("Team Card");
+    // 3-member team: Pikachu, Snorlax, Gengar.
+    setSpecies(0, "SPECIES_PIKACHU");
+    ct.onCustomTrainerClick({ target: q("#ctr-add-member")! });
+    setSpecies(1, "SPECIES_SNORLAX");
+    ct.onCustomTrainerClick({ target: q("#ctr-add-member")! });
+    setSpecies(2, "SPECIES_GENGAR");
+    ct.render();
+
+    const card = q(`[data-ctropen="${key}"]`)!;
+    expect(card).not.toBeNull();
+    // Header still carries the name + #id.
+    expect(card.querySelector(".ctr-card-head")!.textContent).toContain("Team Card");
+    expect(card.querySelector(".ctr-card-head")!.textContent).toContain(`#${ct.ctr.current[key].id}`);
+    // The old "Nmon" member COUNT is gone.
+    expect(card.textContent).not.toMatch(/\dmon\b/);
+
+    // One member ICON per team member, each an <img> (species resolved -> a sprite).
+    const icons = card.querySelectorAll(".ctr-card-mon");
+    expect(icons.length).toBe(3);
+    expect(card.querySelectorAll(".ctr-card-mon img").length).toBe(3);
+    // The trainer's own sprite node is present (ACE_TRAINER ships gendered sprites,
+    // so it carries the atlas file to paint lazily).
+    const sprite = card.querySelector(".ctr-card-sprite") as HTMLElement;
+    expect(sprite).not.toBeNull();
+    expect(sprite.dataset.ctrsprite).toBe("ace_trainer_m");
+
+    // A WEIGHTED lead shows the FIRST possibility's icon (title carries its species).
+    const cb = q('.ctr-weighted[data-idx="0"]') as HTMLInputElement;
+    cb.checked = true;
+    ct.onCustomTrainerChange(cb);
+    ct.onCustomTrainerClick({ target: q('.ctr-var-add[data-idx="0"]')! });
+    setSpecies(0, "SPECIES_RAICHU"); // 2nd possibility
+    ct.render();
+    const firstIcon = q(`[data-ctropen="${key}"] .ctr-card-mon`) as HTMLElement;
+    expect(firstIcon.title).toBe("SPECIES_PIKACHU"); // possibility 0, not the edited cur
+  });
+
+  it("empty-species slot renders a neutral icon box with NO img (never a broken image)", () => {
+    const key = newTrainer("Blank Slot");
+    // Leave the lead's species empty (blank trainer default).
+    ct.render();
+    const card = q(`[data-ctropen="${key}"]`)!;
+    const icons = card.querySelectorAll(".ctr-card-mon");
+    expect(icons.length).toBe(1);
+    // No <img> for an unresolvable species: the box stands in as the placeholder.
+    expect(card.querySelectorAll(".ctr-card-mon img").length).toBe(0);
   });
 
   it("prior-surface smoke still holds: member collapse/expand + the battle-music picker render", () => {

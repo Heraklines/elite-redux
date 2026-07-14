@@ -20,7 +20,8 @@
 //   GET  /health        — liveness
 //   POST /save          — { password, file, delta, author?, deploy? }
 //                          `file` is a whitelist key (egg-moves, species-tuning,
-//                          item-tuning, trainer-tuning); `delta` is deep-merged
+//                          item-tuning, trainer-tuning, custom-trainers,
+//                          custom-trainers-config, …); `delta` is deep-merged
 //                          into the live JSON (null deletes a key; arrays
 //                          replace wholesale), then committed. If deploy, also
 //                          triggers the staging rebuild+deploy workflow.
@@ -38,6 +39,13 @@
 //   EDITOR_PASSWORD (secret) — shared team password
 //   ALLOWED_ORIGIN        — the editor's origin (or "*")
 // =============================================================================
+
+import {
+  type CustomTrainerConflict,
+  commitCustomTrainersWithRetry,
+  mergeCustomTrainersDelta,
+  stableStringify,
+} from "./custom-trainers-merge";
 
 interface Env {
   GITHUB_TOKEN: string;
@@ -450,6 +458,11 @@ const EDITABLE_FILES: Record<string, EditableFile> = {
     label: "custom trainers",
     validate: validateCustomTrainersDelta,
   },
+  "custom-trainers-config": {
+    path: "src/data/elite-redux/er-custom-trainers-config.json",
+    label: "custom trainer spawn density",
+    validate: validateCustomTrainersConfigDelta,
+  },
   learnsets: {
     path: "src/data/elite-redux/er-learnsets.json",
     label: "learnsets",
@@ -554,6 +567,32 @@ function validateCustomMonsDelta(delta: unknown): ValidationResult {
   return { ok: true };
 }
 
+/**
+ * Global custom-trainer spawn-density config (er-custom-trainers-config.json):
+ * { windowSize?: 1-100, windowChancePct?: 0-100 }. Shape-only — the game's loader
+ * (er-custom-trainers.ts) re-normalizes every field and falls back to the shipped
+ * default for anything out of range, so a bad value can never break a build.
+ */
+function validateCustomTrainersConfigDelta(delta: unknown): ValidationResult {
+  if (!isPlainObject(delta)) {
+    return { ok: false, error: "delta must be an object" };
+  }
+  for (const [key, value] of Object.entries(delta)) {
+    if (key === "windowSize") {
+      if (!(Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 100)) {
+        return { ok: false, error: "windowSize must be an integer 1-100" };
+      }
+    } else if (key === "windowChancePct") {
+      if (!(Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 100)) {
+        return { ok: false, error: "windowChancePct must be an integer 0-100" };
+      }
+    } else {
+      return { ok: false, error: `unknown field "${key}"` };
+    }
+  }
+  return { ok: true };
+}
+
 /** trainerKey -> editor-created custom-trainer entry (null deletes the trainer). */
 function validateCustomTrainersDelta(delta: unknown): ValidationResult {
   if (!isPlainObject(delta)) {
@@ -638,6 +677,12 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
     }
     if (t.endless !== undefined && typeof t.endless !== "boolean") {
       return { ok: false, error: `${key}: endless must be a boolean` };
+    }
+    // `weight` is the current spawn-odds field (integer >= 1); `spawnChance`
+    // (1-100) is the DEPRECATED predecessor, still accepted during the transition
+    // (the game migrates it to weight on load). New saves write `weight` only.
+    if (t.weight !== undefined && !(Number.isInteger(t.weight) && (t.weight as number) >= 1)) {
+      return { ok: false, error: `${key}: weight must be an integer >= 1` };
     }
     if (
       t.spawnChance !== undefined
@@ -887,6 +932,115 @@ interface SaveBody {
   delta?: unknown;
   author?: string;
   deploy?: boolean;
+  /**
+   * custom-trainers only: per-trainer load-time baseline hash (trainerKey ->
+   * hashTrainerEntry). Drives the per-trainer stale-edit conflict guard AND marks
+   * a delta entry as a MODIFICATION (has baseline) vs a NEW trainer (no baseline,
+   * server-assigned id). Absent for every other file.
+   */
+  baselines?: Record<string, string>;
+}
+
+/** Read a whitelisted repo file: its sha + parsed object map (or a fatal error). */
+async function readRepoJson(
+  path: string,
+  label: string,
+  env: Env,
+): Promise<{ sha?: string; existing: Record<string, unknown> } | { error: string }> {
+  const base = `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${path}`;
+  const getRes = await fetch(`${base}?ref=${encodeURIComponent(env.GITHUB_BRANCH)}`, { headers: ghHeaders(env) });
+  if (getRes.ok) {
+    const meta = (await getRes.json()) as { sha?: string; content?: string };
+    if (meta.content) {
+      try {
+        const parsed = JSON.parse(fromBase64(meta.content)) as unknown;
+        return { sha: meta.sha, existing: isPlainObject(parsed) ? parsed : {} };
+      } catch {
+        return { error: `current ${label} file is not valid JSON` };
+      }
+    }
+    return { sha: meta.sha, existing: {} };
+  }
+  if (getRes.status === 404) {
+    return { existing: {} };
+  }
+  return { error: `github read failed: ${getRes.status}` };
+}
+
+/**
+ * MULTI-STAFF-SAFE save for er-custom-trainers.json: read the CURRENT file, merge
+ * ONLY the posted trainers (unmentioned preserved; explicit `null` deletes),
+ * SERVER-assign ids to new trainers, reject per-trainer stale-baseline conflicts,
+ * and sha-conditionally commit with a bounded retry so a lost read/write race
+ * never drops a merge. Returns `idRemap` + `conflicts` so the editor can adopt the
+ * real ids and keep conflicted trainers dirty.
+ */
+async function handleSaveCustomTrainers(body: SaveBody, target: EditableFile, env: Env): Promise<Response> {
+  const delta = body.delta as Record<string, unknown>;
+  const baselines = isPlainObject(body.baselines) ? (body.baselines as Record<string, string>) : undefined;
+  const path = target.path;
+  const author = typeof body.author === "string" ? body.author.slice(0, 40).replace(/[^\w .-]/g, "") : "";
+  const apiBase = `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${path}`;
+
+  let committedSha: string | undefined;
+  let committedUrl: string | undefined;
+  const result = await commitCustomTrainersWithRetry({
+    read: () => readRepoJson(path, target.label, env),
+    merge: existing => mergeCustomTrainersDelta(existing, delta, baselines),
+    serialize: merged => `${JSON.stringify(sortKeysDeep(merged), null, 2)}\n`,
+    isUnchanged: (merged, existing) => stableStringify(merged) === stableStringify(existing),
+    write: async (content, sha) => {
+      const putRes = await fetch(apiBase, {
+        method: "PUT",
+        headers: { ...ghHeaders(env), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: `editor: update ${target.label}${author ? ` (by ${author})` : ""}`,
+          content: toBase64(content),
+          branch: env.GITHUB_BRANCH,
+          ...(sha ? { sha } : {}),
+        }),
+      });
+      if (putRes.ok) {
+        const committed = (await putRes.json()) as { commit?: { sha?: string; html_url?: string } };
+        committedSha = committed.commit?.sha;
+        committedUrl = committed.commit?.html_url;
+        return { ok: true };
+      }
+      // 409 = the file sha we PUT is stale (a teammate committed first): retry the
+      // read-merge-write loop against the fresh file. 422 can also signal a sha race.
+      const conflict = putRes.status === 409 || putRes.status === 422;
+      return { ok: false, conflict, error: `github commit failed: ${putRes.status} ${await putRes.text()}` };
+    },
+  });
+
+  if (!result.ok) {
+    return json({ ok: false, error: result.error }, 502, env);
+  }
+
+  // Optionally kick off the rebuild+deploy so the edit goes live.
+  let deployed = false;
+  let deployError: string | undefined;
+  if (body.deploy && result.committed) {
+    const dep = await triggerDeploy(env);
+    deployed = dep.ok;
+    if (!dep.ok) {
+      deployError = dep.error;
+    }
+  }
+  return json(
+    {
+      ok: true,
+      commit: committedSha,
+      url: committedUrl,
+      committed: result.committed,
+      idRemap: result.idRemap,
+      conflicts: result.conflicts as CustomTrainerConflict[],
+      deployed,
+      deployError,
+    },
+    200,
+    env,
+  );
 }
 
 /** Merge-commit a validated delta into a whitelisted file, optionally deploy. */
@@ -905,6 +1059,12 @@ async function handleSave(body: SaveBody, env: Env): Promise<Response> {
   const validated = target.validate(body.delta);
   if (!validated.ok) {
     return json({ ok: false, error: validated.error }, 400, env);
+  }
+
+  // Custom trainers take the multi-staff-safe path (server-assigned ids +
+  // per-trainer conflict guard + sha-retry). Every other file uses deep-merge.
+  if (body.file === "custom-trainers") {
+    return handleSaveCustomTrainers(body, target, env);
   }
 
   // Read the current file so we MERGE the posted delta into it (the editor

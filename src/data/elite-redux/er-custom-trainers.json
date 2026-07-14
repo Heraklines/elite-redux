@@ -1,1 +1,109 @@
-{}
+{
+  "TRAINER_70001": {
+    "battleBgm": "battle_rival",
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "I'll see you later after my training arc!",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite"
+    ],
+    "endless": false,
+    "id": 70001,
+    "introDialogue": "My Rattata is different from regular Rattata. It's like my Rattata is in the top percentage of all Rattata!",
+    "maxWave": 10,
+    "minWave": 1,
+    "name": "Youngster Joey",
+    "team": [
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "ORAN_BERRY"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "BITE",
+              "QUICK_ATTACK",
+              "RLA",
+              "RLNA"
+            ],
+            "sanityOff": true,
+            "species": 19,
+            "weight": 6
+          },
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "THIEF",
+              "SUPER_FANG",
+              "RLA",
+              "RLNA"
+            ],
+            "sanityOff": true,
+            "species": 2019,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "HYPER_FANG",
+              "POISON_FANG",
+              "ENDURE",
+              "COVET"
+            ],
+            "sanityOff": true,
+            "species": 10646,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "KINGS_ROCK"
+              },
+              {
+                "count": 1,
+                "item": "LEFTOVERS"
+              },
+              {
+                "count": 1,
+                "item": "QUICK_CLAW"
+              },
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "EXTREME_SPEED",
+              "POPULATION_BOMB",
+              "SWORDS_DANCE",
+              "FAKE_OUT"
+            ],
+            "sanityOff": true,
+            "shiny": {
+              "around": "zaps",
+              "name": "Top 0.1%",
+              "palette": "hyperpigment"
+            },
+            "species": 19,
+            "weight": 1
+          }
+        ]
+      }
+    ],
+    "trainerClass": "YOUNGSTER",
+    "victoryDialogue": "Told ya!",
+    "weight": 100
+  }
+}
