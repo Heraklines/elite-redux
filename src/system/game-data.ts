@@ -3688,7 +3688,10 @@ export class GameData {
                 ? null
                 : ((markerInspection?.kind === "empty" ? markerInspection : null)
                   ?? remainingInspections.find(inspection => inspection.kind === "empty"))));
-          if (selected?.kind === "empty" && allInspections.some(inspection => inspection.kind === "occupied")) {
+          if (
+            (selected as ResumeSlotInspection | null)?.kind === "empty"
+            && allInspections.some(inspection => inspection.kind === "occupied")
+          ) {
             const summary = allInspections
               .map(inspection => {
                 if (inspection.kind !== "occupied") {

@@ -2155,18 +2155,49 @@ export async function driveRewardShopOwnerLeaveViaUi(hostPhase: ShopPhaseSeam): 
     await globalScene.ui.setModeForceTransition(UiMode.MESSAGE);
   }
   hostPhase.start();
-  await drainLoopback();
   const pinned = hostPhase.coopInteractionStart;
-  if (globalScene.ui.getMode() !== UiMode.MODIFIER_SELECT) {
+
+  // Opening the production shop is asynchronous twice over: the reciprocal co-op barrier must release,
+  // then the real handler waits for its reward/tween/tutorial work before it accepts input. Merely seeing
+  // MODIFIER_SELECT is insufficient because setMode installs the mode before the transition overlay and
+  // AwaitableUiHandler are ready. A human cannot press through that overlay; doing so here made the public
+  // driver report CANCEL=false while a later callback continued in the background. Wait for the exact
+  // public-input boundary instead of racing it.
+  let shopReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    await drainLoopback();
+    const handler = globalScene.ui.getHandler() as unknown as { awaitingActionInput?: boolean };
+    const ui = globalScene.ui as unknown as { overlayActive?: boolean };
+    if (
+      globalScene.ui.getMode() === UiMode.MODIFIER_SELECT
+      && handler.awaitingActionInput === true
+      && ui.overlayActive !== true
+    ) {
+      shopReady = true;
+      break;
+    }
+  }
+  if (!shopReady) {
+    const handler = globalScene.ui.getHandler() as unknown as { awaitingActionInput?: boolean };
+    const ui = globalScene.ui as unknown as { overlayActive?: boolean };
     throw new Error(
-      `reward UI owner did not open MODIFIER_SELECT (mode=${UiMode[globalScene.ui.getMode()]}, pinned=${pinned})`,
+      `reward UI owner did not become input-ready (mode=${UiMode[globalScene.ui.getMode()]}, awaiting=${handler.awaitingActionInput === true}, overlay=${ui.overlayActive === true}, pinned=${pinned})`,
     );
   }
   if (!globalScene.ui.processInput(Button.CANCEL)) {
     throw new Error(`reward UI owner rejected CANCEL at interaction ${pinned}`);
   }
-  await drainLoopback();
-  if (globalScene.ui.getMode() !== UiMode.CONFIRM) {
+
+  let confirmReady = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    await drainLoopback();
+    const ui = globalScene.ui as unknown as { overlayActive?: boolean };
+    if (globalScene.ui.getMode() === UiMode.CONFIRM && ui.overlayActive !== true) {
+      confirmReady = true;
+      break;
+    }
+  }
+  if (!confirmReady) {
     throw new Error(
       `reward UI owner did not open leave CONFIRM (mode=${UiMode[globalScene.ui.getMode()]}, pinned=${pinned})`,
     );
