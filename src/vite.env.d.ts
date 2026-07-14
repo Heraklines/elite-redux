@@ -32,6 +32,13 @@ interface ImportMetaEnv {
   // are uploaded here and endgame ghost trainers are fetched from here. Unset =
   // local fallback (the player's own past runs).
   readonly VITE_GHOST_ENDPOINT?: HTTP_URL;
+  // Elite Redux — player-telemetry ML pipeline (#player-telemetry). Capture is enabled ONLY when this is
+  // set (staging build sets VITE_TELEMETRY="staging"); unset = off (production / local). Designed so a
+  // prod enablement is a one-line flag flip. `VITE_SERVER_URL_TELEMETRY` overrides the ingest host (else
+  // the save-API host `VITE_SERVER_URL`); `VITE_TELEMETRY_SALT` salts the pseudonymous player-id hash.
+  readonly VITE_TELEMETRY?: string;
+  readonly VITE_SERVER_URL_TELEMETRY?: HTTP_URL;
+  readonly VITE_TELEMETRY_SALT?: string;
 }
 
 // tell vite to disallow missing env vars

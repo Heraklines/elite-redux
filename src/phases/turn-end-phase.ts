@@ -14,6 +14,7 @@ import {
 import { endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyFieldMedic } from "#data/elite-redux/er-relics";
+import { recordTelemetryTurnOutcome } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { TerrainType } from "#data/terrain";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { HitResult } from "#enums/hit-result";
@@ -40,6 +41,9 @@ export class TurnEndPhase extends FieldPhase {
     super.start();
 
     globalScene.currentBattle.incrementTurn();
+    // #player-telemetry: capture the resolved both-sides field OUTCOME for the turn that just ended, so
+    // state transitions are learnable. Passive observer, no-op unless a telemetry build is recording.
+    recordTelemetryTurnOutcome();
     globalScene.eventTarget.dispatchEvent(new TurnEndEvent(globalScene.currentBattle.turn));
     globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
 

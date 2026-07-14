@@ -248,8 +248,12 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
           this.setCursor(this.unskippedIndices.length - 1);
         }
       }
-      const option = this.config?.options[this.unskippedIndices[this.fullCursor]];
+      const chosenIndex = this.unskippedIndices[this.fullCursor];
+      const option = this.config?.options[chosenIndex];
       if (option?.handler()) {
+        // #player-telemetry: emit the committed choice (index + label). No listener unless a telemetry
+        // build subscribed, so this is behavior-preserving.
+        globalScene.ui.emit("er-telemetry-choice", chosenIndex, option.label);
         if (option.keepOpen) {
           // ER: a kept-open option (e.g. external community links, Import Session)
           // must not be re-fired by a held / auto-repeating ACTION key — that
@@ -268,8 +272,12 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
       // this is here to differentiate between a Button.SUBMIT vs Button.ACTION within the autocomplete handler
       // this is here because Button.ACTION is picked up as z on the keyboard, meaning if you're typing and hit z, it'll select the option you've chosen
       success = true;
-      const option = this.config?.options[this.unskippedIndices[this.fullCursor]];
+      const submitIndex = this.unskippedIndices[this.fullCursor];
+      const option = this.config?.options[submitIndex];
       if (option?.handler()) {
+        // #player-telemetry: emit the committed choice (index + label). No listener unless a telemetry
+        // build subscribed, so this is behavior-preserving.
+        globalScene.ui.emit("er-telemetry-choice", submitIndex, option.label);
         if (option.keepOpen) {
           // ER: a kept-open option (e.g. external community links, Import Session)
           // must not be re-fired by a held / auto-repeating ACTION key — that
