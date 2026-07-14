@@ -17,6 +17,25 @@
  *      straight into a configured battle (skips starter-select). Add/adjust the
  *      situations in `scenarios.ts`.
  *
+ *   3. A "Custom Trainers" entry (top of the Dev Scenarios list, under the
+ *      Scenario Builder) — pick any staff-authored custom trainer from
+ *      er-custom-trainers.json and drop straight into a forced battle against it,
+ *      with the full resolved feature set (sprite + gender, aura, battle music,
+ *      intro / victory / defeat lines, weighted-slot + slot-fill rolls, RLA / RLNA
+ *      moves, shiny-lab looks, BST bypass). See the "How staff test custom
+ *      trainers" note below.
+ *
+ * HOW STAFF TEST CUSTOM TRAINERS (the full loop):
+ *   a. Author the trainer in the team-balancing editor and SAVE — that commits the
+ *      entry into er-custom-trainers.json.
+ *   b. A STAGING deploy bakes the updated JSON into the game bundle.
+ *   c. In-game: Title -> Dev Scenarios -> Custom Trainers -> pick the trainer to
+ *      fight it. The picker force-adjusts the run difficulty + wave so the trainer
+ *      is eligible; a trainer whose floor range is all boss/fixed waves is reported
+ *      with a readable message instead of a silent wild battle.
+ *   d. Production only ships the trainer on the MANUAL prod patch (the dev tools,
+ *      incl. this picker, are dead in prod builds).
+ *
  * Edit freely — none of this ships to players.
  */
 
@@ -34,12 +53,19 @@ import {
 import { globalScene } from "#app/global-scene";
 import { formatCoopControlPlane } from "#data/elite-redux/coop/coop-diagnostics";
 import { DEVLOG_REPLAY_TRACE_MARKER } from "#data/elite-redux/er-bug-report";
+import {
+  type ErCustomTrainerResolved,
+  getErCustomTrainers,
+  setErCustomTrainerDevForce,
+} from "#data/elite-redux/er-custom-trainers";
 import { getReplayTrace } from "#data/elite-redux/replay-recorder";
 import { GameModes } from "#enums/game-modes";
 import { UiMode } from "#enums/ui-mode";
 import { formatConsoleSnapshot } from "#utils/console-ring-buffer";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { openScenarioBuilder } from "./builder";
-import { DEV_SCENARIOS, type DevScenario, resetDevOverrides } from "./scenarios";
+import { summarizeErCustomTrainer } from "./custom-trainer-picker";
+import { buildErCustomTrainerDevScenario, DEV_SCENARIOS, type DevScenario, resetDevOverrides } from "./scenarios";
 
 /** er-editor-api Worker — the remote log sink (commits logs to the dev-logs branch). */
 const REMOTE_LOG_URL = "https://er-editor-api.heraklines.workers.dev/devlog";
@@ -620,6 +646,16 @@ function openScenarioList(ctx: DevMenuCtx): void {
         return true;
       },
     },
+    {
+      // Battle-test a staff-authored CUSTOM TRAINER (er-custom-trainers.json):
+      // pick one from the list and drop straight into a forced battle against it
+      // with the full resolved feature set. Sits directly under the builder.
+      label: "\u{1F464} Custom Trainers",
+      handler: () => {
+        openCustomTrainerList(ctx);
+        return true;
+      },
+    },
     ...remaining.map(scenario => ({
       // Clamp the displayed label: the OPTION_SELECT window auto-sizes to its
       // WIDEST option, so one long label blew the picker off the screen edges.
@@ -671,6 +707,85 @@ function openScenarioList(ctx: DevMenuCtx): void {
   );
 }
 
+/** Max chars for a custom-trainer picker row (a touch wider than a scenario label
+ * to fit the `Name #id: species` summary; still narrow enough to stay on-screen). */
+const MAX_CUSTOM_TRAINER_LABEL = 44;
+
+/** Truncate a long custom-trainer summary so the sub-list window stays on-screen. */
+function clampCustomTrainerLabel(label: string): string {
+  return label.length > MAX_CUSTOM_TRAINER_LABEL ? `${label.slice(0, MAX_CUSTOM_TRAINER_LABEL - 1)}…` : label;
+}
+
+/**
+ * The CUSTOM TRAINERS sub-list (opened from the "Custom Trainers" entry at the top
+ * of the picker, under the Scenario Builder). One row per RESOLVED authored
+ * trainer (name, #id, first species). Picking one drops straight into a forced
+ * battle against it. Empty state shows a single "(no custom trainers authored
+ * yet)" line. Same single-OPTION_SELECT + scroll behavior as the scenario list.
+ */
+function openCustomTrainerList(ctx: DevMenuCtx): void {
+  const trainers = getErCustomTrainers();
+  const options: { label: string; handler: () => boolean }[] = [];
+  if (trainers.length === 0) {
+    options.push({
+      label: "(no custom trainers authored yet)",
+      handler: () => {
+        // A no-op selection just re-opens this list; the tester can then go Back.
+        openCustomTrainerList(ctx);
+        return true;
+      },
+    });
+  } else {
+    for (const trainer of trainers) {
+      const summary = summarizeErCustomTrainer(trainer, id => getPokemonSpecies(id)?.name ?? `#${id}`);
+      options.push({
+        label: clampCustomTrainerLabel(summary),
+        handler: () => launchCustomTrainer(ctx, trainer),
+      });
+    }
+  }
+  options.push({
+    // Back to the main scenario picker (keeps a live UI mode - no modeless softlock).
+    label: "Back",
+    handler: () => {
+      openScenarioList(ctx);
+      return true;
+    },
+  });
+  const header =
+    trainers.length > 0 ? `Select a custom trainer to fight (${trainers.length})` : "No custom trainers authored yet";
+  globalScene.ui.showText(header, null, () =>
+    globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options, maxOptions: 6 }),
+  );
+}
+
+/**
+ * Launch a forced battle against `trainer`. When the trainer's own gates leave NO
+ * eligible wave (surfaced by `buildErCustomTrainerDevScenario`), show a readable
+ * message + a Back entry instead of dropping into a silent wild battle.
+ */
+function launchCustomTrainer(ctx: DevMenuCtx, trainer: ErCustomTrainerResolved): boolean {
+  const built = buildErCustomTrainerDevScenario(trainer);
+  if ("error" in built) {
+    globalScene.ui.showText(`Can't launch ${trainer.name}: ${built.error}`, null, () =>
+      globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
+        options: [
+          {
+            label: "Back",
+            handler: () => {
+              openCustomTrainerList(ctx);
+              return true;
+            },
+          },
+        ],
+      }),
+    );
+    return true;
+  }
+  activeShareCode = null; // custom-trainer launch: no scenario share code
+  return launchScenario(ctx, built.scenario);
+}
+
 // ---------------------------------------------------------------------------
 // Boot: register everything on import.
 // ---------------------------------------------------------------------------
@@ -697,6 +812,10 @@ registerDevMenu(ctx => {
   scenarioBanner = null;
   activeScenarioLabel = null;
   activeShareCode = null;
+  // Clear any armed custom-trainer dev force so a picked-but-not-fought trainer (or
+  // one whose battle is over) never leaks into a NORMAL run started from the title.
+  // A fought forced trainer already self-clears on install; this covers backing out.
+  setErCustomTrainerDevForce(null);
   // Fast-iteration handoff: if the banner's Reset / Next / Pick button tore the
   // run down (teardownThen), run the staged action now that we have a FRESH
   // title launch ctx. Deferred so the title menu is fully built first; this is
