@@ -3,7 +3,7 @@
   "taskId": "p33-mystery-public-transition-integration",
   "branch": "ci/coop/p33-mystery-public-transition",
   "trainRef": "ci/coop/p33-mystery-public-transition",
-  "baseSha": "6a389fe382cf8298a1880124cf2b2919d9168678",
+  "baseSha": "f2a114bdd01fc074141dc0dc440bbd065988d21b",
   "allowedFiles": [
     ".github/coop-task-ownership/p33-mystery-public-transition.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -95,6 +95,7 @@
     "test/tests/elite-redux/coop/coop-duo-launch-terrain.test.ts",
     "test/tests/elite-redux/coop/coop-duo-learn-move.test.ts",
     "test/tests/elite-redux/coop/coop-duo-me-operation.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-me-reward-oob.test.ts",
     "test/tests/elite-redux/coop/coop-duo-multiwave.test.ts",
     "test/tests/elite-redux/coop/coop-duo-resume.test.ts",
     "test/tests/elite-redux/coop/coop-duo-reward-operation.test.ts",

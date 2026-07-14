@@ -200,12 +200,27 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   let game: GameManager;
   let logs: ReturnType<typeof installDuoLogCapture>;
   let priorLocksDescriptor: PropertyDescriptor | undefined;
+  let priorLocalStorage = new Map<string, string>();
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
   });
 
   beforeEach(() => {
+    // This file now exercises the real authenticated persistence path. Preserve the runner's incoming
+    // browser storage exactly, but give every transaction scenario a fresh browser account substrate;
+    // otherwise a successful checkpoint in one test becomes an unrelated cloud/local parent in the next.
+    priorLocalStorage = new Map<string, string>();
+    for (let index = 0; index < localStorage.length; index++) {
+      const key = localStorage.key(index);
+      if (key != null) {
+        const value = localStorage.getItem(key);
+        if (value != null) {
+          priorLocalStorage.set(key, value);
+        }
+      }
+    }
+    localStorage.clear();
     // Keep fixture boot local/deterministic. The wrapper below disables bypass immediately after each
     // battle starts, so every save/reconcile assertion still exercises authenticated AES + cloud CAS.
     setBypassLoginForTesting(true);
@@ -266,6 +281,10 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     // #710 harness-citizenship: restore the host GameManager scene (buildDuo builds a 2nd BattleScene).
     initGlobalScene(game.scene);
     vi.restoreAllMocks();
+    localStorage.clear();
+    for (const [key, value] of priorLocalStorage) {
+      localStorage.setItem(key, value);
+    }
     if (priorLocksDescriptor == null) {
       Reflect.deleteProperty(globalThis.navigator, "locks");
     } else {

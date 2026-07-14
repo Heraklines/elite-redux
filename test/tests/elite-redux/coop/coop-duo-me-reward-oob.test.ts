@@ -43,11 +43,13 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  beginRewardShopWatch,
   buildDuo,
   drainLoopback,
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
   installDuoLogCapture,
+  pumpDuoDestinations,
   type ShopPhaseSeam,
   withClient,
   withClientSync,
@@ -117,13 +119,15 @@ describe.skipIf(!RUN)(
       );
       await drainLoopback();
 
+      // Production opens the reciprocal watcher before the owner can cross the retained terminal. Park the
+      // guest now so the phantom remains first in its FIFO, then let the owner publish the real option pool
+      // and LEAVE. This preserves the original #854 fault while exercising the continuation-ready barrier.
+      await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
+
       // ===== Host OWNS + drives the shop: rolls + STREAMS its options, then LEAVEs (no reward taken). The
-      // LEAVE is relayed on the reward seq AFTER the phantom (FIFO), and advances the host counter once. =====
+      // LEAVE is relayed on the reward seq AFTER the phantom (FIFO). The owner remains parked until the
+      // watcher materializes that terminal and returns the retained acknowledgement. =====
       await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: false }));
-      expect(
-        rig.hostRuntime.controller.interactionCounter(),
-        "host advanced the interaction counter once at its shop LEAVE",
-      ).toBe(counterBefore + 1);
 
       // ===== Guest WATCHES: startCoopWatch adopts the host's streamed options, then drains the relayed
       // picks. It BUFFER-HITs the phantom FIRST.
@@ -132,7 +136,8 @@ describe.skipIf(!RUN)(
       //            driveGuestRewardWatch's no-progress detector THROWS (WATCH HANG) - fails-before.
       //   POST-FIX: the out-of-range cursor is IGNORED (kept waiting); the watcher then consumes the owner's
       //            LEAVE, ends its mirror, leaves, and advances once - passes-after. =====
-      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
+      await pumpDuoDestinations(rig);
 
       // ===== PASSES-AFTER assertions. =====
       // (b) The watcher left cleanly and the counters are LOCKSTEP (both advanced exactly once).
