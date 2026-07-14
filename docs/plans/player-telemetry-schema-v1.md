@@ -158,3 +158,43 @@ Everything is built so production is a deliberate, small change - NOT a rewrite:
 
 Until then: staging only (`VITE_TELEMETRY=staging`), prod R2 binding commented out, prod client flag
 unset -> production is byte-identical and free.
+
+## 9. Schema evolution - additive-only policy + variable-length audit
+
+**Variable-length audit (done).** Every collection in `MonState` / the events is a variable-length array
+with **no fixed-size assumption** anywhere in the schema, the snapshot code (`telemetry-state.ts`), or the
+tests - the game breaks every obvious cap:
+
+- `moves` can exceed 4 (a 5th-move-slot item) -> never a 4-tuple; snapshot maps the whole moveset.
+- `innates` can exceed the ER four-ability set (Black Shinies carry 5; future Prismatic Shinies add
+  special ones) -> an open array, not a fixed slot count.
+- `heldItems` is already multi / open-ended.
+- `statStages` is whatever the engine reports (7 today), captured with a spread, never index-hardcoded.
+
+No consumer (worker, tests, docs) assumes a fixed length; the worker stores the compressed body verbatim
+and never parses the schema at all.
+
+**Additive-only evolution policy.** So historical data stays readable forever:
+
+1. **New fields are OPTIONAL.** Add fields as optional; a reader must default a missing field.
+2. **Existing fields are NEVER repurposed.** A field's meaning/type is frozen once shipped. Need a
+   different meaning -> add a new field, don't overload an old one.
+3. **Breaking reshapes bump `TELEMETRY_SCHEMA_VERSION`.** Removing/renaming/retyping a field, or changing a
+   collection's element shape incompatibly, is a version bump; the version is stamped on every envelope +
+   R2 object so the ML pipeline routes each object to the right decoder.
+4. **Consumers MUST tolerate unknown fields.** A reader ignores fields it doesn't recognize (forward
+   compatibility) rather than failing - so an older pipeline can still read a newer capture's known fields.
+5. **IDs + build, not baked values.** Events carry numeric ids + the build id; balance-sensitive attributes
+   are joined from the per-build data dictionary (section below / the roadmap), so a rebalance never
+   rewrites the schema or corrupts old data.
+
+## 10. Per-build data dictionary (ML join table)
+
+Telemetry events store numeric ids (moves/abilities) + held-item id strings + the build id - NOT the
+balance values. `scripts/export-data-dictionary.mjs` exports the id -> attributes tables the ML side joins
+against, keyed by build id, from the ER 2.65 authoritative dex (`er-moves.ts` / `er-abilities.ts` /
+`er-move-tables.ts`; pure static data, no engine boot). Output: moves (type/power/accuracy/pp/priority/
+category/target/effect/flags + the authoritative description text) and abilities (name + description);
+held-item attributes are an engine-boot extension point. Training against a historical dataset joins
+against the dictionary **of that build**, so a balance change never corrupts older data. Upload one
+dictionary to R2 per deployed build (upload wired later). See `docs/plans/combat-ai-roadmap.md`.
