@@ -55,6 +55,7 @@
     "test/browser/coop-public-ui/solo-classic.mjs",
     "test/scripts/coop-focused-static-workflow.test.mjs",
     "test/tests/elite-redux/coop/coop-ability-picker-relay.test.ts",
+    "test/tests/elite-redux/coop/coop-battle-events.test.ts",
     "test/tests/elite-redux/coop/coop-battle-stream.test.ts",
     "test/tests/elite-redux/coop/coop-catch-full-operation.test.ts",
     "test/tests/elite-redux/coop/coop-colosseum-board.test.ts",

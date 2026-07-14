@@ -480,6 +480,12 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     // past it (like coop-guest-renderer's REPLAY_DRAIN_PHASES) so the loop reaches the Faint phase.
     for (let i = 0; i < 12 && game.scene.phaseManager.getCurrentPhase() != null; i++) {
       const cur = game.scene.phaseManager.getCurrentPhase();
+      // `end()` normally starts the next queued phase synchronously. On a slower runner the mocked Faint
+      // phase can therefore have already started Finalize before this manual drain observes it; invoking
+      // that same live phase again manufactures a second finalization that production never performs.
+      if (cur.is("CoopFinalizeTurnPhase") && finalizeSpy.mock.calls.length > 0) {
+        break;
+      }
       if (
         cur.is("MessagePhase")
         || cur.is("CoopMoveAnimReplayPhase")
