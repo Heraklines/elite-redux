@@ -43,7 +43,11 @@ import {
   resetCoopMeOperationState,
   setCoopMeOperationEnabled,
 } from "#data/elite-redux/coop/coop-me-operation";
-import { CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
+import {
+  CoopOperationHost,
+  createCoopRuntimeOpState,
+  setActiveCoopRuntimeOpState,
+} from "#data/elite-redux/coop/coop-operation-runtime";
 import { clearCoopRuntime, getCoopInteractionRelay, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
@@ -93,6 +97,10 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
   beforeEach(() => {
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`me-op-${Date.now()}`);
+    // Direct operation-seam assertions below intentionally run without assembling a transport runtime.
+    // Install the same per-runtime operation state production assembly provides so fail-loud runtime
+    // isolation remains part of the contract instead of falling back to process-global state.
+    setActiveCoopRuntimeOpState(createCoopRuntimeOpState());
     // Explicitly select the MIGRATED path from clean operation state (no leftover from a prior file).
     setCoopMeOperationEnabled(true);
     resetCoopMeOperationState();
@@ -109,6 +117,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     resetCoopMeOperationState();
     logs.dispose();
     clearCoopRuntime();
+    setActiveCoopRuntimeOpState(null);
     vi.restoreAllMocks();
     // #710 harness-citizenship: buildDuoForMe builds a 2nd BattleScene (the guest) whose ctor steals
     // globalScene. Restore the host GameManager scene for the NEXT ER_SCENARIO file's GameManager.
