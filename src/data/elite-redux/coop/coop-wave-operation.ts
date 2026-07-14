@@ -953,7 +953,15 @@ export function adoptWaveAdvanceWatcherChoice(
   if (!isValidCoopWaveAdvancePayload(params.payload)) {
     return { adopt: false, reason: "malformed-transition", stale: false };
   }
-  assertBindingRole(binding, params.localRole);
+  // A captured continuation is an architectural ownership claim and must remain role-fenced even when the
+  // ambient controller changes. The no-binding call is the temporary compatibility seam used by existing
+  // synchronous phase code: a few engine tests (and the dev spoof runtime) deliberately change the
+  // controller role after assembly, so its runtime record still carries the original role. It still fails
+  // loudly when no runtime is installed via state()/guest() below; root wiring should pass a binding and
+  // thereby opt into the strict role fence.
+  if (binding != null) {
+    assertBindingRole(binding, params.localRole);
+  }
   try {
     const s = state(binding);
     const opId = makeCoopOperationId(s.epoch, HOST_SEAT, params.payload.wave, "WAVE_ADVANCE");

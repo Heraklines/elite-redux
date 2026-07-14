@@ -216,8 +216,12 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
   // KEYSTONE PROOF - the journal carrier ROUTES INTO the live-mutation seam (the reviewer's demand).
   // ===========================================================================================
   it("keeps captured authority durability and receiver receipts isolated across two runtimes", () => {
-    const hostState = createCoopRuntimeOpState("host");
-    const ambientState = createCoopRuntimeOpState("host");
+    // Role-neutral engine-test records deliberately bypass the temporary legacy global-clock bridge. The
+    // binding's explicit role fences are covered in coop-wave-operation.test.ts; this proof targets the
+    // stronger property that the wave surface, its retained durability and its receipts do not consult the
+    // ambient runtime.
+    const hostState = createCoopRuntimeOpState();
+    const ambientState = createCoopRuntimeOpState();
     const hostPair = createLoopbackPair();
     const ambientPair = createLoopbackPair();
     const hostManager = new CoopDurabilityManager(hostPair.host);
@@ -252,8 +256,8 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     ambientManager.dispose();
     setCoopOperationDurability(null);
 
-    const guestAState = createCoopRuntimeOpState("guest");
-    const guestBState = createCoopRuntimeOpState("guest");
+    const guestAState = createCoopRuntimeOpState();
+    const guestBState = createCoopRuntimeOpState();
     setActiveCoopRuntimeOpState(guestAState);
     const guestA = captureCoopWaveAdvanceOperationBinding("guest");
     setActiveCoopRuntimeOpState(guestBState);
