@@ -100,13 +100,11 @@ An agent resuming should skip er_ids already listed here.
 **Everything below is now fixed** — the 18 blocked/partial items (Batches A/B/C/D) and
 their residuals (Batches R1/R2) are all implemented + headless-verified. Remaining
 non-fixes are intentional no-ops or documented, minor edge-omissions:
-- 🔴 **Magic Room 478 — WRONG, NEEDS RE-FIX.** ER dex is *"Prevents passive damage and
-  disables mega stones for 5 turns"* — NOT vanilla held-item suppression. Batch A
-  mistakenly implemented vanilla Magic Room (a `MAGIC_ROOM` ArenaTag suppressing held
-  items). The real effect is a field-wide **"prevent passive/indirect damage for 5
-  turns"** (repurpose the tag to gate the `HitResult.INDIRECT` / `BlockNonDirectDamage`
-  path field-wide). The "disable mega stones" half IS a genuine battle no-op (ER megas
-  are permanent forms). TODO: rewrite the MAGIC_ROOM tag effect.
+- ✅ **Magic Room 478 — RE-FIXED.** Now correctly implements the ER dex *"Prevents
+  passive damage ... for 5 turns"*: `damageAndUpdate` nullifies all `HitResult.INDIRECT`
+  damage field-wide while `isMagicRoomActive()` (weather/status/hazards/seed/bleed/etc.);
+  the wrong vanilla item-suppression was removed from `modifier.ts`. The "disable mega
+  stones" half is a genuine battle no-op (ER megas are permanent forms). Verified 7/7.
 - **Aerilate 184 "10% faster"** — the ER ROM implements this as ×1.1 DAMAGE, not speed
   (a per-move-type speed boost is structurally impossible — turn order queries SPD with
   MoveId.NONE); done as the ROM's 1.1×.
@@ -123,7 +121,7 @@ whenever a batch reports a PARTIAL or BLOCKED.
 - ✅ **DONE (Batch B)** ~~Move 289 Snatch~~ — SnatchTag + `MovePhase.checkSnatch` steals a foe's self-targeting status move (verified Swords Dance / Recover stolen).
 - ✅ **DONE (Batch B)** ~~Move 382 Me First~~ — `MeFirstAttr` reads `turnCommands`, copies the foe's queued attack at ×1.5 and goes first; fails on a status move.
 - ✅ **DONE (Batch C)** ~~Move 472 Wonder Room~~ — `WONDER_ROOM` ArenaTag swaps ATK↔SpAtk (raw base, stages ignored, 5 turns, both sides) via a `getEffectiveStat` hook. (Dex verified: ATK↔SpAtk, not vanilla Def↔SpDef.)
-- 🔴 **WRONG — Move 478 Magic Room** — Batch A built VANILLA Magic Room (item-suppress `MAGIC_ROOM` ArenaTag), but the ER dex is "Prevents passive damage and disables mega stones for 5 turns". Needs re-fix to a field-wide prevent-passive-damage tag (mega-stone half is a battle no-op). See STILL OPEN header.
+- ✅ **RE-FIXED — Move 478 Magic Room** — now nullifies field-wide passive/indirect damage (the ER dex effect) via a `damageAndUpdate` gate; the wrong vanilla item-suppress was removed. Mega-stone half is a battle no-op.
 - ✅ **DONE (Batch A)** ~~Move 970 Transmute~~ — on-KO regen via the `lostItems` ledger.
 - ✅ **DONE (Batch A)** ~~Ability 139 Harvest~~ — Fling/Natural-Gift berry recovery (berry case; the full Fling item / Natural Gift type tables remain a separate move-mechanic gap).
 - ✅ **DONE (Batch C)** ~~Ability 197 Shields Down~~ — Shell Smash forces Core form + no-revert latch (corrected the vanilla shields-down test's revert assertions to ER's no-revert rule).

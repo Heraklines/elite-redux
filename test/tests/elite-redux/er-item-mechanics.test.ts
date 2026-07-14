@@ -117,10 +117,9 @@ describe.skipIf(!RUN)("ER item-mechanic primitives (5 dex gaps)", () => {
   // ---------------------------------------------------------------------------
   // 2. Magic Room (478) — field-wide item-effect suppression
   // ---------------------------------------------------------------------------
-  it("Magic Room suppresses Leftovers healing while up, and it resumes afterward", async () => {
-    // Bulky player; both sides use Defense Curl (a pure self-buff — no damage in
-    // this ER build, unlike SPLASH which was made damaging), so NOTHING but
-    // Leftovers moves the player's HP and neither mon faints.
+  it("Magic Room prevents passive/indirect damage while up (and does NOT suppress items)", async () => {
+    // ER Magic Room dex: "Prevents passive damage and disables mega stones for 5
+    // turns" — a field-wide passive-damage nullifier (NOT vanilla item-suppression).
     game.override
       .ability(AbilityId.BALL_FETCH)
       .moveset([MoveId.MAGIC_ROOM, MoveId.DEFENSE_CURL])
@@ -130,33 +129,29 @@ describe.skipIf(!RUN)("ER item-mechanic primitives (5 dex gaps)", () => {
     const player = game.field.getPlayerPokemon();
     const leftovers = playerHeldItems(player.id).find(m => m.type.id === "LEFTOVERS")!;
     expect(leftovers, "player holds Leftovers").toBeDefined();
-
-    // Put the player below max so Leftovers has something to heal (small deficit
-    // on a bulky mon — no risk of fainting).
     player.hp = player.getMaxHp() - 100;
 
-    // Turn 1: cast Magic Room. No Leftovers heal at end of turn while it is up.
-    const hpBefore = player.hp;
+    // Turn 1: cast Magic Room.
     game.move.use(MoveId.MAGIC_ROOM, 0);
     await game.toEndOfTurn();
-
     expect(isMagicRoomActive(), "Magic Room is active on the field").toBe(true);
-    expect(leftovers.shouldApply(player), "Leftovers is suppressed by Magic Room").toBe(false);
-    expect(player.hp, "player did not heal from Leftovers under Magic Room").toBe(hpBefore);
 
-    // Simulate Magic Room expiry, then Leftovers works again.
+    // Items are NOT suppressed by ER Magic Room (that was the vanilla behavior).
+    expect(leftovers.shouldApply(player), "Leftovers still applies under ER Magic Room").toBe(true);
+
+    // Passive/indirect damage is nullified while Magic Room is active.
+    const hpUnderRoom = player.hp;
+    const dealtUnderRoom = player.damageAndUpdate(20, { result: HitResult.INDIRECT });
+    expect(dealtUnderRoom, "indirect damage nullified under Magic Room").toBe(0);
+    expect(player.hp, "HP unchanged by the blocked indirect hit").toBe(hpUnderRoom);
+
+    // Once Magic Room ends, indirect damage lands again.
     game.scene.arena.removeTag(ArenaTagType.MAGIC_ROOM);
     expect(isMagicRoomActive(), "Magic Room cleared").toBe(false);
-    expect(leftovers.shouldApply(player), "Leftovers applies again once Magic Room ends").toBe(true);
-
-    // Turn 2: with Magic Room gone, Leftovers heals. The heal is unshifted as a
-    // PokemonHealPhase right after TurnEndPhase, so advance one more phase past
-    // the end of turn to let it resolve.
-    const hpBeforeHeal = player.hp;
-    game.move.use(MoveId.DEFENSE_CURL, 0);
-    await game.toEndOfTurn();
-    await game.phaseInterceptor.to("PokemonHealPhase");
-    expect(player.hp, "Leftovers heals once Magic Room is gone").toBeGreaterThan(hpBeforeHeal);
+    const hpAfterRoom = player.hp;
+    const dealtAfter = player.damageAndUpdate(20, { result: HitResult.INDIRECT });
+    expect(dealtAfter, "indirect damage lands once Magic Room ends").toBeGreaterThan(0);
+    expect(player.hp, "HP dropped from the indirect hit").toBeLessThan(hpAfterRoom);
   }, 120_000);
 
   // ---------------------------------------------------------------------------

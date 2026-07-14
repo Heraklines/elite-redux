@@ -33,7 +33,7 @@ import {
 import { tmSpecies } from "#balance/tm-species-map";
 import { reverseCompatibleTms, speciesTmMoves } from "#balance/tms";
 import type { SuppressAbilitiesTag } from "#data/arena-tag";
-import { EntryHazardTag, isWonderRoomActive, NoCritTag, WeakenMoveScreenTag } from "#data/arena-tag";
+import { EntryHazardTag, isMagicRoomActive, isWonderRoomActive, NoCritTag, WeakenMoveScreenTag } from "#data/arena-tag";
 import { fieldSpriteOffset } from "#data/battle-format";
 import {
   AutotomizedTag,
@@ -5753,6 +5753,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     } = {},
   ): number {
     const isIndirectDamage = [HitResult.INDIRECT, HitResult.INDIRECT_KO].includes(result);
+    // ER Magic Room (move 478) — dex: "Prevents passive damage ... for 5 turns."
+    // While Magic Room is active, ALL passive/indirect damage on the field (weather,
+    // status, hazards, Leech Seed, bleed, etc.) is nullified. (The dex's "disables
+    // mega stones" half is a battle no-op here — ER megas are permanent forms.)
+    if (isIndirectDamage && isMagicRoomActive()) {
+      return 0;
+    }
     const damagePhase = globalScene.phaseManager.create(
       "DamageAnimPhase",
       this.getBattlerIndex(),
