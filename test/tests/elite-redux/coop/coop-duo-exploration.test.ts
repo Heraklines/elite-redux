@@ -60,6 +60,7 @@ import {
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import { PartyOption } from "#ui/party-ui-handler";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -276,7 +277,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
   it("PROBE #673: the biome market alternates - owner buys relay, watcher applies verbatim, counters advance", async () => {
     setCoopBiomeMarketTestSkip(false); // this probe drives the REAL co-op market
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
 
@@ -285,6 +286,9 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     await withClient(rig.guestCtx, async () => {
       await driveGuestReplayTurn(rig.guestScene, turn);
     });
+    // From the market boundary onward, deliver every frame only while its destination client context is
+    // installed. Boot and battle stay automatic so this focused probe pays no unrelated scheduling cost.
+    pair.setAutomaticDelivery(false);
 
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostModsBefore = rig.hostScene.modifiers.length;
@@ -292,11 +296,21 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     const waiveBefore = Overrides.WAIVE_ROLL_FEE_OVERRIDE;
     Overrides.WAIVE_ROLL_FEE_OVERRIDE = true; // wave-1 money cannot afford market goods
 
-    // OWNER (host, counter parity 0): drive the REAL market - buy ONE non-party item, then leave.
+    // OWNER (host, counter parity 0): drive the REAL market - buy ONE non-party item, then leave. The
+    // market has a reciprocal rendezvous, so stage BOTH real phases before expecting either to complete.
     let boughtTypeId = "";
+    let ownerDone = false;
+    let watcherDone = false;
+    let restoreHostUi: (() => void) | null = null;
     try {
       await withClient(rig.hostCtx, async () => {
         const phase = liveBiomeShop();
+        const ownerSeam = phase as unknown as { end: () => void };
+        const realOwnerEnd = ownerSeam.end.bind(phase);
+        ownerSeam.end = () => {
+          ownerDone = true;
+          realOwnerEnd();
+        };
         // The leave-confirm path first hides the shop backdrop via real UI handler calls the
         // headless mock cannot service - neutralize it (purely cosmetic; the flow continues).
         (phase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
@@ -321,6 +335,14 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         const realSetModeWC = ui.setModeWithoutClear.bind(ui);
         const realSetOverlay = ui.setOverlayMode.bind(ui);
         const realShowText = ui.showText.bind(ui);
+        let bought = false;
+        restoreHostUi = () => {
+          uiAny.getHandler = realGetHandler;
+          ui.setMode = realSetMode;
+          ui.setModeWithoutClear = realSetModeWC;
+          ui.setOverlayMode = realSetOverlay;
+          ui.showText = realShowText;
+        };
         // Party-target market goods open the party menu via setModeWithoutClear - auto-pick slot 0.
         ui.setModeWithoutClear = (...args: unknown[]): unknown => {
           if (args[0] === UiMode.PARTY) {
@@ -334,6 +356,11 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
             const options = args[1] as { type?: { id?: string } }[];
             // Signature: (BIOME_SHOP, shopOptions, biomeId, onSelect, qtys) - the callback is [3].
             const cb = args[3] as (index: number) => boolean;
+            if (bought) {
+              // A human leaves only after the completed buy re-opens the public market screen.
+              queueMicrotask(() => cb(-1));
+              return Promise.resolve(true);
+            }
             // Buy a KNOWN NON-party item (balls/lures apply directly, no party sub-menu) so the
             // probe stays deterministic; the relay path is identical for party-target goods.
             // LURE: non-party AND lands in scene.modifiers (balls only bump the ball inventory,
@@ -343,10 +370,8 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
               idx = options.findIndex(o => o?.type != null);
             }
             boughtTypeId = options[idx]?.type?.id ?? "";
-            queueMicrotask(() => {
-              cb(idx);
-              queueMicrotask(() => cb(-1)); // leave after the buy resolves
-            });
+            bought = true;
+            queueMicrotask(() => cb(idx));
             return Promise.resolve(true);
           }
           if (args[0] === UiMode.PARTY) {
@@ -372,37 +397,44 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
           }
           return realSetOverlay(...args);
         };
-        try {
-          haltQueueAfterCurrent();
-          phase.start();
-          for (let i = 0; i < 16; i++) {
-            await drainLoopback();
-          }
-        } finally {
-          ui.setMode = realSetMode;
-          ui.setModeWithoutClear = realSetModeWC;
-          ui.setOverlayMode = realSetOverlay;
-          ui.showText = realShowText;
-        }
+        haltQueueAfterCurrent();
+        phase.start();
+        await drainLoopback();
       });
+
+      await withClient(rig.guestCtx, async () => {
+        const phase = liveBiomeShop();
+        const watcherSeam = phase as unknown as { end: () => void };
+        const realWatcherEnd = watcherSeam.end.bind(phase);
+        watcherSeam.end = () => {
+          watcherDone = true;
+          realWatcherEnd();
+        };
+        haltQueueAfterCurrent();
+        phase.start();
+        await drainLoopback();
+      });
+
+      for (let i = 0; i < 40 && (!ownerDone || !watcherDone); i++) {
+        await withClient(rig.hostCtx, () => drainLoopback());
+        await withClient(rig.guestCtx, () => drainLoopback());
+      }
+      await pumpDuoDestinations(rig);
     } finally {
+      if (restoreHostUi != null) {
+        await withClient(rig.hostCtx, () => restoreHostUi!());
+      }
       Overrides.WAIVE_ROLL_FEE_OVERRIDE = waiveBefore;
     }
+    expect(ownerDone, "OWNER completed the reciprocal market rendezvous").toBe(true);
+    expect(watcherDone, "WATCHER applied the terminal and completed").toBe(true);
     expect(rig.hostScene.modifiers.length, "OWNER bought exactly one market item").toBe(hostModsBefore + 1);
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the market interaction").toBe(
       counterBefore + 1,
     );
 
-    // WATCHER (guest): its market phase adopts the streamed stock + applies the buffered buy + leave.
-    await withClient(rig.guestCtx, async () => {
-      const phase = liveBiomeShop();
-      haltQueueAfterCurrent();
-      phase.start();
-      for (let i = 0; i < 16; i++) {
-        await drainLoopback();
-      }
-    });
-    await pumpDuoDestinations(rig);
+    // WATCHER adopted the streamed stock and applied the retained buy + leave while the two real phases
+    // were alternately pumped above.
     expect(rig.guestScene.modifiers.length, "WATCHER applied the same buy (one new modifier)").toBe(
       guestModsBefore + 1,
     );
