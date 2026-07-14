@@ -3,10 +3,13 @@ import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
+  type CoopLearnMoveOperationBinding,
+  captureCoopLearnMoveOperationBinding,
   commitCoopLearnMoveBatchDecision,
   sendCoopLearnMoveBatchPrompt,
 } from "#data/elite-redux/coop/coop-learn-move-operation";
 import {
+  failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
@@ -283,20 +286,27 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
     // Tell the partner to open the SAME panel (owner if it owns the mon, else a read-only watcher).
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
     const turn = globalScene.currentBattle?.turn ?? 0;
-    sendCoopLearnMoveBatchPrompt(
-      relay,
-      {
-        type: "prompt",
-        partySlot: slot,
-        learnableIds: [...learnable],
-        ownerIsGuest,
-      },
-      { localRole: "host", wave, turn },
-    );
+    const operationBinding = captureCoopLearnMoveOperationBinding("host");
+    if (
+      !sendCoopLearnMoveBatchPrompt(
+        relay,
+        {
+          type: "prompt",
+          partySlot: slot,
+          learnableIds: [...learnable],
+          ownerIsGuest,
+        },
+        { localRole: "host", wave, turn },
+        operationBinding,
+      )
+    ) {
+      failCoopSharedSession(`Learn-move batch prompt for slot ${slot} could not enter durable authority`);
+      return;
+    }
     if (ownerIsGuest) {
-      void this.coopHostWatchBatch(pokemon, learnable, seq);
+      void this.coopHostWatchBatch(pokemon, learnable, seq, operationBinding);
     } else {
-      this.coopHostDriveBatch(pokemon, learnable, seq);
+      this.coopHostDriveBatch(pokemon, learnable, seq, operationBinding);
     }
   }
 
@@ -306,7 +316,12 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
    * ("owner") so the WATCHER's read-only panel mirrors the host's live cursor (cosmetic). A panel error
    * relays a FALLBACK terminal (so the watcher stops waiting) and runs the relayed per-move flow.
    */
-  private coopHostDriveBatch(pokemon: Pokemon, learnable: MoveId[], seq: number): void {
+  private coopHostDriveBatch(
+    pokemon: Pokemon,
+    learnable: MoveId[],
+    seq: number,
+    operationBinding: CoopLearnMoveOperationBinding,
+  ): void {
     const returnMode = this.coopReturnMode();
     const mirror = getCoopUiMirror();
     const relay = getCoopInteractionRelay();
@@ -340,13 +355,26 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
         }
         mirror?.endSession();
         const { choice, data } = encodeCoopLearnMoveBatchTerminal(learned);
-        commitCoopLearnMoveBatchDecision({
-          payload: { type: "decision", partySlot: this.partyMemberIndex, assignments: [...learned], fallback: false },
-          ownerRole: "host",
-          localRole: "host",
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
-        });
+        if (
+          !commitCoopLearnMoveBatchDecision(
+            {
+              payload: {
+                type: "decision",
+                partySlot: this.partyMemberIndex,
+                assignments: [...learned],
+                fallback: false,
+              },
+              ownerRole: "host",
+              localRole: "host",
+              wave: globalScene.currentBattle?.waveIndex ?? 0,
+              turn: globalScene.currentBattle?.turn ?? 0,
+            },
+            operationBinding,
+          )
+        ) {
+          failCoopSharedSession(`Host learn-move batch terminal for slot ${this.partyMemberIndex} was not retained`);
+          return;
+        }
         relay?.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, choice, data);
         coopLog("learnmove", "host drove batch panel, relays terminal to watcher (#848)", { seq, count: choice });
         globalScene.ui.setMode(returnMode).then(() => this.end());
@@ -357,13 +385,21 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
         }
         finished = true;
         mirror?.endSession();
-        commitCoopLearnMoveBatchDecision({
-          payload: { type: "decision", partySlot: this.partyMemberIndex, assignments: [], fallback: true },
-          ownerRole: "host",
-          localRole: "host",
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
-        });
+        if (
+          !commitCoopLearnMoveBatchDecision(
+            {
+              payload: { type: "decision", partySlot: this.partyMemberIndex, assignments: [], fallback: true },
+              ownerRole: "host",
+              localRole: "host",
+              wave: globalScene.currentBattle?.waveIndex ?? 0,
+              turn: globalScene.currentBattle?.turn ?? 0,
+            },
+            operationBinding,
+          )
+        ) {
+          failCoopSharedSession(`Host learn-move batch fallback for slot ${this.partyMemberIndex} was not retained`);
+          return;
+        }
         // Tell the watcher to stop waiting, then run the known-good relayed per-move flow.
         relay?.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, COOP_LEARN_MOVE_BATCH_FALLBACK);
         coopWarn("learnmove", "host batch panel fallback -> per-move flow (#848)", { seq });
@@ -390,7 +426,12 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
    * null (timeout / disconnect) it keeps the mon's current moves and ends - it can NEVER hang; on a FALLBACK
    * terminal it runs the relayed per-move flow.
    */
-  private async coopHostWatchBatch(pokemon: Pokemon, learnable: MoveId[], seq: number): Promise<void> {
+  private async coopHostWatchBatch(
+    pokemon: Pokemon,
+    learnable: MoveId[],
+    seq: number,
+    operationBinding: CoopLearnMoveOperationBinding,
+  ): Promise<void> {
     const returnMode = this.coopReturnMode();
     const relay = getCoopInteractionRelay();
     const mirror = getCoopUiMirror();
@@ -431,43 +472,67 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
     mirror?.endSession();
     if (res == null) {
       coopWarn("learnmove", "guest batch terminal null (timeout/disconnect); keeping current moves (#848)", { seq });
-      commitCoopLearnMoveBatchDecision({
-        payload: { type: "decision", partySlot: this.partyMemberIndex, assignments: [], fallback: true },
-        ownerRole: "guest",
-        localRole: "host",
-        wave: globalScene.currentBattle?.waveIndex ?? 0,
-        turn: globalScene.currentBattle?.turn ?? 0,
-      });
+      if (
+        !commitCoopLearnMoveBatchDecision(
+          {
+            payload: { type: "decision", partySlot: this.partyMemberIndex, assignments: [], fallback: true },
+            ownerRole: "guest",
+            localRole: "host",
+            wave: globalScene.currentBattle?.waveIndex ?? 0,
+            turn: globalScene.currentBattle?.turn ?? 0,
+          },
+          operationBinding,
+        )
+      ) {
+        failCoopSharedSession(`Guest learn-move batch timeout for slot ${this.partyMemberIndex} was not retained`);
+        return;
+      }
       await globalScene.ui.setMode(returnMode);
       this.end();
       return;
     }
     if (res.choice === COOP_LEARN_MOVE_BATCH_FALLBACK) {
       coopWarn("learnmove", "guest batch panel fell back; host runs relayed per-move flow (#848)", { seq });
-      commitCoopLearnMoveBatchDecision({
-        payload: { type: "decision", partySlot: this.partyMemberIndex, assignments: [], fallback: true },
-        ownerRole: "guest",
-        localRole: "host",
-        wave: globalScene.currentBattle?.waveIndex ?? 0,
-        turn: globalScene.currentBattle?.turn ?? 0,
-      });
+      if (
+        !commitCoopLearnMoveBatchDecision(
+          {
+            payload: { type: "decision", partySlot: this.partyMemberIndex, assignments: [], fallback: true },
+            ownerRole: "guest",
+            localRole: "host",
+            wave: globalScene.currentBattle?.waveIndex ?? 0,
+            turn: globalScene.currentBattle?.turn ?? 0,
+          },
+          operationBinding,
+        )
+      ) {
+        failCoopSharedSession(`Guest learn-move batch fallback for slot ${this.partyMemberIndex} was not retained`);
+        return;
+      }
       await globalScene.ui.setMode(returnMode);
       this.coopPerMoveFallback(learnable);
       return;
     }
     const assignments = decodeCoopLearnMoveBatchTerminal(res.choice, res.data);
-    commitCoopLearnMoveBatchDecision({
-      payload: {
-        type: "decision",
-        partySlot: this.partyMemberIndex,
-        assignments: assignments.map(([moveId, slotIndex]) => [moveId, slotIndex] as [number, number]),
-        fallback: false,
-      },
-      ownerRole: "guest",
-      localRole: "host",
-      wave: globalScene.currentBattle?.waveIndex ?? 0,
-      turn: globalScene.currentBattle?.turn ?? 0,
-    });
+    if (
+      !commitCoopLearnMoveBatchDecision(
+        {
+          payload: {
+            type: "decision",
+            partySlot: this.partyMemberIndex,
+            assignments: assignments.map(([moveId, slotIndex]) => [moveId, slotIndex] as [number, number]),
+            fallback: false,
+          },
+          ownerRole: "guest",
+          localRole: "host",
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: globalScene.currentBattle?.turn ?? 0,
+        },
+        operationBinding,
+      )
+    ) {
+      failCoopSharedSession(`Guest learn-move batch terminal for slot ${this.partyMemberIndex} was not retained`);
+      return;
+    }
     // Apply the guest owner's picks AUTHORITATIVELY from the pre-panel snapshot (unaffected by cursor drift).
     pokemon.moveset.splice(0, pokemon.moveset.length, ...snapshotMoveset);
     if (snapshotSummon && pokemon.summonData?.moveset) {

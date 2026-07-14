@@ -156,7 +156,12 @@ describe.skipIf(!RUN)(
       // The guest human picks the replacement. withClientSync = SEND-ONLY: it clears the in-flight mark + relays
       // the terminal (queued) + closes the guest panel, all synchronously under the guest ctx; the host's await
       // then resolves under the HOST ctx in the next drain (not cross-ctx).
-      withClientSync(rig.guestCtx, () => driveOwnerPickFirstSlot(rig.guestScene));
+      withClientSync(rig.guestCtx, () => {
+        // Adversarial shared-process schedule: the production UI callback runs with the authority ambient.
+        // Its captured guest binding + relay must still arm/cancel only the guest's exact retry state.
+        setCoopRuntime(rig.hostRuntime);
+        driveOwnerPickFirstSlot(rig.guestScene);
+      });
       // THE P0: the OWNER (guest) signalled back + tore its picker down - it did NOT strand.
       expect(isCoopLearnMoveForwardInFlightEmpty(), "the guest released the picker (no strand - the P0 fix)").toBe(
         true,
@@ -206,7 +211,12 @@ describe.skipIf(!RUN)(
 
       // The HOST human picks (drives its own panel). withClientSync = SEND-ONLY: done() relays the terminal
       // (queued) + closes the host panel synchronously.
-      withClientSync(rig.hostCtx, () => driveOwnerPickFirstSlot(rig.hostScene));
+      withClientSync(rig.hostCtx, () => {
+        // Reciprocal callback schedule: the renderer is ambient when the host's real panel commits. The
+        // prompt/terminal must remain on the host ledger and the raw carrier must use the captured relay.
+        setCoopRuntime(rig.guestRuntime);
+        driveOwnerPickFirstSlot(rig.hostScene);
+      });
       expect(rig.hostScene.ui.getMode(), "the HOST owner's panel CLOSED").not.toBe(UiMode.LEARN_MOVE_BATCH);
 
       // GUEST: the relayed terminal (delivered under the guest ctx) force-closes the watcher panel.
