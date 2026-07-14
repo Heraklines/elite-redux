@@ -47,9 +47,10 @@ import {
   buildDuo,
   drainLoopback,
   driveGuestRewardWatch,
-  driveHostRewardShopOwner,
+  driveRewardShopOwnerLeaveViaUi,
   installDuoLogCapture,
   pumpDuoDestinations,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   withClient,
   withClientSync,
@@ -99,13 +100,11 @@ describe.skipIf(!RUN)(
       expect(counterBefore, "the reward shop opens on interaction counter 0 (host owns even -> guest watches)").toBe(0);
       const rewardSeq = COOP_REWARD_SEQ_BASE + counterBefore; // reward channel = base 0 + interaction counter
 
-      // ===== Build the HOST owner shop + the GUEST watcher shop (both REAL SelectModifierPhases). =====
-      const hostShop = withClientSync(rig.hostCtx, () =>
-        rig.hostScene.phaseManager.create("SelectModifierPhase"),
-      ) as unknown as ShopPhaseSeam;
-      const guestShop = withClientSync(rig.guestCtx, () =>
-        rig.guestScene.phaseManager.create("SelectModifierPhase"),
-      ) as unknown as ShopPhaseSeam;
+      // ===== Reach both REAL queued production shops. Detached phases are no longer a valid authority
+      // fixture: their terminal callback correctly detects that they do not own the live phase boundary. =====
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectModifierPhase", false));
+      const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+      const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
 
       // ===== FAULT INJECTION (the live #854 phantom): a stale reward-channel pick with an OUT-OF-RANGE
       // cursor sits buffered on the reward seq BEFORE the owner's real terminal. In the capture, inbox[8]
@@ -127,7 +126,7 @@ describe.skipIf(!RUN)(
       // ===== Host OWNS + drives the shop: rolls + STREAMS its options, then LEAVEs (no reward taken). The
       // LEAVE is relayed on the reward seq AFTER the phantom (FIFO). The owner remains parked until the
       // watcher materializes that terminal and returns the retained acknowledgement. =====
-      await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: false }));
+      await withClient(rig.hostCtx, () => driveRewardShopOwnerLeaveViaUi(hostShop));
 
       // ===== Guest WATCHES: startCoopWatch adopts the host's streamed options, then drains the relayed
       // picks. It BUFFER-HITs the phantom FIRST.
@@ -137,7 +136,15 @@ describe.skipIf(!RUN)(
       //   POST-FIX: the out-of-range cursor is IGNORED (kept waiting); the watcher then consumes the owner's
       //            LEAVE, ends its mirror, leaves, and advances once - passes-after. =====
       await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
-      await pumpDuoDestinations(rig);
+      for (
+        let attempt = 0;
+        attempt < 16
+        && (rig.hostRuntime.controller.interactionCounter() !== counterBefore + 1
+          || rig.guestRuntime.controller.interactionCounter() !== counterBefore + 1);
+        attempt++
+      ) {
+        await pumpDuoDestinations(rig);
+      }
 
       // ===== PASSES-AFTER assertions. =====
       // (b) The watcher left cleanly and the counters are LOCKSTEP (both advanced exactly once).

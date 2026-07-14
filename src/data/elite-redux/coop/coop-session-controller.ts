@@ -2189,6 +2189,15 @@ export class CoopSessionController {
           checkpoint.commitment.checkpointRevision,
           "checkpoint-persisted",
         );
+        coopLog(
+          "launch",
+          `resume checkpoint persisted id=${checkpoint.checkpointId} wave=${checkpoint.commitment.wave} checkpointRev=${checkpoint.commitment.checkpointRevision} cloud=${checkpoint.mirrorCloud}`,
+        );
+      } else {
+        coopWarn(
+          "launch",
+          `resume checkpoint NACK id=${checkpoint.checkpointId} wave=${checkpoint.commitment.wave} checkpointRev=${checkpoint.commitment.checkpointRevision} cloud=${checkpoint.mirrorCloud} reason=${result.reason ?? "runtime-invalid"}`,
+        );
       }
       this.transport.send({
         t: "resumeCheckpointAck",

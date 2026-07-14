@@ -38,6 +38,8 @@
     "src/data/elite-redux/coop/coop-renderer-gate.ts",
     "src/data/elite-redux/coop/coop-revival-operation.ts",
     "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/data/elite-redux/coop/coop-session-controller.ts",
+    "src/data/elite-redux/coop/coop-transport.ts",
     "src/data/elite-redux/coop/coop-wave-operation.ts",
     "src/phases/battle-end-phase.ts",
     "src/phases/biome-shop-phase.ts",

@@ -86,6 +86,8 @@ function toCoop(scene: BattleScene): void {
 }
 
 let activeResumeRig: DuoRig | null = null;
+let resumeCheckpointSentSeq = 0;
+let resumeCheckpointAckSeq = 0;
 
 /** Deliver every frame only while its destination's complete browser-equivalent context is installed. */
 async function pumpResumeDestinations(rig: DuoRig, rounds = 2): Promise<void> {
@@ -108,6 +110,8 @@ async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): Promise<
  * {@linkcode withClient} so their async account/runtime fences can never resume under the peer context.
  */
 async function withPeerPumpingClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): Promise<T> {
+  const sentAtEntry = resumeCheckpointSentSeq;
+  const ackAtEntry = resumeCheckpointAckSeq;
   const operation = withClientHarness(ctx, fn);
   const rig = activeResumeRig;
   if (rig == null) {
@@ -122,20 +126,39 @@ async function withPeerPumpingClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>
       settled = true;
     },
   );
-  for (let round = 0; round < 64 && !settled; round++) {
-    // Let immediately-resolving authenticated storage/cloud work finish while the owner context is
-    // still installed. Swapping to the peer before even one macrotask made every ordinary cloud scan
-    // observe the partner's account/runtime at its post-await fence and fail closed.
+  // Keep the initiating browser installed until it either finishes without a peer or reaches the exact
+  // retained-checkpoint rendezvous. In one process, switching accounts during the owner's digest/CAS awaits
+  // creates a state real independent browsers cannot have and correctly trips the production account fence.
+  for (let round = 0; round < 256 && !settled && resumeCheckpointSentSeq === sentAtEntry; round++) {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
-    if (settled) {
-      break;
+  }
+  if (settled) {
+    return operation;
+  }
+  if (resumeCheckpointSentSeq === sentAtEntry) {
+    throw new Error("resume fixture did not reach its peer-checkpoint rendezvous");
+  }
+
+  // The owner is now parked solely on guest durability. Keep the guest browser context installed across
+  // all of its async decrypt/digest/cloud work; leave only after it has emitted the exact ACK/NACK frame.
+  await withClientHarness(rig.guestCtx, async () => {
+    for (let round = 0; round < 256 && !settled && resumeCheckpointAckSeq === ackAtEntry; round++) {
+      await drainLoopback();
+      if (resumeCheckpointAckSeq !== ackAtEntry || settled) {
+        break;
+      }
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
     }
-    const peer = ctx === rig.hostCtx ? rig.guestCtx : rig.hostCtx;
-    await withClientHarness(peer, () => drainLoopback());
-    // The outer withClientHarness scope still owns `ctx`; after the nested peer scope restores it,
-    // pump the owner's inbox directly. Nesting a second async owner scope can unwind out of order if
-    // the operation settles inside that scope and leak the wrong process-global client afterward.
-    await drainLoopback();
+  });
+  if (!settled && resumeCheckpointAckSeq === ackAtEntry) {
+    throw new Error("resume fixture guest did not emit its checkpoint ACK/NACK");
+  }
+
+  // Deliver the retained result while the host browser is installed. The outer initiating context is restored
+  // by withClientHarness afterward; host save continuations therefore resume under their original account.
+  await withClientHarness(rig.hostCtx, () => drainLoopback());
+  for (let round = 0; round < 64 && !settled; round++) {
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
   }
   return operation;
 }
@@ -191,6 +214,20 @@ async function buildDuo(...args: Parameters<typeof buildDuoHarness>) {
   rig.hostCtx.accountIdentity = rig.hostRuntime.controller.localName();
   rig.guestCtx.accountIdentity = rig.guestRuntime.controller.localName();
   rig.pair.setDestinationContextDelivery?.(true);
+  const sendResumeCheckpointDetailed = rig.hostRuntime.controller.sendResumeCheckpointDetailed.bind(
+    rig.hostRuntime.controller,
+  );
+  vi.spyOn(rig.hostRuntime.controller, "sendResumeCheckpointDetailed").mockImplementation((...checkpointArgs) => {
+    resumeCheckpointSentSeq++;
+    return sendResumeCheckpointDetailed(...checkpointArgs);
+  });
+  const guestSend = rig.guestRuntime.localTransport.send.bind(rig.guestRuntime.localTransport);
+  vi.spyOn(rig.guestRuntime.localTransport, "send").mockImplementation(message => {
+    guestSend(message);
+    if (message.t === "resumeCheckpointAck") {
+      resumeCheckpointAckSeq++;
+    }
+  });
   activeResumeRig = rig;
   return rig;
 }
@@ -207,6 +244,8 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   });
 
   beforeEach(() => {
+    resumeCheckpointSentSeq = 0;
+    resumeCheckpointAckSeq = 0;
     // This file now exercises the real authenticated persistence path. Preserve the runner's incoming
     // browser storage exactly, but give every transaction scenario a fresh browser account substrate;
     // otherwise a successful checkpoint in one test becomes an unrelated cloud/local parent in the next.
