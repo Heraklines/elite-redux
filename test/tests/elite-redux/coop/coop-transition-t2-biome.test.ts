@@ -100,17 +100,15 @@ async function pumpBoth(rig: DuoRig, rounds = 1): Promise<void> {
 }
 
 async function waitForMode(rig: DuoRig, ctx: ClientCtx, mode: UiMode, label: string): Promise<void> {
-  for (let i = 0; i < 80; i++) {
+  // Every authoritative transition below opens its target directly through setModeBoundedWhen. In the
+  // headless renderer the fade tween may never tick, so allow the production 2s force-path to complete.
+  // Pressing ACTION against the outgoing MESSAGE handler is not a faithful shortcut: it can start a newer
+  // UI generation and supersede the exact bounded transition we are trying to prove.
+  for (let i = 0; i < 320; i++) {
     await pumpBoth(rig);
     if (ctx.scene.ui.getMode() === mode) {
       return;
     }
-    // A real text prompt owns MESSAGE until ACTION fires its callback and opens the requested menu.
-    await withClient(ctx, () => {
-      if (ctx.scene.ui.getMode() === UiMode.MESSAGE) {
-        ctx.scene.ui.processInput(Button.ACTION);
-      }
-    });
     await new Promise<void>(resolve => setTimeout(resolve, 10));
   }
   throw new Error(`${label} never opened ${UiMode[mode]} (stuck on ${UiMode[ctx.scene.ui.getMode()]})`);
@@ -134,6 +132,29 @@ function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
     resolve = r;
   });
   return { promise, resolve };
+}
+
+const OPERATION_SURFACES = [
+  "ability",
+  "bargain",
+  "biome",
+  "catchFull",
+  "colosseum",
+  "faintSwitch",
+  "learnMove",
+  "me",
+  "revival",
+  "reward",
+  "stormglass",
+  "wave",
+] as const;
+
+function expectOperationSurfaceEpochs(runtime: DuoRig["hostRuntime"], expectedEpoch: number, label: string): void {
+  for (const surface of OPERATION_SURFACES) {
+    const state = runtime.opState.surfaces.get(surface) as { epoch?: unknown } | undefined;
+    expect(state, `${label} owns a ${surface} runtime record`).toBeDefined();
+    expect(state?.epoch, `${label} ${surface} epoch is scoped to its destination runtime`).toBe(expectedEpoch);
+  }
 }
 
 describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transition", () => {
@@ -371,6 +392,29 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
   it("permit mismatches park SwitchBiome/NewBiome in place without mutation or queue advance", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
+
+    // Exercise the controller callback while the OTHER client is ambient. Before the runtime-scoped callback,
+    // this rewrote all twelve host ledgers and left the destination guest ledger stale. Restore the negotiated
+    // value before the gameplay assertions so this is a pure ownership probe, not a synthetic epoch change.
+    const hostEpoch = rig.hostRuntime.controller.sessionEpoch;
+    const guestEpoch = rig.guestRuntime.controller.sessionEpoch;
+    const nextGuestEpoch = Math.max(hostEpoch, guestEpoch) + 1;
+    const guestEpochCallback = (
+      rig.guestRuntime.controller as unknown as { onEpochNegotiated?: (epoch: number) => void }
+    ).onEpochNegotiated;
+    const hostEpochCallback = (rig.hostRuntime.controller as unknown as { onEpochNegotiated?: (epoch: number) => void })
+      .onEpochNegotiated;
+    expect(guestEpochCallback, "guest controller retained its runtime-scoped epoch callback").toBeTypeOf("function");
+    try {
+      await withClient(rig.hostCtx, () => guestEpochCallback!(nextGuestEpoch));
+      expectOperationSurfaceEpochs(rig.guestRuntime, nextGuestEpoch, "guest");
+      expectOperationSurfaceEpochs(rig.hostRuntime, hostEpoch, "host");
+    } finally {
+      guestEpochCallback?.(guestEpoch);
+      hostEpochCallback?.(hostEpoch);
+    }
+    expectOperationSurfaceEpochs(rig.guestRuntime, guestEpoch, "restored guest");
+    expectOperationSurfaceEpochs(rig.hostRuntime, hostEpoch, "restored host");
 
     await withClient(rig.guestCtx, async () => {
       const ui = rig.guestScene.ui as unknown as { showText: (...args: unknown[]) => void };
@@ -696,23 +740,36 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       const send = vi.spyOn(CoopInteractionRelay.prototype, "sendInteractionChoice");
       const ui = rig.hostScene.ui as unknown as {
-        setMode: (mode: UiMode, ...args: unknown[]) => Promise<void>;
+        setModeBoundedWhen: (
+          mode: UiMode,
+          timeoutMs: number,
+          isCurrent: (() => boolean) | undefined,
+          ...args: unknown[]
+        ) => Promise<"completed" | "forced" | "superseded">;
         showText: (...args: unknown[]) => void;
       };
-      const realSetMode = ui.setMode.bind(rig.hostScene.ui);
+      const realSetModeBoundedWhen = ui.setModeBoundedWhen.bind(rig.hostScene.ui);
       const realShowText = ui.showText.bind(rig.hostScene.ui);
       let optionConfig: { options: { handler: () => boolean }[] } | null = null;
       let confirm: (() => void) | null = null;
       let cancel: (() => void) | null = null;
       ui.showText = () => {};
-      ui.setMode = (mode: UiMode, ...args: unknown[]): Promise<void> => {
+      ui.setModeBoundedWhen = (
+        mode: UiMode,
+        _timeoutMs: number,
+        isCurrent: (() => boolean) | undefined,
+        ...args: unknown[]
+      ): Promise<"completed" | "forced" | "superseded"> => {
+        if (!(isCurrent?.() ?? true)) {
+          return Promise.resolve("superseded");
+        }
         if (mode === UiMode.OPTION_SELECT) {
           optionConfig = args[0] as { options: { handler: () => boolean }[] };
         } else if (mode === UiMode.CONFIRM) {
           confirm = args[0] as () => void;
           cancel = args[1] as () => void;
         }
-        return Promise.resolve();
+        return Promise.resolve("completed");
       };
       try {
         let crossroadsLive = true;
@@ -756,7 +813,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
           counterBefore,
         );
       } finally {
-        ui.setMode = realSetMode;
+        ui.setModeBoundedWhen = realSetModeBoundedWhen;
         ui.showText = realShowText;
       }
     });
@@ -867,8 +924,14 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       const pinned = rig.hostRuntime.controller.interactionCounter();
       const durability = rig.hostRuntime.durability;
       expect(durability, "the production-shaped runtime has an active durability journal").not.toBeNull();
-      const retain = vi.spyOn(durability!, "commit").mockReturnValueOnce(false);
       const rawTerminal = vi.spyOn(rig.hostRuntime.interactionRelay, "sendInteractionChoice");
+      let counterAtFailedRetention = -1;
+      let rawCallsAtFailedRetention = -1;
+      const retain = vi.spyOn(durability!, "commit").mockImplementationOnce(() => {
+        counterAtFailedRetention = rig.hostRuntime.controller.interactionCounter();
+        rawCallsAtFailedRetention = rawTerminal.mock.calls.length;
+        return false;
+      });
       const market = new BiomeShopPhase() as unknown as {
         coopBiomeStart: number;
         coopBiomeOwner: boolean;
@@ -881,10 +944,10 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
 
       const terminal = market.coopBiomeTerminal();
       expect(
-        rig.hostRuntime.controller.interactionCounter(),
+        counterAtFailedRetention,
         "the first committed-but-unretained attempt cannot advance market ownership",
       ).toBe(pinned);
-      expect(rawTerminal, "the host cannot expose an unretained raw terminal companion").not.toHaveBeenCalled();
+      expect(rawCallsAtFailedRetention, "the host cannot expose an unretained raw terminal companion").toBe(0);
       await expect(terminal).resolves.toBe(true);
       expect(retain, "the immutable host commit is journaled again on its exact re-ACK").toHaveBeenCalledTimes(2);
       expect(rawTerminal, "the retained terminal may keep its legacy-compatible companion").toHaveBeenCalledOnce();
@@ -1094,6 +1157,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         tween.mockRestore();
 
         const lostCallback = new NewBiomeEncounterPhase() as unknown as {
+          coopCompleted: boolean;
           coopBoundaryStillLive(requirePermit?: boolean): boolean;
           isBoundedAuthoritativeCoop(): boolean;
           startPresentationIntro(authoritativeGuest: boolean): void;
@@ -1101,7 +1165,10 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         };
         lostCallback.coopBoundaryStillLive = () => true;
         lostCallback.isBoundedAuthoritativeCoop = () => true;
-        const lostEnd = vi.spyOn(lostCallback, "end").mockImplementation(() => {});
+        const lostEnd = vi.spyOn(lostCallback, "end").mockImplementation(() => {
+          // Preserve end()'s idempotence side effect while suppressing the unrelated phase-queue mutation.
+          lostCallback.coopCompleted = true;
+        });
         vi.spyOn(rig.guestScene.tweens, "add").mockImplementation(config => config as never);
         lostCallback.startPresentationIntro(true);
         await vi.advanceTimersByTimeAsync(17_000);

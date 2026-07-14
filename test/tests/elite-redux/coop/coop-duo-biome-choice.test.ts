@@ -1039,6 +1039,10 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         liveSelectBiome().start();
         await drainLoopback();
       });
+      // Retained envelopes are intentionally queued by destination so their apply callback can never run
+      // against the sender's scene/runtime. Pump the renderer's addressed inbox before asserting that this
+      // terminal was pre-delivered; a host-context drain only services the host inbox.
+      await withClient(rig.guestCtx, () => drainLoopback());
       expect(
         rig.hostRuntime.durability?.unackedCount(),
         "the natural single-node terminal remains retained before renderer projection",

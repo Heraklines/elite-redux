@@ -4461,6 +4461,10 @@ export function assembleCoopRuntime(
   // re-assemble (it pulls a snapshot in place), so this never clears a live negotiation on a flap.
   clearNegotiatedCoopCapabilities();
   const durabilityEnabled = isCoopDurabilityEnabled();
+  // Epoch negotiation is delivered after controller assembly and may run while the other in-process client
+  // is ambient. Capture this receiver's stable ledger in the callback rather than using the ambient selector.
+  // It is assigned from controller.role below (not transport.role: P33 authority follows stable seats).
+  let opState!: CoopRuntimeOpState;
   let waveOperationBinding: CoopWaveAdvanceOperationBinding;
   const controller = new CoopSessionController(transport, {
     username: opts.username,
@@ -4474,7 +4478,8 @@ export function assembleCoopRuntime(
     requireFunctionalFingerprint: true,
     // The callback runs after assembly, on handshake/rejoin. Its stable binding cannot drift to the other
     // in-process engine while the peer's transport is being pumped.
-    onEpochNegotiated: epoch => applyCoopOperationEpoch(epoch, waveOperationBinding),
+    onEpochNegotiated: epoch =>
+      withActiveCoopRuntimeOpState(opState, () => applyCoopOperationEpoch(epoch, waveOperationBinding)),
     p33: opts.p33,
   });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
@@ -4517,7 +4522,7 @@ export function assembleCoopRuntime(
   const mePump = new CoopMePump(interactionRelay);
   const rendezvous = new CoopRendezvous(transport, { getEpoch: () => controller.sessionEpoch });
   const membership = new CoopMembershipController(() => controller.role);
-  const opState = createCoopRuntimeOpState(controller.role);
+  opState = createCoopRuntimeOpState(controller.role);
   // W2b/W2e (§4/§5): the application-level durability engine, flag-gated. Wave-2e plugs the operation
   // envelope in via the journal bridge's extractKey/apply hooks, so a committed op is journaled + ACKed +
   // resendable end-to-end (no longer a passive scaffold). Its reconnect() is wired into the #805 rejoin
