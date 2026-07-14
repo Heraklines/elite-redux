@@ -80,6 +80,9 @@ export const COOP_RENDERER_ALLOWED_PHASES: ReadonlySet<string> = new Set<string>
   // crash. They own account/session navigation only; no shared battle state is resolved here.
   "LoginPhase",
   "TitlePhase",
+  // Received versus terminal: winner/reason are already decided by the host and carried on the wire;
+  // this phase only presents that immutable result and navigates out of the match.
+  "ShowdownResultPhase",
 
   // ── PRESENTATION (§3.1) - pure render / animation / narration; mutates no hashed state ──
   "MessagePhase", // narration box; guest shows host-localized log lines

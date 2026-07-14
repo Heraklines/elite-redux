@@ -3,23 +3,23 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
-import { getActuallyFieldedCoopPokemon } from "#data/elite-redux/coop/coop-field-presentation";
-// biome-ignore lint/performance/noNamespaceImport: Vitest must spy on the live ESM export used by replay phases.
-import * as coopPresentation from "#data/elite-redux/coop/coop-presentation";
+import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
+import { installCoopAuthoritativeProjectionAdapter } from "#data/elite-redux/coop/coop-presentation";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
-import type { Pokemon } from "#field/pokemon";
-import { vi } from "vitest";
+import { swapAuthoritativeState } from "#data/elite-redux/showdown/showdown-side-swap";
+import { Pokemon } from "#field/pokemon";
 
 interface SemanticProjection {
   readonly player: Pokemon[];
   readonly enemy: Pokemon[];
 }
 
-function resolvePresentedPokemon(state: CoopAuthoritativeBattleStateV1): SemanticProjection | null {
+function resolvePresentedPokemon(scene: BattleScene, state: CoopAuthoritativeBattleStateV1): SemanticProjection | null {
   const projection: { player: Pokemon[]; enemy: Pokemon[] } = { player: [], enemy: [] };
   for (const seat of state.field) {
-    const party = seat.side === "player" ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
+    const party = seat.side === "player" ? scene.getPlayerParty() : scene.getEnemyParty();
     const pokemon = party.find(candidate => candidate.id === seat.pokemonId);
     if (pokemon == null) {
       return null;
@@ -35,11 +35,12 @@ function resolvePresentedPokemon(state: CoopAuthoritativeBattleStateV1): Semanti
   return projection;
 }
 
-function hasExactFieldMembership(projection: SemanticProjection): boolean {
+function hasExactFieldMembership(scene: BattleScene, projection: SemanticProjection): boolean {
   const expectedPlayer = new Set(projection.player.map(pokemon => pokemon.id));
   const expectedEnemy = new Set(projection.enemy.map(pokemon => pokemon.id));
-  const actualPlayer = new Set(getActuallyFieldedCoopPokemon("player").map(pokemon => pokemon.id));
-  const actualEnemy = new Set(getActuallyFieldedCoopPokemon("enemy").map(pokemon => pokemon.id));
+  const field = scene.field.getAll().filter((candidate): candidate is Pokemon => candidate instanceof Pokemon);
+  const actualPlayer = new Set(field.filter(pokemon => pokemon.isPlayer()).map(pokemon => pokemon.id));
+  const actualEnemy = new Set(field.filter(pokemon => pokemon.isEnemy()).map(pokemon => pokemon.id));
   return (
     expectedPlayer.size === actualPlayer.size
     && expectedEnemy.size === actualEnemy.size
@@ -59,20 +60,23 @@ function hasReadySemanticNodes(pokemon: Pokemon): boolean {
  * It verifies stable-id membership, field presence, visibility, and battle-info readiness while leaving
  * atlas, animation, and pixel evidence exclusively to the built-client browser lane.
  */
-export function installHeadlessCoopSemanticProjectionOracle(): void {
-  const semanticProjection = async (state: CoopAuthoritativeBattleStateV1): Promise<boolean> => {
-    const projection = resolvePresentedPokemon(state);
+export function installHeadlessCoopSemanticProjectionOracle(scene: BattleScene = globalScene): () => void {
+  const semanticProjection = async (
+    destination: BattleScene,
+    state: CoopAuthoritativeBattleStateV1,
+  ): Promise<boolean> => {
+    if (destination !== scene || globalScene !== scene) {
+      return false;
+    }
+    // Authority state is host-oriented on the wire. The Showdown guest's renderer and parties are in
+    // local orientation, so semantic readiness must inspect the same side-swapped state as production.
+    const localState = isShowdownGuestFlipGated() ? swapAuthoritativeState(state) : state;
+    const projection = resolvePresentedPokemon(scene, localState);
     return (
       projection != null
-      && hasExactFieldMembership(projection)
+      && hasExactFieldMembership(scene, projection)
       && [...projection.player, ...projection.enemy].every(hasReadySemanticNodes)
     );
   };
-
-  const installed = coopPresentation.settleCoopAuthoritativeProjection;
-  if (vi.isMockFunction(installed)) {
-    installed.mockImplementation(semanticProjection);
-  } else {
-    vi.spyOn(coopPresentation, "settleCoopAuthoritativeProjection").mockImplementation(semanticProjection);
-  }
+  return installCoopAuthoritativeProjectionAdapter(scene, semanticProjection);
 }

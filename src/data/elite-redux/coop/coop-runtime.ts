@@ -247,6 +247,7 @@ import type {
   CoopCapturePresentation,
   CoopFullBattleSnapshot,
   CoopInteractionOutcome,
+  CoopMessage,
   CoopNetcodeMode,
   CoopRole,
   CoopSerializedEnemy,
@@ -1425,32 +1426,60 @@ function wireCoopWaveResolved(controller: CoopSessionController, battleStream: C
  * void the same way. Silent (does NOT re-emit -> no ping-pong) and idempotent (skips when the result
  * phase is already running). Versus-only; a co-op peer never sends these `t` values.
  */
-function wireShowdownResult(transport: CoopTransport, controller: CoopSessionController): void {
+type PendingShowdownResult = Extract<CoopMessage, { t: "showdownResult" | "showdownVoid" }>;
+
+/**
+ * A terminal belongs to its receiver runtime, not whichever process-global scene happened to be installed
+ * when the transport callback ran. Production normally routes immediately; an in-process pair retains one
+ * immutable terminal until `setCoopRuntime(receiver)` installs the destination context.
+ */
+const pendingShowdownResults = new WeakMap<CoopRuntime, PendingShowdownResult>();
+
+function flushPendingShowdownResult(runtime: CoopRuntime): void {
+  if (active !== runtime) {
+    return;
+  }
+  const msg = pendingShowdownResults.get(runtime);
+  if (msg == null) {
+    return;
+  }
+  const scene = globalScene;
+  try {
+    if (scene.phaseManager.getCurrentPhase()?.phaseName === "ShowdownResultPhase") {
+      pendingShowdownResults.delete(runtime);
+      return;
+    }
+    // AFK-guest (#7): if the guest's command menu is still open when the match ends, force it back to
+    // MESSAGE first - otherwise the command menu owns input and the just-unshifted ShowdownResultPhase
+    // parks behind it. Best-effort; the retained terminal phase itself still queues synchronously.
+    if (scene.ui.getMode() === UiMode.COMMAND) {
+      void Promise.resolve(scene.ui.setMode(UiMode.MESSAGE)).catch(() => {});
+    }
+    if (msg.t === "showdownVoid") {
+      scene.phaseManager.unshiftNew("ShowdownResultPhase", false, msg.reason, true, true);
+    } else {
+      // The received `winner` is a role; this client won iff it matches its own role.
+      const localWon = msg.winner === runtime.controller.role;
+      scene.phaseManager.unshiftNew("ShowdownResultPhase", localWon, msg.reason, false, true);
+    }
+    pendingShowdownResults.delete(runtime);
+  } catch {
+    // Keep the exact terminal pending. A later destination activation retries it instead of silently
+    // dropping the match result or mutating another client's scene.
+  }
+}
+
+function wireShowdownResult(transport: CoopTransport, runtime: CoopRuntime): void {
   transport.onMessage(msg => {
     if (msg.t !== "showdownResult" && msg.t !== "showdownVoid") {
       return;
     }
-    try {
-      if (globalScene.phaseManager.getCurrentPhase()?.phaseName === "ShowdownResultPhase") {
-        return; // already ending on this client
-      }
-      // AFK-guest (#7): if the guest's command menu is still open when the match ends, force it back to
-      // MESSAGE first - otherwise the command menu owns input and the just-unshifted ShowdownResultPhase
-      // parks behind it (the guest never sees the result). Task F1: the guest now uses the NORMAL
-      // player-side COMMAND menu (its own team is its local player party). Best-effort; guarded.
-      if (globalScene.ui.getMode() === UiMode.COMMAND) {
-        globalScene.ui.setMode(UiMode.MESSAGE);
-      }
-      if (msg.t === "showdownVoid") {
-        globalScene.phaseManager.unshiftNew("ShowdownResultPhase", false, msg.reason, true, true);
-      } else {
-        // The received `winner` is a role; this client won iff it matches its own role.
-        const localWon = msg.winner === controller.role;
-        globalScene.phaseManager.unshiftNew("ShowdownResultPhase", localWon, msg.reason, false, true);
-      }
-    } catch {
-      /* routing the received result must never crash the receiver */
+    // First terminal wins. Duplicates are idempotent; a conflicting late terminal cannot overwrite the
+    // destination already chosen by the first accepted outcome.
+    if (!pendingShowdownResults.has(runtime)) {
+      pendingShowdownResults.set(runtime, msg);
     }
+    flushPendingShowdownResult(runtime);
   });
 }
 
@@ -2685,6 +2714,10 @@ export function setCoopRuntime(runtime: CoopRuntime): void {
   // Install the cycle-free showdown-guest-flip predicate (C5) so the render layer (pokemon.ts /
   // battle-info panels) can consult the versus-guest perspective flip without importing this module.
   setShowdownGuestFlipPredicate(isShowdownGuestFlip);
+  // A real browser receives under its own process-global scene. The two-engine harness can deliver while
+  // the sender is active, so received terminal control is retained per runtime and routed only after this
+  // destination runtime + scene are installed together.
+  flushPendingShowdownResult(runtime);
 }
 
 /** The live co-op session, or null when not in a co-op run. */
@@ -4589,7 +4622,7 @@ export function assembleCoopRuntime(
   wireCoopLearnMoveForward(interactionRelay);
   wireCoopLearnMoveBatchForward(interactionRelay);
   wireCoopDexSync(transport);
-  wireShowdownResult(transport, controller);
+  wireShowdownResult(transport, runtime);
   wireCoopDisconnectReaction(transport, runtime);
   wireCoopStallWatchdog(transport, interactionRelay, battleStream, runtime);
   // #812: ownership probe for pre-responder commandRequests (buffer own-slot, decline foreign).

@@ -69,6 +69,8 @@ export class ShowdownResultPhase extends BattlePhase {
 
   start(): void {
     super.start();
+    const scene = globalScene;
+    const runtime = getCoopRuntime();
 
     // #900: unlock the Versus achievements for this match BEFORE endShowdownBattle() (below)
     // drops the match id + team manifests this reads. Pure local observer - it validates
@@ -87,14 +89,14 @@ export class ShowdownResultPhase extends BattlePhase {
     const matchId = getShowdownMatchId();
     // Ranked reporting context (null when either player declined ranked). Read BEFORE endShowdownBattle.
     const ranked = getShowdownRankedContext();
-    const localRole = getCoopRuntime()?.controller.role ?? "host";
+    const localRole = runtime?.controller.role ?? "host";
 
     // Emit the outcome to the peer so both clients show the same result (matchId carried verbatim:
     // real id for a staked match, null for a friendly). Best-effort + guarded so a send can never
     // strand the return to title. Skipped when this phase was itself ROUTED from a received peer
     // result/void (silent) - otherwise the two clients ping-pong.
     try {
-      const transport = this.silent ? null : getCoopRuntime()?.localTransport;
+      const transport = this.silent ? null : runtime?.localTransport;
       if (transport != null) {
         if (this.voided) {
           transport.send({ t: "showdownVoid", matchId, reason: this.reason as ShowdownVoidReason });
@@ -120,7 +122,7 @@ export class ShowdownResultPhase extends BattlePhase {
     if (matchId != null && !this.voided) {
       const winner = winnerFromLocalResult(localRole, this.localWon);
       void reportShowdownResult(matchId, winner, this.reason as ShowdownResultReason)
-        .then(() => syncShowdownPendingSettlements(globalScene.gameData))
+        .then(() => syncShowdownPendingSettlements(scene.gameData))
         .catch(() => {});
     } else if (matchId != null && this.voided) {
       // I4: a VOIDED staked match releases both escrow holds server-side (no winner to attest).
@@ -151,7 +153,9 @@ export class ShowdownResultPhase extends BattlePhase {
 
     // Ephemeral match: drop the showdown + co-op runtime state. NEVER persisted (no saveAll).
     endShowdownBattle();
-    clearCoopRuntime();
+    if (getCoopRuntime() === runtime) {
+      clearCoopRuntime();
+    }
 
     const message = this.voided
       ? `The Showdown was voided (${this.reason}).`
@@ -165,24 +169,35 @@ export class ShowdownResultPhase extends BattlePhase {
     // and lingers over the incoming title (the reported "trainer stays on top of the titlescreen").
     // Captured HERE, before reset() drops the `currentBattle` reference, and destroyed in the teardown
     // below. Deterministic for every outcome (win / loss / void) and every entry mode.
-    const enemyTrainer = globalScene.currentBattle?.trainer ?? null;
+    const enemyTrainer = scene.currentBattle?.trainer ?? null;
+
+    const ownsScenePhase = (): boolean => scene.phaseManager.getCurrentPhase() === this;
 
     const showResult = () => {
-      globalScene.ui.showText(
+      if (!ownsScenePhase()) {
+        return;
+      }
+      scene.ui.showText(
         message,
         null,
         () => {
+          if (!ownsScenePhase()) {
+            return;
+          }
           // Return to the title WITHOUT saving - a showdown run never writes a session.
           // Mirror the game-over title-return recipe (staging fix 2026-07-07): hide + fade the
           // battle scene and CLEAR the phase queue BEFORE resetting, or the stale battle
           // field/menu stays rendered underneath the incoming title menu (the reported
           // "title menu on top of the frozen battle" after a forfeit).
-          globalScene.fadeOutBgm(500, true);
-          const activeBattlers = globalScene.getField().filter(p => p?.isActive(true));
+          scene.fadeOutBgm(500, true);
+          const activeBattlers = scene.getField().filter(p => p?.isActive(true));
           for (const battler of activeBattlers) {
             battler.hideInfo();
           }
-          void globalScene.ui.fadeOut(500).then(() => {
+          void scene.ui.fadeOut(500).then(() => {
+            if (!ownsScenePhase()) {
+              return;
+            }
             for (const battler of activeBattlers) {
               battler.setVisible(false);
             }
@@ -195,17 +210,19 @@ export class ShowdownResultPhase extends BattlePhase {
             try {
               if (enemyTrainer != null) {
                 enemyTrainer.setVisible(false);
-                globalScene.field.remove(enemyTrainer, true);
+                scene.field.remove(enemyTrainer, true);
               }
             } catch {
               /* a trainer teardown failure must never block the return to title */
             }
-            globalScene.setFieldScale(1, true);
-            globalScene.phaseManager.clearPhaseQueue();
-            globalScene.ui.clearText();
-            globalScene.reset();
-            globalScene.phaseManager.unshiftNew("TitlePhase");
-            this.end();
+            scene.setFieldScale(1, true);
+            scene.phaseManager.clearPhaseQueue();
+            scene.ui.clearText();
+            scene.reset();
+            scene.phaseManager.unshiftNew("TitlePhase");
+            // `Phase.end()` dereferences mutable globalScene. This async completion belongs to the captured
+            // result scene even if another in-process client was installed while the fade was pending.
+            scene.phaseManager.shiftPhase();
           });
         },
         null,
@@ -218,17 +235,21 @@ export class ShowdownResultPhase extends BattlePhase {
       if (opponentLine == null) {
         showResult();
       } else {
-        globalScene.ui.showText(opponentLine, null, showResult, null, true);
+        scene.ui.showText(opponentLine, null, showResult, null, true);
       }
     };
     // This phase can be routed from ANY prior UI mode: a mid-battle victory/forfeit already sits on the
     // MESSAGE handler, but a PRE-BATTLE abandon (a drop during the wager window) enters with the WAGER
     // screen still up. Ensure the MESSAGE handler is active first, or the result text can't render/advance
     // and the return to title strands. When already on MESSAGE we keep the exact synchronous path.
-    if (globalScene.ui.getMode() === UiMode.MESSAGE) {
+    if (scene.ui.getMode() === UiMode.MESSAGE) {
       runResultText();
     } else {
-      void globalScene.ui.setMode(UiMode.MESSAGE).then(runResultText);
+      void scene.ui.setMode(UiMode.MESSAGE).then(() => {
+        if (ownsScenePhase()) {
+          runResultText();
+        }
+      });
     }
   }
 }

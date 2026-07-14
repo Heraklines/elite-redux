@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
@@ -14,6 +15,38 @@ import { getCoopController, getCoopNetcodeMode, getCoopSessionKind } from "#data
 import type { CoopAuthoritativeBattleStateV1, CoopAuthoritativeFieldSeat } from "#data/elite-redux/coop/coop-transport";
 import { swapAuthoritativeState } from "#data/elite-redux/showdown/showdown-side-swap";
 import type { Pokemon } from "#field/pokemon";
+
+/**
+ * Destination-scoped projection verifier. Production scenes deliberately have no adapter and therefore
+ * execute the real atlas/sprite/info-bar proof below. The in-process two-engine harness registers its
+ * semantic oracle against only the headless destination scene, avoiding a process-global Vitest spy that
+ * could miss an already-bound ESM import or leak into another client.
+ */
+export type CoopAuthoritativeProjectionAdapter = (
+  scene: BattleScene,
+  state: CoopAuthoritativeBattleStateV1,
+) => boolean | Promise<boolean>;
+
+const projectionAdapters = new WeakMap<BattleScene, CoopAuthoritativeProjectionAdapter>();
+
+/** Install one explicit projection verifier for exactly one scene; returns an ownership-safe disposer. */
+export function installCoopAuthoritativeProjectionAdapter(
+  scene: BattleScene,
+  adapter: CoopAuthoritativeProjectionAdapter,
+): () => void {
+  const previous = projectionAdapters.get(scene);
+  projectionAdapters.set(scene, adapter);
+  return () => {
+    if (projectionAdapters.get(scene) !== adapter) {
+      return;
+    }
+    if (previous == null) {
+      projectionAdapters.delete(scene);
+    } else {
+      projectionAdapters.set(scene, previous);
+    }
+  };
+}
 
 function isAuthoritativeGuest(): boolean {
   return (
@@ -133,6 +166,17 @@ function projectionNodesReady(pokemon: Pokemon): boolean {
  */
 export async function settleCoopAuthoritativeProjection(state: CoopAuthoritativeBattleStateV1): Promise<boolean> {
   const scene = globalScene;
+  const adapter = projectionAdapters.get(scene);
+  if (adapter != null) {
+    try {
+      const ready = await adapter(scene, state);
+      // A verifier is destination-owned just like the real asset wait: a scene swap while it was pending
+      // invalidates the result instead of ACKing a continuation from another client context.
+      return ready === true && globalScene === scene;
+    } catch {
+      return false;
+    }
+  }
   // Mechanical apply reflects host coordinates for a Showdown guest. Presentation must inspect the same
   // local orientation or it would look for each team in the opposite party and falsely terminal a valid turn.
   const localState = isShowdownGuestFlipGated() ? swapAuthoritativeState(state) : state;
