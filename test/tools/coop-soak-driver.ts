@@ -2394,9 +2394,55 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       const scriptedSubPicks = [...(opts.meSubPicks?.get(wave) ?? [])];
 
       if (scriptedSubPicks.length === 0) {
-        // The shared-process split remains useful for MEs without nested input: send the owner intent now,
-        // let the host finish, then arm the guest's already-buffered outcome/terminal race below.
-        withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, option - 1));
+        // A flat guest-owned ME still crosses a bidirectional process boundary. Deliver the owner's exact
+        // top-level intent only while the HOST runtime is installed, then keep the sole engine under that
+        // same destination until it opens the reward/post surface. Automatic loopback used to invoke the
+        // host transport handler under the sender's guest runtime: the packet was visibly received, but the
+        // host relay waiter never saw it and retransmitted the valid pick forever (wave-26 Town Raffle).
+        const setDestinationDelivery = rig.pair.setDestinationContextDelivery;
+        if (setDestinationDelivery == null) {
+          fail("no-park", wave, "guest-owned ME requires destination-context transport scheduling");
+        }
+        const deliverInDestinationContext = setDestinationDelivery as (enabled: boolean) => void;
+        let hostReachedDestination = false;
+        let hostDriveError: unknown;
+
+        deliverInDestinationContext(true);
+        try {
+          const hostDrive = withClient(rig.hostCtx, () =>
+            game.phaseInterceptor.to(noRewardShop ? "PostMysteryEncounterPhase" : "SelectModifierPhase", false),
+          ).then(
+            () => {
+              hostReachedDestination = true;
+            },
+            error => {
+              hostDriveError = error;
+            },
+          );
+
+          withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, option - 1));
+          const hostDriveDeadline = Date.now() + 10_000;
+          while (!hostReachedDestination && Date.now() < hostDriveDeadline) {
+            // No guest pump is needed after its complete pick is queued. Keeping the engine's async option
+            // callback in host context also prevents a Promise continuation from ending the guest phase.
+            await withClient(rig.hostCtx, () => drainLoopback());
+            if (hostDriveError != null) {
+              throw hostDriveError;
+            }
+          }
+          if (hostDriveError != null) {
+            throw hostDriveError;
+          }
+          if (!hostReachedDestination) {
+            throw new Error(
+              `wave ${wave} ${MysteryEncounterType[type]} guest-owned public drive did not reach its continuation; `
+                + `host=${rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}`,
+            );
+          }
+          await hostDrive;
+        } finally {
+          deliverInDestinationContext(false);
+        }
       } else {
         // A nested PARTY/OPTION_SELECT cannot be pre-sent. CoopReplayMePhase deliberately accepts a sub-pick
         // only after the exact retained ME_PRESENT has armed its one-shot presentation ticket. The old driver
