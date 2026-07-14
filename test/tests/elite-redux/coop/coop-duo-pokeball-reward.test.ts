@@ -26,6 +26,7 @@ import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
+  beginRewardShopWatch,
   buildDuo,
   type DuoRig,
   driveGuestReplayTurn,
@@ -109,11 +110,19 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
     expect(hostShop.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
     const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     if (hostOwns) {
+      const watcherPinned = await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
+      expect(watcherPinned, "guest watcher parked before the host-owned ball pick").toBe(counterBefore);
       await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: true }));
-      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
     } else {
+      // The host is still the option authority on a guest-owned reward. Starting its real watcher first
+      // both arrives at the reciprocal shop barrier and streams the canonical pool the guest must adopt
+      // before a human-visible pick can occur. Driving the guest first let the 50 ms harness barrier expire,
+      // observed an empty not-yet-adopted pool, and silently exercised LEAVE instead of the asserted TAKE.
+      const watcherPinned = await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
+      expect(watcherPinned, "host watcher parked before the guest-owned ball pick").toBe(counterBefore);
       await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward: true }));
-      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
     }
     // A guest-owned TAKE is an intent: the host watcher commits it, then the retained result must return
     // to the guest owner before either scene is inspected. Real browsers receive that final hop in the
