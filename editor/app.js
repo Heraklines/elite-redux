@@ -2136,6 +2136,101 @@ function ctrShinyPickerHtml(m, i) {
   </div>`;
 }
 
+/** Verbatim port of getFusedSpeciesName (src/utils/pokemon-utils.ts): the NAME the
+ *  game generates for a fusion of two species display names. Kept byte-for-byte so
+ *  the editor preview matches the in-game fused name exactly. */
+function ctrFusedName(speciesAName, speciesBName) {
+  const fragAPattern = /([a-z]{2}.*?[aeiou(?:y$)\-']+)(.*?)$/i;
+  const fragBPattern = /([a-z]{2}.*?[aeiou(?:y$)\-'])(.*?)$/i;
+  const [speciesAPrefixMatch, speciesBPrefixMatch] = [speciesAName, speciesBName].map(n => /^(?:[^ ]+) /.exec(n));
+  const [speciesAPrefix, speciesBPrefix] = [speciesAPrefixMatch, speciesBPrefixMatch].map(m => (m ? m[0] : ""));
+  if (speciesAPrefix) {
+    speciesAName = speciesAName.slice(speciesAPrefix.length);
+  }
+  if (speciesBPrefix) {
+    speciesBName = speciesBName.slice(speciesBPrefix.length);
+  }
+  const [speciesASuffixMatch, speciesBSuffixMatch] = [speciesAName, speciesBName].map(n => / (?:[^ ]+)$/.exec(n));
+  const [speciesASuffix, speciesBSuffix] = [speciesASuffixMatch, speciesBSuffixMatch].map(m => (m ? m[0] : ""));
+  if (speciesASuffix) {
+    speciesAName = speciesAName.slice(0, -speciesASuffix.length);
+  }
+  if (speciesBSuffix) {
+    speciesBName = speciesBName.slice(0, -speciesBSuffix.length);
+  }
+  const splitNameA = speciesAName.split(/ /g);
+  const splitNameB = speciesBName.split(/ /g);
+  const fragAMatch = fragAPattern.exec(speciesAName);
+  const fragBMatch = fragBPattern.exec(speciesBName);
+  let fragA;
+  let fragB;
+  fragA = splitNameA.length === 1 ? (fragAMatch ? fragAMatch[1] : speciesAName) : splitNameA.at(-1);
+  if (splitNameB.length === 1) {
+    if (fragBMatch) {
+      const lastCharA = fragA.slice(fragA.length - 1);
+      const prevCharB = fragBMatch[1].slice(fragBMatch.length - 1);
+      fragB = (/[-']/.test(prevCharB) ? prevCharB : "") + fragBMatch[2] || prevCharB;
+      if (lastCharA === fragB[0]) {
+        if (/[aiu]/.test(lastCharA)) {
+          fragB = fragB.slice(1);
+        } else {
+          const newCharMatch = new RegExp(`[^${lastCharA}]`).exec(fragB);
+          if (newCharMatch?.index !== undefined && newCharMatch.index > 0) {
+            fragB = fragB.slice(newCharMatch.index);
+          }
+        }
+      }
+    } else {
+      fragB = speciesBName;
+    }
+  } else {
+    fragB = splitNameB.at(-1);
+  }
+  if (splitNameA.length > 1) {
+    fragA = `${splitNameA.slice(0, splitNameA.length - 1).join(" ")} ${fragA}`;
+  }
+  fragB = `${fragB.slice(0, 1).toLowerCase()}${fragB.slice(1)}`;
+  if (fragA === "Rapi") {
+    fragA = "Rapid";
+    if (fragB === "ng") {
+      fragB = speciesBName.slice(speciesBName.length - 3);
+    }
+  }
+  return `${speciesAPrefix || speciesBPrefix}${fragA}${fragB}${speciesBSuffix || speciesASuffix}`;
+}
+
+/** A species CONST's front-sprite CDN url (same slug path the game/editor mon
+ *  previews use), or "" when the species/slug can't be resolved. */
+function ctrSpeciesSpriteUrl(speciesConst) {
+  const s = speciesConst ? spByConst.get(speciesConst) : null;
+  return s && s.slug ? `${SPRITE_BASE}/${s.slug}/front.png` : "";
+}
+
+/** Fusion preview: the two base + fusion battle sprites side by side + the fused
+ *  NAME the game would generate. Approximation label: in-game blends palettes too.
+ *  Returns "" when the member has no (complete) fusion configured. */
+function ctrFusionPreviewHtml(m) {
+  const fus = m && m.fusion;
+  if (!fus || !m.species || !fus.species) {
+    return "";
+  }
+  const base = spByConst.get(m.species);
+  const other = spByConst.get(fus.species);
+  if (!base || !other) {
+    return "";
+  }
+  const fused = ctrFusedName(base.name || m.species, other.name || fus.species);
+  const img = url =>
+    url
+      ? `<img src="${esc(url)}" style="width:56px;height:56px;image-rendering:pixelated" onerror="this.style.visibility='hidden'" />`
+      : '<span class="dyn">?</span>';
+  return `<div class="ctr-fusion-preview">
+    <div class="ctr-fusion-sprites">${img(ctrSpeciesSpriteUrl(m.species))}<span class="ctr-fusion-plus">+</span>${img(ctrSpeciesSpriteUrl(fus.species))}</div>
+    <div class="ctr-fusion-name">Fused name: <b>${esc(fused)}</b></div>
+    <div class="hint">Approximation: in-game fusion also blends palettes.</div>
+  </div>`;
+}
+
 function ctrMemberHtml(m, i) {
   ctrEnsureSlot(m); // repair weighted-variant metadata on a legacy/edited slot
   const open = ctrOpenMembers.has(i);
@@ -2226,7 +2321,8 @@ function ctrMemberHtml(m, i) {
         fus
           ? `<input class="ctr-fusion-species" list="species-list" data-idx="${i}" value="${esc(fus.species || "")}" placeholder="fusion SPECIES_…" spellcheck="false" style="width:170px" />
           <label>Form <input type="number" class="ctr-fusion-form" data-idx="${i}" value="${fus.formIndex || 0}" min="0" max="60" style="width:56px" /></label>
-          <label>Ability slot <select class="ctr-fusion-abil" data-idx="${i}">${ctrAbilOptions(fus.species, fus.abilitySlot)}</select></label>`
+          <label>Ability slot <select class="ctr-fusion-abil" data-idx="${i}">${ctrAbilOptions(fus.species, fus.abilitySlot)}</select></label>
+          ${ctrFusionPreviewHtml(m)}`
           : ""
       }
     </div>

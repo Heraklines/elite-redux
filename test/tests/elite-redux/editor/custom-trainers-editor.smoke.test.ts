@@ -44,6 +44,7 @@ interface EditorHarness {
   onCustomTrainerClick(e: { target: Element }): boolean;
   buildDeltas(): { deltas: Record<string, unknown>; bad: string[] };
   ctrMoveIllegal(m: Record<string, unknown>, move: string): boolean;
+  ctrFusedName(a: string, b: string): string;
   ctr: { current: Record<string, any>; baseline: Record<string, any> };
   spByConst: Map<string, unknown>;
   spById: Map<number, unknown>;
@@ -80,7 +81,7 @@ function q(sel: string): Element | null {
 
 /** Seed a species into both editor lookups (species by CONST + by numeric id). */
 function addSpecies(constKey: string, id: number, name: string): void {
-  const entry = { const: constKey, name, id, dex: id, bst: 500 };
+  const entry = { const: constKey, name, id, dex: id, bst: 500, slug: name.toLowerCase() };
   ct.spByConst.set(constKey, entry);
   ct.spById.set(id, entry);
 }
@@ -111,7 +112,7 @@ beforeAll(() => {
   const stripped = appSrc.replace(/\ninit\(\);\s*$/, "\n");
   const shim = `
     ;window.__ct = {
-      blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal,
+      blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal, ctrFusedName,
       render, onCustomTrainerInput, onCustomTrainerChange, onCustomTrainerClick, buildDeltas,
       ctr, spByConst, spById, trainerClassByName, SHINY_EFFECTS, shinyEffectById, MOVE_SET, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
@@ -428,6 +429,35 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     intro.value = "a".repeat(250);
     ct.onCustomTrainerInput(intro);
     expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].introDialogue.length).toBe(200);
+  });
+
+  it("fusion preview renders sprites + the generated fused name for a fused member", () => {
+    newTrainer();
+    const key = ct.ctrSelected!;
+    const t = ct.ctr.current[key];
+    setSpecies(0, "SPECIES_PIKACHU");
+    // No fusion yet -> no preview.
+    expect(q(".ctr-fusion-preview")).toBeNull();
+
+    // Toggle fusion on, then set the fusion species.
+    const fusOn = q('.ctr-fusion-on[data-idx="0"]') as HTMLInputElement;
+    fusOn.checked = true;
+    ct.onCustomTrainerChange(fusOn);
+    const fusSp = q('.ctr-fusion-species[data-idx="0"]') as HTMLInputElement;
+    fusSp.value = "SPECIES_RAICHU";
+    ct.onCustomTrainerInput(fusSp);
+    ct.onCustomTrainerChange(fusSp);
+    expect(t.team[0].fusion.species).toBe("SPECIES_RAICHU");
+
+    // The preview renders: two sprite <img>s + the game-generated fused name.
+    const preview = q(".ctr-fusion-preview");
+    expect(preview).not.toBeNull();
+    expect(preview!.querySelectorAll("img").length).toBe(2);
+    const expectedName = ct.ctrFusedName("Pikachu", "Raichu");
+    expect(preview!.querySelector(".ctr-fusion-name")!.textContent).toContain(expectedName);
+    // The fused-name derivation matches the game's fragment blend (deterministic).
+    expect(expectedName).toBe(ct.ctrFusedName("Pikachu", "Raichu"));
+    expect(expectedName.length).toBeGreaterThan(0);
   });
 
   it("prior-surface smoke still holds: member collapse/expand + the battle-music picker render", () => {
