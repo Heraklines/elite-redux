@@ -87,7 +87,7 @@ import {
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { COOP_UI_MIRRORED_MODES } from "#data/elite-redux/coop/coop-ui-registry";
 import {
   getCoopUiOperationHits,
@@ -1092,8 +1092,9 @@ export function prepareCoopSoakContent(game: GameManager, seed: number, pinSeed?
 
 /**
  * Install the coverage taps (test-side seam wraps, ZERO production change):
- *   - RELAY tap on BOTH runtimes: every owner-sent choice/outcome records its `kind` (hits.kinds) + the
- *     seq BAND it rides (bandForSeq -> hits.bands). ONE tap covers every kind + band the run ever sends,
+ *   - CARRIER tap on BOTH runtimes: every interactionChoice/interactionOutcome frame records its `kind`
+ *     (hits.kinds) + the seq BAND it rides (bandForSeq -> hits.bands). ONE tap covers every kind + band
+ *     the run ever sends, including async ME tails that can escape the relay-instance wrapper,
  *     INCLUDING future ones (a newly-registered kind that actually fires is recorded automatically; one
  *     that never fires stays cold + is caught by the completeness assertion).
  *   - PERMANENT guest ui.setMode recorder: every guest setMode targeting a co-op-MIRRORED UiMode records
@@ -1110,19 +1111,13 @@ function installCoverageTaps(rig: DuoRig, hits: SoakHitSet): void {
     }
   };
   for (const runtime of [rig.hostRuntime, rig.guestRuntime]) {
-    const relay = runtime.interactionRelay as unknown as {
-      sendInteractionChoice: (seq: number, kind: string, choice: number, data?: number[]) => void;
-      sendInteractionOutcome: (seq: number, kind: string, outcome: unknown) => void;
-    };
-    const realChoice = relay.sendInteractionChoice.bind(relay);
-    const realOutcome = relay.sendInteractionOutcome.bind(relay);
-    relay.sendInteractionChoice = (seq, kind, choice, data): void => {
-      recordSend(seq, kind);
-      realChoice(seq, kind, choice, data);
-    };
-    relay.sendInteractionOutcome = (seq, kind, outcome): void => {
-      recordSend(seq, kind);
-      realOutcome(seq, kind, outcome);
+    const transport = runtime.localTransport;
+    const realSend = transport.send.bind(transport);
+    transport.send = (message: CoopMessage): void => {
+      if (message.t === "interactionChoice" || message.t === "interactionOutcome") {
+        recordSend(message.seq, message.kind);
+      }
+      realSend(message);
     };
   }
   const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
