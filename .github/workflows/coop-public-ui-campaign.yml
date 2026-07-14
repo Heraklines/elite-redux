@@ -132,7 +132,8 @@ jobs:
             test/browser/coop-public-ui/campaign-policy.mjs \
             test/browser/coop-public-ui/campaign.mjs \
             test/browser/coop-public-ui/run-campaign.mjs \
-            test/browser/coop-public-ui/check-campaign-boundary.mjs
+            test/browser/coop-public-ui/check-campaign-boundary.mjs \
+            test/browser/coop-public-ui/environment-seal.mjs
 
       - name: Enforce public-driver boundary (original harness files)
         run: node test/browser/coop-public-ui/check-public-boundary.mjs
@@ -253,6 +254,29 @@ jobs:
           name: coop-public-ui-campaign-bundle-${{ github.sha }}
           path: dist-coop-public-ui
 
+      # ENVIRONMENT SEAL / attestation (P33 audit #920): record the EXACT versions under test so
+      # this run's artifacts are reproducible evidence. Runs early (post-checkout, post-bundle) so
+      # the four facts are captured around the decisive run:
+      #   - app_sha:  git rev-parse HEAD (the integrated commit this job checked out)
+      #   - assets_sha:  the Heraklines/er-assets pin the build sealed into coop-browser-artifact.json
+      #   - er_save_api_version / er_coop_api_version:  the DEPLOYED staging worker versions serving
+      #     the run, read from the Cloudflare API using the SAME CLOUDFLARE_API_TOKEN +
+      #     CLOUDFLARE_ACCOUNT_ID secrets the deploy workflows use; falls back to an HTTP probe (the
+      #     workers expose no /version route) and flags degraded provenance when auth is unavailable.
+      # The seal lands at dev-logs/coop-public-ui/environment-seal.json so it rides the evidence
+      # artifacts uploaded below, and is echoed to the job log with a [env-seal] prefix.
+      - name: Seal exact environment under test (attestation)
+        env:
+          COOP_BROWSER_DIST: dist-coop-public-ui
+          COOP_SEAL_OUT_DIR: dev-logs/coop-public-ui
+          COOP_SEAL_SAVE_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
+          COOP_SEAL_COOP_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
+          COOP_SEAL_SAVE_WORKER: er-save-api-staging
+          COOP_SEAL_COOP_WORKER: er-coop-api-staging
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node test/browser/coop-public-ui/environment-seal.mjs
+
       - name: Install isolated Chrome runtime
         run: pnpm exec puppeteer browsers install chrome
 
@@ -284,12 +308,25 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: node test/browser/coop-public-ui/run-campaign.mjs
 
+      # The environment seal is small, decisive audit evidence - upload it as its own artifact
+      # (always, even if the run fails/times out before the evidence uploads below) so audit #920
+      # can always recover the exact versions under test.
+      - name: Upload environment seal (attestation)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-public-ui-campaign-environment-seal-${{ github.sha }}-${{ github.run_attempt }}
+          path: dev-logs/coop-public-ui/environment-seal.json
+          retention-days: 14
+          if-no-files-found: warn
+
       - name: Upload compact campaign diagnosis first
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coop-public-ui-campaign-compact-${{ github.sha }}-${{ github.run_attempt }}
           path: |
+            dev-logs/coop-public-ui/environment-seal.json
             dev-logs/coop-public-ui/**/summary.json
             dev-logs/coop-public-ui/**/campaign-progress.jsonl
             dev-logs/coop-public-ui/**/*.jsonl
