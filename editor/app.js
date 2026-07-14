@@ -1746,6 +1746,18 @@ function ctrIsMoveToken(v) {
   return CTR_MOVE_TOKENS.has((v || "").trim().toUpperCase());
 }
 
+/** A move DISPLAY name (e.g. "Ice Beam") -> the enum KEY the editor/game compare in
+ *  ("ICE_BEAM"). Mirror of gen-editor-data's moveNameToEnumKey (and the game's own
+ *  init-elite-redux-custom-moves.ts): uppercase, non-alnum runs -> a single "_",
+ *  trimmed. This is the ONE normalization for both the legal-move pool (moves-rich
+ *  ships DISPLAY names) and every typed move input (so "ice beam" -> "ICE_BEAM"). */
+function moveNameToEnumKey(name) {
+  return String(name || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 /** The member-FIELD keys that make up ONE weighted possibility (excludes slot meta:
  *  slotChance / weighted / variants / cur). */
 const CTR_MEMBER_FIELDS = [
@@ -2070,8 +2082,46 @@ function setMovesSummary(set) {
 }
 
 /**
- * Legal move NAMEs for a species CONST = levelup ∪ TM ∪ egg moves, from the data
- * the editor already loaded (learnsets / tm-learnsets / er-egg-moves). Memoized.
+ * Every species CONST in a fielded species' pre-evolution line (self + every
+ * pre-evo down to the root), mirroring the game's collectShowdownFreeMoves walk,
+ * which inherits each pre-evolution's learnset. Uses the editor evolution graph
+ * (EVOS, keyed by numeric species id: { to:[], from:[] }). Falls back to just the
+ * species itself when there is no evo data (e.g. the jsdom smoke harness).
+ */
+function ctrPreEvoLineConsts(speciesConst) {
+  const consts = new Set([speciesConst]);
+  const startId = spByConst.get(speciesConst)?.id;
+  if (startId === undefined) {
+    return consts;
+  }
+  const visited = new Set();
+  const stack = [startId];
+  while (stack.length > 0) {
+    const id = stack.pop();
+    if (visited.has(id)) {
+      continue;
+    }
+    visited.add(id);
+    const c = spById.get(id)?.const;
+    if (c) {
+      consts.add(c);
+    }
+    const from = EVOS[id]?.from;
+    if (Array.isArray(from)) {
+      for (const pid of from) {
+        stack.push(pid);
+      }
+    }
+  }
+  return consts;
+}
+
+/**
+ * Legal move enum-KEYs for a species CONST = levelup ∪ TM ∪ egg moves, ACROSS the
+ * whole pre-evolution line (matching the game's RLA/RLNA free-move pool), from the
+ * data the editor already loaded (learnsets / tm-learnsets / er-egg-moves). The
+ * numeric move ids resolve to DISPLAY names via moves-rich; moveNameToEnumKey maps
+ * those to the enum-key space the inputs + MOVE_SET use. Memoized.
  * An empty set means "no data for this species" (treated as: enforce nothing so a
  * data gap never blocks a save — the illegal check below skips an empty pool).
  */
@@ -2084,21 +2134,29 @@ function legalMovesFor(speciesConst) {
     return cached;
   }
   const out = new Set();
-  for (const [, moveId] of learn.current[speciesConst] || []) {
-    const nm = moveById.get(moveId)?.name;
-    if (nm) {
-      out.add(nm);
+  // learnsets/tm-learnsets ship numeric move ids; moves-rich maps id -> DISPLAY
+  // name, so derive the enum KEY (the space the move inputs + MOVE_SET compare in).
+  // Union across the pre-evolution line so an evolved mon keeps its base's moves.
+  for (const c of ctrPreEvoLineConsts(speciesConst)) {
+    for (const [, moveId] of learn.current[c] || []) {
+      const nm = moveById.get(moveId)?.name;
+      if (nm) {
+        out.add(moveNameToEnumKey(nm));
+      }
     }
-  }
-  for (const moveId of tms.current[speciesConst] || []) {
-    const nm = moveById.get(moveId)?.name;
-    if (nm) {
-      out.add(nm);
+    for (const moveId of tms.current[c] || []) {
+      const nm = moveById.get(moveId)?.name;
+      if (nm) {
+        out.add(moveNameToEnumKey(nm));
+      }
     }
-  }
-  const eggNames = (egg.current[speciesConst] ?? EGG_MOVES_LIVE[speciesConst] ?? []).filter(Boolean);
-  for (const nm of eggNames) {
-    out.add(String(nm).toUpperCase());
+    // Egg moves already ship as enum NAMES (er-egg-moves strips the MoveId. prefix);
+    // normalize through the same transform so a stray-spaced entry still lands right.
+    // The line union folds the root's egg moves into an evolved form (as the game does).
+    const eggNames = (egg.current[c] ?? EGG_MOVES_LIVE[c] ?? []).filter(Boolean);
+    for (const nm of eggNames) {
+      out.add(moveNameToEnumKey(nm));
+    }
   }
   legalMovesCache.set(speciesConst, out);
   return out;
@@ -2942,7 +3000,10 @@ function onCustomTrainerInput(el) {
   } else if (el.classList.contains("ctr-level") && m) {
     m.level = el.value === "" ? null : Number(el.value);
   } else if (el.classList.contains("ctr-move") && m) {
-    const v = el.value.trim().toUpperCase();
+    // Normalize to the enum KEY on EVERY edit (regardless of the sanity toggle):
+    // uppercase + spaces/punctuation -> "_", so a typed "ice beam" becomes
+    // "ICE_BEAM" BEFORE the legality check (a two-word move was always flagged).
+    const v = moveNameToEnumKey(el.value);
     el.value = v;
     m.moves[Number(el.dataset.slot)] = v;
     // A manual move edit flips the member's "Use set" dropdown back to (custom).
