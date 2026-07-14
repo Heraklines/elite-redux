@@ -107,7 +107,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --test test/scripts/guard-coop-task-ownership.test.mjs
+          node --test \
+            test/scripts/guard-coop-task-ownership.test.mjs \
+            test/scripts/coop-focused-static-workflow.test.mjs
           node scripts/guard-coop-task-ownership.mjs verify \
             --branch "$COOP_TASK_BRANCH" \
             --manifest "$COOP_MANIFEST_PATH" \
