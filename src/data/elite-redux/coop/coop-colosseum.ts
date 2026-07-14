@@ -55,6 +55,8 @@
 import { globalScene } from "#app/global-scene";
 import {
   armCoopColosseumDecisionResend,
+  type CoopColosseumOperationBinding,
+  captureCoopColosseumOperationBinding,
   commitColosseumBoard,
   commitColosseumDecision,
   isCoopColosseumOperationEnabled,
@@ -70,7 +72,10 @@ import {
   setCoopMeActivePresentation,
   setCoopMeColosseumControl,
 } from "#data/elite-redux/coop/coop-me-pin-state";
-import { isCoopOperationJournalActive } from "#data/elite-redux/coop/coop-operation-journal";
+import {
+  isCoopOperationJournalActive,
+  isCoopOperationJournalActiveFor,
+} from "#data/elite-redux/coop/coop-operation-journal";
 import {
   coopSessionGeneration,
   failCoopSharedSession,
@@ -169,21 +174,26 @@ export function coopColosseumStreamBoard(labels: string[], roundOverride?: numbe
   if (!coopColosseumActiveInMe() || getCoopController()?.role !== "host") {
     return true;
   }
+  const operationEnabled = isCoopColosseumOperationEnabled();
+  const operationBinding = operationEnabled ? captureCoopColosseumOperationBinding("host") : null;
   const pinned = coopMeInteractionStartValue();
   const seq = coopColosseumSeq(pinned);
   const controller = getCoopController();
   const committed =
     controller == null
       ? null
-      : commitColosseumBoard({
-          pinned,
-          round: roundOverride,
-          labels,
-          localRole: controller.role,
-          wave: globalScene?.currentBattle?.waveIndex ?? 0,
-          turn: globalScene?.currentBattle?.turn ?? 0,
-        });
-  if (committed == null || (isCoopColosseumOperationEnabled() && committed.operationId == null)) {
+      : commitColosseumBoard(
+          {
+            pinned,
+            round: roundOverride,
+            labels,
+            localRole: controller.role,
+            wave: globalScene?.currentBattle?.waveIndex ?? 0,
+            turn: globalScene?.currentBattle?.turn ?? 0,
+          },
+          operationBinding,
+        );
+  if (committed == null || (operationEnabled && committed.operationId == null)) {
     failCoopSharedSession(`Colosseum board ${seq} could not enter authoritative control`);
     return false;
   }
@@ -200,7 +210,7 @@ export function coopColosseumStreamBoard(labels: string[], roundOverride?: numbe
     subPrompt: { kind: "secondary", labels },
   };
   coopLog("me", "colosseum: host streams board present (#829)", { seq, labels: labels.length });
-  if (isCoopColosseumOperationEnabled() && isCoopOperationJournalActive()) {
+  if (operationEnabled && isCoopOperationJournalActiveFor(operationBinding?.durability ?? null)) {
     setCoopMeActivePresentation(present, true);
   } else {
     getCoopInteractionRelay()?.sendInteractionOutcome(seq, COOP_COLOSSEUM_BOARD_KIND, present);
@@ -228,15 +238,20 @@ export function coopColosseumSendDecision(index: number, roundOverride?: number)
     failCoopSharedSession(`Colosseum decision ${seq} has no committed board round`);
     return false;
   }
-  if (isCoopColosseumOperationEnabled()) {
-    const committed = commitColosseumDecision({
-      pinned,
-      round,
-      index,
-      localRole: controller.role,
-      wave: globalScene?.currentBattle?.waveIndex ?? 0,
-      turn: globalScene?.currentBattle?.turn ?? 0,
-    });
+  const operationEnabled = isCoopColosseumOperationEnabled();
+  const operationBinding = operationEnabled ? captureCoopColosseumOperationBinding(controller.role) : null;
+  if (operationEnabled) {
+    const committed = commitColosseumDecision(
+      {
+        pinned,
+        round,
+        index,
+        localRole: controller.role,
+        wave: globalScene?.currentBattle?.waveIndex ?? 0,
+        turn: globalScene?.currentBattle?.turn ?? 0,
+      },
+      operationBinding,
+    );
     if (committed.kind === "failed") {
       failCoopSharedSession(`Colosseum decision ${seq}/${round} could not enter authoritative control`);
       return false;
@@ -257,15 +272,25 @@ export function coopColosseumSendDecision(index: number, roundOverride?: number)
     }
   }
   coopLog("me", "colosseum: relay board decision (#829)", { seq, index });
-  if (controller.role === "guest" || !isCoopColosseumOperationEnabled() || !isCoopOperationJournalActive()) {
+  if (
+    controller.role === "guest"
+    || !operationEnabled
+    || !isCoopOperationJournalActiveFor(operationBinding?.durability ?? null)
+  ) {
     getCoopInteractionRelay()?.sendInteractionChoice(seq, COOP_COLOSSEUM_PICK_KIND, index, [round]);
   }
   if (controller.role === "guest") {
     const relay = getCoopInteractionRelay();
     if (relay != null) {
-      armCoopColosseumDecisionResend(pinned, round, index, () => {
-        relay.sendInteractionChoice(seq, COOP_COLOSSEUM_PICK_KIND, index, [round]);
-      });
+      armCoopColosseumDecisionResend(
+        pinned,
+        round,
+        index,
+        () => {
+          relay.sendInteractionChoice(seq, COOP_COLOSSEUM_PICK_KIND, index, [round]);
+        },
+        operationBinding,
+      );
     }
   }
   return true;
@@ -293,15 +318,31 @@ export async function coopColosseumAwaitDecision(
   if (round == null) {
     return null;
   }
+  const operationEnabled = isCoopColosseumOperationEnabled();
+  const controller = getCoopController();
+  if (operationEnabled && controller == null) {
+    failCoopSharedSession(`Colosseum decision ${seq}/${round} has no bound controller`);
+    return null;
+  }
+  const operationBinding: CoopColosseumOperationBinding | null =
+    operationEnabled && controller != null ? captureCoopColosseumOperationBinding(controller.role) : null;
+  // This await can outlive the ambient scene/runtime in the two-engine harness and can outlive the whole
+  // production session after a disconnect. Address the retained decision from the scheduling boundary,
+  // never from whichever scene happens to be active when the relay promise resumes.
+  const generation = coopSessionGeneration();
+  const wave = globalScene?.currentBattle?.waveIndex ?? 0;
+  const turn = globalScene?.currentBattle?.turn ?? 0;
   coopLog("me", "colosseum: await board decision (#829)", { seq, timeoutMs: timeoutMs ?? "default" });
   while (coopMeInteractionStartValue() === pinned) {
     const pick = await relay.awaitInteractionChoice(seq, timeoutMs, COOP_COLO_CHOICE_KINDS);
     if (pick == null) {
       return null;
     }
+    if (coopSessionGeneration() !== generation) {
+      return null;
+    }
     const index = pick.choice;
-    const controller = getCoopController();
-    if (isCoopColosseumOperationEnabled()) {
+    if (operationEnabled) {
       const carriedRound = pick.data?.[0];
       if (!Number.isSafeInteger(carriedRound) || (carriedRound as number) < 0) {
         failCoopSharedSession(`Colosseum decision ${seq} carried no exact round`);
@@ -312,15 +353,23 @@ export async function coopColosseumAwaitDecision(
           failCoopSharedSession(`Colosseum decision ${seq} carried future round ${String(carriedRound)}/${round}`);
           return null;
         }
-        const committed = commitColosseumDecision({
-          pinned,
-          round: carriedRound as number,
-          index,
-          localRole: controller.role,
-          wave: globalScene?.currentBattle?.waveIndex ?? 0,
-          turn: globalScene?.currentBattle?.turn ?? 0,
-        });
+        const committed = commitColosseumDecision(
+          {
+            pinned,
+            round: carriedRound as number,
+            index,
+            localRole: controller.role,
+            wave,
+            turn,
+          },
+          operationBinding,
+        );
         if (committed.kind === "duplicate") {
+          // A retransmitted exact-round decision is already authoritative and must unblock this waiter.
+          // Only an older round is noise that should keep the current-round wait alive.
+          if ((carriedRound as number) === round) {
+            return index;
+          }
           continue;
         }
         if ((carriedRound as number) !== round) {
@@ -333,7 +382,10 @@ export async function coopColosseumAwaitDecision(
           failCoopSharedSession(`Colosseum decision ${seq}/${round} could not commit`);
           return null;
         }
-      } else if ((carriedRound as number) !== round || (isCoopOperationJournalActive() && pick.operationId == null)) {
+      } else if (
+        (carriedRound as number) !== round
+        || (isCoopOperationJournalActiveFor(operationBinding?.durability ?? null) && pick.operationId == null)
+      ) {
         failCoopSharedSession(`Colosseum decision ${seq}/${round} was not journal-led`);
         return null;
       }
