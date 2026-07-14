@@ -2149,12 +2149,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // #849: the reward shop is the real MODIFIER_SELECT surface (owner drives, watcher mirrors over the relay).
     hitMode(UiMode.MODIFIER_SELECT);
 
-    // The production-fidelity campaign shares one JS realm for two engines. During this interaction, queue
-    // EVERY transport frame until its destination ClientCtx is installed: reward options can resume a
-    // watcher, a guest intent can resume the host authority, and the retained result can resume the guest
-    // owner. Real browsers have independent globals; immediate loopback under the sender's context does not.
-    // The ordinary soak keeps its calibrated automatic delivery outside this bounded surface.
-    const destinationScheduled = fidelity === "production" && rig.pair.setDestinationContextDelivery != null;
+    // Every two-engine campaign shares one JS realm for two runtimes. During this interaction, queue EVERY
+    // transport frame until its destination ClientCtx is installed: reward options can resume a watcher, a
+    // guest intent can resume the host authority, and the retained result can resume the guest owner. Real
+    // browsers have independent globals; immediate loopback under the sender's context does not. This is a
+    // harness-fidelity requirement for both calibrated and production-fidelity profiles, not a gameplay mode.
+    const destinationScheduled = rig.pair.setDestinationContextDelivery != null;
     rig.pair.setDestinationContextDelivery?.(destinationScheduled);
     try {
       let action: string;

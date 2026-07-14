@@ -3,7 +3,7 @@
   "taskId": "p33-mystery-public-transition-integration",
   "branch": "ci/coop/p33-mystery-public-transition",
   "trainRef": "ci/coop/p33-mystery-public-transition",
-  "baseSha": "7bc9ba993f077679b8f6864e41aebe37edf4c8aa",
+  "baseSha": "28b72b51549ec4db25f83f45cfc8fa0755bbf912",
   "allowedFiles": [
     ".github/coop-task-ownership/p33-mystery-public-transition.json",
     "test/tools/coop-duo-harness.ts",
