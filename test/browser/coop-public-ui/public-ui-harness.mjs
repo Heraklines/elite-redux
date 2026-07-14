@@ -20,11 +20,122 @@ const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
 const GUEST_CONTINUATION_ACK = /guest ACK turn stage=continuationReady e=(\d+) wave=(\d+) turn=(\d+) rev=(\d+)/u;
 const SHARED_SESSION_TERMINAL = /\[coop:runtime\] shared session stopped safely: /u;
 const LAUNCH_SNAPSHOT_ABORT = /launchSnapshotAbort wave=\d+ reason=/u;
+const POST_TURN_PHASE_PROGRESS = /Start Phase ([A-Za-z0-9]+Phase)/u;
+const POST_TURN_AUTHORITY_PROGRESS = /\[coop:turn\] host recorder: append turn=\d+ seq=(\d+)/u;
+const POST_TURN_RENDERER_PROGRESS = /\[coop:replay\] guest replay turn=\d+: live increment seq=(\d+)\.\.(\d+)/u;
+const POST_TURN_PROGRESS_ALLOWANCE_MS = 90_000;
+const POST_TURN_HARD_CEILING_MS = 360_000;
 
 // Self-healing pairing cadence: how often the requester re-issues its ask while unpaired. Kept
 // well under the observed ~17s worker-side request TTL so each re-send REFRESHES the request and
 // keeps the acceptance window open until the accept lands (see driveSelfHealingPairing).
 const LOBBY_REQUEST_REISSUE_MS = 5_000;
+
+function classifyPostTurnProgress(event) {
+  if (event.kind === "browser-surface2" && event.observation?.operationClass === "battle-progress") {
+    const observation = event.observation;
+    return `${observation.surfaceId}:phase-${observation.phaseInstance}:ready-${
+      observation.ready?.awaitingActionInput === true
+    }`;
+  }
+  const text = event.text ?? "";
+  const phase = POST_TURN_PHASE_PROGRESS.exec(text);
+  if (phase) {
+    return `phase:${phase[1]}`;
+  }
+  const authority = POST_TURN_AUTHORITY_PROGRESS.exec(text);
+  if (authority) {
+    return `authority-seq:${authority[1]}`;
+  }
+  const renderer = POST_TURN_RENDERER_PROGRESS.exec(text);
+  if (renderer) {
+    return `renderer-seq:${renderer[1]}-${renderer[2]}`;
+  }
+  return null;
+}
+
+function postTurnProgressAt(event, startedAtMs, observedAtMs) {
+  const parsedAtMs = Date.parse(event.at ?? "");
+  return Number.isFinite(parsedAtMs) ? Math.min(Math.max(parsedAtMs, startedAtMs), observedAtMs) : observedAtMs;
+}
+
+function latestPostTurnProgress(client, events, startedAtMs, observedAtMs) {
+  return events.reduce((latest, event) => {
+    const progress = classifyPostTurnProgress(event);
+    if (progress == null) {
+      return latest;
+    }
+    const eventAtMs = postTurnProgressAt(event, startedAtMs, observedAtMs);
+    if (latest != null && eventAtMs < latest.eventAtMs) {
+      return latest;
+    }
+    return { client, event, eventAtMs, progress };
+  }, null);
+}
+
+function recordPostTurnBudgetExtension(progress, previousDeadlineMs, deadlineMs, hardDeadlineMs) {
+  progress.client.evidence.record("public-ui-post-turn-progress-budget", {
+    progress: progress.progress,
+    progressEventIndex: progress.event.index,
+    progressObservedAt: progress.event.at ?? null,
+    previousDeadlineAt: new Date(previousDeadlineMs).toISOString(),
+    extendedDeadlineAt: new Date(deadlineMs).toISOString(),
+    hardDeadlineAt: new Date(hardDeadlineMs).toISOString(),
+    hardCeilingReached: deadlineMs === hardDeadlineMs,
+  });
+}
+
+/**
+ * Keep a post-turn public-input wait alive only while the real addressed battle is making causal
+ * progress. Two Chromium game loops can heavily dilate animations on the standard four-core runner;
+ * run 29330330915 reached FaintPhase and an actionable guest narration after the ordinary timeout.
+ * Phase transitions, new authoritative turn events, renderer sequence increments, and semantic
+ * battle-prompt instances may extend the soft deadline, but signaling heartbeats/retries may not.
+ * The immutable hard deadline still makes every wait terminate.
+ */
+export function createPostTurnProgressBudget(
+  rig,
+  from,
+  baseTimeoutMs,
+  {
+    now = () => Date.now(),
+    progressAllowanceMs = POST_TURN_PROGRESS_ALLOWANCE_MS,
+    hardCeilingMs = POST_TURN_HARD_CEILING_MS,
+  } = {},
+) {
+  const clients = Object.values(rig.clients);
+  const startedAtMs = now();
+  const hardDeadlineMs = startedAtMs + Math.max(baseTimeoutMs, hardCeilingMs);
+  let deadlineMs = Math.min(startedAtMs + baseTimeoutMs, hardDeadlineMs);
+  const scanOffsets = new Map(clients.map(client => [client.label, from[client.label] ?? 0]));
+
+  const observe = () => {
+    const observedAtMs = now();
+    const candidates = clients.flatMap(client => {
+      const scanFrom = scanOffsets.get(client.label) ?? 0;
+      const events = client.evidence.events.slice(scanFrom);
+      scanOffsets.set(client.label, client.evidence.events.length);
+      const latest = latestPostTurnProgress(client, events, startedAtMs, observedAtMs);
+      return latest == null ? [] : [latest];
+    });
+    const latestProgress = candidates.toSorted((left, right) => left.eventAtMs - right.eventAtMs).at(-1) ?? null;
+
+    if (latestProgress != null) {
+      const previousDeadlineMs = deadlineMs;
+      deadlineMs = Math.min(hardDeadlineMs, Math.max(deadlineMs, latestProgress.eventAtMs + progressAllowanceMs));
+      if (deadlineMs > previousDeadlineMs) {
+        recordPostTurnBudgetExtension(latestProgress, previousDeadlineMs, deadlineMs, hardDeadlineMs);
+      }
+    }
+    return deadlineMs;
+  };
+
+  return Object.freeze({
+    observe,
+    deadline: () => deadlineMs,
+    hardDeadline: () => hardDeadlineMs,
+  });
+}
 
 /**
  * Loud-fail on a failed response from an endpoint the harness DRIVES navigation from (the
@@ -1048,8 +1159,8 @@ export class DuoPublicUiRig {
 
   async waitForPostTurnOutcome(from) {
     const advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, "public-ui-post-turn");
-    const deadline = Date.now() + this.config.timeoutMs;
-    while (Date.now() < deadline) {
+    const progressBudget = createPostTurnProgressBudget(this, from, this.config.timeoutMs);
+    while (Date.now() < progressBudget.observe()) {
       const values = Object.values(this.clients);
       const rewards = values.map(client => client.evidence.find(REWARD_PHASE, from[client.label]));
       if (rewards.every(Boolean)) {

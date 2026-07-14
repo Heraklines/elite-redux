@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "taskId": "p33-browser-post-turn-frontier",
+  "branch": "ci/coop/p33-browser-post-turn-frontier",
+  "trainRef": "ci/coop/p33-mystery-public-transition",
+  "baseSha": "c696b70224510143b3fa5fe1a9f0b84fd88a10b7",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-browser-post-turn-frontier.json",
+    "test/browser/coop-public-ui/public-ui-harness.mjs",
+    "test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs"
+  ]
+}
