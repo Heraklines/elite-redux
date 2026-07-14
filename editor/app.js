@@ -1563,6 +1563,18 @@ function bstOfConst(speciesConst) {
   return spByConst.get(speciesConst)?.bst ?? 0;
 }
 
+/**
+ * Normalize a spawnChance to an integer 1-100. Absent/invalid => 100 (mirrors
+ * normalizeSpawnChance in er-custom-trainers.ts): 100 = guaranteed once per run.
+ */
+function normalizeCtrSpawnChance(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 100;
+  }
+  const n = Math.floor(value);
+  return n >= 1 && n <= 100 ? n : 100;
+}
+
 /** A fresh blank team member (species by CONST). */
 function blankCtrMember() {
   return {
@@ -1598,6 +1610,7 @@ function blankCtrTrainer() {
     minWave: 20,
     maxWave: 80,
     endless: false,
+    spawnChance: 100,
     challenge: "none",
     team: [blankCtrMember()],
   };
@@ -1615,6 +1628,9 @@ function ctrLiveToEdit(entry) {
     minWave: Number.isInteger(entry.minWave) ? entry.minWave : 20,
     maxWave: Number.isInteger(entry.maxWave) ? entry.maxWave : 80,
     endless: entry.endless === true,
+    // Absent/invalid spawnChance normalizes to 100 (guaranteed once per run) -
+    // keeps pre-feature saved entries behaving exactly as before.
+    spawnChance: normalizeCtrSpawnChance(entry.spawnChance),
     challenge: entry.challenge ?? "none",
     team: (Array.isArray(entry.team) ? entry.team : []).map(m => ({
       species: idToConst(m.species),
@@ -1842,8 +1858,10 @@ function renderCustomTrainers(root) {
         <label>Min wave <input type="number" id="ctr-minwave" value="${t.minWave}" min="1" max="5000" style="width:72px" /></label>
         <label>Max wave <input type="number" id="ctr-maxwave" value="${t.maxWave}" min="1" max="5000" ${t.endless ? "disabled" : ""} style="width:72px" /></label>
         <label title="Any floor >= min wave (endless)"><input type="checkbox" id="ctr-endless"${t.endless ? " checked" : ""} /> Endless (any floor ≥ min)</label>
+        <label title="Per-run chance this trainer appears at all. 100 = guaranteed once per run.">Spawn chance % <input type="number" id="ctr-spawnchance" value="${normalizeCtrSpawnChance(t.spawnChance)}" min="1" max="100" style="width:64px" /></label>
         <br /><label>Battle type <select id="ctr-battletype">${battleSel}</select></label>
         <label>Challenge exclusivity <select id="ctr-challenge">${challSel}</select></label>
+        <p class="hint" style="margin:6px 0 0">Spawn chance is ONE roll per run: 100 = guaranteed. If it hits, the trainer appears ONCE at a random floor in its wave range, sliding forward past boss/fixed/mystery waves.</p>
       </fieldset>
       <fieldset class="full"><legend>Team (1-6)</legend>
         ${t.team.map((m, i) => ctrMemberHtml(m, i)).join("")}
@@ -1891,6 +1909,9 @@ function onCustomTrainerInput(el) {
     t.minWave = Number(el.value) || 1;
   } else if (el.id === "ctr-maxwave") {
     t.maxWave = Number(el.value) || 1;
+  } else if (el.id === "ctr-spawnchance") {
+    // Clamp to 1-100; a blank/invalid entry normalizes back to 100.
+    t.spawnChance = normalizeCtrSpawnChance(Number(el.value));
   } else if (el.classList.contains("ctr-species") && m) {
     m.species = el.value.trim().toUpperCase();
     el.value = m.species;
@@ -2822,6 +2843,7 @@ function buildDeltas() {
       minWave: t.minWave,
       maxWave: t.maxWave,
       endless: t.endless === true,
+      spawnChance: normalizeCtrSpawnChance(t.spawnChance),
       challenge: t.challenge || "none",
       team,
     };

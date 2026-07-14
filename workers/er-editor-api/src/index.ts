@@ -624,6 +624,12 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
     if (t.endless !== undefined && typeof t.endless !== "boolean") {
       return { ok: false, error: `${key}: endless must be a boolean` };
     }
+    if (
+      t.spawnChance !== undefined
+      && !(Number.isInteger(t.spawnChance) && (t.spawnChance as number) >= 1 && (t.spawnChance as number) <= 100)
+    ) {
+      return { ok: false, error: `${key}: spawnChance must be an integer 1-100` };
+    }
     if (!Array.isArray(t.team) || t.team.length === 0 || t.team.length > 6) {
       return { ok: false, error: `${key}: team must have 1-6 members` };
     }

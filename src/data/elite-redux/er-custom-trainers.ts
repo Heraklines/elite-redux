@@ -19,6 +19,12 @@
 //     "minWave": 20,
 //     "maxWave": 60,
 //     "endless": false,                // true => any floor >= minWave (maxWave ignored)
+//     "spawnChance": 100,              // integer 1-100; absent => 100. ONE per-run
+//                                      // roll decides IF the trainer appears this
+//                                      // run; if it does, it spawns EXACTLY ONCE at
+//                                      // a random floor in its window (100 =
+//                                      // guaranteed once per run). See
+//                                      // `rollErCustomTrainerAppearance`.
 //     "challenge": "none",             // none | one of the ErCustomTrainerChallenge
 //                                      // keys (inverse, monocolor, monogen, doubles,
 //                                      // ghost, monotype, maxcost, points, freshstart,
@@ -67,6 +73,13 @@ import customTrainersJson from "./er-custom-trainers.json";
 /** Reserved id band for editor-created custom trainers. */
 export const ER_CUSTOM_TRAINER_ID_MIN = 70000;
 export const ER_CUSTOM_TRAINER_ID_MAX = 79999;
+
+/**
+ * Wave span an endless trainer's single per-run appearance is picked from:
+ * minWave .. minWave + (window - 1). Endless trainers have no maxWave, so the
+ * assigned wave is drawn uniformly across this many floors starting at minWave.
+ */
+export const ER_CUSTOM_TRAINER_ENDLESS_WINDOW = 200;
 
 /** The battle formats a custom trainer can declare. */
 export type ErCustomTrainerBattleType = "single" | "double" | "triple";
@@ -137,6 +150,8 @@ export interface ErCustomTrainer {
   minWave?: number;
   maxWave?: number;
   endless?: boolean;
+  /** Per-run appearance chance, integer 1-100. Absent/invalid => 100 (guaranteed). */
+  spawnChance?: number;
   challenge?: ErCustomTrainerChallenge;
   team?: readonly ErCustomTrainerMember[];
 }
@@ -169,6 +184,8 @@ export interface ErCustomTrainerResolved {
   minWave: number;
   maxWave: number;
   endless: boolean;
+  /** Per-run appearance chance, normalized to an integer 1-100 (100 = guaranteed). */
+  spawnChance: number;
   challenge: ErCustomTrainerChallenge;
   members: readonly ErCustomTrainerMemberResolved[];
 }
@@ -201,6 +218,7 @@ let resolvedCache: readonly ErCustomTrainerResolved[] | null = null;
 export function setErCustomTrainersForTesting(trainers?: ErCustomTrainers): void {
   activeTrainers = trainers ?? (customTrainersJson as ErCustomTrainers);
   resolvedCache = null;
+  CUSTOM_TRAINER_RUN_ROLLS.clear();
 }
 
 /** Move enum NAME -> pokerogue MoveId, vanilla + ER customs (mirror of er-trainer-tuning.ts). */
@@ -234,6 +252,19 @@ function moveByName(): Map<string, number> {
 
 function clampSlot(value: unknown): number {
   return value === 1 || value === 2 ? value : 0;
+}
+
+/**
+ * Normalize an authored `spawnChance` to an integer in 1-100. Absent or invalid
+ * (non-number, non-finite, out of 1-100) => 100, so a saved entry without the
+ * field behaves exactly as before (guaranteed to appear once per run).
+ */
+function normalizeSpawnChance(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 100;
+  }
+  const n = Math.floor(value);
+  return n >= 1 && n <= 100 ? n : 100;
 }
 
 /** Validate + resolve one raw entry; returns a resolved trainer or `null` (skipped). */
@@ -315,6 +346,7 @@ function resolveEntry(key: string, entry: ErCustomTrainer): ErCustomTrainerResol
     minWave,
     maxWave,
     endless: entry.endless === true,
+    spawnChance: normalizeSpawnChance(entry.spawnChance),
     challenge,
     members,
   };
@@ -340,16 +372,35 @@ export function getErCustomTrainers(): readonly ErCustomTrainerResolved[] {
 }
 
 // -----------------------------------------------------------------------------
-// Rotation / non-repeat (mirrors the ER trainer no-repeat set, run-scoped). A
-// used custom trainer is preferred-last for the rest of the run so a pool of
-// staff trainers rotates. Persistence across save/reload is a documented seam
-// (see game-data.ts erUsedTrainerKeys); this set is in-memory for now.
+// Per-run appearance model (once-per-run, seed-deterministic). This REPLACES the
+// old "convert every eligible wave and rotate" behavior: for each trainer we do
+// ONE per-run roll (spawnChance %) to decide IF it appears at all this run, and,
+// if it does, ONE per-run pick of the wave it is assigned to inside its window.
+// The trainer then fires EXACTLY ONCE, at the first non-excluded wave >= its
+// assigned wave (so a boss/fixed/mystery wave slides it forward naturally), and
+// is marked used so it never returns again that run. Both the used set and the
+// roll cache are run-scoped (cleared at run start via resetErCustomTrainerTracking);
+// persistence across save/reload is a documented seam (see game-data.ts
+// erUsedTrainerKeys). Everything derives from the run seed so a save reload — and
+// a future co-op adoption — lands identically (NO Math.random).
 // -----------------------------------------------------------------------------
 const USED_CUSTOM_TRAINER_KEYS = new Set<string>();
 
-/** Reset per-run custom-trainer rotation (call at run start). */
+/** The per-run appearance decision for one custom trainer. */
+export interface ErCustomTrainerRunRoll {
+  /** Whether this trainer appears at all this run (the once-per-run chance roll). */
+  appears: boolean;
+  /** The wave the appearance is assigned to (fires at the first non-excluded wave >= this). */
+  assignedWave: number;
+}
+
+/** Per-run cache of the appearance roll, keyed by trainer key (seed-derived, lazy). */
+const CUSTOM_TRAINER_RUN_ROLLS = new Map<string, ErCustomTrainerRunRoll>();
+
+/** Reset per-run custom-trainer state (used set + appearance rolls); call at run start. */
 export function resetErCustomTrainerTracking(): void {
   USED_CUSTOM_TRAINER_KEYS.clear();
+  CUSTOM_TRAINER_RUN_ROLLS.clear();
 }
 
 /** Mark a custom trainer as fielded this run. */
@@ -367,6 +418,45 @@ function hashSeed(seed: string): number {
   return h >>> 0;
 }
 
+/**
+ * Deterministic per-run appearance decision for one custom trainer, derived
+ * ONLY from the run seed + trainer key (reproducible from the seed; co-op-safe;
+ * NO Math.random). Returns whether the trainer appears this run (the chance
+ * roll) and, if so, the wave it is assigned to inside its eligible window. Pure
+ * — exported for direct unit testing without fragile seed hunting.
+ *
+ * Formula (salts are load-bearing — keep them stable):
+ *   appears      = hashSeed(`${seed}:custom-trainer-roll:${key}`) % 100 < spawnChance
+ *   assignedWave = minWave + hashSeed(`${seed}:custom-trainer-wave:${key}`) % window
+ *   window       = endless ? ER_CUSTOM_TRAINER_ENDLESS_WINDOW : (maxWave - minWave + 1)
+ *
+ * At spawnChance = 100 the roll is `x % 100 < 100`, always true, so the trainer
+ * is guaranteed to appear exactly once per run at a random floor in its window.
+ */
+export function rollErCustomTrainerAppearance(
+  seed: string,
+  trainer: { key: string; minWave: number; maxWave: number; endless: boolean; spawnChance?: number },
+): ErCustomTrainerRunRoll {
+  const chance = normalizeSpawnChance(trainer.spawnChance);
+  const appears = hashSeed(`${seed}:custom-trainer-roll:${trainer.key}`) % 100 < chance;
+  const window = trainer.endless
+    ? ER_CUSTOM_TRAINER_ENDLESS_WINDOW
+    : Math.max(1, trainer.maxWave - trainer.minWave + 1);
+  const assignedWave = trainer.minWave + (hashSeed(`${seed}:custom-trainer-wave:${trainer.key}`) % window);
+  return { appears, assignedWave };
+}
+
+/** The per-run appearance roll for `trainer`, computed once from the run seed and cached. */
+function getRunRoll(trainer: ErCustomTrainerResolved): ErCustomTrainerRunRoll {
+  const cached = CUSTOM_TRAINER_RUN_ROLLS.get(trainer.key);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const roll = rollErCustomTrainerAppearance(globalScene.seed ?? "", trainer);
+  CUSTOM_TRAINER_RUN_ROLLS.set(trainer.key, roll);
+  return roll;
+}
+
 function challengeActive(challenge: ErCustomTrainerChallenge): boolean {
   if (challenge === "none") {
     return true;
@@ -375,10 +465,15 @@ function challengeActive(challenge: ErCustomTrainerChallenge): boolean {
 }
 
 /**
- * Pick a custom trainer for `waveIndex`, gated by the active difficulty, the
- * floor range (or endless: any floor >= minWave), and challenge-exclusivity.
- * Prefers unused-this-run trainers, then a deterministic wave-seeded choice so
- * a save reload lands the same trainer. Returns `null` when none is eligible.
+ * Pick a custom trainer that is DUE at `waveIndex`, gated by the active
+ * difficulty, the floor range (or endless: any floor >= minWave) and
+ * challenge-exclusivity. A trainer is due when its per-run appearance roll came
+ * up (spawnChance), it has NOT been fielded yet this run, and `waveIndex` has
+ * reached (or passed, via a slide-forward off an excluded wave) its assigned
+ * wave — while still inside its window (waveIndex <= maxWave when not endless).
+ * If several are due on the same wave, one is chosen by a deterministic
+ * wave-seeded pick and the rest stay due for later waves. Returns `null` when
+ * none is due. Fires each trainer EXACTLY once per run (the caller marks it used).
  */
 export function selectErCustomTrainerForWave(waveIndex: number): ErCustomTrainerResolved | null {
   const all = getErCustomTrainers();
@@ -386,22 +481,28 @@ export function selectErCustomTrainerForWave(waveIndex: number): ErCustomTrainer
     return null;
   }
   const difficulty = getErDifficulty();
-  const eligible = all.filter(
-    t =>
-      t.difficulties.includes(difficulty)
-      && waveIndex >= t.minWave
-      && (t.endless || waveIndex <= t.maxWave)
-      && challengeActive(t.challenge),
-  );
-  if (eligible.length === 0) {
+  const due = all.filter(t => {
+    if (USED_CUSTOM_TRAINER_KEYS.has(t.key)) {
+      return false;
+    }
+    if (!t.difficulties.includes(difficulty)) {
+      return false;
+    }
+    if (waveIndex < t.minWave || (!t.endless && waveIndex > t.maxWave)) {
+      return false;
+    }
+    if (!challengeActive(t.challenge)) {
+      return false;
+    }
+    const roll = getRunRoll(t);
+    return roll.appears && waveIndex >= roll.assignedWave;
+  });
+  if (due.length === 0) {
     return null;
   }
-  // Prefer trainers not yet fielded this run (rotation / non-repeat).
-  const unused = eligible.filter(t => !USED_CUSTOM_TRAINER_KEYS.has(t.key));
-  const pool = unused.length > 0 ? unused : eligible;
   const seed = `${globalScene.seed ?? ""}:custom-trainer:${waveIndex}`;
-  const idx = hashSeed(seed) % pool.length;
-  return pool[idx];
+  const idx = hashSeed(seed) % due.length;
+  return due[idx];
 }
 
 // The #419 BST-cap bypass flag lives in a zero-import leaf module so the central
