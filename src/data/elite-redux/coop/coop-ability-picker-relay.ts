@@ -30,6 +30,7 @@
 
 import {
   armCoopAbilityOutcomeResend,
+  type CoopAbilityOperationBinding,
   commitAbilityOwnerOutcome,
 } from "#data/elite-redux/coop/coop-ability-operation";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
@@ -120,20 +121,21 @@ export function sendCoopAbilityPickerOutcome(
   shopSeq: number,
   data: number[],
   context?: { localRole: CoopRole; wave: number; turn?: number },
+  operationBinding?: CoopAbilityOperationBinding | null,
 ): void {
   if (context != null) {
-    commitAbilityOwnerOutcome({ pinned: shopSeq, data, ...context });
+    commitAbilityOwnerOutcome({ pinned: shopSeq, data, ...context }, operationBinding);
   }
   const derivedSeq = coopAbilityPickerSeq(shopSeq);
-  relay?.sendInteractionChoice(
-    derivedSeq,
-    COOP_ABILITY_KIND,
-    COOP_ABILITY_OUTCOME,
-    [...data],
-  );
+  relay?.sendInteractionChoice(derivedSeq, COOP_ABILITY_KIND, COOP_ABILITY_OUTCOME, [...data]);
   if (context?.localRole === "guest" && relay != null) {
-    armCoopAbilityOutcomeResend(shopSeq, data, () => {
-      relay.sendInteractionChoice(derivedSeq, COOP_ABILITY_KIND, COOP_ABILITY_OUTCOME, [...data]);
-    });
+    armCoopAbilityOutcomeResend(
+      shopSeq,
+      data,
+      () => {
+        relay.sendInteractionChoice(derivedSeq, COOP_ABILITY_KIND, COOP_ABILITY_OUTCOME, [...data]);
+      },
+      operationBinding,
+    );
   }
 }
