@@ -124,7 +124,13 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         request: async <T>(_name: string, _options: { mode: "exclusive" }, callback: () => Promise<T>) => callback(),
       },
     });
-    game = new GameManager(phaserGame);
+    // This suite exercises the authenticated local+cloud persistence contract.  The
+    // GameManager default installs a getter spy that permanently forces
+    // `bypassLogin=true` for the lifetime of the test, overriding the explicit
+    // setBypassLoginForTesting(false) seam above and making AES rows look like the
+    // local-development codec.  Construct the fixture in authenticated mode so
+    // individual tests can still opt into bypass mode through the real seam.
+    game = new GameManager(phaserGame, false);
     logs = installDuoLogCapture(`resume-${Date.now()}`);
     clearCoopResumeMarker();
     vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue(coopCasMissing());
