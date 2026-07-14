@@ -15,10 +15,7 @@ import {
   setCoopMeOperationEnabled,
 } from "#data/elite-redux/coop/coop-me-operation";
 import { type CoopMeTerminalPayload, makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
-import {
-  createCoopRuntimeOpState,
-  setActiveCoopRuntimeOpState,
-} from "#data/elite-redux/coop/coop-operation-runtime";
+import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopAuthoritativeBattleStateV1, CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it } from "vitest";
@@ -116,7 +113,10 @@ describe("complete retained Mystery terminal transaction", () => {
 
       setActiveCoopRuntimeOpState(runtimeB);
       expect(nextCoopMePresentationStep(pinned), "the renderer did not inherit the host's ordinal").toBe(0);
-      expect(commitMeOwnerIntent(params), "the same deterministic id is independent in the second runtime").not.toBeNull();
+      expect(
+        commitMeOwnerIntent(params),
+        "the same deterministic id is independent in the second runtime",
+      ).not.toBeNull();
       expect(nextCoopMePresentationStep(pinned)).toBe(1);
 
       setActiveCoopRuntimeOpState(runtimeA);

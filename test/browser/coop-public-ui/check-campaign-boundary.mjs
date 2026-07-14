@@ -56,6 +56,15 @@ for (const file of files) {
   }
 }
 
+const campaign = await readFile(new URL("campaign.mjs", import.meta.url), "utf8");
+if (
+  !campaign.includes("currentSharedCommandAddress(clients, purpose)")
+  || !campaign.includes("observedAddress === expectedAddress")
+  || !campaign.includes("observation.ready?.handlerActive === true")
+) {
+  failures.push("campaign.mjs: battle prompt input must be address-exact and active-handler readiness-proven");
+}
+
 if (failures.length > 0) {
   console.error(failures.join("\n"));
   process.exitCode = 1;

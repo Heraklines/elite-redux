@@ -9,22 +9,23 @@ import type { Pokemon } from "../src/field/pokemon";
 // seam used by the browser checkpoint. This file is included only by vite.coop-browser.config.mjs; no staged
 // or production deployment imports it.
 
-// build-only syntax fix, superseded by campaign v2 observer on merge: the file uses top-level `await` but had
-// only dynamic `import()` expressions (no static import/export), so TS treats it as a script and rejects the
-// top-level await (TS1375), which fails the vite:build-html entry replacement. `export {}` makes it a module.
-// Module-shape only; observer semantics are untouched and owned by the campaign branch.
-export {};
-
 await import("../src/main");
 
-const [{ globalScene }, { captureCoopSaveDataDigest }, { canonicalize, fnv1a64 }, { getCoopRuntime }, { UiMode }] =
-  await Promise.all([
-    import("../src/global-scene"),
-    import("../src/data/elite-redux/coop/coop-battle-engine"),
-    import("../src/data/elite-redux/coop/coop-battle-checksum"),
-    import("../src/data/elite-redux/coop/coop-runtime"),
-    import("../src/enums/ui-mode"),
-  ]);
+const [
+  { globalScene },
+  { captureCoopSaveDataDigest },
+  { canonicalize, fnv1a64 },
+  { getCoopRuntime },
+  { StatusEffect },
+  { UiMode },
+] = await Promise.all([
+  import("../src/global-scene"),
+  import("../src/data/elite-redux/coop/coop-battle-engine"),
+  import("../src/data/elite-redux/coop/coop-battle-checksum"),
+  import("../src/data/elite-redux/coop/coop-runtime"),
+  import("../src/enums/status-effect"),
+  import("../src/enums/ui-mode"),
+]);
 
 type BrowserContinuationSurface = "command" | "replacement" | "reward" | "starter";
 
@@ -48,6 +49,7 @@ const SURFACE_PREFIX = "[coop-browser:surface] ";
 const SURFACE2_PREFIX = "[coop-browser:surface2] ";
 const BINDING_PREFIX = "[coop-browser:binding] ";
 const DIGEST_PARTS_PREFIX = "[coop-browser:digest-parts] ";
+const RENDER_PROFILE_PREFIX = "[coop-browser:render-profile] ";
 const CHECKSUM_SENTINEL = "0000000000000000";
 
 /**
@@ -84,13 +86,19 @@ function observedPokemon(pokemon: Pokemon, slot: number) {
     exp: pokemon.exp,
     hp: pokemon.hp,
     maxHp: pokemon.stats[0] ?? 0,
+    // Hash the mechanically meaningful status projection, not constructor ephemera. `doSetStatus` stores
+    // sleepTurnsRemaining=0 on every non-sleep status while an authoritative deserialize uses undefined;
+    // both are the same game state. Likewise, toxicTurnCount matters only for TOXIC. Preserving the relevant
+    // counter for its owning status still catches real sleep/toxic drift without manufacturing a faint-status
+    // divergence immediately after an otherwise checksum-identical retained turn commit.
     status:
       pokemon.status == null
         ? null
         : {
             effect: pokemon.status.effect,
-            toxicTurnCount: pokemon.status.toxicTurnCount,
-            sleepTurnsRemaining: pokemon.status.sleepTurnsRemaining ?? null,
+            toxicTurnCount: pokemon.status.effect === StatusEffect.TOXIC ? pokemon.status.toxicTurnCount : 0,
+            sleepTurnsRemaining:
+              pokemon.status.effect === StatusEffect.SLEEP ? (pokemon.status.sleepTurnsRemaining ?? null) : null,
           },
     fainted: pokemon.isFainted(),
     statStages: [...pokemon.summonData.statStages],
@@ -141,10 +149,20 @@ function partyInnates(party: unknown): number[][] {
     : [];
 }
 
+function partyStageVectors(party: unknown): number[][] {
+  return Array.isArray(party)
+    ? party.map(mon => {
+        const value = (mon as Record<string, unknown> | null)?.statStages;
+        return Array.isArray(value) ? (value as number[]) : [];
+      })
+    : [];
+}
+
 function computeMechanicalDigest(): {
   digest: string;
   parts: Record<string, string>;
   innates: { player: number[][]; enemy: number[][] };
+  stages: { player: number[][]; enemy: number[][] };
 } {
   const components = mechanicalDigestComponents();
   const digest = fnv1a64(canonicalize(components));
@@ -163,7 +181,13 @@ function computeMechanicalDigest(): {
   }
   // Raw per-mon innate ids so the driver can assert enemy innates are LIVE (and both browsers agree).
   const innates = { player: partyInnates(components.playerParty), enemy: partyInnates(components.enemyParty) };
-  return { digest, parts, innates };
+  // Raw stage vectors turn a digest mismatch into exact causal evidence (which mon/stat changed) without
+  // exposing a mutation hook. This caught the pre-command Let’s Roll +DEF host-only entry effect.
+  const stages = {
+    player: partyStageVectors(components.playerParty),
+    enemy: partyStageVectors(components.enemyParty),
+  };
+  return { digest, parts, innates, stages };
 }
 
 function classifyContinuationSurface(phase: string, uiMode: string): BrowserContinuationSurface | null {
@@ -257,7 +281,7 @@ function observeContinuationSurface(): void {
     }
     lastProbedAddress = addressKey;
     lastProbeAt = now;
-    const { digest: stateDigest, parts: digestParts, innates } = computeMechanicalDigest();
+    const { digest: stateDigest, parts: digestParts, innates, stages } = computeMechanicalDigest();
     const observationKey = `${addressKey}:${stateDigest}`;
     if (observationKey === lastObservedSurface) {
       return;
@@ -267,7 +291,7 @@ function observeContinuationSurface(): void {
     // self-identifies the exact field) plus the raw per-mon innate ids (so the driver can assert the
     // ace-difficulty enemy's innates are LIVE and both browsers agree - the innate-activation invariant).
     console.info(
-      `${DIGEST_PARTS_PREFIX}${JSON.stringify({ address: `${runtime.controller.sessionEpoch}:${battle.waveIndex}:${battle.turn}`, surface, digest: stateDigest, parts: digestParts, innates })}`,
+      `${DIGEST_PARTS_PREFIX}${JSON.stringify({ address: `${runtime.controller.sessionEpoch}:${battle.waveIndex}:${battle.turn}`, surface, digest: stateDigest, parts: digestParts, innates, stages })}`,
     );
     const observation: CoopBrowserSurfaceObservationV1 = {
       version: 1,
@@ -399,6 +423,12 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
       }
       return { surfaceId: `confirm:${phase}`, operationClass: "confirm", ownerModel: "interaction" };
     case "MESSAGE":
+      if (phase === "ExpPhase") {
+        return { surfaceId: "battle:exp", operationClass: "battle-progress", ownerModel: "local" };
+      }
+      if (phase === "MessagePhase") {
+        return { surfaceId: "battle:message", operationClass: "battle-progress", ownerModel: "local" };
+      }
       return inMe
         ? { surfaceId: "mystery-encounter:message", operationClass: "encounter-prompt", ownerModel: "interaction" }
         : null;
@@ -450,7 +480,11 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
       };
     }
   }
-  const listOptions = (handler as unknown as { options?: Array<{ label?: unknown }> }).options;
+  const optionHandler = handler as unknown as {
+    options?: Array<{ label?: unknown }>;
+    config?: { options?: Array<{ label?: unknown }> } | null;
+  };
+  const listOptions = optionHandler.options ?? optionHandler.config?.options;
   if (Array.isArray(listOptions) && listOptions.length > 0 && typeof listOptions[0]?.label === "string") {
     const optionIds = listOptions.map((option, index) =>
       typeof option?.label === "string" ? normalizeOptionId(option.label) || `slot:${index}` : `slot:${index}`,
@@ -471,6 +505,43 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
 let lastSemanticObservation = "";
 let lastSemanticProbe = "";
 let lastSemanticProbeAt = 0;
+let lastSemanticPhase: object | null = null;
+let semanticPhaseInstance = 0;
+let lastObservedRenderProfile = "";
+
+function semanticBattleAddress(battle: { waveIndex: number; turn: number } | null | undefined) {
+  return { wave: battle?.waveIndex ?? 0, turn: battle?.turn ?? 0 } as const;
+}
+
+/**
+ * Attest the real Display-settings value while that visible menu is open. The campaign
+ * reaches this handler only through public keys; this probe is read-only and lets an
+ * animations-skipped depth result remain visibly distinct from animations-on coverage.
+ */
+function observeRenderProfile(): void {
+  try {
+    const handler = globalScene?.ui?.getHandler();
+    if (!handler?.active || handler.constructor?.name !== "SettingsDisplayUiHandler") {
+      // A later Settings visit must emit a fresh attestation even when the saved value
+      // did not change (the speed setup opens Settings before the render-profile pass).
+      lastObservedRenderProfile = "";
+      return;
+    }
+    const observation = {
+      version: 1,
+      moveAnimations: globalScene.moveAnimations,
+      handler: "SettingsDisplayUiHandler",
+    } as const;
+    const canonical = JSON.stringify(observation);
+    if (canonical === lastObservedRenderProfile) {
+      return;
+    }
+    lastObservedRenderProfile = canonical;
+    console.info(`${RENDER_PROFILE_PREFIX}${canonical}`);
+  } catch {
+    // Settings are changing mode or the page is tearing down.
+  }
+}
 
 function observeSemanticSurface(): void {
   try {
@@ -478,9 +549,10 @@ function observeSemanticSurface(): void {
     // state-aware navigation primitive is provable against a single-context classic run.
     const runtime = getCoopRuntime();
     const battle = globalScene?.currentBattle;
-    const phase = globalScene?.phaseManager?.getCurrentPhase()?.phaseName;
+    const currentPhase = globalScene?.phaseManager?.getCurrentPhase();
+    const phase = currentPhase?.phaseName;
     const ui = globalScene?.ui;
-    if (battle == null || phase == null || ui == null) {
+    if (phase == null || ui == null) {
       return;
     }
     const handler = ui.getHandler();
@@ -491,6 +563,14 @@ function observeSemanticSurface(): void {
     const semantic = classifySemanticSurface(phase, uiMode);
     if (semantic == null) {
       return;
+    }
+    // Two adjacent ExpPhase objects can expose the same surface/address and can both become
+    // ready between 100 ms observer samples at 10x speed. Object identity is read-only and
+    // gives every observed phase instance a monotonic discriminator, preventing the second
+    // actionable prompt from being deduplicated as an identical observation.
+    if (currentPhase !== lastSemanticPhase) {
+      lastSemanticPhase = currentPhase;
+      semanticPhaseInstance += 1;
     }
 
     let coop = false;
@@ -527,13 +607,28 @@ function observeSemanticSurface(): void {
     }
 
     const selection = readSelection(handler, uiMode);
+    // Title/setup menus exist before a Battle object. Address 0:0 is an explicit non-battle
+    // sentinel that lets the public driver wait for their real option surfaces instead of
+    // racing repeated Action keys; gameplay surfaces still carry their actual wave/turn.
+    const { wave, turn } = semanticBattleAddress(battle);
+    const promptReady = (handler as unknown as { isAwaitingPromptAction?: () => boolean }).isAwaitingPromptAction;
     const awaitingRaw = (handler as unknown as { awaitingActionInput?: unknown }).awaitingActionInput;
-    const awaitingActionInput = typeof awaitingRaw === "boolean" ? awaitingRaw : null;
+    // MessageUiHandler keeps its raw `awaitingActionInput` bit set after an action has consumed
+    // `onActionInput`. Its public readiness method proves the complete actionable contract and
+    // therefore prevents a read-only browser observer from publishing a stale ready=true between
+    // repeated ExpPhase prompts. Non-message handlers keep the established raw-field projection.
+    const awaitingActionInput =
+      typeof promptReady === "function"
+        ? promptReady.call(handler)
+        : typeof awaitingRaw === "boolean"
+          ? awaitingRaw
+          : null;
 
     const probeKey = [
       semantic.surfaceId,
       uiMode,
-      `${epoch}:${battle.waveIndex}:${battle.turn}`,
+      semanticPhaseInstance,
+      `${epoch}:${wave}:${turn}`,
       selection.selectedOptionId ?? "",
       ownerSeat ?? "?",
       awaitingActionInput,
@@ -551,7 +646,7 @@ function observeSemanticSurface(): void {
       operationClass: semantic.operationClass,
       ownerModel: semantic.ownerModel,
       coop,
-      address: { epoch, wave: battle.waveIndex, turn: battle.turn },
+      address: { epoch, wave, turn },
       membershipRevision,
       connectionGeneration,
       localSeat,
@@ -563,6 +658,7 @@ function observeSemanticSurface(): void {
       optionCount: selection.optionCount,
       ready: { handlerActive: true, awaitingActionInput },
       phase,
+      phaseInstance: semanticPhaseInstance,
       uiMode,
     };
     const canonical = JSON.stringify(observation);
@@ -580,6 +676,7 @@ setInterval(() => {
   observeBoundSession();
   observeContinuationSurface();
   observeSemanticSurface();
+  observeRenderProfile();
 }, 100);
 
 // Strictly read-only observer bridge. `ready` is a non-mutating probe; the former

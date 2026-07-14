@@ -4389,12 +4389,11 @@ export function assembleCoopRuntime(
   } = {},
 ): CoopRuntime {
   resetCoopGlobalOperationOrder();
-  // Biome + ability + bargain + catch-full + faint-switch + learn-move + stormglass + reward are per-runtime
+  // Biome + ability + bargain + catch-full + faint-switch + learn-move + revival + stormglass + reward are per-runtime
   // (layer-B): their fresh records come from
   // createCoopRuntimeOpState below, so the old reset-at-assembly call sites are removed (a fresh runtime's
   // records ARE the reset; calling reset here would touch the PREVIOUS runtime's record, not this one's).
   resetCoopColosseumOperationState();
-  resetCoopRevivalOperationState();
   // Mystery-operation state is per-runtime: createCoopRuntimeOpState below constructs the new run's fresh
   // receipt ledger/cursors. Resetting here would mutate the previously active runtime during duo assembly.
   resetCoopActiveMysteryControl();

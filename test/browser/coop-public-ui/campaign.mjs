@@ -16,8 +16,19 @@ import {
 import { delay } from "./evidence.mjs";
 
 const START_PHASE = /Start Phase (\w+)/u;
+const ANIMATION_PROGRESS_PHASE = /Start Phase (MoveEffectPhase|MoveAnimPhase|CoopMoveAnimReplayPhase)/u;
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
+const TURN_PROGRESS = /Start Phase TurnStartPhase|host recorder: begin turn=/u;
+const AUTHORITY_MOVE_EFFECT = /Start Phase MoveEffectPhase/u;
+const RENDERER_MOVE_REPLAY = /Start Phase CoopMoveAnimReplayPhase/u;
+const RENDERER_MOVE_SKIPPED = /present move .* NO-OP end \(user=.* anims=false\)/u;
+const BATTLE_PROMPT_PHASES = new Map([
+  ["battle:message", "MessagePhase"],
+  ["battle:exp", "ExpPhase"],
+]);
+const ANIMATION_PROGRESS_ALLOWANCE_MS = 90_000;
+const OUTCOME_HARD_CEILING_MS = 360_000;
 
 function fromEach(clients, fn) {
   return Object.fromEntries(clients.map(client => [client.label, fn(client)]));
@@ -149,11 +160,258 @@ async function raiseGameSpeed(rig, policy, progress) {
   await progress.note("speed-raise applied (Game Speed -> 10x via Settings UI)", { keys });
 }
 
-/** Poll the post-turn outcome markers for a bounded window; null on timeout (no throw). */
-async function waitForOutcomeBounded(rig, from, timeoutMs) {
+/**
+ * Select and attest one of the two explicit rendering-fidelity profiles through the real
+ * Display Settings UI. The browser observer only reports the applied value; every change
+ * is still a public keyboard action and both clients leave a screenshot on the selected row.
+ */
+async function configureRenderProfile(rig, policy, progress) {
   const clients = Object.values(rig.clients);
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
+  const expected = policy.moveAnimationsExpected;
+  for (const client of clients) {
+    const openCursor = client.evidence.cursor();
+    await client.sequence(policy.keys.renderProfileOpen, `open-render-profile-${policy.renderProfile}`);
+    let attestation = await client.evidence.waitForCondition(
+      sink => sink.findRenderProfile(true, openCursor) ?? sink.findRenderProfile(false, openCursor),
+      {
+        timeoutMs: rig.config.timeoutMs,
+        description: "visible Display Settings move-animation attestation",
+      },
+    );
+    if (attestation.observation.moveAnimations !== expected) {
+      const toggleCursor = client.evidence.cursor();
+      await client.sequence(policy.keys.renderProfileToggle, `toggle-render-profile-${policy.renderProfile}`);
+      attestation = await client.evidence.waitForCondition(sink => sink.findRenderProfile(expected, toggleCursor), {
+        timeoutMs: rig.config.timeoutMs,
+        description: `Move Animations=${expected ? "On" : "Off"} after visible Settings toggle`,
+      });
+    }
+    await delay(client.config.settleDelayMs);
+    client.evidence.record("campaign-render-profile", {
+      profile: policy.renderProfile,
+      moveAnimations: attestation.observation.moveAnimations,
+      fidelity: expected
+        ? "move-animation rendering covered"
+        : "move-animation rendering intentionally skipped; mechanics/network/public UI retained",
+    });
+    await client.checkpoint(`render-profile-${policy.renderProfile}-selected`);
+    await client.sequence(policy.keys.renderProfileClose, `close-render-profile-${policy.renderProfile}`);
+  }
+  await progress.note("render profile visibly selected and observer-attested", {
+    renderProfile: policy.renderProfile,
+    moveAnimations: expected,
+    fidelity: expected
+      ? "move-animation rendering covered"
+      : "move-animation rendering intentionally skipped; mechanics/network/public UI retained",
+  });
+}
+
+/** Prove the selected profile actually governed at least one authoritative/replayed move. */
+async function assertRenderProfileExecution(rig, policy, progress) {
+  const authorityMove = rig.host.evidence.find(AUTHORITY_MOVE_EFFECT);
+  if (!authorityMove) {
+    throw new Error(`${policy.renderProfile}: no authoritative MoveEffectPhase was observed`);
+  }
+  const rendererEvidence = policy.moveAnimationsExpected
+    ? rig.guest.evidence.find(RENDERER_MOVE_REPLAY)
+    : rig.guest.evidence.find(RENDERER_MOVE_SKIPPED);
+  if (!rendererEvidence) {
+    throw new Error(
+      policy.moveAnimationsExpected
+        ? "animations-on-surface: renderer never ran a CoopMoveAnimReplayPhase"
+        : "animations-skipped-depth: renderer never attested a move-animation NO-OP with anims=false",
+    );
+  }
+  const proof = {
+    renderProfile: policy.renderProfile,
+    moveAnimations: policy.moveAnimationsExpected,
+    authorityMoveEventIndex: authorityMove.index,
+    rendererMoveEventIndex: rendererEvidence.index,
+  };
+  rig.host.evidence.record("campaign-render-profile-proof", proof);
+  rig.guest.evidence.record("campaign-render-profile-proof", proof);
+  await progress.note("render profile governed real battle execution", proof);
+}
+
+/** Clients whose submitted command has not yet opened the real turn/replay path. */
+export function clientsAwaitingTurnProgress(rig, from) {
+  return Object.values(rig.clients).filter(client => !client.evidence.find(TURN_PROGRESS, from[client.label] ?? 0));
+}
+
+/**
+ * Drive only the clients whose first command never entered the turn path. A valid but CPU-starved
+ * browser turn can take much longer than the short fallback window. Run 29312876722 proved that
+ * blindly replaying the whole fallback on BOTH clients in that state smears its keys across damage,
+ * faint and EXP messages. Progress evidence makes the fallback selective instead.
+ */
+export async function driveBattleFallback(rig, keys, from, purpose) {
+  const pending = clientsAwaitingTurnProgress(rig, from);
+  await Promise.all(pending.map(client => client.sequence(keys, `${purpose}-${client.label}`)));
+  return pending;
+}
+
+function currentSharedCommandAddress(clients, purpose) {
+  const addresses = clients.map(client => {
+    const observation = client.evidence.findLastSurface("command")?.observation;
+    return observation == null ? null : `${observation.epoch}:${observation.wave}:${observation.turn}`;
+  });
+  if (addresses.some(address => address == null) || new Set(addresses).size !== 1) {
+    throw new Error(`${purpose}: battle prompt advancement requires one shared public command address`);
+  }
+  return addresses[0];
+}
+
+/**
+ * Public-input driver for readiness-proven per-client battle messages.
+ *
+ * Both ordinary MessagePhase narration (for example, "Wild Yungoos fainted!") and ExpPhase can
+ * block the authoritative phase queue on a human ACTION. The read-only semantic observer publishes
+ * them only with the handler's complete `isAwaitingPromptAction()` contract, the exact current
+ * shared command address, and a phase-instance discriminator. One distinct ready instance
+ * authorizes exactly one Space on that same public client. Most renderer phases are passive, but a
+ * narrated CoopFaintReplayPhase opens a real local MessagePhase prompt too; run 29321837675 proved
+ * leaving that readiness signal undriven prevents the guest from applying/ACKing the completed turn
+ * forever.
+ */
+export function createBattlePromptAdvancer(rig, from, stats, purpose) {
+  if (!rig.host) {
+    throw new Error(`${purpose}: battle prompt advancement requires the authenticated public host`);
+  }
+  const clients = Object.values(rig.clients);
+  const expectedAddress = currentSharedCommandAddress(clients, purpose);
+  const cursors = new Map(clients.map(client => [client.label, from[client.label] ?? 0]));
+  const consumedInstances = new Set();
+  return async () => {
+    for (const client of clients) {
+      const readyEvent = client.evidence.events.slice(cursors.get(client.label) ?? 0).find(event => {
+        if (event.kind !== "browser-surface2") {
+          return false;
+        }
+        const observation = event.observation;
+        const expectedPhase = BATTLE_PROMPT_PHASES.get(observation.surfaceId);
+        const observedAddress = `${observation.address?.epoch}:${observation.address?.wave}:${observation.address?.turn}`;
+        const instanceKey = `${client.label}:${observation.surfaceId}:${observation.phaseInstance}`;
+        return (
+          expectedPhase != null
+          && observedAddress === expectedAddress
+          && observation.phase === expectedPhase
+          && observation.uiMode === "MESSAGE"
+          && observation.ownerModel === "local"
+          && observation.seatsWithInput?.includes(observation.localSeat)
+          && Number.isSafeInteger(observation.phaseInstance)
+          && observation.ready?.handlerActive === true
+          && observation.ready?.awaitingActionInput === true
+          && !consumedInstances.has(instanceKey)
+        );
+      });
+      if (!readyEvent) {
+        continue;
+      }
+      cursors.set(client.label, readyEvent.index + 1);
+      const { surfaceId, phase, phaseInstance } = readyEvent.observation;
+      consumedInstances.add(`${client.label}:${surfaceId}:${phaseInstance}`);
+      const statName = phase === "ExpPhase" ? "postBattleExpPrompts" : "battleMessagePrompts";
+      stats[statName] = (stats[statName] ?? 0) + 1;
+      client.evidence.record("campaign-battle-prompt-advance", {
+        surfaceId,
+        phase,
+        phaseInstance,
+        readyEventIndex: readyEvent.index,
+        promptOrdinal: stats[statName],
+        inputSeat: client.label,
+        authority: client === rig.host,
+      });
+      await client.press("Space", `${purpose}-${client.label}-${surfaceId}-${stats[statName]}`);
+      return true;
+    }
+    return false;
+  };
+}
+
+/**
+ * Bound a browser outcome wait by both a normal deadline and a larger hard ceiling while
+ * allowing a newly observed real move-animation phase to refresh part of the budget.
+ *
+ * Two built Chromium clients can heavily dilate Phaser tweens on the standard four-core
+ * runner. Run 29319610458 measured a nominal 13-frame Vine Whip animation taking 26.31s,
+ * so a later 33-frame Mega Drain legitimately crossed the turn-wide timeout even though its
+ * tween was still advancing. A phase event is therefore evidence of progress, but never an
+ * excuse to wait forever: each distinct animation phase gets a bounded allowance and the
+ * whole outcome wait remains capped by one immutable hard deadline.
+ */
+export function createAnimationProgressBudget(
+  rig,
+  from,
+  baseTimeoutMs,
+  {
+    now = () => Date.now(),
+    animationAllowanceMs = ANIMATION_PROGRESS_ALLOWANCE_MS,
+    hardCeilingMs = OUTCOME_HARD_CEILING_MS,
+  } = {},
+) {
+  const clients = Object.values(rig.clients);
+  const startedAtMs = now();
+  const hardDeadlineMs = startedAtMs + Math.max(baseTimeoutMs, hardCeilingMs);
+  let deadlineMs = Math.min(startedAtMs + baseTimeoutMs, hardDeadlineMs);
+  const scanOffsets = new Map(clients.map(client => [client.label, from[client.label] ?? 0]));
+
+  const observeClient = client => {
+    const scanFrom = scanOffsets.get(client.label) ?? 0;
+    const events = client.evidence.events.slice(scanFrom);
+    scanOffsets.set(client.label, client.evidence.events.length);
+    for (const event of events) {
+      const match = ANIMATION_PROGRESS_PHASE.exec(event.text ?? "");
+      if (!match) {
+        continue;
+      }
+      const parsedEventAtMs = Date.parse(event.at ?? "");
+      const eventAtMs = Number.isFinite(parsedEventAtMs) ? Math.max(parsedEventAtMs, startedAtMs) : now();
+      const previousDeadlineMs = deadlineMs;
+      deadlineMs = Math.min(hardDeadlineMs, Math.max(deadlineMs, eventAtMs + animationAllowanceMs));
+      client.evidence.record("campaign-animation-budget", {
+        phase: match[1],
+        phaseEventIndex: event.index,
+        phaseObservedAt: event.at ?? null,
+        phaseMonotonicMs: event.monotonicMs ?? null,
+        waitStartedAt: new Date(startedAtMs).toISOString(),
+        previousDeadlineAt: new Date(previousDeadlineMs).toISOString(),
+        extendedDeadlineAt: new Date(deadlineMs).toISOString(),
+        hardDeadlineAt: new Date(hardDeadlineMs).toISOString(),
+        baseTimeoutMs,
+        animationAllowanceMs,
+        extensionApplied: deadlineMs > previousDeadlineMs,
+        hardCeilingReached: deadlineMs === hardDeadlineMs,
+      });
+    }
+  };
+
+  const observe = () => {
+    clients.forEach(observeClient);
+    return deadlineMs;
+  };
+
+  return Object.freeze({
+    observe,
+    deadline: () => deadlineMs,
+    hardDeadline: () => hardDeadlineMs,
+  });
+}
+
+/** Poll the post-turn outcome markers for a bounded window; null on timeout (no throw). */
+export async function waitForOutcomeBounded(
+  rig,
+  from,
+  timeoutMs,
+  { stopOnTurnProgress = false, advanceBattlePrompt = null, extendForAnimationProgress = false } = {},
+) {
+  const clients = Object.values(rig.clients);
+  const fixedDeadline = Date.now() + timeoutMs;
+  const animationBudget = extendForAnimationProgress ? createAnimationProgressBudget(rig, from, timeoutMs) : null;
+  while (true) {
+    const deadline = animationBudget?.observe() ?? fixedDeadline;
+    if (Date.now() >= deadline) {
+      break;
+    }
     // A mid-battle wipe / game-over is a real run END, not a driver softlock: classify it
     // distinctly so the campaign still produces clean evidence instead of a generic hang.
     if (
@@ -179,6 +437,12 @@ async function waitForOutcomeBounded(rig, from, timeoutMs) {
     if (clients.every(client => client.evidence.find(LOCAL_COMMAND, from[client.label]))) {
       return { kind: "command" };
     }
+    if (stopOnTurnProgress && clientsAwaitingTurnProgress(rig, from).length === 0) {
+      return { kind: "turn-progress" };
+    }
+    if (advanceBattlePrompt && (await advanceBattlePrompt())) {
+      continue;
+    }
     await delay(100);
   }
   return null;
@@ -200,24 +464,49 @@ async function driveBattleWave(rig, policy, stats) {
     stats.turns = turn;
     await Promise.all(clients.map(client => client.checkpoint(`wave-${stats.wave}-turn-${turn}-command`)));
     const from = fromEach(clients, client => client.evidence.cursor());
-    await Promise.all(
-      clients.map(client => client.sequence(policy.keys.battle, `wave-${stats.wave}-turn-${turn}-attack-first`)),
-    );
-    let outcome = await waitForOutcomeBounded(rig, from, fallbackWindow);
-    if (!outcome) {
-      // Attack-first did not resolve the turn (no PP / disabled / wrong target). Cycle to
-      // the next move and wait the full budget before declaring a softlock.
-      stats.fallbackTurns += 1;
-      await Promise.all(
-        clients.map(client => client.sequence(policy.keys.battleFallback, `wave-${stats.wave}-turn-${turn}-fallback`)),
+    const purpose = `wave-${stats.wave}-turn-${turn}`;
+    const advanceBattlePrompt = createBattlePromptAdvancer(rig, from, stats, purpose);
+    await Promise.all(clients.map(client => client.sequence(policy.keys.battle, `${purpose}-attack-first`)));
+    let outcome = await waitForOutcomeBounded(rig, from, fallbackWindow, { stopOnTurnProgress: true });
+    const fallbackClients = [];
+    let turnProgressed = false;
+    if (outcome?.kind === "turn-progress") {
+      turnProgressed = true;
+      rig.host.evidence.record("campaign-turn-progress", {
+        wave: stats.wave,
+        turn,
+        fallbackSuppressed: true,
+        reason: "both public clients entered the addressed turn path",
+      });
+      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, {
+        advanceBattlePrompt,
+        extendForAnimationProgress: true,
+      });
+    }
+    if (!outcome && !turnProgressed) {
+      // Attack-first did not resolve or fully enter the turn (no PP / disabled / wrong target).
+      // Cycle only clients lacking turn-progress evidence; never replay input on a client whose
+      // valid turn is already executing under browser CPU pressure.
+      fallbackClients.push(
+        ...(await driveBattleFallback(rig, policy.keys.battleFallback, from, `${purpose}-fallback`)),
       );
-      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs);
+      if (fallbackClients.length > 0) {
+        stats.fallbackTurns += 1;
+      }
+      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, {
+        advanceBattlePrompt,
+        extendForAnimationProgress: true,
+      });
     }
     if (!outcome) {
       const parked = latestStartPhase(clients);
+      const fallbackDetail =
+        fallbackClients.length > 0
+          ? `fallback clients=${fallbackClients.map(client => client.label).join(",")}`
+          : "fallback suppressed: submitted turn was already progressing";
       throw new Error(
-        `[campaign-softlock] wave ${stats.wave} turn ${turn}: attack-first + fallback produced no reward, `
-          + `wipe, faint, or next command within budget; latest phase=${parked?.name ?? "unknown"}`,
+        `[campaign-softlock] wave ${stats.wave} turn ${turn}: attack-first produced no reward, wipe, faint, `
+          + `or next command within budget (${fallbackDetail}); latest phase=${parked?.name ?? "unknown"}`,
       );
     }
     if (outcome.kind === "wipe") {
@@ -472,12 +761,17 @@ export async function runCampaign(rig) {
   const policy = loadCampaignPolicy();
   const progress = new CampaignProgress(rig.config.artifactDir);
   const clients = Object.values(rig.clients);
-  await progress.note("campaign start", { targetWaves: policy.targetWaves, rewardMode: policy.rewardMode });
+  await progress.note("campaign start", {
+    targetWaves: policy.targetWaves,
+    rewardMode: policy.rewardMode,
+    renderProfile: policy.renderProfile,
+  });
 
   await rig.loginBoth();
   if (policy.raiseSpeed) {
     await raiseGameSpeed(rig, policy, progress);
   }
+  await configureRenderProfile(rig, policy, progress);
   await rig.pair(rig.config.requesterSeat);
   await rig.startFreshRun();
   // Verify the layer-8 passive-digest fix did not disable ER innates (maintainer-directed invariant).
@@ -489,7 +783,17 @@ export async function runCampaign(rig) {
   try {
     for (let ordinal = 1; ordinal <= policy.targetWaves; ordinal++) {
       const waveNo = rig.activeBattleWave;
-      const stats = { wave: waveNo, ordinal, turns: 0, faints: 0, fallbackTurns: 0, surfaces: [], autoFirst: [] };
+      const stats = {
+        wave: waveNo,
+        ordinal,
+        turns: 0,
+        faints: 0,
+        fallbackTurns: 0,
+        battleMessagePrompts: 0,
+        postBattleExpPrompts: 0,
+        surfaces: [],
+        autoFirst: [],
+      };
       const startMs = Date.now();
       // Capture the wave-start cursor BEFORE the battle: the reward shop's OWNER marker is
       // logged when the shop opens (mid-wave), so the between-wave surface search must
@@ -522,9 +826,14 @@ export async function runCampaign(rig) {
         break;
       }
     }
+    if (status === "continue" && wavesCleared >= policy.targetWaves) {
+      await assertRenderProfileExecution(rig, policy, progress);
+    }
   } finally {
     await progress.summary({
       targetWaves: policy.targetWaves,
+      renderProfile: policy.renderProfile,
+      moveAnimations: policy.moveAnimationsExpected,
       wavesCleared,
       finalWave: rig.activeBattleWave,
       lastStatus: status,

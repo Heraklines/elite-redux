@@ -11,6 +11,7 @@ export const delay = ms => new Promise(resolveDelay => setTimeout(resolveDelay, 
 const SURFACE_PREFIX = "[coop-browser:surface] ";
 const SURFACE2_PREFIX = "[coop-browser:surface2] ";
 const BINDING_PREFIX = "[coop-browser:binding] ";
+const RENDER_PROFILE_PREFIX = "[coop-browser:render-profile] ";
 const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
 const CHECKSUM_SENTINEL = "0000000000000000";
 
@@ -175,6 +176,43 @@ function bindingView(text) {
   return Object.freeze({ ...value });
 }
 
+function renderProfileView(text) {
+  if (!text.startsWith(RENDER_PROFILE_PREFIX)) {
+    return null;
+  }
+  let value;
+  try {
+    value = JSON.parse(text.slice(RENDER_PROFILE_PREFIX.length));
+  } catch (error) {
+    throw new Error("built browser emitted malformed render-profile JSON", { cause: error });
+  }
+  if (
+    !value
+    || typeof value !== "object"
+    || value.version !== 1
+    || typeof value.moveAnimations !== "boolean"
+    || value.handler !== "SettingsDisplayUiHandler"
+  ) {
+    throw new Error("built browser emitted an invalid render-profile observation");
+  }
+  return Object.freeze({ ...value });
+}
+
+function recordBrowserObservations(sink, text) {
+  const renderProfile = renderProfileView(text);
+  if (renderProfile) {
+    sink.record("browser-render-profile", { observation: renderProfile });
+  }
+  const binding = bindingView(text);
+  if (binding != null) {
+    sink.record("browser-binding", { observation: binding });
+  }
+  const observation = continuationSurfaceView(text);
+  if (observation != null) {
+    sink.record("browser-surface", { observation });
+  }
+}
+
 /**
  * Parse the read-only v2 semantic surface mirror. Lenient by design: an unrecognized or
  * malformed line returns null and is dropped (v2 drives navigation; it is not a hard proof
@@ -272,6 +310,12 @@ export class EvidenceSink {
     return this.events.slice(from).find(event => event.kind === "browser-binding");
   }
 
+  findRenderProfile(moveAnimations, from = 0) {
+    return this.events
+      .slice(from)
+      .find(event => event.kind === "browser-render-profile" && event.observation.moveAnimations === moveAnimations);
+  }
+
   /** The latest v2 semantic surface observation (optionally matching a surfaceId) from `from`. */
   findLastSemanticSurface(from = 0, surfaceId = null) {
     return this.events
@@ -336,14 +380,7 @@ export class EvidenceSink {
         this.failures.push(event);
       }
       try {
-        const binding = bindingView(text);
-        if (binding != null) {
-          this.record("browser-binding", { observation: binding });
-        }
-        const observation = continuationSurfaceView(text);
-        if (observation != null) {
-          this.record("browser-surface", { observation });
-        }
+        recordBrowserObservations(this, text);
       } catch (error) {
         const invalid = this.record("browser-surface-invalid", {
           text: error instanceof Error ? error.message : String(error),

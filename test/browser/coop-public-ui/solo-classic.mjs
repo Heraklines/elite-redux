@@ -16,11 +16,12 @@ import { delay } from "./evidence.mjs";
 const TITLE_PHASE = /Start Phase TitlePhase/u;
 const STARTER_PHASE = /Start Phase SelectStarterPhase/u;
 const CHALLENGE_PHASE = /Start Phase SelectChallengePhase/u;
+const GAME_MODE_SURFACE = "option-select:TitlePhase";
 const COMMAND_SURFACE = "command:command";
 const FIGHT_SURFACE = "command:fight";
 
-async function waitForSemantic(client, surfaceId, timeoutMs) {
-  return client.evidence.waitForCondition(sink => sink.findLastSemanticSurface(0, surfaceId), {
+async function waitForSemantic(client, surfaceId, timeoutMs, from = 0) {
+  return client.evidence.waitForCondition(sink => sink.findLastSemanticSurface(from, surfaceId), {
     timeoutMs,
     description: `v2 semantic surface ${surfaceId}`,
   });
@@ -55,8 +56,14 @@ export async function runSoloClassic(client) {
 
   // Open New Game -> Classic (index 0; co-op sits one row BELOW classic in the same menu).
   await client.sequence(client.titleNewGameKeys, "solo-title-select-new-game");
+  const gameModeCursor = client.evidence.cursor();
   await client.press("Space", "solo-open-new-game");
-  await client.press("Space", "solo-select-classic-mode");
+  await waitForSemantic(client, GAME_MODE_SURFACE, client.config.timeoutMs, gameModeCursor);
+  await selectOptionById(client, {
+    surfaceId: GAME_MODE_SURFACE,
+    targetId: "classic",
+    navKeys: ["ArrowUp", "ArrowDown"],
+  });
 
   // Classic solo may show a challenge screen before starter select; take the default start.
   const entry = await client.evidence.waitForCondition(

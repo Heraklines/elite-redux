@@ -106,8 +106,8 @@ prepared dedicated accounts. It does not replace the calibrated co-op gate or mi
 
 ## Campaign + semantic surface mirror
 
-`campaign.mjs` / `run-campaign.mjs` drive a longer co-op run (default 30 waves,
-`COOP_UI_CAMPAIGN_WAVES`) using the read-only **v2 semantic surface mirror** the sealed observer emits
+`campaign.mjs` / `run-campaign.mjs` drive a longer co-op run using the read-only **v2 semantic surface
+mirror** the sealed observer emits
 (`[coop-browser:surface2]`, parsed by `evidence.mjs` as `browser-surface2`). The mirror reports, per
 active interactive surface: a stable `surfaceId`, `operationClass`, authoritative `address`
 `{epoch,wave,turn}`, `ownerSeat`/`ownerModel`, this client's `seatsWithInput`, `optionIds` +
@@ -136,6 +136,12 @@ trustworthy (all lossless - they never change what is asserted):
   the identical source, so the exact-SHA seal is preserved (a bad reuse fails loudly at the
   gameplay job's manifest verification). Inter-job handoff is compressed; solo + campaign legs
   run as parallel jobs off one build.
+- **CDN-only artifact pruning**: the beta Vite plugin copies vendored images, audio, battle
+  animations, and fonts into its output even though staging serves those exact paths through
+  immutable `er-assets@<sha>` redirects. Before sealing, the artifact builder removes only paths
+  validated by `_redirects`. This prevents local files from masking CDN failures and avoids
+  transferring the measured 34,203-file / 522.5 MB duplicate asset payload to every fan-out runner;
+  application chunks and all non-redirected runtime data remain digest-sealed.
 - **Runner sizing (note for the maintainer):** two Chromium contexts + the localhost preview on
   the default 2-vCPU `ubuntu-latest` are CPU-starved, which inflates WebRTC ICE (~33s observed to
   open the data channel) and the guest's real-cloud persist RTTs. Moving the gameplay jobs to a
@@ -152,8 +158,16 @@ trustworthy (all lossless - they never change what is asserted):
   the whole run. Override the key path with `COOP_UI_SPEED_KEYS` (JSON), or pass `"[]"` to leave
   the account's speed unchanged; `COOP_UI_RAISE_SPEED=0` skips the step entirely.
 - **Assets always load from the real jsDelivr production CDN** in every profile - local asset
-  serving is deliberately NOT offered, so a CDN/asset regression can still surface. There is no
-  reduced-fidelity "fast" profile: the run is full-fidelity (real CDN, real menus) at 10x speed.
+  serving is deliberately NOT offered, so a CDN/asset regression can still surface.
+- The campaign workflow fans two labelled profiles from the same immutable bundle. The short
+  `animations-on-surface` lane (default 3 waves, `surface_waves`) keeps Move Animations ON and must
+  observe both the authoritative move phase and the guest renderer replay. The longer
+  `animations-skipped-depth` lane (`campaign_waves`, default 30) visibly selects Move Animations OFF
+  through each client's real Display Settings menu and must observe the renderer's explicit
+  `anims=false` no-op. The depth lane preserves real accounts, canvas input, game mechanics, staging
+  WebRTC, synchronization barriers, CDN assets, and all non-move UI; its one declared fidelity cost is
+  move-animation rendering/tween timing. Screenshots, traces, summaries, job names, and artifact names
+  retain the profile label so a depth result can never be mistaken for animation-rendering coverage.
 
 ## Known future-proofing TODO (do not do now)
 

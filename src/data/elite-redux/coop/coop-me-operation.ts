@@ -79,9 +79,9 @@ import {
 import {
   type CoopCommitContext,
   type CoopIntentValidator,
-  type CoopRuntimeOpState,
   CoopOperationGuest,
   CoopOperationHost,
+  type CoopRuntimeOpState,
   maybeCoopOpSurfaceState,
   registerCoopOpSurfaceState,
   requireCoopOpSurfaceState,
@@ -245,13 +245,13 @@ export class CoopMeTerminalTransactionReceiver {
         return "rejected";
       }
     }
-    const state: CoopMeTerminalReceiptState = priorReceipt ?? {
+    const receiptState: CoopMeTerminalReceiptState = priorReceipt ?? {
       identity,
       materialApplied: false,
       executed: false,
     };
     if (priorReceipt == null) {
-      this.receipts.set(receipt.operationId, state);
+      this.receipts.set(receipt.operationId, receiptState);
       this.pinned.set(receipt.pinned, {
         operationId: receipt.operationId,
         terminal: receipt.payload.terminal,
@@ -260,11 +260,11 @@ export class CoopMeTerminalTransactionReceiver {
       });
     }
     try {
-      if (!state.materialApplied) {
+      if (!receiptState.materialApplied) {
         if (!hooks.applyMaterial()) {
           return "retry";
         }
-        state.materialApplied = true;
+        receiptState.materialApplied = true;
       }
       if (!hooks.executeDestination()) {
         return "retry";
@@ -272,7 +272,7 @@ export class CoopMeTerminalTransactionReceiver {
     } catch {
       return "retry";
     }
-    state.executed = true;
+    receiptState.executed = true;
     const current = this.pinned.get(receipt.pinned);
     if (current?.operationId === receipt.operationId) {
       current.executed = true;
