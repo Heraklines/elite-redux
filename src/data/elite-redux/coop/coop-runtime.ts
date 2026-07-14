@@ -4392,13 +4392,7 @@ export function assembleCoopRuntime(
   } = {},
 ): CoopRuntime {
   resetCoopGlobalOperationOrder();
-  // Wave-2a: a fresh session assembly is a fresh control plane (§1.4) - clear any leftover biome-travel
-  // operation state so a new run's interaction counter (re-init from base 0, so it reuses the same seq
-  // addresses) can never collide with a prior run's already-applied operationIds. NOT a hot rejoin (that
-  // pulls a snapshot without re-assembling), so this never wipes a live pending op.
-  resetCoopBiomeOperationState();
-  resetCoopAbilityOperationState();
-  // bargain + stormglass + reward are per-runtime (layer-B): their fresh records come from
+  // Biome + ability + bargain + stormglass + reward are per-runtime (layer-B): their fresh records come from
   // createCoopRuntimeOpState below, so the old reset-at-assembly call sites are removed (a fresh runtime's
   // records ARE the reset; calling reset here would touch the PREVIOUS runtime's record, not this one's).
   resetCoopCatchFullOperationState();

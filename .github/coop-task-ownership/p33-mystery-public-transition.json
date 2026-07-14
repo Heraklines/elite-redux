@@ -9,6 +9,7 @@
     "src/data/elite-redux/coop/coop-ability-operation.ts",
     "src/data/elite-redux/coop/coop-ability-picker-relay.ts",
     "src/data/elite-redux/coop/coop-biome-operation.ts",
+    "src/data/elite-redux/coop/coop-runtime.ts",
     "src/phases/er-ability-capsule-phase.ts",
     "src/phases/er-greater-ability-capsule-phase.ts",
     "src/phases/er-greater-ability-randomizer-phase.ts",
