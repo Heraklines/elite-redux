@@ -248,15 +248,16 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
       const animationExists = vi
         .spyOn(rig.guestScene.anims, "exists")
         .mockImplementation(key => releasedKeys.has(String(key)) || originalAnimationExists(key));
-      const releases: (() => void)[] = [];
+      const releases: (() => Promise<void>)[] = [];
       const assetLoads = seats.map(pokemon => {
         const original = pokemon.loadAssets.bind(pokemon);
         const key = pokemon.getBattleSpriteKey();
         return vi.spyOn(pokemon, "loadAssets").mockImplementationOnce(
           () =>
             new Promise<void>((resolve, reject) => {
-              releases.push(() => {
-                original(false).then(() => {
+              releases.push(async () => {
+                try {
+                  await original(false);
                   releasedKeys.add(key);
                   const sprite = pokemon.getSprite() as unknown as {
                     texture: { key: string };
@@ -265,7 +266,10 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
                   sprite.texture.key = key;
                   sprite.anims.currentAnim = { key };
                   resolve();
-                }, reject);
+                } catch (error) {
+                  reject(error);
+                  throw error;
+                }
               });
             }),
         );
@@ -276,11 +280,10 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
       expect(phase.continuationOpened, "placeholder nodes cannot open an actionable command surface").toBe(false);
       expect(releases, "both active player atlases are part of the same launch gate").toHaveLength(2);
 
-      releases[0]();
-      await Promise.resolve();
+      await releases[0]();
       expect(phase.continuationOpened, "one loaded seat cannot release a two-seat command surface").toBe(false);
 
-      releases[1]();
+      await releases[1]();
       await vi.waitFor(() => {
         expect(phase.continuationOpened, "the encounter shifts only after both real atlases are ready").toBe(true);
       });
