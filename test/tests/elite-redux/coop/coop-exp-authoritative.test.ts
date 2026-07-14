@@ -151,6 +151,9 @@ describe.skipIf(!RUN)("co-op WAVE-END authoritative capture (#838) - guest conve
       broadcastCoopWaveEndState();
       await drainLoopback();
     });
+    // The two-engine harness now delivers state carriers only while their destination scene is installed,
+    // matching separate browser realms. Admit the pending wave-end image under the guest context first.
+    await withClient(rig.guestCtx, () => drainLoopback());
 
     // ===== GUEST BattleEndPhase branch: adopt the wave-end snapshot via the id-based full-state apply. This
     // is the exact production seam (consume the pending wave-end state, then applyCoopAuthoritativeBattleState)

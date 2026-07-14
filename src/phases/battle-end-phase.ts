@@ -26,6 +26,29 @@ import { advanceErWardStoneCharges } from "#data/elite-redux/er-ward-stones";
 import { LapsingPersistentModifier, LapsingPokemonHeldItemModifier } from "#modifiers/modifier";
 import { BattlePhase } from "#phases/battle-phase";
 
+export type RetainedWaveStateAdmission = "applied" | "superseded" | "reapply" | "rejected";
+
+/**
+ * Classify a retained transition image against the guest's monotonic state high-water. A newer recovery
+ * image satisfies the older transaction's DATA obligation without authorizing a rollback.
+ */
+export function classifyRetainedWaveStateAdmission(
+  applySucceeded: boolean,
+  appliedTick: number,
+  retainedTick: number | undefined,
+): RetainedWaveStateAdmission {
+  if (applySucceeded) {
+    return "applied";
+  }
+  if (retainedTick !== undefined && appliedTick > retainedTick) {
+    return "superseded";
+  }
+  if (retainedTick !== undefined && appliedTick === retainedTick) {
+    return "reapply";
+  }
+  return "rejected";
+}
+
 /**
  * The one engine-coupled DATA admission seam for retained WAVE_ADVANCE transactions. BattleEnd is the
  * preferred boundary. A source-wave shared input / biome / terminal surface is also safe when a scheduled
@@ -68,7 +91,19 @@ registerCoopWaveAdvanceBoundaryDataApplier(envelope => {
 
   const immutableState = structuredClone(envelope.authoritativeState);
   let applied = applyCoopAuthoritativeBattleState(immutableState, true);
-  if (!applied && coopAppliedStateTick() === immutableState.tick) {
+  const appliedTick = coopAppliedStateTick();
+  const admission = classifyRetainedWaveStateAdmission(applied, appliedTick, immutableState.tick);
+  if (admission === "superseded") {
+    // A verified recovery image may overtake the older state image retained inside this operation while
+    // BattleEnd is still queued. The operation's DATA obligation is already satisfied in that case: never
+    // roll the engine back to the older image, but do release this operation's structural continuation.
+    // Treating the monotonic rejection as fatal tears the session down after a successful one-heal resync.
+    coopLog(
+      "progression",
+      `GUEST retained WAVE_ADVANCE DATA tick=${immutableState.tick} superseded by recovered tick=${appliedTick}`,
+    );
+    applied = true;
+  } else if (admission === "reapply") {
     applied = reapplyAcceptedCoopAuthoritativeBattleState(immutableState, true);
   }
   return applied ? "applied" : "rejected";

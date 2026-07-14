@@ -35,6 +35,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import * as meOp from "#data/elite-redux/coop/coop-me-operation";
 import {
@@ -60,7 +61,7 @@ import {
   drainGuestMeReplayToSettle,
   drainLoopback,
   driveGuestMeReplay,
-  driveHostRewardShopOwner,
+  driveHostMeRewardShopWithGuestReplay,
   installDuoLogCapture,
   relayGuestMeShopLeaveSync,
   type ShopPhaseSeam,
@@ -150,16 +151,17 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const applyOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
 
     // Drive the HOST through the whole ME (buffers present + meResync + LEAVE), then the guest replays.
+    let guestReplayPhase!: Phase;
     await withClient(rig.hostCtx, async () => {
       await runMysteryEncounterToEnd(game, 1);
       await game.phaseInterceptor.to("SelectModifierPhase", false);
       const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       // Drive the embedded reward shop to its leave (the host is the forced reward owner mid-ME).
-      await driveHostRewardShopOwner(hostShop, { takeReward: false });
+      guestReplayPhase = await driveHostMeRewardShopWithGuestReplay(hostShop, rig.guestCtx, rig.guestScene);
       await game.phaseInterceptor.to("PostMysteryEncounterPhase");
     });
 
-    const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+    const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(guestReplayPhase));
     expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once)").toBe(true);
 
     const terminal = submitSpy.mock.calls.map(call => call[0]).find(intent => intent.kind === "ME_TERMINAL")?.payload;
@@ -192,11 +194,12 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const applyOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
 
+    let guestReplayPhase!: Phase;
     await withClient(rig.hostCtx, async () => {
       await runMysteryEncounterToEnd(game, 1);
       await game.phaseInterceptor.to("SelectModifierPhase", false);
       const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-      await driveHostRewardShopOwner(hostShop, { takeReward: false });
+      guestReplayPhase = await driveHostMeRewardShopWithGuestReplay(hostShop, rig.guestCtx, rig.guestScene);
       // Lose exactly the first retained terminal frame. A permanent `drop: 1` profile would discard every
       // retransmission too and therefore model an unrecoverable partition, not the one-frame loss named by
       // this test. The journal must heal this one-shot loss from the same immutable transaction.
@@ -207,7 +210,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       0,
     );
 
-    const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+    const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(guestReplayPhase));
     expect(guestReplay.settled, "the durable ME_TERMINAL must settle the real guest replay phase").toBe(true);
     expect(applyOutcomeSpy, "redelivery applies the retained state image once").toHaveBeenCalledTimes(1);
     expect(rig.guestRuntime.controller.interactionCounter()).toBe(counterBefore + 1);
@@ -221,11 +224,12 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
 
+    let guestReplayPhase!: Phase;
     await withClient(rig.hostCtx, async () => {
       await runMysteryEncounterToEnd(game, 1);
       await game.phaseInterceptor.to("SelectModifierPhase", false);
       const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-      await driveHostRewardShopOwner(hostShop, { takeReward: false });
+      guestReplayPhase = await driveHostMeRewardShopWithGuestReplay(hostShop, rig.guestCtx, rig.guestScene);
       await game.phaseInterceptor.to("PostMysteryEncounterPhase", false);
     });
 
@@ -306,7 +310,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       "delivery alone cannot mutate the inactive guest engine context",
     ).toBe(counterBefore);
 
-    const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+    const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(guestReplayPhase));
     expect(guestReplay.settled, "the retried committed terminal settles the production guest replay").toBe(true);
     expect(rig.guestRuntime.controller.interactionCounter(), "the guest advances exactly once from that terminal").toBe(
       counterBefore + 1,
@@ -338,18 +342,19 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     });
     rig.guestScene.currentBattle.mysteryEncounter!.dialogueTokens.durableProof = "guest-local";
 
+    let guestReplayPhase!: Phase;
     await withClient(rig.hostCtx, async () => {
       await runMysteryEncounterToEnd(game, 1);
       await game.phaseInterceptor.to("SelectModifierPhase", false);
       const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-      await driveHostRewardShopOwner(hostShop, { takeReward: false });
+      guestReplayPhase = await driveHostMeRewardShopWithGuestReplay(hostShop, rig.guestCtx, rig.guestScene);
       await game.phaseInterceptor.to("PostMysteryEncounterPhase");
     });
     expect(pair.faultsInjected(), "the first retained top-level presentation must actually be dropped").toBeGreaterThan(
       0,
     );
 
-    const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+    const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(guestReplayPhase));
     expect(guestReplay.settled, "the guest replay still reaches its terminal").toBe(true);
     expect(
       rig.guestScene.currentBattle.mysteryEncounter!.dialogueTokens.durableProof,
@@ -443,7 +448,19 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const guestShop = await withClient(rig.guestCtx, () => startGuestMeShopOwner(rig.guestScene));
     withClientSync(rig.guestCtx, () => relayGuestMeShopLeaveSync(guestShop));
 
-    // STEP C3 (host): drain the guest owner's LEAVE, run the option chain to the ME terminal (advances once).
+    // STEP C3: the host commits the guest owner's LEAVE, the guest materializes the retained result and
+    // returns its reciprocal proof, then the host is allowed to leave the embedded shop. This interleave
+    // is the production two-browser barrier; a sequential host-only drain cannot cross it.
+    await withClient(rig.hostCtx, async () => {
+      for (let i = 0; i < 8; i++) {
+        await drainLoopback();
+      }
+    });
+    await withClient(rig.guestCtx, async () => {
+      for (let i = 0; i < 16; i++) {
+        await drainLoopback();
+      }
+    });
     await withClient(rig.hostCtx, async () => {
       for (let i = 0; i < 16; i++) {
         await drainLoopback();

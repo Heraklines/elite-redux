@@ -1182,7 +1182,10 @@ export function installHeadlessPlayerAtlasCompletionModel(scene: BattleScene): v
     }
     model.wrappedPokemon.add(pokemon);
     const original = pokemon.loadAssets.bind(pokemon);
-    vi.spyOn(pokemon, "loadAssets").mockImplementation(async (ignoreOverride = true, useIllusion = false) => {
+    // Install a plain per-instance adapter, not a Vitest spy. Renderer proofs legitimately layer their
+    // own delay/count spy around this model; spying on an existing spy makes the captured "original"
+    // resolve to the newly replaced implementation and recurse forever.
+    pokemon.loadAssets = async (ignoreOverride = true, useIllusion = false) => {
       await original(ignoreOverride, useIllusion);
       const key = pokemon.getBattleSpriteKey();
       model.releasedKeys.add(key);
@@ -1197,7 +1200,7 @@ export function installHeadlessPlayerAtlasCompletionModel(scene: BattleScene): v
         live.texture.key = key;
         live.anims.currentAnim = { key };
       }
-    });
+    };
   }
 }
 
@@ -2081,15 +2084,38 @@ export async function reachQueuedRewardShop(scene: BattleScene): Promise<ShopPha
  */
 export async function driveHostRewardShopOwner(
   hostPhase: ShopPhaseSeam,
-  opts: { takeReward?: boolean; reviveSlot?: number } = {},
+  opts: {
+    takeReward?: boolean;
+    reviveSlot?: number;
+    /** Start/arrive the other real client at this same reciprocal shop boundary. */
+    partnerReady?: () => Promise<void>;
+    /** Let the other client materialize the retained terminal before the owner continues. */
+    partnerSettle?: () => Promise<void>;
+  } = {},
 ): Promise<number> {
   // start() resolves owner/watcher from the pinned counter, streams the rolled options to the watcher,
   // and opens the owner screen (the prompt handler would drive the UI; here we drive the logic directly).
   hostPhase.start();
-  await drainLoopback();
+  await opts.partnerReady?.();
+  // A guest owner adopts the host-rolled list over transport. Real UI input cannot occur until that
+  // asynchronous adoption populates the grid; observe the same readiness boundary here so takeReward
+  // cannot mistake an empty, not-yet-delivered list for a request to leave.
+  for (let i = 0; i < 16; i++) {
+    await drainLoopback();
+    if ((hostPhase.typeOptions as unknown[]).length > 0) {
+      break;
+    }
+  }
   const pinned = hostPhase.coopInteractionStart;
   const noop = () => false;
   let tookTerminalReward = false;
+  let partnerSettled = false;
+  const settlePartner = async (): Promise<void> => {
+    if (!partnerSettled) {
+      partnerSettled = true;
+      await opts.partnerSettle?.();
+    }
+  };
   // #832 REVIVE-TAKE (level soak): when the caller passes a fainted `reviveSlot` AND this wave's REAL pool
   // rolled a Revive (it gates on a fainted party member), TAKE it (revive that mon) over leaving it dead.
   // A Revive is a party-target reward, so drive the ONE PARTY open the owner's openModifierMenu issues -
@@ -2121,6 +2147,8 @@ export async function driveHostRewardShopOwner(
         ui.setModeWithoutClear = realSetModeWithoutClear; // restore even if the PARTY open never came
       }
       await drainLoopback();
+      await settlePartner();
+      await drainLoopback();
       return pinned;
     }
   }
@@ -2151,6 +2179,8 @@ export async function driveHostRewardShopOwner(
       hostPhase.coopAdvanceInteraction();
     }
   }
+  await drainLoopback();
+  await settlePartner();
   await drainLoopback();
   return pinned;
 }
@@ -2817,6 +2847,38 @@ export async function startGuestMeReplay(guestScene: MeReplayPumpScene): Promise
   }
   replay.start();
   await drainLoopback();
+  return replay;
+}
+
+/**
+ * Cross the embedded host-owned ME reward shop with both real client engines present. The host caller
+ * remains on its live SelectModifierPhase while the guest starts its production CoopReplayMePhase,
+ * arrives at the reciprocal watcher boundary, and later consumes the owner's retained shop terminal.
+ * Returns the already-running guest replay so the caller can settle it after PostMysteryEncounter emits
+ * the comprehensive ME terminal. MUST be called while the host ClientCtx is installed.
+ */
+export async function driveHostMeRewardShopWithGuestReplay(
+  hostPhase: ShopPhaseSeam,
+  guestCtx: ClientCtx,
+  guestScene: MeReplayPumpScene,
+): Promise<Phase> {
+  let replay: Phase | null = null;
+  await driveHostRewardShopOwner(hostPhase, {
+    takeReward: false,
+    partnerReady: async () => {
+      replay = await withClient(guestCtx, () => startGuestMeReplay(guestScene));
+    },
+    partnerSettle: async () => {
+      await withClient(guestCtx, async () => {
+        for (let i = 0; i < 16; i++) {
+          await drainLoopback();
+        }
+      });
+    },
+  });
+  if (replay == null) {
+    throw new Error("host-owned ME reward shop never started its guest replay partner");
+  }
   return replay;
 }
 

@@ -50,6 +50,7 @@ import {
   drainLoopback,
   driveGuestReplayTurn,
   installDuoLogCapture,
+  pumpDuoDestinations,
   type ShopPhaseSeam,
   withClient,
   withClientSync,
@@ -243,6 +244,9 @@ describe.skipIf(!RUN)(
           }
         }
       });
+      // The watcher materialization emits its retained material-applied proof back to the authority.
+      // Close that destination-scoped round trip before asserting the authority-side terminal release.
+      await pumpDuoDestinations(rig, 4);
       expect(
         getCoopUiRelayEdges().some(
           edge =>

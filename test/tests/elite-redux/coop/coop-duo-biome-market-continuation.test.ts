@@ -384,7 +384,9 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
         await drainLoopback();
       }
     });
-    await pumpDuoDestinations(rig);
+    // Fault recovery can require result -> material-applied -> authority release -> final counter broadcast.
+    // Pump the bounded complete transaction, not merely the first result/ACK pair.
+    await pumpDuoDestinations(rig, 8);
 
     // Both engines advanced the alternating interaction exactly once - lockstep, no asymmetric drift.
     expect(rig.guestRuntime.controller.interactionCounter(), "watcher advanced the interaction once (lockstep)").toBe(

@@ -165,7 +165,9 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
     // KO turn: host FLAMETHROWERs the ENEMY-slot lead; guest THUNDER_WAVEs ENEMY_2 (no damage, survives).
     // The enemy trainer sends its next reserve at the turn BOUNDARY (the to("CommandPhase") crossing).
     await playTurn(rig, KO_MOVE, HOLD_MOVE);
-    await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, rig.hostScene.currentBattle.turn + 1);
+    // playTurn already ran TurnEndPhase, which increments currentBattle.turn. Materialize that live next
+    // boundary; adding another one asked the harness for a phantom turn that neither engine had reached.
+    await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, rig.hostScene.currentBattle.turn);
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("CommandPhase");
     });

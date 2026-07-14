@@ -61,6 +61,7 @@ import {
   setCoopWaveAdvanceOperationRevisionFloor,
   tryApplyCoopWaveAdvanceDataAtBoundary,
 } from "#data/elite-redux/coop/coop-wave-operation";
+import { classifyRetainedWaveStateAdmission } from "#phases/battle-end-phase";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 /** Await several microtask turns so the loopback (queueMicrotask) delivery + ACK round-trips settle. */
@@ -200,6 +201,12 @@ describe("co-op WAVE-ADVANCE operation <-> durability seam (Wave-2f KEYSTONE, W2
     clearNegotiatedCoopCapabilities();
     registerCoopOperationLiveSink("op:wave", null);
     setCoopDurabilityEnabled(true);
+  });
+
+  it("releases an older retained DATA obligation after a newer recovery image without authorizing rollback", () => {
+    expect(classifyRetainedWaveStateAdmission(false, 40, 38)).toBe("superseded");
+    expect(classifyRetainedWaveStateAdmission(false, 38, 38)).toBe("reapply");
+    expect(classifyRetainedWaveStateAdmission(false, 37, 38)).toBe("rejected");
   });
   afterEach(() => {
     restoreBoundaryApplier?.();
