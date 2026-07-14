@@ -16,6 +16,7 @@ import {
 import { delay } from "./evidence.mjs";
 
 const START_PHASE = /Start Phase (\w+)/u;
+const ANIMATION_PROGRESS_PHASE = /Start Phase (MoveEffectPhase|MoveAnimPhase|CoopMoveAnimReplayPhase)/u;
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
 const TURN_PROGRESS = /Start Phase TurnStartPhase|host recorder: begin turn=/u;
@@ -23,6 +24,8 @@ const BATTLE_PROMPT_PHASES = new Map([
   ["battle:message", "MessagePhase"],
   ["battle:exp", "ExpPhase"],
 ]);
+const ANIMATION_PROGRESS_ALLOWANCE_MS = 90_000;
+const OUTCOME_HARD_CEILING_MS = 360_000;
 
 function fromEach(clients, fn) {
   return Object.fromEntries(clients.map(client => [client.label, fn(client)]));
@@ -225,16 +228,90 @@ export function createBattlePromptAdvancer(rig, from, stats, purpose) {
   };
 }
 
+/**
+ * Bound a browser outcome wait by both a normal deadline and a larger hard ceiling while
+ * allowing a newly observed real move-animation phase to refresh part of the budget.
+ *
+ * Two built Chromium clients can heavily dilate Phaser tweens on the standard four-core
+ * runner. Run 29319610458 measured a nominal 13-frame Vine Whip animation taking 26.31s,
+ * so a later 33-frame Mega Drain legitimately crossed the turn-wide timeout even though its
+ * tween was still advancing. A phase event is therefore evidence of progress, but never an
+ * excuse to wait forever: each distinct animation phase gets a bounded allowance and the
+ * whole outcome wait remains capped by one immutable hard deadline.
+ */
+export function createAnimationProgressBudget(
+  rig,
+  from,
+  baseTimeoutMs,
+  {
+    now = () => Date.now(),
+    animationAllowanceMs = ANIMATION_PROGRESS_ALLOWANCE_MS,
+    hardCeilingMs = OUTCOME_HARD_CEILING_MS,
+  } = {},
+) {
+  const clients = Object.values(rig.clients);
+  const startedAtMs = now();
+  const hardDeadlineMs = startedAtMs + Math.max(baseTimeoutMs, hardCeilingMs);
+  let deadlineMs = Math.min(startedAtMs + baseTimeoutMs, hardDeadlineMs);
+  const scanOffsets = new Map(clients.map(client => [client.label, from[client.label] ?? 0]));
+
+  const observeClient = client => {
+    const scanFrom = scanOffsets.get(client.label) ?? 0;
+    const events = client.evidence.events.slice(scanFrom);
+    scanOffsets.set(client.label, client.evidence.events.length);
+    for (const event of events) {
+      const match = ANIMATION_PROGRESS_PHASE.exec(event.text ?? "");
+      if (!match) {
+        continue;
+      }
+      const parsedEventAtMs = Date.parse(event.at ?? "");
+      const eventAtMs = Number.isFinite(parsedEventAtMs) ? Math.max(parsedEventAtMs, startedAtMs) : now();
+      const previousDeadlineMs = deadlineMs;
+      deadlineMs = Math.min(hardDeadlineMs, Math.max(deadlineMs, eventAtMs + animationAllowanceMs));
+      client.evidence.record("campaign-animation-budget", {
+        phase: match[1],
+        phaseEventIndex: event.index,
+        phaseObservedAt: event.at ?? null,
+        phaseMonotonicMs: event.monotonicMs ?? null,
+        waitStartedAt: new Date(startedAtMs).toISOString(),
+        previousDeadlineAt: new Date(previousDeadlineMs).toISOString(),
+        extendedDeadlineAt: new Date(deadlineMs).toISOString(),
+        hardDeadlineAt: new Date(hardDeadlineMs).toISOString(),
+        baseTimeoutMs,
+        animationAllowanceMs,
+        extensionApplied: deadlineMs > previousDeadlineMs,
+        hardCeilingReached: deadlineMs === hardDeadlineMs,
+      });
+    }
+  };
+
+  const observe = () => {
+    clients.forEach(observeClient);
+    return deadlineMs;
+  };
+
+  return Object.freeze({
+    observe,
+    deadline: () => deadlineMs,
+    hardDeadline: () => hardDeadlineMs,
+  });
+}
+
 /** Poll the post-turn outcome markers for a bounded window; null on timeout (no throw). */
 export async function waitForOutcomeBounded(
   rig,
   from,
   timeoutMs,
-  { stopOnTurnProgress = false, advanceBattlePrompt = null } = {},
+  { stopOnTurnProgress = false, advanceBattlePrompt = null, extendForAnimationProgress = false } = {},
 ) {
   const clients = Object.values(rig.clients);
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
+  const fixedDeadline = Date.now() + timeoutMs;
+  const animationBudget = extendForAnimationProgress ? createAnimationProgressBudget(rig, from, timeoutMs) : null;
+  while (true) {
+    const deadline = animationBudget?.observe() ?? fixedDeadline;
+    if (Date.now() >= deadline) {
+      break;
+    }
     // A mid-battle wipe / game-over is a real run END, not a driver softlock: classify it
     // distinctly so the campaign still produces clean evidence instead of a generic hang.
     if (
@@ -301,7 +378,10 @@ async function driveBattleWave(rig, policy, stats) {
         fallbackSuppressed: true,
         reason: "both public clients entered the addressed turn path",
       });
-      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, { advanceBattlePrompt });
+      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, {
+        advanceBattlePrompt,
+        extendForAnimationProgress: true,
+      });
     }
     if (!outcome && !turnProgressed) {
       // Attack-first did not resolve or fully enter the turn (no PP / disabled / wrong target).
@@ -313,7 +393,10 @@ async function driveBattleWave(rig, policy, stats) {
       if (fallbackClients.length > 0) {
         stats.fallbackTurns += 1;
       }
-      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, { advanceBattlePrompt });
+      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, {
+        advanceBattlePrompt,
+        extendForAnimationProgress: true,
+      });
     }
     if (!outcome) {
       const parked = latestStartPhase(clients);
