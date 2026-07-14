@@ -84,6 +84,11 @@ import {
   setCoopBiomeInteractionStart,
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import {
+  commitMeOwnerIntent,
+  isCoopMeOperationEnabled,
+  isCoopMeOperationJournalActive,
+} from "#data/elite-redux/coop/coop-me-operation";
+import {
   captureCoopActiveMysteryControl,
   coopMeHandoffBattleStarted,
   coopMeHandoffBattleWaveValue,
@@ -2599,13 +2604,48 @@ export async function startGuestMeReplay(guestScene: MeReplayPumpScene): Promise
  *    host has buffered the meResync (8M) + LEAVE (9M) - else the race's awaits, being pending while the
  *    HOST drives (STEP C), resolve under the HOST globalScene (a cross-ctx continuation: applyCoopMeOutcome
  *    + leaveEncounterWithoutBattle would run against the HOST scene, and the guest never converges).
- * So this sends the EXACT wire {@linkcode CoopReplayMePhase.handleGuestOptionSelect} sends (an "me"
- * interactionChoice on the 8M pick seq), and {@linkcode startGuestMeOutcomeRace} starts the race in STEP D.
+ * This shared-process split cannot invoke {@linkcode CoopReplayMePhase.handleGuestOptionSelect} because that
+ * method also arms the outcome await immediately. It must nevertheless cross the SAME authoritative owner
+ * seam before sending the SAME addressed proposal: mint the retained ME_PICK intent, advance the replay's
+ * stable pick ordinal, then carry that ordinal in the "me" interactionChoice data. The browser lane drives
+ * the public UI method itself; this engine harness isolates its await only to preserve destination context.
+ * {@linkcode startGuestMeOutcomeRace} starts that await later in STEP D.
  * MUST be called inside `withClient(guestCtx, ...)`.
  */
 export function relayGuestMeOptionIndexOnly(replay: Phase, index: number): void {
-  const seq = (replay as unknown as { seq: number }).seq;
-  getCoopInteractionRelay()?.sendInteractionChoice(seq, "me", index);
+  const seam = replay as unknown as {
+    seq: number;
+    interactionCounter: number;
+    pickStep: number;
+    pickSent: boolean;
+  };
+  const relay = getCoopInteractionRelay();
+  if (relay == null) {
+    throw new Error("relayGuestMeOptionIndexOnly: no live interaction relay (call inside withClient(guestCtx))");
+  }
+  if (seam.pickSent) {
+    throw new Error(`relayGuestMeOptionIndexOnly: duplicate pick for Mystery ${seam.seq}`);
+  }
+  const step = seam.pickStep;
+  const operationId = commitMeOwnerIntent({
+    kind: "ME_PICK",
+    seq: seam.seq,
+    pinned: seam.interactionCounter,
+    step,
+    payload: { optionIndex: index },
+    localRole: getCoopRuntime()?.controller.role ?? "guest",
+    wave: globalScene.currentBattle?.waveIndex ?? -1,
+    turn: 0,
+    resend: isCoopMeOperationJournalActive()
+      ? () => relay.sendInteractionChoice(seam.seq, "me", index, [step])
+      : undefined,
+  });
+  if (operationId == null && isCoopMeOperationEnabled()) {
+    throw new Error(`relayGuestMeOptionIndexOnly: Mystery ${seam.seq}/${step} could not enter retained control`);
+  }
+  seam.pickStep = step + 1;
+  seam.pickSent = true;
+  relay.sendInteractionChoice(seam.seq, "me", index, [step]);
 }
 
 /**
