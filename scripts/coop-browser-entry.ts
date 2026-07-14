@@ -476,6 +476,10 @@ let lastSemanticPhase: object | null = null;
 let semanticPhaseInstance = 0;
 let lastObservedRenderProfile = "";
 
+function semanticBattleAddress(battle: { waveIndex: number; turn: number } | null | undefined) {
+  return { wave: battle?.waveIndex ?? 0, turn: battle?.turn ?? 0 } as const;
+}
+
 /**
  * Attest the real Display-settings value while that visible menu is open. The campaign
  * reaches this handler only through public keys; this probe is read-only and lets an
@@ -515,7 +519,7 @@ function observeSemanticSurface(): void {
     const currentPhase = globalScene?.phaseManager?.getCurrentPhase();
     const phase = currentPhase?.phaseName;
     const ui = globalScene?.ui;
-    if (battle == null || phase == null || ui == null) {
+    if (phase == null || ui == null) {
       return;
     }
     const handler = ui.getHandler();
@@ -570,6 +574,10 @@ function observeSemanticSurface(): void {
     }
 
     const selection = readSelection(handler, uiMode);
+    // Title/setup menus exist before a Battle object. Address 0:0 is an explicit non-battle
+    // sentinel that lets the public driver wait for their real option surfaces instead of
+    // racing repeated Action keys; gameplay surfaces still carry their actual wave/turn.
+    const { wave, turn } = semanticBattleAddress(battle);
     const promptReady = (handler as unknown as { isAwaitingPromptAction?: () => boolean }).isAwaitingPromptAction;
     const awaitingRaw = (handler as unknown as { awaitingActionInput?: unknown }).awaitingActionInput;
     // MessageUiHandler keeps its raw `awaitingActionInput` bit set after an action has consumed
@@ -587,7 +595,7 @@ function observeSemanticSurface(): void {
       semantic.surfaceId,
       uiMode,
       semanticPhaseInstance,
-      `${epoch}:${battle.waveIndex}:${battle.turn}`,
+      `${epoch}:${wave}:${turn}`,
       selection.selectedOptionId ?? "",
       ownerSeat ?? "?",
       awaitingActionInput,
@@ -605,7 +613,7 @@ function observeSemanticSurface(): void {
       operationClass: semantic.operationClass,
       ownerModel: semantic.ownerModel,
       coop,
-      address: { epoch, wave: battle.waveIndex, turn: battle.turn },
+      address: { epoch, wave, turn },
       membershipRevision,
       connectionGeneration,
       localSeat,
