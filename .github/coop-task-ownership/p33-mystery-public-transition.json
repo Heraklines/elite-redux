@@ -3,7 +3,7 @@
   "taskId": "p33-mystery-public-transition-integration",
   "branch": "ci/coop/p33-mystery-public-transition",
   "trainRef": "ci/coop/p33-mystery-public-transition",
-  "baseSha": "278db51217b3cfcca4f05f1a1099a162ea9546df",
+  "baseSha": "c696b70224510143b3fa5fe1a9f0b84fd88a10b7",
   "allowedFiles": [
     ".github/coop-task-ownership/p33-mystery-public-transition.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -54,6 +54,7 @@
     "test/tests/elite-redux/coop/coop-ability-picker-relay.test.ts",
     "test/tests/elite-redux/coop/coop-battle-stream.test.ts",
     "test/tests/elite-redux/coop/coop-catch-full-operation.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-biome-choice.test.ts",
     "test/tests/elite-redux/coop/coop-duo-biome-operation.test.ts",
     "test/tests/elite-redux/coop/coop-duo-faint-switch.test.ts",
     "test/tests/elite-redux/coop/coop-duo-launch-terrain.test.ts",
