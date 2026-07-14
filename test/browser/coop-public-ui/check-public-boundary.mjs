@@ -84,7 +84,7 @@ if (
   || !browserEntry.includes("[coop-browser:binding]")
   || !browserEntry.includes("seat: runtime.controller.seat")
   || !browserEntry.includes("ui.getHandler().active")
-  || !browserEntry.includes("observedMechanicalDigest()")
+  || !browserEntry.includes("computeMechanicalDigest(")
   || browserEntry.includes("captureCoopChecksumState")
 ) {
   failures.push("coop-browser-entry.ts: missing the read-only rendered-surface/address/digest observer contract");

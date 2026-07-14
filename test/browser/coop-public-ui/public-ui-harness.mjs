@@ -84,6 +84,56 @@ function findSharedSurfaceMatch(host, guest, surface, cursors, priorAddress, all
   return null;
 }
 
+const DIGEST_PARTS = /\[coop-browser:digest-parts\] (\{.*\})/u;
+
+/** The latest per-component digest breakdown a client emitted for `address`, or null. */
+function latestDigestParts(client, address, from) {
+  const events = client.evidence.events;
+  for (let i = events.length - 1; i >= from; i--) {
+    const match = DIGEST_PARTS.exec(events[i].text ?? "");
+    if (match) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (parsed.address === address) {
+          return parsed;
+        }
+      } catch {
+        // A malformed diagnostic line is ignored; the combined-digest abort still fires.
+      }
+    }
+  }
+  return null;
+}
+
+/** Both clients at the SAME address/surface but UNEQUAL digest -> a real state divergence, else null. */
+function detectSurfaceDivergence(host, guest, surface, cursors) {
+  const h = host.evidence.findLastSurface(surface, cursors[host.label])?.observation;
+  const g = guest.evidence.findLastSurface(surface, cursors[guest.label])?.observation;
+  if (h == null || g == null) {
+    return null;
+  }
+  const hostAddress = `${h.epoch}:${h.wave}:${h.turn}`;
+  const guestAddress = `${g.epoch}:${g.wave}:${g.turn}`;
+  if (hostAddress === guestAddress && h.surface === g.surface && h.stateDigest !== g.stateDigest) {
+    return { address: hostAddress, hostDigest: h.stateDigest, guestDigest: g.stateDigest };
+  }
+  return null;
+}
+
+/** Name the digest COMPONENTS that differ between the two clients at `address` (self-identifying divergence). */
+function diffDigestComponents(host, guest, address, cursors) {
+  const hostParts = latestDigestParts(host, address, cursors[host.label])?.parts;
+  const guestParts = latestDigestParts(guest, address, cursors[guest.label])?.parts;
+  if (hostParts == null || guestParts == null) {
+    return "component breakdown unavailable (digest-parts markers missing)";
+  }
+  const keys = [...new Set([...Object.keys(hostParts), ...Object.keys(guestParts)])].sort();
+  const diffs = keys
+    .filter(key => hostParts[key] !== guestParts[key])
+    .map(key => `${key} [host=${hostParts[key] ?? "-"} guest=${guestParts[key] ?? "-"}]`);
+  return diffs.length > 0 ? diffs.join("; ") : "no component-level difference (combined-hash only)";
+}
+
 export class PublicUiClient {
   constructor(browserContext, credentials, config) {
     this.context = browserContext;
@@ -642,11 +692,32 @@ export class DuoPublicUiRig {
     const priorAddress = this.lastSharedSurfaceAddress.get(surface);
     const deadline = Date.now() + this.config.timeoutMs;
     let match = null;
+    // Divergence-aware fast-abort: if both clients sit at the SAME address/surface with STABLE but
+    // UNEQUAL digests for ~30s, converge will never happen - abort now with the diverging components
+    // instead of burning the full timeout on a decided divergence.
+    let divergenceSignature = null;
+    let divergenceSince = 0;
     while (Date.now() < deadline && match == null) {
       match = findSharedSurfaceMatch(host, guest, surface, cursors, priorAddress, allowAddressRepeat, expectedWave);
-      if (match == null) {
-        await delay(100);
+      if (match != null) {
+        break;
       }
+      const divergence = detectSurfaceDivergence(host, guest, surface, cursors);
+      if (divergence == null) {
+        divergenceSignature = null;
+      } else {
+        const signature = `${divergence.address}|${divergence.hostDigest}|${divergence.guestDigest}`;
+        if (signature !== divergenceSignature) {
+          divergenceSignature = signature;
+          divergenceSince = Date.now();
+        } else if (Date.now() - divergenceSince > 30_000) {
+          const components = diffDigestComponents(host, guest, divergence.address, cursors);
+          throw new Error(
+            `${proofName}: STABLE state-digest DIVERGENCE at ${surface} address ${divergence.address} (host=${divergence.hostDigest} guest=${divergence.guestDigest}) held >30s; diverging components: ${components}`,
+          );
+        }
+      }
+      await delay(100);
     }
     if (match == null) {
       const hostLast = host.evidence.findLastSurface(surface, cursors[host.label])?.observation ?? null;

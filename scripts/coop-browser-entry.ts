@@ -40,6 +40,7 @@ interface CoopBrowserSurfaceObservationV1 {
 const SURFACE_PREFIX = "[coop-browser:surface] ";
 const SURFACE2_PREFIX = "[coop-browser:surface2] ";
 const BINDING_PREFIX = "[coop-browser:binding] ";
+const DIGEST_PARTS_PREFIX = "[coop-browser:digest-parts] ";
 const CHECKSUM_SENTINEL = "0000000000000000";
 
 function observedPokemon(pokemon: Pokemon, slot: number) {
@@ -74,30 +75,52 @@ function observedPokemon(pokemon: Pokemon, slot: number) {
   };
 }
 
-/** A strong observer-only projection. Unlike the production boundary capture, every read here is non-mutating. */
-function observedMechanicalDigest(): string {
+/** The canonical component object the mechanical digest hashes. Read once, reused for the breakdown. */
+function mechanicalDigestComponents(): Record<string, unknown> {
   const saveDataDigest = captureCoopSaveDataDigest();
   if (saveDataDigest === CHECKSUM_SENTINEL) {
     throw new Error("save-data observer could not capture a stable digest");
   }
   const playerParty = globalScene.getPlayerParty();
   const enemyParty = globalScene.getEnemyParty();
-  return fnv1a64(
-    canonicalize({
-      wave: globalScene.currentBattle.waveIndex,
-      turn: globalScene.currentBattle.turn,
-      money: globalScene.money,
-      seed: globalScene.seed ?? "",
-      biome: globalScene.arena.biomeId ?? 0,
-      weather: globalScene.arena.weather?.weatherType ?? 0,
-      terrain: globalScene.arena.terrain?.terrainType ?? 0,
-      playerParty: playerParty.map(observedPokemon),
-      enemyParty: enemyParty.map(observedPokemon),
-      playerField: globalScene.getPlayerField().map(pokemon => pokemon.getBattlerIndex()),
-      enemyField: globalScene.getEnemyField().map(pokemon => pokemon.getBattlerIndex()),
-      saveDataDigest,
-    }),
-  );
+  return {
+    wave: globalScene.currentBattle.waveIndex,
+    turn: globalScene.currentBattle.turn,
+    money: globalScene.money,
+    seed: globalScene.seed ?? "",
+    biome: globalScene.arena.biomeId ?? 0,
+    weather: globalScene.arena.weather?.weatherType ?? 0,
+    terrain: globalScene.arena.terrain?.terrainType ?? 0,
+    playerParty: playerParty.map(observedPokemon),
+    enemyParty: enemyParty.map(observedPokemon),
+    playerField: globalScene.getPlayerField().map(pokemon => pokemon.getBattlerIndex()),
+    enemyField: globalScene.getEnemyField().map(pokemon => pokemon.getBattlerIndex()),
+    saveDataDigest,
+  };
+}
+
+/**
+ * A strong observer-only projection (non-mutating). Returns the combined digest AND a per-component
+ * hash breakdown (incl. a per-mon-field split of playerParty/enemyParty) so a two-browser digest
+ * divergence self-identifies the exact field rather than only the opaque combined hash.
+ */
+function computeMechanicalDigest(): { digest: string; parts: Record<string, string> } {
+  const components = mechanicalDigestComponents();
+  const digest = fnv1a64(canonicalize(components));
+  const parts: Record<string, string> = {};
+  for (const [key, value] of Object.entries(components)) {
+    parts[key] = fnv1a64(canonicalize(value));
+    // Split party arrays into per-observed-field column hashes so the diverging field is named.
+    if ((key === "playerParty" || key === "enemyParty") && Array.isArray(value) && value.length > 0) {
+      const first = value[0];
+      if (first != null && typeof first === "object") {
+        for (const field of Object.keys(first as Record<string, unknown>)) {
+          parts[`${key}.${field}`] = fnv1a64(canonicalize((value as Record<string, unknown>[]).map(mon => mon[field])));
+        }
+      }
+    }
+  }
+  return { digest, parts };
 }
 
 function classifyContinuationSurface(phase: string, uiMode: string): BrowserContinuationSurface | null {
@@ -191,12 +214,17 @@ function observeContinuationSurface(): void {
     }
     lastProbedAddress = addressKey;
     lastProbeAt = now;
-    const stateDigest = observedMechanicalDigest();
+    const { digest: stateDigest, parts: digestParts } = computeMechanicalDigest();
     const observationKey = `${addressKey}:${stateDigest}`;
     if (observationKey === lastObservedSurface) {
       return;
     }
     lastObservedSurface = observationKey;
+    // Read-only diagnostic: the per-component digest breakdown, so a two-browser digest divergence
+    // self-identifies the exact diverging field when the driver aborts on it.
+    console.info(
+      `${DIGEST_PARTS_PREFIX}${JSON.stringify({ address: `${runtime.controller.sessionEpoch}:${battle.waveIndex}:${battle.turn}`, surface, digest: stateDigest, parts: digestParts })}`,
+    );
     const observation: CoopBrowserSurfaceObservationV1 = {
       version: 1,
       surface,
