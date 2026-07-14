@@ -42,11 +42,35 @@ function assertNoDriverApiFailure(sink, context) {
 }
 
 let publicKeyInputTail = Promise.resolve();
+// The Puppeteer page most recently brought to the front, so consecutive same-page presses can
+// skip a redundant bringToFront (see withFocusedPublicKeyInput). Module-scoped because the front
+// tab is a single browser-wide state shared across both clients.
+let lastFrontedPublicPage = null;
 
 function withFocusedPublicKeyInput(page, action) {
+  const enqueuedAt = Date.now();
   const focused = publicKeyInputTail.then(async () => {
-    await page.bringToFront();
-    return action();
+    const queueWaitMs = Date.now() - enqueuedAt;
+    // bringToFront is load-bearing (the game gates input on document.hasFocus()) but it runs on
+    // EVERY press and is the prime suspect for the per-keypress latency, which taxes the whole
+    // campaign. Skip it when THIS page was the last one fronted - the common case for a run of
+    // same-page keys (a battle/between-wave sequence, the reissue loop). If the assumption is
+    // wrong (focus was stolen), the caller's focus check calls forceFront() and re-verifies, so
+    // the skip can never press into an unfocused page.
+    let bringToFrontMs = 0;
+    if (lastFrontedPublicPage !== page) {
+      const startedAt = Date.now();
+      await page.bringToFront();
+      bringToFrontMs = Date.now() - startedAt;
+      lastFrontedPublicPage = page;
+    }
+    const forceFront = async () => {
+      const startedAt = Date.now();
+      await page.bringToFront();
+      lastFrontedPublicPage = page;
+      return Date.now() - startedAt;
+    };
+    return action({ queueWaitMs, bringToFrontMs, forceFront });
   });
   publicKeyInputTail = focused.then(
     () => undefined,
@@ -413,17 +437,30 @@ export class PublicUiClient {
   }
 
   async press(key, purpose, { blurInputs = true } = {}) {
-    await withFocusedPublicKeyInput(this.page, async () => {
-      const [title, focused] = await Promise.all([
-        this.page.title(),
-        this.page.$eval("body", () => document.hasFocus()),
-      ]);
+    await withFocusedPublicKeyInput(this.page, async ({ queueWaitMs, bringToFrontMs, forceFront }) => {
+      const focusCheckStart = Date.now();
+      let [title, focused] = await Promise.all([this.page.title(), this.page.$eval("body", () => document.hasFocus())]);
+      const focusCheckMs = Date.now() - focusCheckStart;
+      // Fallback for the skipped-bringToFront optimization: this page was assumed still fronted
+      // but is not focused, so force it forward and re-verify before pressing.
+      let refrontMs = 0;
+      if (!focused) {
+        refrontMs = await forceFront();
+        [title, focused] = await Promise.all([this.page.title(), this.page.$eval("body", () => document.hasFocus())]);
+      }
       this.evidence.record("key-target", {
         focused,
         pageGeneration: this.pageGeneration,
         purpose,
         target: `${new URL(this.page.url()).origin}${new URL(this.page.url()).pathname}`,
         title,
+        // Per-press latency diagnostics (the ~5.6s pairing-accept lag investigation): time spent
+        // waiting on the shared input tail, bringing the tab to front, checking focus, and any
+        // fallback re-front. The next relaunch's trace pinpoints which sub-step dominates.
+        queueWaitMs,
+        bringToFrontMs,
+        focusCheckMs,
+        refrontMs,
       });
       if (!focused) {
         throw new Error(`${this.label}: public key target did not acquire browser focus for ${purpose}`);
