@@ -33,6 +33,7 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { setBypassLoginForTesting } from "#constants/app-constants";
 import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
+import type { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { enqueueSessionCloudMutation } from "#data/elite-redux/coop/coop-cloud-save-tail";
 import {
   clearCoopResumeMarker,
@@ -80,6 +81,15 @@ function toCoop(scene: BattleScene): void {
 /** Flush the loopback's microtask delivery (a sent message reaches the peer's handler). */
 function flush(): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, 0));
+}
+
+/**
+ * Launch aborts are retained control-plane results and should arrive immediately in
+ * these loopback tests.  Bound that proof independently of the production streamer's
+ * long reconnect budget so a missing terminal cannot consume a five-minute test cap.
+ */
+function awaitRetainedLaunchAbort(stream: { awaitLaunchSnapshot: CoopBattleStreamer["awaitLaunchSnapshot"] }) {
+  return stream.awaitLaunchSnapshot(1, 2_000, { retryIntervalMs: 100, maxRetries: 5 });
 }
 
 /** Deterministic zero-wall-clock expiry for persistence lock/network timeout paths. */
@@ -2027,7 +2037,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       const slot = await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot());
       expect(slot).toBe(0);
       rig.hostScene.sessionSlotId = slot!;
-      const guestAbort = rig.guestRuntime.battleStream.awaitLaunchSnapshot(1);
+      const guestAbort = awaitRetainedLaunchAbort(rig.guestRuntime.battleStream);
       await expect(
         withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
         "different bytes appearing after the scan make first save fail closed",
@@ -2189,7 +2199,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       const hungWrite = vi
         .spyOn(pokerogueApi.savedata.session, "updateCoopCas")
         .mockImplementation(() => new Promise<never>(() => {}));
-      const guestAbort = rig.guestRuntime.battleStream.awaitLaunchSnapshot(1);
+      const guestAbort = awaitRetainedLaunchAbort(rig.guestRuntime.battleStream);
 
       await expect(
         withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
@@ -2225,7 +2235,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       const slot = await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot());
       rig.hostScene.sessionSlotId = slot!;
       Reflect.deleteProperty(globalThis.navigator, "locks");
-      const guestAbort = rig.guestRuntime.battleStream.awaitLaunchSnapshot(1);
+      const guestAbort = awaitRetainedLaunchAbort(rig.guestRuntime.battleStream);
 
       await expect(
         withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
@@ -2260,14 +2270,14 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       vi.spyOn(rig.hostScene.gameData, "getSessionSaveData").mockImplementationOnce(() => {
         throw new Error("injected serializer failure");
       });
-      const firstAbort = rig.guestRuntime.battleStream.awaitLaunchSnapshot(1);
+      const firstAbort = awaitRetainedLaunchAbort(rig.guestRuntime.battleStream);
 
       await expect(
         withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
       ).rejects.toThrow("injected serializer failure");
       await expect(firstAbort).resolves.toBeNull();
       await expect(
-        rig.guestRuntime.battleStream.awaitLaunchSnapshot(1),
+        awaitRetainedLaunchAbort(rig.guestRuntime.battleStream),
         "a late/reconnected guest receives the retained abort replay",
       ).resolves.toBeNull();
     } finally {
@@ -2303,7 +2313,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
       ).resolves.toBe(true);
       localStorage.setItem(keys[slot!], "concurrent-post-ack-writer");
-      const guestAbort = rig.guestRuntime.battleStream.awaitLaunchSnapshot(1);
+      const guestAbort = awaitRetainedLaunchAbort(rig.guestRuntime.battleStream);
 
       await expect(
         withClient(rig.hostCtx, () => rig.hostScene.gameData.consumeCommittedFreshCoopLaunchSession(1)),
@@ -2381,7 +2391,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         localStorage.setItem(keys[slot!], "late-concurrent-local-save");
         return session;
       });
-      const guestAbort = rig.guestRuntime.battleStream.awaitLaunchSnapshot(1);
+      const guestAbort = awaitRetainedLaunchAbort(rig.guestRuntime.battleStream);
       await expect(
         withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
       ).resolves.toBe(false);
@@ -2411,6 +2421,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const prior = keys.map(key => localStorage.getItem(key));
     let releaseGuest!: () => void;
     let markGuestStarted!: () => void;
+    let guestPersistenceStarted = false;
     const guestStarted = new Promise<void>(resolve => {
       markGuestStarted = resolve;
     });
@@ -2432,6 +2443,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       });
       vi.spyOn(pokerogueApi.savedata, "updateAll").mockResolvedValue("");
       rig.guestRuntime.controller.armResumeCheckpointHandler(async () => {
+        guestPersistenceStarted = true;
         markGuestStarted();
         await guestGate;
         return { success: true };
@@ -2439,6 +2451,10 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       const slot = await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot());
       rig.hostScene.sessionSlotId = slot!;
       const saving = withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true));
+      await vi.waitFor(() => expect(guestPersistenceStarted, "host reached guest checkpoint persistence").toBe(true), {
+        timeout: 2_000,
+        interval: 10,
+      });
       await guestStarted;
       if (invalidation === "runtime-generation") {
         setCoopRuntime(rig.guestRuntime);
