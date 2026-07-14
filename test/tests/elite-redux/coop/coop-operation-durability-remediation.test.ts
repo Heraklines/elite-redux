@@ -48,7 +48,6 @@ import {
   resetCoopOperationJournalLog,
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
-import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   commitRewardAuthoritativeResult,
   commitRewardOwnerIntent,
@@ -112,9 +111,6 @@ function sinkBiomes(): number[] {
 
 describe("W2e-R P0 remediation: the operation<->durability seam mutates (or declines to ACK), never a phantom ACK", () => {
   beforeEach(() => {
-    // The reward surface's apply state is now per-runtime (fail-loud without an installed runtime). Install a
-    // single op-state for this engine-free realm so the reward record exists (biome stays module-global here).
-    setActiveCoopRuntimeOpState(createCoopRuntimeOpState());
     setCoopDurabilityEnabled(true);
     setCoopBiomeOperationEnabled(true);
     setCoopRewardOperationEnabled(true);
@@ -137,8 +133,6 @@ describe("W2e-R P0 remediation: the operation<->durability seam mutates (or decl
     resetCoopBiomeOperationFlag();
     resetCoopRewardOperationFlag();
     setCoopDurabilityEnabled(true);
-    // Citizenship: clear the installed op-state so the next (--no-isolate) file starts with none installed.
-    setActiveCoopRuntimeOpState(null);
   });
 
   function commitHostOwnedBiome(pinned: number, biomeId: number): void {
