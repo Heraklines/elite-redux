@@ -1921,10 +1921,6 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `wave=${msg.wave} reason=${msg.reason}`;
     case "requestLaunchSnapshot":
       return `wave=${msg.wave}`;
-    case "resumeCheckpoint":
-      return `id=${msg.checkpointId} run=${msg.commitment.runId} wave=${msg.commitment.wave} checkpointRev=${msg.commitment.checkpointRevision} cloud=${msg.mirrorCloud}`;
-    case "resumeCheckpointAck":
-      return `id=${msg.checkpointId} success=${msg.success} reason=${msg.reason ?? "-"}`;
     case "meBattleEnemyPartySync":
       return `key=${msg.key} enemies=${msg.enemies.length}`;
     case "requestMeBattleEnemyParty":
