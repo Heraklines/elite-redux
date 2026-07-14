@@ -38,7 +38,6 @@ import { initGlobalScene } from "#app/global-scene";
 import { clearCoopRuntime, getCoopUiMirror, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REWARD_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -62,6 +61,7 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -124,10 +124,14 @@ describe.skipIf(!RUN)(
 
     it("WATCHER skips a STALE out-of-range relayed reward cursor, applies the owner's LEAVE, leaves in lockstep, mirror closed", async () => {
       // ===== Stand up the two-engine rig (host = sole authoritative engine, guest = renderer) over one
-      // loopback pair. The reward interaction opens on counter 0 -> host owns (even), guest WATCHES. =====
+      // scheduled pair. The reward interaction opens on counter 0 -> host owns (even), guest WATCHES. =====
       await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-      const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+      const pair = createScheduledCoopPair({ automatic: true });
+      const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
       wireGuestCommand(rig);
+      // Bootstrap handshakes use ordinary automatic delivery. The production reward transition below must
+      // resume each async continuation only while that destination client's complete context is installed.
+      pair.setAutomaticDelivery(false);
 
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       expect(counterBefore, "the reward shop opens on interaction counter 0 (host owns even -> guest watches)").toBe(0);
@@ -150,7 +154,7 @@ describe.skipIf(!RUN)(
       withClientSync(rig.hostCtx, () =>
         rig.hostRuntime.interactionRelay.sendInteractionChoice(rewardSeq, "reward", OOB_CURSOR, [0]),
       );
-      await drainLoopback();
+      await withClient(rig.guestCtx, () => drainLoopback());
 
       // Production opens the reciprocal watcher before the owner can cross the retained terminal. Park the
       // guest now so the phantom remains first in its FIFO, then let the owner publish the real option pool
