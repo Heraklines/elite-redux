@@ -35,8 +35,13 @@ import {
   runColosseumGuestRoundLoop,
 } from "#data/elite-redux/coop/coop-colosseum";
 import {
+  armCoopColosseumDecisionResend,
+  captureCoopColosseumOperationBinding,
+  commitColosseumBoard,
+  commitColosseumDecision,
   resetCoopColosseumDecisionRetryMs,
   resetCoopColosseumOperationFlag,
+  resetCoopColosseumOperationState,
   setCoopColosseumDecisionRetryMs,
   setCoopColosseumOperationEnabled,
 } from "#data/elite-redux/coop/coop-colosseum-operation";
@@ -44,6 +49,13 @@ import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/
 import { resetCoopMeOperationFlag, setCoopMeOperationEnabled } from "#data/elite-redux/coop/coop-me-operation";
 import { setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
+import { type CoopAuthoritativeEnvelopeV1, makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  coopOperationDurabilityHooks,
+  registerCoopOperationLiveSink,
+  resetCoopOperationJournalLog,
+} from "#data/elite-redux/coop/coop-operation-journal";
+import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   assembleCoopRuntime,
   clearCoopRuntime,
@@ -59,10 +71,48 @@ import type {
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { COLOSSEUM_CASH_OUT, COLOSSEUM_CONTINUE } from "#ui/colosseum-ui-handler";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** The board's two decision labels (index 0 == CONTINUE, index 1 == CASH OUT); asserted verbatim on the wire. */
 const BOARD_LABELS = ["CONTINUE (risk for S+)", "CASH OUT (claim S)"];
+
+function retainedBoardEnvelope(pinned: number): CoopAuthoritativeEnvelopeV1 {
+  const wave = 10;
+  const turn = 0;
+  return {
+    version: 1,
+    sessionEpoch: 1,
+    revision: 1,
+    wave,
+    turn,
+    logicalPhase: "INTERACTION",
+    pendingOperation: {
+      id: makeCoopOperationId(1, 0, pinned * 100, "COLO_PICK"),
+      kind: "COLO_PICK",
+      owner: 0,
+      status: "applied",
+      payload: { type: "board", round: 0, labels: [...BOARD_LABELS] },
+    },
+    authoritativeState: {
+      version: 1,
+      tick: 0,
+      wave,
+      turn,
+      playerParty: [],
+      enemyParty: [],
+      field: [],
+      weather: 0,
+      weatherTurnsLeft: 0,
+      terrain: 0,
+      terrainTurnsLeft: 0,
+      arenaTags: [],
+      money: 0,
+      pokeballCounts: [],
+      playerModifiers: [],
+      enemyModifiers: [],
+    },
+  };
+}
 
 describe("co-op Colosseum between-rounds board relay (#829)", () => {
   afterEach(() => {
@@ -194,6 +244,129 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
 
     expect(pair.faultsInjected(), "the first guest intent was actually dropped").toBe(1);
     expect(await hostDecision, "the retry reached the host authority").toBe(COLOSSEUM_CONTINUE);
+  });
+
+  it("keeps identical Colosseum authority receipts isolated across two operation runtimes", () => {
+    setCoopColosseumOperationEnabled(true);
+    const runtimeA = createCoopRuntimeOpState();
+    const runtimeB = createCoopRuntimeOpState();
+    setActiveCoopRuntimeOpState(runtimeA);
+    const bindingA = captureCoopColosseumOperationBinding("host");
+    setActiveCoopRuntimeOpState(runtimeB);
+    const bindingB = captureCoopColosseumOperationBinding("host");
+
+    try {
+      const boardA = commitColosseumBoard(
+        { pinned: 41, round: 0, labels: [...BOARD_LABELS], localRole: "host", wave: 10 },
+        bindingA,
+      );
+      const decisionA = commitColosseumDecision(
+        { pinned: 41, round: 0, index: COLOSSEUM_CONTINUE, localRole: "host", wave: 10 },
+        bindingA,
+      );
+      const boardB = commitColosseumBoard(
+        { pinned: 41, round: 0, labels: [...BOARD_LABELS], localRole: "host", wave: 10 },
+        bindingB,
+      );
+      const decisionB = commitColosseumDecision(
+        { pinned: 41, round: 0, index: COLOSSEUM_CONTINUE, localRole: "host", wave: 10 },
+        bindingB,
+      );
+
+      expect(boardA?.operationId).toBe(boardB?.operationId);
+      expect(decisionA).toEqual(decisionB);
+      expect(decisionA.kind).toBe("committed");
+
+      // Reset A while B is ambient. B must retain its exact receipt; A must become independently fresh.
+      setActiveCoopRuntimeOpState(runtimeB);
+      resetCoopColosseumOperationState(bindingA);
+      expect(
+        commitColosseumDecision(
+          { pinned: 41, round: 0, index: COLOSSEUM_CONTINUE, localRole: "host", wave: 10 },
+          bindingB,
+        ).kind,
+      ).toBe("duplicate");
+      expect(
+        commitColosseumDecision(
+          { pinned: 41, round: 0, index: COLOSSEUM_CASH_OUT, localRole: "host", wave: 10 },
+          bindingA,
+        ).kind,
+      ).toBe("committed");
+    } finally {
+      resetCoopColosseumOperationState(bindingA);
+      resetCoopColosseumOperationState(bindingB);
+      setActiveCoopRuntimeOpState(null);
+    }
+  });
+
+  it("keeps identical guest apply receipts isolated and reset-scoped", () => {
+    setCoopColosseumOperationEnabled(true);
+    const pinned = 47;
+    const envelope = retainedBoardEnvelope(pinned);
+    const apply = coopOperationDurabilityHooks().apply!;
+    // Role-less operation containers bypass the temporary global-clock migration bridge, isolating the
+    // surface's own receiver ledger exactly as two production processes do.
+    const runtimeA = createCoopRuntimeOpState();
+    const runtimeB = createCoopRuntimeOpState();
+    setActiveCoopRuntimeOpState(runtimeA);
+    const bindingA = captureCoopColosseumOperationBinding("guest");
+    setActiveCoopRuntimeOpState(runtimeB);
+    const bindingB = captureCoopColosseumOperationBinding("guest");
+    const entry = { cls: "op:global", seq: 1, msg: { t: "envelope" as const, envelope } };
+    setCoopMeInteractionStart(pinned);
+    resetCoopOperationJournalLog();
+    registerCoopOperationLiveSink("op:colosseum", () => true);
+
+    try {
+      setActiveCoopRuntimeOpState(runtimeA);
+      expect(apply(entry)).toBe("applied");
+      setActiveCoopRuntimeOpState(runtimeB);
+      expect(apply(entry), "the same envelope is new to runtime B").toBe("applied");
+      setActiveCoopRuntimeOpState(runtimeA);
+      expect(apply(entry)).toBe("duplicate");
+
+      resetCoopColosseumOperationState(bindingA);
+      setActiveCoopRuntimeOpState(runtimeB);
+      expect(apply(entry), "resetting A cannot erase B's applied receipt").toBe("duplicate");
+      setActiveCoopRuntimeOpState(runtimeA);
+      expect(apply(entry), "runtime A accepts the envelope once after its own reset").toBe("applied");
+    } finally {
+      registerCoopOperationLiveSink("op:colosseum", null);
+      resetCoopOperationJournalLog();
+      resetCoopColosseumOperationState(bindingA);
+      resetCoopColosseumOperationState(bindingB);
+      setActiveCoopRuntimeOpState(null);
+      setCoopMeInteractionStart(-1);
+    }
+  });
+
+  it("captures guest resend timers so switching the ambient runtime cannot cross-cancel them", () => {
+    vi.useFakeTimers();
+    setCoopColosseumOperationEnabled(true);
+    setCoopColosseumDecisionRetryMs(10);
+    const runtimeA = createCoopRuntimeOpState("guest");
+    const runtimeB = createCoopRuntimeOpState("guest");
+    setActiveCoopRuntimeOpState(runtimeA);
+    const bindingA = captureCoopColosseumOperationBinding("guest");
+    setActiveCoopRuntimeOpState(runtimeB);
+    const bindingB = captureCoopColosseumOperationBinding("guest");
+    let retriesA = 0;
+    let retriesB = 0;
+
+    try {
+      armCoopColosseumDecisionResend(51, 0, 0, () => retriesA++, bindingA);
+      armCoopColosseumDecisionResend(51, 0, 0, () => retriesB++, bindingB);
+      resetCoopColosseumOperationState(bindingA);
+      setActiveCoopRuntimeOpState(runtimeA);
+      vi.advanceTimersByTime(11);
+      expect(retriesA).toBe(0);
+      expect(retriesB, "B's captured timer survives A's reset and an ambient switch to A").toBe(1);
+    } finally {
+      resetCoopColosseumOperationState(bindingA);
+      resetCoopColosseumOperationState(bindingB);
+      setActiveCoopRuntimeOpState(null);
+      vi.useRealTimers();
+    }
   });
 
   it("awaits the guest owner's relayed decision index (guest-owned)", async () => {
