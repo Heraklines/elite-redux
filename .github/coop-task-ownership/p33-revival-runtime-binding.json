@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "taskId": "p33-revival-runtime-binding",
+  "branch": "ci/coop/p33-revival-runtime-binding",
+  "trainRef": "ci/coop/p33-mystery-public-transition",
+  "baseSha": "880fbd0c8765f1b9bd42f16d54b3ed5ad46c331a",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-revival-runtime-binding.json",
+    "src/data/elite-redux/coop/coop-revival-operation.ts",
+    "test/tests/elite-redux/coop/coop-revival-operation.test.ts"
+  ]
+}
