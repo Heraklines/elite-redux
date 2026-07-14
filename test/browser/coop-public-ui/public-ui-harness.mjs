@@ -272,6 +272,24 @@ function assertNoDriverApiFailure(sink, context) {
   }
 }
 
+function isCrossedLobbyRequestFailure(failure) {
+  return failure?.status === 401 && failure.pathname === "/coop/v3/lobby/request";
+}
+
+function clearCrossedLobbyRequestFailures(clients) {
+  for (const client of clients) {
+    const failure = client.evidence.networkState.apiFailure;
+    if (!isCrossedLobbyRequestFailure(failure)) {
+      continue;
+    }
+    client.evidence.networkState.apiFailure = null;
+    client.evidence.record("driver-api-failure-superseded", {
+      ...failure,
+      proof: "stable-seat-binding",
+    });
+  }
+}
+
 let publicKeyInputTail = Promise.resolve();
 // The Puppeteer page most recently brought to the front, so consecutive same-page presses can
 // skip a redundant bringToFront (see withFocusedPublicKeyInput). Module-scoped because the front
@@ -1029,7 +1047,7 @@ export class DuoPublicUiRig {
     while (Date.now() < deadline) {
       for (const client of Object.values(this.clients)) {
         const failure = client.evidence.networkState.apiFailure;
-        if (failure?.status === 401 && failure.pathname === "/coop/v3/lobby/request") {
+        if (isCrossedLobbyRequestFailure(failure)) {
           // Reciprocal requests can cross: one request consumes the lobby credential and creates
           // the match while the other in-flight request receives 401. Do not call that a pass;
           // keep driving until the public stable-seat binding proves the match won the race. If no
@@ -1043,6 +1061,7 @@ export class DuoPublicUiRig {
           client.publicRole = binding.observation.role;
           client.publicSeat = binding.observation.seat;
           if (binding.observation.role === "host") {
+            clearCrossedLobbyRequestFailures(Object.values(this.clients));
             return client;
           }
         }
