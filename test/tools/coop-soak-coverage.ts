@@ -221,6 +221,7 @@ export const COOP_DEDICATED_SCENARIO_COVERAGE: ReadonlyMap<string, CoopDedicated
         bandKey("biomeShop"),
         bandKey("crossroads"),
         bandKey("biomePick"),
+        bandKey("biomeTransition"),
         sitKey(COOP_SOAK_SITUATIONS.biomeBoundary),
         operationKey("op:biome"),
       ]),
@@ -667,6 +668,15 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
     },
   ],
   [bandKey("biomeShop"), { reason: "the biome-market seq band is not driven", followupTask: BIOME_BOUNDARY }],
+  [
+    bandKey("biomeTransition"),
+    {
+      reason:
+        "the deterministic no-human-route biome transition band is outside the default soak's driven "
+        + "crossroads/World-Map surface; the dedicated T2 biome transition journey owns its retained tail proof",
+      followupTask: BIOME_BOUNDARY,
+    },
+  ],
   // #848: the crossroads (Stay/Leave) + World-Map biome-pick owner-alternated relays. The soak's vitest
   // auto-resolve bypasses both with no relay send, so their seq bands never fire (undrivable until the
   // two-engine pick is driven for real - see BIOME_BOUNDARY).

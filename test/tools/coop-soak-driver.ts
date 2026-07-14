@@ -126,6 +126,7 @@ import {
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
   mirrorHostMeToGuest,
+  pumpDuoDestinations,
   relayGuestMeOptionIndexOnly,
   remirrorWave,
   type ShopPhaseSeam,
@@ -2148,29 +2149,45 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // #849: the reward shop is the real MODIFIER_SELECT surface (owner drives, watcher mirrors over the relay).
     hitMode(UiMode.MODIFIER_SELECT);
 
-    let action: string;
-    if (hostOwns) {
-      await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
-      action = await withClient(rig.hostCtx, () => driveOwnerReward(hostShop, rig.hostScene));
-      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
-    } else {
-      await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
-      action = await withClient(rig.guestCtx, () => driveOwnerReward(guestShop, rig.guestScene));
-      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
-    }
-    actionScript.push(`wave ${wave}: reward shop owner=${hostOwns ? "host" : "guest"} ${action}`);
+    // The production-fidelity campaign shares one JS realm for two engines. During this interaction, queue
+    // EVERY transport frame until its destination ClientCtx is installed: reward options can resume a
+    // watcher, a guest intent can resume the host authority, and the retained result can resume the guest
+    // owner. Real browsers have independent globals; immediate loopback under the sender's context does not.
+    // The ordinary soak keeps its calibrated automatic delivery outside this bounded surface.
+    const destinationScheduled = fidelity === "production" && rig.pair.setDestinationContextDelivery != null;
+    rig.pair.setDestinationContextDelivery?.(destinationScheduled);
+    try {
+      let action: string;
+      if (hostOwns) {
+        await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
+        action = await withClient(rig.hostCtx, () => driveOwnerReward(hostShop, rig.hostScene));
+        await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
+      } else {
+        await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
+        action = await withClient(rig.guestCtx, () => driveOwnerReward(guestShop, rig.guestScene));
+        await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
+      }
+      if (destinationScheduled) {
+        // Close result -> materialization -> exact ACK before reading either controller. Four alternating
+        // rounds are bounded and cover the longest retained-result chain without a timing sleep.
+        await pumpDuoDestinations(rig, 4);
+      }
+      actionScript.push(`wave ${wave}: reward shop owner=${hostOwns ? "host" : "guest"} ${action}`);
 
-    const hostAfter = rig.hostRuntime.controller.interactionCounter();
-    const guestAfter = rig.guestRuntime.controller.interactionCounter();
-    const expectedAfter = deferAdvanceToMeTerminal ? counterBefore : counterBefore + 1;
-    if (hostAfter !== expectedAfter || guestAfter !== expectedAfter) {
-      fail(
-        "lockstep",
-        wave,
-        deferAdvanceToMeTerminal
-          ? `ME battle reward shop advanced before the true ME terminal (before=${counterBefore} host=${hostAfter} guest=${guestAfter})`
-          : `reward shop did not advance both counters once (before=${counterBefore} host=${hostAfter} guest=${guestAfter})`,
-      );
+      const hostAfter = rig.hostRuntime.controller.interactionCounter();
+      const guestAfter = rig.guestRuntime.controller.interactionCounter();
+      const expectedAfter = deferAdvanceToMeTerminal ? counterBefore : counterBefore + 1;
+      if (hostAfter !== expectedAfter || guestAfter !== expectedAfter) {
+        fail(
+          "lockstep",
+          wave,
+          deferAdvanceToMeTerminal
+            ? `ME battle reward shop advanced before the true ME terminal (before=${counterBefore} host=${hostAfter} guest=${guestAfter})`
+            : `reward shop did not advance both counters once (before=${counterBefore} host=${hostAfter} guest=${guestAfter})`,
+        );
+      }
+    } finally {
+      rig.pair.setDestinationContextDelivery?.(false);
     }
   };
 

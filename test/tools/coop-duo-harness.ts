@@ -1137,6 +1137,11 @@ interface DestinationEnvelopePumpPair {
   host: CoopTransport;
   guest: CoopTransport;
   flush(role: CoopRole, limit?: number): number;
+  /**
+   * Queue every frame until its destination ClientCtx is installed. The ordinary harness keeps this off
+   * outside production-transition surfaces so legacy request/response helpers retain automatic loopback.
+   */
+  setDestinationContextDelivery?(enabled: boolean): void;
 }
 
 /**
@@ -1148,21 +1153,24 @@ interface DestinationEnvelopePumpPair {
  * already applied. The later watcher can therefore materialize the journal entry without ever mutating
  * its own scene. Real clients cannot do this because each browser owns an independent global context.
  *
- * Queue ONLY `envelope` frames here. Handshake, command/request, relay, checkpoint, and state traffic
- * retains the legacy automatic loopback behavior, so existing command-response tests cannot deadlock.
- * `drainLoopback()` flushes this queue through the active destination ClientCtx. Callers that already
- * provide a full scheduled pair bypass this adapter entirely.
+ * Queue `envelope` frames by default. A production-transition surface may temporarily opt every frame
+ * into the same destination-context queue while it explicitly alternates client pumps. Handshake,
+ * command/request, relay, checkpoint, and state traffic otherwise retain the legacy automatic loopback
+ * behavior, so existing command-response tests cannot deadlock. `drainLoopback()` flushes this queue
+ * through the active destination ClientCtx. Callers that already provide a full scheduled pair bypass
+ * this adapter entirely.
  */
 function destinationPumpOperationEnvelopes(pair: {
   host: CoopTransport;
   guest: CoopTransport;
 }): DestinationEnvelopePumpPair {
   const queues: Record<CoopRole, CoopMessage[]> = { host: [], guest: [] };
+  let destinationContextDelivery = false;
 
-  const wrap = (inner: CoopTransport): { transport: CoopTransport; deliverEnvelope(message: CoopMessage): void } => {
+  const wrap = (inner: CoopTransport): { transport: CoopTransport; deliverQueued(message: CoopMessage): void } => {
     const handlers = new Set<(message: CoopMessage) => void>();
     const unsubscribe = inner.onMessage(message => {
-      if (message.t === "envelope") {
+      if (message.t === "envelope" || destinationContextDelivery) {
         queues[inner.role].push(message);
         return;
       }
@@ -1205,7 +1213,7 @@ function destinationPumpOperationEnvelopes(pair: {
 
     return {
       transport,
-      deliverEnvelope(message): void {
+      deliverQueued(message): void {
         for (const handler of [...handlers]) {
           handler(message);
         }
@@ -1222,10 +1230,13 @@ function destinationPumpOperationEnvelopes(pair: {
     flush(role, limit = Number.POSITIVE_INFINITY): number {
       let delivered = 0;
       while (queues[role].length > 0 && delivered < limit) {
-        endpoints[role].deliverEnvelope(queues[role].shift()!);
+        endpoints[role].deliverQueued(queues[role].shift()!);
         delivered++;
       }
       return delivered;
+    },
+    setDestinationContextDelivery(enabled): void {
+      destinationContextDelivery = enabled;
     },
   };
   return wrapped;
@@ -1336,7 +1347,12 @@ export interface DuoRig {
   hostCtx: ClientCtx;
   guestCtx: ClientCtx;
   /** The loopback pair both runtimes ride (raw endpoints exposed for assertion taps). */
-  pair: { host: CoopTransport; guest: CoopTransport };
+  pair: {
+    host: CoopTransport;
+    guest: CoopTransport;
+    /** Test-only full destination scheduling used by production-transition interaction surfaces. */
+    setDestinationContextDelivery?: (enabled: boolean) => void;
+  };
 }
 
 /**
