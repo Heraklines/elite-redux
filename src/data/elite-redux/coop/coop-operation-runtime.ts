@@ -246,6 +246,15 @@ export function setActiveCoopRuntimeOpState(state: CoopRuntimeOpState | null): v
 }
 
 /**
+ * Capture the currently installed runtime state for a later callback. The returned object is the runtime's
+ * stable state container, not a view of the mutable ambient selector, so an async continuation can bind to
+ * the client that scheduled it even after the two-engine harness has installed the other client.
+ */
+export function getActiveCoopRuntimeOpState(): CoopRuntimeOpState | null {
+  return activeOpState;
+}
+
+/**
  * Run `fn` with `state` installed as the active op-state, restoring the previous one after. Used to scope a
  * durability-delivered op APPLY to the RECEIVING runtime's op-state: an in-process transport (the two-engine
  * harness loopback) delivers a peer's envelope synchronously during whichever client happens to be draining -
@@ -275,7 +284,12 @@ export function requireCoopOpSurfaceState<T>(surface: string): T {
       `[coop-op] no runtime installed for surface=${surface} (apply-path access requires an active runtime)`,
     );
   }
-  const record = activeOpState.surfaces.get(surface);
+  return requireCoopOpSurfaceStateFor<T>(activeOpState, surface);
+}
+
+/** Explicit-runtime sibling used by callbacks that captured their owning runtime before an async boundary. */
+export function requireCoopOpSurfaceStateFor<T>(state: CoopRuntimeOpState, surface: string): T {
+  const record = state.surfaces.get(surface);
   if (record === undefined) {
     throw new Error(
       `[coop-op] surface=${surface} has no per-runtime record (missing registerCoopOpSurfaceState / init)`,
@@ -298,13 +312,22 @@ function activeRuntimeClock(
   if (activeOpState == null) {
     throw new Error(`[coop-op] no runtime installed (${side} clock)`);
   }
-  let clock = side === "host" ? activeOpState.hostClock : activeOpState.guestClock;
+  return runtimeClock(activeOpState, side, epoch, initialRevision);
+}
+
+function runtimeClock(
+  state: CoopRuntimeOpState,
+  side: "host" | "guest",
+  epoch: CoopSessionEpoch,
+  initialRevision: CoopRevision,
+): CoopOperationRevisionClock {
+  let clock = side === "host" ? state.hostClock : state.guestClock;
   if (clock == null || clock.epoch !== epoch) {
     clock = { epoch, revision: initialRevision };
     if (side === "host") {
-      activeOpState.hostClock = clock;
+      state.hostClock = clock;
     } else {
-      activeOpState.guestClock = clock;
+      state.guestClock = clock;
     }
   } else if (initialRevision > clock.revision) {
     clock.revision = initialRevision;
@@ -324,6 +347,22 @@ export function activeRuntimeGuestClock(
   initialRevision: CoopRevision = 0,
 ): CoopOperationRevisionClock {
   return activeRuntimeClock("guest", epoch, initialRevision);
+}
+
+export function runtimeHostClock(
+  state: CoopRuntimeOpState,
+  epoch: CoopSessionEpoch,
+  initialRevision: CoopRevision = 0,
+): CoopOperationRevisionClock {
+  return runtimeClock(state, "host", epoch, initialRevision);
+}
+
+export function runtimeGuestClock(
+  state: CoopRuntimeOpState,
+  epoch: CoopSessionEpoch,
+  initialRevision: CoopRevision = 0,
+): CoopOperationRevisionClock {
+  return runtimeClock(state, "guest", epoch, initialRevision);
 }
 
 /** Reset the ACTIVE runtime's shared clocks (the per-runtime equivalent of CoopOperationHost.resetGlobalOrder). */
@@ -364,6 +403,17 @@ export class CoopOperationHost {
     return new CoopOperationHost({
       ...config,
       revisionClock: activeRuntimeHostClock(config.epoch, config.initialRevision ?? 0),
+    });
+  }
+
+  /** Bind directly to a captured runtime; safe across async client-context swaps. */
+  public static forRuntime(
+    state: CoopRuntimeOpState,
+    config: Omit<CoopOperationHostConfig, "revisionClock">,
+  ): CoopOperationHost {
+    return new CoopOperationHost({
+      ...config,
+      revisionClock: runtimeHostClock(state, config.epoch, config.initialRevision ?? 0),
     });
   }
 
@@ -621,6 +671,17 @@ export class CoopOperationGuest {
     return new CoopOperationGuest({
       ...config,
       revisionClock: activeRuntimeGuestClock(config.epoch, config.initialRevision ?? 0),
+    });
+  }
+
+  /** Bind directly to a captured runtime; safe across async client-context swaps. */
+  public static forRuntime(
+    state: CoopRuntimeOpState,
+    config: Omit<CoopOperationGuestConfig, "revisionClock">,
+  ): CoopOperationGuest {
+    return new CoopOperationGuest({
+      ...config,
+      revisionClock: runtimeGuestClock(state, config.epoch, config.initialRevision ?? 0),
     });
   }
 

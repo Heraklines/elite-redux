@@ -179,7 +179,6 @@ import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-enve
 import { applyCoopOperationEpoch } from "#data/elite-redux/coop/coop-operation-epoch";
 import {
   coopOperationDurabilityHooks,
-  getActiveCoopOperationDurability,
   isCoopOperationJournalActive,
   registerCoopOperationLiveSink,
   resetCoopOperationJournalLog,
@@ -2680,27 +2679,6 @@ export function setCoopRuntime(runtime: CoopRuntime): void {
   // Install the cycle-free showdown-guest-flip predicate (C5) so the render layer (pokemon.ts /
   // battle-info panels) can consult the versus-guest perspective flip without importing this module.
   setShowdownGuestFlipPredicate(isShowdownGuestFlip);
-}
-
-/**
- * Run `fn` with `runtime`'s per-surface op-state AND its durability manager installed as the active ones,
- * restoring BOTH afterwards. This is the ASYNC-CONTINUATION sibling of {@linkcode withActiveCoopRuntimeOpState}:
- * the reward/market surfaces read/write per-runtime op-state and journal through the active durability manager
- * from Phaser phase callbacks and `await` tails that resume AFTER the harness's `withClient` scope has already
- * restored the previous ambient context (or under the SENDER's context on an in-process loopback). A reward
- * continuation must therefore capture its OWNING runtime at schedule time (`getCoopRuntime()`) and re-establish
- * it around every synchronous reward-op call it makes on resume - otherwise `requireCoopOpSurfaceState("reward")`
- * reads the wrong engine's record (or fail-loud throws) and `tryJournalCoopCommittedEnvelope` lands in the wrong
- * journal. In production (one runtime per process) `runtime === active` already, so this is an identity no-op.
- */
-export function withActiveCoopRuntimeScope<T>(runtime: CoopRuntime, fn: () => T): T {
-  const prevDurability = getActiveCoopOperationDurability();
-  setCoopOperationDurability(runtime.durability ?? null);
-  try {
-    return withActiveCoopRuntimeOpState(runtime.opState, fn);
-  } finally {
-    setCoopOperationDurability(prevDurability);
-  }
 }
 
 /** The live co-op session, or null when not in a co-op run. */

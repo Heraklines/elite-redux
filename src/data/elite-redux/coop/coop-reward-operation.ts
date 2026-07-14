@@ -27,7 +27,7 @@ import {
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_CAP_OP_REWARD, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
+import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
 import { COOP_INTERACTION_LEAVE, COOP_INTERACTION_REROLL } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   type CoopAuthoritativeEnvelopeV1,
@@ -39,18 +39,24 @@ import {
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
+  getActiveCoopOperationDurability,
   isCoopOperationJournalActive,
+  isCoopOperationJournalActiveFor,
   registerCoopOperationApplier,
   tryJournalCoopCommittedEnvelope,
+  tryJournalCoopCommittedEnvelopeFor,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
   type CoopIntentValidator,
   CoopOperationGuest,
   CoopOperationHost,
+  type CoopRuntimeOpState,
+  getActiveCoopRuntimeOpState,
   maybeCoopOpSurfaceState,
   registerCoopOpSurfaceState,
   requireCoopOpSurfaceState,
+  requireCoopOpSurfaceStateFor,
   resetActiveCoopRuntimeClocks,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
@@ -169,10 +175,10 @@ function preparedKey(role: CoopRole, operationId: string): string {
  * infra). Relocated off module-globals (bargain/stormglass pattern) so the single-process two-engine harness
  * gives each client its OWN reward cursors/tracking: a host self-apply no longer marks a SHARED cursor that
  * the guest then short-circuits as a duplicate (the reward-mirror desync). CRUCIAL for reward: its guest
- * watcher + owner two-phase commit run from `await` tails / Phaser callbacks, so callers must re-establish
- * the OWNING runtime around those continuations (withActiveCoopRuntimeScope) - the ambient active runtime is
- * NOT reliably this surface's at resume time. In production (one runtime per process) this is identical to
- * the former globals. The reward screen + biome market share ONE record.
+ * watcher + owner two-phase commit run from `await` tails / Phaser callbacks, so phases capture a
+ * {@linkcode CoopRewardOperationBinding} before scheduling and pass it back explicitly. They never mutate
+ * the process-wide active selector to impersonate another runtime. In production (one runtime per process)
+ * this is identical to the former globals. The reward screen + biome market share ONE record.
  */
 interface RewardOpState {
   /**
@@ -235,14 +241,42 @@ registerCoopOpSurfaceState(
  * a missing/wrong runtime at a reward continuation is a real defect that must self-identify, not hide behind
  * "expected false to be true".
  */
-function state(): RewardOpState {
-  return requireCoopOpSurfaceState<RewardOpState>("reward");
+export interface CoopRewardOperationBinding {
+  readonly opState: CoopRuntimeOpState;
+  readonly durability: CoopDurabilityManager | null;
+}
+
+/** Capture the scheduling client's immutable runtime selectors before an async UI/phase boundary. */
+export function captureCoopRewardOperationBinding(): CoopRewardOperationBinding | null {
+  const opState = getActiveCoopRuntimeOpState();
+  return opState == null ? null : { opState, durability: getActiveCoopOperationDurability() };
+}
+
+function state(binding?: CoopRewardOperationBinding | null): RewardOpState {
+  return binding == null
+    ? requireCoopOpSurfaceState<RewardOpState>("reward")
+    : requireCoopOpSurfaceStateFor<RewardOpState>(binding.opState, "reward");
+}
+
+function journalActive(binding?: CoopRewardOperationBinding | null): boolean {
+  return binding == null
+    ? isCoopOperationJournalActive()
+    : isCoopOperationJournalActiveFor(binding.durability);
+}
+
+function retainEnvelope(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  binding?: CoopRewardOperationBinding | null,
+): boolean {
+  return binding == null
+    ? tryJournalCoopCommittedEnvelope(envelope)
+    : tryJournalCoopCommittedEnvelopeFor(binding.durability, envelope);
 }
 
 /**
  * True iff a caught error is the fail-loud "no runtime installed / no per-runtime record" from
  * {@linkcode requireCoopOpSurfaceState}. Such an error means a reward op ran outside its owning runtime's
- * context (a continuation that escaped {@linkcode withActiveCoopRuntimeScope}); it must PROPAGATE so it is
+ * context (a continuation that failed to carry its captured binding); it must PROPAGATE so it is
  * visible, never be swallowed into the legacy-relay fallback (that masking caused the #922 reward-mirror
  * regression to surface only as "expected false to be true").
  */
@@ -261,8 +295,8 @@ export function isCoopRewardOperationEnabled(): boolean {
 }
 
 /** Live P33 result mode: choices are intents and only a retained complete host result may author state. */
-export function isCoopRewardRetainedResultMode(): boolean {
-  return isCoopRewardOperationEnabled() && isCoopOperationJournalActive();
+export function isCoopRewardRetainedResultMode(binding?: CoopRewardOperationBinding | null): boolean {
+  return isCoopRewardOperationEnabled() && journalActive(binding);
 }
 
 /** Select the migrated path (true) or the legacy relay fallback (false). The one-line per-surface rollback (§5.4). */
@@ -341,15 +375,19 @@ export function setCoopRewardOperationRevisionFloor(hw: number): void {
 // Internals.
 // -----------------------------------------------------------------------------
 
-function host(): CoopOperationHost {
-  const s = state();
-  s.authorityHost ??= CoopOperationHost.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor });
+function host(binding?: CoopRewardOperationBinding | null): CoopOperationHost {
+  const s = state(binding);
+  s.authorityHost ??= binding == null
+    ? CoopOperationHost.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor })
+    : CoopOperationHost.forRuntime(binding.opState, { epoch: s.epoch, initialRevision: s.revisionFloor });
   return s.authorityHost;
 }
 
-function guest(): CoopOperationGuest {
-  const s = state();
-  s.watchGuest ??= CoopOperationGuest.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor });
+function guest(binding?: CoopRewardOperationBinding | null): CoopOperationGuest {
+  const s = state(binding);
+  s.watchGuest ??= binding == null
+    ? CoopOperationGuest.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor })
+    : CoopOperationGuest.forRuntime(binding.opState, { epoch: s.epoch, initialRevision: s.revisionFloor });
   return s.watchGuest;
 }
 
@@ -524,12 +562,15 @@ export interface CoopRewardOwnerCommitResult {
  * (§1.3). ADDITIVE + dual-run: the phase still fires the legacy relay send; this records the authoritative
  * operation. No-op when the flag is OFF. Never throws (the legacy relay is the fallback).
  */
-export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): CoopRewardOwnerCommitResult | null {
+export function commitRewardOwnerIntent(
+  params: CoopRewardOwnerCommitParams,
+  binding?: CoopRewardOperationBinding | null,
+): CoopRewardOwnerCommitResult | null {
   if (!isCoopRewardOperationEnabled() || params.pinned < 0) {
     return null;
   }
   try {
-    const s = state();
+    const s = state(binding);
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
     const terminalKey = `${params.surface}:${params.pinned}`;
     const retainedTerminal = params.terminal ? s.ownerTerminalOperations.get(terminalKey) : undefined;
@@ -571,7 +612,7 @@ export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): Co
     // A live journaled action is deliberately TWO-STAGE: this call retains the typed intent only. The phase
     // executes on the host at its safe seam, then commitRewardAuthoritativeResult captures the complete
     // post-action state. Thus no live envelope can carry the historical empty control placeholder.
-    if (isCoopOperationJournalActive()) {
+    if (journalActive(binding)) {
       coopLog("reward", `${params.surface} op INTENT prepared label=${params.label} id=${opId}`);
       return { operationId: opId, revision: 0 };
     }
@@ -579,7 +620,7 @@ export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): Co
     // Compatibility when durability is disabled: preserve the former control-only local gate. This context
     // never reaches the wire, and the legacy relay remains the sole carrier.
     if (params.localRole === "host") {
-      const res = host().submit(
+      const res = host(binding).submit(
         intent,
         legacyControlContext(params.surface, params.wave, params.turn ?? 0),
         ownerParityValidator(params.pinned),
@@ -591,7 +632,7 @@ export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): Co
         }
         // COMMIT -> JOURNAL (Wave-2e, §4.1/§4.2): register the committed action with the durability journal
         // (resend / reconnect replay). Rides ALONGSIDE the legacy relay (dual-run); no-op when durability OFF.
-        if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
+        if (!retainEnvelope(res.envelope, binding)) {
           return null;
         }
         coopLog(
@@ -626,11 +667,12 @@ export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): Co
 export function commitRewardAuthoritativeResult(
   operationId: string,
   authoritativeState?: CoopAuthoritativeBattleStateV1 | null,
+  binding?: CoopRewardOperationBinding | null,
 ): CoopRewardOwnerCommitResult | null {
-  if (!isCoopRewardOperationEnabled() || !isCoopOperationJournalActive()) {
+  if (!isCoopRewardOperationEnabled() || !journalActive(binding)) {
     return null;
   }
-  const s = state();
+  const s = state(binding);
   const key = preparedKey("host", operationId);
   const prepared = s.preparedIntents.get(key);
   if (prepared == null) {
@@ -640,7 +682,7 @@ export function commitRewardAuthoritativeResult(
 
   const retained = s.committedResultEnvelopes.get(operationId);
   if (retained != null) {
-    if (!tryJournalCoopCommittedEnvelope(retained)) {
+    if (!retainEnvelope(retained, binding)) {
       return null;
     }
     advancePreparedWatcher(prepared);
@@ -655,7 +697,7 @@ export function commitRewardAuthoritativeResult(
     );
     return null;
   }
-  const res = host().submit(
+  const res = host(binding).submit(
     prepared.intent,
     authoritativeResultContext(prepared.surface, prepared.wave, prepared.turn, resultState),
     ownerParityValidator(prepared.pinned),
@@ -673,7 +715,7 @@ export function commitRewardAuthoritativeResult(
     return null;
   }
   s.committedResultEnvelopes.set(operationId, res.envelope);
-  if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
+  if (!retainEnvelope(res.envelope, binding)) {
     return null;
   }
   advancePreparedWatcher(prepared);
@@ -722,7 +764,10 @@ export interface CoopRewardWatcherAdoptParams {
  *     authoritative terminal (exactly like the existing #854 out-of-range guard).
  * Never throws (a throw returns `adopt:false` -> the caller skips the action, never crashing the watcher).
  */
-export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): CoopRewardAdoptDecision {
+export function adoptRewardWatcherChoice(
+  params: CoopRewardWatcherAdoptParams,
+  binding?: CoopRewardOperationBinding | null,
+): CoopRewardAdoptDecision {
   // Legacy / fallback: adopt iff the action landed, no operation gating.
   if (!isCoopRewardOperationEnabled()) {
     return params.action == null ? { adopt: false, reason: "no-relay" } : { adopt: true };
@@ -735,7 +780,7 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
     return { adopt: true };
   }
   try {
-    const s = state();
+    const s = state(binding);
     const ws = watcherState(s, params.localRole, params.pinned);
     // Stale / late rejection (invariant 6, the #861 shape). The pinned interaction counter is monotonic, so:
     //  - a pick STRICTLY BELOW the highest interaction we have adopted at is a leftover from an interaction a
@@ -777,7 +822,7 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
     // The AUTHORITY (host) watching a guest-owned action first validates and retains the INTENT. The phase
     // executes it exactly once, then calls commitRewardAuthoritativeResult at the post-action safe seam.
     if (params.localRole === "host") {
-      if (isCoopOperationJournalActive()) {
+      if (journalActive(binding)) {
         if (!ownerParityValidator(params.pinned)(intent).ok) {
           return { adopt: false, reason: "host-wrong-owner" };
         }
@@ -812,7 +857,7 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
           requiresAuthorityCommit: true,
         };
       }
-      const res = host().submit(
+      const res = host(binding).submit(
         intent,
         legacyControlContext(params.surface, params.wave, params.turn ?? 0),
         ownerParityValidator(params.pinned),
@@ -828,7 +873,7 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
         }
         // COMMIT -> JOURNAL (Wave-2e): the host is the sole committer of a GUEST-owned action; journal the
         // authoritative envelope so a cut is healed by the journal, not a bespoke self-heal.
-        if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
+        if (!retainEnvelope(res.envelope, binding)) {
           return { adopt: false, reason: "host-journal-not-retained" };
         }
         // The authoritative host applies its validated guest-owned action at this safe phase seam.
@@ -852,7 +897,7 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
 
     // The journal consumes the ONE shared ledger before the safe phase loop resumes. A tagged durable action
     // with the matching one-shot marker is therefore legitimate materialization, not a duplicate.
-    if (guest().hasApplied(opId)) {
+    if (guest(binding).hasApplied(opId)) {
       if (params.action.operationId === opId && s.pendingJournalMaterializations.delete(opId)) {
         ws.ordinal += 1;
         ws.lastAdoptedStart = Math.max(ws.lastAdoptedStart, params.pinned);
@@ -869,13 +914,13 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
       return { adopt: false, reason: "duplicate" };
     }
 
-    if (isCoopOperationJournalActive()) {
+    if (journalActive(binding)) {
       return { adopt: false, reason: "await-authoritative-envelope" };
     }
 
     // Apply through the guest applier (surface-local dense revision; classifies + records the op).
     const appliedOp: CoopPendingOperation = { ...intent, status: "applied" };
-    const g = guest();
+    const g = guest(binding);
     const applyRes = g.applyEnvelope({
       version: 1,
       sessionEpoch: s.epoch,
@@ -904,8 +949,8 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
     return { adopt: true, operationId: opId };
   } catch (e) {
     if (isCoopOpRuntimeError(e)) {
-      // A missing/wrong runtime here means this watcher continuation ran outside its owning runtime's scope
-      // (it must be wrapped in withActiveCoopRuntimeScope). Do NOT degrade to {adopt:true}: that silently
+      // A missing/wrong runtime here means this watcher continuation lost its captured runtime binding.
+      // Do NOT degrade to {adopt:true}: that silently
       // hangs the watcher (no operationId/authoritativeProjection) - the #922 reward-mirror regression. Surface it.
       throw e;
     }
