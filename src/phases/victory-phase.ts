@@ -260,7 +260,10 @@ export class VictoryPhase extends PokemonPhase {
         // x0 waves. Biome-change waves (biomeEnding) still heal via SelectBiomePhase,
         // so the !biomeEnding guard avoids a double heal. ER routing only (in vanilla
         // a x0 wave is always the biome change, so nothing changes there).
-        if (erRouting && fireBiomeShop && !biomeEnding) {
+        if (erRouting && fireBiomeShop && !biomeEnding && !isCoopAuthoritativeGuest()) {
+          // The authoritative guest receives the host's settled heal in the next complete carrier.
+          // Constructing PartyHealPhase locally is already a forbidden shared mutation even when the
+          // renderer gate catches it and substitutes CoopInertPhase, so prevent the factory call itself.
           globalScene.phaseManager.pushNew("PartyHealPhase", false);
         }
 

@@ -11,7 +11,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
+import { captureCoopChecksum, captureCoopSaveDataNormalized } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   commitAuthoritativeBiomeTransition,
   coopAuthoritativeBiomeTransitionOperationId,
@@ -1280,6 +1280,10 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       expect(withClientSync(rig.guestCtx, () => getErMapSaveData())).toEqual(
         withClientSync(rig.hostCtx, () => getErMapSaveData()),
       );
+      expect(
+        withClientSync(rig.guestCtx, () => captureCoopSaveDataNormalized()),
+        "every normalized persistent substrate converges before the opaque checksum",
+      ).toEqual(withClientSync(rig.hostCtx, () => captureCoopSaveDataNormalized()));
       expect(withClientSync(rig.guestCtx, () => captureCoopChecksum())).toBe(
         withClientSync(rig.hostCtx, () => captureCoopChecksum()),
       );
@@ -1314,6 +1318,12 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
           "NewBiome presentation cannot derive Mystery Encounter chance on the authoritative renderer",
         ).toBe(guestMeChanceBeforeNewBiome);
       }
+      expect(
+        getObservedCoopGuestPhases().filter(phase =>
+          ["PartyHealPhase", "ReturnPhase", "LevelCapPhase"].includes(phase),
+        ),
+        "the renderer never constructs host-owned post-battle mutation phases",
+      ).toEqual([]);
       expect(getCoopRendererNeutralizedLog(), "no guest boundary phase became CoopInert").toEqual([]);
       expect(getCoopTailWouldBlockLog(), "the committed BIOME_PICK sanctions the late biome tail").toEqual([]);
       expect(
