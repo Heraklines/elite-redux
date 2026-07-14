@@ -20,11 +20,240 @@ const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
 const GUEST_CONTINUATION_ACK = /guest ACK turn stage=continuationReady e=(\d+) wave=(\d+) turn=(\d+) rev=(\d+)/u;
 const SHARED_SESSION_TERMINAL = /\[coop:runtime\] shared session stopped safely: /u;
 const LAUNCH_SNAPSHOT_ABORT = /launchSnapshotAbort wave=\d+ reason=/u;
+const POST_TURN_PHASE_PROGRESS = /Start Phase ([A-Za-z0-9]+Phase)/u;
+const POST_TURN_AUTHORITY_PROGRESS = /\[coop:turn\] host recorder: append turn=\d+ seq=(\d+)/u;
+const POST_TURN_RENDERER_PROGRESS = /\[coop:replay\] guest replay turn=\d+: live increment seq=(\d+)\.\.(\d+)/u;
+const REWARD_RESULT_RETAINED = /reward authoritative RESULT retained rev=(\d+) tick=(\d+) id=([^\s]+)/u;
+const POST_TURN_PROGRESS_ALLOWANCE_MS = 90_000;
+const POST_TURN_HARD_CEILING_MS = 360_000;
 
 // Self-healing pairing cadence: how often the requester re-issues its ask while unpaired. Kept
 // well under the observed ~17s worker-side request TTL so each re-send REFRESHES the request and
 // keeps the acceptance window open until the accept lands (see driveSelfHealingPairing).
 const LOBBY_REQUEST_REISSUE_MS = 5_000;
+
+function classifyPostTurnProgress(event) {
+  if (
+    event.kind === "browser-surface2"
+    && ["battle-progress", "command", "reward"].includes(event.observation?.operationClass)
+  ) {
+    const observation = event.observation;
+    return `${observation.surfaceId}:phase-${observation.phaseInstance}:ready-${
+      observation.ready?.awaitingActionInput === true
+    }`;
+  }
+  const text = event.text ?? "";
+  const phase = POST_TURN_PHASE_PROGRESS.exec(text);
+  if (phase) {
+    return `phase:${phase[1]}`;
+  }
+  const authority = POST_TURN_AUTHORITY_PROGRESS.exec(text);
+  if (authority) {
+    return `authority-seq:${authority[1]}`;
+  }
+  const renderer = POST_TURN_RENDERER_PROGRESS.exec(text);
+  if (renderer) {
+    return `renderer-seq:${renderer[1]}-${renderer[2]}`;
+  }
+  return null;
+}
+
+function postTurnProgressAt(event, startedAtMs, observedAtMs) {
+  const parsedAtMs = Date.parse(event.at ?? "");
+  return Number.isFinite(parsedAtMs) ? Math.min(Math.max(parsedAtMs, startedAtMs), observedAtMs) : observedAtMs;
+}
+
+function latestPostTurnProgress(client, events, startedAtMs, observedAtMs, seenSemanticProgress) {
+  return events.reduce((latest, event) => {
+    const progress = classifyPostTurnProgress(event);
+    if (progress == null) {
+      return latest;
+    }
+    // The semantic observer republishes when selection/readiness detail changes. Those are useful
+    // projections, but the same client/surface/phase-instance/readiness tuple is still one causal
+    // transition and must not repeatedly buy another 90 seconds. Console phase markers are not
+    // deduplicated here because the same phase class can legitimately recur within a battle.
+    if (event.kind === "browser-surface2") {
+      const semanticProgressToken = `${client.label}:${progress}`;
+      if (seenSemanticProgress.has(semanticProgressToken)) {
+        return latest;
+      }
+      seenSemanticProgress.add(semanticProgressToken);
+    }
+    const eventAtMs = postTurnProgressAt(event, startedAtMs, observedAtMs);
+    if (latest != null && eventAtMs < latest.eventAtMs) {
+      return latest;
+    }
+    return { client, event, eventAtMs, progress };
+  }, null);
+}
+
+function recordPostTurnBudgetExtension(progress, previousDeadlineMs, deadlineMs, hardDeadlineMs) {
+  progress.client.evidence.record("public-ui-post-turn-progress-budget", {
+    progress: progress.progress,
+    progressEventIndex: progress.event.index,
+    progressObservedAt: progress.event.at ?? null,
+    previousDeadlineAt: new Date(previousDeadlineMs).toISOString(),
+    extendedDeadlineAt: new Date(deadlineMs).toISOString(),
+    hardDeadlineAt: new Date(hardDeadlineMs).toISOString(),
+    hardCeilingReached: deadlineMs === hardDeadlineMs,
+  });
+}
+
+/**
+ * Keep public command/post-turn waits alive only while the real addressed battle is making causal
+ * progress. Two Chromium game loops can heavily dilate launch and animations on the standard
+ * four-core runner; runs 29330330915 and 29332163279 reached real command/narration surfaces after
+ * the ordinary timeout. Phase transitions, new authoritative turn events, renderer sequence
+ * increments, and semantic command/battle-prompt instances may extend the soft deadline, but
+ * signaling heartbeats/retries may not. The immutable hard deadline still makes every wait terminate.
+ */
+export function createPublicBattleProgressBudget(
+  rig,
+  from,
+  baseTimeoutMs,
+  {
+    now = () => Date.now(),
+    progressAllowanceMs = POST_TURN_PROGRESS_ALLOWANCE_MS,
+    hardCeilingMs = POST_TURN_HARD_CEILING_MS,
+  } = {},
+) {
+  const clients = Object.values(rig.clients);
+  const startedAtMs = now();
+  const hardDeadlineMs = startedAtMs + Math.max(baseTimeoutMs, hardCeilingMs);
+  let deadlineMs = Math.min(startedAtMs + baseTimeoutMs, hardDeadlineMs);
+  const scanOffsets = new Map(clients.map(client => [client.label, from[client.label] ?? 0]));
+  const seenSemanticProgress = new Set();
+
+  const observe = () => {
+    const observedAtMs = now();
+    const candidates = clients.flatMap(client => {
+      const scanFrom = scanOffsets.get(client.label) ?? 0;
+      const events = client.evidence.events.slice(scanFrom);
+      scanOffsets.set(client.label, client.evidence.events.length);
+      const latest = latestPostTurnProgress(client, events, startedAtMs, observedAtMs, seenSemanticProgress);
+      return latest == null ? [] : [latest];
+    });
+    const latestProgress = candidates.toSorted((left, right) => left.eventAtMs - right.eventAtMs).at(-1) ?? null;
+
+    if (latestProgress != null) {
+      const previousDeadlineMs = deadlineMs;
+      deadlineMs = Math.min(hardDeadlineMs, Math.max(deadlineMs, latestProgress.eventAtMs + progressAllowanceMs));
+      if (deadlineMs > previousDeadlineMs) {
+        recordPostTurnBudgetExtension(latestProgress, previousDeadlineMs, deadlineMs, hardDeadlineMs);
+      }
+    }
+    return deadlineMs;
+  };
+
+  return Object.freeze({
+    observe,
+    deadline: () => deadlineMs,
+    hardDeadline: () => hardDeadlineMs,
+  });
+}
+
+function findOwnedCommandOrTerminal(client, from) {
+  const semantic = client.evidence.findLastSemanticSurface(from, "command:command");
+  const ownedSemantic =
+    semantic?.observation.ready?.handlerActive === true
+    && semantic.observation.phase === "CommandPhase"
+    && semantic.observation.uiMode === "COMMAND"
+    && semantic.observation.localSeat === client.publicSeat
+    && semantic.observation.seatsWithInput?.includes(client.publicSeat)
+      ? semantic
+      : null;
+  return (
+    ownedSemantic
+    ?? client.evidence.find(LOCAL_COMMAND, from)
+    ?? client.evidence.find(SHARED_SESSION_TERMINAL, from)
+    ?? client.evidence.find(LAUNCH_SNAPSHOT_ABORT, from)
+  );
+}
+
+function findOwnedReadyReward(client, from) {
+  const semantic = client.evidence.findLastSemanticSurface(from, "reward-shop");
+  return semantic?.observation.operationClass === "reward"
+    && semantic.observation.ownerModel === "interaction"
+    && semantic.observation.phase === "SelectModifierPhase"
+    && semantic.observation.uiMode === "MODIFIER_SELECT"
+    && semantic.observation.localSeat === client.publicSeat
+    && semantic.observation.ownerSeat === client.publicSeat
+    && semantic.observation.seatsWithInput?.includes(client.publicSeat)
+    && semantic.observation.ready?.handlerActive === true
+    && semantic.observation.ready.awaitingActionInput === true
+    ? semantic
+    : null;
+}
+
+function sameAddress(left, right) {
+  return left?.epoch === right?.epoch && left?.wave === right?.wave && left?.turn === right?.turn;
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function findOwnedRewardConfirm(client, from, expectedAddress) {
+  const semantic = client.evidence.findLastSemanticSurface(from);
+  return semantic?.observation.surfaceId === "reward:confirm"
+    && semantic.observation.operationClass === "reward"
+    && semantic.observation.ownerModel === "interaction"
+    && semantic.observation.phase === "SelectModifierPhase"
+    && semantic.observation.uiMode === "CONFIRM"
+    && semantic.observation.localSeat === client.publicSeat
+    && semantic.observation.ownerSeat === client.publicSeat
+    && semantic.observation.seatsWithInput?.includes(client.publicSeat)
+    && semantic.observation.selectedOptionId === "yes"
+    && semantic.observation.ready?.handlerActive === true
+    && sameAddress(semantic.observation.address, expectedAddress)
+    ? semantic
+    : null;
+}
+
+function findAddressedRewardWatcher(client, from, ownerSeat, expectedAddress) {
+  const semantic = client.evidence.findLastSemanticSurface(from, "reward-shop");
+  return semantic?.observation.operationClass === "reward"
+    && semantic.observation.ownerModel === "interaction"
+    && semantic.observation.phase === "SelectModifierPhase"
+    && semantic.observation.uiMode === "MODIFIER_SELECT"
+    && semantic.observation.localSeat === client.publicSeat
+    && semantic.observation.ownerSeat === ownerSeat
+    && client.publicSeat !== ownerSeat
+    && semantic.observation.seatsWithInput?.includes(ownerSeat)
+    && !semantic.observation.seatsWithInput?.includes(client.publicSeat)
+    && semantic.observation.ready?.handlerActive === true
+    && semantic.observation.ready.awaitingActionInput === false
+    && sameAddress(semantic.observation.address, expectedAddress)
+    ? semantic
+    : null;
+}
+
+async function waitForProgressBoundedEvidence(client, from, findEvidence, description, progressBudgetOptions) {
+  const clients = { [client.label]: client };
+  const progressBudget = createPublicBattleProgressBudget(
+    { clients },
+    { [client.label]: from },
+    client.config.timeoutMs,
+    progressBudgetOptions,
+  );
+  let event = null;
+  while (Date.now() < progressBudget.observe()) {
+    event = findEvidence();
+    if (event != null) {
+      break;
+    }
+    await delay(100);
+  }
+  // Drain once after the soft/hard deadline check. Under severe browser CPU contention a semantic
+  // event can already be buffered when the timer callback finally resumes; discard it only if the
+  // bounded wait truly has no matching public evidence.
+  event ??= findEvidence();
+  if (event == null) {
+    throw new Error(`${client.label}: timed out waiting for ${description}`);
+  }
+  return event;
+}
 
 /**
  * Loud-fail on a failed response from an endpoint the harness DRIVES navigation from (the
@@ -587,34 +816,66 @@ export class PublicUiClient {
     throw new Error(`${this.label}: ${purpose} never produced ${pattern}`);
   }
 
-  async waitForLocalCommand(from = 0) {
-    const event = await this.evidence.waitForCondition(
-      sink => {
-        const semantic = sink.findLastSemanticSurface(from, "command:command");
-        const ownedSemantic =
-          semantic?.observation.ready?.handlerActive === true
-          && semantic.observation.phase === "CommandPhase"
-          && semantic.observation.uiMode === "COMMAND"
-          && semantic.observation.localSeat === this.publicSeat
-          && semantic.observation.seatsWithInput?.includes(this.publicSeat)
-            ? semantic
-            : null;
-        return (
-          ownedSemantic
-          ?? sink.find(LOCAL_COMMAND, from)
-          ?? sink.find(SHARED_SESSION_TERMINAL, from)
-          ?? sink.find(LAUNCH_SNAPSHOT_ABORT, from)
-        );
-      },
-      {
-        timeoutMs: this.config.timeoutMs,
-        description: "owned semantic command surface or bounded shared terminal",
-      },
+  async waitForLocalCommand(from = 0, progressBudgetOptions = {}) {
+    const event = await waitForProgressBoundedEvidence(
+      this,
+      from,
+      () => findOwnedCommandOrTerminal(this, from),
+      "owned semantic command surface or bounded shared terminal",
+      progressBudgetOptions,
     );
     if (event.kind !== "browser-surface2" && !LOCAL_COMMAND.test(event.text ?? "")) {
       throw new Error(`${this.label}: shared session terminated before owned CommandPhase: ${event.text}`);
     }
     return event;
+  }
+
+  async waitForOwnedReward(from = 0, progressBudgetOptions = {}) {
+    return waitForProgressBoundedEvidence(
+      this,
+      from,
+      () => findOwnedReadyReward(this, from),
+      "actionable owned semantic reward surface",
+      progressBudgetOptions,
+    );
+  }
+
+  async waitForOwnedRewardConfirm(from, expectedAddress, progressBudgetOptions) {
+    return waitForProgressBoundedEvidence(
+      this,
+      from,
+      () => {
+        const terminal =
+          this.evidence.find(SHARED_SESSION_TERMINAL, from) ?? this.evidence.find(LAUNCH_SNAPSHOT_ABORT, from);
+        if (terminal != null) {
+          throw new Error(
+            `${this.label}: shared session terminated while waiting for reward confirmation: ${terminal.text}`,
+          );
+        }
+        return findOwnedRewardConfirm(this, from, expectedAddress);
+      },
+      `actionable reward confirmation at ${expectedAddress.epoch}/${expectedAddress.wave}/${expectedAddress.turn}`,
+      progressBudgetOptions,
+    );
+  }
+
+  async waitForAddressedRewardWatcher(from, ownerSeat, expectedAddress, progressBudgetOptions) {
+    return waitForProgressBoundedEvidence(
+      this,
+      from,
+      () => {
+        const terminal =
+          this.evidence.find(SHARED_SESSION_TERMINAL, from) ?? this.evidence.find(LAUNCH_SNAPSHOT_ABORT, from);
+        if (terminal != null) {
+          throw new Error(
+            `${this.label}: shared session terminated while waiting for the reward watcher: ${terminal.text}`,
+          );
+        }
+        return findAddressedRewardWatcher(this, from, ownerSeat, expectedAddress);
+      },
+      `non-actionable reward watcher at ${expectedAddress.epoch}/${expectedAddress.wave}/${expectedAddress.turn}`,
+      progressBudgetOptions,
+    );
   }
 
   async waitForObservedSurface(surface, from = 0) {
@@ -905,6 +1166,68 @@ export class DuoPublicUiRig {
     return retainedAddress;
   }
 
+  async assertRetainedRewardTerminal(cursors, expectedAddress, ownerSeat) {
+    if (!this.host || !this.guest) {
+      throw new Error("retained reward terminal proof requires a paired host and guest");
+    }
+    const retained = await this.host.evidence.waitFor(REWARD_RESULT_RETAINED, {
+      from: cursors[this.host.label],
+      timeoutMs: this.config.timeoutMs,
+      description: "host retained complete reward terminal result",
+    });
+    const retainedMatch = REWARD_RESULT_RETAINED.exec(retained.text);
+    if (!retainedMatch) {
+      throw new Error("host emitted malformed retained reward terminal evidence");
+    }
+    const [, revision, tick, operationId] = retainedMatch;
+    const expectedOperationPrefix = `${expectedAddress.epoch}:${ownerSeat}:REWARD:`;
+    if (!operationId.startsWith(expectedOperationPrefix)) {
+      throw new Error(`reward terminal operation ${operationId} is not addressed to ${expectedOperationPrefix}`);
+    }
+    const escapedOperationId = escapeRegExp(operationId);
+    const [hostTerminal, guestApplied, guestMaterialized] = await Promise.all([
+      this.host.evidence.waitFor(
+        new RegExp(`OWNER retained terminal before continuation seq=\\d+ id=${escapedOperationId}`, "u"),
+        {
+          from: cursors[this.host.label],
+          timeoutMs: this.config.timeoutMs,
+          description: `host retained reward terminal ${operationId}`,
+        },
+      ),
+      this.guest.evidence.waitFor(
+        new RegExp(
+          `shop authoritative RESULT applied-before-render kind=REWARD id=${escapedOperationId} rev=${revision} tick=${tick}`,
+          "u",
+        ),
+        {
+          from: cursors[this.guest.label],
+          timeoutMs: this.config.timeoutMs,
+          description: `guest applied exact retained reward result ${operationId}`,
+        },
+      ),
+      this.guest.evidence.waitFor(
+        new RegExp(`reward op WATCHER materialize JOURNAL choice=-1 terminal=true id=${escapedOperationId}`, "u"),
+        {
+          from: cursors[this.guest.label],
+          timeoutMs: this.config.timeoutMs,
+          description: `guest materialized exact retained reward terminal ${operationId}`,
+        },
+      ),
+    ]);
+    const proof = { operationId, revision: Number(revision), tick: Number(tick), ownerSeat, expectedAddress };
+    this.host.evidence.record("retained-reward-terminal-proof", {
+      ...proof,
+      side: "retained",
+      evidenceIndex: hostTerminal.index,
+    });
+    this.guest.evidence.record("retained-reward-terminal-proof", {
+      ...proof,
+      side: "applied-and-materialized",
+      evidenceIndex: Math.max(guestApplied.index, guestMaterialized.index),
+    });
+    return proof;
+  }
+
   async startFreshRun() {
     if (!this.host) {
       throw new Error("startFreshRun requires a paired public host (call pair() first)");
@@ -1048,8 +1371,8 @@ export class DuoPublicUiRig {
 
   async waitForPostTurnOutcome(from) {
     const advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, "public-ui-post-turn");
-    const deadline = Date.now() + this.config.timeoutMs;
-    while (Date.now() < deadline) {
+    const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs);
+    while (Date.now() < progressBudget.observe()) {
       const values = Object.values(this.clients);
       const rewards = values.map(client => client.evidence.find(REWARD_PHASE, from[client.label]));
       if (rewards.every(Boolean)) {
@@ -1105,9 +1428,47 @@ export class DuoPublicUiRig {
       () => values.find(client => client.evidence.find(REWARD_OWNER, ownerCursors[client.label])),
       { timeoutMs: this.config.timeoutMs, description: "reward owner public UI" },
     );
+    if (owner !== this.host || !this.guest) {
+      throw new Error(
+        `wave-1 reward leave requires authenticated host ownership; observed ${owner.label}/seat-${owner.publicSeat}`,
+      );
+    }
+    const watcher = this.guest;
+    const ownedReward = await owner.waitForOwnedReward(ownerCursors[owner.label]);
+    const expectedRewardAddress = ownedReward.observation.address;
     await owner.checkpoint("reward-owner-screen");
     const commandCursors = Object.fromEntries(values.map(client => [client.label, client.evidence.cursor()]));
-    await owner.sequence(this.config.keys.rewardLeave, "leave-reward-screen");
+    const [openConfirmKey, ...confirmKeys] = this.config.keys.rewardLeave;
+    if (openConfirmKey == null || confirmKeys.length === 0) {
+      throw new Error("public reward-leave journey requires keys to open and accept the reward confirmation");
+    }
+    const rewardConfirmCursors = Object.fromEntries(values.map(client => [client.label, client.evidence.cursor()]));
+    await owner.press(openConfirmKey, `leave-reward-screen:1/${this.config.keys.rewardLeave.length}`);
+    const [ownerConfirmation, watcherProjection] = await Promise.all([
+      owner.waitForOwnedRewardConfirm(rewardConfirmCursors[owner.label], expectedRewardAddress),
+      watcher.waitForAddressedRewardWatcher(
+        rewardConfirmCursors[watcher.label],
+        owner.publicSeat,
+        expectedRewardAddress,
+      ),
+    ]);
+    owner.evidence.record("shared-reward-confirm-proof", {
+      peer: watcher.label,
+      address: ownerConfirmation.observation.address,
+      ownerSeat: owner.publicSeat,
+      projection: "actionable-confirmation",
+    });
+    watcher.evidence.record("shared-reward-confirm-proof", {
+      peer: owner.label,
+      address: watcherProjection.observation.address,
+      ownerSeat: owner.publicSeat,
+      projection: "non-actionable-shop-watcher",
+    });
+    const terminalCursors = Object.fromEntries(values.map(client => [client.label, client.evidence.cursor()]));
+    for (const [index, key] of confirmKeys.entries()) {
+      await owner.press(key, `leave-reward-screen:${index + 2}/${this.config.keys.rewardLeave.length}`);
+    }
+    await this.assertRetainedRewardTerminal(terminalCursors, expectedRewardAddress, owner.publicSeat);
     await Promise.all(values.map(client => client.waitForLocalCommand(commandCursors[client.label])));
     const expectedWave = this.activeBattleWave == null ? null : this.activeBattleWave + 1;
     const boundary = await this.assertSharedSurface("command", commandCursors, "wave-2-command", {

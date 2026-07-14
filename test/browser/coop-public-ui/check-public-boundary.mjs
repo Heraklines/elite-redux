@@ -78,11 +78,57 @@ if (!provision?.includes("randomBytes") || /fetch\s*\(|["'`]\/coop\//u.test(prov
   failures.push("provision-accounts.mjs: fixture setup may generate credentials but must not call any API");
 }
 if (
-  !harness?.includes('findLastSemanticSurface(from, "command:command")')
+  !harness?.includes("function findOwnedCommandOrTerminal(client, from)")
+  || !harness.includes("findOwnedCommandOrTerminal(this, from)")
+  || !harness.includes('findLastSemanticSurface(from, "command:command")')
   || !harness.includes('semantic.observation.uiMode === "COMMAND"')
-  || !harness.includes("semantic.observation.seatsWithInput?.includes(this.publicSeat)")
+  || !harness.includes("semantic.observation.seatsWithInput?.includes(client.publicSeat)")
 ) {
   failures.push("public-ui-harness.mjs: command readiness must use the owned public semantic surface");
+}
+if (!harness?.includes("createPublicBattleProgressBudget(") || !harness.includes("event ??= findEvidence()")) {
+  failures.push("public-ui-harness.mjs: command readiness must retain bounded progress and drain buffered evidence");
+}
+if (
+  !harness?.includes('findLastSemanticSurface(from, "reward-shop")')
+  || !harness.includes("semantic.observation.ready.awaitingActionInput === true")
+  || !harness.includes("semantic.observation.ownerSeat === client.publicSeat")
+  || !harness.includes("await owner.waitForOwnedReward(ownerCursors[owner.label])")
+  || !harness.includes("findLastSemanticSurface(from)")
+  || !harness.includes('semantic?.observation.surfaceId === "reward:confirm"')
+  || !harness.includes('semantic.observation.uiMode === "CONFIRM"')
+  || !harness.includes('semantic.observation.selectedOptionId === "yes"')
+  || !harness.includes("sameAddress(semantic.observation.address, expectedAddress)")
+  || !harness.includes("owner.waitForOwnedRewardConfirm(rewardConfirmCursors[owner.label]")
+  || !harness.includes("watcher.waitForAddressedRewardWatcher(")
+  || !harness.includes("!semantic.observation.seatsWithInput?.includes(client.publicSeat)")
+  || !harness.includes("semantic.observation.ready.awaitingActionInput === false")
+  || !harness.includes("this.evidence.find(SHARED_SESSION_TERMINAL, from)")
+  || !harness.includes('projection: "actionable-confirmation"')
+  || !harness.includes('projection: "non-actionable-shop-watcher"')
+) {
+  failures.push(
+    "public-ui-harness.mjs: reward leave must prove the owner confirmation and addressed non-actionable watcher",
+  );
+}
+const rewardConfirmOpen = harness?.indexOf("await owner.press(openConfirmKey") ?? -1;
+const rewardConfirmReady = harness?.indexOf("owner.waitForOwnedRewardConfirm(rewardConfirmCursors[owner.label]") ?? -1;
+const rewardConfirmAccept = harness?.indexOf("for (const [index, key] of confirmKeys.entries())") ?? -1;
+const rewardTerminalApplied = harness?.indexOf("await this.assertRetainedRewardTerminal(") ?? -1;
+if (
+  rewardConfirmOpen < 0
+  || rewardConfirmReady <= rewardConfirmOpen
+  || rewardConfirmAccept <= rewardConfirmReady
+  || rewardTerminalApplied <= rewardConfirmAccept
+) {
+  failures.push("public-ui-harness.mjs: reward confirmation must open, converge at one address, then accept");
+}
+if (
+  !harness?.includes("reward authoritative RESULT retained")
+  || !harness.includes("shop authoritative RESULT applied-before-render")
+  || !harness.includes("reward op WATCHER materialize JOURNAL")
+) {
+  failures.push("public-ui-harness.mjs: reward leave must prove exact retained terminal application before wave 2");
 }
 if (!harness?.includes("createBattlePromptAdvancer(this, from") || !harness.includes("await advanceBattlePrompt()")) {
   failures.push("public-ui-harness.mjs: post-turn waits must drive readiness-proven public battle prompts");

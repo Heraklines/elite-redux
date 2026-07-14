@@ -136,6 +136,7 @@ jobs:
             test/browser/coop-public-ui/preview-server.mjs \
             test/browser/coop-public-ui/provision-accounts.mjs \
             test/browser/coop-public-ui/public-ui-harness.mjs \
+            test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs \
             test/browser/coop-public-ui/run.mjs \
             test/browser/coop-public-ui/vite.config.mjs
 
@@ -144,6 +145,9 @@ jobs:
 
       - name: Verify browser fan-out checkout isolation
         run: node --test test/browser/coop-public-ui/browser-workflow-fanout.test.mjs
+
+      - name: Verify bounded public post-turn progress contracts
+        run: node --test test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs
 
       - name: Build normal application with CI-only read-only observer
         env:

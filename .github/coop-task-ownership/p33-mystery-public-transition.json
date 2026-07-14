@@ -3,7 +3,7 @@
   "taskId": "p33-mystery-public-transition-integration",
   "branch": "ci/coop/p33-mystery-public-transition",
   "trainRef": "ci/coop/p33-mystery-public-transition",
-  "baseSha": "f2a114bdd01fc074141dc0dc440bbd065988d21b",
+  "baseSha": "c3e38cf01e28d2e43caa9d050eb762319115593c",
   "allowedFiles": [
     ".github/coop-task-ownership/p33-mystery-public-transition.json",
     ".github/workflows/coop-focused-branch.yml",
