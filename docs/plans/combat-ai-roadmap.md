@@ -92,6 +92,87 @@ dataset the rest of this stands on.
 - **Search over team space** to synthesize counter-teams -> a difficulty knob where high-tier trainers are
   built to counter the PLAYER's specific team.
 
+## Simulation-Driven Balance Pipeline
+
+The maintainer's design-tool vision: **the battle AI doubles as a pre-release balance simulator.** New
+content (abilities / moves / items / relics / field-effects / whole formats) is defined in data as
+effect-flags, injected into the headless engine, and evaluated by **millions of CPU self-play games
+BEFORE any player sees it.** Design decisions get an evidence base instead of guesswork + a live meta.
+
+### First-contact bias + the fix (the core methodology)
+
+A naive evaluation is BIASED: the policy neither wields the new content well nor knows to counter it, so a
+one-shot self-play result says more about unfamiliarity than about balance. **Measure at ADAPTATION
+EQUILIBRIUM, not first contact:**
+
+- Run a brief self-play **fine-tune WITH the candidate content** until its win-rate contribution
+  **plateaus**.
+- If it stays dominant **even after opponents learn to counter it**, it is genuinely overpowered.
+- If it converges to fair, it was only a **surprise mechanic** (strong on first contact, fine once known) -
+  not a balance problem.
+
+Two bias reducers make the equilibrium cheaper to reach and the first-contact read less wrong:
+1. **Effect-vector featurization** (the load-bearing principle above) gives non-trivial **zero-shot** play
+   with content similar to what already exists - the model isn't starting from zero on a recombination.
+2. **Evaluate with model + search (the boss config)** - real-engine search compensates for policy
+   unfamiliarity because it scores **actual engine outcomes**, not just the policy's prior.
+
+### Metrics beyond win-rate
+
+A single win-rate number hides design failures. Report a profile:
+
+- **Win-rate contribution** via **swap / ablation tests** (field the content vs an identical build without
+  it).
+- **Usage-at-equilibrium**: always-picked = over-centralizing; never-picked = dead content.
+- **Counterplay breadth**: the number of DISTINCT strategies that beat it. A one-counter mechanic is a
+  design failure **even at 50% win-rate**.
+- **Variance / swinginess**: a coin-flip detector (does it decide games by luck?).
+- **Decision-entropy as a fun proxy**: does it create real decisions, or auto-pilot?
+- **Game-length impact**: does it drag games out or end them too fast?
+
+### Auto-tuning
+
+The designer specifies the **concept**; the simulator finds the **numbers**. Binary-search / regress a
+move's BP, a proc %, stack counts, etc. against a **target win-rate-contribution band** - the tool returns
+the value that lands the content in range.
+
+### Per-skill-tier balance
+
+Evaluate with the **Elo-laddered policy checkpoints** (the same difficulty-knob checkpoints). Content
+balanced at top play can be broken at low skill and vice versa, so report a **per-tier balance profile**,
+not one aggregate number.
+
+### Design-space exploration (balance-constrained PCG)
+
+A generative loop: an **LLM proposes** candidate abilities in the effect-flag data format -> the
+**simulator evaluates** each at equilibrium -> **survivors are ranked** by balance + decision-entropy ->
+the **designer curates**. Balance-constrained procedural content generation - the machine drafts and
+vets, the human chooses.
+
+### Balance CI + meta forecast
+
+Every patch runs a **standard benchmark suite** (a fixed team pool + an archetype matchup matrix) as a
+**regression gate**. The diff vs the previous patch is the **predicted meta shift** - publishable as
+patch-note **meta forecasts** ("expect X to rise, Y to fall").
+
+### Run-level extension
+
+Battles are only half of a roguelike's balance - **items / relics / economy need RUN-level simulation.**
+The existing headless scenario runner + BST-curve reports already simulate full runs, so the AI simply
+**slots in as the decision-maker**: e.g. a relic's win-rate contribution measured over full **200-wave
+runs**, not just single battles.
+
+### Honest limits
+
+The simulator measures **balance, not fun.** Human telemetry (this pipeline) **calibrates where the AI
+meta diverges from the human meta**, and the **final call stays with the designer** - the tool informs,
+it does not decide.
+
+### Compute
+
+All of this is **CPU self-play + CPU inference of small checkpoints** = the free **GitHub runner fleet**.
+**GPU is only needed for the fine-tune steps**, not for the generation or the evaluation games.
+
 ## Free-compute inventory
 
 - **Training (GPU/TPU):** Kaggle (~30 h/wk GPU + TPU), Colab free, AWS SageMaker Studio Lab, Modal /
