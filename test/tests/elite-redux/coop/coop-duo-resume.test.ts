@@ -100,6 +100,14 @@ async function pumpResumeDestinations(rig: DuoRig, rounds = 2): Promise<void> {
  * contexts while that operation is pending, just as two browsers continue servicing their own event loops.
  */
 async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): Promise<T> {
+  return withClientHarness(ctx, fn);
+}
+
+/**
+ * Run a transaction that is expected to wait for the other browser. Ordinary persistence calls use
+ * {@linkcode withClient} so their async account/runtime fences can never resume under the peer context.
+ */
+async function withPeerPumpingClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): Promise<T> {
   const operation = withClientHarness(ctx, fn);
   const rig = activeResumeRig;
   if (rig == null) {
@@ -289,6 +297,12 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const hostSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(hostJson));
     const commitment = await deriveCoopResumeCommitment(hostJson, hostSession);
     expect(commitment, "the frozen save produces an immutable resume discriminator").not.toBeNull();
+    const guestCloudWrite = vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockResolvedValue({
+      ok: true,
+      status: 200,
+      error: "",
+      failureKind: null,
+    });
     // IDENTITY GATE: the pointer binds the exact run + checkpoint, not merely a partner pair/wave.
     recordCoopResumeMarker(
       2,
@@ -332,11 +346,15 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     );
     expect(booted, "the guest booted from the resumed session snapshot").toBe(true);
     const persisted = await withClient(rig.guestCtx, () =>
-      rig.guestScene.gameData.persistCurrentCoopResumeCheckpoint(hostJson, commitment!, false),
+      rig.guestScene.gameData.persistCurrentCoopResumeCheckpoint(hostJson, commitment!, true),
     );
     expect(persisted.success, "cold resume durably persists the exact candidate before reporting scene readiness").toBe(
       true,
     );
+    expect(
+      guestCloudWrite,
+      "cold resume mirrors the accepted checkpoint into the guest account",
+    ).toHaveBeenCalledOnce();
     const hostApplyBarrier = host.awaitResumeApplied(1_000);
     const delivered = guest.reportResumeApplied(booted);
     await flush();
@@ -478,8 +496,10 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const priorGameplaySlot = rig.guestScene.sessionSlotId;
 
     setBypassLoginForTesting(false);
-    let cloudSlot = -1;
-    let cloudRaw: string | null = null;
+    // An ordinary non-cloud cadence checkpoint may advance only an already cloud-backed replica.
+    // Fresh launch/resume establishes this exact guest-account parent before later lightweight mirrors.
+    let cloudSlot = 0;
+    let cloudRaw: string | null = hostJson;
     const cloudRead = vi
       .spyOn(pokerogueApi.savedata.session, "getCoopCas")
       .mockImplementation(async request =>
@@ -507,7 +527,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     await withClient(rig.guestCtx, () => {
       rig.guestScene.gameData.armCoopResumeCheckpointPersistence();
     });
-    const persisted = await withClient(rig.guestCtx, () => host.sendResumeCheckpoint(hostJson, commitment!));
+    const persisted = await withPeerPumpingClient(rig.guestCtx, () => host.sendResumeCheckpoint(hostJson, commitment!));
     expect(persisted, "guest ACKs only after exact bytes + its own marker are durable locally").toBe(true);
     const marker = readCoopResumeMarker(guest.localName(), host.localName());
     expect(marker, "former guest has its own resume pointer").toMatchObject({ wave: commitment!.wave });
@@ -536,7 +556,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const newerSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(newerJson));
     const newerCommitment = await deriveCoopResumeCommitment(newerJson, newerSession);
     expect(newerCommitment).not.toBeNull();
-    const newerCloudDurable = withClient(rig.guestCtx, () =>
+    const newerCloudDurable = withPeerPumpingClient(rig.guestCtx, () =>
       host.sendResumeCheckpoint(newerJson, newerCommitment!, 30_000, true),
     );
     await flush();
@@ -562,7 +582,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       "a cloud-cadence checkpoint ACKs only after both guest local and guest cloud durability",
     ).resolves.toBe(true);
     await expect(
-      withClient(rig.guestCtx, () => host.sendResumeCheckpoint(newestJson, newestCommitment!, 30_000, true)),
+      withPeerPumpingClient(rig.guestCtx, () => host.sendResumeCheckpoint(newestJson, newestCommitment!, 30_000, true)),
       "the next cloud checkpoint follows the prior mutation in account-wide order",
     ).resolves.toBe(true);
     expect(requestedCloudBytes, "serialized cloud requests preserve causal request order").toEqual([
@@ -600,7 +620,9 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       failureKind: "transient",
     }));
     await expect(
-      withClient(rig.guestCtx, () => host.sendResumeCheckpoint(cloudAheadJson, cloudAheadCommitment!, 30_000, true)),
+      withPeerPumpingClient(rig.guestCtx, () =>
+        host.sendResumeCheckpoint(cloudAheadJson, cloudAheadCommitment!, 30_000, true),
+      ),
       "a failed cloud CAS NACKs instead of exposing a local-only checkpoint as durable",
     ).resolves.toBe(false);
     expect(localStorage.getItem(replicaKey), "cloud failure restores the exact prior encrypted local bytes").toBe(
@@ -618,7 +640,9 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       request.slot === marker!.slot ? coopCasFound(cloudAheadJson) : coopCasMissing(),
     );
     await expect(
-      withClient(rig.guestCtx, () => host.sendResumeCheckpoint(cloudAheadJson, cloudAheadCommitment!, 30_000, true)),
+      withPeerPumpingClient(rig.guestCtx, () =>
+        host.sendResumeCheckpoint(cloudAheadJson, cloudAheadCommitment!, 30_000, true),
+      ),
       "cloud-ahead same-checkpoint receipt converges the stale local replica before ACK",
     ).resolves.toBe(true);
     const convergedLocal = await withClient(rig.guestCtx, () => rig.guestScene.gameData.getSession(marker!.slot));
@@ -635,12 +659,12 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const conflictCommitment = await deriveCoopResumeCommitment(conflictJson, conflictSession);
     expect(conflictCommitment).not.toBeNull();
     await expect(
-      withClient(rig.guestCtx, () => host.sendResumeCheckpoint(conflictJson, conflictCommitment!)),
+      withPeerPumpingClient(rig.guestCtx, () => host.sendResumeCheckpoint(conflictJson, conflictCommitment!)),
       "different exact bytes at the same wave/control revision fail closed",
     ).resolves.toBe(false);
 
     await expect(
-      withClient(rig.guestCtx, () => host.sendResumeCheckpoint(hostJson, commitment!)),
+      withPeerPumpingClient(rig.guestCtx, () => host.sendResumeCheckpoint(hostJson, commitment!)),
       "reordered old checkpoint is rejected without rollback",
     ).resolves.toBe(false);
     const finalReplica = await withClient(rig.guestCtx, () => rig.guestScene.gameData.getSession(marker!.slot));
@@ -676,9 +700,9 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       clearCoopResumeMarker();
       keys.forEach((key, slot) => localStorage.setItem(key, `unrelated-save-${slot}`));
       await withClient(rig.guestCtx, () => rig.guestScene.gameData.armCoopResumeCheckpointPersistence());
-      await expect(withClient(rig.guestCtx, () => host.sendResumeCheckpoint(hostJson, commitment!))).resolves.toBe(
-        false,
-      );
+      await expect(
+        withPeerPumpingClient(rig.guestCtx, () => host.sendResumeCheckpoint(hostJson, commitment!)),
+      ).resolves.toBe(false);
       await expect(
         findCoopResumeCandidate(guest.localName(), host.localName(), "host", async () => undefined),
         "the former guest accepting a later lobby sees known-save evidence, never no-save/New Game",
@@ -743,7 +767,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       });
       await withClient(rig.guestCtx, () => rig.guestScene.gameData.armCoopResumeCheckpointPersistence());
       await expect(
-        withClient(rig.guestCtx, () => host.sendResumeCheckpoint(hostJson, commitment!, 5_000, true)),
+        withPeerPumpingClient(rig.guestCtx, () => host.sendResumeCheckpoint(hostJson, commitment!, 5_000, true)),
         "cloud-only unrelated saves make every candidate slot unsafe",
       ).resolves.toBe(false);
       expect(cloudRead, "every locally absent slot was resolved against cloud state").toHaveBeenCalledTimes(5);
@@ -775,7 +799,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       localStorage.setItem(key, encrypted);
       const updateAll = vi.spyOn(pokerogueApi.savedata, "updateAll").mockResolvedValue("");
       await expect(
-        withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, true, false, true)),
+        withPeerPumpingClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, true, false, true)),
         "cached co-op bytes cannot bypass runtime/controller/generation fencing",
       ).resolves.toBe(false);
       expect(localStorage.getItem(key), "the protected cached row remains byte-identical").toBe(encrypted);
@@ -1458,7 +1482,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       rig.hostScene.sessionSlotId = slot;
       const cloudWrite = vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas");
       await expect(
-        withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+        withPeerPumpingClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
         "local protection is classified before any system/session write",
       ).resolves.toBe(false);
       expect(localStorage.getItem(systemKey)).toBe("system-before-protected-save");
@@ -1903,7 +1927,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       hostSlot = slot!;
       rig.hostScene.sessionSlotId = slot!;
       await expect(
-        withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+        withPeerPumpingClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
       ).resolves.toBe(true);
       await withClient(rig.hostCtx, () => rig.hostScene.gameData.consumeCommittedFreshCoopLaunchSession(1));
 
@@ -1932,7 +1956,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         });
       }
       await expect(
-        withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+        withPeerPumpingClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
         "rollback storage failure is terminal and never rejects the save promise",
       ).resolves.toBe(expectedSave);
       expect(events, "deterministic conflicts never reach the guest; transient debt mirrors locally").toEqual(
@@ -1982,7 +2006,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         sendResumeCheckpoint.mockClear();
         lastGuestReplicaRaw = null;
         await expect(
-          withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+          withPeerPumpingClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
           "a later retry advances from the previously frozen cloud head",
         ).resolves.toBe(true);
         const retryRequest = authorityRequests.at(-1)!;
@@ -2045,7 +2069,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       ).toBe(true);
       rig.hostScene.sessionSlotId = slot!;
       await expect(
-        withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+        withPeerPumpingClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
       ).resolves.toBe(true);
 
       expect(firstSave).toHaveBeenCalledOnce();
@@ -2119,7 +2143,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       rig.hostScene.sessionSlotId = slot!;
       const guestAbort = awaitRetainedLaunchAbort(rig.guestRuntime.battleStream);
       await expect(
-        withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+        withPeerPumpingClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
         "different bytes appearing after the scan make first save fail closed",
       ).resolves.toBe(false);
       await expect(guestAbort, "guest receives the same retained launch-abort outcome").resolves.toBeNull();
@@ -2282,7 +2306,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       const guestAbort = awaitRetainedLaunchAbort(rig.guestRuntime.battleStream);
 
       await expect(
-        withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+        withPeerPumpingClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
         "a never-settling write resolves through bounded readback and terminal coordination",
       ).resolves.toBe(false);
       await expect(guestAbort, "the guest cannot remain on an unbounded first-save wait").resolves.toBeNull();
@@ -2318,7 +2342,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       const guestAbort = awaitRetainedLaunchAbort(rig.guestRuntime.battleStream);
 
       await expect(
-        withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+        withPeerPumpingClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
       ).resolves.toBe(false);
       await expect(guestAbort, "guest observes the retained terminal outcome").resolves.toBeNull();
       expect(
@@ -2353,7 +2377,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       const firstAbort = awaitRetainedLaunchAbort(rig.guestRuntime.battleStream);
 
       await expect(
-        withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+        withPeerPumpingClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
       ).rejects.toThrow("injected serializer failure");
       await expect(firstAbort).resolves.toBeNull();
       await expect(
@@ -2390,7 +2414,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       const slot = await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot());
       rig.hostScene.sessionSlotId = slot!;
       await expect(
-        withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+        withPeerPumpingClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
       ).resolves.toBe(true);
       localStorage.setItem(keys[slot!], "concurrent-post-ack-writer");
       const guestAbort = awaitRetainedLaunchAbort(rig.guestRuntime.battleStream);
@@ -2473,7 +2497,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       });
       const guestAbort = awaitRetainedLaunchAbort(rig.guestRuntime.battleStream);
       await expect(
-        withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
+        withPeerPumpingClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true)),
       ).resolves.toBe(false);
       await expect(guestAbort).resolves.toBeNull();
       expect(firstSave, "valid complete cloud CAS may win before final local check").toHaveBeenCalledOnce();
@@ -2530,7 +2554,9 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       });
       const slot = await withClient(rig.hostCtx, () => rig.hostScene.gameData.findVerifiedEmptyCoopSessionSlot());
       rig.hostScene.sessionSlotId = slot!;
-      const saving = withClient(rig.hostCtx, () => rig.hostScene.gameData.saveAll(true, true, false, false, true));
+      const saving = withPeerPumpingClient(rig.hostCtx, () =>
+        rig.hostScene.gameData.saveAll(true, true, false, false, true),
+      );
       await vi.waitFor(() => expect(guestPersistenceStarted, "host reached guest checkpoint persistence").toBe(true), {
         timeout: 2_000,
         interval: 10,
