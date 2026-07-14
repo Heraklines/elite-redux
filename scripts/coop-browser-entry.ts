@@ -9,12 +9,6 @@ import type { Pokemon } from "../src/field/pokemon";
 // seam used by the browser checkpoint. This file is included only by vite.coop-browser.config.mjs; no staged
 // or production deployment imports it.
 
-// build-only syntax fix, superseded by campaign v2 observer on merge: the file uses top-level `await` but had
-// only dynamic `import()` expressions (no static import/export), so TS treats it as a script and rejects the
-// top-level await (TS1375), which fails the vite:build-html entry replacement. `export {}` makes it a module.
-// Module-shape only; observer semantics are untouched and owned by the campaign branch.
-export {};
-
 await import("../src/main");
 
 const [{ globalScene }, { captureCoopSaveDataDigest }, { canonicalize, fnv1a64 }, { getCoopRuntime }, { UiMode }] =
@@ -399,6 +393,9 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
       }
       return { surfaceId: `confirm:${phase}`, operationClass: "confirm", ownerModel: "interaction" };
     case "MESSAGE":
+      if (phase === "ExpPhase") {
+        return { surfaceId: "battle:exp", operationClass: "battle-progress", ownerModel: "local" };
+      }
       return inMe
         ? { surfaceId: "mystery-encounter:message", operationClass: "encounter-prompt", ownerModel: "interaction" }
         : null;
@@ -527,8 +524,18 @@ function observeSemanticSurface(): void {
     }
 
     const selection = readSelection(handler, uiMode);
+    const promptReady = (handler as unknown as { isAwaitingPromptAction?: () => boolean }).isAwaitingPromptAction;
     const awaitingRaw = (handler as unknown as { awaitingActionInput?: unknown }).awaitingActionInput;
-    const awaitingActionInput = typeof awaitingRaw === "boolean" ? awaitingRaw : null;
+    // MessageUiHandler keeps its raw `awaitingActionInput` bit set after an action has consumed
+    // `onActionInput`. Its public readiness method proves the complete actionable contract and
+    // therefore prevents a read-only browser observer from publishing a stale ready=true between
+    // repeated ExpPhase prompts. Non-message handlers keep the established raw-field projection.
+    const awaitingActionInput =
+      typeof promptReady === "function"
+        ? promptReady.call(handler)
+        : typeof awaitingRaw === "boolean"
+          ? awaitingRaw
+          : null;
 
     const probeKey = [
       semantic.surfaceId,
