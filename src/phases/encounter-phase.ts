@@ -13,12 +13,13 @@ import {
   applyCoopAuthoritativeBattleState,
   applyCoopEnemies,
   captureCoopAuthoritativeBattleState,
+  captureCoopAuthoritativeCarrier,
   captureCoopDexBaseline,
   captureCoopEnemies,
   coopWaveStartEntryEffectSignature,
   normalizeCoopHpBoundsAtAuthorityBoundary,
 } from "#data/elite-redux/coop/coop-battle-engine";
-import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
+import { COOP_WAVE_NO_ME, type CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
@@ -286,76 +287,104 @@ export function captureCoopEncounterAuthority(battle: Battle): CoopEncounterAuth
 }
 
 /**
- * Co-op HOST (#920): RE-BROADCAST the wave-start authoritative state AFTER the on-entry ability chain
- * (PostSummonPhase) has settled and BEFORE the host's first CommandPhase, so the pure-renderer guest -
- * which never runs summon/PostSummon and only ADOPTS host state - picks up EVERY on-entry effect (terrain,
- * weather, entry-hazard/screen arena tags, entry FORM changes) at its own turn-1 belt-and-suspenders adopt
- * (command-phase `tryCoopCheckpointSync` -> {@linkcode applyCoopAuthoritativeBattleState}) rather than at the
- * turn-1 END checkpoint - after it already commanded with stale state (#920 wave-1 GRASSY_SURGE desync).
+ * HOST: publish the complete settled state between PostSummon and the first command decision.
  *
- * The wave-start enemyPartySync ({@linkcode broadcastCoopEnemyParty}) captures its authoritativeState at the
- * PRE-summon encounter boundary, STRICTLY before any entry ability fires, so its terrain/weather/tags/forms
- * are stale. This reuses the SAME carrier (NO new wire type): re-send the enemyPartySync with a POST-PostSummon
- * re-capture, and the guest's already-existing arena/form adopt applies it.
- *
- * IDEMPOTENT / NO-OP: fires the re-send ONLY when the live post-PostSummon entry-effect signature DIFFERS
- * from the one already broadcast for this wave (no entry effect -> no re-send at all). A double-battle's
- * second turn-1 CommandPhase self-latches: the first re-send updated the retained SENT state, so the
- * signatures then match. Host-only + co-op/showdown-only, gated exactly like {@linkcode broadcastCoopEnemyParty}
- * (isAuthoritativeBattleSession + host role); solo / guest / non-host are a hard no-op. It does NOT wait on
- * the interaction counter (plain `transport.send`), so it cannot re-introduce the wave-1 -> wave-2 command
- * rendezvous deadlock the sole-publication comment in {@linkcode broadcastCoopEnemyParty} warns against.
+ * `enemyPartySync` remains the structural pre-summon encounter bootstrap. The actual command-readiness
+ * contract reuses the frozen retained replacement transaction, addressed to this exact epoch/wave/turn and
+ * held until the guest separately proves material, presentation, and real continuation readiness. A raw
+ * refreshed enemy carrier is still emitted when entry mechanics changed for migration compatibility, but it
+ * is no longer authority to open commands. Every first-command boundary gets a retained transaction even
+ * when no entry effect fired; repeat entry returns the original immutable revision.
  */
-export function rebroadcastCoopWaveStartAuthorityAfterEntryEffects(): void {
+export function rebroadcastCoopWaveStartAuthorityAfterEntryEffects(): CoopCheckpointEnvelope | null {
   if (!isAuthoritativeBattleSession()) {
-    return;
+    return null;
   }
   const controller = getCoopController();
   const streamer = getCoopBattleStreamer();
   if (controller == null || streamer == null || controller.role !== "host") {
-    return;
+    return null;
   }
   try {
     const battle = globalScene.currentBattle;
     if (battle == null) {
-      return;
+      return null;
     }
     const wave = battle.waveIndex;
+    const existing = streamer.peekSentCommandStartCheckpoint(controller.sessionEpoch, wave, battle.turn);
+    if (existing != null) {
+      return existing;
+    }
     const sentState = streamer.peekSentEnemyPartyAuthoritativeState(wave);
     if (sentState === undefined) {
-      // No wave-start authoritative state was published for this wave; there is nothing to refresh.
-      return;
+      failCoopSharedSession(`The host reached wave ${wave} commands without a complete encounter bootstrap.`, {
+        boundary: "surface",
+        reasonCode: "authority-missing",
+        wave,
+        turn: battle.turn,
+      });
+      return null;
     }
     const liveSignature = coopWaveStartEntryEffectSignature();
-    if (liveSignature === "" || liveSignature === coopWaveStartEntryEffectSignature(sentState)) {
-      // No on-entry effect mutated arena/forms after the pre-summon capture: a true no-op.
-      return;
+    if (liveSignature !== "" && liveSignature !== coopWaveStartEntryEffectSignature(sentState)) {
+      const enemies = captureCoopEnemies();
+      const authoritativeState = captureCoopAuthoritativeBattleState(battle.turn);
+      if (authoritativeState != null) {
+        const encounter = captureCoopEncounterAuthority(battle);
+        streamer.sendEnemyParty(
+          wave,
+          enemies,
+          battle.mysteryEncounter?.encounterType ?? COOP_WAVE_NO_ME,
+          battle.battleType,
+          authoritativeState,
+          encounter,
+        );
+      }
     }
-    const enemies = captureCoopEnemies();
-    const authoritativeState = captureCoopAuthoritativeBattleState(battle.turn);
-    if (authoritativeState == null) {
-      return;
+    const carrier = captureCoopAuthoritativeCarrier(battle.turn, "replacement");
+    if (carrier == null) {
+      failCoopSharedSession(`The host could not capture settled command authority for wave ${wave}.`, {
+        boundary: "surface",
+        reasonCode: "authority-missing",
+        wave,
+        turn: battle.turn,
+      });
+      return null;
     }
-    const encounter = captureCoopEncounterAuthority(battle);
-    // Re-publish the SAME carrier with the post-summon re-capture. The encounter descriptor is re-sent so
-    // this passes the monotonic-authority guard (a party-only downgrade would be ignored); the guest's
-    // turn-1 belt-and-suspenders re-consumes the buffers and adopts terrain/weather/tags/forms.
-    streamer.sendEnemyParty(
-      wave,
-      enemies,
-      battle.mysteryEncounter?.encounterType ?? COOP_WAVE_NO_ME,
-      battle.battleType,
-      authoritativeState,
-      encounter,
+    const retained = streamer.sendCommandStartCheckpoint(
+      controller.sessionEpoch,
+      carrier.authoritativeState.wave,
+      carrier.authoritativeState.turn,
+      carrier.checkpoint,
+      carrier.checksum,
+      carrier.fullField,
+      carrier.authoritativeState,
     );
+    if (retained == null) {
+      failCoopSharedSession(`The host could not retain settled command authority for wave ${wave}.`, {
+        boundary: "surface",
+        reasonCode: "authority-missing",
+        wave,
+        turn: battle.turn,
+      });
+      return null;
+    }
     coopLog(
       "replay",
-      `host RE-BROADCAST wave-start authority wave=${wave} after post-summon entry effects settled (#920)`,
+      `host retained command-start authority e=${retained.epoch} wave=${wave} turn=${retained.turn} `
+        + `rev=${retained.revision} after PostSummon settled`,
     );
+    return retained;
   } catch (error) {
-    // A re-broadcast failure must never break the host's turn; the guest still heals at the turn-1 END
-    // checkpoint (its prior, slower behavior), so this is strictly best-effort.
-    coopWarn("stream", "host failed to re-broadcast post-summon wave-start authority", error);
+    coopWarn("stream", "host failed to retain post-summon command-start authority", error);
+    const battle = globalScene.currentBattle;
+    failCoopSharedSession("The host could not publish the next shared command boundary.", {
+      boundary: "surface",
+      reasonCode: "authority-missing",
+      wave: battle?.waveIndex,
+      turn: battle?.turn,
+    });
+    return null;
   }
 }
 

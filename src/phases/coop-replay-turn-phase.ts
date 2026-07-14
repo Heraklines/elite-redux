@@ -7,17 +7,8 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
+import { applyCoopRetainedCheckpointTransaction } from "#data/elite-redux/coop/coop-authority-apply";
 import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
-import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
-import {
-  applyCoopAuthoritativeBattleState,
-  applyCoopCheckpoint,
-  applyCoopFieldSnapshot,
-  captureCoopChecksum,
-  coopAppliedStateTick,
-  drainCoopApplyFailures,
-  reapplyAcceptedCoopAuthoritativeBattleState,
-} from "#data/elite-redux/coop/coop-battle-engine";
 import type { CoopAuthorityFailure, CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-presentation";
@@ -253,7 +244,7 @@ export class CoopReplayTurnPhase extends Phase {
               "checkpoint",
               `guest apply OUT-OF-BAND checkpoint mid-park reason=${envelope.reason} turn=${this.turn}`,
             );
-            if (!this.applyReplacementTransaction(envelope)) {
+            if (!applyCoopRetainedCheckpointTransaction(envelope, isCoopAuthoritativeGuest())) {
               this.parkForReplacementRetry(streamer, envelope);
               return;
             }
@@ -517,92 +508,6 @@ export class CoopReplayTurnPhase extends Phase {
       return;
     }
     this.failAuthority(streamer, "replacement", reason, failed);
-  }
-
-  /**
-   * Apply one complete replacement frame and prove exact convergence before control can reopen. This is a
-   * control/consumption transaction, not a rollback-capable data transaction: lower-level appliers may have
-   * mutated state before reporting failure, so a same-frame retry explicitly reasserts the accepted state.
-   */
-  private applyReplacementTransaction(envelope: CoopCheckpointEnvelope): boolean {
-    const state = envelope.authoritativeState;
-    const fullField = envelope.fullField;
-    const checkpointTick = envelope.checkpoint.tick;
-    const stateTick = state?.tick;
-    if (
-      envelope.reason !== "replacement"
-      || !Number.isSafeInteger(checkpointTick)
-      || (checkpointTick as number) <= 0
-      || !Number.isSafeInteger(stateTick)
-      || (stateTick as number) <= (checkpointTick as number)
-      || !Array.isArray(fullField)
-      || fullField.length === 0
-      || envelope.checksum === COOP_CHECKSUM_SENTINEL
-    ) {
-      coopWarn(
-        "checkpoint",
-        `guest rejected incomplete replacement frame reason=${envelope.reason} `
-          + `checkpointTick=${checkpointTick ?? "missing"} stateTick=${stateTick ?? "missing"} `
-          + `fullField=${fullField?.length ?? 0} checksum=${envelope.checksum}`,
-      );
-      return false;
-    }
-
-    try {
-      const admittedBefore = coopAppliedStateTick();
-      if (
-        admittedBefore > (stateTick as number)
-        || (admittedBefore > (checkpointTick as number) && admittedBefore < (stateTick as number))
-      ) {
-        coopWarn(
-          "checkpoint",
-          `guest replacement ticks ${checkpointTick}/${stateTick} conflict with lastApplied=${admittedBefore}`,
-        );
-        return false;
-      }
-
-      // A failed first attempt may already have admitted one or both ticks. Retry the same pair
-      // idempotently, reasserting the authoritative state rather than treating it as permanently stale.
-      const checkpointAlreadyApplied =
-        admittedBefore === (checkpointTick as number) || admittedBefore === (stateTick as number);
-      const checkpointApplied = checkpointAlreadyApplied || applyCoopCheckpoint(envelope.checkpoint);
-      const admittedAfterCheckpoint = coopAppliedStateTick();
-      const authoritativeAlreadyApplied = admittedAfterCheckpoint === (stateTick as number);
-      const authoritativeApplied =
-        checkpointApplied
-        && (authoritativeAlreadyApplied
-          ? reapplyAcceptedCoopAuthoritativeBattleState(state, isCoopAuthoritativeGuest())
-          : applyCoopAuthoritativeBattleState(state, isCoopAuthoritativeGuest()));
-      if (authoritativeApplied) {
-        applyCoopFieldSnapshot(fullField, isCoopAuthoritativeGuest());
-      }
-      const failures = drainCoopApplyFailures();
-      const guestChecksum = captureCoopChecksum();
-      const converged =
-        checkpointApplied
-        && authoritativeApplied
-        && failures.length === 0
-        && guestChecksum !== COOP_CHECKSUM_SENTINEL
-        && guestChecksum === envelope.checksum;
-      if (converged) {
-        coopLog(
-          "checkpoint",
-          `guest replacement transaction COMMIT host=guest=${guestChecksum} `
-            + `checkpoint=${checkpointAlreadyApplied ? "reused" : "applied"} `
-            + `state=${authoritativeAlreadyApplied ? "reasserted" : "applied"}`,
-        );
-        return true;
-      }
-      coopWarn(
-        "checkpoint",
-        `guest replacement transaction NOT converged checkpointApplied=${checkpointApplied} `
-          + `authoritativeApplied=${authoritativeApplied} failures=${failures.length} `
-          + `host=${envelope.checksum} guest=${guestChecksum}`,
-      );
-    } catch (error) {
-      coopWarn("checkpoint", "guest replacement transaction threw; frame retained", error);
-    }
-    return false;
   }
 
   private awaitReplacementPresentation(

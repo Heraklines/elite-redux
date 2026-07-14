@@ -5,7 +5,9 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
+import { applyCoopRetainedCheckpointTransaction } from "#data/elite-redux/coop/coop-authority-apply";
 import { applyCoopAuthoritativeBattleState } from "#data/elite-redux/coop/coop-battle-engine";
+import type { CoopCheckpointEnvelope } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
@@ -13,17 +15,25 @@ import {
   type ResolvedPartnerCommand,
   resolvePartnerCommand,
 } from "#data/elite-redux/coop/coop-partner-ai";
-import { ensureCoopAuthoritativeCommandPresentation } from "#data/elite-redux/coop/coop-presentation";
+import {
+  ensureCoopAuthoritativeCommandPresentation,
+  settleCoopAuthoritativeProjection,
+} from "#data/elite-redux/coop/coop-presentation";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   coopHasPendingWaveAdvance,
+  coopLocalOwnedPlayerFieldSlot,
   coopOwnerOfPlayerFieldSlot,
+  coopSessionGeneration,
+  failCoopSharedSession,
   getCoopBattleStreamer,
   getCoopBattleSync,
   getCoopController,
   getCoopNetcodeMode,
   getCoopRendezvous,
   getCoopRuntime,
+  isAuthoritativeBattleSession,
+  isCoopAuthoritativeGuest,
   isCoopSharedTerminalFrozen,
   isVersusSession,
   recordCoopOwnSlotCommand,
@@ -66,6 +76,11 @@ import type { TurnMove } from "#types/turn-move";
 import { canTerastallize } from "#utils/pokemon-utils";
 import i18next from "i18next";
 
+const COOP_COMMAND_START_AUTHORITY_WAIT_MS = 150_000;
+const COOP_COMMAND_START_PRESENTATION_WAIT_MS = 15_000;
+const COOP_COMMAND_START_APPLY_ATTEMPTS = 3;
+type CoopCommandStartProof = CoopCheckpointEnvelope | "host" | false;
+
 export class CommandPhase extends FieldPhase {
   public readonly phaseName = "CommandPhase";
   protected fieldIndex: number;
@@ -77,6 +92,9 @@ export class CommandPhase extends FieldPhase {
 
   /** Showdown versus-host 60s turn clock (timeout id); null when unarmed. */
   private showdownTurnClock: number | null = null;
+
+  /** A retained command-start preflight is single-flight for this phase instance. */
+  private coopCommandStartPreflightPending = false;
 
   constructor(fieldIndex: number) {
     super();
@@ -564,7 +582,7 @@ export class CommandPhase extends FieldPhase {
    * guarded: no-op outside a live co-op session, and the apply/capture are themselves
    * wrapped so a sync hiccup can never break the turn.
    */
-  private tryCoopCheckpointSync(): void {
+  private consumeCoopWaveStartBootstrap(): void {
     if (!globalScene.gameMode.isCoop) {
       return;
     }
@@ -589,14 +607,6 @@ export class CommandPhase extends FieldPhase {
         adoptCoopEnemiesStructural(enemies);
         applyCoopAuthoritativeBattleState(streamer.consumeEnemyPartyState(waveIndex), true);
       }
-    } else if (controller.role === "host" && turn === 1 && this.fieldIndex === 0) {
-      // Co-op HOST (#920): the entry-ability chain (PostSummonPhase) has now settled - terrain, weather,
-      // entry-hazard arena tags and entry form changes are on the arena/field, but the wave-start
-      // enemyPartySync captured its authoritative state BEFORE PostSummon (pre-summon boundary). Re-broadcast
-      // the post-summon re-capture so the guest adopts those on-entry effects at its OWN turn-1 belt-and-
-      // suspenders above, BEFORE it commands, instead of at the turn-1 END checkpoint. Gated to field slot 0
-      // so it evaluates once per wave; a hard no-op unless an entry effect actually changed state (self-latching).
-      rebroadcastCoopWaveStartAuthorityAfterEntryEffects();
     }
   }
 
@@ -608,7 +618,7 @@ export class CommandPhase extends FieldPhase {
     // membership must come from an authoritative seat manifest, never a local presentation guess.
     ensureCoopAuthoritativeCommandPresentation();
 
-    this.tryCoopCheckpointSync();
+    this.consumeCoopWaveStartBootstrap();
 
     globalScene.updateGameInfo();
     this.resetCursorIfNeeded();
@@ -619,16 +629,56 @@ export class CommandPhase extends FieldPhase {
 
     this.checkCommander();
 
+    const commandStartPreflight = this.beginCoopCommandStartAuthorityPreflight();
+    if (commandStartPreflight != null) {
+      this.coopCommandStartPreflightPending = true;
+      void commandStartPreflight.then(proof => {
+        this.coopCommandStartPreflightPending = false;
+        if (proof === false) {
+          return;
+        }
+        this.continueCommandStart(proof === "host" ? undefined : proof, true);
+      });
+      return;
+    }
+    if (this.coopCommandStartPreflightPending) {
+      return;
+    }
+    this.continueCommandStart(undefined, false);
+  }
+
+  /** Continue only after the wave-start retained authority preflight (when one applies) has completed. */
+  private continueCommandStart(commandStart: CoopCheckpointEnvelope | undefined, commandBarrierCrossed: boolean): void {
     if (globalScene.currentBattle.turnCommands[this.fieldIndex]?.skip) {
+      if (!this.completeCommittedCommandStart(commandStart)) {
+        return;
+      }
       this.end();
       return;
     }
 
     if (this.tryExecuteQueuedMove()) {
+      if (
+        globalScene.currentBattle.turnCommands[this.fieldIndex] != null
+        && !this.completeCommittedCommandStart(commandStart)
+      ) {
+        return;
+      }
       return;
     }
 
     if (this.tryCoopAutoResolve()) {
+      if (
+        globalScene.currentBattle.turnCommands[this.fieldIndex] != null
+        && !this.completeCommittedCommandStart(commandStart)
+      ) {
+        return;
+      }
+      return;
+    }
+
+    if (commandBarrierCrossed) {
+      this.openOwnCommandUi();
       return;
     }
 
@@ -649,14 +699,246 @@ export class CommandPhase extends FieldPhase {
     }
     void pendingBarrier.then(crossed => {
       if (crossed) {
-        // The guest can reach turn-1 CommandPhase first and consume the PRE-summon enemyPartySync while
-        // the host is still draining PostSummon. The host publishes its refreshed full authority before it
-        // arrives at this same rendezvous; RTCDataChannel ordering therefore puts that refresh ahead of the
-        // arrival that releases us. Re-consume at the crossed boundary so entry stat stages/weather/forms
-        // land before public input opens, instead of leaving the refreshed carrier buffered until too late.
-        this.tryCoopCheckpointSync();
         this.openOwnCommandUi();
       }
+    });
+  }
+
+  /**
+   * First command of a live peer wave: freeze one complete host state after PostSummon, rendezvous both
+   * clients, and keep every executable path closed until the guest has applied that exact addressed frame.
+   * The host waits only for materialApplied; the retained commit itself survives until the guest separately
+   * proves presentation and a real public/committed continuation.
+   */
+  private beginCoopCommandStartAuthorityPreflight(): Promise<CoopCommandStartProof> | null {
+    if (
+      this.coopCommandStartPreflightPending
+      || !globalScene.gameMode.isCoop
+      || !isAuthoritativeBattleSession()
+      || getCoopRuntime()?.spoof != null
+      || globalScene.currentBattle.turn !== 1
+    ) {
+      return null;
+    }
+    const scene = globalScene;
+    const battle = scene.currentBattle;
+    const runtime = getCoopRuntime();
+    const controller = getCoopController();
+    const streamer = getCoopBattleStreamer();
+    if (runtime == null || controller == null || streamer == null) {
+      return null;
+    }
+    const isHostBoundary = controller.role === "host" && this.fieldIndex === 0;
+    const isGuestBoundary =
+      controller.role === "guest"
+      && this.fieldIndex === coopLocalOwnedPlayerFieldSlot()
+      && coopOwnerOfPlayerFieldSlot(this.fieldIndex) === "guest";
+    if (!isHostBoundary && !isGuestBoundary) {
+      return null;
+    }
+    const generation = coopSessionGeneration();
+    const address = { epoch: controller.sessionEpoch, wave: battle.waveIndex, turn: battle.turn };
+    const stillCurrent = (): boolean =>
+      globalScene === scene
+      && getCoopRuntime() === runtime
+      && getCoopBattleStreamer() === streamer
+      && coopSessionGeneration() === generation
+      && scene.currentBattle === battle
+      && battle.waveIndex === address.wave
+      && battle.turn === address.turn
+      && scene.phaseManager.getCurrentPhase() === this
+      && !isCoopSharedTerminalFrozen(runtime);
+
+    let hostEnvelope: CoopCheckpointEnvelope | null = null;
+    if (isHostBoundary) {
+      // Co-op HOST (#920/P33): PostSummon is now settled. Publish before ARRIVE so ordered transport
+      // delivery guarantees the guest cannot cross this boundary without the retained carrier preceding it.
+      hostEnvelope = rebroadcastCoopWaveStartAuthorityAfterEntryEffects();
+      if (hostEnvelope == null) {
+        return Promise.resolve(false);
+      }
+    }
+
+    const barrier = this.coopNextCommandBarrier();
+    const crossed = barrier ?? Promise.resolve(true);
+    return crossed.then(didCross => {
+      if (!didCross || !stillCurrent()) {
+        return false;
+      }
+      if (isHostBoundary) {
+        return this.finishHostCommandStartPreflight(hostEnvelope!, streamer, address.wave, stillCurrent);
+      }
+      return this.finishGuestCommandStartPreflight(address, streamer, stillCurrent);
+    });
+  }
+
+  private async finishHostCommandStartPreflight(
+    envelope: CoopCheckpointEnvelope,
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    wave: number,
+    stillCurrent: () => boolean,
+  ): Promise<CoopCommandStartProof> {
+    const applied = await this.awaitBoundedCommandStartProof(
+      streamer.waitForReplacementMaterialApplied(envelope),
+      streamer,
+      COOP_COMMAND_START_AUTHORITY_WAIT_MS,
+    );
+    if (applied && stillCurrent()) {
+      return "host";
+    }
+    if (stillCurrent()) {
+      this.failCommandStartAuthority(
+        `Your partner did not apply the retained command state for wave ${wave}.`,
+        envelope,
+      );
+    }
+    return false;
+  }
+
+  private async finishGuestCommandStartPreflight(
+    address: { epoch: number; wave: number; turn: number },
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    stillCurrent: () => boolean,
+  ): Promise<CoopCommandStartProof> {
+    let envelope = await streamer.awaitReplacementCheckpointAt(address, COOP_COMMAND_START_AUTHORITY_WAIT_MS);
+    for (let attempt = 1; attempt <= COOP_COMMAND_START_APPLY_ATTEMPTS; attempt++) {
+      if (envelope == null || !stillCurrent()) {
+        break;
+      }
+      if (applyCoopRetainedCheckpointTransaction(envelope, isCoopAuthoritativeGuest())) {
+        return this.finishAppliedGuestCommandStart(envelope, streamer, stillCurrent);
+      }
+      if (attempt < COOP_COMMAND_START_APPLY_ATTEMPTS) {
+        coopWarn(
+          "checkpoint",
+          `guest command-start apply failed attempt=${attempt}/${COOP_COMMAND_START_APPLY_ATTEMPTS}; `
+            + `requesting exact retained revision ${envelope.revision}`,
+        );
+        envelope = await streamer.awaitReplacementCheckpointRedelivery(envelope);
+      }
+    }
+    if (stillCurrent()) {
+      this.failCommandStartAuthority(
+        `The retained command state for wave ${address.wave} could not be recovered.`,
+        envelope ?? undefined,
+      );
+    }
+    return false;
+  }
+
+  private async finishAppliedGuestCommandStart(
+    envelope: CoopCheckpointEnvelope,
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    stillCurrent: () => boolean,
+  ): Promise<CoopCommandStartProof> {
+    if (!streamer.acknowledgeReplacement(envelope, "materialApplied")) {
+      return false;
+    }
+    const projectionReady = await this.awaitBoundedCommandStartProof(
+      settleCoopAuthoritativeProjection(envelope.authoritativeState),
+      streamer,
+      COOP_COMMAND_START_PRESENTATION_WAIT_MS,
+    );
+    if (!projectionReady || !stillCurrent()) {
+      if (stillCurrent()) {
+        this.failCommandStartAuthority(
+          `The retained command state for wave ${envelope.wave} could not open a complete battle view.`,
+          envelope,
+        );
+      }
+      return false;
+    }
+    const registered =
+      streamer.acknowledgeReplacement(envelope, "presentationReady")
+      && streamer.registerReplacementContinuation(envelope, {
+        kind: "command",
+        epoch: envelope.epoch,
+        wave: envelope.wave,
+        turn: envelope.turn,
+      })
+      && streamer.consumeExactCheckpoint(envelope);
+    if (registered) {
+      return envelope;
+    }
+    this.failCommandStartAuthority(
+      `The retained command transaction for wave ${envelope.wave} changed before continuation.`,
+      envelope,
+    );
+    return false;
+  }
+
+  /** Bound an authority wait with the stream's injected scheduler so deterministic fault tests own time. */
+  private awaitBoundedCommandStartProof(
+    proof: Promise<boolean>,
+    streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>,
+    timeoutMs: number,
+  ): Promise<boolean> {
+    return new Promise(resolve => {
+      let settled = false;
+      let cancel = () => {};
+      const finish = (result: boolean): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cancel();
+        resolve(result);
+      };
+      const scheduledCancel = streamer.scheduleAuthorityRetry(() => finish(false), timeoutMs);
+      if (settled) {
+        scheduledCancel();
+      } else {
+        cancel = scheduledCancel;
+      }
+      void proof.then(
+        result => finish(result),
+        () => finish(false),
+      );
+    });
+  }
+
+  /**
+   * Forced, queued, and pre-seeded skip paths have no public menu to report. Release their registered
+   * command continuation only when this authoritative guest owns the slot and a concrete command record
+   * already exists; interactive paths return here with no envelope and rely on the UI post-commit hook.
+   */
+  private completeCommittedCommandStart(envelope: CoopCheckpointEnvelope | undefined): boolean {
+    if (!isCoopAuthoritativeGuest()) {
+      return true;
+    }
+    const streamer = getCoopBattleStreamer();
+    const controller = getCoopController();
+    const command = globalScene.currentBattle.turnCommands[this.fieldIndex];
+    if (
+      streamer != null
+      && controller?.role === "guest"
+      && isCoopAuthoritativeGuest()
+      && coopOwnerOfPlayerFieldSlot(this.fieldIndex) === "guest"
+      && command != null
+      && streamer.notifyCommittedCommandContinuation(envelope) > 0
+    ) {
+      return true;
+    }
+    if (envelope == null) {
+      // Most turns have no retained replacement waiting at this address. A committed forced/queued command
+      // is still complete; the notifier's zero simply means there was no transaction to release.
+      return true;
+    }
+    this.failCommandStartAuthority(
+      `The retained command state for wave ${envelope.wave} did not produce an executable local command.`,
+      envelope,
+    );
+    return false;
+  }
+
+  private failCommandStartAuthority(reason: string, envelope?: CoopCheckpointEnvelope): void {
+    coopWarn("checkpoint", reason);
+    failCoopSharedSession(reason, {
+      boundary: "surface",
+      reasonCode: "recovery-exhausted",
+      wave: envelope?.wave ?? globalScene.currentBattle?.waveIndex,
+      turn: envelope?.turn ?? globalScene.currentBattle?.turn,
+      boundaryRevision: envelope?.revision,
     });
   }
 

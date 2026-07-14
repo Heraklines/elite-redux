@@ -744,7 +744,11 @@ export class CoopBattleStreamer {
     string,
     AckEvidence<Extract<CoopMessage, { t: "battleCheckpointAck" }>>
   >();
+  /** HOST: exact phase barriers waiting only for the peer's ordered materialApplied replacement proof. */
+  private readonly hostReplacementMaterialWaiters = new Map<string, Set<(applied: boolean) => void>>();
   private readonly pendingReplacementContinuations = new Map<string, PendingReplacementContinuation>();
+  /** HOST: one immutable post-PostSummon command-start carrier per complete session/wave/turn address. */
+  private readonly sentCommandStartAuthorities = new Map<string, CoopCheckpointEnvelope>();
   /** HOST: bounded proof that a causally newer replacement was ACKed before an old turn is superseded. */
   private readonly hostAppliedReplacementAcks = new Map<string, Extract<CoopMessage, { t: "battleCheckpointAck" }>>();
   private authorityFailureHandlers = new Set<(failure: CoopAuthorityFailure) => void>();
@@ -1105,6 +1109,11 @@ export class CoopBattleStreamer {
     return [...this.pendingCheckpoints.entries()].at(-1);
   }
 
+  /** Newest retained replacement at one complete address, independent of the ambient authority cursor. */
+  private checkpointEntryAt(address: CoopTurnAddress): [string, CoopCheckpointEnvelope] | undefined {
+    return newestAuthorityAtAddress(this.pendingCheckpoints, address);
+  }
+
   private checkpointCanWakeTurn(
     envelope: CoopCheckpointEnvelope,
     waitedAddress: CoopTurnAddress | null,
@@ -1141,6 +1150,7 @@ export class CoopBattleStreamer {
   }
 
   private clearRetainedAuthorityAfterTerminal(): void {
+    this.settleAllReplacementMaterialWaiters(false);
     this.sentTurnCommits.clear();
     this.issuedTurnAuthority.clear();
     this.sentTurnCommitDeadlines.clear();
@@ -1155,6 +1165,7 @@ export class CoopBattleStreamer {
     this.pendingTurnContinuations.clear();
     this.ackedReplacementCommits.clear();
     this.hostReplacementAckEvidence.clear();
+    this.sentCommandStartAuthorities.clear();
     this.pendingReplacementContinuations.clear();
     this.hostAppliedReplacementAcks.clear();
     this.inbox.clear();
@@ -1176,6 +1187,7 @@ export class CoopBattleStreamer {
   }
 
   private cancelAuthorityGameplayWaiters(): void {
+    this.settleAllReplacementMaterialWaiters(false);
     for (const pending of [...this.pending.values()]) {
       pending.finish(null);
     }
@@ -1257,7 +1269,8 @@ export class CoopBattleStreamer {
         + this.launchSnapshotWaiters.size
         + this.stateSyncWaiters.size
         + this.pendingTurnContinuations.size
-        + this.pendingReplacementContinuations.size,
+        + this.pendingReplacementContinuations.size
+        + this.hostReplacementMaterialWaiters.size,
       fatalPending: this.pendingAuthorityFailure != null,
       terminal: this.authorityTerminalStarted,
     };
@@ -1624,9 +1637,9 @@ export class CoopBattleStreamer {
     checksum: string,
     fullField: CoopFullMonSnapshot[],
     authoritativeState: CoopAuthoritativeBattleStateV1,
-  ): void {
+  ): CoopCheckpointEnvelope | null {
     if (this.authorityTerminalStarted) {
-      return;
+      return null;
     }
     const revision = authoritativeState.tick;
     coopLog(
@@ -1655,11 +1668,221 @@ export class CoopBattleStreamer {
         "checkpoint",
         `host WITHHOLD replacement e=${epoch} wave=${wave} turn=${turn}: authority terminal active`,
       );
-      return;
+      return null;
     }
     this.transport.send({
       t: "battleCheckpoint",
       ...envelope,
+    });
+    return structuredClone(envelope);
+  }
+
+  /**
+   * HOST: publish one settled post-PostSummon state image for the first command boundary. The wire remains
+   * the frozen replacement transaction; command-start is a local producer label only. Re-entering the same
+   * CommandPhase returns the immutable original revision instead of minting a conflicting second authority.
+   */
+  sendCommandStartCheckpoint(
+    epoch: number,
+    wave: number,
+    turn: number,
+    checkpoint: CoopBattleCheckpoint,
+    checksum: string,
+    fullField: CoopFullMonSnapshot[],
+    authoritativeState: CoopAuthoritativeBattleStateV1,
+  ): CoopCheckpointEnvelope | null {
+    const address = { epoch, wave, turn };
+    const current = this.currentAuthorityAddress();
+    if (
+      !isSafeAddressPart(epoch, false)
+      || !isSafeAddressPart(wave, false)
+      || !isSafeAddressPart(turn, false)
+      || (this.authorityContext != null && (current == null || !sameTurnAddress(address, current)))
+    ) {
+      return null;
+    }
+    const addressKey = pendingTurnKey(address);
+    const existing = this.sentCommandStartAuthorities.get(addressKey);
+    if (existing != null) {
+      return structuredClone(existing);
+    }
+    const published = this.sendCheckpoint(
+      "replacement",
+      epoch,
+      wave,
+      turn,
+      checkpoint,
+      checksum,
+      fullField,
+      authoritativeState,
+    );
+    if (published == null) {
+      return null;
+    }
+    rememberBounded(this.sentCommandStartAuthorities, addressKey, structuredClone(published));
+    coopLog("checkpoint", `host RETAIN command-start e=${epoch} wave=${wave} turn=${turn} rev=${published.revision}`);
+    return structuredClone(published);
+  }
+
+  /** HOST: inspect an already-published command-start authority without changing retention or replay state. */
+  peekSentCommandStartCheckpoint(epoch: number, wave: number, turn: number): CoopCheckpointEnvelope | null {
+    const retained = this.sentCommandStartAuthorities.get(pendingTurnKey({ epoch, wave, turn }));
+    return retained == null ? null : structuredClone(retained);
+  }
+
+  /**
+   * HOST phase barrier: wait for the exact guest to apply the immutable checkpoint mechanically. This does
+   * not release retention; presentationReady and continuationReady remain separately required afterward.
+   */
+  waitForReplacementMaterialApplied(envelope: CoopCheckpointEnvelope): Promise<boolean> {
+    if (this.authorityTerminalStarted || this.disposed || envelope.reason !== "replacement") {
+      return Promise.resolve(false);
+    }
+    const key = authorityKey(envelope);
+    const evidence = this.hostReplacementAckEvidence.get(key);
+    if (evidence != null && AUTHORITY_ACK_STAGE_ORDER[evidence.stage] >= AUTHORITY_ACK_STAGE_ORDER.materialApplied) {
+      return Promise.resolve(true);
+    }
+    const retained = this.sentReplacementCheckpoints.get(key);
+    if (retained == null || !sameAuthorityAckIdentity(retained, envelope)) {
+      return Promise.resolve(false);
+    }
+    let waiters = this.hostReplacementMaterialWaiters.get(key);
+    if (waiters == null) {
+      waiters = new Set();
+      this.hostReplacementMaterialWaiters.set(key, waiters);
+    }
+    return new Promise(resolve => waiters?.add(resolve));
+  }
+
+  private settleReplacementMaterialWaiters(key: string, applied: boolean): void {
+    const waiters = this.hostReplacementMaterialWaiters.get(key);
+    if (waiters == null) {
+      return;
+    }
+    this.hostReplacementMaterialWaiters.delete(key);
+    for (const resolve of waiters) {
+      resolve(applied);
+    }
+  }
+
+  private settleAllReplacementMaterialWaiters(applied: boolean): void {
+    for (const key of [...this.hostReplacementMaterialWaiters.keys()]) {
+      this.settleReplacementMaterialWaiters(key, applied);
+    }
+  }
+
+  /**
+   * GUEST: await the exact current-address retained checkpoint. Used only after the reciprocal command
+   * rendezvous, where ordered delivery says the host published first; the wait covers an intentionally
+   * dropped first frame until the host's retained retry arrives. It never accepts another epoch/wave/turn.
+   */
+  awaitReplacementCheckpointAt(
+    address: { epoch: number; wave: number; turn: number },
+    timeoutMs = 12_000,
+  ): Promise<CoopCheckpointEnvelope | null> {
+    if (
+      this.authorityTerminalStarted
+      || this.disposed
+      || !isSafeAddressPart(address.epoch, false)
+      || !isSafeAddressPart(address.wave, false)
+      || !isSafeAddressPart(address.turn, false)
+      || !Number.isFinite(timeoutMs)
+      || timeoutMs <= 0
+    ) {
+      return Promise.resolve(null);
+    }
+    const matches = (envelope: CoopCheckpointEnvelope | null): envelope is CoopCheckpointEnvelope =>
+      envelope != null
+      && envelope.reason === "replacement"
+      && envelope.epoch === address.epoch
+      && envelope.wave === address.wave
+      && envelope.turn === address.turn;
+    const buffered = this.checkpointEntryAt(address)?.[1] ?? null;
+    if (matches(buffered)) {
+      return Promise.resolve(buffered);
+    }
+    return new Promise(resolve => {
+      let settled = false;
+      let stop = () => {};
+      let cancel = () => {};
+      const finish = (envelope: CoopCheckpointEnvelope | null): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        stop();
+        cancel();
+        resolve(envelope);
+      };
+      stop = this.onCheckpointEnvelope(envelope => {
+        if (matches(envelope)) {
+          finish(envelope);
+        }
+      });
+      const scheduledCancel = this.schedule(() => finish(null), timeoutMs);
+      if (settled) {
+        scheduledCancel();
+      } else {
+        cancel = scheduledCancel;
+      }
+      // Close the subscribe/peek race for transports that schedule delivery in a microtask.
+      const raced = this.checkpointEntryAt(address)?.[1] ?? null;
+      if (matches(raced)) {
+        finish(raced);
+      }
+    });
+  }
+
+  /**
+   * GUEST: request and await one fresh delivery of the exact immutable replacement revision. Unlike
+   * {@linkcode awaitReplacementCheckpointAt}, this deliberately does not resolve from the existing buffer:
+   * a failed transactional apply keeps that buffer as the rollback/retry source, while this observer proves
+   * the host still retains and can retransmit the same commit. The receiver's explicit-redelivery path then
+   * reopens the safe-boundary buffer and notifies this waiter.
+   */
+  awaitReplacementCheckpointRedelivery(
+    envelope: CoopCheckpointEnvelope,
+    timeoutMs = 4_000,
+  ): Promise<CoopCheckpointEnvelope | null> {
+    if (
+      this.authorityTerminalStarted
+      || this.disposed
+      || envelope.reason !== "replacement"
+      || !Number.isFinite(timeoutMs)
+      || timeoutMs <= 0
+    ) {
+      return Promise.resolve(null);
+    }
+    const matches = (candidate: CoopCheckpointEnvelope): boolean =>
+      candidate.reason === "replacement" && sameAuthorityAckIdentity(candidate, envelope);
+    return new Promise(resolve => {
+      let settled = false;
+      let stop = () => {};
+      let cancel = () => {};
+      const finish = (candidate: CoopCheckpointEnvelope | null): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        stop();
+        cancel();
+        resolve(candidate);
+      };
+      stop = this.onCheckpointEnvelope(candidate => {
+        if (matches(candidate)) {
+          finish(candidate);
+        }
+      });
+      const scheduledCancel = this.schedule(() => finish(null), timeoutMs);
+      if (settled) {
+        scheduledCancel();
+      } else {
+        cancel = scheduledCancel;
+      }
+      if (!settled) {
+        this.requestReplacementCheckpoint(envelope);
+      }
     });
   }
 
@@ -2015,6 +2238,38 @@ export class CoopBattleStreamer {
     }
     this.pendingReplacementContinuations.set(key, pending);
     return true;
+  }
+
+  /**
+   * GUEST: complete an already-registered command continuation without pretending that a UI opened. This
+   * is reserved for forced/queued/skip paths whose exact local command record is already executable; the
+   * CommandPhase caller owns that mechanical proof. Interactive paths must continue through
+   * {@linkcode notifyContinuationSurface} after the real COMMAND/FIGHT handler commits.
+   */
+  notifyCommittedCommandContinuation(envelope?: CoopCheckpointEnvelope): number {
+    if (this.authorityTerminalStarted || (envelope != null && envelope.reason !== "replacement")) {
+      return 0;
+    }
+    const current = this.currentAuthorityAddress();
+    if (current == null) {
+      return 0;
+    }
+    let released = 0;
+    for (const pending of [...this.pendingReplacementContinuations.values()]) {
+      if (
+        pending.expectation.kind !== "command"
+        || (envelope != null && !sameAuthorityAckIdentity(pending.envelope, envelope))
+        || current.epoch !== pending.expectation.epoch
+        || current.wave !== pending.expectation.wave
+        || current.turn !== pending.expectation.turn
+      ) {
+        continue;
+      }
+      if (this.acknowledgeReplacement(pending.envelope, "continuationReady")) {
+        released++;
+      }
+    }
+    return released;
   }
 
   private continuationMatches(
@@ -2732,6 +2987,20 @@ export class CoopBattleStreamer {
     return entry[1];
   }
 
+  /** GUEST: consume only the exact verified replacement revision, preserving every unrelated address. */
+  consumeExactCheckpoint(envelope: CoopCheckpointEnvelope): boolean {
+    if (envelope.reason !== "replacement") {
+      return false;
+    }
+    const key = bufferedAuthorityKey("replacement", envelope);
+    const buffered = this.pendingCheckpoints.get(key);
+    if (buffered == null || !sameAuthorityAckIdentity(buffered, envelope)) {
+      return false;
+    }
+    discardAuthorityThrough(this.pendingCheckpoints, buffered);
+    return true;
+  }
+
   /** Inspect, but do not consume, the latest authoritative checkpoint envelope. */
   peekCheckpoint(): CoopCheckpointEnvelope | null {
     return this.currentCheckpointEntry()?.[1] ?? null;
@@ -3096,6 +3365,7 @@ export class CoopBattleStreamer {
   /** Stop listening and fail any in-flight awaits. */
   dispose(): void {
     this.disposed = true;
+    this.settleAllReplacementMaterialWaiters(false);
     coopLog(
       "stream",
       `streamer DISPOSE: cancel pending(turns=${this.pending.size} enemyParty=${this.enemyPartyWaiters.size}`
@@ -3160,6 +3430,7 @@ export class CoopBattleStreamer {
     this.sentReplacementDeadlines.clear();
     this.ackedReplacementCommits.clear();
     this.hostReplacementAckEvidence.clear();
+    this.sentCommandStartAuthorities.clear();
     this.pendingReplacementContinuations.clear();
     this.hostAppliedReplacementAcks.clear();
     this.authorityFailureHandlers.clear();
@@ -3759,6 +4030,9 @@ export class CoopBattleStreamer {
         }
         if (progress === "advance") {
           rememberAckEvidence(this.hostReplacementAckEvidence, key, { stage, canonical, value: msg });
+        }
+        if (AUTHORITY_ACK_STAGE_ORDER[stage] >= AUTHORITY_ACK_STAGE_ORDER.materialApplied) {
+          this.settleReplacementMaterialWaiters(key, true);
         }
         coopLog("stream", `host ACCEPT replacement ACK stage=${stage} key=${key}`);
         if (stage !== "continuationReady") {

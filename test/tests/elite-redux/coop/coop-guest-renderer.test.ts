@@ -329,6 +329,80 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     }
   });
 
+  it.each([
+    "queued",
+    "skip",
+  ] as const)("a retained replacement reaches continuationReady through a committed %s command without faking a UI", async path => {
+    const field = await startCoopGuest();
+    const runtime = getCoopRuntime()!;
+    const turn = globalScene.currentBattle.turn;
+    const carrier = coopEngine.captureCoopAuthoritativeCarrier(turn, "replacement");
+    expect(carrier, "the real engine produced a complete retained carrier").not.toBeNull();
+    const acknowledgements: string[] = [];
+    runtime.partnerTransport?.onMessage(message => {
+      if (message.t === "battleCheckpointAck") {
+        acknowledgements.push(message.stage ?? "missing");
+      }
+    });
+    runtime.partnerTransport?.send({
+      t: "battleCheckpoint",
+      reason: "replacement",
+      epoch: runtime.controller.sessionEpoch,
+      wave: globalScene.currentBattle.waveIndex,
+      turn,
+      revision: carrier!.authoritativeState.tick,
+      checkpoint: carrier!.checkpoint,
+      checksum: carrier!.checksum,
+      fullField: carrier!.fullField,
+      authoritativeState: carrier!.authoritativeState,
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const envelope = runtime.battleStream.peekCheckpoint();
+    expect(envelope).not.toBeNull();
+    expect(runtime.battleStream.acknowledgeReplacement(envelope!, "materialApplied")).toBe(true);
+    expect(runtime.battleStream.acknowledgeReplacement(envelope!, "presentationReady")).toBe(true);
+    expect(
+      runtime.battleStream.registerReplacementContinuation(envelope!, {
+        kind: "command",
+        epoch: envelope!.epoch,
+        wave: envelope!.wave,
+        turn: envelope!.turn,
+      }),
+    ).toBe(true);
+    expect(runtime.battleStream.consumeExactCheckpoint(envelope!)).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    globalScene.currentBattle.turnCommands = {};
+    if (path === "queued") {
+      field[COOP_GUEST_FIELD_INDEX].pushMoveQueue({
+        move: MoveId.TACKLE,
+        targets: [BattlerIndex.ENEMY],
+        useMode: MoveUseMode.NORMAL,
+      });
+    } else {
+      globalScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX] = {
+        command: Command.FIGHT,
+        move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
+        skip: true,
+      };
+    }
+    const setModeSpy = vi.spyOn(globalScene.ui, "setMode");
+    const phase = game.scene.phaseManager.create("CommandPhase", COOP_GUEST_FIELD_INDEX);
+    phase.start();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(globalScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX]).toBeDefined();
+    expect(
+      setModeSpy.mock.calls.some(([mode]) =>
+        [UiMode.COMMAND, UiMode.FIGHT, UiMode.TARGET_SELECT].includes(mode as UiMode),
+      ),
+      "a forced command record cannot masquerade as a public continuation surface",
+    ).toBe(false);
+    expect(acknowledgements).toEqual(["materialApplied", "presentationReady", "continuationReady"]);
+    expect(runtime.battleStream.retainedAuthorityDiagnostics().waiters).toBe(0);
+    expect(runtime.battleStream.retainedAuthorityDiagnostics().terminal).toBe(false);
+  });
+
   it("clears the gated guest's player trainer before the next-encounter authority wait", async () => {
     await startCoopGuest();
     const trainerVisibilitySpy = vi.spyOn(globalScene.trainer, "setVisible");

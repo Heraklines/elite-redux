@@ -554,6 +554,100 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("retains one exact command-start transaction through material, presentation, and real UI readiness", async () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 1, turn: 1 };
+      const guestTimers: { fire: () => void; cancelled: boolean }[] = [];
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, {
+        authorityContext: () => current,
+        schedule: callback => {
+          const timer = { fire: callback, cancelled: false };
+          guestTimers.push(timer);
+          return () => {
+            timer.cancelled = true;
+          };
+        },
+      });
+      const rawRevisions: number[] = [];
+      guest.onMessage(message => {
+        if (message.t === "battleCheckpoint") {
+          rawRevisions.push(message.revision);
+        }
+      });
+
+      const first = hostStream.sendCommandStartCheckpoint(
+        7,
+        1,
+        1,
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        emptyFullField(),
+        emptyAuthoritativeState(1),
+      );
+      const duplicate = hostStream.sendCommandStartCheckpoint(
+        7,
+        1,
+        1,
+        emptyCheckpoint(),
+        "ffffffffffffffff",
+        emptyFullField(),
+        emptyAuthoritativeState(1, 1, 99),
+      );
+      expect(first).not.toBeNull();
+      expect(duplicate, "re-entry returns the immutable original instead of minting another revision").toEqual(first);
+      await flushWire();
+      expect(rawRevisions, "duplicate publication emits no second carrier").toEqual([20]);
+
+      const exact = await guestStream.awaitReplacementCheckpointAt(current);
+      expect(exact).toEqual(first);
+      const wrongAddress = guestStream.awaitReplacementCheckpointAt({ epoch: 7, wave: 2, turn: 1 }, 100);
+      const wrongTimer = guestTimers.at(-1);
+      expect(wrongTimer).toBeDefined();
+      wrongTimer?.fire();
+      await expect(wrongAddress, "a full-address waiter cannot consume the buffered current wave").resolves.toBeNull();
+
+      let materialResolved = false;
+      const materialApplied = hostStream.waitForReplacementMaterialApplied(first!).then(result => {
+        materialResolved = result;
+        return result;
+      });
+      await flushWire();
+      expect(materialResolved, "publication alone is not mechanical apply evidence").toBe(false);
+
+      expect(guestStream.acknowledgeReplacement(exact!, "materialApplied")).toBe(true);
+      await expect(materialApplied).resolves.toBe(true);
+      await flushWire();
+      expect(hostStream.retainedAuthorityDiagnostics().replacementCommits).toBe(1);
+      expect(hostStream.retainedAuthorityDiagnostics().waiters, "the material-only phase waiter is drained").toBe(0);
+
+      expect(guestStream.acknowledgeReplacement(exact!, "presentationReady")).toBe(true);
+      expect(
+        guestStream.registerReplacementContinuation(exact!, {
+          kind: "command",
+          epoch: 7,
+          wave: 1,
+          turn: 1,
+        }),
+      ).toBe(true);
+      expect(guestStream.consumeExactCheckpoint(exact!)).toBe(true);
+      await flushWire();
+      expect(
+        hostStream.retainedAuthorityDiagnostics().replacementCommits,
+        "material and renderer readiness cannot release host retention",
+      ).toBe(1);
+
+      expect(guestStream.notifyContinuationSurface("command"), "the real addressed command UI releases once").toBe(1);
+      await flushWire();
+      expect(hostStream.retainedAuthorityDiagnostics().replacementCommits).toBe(0);
+      expect(guestStream.notifyContinuationSurface("command"), "duplicate UI commits are idempotent").toBe(0);
+      expect(hostStream.retainedAuthorityDiagnostics().terminal).toBe(false);
+      expect(guestStream.retainedAuthorityDiagnostics().terminal).toBe(false);
+
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
     it("accepts an exact-address reward surface when wave-end authority arrives after the next-command prediction", async () => {
       const { host, guest } = createLoopbackPair();
       const current = { epoch: 7, wave: 1, turn: 3 };

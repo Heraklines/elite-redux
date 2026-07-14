@@ -53,9 +53,16 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { coopWaveStartEntryEffectSignature } from "#data/elite-redux/coop/coop-battle-engine";
+import { applyCoopRetainedCheckpointTransaction } from "#data/elite-redux/coop/coop-authority-apply";
+import {
+  captureCoopAuthoritativeBattleState,
+  captureCoopEnemies,
+  coopWaveStartEntryEffectSignature,
+} from "#data/elite-redux/coop/coop-battle-engine";
+import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-presentation";
+import { clearCoopRuntime, isCoopAuthoritativeGuest, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { TerrainType } from "#data/terrain";
@@ -63,8 +70,13 @@ import { AbilityId } from "#enums/ability-id";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import {
+  captureCoopEncounterAuthority,
+  rebroadcastCoopWaveStartAuthorityAfterEntryEffects,
+} from "#phases/encounter-phase";
 import { GameManager } from "#test/framework/game-manager";
-import { buildDuo, type DuoRig, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
+import { buildDuo, type DuoRig, drainLoopback, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -222,6 +234,77 @@ describe.skipIf(!RUN)("co-op DUO launch-snapshot: guest adopts the host's on-ent
       "guest adopts the host's FULL on-entry arena state (terrain+weather+tags), no wave-start divergence (#920)",
     ).toBe(hostDigest);
 
+    logs.flush();
+  }, 300_000);
+
+  it("converges from the retained post-summon carrier when the raw refresh is dropped", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createScheduledCoopPair({ automatic: true });
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    pair.setAutomaticDelivery(false);
+    const receivedAfterBootstrap: string[] = [];
+    pair.guest.onMessage(message => receivedAfterBootstrap.push(message.t));
+
+    // Seed the stream with the pre-summon view that production EncounterPhase publishes. The live host
+    // already has GRASSY, so the command-start seam must detect the difference, emit a compatibility raw
+    // refresh, and independently retain the complete replacement transaction.
+    await withClient(rig.hostCtx, () => {
+      const battle = rig.hostScene.currentBattle;
+      const preSummon = captureCoopAuthoritativeBattleState(battle.turn)!;
+      preSummon.terrain = TerrainType.NONE;
+      preSummon.terrainTurnsLeft = 0;
+      rig.hostRuntime.battleStream.sendEnemyParty(
+        battle.waveIndex,
+        captureCoopEnemies(),
+        COOP_WAVE_NO_ME,
+        battle.battleType,
+        preSummon,
+        captureCoopEncounterAuthority(battle),
+      );
+    });
+    await withClient(rig.guestCtx, () => drainLoopback());
+    receivedAfterBootstrap.length = 0;
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.arena.trySetTerrain(TerrainType.NONE, true);
+    });
+
+    pair.dropNext("guest", message => message.t === "enemyPartySync");
+    const retained = await withClient(rig.hostCtx, () => rebroadcastCoopWaveStartAuthorityAfterEntryEffects());
+    expect(retained, "the host published a retained command-start transaction").not.toBeNull();
+    expect(retained?.checkpoint.terrain).toBe(TerrainType.GRASSY);
+    expect(retained?.authoritativeState.terrain).toBe(TerrainType.GRASSY);
+
+    await withClient(rig.guestCtx, () => drainLoopback());
+    expect(
+      receivedAfterBootstrap.filter(type => type === "enemyPartySync"),
+      "the declared raw post-summon refresh was actually dropped",
+    ).toEqual([]);
+    expect(receivedAfterBootstrap).toContain("battleCheckpoint");
+
+    await withClient(rig.guestCtx, async () => {
+      const envelope = rig.guestRuntime.battleStream.peekCheckpoint();
+      expect(envelope).not.toBeNull();
+      expect(applyCoopRetainedCheckpointTransaction(envelope!, isCoopAuthoritativeGuest())).toBe(true);
+      expect(rig.guestScene.arena.terrain?.terrainType).toBe(TerrainType.GRASSY);
+      expect(rig.guestRuntime.battleStream.acknowledgeReplacement(envelope!, "materialApplied")).toBe(true);
+      expect(await settleCoopAuthoritativeProjection(envelope!.authoritativeState)).toBe(true);
+      expect(rig.guestRuntime.battleStream.acknowledgeReplacement(envelope!, "presentationReady")).toBe(true);
+      expect(
+        rig.guestRuntime.battleStream.registerReplacementContinuation(envelope!, {
+          kind: "command",
+          epoch: envelope!.epoch,
+          wave: envelope!.wave,
+          turn: envelope!.turn,
+        }),
+      ).toBe(true);
+      expect(rig.guestRuntime.battleStream.consumeExactCheckpoint(envelope!)).toBe(true);
+      expect(rig.guestRuntime.battleStream.notifyContinuationSurface("command")).toBe(1);
+      await drainLoopback();
+    });
+    await withClient(rig.hostCtx, () => drainLoopback());
+    expect(rig.hostRuntime.battleStream.retainedAuthorityDiagnostics().replacementCommits).toBe(0);
+    expect(rig.hostRuntime.battleStream.retainedAuthorityDiagnostics().terminal).toBe(false);
+    expect(rig.guestRuntime.battleStream.retainedAuthorityDiagnostics().terminal).toBe(false);
     logs.flush();
   }, 300_000);
 });

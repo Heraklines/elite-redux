@@ -1358,12 +1358,32 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         expect(hostCommand.phaseName, "host is parked immediately before command-start authority publication").toBe(
           "CommandPhase",
         );
+        if (leave) {
+          // P33 fault schedule: the complete command-start transaction is the first battleCheckpoint on
+          // this fresh wave. Drop it once while preserving the following rendezvous arrival, proving that
+          // arrival alone cannot open public input and the host's retained retry is the recovery source.
+          pair.dropNext("guest", message => message.t === "battleCheckpoint");
+        }
         hostCommand.start();
         await drainLoopback();
       });
       const hostCommandReadyState = withClientSync(rig.hostCtx, () => captureCoopChecksumState());
       await withClient(rig.guestCtx, async () => {
         await drainLoopback();
+        if (leave) {
+          expect(
+            rig.guestScene.ui.getMode(),
+            "the rendezvous arrival cannot open command after the retained state frame is dropped",
+          ).not.toBe(UiMode.COMMAND);
+          expect(
+            rig.hostRuntime.battleStream.retainedAuthorityDiagnostics().replacementCommits,
+            "the exact command-start revision remains retained while the guest has no material proof",
+          ).toBe(1);
+          // Production retries retained authority every two seconds. Keep the guest's destination context
+          // installed while that timer fires, then pump only its inbox just like an isolated browser.
+          await new Promise(resolve => setTimeout(resolve, 2_100));
+          await drainLoopback();
+        }
         expect(
           captureCoopChecksumState(),
           "the post-summon refresh is applied before the guest command continuation opens",
@@ -1372,6 +1392,11 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
           UiMode.COMMAND,
         );
       });
+      await withClient(rig.hostCtx, () => drainLoopback());
+      expect(
+        rig.hostRuntime.battleStream.retainedAuthorityDiagnostics().replacementCommits,
+        "the host releases command-start authority only after the guest's real COMMAND post-commit ACK",
+      ).toBe(0);
 
       const expectedBiome = leave ? BiomeId.VOLCANO : sourceBiome;
       expect(rig.hostScene.currentBattle.waveIndex).toBe(11);
@@ -1468,6 +1493,4 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       resync.restore();
     }
   }, 300_000);
-
-  it.todo("P33 debt: retain/address/ACK the post-PostSummon refresh before command continuation readiness");
 });
