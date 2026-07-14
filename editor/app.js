@@ -11,6 +11,7 @@ const REPO = "Heraklines/elite-redux";
 const BRANCH = "feat/elite-redux-port";
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/src/data/elite-redux`;
 const SPRITE_BASE = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/images/pokemon/elite-redux";
+const TRAINER_SPRITE_BASE = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/images/trainer";
 const USAGE_TIERS_URL = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/usage-tiers.json";
 
 const EGG_TIER_NAMES = ["Common", "Rare", "Epic", "Legendary"];
@@ -80,6 +81,13 @@ let POKEDEX_SPECIES = []; // [{const, name, slug, id, dex}]
 let EVOS = {}; // speciesId → { to: number[], from: number[] }
 const moveById = new Map(); // moveId → rich move
 const abilById = new Map(); // abilityId → rich ability
+// Custom Trainers: sprite-bearing trainer classes (from trainer-classes.json),
+// with a NAME→entry lookup for the sprite preview. Falls back to the static
+// TRAINER_CLASS_OPTIONS list if the generated file is missing.
+let TRAINER_CLASSES = []; // [{name, sprite, genders}]
+const trainerClassByName = new Map(); // TrainerType NAME → {name, sprite, genders}
+// Cache of fetched TexturePacker atlas jsons (CDN url → parsed json | null on fail).
+const trainerAtlasCache = new Map();
 // Edit state keyed by species CONST (joined to data via SPECIES[i].id), so the
 // committed override JSON is human-readable and consistent with the other tabs.
 const learn = { current: {}, baseline: {} }; // const → [[level, moveId], ...]
@@ -1497,14 +1505,46 @@ const BST_CAPS = {
 };
 const DIFFICULTY_OPTIONS = ["youngster", "ace", "elite", "hell"];
 const BATTLE_TYPE_OPTIONS = ["single", "double", "triple"];
-const CHALLENGE_OPTIONS = ["none", "inverse", "monocolor", "monogen", "doubles", "ghost"];
+// Challenge-exclusivity keys must match ErCustomTrainerChallenge in
+// er-custom-trainers.ts (one key per Challenges enum member). Labels come from
+// the in-game challenge display names (locales/en/challenges.json).
+const CHALLENGE_OPTIONS = [
+  "none",
+  "inverse",
+  "monocolor",
+  "monogen",
+  "doubles",
+  "ghost",
+  "monotype",
+  "maxcost",
+  "points",
+  "freshstart",
+  "flipstat",
+  "limitedcatch",
+  "limitedsupport",
+  "hardcore",
+  "passives",
+  "usagetier",
+  "triples",
+];
 const CHALLENGE_LABELS = {
   none: "None",
-  inverse: "Inverse",
-  monocolor: "Monocolor",
-  monogen: "Mono-gen",
+  inverse: "Inverse Battle",
+  monocolor: "Mono Color",
+  monogen: "Mono Gen",
   doubles: "Doubles Only",
-  ghost: "Ghost",
+  ghost: "Ghost Trainers",
+  monotype: "Mono Type",
+  maxcost: "Max Starter Cost",
+  points: "Starter Points",
+  freshstart: "Fresh Start",
+  flipstat: "Flip Stat",
+  limitedcatch: "Limited Catch",
+  limitedsupport: "Limited Support",
+  hardcore: "Hardcore",
+  passives: "Active Passives",
+  usagetier: "Usage Tier",
+  triples: "Triples Only",
 };
 
 /** BST cap for a wave on a ladder (elite/hell); null = past the ladder (no cap). */
@@ -1635,6 +1675,25 @@ function ctrWarnings(t) {
   return { warnings, notes };
 }
 
+/** Label for one ability slot (0/1/2) of a species CONST: "0 · Pressure".
+ *  Falls back to the bare slot number when the species/ability doesn't resolve. */
+function ctrAbilLabel(speciesConst, slot) {
+  const ab = speciesConst ? abil.current[speciesConst] : null;
+  if (!ab) {
+    return String(slot);
+  }
+  const id = slot === 0 ? ab.ability1 : slot === 1 ? ab.ability2 : ab.hidden;
+  const name = id ? abilById.get(id)?.name : null;
+  return name ? `${slot} · ${name}` : String(slot);
+}
+
+/** The three <option>s for an ability-slot picker, labelled with real names. */
+function ctrAbilOptions(speciesConst, selected) {
+  return [0, 1, 2]
+    .map(s => `<option value="${s}"${selected === s ? " selected" : ""}>${esc(ctrAbilLabel(speciesConst, s))}</option>`)
+    .join("");
+}
+
 function ctrMemberHtml(m, i) {
   const moveInputs = [0, 1, 2, 3]
     .map(
@@ -1656,7 +1715,7 @@ function ctrMemberHtml(m, i) {
     <legend>Slot ${i + 1} <button type="button" class="ctr-mem-del" data-idx="${i}" title="Remove this member">✕</button></legend>
     <label>Species <input class="ctr-species" list="species-list" data-idx="${i}" value="${esc(m.species || "")}" placeholder="SPECIES_…" spellcheck="false" style="width:170px" /></label>
     <label>Form <input type="number" class="ctr-form" data-idx="${i}" value="${m.formIndex || 0}" min="0" max="60" style="width:56px" /></label>
-    <label>Ability slot <select class="ctr-abil" data-idx="${i}">${[0, 1, 2].map(s => `<option value="${s}"${m.abilitySlot === s ? " selected" : ""}>${s}</option>`).join("")}</select></label>
+    <label>Ability slot <select class="ctr-abil" data-idx="${i}">${ctrAbilOptions(m.species, m.abilitySlot)}</select></label>
     <label title="Uncheck to set an explicit level">Wave-scale level <input type="checkbox" class="ctr-scale" data-idx="${i}"${scale ? " checked" : ""} /></label>
     <label>Level <input type="number" class="ctr-level" data-idx="${i}" value="${scale ? "" : m.level}" min="1" max="200" ${scale ? "disabled" : ""} style="width:64px" /></label>
     <div class="ctr-moves">${moveInputs}</div>
@@ -1666,12 +1725,81 @@ function ctrMemberHtml(m, i) {
         fus
           ? `<input class="ctr-fusion-species" list="species-list" data-idx="${i}" value="${esc(fus.species || "")}" placeholder="fusion SPECIES_…" spellcheck="false" style="width:170px" />
           <label>Form <input type="number" class="ctr-fusion-form" data-idx="${i}" value="${fus.formIndex || 0}" min="0" max="60" style="width:56px" /></label>
-          <label>Ability slot <select class="ctr-fusion-abil" data-idx="${i}">${[0, 1, 2].map(s => `<option value="${s}"${fus.abilitySlot === s ? " selected" : ""}>${s}</option>`).join("")}</select></label>`
+          <label>Ability slot <select class="ctr-fusion-abil" data-idx="${i}">${ctrAbilOptions(fus.species, fus.abilitySlot)}</select></label>`
           : ""
       }
     </div>
     <div class="ctr-held">Held items: ${heldRows}<button type="button" class="ctr-held-add" data-idx="${i}">＋ item</button></div>
   </fieldset>`;
+}
+
+/** First frame + sheet size from a TexturePacker atlas json, or null. */
+function firstAtlasFrame(atlas) {
+  const tx = atlas && Array.isArray(atlas.textures) ? atlas.textures[0] : null;
+  const fr = tx && Array.isArray(tx.frames) ? tx.frames[0] : null;
+  if (!tx || !fr || !fr.frame || tx.size === 0) {
+    return null;
+  }
+  return { crop: fr.frame, sheet: tx.size };
+}
+
+/** Crop one trainer sprite's first frame into `el` via CSS background (scaled 2x). */
+function renderTrainerFrame(file, el) {
+  const url = `${TRAINER_SPRITE_BASE}/${file}.json`;
+  const paint = atlas => {
+    if (!el.isConnected) {
+      return;
+    }
+    const info = atlas ? firstAtlasFrame(atlas) : null;
+    if (!info) {
+      el.textContent = "?";
+      el.title = "sprite atlas unavailable";
+      return;
+    }
+    const scale = 2;
+    const { crop, sheet } = info;
+    el.style.width = `${crop.w * scale}px`;
+    el.style.height = `${crop.h * scale}px`;
+    el.style.backgroundImage = `url("${TRAINER_SPRITE_BASE}/${file}.png")`;
+    el.style.backgroundSize = `${sheet.w * scale}px ${sheet.h * scale}px`;
+    el.style.backgroundPosition = `-${crop.x * scale}px -${crop.y * scale}px`;
+    el.style.backgroundRepeat = "no-repeat";
+    el.style.imageRendering = "pixelated";
+  };
+  if (trainerAtlasCache.has(url)) {
+    paint(trainerAtlasCache.get(url));
+    return;
+  }
+  fetch(url)
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null)
+    .then(atlas => {
+      trainerAtlasCache.set(url, atlas);
+      paint(atlas);
+    });
+}
+
+/** Refresh the trainer-class sprite preview from the current #ctr-class value. */
+function updateCtrSpritePreview() {
+  const box = document.getElementById("ctr-sprite-preview");
+  if (!box) {
+    return;
+  }
+  const input = document.getElementById("ctr-class");
+  const name = input ? input.value.trim().toUpperCase() : "";
+  const entry = trainerClassByName.get(name);
+  box.innerHTML = "";
+  if (!entry) {
+    box.innerHTML = '<span class="dyn">no sprite for this class</span>';
+    return;
+  }
+  const files = entry.genders ? [`${entry.sprite}_m`, `${entry.sprite}_f`] : [entry.sprite];
+  for (const f of files) {
+    const frame = document.createElement("div");
+    frame.className = "ctr-sprite-frame";
+    box.appendChild(frame);
+    renderTrainerFrame(f, frame);
+  }
 }
 
 function renderCustomTrainers(root) {
@@ -1707,6 +1835,7 @@ function renderCustomTrainers(root) {
         <label>Name <input type="text" id="ctr-name" maxlength="24" value="${esc(t.name || "")}" style="width:200px" /></label>
         <label>Id <input type="number" value="${t.id}" readonly style="width:80px;opacity:.6" /></label>
         <label>Sprite / class <input type="text" id="ctr-class" list="trainerclass-list" value="${esc(t.trainerClass || "")}" style="width:170px" spellcheck="false" /></label>
+        <div id="ctr-sprite-preview" class="ctr-sprite-preview"></div>
       </fieldset>
       <fieldset><legend>Spawn gates</legend>
         <div>Difficulties: ${diffChecks}</div>
@@ -1731,10 +1860,12 @@ function renderCustomTrainers(root) {
   root.innerHTML = `
     <div class="section">
       <h2>Custom Trainers</h2>
-      <p class="hint">Staff-authored trainers that spawn in real runs, gated by difficulty, floor range and challenge mode. The team is fielded EXACTLY as authored (the #419 BST cap is bypassed). Warnings never block — staff intent wins.</p>
+      <p class="hint">Staff-authored trainers that spawn in real runs, gated by difficulty, floor range and challenge mode. The team is fielded EXACTLY as authored (the #419 BST cap is bypassed).</p>
       <div class="mon-list">${list || '<span class="dyn">none yet</span>'}<button type="button" id="ctr-new" class="primary">＋ New trainer</button></div>
     </div>
     <div class="section">${form}</div>`;
+  // The sprite preview reads the live CDN atlas, so paint it after the DOM exists.
+  updateCtrSpritePreview();
 }
 
 // ---- Custom Trainers: input + click handling -------------------------------
@@ -1754,6 +1885,8 @@ function onCustomTrainerInput(el) {
   } else if (el.id === "ctr-class") {
     t.trainerClass = el.value.trim().toUpperCase();
     el.value = t.trainerClass;
+    // Live preview without a full re-render (keeps the input cursor).
+    updateCtrSpritePreview();
   } else if (el.id === "ctr-minwave") {
     t.minWave = Number(el.value) || 1;
   } else if (el.id === "ctr-maxwave") {
@@ -1818,6 +1951,11 @@ function onCustomTrainerChange(el) {
       set.delete(el.dataset.diff);
     }
     t.difficulties = DIFFICULTY_OPTIONS.filter(d => set.has(d));
+    render();
+    return true;
+  } else if ((el.classList.contains("ctr-species") || el.classList.contains("ctr-fusion-species")) && m) {
+    // Species changed (pick/blur): re-render so the ability-slot labels for the
+    // new species resolve to their real names.
     render();
     return true;
   } else if (el.classList.contains("ctr-abil") && m) {
@@ -2841,6 +2979,7 @@ async function init() {
       allSpeciesData,
       evosData,
       ctrLive,
+      trainerClassesData,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
@@ -2870,6 +3009,8 @@ async function init() {
       fetchJson("./data/evolutions.json", {}),
       // Live custom-trainers override file (resilient: missing on the branch → empty).
       fetchJson(`${RAW_BASE}/er-custom-trainers.json${bust}`, {}),
+      // Trainer-class sprite catalog (generated). Fallback → static list below.
+      fetchJson("./data/trainer-classes.json", []),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -2938,6 +3079,17 @@ async function init() {
     learn.baseline = JSON.parse(JSON.stringify(learn.current));
     tms.baseline = JSON.parse(JSON.stringify(tms.current));
     abil.baseline = JSON.parse(JSON.stringify(abil.current));
+
+    // Trainer-class sprite catalog (generated). Fall back to the static curated
+    // list (no sprite metadata → no preview) when the generated file is absent.
+    TRAINER_CLASSES =
+      Array.isArray(trainerClassesData) && trainerClassesData.length > 0
+        ? trainerClassesData
+        : TRAINER_CLASS_OPTIONS.map(name => ({ name, sprite: name.toLowerCase(), genders: false }));
+    trainerClassByName.clear();
+    for (const c of TRAINER_CLASSES) {
+      trainerClassByName.set(c.name, c);
+    }
 
     // Seed custom trainers from the live file (species id → CONST for editing).
     // Requires spById to be populated (the POKEDEX_SPECIES loop above).
@@ -3012,7 +3164,7 @@ async function init() {
     document.body.appendChild(sdl);
     const tcdl = document.createElement("datalist");
     tcdl.id = "trainerclass-list";
-    tcdl.innerHTML = TRAINER_CLASS_OPTIONS.map(t => `<option value="${t}">${prettify(t)}</option>`).join("");
+    tcdl.innerHTML = TRAINER_CLASSES.map(t => `<option value="${t.name}">${prettify(t.name)}</option>`).join("");
     document.body.appendChild(tcdl);
     const hidl = document.createElement("datalist");
     hidl.id = "helditems-list";

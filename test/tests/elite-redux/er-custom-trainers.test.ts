@@ -97,6 +97,20 @@ const TABLE = {
     challenge: "none",
     team: [{ species: SpeciesId.MACHAMP }],
   },
+  // Exercises a NON-original challenge key (added in the round-2 expansion of
+  // ErCustomTrainerChallenge): must parse via CHALLENGE_MAP and gate on Hardcore.
+  HARDCORE_ONLY: {
+    id: 70006,
+    name: "Hardcore Hank",
+    trainerClass: "VETERAN",
+    battleType: "single",
+    difficulties: ["ace", "elite", "hell"],
+    minWave: 1,
+    maxWave: 200,
+    endless: false,
+    challenge: "hardcore",
+    team: [{ species: SpeciesId.MACHAMP }],
+  },
   // Invalid: blank name -> must be dropped by getErCustomTrainers (never fatal).
   BROKEN: {
     id: 70005,
@@ -137,7 +151,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
   it("validation drops invalid entries (blank name) but keeps the rest", () => {
     const resolved = getErCustomTrainers();
     const keys = resolved.map(t => t.key).sort();
-    expect(keys).toEqual(["ACE_RICO", "ENDLESS_T", "GHOST_ONLY", "HELL_BOSS"]);
+    expect(keys).toEqual(["ACE_RICO", "ENDLESS_T", "GHOST_ONLY", "HARDCORE_ONLY", "HELL_BOSS"]);
     expect(keys).not.toContain("BROKEN");
   });
 
@@ -176,6 +190,28 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
         }
       }
       expect(eligibleKeys.has("GHOST_ONLY")).toBe(true);
+    } finally {
+      globalScene.gameMode.challenges.pop();
+    }
+  });
+
+  it("gates by a newly-added challenge key (hardcore parses + gates via CHALLENGE_MAP)", () => {
+    setErDifficulty("ace");
+    // Without the Hardcore challenge active, the hardcore-only trainer is excluded.
+    for (let w = 1; w <= 40; w++) {
+      expect(selectErCustomTrainerForWave(w)?.key).not.toBe("HARDCORE_ONLY");
+    }
+    // Activate the Hardcore challenge -> the hardcore-only trainer becomes eligible.
+    globalScene.gameMode.challenges.push({ id: Challenges.HARDCORE, value: 1 } as never);
+    try {
+      const eligibleKeys = new Set<string>();
+      for (let w = 1; w <= 40; w++) {
+        const pick = selectErCustomTrainerForWave(w);
+        if (pick) {
+          eligibleKeys.add(pick.key);
+        }
+      }
+      expect(eligibleKeys.has("HARDCORE_ONLY")).toBe(true);
     } finally {
       globalScene.gameMode.challenges.pop();
     }

@@ -561,7 +561,25 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
   }
   const isName = (v: unknown): boolean => typeof v === "string" && /^[A-Z0-9_]{1,60}$/.test(v);
   const validBattleTypes = new Set(["single", "double", "triple"]);
-  const validChallenges = new Set(["none", "inverse", "monocolor", "monogen", "doubles", "ghost"]);
+  const validChallenges = new Set([
+    "none",
+    "inverse",
+    "monocolor",
+    "monogen",
+    "doubles",
+    "ghost",
+    "monotype",
+    "maxcost",
+    "points",
+    "freshstart",
+    "flipstat",
+    "limitedcatch",
+    "limitedsupport",
+    "hardcore",
+    "passives",
+    "usagetier",
+    "triples",
+  ]);
   const validDifficulties = new Set(["youngster", "ace", "elite", "hell", "mystery"]);
   for (const [key, tr] of Object.entries(delta)) {
     if (!/^[A-Z0-9_]{1,40}$/.test(key)) {
@@ -587,7 +605,7 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
       return { ok: false, error: `${key}: battleType must be single/double/triple` };
     }
     if (t.challenge !== undefined && !validChallenges.has(t.challenge as string)) {
-      return { ok: false, error: `${key}: challenge must be one of none/inverse/monocolor/monogen/doubles/ghost` };
+      return { ok: false, error: `${key}: challenge must be a known challenge key (see ErCustomTrainerChallenge)` };
     }
     if (
       t.difficulties !== undefined

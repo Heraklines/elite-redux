@@ -19,7 +19,11 @@
 //     "minWave": 20,
 //     "maxWave": 60,
 //     "endless": false,                // true => any floor >= minWave (maxWave ignored)
-//     "challenge": "none",             // none|inverse|monocolor|monogen|doubles|ghost
+//     "challenge": "none",             // none | one of the ErCustomTrainerChallenge
+//                                      // keys (inverse, monocolor, monogen, doubles,
+//                                      // ghost, monotype, maxcost, points, freshstart,
+//                                      // flipstat, limitedcatch, limitedsupport,
+//                                      // hardcore, passives, usagetier, triples)
 //     "team": [
 //       {
 //         "species": 445,              // pokerogue speciesId (vanilla + ER customs)
@@ -67,8 +71,29 @@ export const ER_CUSTOM_TRAINER_ID_MAX = 79999;
 /** The battle formats a custom trainer can declare. */
 export type ErCustomTrainerBattleType = "single" | "double" | "triple";
 
-/** Challenge-exclusivity keys the editor exposes (a subset of `Challenges`). */
-export type ErCustomTrainerChallenge = "none" | "inverse" | "monocolor" | "monogen" | "doubles" | "ghost";
+/**
+ * Challenge-exclusivity keys the editor exposes (one per `Challenges`). The
+ * first five keys are the original set and MUST stay as-is (saved JSON
+ * back-compat); the rest cover the remaining challenges.
+ */
+export type ErCustomTrainerChallenge =
+  | "none"
+  | "inverse"
+  | "monocolor"
+  | "monogen"
+  | "doubles"
+  | "ghost"
+  | "monotype"
+  | "maxcost"
+  | "points"
+  | "freshstart"
+  | "flipstat"
+  | "limitedcatch"
+  | "limitedsupport"
+  | "hardcore"
+  | "passives"
+  | "usagetier"
+  | "triples";
 
 /** Editor-authored fusion for one team member (base is the member's species). */
 export interface ErCustomTrainerFusion {
@@ -154,6 +179,17 @@ const CHALLENGE_MAP: Record<Exclude<ErCustomTrainerChallenge, "none">, Challenge
   monogen: Challenges.SINGLE_GENERATION,
   doubles: Challenges.DOUBLES_ONLY,
   ghost: Challenges.GHOST_TRAINERS,
+  monotype: Challenges.SINGLE_TYPE,
+  maxcost: Challenges.LOWER_MAX_STARTER_COST,
+  points: Challenges.LOWER_STARTER_POINTS,
+  freshstart: Challenges.FRESH_START,
+  flipstat: Challenges.FLIP_STAT,
+  limitedcatch: Challenges.LIMITED_CATCH,
+  limitedsupport: Challenges.LIMITED_SUPPORT,
+  hardcore: Challenges.HARDCORE,
+  passives: Challenges.PASSIVES,
+  usagetier: Challenges.USAGE_TIER,
+  triples: Challenges.TRIPLES_ONLY,
 };
 
 const VALID_DIFFICULTIES: ReadonlySet<string> = new Set(["youngster", "ace", "elite", "hell", "mystery"]);
