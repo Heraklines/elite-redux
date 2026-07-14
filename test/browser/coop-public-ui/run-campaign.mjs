@@ -55,6 +55,11 @@ try {
     journey: "campaign",
     targetWaves: policy.targetWaves,
     rewardMode: policy.rewardMode,
+    renderProfile: policy.renderProfile,
+    moveAnimations: policy.moveAnimationsExpected,
+    animationFidelity: policy.moveAnimationsExpected
+      ? "move-animation rendering covered"
+      : "move-animation rendering intentionally skipped; mechanics/network/public UI retained",
     autoFirst: policy.autoFirst,
     status: failure ? "failed" : "passed",
     startedAt: startedAt.toISOString(),
@@ -88,5 +93,7 @@ try {
 if (failure) {
   console.error(failure.stack ?? failure.message);
 } else {
-  console.log(`Public-UI campaign (${policy.targetWaves} waves) passed; evidence: ${config.artifactDir}`);
+  console.log(
+    `Public-UI campaign (${policy.targetWaves} waves, ${policy.renderProfile}) passed; evidence: ${config.artifactDir}`,
+  );
 }

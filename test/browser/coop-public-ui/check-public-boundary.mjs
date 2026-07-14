@@ -99,6 +99,14 @@ if (
 ) {
   failures.push("coop-browser-entry.ts: EXP prompts must expose complete actionable readiness to the public driver");
 }
+if (
+  !browserEntry.includes("[coop-browser:render-profile]")
+  || !browserEntry.includes('handler.constructor?.name !== "SettingsDisplayUiHandler"')
+  || !browserEntry.includes("moveAnimations: globalScene.moveAnimations")
+  || !browserEntry.includes('lastObservedRenderProfile = "";')
+) {
+  failures.push("coop-browser-entry.ts: missing the read-only visible render-profile attestation");
+}
 
 if (failures.length > 0) {
   console.error(failures.join("\n"));

@@ -4,10 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       campaign_waves:
-        description: Minimum number of co-op waves to play through public UI only
+        description: Co-op wave depth for the animations-skipped public-UI profile
         required: true
         type: string
         default: "30"
+      surface_waves:
+        description: Animation-rendering surface breadth (kept short; runs beside depth)
+        required: false
+        type: string
+        default: "3"
       cadence:
         description: Human input cadence (fast keeps 30 waves inside the CI budget)
         required: true
@@ -37,7 +42,7 @@ on:
         default: true
       speed_keys:
         description: Override Settings key sequence; blank uses the built-in 10x path, "[]" leaves speed unchanged
-        required: true
+        required: false
         type: string
         default: ""
       requester_seat:
@@ -131,17 +136,26 @@ jobs:
         run: |
           pnpm exec biome check \
             .github/workflows/coop-public-ui-campaign.yml \
+            scripts/coop-browser-entry.ts \
             test/browser/coop-public-ui/campaign-policy.mjs \
             test/browser/coop-public-ui/campaign.mjs \
+            test/browser/coop-public-ui/campaign-render-profile.test.mjs \
             test/browser/coop-public-ui/run-campaign.mjs \
             test/browser/coop-public-ui/check-campaign-boundary.mjs \
-            test/browser/coop-public-ui/environment-seal.mjs
+            test/browser/coop-public-ui/environment-seal.mjs \
+            test/browser/coop-public-ui/evidence.mjs
 
       - name: Enforce public-driver boundary (original harness files)
         run: node test/browser/coop-public-ui/check-public-boundary.mjs
 
       - name: Enforce public-driver boundary (new campaign files)
         run: node test/browser/coop-public-ui/check-campaign-boundary.mjs
+
+      - name: Verify campaign wait and rendering-profile contracts
+        run: >-
+          node --test
+          test/browser/coop-public-ui/campaign-exp-phase.test.mjs
+          test/browser/coop-public-ui/campaign-render-profile.test.mjs
 
       # Cache the built bundle keyed on the GAME-SOURCE inputs only (src/public/lockfile/
       # entry/sealer/vite-config/workflow-env) - NOT the harness driver. A harness-only push
@@ -238,10 +252,20 @@ jobs:
           if-no-files-found: warn
 
   campaign:
-    name: ${{ inputs.campaign_waves || '30' }}-wave co-op campaign / ${{ inputs.cadence || 'fast' }}
+    name: ${{ matrix.waves }}-wave co-op / ${{ matrix.profile }} / ${{ inputs.cadence || 'fast' }}
     needs: browser-build
     runs-on: ${{ vars.COOP_UI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: animations-on-surface
+            artifact: surface
+            waves: ${{ inputs.surface_waves || '3' }}
+          - profile: animations-skipped-depth
+            artifact: depth
+            waves: ${{ inputs.campaign_waves || (github.event_name == 'push' && '8') || '30' }}
     steps:
       - name: Check out exact implementation SHA and assets
         uses: actions/checkout@v6
@@ -285,7 +309,7 @@ jobs:
       - name: Prepare an isolated account pair for visible registration
         run: node test/browser/coop-public-ui/provision-accounts.mjs
 
-      - name: Drive two isolated built clients through a full public-UI campaign
+      - name: Drive two isolated built clients through the ${{ matrix.profile }} campaign
         env:
           COOP_UI_BASE_URL: http://127.0.0.1:4175/?coopdebug=1
           COOP_UI_BROWSER_DIST: dist-coop-public-ui
@@ -293,8 +317,10 @@ jobs:
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           COOP_UI_ACCOUNT_MODE: register
-          # push = cheap shakedown (8 waves, auto-first ON); dispatch = inputs; cron = 30-wave soak.
-          COOP_UI_CAMPAIGN_WAVES: ${{ inputs.campaign_waves || (github.event_name == 'push' && '8') || '30' }}
+          # The surface lane keeps real move animations on for a short breadth proof. The depth lane
+          # visibly selects Move Animations OFF and spends its runner budget on more waves instead.
+          COOP_UI_CAMPAIGN_WAVES: ${{ matrix.waves }}
+          COOP_UI_RENDER_PROFILE: ${{ matrix.profile }}
           # Loud-fail everywhere by default. `shakedown` (the ONLY mode that permits press-through of
           # an unknown surface) is now reachable ONLY by an explicit dispatch with auto_first=true - a
           # deliberate ordering test. push = loud-fail smoke, schedule = nightly, dispatch = gating.
@@ -325,7 +351,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coop-public-ui-campaign-environment-seal-${{ github.sha }}-${{ github.run_attempt }}
+          name: coop-public-ui-campaign-${{ matrix.artifact }}-environment-seal-${{ github.sha }}-${{ github.run_attempt }}
           path: dev-logs/coop-public-ui/environment-seal.json
           retention-days: 14
           if-no-files-found: warn
@@ -334,7 +360,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coop-public-ui-campaign-compact-${{ github.sha }}-${{ github.run_attempt }}
+          name: coop-public-ui-campaign-${{ matrix.artifact }}-compact-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             dev-logs/coop-public-ui/environment-seal.json
             dev-logs/coop-public-ui/**/summary.json
@@ -351,7 +377,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coop-public-ui-campaign-${{ github.sha }}-${{ github.run_attempt }}
+          name: coop-public-ui-campaign-${{ matrix.artifact }}-${{ github.sha }}-${{ github.run_attempt }}
           path: dev-logs/coop-public-ui/**
           retention-days: 14
           if-no-files-found: warn
