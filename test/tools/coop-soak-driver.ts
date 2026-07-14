@@ -95,6 +95,7 @@ import {
   getCoopUiRelayHitModes,
   resetCoopUiRelayTrace,
 } from "#data/elite-redux/coop/coop-ui-relay-trace";
+import { getCoopStagedWaveAdvanceTransaction } from "#data/elite-redux/coop/coop-wave-operation";
 import { erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
 import { TerrainType } from "#data/terrain";
 import { BattleType } from "#enums/battle-type";
@@ -133,6 +134,7 @@ import {
   driveHostRewardShopOwner,
   mirrorHostMeToGuest,
   pumpDuoDestinations,
+  reachQueuedRewardShop,
   relayGuestMeOptionIndexOnly,
   remirrorWave,
   type ShopPhaseSeam,
@@ -378,6 +380,24 @@ export interface SoakBoundaryDigest {
 }
 
 /**
+ * Immutable post-wave evidence for bounded transition regressions. Captured only when requested so long
+ * campaigns do not retain redundant serializer preimages. `playerModifiers` uses the same normalized
+ * blobs as the production save digest, including exact constructor args and remaining battle count.
+ */
+export interface SoakPostWaveState {
+  wave: number;
+  hostPlayerModifiers: Record<string, unknown>[];
+  guestPlayerModifiers: Record<string, unknown>[];
+  retainedWaveTransaction: {
+    operationId: string;
+    dataApplied: boolean;
+    continuationReady: boolean;
+  } | null;
+  /** Cumulative boundary recoveries at this point; a clean focused transition remains zero throughout. */
+  resyncHeals: number;
+}
+
+/**
  * A DIGEST divergence the soak found that the documented one-heal resync did NOT converge - i.e. a REAL
  * host-vs-guest desync (the machine doing its job). The run RECORDS it (grouped by the set of diverging
  * checksum fields) and CONTINUES so a long soak surveys the WHOLE run and reports EVERY finding, rather
@@ -426,6 +446,8 @@ export interface SoakResult {
   actionScript: string[];
   /** Per-boundary digest samples (for #842). */
   boundaryDigests: SoakBoundaryDigest[];
+  /** Optional post-wave transaction/modifier evidence requested by a bounded focused regression. */
+  postWaveStates: SoakPostWaveState[];
   /** REAL host-vs-guest desyncs the one-heal resync did not converge (the soak's findings; empty = clean). */
   findings: SoakFinding[];
   /**
@@ -479,8 +501,15 @@ export interface SoakOptions {
    * leave (the determinism contract, so no reward grant perturbs the cross-run digest compare).
    */
   rewardPolicy?: "seeded" | "leave";
+  /**
+   * Exact waves that must take the first eligible non-party reward even when `rewardPolicy` is `leave`.
+   * Used by focused lifecycle proofs so one forced item is acquired once and can then expire naturally.
+   */
+  forceTakeRewardWaves?: ReadonlySet<number>;
   /** Retain normalized save-digest preimages at each boundary; bounded diagnostic/contract runs only. */
   captureBoundaryPreimages?: boolean;
+  /** Retain exact normalized modifier + WAVE_ADVANCE latch evidence after each completed wave. */
+  capturePostWaveState?: boolean;
   /**
    * Override the deterministic content seed used from the first post-bootstrap crossing onward. When absent,
    * the driver derives `coop-soak-<SOAK_SEED>`; the printed replay seed must reproduce game content as well as
@@ -1276,6 +1305,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   const actionScript: string[] = [];
   const skips: Record<string, number> = {};
   const boundaryDigests: SoakBoundaryDigest[] = [];
+  const postWaveStates: SoakPostWaveState[] = [];
   const findings: SoakFinding[] = [];
   let resyncHeals = 0;
   const preHealMismatches: SoakPreHealMismatch[] = [];
@@ -2177,9 +2207,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * would read undefined). Gated to "level" so the god profile is byte-identical (reviveSlot stays undefined).
    * MUST be called inside withClient(ownerCtx) with the OWNER's scene.
    */
-  const driveOwnerReward = async (shop: ShopPhaseSeam, ownerScene: BattleScene): Promise<string> => {
+  const driveOwnerReward = async (shop: ShopPhaseSeam, ownerScene: BattleScene, wave: number): Promise<string> => {
     const reviveSlot = profile === "level" ? firstFaintedPartySlot(ownerScene) : -1;
-    const take = rewardPolicy === "seeded" && rng() < 0.5;
+    const take = opts.forceTakeRewardWaves?.has(wave) === true || (rewardPolicy === "seeded" && rng() < 0.5);
     await driveHostRewardShopOwner(shop, reviveSlot >= 0 ? { takeReward: take, reviveSlot } : { takeReward: take });
     // reviveSlot>=0 means a Revive was TAKEN iff the pool rolled one (the shop path decides post-start); a
     // non-fainted party or no-Revive pool falls through to seeded take/leave. The label reflects the intent.
@@ -2189,25 +2219,42 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     return take ? "take-nonparty" : "leave";
   };
 
+  /**
+   * Bounded proof that the real guest boundary applied the exact retained DATA and, after its public shop
+   * opens, recorded continuationReady. Pumping alternates complete client contexts; it never advances a
+   * phase or mutates the latch itself.
+   */
+  const awaitGuestWaveTransaction = async (wave: number, continuationReady: boolean): Promise<void> => {
+    for (let attempt = 0; attempt < 24; attempt++) {
+      const staged = getCoopStagedWaveAdvanceTransaction(wave, rig.guestRuntime.waveOperationBinding);
+      const current = rig.guestScene.phaseManager.getCurrentPhase();
+      const boundaryReleased = current?.phaseName !== "BattleEndPhase";
+      if (
+        staged?.dataApplied === true
+        && boundaryReleased
+        && (!continuationReady || staged.continuationReady === true)
+      ) {
+        return;
+      }
+      await pumpDuoDestinations(rig, 1);
+    }
+    const staged = getCoopStagedWaveAdvanceTransaction(wave, rig.guestRuntime.waveOperationBinding);
+    const current = rig.guestScene.phaseManager.getCurrentPhase();
+    throw new Error(
+      `guest retained wave ${wave} did not reach ${continuationReady ? "continuationReady" : "dataApplied/release"} `
+        + `within 24 destination pumps (current=${current?.phaseName ?? "none"} `
+        + `dataApplied=${staged?.dataApplied === true} continuationReady=${staged?.continuationReady === true})`,
+    );
+  };
+
   /** Drive the reward shop (seeded owner take/leave across ALL reward types; watcher mirrors) + LOCKSTEP. */
-  const driveRewardShop = async (wave: number, deferAdvanceToMeTerminal = false): Promise<void> => {
+  const driveRewardShop = async (
+    wave: number,
+    deferAdvanceToMeTerminal = false,
+    fixtureMode: "queued" | "capture-compat" = "queued",
+  ): Promise<void> => {
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
-
-    await withClient(rig.hostCtx, async () => {
-      // #845: a KILLING-TURN host faint (fainted the same turn the wave was won) opens its PARTY picker on
-      // this post-victory crossing to the shop - drive it (guarded; no-op when no host faint is pending).
-      armHostFaintAutoPick();
-      await game.phaseInterceptor.to("SelectModifierPhase", false);
-    });
-    const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-    if (hostShop.phaseName !== "SelectModifierPhase") {
-      bumpSkip("rewardShopUnavailable");
-      return;
-    }
-    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
-    // #849: the reward shop is the real MODIFIER_SELECT surface (owner drives, watcher mirrors over the relay).
-    hitMode(UiMode.MODIFIER_SELECT);
 
     // Every two-engine campaign shares one JS realm for two runtimes. During this interaction, queue EVERY
     // transport frame until its destination ClientCtx is installed: reward options can resume a watcher, a
@@ -2217,20 +2264,49 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const destinationScheduled = rig.pair.setDestinationContextDelivery != null;
     rig.pair.setDestinationContextDelivery?.(destinationScheduled);
     try {
+      await withClient(rig.hostCtx, async () => {
+        // #845: a KILLING-TURN host faint (fainted the same turn the wave was won) opens its PARTY picker on
+        // this post-victory crossing to the shop - drive it (guarded; no-op when no host faint is pending).
+        armHostFaintAutoPick();
+        await game.phaseInterceptor.to("SelectModifierPhase", false);
+      });
+      const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+      if (hostShop.phaseName !== "SelectModifierPhase") {
+        bumpSkip("rewardShopUnavailable");
+        return;
+      }
+      // Normal and ME-battle campaigns must execute the guest's ACTUAL queued Victory -> BattleEnd tail.
+      // The retained WAVE_ADVANCE DATA is admitted only while that exact BattleEnd is current; the helper
+      // stops before the queued SelectModifierPhase starts, so no detached surface can skip the boundary.
+      // The old capture leg has no guest turn-finalizer (AttemptCapture ends before TurnEnd) and remains an
+      // explicit compatibility fixture until that separate campaign drives its capture presentation tail.
+      const guestShop =
+        fixtureMode === "queued"
+          ? await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene))
+          : (withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam);
+      if (fixtureMode === "queued") {
+        await awaitGuestWaveTransaction(wave, false);
+      }
+      // #849: the reward shop is the real MODIFIER_SELECT surface (owner drives, watcher mirrors over the relay).
+      hitMode(UiMode.MODIFIER_SELECT);
+
       let action: string;
       if (hostOwns) {
         await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
-        action = await withClient(rig.hostCtx, () => driveOwnerReward(hostShop, rig.hostScene));
+        action = await withClient(rig.hostCtx, () => driveOwnerReward(hostShop, rig.hostScene, wave));
         await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
       } else {
         await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
-        action = await withClient(rig.guestCtx, () => driveOwnerReward(guestShop, rig.guestScene));
+        action = await withClient(rig.guestCtx, () => driveOwnerReward(guestShop, rig.guestScene, wave));
         await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
       }
       if (destinationScheduled) {
         // Close result -> materialization -> exact ACK before reading either controller. Four alternating
         // rounds are bounded and cover the longest retained-result chain without a timing sleep.
         await pumpDuoDestinations(rig, 4);
+      }
+      if (fixtureMode === "queued") {
+        await awaitGuestWaveTransaction(wave, true);
       }
       actionScript.push(`wave ${wave}: reward shop owner=${hostOwns ? "host" : "guest"} ${action}`);
 
@@ -2410,15 +2486,62 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         }
 
         // Flush the guest arrival under the host context, then commit the already-started owner shop exactly
-        // once (do not call driveHostRewardShopOwner: it would start the phase/barrier a second time).
-        await withClient(rig.hostCtx, async () => {
-          await drainLoopback();
-          hostShop.coopEndMirror();
-          hostShop.coopRelaySend(-1, undefined, "skip");
-          hostShop.end();
-          hostShop.coopAdvanceInteraction();
-          await drainLoopback();
-        });
+        // once (do not call driveHostRewardShopOwner: it would start the phase/barrier a second time). A
+        // retained host terminal returns true and owns teardown: it must remain the current phase until the
+        // guest materially applies that exact result and the peer-material callback ends/advances it. Ending
+        // here used to replace the phase with PostMysteryEncounter before the ACK callback, which correctly
+        // failed the strict phase fence and left the comprehensive ME terminal empty.
+        const setDestinationDelivery = rig.pair.setDestinationContextDelivery;
+        if (setDestinationDelivery == null) {
+          fail("no-park", wave, "host-owned embedded ME reward requires destination-context transport scheduling");
+        }
+        const deliverInDestinationContext = setDestinationDelivery as (enabled: boolean) => void;
+        let parkedForPeerMaterial = false;
+        deliverInDestinationContext(true);
+        try {
+          await withClient(rig.hostCtx, async () => {
+            await drainLoopback();
+            hostShop.coopEndMirror();
+            parkedForPeerMaterial = hostShop.coopRelaySend(-1, undefined, "skip");
+            // Compatibility/non-retained fallback only. In the retained path the production callback owns
+            // these exact mutations after the guest's material ACK.
+            if (!parkedForPeerMaterial) {
+              hostShop.end();
+              hostShop.coopAdvanceInteraction();
+            }
+          });
+
+          if (parkedForPeerMaterial) {
+            for (let i = 0; i < 24; i++) {
+              // Result first reaches/materializes on the guest; its addressed ACK then reaches the host.
+              // Preserve this causal order instead of using a timing sleep or advancing either phase directly.
+              await withClient(rig.guestCtx, () => drainLoopback());
+              await withClient(rig.hostCtx, () => drainLoopback());
+              if (
+                rig.hostRuntime.controller.interactionCounter() === counterBefore + 1
+                && rig.guestRuntime.controller.interactionCounter() === counterBefore + 1
+              ) {
+                break;
+              }
+            }
+            if (
+              rig.hostRuntime.controller.interactionCounter() !== counterBefore + 1
+              || rig.guestRuntime.controller.interactionCounter() !== counterBefore + 1
+            ) {
+              fail(
+                "no-park",
+                wave,
+                "host-owned ME retained reward terminal did not finish after peer material apply "
+                  + `(host=${rig.hostRuntime.controller.interactionCounter()} `
+                  + `guest=${rig.guestRuntime.controller.interactionCounter()} expected=${counterBefore + 1} `
+                  + `hostPhase=${rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"} `
+                  + `guestPhase=${rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"})`,
+              );
+            }
+          }
+        } finally {
+          deliverInDestinationContext(false);
+        }
         await withClient(rig.guestCtx, async () => {
           for (let i = 0; i < 8; i++) {
             await drainLoopback();
@@ -3006,7 +3129,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
 
     // ===== Reward shop + boundary (the captured wave still awards the wave-win reward pool). =====
     withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.clearPhaseQueue());
-    await driveRewardShop(wave);
+    await driveRewardShop(wave, false, "capture-compat");
     assertLockstep(wave, "catch-wave-end");
     assertScalarConvergence(wave, "post-shop");
   };
@@ -3237,6 +3360,31 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       hits.uiOperations.add(uiOperationPair);
     }
   };
+  const capturePostWaveState = async (wave: number): Promise<void> => {
+    if (!opts.capturePostWaveState) {
+      return;
+    }
+    const modifiersFor = async (ctx: typeof rig.hostCtx): Promise<Record<string, unknown>[]> =>
+      withClient(ctx, () => {
+        const modifiers = captureCoopSaveDataNormalized().modifiers;
+        return Array.isArray(modifiers) ? structuredClone(modifiers as Record<string, unknown>[]) : [];
+      });
+    const staged = getCoopStagedWaveAdvanceTransaction(wave, rig.guestRuntime.waveOperationBinding);
+    postWaveStates.push({
+      wave,
+      hostPlayerModifiers: await modifiersFor(rig.hostCtx),
+      guestPlayerModifiers: await modifiersFor(rig.guestCtx),
+      retainedWaveTransaction:
+        staged == null
+          ? null
+          : {
+              operationId: staged.operationId,
+              dataApplied: staged.dataApplied,
+              continuationReady: staged.continuationReady,
+            },
+      resyncHeals,
+    });
+  };
   for (let wave = 1; wave <= waves; wave++) {
     // Sample cumulatively before the next wave can terminal and clear the runtime's session-local diagnostic
     // ledger. A wave-180 GameOver used to erase 179 waves of op:wave/op:reward evidence before the sole
@@ -3396,6 +3544,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       fail("no-park", wave, `wave driving threw (strand/stall): ${e instanceof Error ? e.message : String(e)}`);
     }
 
+    await capturePostWaveState(wave);
     wavesCompleted++;
     // #828 ASYMMETRIC CONTINUATION (BUILD 2): if the HOST half is exhausted after this wave (a host-owned
     // field slot fainted with no legal host-owned replacement) but the GUEST half is still alive, the run
@@ -3513,6 +3662,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     assertions: getCoopChecksumAssertionCount(),
     actionScript,
     boundaryDigests,
+    postWaveStates,
     findings,
     runEnded,
     trainerWaves,

@@ -1217,6 +1217,28 @@ function maybeMarkCoopWaveContinuationReady(wave: number, binding: CoopWaveAdvan
 }
 
 /**
+ * GUEST: publish the retained wave transaction's final readiness latch from a real, already-open public
+ * continuation surface. The boundary DATA and UI surface are deliberately verified again here; merely
+ * constructing a phase or receiving an envelope cannot mark the transaction ready. Idempotent and a hard
+ * no-op outside the retained authoritative guest path.
+ *
+ * Reward/shop phases call this after their UI promise commits. WAVE_ADVANCE uses a plain durability ACK
+ * after staging (so it is not a generic deferred-operation receipt); without this engine-owned wake, a
+ * transaction that correctly waited in BattleEnd could apply DATA yet never record its later public surface.
+ */
+export function notifyCoopWaveContinuationSurfaceReady(): boolean {
+  const runtime = active;
+  if (runtime == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
+    return false;
+  }
+  const wave = globalScene.currentBattle?.waveIndex ?? -1;
+  if (!Number.isSafeInteger(wave) || wave < 0) {
+    return false;
+  }
+  return maybeMarkCoopWaveContinuationReady(wave, runtime.waveOperationBinding);
+}
+
+/**
  * GUEST: take + clear any pending wave-advance the host signaled (#633). Returns the
  * outcome to run the victory tail for, or null when none is pending or this wave was
  * already advanced past. Called by `CoopReplayTurnPhase` at a safe boundary. Bumps the

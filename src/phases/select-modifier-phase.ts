@@ -28,6 +28,7 @@ import {
   getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
+  notifyCoopWaveContinuationSurfaceReady,
   runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REWARD_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
@@ -1090,13 +1091,19 @@ export class SelectModifierPhase extends BattlePhase {
   // Function that resets the reward selection screen,
   // e.g. after pressing cancel in the party ui or while learning a move
   protected resetModifierSelect(modifierSelectCallback: ModifierSelectCallback) {
-    globalScene.ui.setMode(
-      UiMode.MODIFIER_SELECT,
-      this.isPlayer(),
-      this.typeOptions,
-      modifierSelectCallback,
-      this.getRerollCost(globalScene.lockModifierTiers),
-    );
+    void globalScene.ui
+      .setMode(
+        UiMode.MODIFIER_SELECT,
+        this.isPlayer(),
+        this.typeOptions,
+        modifierSelectCallback,
+        this.getRerollCost(globalScene.lockModifierTiers),
+      )
+      .then(() => {
+        // The retained wave's DATA already landed in the queued BattleEndPhase. Record readiness only
+        // after this real public shop handler has committed, never when a phase object is constructed.
+        notifyCoopWaveContinuationSurfaceReady();
+      });
   }
 
   updateSeed(): void {
@@ -1920,6 +1927,8 @@ export class SelectModifierPhase extends BattlePhase {
       () => false,
       this.getRerollCost(globalScene.lockModifierTiers),
     );
+    // Watchers open the same real surface through a separate async path from resetModifierSelect.
+    notifyCoopWaveContinuationSurfaceReady();
     this.coopBeginMirror("watcher");
     // Await on the PINNED interaction counter (#633), matching the owner's pinned send seq.
     // Reading the live counter here would let an inbound reconcile broadcast (which can bump
