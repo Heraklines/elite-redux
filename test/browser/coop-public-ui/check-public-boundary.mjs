@@ -99,19 +99,36 @@ if (
   || !harness.includes('semantic.observation.uiMode === "CONFIRM"')
   || !harness.includes('semantic.observation.selectedOptionId === "yes"')
   || !harness.includes("sameAddress(semantic.observation.address, expectedAddress)")
-  || !harness.includes("client.waitForRewardConfirm(rewardConfirmCursors[client.label]")
+  || !harness.includes("owner.waitForOwnedRewardConfirm(rewardConfirmCursors[owner.label]")
+  || !harness.includes("watcher.waitForAddressedRewardWatcher(")
+  || !harness.includes("!semantic.observation.seatsWithInput?.includes(client.publicSeat)")
+  || !harness.includes("semantic.observation.ready.awaitingActionInput === false")
   || !harness.includes("this.evidence.find(SHARED_SESSION_TERMINAL, from)")
-  || !harness.includes('client.evidence.record("shared-reward-confirm-proof"')
+  || !harness.includes('projection: "actionable-confirmation"')
+  || !harness.includes('projection: "non-actionable-shop-watcher"')
 ) {
   failures.push(
-    "public-ui-harness.mjs: reward leave must wait for the owned actionable shop and confirmation surfaces",
+    "public-ui-harness.mjs: reward leave must prove the owner confirmation and addressed non-actionable watcher",
   );
 }
 const rewardConfirmOpen = harness?.indexOf("await owner.press(openConfirmKey") ?? -1;
-const rewardConfirmReady = harness?.indexOf("client.waitForRewardConfirm(rewardConfirmCursors[client.label]") ?? -1;
+const rewardConfirmReady = harness?.indexOf("owner.waitForOwnedRewardConfirm(rewardConfirmCursors[owner.label]") ?? -1;
 const rewardConfirmAccept = harness?.indexOf("for (const [index, key] of confirmKeys.entries())") ?? -1;
-if (rewardConfirmOpen < 0 || rewardConfirmReady <= rewardConfirmOpen || rewardConfirmAccept <= rewardConfirmReady) {
+const rewardTerminalApplied = harness?.indexOf("await this.assertRetainedRewardTerminal(") ?? -1;
+if (
+  rewardConfirmOpen < 0
+  || rewardConfirmReady <= rewardConfirmOpen
+  || rewardConfirmAccept <= rewardConfirmReady
+  || rewardTerminalApplied <= rewardConfirmAccept
+) {
   failures.push("public-ui-harness.mjs: reward confirmation must open, converge at one address, then accept");
+}
+if (
+  !harness?.includes("reward authoritative RESULT retained")
+  || !harness.includes("shop authoritative RESULT applied-before-render")
+  || !harness.includes("reward op WATCHER materialize JOURNAL")
+) {
+  failures.push("public-ui-harness.mjs: reward leave must prove exact retained terminal application before wave 2");
 }
 if (!harness?.includes("createBattlePromptAdvancer(this, from") || !harness.includes("await advanceBattlePrompt()")) {
   failures.push("public-ui-harness.mjs: post-turn waits must drive readiness-proven public battle prompts");

@@ -23,6 +23,7 @@ const LAUNCH_SNAPSHOT_ABORT = /launchSnapshotAbort wave=\d+ reason=/u;
 const POST_TURN_PHASE_PROGRESS = /Start Phase ([A-Za-z0-9]+Phase)/u;
 const POST_TURN_AUTHORITY_PROGRESS = /\[coop:turn\] host recorder: append turn=\d+ seq=(\d+)/u;
 const POST_TURN_RENDERER_PROGRESS = /\[coop:replay\] guest replay turn=\d+: live increment seq=(\d+)\.\.(\d+)/u;
+const REWARD_RESULT_RETAINED = /reward authoritative RESULT retained rev=(\d+) tick=(\d+) id=([^\s]+)/u;
 const POST_TURN_PROGRESS_ALLOWANCE_MS = 90_000;
 const POST_TURN_HARD_CEILING_MS = 360_000;
 
@@ -177,7 +178,11 @@ function sameAddress(left, right) {
   return left?.epoch === right?.epoch && left?.wave === right?.wave && left?.turn === right?.turn;
 }
 
-function findRewardConfirmProjection(client, from, ownerSeat, expectedAddress) {
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function findOwnedRewardConfirm(client, from, expectedAddress) {
   const semantic = client.evidence.findLastSemanticSurface(from);
   return semantic?.observation.surfaceId === "reward:confirm"
     && semantic.observation.operationClass === "reward"
@@ -185,10 +190,28 @@ function findRewardConfirmProjection(client, from, ownerSeat, expectedAddress) {
     && semantic.observation.phase === "SelectModifierPhase"
     && semantic.observation.uiMode === "CONFIRM"
     && semantic.observation.localSeat === client.publicSeat
-    && semantic.observation.ownerSeat === ownerSeat
-    && semantic.observation.seatsWithInput?.includes(ownerSeat)
+    && semantic.observation.ownerSeat === client.publicSeat
+    && semantic.observation.seatsWithInput?.includes(client.publicSeat)
     && semantic.observation.selectedOptionId === "yes"
     && semantic.observation.ready?.handlerActive === true
+    && sameAddress(semantic.observation.address, expectedAddress)
+    ? semantic
+    : null;
+}
+
+function findAddressedRewardWatcher(client, from, ownerSeat, expectedAddress) {
+  const semantic = client.evidence.findLastSemanticSurface(from, "reward-shop");
+  return semantic?.observation.operationClass === "reward"
+    && semantic.observation.ownerModel === "interaction"
+    && semantic.observation.phase === "SelectModifierPhase"
+    && semantic.observation.uiMode === "MODIFIER_SELECT"
+    && semantic.observation.localSeat === client.publicSeat
+    && semantic.observation.ownerSeat === ownerSeat
+    && client.publicSeat !== ownerSeat
+    && semantic.observation.seatsWithInput?.includes(ownerSeat)
+    && !semantic.observation.seatsWithInput?.includes(client.publicSeat)
+    && semantic.observation.ready?.handlerActive === true
+    && semantic.observation.ready.awaitingActionInput === false
     && sameAddress(semantic.observation.address, expectedAddress)
     ? semantic
     : null;
@@ -802,7 +825,7 @@ export class PublicUiClient {
     );
   }
 
-  async waitForRewardConfirm(from, ownerSeat, expectedAddress) {
+  async waitForOwnedRewardConfirm(from, expectedAddress) {
     return waitForProgressBoundedEvidence(
       this,
       from,
@@ -814,9 +837,27 @@ export class PublicUiClient {
             `${this.label}: shared session terminated while waiting for reward confirmation: ${terminal.text}`,
           );
         }
-        return findRewardConfirmProjection(this, from, ownerSeat, expectedAddress);
+        return findOwnedRewardConfirm(this, from, expectedAddress);
       },
       `actionable reward confirmation at ${expectedAddress.epoch}/${expectedAddress.wave}/${expectedAddress.turn}`,
+    );
+  }
+
+  async waitForAddressedRewardWatcher(from, ownerSeat, expectedAddress) {
+    return waitForProgressBoundedEvidence(
+      this,
+      from,
+      () => {
+        const terminal =
+          this.evidence.find(SHARED_SESSION_TERMINAL, from) ?? this.evidence.find(LAUNCH_SNAPSHOT_ABORT, from);
+        if (terminal != null) {
+          throw new Error(
+            `${this.label}: shared session terminated while waiting for the reward watcher: ${terminal.text}`,
+          );
+        }
+        return findAddressedRewardWatcher(this, from, ownerSeat, expectedAddress);
+      },
+      `non-actionable reward watcher at ${expectedAddress.epoch}/${expectedAddress.wave}/${expectedAddress.turn}`,
     );
   }
 
@@ -1108,6 +1149,68 @@ export class DuoPublicUiRig {
     return retainedAddress;
   }
 
+  async assertRetainedRewardTerminal(cursors, expectedAddress, ownerSeat) {
+    if (!this.host || !this.guest) {
+      throw new Error("retained reward terminal proof requires a paired host and guest");
+    }
+    const retained = await this.host.evidence.waitFor(REWARD_RESULT_RETAINED, {
+      from: cursors[this.host.label],
+      timeoutMs: this.config.timeoutMs,
+      description: "host retained complete reward terminal result",
+    });
+    const retainedMatch = REWARD_RESULT_RETAINED.exec(retained.text);
+    if (!retainedMatch) {
+      throw new Error("host emitted malformed retained reward terminal evidence");
+    }
+    const [, revision, tick, operationId] = retainedMatch;
+    const expectedOperationPrefix = `${expectedAddress.epoch}:${ownerSeat}:REWARD_PICK:`;
+    if (!operationId.startsWith(expectedOperationPrefix)) {
+      throw new Error(`reward terminal operation ${operationId} is not addressed to ${expectedOperationPrefix}`);
+    }
+    const escapedOperationId = escapeRegExp(operationId);
+    const [hostTerminal, guestApplied, guestMaterialized] = await Promise.all([
+      this.host.evidence.waitFor(
+        new RegExp(`OWNER retained terminal before continuation seq=\\d+ id=${escapedOperationId}`, "u"),
+        {
+          from: cursors[this.host.label],
+          timeoutMs: this.config.timeoutMs,
+          description: `host retained reward terminal ${operationId}`,
+        },
+      ),
+      this.guest.evidence.waitFor(
+        new RegExp(
+          `shop authoritative RESULT applied-before-render kind=REWARD_PICK id=${escapedOperationId} rev=${revision} tick=${tick}`,
+          "u",
+        ),
+        {
+          from: cursors[this.guest.label],
+          timeoutMs: this.config.timeoutMs,
+          description: `guest applied exact retained reward result ${operationId}`,
+        },
+      ),
+      this.guest.evidence.waitFor(
+        new RegExp(`reward op WATCHER materialize JOURNAL choice=-1 terminal=true id=${escapedOperationId}`, "u"),
+        {
+          from: cursors[this.guest.label],
+          timeoutMs: this.config.timeoutMs,
+          description: `guest materialized exact retained reward terminal ${operationId}`,
+        },
+      ),
+    ]);
+    const proof = { operationId, revision: Number(revision), tick: Number(tick), ownerSeat, expectedAddress };
+    this.host.evidence.record("retained-reward-terminal-proof", {
+      ...proof,
+      side: "retained",
+      evidenceIndex: hostTerminal.index,
+    });
+    this.guest.evidence.record("retained-reward-terminal-proof", {
+      ...proof,
+      side: "applied-and-materialized",
+      evidenceIndex: Math.max(guestApplied.index, guestMaterialized.index),
+    });
+    return proof;
+  }
+
   async startFreshRun() {
     if (!this.host) {
       throw new Error("startFreshRun requires a paired public host (call pair() first)");
@@ -1308,6 +1411,12 @@ export class DuoPublicUiRig {
       () => values.find(client => client.evidence.find(REWARD_OWNER, ownerCursors[client.label])),
       { timeoutMs: this.config.timeoutMs, description: "reward owner public UI" },
     );
+    if (owner !== this.host || !this.guest) {
+      throw new Error(
+        `wave-1 reward leave requires authenticated host ownership; observed ${owner.label}/seat-${owner.publicSeat}`,
+      );
+    }
+    const watcher = this.guest;
     const ownedReward = await owner.waitForOwnedReward(ownerCursors[owner.label]);
     const expectedRewardAddress = ownedReward.observation.address;
     await owner.checkpoint("reward-owner-screen");
@@ -1318,21 +1427,31 @@ export class DuoPublicUiRig {
     }
     const rewardConfirmCursors = Object.fromEntries(values.map(client => [client.label, client.evidence.cursor()]));
     await owner.press(openConfirmKey, `leave-reward-screen:1/${this.config.keys.rewardLeave.length}`);
-    const confirmations = await Promise.all(
-      values.map(client =>
-        client.waitForRewardConfirm(rewardConfirmCursors[client.label], owner.publicSeat, expectedRewardAddress),
+    const [ownerConfirmation, watcherProjection] = await Promise.all([
+      owner.waitForOwnedRewardConfirm(rewardConfirmCursors[owner.label], expectedRewardAddress),
+      watcher.waitForAddressedRewardWatcher(
+        rewardConfirmCursors[watcher.label],
+        owner.publicSeat,
+        expectedRewardAddress,
       ),
-    );
-    for (const [index, client] of values.entries()) {
-      client.evidence.record("shared-reward-confirm-proof", {
-        peer: values[(index + 1) % values.length].label,
-        address: confirmations[index].observation.address,
-        ownerSeat: owner.publicSeat,
-      });
-    }
+    ]);
+    owner.evidence.record("shared-reward-confirm-proof", {
+      peer: watcher.label,
+      address: ownerConfirmation.observation.address,
+      ownerSeat: owner.publicSeat,
+      projection: "actionable-confirmation",
+    });
+    watcher.evidence.record("shared-reward-confirm-proof", {
+      peer: owner.label,
+      address: watcherProjection.observation.address,
+      ownerSeat: owner.publicSeat,
+      projection: "non-actionable-shop-watcher",
+    });
+    const terminalCursors = Object.fromEntries(values.map(client => [client.label, client.evidence.cursor()]));
     for (const [index, key] of confirmKeys.entries()) {
       await owner.press(key, `leave-reward-screen:${index + 2}/${this.config.keys.rewardLeave.length}`);
     }
+    await this.assertRetainedRewardTerminal(terminalCursors, expectedRewardAddress, owner.publicSeat);
     await Promise.all(values.map(client => client.waitForLocalCommand(commandCursors[client.label])));
     const expectedWave = this.activeBattleWave == null ? null : this.activeBattleWave + 1;
     const boundary = await this.assertSharedSurface("command", commandCursors, "wave-2-command", {

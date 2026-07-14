@@ -3,7 +3,7 @@
   "taskId": "p33-browser-post-turn-frontier",
   "branch": "ci/coop/p33-browser-post-turn-frontier",
   "trainRef": "ci/coop/p33-mystery-public-transition",
-  "baseSha": "c696b70224510143b3fa5fe1a9f0b84fd88a10b7",
+  "baseSha": "8600b960d081b52e61b74502509c27e7b8770fae",
   "allowedFiles": [
     ".github/coop-task-ownership/p33-browser-post-turn-frontier.json",
     "test/browser/coop-public-ui/check-public-boundary.mjs",

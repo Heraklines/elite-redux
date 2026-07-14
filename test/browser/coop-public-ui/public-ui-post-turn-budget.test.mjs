@@ -5,7 +5,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createPublicBattleProgressBudget, PublicUiClient } from "./public-ui-harness.mjs";
+import { createPublicBattleProgressBudget, DuoPublicUiRig, PublicUiClient } from "./public-ui-harness.mjs";
 
 class FakeEvidence {
   constructor(label) {
@@ -32,6 +32,14 @@ class FakeEvidence {
       .find(
         event => event.kind === "browser-surface2" && (surfaceId == null || event.observation.surfaceId === surfaceId),
       );
+  }
+
+  async waitFor(pattern, { from = 0, description = String(pattern) } = {}) {
+    const event = this.find(pattern, from);
+    if (event == null) {
+      throw new Error(`${this.label}: timed out waiting for ${description}`);
+    }
+    return event;
   }
 }
 
@@ -143,8 +151,8 @@ test("reward leave waits for the exact owned actionable semantic shop surface", 
   assert.equal(await PublicUiClient.prototype.waitForOwnedReward.call(owner, 0), evidence.events[1]);
 });
 
-test("reward leave confirms only after each client projects the exact addressed confirmation surface", async () => {
-  const evidence = new FakeEvidence("watcher");
+test("reward leave accepts only the owner's exact addressed actionable confirmation", async () => {
+  const evidence = new FakeEvidence("owner");
   const address = { epoch: 73, wave: 1, turn: 4 };
   const confirmObservation = {
     operationClass: "reward",
@@ -153,19 +161,70 @@ test("reward leave confirms only after each client projects the exact addressed 
     phase: "SelectModifierPhase",
     uiMode: "CONFIRM",
     address,
-    localSeat: 1,
+    localSeat: 0,
     ownerSeat: 0,
     seatsWithInput: [0],
     selectedOptionId: "yes",
     ready: { handlerActive: true, awaitingActionInput: null },
   };
   evidence.push({ kind: "browser-surface2", observation: confirmObservation });
-  const watcher = { label: "watcher", publicSeat: 1, evidence, config: { timeoutMs: 0 } };
+  const owner = { label: "owner", publicSeat: 0, evidence, config: { timeoutMs: 0 } };
 
-  assert.equal(await PublicUiClient.prototype.waitForRewardConfirm.call(watcher, 0, 0, address), evidence.events[0]);
+  assert.equal(await PublicUiClient.prototype.waitForOwnedRewardConfirm.call(owner, 0, address), evidence.events[0]);
 });
 
-test("reward confirmation wait aborts on a bounded shared terminal", async () => {
+test("reward leave requires the peer to remain an exact addressed non-actionable watcher", async () => {
+  const evidence = new FakeEvidence("watcher");
+  const address = { epoch: 73, wave: 1, turn: 4 };
+  const watcherObservation = {
+    operationClass: "reward",
+    surfaceId: "reward-shop",
+    ownerModel: "interaction",
+    phase: "SelectModifierPhase",
+    uiMode: "MODIFIER_SELECT",
+    address,
+    localSeat: 1,
+    ownerSeat: 0,
+    seatsWithInput: [0],
+    ready: { handlerActive: true, awaitingActionInput: false },
+  };
+  evidence.push({ kind: "browser-surface2", observation: watcherObservation });
+  const watcher = { label: "watcher", publicSeat: 1, evidence, config: { timeoutMs: 0 } };
+
+  assert.equal(
+    await PublicUiClient.prototype.waitForAddressedRewardWatcher.call(watcher, 0, 0, address),
+    evidence.events[0],
+  );
+});
+
+test("a non-owner confirmation projection cannot satisfy the owner contract", async () => {
+  const evidence = new FakeEvidence("watcher");
+  const address = { epoch: 73, wave: 1, turn: 4 };
+  evidence.push({
+    kind: "browser-surface2",
+    observation: {
+      operationClass: "reward",
+      surfaceId: "reward:confirm",
+      ownerModel: "interaction",
+      phase: "SelectModifierPhase",
+      uiMode: "CONFIRM",
+      address,
+      localSeat: 1,
+      ownerSeat: 0,
+      seatsWithInput: [0],
+      selectedOptionId: "yes",
+      ready: { handlerActive: true, awaitingActionInput: null },
+    },
+  });
+  const watcher = { label: "watcher", publicSeat: 1, evidence, config: { timeoutMs: 0 } };
+
+  await assert.rejects(
+    PublicUiClient.prototype.waitForOwnedRewardConfirm.call(watcher, 0, address),
+    /timed out waiting for actionable reward confirmation/u,
+  );
+});
+
+test("reward watcher wait aborts on a bounded shared terminal", async () => {
   const evidence = new FakeEvidence("watcher");
   evidence.push({
     kind: "console",
@@ -174,7 +233,47 @@ test("reward confirmation wait aborts on a bounded shared terminal", async () =>
   const watcher = { label: "watcher", publicSeat: 1, evidence, config: { timeoutMs: 0 } };
 
   await assert.rejects(
-    PublicUiClient.prototype.waitForRewardConfirm.call(watcher, 0, 0, { epoch: 73, wave: 1, turn: 4 }),
-    /shared session terminated while waiting for reward confirmation/u,
+    PublicUiClient.prototype.waitForAddressedRewardWatcher.call(watcher, 0, 0, { epoch: 73, wave: 1, turn: 4 }),
+    /shared session terminated while waiting for the reward watcher/u,
   );
+});
+
+test("reward terminal proof binds host retention to guest application and materialization", async () => {
+  const hostEvidence = new FakeEvidence("host");
+  const guestEvidence = new FakeEvidence("guest");
+  const operationId = "73:0:REWARD_PICK:0";
+  hostEvidence.push({
+    kind: "console",
+    text: `[coop:reward] reward authoritative RESULT retained rev=7 tick=11 id=${operationId}`,
+  });
+  hostEvidence.push({
+    kind: "console",
+    text: `[coop:reward] OWNER retained terminal before continuation seq=0 id=${operationId}`,
+  });
+  guestEvidence.push({
+    kind: "console",
+    text: `[coop:reward] shop authoritative RESULT applied-before-render kind=REWARD_PICK id=${operationId} rev=7 tick=11`,
+  });
+  guestEvidence.push({
+    kind: "console",
+    text: `[coop:reward] reward op WATCHER materialize JOURNAL choice=-1 terminal=true id=${operationId}`,
+  });
+  const host = { label: "host", evidence: hostEvidence };
+  const guest = { label: "guest", evidence: guestEvidence };
+  const rig = { host, guest, config: { timeoutMs: 0 } };
+
+  const proof = await DuoPublicUiRig.prototype.assertRetainedRewardTerminal.call(
+    rig,
+    { host: 0, guest: 0 },
+    { epoch: 73, wave: 1, turn: 4 },
+    0,
+  );
+
+  assert.deepEqual(proof, {
+    operationId,
+    revision: 7,
+    tick: 11,
+    ownerSeat: 0,
+    expectedAddress: { epoch: 73, wave: 1, turn: 4 },
+  });
 });
