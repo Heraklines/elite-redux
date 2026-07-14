@@ -308,9 +308,10 @@ describe.skipIf(!RUN)("Showdown versus - turn-1 initial-summon ability desync (t
       rig.guestScene.phaseManager.pushNew("EncounterPhase", true);
       rig.guestScene.phaseManager.shiftPhase();
       const reached = await pumpGuestLaunchChain(rig.guestScene);
-      expect(atlas.completed(), "strict readiness awaited every real production player-atlas load").toBeGreaterThanOrEqual(
-        atlas.expected,
-      );
+      expect(
+        atlas.completed(),
+        "strict readiness awaited every real production player-atlas load",
+      ).toBeGreaterThanOrEqual(atlas.expected);
       return { reached, weather: rig.guestScene.arena.weather?.weatherType ?? WeatherType.NONE };
     });
 
