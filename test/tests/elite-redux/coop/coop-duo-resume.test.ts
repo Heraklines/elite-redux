@@ -218,6 +218,10 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     });
     // Do not install GameManager's permanent bypass getter: persistence must follow the real mutable seam.
     game = new GameManager(phaserGame, false);
+    // GameManager's ReloadHelper replaces saveAll with an in-memory reload shortcut for ordinary engine
+    // tests. This suite verifies the real authenticated local/cloud transaction and must restore it before
+    // any fresh-slot CAS, checkpoint, rollback, or account-fence assertion can be meaningful.
+    vi.mocked(game.scene.gameData.saveAll).mockRestore();
     const startBattle = game.classicMode.startBattle.bind(game.classicMode);
     vi.spyOn(game.classicMode, "startBattle").mockImplementation(async (...args) => {
       setBypassLoginForTesting(true);

@@ -55,6 +55,7 @@ import {
   driveHostRewardShopOwner,
   installDuoLogCapture,
   installHeadlessPlayerAtlasCompletionModel,
+  pumpDuoDestinations,
   reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
@@ -158,6 +159,7 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
       await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward: false }));
       await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
     }
+    await pumpDuoDestinations(rig);
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once").toBe(counterBefore + 1);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced the counter once").toBe(counterBefore + 1);
   }
