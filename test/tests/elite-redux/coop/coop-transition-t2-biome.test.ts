@@ -66,6 +66,7 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
+import { BattleSceneEventType } from "#events/battle-scene";
 import { BiomeShopPhase, setCoopBiomeMarketTestSkip } from "#phases/biome-shop-phase";
 import { EncounterPhase } from "#phases/encounter-phase";
 import { ErCrossroadsPhase } from "#phases/er-crossroads-phase";
@@ -1414,10 +1415,15 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
           guestInitSession,
           "NewBiome renderer bypasses EncounterPhase.runEncounter/initSession",
         ).not.toHaveBeenCalled();
+        const guestSceneEventTypes = guestEncounterEvent?.mock.calls.map(([event]) => event.type) ?? [];
         expect(
-          guestEncounterEvent,
+          guestSceneEventTypes.filter(type => type === BattleSceneEventType.ENCOUNTER_PHASE),
           "NewBiome renderer cannot dispatch a second shared encounter event",
-        ).not.toHaveBeenCalled();
+        ).toHaveLength(0);
+        expect(
+          guestSceneEventTypes.filter(type => type === BattleSceneEventType.NEW_ARENA),
+          "the renderer dispatches exactly one local NewArena presentation event",
+        ).toHaveLength(1);
         expect(
           guestResetBattle.every(spy => spy.mock.calls.length === 0),
           "NewBiome renderer skips biome reset hooks",
