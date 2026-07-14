@@ -39,13 +39,35 @@
 //         "species": 445,              // pokerogue speciesId (vanilla + ER customs)
 //         "formIndex": 0,              // optional
 //         "level": 55,                 // explicit level; null/absent => wave-scaled
-//         "moves": ["EARTHQUAKE", "DRAGON_CLAW", "SWORDS_DANCE", "FIRE_FANG"],
+//         "moves": ["EARTHQUAKE", "DRAGON_CLAW", "RLA", "RLNA"],
+//                                      // move enum NAMES. Two literal tokens are
+//                                      // resolved at install to a SEEDED random legal
+//                                      // move of the species (level-up ∪ TM ∪ egg):
+//                                      //   RLA  = random legal ATTACKING move (non-STATUS)
+//                                      //   RLNA = random legal NON-ATTACKING move (STATUS)
 //         "abilitySlot": 0,            // 0 | 1 | 2
 //         "fusion": { "species": 384, "formIndex": 0, "abilitySlot": 0 }, // optional
-//         "heldItems": [{ "item": "LEFTOVERS", "count": 1 }]  // enemy-legal keys
+//         "heldItems": [{ "item": "LEFTOVERS", "count": 1 }], // enemy-legal keys
+//         "slotChance": 100            // slots 2-6 only: integer 1-100 chance the slot
+//                                      // is FILLED this run (absent/slot-1 => 100). A
+//                                      // failed roll omits the slot (party shrinks).
+//       },
+//       {                             // A WEIGHTED slot: ONE possibility is picked per
+//                                      // run, probability weight/totalWeight (seeded).
+//                                      // A flat member (above) == 1 variant weight 1.
+//         "slotChance": 100,           // optional; lives on the slot wrapper here
+//         "variants": [
+//           { "species": 445, "moves": ["EARTHQUAKE"], "weight": 30 },
+//           { "species": 448, "moves": ["CLOSE_COMBAT"], "weight": 70 }
+//         ]
 //       }
 //     ]
 //   }
+//
+// Every per-run choice (spawn, wave, weighted-variant pick, slot-fill, RLA/RLNA
+// move) derives ONLY from the run seed (NO Math.random), so a save reload — and a
+// future co-op adoption — reproduce identically. Salts are documented at each
+// helper (custom-trainer-slot / custom-trainer-slotfill / custom-trainer-move).
 //
 // Ids live in the RESERVED 70000-79999 band (above the editor mons at
 // 60000-69999). Every entry is validated at load; an invalid entry is SKIPPED
@@ -58,12 +80,16 @@
 // is future work and must not touch `src/data/elite-redux/coop/**`.
 // =============================================================================
 
+import { speciesEggMoves } from "#balance/moves/egg-moves";
 import { globalScene } from "#app/global-scene";
+import { allMoves } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { collectShowdownFreeMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
 import { Challenges } from "#enums/challenges";
 import { Gender } from "#data/gender";
+import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
@@ -135,12 +161,49 @@ export interface ErCustomTrainerMember {
   formIndex?: number;
   /** Explicit level; `null`/absent => the wave-scaled enemy level applies. */
   level?: number | null;
-  /** Move enum NAMES (vanilla MoveId keys or ER-custom enum-keyed names). */
+  /**
+   * Move enum NAMES (vanilla MoveId keys or ER-custom enum-keyed names). The two
+   * literal tokens `RLA` (Random Legal Attacking move) and `RLNA` (Random Legal
+   * Non-Attacking move) are resolved at install time to a seeded random legal
+   * move of the matching category (see `resolveErCustomTrainerMoveIds`).
+   */
   moves?: readonly string[];
   /** Index into the species' ability list (active ability pick). */
   abilitySlot?: number;
   fusion?: ErCustomTrainerFusion | null;
   heldItems?: readonly ErCustomTrainerHeldItem[];
+  /**
+   * WEIGHTED-SLOT possibility weight (integer >= 1). Only meaningful inside a
+   * `variants` slot; ignored (treated as 1) on a bare flat member. Invalid
+   * weights clamp to 1.
+   */
+  weight?: number;
+  /**
+   * SLOT-FILL chance (integer 1-100) that this slot is fielded AT ALL this run.
+   * Absent/invalid => 100 (always filled). Slot 1 (index 0) ignores it — the
+   * trainer always has a lead. On a `variants` slot the chance lives on the slot
+   * wrapper instead (see {@linkcode ErCustomTrainerVariantSlot}).
+   */
+  slotChance?: number;
+}
+
+/**
+ * A WEIGHTED slot: several member possibilities, ONE of which is picked per run
+ * (probability weight/totalWeight, seeded). Back-compat: a flat member object is
+ * equivalent to a single-variant slot of weight 1.
+ */
+export interface ErCustomTrainerVariantSlot {
+  variants: readonly ErCustomTrainerMember[];
+  /** Slot-fill chance 1-100 (absent/invalid => 100); ignored for slot 1 (index 0). */
+  slotChance?: number;
+}
+
+/** One team-slot entry in the raw JSON: either a flat member or a weighted slot. */
+export type ErCustomTrainerTeamEntry = ErCustomTrainerMember | ErCustomTrainerVariantSlot;
+
+/** True when a raw team entry is the weighted `{ variants: [...] }` form. */
+function isVariantSlot(entry: ErCustomTrainerTeamEntry): entry is ErCustomTrainerVariantSlot {
+  return Array.isArray((entry as ErCustomTrainerVariantSlot).variants);
 }
 
 /** One authored trainer (raw JSON shape). */
@@ -163,10 +226,16 @@ export interface ErCustomTrainer {
    * theme. Charset `[a-z0-9_]+` (mirrors the editor + worker validator).
    */
   battleBgm?: string;
-  team?: readonly ErCustomTrainerMember[];
+  team?: readonly ErCustomTrainerTeamEntry[];
 }
 
 export type ErCustomTrainers = Record<string, ErCustomTrainer>;
+
+/**
+ * One move slot on a resolved member: a concrete move id, or an `RLA`/`RLNA`
+ * token that is resolved to a seeded random legal move at install time.
+ */
+export type ErCustomTrainerMoveSpec = { kind: "id"; id: number } | { kind: "token"; token: "RLA" | "RLNA" };
 
 /** A fully-resolved member ready for the battle layer (ids resolved, moves mapped). */
 export interface ErCustomTrainerMemberResolved {
@@ -174,10 +243,35 @@ export interface ErCustomTrainerMemberResolved {
   formIndex: number;
   /** Explicit level, or `null` to use the wave-scaled enemy level. */
   level: number | null;
+  /** Concrete move ids ONLY (RLA/RLNA tokens excluded); see `moveSpecs` for the full ordered slots. */
   moveIds: readonly number[];
+  /** Ordered move slots incl. RLA/RLNA tokens (resolved via `resolveErCustomTrainerMoveIds`). */
+  moveSpecs: readonly ErCustomTrainerMoveSpec[];
   abilitySlot: number;
   fusion: { speciesId: number; formIndex: number; abilitySlot: number } | null;
   heldItemKeys: readonly { key: string; count: number }[];
+}
+
+/** One weighted possibility of a resolved team slot. */
+export interface ErCustomTrainerVariantResolved {
+  member: ErCustomTrainerMemberResolved;
+  /** Integer weight >= 1 (probability weight/totalWeight within the slot). */
+  weight: number;
+}
+
+/** A fully-resolved team slot: 1+ weighted possibilities + a per-run fill chance. */
+export interface ErCustomTrainerSlotResolved {
+  /** Possibilities (length >= 1); ONE is picked per run by weight. */
+  variants: readonly ErCustomTrainerVariantResolved[];
+  /** Chance 1-100 the slot is fielded this run. Slot 1 (index 0) is forced to 100. */
+  slotChance: number;
+}
+
+/** One member actually fielded this run, tagged with its authored slot index. */
+export interface ErCustomTrainerFieldedMember {
+  member: ErCustomTrainerMemberResolved;
+  /** Authored slot index (0-based); the salt anchor for variant + move-token rolls. */
+  slotIndex: number;
 }
 
 /** A fully-resolved custom trainer ready for install. */
@@ -199,7 +293,14 @@ export interface ErCustomTrainerResolved {
   challenge: ErCustomTrainerChallenge;
   /** er-assets bgm key to play for this battle only, or "" for the default theme. */
   battleBgm: string;
+  /**
+   * The REPRESENTATIVE members (variant 0 of each slot, slot-fill ignored) — the
+   * authored default view. The FIELDED party for a run is derived per-seed via
+   * {@linkcode resolveErCustomTrainerParty} (weighted variant pick + slot-fill).
+   */
   members: readonly ErCustomTrainerMemberResolved[];
+  /** Full per-slot detail: weighted possibilities + slot-fill chance. */
+  slots: readonly ErCustomTrainerSlotResolved[];
 }
 
 const CHALLENGE_MAP: Record<Exclude<ErCustomTrainerChallenge, "none">, Challenges> = {
@@ -298,6 +399,111 @@ function normalizeSpawnChance(value: unknown): number {
   return n >= 1 && n <= 100 ? n : 100;
 }
 
+/**
+ * Normalize a slot-fill chance (slots 2-6) to an integer 1-100. Identical rules
+ * to {@linkcode normalizeSpawnChance}: absent/invalid => 100 (slot always filled).
+ */
+function normalizeSlotChance(value: unknown): number {
+  return normalizeSpawnChance(value);
+}
+
+/** Clamp an authored variant weight to an integer >= 1 (invalid => 1). */
+function clampVariantWeight(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 1;
+  }
+  const n = Math.floor(value);
+  return n >= 1 ? n : 1;
+}
+
+/**
+ * Parse one member's authored move NAMES into ordered move slots. A concrete name
+ * resolves to a `{ kind: "id" }` spec; the literal `RLA`/`RLNA` tokens become
+ * `{ kind: "token" }` specs (resolved to a seeded legal move at install); an
+ * unknown name is DROPPED (matches the pre-existing unknown-move behavior).
+ */
+function parseMoveSpecs(rawMoves: readonly string[] | undefined): {
+  specs: ErCustomTrainerMoveSpec[];
+  ids: number[];
+} {
+  const moves = moveByName();
+  const specs: ErCustomTrainerMoveSpec[] = [];
+  const ids: number[] = [];
+  for (const raw of rawMoves ?? []) {
+    const name = String(raw).trim().toUpperCase();
+    if (name === "RLA" || name === "RLNA") {
+      specs.push({ kind: "token", token: name });
+      continue;
+    }
+    const id = moves.get(name);
+    if (id !== undefined) {
+      specs.push({ kind: "id", id });
+      ids.push(id);
+    }
+  }
+  return { specs, ids };
+}
+
+/** Resolve one raw member; returns `null` when the species id is invalid (drops the trainer). */
+function resolveMember(m: ErCustomTrainerMember): ErCustomTrainerMemberResolved | null {
+  if (!Number.isInteger(m.species) || (m.species as number) < 1) {
+    return null;
+  }
+  const { specs, ids } = parseMoveSpecs(m.moves);
+  const fusion =
+    m.fusion && Number.isInteger(m.fusion.species) && (m.fusion.species as number) >= 1
+      ? {
+          speciesId: m.fusion.species,
+          formIndex: Number.isInteger(m.fusion.formIndex) ? (m.fusion.formIndex as number) : 0,
+          abilitySlot: clampSlot(m.fusion.abilitySlot),
+        }
+      : null;
+  const heldItemKeys = (m.heldItems ?? [])
+    .filter(h => h && typeof h.item === "string" && h.item.length > 0)
+    .map(h => ({ key: h.item, count: Number.isInteger(h.count) && (h.count as number) > 0 ? (h.count as number) : 1 }));
+  return {
+    speciesId: m.species,
+    formIndex: Number.isInteger(m.formIndex) ? (m.formIndex as number) : 0,
+    level: typeof m.level === "number" && m.level >= 1 ? Math.floor(m.level) : null,
+    moveIds: ids,
+    moveSpecs: specs,
+    abilitySlot: clampSlot(m.abilitySlot),
+    fusion,
+    heldItemKeys,
+  };
+}
+
+/**
+ * Resolve one raw team entry (flat member OR weighted `{ variants }` slot) into a
+ * resolved slot. Slot index 0 (the lead) is forced to slotChance 100. Returns
+ * `null` when any member/variant is invalid (drops the whole trainer).
+ */
+function resolveSlot(entry: ErCustomTrainerTeamEntry, slotIndex: number): ErCustomTrainerSlotResolved | null {
+  if (isVariantSlot(entry)) {
+    const rawVariants = Array.isArray(entry.variants) ? entry.variants : [];
+    if (rawVariants.length < 1) {
+      return null;
+    }
+    const variants: ErCustomTrainerVariantResolved[] = [];
+    for (const v of rawVariants) {
+      const member = resolveMember(v);
+      if (member === null) {
+        return null;
+      }
+      variants.push({ member, weight: clampVariantWeight(v.weight) });
+    }
+    return { variants, slotChance: slotIndex === 0 ? 100 : normalizeSlotChance(entry.slotChance) };
+  }
+  const member = resolveMember(entry);
+  if (member === null) {
+    return null;
+  }
+  return {
+    variants: [{ member, weight: 1 }],
+    slotChance: slotIndex === 0 ? 100 : normalizeSlotChance(entry.slotChance),
+  };
+}
+
 /** Validate + resolve one raw entry; returns a resolved trainer or `null` (skipped). */
 function resolveEntry(key: string, entry: ErCustomTrainer): ErCustomTrainerResolved | null {
   if (!/^[A-Z0-9_]{1,40}$/.test(key)) {
@@ -325,37 +531,18 @@ function resolveEntry(key: string, entry: ErCustomTrainer): ErCustomTrainerResol
     console.warn(`[er-custom-trainers] skipped ${key}: team must have 1-6 members`);
     return null;
   }
-  const moves = moveByName();
-  const members: ErCustomTrainerMemberResolved[] = [];
-  for (const m of team) {
-    if (!Number.isInteger(m.species) || (m.species as number) < 1) {
-      console.warn(`[er-custom-trainers] skipped ${key}: member species must be a positive speciesId`);
+  const slots: ErCustomTrainerSlotResolved[] = [];
+  for (let i = 0; i < team.length; i++) {
+    const slot = resolveSlot(team[i], i);
+    if (slot === null) {
+      console.warn(`[er-custom-trainers] skipped ${key}: slot ${i + 1} has an invalid member/variant`);
       return null;
     }
-    const moveIds = (m.moves ?? [])
-      .map(name => moves.get(String(name).trim().toUpperCase()))
-      .filter((id): id is number => id !== undefined);
-    const fusion =
-      m.fusion && Number.isInteger(m.fusion.species) && (m.fusion.species as number) >= 1
-        ? {
-            speciesId: m.fusion.species,
-            formIndex: Number.isInteger(m.fusion.formIndex) ? (m.fusion.formIndex as number) : 0,
-            abilitySlot: clampSlot(m.fusion.abilitySlot),
-          }
-        : null;
-    const heldItemKeys = (m.heldItems ?? [])
-      .filter(h => h && typeof h.item === "string" && h.item.length > 0)
-      .map(h => ({ key: h.item, count: Number.isInteger(h.count) && (h.count as number) > 0 ? (h.count as number) : 1 }));
-    members.push({
-      speciesId: m.species,
-      formIndex: Number.isInteger(m.formIndex) ? (m.formIndex as number) : 0,
-      level: typeof m.level === "number" && m.level >= 1 ? Math.floor(m.level) : null,
-      moveIds,
-      abilitySlot: clampSlot(m.abilitySlot),
-      fusion,
-      heldItemKeys,
-    });
+    slots.push(slot);
   }
+  // Representative members = variant 0 of each slot (slot-fill ignored) — the
+  // authored default view. The FIELDED party is derived per-seed at install.
+  const members = slots.map(s => s.variants[0].member);
   const difficulties = (Array.isArray(entry.difficulties) ? entry.difficulties : ["ace", "elite", "hell"]).filter(d =>
     VALID_DIFFICULTIES.has(d),
   );
@@ -381,6 +568,7 @@ function resolveEntry(key: string, entry: ErCustomTrainer): ErCustomTrainerResol
     challenge,
     battleBgm: normalizeBattleBgm(entry.battleBgm),
     members,
+    slots,
   };
 }
 
@@ -476,6 +664,189 @@ export function rollErCustomTrainerAppearance(
     : Math.max(1, trainer.maxWave - trainer.minWave + 1);
   const assignedWave = trainer.minWave + (hashSeed(`${seed}:custom-trainer-wave:${trainer.key}`) % window);
   return { appears, assignedWave };
+}
+
+// -----------------------------------------------------------------------------
+// Weighted slot variants + slot-fill + RLA/RLNA move tokens (all seed-derived,
+// NO Math.random — the run seed governs every choice so a save reload and a
+// future co-op adoption land identically). Salts (load-bearing, keep stable):
+//   variant pick : `${seed}:custom-trainer-slot:${key}:${slotIndex}`
+//   slot fill    : `${seed}:custom-trainer-slotfill:${key}:${slotIndex}`
+//   move token   : `${seed}:custom-trainer-move:${key}:${slotIndex}:${moveIndex}`
+// -----------------------------------------------------------------------------
+
+/**
+ * Pick ONE variant index from a weighted slot, with probability weight/totalWeight,
+ * seeded by `${seed}:custom-trainer-slot:${key}:${slotIndex}`. Pure + deterministic;
+ * a single-variant slot always returns 0. Weights are clamped to >= 1.
+ */
+export function pickErCustomTrainerVariant(
+  seed: string,
+  key: string,
+  slotIndex: number,
+  variants: readonly { weight: number }[],
+): number {
+  if (variants.length <= 1) {
+    return 0;
+  }
+  let total = 0;
+  for (const v of variants) {
+    total += Math.max(1, Math.floor(v.weight));
+  }
+  const r = hashSeed(`${seed}:custom-trainer-slot:${key}:${slotIndex}`) % total;
+  let acc = 0;
+  for (let i = 0; i < variants.length; i++) {
+    acc += Math.max(1, Math.floor(variants[i].weight));
+    if (r < acc) {
+      return i;
+    }
+  }
+  return variants.length - 1;
+}
+
+/**
+ * Seeded slot-fill roll: whether slot `slotIndex` (0-based) is fielded this run.
+ * Slot 0 (the lead) is ALWAYS filled. Otherwise the slot fills when
+ * `hashSeed(...slotfill...) % 100 < slotChance` (100 => always). Pure.
+ */
+export function rollErCustomTrainerSlotFill(
+  seed: string,
+  key: string,
+  slotIndex: number,
+  slotChance: number,
+): boolean {
+  if (slotIndex === 0) {
+    return true;
+  }
+  const chance = normalizeSlotChance(slotChance);
+  return hashSeed(`${seed}:custom-trainer-slotfill:${key}:${slotIndex}`) % 100 < chance;
+}
+
+/**
+ * Resolve the FIELDED party for a run: per authored slot roll slot-fill (slot 0
+ * always fills), and for a filled slot pick one weighted variant. Returns the
+ * fielded members tagged with their authored slot index (the salt anchor for
+ * move-token resolution). Deterministic from `seed`; NO Math.random.
+ */
+export function resolveErCustomTrainerParty(
+  seed: string,
+  trainer: ErCustomTrainerResolved,
+): ErCustomTrainerFieldedMember[] {
+  const out: ErCustomTrainerFieldedMember[] = [];
+  trainer.slots.forEach((slot, slotIndex) => {
+    if (!rollErCustomTrainerSlotFill(seed, trainer.key, slotIndex, slot.slotChance)) {
+      return;
+    }
+    const vi = pickErCustomTrainerVariant(seed, trainer.key, slotIndex, slot.variants);
+    out.push({ member: slot.variants[vi].member, slotIndex });
+  });
+  return out;
+}
+
+// Legal-move pool cache: `${speciesId}:${wantStatus ? 1 : 0}` -> sorted move ids.
+// The pools are static game data (level-up ∪ TM ∪ egg), so a run-level clear is
+// unnecessary; the cache just amortizes the union across a fielded party.
+const LEGAL_MOVE_POOL_CACHE = new Map<string, readonly number[]>();
+
+/**
+ * The legal-move pool for a species, split by category. Pool = the species'
+ * level-up learnset ∪ TM/tutor-learnable ∪ egg moves, computed from the GAME's own
+ * balance tables (NOT editor JSON), then filtered to attacking (category !== STATUS)
+ * or non-attacking (category === STATUS). Returned SORTED by move id for a stable,
+ * deterministic walk order. Empty when the species has no data for that category.
+ */
+function legalMovePool(speciesId: number, wantStatus: boolean): readonly number[] {
+  const cacheKey = `${speciesId}:${wantStatus ? 1 : 0}`;
+  const cached = LEGAL_MOVE_POOL_CACHE.get(cacheKey);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const species = getPokemonSpecies(speciesId);
+  if (!species) {
+    LEGAL_MOVE_POOL_CACHE.set(cacheKey, []);
+    return [];
+  }
+  const root = species.getRootSpeciesId();
+  const pool = collectShowdownFreeMoves(root, speciesId); // level-up ∪ TM/tutor (pre-evo inheritance)
+  const eggs = speciesEggMoves[root];
+  if (eggs) {
+    for (const moveId of eggs) {
+      pool.add(moveId);
+    }
+  }
+  const out: number[] = [];
+  for (const id of pool) {
+    const move = allMoves[id];
+    if (!move) {
+      continue;
+    }
+    if ((move.category === MoveCategory.STATUS) === wantStatus) {
+      out.push(id);
+    }
+  }
+  out.sort((a, b) => a - b);
+  LEGAL_MOVE_POOL_CACHE.set(cacheKey, out);
+  return out;
+}
+
+/**
+ * Seeded pick of a legal move for one RLA/RLNA token slot: start at
+ * `hashSeed(...move...) % pool.length` and walk FORWARD deterministically until a
+ * move not already in `used` is found (no duplicates within the moveset). Returns
+ * `undefined` when the pool is empty OR every pool move is already used — the
+ * caller then leaves the slot empty (matches the unknown-move drop behavior).
+ */
+function pickTokenMove(
+  seed: string,
+  key: string,
+  slotIndex: number,
+  moveIndex: number,
+  pool: readonly number[],
+  used: ReadonlySet<number>,
+): number | undefined {
+  if (pool.length === 0) {
+    return undefined;
+  }
+  const start = hashSeed(`${seed}:custom-trainer-move:${key}:${slotIndex}:${moveIndex}`) % pool.length;
+  for (let step = 0; step < pool.length; step++) {
+    const cand = pool[(start + step) % pool.length];
+    if (!used.has(cand)) {
+      return cand;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Resolve one fielded member's move slots to concrete move ids: concrete specs
+ * pass through; an `RLA` token resolves to a seeded random legal ATTACKING move
+ * (category !== STATUS) and `RLNA` to a legal NON-ATTACKING move (category ===
+ * STATUS). No duplicates within the moveset (a colliding roll walks the pool
+ * forward). An empty legal pool leaves the slot out entirely (never crashes).
+ * Deterministic from `seed`; NO Math.random.
+ */
+export function resolveErCustomTrainerMoveIds(
+  seed: string,
+  key: string,
+  slotIndex: number,
+  member: ErCustomTrainerMemberResolved,
+): number[] {
+  const chosen: number[] = [];
+  const used = new Set<number>();
+  member.moveSpecs.forEach((spec, moveIndex) => {
+    if (spec.kind === "id") {
+      chosen.push(spec.id);
+      used.add(spec.id);
+      return;
+    }
+    const pool = legalMovePool(member.speciesId, spec.token === "RLNA");
+    const picked = pickTokenMove(seed, key, slotIndex, moveIndex, pool, used);
+    if (picked !== undefined) {
+      chosen.push(picked);
+      used.add(picked);
+    }
+  });
+  return chosen;
 }
 
 /** The per-run appearance roll for `trainer`, computed once from the run seed and cached. */
@@ -580,6 +951,7 @@ export function buildErCustomTrainerMember(
   index: number,
   scaledLevel: number,
   isDouble: boolean,
+  moveIds: readonly number[] = member.moveIds,
 ): EnemyPokemon | null {
   const species = getPokemonSpecies(member.speciesId);
   if (!species) {
@@ -595,8 +967,8 @@ export function buildErCustomTrainerMember(
   if (member.fusion) {
     applyCustomFusion(enemy, member.fusion);
   }
-  if (member.moveIds.length > 0) {
-    const moves = member.moveIds.map(id => new PokemonMove(id));
+  if (moveIds.length > 0) {
+    const moves = moveIds.map(id => new PokemonMove(id));
     enemy.moveset = moves;
     enemy.summonData.moveset = moves.slice();
   }

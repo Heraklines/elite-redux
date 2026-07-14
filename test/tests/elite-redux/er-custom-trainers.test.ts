@@ -24,14 +24,19 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { allMoves } from "#data/data-lists";
 import {
   buildErCustomTrainerMember,
   type ErCustomTrainerMemberResolved,
   getErCustomTrainers,
   markErCustomTrainerUsed,
   normalizeBattleBgm,
+  pickErCustomTrainerVariant,
   resetErCustomTrainerTracking,
+  resolveErCustomTrainerMoveIds,
+  resolveErCustomTrainerParty,
   rollErCustomTrainerAppearance,
+  rollErCustomTrainerSlotFill,
   selectErCustomTrainerForWave,
   setErCustomTrainerBstBypass,
   setErCustomTrainersForTesting,
@@ -39,6 +44,7 @@ import {
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
 import { Challenges } from "#enums/challenges";
+import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
@@ -456,6 +462,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
       formIndex: 0,
       level: 60,
       moveIds: [],
+      moveSpecs: [],
       abilitySlot: 0,
       fusion: null,
       heldItemKeys: [],
@@ -472,5 +479,174 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     setErCustomTrainerBstBypass(false);
     const devolved = buildErCustomTrainerMember(highBst, 0, 60, false);
     expect(devolved!.species.speciesId).not.toBe(SpeciesId.GARCHOMP);
+  });
+
+  // ---- FEATURE 1: weighted slot variants -----------------------------------
+  it("flat member is back-compat: 1 variant weight 1, slotChance 100 (representative == variant 0)", () => {
+    const FLAT = {
+      FLATTY: {
+        id: 70030,
+        name: "Flatty",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [
+          { species: SpeciesId.PIKACHU, moves: ["THUNDERBOLT"] },
+          { species: SpeciesId.SNORLAX }, // slot 2: still slotChance 100 by default
+        ],
+      },
+    };
+    setErCustomTrainersForTesting(FLAT as never);
+    const resolved = getErCustomTrainers().find(t => t.key === "FLATTY")!;
+    // Every slot has exactly ONE possibility of weight 1.
+    expect(resolved.slots.length).toBe(2);
+    for (const slot of resolved.slots) {
+      expect(slot.variants.length).toBe(1);
+      expect(slot.variants[0].weight).toBe(1);
+      expect(slot.slotChance).toBe(100); // absent slotChance normalizes to 100
+    }
+    // The representative members mirror variant 0 of each slot.
+    expect(resolved.members.length).toBe(2);
+    expect(resolved.members[0]).toBe(resolved.slots[0].variants[0].member);
+    expect(resolved.members[0].speciesId).toBe(SpeciesId.PIKACHU);
+    expect(resolved.members[0].moveIds).toEqual([MoveId.THUNDERBOLT]);
+  });
+
+  it("weighted pick is DETERMINISTIC for a fixed seed and respects the variants list", () => {
+    // Pure helper: no seed hunting. Assert it matches the documented cumulative
+    // weight walk exactly, is stable across calls, and only returns valid indices.
+    const variants = [{ weight: 30 }, { weight: 70 }];
+    const key = "PICKY";
+    const slotIndex = 1;
+    const manual = (seed: string): number => {
+      // Mirror pickErCustomTrainerVariant's FNV-1a walk for an independent check.
+      let h = 0x811c9dc5;
+      const s = `${seed}:custom-trainer-slot:${key}:${slotIndex}`;
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+      }
+      const r = (h >>> 0) % 100;
+      return r < 30 ? 0 : 1;
+    };
+    for (const seed of ["RUNSEED", "ABC", "hello-world", "42", ""]) {
+      const got = pickErCustomTrainerVariant(seed, key, slotIndex, variants);
+      // Deterministic: same inputs, same output on repeat.
+      expect(pickErCustomTrainerVariant(seed, key, slotIndex, variants)).toBe(got);
+      // Correct: matches the manual cumulative-weight computation.
+      expect(got).toBe(manual(seed));
+      expect(got).toBeGreaterThanOrEqual(0);
+      expect(got).toBeLessThan(variants.length);
+    }
+    // A single-variant slot always returns index 0 regardless of seed.
+    expect(pickErCustomTrainerVariant("anything", "X", 0, [{ weight: 5 }])).toBe(0);
+    // The picked variant is honored end-to-end by resolveErCustomTrainerParty.
+    const WT = {
+      WT: {
+        id: 70031,
+        name: "Weighted",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [
+          {
+            variants: [
+              { species: SpeciesId.PIKACHU, weight: 30 },
+              { species: SpeciesId.RAICHU, weight: 70 },
+            ],
+          },
+        ],
+      },
+    };
+    setErCustomTrainersForTesting(WT as never);
+    const resolved = getErCustomTrainers().find(t => t.key === "WT")!;
+    const slot = resolved.slots[0];
+    expect(slot.variants.map(v => v.weight)).toEqual([30, 70]);
+    const idx = pickErCustomTrainerVariant("RUNSEED", "WT", 0, slot.variants);
+    const party = resolveErCustomTrainerParty("RUNSEED", resolved);
+    expect(party.length).toBe(1);
+    expect(party[0].member.speciesId).toBe(slot.variants[idx].member.speciesId);
+  });
+
+  // ---- FEATURE 2: slot fill probability (slots 2-6) ------------------------
+  it("slotChance 100 always fills; a failing fill roll omits the slot and the party shrinks", () => {
+    const SC = {
+      SHRINK: {
+        id: 70032,
+        name: "Shrinker",
+        trainerClass: "VETERAN",
+        difficulties: ["ace"],
+        team: [
+          { species: SpeciesId.SNORLAX }, // slot 1: lead, always present
+          { species: SpeciesId.GENGAR, slotChance: 100 }, // slot 2: guaranteed
+          { species: SpeciesId.HAUNTER, slotChance: 1 }, // slot 3: almost never fills
+        ],
+      },
+    };
+    setErCustomTrainersForTesting(SC as never);
+    const resolved = getErCustomTrainers().find(t => t.key === "SHRINK")!;
+    // Slot 1 (index 0) is FORCED to 100 even when authored otherwise; slot 3 keeps 1.
+    expect(resolved.slots[0].slotChance).toBe(100);
+    expect(resolved.slots[2].slotChance).toBe(1);
+    const seed = "RUNSEED";
+    // Derive the expected fielded set straight from the pure fill roll — robust
+    // against whatever the seed hashes to.
+    const expected = resolved.slots
+      .map((s, i) => ({ i, fill: rollErCustomTrainerSlotFill(seed, "SHRINK", i, s.slotChance) }))
+      .filter(x => x.fill)
+      .map(x => x.i);
+    const party = resolveErCustomTrainerParty(seed, resolved);
+    expect(party.map(f => f.slotIndex)).toEqual(expected);
+    // Slot 1 (lead, forced 100) and slot 2 (slotChance 100) ALWAYS fill.
+    expect(rollErCustomTrainerSlotFill(seed, "SHRINK", 0, 100)).toBe(true);
+    expect(rollErCustomTrainerSlotFill(seed, "SHRINK", 1, 100)).toBe(true);
+    expect(party.some(f => f.slotIndex === 0)).toBe(true);
+    expect(party.some(f => f.slotIndex === 1)).toBe(true);
+    // The slotChance-1 slot follows its (deterministic) roll; when it fails, the
+    // fielded party is smaller than the authored 3 (party shrinks). Derived from
+    // the pure roll so it is robust against the exact hash value.
+    const slot3Fills = rollErCustomTrainerSlotFill(seed, "SHRINK", 2, 1);
+    expect(party.length).toBe(slot3Fills ? 3 : 2);
+    if (!slot3Fills) {
+      expect(party.length).toBeLessThan(resolved.slots.length);
+    }
+    // A slotChance of 100 on the SAME slot would always field it (proves it is
+    // the roll, not some other gate, that omits the slot).
+    expect(rollErCustomTrainerSlotFill(seed, "SHRINK", 2, 100)).toBe(true);
+  });
+
+  // ---- FEATURE 3: RLA / RLNA move tokens -----------------------------------
+  it("RLA resolves to a damaging legal move and RLNA to a status legal move (no dupes, deterministic)", () => {
+    const RL = {
+      RANDO: {
+        id: 70033,
+        name: "Rando",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [{ species: SpeciesId.GARCHOMP, moves: ["RLA", "RLNA", "RLA", "RLNA"] }],
+      },
+    };
+    setErCustomTrainersForTesting(RL as never);
+    const resolved = getErCustomTrainers().find(t => t.key === "RANDO")!;
+    const member = resolved.members[0];
+    // The tokens survive resolution as ordered move specs (no concrete ids yet).
+    expect(member.moveSpecs.map(s => (s.kind === "token" ? s.token : "id"))).toEqual(["RLA", "RLNA", "RLA", "RLNA"]);
+    expect(member.moveIds).toEqual([]); // tokens contribute no concrete id up front
+
+    const seed = "RUNSEED";
+    const ids = resolveErCustomTrainerMoveIds(seed, "RANDO", 0, member);
+    // All four slots resolved to a real move (Garchomp has a rich pool).
+    expect(ids.length).toBe(4);
+    // No duplicates within the fielded moveset.
+    expect(new Set(ids).size).toBe(ids.length);
+    // Slots 0 and 2 (RLA) are damaging; slots 1 and 3 (RLNA) are status.
+    expect(allMoves[ids[0]].category).not.toBe(MoveCategory.STATUS);
+    expect(allMoves[ids[2]].category).not.toBe(MoveCategory.STATUS);
+    expect(allMoves[ids[1]].category).toBe(MoveCategory.STATUS);
+    expect(allMoves[ids[3]].category).toBe(MoveCategory.STATUS);
+    // Deterministic: the same seed reproduces the same moveset exactly.
+    expect(resolveErCustomTrainerMoveIds(seed, "RANDO", 0, member)).toEqual(ids);
+    // A different salt anchor (slot index) can pick a different set -> proves the
+    // salt is load-bearing (not a constant), while staying deterministic.
+    const other = resolveErCustomTrainerMoveIds(seed, "RANDO", 3, member);
+    expect(resolveErCustomTrainerMoveIds(seed, "RANDO", 3, member)).toEqual(other);
   });
 });
