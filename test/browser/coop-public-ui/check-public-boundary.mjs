@@ -84,8 +84,14 @@ if (
 ) {
   failures.push("public-ui-harness.mjs: command readiness must use the owned public semantic surface");
 }
+if (!harness?.includes("createBattlePromptAdvancer(this, from") || !harness.includes("await advanceBattlePrompt()")) {
+  failures.push("public-ui-harness.mjs: post-turn waits must drive readiness-proven public battle prompts");
+}
 
 const browserEntry = await readFile(new URL("../../../scripts/coop-browser-entry.ts", import.meta.url), "utf8");
+if (!browserEntry.includes("import type { Pokemon }") || browserEntry.includes("export {};")) {
+  failures.push("coop-browser-entry.ts: the static Pokemon type import must be the sole top-level-await module marker");
+}
 if (
   !browserEntry.includes("surfaceObserverVersion: 1")
   || !browserEntry.includes("[coop-browser:binding]")

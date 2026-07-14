@@ -12,7 +12,7 @@ import {
   driveBattleFallback,
   waitForOutcomeBounded,
 } from "./campaign.mjs";
-import { PublicUiClient } from "./public-ui-harness.mjs";
+import { DuoPublicUiRig, PublicUiClient } from "./public-ui-harness.mjs";
 
 class FakeEvidence {
   constructor(texts = []) {
@@ -30,6 +30,13 @@ class FakeEvidence {
       .find(
         event => event.kind === "browser-surface2" && (surfaceId == null || event.observation.surfaceId === surfaceId),
       );
+  }
+
+  findLastSurface(surface, from = 0) {
+    return this.events
+      .slice(from)
+      .toReversed()
+      .find(event => event.kind === "browser-surface" && event.observation.surface === surface);
   }
 
   async waitForCondition(predicate, { description = "condition" } = {}) {
@@ -54,7 +61,22 @@ class FakeEvidence {
     this.events.push({ index: this.events.length, text, at, monotonicMs });
   }
 
-  pushBattleReadiness(surfaceId, phase, awaitingActionInput, phaseInstance) {
+  pushCommandSurface(address = { epoch: 7, wave: 1, turn: 1 }) {
+    this.events.push({
+      index: this.events.length,
+      kind: "browser-surface",
+      observation: { surface: "command", ...address },
+    });
+  }
+
+  pushBattleReadiness(
+    surfaceId,
+    phase,
+    awaitingActionInput,
+    phaseInstance,
+    handlerActive = true,
+    address = { epoch: 7, wave: 1, turn: 1 },
+  ) {
     this.events.push({
       index: this.events.length,
       kind: "browser-surface2",
@@ -66,7 +88,8 @@ class FakeEvidence {
         ownerModel: "local",
         localSeat: 0,
         seatsWithInput: [0],
-        ready: { awaitingActionInput },
+        ready: { awaitingActionInput, handlerActive },
+        address,
       },
     });
   }
@@ -122,11 +145,13 @@ function fakeClient(label, texts = []) {
   };
 }
 
-test("ready local battle narration and EXP instances advance once on each public client", async () => {
+test("only ready active local battle narration and EXP instances advance once on each public client", async () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
   const rig = { host: authority, clients: { authority, renderer } };
   const stats = { battleMessagePrompts: 0, postBattleExpPrompts: 0 };
+  authority.evidence.pushCommandSurface();
+  renderer.evidence.pushCommandSurface();
   const advance = createBattlePromptAdvancer(rig, { authority: 0, renderer: 0 }, stats, "wave-1-turn-1");
 
   authority.evidence.pushBattleReadiness("battle:message", "MessagePhase", false, 1);
@@ -139,6 +164,15 @@ test("ready local battle narration and EXP instances advance once on each public
   renderer.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 1);
   assert.equal(await advance(), true, "a renderer faint narration is a distinct human-action surface");
   assert.equal(await advance(), false);
+  authority.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 3, false);
+  renderer.evidence.pushBattleReadiness("command:command", "CommandPhase", true, 2);
+  assert.equal(await advance(), false, "inactive and non-battle surfaces must never receive fallback input");
+  renderer.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 3, true, {
+    epoch: 7,
+    wave: 1,
+    turn: 2,
+  });
+  assert.equal(await advance(), false, "a ready prompt from a different turn address must never receive input");
   authority.evidence.pushBattleReadiness("battle:exp", "ExpPhase", true, 2);
   assert.equal(await advance(), true);
   assert.equal(await advance(), false);
@@ -164,6 +198,37 @@ test("ready local battle narration and EXP instances advance once on each public
       ["authority", "battle:exp", 2],
       ["renderer", "battle:message", 1],
     ],
+  );
+});
+
+test("the short public journey advances readiness-proven narration before polling the next outcome", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const clients = { authority, renderer };
+  for (const client of Object.values(clients)) {
+    client.evidence.pushCommandSurface();
+    client.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 1);
+    client.press = async function press(key, purpose) {
+      this.presses.push({ key, purpose });
+      this.evidence.pushConsole("CommandPhase regression -> LOCAL UI");
+    };
+  }
+  const rig = {
+    host: authority,
+    clients,
+    config: { faintOwnerSeat: "renderer", timeoutMs: 1_000 },
+  };
+
+  assert.deepEqual(await DuoPublicUiRig.prototype.waitForPostTurnOutcome.call(rig, { authority: 0, renderer: 0 }), {
+    kind: "command",
+  });
+  assert.deepEqual(
+    authority.presses.map(entry => entry.key),
+    ["Space"],
+  );
+  assert.deepEqual(
+    renderer.presses.map(entry => entry.key),
+    ["Space"],
   );
 });
 

@@ -250,22 +250,35 @@ export async function driveBattleFallback(rig, keys, from, purpose) {
   return pending;
 }
 
+function currentSharedCommandAddress(clients, purpose) {
+  const addresses = clients.map(client => {
+    const observation = client.evidence.findLastSurface("command")?.observation;
+    return observation == null ? null : `${observation.epoch}:${observation.wave}:${observation.turn}`;
+  });
+  if (addresses.some(address => address == null) || new Set(addresses).size !== 1) {
+    throw new Error(`${purpose}: battle prompt advancement requires one shared public command address`);
+  }
+  return addresses[0];
+}
+
 /**
  * Public-input driver for readiness-proven per-client battle messages.
  *
  * Both ordinary MessagePhase narration (for example, "Wild Yungoos fainted!") and ExpPhase can
  * block the authoritative phase queue on a human ACTION. The read-only semantic observer publishes
- * them only with the handler's complete `isAwaitingPromptAction()` contract and a phase-instance
- * discriminator. One distinct ready instance authorizes exactly one Space on that same public
- * client. Most renderer phases are passive, but a narrated CoopFaintReplayPhase opens a real local
- * MessagePhase prompt too; run 29321837675 proved leaving that readiness signal undriven prevents
- * the guest from applying/ACKing the completed turn forever.
+ * them only with the handler's complete `isAwaitingPromptAction()` contract, the exact current
+ * shared command address, and a phase-instance discriminator. One distinct ready instance
+ * authorizes exactly one Space on that same public client. Most renderer phases are passive, but a
+ * narrated CoopFaintReplayPhase opens a real local MessagePhase prompt too; run 29321837675 proved
+ * leaving that readiness signal undriven prevents the guest from applying/ACKing the completed turn
+ * forever.
  */
 export function createBattlePromptAdvancer(rig, from, stats, purpose) {
   if (!rig.host) {
     throw new Error(`${purpose}: battle prompt advancement requires the authenticated public host`);
   }
   const clients = Object.values(rig.clients);
+  const expectedAddress = currentSharedCommandAddress(clients, purpose);
   const cursors = new Map(clients.map(client => [client.label, from[client.label] ?? 0]));
   const consumedInstances = new Set();
   return async () => {
@@ -276,14 +289,17 @@ export function createBattlePromptAdvancer(rig, from, stats, purpose) {
         }
         const observation = event.observation;
         const expectedPhase = BATTLE_PROMPT_PHASES.get(observation.surfaceId);
+        const observedAddress = `${observation.address?.epoch}:${observation.address?.wave}:${observation.address?.turn}`;
         const instanceKey = `${client.label}:${observation.surfaceId}:${observation.phaseInstance}`;
         return (
           expectedPhase != null
+          && observedAddress === expectedAddress
           && observation.phase === expectedPhase
           && observation.uiMode === "MESSAGE"
           && observation.ownerModel === "local"
           && observation.seatsWithInput?.includes(observation.localSeat)
           && Number.isSafeInteger(observation.phaseInstance)
+          && observation.ready?.handlerActive === true
           && observation.ready?.awaitingActionInput === true
           && !consumedInstances.has(instanceKey)
         );
