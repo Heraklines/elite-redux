@@ -75,6 +75,7 @@ import {
   resetCoopChecksumAssertionCount,
   setCoopChecksumAssertSeverity,
 } from "#data/elite-redux/coop/coop-checksum-assert";
+import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import { getCoopOperationJournalCommittedClasses } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   clearCoopRuntime,
@@ -1098,15 +1099,67 @@ export function prepareCoopSoakContent(game: GameManager, seed: number, pinSeed?
 /**
  * Install the coverage taps (test-side seam wraps, ZERO production change):
  *   - CARRIER tap on BOTH runtimes: every interactionChoice/interactionOutcome frame records its `kind`
- *     (hits.kinds) + the seq BAND it rides (bandForSeq -> hits.bands). ONE tap covers every kind + band
- *     the run ever sends, including async ME tails that can escape the relay-instance wrapper,
- *     INCLUDING future ones (a newly-registered kind that actually fires is recorded automatically; one
- *     that never fires stays cold + is caught by the completeness assertion).
+ *     (hits.kinds) + the seq BAND it rides (bandForSeq -> hits.bands). The two ME carriers already cut over
+ *     to retained P33 envelopes are projected from the exact outgoing operation id onto their legacy semantic
+ *     coverage edges (`ME_PRESENT` -> `mePresent`, `ME_TERMINAL` -> `meResync`). ONE tap therefore covers
+ *     every raw kind plus the durable replacements, including async ME tails that can escape the relay-instance
+ *     wrapper. A carrier that never actually leaves a runtime stays cold and is caught by completeness.
  *   - PERMANENT guest ui.setMode recorder: every guest setMode targeting a co-op-MIRRORED UiMode records
  *     hits.modes. The guest is the renderer, so it opens the mirrored screens the headless host bypass
  *     never shows. The one-shot faint wrapper (driveGuestReplayTurnWithFaint) saves + calls THIS recorder
  *     as its `realSetMode`, so the two compose.
  */
+const ME_OPERATION_WIRE_SEQ_STRIDE = 8_000;
+const ME_OPERATION_KIND_SEQ_STRIDE = 1_000;
+
+/**
+ * Recover the real relay-address root encoded in an outgoing durable ME operation. This is deliberately an
+ * observer of the final wire envelope: it does not sample the journal ledger, infer success from scene state,
+ * or call an apply seam. Full address validation prevents a malformed/unrelated envelope from manufacturing a
+ * coverage hit.
+ */
+function durableMeCoverageCarrier(message: CoopMessage): { seq: number; kind: "mePresent" | "meResync" } | null {
+  if (message.t !== "envelope") {
+    return null;
+  }
+  const operation = message.envelope.pendingOperation;
+  if (operation == null || operation.status !== "applied") {
+    return null;
+  }
+
+  let semanticKind: "mePresent" | "meResync";
+  let kindTag: number;
+  switch (operation.kind) {
+    case "ME_PRESENT":
+      semanticKind = "mePresent";
+      kindTag = 0;
+      break;
+    case "ME_TERMINAL":
+      semanticKind = "meResync";
+      kindTag = 4;
+      break;
+    default:
+      return null;
+  }
+
+  const parsed = parseCoopOperationId(operation.id);
+  if (
+    parsed == null
+    || parsed.epoch !== message.envelope.sessionEpoch
+    || parsed.owner !== operation.owner
+    || parsed.kind !== operation.kind
+  ) {
+    return null;
+  }
+  const kindOffset = parsed.pinnedSeq % ME_OPERATION_WIRE_SEQ_STRIDE;
+  const kindOffsetMin = kindTag * ME_OPERATION_KIND_SEQ_STRIDE;
+  if (kindOffset < kindOffsetMin || kindOffset >= kindOffsetMin + ME_OPERATION_KIND_SEQ_STRIDE) {
+    return null;
+  }
+  const seq = (parsed.pinnedSeq - kindOffset) / ME_OPERATION_WIRE_SEQ_STRIDE;
+  return Number.isSafeInteger(seq) && seq >= 0 ? { seq, kind: semanticKind } : null;
+}
+
 function installCoverageTaps(rig: DuoRig, hits: SoakHitSet): void {
   const recordSend = (seq: number, kind: string): void => {
     hits.kinds.add(kind);
@@ -1123,6 +1176,11 @@ function installCoverageTaps(rig: DuoRig, hits: SoakHitSet): void {
     transport.send = (message: CoopMessage): void => {
       if (message.t === "interactionChoice" || message.t === "interactionOutcome") {
         recordSend(message.seq, message.kind);
+      } else {
+        const durableMeCarrier = durableMeCoverageCarrier(message);
+        if (durableMeCarrier != null) {
+          recordSend(durableMeCarrier.seq, durableMeCarrier.kind);
+        }
       }
       realSend(message);
     };
