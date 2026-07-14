@@ -4,6 +4,7 @@
  */
 
 import puppeteer from "puppeteer";
+import { createBattlePromptAdvancer } from "./campaign.mjs";
 import { delay, EvidenceSink } from "./evidence.mjs";
 
 const TITLE_PHASE = /Start Phase TitlePhase/u;
@@ -1046,6 +1047,7 @@ export class DuoPublicUiRig {
   }
 
   async waitForPostTurnOutcome(from) {
+    const advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, "public-ui-post-turn");
     const deadline = Date.now() + this.config.timeoutMs;
     while (Date.now() < deadline) {
       const values = Object.values(this.clients);
@@ -1068,6 +1070,7 @@ export class DuoPublicUiRig {
       if (commands.every(Boolean)) {
         return { kind: "command" };
       }
+      await advanceBattlePrompt();
       await delay(100);
     }
     throw new Error("Timed out waiting for public post-turn command, faint, or reward evidence");
