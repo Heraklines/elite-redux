@@ -37,6 +37,7 @@ import {
 import {
   type CoopRuntime,
   clearCoopRuntime,
+  isCoopSharedTerminalFrozen,
   setCoopRuntime,
   wireCoopStallWatchdog,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -279,6 +280,10 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
       expect(rep?.speciesId, "the guest materialized ITS pick (GYARADOS) on its own player field").toBe(GUEST_BENCH_2);
       expect(rep != null && rep.hp > 0 && !rep.fainted, "the guest's replacement is presented ALIVE").toBe(true);
     });
+    expect(
+      isCoopSharedTerminalFrozen(rig.guestRuntime),
+      "a semantically complete replacement projection never closes the shared match",
+    ).toBe(false);
     expect(resyncProbe.count(), "the guest-faint replacement converged with ZERO forced resyncs").toBe(0);
 
     logs.flush();
