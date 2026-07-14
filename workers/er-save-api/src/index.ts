@@ -60,9 +60,17 @@ import {
   reconcileSeason,
   seasonIdFromTime,
 } from "./showdown-rank";
+import { handleTelemetryIngest, type TelemetryR2Bucket } from "./telemetry";
 
 interface Env {
   DB: D1Database;
+  /**
+   * OPTIONAL R2 bucket for the player-telemetry ML pipeline (#player-telemetry). Bound only on the
+   * staging worker (bucket `er-telemetry-staging`); absent elsewhere, so `POST /telemetry/ingest` fails
+   * soft (503) until the maintainer enables R2 + binds it. The client drops on any non-2xx, so an unbound
+   * binding never affects gameplay.
+   */
+  TELEMETRY?: TelemetryR2Bucket;
   /** Secret used to sign/verify session tokens. Set via `wrangler secret put`. */
   SESSION_SECRET: string;
   /** Optional comma-separated origin allowlist; "*" / unset = allow all. */
@@ -3601,6 +3609,15 @@ export default {
       // client clears its cookie regardless.
       if (pathname === "/account/logout" && method === "GET") {
         return text("", 200, cors);
+      }
+      // Player-telemetry ML ingest (#player-telemetry). Routed in the PUBLIC block because a
+      // `navigator.sendBeacon` flush (fired on pagehide/visibilitychange) cannot set an Authorization
+      // header, so the token also rides the `?t=` query param; the handler owns its own 401. Auth is the
+      // SAME stateless session token as the savedata endpoints.
+      if (pathname === "/telemetry/ingest" && method === "POST") {
+        const tAuth =
+          (await authUser(request, env)) ?? (await verifyToken(url.searchParams.get("t") ?? "", env.SESSION_SECRET));
+        return await handleTelemetryIngest(request, tAuth, env, cors);
       }
 
       // ---- authenticated ----

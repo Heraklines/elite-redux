@@ -14,6 +14,14 @@ binding = "DB"
 database_name = "er-saves"
 database_id = "b2fae947-6971-45e7-b287-d42648fd0a30"
 
+# Player-telemetry ML capture sink (#player-telemetry) - PROD BINDING PREPARED BUT NOT ACTIVE.
+# Telemetry is staging-only for now (the client is gated by VITE_TELEMETRY=staging), so production
+# does NOT bind an R2 bucket. To enable in prod later (a flag flip): create the bucket, then uncomment.
+#   npx wrangler r2 bucket create er-telemetry
+# [[r2_buckets]]
+# binding = "TELEMETRY"
+# bucket_name = "er-telemetry"
+
 # Secrets (DO NOT put real values here — set them with `wrangler secret put`):
 #   npx wrangler secret put SESSION_SECRET   # long random string; signs session tokens
 # SESSION_SECRET is read from the encrypted secret store, not from [vars].

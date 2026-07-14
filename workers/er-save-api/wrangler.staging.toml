@@ -10,6 +10,16 @@ binding = "DB"
 database_name = "er-saves-staging"
 database_id = "7dc09f64-6810-4756-8c0f-e44f7d382eed"
 
+# Player-telemetry ML capture sink (#player-telemetry). Staging-only R2 bucket; the client's
+# compressed (state, action) event batches are written here verbatim by POST /telemetry/ingest.
+# NOTE: R2 must be enabled on the Cloudflare account and the bucket created BEFORE this deploys:
+#   npx wrangler r2 bucket create er-telemetry-staging
+# Until then the binding is harmless to define but a deploy will fail if the bucket is missing, so
+# create the bucket first (see the worker README "Player telemetry" section).
+[[r2_buckets]]
+binding = "TELEMETRY"
+bucket_name = "er-telemetry-staging"
+
 [vars]
 ALLOWED_ORIGIN = "*"
 MIN_USERNAME_LENGTH = "3"
