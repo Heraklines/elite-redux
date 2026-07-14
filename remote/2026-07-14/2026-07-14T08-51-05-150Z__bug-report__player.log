@@ -1,0 +1,114 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.3 Mobile/15E148 Safari/604.1
+mode:     0  wave:null  difficulty:ace
+seed:     PuOiR97udkAEyhM7iZS2KTRs
+party:    
+
+----- DESCRIPTION -----
+i lost all my data and i dont know what happend all i have left is a run i was doing
+
+----- CONSOLE -----
+[08:41:50.802] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[08:41:51.188] LOG: [ER] build mr1lenh7-fth8
+[08:42:31.173] DEBUG: Destroying loading scene
+[08:42:31.173] DEBUG: Destroyed loading scene
+[08:42:31.317] LOG: Seed: lu0z7IezRdgQKZ21sLq72h0H
+[08:42:31.317] LOG: Wave Seed: lu0z7IezRdgQKZ21sLq72h0H 0
+[08:42:35.174] LOG: %cStart Phase LoginPhase color:green;
+[08:42:35.540] LOG: Client Session: GGpgRz69fld6eIRFJY6b2ATfogwDy5LO
+[08:42:35.914] DEBUG: Using cached system data
+[08:42:35.970] LOG: %cStart Phase TitlePhase color:green;
+[08:42:35.970] LOG: Getting Session Slot id: %d 0
+[08:42:35.986] LOG: use seasonal splash messages true
+[08:44:02.743] LOG: %cStart Phase SelectStarterPhase color:green;
+[08:44:04.984] LOG: %cStart Phase TitlePhase color:green;
+[08:44:04.984] LOG: Getting Session Slot id: %d 0
+[08:44:05.016] LOG: use seasonal splash messages true
+[08:44:05.899] LOG: Getting Session Slot id: %d 0
+[08:44:05.913] LOG: Getting Session Slot id: %d 1
+[08:44:05.922] LOG: Getting Session Slot id: %d 2
+[08:44:05.929] LOG: Getting Session Slot id: %d 3
+[08:44:05.936] LOG: Getting Session Slot id: %d 4
+[08:44:06.185] ERROR: Invalid save data JSON detected! Session not found.
+[08:44:06.204] ERROR: Invalid save data JSON detected! Session not found.
+[08:44:06.207] ERROR: Invalid save data JSON detected! Session not found.
+[08:44:06.214] ERROR: Invalid save data JSON detected! Session not found.
+[08:44:09.230] WARN: Attempted to load save slot of -1 through load game menu!
+[08:44:09.261] LOG: use seasonal splash messages true
+[08:44:33.062] ERROR: [uncaught] Error: Malformed UTF-8 data @ https://elite-redux.pages.dev/assets/er-ghost-teams-DnzG5f35.js:4:459152
+[08:44:42.723] WARN: Could not get system savedata! TypeError: Load failed
+[08:45:10.765] WARN: Could not get account info! 401 
+[08:45:10.793] LOG: Seed: uuQWHmLsqy6z1W7oCta2mq8O
+[08:45:10.793] LOG: Wave Seed: uuQWHmLsqy6z1W7oCta2mq8O 0
+[08:45:11.115] WARN: AnimationManager key already exists: prompt
+[08:45:11.115] WARN: AnimationManager key already exists: tera_sparkle
+[08:45:11.115] LOG: Seed: PuOiR97udkAEyhM7iZS2KTRs
+[08:45:11.115] LOG: Wave Seed: PuOiR97udkAEyhM7iZS2KTRs 0
+[08:45:14.764] LOG: %cStart Phase LoginPhase color:green;
+[08:45:19.463] LOG: %cStart Phase LoginPhase color:green;
+[08:46:45.123] LOG: Client Session: GGpgRz69fld6eIRFJY6b2ATfogwDy5LO
+[08:46:46.419] DEBUG: Using cached system data
+[08:46:46.485] LOG: %cStart Phase SelectGenderPhase color:green;
+[08:46:49.445] LOG: %cStart Phase TitlePhase color:green;
+[08:46:49.448] LOG: Getting Session Slot id: %d 0
+[08:46:49.460] LOG: use seasonal splash messages true
+[08:46:52.289] LOG: %cStart Phase TitlePhase color:green;
+[08:46:52.289] LOG: Getting Session Slot id: %d 0
+[08:46:52.322] LOG: use seasonal splash messages true
+[08:46:55.664] LOG: %cStart Phase SelectStarterPhase color:green;
+[08:46:58.244] LOG: %cStart Phase TitlePhase color:green;
+[08:46:58.245] LOG: Getting Session Slot id: %d 0
+[08:46:58.267] LOG: use seasonal splash messages true
+[08:47:05.785] LOG: %cStart Phase TitlePhase color:green;
+[08:47:05.785] LOG: Getting Session Slot id: %d 0
+[08:47:05.819] LOG: use seasonal splash messages true
+[08:47:07.492] LOG: Getting Session Slot id: %d 0
+[08:47:07.504] LOG: Getting Session Slot id: %d 1
+[08:47:07.513] LOG: Getting Session Slot id: %d 2
+[08:47:07.521] LOG: Getting Session Slot id: %d 3
+[08:47:07.528] LOG: Getting Session Slot id: %d 4
+[08:47:07.753] ERROR: Invalid save data JSON detected! Session not found.
+[08:47:07.759] ERROR: Invalid save data JSON detected! Session not found.
+[08:47:07.759] ERROR: Invalid save data JSON detected! Session not found.
+[08:47:07.762] ERROR: Invalid save data JSON detected! Session not found.
+[08:47:08.963] WARN: Attempted to load save slot of -1 through load game menu!
+[08:47:08.995] LOG: use seasonal splash messages true
+[08:47:11.495] LOG: Dragon Tamer Darien
+[08:47:11.571] LOG: Gym Leader Bea
+[08:47:11.615] LOG: Gym Leader Chili
+[08:47:11.653] LOG: Twins Kiri & Jan
+[08:47:11.702] LOG: Ace Trainer Mac
+[08:47:11.853] LOG: Twins Jo & Zoe
+[08:47:11.885] LOG: Ace Trainer Jaxson
+[08:47:11.918] LOG: Ace Trainer Viktor
+[08:47:11.950] LOG: Twins Emma & Lil
+[08:47:11.983] LOG: Gym Leader Misty
+[08:47:12.069] LOG: Ace Trainer Johnson
+[08:47:12.239] LOG: Swimmers Wade & Kelsie
+[08:47:12.310] LOG: Macro Cosmos Oleana
+[08:47:12.355] LOG: Team Plasma Sage Zinzolin
+[08:47:12.413] LOG: Breeder Elena
+[08:47:12.445] LOG: Ace Trainer Kassandra
+[08:47:12.501] LOG: Fisherman Alec
+[08:47:12.557] LOG: Cyclist James
+[08:47:12.603] LOG: Breeders William & Bethany
+[08:47:12.637] LOG: Ace Duo Abel & Flora
+[08:47:12.720] LOG: Cyclists Hector & Kayla
+[08:47:12.791] LOG: Cyclist Ryan
+[08:47:13.539] LOG: %cStart Phase TitlePhase color:green;
+[08:47:13.539] LOG: Getting Session Slot id: %d 0
+[08:47:13.573] LOG: use seasonal splash messages true
+[08:49:38.151] ERROR: [unhandledrejection] InvalidStateError: Failed to start the audio device
+[08:49:40.454] LOG: Getting Session Slot id: %d 0
+[08:49:40.472] LOG: Getting Session Slot id: %d 1
+[08:49:40.480] LOG: Getting Session Slot id: %d 2
+[08:49:40.486] LOG: Getting Session Slot id: %d 3
+[08:49:40.491] LOG: Getting Session Slot id: %d 4
+[08:49:40.735] ERROR: Invalid save data JSON detected! Session not found.
+[08:49:40.741] ERROR: Invalid save data JSON detected! Session not found.
+[08:49:40.742] ERROR: Invalid save data JSON detected! Session not found.
+[08:49:40.744] ERROR: Invalid save data JSON detected! Session not found.
+[08:49:43.171] WARN: Attempted to load save slot of -1 through load game menu!
+[08:49:43.204] LOG: use seasonal splash messages true
