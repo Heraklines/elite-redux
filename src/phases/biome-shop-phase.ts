@@ -46,6 +46,7 @@ import {
   getCoopController,
   getCoopInteractionRelay,
   getCoopRuntime,
+  withActiveCoopRuntimeScope,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_SHOP_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { erRecordBiomeShopPurchase, erRecordBlackMarketPurchase } from "#data/elite-redux/er-achievement-detection";
@@ -72,6 +73,16 @@ import i18next from "i18next";
 let coopBiomeMarketTestSkip = false;
 export function setCoopBiomeMarketTestSkip(on: boolean): void {
   coopBiomeMarketTestSkip = on;
+}
+
+/**
+ * Run a reward-op call under `runtime`'s captured op-state + durability scope (#922). The market watcher's
+ * adopt/commit calls run from `await` tails, so the ambient active runtime is NOT reliably this client's on
+ * resume; the reward surface ("market" shares the "reward" per-runtime record) must be read/written under the
+ * runtime captured at schedule time. Null runtime (non-coop) = ambient. Production (one runtime) = no-op.
+ */
+function scopeReward<T>(runtime: ReturnType<typeof getCoopRuntime>, fn: () => T): T {
+  return runtime == null ? fn() : withActiveCoopRuntimeScope(runtime, fn);
 }
 
 export class BiomeShopPhase extends SelectModifierPhase {
@@ -453,6 +464,9 @@ export class BiomeShopPhase extends SelectModifierPhase {
     const generation = coopSessionGeneration();
     const wave = globalScene.currentBattle?.waveIndex ?? -1;
     const pinned = this.coopBiomeStart;
+    // Capture the OWNING runtime at schedule time so the reward-op commit/adopt calls below (retried after
+    // `await`s) read/write THIS client's per-runtime record + journal, not the ambient one (#922).
+    const runtime = getCoopRuntime();
     if (this.coopBiomeOwner) {
       const role = getCoopController()?.role ?? "guest";
       const relay = getCoopInteractionRelay();
@@ -460,17 +474,19 @@ export class BiomeShopPhase extends SelectModifierPhase {
         if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
           return false;
         }
-        const commit = commitRewardOwnerIntent({
-          surface: "market",
-          pinned,
-          label: "biomeShop",
-          choice: COOP_INTERACTION_LEAVE,
-          data: undefined,
-          terminal: true,
-          localRole: role,
-          wave,
-          turn: globalScene.currentBattle?.turn ?? 0,
-        });
+        const commit = scopeReward(runtime, () =>
+          commitRewardOwnerIntent({
+            surface: "market",
+            pinned,
+            label: "biomeShop",
+            choice: COOP_INTERACTION_LEAVE,
+            data: undefined,
+            terminal: true,
+            localRole: role,
+            wave,
+            turn: globalScene.currentBattle?.turn ?? 0,
+          }),
+        );
         if (!isCoopRewardOperationEnabled() || commit != null) {
           const resend = (): void =>
             relay?.sendInteractionChoice(coopBiomeShopSeq(pinned), "biomeShop", COOP_INTERACTION_LEAVE);
@@ -516,15 +532,17 @@ export class BiomeShopPhase extends SelectModifierPhase {
               action != null
               && action.choice === COOP_INTERACTION_LEAVE
               && action.operationId === commit?.operationId
-              && adoptRewardWatcherChoice({
-                surface: "market",
-                pinned,
-                action: { choice: action.choice, data: action.data, operationId: action.operationId },
-                terminal: true,
-                localRole: role,
-                wave,
-                turn: globalScene.currentBattle?.turn ?? 0,
-              }).adopt;
+              && scopeReward(runtime, () =>
+                adoptRewardWatcherChoice({
+                  surface: "market",
+                  pinned,
+                  action: { choice: action.choice, data: action.data, operationId: action.operationId },
+                  terminal: true,
+                  localRole: role,
+                  wave,
+                  turn: globalScene.currentBattle?.turn ?? 0,
+                }),
+              ).adopt;
             if (!adopted) {
               getCoopRuntime()?.durability?.reconnect();
               continue;
@@ -533,7 +551,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
           if (
             role === "host"
             && isCoopRewardRetainedResultMode()
-            && (commit == null || commitRewardAuthoritativeResult(commit.operationId) == null)
+            && (commit == null
+              || scopeReward(runtime, () => commitRewardAuthoritativeResult(commit.operationId)) == null)
           ) {
             getCoopRuntime()?.durability?.reconnect();
             continue;
@@ -671,6 +690,9 @@ export class BiomeShopPhase extends SelectModifierPhase {
       this.qtys = this.shopOptions.map(() => 99);
     }
     const seq = coopBiomeShopSeq(this.coopBiomeStart);
+    // Capture the OWNING runtime at schedule time so the reward-op adopt/commit calls below (which resume
+    // after an `await`) read/write THIS client's per-runtime record + journal, not the ambient one (#922).
+    const runtime = getCoopRuntime();
     let missingTerminalAttempts = 0;
     for (;;) {
       const action = await awaitCoopChoiceWithOrphanBackstop(
@@ -702,15 +724,17 @@ export class BiomeShopPhase extends SelectModifierPhase {
       // stale-/late-rejecting a buy from an earlier interaction or after this market left - the #861 shape).
       // When the flag is OFF this passes through verbatim (legacy). The LEAVE terminal always ends the loop
       // (the gate still records its watermark); a rejected non-terminal buy is IGNORED (keep awaiting).
-      const decision = adoptRewardWatcherChoice({
-        surface: "market",
-        pinned: this.coopBiomeStart,
-        action: { choice: action.choice, data: action.data, operationId: action.operationId },
-        terminal,
-        localRole: getCoopController()?.role ?? "guest",
-        wave: globalScene.currentBattle?.waveIndex ?? -1,
-        turn: globalScene.currentBattle?.turn ?? 0,
-      });
+      const decision = scopeReward(runtime, () =>
+        adoptRewardWatcherChoice({
+          surface: "market",
+          pinned: this.coopBiomeStart,
+          action: { choice: action.choice, data: action.data, operationId: action.operationId },
+          terminal,
+          localRole: getCoopController()?.role ?? "guest",
+          wave: globalScene.currentBattle?.waveIndex ?? -1,
+          turn: globalScene.currentBattle?.turn ?? 0,
+        }),
+      );
       if (!decision.adopt) {
         coopWarn(
           "reward",
@@ -725,7 +749,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         if (
           decision.authoritativeProjection !== true
           && decision.operationId != null
-          && commitRewardAuthoritativeResult(decision.operationId) == null
+          && scopeReward(runtime, () => commitRewardAuthoritativeResult(decision.operationId!)) == null
         ) {
           failCoopSharedSession(`Biome market terminal result ${decision.operationId} could not be retained`);
           return;
@@ -780,7 +804,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       if (
         decision.requiresAuthorityCommit
         && decision.operationId != null
-        && commitRewardAuthoritativeResult(decision.operationId) == null
+        && scopeReward(runtime, () => commitRewardAuthoritativeResult(decision.operationId!)) == null
       ) {
         failCoopSharedSession(`Biome market buy result ${decision.operationId} could not be retained`);
         return;
@@ -913,6 +937,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
       failCoopSharedSession(`Biome market buy ${operationId} has no live relay`);
       return;
     }
+    // Capture the OWNING runtime at schedule time so the post-`await` adopt below reads THIS client's record (#922).
+    const runtime = getCoopRuntime();
     for (;;) {
       const action = await awaitCoopChoiceWithOrphanBackstop(
         relay,
@@ -928,15 +954,17 @@ export class BiomeShopPhase extends SelectModifierPhase {
         getCoopRuntime()?.durability?.reconnect();
         continue;
       }
-      const decision = adoptRewardWatcherChoice({
-        surface: "market",
-        pinned,
-        action: { choice: action.choice, data: action.data, operationId: action.operationId },
-        terminal: false,
-        localRole: "guest",
-        wave,
-        turn: globalScene.currentBattle?.turn ?? 0,
-      });
+      const decision = scopeReward(runtime, () =>
+        adoptRewardWatcherChoice({
+          surface: "market",
+          pinned,
+          action: { choice: action.choice, data: action.data, operationId: action.operationId },
+          terminal: false,
+          localRole: "guest",
+          wave,
+          turn: globalScene.currentBattle?.turn ?? 0,
+        }),
+      );
       if (
         !decision.adopt
         || decision.operationId !== operationId

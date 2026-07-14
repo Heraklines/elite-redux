@@ -13,6 +13,7 @@ import {
   resetCoopOperationJournalLog,
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
+import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   adoptRewardWatcherChoice,
   commitRewardAuthoritativeResult,
@@ -67,6 +68,10 @@ describe("P33 retained reward/shop authoritative results", () => {
   let reapplyCalls: number;
 
   beforeEach(() => {
+    // The reward surface's apply state is per-runtime (fail-loud without an installed runtime). This
+    // engine-free suite exercises one logical client in one realm, so a single installed op-state faithfully
+    // reproduces the former shared module state (role separation is internal to the record).
+    setActiveCoopRuntimeOpState(createCoopRuntimeOpState());
     setCoopDurabilityEnabled(true);
     setCoopRewardOperationEnabled(true);
     resetCoopRewardOperationState();
@@ -97,6 +102,8 @@ describe("P33 retained reward/shop authoritative results", () => {
     setCoopRewardAuthorityStateHooksForTest(null);
     resetCoopOperationJournalLog();
     resetCoopRewardOperationState();
+    // Citizenship: clear the installed op-state so the next (--no-isolate) file starts with none installed.
+    setActiveCoopRuntimeOpState(null);
   });
 
   it("host-owned buy/skip/reroll results carry non-empty post-action state and open projection only after apply", async () => {
