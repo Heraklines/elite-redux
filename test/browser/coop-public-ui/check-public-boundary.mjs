@@ -77,6 +77,13 @@ if (!viteConfig?.includes("SOURCE_ENTRY") || !viteConfig.includes("sourceEntryRe
 if (!provision?.includes("randomBytes") || /fetch\s*\(|["'`]\/coop\//u.test(provision)) {
   failures.push("provision-accounts.mjs: fixture setup may generate credentials but must not call any API");
 }
+if (
+  !harness?.includes('findLastSemanticSurface(from, "command:command")')
+  || !harness.includes('semantic.observation.uiMode === "COMMAND"')
+  || !harness.includes("semantic.observation.seatsWithInput?.includes(this.publicSeat)")
+) {
+  failures.push("public-ui-harness.mjs: command readiness must use the owned public semantic surface");
+}
 
 const browserEntry = await readFile(new URL("../../../scripts/coop-browser-entry.ts", import.meta.url), "utf8");
 if (

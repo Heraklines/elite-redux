@@ -588,16 +588,29 @@ export class PublicUiClient {
 
   async waitForLocalCommand(from = 0) {
     const event = await this.evidence.waitForCondition(
-      sink =>
-        sink.find(LOCAL_COMMAND, from)
-        ?? sink.find(SHARED_SESSION_TERMINAL, from)
-        ?? sink.find(LAUNCH_SNAPSHOT_ABORT, from),
+      sink => {
+        const semantic = sink.findLastSemanticSurface(from, "command:command");
+        const ownedSemantic =
+          semantic?.observation.ready?.handlerActive === true
+          && semantic.observation.phase === "CommandPhase"
+          && semantic.observation.uiMode === "COMMAND"
+          && semantic.observation.localSeat === this.publicSeat
+          && semantic.observation.seatsWithInput?.includes(this.publicSeat)
+            ? semantic
+            : null;
+        return (
+          ownedSemantic
+          ?? sink.find(LOCAL_COMMAND, from)
+          ?? sink.find(SHARED_SESSION_TERMINAL, from)
+          ?? sink.find(LAUNCH_SNAPSHOT_ABORT, from)
+        );
+      },
       {
         timeoutMs: this.config.timeoutMs,
-        description: "owned CommandPhase public UI or bounded shared terminal",
+        description: "owned semantic command surface or bounded shared terminal",
       },
     );
-    if (!LOCAL_COMMAND.test(event.text ?? "")) {
+    if (event.kind !== "browser-surface2" && !LOCAL_COMMAND.test(event.text ?? "")) {
       throw new Error(`${this.label}: shared session terminated before owned CommandPhase: ${event.text}`);
     }
     return event;

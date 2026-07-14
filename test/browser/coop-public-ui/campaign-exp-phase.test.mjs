@@ -12,6 +12,7 @@ import {
   driveBattleFallback,
   waitForOutcomeBounded,
 } from "./campaign.mjs";
+import { PublicUiClient } from "./public-ui-harness.mjs";
 
 class FakeEvidence {
   constructor(texts = []) {
@@ -29,6 +30,14 @@ class FakeEvidence {
       .find(
         event => event.kind === "browser-surface2" && (surfaceId == null || event.observation.surfaceId === surfaceId),
       );
+  }
+
+  async waitForCondition(predicate, { description = "condition" } = {}) {
+    const result = predicate(this);
+    if (result) {
+      return result;
+    }
+    throw new Error(`timed out waiting for ${description}`);
   }
 
   record(kind, detail = {}) {
@@ -62,6 +71,41 @@ class FakeEvidence {
     });
   }
 }
+
+test("owned semantic CommandPhase readiness survives a console-regex miss and enforces UI ownership", async () => {
+  const evidence = new FakeEvidence(["[coop:battle] command surface opened for the local player"]);
+  const commandSurface = {
+    index: evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:command",
+      phase: "CommandPhase",
+      uiMode: "COMMAND",
+      localSeat: 1,
+      seatsWithInput: [1],
+      ready: { handlerActive: true },
+    },
+  };
+  evidence.events.push(commandSurface);
+  const client = { publicSeat: 1, evidence, config: { timeoutMs: 1 } };
+
+  assert.equal(evidence.find(/CommandPhase .*-> LOCAL UI/u), undefined, "the legacy console predicate must miss");
+  assert.equal(await PublicUiClient.prototype.waitForLocalCommand.call(client, 0), commandSurface);
+
+  const inactiveEvidence = new FakeEvidence(["[coop:runtime] shared session stopped safely: test terminal"]);
+  inactiveEvidence.events.unshift({
+    ...commandSurface,
+    index: 0,
+    observation: { ...commandSurface.observation, ready: { handlerActive: false } },
+  });
+  await assert.rejects(
+    PublicUiClient.prototype.waitForLocalCommand.call(
+      { publicSeat: 1, evidence: inactiveEvidence, config: { timeoutMs: 1 } },
+      0,
+    ),
+    /shared session terminated before owned CommandPhase/u,
+  );
+});
 
 function fakeClient(label, texts = []) {
   return {
