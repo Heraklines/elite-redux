@@ -6,7 +6,11 @@
 import { COOP_CAP_OP_COLOSSEUM, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
-import { setCoopMeColosseumControl } from "#data/elite-redux/coop/coop-me-pin-state";
+import {
+  captureCoopMeControlTransactionState,
+  restoreCoopMeControlTransactionState,
+  setCoopMeColosseumControl,
+} from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   type CoopAuthoritativeEnvelopeV1,
   type CoopColosseumPayload,
@@ -541,20 +545,34 @@ function applyJournaledColosseumEnvelope(envelope: CoopAuthoritativeEnvelopeV1):
   if (inspected.kind !== "applied") {
     return "rejected";
   }
-  const controlRetained =
-    payload.type === "board"
-      ? setCoopMeColosseumControl(pinned, { expectedRound: payload.round, boardRound: payload.round })
-      : setCoopMeColosseumControl(pinned, {
-          expectedRound: payload.round,
-          boardRound: payload.round,
-          decision: { round: payload.round, index: payload.index, operationId: op.id },
-        });
-  if (!controlRetained) {
-    return "rejected";
-  }
-  const result = applyCoopOperationEnvelope(g, "op:colosseum", envelope);
-  if (result !== "applied") {
-    return "rejected";
+  // The Colosseum cursor and the journal/live-sink application are one transaction. Recovery can snapshot
+  // this process-global ME control between durability retries, so a sink rejection must not leave a board or
+  // decision visible before the corresponding operation is materialized and ACKable. Capture every coupled
+  // ME scalar, pre-apply the exact cursor (the live sink may synchronously wake its consumer), and restore the
+  // immutable before-image unless the sink AND guest ledger both accept. This is the same shadow-atomic seam
+  // used by full ME-state recovery: failure is externally indistinguishable from no attempt.
+  const controlBefore = captureCoopMeControlTransactionState();
+  let applied = false;
+  try {
+    const controlRetained =
+      payload.type === "board"
+        ? setCoopMeColosseumControl(pinned, { expectedRound: payload.round, boardRound: payload.round })
+        : setCoopMeColosseumControl(pinned, {
+            expectedRound: payload.round,
+            boardRound: payload.round,
+            decision: { round: payload.round, index: payload.index, operationId: op.id },
+          });
+    if (!controlRetained) {
+      return "rejected";
+    }
+    if (applyCoopOperationEnvelope(g, "op:colosseum", envelope) !== "applied") {
+      return "rejected";
+    }
+    applied = true;
+  } finally {
+    if (!applied) {
+      restoreCoopMeControlTransactionState(controlBefore);
+    }
   }
   if (payload.type === "decision") {
     cancelDecisionRetriesForRound(s, pinned, payload.round);

@@ -47,7 +47,10 @@ import {
 } from "#data/elite-redux/coop/coop-colosseum-operation";
 import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopMeOperationFlag, setCoopMeOperationEnabled } from "#data/elite-redux/coop/coop-me-operation";
-import { setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
+import {
+  captureCoopMeControlTransactionState,
+  setCoopMeInteractionStart,
+} from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import { type CoopAuthoritativeEnvelopeV1, makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
@@ -335,6 +338,76 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
       resetCoopOperationJournalLog();
       resetCoopColosseumOperationState(bindingA);
       resetCoopColosseumOperationState(bindingB);
+      setActiveCoopRuntimeOpState(null);
+      setCoopMeInteractionStart(-1);
+    }
+  });
+
+  it("rolls back the complete ME control before-image when Colosseum materialization rejects", () => {
+    setCoopColosseumOperationEnabled(true);
+    const pinned = 49;
+    const envelope = retainedBoardEnvelope(pinned);
+    const entry = { cls: "op:global", seq: 1, msg: { t: "envelope" as const, envelope } };
+    const apply = coopOperationDurabilityHooks().apply!;
+    const runtime = createCoopRuntimeOpState("guest");
+    setActiveCoopRuntimeOpState(runtime);
+    const binding = captureCoopColosseumOperationBinding("guest");
+    setCoopMeInteractionStart(pinned);
+    const before = captureCoopMeControlTransactionState();
+    const sink = vi.fn(() => false);
+    registerCoopOperationLiveSink("op:colosseum", sink);
+
+    try {
+      expect(apply(entry)).toBe("rejected");
+      expect(sink).toHaveBeenCalledTimes(1);
+      expect(
+        captureCoopMeControlTransactionState(),
+        "a rejected sink cannot expose a board cursor to recovery or a concurrent snapshot",
+      ).toEqual(before);
+
+      registerCoopOperationLiveSink("op:colosseum", () => true);
+      expect(apply(entry), "the unchanged journal cursor retries the exact envelope").toBe("applied");
+      expect(captureCoopMeControlTransactionState().activeControl?.colosseum).toEqual({
+        expectedRound: 0,
+        boardRound: 0,
+      });
+      expect(apply(entry), "the accepted retry remains exactly-once").toBe("duplicate");
+    } finally {
+      registerCoopOperationLiveSink("op:colosseum", null);
+      resetCoopOperationJournalLog();
+      resetCoopColosseumOperationState(binding);
+      setActiveCoopRuntimeOpState(null);
+      setCoopMeInteractionStart(-1);
+    }
+  });
+
+  it("rejects a Colosseum envelope in a foreign ME-pin context without mutating that context", () => {
+    setCoopColosseumOperationEnabled(true);
+    const envelope = retainedBoardEnvelope(53);
+    const entry = { cls: "op:global", seq: 1, msg: { t: "envelope" as const, envelope } };
+    const apply = coopOperationDurabilityHooks().apply!;
+    const runtime = createCoopRuntimeOpState("guest");
+    setActiveCoopRuntimeOpState(runtime);
+    const binding = captureCoopColosseumOperationBinding("guest");
+    setCoopMeInteractionStart(55);
+    const foreignBefore = captureCoopMeControlTransactionState();
+    const sink = vi.fn(() => true);
+    registerCoopOperationLiveSink("op:colosseum", sink);
+
+    try {
+      expect(apply(entry)).toBe("rejected");
+      expect(
+        sink,
+        "the live sink cannot run against a foreign client's/pin's presentation context",
+      ).not.toHaveBeenCalled();
+      expect(captureCoopMeControlTransactionState()).toEqual(foreignBefore);
+
+      setCoopMeInteractionStart(53);
+      expect(apply(entry), "the exact receiver context can consume the still-unapplied envelope").toBe("applied");
+    } finally {
+      registerCoopOperationLiveSink("op:colosseum", null);
+      resetCoopOperationJournalLog();
+      resetCoopColosseumOperationState(binding);
       setActiveCoopRuntimeOpState(null);
       setCoopMeInteractionStart(-1);
     }
