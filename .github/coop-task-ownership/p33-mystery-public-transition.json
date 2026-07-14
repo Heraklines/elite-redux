@@ -3,9 +3,26 @@
   "taskId": "p33-mystery-public-transition-integration",
   "branch": "ci/coop/p33-mystery-public-transition",
   "trainRef": "ci/coop/p33-mystery-public-transition",
-  "baseSha": "19676832c2264e8c6b67bcd3d4bfbf12c9aa12c8",
+  "baseSha": "05c6c928b4ca52763f841578d3b3d5fed2275da1",
   "allowedFiles": [
     ".github/coop-task-ownership/p33-mystery-public-transition.json",
-    ".github/workflows/coop-focused-branch.yml"
+    "src/data/elite-redux/coop/coop-bargain-operation.ts",
+    "src/data/elite-redux/coop/coop-operation-journal.ts",
+    "src/data/elite-redux/coop/coop-operation-runtime.ts",
+    "src/data/elite-redux/coop/coop-reward-operation.ts",
+    "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/data/elite-redux/coop/coop-stormglass-operation.ts",
+    "src/phases/biome-shop-phase.ts",
+    "src/phases/er-stormglass-picker-phase.ts",
+    "src/phases/select-modifier-phase.ts",
+    "src/phases/the-bargain-phase.ts",
+    "test/tests/elite-redux/coop/coop-duo-biome-market-continuation.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-exploration.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-replay.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-reward-items.test.ts",
+    "test/tests/elite-redux/coop/coop-operation-durability-remediation.test.ts",
+    "test/tests/elite-redux/coop/coop-operation-runtime.test.ts",
+    "test/tests/elite-redux/coop/coop-reward-authoritative-result.test.ts",
+    "test/tools/coop-duo-harness.ts"
   ]
 }
