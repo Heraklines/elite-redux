@@ -219,6 +219,10 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
     ).resolves.toBe(true);
 
     await withClient(rig.guestCtx, async () => {
+      // This proof isolates the atlas/surface prerequisite. EncounterPhase still awaits the real tutorial
+      // prerequisite in production; disable tutorials here so an unrelated UI callback cannot hide whether
+      // the two deferred production loaders are the exact continuation gate under test.
+      rig.guestScene.enableTutorials = false;
       const capacity = rig.guestScene.currentBattle.arrangement.playerCapacity;
       const seats = rig.guestScene.getPlayerParty().slice(0, capacity);
       expect(seats, "the production co-op launch has both active player seats").toHaveLength(2);
