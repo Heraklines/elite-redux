@@ -129,9 +129,6 @@ describe.skipIf(!RUN)(
       const pair = createScheduledCoopPair({ automatic: true });
       const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
       wireGuestCommand(rig);
-      // Bootstrap handshakes use ordinary automatic delivery. The production reward transition below must
-      // resume each async continuation only while that destination client's complete context is installed.
-      pair.setAutomaticDelivery(false);
 
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       expect(counterBefore, "the reward shop opens on interaction counter 0 (host owns even -> guest watches)").toBe(0);
@@ -140,6 +137,10 @@ describe.skipIf(!RUN)(
       // ===== Reach both REAL queued production shops. Detached phases are no longer a valid authority
       // fixture: their terminal callback correctly detects that they do not own the live phase boundary. =====
       await playOneAuthoritativeWave(game, rig);
+      // Bootstrap handshakes and the live command request/reply use ordinary automatic delivery. From the
+      // reward transition onward, resume each async continuation only while that destination client's
+      // complete context is installed.
+      pair.setAutomaticDelivery(false);
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectModifierPhase", false));
       const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
