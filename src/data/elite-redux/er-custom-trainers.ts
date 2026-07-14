@@ -120,7 +120,7 @@ import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
-import type { EnemyPokemon } from "#field/pokemon";
+import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
 import { PokemonMove } from "#moves/pokemon-move";
 import { resolveHeldItemKey } from "#system/llm-director/held-item-resolver";
@@ -1336,8 +1336,15 @@ export { isErCustomTrainerBstBypassActive, setErCustomTrainerBstBypass } from "#
 // Enemy construction (the exact-party guarantee).
 // -----------------------------------------------------------------------------
 
-/** Apply an authored fusion onto a freshly built enemy (mirrors generateFusionSpecies). */
-function applyCustomFusion(enemy: EnemyPokemon, fusion: { speciesId: number; formIndex: number; abilitySlot: number }): void {
+/**
+ * Apply an authored fusion onto a built Pokemon (mirrors generateFusionSpecies).
+ * Works for either side: the enemy build path uses it, and the dev "Use as my
+ * team" picker applies it to the player copy of an authored member.
+ */
+export function applyErCustomTrainerFusion(
+  enemy: Pokemon,
+  fusion: { speciesId: number; formIndex: number; abilitySlot: number },
+): void {
   const fusionSpecies = getPokemonSpecies(fusion.speciesId);
   if (!fusionSpecies) {
     return;
@@ -1395,7 +1402,7 @@ export function buildErCustomTrainerMember(
     enemy.customPokemonData.erShinyLabName = member.shinyName || undefined;
   }
   if (member.fusion) {
-    applyCustomFusion(enemy, member.fusion);
+    applyErCustomTrainerFusion(enemy, member.fusion);
   }
   if (moveIds.length > 0) {
     const moves = moveIds.map(id => new PokemonMove(id));
