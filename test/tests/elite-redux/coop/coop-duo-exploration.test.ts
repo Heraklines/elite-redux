@@ -354,10 +354,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
           }
           return Promise.resolve(true);
         };
-        const driveBiomeShop = (
-          options: { type?: { id?: string } }[],
-          cb: (index: number) => boolean,
-        ): void => {
+        const driveBiomeShop = (options: { type?: { id?: string } }[], cb: (index: number) => boolean): void => {
           if (!bought) {
             // Buy a KNOWN NON-party item (balls/lures apply directly, no party sub-menu) so the
             // probe stays deterministic; the relay path is identical for party-target goods.
@@ -379,10 +376,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         };
         ui.setMode = (...args: unknown[]): unknown => {
           if (args[0] === UiMode.BIOME_SHOP) {
-            driveBiomeShop(
-              args[1] as { type?: { id?: string } }[],
-              args[3] as (index: number) => boolean,
-            );
+            driveBiomeShop(args[1] as { type?: { id?: string } }[], args[3] as (index: number) => boolean);
             return Promise.resolve(true);
           }
           if (args[0] === UiMode.PARTY) {
@@ -404,10 +398,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
           if (args[0] === UiMode.BIOME_SHOP) {
             // Production co-op opens the market only through the bounded transition seam:
             // mode, timeout, liveness fence, stock, biome, public selection callback, quantities.
-            driveBiomeShop(
-              args[3] as { type?: { id?: string } }[],
-              args[5] as (index: number) => boolean,
-            );
+            driveBiomeShop(args[3] as { type?: { id?: string } }[], args[5] as (index: number) => boolean);
           } else if (args[0] === UiMode.CONFIRM) {
             queueMicrotask(args[3] as () => void); // YES: leave the market
           }

@@ -1326,7 +1326,7 @@ export function assertSoakCompleteness(hits: SoakHitSet, opts: SoakCompletenessO
   );
   if (staleClassified.length > 0) {
     log(
-      `[coop-soak-coverage] ⚠ STALE classification keys (no longer in any registry - prune): [${staleClassified.join(", ")}]`,
+      `[coop-soak-coverage] ! STALE classification keys (no longer in any registry - prune): [${staleClassified.join(", ")}]`,
     );
   }
 

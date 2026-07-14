@@ -61,6 +61,7 @@
     "test/tests/elite-redux/coop/coop-colosseum-board.test.ts",
     "test/tests/elite-redux/coop/coop-duo-biome-choice.test.ts",
     "test/tests/elite-redux/coop/coop-duo-biome-operation.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-exploration.test.ts",
     "test/tests/elite-redux/coop/coop-duo-faint-switch.test.ts",
     "test/tests/elite-redux/coop/coop-duo-launch-terrain.test.ts",
     "test/tests/elite-redux/coop/coop-duo-learn-move.test.ts",
