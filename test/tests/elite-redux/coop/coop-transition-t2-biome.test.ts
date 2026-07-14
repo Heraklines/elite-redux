@@ -11,7 +11,11 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { captureCoopChecksum, captureCoopSaveDataNormalized } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  captureCoopChecksum,
+  captureCoopChecksumState,
+  captureCoopSaveDataNormalized,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import {
   commitAuthoritativeBiomeTransition,
   coopAuthoritativeBiomeTransitionOperationId,
@@ -1284,6 +1288,10 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         withClientSync(rig.guestCtx, () => captureCoopSaveDataNormalized()),
         "every normalized persistent substrate converges before the opaque checksum",
       ).toEqual(withClientSync(rig.hostCtx, () => captureCoopSaveDataNormalized()));
+      expect(
+        withClientSync(rig.guestCtx, () => captureCoopChecksumState()),
+        "every structured battle component converges before the opaque checksum",
+      ).toEqual(withClientSync(rig.hostCtx, () => captureCoopChecksumState()));
       expect(withClientSync(rig.guestCtx, () => captureCoopChecksum())).toBe(
         withClientSync(rig.hostCtx, () => captureCoopChecksum()),
       );
@@ -1319,7 +1327,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         ).toBe(guestMeChanceBeforeNewBiome);
       }
       expect(
-        getObservedCoopGuestPhases().filter(phase =>
+        [...getObservedCoopGuestPhases()].filter(phase =>
           ["PartyHealPhase", "ReturnPhase", "LevelCapPhase"].includes(phase),
         ),
         "the renderer never constructs host-owned post-battle mutation phases",
