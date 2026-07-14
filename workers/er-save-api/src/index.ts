@@ -33,6 +33,12 @@
 
 import { BiomeId } from "../../../src/enums/biome-id";
 import { Challenges } from "../../../src/enums/challenges";
+// ER customs live in dedicated high-range enums (moves >= 5000, species >= 10000), registered at
+// init by initEliteReduxCustomMoves()/initEliteReduxSpecies(). A resumable co-op checkpoint can carry
+// them the instant an ER move/species is ROLLED (RNG-dependent), so the resumable allowlists below MUST
+// union the ER enums - see resumableMoveIds/resumableSpeciesIds. Both files are pure value objects.
+import { ErMoveId } from "../../../src/enums/er-move-id";
+import { ErSpeciesId } from "../../../src/enums/er-species-id";
 import { MoveId } from "../../../src/enums/move-id";
 import { MysteryEncounterType } from "../../../src/enums/mystery-encounter-type";
 import { SpeciesId } from "../../../src/enums/species-id";
@@ -842,8 +848,15 @@ function numericEnumValues(value: object): Set<number> {
   return new Set(Object.values(value).filter((entry): entry is number => typeof entry === "number"));
 }
 
-const resumableSpeciesIds = numericEnumValues(SpeciesId);
-const resumableMoveIds = numericEnumValues(MoveId);
+// CONTRACT (P33 layer-7): every ER-custom enum whose ids can appear in a serialized mon/session MUST be
+// unioned into the matching resumable allowlist, or the fail-closed shape check 409s a valid fresh save
+// the moment RNG rolls that custom ("incoming resumable co-op checkpoint is invalid"). Today only species
+// and moves have ER-custom id enums (ErSpeciesId/ErMoveId); abilities validate abilityIndex (0-2), not an
+// id, and there are no ER-custom MysteryEncounterType/Biome/Trainer enums (those extend the vanilla enums
+// in place, already covered). Adding a new ER id enum here without extending its set silently re-breaks
+// the fresh first-save - the coop-cloud-save-worker-integration test pins one ER id from each enum.
+const resumableSpeciesIds = new Set<number>([...numericEnumValues(SpeciesId), ...numericEnumValues(ErSpeciesId)]);
+const resumableMoveIds = new Set<number>([...numericEnumValues(MoveId), ...numericEnumValues(ErMoveId)]);
 const resumableTrainerTypes = numericEnumValues(TrainerType);
 const resumableTrainerVariants = numericEnumValues(TrainerVariant);
 const resumableChallengeIds = numericEnumValues(Challenges);

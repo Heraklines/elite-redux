@@ -8,6 +8,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseSync, type SQLInputValue, type StatementSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ErMoveId } from "../../../../src/enums/er-move-id";
+import { ErSpeciesId } from "../../../../src/enums/er-species-id";
 import saveWorker from "../../../../workers/er-save-api/src/index";
 
 interface D1ResultLike {
@@ -345,6 +347,42 @@ describe("co-op save Worker endpoint integration", () => {
       body: checkpoint(runId, 0, 1),
     });
     expect(patched.status, "the same fresh save with a real boolean passive commits from nothing").toBe(200);
+  });
+
+  it("from-nothing empty-CAS accepts ER-custom move/species ids (P33 layer-7), still rejects out-of-range ids", async () => {
+    // ER customs are high-range (moves >= 5000, species >= 10000) and appear the instant RNG rolls one.
+    // The worker's resumable allowlists must union the ER enums; without the union this commits 200 only
+    // when wave-1 rolled all-vanilla moves and 409s "invalid checkpoint" the moment an ER move is rolled
+    // (the observed wave-1 CAS 409). Assert an ER species + ER move validate + commit from nothing.
+    const erRunId = "run-er-custom-ids-1234567890";
+    const erCustom = JSON.parse(checkpoint(erRunId, 0, 1));
+    erCustom.party = [
+      {
+        ...capturedPokemonData(101, true, ErSpeciesId.PHANTOWL),
+        moveset: [{ moveId: ErMoveId.OUTBURST, ppUsed: 0, ppUp: 0 }],
+      },
+      capturedPokemonData(102, true, 4),
+    ];
+    const accepted = await call("/savedata/session/coop-cas-update?slot=0&coopCasMode=empty", {
+      method: "POST",
+      body: JSON.stringify(erCustom),
+    });
+    expect(accepted.status, "an ER-custom species (10000) + ER-custom move (5004) validate + commit from nothing").toBe(
+      200,
+    );
+
+    // The allowlist is still ENFORCED (not allow-all): an id in neither the vanilla nor the ER enum fails closed.
+    const garbageRunId = "run-garbage-move-id-1234567890";
+    const garbage = JSON.parse(checkpoint(garbageRunId, 0, 1));
+    garbage.party = [
+      { ...capturedPokemonData(101, true, 1), moveset: [{ moveId: 999_999, ppUsed: 0, ppUp: 0 }] },
+      capturedPokemonData(102, true, 4),
+    ];
+    const rejected = await call("/savedata/session/coop-cas-update?slot=1&coopCasMode=empty", {
+      method: "POST",
+      body: JSON.stringify(garbage),
+    });
+    expect(rejected.status, "a move id in neither the vanilla nor the ER enum is still rejected").toBe(409);
   });
 
   it("rejects incomplete, non-canonical, and foreign-account checkpoints through the real route", async () => {
