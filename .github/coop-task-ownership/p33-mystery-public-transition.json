@@ -116,6 +116,7 @@
     "test/tests/elite-redux/coop/coop-single-turn-win-finalize.test.ts",
     "test/tests/elite-redux/coop/coop-soak-journey.test.ts",
     "test/tests/elite-redux/coop/coop-soak-me.test.ts",
+    "test/tests/elite-redux/coop/coop-soak.test.ts",
     "test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts",
     "test/tests/elite-redux/coop/coop-wave-operation-durability.test.ts",
     "test/tests/elite-redux/coop/coop-wave-operation.test.ts",
