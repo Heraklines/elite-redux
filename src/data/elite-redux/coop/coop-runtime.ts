@@ -4395,7 +4395,6 @@ export function assembleCoopRuntime(
   // Biome + ability + bargain + stormglass + reward are per-runtime (layer-B): their fresh records come from
   // createCoopRuntimeOpState below, so the old reset-at-assembly call sites are removed (a fresh runtime's
   // records ARE the reset; calling reset here would touch the PREVIOUS runtime's record, not this one's).
-  resetCoopCatchFullOperationState();
   resetCoopColosseumOperationState();
   resetCoopFaintSwitchOperationState();
   resetCoopLearnMoveOperationState();
