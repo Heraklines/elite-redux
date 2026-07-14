@@ -115,6 +115,11 @@ const trainerClassByName = new Map(); // TrainerType NAME → {name, sprite, gen
 // {id, label, accent}; id→entry lookups power the picker + preview swatch.
 let SHINY_EFFECTS = { palette: [], surface: [], around: [] };
 const shinyEffectById = new Map(); // effect id → {id, label, accent, category}
+// Ghost Trainer FX aura catalog (editor/data/trainer-fx.json): the per-trainer
+// SPRITE effect picker options. Each entry is {id, label, accent}; the id is a
+// ghost aura id (validated in-game via isKnownTrainerAuraId → trainer.erGhostAura).
+let TRAINER_FX = [];
+const trainerFxById = new Map(); // aura id → {id, label, accent}
 // Cache of fetched TexturePacker atlas jsons (CDN url → parsed json | null on fail).
 const trainerAtlasCache = new Map();
 // Edit state keyed by species CONST (joined to data via SPECIES[i].id), so the
@@ -1785,6 +1790,9 @@ function blankCtrTrainer() {
     challenge: "none",
     battleBgm: "",
     introDialogue: "",
+    victoryDialogue: "",
+    defeatDialogue: "",
+    trainerEffect: "",
     team: [blankCtrMember()],
   };
 }
@@ -1808,6 +1816,10 @@ function ctrLiveToEdit(entry) {
     // Trimmed bgm key; anything not [a-z0-9_] (or absent) normalizes to "" (none).
     battleBgm: normalizeCtrBattleBgm(entry.battleBgm),
     introDialogue: typeof entry.introDialogue === "string" ? entry.introDialogue.slice(0, 200) : "",
+    victoryDialogue: typeof entry.victoryDialogue === "string" ? entry.victoryDialogue.slice(0, 200) : "",
+    defeatDialogue: typeof entry.defeatDialogue === "string" ? entry.defeatDialogue.slice(0, 200) : "",
+    // Known aura id kept; anything else (or absent) normalizes to "" (no effect).
+    trainerEffect: normalizeCtrTrainerEffect(entry.trainerEffect),
     team: (Array.isArray(entry.team) ? entry.team : []).map(ctrLiveSlotToEdit),
   };
 }
@@ -1873,6 +1885,11 @@ function normalizeCtrBattleBgm(value) {
   }
   const key = value.trim();
   return key.length > 0 && key.length <= 64 && /^[a-z0-9_]+$/.test(key) ? key : "";
+}
+
+/** A known Ghost-FX aura id (validated against the loaded catalog), else "" (no effect). */
+function normalizeCtrTrainerEffect(value) {
+  return typeof value === "string" && trainerFxById.has(value) ? value : "";
 }
 
 /** Compute BST warnings + the Ace/custom informational note for a trainer (never blocks). */
@@ -2061,6 +2078,28 @@ function ctrBgmOptions(selected) {
     html += `<option value="${esc(selected)}" selected>${esc(selected)} (missing)</option>`;
   }
   return html;
+}
+
+/** <option> list for the per-trainer SPRITE effect (aura) picker: a leading "(none)"
+ *  entry then every ghost-FX aura, with a saved-but-unknown id kept as selected. */
+function ctrEffectOptions(selected) {
+  let html = `<option value=""${selected ? "" : " selected"}>(none)</option>`;
+  html += TRAINER_FX.map(
+    e => `<option value="${esc(e.id)}"${selected === e.id ? " selected" : ""}>${esc(e.label)}</option>`,
+  ).join("");
+  if (selected && !trainerFxById.has(selected)) {
+    html += `<option value="${esc(selected)}" selected>${esc(selected)} (unknown)</option>`;
+  }
+  return html;
+}
+
+/** A small swatch chip for the currently-selected trainer sprite effect (preview column). */
+function ctrEffectSwatchHtml(effectId) {
+  const e = effectId ? trainerFxById.get(effectId) : null;
+  if (!e) {
+    return '<span class="dyn">no effect</span>';
+  }
+  return `<span class="ctr-shiny-swatch"><span class="ctr-shiny-chip"><span class="ctr-shiny-dot" style="background:${esc(e.accent || "#ffd27a")}"></span>${esc(e.label)}</span></span>`;
 }
 
 /** The always-visible header controls for a slot: slot-fill probability (slots
@@ -2562,6 +2601,7 @@ function ctrPreviewPanelHtml(t) {
     <div class="ctr-preview-sec">
       <div class="ctr-preview-h">Trainer sprite</div>
       <div id="ctr-sprite-preview" class="ctr-sprite-preview"></div>
+      <div class="ctr-preview-effect">Effect: ${ctrEffectSwatchHtml(t.trainerEffect || "")}</div>
     </div>
     <div class="ctr-preview-sec">
       <div class="ctr-preview-h">Slot ${idx + 1}: ${esc(spName)}</div>
@@ -2625,6 +2665,18 @@ function renderCustomTrainers(root) {
           <label title="Line shown when this trainer's battle starts (up to 200 chars). Players can turn these off with the 'Skip custom trainer intros' setting.">Intro blurb
             <input type="text" id="ctr-intro" maxlength="200" value="${esc(t.introDialogue || "")}" placeholder="Shown at battle start (optional)" style="width:320px" />
           </label>
+          <label title="Line shown when the PLAYER beats this trainer (up to 200 chars). Uses the same dialogue routine ghost trainers use for their victory line.">Victory line
+            <input type="text" id="ctr-victory" maxlength="200" value="${esc(t.victoryDialogue || "")}" placeholder="When the player wins (optional)" style="width:280px" />
+          </label>
+          <label title="Line shown when this trainer BEATS the player (up to 200 chars). Uses the same routine ghost trainers use for their defeat line.">Defeat line
+            <input type="text" id="ctr-defeat" maxlength="200" value="${esc(t.defeatDialogue || "")}" placeholder="When the trainer wins (optional)" style="width:280px" />
+          </label>
+        </div>
+        <div class="ctr-effect-row">
+          <label title="A visual aura rendered around this trainer's sprite in battle, reusing the Ghost Trainer FX aura effects. '(none)' is the plain sprite.">Sprite effect
+            <select id="ctr-effect">${ctrEffectOptions(t.trainerEffect || "")}</select>
+          </label>
+          ${ctrEffectSwatchHtml(t.trainerEffect || "")}
         </div>
       </fieldset>
       <fieldset class="ctr-sec"><legend>Spawn gates</legend>
@@ -2684,6 +2736,10 @@ function onCustomTrainerInput(el) {
     t.name = el.value;
   } else if (el.id === "ctr-intro") {
     t.introDialogue = el.value;
+  } else if (el.id === "ctr-victory") {
+    t.victoryDialogue = el.value;
+  } else if (el.id === "ctr-defeat") {
+    t.defeatDialogue = el.value;
   } else if (el.id === "ctr-class") {
     t.trainerClass = el.value.trim().toUpperCase();
     el.value = t.trainerClass;
@@ -2773,6 +2829,11 @@ function onCustomTrainerChange(el) {
     return true;
   } else if (el.id === "ctr-challenge") {
     t.challenge = el.value;
+  } else if (el.id === "ctr-effect") {
+    // Pick a trainer sprite effect (aura); re-render so the preview swatch updates.
+    t.trainerEffect = normalizeCtrTrainerEffect(el.value);
+    render();
+    return true;
   } else if (el.id === "ctr-bgm") {
     // Picking a track stops any current preview (a new pick supersedes it).
     t.battleBgm = normalizeCtrBattleBgm(el.value);
@@ -3874,6 +3935,13 @@ function buildDeltas() {
       ...(normalizeCtrBattleBgm(t.battleBgm) ? { battleBgm: normalizeCtrBattleBgm(t.battleBgm) } : {}),
       // Intro blurb: trimmed + 200-char cap; omit when empty (byte-clean default).
       ...((t.introDialogue || "").trim() ? { introDialogue: (t.introDialogue || "").trim().slice(0, 200) } : {}),
+      // Victory / defeat lines: same trim + 200-char cap; omit when empty.
+      ...((t.victoryDialogue || "").trim() ? { victoryDialogue: (t.victoryDialogue || "").trim().slice(0, 200) } : {}),
+      ...((t.defeatDialogue || "").trim() ? { defeatDialogue: (t.defeatDialogue || "").trim().slice(0, 200) } : {}),
+      // Trainer sprite effect (aura): serialize only a known aura id; omit otherwise.
+      ...(normalizeCtrTrainerEffect(t.trainerEffect)
+        ? { trainerEffect: normalizeCtrTrainerEffect(t.trainerEffect) }
+        : {}),
       team,
     };
   }
@@ -4033,6 +4101,7 @@ async function init() {
       trainerClassesData,
       bgmData,
       shinyEffectsData,
+      trainerFxData,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
@@ -4068,6 +4137,8 @@ async function init() {
       fetchJson("./data/bgm.json", []),
       // Shiny Lab effect registry (generated). Fallback → empty (picker offers "(none)").
       fetchJson("./data/shiny-effects.json", { palette: [], surface: [], around: [] }),
+      // Ghost Trainer FX aura catalog (generated). Fallback → empty (picker offers "(none)").
+      fetchJson("./data/trainer-fx.json", []),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -4170,6 +4241,13 @@ async function init() {
           shinyEffectById.set(e.id, { ...e, category });
         }
       }
+    }
+
+    // Ghost Trainer FX aura catalog: the per-trainer sprite-effect picker options.
+    TRAINER_FX = Array.isArray(trainerFxData) ? trainerFxData.filter(e => e && typeof e.id === "string") : [];
+    trainerFxById.clear();
+    for (const e of TRAINER_FX) {
+      trainerFxById.set(e.id, e);
     }
 
     // Egg-move source + factory-set index for the per-member legality/set helpers.

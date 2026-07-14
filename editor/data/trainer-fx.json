@@ -1,0 +1,42 @@
+[
+  {
+    "id": "smoke",
+    "label": "Smoke",
+    "accent": "#ffd27a"
+  },
+  {
+    "id": "embers",
+    "label": "Embers",
+    "accent": "#ffd27a"
+  },
+  {
+    "id": "frost",
+    "label": "Frost",
+    "accent": "#a6f0ff"
+  },
+  {
+    "id": "shadowaura",
+    "label": "Shadow Aura",
+    "accent": "#9b6cff"
+  },
+  {
+    "id": "goldenglow",
+    "label": "Golden Glow",
+    "accent": "#ffcf52"
+  },
+  {
+    "id": "holyrays",
+    "label": "Holy Rays",
+    "accent": "#ffd27a"
+  },
+  {
+    "id": "cosmos",
+    "label": "Cosmos",
+    "accent": "#ffd27a"
+  },
+  {
+    "id": "sparkstorm",
+    "label": "Spark Storm",
+    "accent": "#ffd27a"
+  }
+]
