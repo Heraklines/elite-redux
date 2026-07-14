@@ -20,6 +20,11 @@ const GUEST_CONTINUATION_ACK = /guest ACK turn stage=continuationReady e=(\d+) w
 const SHARED_SESSION_TERMINAL = /\[coop:runtime\] shared session stopped safely: /u;
 const LAUNCH_SNAPSHOT_ABORT = /launchSnapshotAbort wave=\d+ reason=/u;
 
+// Self-healing pairing cadence: how often the requester re-issues its ask while unpaired. Kept
+// well under the observed ~17s worker-side request TTL so each re-send REFRESHES the request and
+// keeps the acceptance window open until the accept lands (see driveSelfHealingPairing).
+const LOBBY_REQUEST_REISSUE_MS = 5_000;
+
 /**
  * Loud-fail on a failed response from an endpoint the harness DRIVES navigation from (the
  * co-op lobby / account view). A non-2xx there means the lobby the player would see never
@@ -492,20 +497,6 @@ export class PublicUiClient {
     });
   }
 
-  async acceptRequest(username) {
-    await this.evidence.waitForCondition(
-      sink => {
-        assertNoDriverApiFailure(sink, "co-op lobby");
-        return sink.networkState.lobby?.request === username;
-      },
-      {
-        timeoutMs: this.config.timeoutMs,
-        description: `visible incoming request from ${username}`,
-      },
-    );
-    await this.press("Space", `lobby-accept-${username}`);
-  }
-
   async waitForPublicRole(from = this.pageCursor) {
     const event = await this.evidence.waitForCondition(sink => sink.findBinding(from), {
       timeoutMs: this.config.timeoutMs,
@@ -651,8 +642,10 @@ export class DuoPublicUiRig {
     const roleCursors = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
     );
+    // Navigate the requester's cursor onto the acceptor and send the FIRST request. This parks
+    // the OPTION_SELECT cursor on the acceptor's "Ask ... to play" row, so a bare Space re-issues
+    // the same request without re-navigating.
     await requester.requestPlayer(acceptor.credentials.username);
-    await acceptor.acceptRequest(requester.credentials.username);
     // The co-op HOST binds from the WebRTC session connect (sessionEpoch>0). The co-op GUEST
     // only binds AFTER the host fires its LAUNCH DECISION ("Press to start co-op" ->
     // sendResumeStartNew / resume offer), which the journey (startFreshRun/resumeRun) drives
@@ -660,16 +653,37 @@ export class DuoPublicUiRig {
     // to completePairingBinding() AFTER that human launch press - otherwise we deadlock waiting
     // for a binding that only the launch action produces.
     this.pairRoleCursors = roleCursors;
-    await this.waitForCoopHost(roleCursors);
+    await this.driveSelfHealingPairing(requester, acceptor, roleCursors);
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("paired-awaiting-launch")));
     return { requester, acceptor };
   }
 
-  /** Wait for the co-op HOST to publish its stable-seat binding (it connects before the launch). */
-  async waitForCoopHost(roleCursors) {
+  /**
+   * Self-healing lobby pairing, driven until the HOST publishes its stable-seat binding.
+   *
+   * A single "wait for the request, press Accept once" is fragile: the incoming request has a
+   * finite worker-side lifetime (~17s) and only surfaces on the acceptor's poll cadence, so one
+   * slow accept can land after the request has already evaporated - `respond()` then early-returns
+   * (its `incomingRequestId` is null) and NO accept is ever sent, leaving both clients polling
+   * forever (the observed 7ms-miss failure). Instead, loop both sides to remove the luck:
+   *   - ACCEPTOR: the instant an incoming request FROM the requester is visible, press Space
+   *     (Accept is option 0 of the take-over panel). Press once per distinct appearance; if it
+   *     evaporates and returns, accept again.
+   *   - REQUESTER: whenever no request is in flight, re-press Space to re-issue the ask. `request()`
+   *     re-sends unconditionally (no pending guard), which REFRESHES the worker-side request TTL,
+   *     keeping the acceptance window open until the accept lands.
+   * Exits when either client observes a role=host binding; throws (same message as before) on the
+   * pairing deadline so a genuine never-binds still fails loudly.
+   */
+  async driveSelfHealingPairing(requester, acceptor, roleCursors) {
+    const requesterName = requester.credentials.username;
+    const acceptorName = acceptor.credentials.username;
     const deadline = Date.now() + this.config.timeoutMs;
+    let acceptedForLiveRequest = false;
+    let nextReissueAt = Date.now() + LOBBY_REQUEST_REISSUE_MS;
     while (Date.now() < deadline) {
       for (const client of Object.values(this.clients)) {
+        assertNoDriverApiFailure(client.evidence, "co-op lobby");
         const binding = client.evidence.findBinding(roleCursors[client.label]);
         if (binding) {
           client.publicRole = binding.observation.role;
@@ -679,7 +693,20 @@ export class DuoPublicUiRig {
           }
         }
       }
-      await delay(100);
+      const incoming = acceptor.evidence.networkState.lobby?.request ?? null;
+      if (incoming === requesterName) {
+        if (!acceptedForLiveRequest) {
+          await acceptor.press("Space", `lobby-accept-${requesterName}`);
+          acceptedForLiveRequest = true;
+        }
+      } else {
+        acceptedForLiveRequest = false;
+        if (Date.now() >= nextReissueAt) {
+          await requester.press("Space", `lobby-reissue-request-${acceptorName}`);
+          nextReissueAt = Date.now() + LOBBY_REQUEST_REISSUE_MS;
+        }
+      }
+      await delay(150);
     }
     throw new Error("Co-op host never reached a stable-seat session binding after lobby pairing");
   }
