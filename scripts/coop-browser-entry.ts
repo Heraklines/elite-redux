@@ -396,6 +396,9 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
       if (phase === "ExpPhase") {
         return { surfaceId: "battle:exp", operationClass: "battle-progress", ownerModel: "local" };
       }
+      if (phase === "MessagePhase") {
+        return { surfaceId: "battle:message", operationClass: "battle-progress", ownerModel: "local" };
+      }
       return inMe
         ? { surfaceId: "mystery-encounter:message", operationClass: "encounter-prompt", ownerModel: "interaction" }
         : null;
