@@ -53,8 +53,8 @@ import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo as buildDuoHarness,
   type ClientCtx,
-  drainLoopback,
   type DuoRig,
+  drainLoopback,
   installDuoLogCapture,
   withClient as withClientHarness,
 } from "#test/tools/coop-duo-harness";
@@ -115,9 +115,19 @@ async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): Promise<
     },
   );
   for (let round = 0; round < 64 && !settled; round++) {
+    // Let immediately-resolving authenticated storage/cloud work finish while the owner context is
+    // still installed. Swapping to the peer before even one macrotask made every ordinary cloud scan
+    // observe the partner's account/runtime at its post-await fence and fail closed.
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    if (settled) {
+      break;
+    }
     const peer = ctx === rig.hostCtx ? rig.guestCtx : rig.hostCtx;
     await withClientHarness(peer, () => drainLoopback());
-    await withClientHarness(ctx, () => drainLoopback());
+    // The outer withClientHarness scope still owns `ctx`; after the nested peer scope restores it,
+    // pump the owner's inbox directly. Nesting a second async owner scope can unwind out of order if
+    // the operation settles inside that scope and leak the wrong process-global client afterward.
+    await drainLoopback();
   }
   return operation;
 }
