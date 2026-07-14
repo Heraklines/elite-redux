@@ -92,6 +92,8 @@ if (
 if (
   !browserEntry.includes('phase === "ExpPhase"')
   || !browserEntry.includes('surfaceId: "battle:exp"')
+  || !browserEntry.includes('phase === "MessagePhase"')
+  || !browserEntry.includes('surfaceId: "battle:message"')
   || !browserEntry.includes("isAwaitingPromptAction")
   || !browserEntry.includes("phaseInstance: semanticPhaseInstance")
 ) {

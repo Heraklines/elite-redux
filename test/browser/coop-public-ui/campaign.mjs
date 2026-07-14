@@ -19,7 +19,10 @@ const START_PHASE = /Start Phase (\w+)/u;
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
 const TURN_PROGRESS = /Start Phase TurnStartPhase|host recorder: begin turn=/u;
-const EXP_PHASE = /Start Phase ExpPhase/u;
+const BATTLE_PROMPT_PHASES = new Map([
+  ["battle:message", "MessagePhase"],
+  ["battle:exp", "ExpPhase"],
+]);
 
 function fromEach(clients, fn) {
   return Object.fromEntries(clients.map(client => [client.label, fn(client)]));
@@ -169,47 +172,55 @@ export async function driveBattleFallback(rig, keys, from, purpose) {
 }
 
 /**
- * Public-input driver for the authority's repeated post-battle EXP messages.
+ * Public-input driver for readiness-proven authority battle messages.
  *
- * ExpPhase is one prompt per party member. It logs a fresh phase instance immediately before
- * opening the human-action message, so one exact marker authorizes one Space press. The renderer
- * remains in CoopReplayTurnPhase until all authority-side EXP phases finish and the retained turn
- * commit is published; it must never receive these presses.
+ * Both ordinary MessagePhase narration (for example, "Wild Yungoos fainted!") and ExpPhase can
+ * block the authoritative phase queue on a human ACTION. The read-only semantic observer publishes
+ * them only with the handler's complete `isAwaitingPromptAction()` contract and a phase-instance
+ * discriminator. One distinct ready instance authorizes exactly one Space on the public authority.
+ * The renderer remains in CoopReplayTurnPhase and must never receive these presses.
  */
-export function createPostBattleExpAdvancer(rig, from, stats, purpose) {
+export function createBattlePromptAdvancer(rig, from, stats, purpose) {
   const authority = rig.host;
   if (!authority) {
-    throw new Error(`${purpose}: post-battle EXP advancement requires the authenticated public host`);
+    throw new Error(`${purpose}: battle prompt advancement requires the authenticated public host`);
   }
   let cursor = from[authority.label] ?? 0;
-  let pendingPhaseEvent = null;
+  const consumedInstances = new Set();
   return async () => {
-    const phaseEvent = pendingPhaseEvent ?? authority.evidence.find(EXP_PHASE, cursor);
-    if (!phaseEvent) {
+    const readyEvent = authority.evidence.events.slice(cursor).find(event => {
+      if (event.kind !== "browser-surface2") {
+        return false;
+      }
+      const observation = event.observation;
+      const expectedPhase = BATTLE_PROMPT_PHASES.get(observation.surfaceId);
+      const instanceKey = `${observation.surfaceId}:${observation.phaseInstance}`;
+      return (
+        expectedPhase != null
+        && observation.phase === expectedPhase
+        && observation.uiMode === "MESSAGE"
+        && Number.isSafeInteger(observation.phaseInstance)
+        && observation.ready?.awaitingActionInput === true
+        && !consumedInstances.has(instanceKey)
+      );
+    });
+    if (!readyEvent) {
       return false;
     }
-    pendingPhaseEvent = phaseEvent;
-    const readyEvent = authority.evidence.findLastSemanticSurface(phaseEvent.index + 1, "battle:exp");
-    if (
-      readyEvent?.observation.phase !== "ExpPhase"
-      || readyEvent.observation.uiMode !== "MESSAGE"
-      || !Number.isSafeInteger(readyEvent.observation.phaseInstance)
-      || readyEvent.observation.ready?.awaitingActionInput !== true
-    ) {
-      return false;
-    }
-    cursor = phaseEvent.index + 1;
-    pendingPhaseEvent = null;
-    stats.postBattleExpPrompts += 1;
-    authority.evidence.record("campaign-post-battle-advance", {
-      phase: "ExpPhase",
-      phaseInstance: readyEvent.observation.phaseInstance,
-      phaseEventIndex: phaseEvent.index,
+    cursor = readyEvent.index + 1;
+    const { surfaceId, phase, phaseInstance } = readyEvent.observation;
+    consumedInstances.add(`${surfaceId}:${phaseInstance}`);
+    const statName = phase === "ExpPhase" ? "postBattleExpPrompts" : "battleMessagePrompts";
+    stats[statName] = (stats[statName] ?? 0) + 1;
+    authority.evidence.record("campaign-battle-prompt-advance", {
+      surfaceId,
+      phase,
+      phaseInstance,
       readyEventIndex: readyEvent.index,
-      promptOrdinal: stats.postBattleExpPrompts,
+      promptOrdinal: stats[statName],
       authoritySeat: authority.label,
     });
-    await authority.press("Space", `${purpose}-exp-${stats.postBattleExpPrompts}`);
+    await authority.press("Space", `${purpose}-${surfaceId}-${stats[statName]}`);
     return true;
   };
 }
@@ -219,7 +230,7 @@ export async function waitForOutcomeBounded(
   rig,
   from,
   timeoutMs,
-  { stopOnTurnProgress = false, advancePostBattleExp = null } = {},
+  { stopOnTurnProgress = false, advanceBattlePrompt = null } = {},
 ) {
   const clients = Object.values(rig.clients);
   const deadline = Date.now() + timeoutMs;
@@ -252,7 +263,7 @@ export async function waitForOutcomeBounded(
     if (stopOnTurnProgress && clientsAwaitingTurnProgress(rig, from).length === 0) {
       return { kind: "turn-progress" };
     }
-    if (advancePostBattleExp && (await advancePostBattleExp())) {
+    if (advanceBattlePrompt && (await advanceBattlePrompt())) {
       continue;
     }
     await delay(100);
@@ -277,7 +288,7 @@ async function driveBattleWave(rig, policy, stats) {
     await Promise.all(clients.map(client => client.checkpoint(`wave-${stats.wave}-turn-${turn}-command`)));
     const from = fromEach(clients, client => client.evidence.cursor());
     const purpose = `wave-${stats.wave}-turn-${turn}`;
-    const advancePostBattleExp = createPostBattleExpAdvancer(rig, from, stats, purpose);
+    const advanceBattlePrompt = createBattlePromptAdvancer(rig, from, stats, purpose);
     await Promise.all(clients.map(client => client.sequence(policy.keys.battle, `${purpose}-attack-first`)));
     let outcome = await waitForOutcomeBounded(rig, from, fallbackWindow, { stopOnTurnProgress: true });
     const fallbackClients = [];
@@ -290,7 +301,7 @@ async function driveBattleWave(rig, policy, stats) {
         fallbackSuppressed: true,
         reason: "both public clients entered the addressed turn path",
       });
-      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, { advancePostBattleExp });
+      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, { advanceBattlePrompt });
     }
     if (!outcome && !turnProgressed) {
       // Attack-first did not resolve or fully enter the turn (no PP / disabled / wrong target).
@@ -302,7 +313,7 @@ async function driveBattleWave(rig, policy, stats) {
       if (fallbackClients.length > 0) {
         stats.fallbackTurns += 1;
       }
-      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, { advancePostBattleExp });
+      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, { advanceBattlePrompt });
     }
     if (!outcome) {
       const parked = latestStartPhase(clients);
@@ -590,6 +601,7 @@ export async function runCampaign(rig) {
         turns: 0,
         faints: 0,
         fallbackTurns: 0,
+        battleMessagePrompts: 0,
         postBattleExpPrompts: 0,
         surfaces: [],
         autoFirst: [],
