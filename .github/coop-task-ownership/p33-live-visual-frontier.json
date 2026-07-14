@@ -8,6 +8,7 @@
     ".github/coop-task-ownership/p33-live-visual-frontier.json",
     "src/data/elite-redux/coop/coop-field-presentation.ts",
     "src/phases/encounter-phase.ts",
-    "test/tests/elite-redux/coop/coop-duo-launch-snapshot.test.ts"
+    "test/tests/elite-redux/coop/coop-duo-launch-snapshot.test.ts",
+    "test/tools/coop-duo-harness.ts"
   ]
 }
