@@ -210,6 +210,20 @@ const CLOUD_SYNC_BACKOFF_BASE_MS = 20 * 60 * 1000;
 const CLOUD_SYNC_BACKOFF_MAX_MS = 6 * 60 * 60 * 1000;
 const COOP_PERSISTENCE_LOCK_ACQUIRE_TIMEOUT_MS = 2_000;
 const COOP_PERSISTENCE_NETWORK_TIMEOUT_MS = 5_000;
+// The GUEST's fresh first-save durability persist chains several SEQUENTIAL real-cloud round-trips
+// (per-slot CAS reads -> run-status guard -> empty-CAS mirror write), each independently bounded by
+// COOP_PERSISTENCE_NETWORK_TIMEOUT_MS, plus a lock acquire and digest hashing. The HOST's ack budget
+// must cover the guest's WORST-CASE completion, not a single round-trip: the bare 5_000ms was inverted
+// against the guest's chain and, on real-world RTT (phones / slow links) or a CPU-starved client, the
+// ack times out (~6.5s observed) and the host aborts a perfectly healthy launch ("guest-persistence-
+// failed") - stranding the guest pre-boot (P33 layer-6). Size for real players, not CI. A generous
+// budget only adds latency to a GENUINE-failure abort; the checkpoint is retained for reconnect retry
+// either way, and a successful late ack still retires the outbox (see resumeCheckpointAck handling).
+const COOP_FRESH_LAUNCH_GUEST_CHAIN_DEPTH = 4; // marker read + parallel slot reads + run-status + mirror write
+const COOP_RESUME_CHECKPOINT_ACK_TIMEOUT_MS =
+  COOP_FRESH_LAUNCH_GUEST_CHAIN_DEPTH * COOP_PERSISTENCE_NETWORK_TIMEOUT_MS
+  + COOP_PERSISTENCE_LOCK_ACQUIRE_TIMEOUT_MS
+  + 3_000; // digest hashing + CPU-starved-client scheduling headroom
 
 export interface CoopPersistenceClock {
   lockAcquireTimeoutMs: number;
@@ -5555,7 +5569,7 @@ export class GameData {
           const delivery = await checkpointController.sendResumeCheckpointDetailed(
             sessionJson,
             commitment,
-            5_000,
+            COOP_RESUME_CHECKPOINT_ACK_TIMEOUT_MS,
             freshSlotCommitted || authorityCloudCommitted,
           );
           freshGuestPersisted = delivery.status === "persisted";
