@@ -1,0 +1,678 @@
+[
+  {
+    "key": "abyss",
+    "battle": false
+  },
+  {
+    "key": "badlands",
+    "battle": false
+  },
+  {
+    "key": "battle_aether_boss",
+    "battle": true
+  },
+  {
+    "key": "battle_aether_grunt",
+    "battle": true
+  },
+  {
+    "key": "battle_alola_champion",
+    "battle": true
+  },
+  {
+    "key": "battle_alola_elite",
+    "battle": true
+  },
+  {
+    "key": "battle_aqua_magma_boss",
+    "battle": true
+  },
+  {
+    "key": "battle_aqua_magma_grunt",
+    "battle": true
+  },
+  {
+    "key": "battle_bb_elite",
+    "battle": true
+  },
+  {
+    "key": "battle_champion_alder",
+    "battle": true
+  },
+  {
+    "key": "battle_champion_geeta",
+    "battle": true
+  },
+  {
+    "key": "battle_champion_iris",
+    "battle": true
+  },
+  {
+    "key": "battle_champion_kieran",
+    "battle": true
+  },
+  {
+    "key": "battle_champion_kukui",
+    "battle": true
+  },
+  {
+    "key": "battle_champion_nemona",
+    "battle": true
+  },
+  {
+    "key": "battle_colress",
+    "battle": true
+  },
+  {
+    "key": "battle_final",
+    "battle": true
+  },
+  {
+    "key": "battle_final_encounter",
+    "battle": true
+  },
+  {
+    "key": "battle_flare_boss",
+    "battle": true
+  },
+  {
+    "key": "battle_flare_grunt",
+    "battle": true
+  },
+  {
+    "key": "battle_galactic_admin",
+    "battle": true
+  },
+  {
+    "key": "battle_galactic_boss",
+    "battle": true
+  },
+  {
+    "key": "battle_galactic_grunt",
+    "battle": true
+  },
+  {
+    "key": "battle_galar_champion",
+    "battle": true
+  },
+  {
+    "key": "battle_galar_elite",
+    "battle": true
+  },
+  {
+    "key": "battle_galar_gym",
+    "battle": true
+  },
+  {
+    "key": "battle_ghost_piano",
+    "battle": true
+  },
+  {
+    "key": "battle_hoenn_champion_g5",
+    "battle": true
+  },
+  {
+    "key": "battle_hoenn_champion_g6",
+    "battle": true
+  },
+  {
+    "key": "battle_hoenn_elite",
+    "battle": true
+  },
+  {
+    "key": "battle_hoenn_gym",
+    "battle": true
+  },
+  {
+    "key": "battle_jacinthe",
+    "battle": true
+  },
+  {
+    "key": "battle_johto_champion",
+    "battle": true
+  },
+  {
+    "key": "battle_johto_gym",
+    "battle": true
+  },
+  {
+    "key": "battle_kalos_champion",
+    "battle": true
+  },
+  {
+    "key": "battle_kalos_elite",
+    "battle": true
+  },
+  {
+    "key": "battle_kalos_gym",
+    "battle": true
+  },
+  {
+    "key": "battle_kanto_champion",
+    "battle": true
+  },
+  {
+    "key": "battle_kanto_gym",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_arceus",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_birds_galar",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_calyrex",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_deoxys",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_dia_pal",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_dusk_dawn",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_entei",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_eternatus_p1",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_eternatus_p2",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_giratina",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_glas_spec",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_gro_kyo",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_ho_oh",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_kanto",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_kor_mir",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_kyurem",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_lake_trio",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_loyal_three",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_lugia",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_mew",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_ogerpon",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_origin_forme",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_pecharunt",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_raikou",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_rayquaza",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_regis_g5",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_regis_g6",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_res_zek",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_riders",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_ruinous",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_sinnoh",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_sol_lun",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_suicune",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_tapu",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_terapagos",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_ub",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_ultra_nec",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_unova",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_xern_yvel",
+    "battle": true
+  },
+  {
+    "key": "battle_legendary_zac_zam",
+    "battle": true
+  },
+  {
+    "key": "battle_macro_boss",
+    "battle": true
+  },
+  {
+    "key": "battle_macro_grunt",
+    "battle": true
+  },
+  {
+    "key": "battle_mustard",
+    "battle": true
+  },
+  {
+    "key": "battle_oleana",
+    "battle": true
+  },
+  {
+    "key": "battle_paldea_elite",
+    "battle": true
+  },
+  {
+    "key": "battle_paldea_gym",
+    "battle": true
+  },
+  {
+    "key": "battle_plasma_boss",
+    "battle": true
+  },
+  {
+    "key": "battle_plasma_grunt",
+    "battle": true
+  },
+  {
+    "key": "battle_rival",
+    "battle": true
+  },
+  {
+    "key": "battle_rival_2",
+    "battle": true
+  },
+  {
+    "key": "battle_rival_3",
+    "battle": true
+  },
+  {
+    "key": "battle_rival_3_afd",
+    "battle": true
+  },
+  {
+    "key": "battle_rocket_boss",
+    "battle": true
+  },
+  {
+    "key": "battle_rocket_grunt",
+    "battle": true
+  },
+  {
+    "key": "battle_rogue_mega",
+    "battle": true
+  },
+  {
+    "key": "battle_sinnoh_champion",
+    "battle": true
+  },
+  {
+    "key": "battle_sinnoh_gym",
+    "battle": true
+  },
+  {
+    "key": "battle_skull_admin",
+    "battle": true
+  },
+  {
+    "key": "battle_skull_boss",
+    "battle": true
+  },
+  {
+    "key": "battle_skull_grunt",
+    "battle": true
+  },
+  {
+    "key": "battle_star_admin",
+    "battle": true
+  },
+  {
+    "key": "battle_star_boss",
+    "battle": true
+  },
+  {
+    "key": "battle_star_grunt",
+    "battle": true
+  },
+  {
+    "key": "battle_trainer",
+    "battle": true
+  },
+  {
+    "key": "battle_trainer_afd",
+    "battle": true
+  },
+  {
+    "key": "battle_unova_elite",
+    "battle": true
+  },
+  {
+    "key": "battle_unova_gym",
+    "battle": true
+  },
+  {
+    "key": "battle_wild",
+    "battle": true
+  },
+  {
+    "key": "battle_wild_strong",
+    "battle": true
+  },
+  {
+    "key": "beach",
+    "battle": false
+  },
+  {
+    "key": "cave",
+    "battle": false
+  },
+  {
+    "key": "construction_site",
+    "battle": false
+  },
+  {
+    "key": "desert",
+    "battle": false
+  },
+  {
+    "key": "dojo",
+    "battle": false
+  },
+  {
+    "key": "encounter_ace_trainer",
+    "battle": false
+  },
+  {
+    "key": "encounter_backpacker",
+    "battle": false
+  },
+  {
+    "key": "encounter_clerk",
+    "battle": false
+  },
+  {
+    "key": "encounter_cyclist",
+    "battle": false
+  },
+  {
+    "key": "encounter_final",
+    "battle": false
+  },
+  {
+    "key": "encounter_lass",
+    "battle": false
+  },
+  {
+    "key": "encounter_parasol_lady",
+    "battle": false
+  },
+  {
+    "key": "encounter_plasma_grunt",
+    "battle": false
+  },
+  {
+    "key": "encounter_pokefan",
+    "battle": false
+  },
+  {
+    "key": "encounter_psychic",
+    "battle": false
+  },
+  {
+    "key": "encounter_rich",
+    "battle": false
+  },
+  {
+    "key": "encounter_rival",
+    "battle": false
+  },
+  {
+    "key": "encounter_roughneck",
+    "battle": false
+  },
+  {
+    "key": "encounter_scientist",
+    "battle": false
+  },
+  {
+    "key": "encounter_twins",
+    "battle": false
+  },
+  {
+    "key": "encounter_youngster",
+    "battle": false
+  },
+  {
+    "key": "end",
+    "battle": false
+  },
+  {
+    "key": "end_summit",
+    "battle": false
+  },
+  {
+    "key": "factory",
+    "battle": false
+  },
+  {
+    "key": "fairy_cave",
+    "battle": false
+  },
+  {
+    "key": "forest",
+    "battle": false
+  },
+  {
+    "key": "grass",
+    "battle": false
+  },
+  {
+    "key": "graveyard",
+    "battle": false
+  },
+  {
+    "key": "heal",
+    "battle": false
+  },
+  {
+    "key": "ice_cave",
+    "battle": false
+  },
+  {
+    "key": "island",
+    "battle": false
+  },
+  {
+    "key": "jungle",
+    "battle": false
+  },
+  {
+    "key": "laboratory",
+    "battle": false
+  },
+  {
+    "key": "lake",
+    "battle": false
+  },
+  {
+    "key": "meadow",
+    "battle": false
+  },
+  {
+    "key": "menu",
+    "battle": false
+  },
+  {
+    "key": "metropolis",
+    "battle": false
+  },
+  {
+    "key": "mountain",
+    "battle": false
+  },
+  {
+    "key": "mystery_encounter_delibirdy",
+    "battle": false
+  },
+  {
+    "key": "mystery_encounter_fun_and_games",
+    "battle": false
+  },
+  {
+    "key": "mystery_encounter_gen_5_gts",
+    "battle": false
+  },
+  {
+    "key": "mystery_encounter_gen_6_gts",
+    "battle": false
+  },
+  {
+    "key": "mystery_encounter_weird_dream",
+    "battle": false
+  },
+  {
+    "key": "plains",
+    "battle": false
+  },
+  {
+    "key": "power_plant",
+    "battle": false
+  },
+  {
+    "key": "ruins",
+    "battle": false
+  },
+  {
+    "key": "sea",
+    "battle": false
+  },
+  {
+    "key": "seabed",
+    "battle": false
+  },
+  {
+    "key": "slum",
+    "battle": false
+  },
+  {
+    "key": "snowy_forest",
+    "battle": false
+  },
+  {
+    "key": "space",
+    "battle": false
+  },
+  {
+    "key": "swamp",
+    "battle": false
+  },
+  {
+    "key": "tall_grass",
+    "battle": false
+  },
+  {
+    "key": "temple",
+    "battle": false
+  },
+  {
+    "key": "title",
+    "battle": false
+  },
+  {
+    "key": "title_afd",
+    "battle": false
+  },
+  {
+    "key": "title_afd_2",
+    "battle": false
+  },
+  {
+    "key": "town",
+    "battle": false
+  },
+  {
+    "key": "volcano",
+    "battle": false
+  },
+  {
+    "key": "wasteland",
+    "battle": false
+  },
+  {
+    "key": "winter_title",
+    "battle": false
+  }
+]

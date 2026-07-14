@@ -109,3 +109,38 @@ console.log("species/items/trainers: run the dump tool (see header) — they com
     console.log("trainer-classes: SKIPPED — er-assets trainer dir not found (set ER_ASSETS_DIR).");
   }
 }
+
+// BGM catalog: every track that ships in the er-assets audio/bgm dir, so the
+// Custom Trainers editor can offer a per-trainer BATTLE MUSIC picker. Each entry
+// is { key, battle } where key = the filename without ".mp3" and battle =
+// key.startsWith("battle_") (so battle themes can be listed first in the picker).
+// The er-assets dir is resolved the same way as the trainer sprites above:
+// $ER_ASSETS_DIR, then ../er-assets, then the local checkout.
+{
+  const BGM_DIR = (() => {
+    const candidates = [
+      process.env.ER_ASSETS_DIR,
+      resolve(process.cwd(), "../er-assets"),
+      "C:/Users/Hafida/pokerogue/.worktrees/er-assets",
+    ].filter(Boolean);
+    for (const c of candidates) {
+      if (existsSync(resolve(c, "audio/bgm"))) {
+        return resolve(c, "audio/bgm");
+      }
+    }
+    return null;
+  })();
+
+  if (BGM_DIR) {
+    const keys = readdirSync(BGM_DIR)
+      .filter(f => f.endsWith(".mp3"))
+      .map(f => f.slice(0, -".mp3".length))
+      .sort();
+    const bgm = keys.map(key => ({ key, battle: key.startsWith("battle_") }));
+    writeFileSync("editor/data/bgm.json", `${JSON.stringify(bgm, null, 2)}\n`);
+    const battleCount = bgm.filter(b => b.battle).length;
+    console.log(`bgm: ${bgm.length} tracks (${battleCount} battle themes).`);
+  } else {
+    console.log("bgm: SKIPPED — er-assets audio/bgm dir not found (set ER_ASSETS_DIR).");
+  }
+}
