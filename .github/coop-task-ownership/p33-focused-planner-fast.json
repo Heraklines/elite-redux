@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "taskId": "p33-focused-planner-fast",
+  "branch": "ci/coop/p33-focused-planner-fast",
+  "trainRef": "ci/coop/p33-mystery-public-transition",
+  "baseSha": "4c98322741a25d50649d0bac225c42be6e0999ec",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-focused-planner-fast.json",
+    ".github/workflows/coop-focused-branch.yml",
+    "test/scripts/coop-focused-static-workflow.test.mjs"
+  ]
+}
