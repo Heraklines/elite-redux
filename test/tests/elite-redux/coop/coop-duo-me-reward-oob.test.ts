@@ -47,6 +47,7 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  beginRewardShopOwnerUi,
   beginRewardShopWatch,
   buildDuo,
   type DuoRig,
@@ -159,12 +160,13 @@ describe.skipIf(!RUN)(
       // ===== Host OWNS + drives the shop: rolls + STREAMS its options, then LEAVEs (no reward taken). The
       // LEAVE is relayed on the reward seq AFTER the phantom (FIFO). The owner remains parked until the
       // watcher materializes that terminal and returns the retained acknowledgement. =====
-      // Start the host transition synchronously, then give the scheduled transport to the GUEST before
-      // driving any host key. The guest watcher was armed before the owner could stream its options, so its
+      // Start the host transition and keep the host context installed until its real handler is ready, then
+      // give the scheduled transport to the GUEST before driving any host key. The guest watcher was armed
+      // before the owner could stream its options, so its
       // detached async continuation must adopt/open under the guest's complete client context. Keeping a
       // single-process host context installed while that continuation resumes would overwrite the host's
       // mirror role with `watcher` - an impossible two-browser state and a false CANCEL rejection.
-      withClientSync(rig.hostCtx, () => hostShop.start());
+      await withClient(rig.hostCtx, () => beginRewardShopOwnerUi(hostShop));
       await withClient(rig.guestCtx, async () => {
         for (let attempt = 0; attempt < 100; attempt++) {
           await drainLoopback();

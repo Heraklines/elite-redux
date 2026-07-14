@@ -2140,34 +2140,9 @@ export async function driveHostRewardShopOwner(
   return pinned;
 }
 
-/**
- * Drive the ordinary reward-shop LEAVE path exclusively through the public UI adapter. This is the
- * production-transition counterpart to the legacy seam driver above: phase start opens the real
- * MODIFIER_SELECT handler, CANCEL opens its real confirmation, and ACTION commits the leave intent.
- * No private selection/terminal method is invoked. MUST run inside the owner's ClientCtx.
- */
-export async function driveRewardShopOwnerLeaveViaUi(
-  hostPhase: ShopPhaseSeam,
-  opts: { alreadyStarted?: boolean } = {},
-): Promise<number> {
-  // The legacy multiwave fixture constructs the non-current client's matching shop phase directly.
-  // Its previous watcher UI can therefore remain MODIFIER_SELECT even though production's real phase
-  // tail would have cleared it. Force a clean MESSAGE base only for that synthetic phase so setMode
-  // installs this phase's callback instead of reusing the prior interaction's callback.
-  if (!opts.alreadyStarted) {
-    if (globalScene.phaseManager.getCurrentPhase() !== (hostPhase as unknown as Phase)) {
-      await globalScene.ui.setModeForceTransition(UiMode.MESSAGE);
-    }
-    hostPhase.start();
-  }
+/** Wait until an already-started owner shop reaches the same public input boundary a human sees. */
+async function awaitRewardShopOwnerInputReady(hostPhase: ShopPhaseSeam): Promise<number> {
   const pinned = hostPhase.coopInteractionStart;
-
-  // Opening the production shop is asynchronous twice over: the reciprocal co-op barrier must release,
-  // then the real handler waits for its reward/tween/tutorial work before it accepts input. Merely seeing
-  // MODIFIER_SELECT is insufficient because setMode installs the mode before the transition overlay and
-  // AwaitableUiHandler are ready. A human cannot press through that overlay; doing so here made the public
-  // driver report CANCEL=false while a later callback continued in the background. Wait for the exact
-  // public-input boundary instead of racing it.
   let shopReady = false;
   for (let attempt = 0; attempt < 100; attempt++) {
     await drainLoopback();
@@ -2189,6 +2164,46 @@ export async function driveRewardShopOwnerLeaveViaUi(
       `reward UI owner did not become input-ready (mode=${UiMode[globalScene.ui.getMode()]}, awaiting=${handler.awaitingActionInput === true}, overlay=${ui.overlayActive === true}, pinned=${pinned})`,
     );
   }
+  return pinned;
+}
+
+/**
+ * Start the ordinary reward owner phase and keep its ClientCtx installed until the real public handler is
+ * input-ready. This explicit half-step lets a two-engine test switch to the destination client and settle
+ * an independently-awaited watcher continuation before returning to drive the owner. No gameplay input is
+ * synthesized here. MUST run inside the owner's ClientCtx.
+ */
+export async function beginRewardShopOwnerUi(hostPhase: ShopPhaseSeam): Promise<number> {
+  // The legacy multiwave fixture constructs the non-current client's matching shop phase directly.
+  // Its previous watcher UI can therefore remain MODIFIER_SELECT even though production's real phase
+  // tail would have cleared it. Force a clean MESSAGE base only for that synthetic phase so setMode
+  // installs this phase's callback instead of reusing the prior interaction's callback.
+  if (globalScene.phaseManager.getCurrentPhase() !== (hostPhase as unknown as Phase)) {
+    await globalScene.ui.setModeForceTransition(UiMode.MESSAGE);
+  }
+  hostPhase.start();
+  return awaitRewardShopOwnerInputReady(hostPhase);
+}
+
+/**
+ * Drive the ordinary reward-shop LEAVE path exclusively through the public UI adapter. This is the
+ * production-transition counterpart to the legacy seam driver above: phase start opens the real
+ * MODIFIER_SELECT handler, CANCEL opens its real confirmation, and ACTION commits the leave intent.
+ * No private selection/terminal method is invoked. MUST run inside the owner's ClientCtx.
+ */
+export async function driveRewardShopOwnerLeaveViaUi(
+  hostPhase: ShopPhaseSeam,
+  opts: { alreadyStarted?: boolean } = {},
+): Promise<number> {
+  // Opening the production shop is asynchronous twice over: the reciprocal co-op barrier must release,
+  // then the real handler waits for its reward/tween/tutorial work before it accepts input. Merely seeing
+  // MODIFIER_SELECT is insufficient because setMode installs the mode before the transition overlay and
+  // AwaitableUiHandler are ready. A human cannot press through that overlay; doing so here made the public
+  // driver report CANCEL=false while a later callback continued in the background. Wait for the exact
+  // public-input boundary instead of racing it.
+  const pinned = opts.alreadyStarted
+    ? await awaitRewardShopOwnerInputReady(hostPhase)
+    : await beginRewardShopOwnerUi(hostPhase);
   if (!globalScene.ui.processInput(Button.CANCEL)) {
     throw new Error(`reward UI owner rejected CANCEL at interaction ${pinned}`);
   }
