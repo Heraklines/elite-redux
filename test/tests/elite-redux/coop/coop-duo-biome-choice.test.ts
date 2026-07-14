@@ -630,9 +630,12 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         ).toBe(true);
         await drainLoopback();
       });
+      // Retained receipts are receiver-side materialization evidence. The harness deliberately queues
+      // operation envelopes until the destination client is installed, matching separate browser globals.
+      await withClient(rig.guestCtx, () => drainLoopback());
       expect(
         withClientSync(
-          rig.hostCtx,
+          rig.guestCtx,
           () =>
             getCoopBiomeTransitionCommitReceipt({
               sourceWave: 11,
@@ -934,12 +937,13 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       liveSelectBiome().start();
       await drainLoopback();
     });
+    await withClient(rig.guestCtx, () => drainLoopback());
     expect(
       withClientSync(
-        rig.hostCtx,
+        rig.guestCtx,
         () => getCoopBiomeTransitionCommitReceipt({ sourceWave: 11, interactivePinned: counterBefore })?.payload,
       ),
-      "the host retained the exact deterministic boundary terminal",
+      "the guest materialized the host's exact retained deterministic boundary terminal",
     ).toMatchObject({ biomeId: destination, nodeIndex: -1, nextWave: 12 });
     await withClient(rig.guestCtx, async () => {
       setErPendingNodes([{ biome: destination, revealed: true }]);
@@ -1047,9 +1051,10 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         liveSelectBiome().start();
         await drainLoopback();
       });
+      await withClient(rig.guestCtx, () => drainLoopback());
       expect(
-        withClientSync(rig.hostCtx, () => getCoopBiomeTransitionCommitReceipt({ sourceWave: 13 })?.payload),
-        "the host retained the natural single-node terminal before renderer projection",
+        withClientSync(rig.guestCtx, () => getCoopBiomeTransitionCommitReceipt({ sourceWave: 13 })?.payload),
+        "the guest materialized the host's retained single-node terminal before renderer projection",
       ).toMatchObject({ biomeId: hostBiome, nodeIndex: -1, nextWave: 14 });
       expect(
         hostSwitch.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1],
