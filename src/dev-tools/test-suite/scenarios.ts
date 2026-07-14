@@ -33,6 +33,7 @@ import { coopOwnedCount } from "#data/elite-redux/coop/coop-session";
 import { erRunUnlockAbilitySlot, erRunUnlockableInnateSlots } from "#data/elite-redux/er-ability-capsule";
 import type { ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { setCommunityAllowedSpecies } from "#data/elite-redux/er-community-run-state";
+import { type ErCustomTrainerResolved, setErCustomTrainerDevForce } from "#data/elite-redux/er-custom-trainers";
 import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
 import { seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
@@ -71,6 +72,7 @@ import type { Starter, StarterMoveset } from "#types/save-data";
 import { openErMapOverlay } from "#ui/er-map-ui-handler";
 import { isSlotUnlocked, PASSIVE_SLOTS, unlockSlot } from "#utils/passive-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
+import { planErCustomTrainerLaunch } from "./custom-trainer-picker";
 
 export interface DevScenario {
   /** Short name for the picker list. */
@@ -245,6 +247,75 @@ function setOverrides(partial: Partial<MutableOverrides>): void {
     // triggers on EVERY launch, not just the lucky seeds.
     O.DISABLE_STANDARD_TRAINERS_OVERRIDE = true;
   }
+}
+
+/**
+ * Player party fielded when a staff tester picks a custom trainer to battle-test
+ * from the Dev Scenarios "Custom Trainers" list. A generic, capable team (2+ mons
+ * so double/triple custom trainers have something to face) with explicit movesets
+ * per the standing rule. The point is to exercise the TRAINER, not the player.
+ */
+function customTrainerTestParty(): Starter[] {
+  return [
+    makeStarter(SpeciesId.GARCHOMP, {
+      moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+    }),
+    makeStarter(SpeciesId.GRENINJA, {
+      moveset: [MoveId.HYDRO_PUMP, MoveId.ICE_BEAM, MoveId.DARK_PULSE, MoveId.EXTRASENSORY],
+    }),
+    makeStarter(SpeciesId.MAGNEZONE, {
+      moveset: [MoveId.THUNDERBOLT, MoveId.FLASH_CANNON, MoveId.THUNDER_WAVE, MoveId.PROTECT],
+    }),
+  ];
+}
+
+/**
+ * Build a one-off {@linkcode DevScenario} that force-fields ONE staff-authored
+ * custom trainer (er-custom-trainers.json) so the test team can battle-test it
+ * from the in-game Dev Scenarios picker. Reuses the round-7 dev force seam
+ * ({@linkcode setErCustomTrainerDevForce}): the picked trainer installs at the
+ * launched wave with the FULL feature set (sprite + gender, aura, battle music,
+ * intro/victory/defeat lines, weighted-slot rolls, slot-fill, RLA/RLNA tokens,
+ * shiny-lab looks, BST bypass) exactly as a real run would field it.
+ *
+ * Wave eligibility is handled by {@linkcode planErCustomTrainerLaunch}: the run
+ * difficulty is force-adjusted to one the trainer allows and the starting wave is
+ * chosen inside its range (skipping boss `% 10` + fixed-battle waves the install
+ * seam rejects). When no wave can field it, an `error` string is returned so the
+ * caller shows a readable message instead of dropping into a silent wild battle.
+ * The force is a one-shot: it clears itself after the install, so the rest of the
+ * run fields normal battles.
+ */
+export function buildErCustomTrainerDevScenario(
+  trainer: ErCustomTrainerResolved,
+): { scenario: DevScenario } | { error: string } {
+  const mode = getGameMode(GameModes.CLASSIC);
+  const plan = planErCustomTrainerLaunch(trainer, w => mode.isFixedBattle(w));
+  if (!plan.ok) {
+    return { error: plan.reason };
+  }
+  const { difficulty, wave } = plan.plan;
+  const scenario: DevScenario = {
+    label: `Custom: ${trainer.name}`,
+    description:
+      `CUSTOM TRAINER #${trainer.id} "${trainer.name}"\n`
+      + `Forced spawn on wave ${wave} (difficulty ${difficulty}).\n`
+      + "DO: fight it. EXPECT the authored party, sprite + gender, aura, battle\n"
+      + "music, intro / victory / defeat lines, weighted slots + slot-fill, RLA /\n"
+      + "RLNA move rolls and shiny-lab looks, exactly as a real run fields it.",
+    setup: () => {
+      resetDevOverrides();
+      // Arm the one-shot dev force + pin a difficulty/wave the trainer allows.
+      setErCustomTrainerDevForce(trainer.key);
+      setErDifficulty(difficulty);
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: wave,
+        STARTING_LEVEL_OVERRIDE: 60,
+      });
+      return customTrainerTestParty();
+    },
+  };
+  return { scenario };
 }
 
 /**
