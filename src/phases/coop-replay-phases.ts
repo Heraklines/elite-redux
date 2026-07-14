@@ -56,7 +56,10 @@ import type {
 import { recordCoopChecksumAssertion } from "#data/elite-redux/coop/coop-checksum-assert";
 import { collectCanonicalDiff, logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import { armCoopFaintSwitchIntentResend } from "#data/elite-redux/coop/coop-faint-switch-operation";
+import {
+  armCoopFaintSwitchIntentResend,
+  captureCoopFaintSwitchOperationBinding,
+} from "#data/elite-redux/coop/coop-faint-switch-operation";
 import { isCoopFaintSwitchSeq, sendCoopFaintSwitchChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { settleCoopAuthoritativeProjection } from "#data/elite-redux/coop/coop-presentation";
 import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
@@ -601,17 +604,27 @@ export class CoopFaintReplayPhase extends PokemonPhase {
         // truly empty, cleanly skips the summon: the lone-survivor flow). Zero wait either way.
         const relay = getCoopInteractionRelay();
         const data = [0];
+        const operationBinding = captureCoopFaintSwitchOperationBinding("guest");
         sendCoopFaintSwitchChoice(relay, this.battlerIndex, -1, data);
-        armCoopFaintSwitchIntentResend({
-          payload: { fieldIndex: this.battlerIndex, partySlot: -1, data },
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
-          resend: () => sendCoopFaintSwitchChoice(relay, this.battlerIndex, -1, data),
-        });
+        armCoopFaintSwitchIntentResend(
+          {
+            payload: { fieldIndex: this.battlerIndex, partySlot: -1, data },
+            localRole: controller.role,
+            wave: globalScene.currentBattle?.waveIndex ?? 0,
+            turn: globalScene.currentBattle?.turn ?? 0,
+            resend: () => sendCoopFaintSwitchChoice(relay, this.battlerIndex, -1, data),
+          },
+          operationBinding,
+        );
         return; // nothing to send out - the host's flow decides (wipe / lone survivor)
       }
       globalScene.phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", this.battlerIndex);
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("[coop-op]")) {
+        coopWarn("replay", `own-faint picker gate bi=${this.battlerIndex} lost its runtime binding`, error);
+        failCoopSharedSession("The replacement flow lost its co-op runtime binding.");
+        return;
+      }
       coopWarn("replay", `own-faint picker gate bi=${this.battlerIndex} threw (handled, host auto-picks)`);
     }
   }

@@ -5,7 +5,7 @@
 
 import { COOP_CAP_OP_FAINT_SWITCH, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
+import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
 import {
   type CoopAuthoritativeEnvelopeV1,
   type CoopFaintSwitchPayload,
@@ -14,10 +14,22 @@ import {
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
-  journalCoopCommittedEnvelope,
+  getActiveCoopOperationDurability,
   registerCoopOperationApplier,
+  tryJournalCoopCommittedEnvelope,
+  tryJournalCoopCommittedEnvelopeFor,
 } from "#data/elite-redux/coop/coop-operation-journal";
-import { CoopOperationGuest, CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
+import {
+  CoopOperationGuest,
+  CoopOperationHost,
+  type CoopRuntimeOpState,
+  getActiveCoopRuntimeOpState,
+  maybeCoopOpSurfaceState,
+  registerCoopOpSurfaceState,
+  requireCoopOpSurfaceState,
+  requireCoopOpSurfaceStateFor,
+  resetActiveCoopRuntimeClocks,
+} from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopSeatOfRole } from "#data/elite-redux/coop/coop-session";
 import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
 
@@ -27,12 +39,77 @@ const COOP_FAINT_SWITCH_TURN_STRIDE = 100;
 const COOP_FAINT_SWITCH_FIELD_STRIDE = 10;
 
 let enabled = DEFAULT_ENABLED;
-let epoch = 1;
-let revisionFloor = 0;
-let authorityHost: CoopOperationHost | null = null;
-let receiverGuest: CoopOperationGuest | null = null;
 let retryMs = 1_000;
-const retries = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** Every mutable faint/replacement cursor and retry timer belongs to one assembled runtime. */
+interface FaintSwitchOpState {
+  epoch: number;
+  revisionFloor: number;
+  authorityHost: CoopOperationHost | null;
+  receiverGuest: CoopOperationGuest | null;
+  readonly retries: Map<string, ReturnType<typeof setTimeout>>;
+}
+
+registerCoopOpSurfaceState(
+  "faintSwitch",
+  (): FaintSwitchOpState => ({
+    epoch: 1,
+    revisionFloor: 0,
+    authorityHost: null,
+    receiverGuest: null,
+    retries: new Map(),
+  }),
+);
+
+/** Stable selectors captured before a replacement await, picker callback, or retry timer can resume. */
+export interface CoopFaintSwitchOperationBinding {
+  readonly opState: CoopRuntimeOpState;
+  readonly durability: CoopDurabilityManager | null;
+}
+
+/** Missing runtime state is a programming error, never permission to share a process-global ledger. */
+export function captureCoopFaintSwitchOperationBinding(expectedRole?: CoopRole): CoopFaintSwitchOperationBinding {
+  const opState = getActiveCoopRuntimeOpState();
+  if (opState == null) {
+    throw new Error("[coop-op] no runtime installed for surface=faintSwitch (cannot capture continuation binding)");
+  }
+  if (expectedRole != null && opState.localRole != null && opState.localRole !== expectedRole) {
+    throw new Error(
+      `[coop-op] surface=faintSwitch binding role=${opState.localRole} cannot execute localRole=${expectedRole}`,
+    );
+  }
+  requireCoopOpSurfaceStateFor<FaintSwitchOpState>(opState, "faintSwitch");
+  return { opState, durability: getActiveCoopOperationDurability() };
+}
+
+function state(binding?: CoopFaintSwitchOperationBinding | null): FaintSwitchOpState {
+  return binding == null
+    ? requireCoopOpSurfaceState<FaintSwitchOpState>("faintSwitch")
+    : requireCoopOpSurfaceStateFor<FaintSwitchOpState>(binding.opState, "faintSwitch");
+}
+
+function assertBindingRole(binding: CoopFaintSwitchOperationBinding | null | undefined, role: CoopRole): void {
+  const opState = binding?.opState ?? getActiveCoopRuntimeOpState();
+  if (opState == null) {
+    throw new Error(`[coop-op] no runtime installed for surface=faintSwitch localRole=${role}`);
+  }
+  if (opState.localRole != null && opState.localRole !== role) {
+    throw new Error(`[coop-op] surface=faintSwitch binding role=${opState.localRole} cannot execute localRole=${role}`);
+  }
+}
+
+function retainEnvelope(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  binding?: CoopFaintSwitchOperationBinding | null,
+): boolean {
+  return binding == null
+    ? tryJournalCoopCommittedEnvelope(envelope)
+    : tryJournalCoopCommittedEnvelopeFor(binding.durability, envelope);
+}
+
+function isCoopOpRuntimeError(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith("[coop-op]");
+}
 
 export function isCoopFaintSwitchOperationEnabled(): boolean {
   return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_FAINT_SWITCH);
@@ -55,30 +132,36 @@ export function resetCoopFaintSwitchRetryMs(): void {
 }
 
 export function resetCoopFaintSwitchOperationState(): void {
-  CoopOperationHost.resetGlobalOrder();
-  for (const timer of retries.values()) {
+  const s = maybeCoopOpSurfaceState<FaintSwitchOpState>("faintSwitch");
+  if (s == null) {
+    return;
+  }
+  resetActiveCoopRuntimeClocks();
+  for (const timer of s.retries.values()) {
     clearTimeout(timer);
   }
-  retries.clear();
-  authorityHost = null;
-  receiverGuest = null;
-  revisionFloor = 0;
+  s.retries.clear();
+  s.authorityHost = null;
+  s.receiverGuest = null;
+  s.revisionFloor = 0;
 }
 
 export function setCoopFaintSwitchOperationRevisionFloor(highWater: number): void {
-  if (!Number.isFinite(highWater) || highWater <= 0 || highWater === revisionFloor) {
+  const s = maybeCoopOpSurfaceState<FaintSwitchOpState>("faintSwitch");
+  if (s == null || !Number.isFinite(highWater) || highWater <= 0 || highWater === s.revisionFloor) {
     return;
   }
-  revisionFloor = highWater;
-  authorityHost = null;
-  receiverGuest = null;
+  s.revisionFloor = highWater;
+  s.authorityHost = null;
+  s.receiverGuest = null;
 }
 
 export function setCoopFaintSwitchOperationEpoch(value: number): void {
-  if (!Number.isSafeInteger(value) || value <= 0 || value === epoch) {
+  const s = maybeCoopOpSurfaceState<FaintSwitchOpState>("faintSwitch");
+  if (s == null || !Number.isSafeInteger(value) || value <= 0 || value === s.epoch) {
     return;
   }
-  epoch = value;
+  s.epoch = value;
   resetCoopFaintSwitchOperationState();
 }
 
@@ -99,14 +182,22 @@ export function coopFaintSwitchOperationAddress(
   return coopFaintSwitchEventAddress(wave, turn, fieldIndex) + Math.max(0, Math.trunc(partySlot) + 1);
 }
 
-function host(): CoopOperationHost {
-  authorityHost ??= CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
-  return authorityHost;
+function host(binding?: CoopFaintSwitchOperationBinding | null): CoopOperationHost {
+  const s = state(binding);
+  s.authorityHost ??=
+    binding == null
+      ? CoopOperationHost.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor })
+      : CoopOperationHost.forRuntime(binding.opState, { epoch: s.epoch, initialRevision: s.revisionFloor });
+  return s.authorityHost;
 }
 
-function guest(): CoopOperationGuest {
-  receiverGuest ??= CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
-  return receiverGuest;
+function guest(binding?: CoopFaintSwitchOperationBinding | null): CoopOperationGuest {
+  const s = state(binding);
+  s.receiverGuest ??=
+    binding == null
+      ? CoopOperationGuest.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor })
+      : CoopOperationGuest.forRuntime(binding.opState, { epoch: s.epoch, initialRevision: s.revisionFloor });
+  return s.receiverGuest;
 }
 
 function context(wave: number, turn: number) {
@@ -135,17 +226,17 @@ function retryKey(payload: CoopFaintSwitchPayload, wave: number, turn: number): 
   return `${payload.fieldIndex}:${coopFaintSwitchEventAddress(wave, turn, payload.fieldIndex)}`;
 }
 
-function cancelRetry(payload: CoopFaintSwitchPayload): void {
+function cancelRetry(s: FaintSwitchOpState, payload: CoopFaintSwitchPayload): void {
   // The legacy carrier is addressed by owned field slot, while the peers may
   // temporarily observe its wave/turn from different checkpoint revisions. A
   // commit must therefore terminate retries by the stable shared identity.
   // Replacements for the same field cannot legitimately overlap.
   const fieldPrefix = `${payload.fieldIndex}:`;
   let cancelled = 0;
-  for (const [key, timer] of retries) {
+  for (const [key, timer] of s.retries) {
     if (key.startsWith(fieldPrefix)) {
       clearTimeout(timer);
-      retries.delete(key);
+      s.retries.delete(key);
       cancelled++;
     }
   }
@@ -157,21 +248,27 @@ function cancelRetry(payload: CoopFaintSwitchPayload): void {
   }
 }
 
-export function armCoopFaintSwitchIntentResend(params: {
-  payload: CoopFaintSwitchPayload;
-  wave: number;
-  turn: number;
-  resend: () => void;
-}): void {
+export function armCoopFaintSwitchIntentResend(
+  params: {
+    payload: CoopFaintSwitchPayload;
+    localRole: CoopRole;
+    wave: number;
+    turn: number;
+    resend: () => void;
+  },
+  binding?: CoopFaintSwitchOperationBinding | null,
+): void {
   if (!isCoopFaintSwitchOperationEnabled()) {
     return;
   }
+  assertBindingRole(binding, params.localRole);
+  const s = state(binding);
   const key = retryKey(params.payload, params.wave, params.turn);
-  if (retries.has(key)) {
+  if (s.retries.has(key)) {
     return;
   }
   const tick = () => {
-    if (!retries.has(key)) {
+    if (!s.retries.has(key)) {
       return;
     }
     try {
@@ -179,28 +276,36 @@ export function armCoopFaintSwitchIntentResend(params: {
     } catch (error) {
       coopWarn("replay", "faint-switch intent resend threw; retry remains armed", error);
     }
-    if (retries.has(key)) {
-      retries.set(key, setTimeout(tick, retryMs));
+    if (s.retries.has(key)) {
+      s.retries.set(key, setTimeout(tick, retryMs));
     }
   };
-  retries.set(key, setTimeout(tick, retryMs));
+  s.retries.set(key, setTimeout(tick, retryMs));
 }
 
-export function commitFaintSwitchAuthorityIntent(params: {
-  payload: CoopFaintSwitchPayload;
-  ownerRole: CoopRole;
-  localRole: CoopRole;
-  wave: number;
-  turn: number;
-}): void {
-  if (!isCoopFaintSwitchOperationEnabled() || params.localRole !== "host") {
-    return;
+export function commitFaintSwitchAuthorityIntent(
+  params: {
+    payload: CoopFaintSwitchPayload;
+    ownerRole: CoopRole;
+    localRole: CoopRole;
+    wave: number;
+    turn: number;
+  },
+  binding?: CoopFaintSwitchOperationBinding | null,
+): boolean {
+  if (!isCoopFaintSwitchOperationEnabled()) {
+    return true;
+  }
+  assertBindingRole(binding, params.localRole);
+  if (params.localRole !== "host") {
+    return true;
   }
   try {
+    const s = state(binding);
     const owner = coopSeatOfRole(params.ownerRole);
     const operation: CoopPendingOperation = {
       id: makeCoopOperationId(
-        epoch,
+        s.epoch,
         owner,
         coopFaintSwitchOperationAddress(params.wave, params.turn, params.payload.fieldIndex, params.payload.partySlot),
         "FAINT_SWITCH",
@@ -210,14 +315,23 @@ export function commitFaintSwitchAuthorityIntent(params: {
       status: "proposed",
       payload: { ...params.payload, data: [...params.payload.data] },
     };
-    const result = host().submit(operation, context(params.wave, params.turn), intent =>
+    const result = host(binding).submit(operation, context(params.wave, params.turn), intent =>
       intent.owner === owner ? { ok: true } : { ok: false, reason: "wrong-owner" },
     );
-    if (result.kind === "committed") {
-      journalCoopCommittedEnvelope(result.envelope);
+    if (result.kind === "committed" || result.kind === "reack") {
+      if (!retainEnvelope(result.envelope, binding)) {
+        coopWarn("replay", `faint-switch op could not retain rev=${result.envelope.revision} id=${operation.id}`);
+        return false;
+      }
+      return true;
     }
+    return false;
   } catch (error) {
+    if (isCoopOpRuntimeError(error)) {
+      throw error;
+    }
     coopWarn("replay", "faint-switch op commit threw; legacy carrier/fallback remains active", error);
+    return false;
   }
 }
 
@@ -245,6 +359,8 @@ function applyJournaledFaintSwitchEnvelope(envelope: CoopAuthoritativeEnvelopeV1
   if (!validPayload(operation.payload)) {
     return "rejected";
   }
+  assertBindingRole(undefined, "guest");
+  const s = state();
   const g = guest();
   if (g.hasApplied(operation.id)) {
     return "duplicate";
@@ -253,7 +369,7 @@ function applyJournaledFaintSwitchEnvelope(envelope: CoopAuthoritativeEnvelopeV1
   if (result !== "applied") {
     return "rejected";
   }
-  cancelRetry(operation.payload);
+  cancelRetry(s, operation.payload);
   return "applied";
 }
 
