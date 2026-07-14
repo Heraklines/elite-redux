@@ -7,6 +7,7 @@
   "allowedFiles": [
     ".github/coop-task-ownership/p33-biome-transition-frontier.json",
     "src/data/elite-redux/coop/coop-biome-operation.ts",
+    "src/data/elite-redux/coop/coop-runtime.ts",
     "src/phases/select-biome-phase.ts",
     "test/tests/elite-redux/coop/coop-duo-biome-boundary.test.ts",
     "test/tests/elite-redux/coop/coop-duo-biome-choice.test.ts",

@@ -3303,9 +3303,12 @@ function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAu
   if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
     return false;
   }
+  // Transport delivery can run while the sender is the ambient harness client. Bind both validation and
+  // publication to the receiving runtime so an ACK can never outlive a receipt written into the wrong peer.
+  const binding = { opState: runtime.opState, durability: runtime.durability ?? null };
   const op = envelope.pendingOperation;
   const parsed = op == null ? null : parseCoopOperationId(op.id);
-  const plan = preflightCoopBiomeJournalMaterialization(envelope);
+  const plan = preflightCoopBiomeJournalMaterialization(envelope, binding);
   if (op == null || parsed == null || plan == null) {
     return false;
   }
@@ -3336,7 +3339,7 @@ function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAu
     if (deterministicAddress) {
       // No interaction exists for a deterministic transition. Publish its exact receipt/permit directly;
       // buffering it in InteractionRelay would create a phantom owner/watcher action at this wave address.
-      return publishCoopBiomeJournalMaterialization(plan);
+      return publishCoopBiomeJournalMaterialization(plan, binding);
     }
     try {
       runtime.interactionRelay.materializeCommittedInteractionChoice(parsed.pinnedSeq, "biomePick", payload.nodeIndex, [
@@ -3346,7 +3349,7 @@ function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAu
       coopWarn("runtime", `biome committed relay materialization threw id=${op.id}; receipt remains unpublished`, e);
       return false;
     }
-    return publishCoopBiomeJournalMaterialization(plan);
+    return publishCoopBiomeJournalMaterialization(plan, binding);
   }
   if (op.kind === "CROSSROADS_PICK") {
     const payload = op.payload as CoopCrossroadsPickPayload;
@@ -3372,7 +3375,7 @@ function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAu
       );
       return false;
     }
-    return publishCoopBiomeJournalMaterialization(plan);
+    return publishCoopBiomeJournalMaterialization(plan, binding);
   }
   return false;
 }
