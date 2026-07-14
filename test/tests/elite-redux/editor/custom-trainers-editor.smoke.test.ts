@@ -768,6 +768,35 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].victoryDialogue.length).toBe(200);
   });
 
+  it("dialogue fields are relabeled from the TRAINER's point of view (bindings unchanged)", () => {
+    // The maintainer ruling: keep the JSON schema (victoryDialogue = trainer
+    // defeated, defeatDialogue = trainer wins) but relabel the editor inputs so a
+    // staff author can't confuse whose win it is. The input ids/bindings are the
+    // SAME; only the labels change.
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // Both inputs still exist with their original ids (schema/binding unchanged).
+    const winsInput = q("#ctr-defeat") as HTMLInputElement; // bound to defeatDialogue
+    const defeatedInput = q("#ctr-victory") as HTMLInputElement; // bound to victoryDialogue
+    expect(winsInput).not.toBeNull();
+    expect(defeatedInput).not.toBeNull();
+    // The visible <label> wrapping each input names the TRAINER's outcome.
+    const winsLabel = winsInput.closest("label")!.textContent || "";
+    const defeatedLabel = defeatedInput.closest("label")!.textContent || "";
+    expect(winsLabel).toMatch(/trainer\s+WINS/i);
+    expect(defeatedLabel).toMatch(/trainer\s+is\s+DEFEATED/i);
+
+    // Typing into the WINS field still serializes as defeatDialogue (trainer wins);
+    // the DEFEATED field still serializes as victoryDialogue (player wins).
+    winsInput.value = "You never stood a chance.";
+    ct.onCustomTrainerInput(winsInput);
+    defeatedInput.value = "Impressive... you have earned this.";
+    ct.onCustomTrainerInput(defeatedInput);
+    const delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.defeatDialogue).toBe("You never stood a chance."); // trainer wins
+    expect(delta.victoryDialogue).toBe("Impressive... you have earned this."); // trainer defeated
+  });
+
   it("clicking the readonly trainer Id field never clears the team (BUG regression)", () => {
     const key = newTrainer();
     setSpecies(0, "SPECIES_SNORLAX");

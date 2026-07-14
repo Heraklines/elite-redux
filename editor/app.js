@@ -2875,13 +2875,14 @@ function renderCustomTrainers(root) {
           <label title="Line shown when this trainer's battle starts (up to 200 chars). Players can turn these off with the 'Skip custom trainer intros' setting.">Intro blurb
             <input type="text" id="ctr-intro" maxlength="200" value="${esc(t.introDialogue || "")}" placeholder="Shown at battle start (optional)" style="width:320px" />
           </label>
-          <label title="Line shown when the PLAYER beats this trainer (up to 200 chars). Uses the same dialogue routine ghost trainers use for their victory line.">Victory line
-            <input type="text" id="ctr-victory" maxlength="200" value="${esc(t.victoryDialogue || "")}" placeholder="When the player wins (optional)" style="width:280px" />
+          <label title="Line this trainer says when it BEATS the player (the trainer wins and the player's run ends). Up to 200 chars. Uses the same dialogue routine ghost trainers use.">Line when the trainer WINS
+            <input type="text" id="ctr-defeat" maxlength="200" value="${esc(t.defeatDialogue || "")}" placeholder="Trainer's taunt when it beats you (optional)" style="width:280px" />
           </label>
-          <label title="Line shown when this trainer BEATS the player (up to 200 chars). Uses the same routine ghost trainers use for their defeat line.">Defeat line
-            <input type="text" id="ctr-defeat" maxlength="200" value="${esc(t.defeatDialogue || "")}" placeholder="When the trainer wins (optional)" style="width:280px" />
+          <label title="Line this trainer says when it is DEFEATED (the player wins the battle). Up to 200 chars. Uses the same dialogue routine ghost trainers use.">Line when the trainer is DEFEATED
+            <input type="text" id="ctr-victory" maxlength="200" value="${esc(t.victoryDialogue || "")}" placeholder="Trainer's line when you beat it (optional)" style="width:280px" />
           </label>
         </div>
+        <p class="hint" style="margin:2px 0 0">Heads-up: "wins/defeated" is from the TRAINER's point of view. The DEFEATED line plays when you beat the trainer; the WINS line plays when the trainer beats you.</p>
         <div class="ctr-effect-row">
           <label title="A visual aura rendered around this trainer's sprite in battle, reusing the Ghost Trainer FX aura effects. '(none)' is the plain sprite.">Sprite effect
             <select id="ctr-effect">${ctrEffectOptions(t.trainerEffect || "")}</select>
