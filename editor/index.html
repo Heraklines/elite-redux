@@ -179,7 +179,8 @@
       .ctr-member + .ctr-member { margin-top: 12px; }
       .ctr-mem-sum { cursor: pointer; user-select: none; }
       .ctr-mem-sum:hover { color: var(--accent); }
-      .ctr-mem-caret { display: inline-block; width: 14px; color: var(--muted); }
+      .ctr-mem-sum:hover .ctr-mem-caret { color: var(--accent); border-color: var(--accent); }
+      .ctr-mem-caret { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; font-size: 14px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; margin-right: 4px; vertical-align: middle; }
       .ctr-mem-sum small { color: var(--muted); font-weight: 400; margin-left: 6px; }
       .ctr-moves-head { margin-top: 8px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
       .ctr-moves-head select { max-width: 240px; }
