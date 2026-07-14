@@ -1,8 +1,13 @@
 import { globalScene } from "#app/global-scene";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { COOP_REVIVAL_SEQ_BASE, getCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { commitRevivalAuthorityDecision, sendCoopRevivalPrompt } from "#data/elite-redux/coop/coop-revival-operation";
-import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import {
+  type CoopRevivalOperationBinding,
+  captureCoopRevivalOperationBinding,
+  commitRevivalAuthorityDecision,
+  sendCoopRevivalPrompt,
+} from "#data/elite-redux/coop/coop-revival-operation";
+import { failCoopSharedSession, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REVIVAL_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { erRecordCoopRevivePartnerMon } from "#data/elite-redux/er-social-achievement-tracker";
 import { SwitchType } from "#enums/switch-type";
@@ -20,17 +25,29 @@ import i18next from "i18next";
  */
 export class RevivalBlessingPhase extends BattlePhase {
   public readonly phaseName = "RevivalBlessingPhase";
+  private coopOperationBinding: CoopRevivalOperationBinding | null = null;
+
   constructor(protected user: PlayerPokemon) {
     super();
   }
 
   public override start(): void {
+    const controller = getCoopController();
+    if (globalScene.gameMode?.isCoop === true && controller?.role === "host") {
+      try {
+        this.coopOperationBinding ??= captureCoopRevivalOperationBinding("host");
+      } catch {
+        failCoopSharedSession("Revival Blessing lost its authoritative host runtime binding.");
+        this.end();
+        return;
+      }
+    }
     // Co-op (#809, the faint-switch owner-pick pattern): the pick belongs to the mon's
     // OWNER. On the host engine with a PARTNER-owned user, prompt the partner's client
     // and await its relayed pick instead of opening the local party screen.
     if (
       globalScene.gameMode?.isCoop === true
-      && getCoopController()?.role === "host"
+      && controller?.role === "host"
       && this.user.coopOwner != null
       && this.user.coopOwner !== "host"
     ) {
@@ -47,20 +64,26 @@ export class RevivalBlessingPhase extends BattlePhase {
           if (!pokemon || !pokemon.isFainted()) {
             return this.end();
           }
-          const controller = getCoopController();
           if (controller?.role === "host") {
-            commitRevivalAuthorityDecision({
-              payload: {
-                type: "decision",
-                fieldIndex: this.user.getFieldIndex(),
-                partySlot: slotIndex,
-                speciesId: pokemon.species?.speciesId ?? 0,
+            const committed = commitRevivalAuthorityDecision(
+              {
+                payload: {
+                  type: "decision",
+                  fieldIndex: this.user.getFieldIndex(),
+                  partySlot: slotIndex,
+                  speciesId: pokemon.species?.speciesId ?? 0,
+                },
+                ownerRole: "host",
+                localRole: "host",
+                wave: globalScene.currentBattle?.waveIndex ?? 0,
+                turn: globalScene.currentBattle?.turn ?? 0,
               },
-              ownerRole: "host",
-              localRole: "host",
-              wave: globalScene.currentBattle?.waveIndex ?? 0,
-              turn: globalScene.currentBattle?.turn ?? 0,
-            });
+              this.coopOperationBinding,
+            );
+            if (!committed) {
+              failCoopSharedSession("Host-owned Revival Blessing decision could not enter durable authority.");
+              return this.end();
+            }
           }
           this.applyRevive(slotIndex, pokemon);
         }
@@ -87,7 +110,11 @@ export class RevivalBlessingPhase extends BattlePhase {
     coopLog("replay", `revival owner-pick: awaiting partner pick seq=${seq} (user slot=${fieldIndex})`);
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
     const turn = globalScene.currentBattle?.turn ?? 0;
-    sendCoopRevivalPrompt(relay, fieldIndex, { localRole: "host", wave, turn });
+    if (!sendCoopRevivalPrompt(relay, fieldIndex, { localRole: "host", wave, turn }, this.coopOperationBinding)) {
+      failCoopSharedSession("Revival Blessing prompt could not enter durable authority.");
+      this.end();
+      return;
+    }
     void relay.awaitInteractionChoice(seq, getCoopFaintSwitchWaitMs(), COOP_REVIVAL_CHOICE_KINDS).then(res => {
       const party = globalScene.getPlayerParty();
       let slotIndex = res?.choice ?? -1;
@@ -111,18 +138,26 @@ export class RevivalBlessingPhase extends BattlePhase {
         coopLog("replay", `revival owner-pick: fallback -> party[${slotIndex}]`);
       }
       if (slotIndex >= 0) {
-        commitRevivalAuthorityDecision({
-          payload: {
-            type: "decision",
-            fieldIndex,
-            partySlot: slotIndex,
-            speciesId: party[slotIndex].species?.speciesId ?? 0,
+        const committed = commitRevivalAuthorityDecision(
+          {
+            payload: {
+              type: "decision",
+              fieldIndex,
+              partySlot: slotIndex,
+              speciesId: party[slotIndex].species?.speciesId ?? 0,
+            },
+            ownerRole: this.user.coopOwner ?? "guest",
+            localRole: "host",
+            wave,
+            turn,
           },
-          ownerRole: this.user.coopOwner ?? "guest",
-          localRole: "host",
-          wave,
-          turn,
-        });
+          this.coopOperationBinding,
+        );
+        if (!committed) {
+          failCoopSharedSession("Guest-owned Revival Blessing decision could not enter durable authority.");
+          this.end();
+          return;
+        }
         this.applyRevive(slotIndex, party[slotIndex]);
       }
       this.end();
