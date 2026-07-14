@@ -93,6 +93,7 @@ if (
   !browserEntry.includes('phase === "ExpPhase"')
   || !browserEntry.includes('surfaceId: "battle:exp"')
   || !browserEntry.includes("isAwaitingPromptAction")
+  || !browserEntry.includes("phaseInstance: semanticPhaseInstance")
 ) {
   failures.push("coop-browser-entry.ts: EXP prompts must expose complete actionable readiness to the public driver");
 }

@@ -193,6 +193,7 @@ export function createPostBattleExpAdvancer(rig, from, stats, purpose) {
     if (
       readyEvent?.observation.phase !== "ExpPhase"
       || readyEvent.observation.uiMode !== "MESSAGE"
+      || !Number.isSafeInteger(readyEvent.observation.phaseInstance)
       || readyEvent.observation.ready?.awaitingActionInput !== true
     ) {
       return false;
@@ -202,6 +203,7 @@ export function createPostBattleExpAdvancer(rig, from, stats, purpose) {
     stats.postBattleExpPrompts += 1;
     authority.evidence.record("campaign-post-battle-advance", {
       phase: "ExpPhase",
+      phaseInstance: readyEvent.observation.phaseInstance,
       phaseEventIndex: phaseEvent.index,
       readyEventIndex: readyEvent.index,
       promptOrdinal: stats.postBattleExpPrompts,
