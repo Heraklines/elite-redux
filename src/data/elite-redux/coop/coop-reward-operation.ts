@@ -48,10 +48,6 @@ import {
   type CoopIntentValidator,
   CoopOperationGuest,
   CoopOperationHost,
-  maybeCoopOpSurfaceState,
-  registerCoopOpSurfaceState,
-  requireCoopOpSurfaceState,
-  resetActiveCoopRuntimeClocks,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
@@ -99,6 +95,28 @@ const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_RE
 let enabled = DEFAULT_ENABLED;
 
 /**
+ * The session epoch (§1.4). Wave-2d keeps it constant (1) per session and resets the surface state on
+ * session boundaries; the full launch/resume epoch mint is a later, cross-surface piece (§2.4). An epoch
+ * change still bumps it here so a cross-epoch operationId is dropped structurally (invariant 6).
+ */
+let epoch = 1;
+
+/** The authority (coop host) commit log for shop ops. Lazily created; null until first use / on a non-host. */
+let authorityHost: CoopOperationHost | null = null;
+
+/** The watcher applier that gates adoption of a relayed action. Lazily created; null until first use. */
+let watchGuest: CoopOperationGuest | null = null;
+
+/** Pinned streams for which the journal became the live carrier; raw legacy echoes no longer mutate them. */
+const journalLeadingStarts = new Set<number>();
+
+/** Journal-consumed operations waiting for their safe phase-loop materialization. */
+const pendingJournalMaterializations = new Set<string>();
+
+/** Complete result state already installed on this receiver, but not necessarily materialized into its UI yet. */
+const stateAppliedOperations = new Set<string>();
+
+/**
  * Engine state seam. Production uses the normal atomic battle-state transaction. A focused operation test
  * can replace it with a plain-state model without importing a second Phaser scene into the same process.
  */
@@ -137,15 +155,26 @@ function freshWatcherState(): RewardWatcherState {
   return { ordinal: 0, ordinalStart: -1, lastAdoptedStart: -1, lastLeftStart: -1 };
 }
 
+/** Per-peer state. Dual-engine tests share one JS realm; real peers do not share these cursors either. */
+const watcherStateByRole: Record<CoopRole, RewardWatcherState> = {
+  host: freshWatcherState(),
+  guest: freshWatcherState(),
+};
+
 /** ACTION ORDINAL stride: pin * STRIDE + ordinal must not overflow into the next pin's op-id space. */
 export const COOP_REWARD_ACTION_STRIDE = 100_000;
 
 /** Arm one journal-led action before its production sink feeds the real reward/market FIFO. */
 export function armCoopRewardJournalMaterialization(operationId: string, pinned: number): void {
-  const s = state();
-  s.journalLeadingStarts.add(pinned);
-  s.pendingJournalMaterializations.add(operationId);
+  journalLeadingStarts.add(pinned);
+  pendingJournalMaterializations.add(operationId);
 }
+
+/** The owner's per-interaction monotonic action ordinal (for the committed op-id). Reset when the pin changes. */
+let ownerOrdinal = 0;
+let ownerOrdinalStart = -1;
+/** Exact once-only identity retained when a terminal must be retried after commit/journal failure. */
+const ownerTerminalOperations = new Map<string, { readonly ordinal: number; readonly operationId: string }>();
 
 interface PreparedRewardIntent {
   readonly intent: CoopPendingOperation;
@@ -160,95 +189,24 @@ interface PreparedRewardIntent {
   watcherAdvanced: boolean;
 }
 
+/** Proposed peer intents are retained separately per local role (the two-engine harness shares one realm). */
+const preparedIntents = new Map<string, PreparedRewardIntent>();
+/** Exact immutable host results survive a journal failure/retry without recapturing a later state tick. */
+const committedResultEnvelopes = new Map<string, CoopAuthoritativeEnvelopeV1>();
+
 function preparedKey(role: CoopRole, operationId: string): string {
   return `${role}:${operationId}`;
 }
 
-/**
- * Per-runtime apply state for the reward-shop + biome-market surface (see coop-operation-runtime.ts opState
- * infra). Relocated off module-globals (bargain/stormglass pattern) so the single-process two-engine harness
- * gives each client its OWN reward cursors/tracking: a host self-apply no longer marks a SHARED cursor that
- * the guest then short-circuits as a duplicate (the reward-mirror desync). CRUCIAL for reward: its guest
- * watcher + owner two-phase commit run from `await` tails / Phaser callbacks, so callers must re-establish
- * the OWNING runtime around those continuations (withActiveCoopRuntimeScope) - the ambient active runtime is
- * NOT reliably this surface's at resume time. In production (one runtime per process) this is identical to
- * the former globals. The reward screen + biome market share ONE record.
- */
-interface RewardOpState {
-  /**
-   * The session epoch (§1.4). Wave-2d keeps it constant (1) per session and resets the surface state on
-   * session boundaries; a change bumps it here so a cross-epoch operationId is dropped structurally (invariant 6).
-   */
-  epoch: number;
-  /**
-   * The surface-local revision FLOOR (W2e-R P0-3): seeded from the persisted per-class high-water on a COLD
-   * resume so the producer continues at floor+1 (matching the restored durability receiver), keeping the
-   * committed-op revision stream monotonic across the save boundary. 0 = fresh session. The reward screen +
-   * biome market share ONE host (§8.2.1), so ONE floor serves both.
-   */
-  revisionFloor: number;
-  /** The authority (coop host) commit log for shop ops. Lazily created; null until first use / on a non-host. */
-  authorityHost: CoopOperationHost | null;
-  /** The watcher applier that gates adoption of a relayed action. Lazily created; null until first use. */
-  watchGuest: CoopOperationGuest | null;
-  /** Pinned streams for which the journal became the live carrier; raw legacy echoes no longer mutate them. */
-  readonly journalLeadingStarts: Set<number>;
-  /** Journal-consumed operations waiting for their safe phase-loop materialization. */
-  readonly pendingJournalMaterializations: Set<string>;
-  /** Complete result state already installed on this receiver, but not necessarily materialized into its UI yet. */
-  readonly stateAppliedOperations: Set<string>;
-  /** Per-peer watcher state. Dual-engine tests share one JS realm; real peers do not share these cursors either. */
-  readonly watcherStateByRole: Record<CoopRole, RewardWatcherState>;
-  /** The owner's per-interaction monotonic action ordinal (for the committed op-id). Reset when the pin changes. */
-  ownerOrdinal: number;
-  ownerOrdinalStart: number;
-  /** Exact once-only identity retained when a terminal must be retried after commit/journal failure. */
-  readonly ownerTerminalOperations: Map<string, { readonly ordinal: number; readonly operationId: string }>;
-  /** Proposed peer intents retained separately per local role (the two-engine harness shares one realm). */
-  readonly preparedIntents: Map<string, PreparedRewardIntent>;
-  /** Exact immutable host results survive a journal failure/retry without recapturing a later state tick. */
-  readonly committedResultEnvelopes: Map<string, CoopAuthoritativeEnvelopeV1>;
-}
-
-registerCoopOpSurfaceState(
-  "reward",
-  (): RewardOpState => ({
-    epoch: 1,
-    revisionFloor: 0,
-    authorityHost: null,
-    watchGuest: null,
-    journalLeadingStarts: new Set<number>(),
-    pendingJournalMaterializations: new Set<string>(),
-    stateAppliedOperations: new Set<string>(),
-    watcherStateByRole: { host: freshWatcherState(), guest: freshWatcherState() },
-    ownerOrdinal: 0,
-    ownerOrdinalStart: -1,
-    ownerTerminalOperations: new Map(),
-    preparedIntents: new Map(),
-    committedResultEnvelopes: new Map(),
-  }),
-);
+/** The watcher's per-interaction monotonic action ordinal (for the applied op-id). Reset when the pin changes. */
 
 /**
- * FAIL-LOUD apply-path accessor: requires an installed runtime (a fresh runtime holds a reset record). The
- * caught `[coop-op]` throw is NEVER silently degraded to legacy fallback ({@linkcode isCoopOpRuntimeError}) -
- * a missing/wrong runtime at a reward continuation is a real defect that must self-identify, not hide behind
- * "expected false to be true".
+ * The surface-local revision FLOOR (W2e-R P0-3): seeded from the persisted per-class high-water on a COLD
+ * resume so the producer continues at floor+1 (matching the restored durability receiver), keeping the
+ * committed-op revision stream monotonic across the save boundary. See the biome adapter for the rationale.
+ * 0 = fresh session. The reward screen + biome market share ONE host (§8.2.1), so ONE floor serves both.
  */
-function state(): RewardOpState {
-  return requireCoopOpSurfaceState<RewardOpState>("reward");
-}
-
-/**
- * True iff a caught error is the fail-loud "no runtime installed / no per-runtime record" from
- * {@linkcode requireCoopOpSurfaceState}. Such an error means a reward op ran outside its owning runtime's
- * context (a continuation that escaped {@linkcode withActiveCoopRuntimeScope}); it must PROPAGATE so it is
- * visible, never be swallowed into the legacy-relay fallback (that masking caused the #922 reward-mirror
- * regression to surface only as "expected false to be true").
- */
-function isCoopOpRuntimeError(error: unknown): boolean {
-  return error instanceof Error && error.message.startsWith("[coop-op]");
-}
+let revisionFloor = 0;
 
 /**
  * True iff the migrated (envelope-gated) shop path is active; else pure legacy fallback (§5.1). The local
@@ -275,48 +233,39 @@ export function resetCoopRewardOperationFlag(): void {
   enabled = DEFAULT_ENABLED;
 }
 
-/** The current shop operation epoch (§1.4). Base epoch (1) when no runtime is installed. */
+/** The current shop operation epoch (§1.4). */
 export function getCoopRewardOperationEpoch(): number {
-  return maybeCoopOpSurfaceState<RewardOpState>("reward")?.epoch ?? 1;
+  return epoch;
 }
 
 /**
  * Set the operation epoch (§1.4). A CHANGE resets the per-session op state so a leftover operationId from a
- * prior epoch can never satisfy a live op (invariant 6). Idempotent for the same epoch. Safe no-op when idle.
+ * prior epoch can never satisfy a live op (invariant 6). Idempotent for the same epoch.
  */
 export function setCoopRewardOperationEpoch(next: number): void {
-  const s = maybeCoopOpSurfaceState<RewardOpState>("reward");
-  if (s == null || next === s.epoch) {
+  if (next === epoch) {
     return;
   }
-  s.epoch = next;
+  epoch = next;
   resetCoopRewardOperationState();
 }
 
-/**
- * Tear down all per-session operation state (called from clearCoopRuntime + tests). Routes through the
- * ACTIVE runtime's own record so a teardown clears its OWN cursors/tracking, not a global. Keeps the flag.
- * Safe no-op when no runtime is installed (a fresh runtime's record is already reset).
- */
+/** Tear down all per-session operation state (called from assembleCoopRuntime / clearCoopRuntime + tests). Keeps the flag. */
 export function resetCoopRewardOperationState(): void {
-  const s = maybeCoopOpSurfaceState<RewardOpState>("reward");
-  if (s == null) {
-    return; // safe no-op: no runtime installed, nothing exists to reset
-  }
-  resetActiveCoopRuntimeClocks();
-  s.authorityHost = null;
-  s.watchGuest = null;
-  s.journalLeadingStarts.clear();
-  s.pendingJournalMaterializations.clear();
-  s.stateAppliedOperations.clear();
-  s.preparedIntents.clear();
-  s.committedResultEnvelopes.clear();
-  s.watcherStateByRole.host = freshWatcherState();
-  s.watcherStateByRole.guest = freshWatcherState();
-  s.ownerOrdinal = 0;
-  s.ownerOrdinalStart = -1;
-  s.ownerTerminalOperations.clear();
-  s.revisionFloor = 0;
+  CoopOperationHost.resetGlobalOrder();
+  authorityHost = null;
+  watchGuest = null;
+  journalLeadingStarts.clear();
+  pendingJournalMaterializations.clear();
+  stateAppliedOperations.clear();
+  preparedIntents.clear();
+  committedResultEnvelopes.clear();
+  watcherStateByRole.host = freshWatcherState();
+  watcherStateByRole.guest = freshWatcherState();
+  ownerOrdinal = 0;
+  ownerOrdinalStart = -1;
+  ownerTerminalOperations.clear();
+  revisionFloor = 0;
 }
 
 /**
@@ -325,16 +274,12 @@ export function resetCoopRewardOperationState(): void {
  * host + guests so the producer continues at floor+1 and the guests accept it. No-op for a fresh session.
  */
 export function setCoopRewardOperationRevisionFloor(hw: number): void {
-  const s = maybeCoopOpSurfaceState<RewardOpState>("reward");
-  if (s == null) {
+  if (!Number.isFinite(hw) || hw <= 0 || hw === revisionFloor) {
     return;
   }
-  if (!Number.isFinite(hw) || hw <= 0 || hw === s.revisionFloor) {
-    return;
-  }
-  s.revisionFloor = hw;
-  s.authorityHost = null;
-  s.watchGuest = null;
+  revisionFloor = hw;
+  authorityHost = null;
+  watchGuest = null;
 }
 
 // -----------------------------------------------------------------------------
@@ -342,15 +287,17 @@ export function setCoopRewardOperationRevisionFloor(hw: number): void {
 // -----------------------------------------------------------------------------
 
 function host(): CoopOperationHost {
-  const s = state();
-  s.authorityHost ??= CoopOperationHost.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor });
-  return s.authorityHost;
+  if (authorityHost == null) {
+    authorityHost = CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
+  }
+  return authorityHost;
 }
 
 function guest(): CoopOperationGuest {
-  const s = state();
-  s.watchGuest ??= CoopOperationGuest.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor });
-  return s.watchGuest;
+  if (watchGuest == null) {
+    watchGuest = CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
+  }
+  return watchGuest;
 }
 
 /** The operation kind for a surface (the §2 successor of the reward / biomeShop relay kinds). */
@@ -458,9 +405,9 @@ function samePayload(left: CoopPendingOperation["payload"], right: CoopPendingOp
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function retainPreparedIntent(s: RewardOpState, prepared: PreparedRewardIntent): boolean {
+function retainPreparedIntent(prepared: PreparedRewardIntent): boolean {
   const key = preparedKey(prepared.localRole, prepared.intent.id);
-  const existing = s.preparedIntents.get(key);
+  const existing = preparedIntents.get(key);
   if (existing != null) {
     return (
       existing.surface === prepared.surface
@@ -469,27 +416,27 @@ function retainPreparedIntent(s: RewardOpState, prepared: PreparedRewardIntent):
       && samePayload(existing.intent.payload, prepared.intent.payload)
     );
   }
-  s.preparedIntents.set(key, prepared);
+  preparedIntents.set(key, prepared);
   return true;
 }
 
 /** Next per-interaction owner action ordinal for `pinned` (resets when the pinned interaction changes). */
-function nextOwnerOrdinal(s: RewardOpState, pinned: number): number {
-  if (s.ownerOrdinalStart !== pinned) {
-    s.ownerOrdinal = 0;
-    s.ownerOrdinalStart = pinned;
+function nextOwnerOrdinal(pinned: number): number {
+  if (ownerOrdinalStart !== pinned) {
+    ownerOrdinal = 0;
+    ownerOrdinalStart = pinned;
   }
-  return s.ownerOrdinal++;
+  return ownerOrdinal++;
 }
 
 /** Peek the watcher's current per-interaction action ordinal for `pinned` (resets when the pin changes). */
-function watcherState(s: RewardOpState, role: CoopRole, pinned: number): RewardWatcherState {
-  const ws = s.watcherStateByRole[role];
-  if (ws.ordinalStart !== pinned) {
-    ws.ordinal = 0;
-    ws.ordinalStart = pinned;
+function watcherState(role: CoopRole, pinned: number): RewardWatcherState {
+  const state = watcherStateByRole[role];
+  if (state.ordinalStart !== pinned) {
+    state.ordinal = 0;
+    state.ordinalStart = pinned;
   }
-  return ws;
+  return state;
 }
 
 // -----------------------------------------------------------------------------
@@ -529,21 +476,20 @@ export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): Co
     return null;
   }
   try {
-    const s = state();
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
     const terminalKey = `${params.surface}:${params.pinned}`;
-    const retainedTerminal = params.terminal ? s.ownerTerminalOperations.get(terminalKey) : undefined;
-    const ordinal = retainedTerminal?.ordinal ?? nextOwnerOrdinal(s, params.pinned);
+    const retainedTerminal = params.terminal ? ownerTerminalOperations.get(terminalKey) : undefined;
+    const ordinal = retainedTerminal?.ordinal ?? nextOwnerOrdinal(params.pinned);
     const opId =
       retainedTerminal?.operationId
       ?? makeCoopOperationId(
-        s.epoch,
+        epoch,
         ownerSeat,
         params.pinned * COOP_REWARD_ACTION_STRIDE + ordinal,
         kindFor(params.surface),
       );
     if (params.terminal && retainedTerminal == null) {
-      s.ownerTerminalOperations.set(terminalKey, { ordinal, operationId: opId });
+      ownerTerminalOperations.set(terminalKey, { ordinal, operationId: opId });
     }
     const payload = buildPayload(params.surface, params.label, params.choice, params.data, params.terminal);
     const intent: CoopPendingOperation = {
@@ -564,7 +510,7 @@ export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): Co
       executing: false,
       watcherAdvanced: false,
     };
-    if (!retainPreparedIntent(s, prepared)) {
+    if (!retainPreparedIntent(prepared)) {
       return null;
     }
 
@@ -610,9 +556,6 @@ export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): Co
     // owner knows its own picks; only an adopted RELAY needs the stale-ordering guard.
     return { operationId: opId, revision: 0 };
   } catch (e) {
-    if (isCoopOpRuntimeError(e)) {
-      throw e; // a missing/wrong runtime here is a real defect - surface it, never mask as legacy fallback (#922)
-    }
     coopWarn("reward", `${params.surface} op OWNER commit threw (handled - legacy relay is the fallback) (Wave-2d)`, e);
     return null;
   }
@@ -630,15 +573,14 @@ export function commitRewardAuthoritativeResult(
   if (!isCoopRewardOperationEnabled() || !isCoopOperationJournalActive()) {
     return null;
   }
-  const s = state();
   const key = preparedKey("host", operationId);
-  const prepared = s.preparedIntents.get(key);
+  const prepared = preparedIntents.get(key);
   if (prepared == null) {
     coopWarn("reward", `authoritative reward result has no prepared host intent id=${operationId}`);
     return null;
   }
 
-  const retained = s.committedResultEnvelopes.get(operationId);
+  const retained = committedResultEnvelopes.get(operationId);
   if (retained != null) {
     if (!tryJournalCoopCommittedEnvelope(retained)) {
       return null;
@@ -647,8 +589,8 @@ export function commitRewardAuthoritativeResult(
     return { operationId, revision: retained.revision };
   }
 
-  const resultState = authoritativeState ?? authorityStateHooks.capture(prepared.turn);
-  if (!isCompleteRewardAuthorityState(resultState, prepared.wave, prepared.turn)) {
+  const state = authoritativeState ?? authorityStateHooks.capture(prepared.turn);
+  if (!isCompleteRewardAuthorityState(state, prepared.wave, prepared.turn)) {
     coopWarn(
       "reward",
       `authoritative reward result refused incomplete state id=${operationId} wave=${prepared.wave} turn=${prepared.turn}`,
@@ -657,7 +599,7 @@ export function commitRewardAuthoritativeResult(
   }
   const res = host().submit(
     prepared.intent,
-    authoritativeResultContext(prepared.surface, prepared.wave, prepared.turn, resultState),
+    authoritativeResultContext(prepared.surface, prepared.wave, prepared.turn, state),
     ownerParityValidator(prepared.pinned),
   );
   if (res.kind !== "committed" && res.kind !== "reack") {
@@ -672,14 +614,14 @@ export function commitRewardAuthoritativeResult(
   ) {
     return null;
   }
-  s.committedResultEnvelopes.set(operationId, res.envelope);
+  committedResultEnvelopes.set(operationId, res.envelope);
   if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
     return null;
   }
   advancePreparedWatcher(prepared);
   coopLog(
     "reward",
-    `${prepared.surface} authoritative RESULT retained rev=${res.envelope.revision} tick=${resultState.tick} id=${operationId}`,
+    `${prepared.surface} authoritative RESULT retained rev=${res.envelope.revision} tick=${state.tick} id=${operationId}`,
   );
   return { operationId, revision: res.envelope.revision };
 }
@@ -735,26 +677,25 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
     return { adopt: true };
   }
   try {
-    const s = state();
-    const ws = watcherState(s, params.localRole, params.pinned);
+    const state = watcherState(params.localRole, params.pinned);
     // Stale / late rejection (invariant 6, the #861 shape). The pinned interaction counter is monotonic, so:
     //  - a pick STRICTLY BELOW the highest interaction we have adopted at is a leftover from an interaction a
     //    later one already superseded (the cross-interaction stale buffer);
     //  - a pick AT OR BELOW the highest interaction we have LEFT is a late choice for an interaction we
     //    already terminated (the late-after-leave shape).
     // Within a live interaction (pin > both) every action passes, so a legitimate stream of buys is adopted.
-    if (params.pinned < ws.lastAdoptedStart || params.pinned <= ws.lastLeftStart) {
+    if (params.pinned < state.lastAdoptedStart || params.pinned <= state.lastLeftStart) {
       coopWarn(
         "reward",
-        `${params.surface} op WATCHER REJECT stale/late pin=${params.pinned} adoptedStart=${ws.lastAdoptedStart} leftStart=${ws.lastLeftStart} role=${params.localRole} (Wave-2d)`,
+        `${params.surface} op WATCHER REJECT stale/late pin=${params.pinned} adoptedStart=${state.lastAdoptedStart} leftStart=${state.lastLeftStart} role=${params.localRole} (Wave-2d)`,
       );
       return { adopt: false, reason: "stale-or-late" };
     }
 
     const ownerSeat = coopInteractionOwnerSeat(params.pinned);
-    const ordinal = ws.ordinal;
+    const ordinal = state.ordinal;
     const opId = makeCoopOperationId(
-      s.epoch,
+      epoch,
       ownerSeat,
       params.pinned * COOP_REWARD_ACTION_STRIDE + ordinal,
       kindFor(params.surface),
@@ -782,8 +723,8 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
           return { adopt: false, reason: "host-wrong-owner" };
         }
         const key = preparedKey("host", opId);
-        const existing = s.preparedIntents.get(key);
-        if (existing?.executing || s.committedResultEnvelopes.has(opId)) {
+        const existing = preparedIntents.get(key);
+        if (existing?.executing || committedResultEnvelopes.has(opId)) {
           return { adopt: false, reason: "host-intent-in-flight-or-complete" };
         }
         const prepared: PreparedRewardIntent = {
@@ -794,14 +735,14 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
           wave: params.wave,
           turn: params.turn ?? 0,
           localRole: "host",
-          watcherState: ws,
+          watcherState: state,
           executing: true,
           watcherAdvanced: false,
         };
-        if (!retainPreparedIntent(s, prepared)) {
+        if (!retainPreparedIntent(prepared)) {
           return { adopt: false, reason: "host-intent-payload-conflict" };
         }
-        const retainedPrepared = s.preparedIntents.get(key);
+        const retainedPrepared = preparedIntents.get(key);
         if (retainedPrepared != null) {
           retainedPrepared.executing = true;
         }
@@ -833,10 +774,10 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
         }
         // The authoritative host applies its validated guest-owned action at this safe phase seam.
         // The remote guest remains envelope-gated and merely ACKs/dedupes its already-proposed action.
-        ws.ordinal += 1;
-        ws.lastAdoptedStart = Math.max(ws.lastAdoptedStart, params.pinned);
+        state.ordinal += 1;
+        state.lastAdoptedStart = Math.max(state.lastAdoptedStart, params.pinned);
         if (params.terminal) {
-          ws.lastLeftStart = Math.max(ws.lastLeftStart, params.pinned);
+          state.lastLeftStart = Math.max(state.lastLeftStart, params.pinned);
         }
         return { adopt: true, operationId: opId };
       }
@@ -846,18 +787,18 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
     // Once the durability journal wins one action in this pinned FIFO, it leads the remainder of the
     // interaction. Ignore raw legacy echoes (or raw later actions that raced ahead) and await their tagged
     // committed envelope. This prevents a reordered echo from being mistaken for the next ordinal.
-    if (s.journalLeadingStarts.has(params.pinned) && params.action.operationId !== opId) {
+    if (journalLeadingStarts.has(params.pinned) && params.action.operationId !== opId) {
       return { adopt: false, reason: "await-journal" };
     }
 
     // The journal consumes the ONE shared ledger before the safe phase loop resumes. A tagged durable action
     // with the matching one-shot marker is therefore legitimate materialization, not a duplicate.
     if (guest().hasApplied(opId)) {
-      if (params.action.operationId === opId && s.pendingJournalMaterializations.delete(opId)) {
-        ws.ordinal += 1;
-        ws.lastAdoptedStart = Math.max(ws.lastAdoptedStart, params.pinned);
+      if (params.action.operationId === opId && pendingJournalMaterializations.delete(opId)) {
+        state.ordinal += 1;
+        state.lastAdoptedStart = Math.max(state.lastAdoptedStart, params.pinned);
         if (params.terminal) {
-          ws.lastLeftStart = Math.max(ws.lastLeftStart, params.pinned);
+          state.lastLeftStart = Math.max(state.lastLeftStart, params.pinned);
         }
         coopLog(
           "reward",
@@ -878,7 +819,7 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
     const g = guest();
     const applyRes = g.applyEnvelope({
       version: 1,
-      sessionEpoch: s.epoch,
+      sessionEpoch: epoch,
       revision: g.getLastAppliedRevision() + 1,
       wave: params.wave,
       turn: params.turn ?? 0,
@@ -892,10 +833,10 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
     }
 
     // Advance the watcher order + ordinal ONLY on a successful adoption (§8.2: never on the owner's commit).
-    ws.ordinal += 1;
-    ws.lastAdoptedStart = Math.max(ws.lastAdoptedStart, params.pinned);
+    state.ordinal += 1;
+    state.lastAdoptedStart = Math.max(state.lastAdoptedStart, params.pinned);
     if (params.terminal) {
-      ws.lastLeftStart = Math.max(ws.lastLeftStart, params.pinned);
+      state.lastLeftStart = Math.max(state.lastLeftStart, params.pinned);
     }
     coopLog(
       "reward",
@@ -903,12 +844,6 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
     );
     return { adopt: true, operationId: opId };
   } catch (e) {
-    if (isCoopOpRuntimeError(e)) {
-      // A missing/wrong runtime here means this watcher continuation ran outside its owning runtime's scope
-      // (it must be wrapped in withActiveCoopRuntimeScope). Do NOT degrade to {adopt:true}: that silently
-      // hangs the watcher (no operationId/authoritativeProjection) - the #922 reward-mirror regression. Surface it.
-      throw e;
-    }
     coopWarn("reward", `${params.surface} op WATCHER gate threw (handled - legacy apply is the fallback) (Wave-2d)`, e);
     return { adopt: true };
   }
@@ -934,7 +869,6 @@ function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Co
   if (op == null || op.status !== "applied") {
     return "rejected";
   }
-  const s = state();
   const g = guest();
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
@@ -947,12 +881,12 @@ function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): Co
     coopWarn("reward", `shop result rejected empty/incomplete authoritative state id=${op.id}`);
     return "rejected";
   }
-  if (!s.stateAppliedOperations.has(op.id)) {
+  if (!stateAppliedOperations.has(op.id)) {
     const stateApplied = authorityStateHooks.apply(envelope.authoritativeState);
     if (!stateApplied) {
       return "rejected";
     }
-    s.stateAppliedOperations.add(op.id);
+    stateAppliedOperations.add(op.id);
   } else if (!authorityStateHooks.reapply(envelope.authoritativeState)) {
     // A retry after the state seam succeeded but before the live UI sink accepted must reassert exactly the
     // same immutable result. It never executes the reward/shop action locally a second time.

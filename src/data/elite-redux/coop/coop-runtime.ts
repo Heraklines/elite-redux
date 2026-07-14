@@ -179,7 +179,6 @@ import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-enve
 import { applyCoopOperationEpoch } from "#data/elite-redux/coop/coop-operation-epoch";
 import {
   coopOperationDurabilityHooks,
-  getActiveCoopOperationDurability,
   isCoopOperationJournalActive,
   registerCoopOperationLiveSink,
   resetCoopOperationJournalLog,
@@ -2682,27 +2681,6 @@ export function setCoopRuntime(runtime: CoopRuntime): void {
   setShowdownGuestFlipPredicate(isShowdownGuestFlip);
 }
 
-/**
- * Run `fn` with `runtime`'s per-surface op-state AND its durability manager installed as the active ones,
- * restoring BOTH afterwards. This is the ASYNC-CONTINUATION sibling of {@linkcode withActiveCoopRuntimeOpState}:
- * the reward/market surfaces read/write per-runtime op-state and journal through the active durability manager
- * from Phaser phase callbacks and `await` tails that resume AFTER the harness's `withClient` scope has already
- * restored the previous ambient context (or under the SENDER's context on an in-process loopback). A reward
- * continuation must therefore capture its OWNING runtime at schedule time (`getCoopRuntime()`) and re-establish
- * it around every synchronous reward-op call it makes on resume - otherwise `requireCoopOpSurfaceState("reward")`
- * reads the wrong engine's record (or fail-loud throws) and `tryJournalCoopCommittedEnvelope` lands in the wrong
- * journal. In production (one runtime per process) `runtime === active` already, so this is an identity no-op.
- */
-export function withActiveCoopRuntimeScope<T>(runtime: CoopRuntime, fn: () => T): T {
-  const prevDurability = getActiveCoopOperationDurability();
-  setCoopOperationDurability(runtime.durability ?? null);
-  try {
-    return withActiveCoopRuntimeOpState(runtime.opState, fn);
-  } finally {
-    setCoopOperationDurability(prevDurability);
-  }
-}
-
 /** The live co-op session, or null when not in a co-op run. */
 export function getCoopRuntime(): CoopRuntime | null {
   return active;
@@ -4420,14 +4398,15 @@ export function assembleCoopRuntime(
   // pulls a snapshot without re-assembling), so this never wipes a live pending op.
   resetCoopBiomeOperationState();
   resetCoopAbilityOperationState();
-  // bargain + stormglass + reward are per-runtime (layer-B): their fresh records come from
-  // createCoopRuntimeOpState below, so the old reset-at-assembly call sites are removed (a fresh runtime's
-  // records ARE the reset; calling reset here would touch the PREVIOUS runtime's record, not this one's).
+  // bargain + stormglass are per-runtime (layer-B): their fresh records come from createCoopRuntimeOpState
+  // below, so the old reset-at-assembly call sites are removed (a fresh runtime's records ARE the reset).
   resetCoopCatchFullOperationState();
   resetCoopColosseumOperationState();
   resetCoopFaintSwitchOperationState();
   resetCoopLearnMoveOperationState();
   resetCoopRevivalOperationState();
+  // Wave-2d: same fresh-control-plane reset for the reward-shop + biome-market operation state (SURFACE 3).
+  resetCoopRewardOperationState();
   // Wave-2c: the mystery-encounter operation surface shares the same fresh-control-plane discipline (§8
   // step 5) - drop any leftover ME op state so a new run's re-init-from-0 interaction counter can never
   // collide with a prior run's already-applied ME operationIds.
