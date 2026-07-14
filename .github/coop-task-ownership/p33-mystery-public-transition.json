@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "taskId": "p33-mystery-public-transition-integration",
+  "branch": "ci/coop/p33-mystery-public-transition",
+  "trainRef": "ci/coop/p33-mystery-public-transition",
+  "baseSha": "e5012bf70e609f0ecea2567fdc3603b147067256",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-ci-train-ownership.json",
+    ".github/coop-task-ownership/p33-mystery-public-transition.json",
+    ".github/workflows/coop-focused-branch.yml",
+    "docs/coop-task-ownership.md",
+    "scripts/guard-coop-task-ownership.mjs",
+    "test/scripts/guard-coop-task-ownership.test.mjs"
+  ]
+}

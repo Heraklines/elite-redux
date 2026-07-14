@@ -5,6 +5,7 @@ on:
     branches:
       - "ci/coop/**"
     paths:
+      - ".github/coop-task-ownership/**"
       - ".github/workflows/coop-focused-branch.yml"
       - ".github/workflows/coop-gate-sharded.yml"
       - ".github/actions/setup-deps/**"
@@ -12,10 +13,12 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "scripts/coop-gate-timings.json"
+      - "scripts/guard-coop-task-ownership.mjs"
       - "scripts/run-coop-gate.mjs"
       - "scripts/write-coop-ci-status.mjs"
       - "src/**"
       - "test/**"
+      - "docs/coop-task-ownership.md"
       - "tsconfig*.json"
       - "vite.config.ts"
       - "vitest.config.ts"
@@ -43,11 +46,64 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Fetch explicit integration base
+      - name: Resolve this branch's train and ownership contract
+        id: ownership
+        env:
+          COOP_TASK_BRANCH: ${{ github.ref_name }}
+        shell: bash
+        run: >-
+          node scripts/guard-coop-task-ownership.mjs resolve
+          --branch "$COOP_TASK_BRANCH"
+          --output coop-task-ownership-resolution.json
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Fetch the exact declared train base
+        id: train
+        env:
+          COOP_DECLARED_BASE: ${{ steps.ownership.outputs.base_sha }}
+          COOP_PUSH_BASE: ${{ github.event.before }}
+          COOP_TASK_BRANCH: ${{ github.ref_name }}
+          COOP_TRAIN_REF: ${{ steps.ownership.outputs.train_ref }}
         shell: bash
         run: |
-          git fetch --no-tags --depth=1 origin feat/elite-redux-port
-          echo "COOP_INTEGRATION_BASE=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
+          set -euo pipefail
+          if [ "$COOP_TASK_BRANCH" = "$COOP_TRAIN_REF" ]; then
+            if [[ -z "$COOP_PUSH_BASE" || "$COOP_PUSH_BASE" =~ ^0+$ ]]; then
+              echo "integration-train pushes require a real github.event.before SHA" >&2
+              exit 1
+            fi
+            expected_base="$COOP_PUSH_BASE"
+            git fetch --no-tags --depth=1 origin "$expected_base"
+            train_tip="$(git rev-parse HEAD)"
+          else
+            # No depth cap: the task checkout already contains its fork commit, so Git negotiates only the
+            # train commits needed to prove that the declared base remains in the train's unrebased lineage.
+            git fetch --no-tags origin "+refs/heads/$COOP_TRAIN_REF:refs/remotes/origin/coop-declared-train"
+            train_tip="$(git rev-parse refs/remotes/origin/coop-declared-train)"
+            expected_base="$COOP_DECLARED_BASE"
+          fi
+          git fetch --no-tags --depth=1 origin "$COOP_DECLARED_BASE"
+          git cat-file -e "${COOP_DECLARED_BASE}^{commit}"
+          echo "resolved train $COOP_TRAIN_REF tip=$train_tip task-base=$expected_base (declared $COOP_DECLARED_BASE)"
+          echo "expected_base=$expected_base" >> "$GITHUB_OUTPUT"
+          echo "train_tip=$train_tip" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce train base, owned files, and frozen P33 schema
+        env:
+          COOP_EXPECTED_BASE: ${{ steps.train.outputs.expected_base }}
+          COOP_MANIFEST_PATH: ${{ steps.ownership.outputs.manifest_path }}
+          COOP_TASK_BRANCH: ${{ github.ref_name }}
+          COOP_TRAIN_TIP: ${{ steps.train.outputs.train_tip }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test test/scripts/guard-coop-task-ownership.test.mjs
+          node scripts/guard-coop-task-ownership.mjs verify \
+            --branch "$COOP_TASK_BRANCH" \
+            --manifest "$COOP_MANIFEST_PATH" \
+            --expected-base "$COOP_EXPECTED_BASE" \
+            --train-tip "$COOP_TRAIN_TIP" \
+            --output coop-task-ownership-evidence.json
 
       - name: Select one to five affected shards deterministically
         id: plan
@@ -67,7 +123,7 @@ jobs:
             priority_base="HEAD^"
           fi
           node scripts/run-coop-gate.mjs --focused-matrix \
-            --base "$COOP_INTEGRATION_BASE" --priority-base "$priority_base" --max-shards 5 \
+            --base "${{ steps.ownership.outputs.base_sha }}" --priority-base "$priority_base" --max-shards 5 \
             2>&1 | tee coop-ci-focused-plan.log
           status=${PIPESTATUS[0]}
           echo "exit_code=$status" >> "$GITHUB_OUTPUT"
@@ -91,6 +147,8 @@ jobs:
           path: |
             coop-ci-focused-plan.json
             coop-ci-focused-plan-status.json
+            coop-task-ownership-evidence.json
+            coop-task-ownership-resolution.json
           retention-days: 7
           if-no-files-found: error
 
@@ -104,6 +162,8 @@ jobs:
             coop-ci-focused-plan.json
             coop-ci-focused-plan-status.json
             coop-ci-focused-plan.log
+            coop-task-ownership-evidence.json
+            coop-task-ownership-resolution.json
           retention-days: 7
           if-no-files-found: warn
 
