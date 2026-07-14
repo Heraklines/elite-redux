@@ -89,8 +89,16 @@ dependency setup, Vite transforms, browser startup, and artifact uploads can mak
   return status even when heavy success artifacts are omitted.
 - Branch-focused CI should trigger from `ci/coop/**` branches with concurrency scoped by the full branch ref,
   for example `coop-focused-${{ github.ref }}`, so agents cannot cancel each other's checks. Each agent
-  pushes only its exact isolated-worktree commit and dispatches the smallest 1-5 affected shards. A focused
-  green run never replaces the complete integration gate.
+  pushes only its exact isolated-worktree commit and dispatches the smallest 1-5 affected shards. The same
+  focused workflow must run its dedicated static job against the ownership planner's exact declared train
+  base, so every surface handoff includes branch-scoped TypeScript and Biome evidence without launching the
+  full checkpoint matrix. A focused green run never replaces the complete integration gate or its independent
+  static job; the full gate remains exclusive to the integration/staging checkpoint.
 - Do not depend on a `workflow_dispatch`-only workflow that exists only off the default branch; GitHub will
   not register it for dispatch. Until the focused workflow is present on the default branch, use a push
   trigger on `ci/coop/**` or dispatch an existing registered workflow against the exact branch SHA.
+- After a worker handoff is accepted, remove clean inactive worktrees and their reinstallable dependency
+  directories so parallel work does not accumulate avoidable disk and filesystem-watcher load. Prefer sparse
+  worktrees or worktrees without `node_modules` when the owned-file set and validation commands permit it.
+  Never delete a dirty worktree or delete a branch as part of automated cleanup; preserve it for explicit
+  integration-owner review.

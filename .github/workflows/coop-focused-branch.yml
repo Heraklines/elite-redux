@@ -10,11 +10,13 @@ on:
       - ".github/workflows/coop-gate-sharded.yml"
       - ".github/actions/setup-deps/**"
       - ".nvmrc"
+      - "biome.jsonc"
       - "package.json"
       - "pnpm-lock.yaml"
       - "scripts/coop-gate-timings.json"
       - "scripts/guard-coop-task-ownership.mjs"
       - "scripts/run-coop-gate.mjs"
+      - "scripts/run-coop-static-gate.mjs"
       - "scripts/write-coop-ci-status.mjs"
       - "src/**"
       - "test/**"
@@ -33,6 +35,7 @@ jobs:
     name: Select affected integration shards
     runs-on: ubuntu-latest
     outputs:
+      declared_base_sha: ${{ steps.ownership.outputs.base_sha }}
       matrix: ${{ steps.plan.outputs.matrix }}
     steps:
       - uses: actions/checkout@v6
@@ -174,6 +177,78 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  static:
+    if: github.repository == 'Heraklines/elite-redux'
+    needs: plan
+    name: Focused co-op static type and format gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Fetch the exact planner-declared train base
+        env:
+          COOP_BASE_SHA: ${{ needs.plan.outputs.declared_base_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$COOP_BASE_SHA"
+          [[ ! "$COOP_BASE_SHA" =~ ^0+$ ]]
+          git fetch --no-tags --depth=1 origin "$COOP_BASE_SHA"
+          git cat-file -e "${COOP_BASE_SHA}^{commit}"
+          printf '%s\n' "$COOP_BASE_SHA" > coop-focused-static-base.txt
+
+      - name: Check branch-scoped types, formatting, and lint
+        id: static
+        env:
+          COOP_BASE_SHA: ${{ needs.plan.outputs.declared_base_sha }}
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          node scripts/run-coop-static-gate.mjs 2>&1 | tee coop-focused-static.log
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Write focused static status evidence
+        if: always()
+        env:
+          STATIC_EXIT: ${{ steps.static.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs --output coop-focused-static-status.json
+          --kind focused-static --exit-code "$STATIC_EXIT" --log coop-focused-static.log
+
+      - name: Upload compact focused static evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-static-${{ github.sha }}-status
+          overwrite: true
+          path: |
+            coop-focused-static-status.json
+            coop-focused-static-base.txt
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload full focused static failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-static-${{ github.sha }}-failure
+          overwrite: true
+          path: |
+            coop-focused-static-status.json
+            coop-focused-static-base.txt
+            coop-focused-static.log
+          retention-days: 7
+          if-no-files-found: warn
+
   gate:
     if: github.repository == 'Heraklines/elite-redux'
     needs: plan
@@ -251,13 +326,15 @@ jobs:
   focused-required:
     name: Focused co-op required aggregate
     if: always()
-    needs: [plan, gate]
+    needs: [plan, static, gate]
     runs-on: ubuntu-latest
     steps:
-      - name: Require planner and every selected shard
+      - name: Require planner, branch static checks, and every selected shard
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
+          STATIC_RESULT: ${{ needs.static.result }}
           GATE_RESULT: ${{ needs.gate.result }}
         run: |
           test "$PLAN_RESULT" = success
+          test "$STATIC_RESULT" = success
           test "$GATE_RESULT" = success
