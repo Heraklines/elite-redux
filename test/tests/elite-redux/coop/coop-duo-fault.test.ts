@@ -52,6 +52,7 @@ import {
   driveHostRewardShopOwner,
   installDuoLogCapture,
   installHeadlessPlayerAtlasCompletionModel,
+  pumpDuoDestinations,
   reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
@@ -177,6 +178,7 @@ describe.skipIf(!RUN)(
         await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward: false }));
         await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
       }
+      await pumpDuoDestinations(rig);
       expect(
         rig.guestRuntime.controller.interactionCounter(),
         `wave ${w}: guest advanced the interaction counter in lockstep with host`,
