@@ -51,6 +51,7 @@ import {
   driveGuestReplayTurn,
   installDuoLogCapture,
   pumpDuoDestinations,
+  reachQueuedRewardShop,
   type ShopPhaseSeam,
   withClient,
   withClientSync,
@@ -149,23 +150,28 @@ describe.skipIf(!RUN)(
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn);
       });
-      // The battle bootstrap may use ordinary automatic delivery. The live-shop proof itself uses
-      // destination-scoped delivery so the retained terminal can only resume the watcher under guest ctx.
-      pair.setAutomaticDelivery(false);
-
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       expect(counterBefore % 2, "wave-1 shop is host-owned (even counter)").toBe(0);
+
+      // Reach each client's real queued Victory -> BattleEnd -> reward phase before opening either side.
+      // A detached phase can appear to relay correctly, but the retained terminal must reject it once the
+      // material-apply barrier discovers that the phase manager owns a different continuation surface.
+      await withClient(rig.hostCtx, async () => {
+        await game.phaseInterceptor.to("SelectModifierPhase", false);
+      });
+      const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+      expect(hostShop.phaseName, "host reached the live queued reward phase").toBe("SelectModifierPhase");
+      const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
+      expect(guestShop.phaseName, "guest reached the live queued reward phase").toBe("SelectModifierPhase");
+
+      // The battle bootstrap and retained wave transition may use ordinary automatic delivery. The
+      // live-shop proof itself uses destination-scoped delivery so the retained terminal can only resume
+      // the watcher under its own guest context.
+      pair.setAutomaticDelivery(false);
 
       // ===== OPEN the shop on both engines. The OWNER (host) starts + streams its options. The WATCHER
       // (guest) starts its watch loop and PARKS on a live awaitInteractionChoice for the reward seq (no pick
       // relayed yet) - that parked wait is exactly what a mid-shop resync must not cancel. =====
-      const hostShop = withClientSync(rig.hostCtx, () =>
-        rig.hostScene.phaseManager.create("SelectModifierPhase"),
-      ) as unknown as ShopPhaseSeam;
-      const guestShop = withClientSync(rig.guestCtx, () =>
-        rig.guestScene.phaseManager.create("SelectModifierPhase"),
-      ) as unknown as ShopPhaseSeam;
-
       await withClient(rig.hostCtx, async () => {
         hostShop.start(); // opens the owner screen + streams the reward options (pins counter 0)
         await drainLoopback();
