@@ -64,6 +64,7 @@
 //      reach the next wave; a no-progress stall THROWS (driveGuestReplayTurn) so a regression hangs loudly.
 // =============================================================================
 
+import { loggedInUser } from "#app/account";
 import { Battle } from "#app/battle";
 import { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
@@ -282,6 +283,12 @@ export interface ClientCtx {
   label: "host" | "guest";
   scene: BattleScene;
   runtime: CoopRuntime;
+  /**
+   * Optional per-browser account identity for authenticated persistence tests.
+   * Production clients own independent account modules; the two-engine harness
+   * must therefore swap this process-global value with the scene/runtime.
+   */
+  accountIdentity?: string;
   /** Phaser.Math.RND.state() string for THIS client's last pump (process-global RNG cursor). */
   rndState: string;
   /** The er-ghost per-run cache for this client (save/restore around the swap). */
@@ -489,8 +496,12 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
   const prev = captureLiveCtx();
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
+  const prevAccountIdentity = loggedInUser?.username;
   activeClientLabel = ctx.label;
   activeClientInboundPump = ctx.pumpInbound;
+  if (ctx.accountIdentity != null && loggedInUser != null) {
+    loggedInUser.username = ctx.accountIdentity;
+  }
   initGlobalScene(ctx.scene);
   setCoopRuntime(ctx.runtime);
   installCoopHooksForActive(ctx.runtime);
@@ -519,6 +530,9 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
       restoreModuleLets(prev.moduleLets);
     }
     writeMePins(prev.mePins);
+    if (prevAccountIdentity != null && loggedInUser != null) {
+      loggedInUser.username = prevAccountIdentity;
+    }
     activeClientLabel = prevLabel;
     activeClientInboundPump = prevInboundPump;
   }
@@ -528,8 +542,12 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
   const prev = captureLiveCtx();
   const prevLabel = activeClientLabel;
   const prevInboundPump = activeClientInboundPump;
+  const prevAccountIdentity = loggedInUser?.username;
   activeClientLabel = ctx.label;
   activeClientInboundPump = ctx.pumpInbound;
+  if (ctx.accountIdentity != null && loggedInUser != null) {
+    loggedInUser.username = ctx.accountIdentity;
+  }
   // 1. globalScene
   initGlobalScene(ctx.scene);
   // 2. coop active runtime (also installs the authoritative-guest predicate)
@@ -571,6 +589,9 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
       restoreModuleLets(prev.moduleLets);
     }
     writeMePins(prev.mePins);
+    if (prevAccountIdentity != null && loggedInUser != null) {
+      loggedInUser.username = prevAccountIdentity;
+    }
     activeClientLabel = prevLabel;
     activeClientInboundPump = prevInboundPump;
   }

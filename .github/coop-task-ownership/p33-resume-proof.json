@@ -7,6 +7,7 @@
   "allowedFiles": [
     ".github/coop-task-ownership/p33-mystery-public-transition.json",
     ".github/coop-task-ownership/p33-resume-proof.json",
-    "test/tests/elite-redux/coop/coop-duo-resume.test.ts"
+    "test/tests/elite-redux/coop/coop-duo-resume.test.ts",
+    "test/tools/coop-duo-harness.ts"
   ]
 }

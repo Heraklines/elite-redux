@@ -50,7 +50,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { setCoopPersistenceClockForTesting } from "#system/game-data";
 import { GameManager } from "#test/framework/game-manager";
-import { buildDuo, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
+import { buildDuo as buildDuoHarness, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
 import { decrypt, encrypt } from "#utils/data";
 import { AES } from "crypto-js";
 import Phaser from "phaser";
@@ -113,6 +113,18 @@ function installImmediateCoopPersistenceTimeouts(): void {
       }
     },
   });
+}
+
+/**
+ * Give each engine the account identity its controller advertises. Real browsers
+ * have independent account modules; the in-process duo harness must swap that
+ * module-global identity alongside the scene and runtime for authenticated saves.
+ */
+async function buildDuo(...args: Parameters<typeof buildDuoHarness>) {
+  const rig = await buildDuoHarness(...args);
+  rig.hostCtx.accountIdentity = rig.hostRuntime.controller.localName();
+  rig.guestCtx.accountIdentity = rig.guestRuntime.controller.localName();
+  return rig;
 }
 
 describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
@@ -510,7 +522,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     );
     const cloudAheadCommitment = await deriveCoopResumeCommitment(cloudAheadJson, cloudAheadSession);
     expect(cloudAheadCommitment).not.toBeNull();
-    const replicaKey = getSessionDataLocalStorageKey(marker!.slot);
+    const replicaKey = await withClient(rig.guestCtx, () => getSessionDataLocalStorageKey(marker!.slot));
     const localBeforeFailedCloud = localStorage.getItem(replicaKey);
     const markerBeforeFailedCloud = readCoopResumeMarker(guest.localName(), host.localName());
     cloudUpdate.mockImplementationOnce(async () => ({
@@ -589,7 +601,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const hostSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(hostJson));
     const commitment = await deriveCoopResumeCommitment(hostJson, hostSession);
     expect(commitment).not.toBeNull();
-    const keys = [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey);
+    const keys = await withClient(rig.guestCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
     const prior = keys.map(key => localStorage.getItem(key));
 
     try {
@@ -628,7 +640,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const hostSession = await withClient(rig.hostCtx, () => rig.hostScene.gameData.parseSessionData(hostJson));
     const commitment = await deriveCoopResumeCommitment(hostJson, hostSession);
     expect(commitment).not.toBeNull();
-    const keys = [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey);
+    const keys = await withClient(rig.guestCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
     const prior = keys.map(key => localStorage.getItem(key));
     const unrelatedCloudJson = JSON.stringify({
       ...JSON.parse(hostJson),
@@ -1730,7 +1742,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   }) => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-    const keys = [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey);
+    const keys = await withClient(rig.hostCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
     const prior = keys.map(key => localStorage.getItem(key));
     const cloudBySlot = new Map<number, string>();
     let hostSlot = -1;
@@ -1929,7 +1941,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   it("commits a complete fresh session with empty-slot CAS and releases those exact bytes", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-    const keys = [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey);
+    const keys = await withClient(rig.hostCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
     const prior = keys.map(key => localStorage.getItem(key));
     let committedRaw: string | null = null;
 
@@ -1999,7 +2011,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   it("does not overwrite a row that wins after empty scan and symmetrically aborts launch", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-    const keys = [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey);
+    const keys = await withClient(rig.hostCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
     const prior = keys.map(key => localStorage.getItem(key));
     const concurrentRow = JSON.stringify({ gameMode: GameModes.CLASSIC, waveIndex: 88, owner: "other-tab" });
     let scanComplete = false;
@@ -2219,7 +2231,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   it("fails closed and retains launch abort when Web Locks are unavailable", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-    const keys = [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey);
+    const keys = await withClient(rig.hostCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
     const prior = keys.map(key => localStorage.getItem(key));
 
     try {
@@ -2258,7 +2270,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   it("turns an unexpected first-save throw into a retained launch abort", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-    const keys = [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey);
+    const keys = await withClient(rig.hostCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
     const prior = keys.map(key => localStorage.getItem(key));
 
     try {
@@ -2292,7 +2304,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   it("does not recapture live state when exact local bytes change after ACK but before consumption", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-    const keys = [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey);
+    const keys = await withClient(rig.hostCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
     const prior = keys.map(key => localStorage.getItem(key));
 
     try {
@@ -2334,7 +2346,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   it("rejects a local slot write that lands after scan but before starter materialization", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-    const keys = [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey);
+    const keys = await withClient(rig.hostCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
     const prior = keys.map(key => localStorage.getItem(key));
 
     try {
@@ -2365,7 +2377,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   it("never overwrites a local row landing after materialization confirmation but before first save", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-    const keys = [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey);
+    const keys = await withClient(rig.hostCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
     const prior = keys.map(key => localStorage.getItem(key));
 
     try {
@@ -2417,7 +2429,7 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
   ] as const)("cannot cache a same-wave launch release from a stale guest persistence ACK after %s changes", async invalidation => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
-    const keys = [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey);
+    const keys = await withClient(rig.hostCtx, () => [0, 1, 2, 3, 4].map(getSessionDataLocalStorageKey));
     const prior = keys.map(key => localStorage.getItem(key));
     let releaseGuest!: () => void;
     let markGuestStarted!: () => void;
