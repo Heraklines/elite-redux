@@ -2487,7 +2487,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             await drainLoopback();
           });
 
-          for (let round = 0; round < 24 && !hostReachedNestedDestination; round++) {
+          // Once the final sub-pick lands, the real Field Trip chain still crosses narration, rewards, and
+          // party EXP before opening SelectModifierPhase. Twenty-four zero-delay pump rounds were only about
+          // 200 ms and became runner-load dependent; use the same bounded ten-second production-transition
+          // window as the T2 journey while continuing to fail loudly on a genuine no-progress state.
+          const nestedDriveDeadline = Date.now() + 10_000;
+          while (!hostReachedNestedDestination && Date.now() < nestedDriveDeadline) {
             await pumpDuoDestinations(rig, 1);
             if (scriptedDriveError != null) {
               throw scriptedDriveError;
