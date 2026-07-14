@@ -11,14 +11,21 @@ import type { Pokemon } from "../src/field/pokemon";
 
 await import("../src/main");
 
-const [{ globalScene }, { captureCoopSaveDataDigest }, { canonicalize, fnv1a64 }, { getCoopRuntime }, { UiMode }] =
-  await Promise.all([
-    import("../src/global-scene"),
-    import("../src/data/elite-redux/coop/coop-battle-engine"),
-    import("../src/data/elite-redux/coop/coop-battle-checksum"),
-    import("../src/data/elite-redux/coop/coop-runtime"),
-    import("../src/enums/ui-mode"),
-  ]);
+const [
+  { globalScene },
+  { captureCoopSaveDataDigest },
+  { canonicalize, fnv1a64 },
+  { getCoopRuntime },
+  { StatusEffect },
+  { UiMode },
+] = await Promise.all([
+  import("../src/global-scene"),
+  import("../src/data/elite-redux/coop/coop-battle-engine"),
+  import("../src/data/elite-redux/coop/coop-battle-checksum"),
+  import("../src/data/elite-redux/coop/coop-runtime"),
+  import("../src/enums/status-effect"),
+  import("../src/enums/ui-mode"),
+]);
 
 type BrowserContinuationSurface = "command" | "replacement" | "reward" | "starter";
 
@@ -79,13 +86,19 @@ function observedPokemon(pokemon: Pokemon, slot: number) {
     exp: pokemon.exp,
     hp: pokemon.hp,
     maxHp: pokemon.stats[0] ?? 0,
+    // Hash the mechanically meaningful status projection, not constructor ephemera. `doSetStatus` stores
+    // sleepTurnsRemaining=0 on every non-sleep status while an authoritative deserialize uses undefined;
+    // both are the same game state. Likewise, toxicTurnCount matters only for TOXIC. Preserving the relevant
+    // counter for its owning status still catches real sleep/toxic drift without manufacturing a faint-status
+    // divergence immediately after an otherwise checksum-identical retained turn commit.
     status:
       pokemon.status == null
         ? null
         : {
             effect: pokemon.status.effect,
-            toxicTurnCount: pokemon.status.toxicTurnCount,
-            sleepTurnsRemaining: pokemon.status.sleepTurnsRemaining ?? null,
+            toxicTurnCount: pokemon.status.effect === StatusEffect.TOXIC ? pokemon.status.toxicTurnCount : 0,
+            sleepTurnsRemaining:
+              pokemon.status.effect === StatusEffect.SLEEP ? (pokemon.status.sleepTurnsRemaining ?? null) : null,
           },
     fainted: pokemon.isFainted(),
     statStages: [...pokemon.summonData.statStages],
@@ -136,10 +149,20 @@ function partyInnates(party: unknown): number[][] {
     : [];
 }
 
+function partyStageVectors(party: unknown): number[][] {
+  return Array.isArray(party)
+    ? party.map(mon => {
+        const value = (mon as Record<string, unknown> | null)?.statStages;
+        return Array.isArray(value) ? (value as number[]) : [];
+      })
+    : [];
+}
+
 function computeMechanicalDigest(): {
   digest: string;
   parts: Record<string, string>;
   innates: { player: number[][]; enemy: number[][] };
+  stages: { player: number[][]; enemy: number[][] };
 } {
   const components = mechanicalDigestComponents();
   const digest = fnv1a64(canonicalize(components));
@@ -158,7 +181,13 @@ function computeMechanicalDigest(): {
   }
   // Raw per-mon innate ids so the driver can assert enemy innates are LIVE (and both browsers agree).
   const innates = { player: partyInnates(components.playerParty), enemy: partyInnates(components.enemyParty) };
-  return { digest, parts, innates };
+  // Raw stage vectors turn a digest mismatch into exact causal evidence (which mon/stat changed) without
+  // exposing a mutation hook. This caught the pre-command Let’s Roll +DEF host-only entry effect.
+  const stages = {
+    player: partyStageVectors(components.playerParty),
+    enemy: partyStageVectors(components.enemyParty),
+  };
+  return { digest, parts, innates, stages };
 }
 
 function classifyContinuationSurface(phase: string, uiMode: string): BrowserContinuationSurface | null {
@@ -252,7 +281,7 @@ function observeContinuationSurface(): void {
     }
     lastProbedAddress = addressKey;
     lastProbeAt = now;
-    const { digest: stateDigest, parts: digestParts, innates } = computeMechanicalDigest();
+    const { digest: stateDigest, parts: digestParts, innates, stages } = computeMechanicalDigest();
     const observationKey = `${addressKey}:${stateDigest}`;
     if (observationKey === lastObservedSurface) {
       return;
@@ -262,7 +291,7 @@ function observeContinuationSurface(): void {
     // self-identifies the exact field) plus the raw per-mon innate ids (so the driver can assert the
     // ace-difficulty enemy's innates are LIVE and both browsers agree - the innate-activation invariant).
     console.info(
-      `${DIGEST_PARTS_PREFIX}${JSON.stringify({ address: `${runtime.controller.sessionEpoch}:${battle.waveIndex}:${battle.turn}`, surface, digest: stateDigest, parts: digestParts, innates })}`,
+      `${DIGEST_PARTS_PREFIX}${JSON.stringify({ address: `${runtime.controller.sessionEpoch}:${battle.waveIndex}:${battle.turn}`, surface, digest: stateDigest, parts: digestParts, innates, stages })}`,
     );
     const observation: CoopBrowserSurfaceObservationV1 = {
       version: 1,

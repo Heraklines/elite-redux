@@ -108,6 +108,15 @@ if (
   failures.push("coop-browser-entry.ts: missing the read-only visible render-profile attestation");
 }
 if (
+  !browserEntry.includes("pokemon.status.effect === StatusEffect.TOXIC")
+  || !browserEntry.includes("pokemon.status.effect === StatusEffect.SLEEP")
+) {
+  failures.push("coop-browser-entry.ts: status digest must ignore non-mechanical sleep/toxic constructor ephemera");
+}
+if (!browserEntry.includes("partyStageVectors") || !browserEntry.includes("innates, stages")) {
+  failures.push("coop-browser-entry.ts: digest evidence must expose exact stage vectors beside innate ids");
+}
+if (
   !browserEntry.includes("semanticBattleAddress(battle)")
   || !browserEntry.includes("address: { epoch, wave, turn }")
   || !browserEntry.includes("optionHandler.config?.options")

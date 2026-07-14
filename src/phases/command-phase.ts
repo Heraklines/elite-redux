@@ -649,6 +649,12 @@ export class CommandPhase extends FieldPhase {
     }
     void pendingBarrier.then(crossed => {
       if (crossed) {
+        // The guest can reach turn-1 CommandPhase first and consume the PRE-summon enemyPartySync while
+        // the host is still draining PostSummon. The host publishes its refreshed full authority before it
+        // arrives at this same rendezvous; RTCDataChannel ordering therefore puts that refresh ahead of the
+        // arrival that releases us. Re-consume at the crossed boundary so entry stat stages/weather/forms
+        // land before public input opens, instead of leaving the refreshed carrier buffered until too late.
+        this.tryCoopCheckpointSync();
         this.openOwnCommandUi();
       }
     });
