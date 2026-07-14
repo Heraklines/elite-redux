@@ -196,15 +196,20 @@ describe.skipIf(!RUN)("Showdown versus - two-engine end-to-end proof (C6v2d)", (
     // open here.)
     const decision = detectShowdownVictory(hostSwept, guestSwept);
     expect(decision?.winner, "the pure outcome rule names the host the winner").toBe("host");
-    await withClient(rig.hostCtx, () => {
+    const hostResultSurfaceBefore = await withClient(rig.hostCtx, () => {
+      const before = {
+        current: rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
+        queued: rig.hostScene.phaseManager.getQueuedPhaseNames(),
+      };
       rig.hostRuntime.localTransport.send({
         t: "showdownResult",
         matchId: null,
         winner: decision!.winner,
         reason: decision!.reason,
       });
+      return before;
     });
-    // Route it on the GUEST (globalScene = guest so wireShowdownResult unshifts the guest's terminal phase).
+    // Activating the GUEST flushes its retained, destination-owned terminal onto the guest phase manager.
     const guestResultSurface = await withClient(rig.guestCtx, async () => {
       await new Promise<void>(r => setTimeout(r, 0));
       return {
@@ -226,9 +231,9 @@ describe.skipIf(!RUN)("Showdown versus - two-engine end-to-end proof (C6v2d)", (
       queued: rig.hostScene.phaseManager.getQueuedPhaseNames(),
     }));
     expect(
-      hostResultSurface.current === "ShowdownResultPhase" || hostResultSurface.queued.includes("ShowdownResultPhase"),
-      "the guest's received result never mutated the sender host's phase manager",
-    ).toBe(false);
+      hostResultSurface,
+      "routing the guest's received result left the sender host's pre-existing terminal surface unchanged",
+    ).toEqual(hostResultSurfaceBefore);
 
     logs.flush();
   }, 300_000);
