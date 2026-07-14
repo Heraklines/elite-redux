@@ -159,7 +159,24 @@ describe.skipIf(!RUN)(
       // ===== Host OWNS + drives the shop: rolls + STREAMS its options, then LEAVEs (no reward taken). The
       // LEAVE is relayed on the reward seq AFTER the phantom (FIFO). The owner remains parked until the
       // watcher materializes that terminal and returns the retained acknowledgement. =====
-      await withClient(rig.hostCtx, () => driveRewardShopOwnerLeaveViaUi(hostShop));
+      // Start the host transition synchronously, then give the scheduled transport to the GUEST before
+      // driving any host key. The guest watcher was armed before the owner could stream its options, so its
+      // detached async continuation must adopt/open under the guest's complete client context. Keeping a
+      // single-process host context installed while that continuation resumes would overwrite the host's
+      // mirror role with `watcher` - an impossible two-browser state and a false CANCEL rejection.
+      withClientSync(rig.hostCtx, () => hostShop.start());
+      await withClient(rig.guestCtx, async () => {
+        for (let attempt = 0; attempt < 100; attempt++) {
+          await drainLoopback();
+          if (rig.guestScene.ui.getMode() === UiMode.MODIFIER_SELECT && getCoopUiMirror()?.isWatcher() === true) {
+            return;
+          }
+        }
+        throw new Error(
+          `reward UI watcher did not become ready under guest context (mode=${UiMode[rig.guestScene.ui.getMode()]})`,
+        );
+      });
+      await withClient(rig.hostCtx, () => driveRewardShopOwnerLeaveViaUi(hostShop, { alreadyStarted: true }));
 
       // ===== Guest WATCHES: startCoopWatch adopts the host's streamed options, then drains the relayed
       // picks. It BUFFER-HITs the phantom FIRST.

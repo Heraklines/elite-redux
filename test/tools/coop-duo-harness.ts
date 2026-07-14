@@ -2146,15 +2146,20 @@ export async function driveHostRewardShopOwner(
  * MODIFIER_SELECT handler, CANCEL opens its real confirmation, and ACTION commits the leave intent.
  * No private selection/terminal method is invoked. MUST run inside the owner's ClientCtx.
  */
-export async function driveRewardShopOwnerLeaveViaUi(hostPhase: ShopPhaseSeam): Promise<number> {
+export async function driveRewardShopOwnerLeaveViaUi(
+  hostPhase: ShopPhaseSeam,
+  opts: { alreadyStarted?: boolean } = {},
+): Promise<number> {
   // The legacy multiwave fixture constructs the non-current client's matching shop phase directly.
   // Its previous watcher UI can therefore remain MODIFIER_SELECT even though production's real phase
   // tail would have cleared it. Force a clean MESSAGE base only for that synthetic phase so setMode
   // installs this phase's callback instead of reusing the prior interaction's callback.
-  if (globalScene.phaseManager.getCurrentPhase() !== (hostPhase as unknown as Phase)) {
-    await globalScene.ui.setModeForceTransition(UiMode.MESSAGE);
+  if (!opts.alreadyStarted) {
+    if (globalScene.phaseManager.getCurrentPhase() !== (hostPhase as unknown as Phase)) {
+      await globalScene.ui.setModeForceTransition(UiMode.MESSAGE);
+    }
+    hostPhase.start();
   }
-  hostPhase.start();
   const pinned = hostPhase.coopInteractionStart;
 
   // Opening the production shop is asynchronous twice over: the reciprocal co-op barrier must release,
