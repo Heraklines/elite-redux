@@ -140,7 +140,24 @@ jobs:
       - name: Enforce public-driver boundary (new campaign files)
         run: node test/browser/coop-public-ui/check-campaign-boundary.mjs
 
+      # Cache the built bundle keyed on the GAME-SOURCE inputs only (src/public/lockfile/
+      # entry/sealer/vite-config/workflow-env) - NOT the harness driver. A harness-only push
+      # therefore reuses the identical-source bundle and skips the ~build. The seal step below
+      # ALWAYS re-runs, re-stamping the manifest with the current commit SHA + recomputing the
+      # digest from the (identical) source, so the exact-SHA seal semantics are preserved and a
+      # bad reuse fails loudly at the gameplay job's manifest verification.
+      - name: Restore source-keyed browser bundle
+        id: bundle-cache
+        uses: actions/cache@v4
+        with:
+          path: dist-coop-public-ui
+          key: >-
+            coop-ui-bundle-v1-${{ hashFiles('src/**', 'public/**', 'pnpm-lock.yaml',
+            'scripts/coop-browser-entry.ts', 'scripts/prepare-coop-browser-artifact.mjs',
+            'test/browser/coop-public-ui/vite.config.mjs', '.github/workflows/coop-public-ui-campaign.yml') }}
+
       - name: Build normal application with CI-only read-only observer
+        if: steps.bundle-cache.outputs.cache-hit != 'true'
         env:
           COOP_BROWSER_OUT_DIR: dist-coop-public-ui
           VITE_BYPASS_LOGIN: 0
@@ -150,12 +167,15 @@ jobs:
           VITE_SERVER_URL: ${{ env.COOP_UI_API_ORIGIN }}
         run: pnpm exec vite build --mode beta --config test/browser/coop-public-ui/vite.config.mjs
 
-      - name: Seal immutable execution input
+      - name: Seal immutable execution input (always, re-stamps the current commit SHA)
         env:
           COOP_BROWSER_DIST: dist-coop-public-ui
           COOP_BROWSER_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-        run: node scripts/prepare-coop-browser-artifact.mjs
+        run: |
+          rm -f dist-coop-public-ui/coop-browser-artifact.json
+          node scripts/prepare-coop-browser-artifact.mjs
+          echo "bundle-source-cache-hit=${{ steps.bundle-cache.outputs.cache-hit == 'true' }}"
 
       - name: Publish exact bundle for the isolated campaign runner
         uses: actions/upload-artifact@v4
@@ -163,6 +183,7 @@ jobs:
           name: coop-public-ui-campaign-bundle-${{ github.sha }}
           path: dist-coop-public-ui/**
           include-hidden-files: true
+          compression-level: 9
           retention-days: 1
           if-no-files-found: error
 

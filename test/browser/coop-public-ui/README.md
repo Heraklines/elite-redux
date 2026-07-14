@@ -116,6 +116,49 @@ loud-fail contract: only `shakedown` may press through an UNKNOWN surface (`COOP
 `gating` and `nightly` runs fail loudly and immediately on any surface with no registered driver.
 `check-campaign-boundary.mjs` re-applies the private-state prohibitions to the campaign files.
 
+## Run speed and the fidelity-profile split
+
+Two-browser runs are slow; the following keep them fast WITHOUT weakening what makes them
+trustworthy (all lossless - they never change what is asserted):
+
+- **Fast-abort watchdog** (`terminal-watchdog.mjs`): a decided leg (launch-snapshot abort,
+  shared-session terminal, fail-closed, game over, lobby start failure) previously rode out
+  120s waits several times over, burning 10+ minutes past the verdict. The watchdog races the
+  journey against a poll of the clients' own console evidence and ends the leg within ~200ms of
+  a terminal marker, capturing evidence first. `summary.json`'s error names the terminal marker.
+- **Marker-driven waits**: the driver's per-step waits poll the v2 semantic surface stream /
+  phase markers with short intervals rather than sleeping fixed durations, so a surface that is
+  ready early is picked up immediately.
+- **Source-keyed bundle cache**: the build job caches the sealed bundle keyed on a hash of the
+  GAME source (`src/`, `public/`, lockfile, entry, sealer, vite config, workflow env) - NOT the
+  harness driver - so a harness-only push reuses the identical-source bundle and skips the build.
+  The seal step always re-runs, re-stamping the current commit SHA + recomputing the digest from
+  the identical source, so the exact-SHA seal is preserved (a bad reuse fails loudly at the
+  gameplay job's manifest verification). Inter-job handoff is compressed; solo + campaign legs
+  run as parallel jobs off one build.
+- **Runner sizing (note for the maintainer):** two Chromium contexts + the localhost preview on
+  the default 2-vCPU `ubuntu-latest` are CPU-starved, which inflates WebRTC ICE (~33s observed to
+  open the data channel) and the guest's real-cloud persist RTTs. Moving the gameplay jobs to a
+  4-core larger runner is a one-line `runs-on:` label change (e.g. a 4-vCPU runner label) - the
+  maintainer decides on the paid runner separately; it would materially cut ICE + RTT (and may on
+  its own let the guest durability ACK land inside the host's budget).
+
+### Fidelity profiles (opt-in `fast`, default OFF)
+
+The **nightly** launcher runs the FULL-FIDELITY profile: real 1x game speed and the pinned
+jsDelivr production asset CDN - the same surfaces a player hits. A **`fast` iteration profile** is
+available for quick dev loops and trades some fidelity for speed:
+
+- `COOP_UI_SPEED_KEYS` (JSON key sequence): drive the in-game **Game Speed** setting to a high
+  value through the REAL Settings UI early in the run (a legitimate player flow) so battle
+  animations play faster. Empty by default (full fidelity); the maintainer supplies a verified
+  Title->Settings->GameSpeed sequence to enable it.
+- Optional local `er-assets` serving instead of jsDelivr for iteration runs (lower asset latency).
+
+🔴 A green under the `fast` profile is NOT full-fidelity assurance - it can pass while a real
+1x-speed / production-CDN issue would fail. Only a green NIGHTLY (1x + real CDN) is the fidelity
+gate. Never gate a release on a fast-profile green.
+
 ## Known future-proofing TODO (do not do now)
 
 The rig hard-codes a two-seat topology: `pair()` asserts the sorted seat set is exactly `[0,1]` and
