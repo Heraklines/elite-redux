@@ -42,6 +42,7 @@ import {
   type CoopTransport,
   createLoopbackPair,
 } from "#data/elite-redux/coop/coop-transport";
+import { getCoopWaveAdvanceOperationEpoch } from "#data/elite-redux/coop/coop-wave-operation";
 import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -114,7 +115,10 @@ async function startGuestWithPendingWin(): Promise<CoopRuntime> {
   // The host endpoint sends both the compatibility cue and the authoritative committed envelope.
   // Under durability the raw cue alone must not advance; the envelope is the one mutation authority.
   peer.send({ t: "waveResolved", wave: WAVE, outcome: "win" });
-  const epoch = controller.sessionEpoch;
+  // This engine-free fixture does not stand up a peer controller to negotiate a run epoch. Address the
+  // retained envelope to the owning operation runtime's valid epoch, never the controller's pre-handshake
+  // sentinel epoch 0.
+  const epoch = getCoopWaveAdvanceOperationEpoch(runtime.waveOperationBinding);
   const authoritativeState: CoopAuthoritativeBattleStateV1 = {
     version: 1,
     tick: 0,
