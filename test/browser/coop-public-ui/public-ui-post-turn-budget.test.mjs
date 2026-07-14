@@ -119,3 +119,26 @@ test("command wait drains an owned semantic surface buffered as its deadline cal
   const result = await PublicUiClient.prototype.waitForLocalCommand.call(client, 0);
   assert.equal(result, evidence.events[0]);
 });
+
+test("reward leave waits for the exact owned actionable semantic shop surface", async () => {
+  const evidence = new FakeEvidence("authority");
+  const rewardObservation = {
+    operationClass: "reward",
+    surfaceId: "reward-shop",
+    ownerModel: "interaction",
+    phase: "SelectModifierPhase",
+    uiMode: "MODIFIER_SELECT",
+    localSeat: 0,
+    ownerSeat: 0,
+    seatsWithInput: [0],
+    ready: { handlerActive: true, awaitingActionInput: false },
+  };
+  evidence.push({ kind: "browser-surface2", observation: rewardObservation });
+  evidence.push({
+    kind: "browser-surface2",
+    observation: { ...rewardObservation, ready: { handlerActive: true, awaitingActionInput: true } },
+  });
+  const owner = { label: "authority", publicSeat: 0, evidence, config: { timeoutMs: 0 } };
+
+  assert.equal(await PublicUiClient.prototype.waitForOwnedReward.call(owner, 0), evidence.events[1]);
+});

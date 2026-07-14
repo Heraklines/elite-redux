@@ -86,11 +86,16 @@ if (
 ) {
   failures.push("public-ui-harness.mjs: command readiness must use the owned public semantic surface");
 }
-if (
-  !harness?.includes("createPublicBattleProgressBudget(")
-  || !harness.includes("event ??= findOwnedCommandOrTerminal(this, from)")
-) {
+if (!harness?.includes("createPublicBattleProgressBudget(") || !harness.includes("event ??= findEvidence()")) {
   failures.push("public-ui-harness.mjs: command readiness must retain bounded progress and drain buffered evidence");
+}
+if (
+  !harness?.includes('findLastSemanticSurface(from, "reward-shop")')
+  || !harness.includes("semantic.observation.ready.awaitingActionInput === true")
+  || !harness.includes("semantic.observation.ownerSeat === client.publicSeat")
+  || !harness.includes("await owner.waitForOwnedReward(ownerCursors[owner.label])")
+) {
+  failures.push("public-ui-harness.mjs: reward leave must wait for the owned actionable public surface");
 }
 if (!harness?.includes("createBattlePromptAdvancer(this, from") || !harness.includes("await advanceBattlePrompt()")) {
   failures.push("public-ui-harness.mjs: post-turn waits must drive readiness-proven public battle prompts");

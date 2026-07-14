@@ -32,7 +32,10 @@ const POST_TURN_HARD_CEILING_MS = 360_000;
 const LOBBY_REQUEST_REISSUE_MS = 5_000;
 
 function classifyPostTurnProgress(event) {
-  if (event.kind === "browser-surface2" && ["battle-progress", "command"].includes(event.observation?.operationClass)) {
+  if (
+    event.kind === "browser-surface2"
+    && ["battle-progress", "command", "reward"].includes(event.observation?.operationClass)
+  ) {
     const observation = event.observation;
     return `${observation.surfaceId}:phase-${observation.phaseInstance}:ready-${
       observation.ready?.awaitingActionInput === true
@@ -153,6 +156,46 @@ function findOwnedCommandOrTerminal(client, from) {
     ?? client.evidence.find(SHARED_SESSION_TERMINAL, from)
     ?? client.evidence.find(LAUNCH_SNAPSHOT_ABORT, from)
   );
+}
+
+function findOwnedReadyReward(client, from) {
+  const semantic = client.evidence.findLastSemanticSurface(from, "reward-shop");
+  return semantic?.observation.operationClass === "reward"
+    && semantic.observation.ownerModel === "interaction"
+    && semantic.observation.phase === "SelectModifierPhase"
+    && semantic.observation.uiMode === "MODIFIER_SELECT"
+    && semantic.observation.localSeat === client.publicSeat
+    && semantic.observation.ownerSeat === client.publicSeat
+    && semantic.observation.seatsWithInput?.includes(client.publicSeat)
+    && semantic.observation.ready?.handlerActive === true
+    && semantic.observation.ready.awaitingActionInput === true
+    ? semantic
+    : null;
+}
+
+async function waitForProgressBoundedEvidence(client, from, findEvidence, description) {
+  const clients = { [client.label]: client };
+  const progressBudget = createPublicBattleProgressBudget(
+    { clients },
+    { [client.label]: from },
+    client.config.timeoutMs,
+  );
+  let event = null;
+  while (Date.now() < progressBudget.observe()) {
+    event = findEvidence();
+    if (event != null) {
+      break;
+    }
+    await delay(100);
+  }
+  // Drain once after the soft/hard deadline check. Under severe browser CPU contention a semantic
+  // event can already be buffered when the timer callback finally resumes; discard it only if the
+  // bounded wait truly has no matching public evidence.
+  event ??= findEvidence();
+  if (event == null) {
+    throw new Error(`${client.label}: timed out waiting for ${description}`);
+  }
+  return event;
 }
 
 /**
@@ -717,27 +760,25 @@ export class PublicUiClient {
   }
 
   async waitForLocalCommand(from = 0) {
-    const clients = { [this.label]: this };
-    const progressBudget = createPublicBattleProgressBudget({ clients }, { [this.label]: from }, this.config.timeoutMs);
-    let event = null;
-    while (Date.now() < progressBudget.observe()) {
-      event = findOwnedCommandOrTerminal(this, from);
-      if (event != null) {
-        break;
-      }
-      await delay(100);
-    }
-    // Drain once after the soft/hard deadline check. Under severe browser CPU contention the
-    // semantic event can already be buffered when the timer callback finally resumes; discarding
-    // that real public surface solely because the nominal timer elapsed caused run 29332163279.
-    event ??= findOwnedCommandOrTerminal(this, from);
-    if (event == null) {
-      throw new Error(`${this.label}: timed out waiting for owned semantic command surface or bounded shared terminal`);
-    }
+    const event = await waitForProgressBoundedEvidence(
+      this,
+      from,
+      () => findOwnedCommandOrTerminal(this, from),
+      "owned semantic command surface or bounded shared terminal",
+    );
     if (event.kind !== "browser-surface2" && !LOCAL_COMMAND.test(event.text ?? "")) {
       throw new Error(`${this.label}: shared session terminated before owned CommandPhase: ${event.text}`);
     }
     return event;
+  }
+
+  async waitForOwnedReward(from = 0) {
+    return waitForProgressBoundedEvidence(
+      this,
+      from,
+      () => findOwnedReadyReward(this, from),
+      "actionable owned semantic reward surface",
+    );
   }
 
   async waitForObservedSurface(surface, from = 0) {
@@ -1228,6 +1269,7 @@ export class DuoPublicUiRig {
       () => values.find(client => client.evidence.find(REWARD_OWNER, ownerCursors[client.label])),
       { timeoutMs: this.config.timeoutMs, description: "reward owner public UI" },
     );
+    await owner.waitForOwnedReward(ownerCursors[owner.label]);
     await owner.checkpoint("reward-owner-screen");
     const commandCursors = Object.fromEntries(values.map(client => [client.label, client.evidence.cursor()]));
     await owner.sequence(this.config.keys.rewardLeave, "leave-reward-screen");
