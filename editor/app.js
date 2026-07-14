@@ -59,6 +59,29 @@ let ABILITY_NAMES = [];
 let CTR_LIVE = {}; // key → entry (species by numeric id, as stored)
 const ctr = { current: {}, baseline: {} }; // key → entry (species by CONST)
 let ctrSelected = null; // open trainer key, or null
+// Per-member TRANSIENT UI state (NOT saved, NOT part of the dirty diff): which
+// member fieldsets are expanded, and which authored set a member's dropdown
+// currently points at (member index → set index; absent/-1 = "(custom)"). Both
+// are keyed by team-slot index and reset when the open trainer changes.
+const ctrOpenMembers = new Set(); // expanded team-slot indices
+const ctrSetSel = new Map(); // team-slot index → selected set index
+
+// Battle-music catalog (editor/data/bgm.json): [{ key, battle }]. Battle themes
+// are listed first in the picker. One SHARED Audio element previews a track;
+// picking/previewing another (or ■ stop) halts the previous playback.
+let BGM_LIST = [];
+const BGM_AUDIO_BASE = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/audio/bgm";
+let bgmPreviewAudio = null; // the single shared HTMLAudioElement
+let bgmPreviewKey = null; // the key currently playing, or null
+
+// Live egg-move source (er-egg-moves.json, keyed by species CONST → move NAMEs),
+// used by the per-member move-legality helper (levelup ∪ TM ∪ egg).
+let EGG_MOVES_LIVE = {};
+// Factory sets keyed by species CONST (from trainers.json factorySpecies): the
+// per-species authored sets powering the "Use set" move-default dropdown.
+const factoryByConst = new Map(); // CONST → [{moves:[names], abilitySlot}]
+// Memoized legal-move sets per species CONST (levelup ∪ TM ∪ egg move NAMEs).
+const legalMovesCache = new Map(); // CONST → Set<move NAME>
 
 // Usage tiers (fetched at runtime; graceful "unranked" fallback when missing).
 const usage = { loaded: false, lines: {} };
@@ -1585,6 +1608,9 @@ function blankCtrMember() {
     abilitySlot: 0,
     fusion: null,
     heldItems: [],
+    // Editor metadata: when true, this member's moves are NOT legality-checked.
+    // Persisted only when true; absent in saved JSON = enforced.
+    sanityOff: false,
   };
 }
 
@@ -1612,6 +1638,7 @@ function blankCtrTrainer() {
     endless: false,
     spawnChance: 100,
     challenge: "none",
+    battleBgm: "",
     team: [blankCtrMember()],
   };
 }
@@ -1632,6 +1659,8 @@ function ctrLiveToEdit(entry) {
     // keeps pre-feature saved entries behaving exactly as before.
     spawnChance: normalizeCtrSpawnChance(entry.spawnChance),
     challenge: entry.challenge ?? "none",
+    // Trimmed bgm key; anything not [a-z0-9_] (or absent) normalizes to "" (none).
+    battleBgm: normalizeCtrBattleBgm(entry.battleBgm),
     team: (Array.isArray(entry.team) ? entry.team : []).map(m => ({
       species: idToConst(m.species),
       formIndex: Number.isInteger(m.formIndex) ? m.formIndex : 0,
@@ -1650,8 +1679,18 @@ function ctrLiveToEdit(entry) {
         item: h.item || "",
         count: Number.isInteger(h.count) ? h.count : 1,
       })),
+      sanityOff: m.sanityOff === true,
     })),
   };
+}
+
+/** Normalize a bgm key for editing: trim + [a-z0-9_] + 64 cap; else "" (none). */
+function normalizeCtrBattleBgm(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const key = value.trim();
+  return key.length > 0 && key.length <= 64 && /^[a-z0-9_]+$/.test(key) ? key : "";
 }
 
 /** Compute BST warnings + the Ace/custom informational note for a trainer (never blocks). */
@@ -1710,14 +1749,188 @@ function ctrAbilOptions(speciesConst, selected) {
     .join("");
 }
 
+/** The authored factory sets for a species CONST (empty when the species has none). */
+function factorySetsFor(speciesConst) {
+  return speciesConst ? factoryByConst.get(speciesConst) || [] : [];
+}
+
+/** A short "MOVE_A / MOVE_B / …" summary of a set's moves (for the option tooltip). */
+function setMovesSummary(set) {
+  return (set.moves || []).filter(Boolean).map(prettify).join(" / ");
+}
+
+/**
+ * Legal move NAMEs for a species CONST = levelup ∪ TM ∪ egg moves, from the data
+ * the editor already loaded (learnsets / tm-learnsets / er-egg-moves). Memoized.
+ * An empty set means "no data for this species" (treated as: enforce nothing so a
+ * data gap never blocks a save — the illegal check below skips an empty pool).
+ */
+function legalMovesFor(speciesConst) {
+  if (!speciesConst) {
+    return new Set();
+  }
+  const cached = legalMovesCache.get(speciesConst);
+  if (cached) {
+    return cached;
+  }
+  const out = new Set();
+  for (const [, moveId] of learn.current[speciesConst] || []) {
+    const nm = moveById.get(moveId)?.name;
+    if (nm) {
+      out.add(nm);
+    }
+  }
+  for (const moveId of tms.current[speciesConst] || []) {
+    const nm = moveById.get(moveId)?.name;
+    if (nm) {
+      out.add(nm);
+    }
+  }
+  const eggNames = (egg.current[speciesConst] ?? EGG_MOVES_LIVE[speciesConst] ?? []).filter(Boolean);
+  for (const nm of eggNames) {
+    out.add(String(nm).toUpperCase());
+  }
+  legalMovesCache.set(speciesConst, out);
+  return out;
+}
+
+/** True when enforcement is ON for this member AND `move` is not in its legal pool. */
+function ctrMoveIllegal(m, move) {
+  if (m.sanityOff || !move) {
+    return false;
+  }
+  const legal = legalMovesFor(m.species);
+  // An empty pool = no legality data for this species; don't flag (never blocks).
+  return legal.size > 0 && !legal.has(move);
+}
+
+/** Every illegal move on an enforced member (names), for the error line + save gate. */
+function ctrIllegalMoves(m) {
+  if (m.sanityOff) {
+    return [];
+  }
+  const legal = legalMovesFor(m.species);
+  if (legal.size === 0) {
+    return [];
+  }
+  return (m.moves || []).map(x => (x || "").trim().toUpperCase()).filter(mv => mv && !legal.has(mv));
+}
+
+// ---- Battle-music preview (one shared Audio element) ------------------------
+/** Stop any in-flight preview and clear the "now playing" marker. */
+function bgmStop() {
+  if (bgmPreviewAudio) {
+    bgmPreviewAudio.pause();
+    bgmPreviewAudio.currentTime = 0;
+  }
+  bgmPreviewKey = null;
+  const btn = document.getElementById("ctr-bgm-play");
+  if (btn) {
+    btn.textContent = "▶";
+  }
+}
+
+/** Preview a bgm key through the single shared Audio element (toggles on repeat). */
+function bgmPlay(key) {
+  if (!key) {
+    return;
+  }
+  // Clicking the same track again while it plays stops it (toggle).
+  if (bgmPreviewKey === key && bgmPreviewAudio && !bgmPreviewAudio.paused) {
+    bgmStop();
+    return;
+  }
+  if (!bgmPreviewAudio) {
+    bgmPreviewAudio = new Audio();
+    bgmPreviewAudio.addEventListener("ended", bgmStop);
+  }
+  bgmPreviewAudio.pause();
+  bgmPreviewAudio.src = `${BGM_AUDIO_BASE}/${key}.mp3`;
+  bgmPreviewKey = key;
+  bgmPreviewAudio.currentTime = 0;
+  bgmPreviewAudio.play().catch(() => {
+    /* autoplay/network failure: leave the marker cleared */
+    bgmStop();
+  });
+  const btn = document.getElementById("ctr-bgm-play");
+  if (btn) {
+    btn.textContent = "⏸";
+  }
+}
+
+/** The <option>s for the battle-music picker: "(default)" + battle themes + rest. */
+function ctrBgmOptions(selected) {
+  const opt = b => `<option value="${esc(b.key)}"${selected === b.key ? " selected" : ""}>${esc(b.key)}</option>`;
+  const battle = BGM_LIST.filter(b => b.battle);
+  const other = BGM_LIST.filter(b => !b.battle);
+  let html = `<option value=""${selected ? "" : " selected"}>(default)</option>`;
+  if (battle.length > 0) {
+    html += `<optgroup label="Battle themes">${battle.map(opt).join("")}</optgroup>`;
+  }
+  if (other.length > 0) {
+    html += `<optgroup label="Other tracks">${other.map(opt).join("")}</optgroup>`;
+  }
+  // A saved key that is no longer in the catalog still shows as selected.
+  if (selected && !BGM_LIST.some(b => b.key === selected)) {
+    html += `<option value="${esc(selected)}" selected>${esc(selected)} (missing)</option>`;
+  }
+  return html;
+}
+
 function ctrMemberHtml(m, i) {
-  const moveInputs = [0, 1, 2, 3]
-    .map(
-      s =>
-        `<input class="ctr-move" list="moves-list" data-idx="${i}" data-slot="${s}" value="${esc(m.moves[s] || "")}" placeholder="move ${s + 1}" spellcheck="false" style="width:130px" />`,
-    )
-    .join(" ");
+  const open = ctrOpenMembers.has(i);
   const scale = m.level === null;
+  const sets = factorySetsFor(m.species);
+  const selSet = ctrSetSel.has(i) ? ctrSetSel.get(i) : -1;
+  const spName = m.species ? spByConst.get(m.species)?.name || m.species : "(empty)";
+  // Collapsed summary: slot, species, level, set name if any (task #9).
+  const setTag = selSet >= 0 && sets[selSet] ? ` · Set ${selSet + 1}` : "";
+  const summary = `<span class="ctr-mem-sum" data-idx="${i}" role="button" title="Click to ${open ? "collapse" : "expand"}">
+    <span class="ctr-mem-caret">${open ? "▾" : "▸"}</span> Slot ${i + 1}: <b>${esc(spName)}</b>
+    <small>${scale ? "wave-scaled" : `Lv ${m.level}`}${setTag}${m.sanityOff ? " · sanity off" : ""}</small></span>`;
+  if (!open) {
+    return `<fieldset class="ctr-member">
+      <legend>${summary} <button type="button" class="ctr-mem-del" data-idx="${i}" title="Remove this member">✕</button></legend>
+    </fieldset>`;
+  }
+  // Move-legality: enforce unless sanity is off. Use a per-member datalist of the
+  // legal pool when we HAVE data; otherwise fall back to the full move list so a
+  // data gap never traps the user (matches the never-block save gate).
+  const enforce = !m.sanityOff;
+  const legal = enforce ? legalMovesFor(m.species) : null;
+  const useLegalList = enforce && legal && legal.size > 0;
+  const listId = useLegalList ? `ctr-legal-${i}` : "moves-list";
+  const legalDatalist = useLegalList
+    ? `<datalist id="ctr-legal-${i}">${[...legal]
+        .sort()
+        .map(mv => `<option value="${mv}">${prettify(mv)}</option>`)
+        .join("")}</datalist>`
+    : "";
+  const moveInputs = [0, 1, 2, 3]
+    .map(s => {
+      const bad = ctrMoveIllegal(m, (m.moves[s] || "").trim().toUpperCase());
+      return `<input class="ctr-move" list="${listId}" data-idx="${i}" data-slot="${s}" value="${esc(m.moves[s] || "")}" placeholder="move ${s + 1}" spellcheck="false" style="width:130px${bad ? `;border-color:${ERR}` : ""}" />`;
+    })
+    .join(" ");
+  const illegal = ctrIllegalMoves(m);
+  const errLine =
+    illegal.length > 0
+      ? `<div class="ctr-move-err">✗ illegal move${illegal.length > 1 ? "s" : ""} for ${esc(spName)}: ${illegal
+          .map(esc)
+          .join(", ")} — not in its level-up/TM/egg pool. Fix it, or tick “Move sanity off”.</div>`
+      : "";
+  const setDropdown =
+    sets.length === 0
+      ? `<select class="ctr-set" data-idx="${i}" disabled title="This species has no authored factory sets"><option>(no sets)</option></select>`
+      : `<select class="ctr-set" data-idx="${i}" title="Fill the 4 moves + ability from an authored set">
+          <option value="-1"${selSet === -1 ? " selected" : ""}>(custom)</option>
+          ${sets
+            .map(
+              (set, si) =>
+                `<option value="${si}"${selSet === si ? " selected" : ""} title="${esc(setMovesSummary(set))}">Set ${si + 1} · ${esc(setMovesSummary(set))}</option>`,
+            )
+            .join("")}
+        </select>`;
   const heldRows = m.heldItems
     .map(
       (h, hi) =>
@@ -1727,14 +1940,19 @@ function ctrMemberHtml(m, i) {
     )
     .join("");
   const fus = m.fusion;
-  return `<fieldset class="ctr-member">
-    <legend>Slot ${i + 1} <button type="button" class="ctr-mem-del" data-idx="${i}" title="Remove this member">✕</button></legend>
+  return `<fieldset class="ctr-member open">
+    <legend>${summary} <button type="button" class="ctr-mem-del" data-idx="${i}" title="Remove this member">✕</button></legend>
     <label>Species <input class="ctr-species" list="species-list" data-idx="${i}" value="${esc(m.species || "")}" placeholder="SPECIES_…" spellcheck="false" style="width:170px" /></label>
     <label>Form <input type="number" class="ctr-form" data-idx="${i}" value="${m.formIndex || 0}" min="0" max="60" style="width:56px" /></label>
     <label>Ability slot <select class="ctr-abil" data-idx="${i}">${ctrAbilOptions(m.species, m.abilitySlot)}</select></label>
     <label title="Uncheck to set an explicit level">Wave-scale level <input type="checkbox" class="ctr-scale" data-idx="${i}"${scale ? " checked" : ""} /></label>
     <label>Level <input type="number" class="ctr-level" data-idx="${i}" value="${scale ? "" : m.level}" min="1" max="200" ${scale ? "disabled" : ""} style="width:64px" /></label>
-    <div class="ctr-moves">${moveInputs}</div>
+    <div class="ctr-moves-head">
+      <label>Use set <span>${setDropdown}</span></label>
+      <label title="Skip move-legality checks for this member (saved as sanityOff)"><input type="checkbox" class="ctr-sanity" data-idx="${i}"${m.sanityOff ? " checked" : ""} /> Move sanity off</label>
+    </div>
+    <div class="ctr-moves">${moveInputs}${legalDatalist}</div>
+    ${errLine}
     <div class="ctr-fusion">
       <label>Fusion <input type="checkbox" class="ctr-fusion-on" data-idx="${i}"${fus ? " checked" : ""} /></label>
       ${
@@ -1818,6 +2036,119 @@ function updateCtrSpritePreview() {
   }
 }
 
+// ---- Trainer-class Browse modal (visual sprite picker, task #6) -------------
+let trainerClassModalEl = null;
+
+/** Tear down the class-browse modal (and its IntersectionObserver). */
+function closeTrainerClassModal() {
+  if (trainerClassModalEl) {
+    if (trainerClassModalEl._io) {
+      trainerClassModalEl._io.disconnect();
+    }
+    trainerClassModalEl.remove();
+    trainerClassModalEl = null;
+  }
+}
+
+/**
+ * Open an in-page modal grid of EVERY sprite-bearing trainer class
+ * (trainer-classes.json). Each cell shows the lazy CDN atlas-crop sprite (reusing
+ * renderTrainerFrame + the shared trainerAtlasCache) + the prettified name. Cells
+ * paint their sprite ONLY when scrolled into view (IntersectionObserver), so
+ * opening the modal doesn't fire 249 fetches at once. A text filter narrows the
+ * grid. Clicking a cell fills #ctr-class, closes, and refreshes the inline preview.
+ */
+function openTrainerClassModal() {
+  closeTrainerClassModal();
+  const overlay = document.createElement("div");
+  overlay.className = "ctr-modal-overlay";
+  overlay.innerHTML = `
+    <div class="ctr-modal" role="dialog" aria-label="Browse trainer classes">
+      <div class="ctr-modal-head">
+        <b>Browse trainer classes</b>
+        <input type="search" class="ctr-modal-filter" placeholder="Filter by name…" autocomplete="off" spellcheck="false" />
+        <button type="button" class="ctr-modal-close" title="Close">✕</button>
+      </div>
+      <div class="ctr-modal-grid"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  trainerClassModalEl = overlay;
+
+  const grid = overlay.querySelector(".ctr-modal-grid");
+  const io = new IntersectionObserver(
+    entries => {
+      for (const ent of entries) {
+        if (ent.isIntersecting) {
+          const cell = ent.target;
+          const frame = cell.querySelector(".ctr-sprite-frame");
+          if (frame && !frame.dataset.painted) {
+            frame.dataset.painted = "1";
+            renderTrainerFrame(cell.dataset.file, frame);
+          }
+          io.unobserve(cell);
+        }
+      }
+    },
+    { root: grid, rootMargin: "120px" },
+  );
+  overlay._io = io;
+
+  for (const c of TRAINER_CLASSES) {
+    const file = c.genders ? `${c.sprite}_m` : c.sprite;
+    const cell = document.createElement("button");
+    cell.type = "button";
+    cell.className = "ctr-modal-cell";
+    cell.dataset.tcname = c.name;
+    cell.dataset.file = file;
+    cell.dataset.hay = `${c.name} ${prettify(c.name)}`.toLowerCase();
+    cell.innerHTML = `<div class="ctr-sprite-frame"></div><span class="ctr-cell-name">${esc(prettify(c.name))}</span>`;
+    grid.appendChild(cell);
+    io.observe(cell);
+  }
+
+  const filter = overlay.querySelector(".ctr-modal-filter");
+  filter.addEventListener("input", () => {
+    const q = filter.value.trim().toLowerCase();
+    for (const cell of grid.children) {
+      const show = q === "" || cell.dataset.hay.includes(q);
+      cell.style.display = show ? "" : "none";
+      // Paint a newly-revealed cell that scrolled past the observer while hidden.
+      if (show) {
+        const frame = cell.querySelector(".ctr-sprite-frame");
+        if (frame && !frame.dataset.painted) {
+          io.observe(cell);
+        }
+      }
+    }
+  });
+
+  grid.addEventListener("click", e => {
+    const cell = e.target.closest(".ctr-modal-cell");
+    if (!cell) {
+      return;
+    }
+    const t = ctrCur();
+    if (t) {
+      t.trainerClass = cell.dataset.tcname;
+    }
+    const input = document.getElementById("ctr-class");
+    if (input) {
+      input.value = cell.dataset.tcname;
+    }
+    closeTrainerClassModal();
+    updateCtrSpritePreview();
+    refreshChrome();
+  });
+
+  overlay.querySelector(".ctr-modal-close").addEventListener("click", closeTrainerClassModal);
+  overlay.addEventListener("click", e => {
+    if (e.target === overlay) {
+      closeTrainerClassModal();
+    }
+  });
+  filter.focus();
+}
+
 function renderCustomTrainers(root) {
   const keys = Object.keys(ctr.current)
     .filter(k => ctr.current[k])
@@ -1846,14 +2177,23 @@ function renderCustomTrainers(root) {
     const challSel = CHALLENGE_OPTIONS.map(
       c => `<option value="${c}"${t.challenge === c ? " selected" : ""}>${CHALLENGE_LABELS[c]}</option>`,
     ).join("");
+    const bgmSel = ctrBgmOptions(t.battleBgm || "");
     form = `<div class="ctr-form">
-      <fieldset><legend>Identity</legend>
+      <fieldset class="ctr-sec"><legend>Identity</legend>
         <label>Name <input type="text" id="ctr-name" maxlength="24" value="${esc(t.name || "")}" style="width:200px" /></label>
         <label>Id <input type="number" value="${t.id}" readonly style="width:80px;opacity:.6" /></label>
         <label>Sprite / class <input type="text" id="ctr-class" list="trainerclass-list" value="${esc(t.trainerClass || "")}" style="width:170px" spellcheck="false" /></label>
+        <button type="button" id="ctr-browse-class" title="Browse trainer classes by sprite">Browse…</button>
         <div id="ctr-sprite-preview" class="ctr-sprite-preview"></div>
+        <div class="ctr-bgm-row">
+          <label title="Music that plays for THIS trainer's battle only (er-assets audio/bgm). '(default)' keeps the trainer class's normal theme.">Battle music
+            <select id="ctr-bgm">${bgmSel}</select>
+          </label>
+          <button type="button" id="ctr-bgm-play" title="Preview the selected track">▶</button>
+          <button type="button" id="ctr-bgm-stop" title="Stop preview">■</button>
+        </div>
       </fieldset>
-      <fieldset><legend>Spawn gates</legend>
+      <fieldset class="ctr-sec"><legend>Spawn gates</legend>
         <div>Difficulties: ${diffChecks}</div>
         <label>Min wave <input type="number" id="ctr-minwave" value="${t.minWave}" min="1" max="5000" style="width:72px" /></label>
         <label>Max wave <input type="number" id="ctr-maxwave" value="${t.maxWave}" min="1" max="5000" ${t.endless ? "disabled" : ""} style="width:72px" /></label>
@@ -1863,7 +2203,7 @@ function renderCustomTrainers(root) {
         <label>Challenge exclusivity <select id="ctr-challenge">${challSel}</select></label>
         <p class="hint" style="margin:6px 0 0">Spawn chance is ONE roll per run: 100 = guaranteed. If it hits, the trainer appears ONCE at a random floor in its wave range, sliding forward past boss/fixed/mystery waves.</p>
       </fieldset>
-      <fieldset class="full"><legend>Team (1-6)</legend>
+      <fieldset class="full ctr-sec"><legend>Team (1-6)</legend>
         ${t.team.map((m, i) => ctrMemberHtml(m, i)).join("")}
         ${t.team.length < 6 ? '<button type="button" id="ctr-add-member">＋ Add member</button>' : ""}
       </fieldset>
@@ -1924,7 +2264,12 @@ function onCustomTrainerInput(el) {
     const v = el.value.trim().toUpperCase();
     el.value = v;
     m.moves[Number(el.dataset.slot)] = v;
-    el.style.borderColor = v === "" || MOVE_SET.has(v) ? "" : ERR;
+    // A manual move edit flips the member's "Use set" dropdown back to (custom).
+    ctrSetSel.set(idx, -1);
+    // Red border for an unknown move name OR (enforcing) an illegal move. The
+    // error line + dropdown refresh on blur (onCustomTrainerChange -> render).
+    const bad = (v !== "" && !MOVE_SET.has(v)) || ctrMoveIllegal(m, v);
+    el.style.borderColor = bad ? ERR : "";
   } else if (el.classList.contains("ctr-held-item") && m) {
     const h = m.heldItems[Number(el.dataset.heldidx)];
     if (h) {
@@ -1960,8 +2305,34 @@ function onCustomTrainerChange(el) {
     t.battleType = el.value;
   } else if (el.id === "ctr-challenge") {
     t.challenge = el.value;
+  } else if (el.id === "ctr-bgm") {
+    // Picking a track stops any current preview (a new pick supersedes it).
+    t.battleBgm = normalizeCtrBattleBgm(el.value);
+    bgmStop();
+    refreshChrome();
+    return true;
   } else if (el.id === "ctr-endless") {
     t.endless = el.checked;
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-set") && m) {
+    // Apply an authored set: fill the 4 moves + abilitySlot, mark the dropdown.
+    const si = Number(el.value);
+    ctrSetSel.set(idx, si);
+    const set = si >= 0 ? factorySetsFor(m.species)[si] : null;
+    if (set) {
+      m.moves = [...(set.moves || []), "", "", "", ""].slice(0, 4);
+      m.abilitySlot = [0, 1, 2].includes(set.abilitySlot) ? set.abilitySlot : 0;
+    }
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-sanity") && m) {
+    m.sanityOff = el.checked;
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-move") && m) {
+    // Blur after a manual move edit: re-render so the error line + set dropdown
+    // reflect the change (the live red border already updated on input).
     render();
     return true;
   } else if (el.classList.contains("ctr-diff")) {
@@ -1975,12 +2346,18 @@ function onCustomTrainerChange(el) {
     render();
     return true;
   } else if ((el.classList.contains("ctr-species") || el.classList.contains("ctr-fusion-species")) && m) {
-    // Species changed (pick/blur): re-render so the ability-slot labels for the
-    // new species resolve to their real names.
+    // Species changed (pick/blur): the authored-set list + legal pool differ, so
+    // reset this member's set selection to (custom) and re-render (also refreshes
+    // the ability-slot labels for the new species).
+    if (el.classList.contains("ctr-species")) {
+      ctrSetSel.set(idx, -1);
+    }
     render();
     return true;
   } else if (el.classList.contains("ctr-abil") && m) {
     m.abilitySlot = Number(el.value);
+    // A manual ability pick flips the "Use set" dropdown back to (custom).
+    ctrSetSel.set(idx, -1);
   } else if (el.classList.contains("ctr-fusion-abil") && m && m.fusion) {
     m.fusion.abilitySlot = Number(el.value);
   } else if (el.classList.contains("ctr-scale") && m) {
@@ -1998,10 +2375,18 @@ function onCustomTrainerChange(el) {
   return true;
 }
 
+/** Reset the per-member transient UI state (collapse + set selection). */
+function ctrResetMemberUiState() {
+  ctrOpenMembers.clear();
+  ctrSetSel.clear();
+}
+
 function onCustomTrainerClick(e) {
   const open = e.target.closest("[data-ctropen]");
   if (open) {
     ctrSelected = open.dataset.ctropen;
+    ctrResetMemberUiState();
+    bgmStop();
     render();
     return true;
   }
@@ -2013,6 +2398,9 @@ function onCustomTrainerClick(e) {
     }
     ctr.current[key] = t;
     ctrSelected = key;
+    ctrResetMemberUiState();
+    ctrOpenMembers.add(0); // the fresh member starts expanded
+    bgmStop();
     render();
     return true;
   }
@@ -2020,9 +2408,35 @@ function onCustomTrainerClick(e) {
   if (!t) {
     return false;
   }
+  // Collapse/expand a team member (task #9). Ignore clicks on the delete button.
+  const memSum = e.target.closest(".ctr-mem-sum");
+  if (memSum) {
+    const mi = Number(memSum.dataset.idx);
+    if (ctrOpenMembers.has(mi)) {
+      ctrOpenMembers.delete(mi);
+    } else {
+      ctrOpenMembers.add(mi);
+    }
+    render();
+    return true;
+  }
+  if (e.target.closest("#ctr-browse-class")) {
+    openTrainerClassModal();
+    return true;
+  }
+  if (e.target.closest("#ctr-bgm-play")) {
+    const sel = document.getElementById("ctr-bgm");
+    bgmPlay(sel ? sel.value : t.battleBgm);
+    return true;
+  }
+  if (e.target.closest("#ctr-bgm-stop")) {
+    bgmStop();
+    return true;
+  }
   if (e.target.closest("#ctr-add-member")) {
     if (t.team.length < 6) {
       t.team.push(blankCtrMember());
+      ctrOpenMembers.add(t.team.length - 1); // new member starts expanded
     }
     render();
     return true;
@@ -2031,6 +2445,8 @@ function onCustomTrainerClick(e) {
   if (memDel) {
     if (t.team.length > 1) {
       t.team.splice(Number(memDel.dataset.idx), 1);
+      // Team indices shifted; drop the (now-stale) per-index UI state.
+      ctrResetMemberUiState();
     }
     render();
     return true;
@@ -2806,6 +3222,17 @@ function buildDeltas() {
           memberBad = true;
         }
       }
+      // Move-legality gate: a member with sanity ENFORCED (sanityOff not set)
+      // must not carry an illegal move. Members with sanity off are exempt.
+      // Never silently strip — surface a clear error and refuse the trainer.
+      if (!m.sanityOff) {
+        for (const mv of ctrIllegalMoves(m)) {
+          bad.push(
+            `${t.name}: illegal move "${mv}" for ${m.species} (not in level-up/TM/egg pool; tick "Move sanity off" to allow it)`,
+          );
+          memberBad = true;
+        }
+      }
       const out = { species: id, abilitySlot: m.abilitySlot || 0 };
       if (m.formIndex) {
         out.formIndex = m.formIndex;
@@ -2829,6 +3256,10 @@ function buildDeltas() {
       if (held.length > 0) {
         out.heldItems = held;
       }
+      // Editor metadata: persist sanityOff ONLY when the check is turned off.
+      if (m.sanityOff) {
+        out.sanityOff = true;
+      }
       return out;
     });
     if (memberBad) {
@@ -2845,6 +3276,7 @@ function buildDeltas() {
       endless: t.endless === true,
       spawnChance: normalizeCtrSpawnChance(t.spawnChance),
       challenge: t.challenge || "none",
+      ...(normalizeCtrBattleBgm(t.battleBgm) ? { battleBgm: normalizeCtrBattleBgm(t.battleBgm) } : {}),
       team,
     };
   }
@@ -3002,6 +3434,7 @@ async function init() {
       evosData,
       ctrLive,
       trainerClassesData,
+      bgmData,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
@@ -3033,6 +3466,8 @@ async function init() {
       fetchJson(`${RAW_BASE}/er-custom-trainers.json${bust}`, {}),
       // Trainer-class sprite catalog (generated). Fallback → static list below.
       fetchJson("./data/trainer-classes.json", []),
+      // Battle-music catalog (generated). Fallback → empty (picker offers "(default)").
+      fetchJson("./data/bgm.json", []),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -3111,6 +3546,23 @@ async function init() {
     trainerClassByName.clear();
     for (const c of TRAINER_CLASSES) {
       trainerClassByName.set(c.name, c);
+    }
+
+    // Battle-music catalog: battle_* themes first, then everything else (each
+    // group alpha-sorted) so the picker surfaces battle tracks up top.
+    BGM_LIST = (Array.isArray(bgmData) ? bgmData : [])
+      .filter(b => b && typeof b.key === "string")
+      .map(b => ({ key: b.key, battle: b.battle === true }))
+      .sort((a, b) => (a.battle === b.battle ? a.key.localeCompare(b.key) : a.battle ? -1 : 1));
+
+    // Egg-move source + factory-set index for the per-member legality/set helpers.
+    EGG_MOVES_LIVE = eggLive && typeof eggLive === "object" ? eggLive : {};
+    factoryByConst.clear();
+    legalMovesCache.clear();
+    for (const s of FACTORY_SPECIES) {
+      if (s && s.const) {
+        factoryByConst.set(s.const, Array.isArray(s.setsDetail) ? s.setsDetail : []);
+      }
     }
 
     // Seed custom trainers from the live file (species id → CONST for editing).
