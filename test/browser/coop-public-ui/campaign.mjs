@@ -18,6 +18,8 @@ import { delay } from "./evidence.mjs";
 const START_PHASE = /Start Phase (\w+)/u;
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
+const TURN_PROGRESS = /Start Phase TurnStartPhase|host recorder: begin turn=/u;
+const EXP_PHASE = /Start Phase ExpPhase/u;
 
 function fromEach(clients, fn) {
   return Object.fromEntries(clients.map(client => [client.label, fn(client)]));
@@ -149,8 +151,62 @@ async function raiseGameSpeed(rig, policy, progress) {
   await progress.note("speed-raise applied (Game Speed -> 10x via Settings UI)", { keys });
 }
 
+/** Clients whose submitted command has not yet opened the real turn/replay path. */
+export function clientsAwaitingTurnProgress(rig, from) {
+  return Object.values(rig.clients).filter(client => !client.evidence.find(TURN_PROGRESS, from[client.label] ?? 0));
+}
+
+/**
+ * Drive only the clients whose first command never entered the turn path. A valid but CPU-starved
+ * browser turn can take much longer than the short fallback window. Run 29312876722 proved that
+ * blindly replaying the whole fallback on BOTH clients in that state smears its keys across damage,
+ * faint and EXP messages. Progress evidence makes the fallback selective instead.
+ */
+export async function driveBattleFallback(rig, keys, from, purpose) {
+  const pending = clientsAwaitingTurnProgress(rig, from);
+  await Promise.all(pending.map(client => client.sequence(keys, `${purpose}-${client.label}`)));
+  return pending;
+}
+
+/**
+ * Public-input driver for the authority's repeated post-battle EXP messages.
+ *
+ * ExpPhase is one prompt per party member. It logs a fresh phase instance immediately before
+ * opening the human-action message, so one exact marker authorizes one Space press. The renderer
+ * remains in CoopReplayTurnPhase until all authority-side EXP phases finish and the retained turn
+ * commit is published; it must never receive these presses.
+ */
+export function createPostBattleExpAdvancer(rig, from, stats, purpose) {
+  const authority = rig.host;
+  if (!authority) {
+    throw new Error(`${purpose}: post-battle EXP advancement requires the authenticated public host`);
+  }
+  let cursor = from[authority.label] ?? 0;
+  return async () => {
+    const phaseEvent = authority.evidence.find(EXP_PHASE, cursor);
+    if (!phaseEvent) {
+      return false;
+    }
+    cursor = phaseEvent.index + 1;
+    stats.postBattleExpPrompts += 1;
+    authority.evidence.record("campaign-post-battle-advance", {
+      phase: "ExpPhase",
+      phaseEventIndex: phaseEvent.index,
+      promptOrdinal: stats.postBattleExpPrompts,
+      authoritySeat: authority.label,
+    });
+    await authority.press("Space", `${purpose}-exp-${stats.postBattleExpPrompts}`);
+    return true;
+  };
+}
+
 /** Poll the post-turn outcome markers for a bounded window; null on timeout (no throw). */
-async function waitForOutcomeBounded(rig, from, timeoutMs) {
+export async function waitForOutcomeBounded(
+  rig,
+  from,
+  timeoutMs,
+  { stopOnTurnProgress = false, advancePostBattleExp = null } = {},
+) {
   const clients = Object.values(rig.clients);
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -179,6 +235,12 @@ async function waitForOutcomeBounded(rig, from, timeoutMs) {
     if (clients.every(client => client.evidence.find(LOCAL_COMMAND, from[client.label]))) {
       return { kind: "command" };
     }
+    if (stopOnTurnProgress && clientsAwaitingTurnProgress(rig, from).length === 0) {
+      return { kind: "turn-progress" };
+    }
+    if (advancePostBattleExp && (await advancePostBattleExp())) {
+      continue;
+    }
     await delay(100);
   }
   return null;
@@ -200,24 +262,43 @@ async function driveBattleWave(rig, policy, stats) {
     stats.turns = turn;
     await Promise.all(clients.map(client => client.checkpoint(`wave-${stats.wave}-turn-${turn}-command`)));
     const from = fromEach(clients, client => client.evidence.cursor());
-    await Promise.all(
-      clients.map(client => client.sequence(policy.keys.battle, `wave-${stats.wave}-turn-${turn}-attack-first`)),
-    );
-    let outcome = await waitForOutcomeBounded(rig, from, fallbackWindow);
-    if (!outcome) {
-      // Attack-first did not resolve the turn (no PP / disabled / wrong target). Cycle to
-      // the next move and wait the full budget before declaring a softlock.
-      stats.fallbackTurns += 1;
-      await Promise.all(
-        clients.map(client => client.sequence(policy.keys.battleFallback, `wave-${stats.wave}-turn-${turn}-fallback`)),
+    const purpose = `wave-${stats.wave}-turn-${turn}`;
+    const advancePostBattleExp = createPostBattleExpAdvancer(rig, from, stats, purpose);
+    await Promise.all(clients.map(client => client.sequence(policy.keys.battle, `${purpose}-attack-first`)));
+    let outcome = await waitForOutcomeBounded(rig, from, fallbackWindow, { stopOnTurnProgress: true });
+    const fallbackClients = [];
+    let turnProgressed = false;
+    if (outcome?.kind === "turn-progress") {
+      turnProgressed = true;
+      rig.host.evidence.record("campaign-turn-progress", {
+        wave: stats.wave,
+        turn,
+        fallbackSuppressed: true,
+        reason: "both public clients entered the addressed turn path",
+      });
+      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, { advancePostBattleExp });
+    }
+    if (!outcome && !turnProgressed) {
+      // Attack-first did not resolve or fully enter the turn (no PP / disabled / wrong target).
+      // Cycle only clients lacking turn-progress evidence; never replay input on a client whose
+      // valid turn is already executing under browser CPU pressure.
+      fallbackClients.push(
+        ...(await driveBattleFallback(rig, policy.keys.battleFallback, from, `${purpose}-fallback`)),
       );
-      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs);
+      if (fallbackClients.length > 0) {
+        stats.fallbackTurns += 1;
+      }
+      outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, { advancePostBattleExp });
     }
     if (!outcome) {
       const parked = latestStartPhase(clients);
+      const fallbackDetail =
+        fallbackClients.length > 0
+          ? `fallback clients=${fallbackClients.map(client => client.label).join(",")}`
+          : "fallback suppressed: submitted turn was already progressing";
       throw new Error(
-        `[campaign-softlock] wave ${stats.wave} turn ${turn}: attack-first + fallback produced no reward, `
-          + `wipe, faint, or next command within budget; latest phase=${parked?.name ?? "unknown"}`,
+        `[campaign-softlock] wave ${stats.wave} turn ${turn}: attack-first produced no reward, wipe, faint, `
+          + `or next command within budget (${fallbackDetail}); latest phase=${parked?.name ?? "unknown"}`,
       );
     }
     if (outcome.kind === "wipe") {
@@ -489,7 +570,16 @@ export async function runCampaign(rig) {
   try {
     for (let ordinal = 1; ordinal <= policy.targetWaves; ordinal++) {
       const waveNo = rig.activeBattleWave;
-      const stats = { wave: waveNo, ordinal, turns: 0, faints: 0, fallbackTurns: 0, surfaces: [], autoFirst: [] };
+      const stats = {
+        wave: waveNo,
+        ordinal,
+        turns: 0,
+        faints: 0,
+        fallbackTurns: 0,
+        postBattleExpPrompts: 0,
+        surfaces: [],
+        autoFirst: [],
+      };
       const startMs = Date.now();
       // Capture the wave-start cursor BEFORE the battle: the reward shop's OWNER marker is
       // logged when the shop opens (mid-wave), so the between-wave surface search must
