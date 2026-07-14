@@ -26,12 +26,13 @@ import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
+  assembleCoopRuntime,
   clearCoopLearnMoveForwardInFlight,
   clearCoopRuntime,
   getCoopController,
   getCoopInteractionRelay,
   markCoopLearnMoveForwardInFlight,
-  startLocalCoopSession,
+  setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { CoopInteractionTurn } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -103,12 +104,17 @@ function makeStubScene(): BattleScene {
 }
 
 function startAuthoritativeGuestSession(): void {
-  startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
+  const pair = createLoopbackPair();
+  const runtime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
+  setCoopRuntime(runtime);
+  runtime.controller.connect();
   const controller = getCoopController();
   if (controller == null) {
-    throw new Error("expected a live co-op controller after startLocalCoopSession");
+    throw new Error("expected a live co-op controller after assembling the guest runtime");
   }
-  controller.role = "guest";
+  if (controller.role !== "guest") {
+    throw new Error(`expected a genuine guest runtime, got ${controller.role}`);
+  }
 }
 
 /** Build a LearnMovePhase + neutralize its end() (the guest branch calls this.end() last). */
