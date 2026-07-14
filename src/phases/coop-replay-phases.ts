@@ -1732,6 +1732,21 @@ export class CoopFinalizeTurnPhase extends Phase {
       `guest wave-advance outcome=${tail.outcome} wave=${pending.wave} next=${tail.nextLogicalPhase}/wave${tail.nextWave} biomeChange=${tail.biomeChange} eggLapse=${tail.eggLapse} victoryKind=${tail.victoryKind ?? "-"} battleType=${BattleType[globalScene.currentBattle.battleType]} queues=${tail.outcome === "win" || tail.outcome === "capture" ? "VictoryPhase" : tail.outcome === "flee" ? "BattleEnd+NewBattle" : "GameOverPhase"} (host-stated)`,
     );
     try {
+      // This retained commit is the sole structural authority after the final replayed turn. A guest can
+      // already have a locally-derived NextEncounter/NewBattle tail in its future queue (especially when a
+      // delayed final carrier lands after presentation advanced). Appending the host-stated victory behind
+      // that tail starts wave N+1 before wave N's BattleEnd/reward boundary and parks the guest requesting an
+      // enemy carrier the host cannot publish yet. Fence the queue here: every legitimate post-turn visual
+      // event has completed before CoopFinalizeTurnPhase, and the committed transition below replaces all
+      // speculative future structure.
+      const displaced = globalScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+      if (displaced.length > 0) {
+        coopWarn(
+          "replay",
+          `guest wave-advance wave=${pending.wave}: replacing speculative future queue [${displaced.join(",")}]`,
+        );
+      }
+      globalScene.phaseManager.clearPhaseQueue();
       switch (tail.outcome) {
         case "win":
         case "capture": {

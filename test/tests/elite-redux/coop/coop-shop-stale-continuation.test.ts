@@ -37,7 +37,9 @@ describe.skipIf(!RUN)("coop #872 - stale shop continuation is dropped, not an NP
 
   /** Install a stub scene; `battle` null = torn down, `current` = what the phase manager reports as running. */
   function installScene(battle: { waveIndex: number } | null, current: unknown): void {
-    setMode = vi.fn();
+    // The real UI contract is Promise-returning. Keep the engine-free seam faithful so the positive
+    // live-scene case also reaches resetModifierSelect's readiness continuation.
+    setMode = vi.fn().mockResolvedValue(undefined);
     initGlobalScene({
       currentBattle: battle,
       phaseManager: { getCurrentPhase: () => current },

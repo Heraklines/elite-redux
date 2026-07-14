@@ -33,6 +33,7 @@ import {
   driveHostRewardShopOwner,
   forceItemRewards,
   installDuoLogCapture,
+  pumpDuoDestinations,
   reachQueuedRewardShop,
   remirrorWave,
   type ShopPhaseSeam,
@@ -114,6 +115,10 @@ describe.skipIf(!RUN)("co-op DUO pokeball reward: ball grant SYNCs across two en
       await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward: true }));
       await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
     }
+    // A guest-owned TAKE is an intent: the host watcher commits it, then the retained result must return
+    // to the guest owner before either scene is inspected. Real browsers receive that final hop in the
+    // guest process; the one-realm harness closes it explicitly under each destination context.
+    await pumpDuoDestinations(rig, 2);
     return { hostOwns };
   }
 

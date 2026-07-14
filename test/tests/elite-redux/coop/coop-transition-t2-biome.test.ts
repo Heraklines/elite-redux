@@ -149,22 +149,14 @@ function installHeadlessPlayerAtlasCompletion(scene: BattleScene): {
   // with no-ops. Model only those missing cache/live-key effects after the real production loader resolves;
   // the transition still awaits Pokemon.loadAssets(false) and still exercises every fail-closed production
   // presentation assertion before command continuation can open.
-  const releasedKeys = new Set<string>();
-  const originalTextureExists = scene.textures.exists.bind(scene.textures);
-  const originalAnimationExists = scene.anims.exists.bind(scene.anims);
-  const textureExists = vi
-    .spyOn(scene.textures, "exists")
-    .mockImplementation(key => releasedKeys.has(String(key)) || originalTextureExists(key));
-  const animationExists = vi
-    .spyOn(scene.anims, "exists")
-    .mockImplementation(key => releasedKeys.has(String(key)) || originalAnimationExists(key));
+  // buildDuo owns the one scene-level cache model. This helper counts production player loads only;
+  // wrapping the already-spied cache methods again creates a self-recursive Vitest mock.
   let productionLoadsCompleted = 0;
   const assetLoads = scene.getPlayerParty().map(pokemon => {
     const original = pokemon.loadAssets.bind(pokemon);
     return vi.spyOn(pokemon, "loadAssets").mockImplementation(async (ignoreOverride = true, useIllusion = false) => {
       await original(ignoreOverride, useIllusion);
       const key = pokemon.getBattleSpriteKey();
-      releasedKeys.add(key);
       const sprite = pokemon.getSprite() as unknown as
         | {
             texture?: { key: string };
@@ -189,8 +181,6 @@ function installHeadlessPlayerAtlasCompletion(scene: BattleScene): {
       for (const assetLoad of assetLoads) {
         assetLoad.mockRestore();
       }
-      textureExists.mockRestore();
-      animationExists.mockRestore();
     },
   };
 }

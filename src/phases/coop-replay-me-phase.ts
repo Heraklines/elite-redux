@@ -382,6 +382,17 @@ export class CoopReplayMePhase extends Phase {
       }
       this.settleForWatcherShop(relay);
     };
+    // The option carrier can beat this phase during a slow guest transition/rejoin. The relay retains
+    // that carrier, but assigning a callback does not replay an already-buffered notification. Without
+    // this admission the guest waits forever on the ME surface while the host is already parked at the
+    // reciprocal shop barrier. Treat the retained inbox as an edge-trigger that already happened; the
+    // shop opener consumes the same buffered options and still performs every normal authority check.
+    if (relay.hasBufferedRewardOptionsFor(shopKeyPrefix)) {
+      coopLog("me", "reward shop handoff was buffered before replay listener; admitting retained edge", {
+        counter: this.interactionCounter,
+      });
+      relay.onRewardOptionsBuffered(shopKeyPrefix);
+    }
     this.awaitHostPresentationThenEnter(relay);
   }
 

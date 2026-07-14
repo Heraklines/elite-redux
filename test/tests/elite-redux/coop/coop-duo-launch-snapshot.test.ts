@@ -235,19 +235,9 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
 
       const phase = new LaunchPresentationProbePhase(true);
       const currentPhase = vi.spyOn(rig.guestScene.phaseManager, "getCurrentPhase").mockReturnValue(phase);
-      // The shared HEADLESS fixture intentionally replaces Phaser's atlas loader and Sprite.play with no-ops:
-      // it cannot populate TextureManager/AnimationManager or move a sprite off its substitute texture. Model
-      // exactly those three effects at each deferred production-loader completion; the implementation still
-      // calls the real Pokemon.loadAssets and still performs its production cache/live-key assertions.
-      const releasedKeys = new Set<string>();
-      const originalTextureExists = rig.guestScene.textures.exists.bind(rig.guestScene.textures);
-      const originalAnimationExists = rig.guestScene.anims.exists.bind(rig.guestScene.anims);
-      const textureExists = vi
-        .spyOn(rig.guestScene.textures, "exists")
-        .mockImplementation(key => releasedKeys.has(String(key)) || originalTextureExists(key));
-      const animationExists = vi
-        .spyOn(rig.guestScene.anims, "exists")
-        .mockImplementation(key => releasedKeys.has(String(key)) || originalAnimationExists(key));
+      // buildDuo installs the shared HEADLESS atlas-completion model. This proof delays the two real loaders
+      // but must not wrap TextureManager/AnimationManager a second time: stacking a spy around an existing
+      // spy makes the captured "original" point back at itself and recurses instead of modeling Phaser.
       const releases: (() => Promise<void>)[] = [];
       const assetLoads = seats.map(pokemon => {
         const original = pokemon.loadAssets.bind(pokemon);
@@ -258,7 +248,6 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
               releases.push(async () => {
                 try {
                   await original(false);
-                  releasedKeys.add(key);
                   const sprite = pokemon.getSprite() as unknown as {
                     texture: { key: string };
                     anims: { currentAnim?: { key: string } };
@@ -293,11 +282,9 @@ describe.skipIf(!RUN)("co-op DUO M4 push-snapshot launch: guest boots from the h
         expect(pokemon.getSprite()?.visible, `${pokemon.name} sprite is visible before continuation`).toBe(true);
         expect(pokemon.getBattleInfo()?.visible, `${pokemon.name} info bar is visible before continuation`).toBe(true);
         const key = pokemon.getBattleSpriteKey();
-        expect(textureExists, `${pokemon.name} real texture cache was inspected`).toHaveBeenCalledWith(key);
-        expect(animationExists, `${pokemon.name} real animation cache was inspected`).toHaveBeenCalledWith(key);
+        expect(rig.guestScene.textures.exists(key), `${pokemon.name} real texture cache is resident`).toBe(true);
+        expect(rig.guestScene.anims.exists(key), `${pokemon.name} real animation cache is resident`).toBe(true);
       }
-      textureExists.mockRestore();
-      animationExists.mockRestore();
       currentPhase.mockRestore();
     });
     logs.flush();

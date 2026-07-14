@@ -57,6 +57,8 @@ const rec = {
   incrementTurnCalls: 0,
   queueTurnEndCalls: 0,
   clearLastTurnOrderCalls: 0,
+  clearPhaseQueueCalls: 0,
+  queuedFuture: [] as string[],
   pushedPhases: [] as string[],
   turn: 1,
 };
@@ -85,6 +87,13 @@ function makeStubScene(): BattleScene {
     },
     phaseManager: {
       shiftPhase() {},
+      getQueuedPhaseNames() {
+        return [...rec.queuedFuture];
+      },
+      clearPhaseQueue() {
+        rec.clearPhaseQueueCalls++;
+        rec.queuedFuture = [];
+      },
       pushNew(name: string, ..._args: unknown[]) {
         rec.pushedPhases.push(name);
       },
@@ -209,6 +218,8 @@ describe("#698 - single-turn-win finalize must not start a phantom next turn", (
     rec.incrementTurnCalls = 0;
     rec.queueTurnEndCalls = 0;
     rec.clearLastTurnOrderCalls = 0;
+    rec.clearPhaseQueueCalls = 0;
+    rec.queuedFuture = [];
     rec.pushedPhases = [];
     rec.turn = 1;
     initGlobalScene(makeStubScene());
@@ -234,6 +245,9 @@ describe("#698 - single-turn-win finalize must not start a phantom next turn", (
 
   it("CoopFinalizeTurnPhase.finishTurn(): a same-turn win runs the wave-advance tail and advances NO turn", async () => {
     await startGuestWithPendingWin();
+    // A delayed final carrier may arrive after local presentation speculatively queued the next encounter.
+    // The retained host transition must replace that future instead of appending Victory behind it.
+    rec.queuedFuture = ["NextEncounterPhase", "NewBattlePhase"];
 
     const phase = makeFinalizePhase(1);
     callPrivate(phase, "finishTurn");
@@ -244,6 +258,8 @@ describe("#698 - single-turn-win finalize must not start a phantom next turn", (
     expect(rec.turn).toBe(1);
     // The damaging turn-end engine must NOT run on the terminal branch either.
     expect(rec.queueTurnEndCalls).toBe(0);
+    expect(rec.clearPhaseQueueCalls, "the retained transition fences speculative future phases").toBe(1);
+    expect(rec.queuedFuture, "the speculative local next-wave tail was discarded").toEqual([]);
     // Instead the wave-advance tail runs: the pending advance is consumed and a VictoryPhase is queued.
     expect(coopHasPendingWaveAdvance()).toBe(false);
     expect(rec.pushedPhases).toContain("VictoryPhase");

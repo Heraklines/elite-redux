@@ -1251,10 +1251,25 @@ function destinationPumpOperationEnvelopes(pair: {
   const queues: Record<CoopRole, CoopMessage[]> = { host: [], guest: [] };
   let destinationContextDelivery = false;
 
+  // These carriers either validate/apply against globalScene immediately or resume a continuation which
+  // does. Delivering them synchronously while the sender's ClientCtx is installed can make a valid guest
+  // turn inspect the host preimage (and be rejected as malformed), or mutate the host scene through the
+  // guest runtime. Real browsers can never borrow one another's globals, so these always wait for the
+  // destination pump even outside an explicitly fully-scheduled transition surface.
+  const requiresDestinationScene = new Set<CoopMessage["t"]>([
+    "envelope",
+    "turnResolution",
+    "waveResolved",
+    "waveEndState",
+    "enemyPartySync",
+    "stateSync",
+    "rewardOptions",
+  ]);
+
   const wrap = (inner: CoopTransport): { transport: CoopTransport; deliverQueued(message: CoopMessage): void } => {
     const handlers = new Set<(message: CoopMessage) => void>();
     const unsubscribe = inner.onMessage(message => {
-      if (message.t === "envelope" || destinationContextDelivery) {
+      if (requiresDestinationScene.has(message.t) || destinationContextDelivery) {
         queues[inner.role].push(message);
         return;
       }
