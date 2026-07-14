@@ -26,7 +26,7 @@
 // =============================================================================
 
 import { pokerogueApi } from "#api/api";
-import { getSessionDataLocalStorageKey, loggedInUser } from "#app/account";
+import { getSessionDataLocalStorageKey, loggedInUser, updateUserInfo } from "#app/account";
 import type { BattleScene } from "#app/battle-scene";
 import { saveKey } from "#app/constants";
 import { getGameMode } from "#app/game-mode";
@@ -226,7 +226,12 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     vi.spyOn(game.classicMode, "startBattle").mockImplementation(async (...args) => {
       setBypassLoginForTesting(true);
       try {
-        return await startBattle(...args);
+        const result = await startBattle(...args);
+        const [accountReady] = await updateUserInfo();
+        if (!accountReady || loggedInUser == null) {
+          throw new Error("resume fixture could not initialize its pre-pair browser account");
+        }
+        return result;
       } finally {
         setBypassLoginForTesting(false);
       }
@@ -563,7 +568,10 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
     const newerCloudDurable = withPeerPumpingClient(rig.guestCtx, () =>
       host.sendResumeCheckpoint(newerJson, newerCommitment!, 30_000, true),
     );
-    await flush();
+    await vi.waitFor(
+      () => expect(requestedCloudBytes, "the cloud transaction reached its ordered mutation tail").toHaveLength(1),
+      { timeout: 2_000, interval: 10 },
+    );
     expect(requestedCloudBytes, "a host-cadence checkpoint starts one ordered guest cloud mirror").toEqual([newerJson]);
 
     const newestJson = JSON.stringify({
@@ -1413,15 +1421,23 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         cloudRaw = raw;
         return { ok: true, status: 200, error: "", failureKind: null };
       });
-      const encryptedIncoming = encrypt(incomingJson, false);
       storageWrite = vi.spyOn(localStorage, "setItem").mockImplementation(function (
         this: Storage,
         key: string,
         value: string,
       ) {
-        if (failIncomingLocalWrite && key === localKey && value === encryptedIncoming) {
-          failIncomingLocalWrite = false;
-          throw new DOMException("quota", "QuotaExceededError");
+        if (failIncomingLocalWrite && key === localKey) {
+          try {
+            if (decrypt(value, false) === incomingJson) {
+              failIncomingLocalWrite = false;
+              throw new DOMException("quota", "QuotaExceededError");
+            }
+          } catch (error) {
+            if (error instanceof DOMException && error.name === "QuotaExceededError") {
+              throw error;
+            }
+            // A non-save write is not the exact incoming checkpoint targeted by this fault.
+          }
         }
         return originalSetItem.call(this, key, value);
       });
@@ -1709,7 +1725,12 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
             }
           : { ok: true, status: 200, value: { state: "missing", runId: request.coopRunId } },
       );
-      const cloudWrite = vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas");
+      const cloudWrite = vi.spyOn(pokerogueApi.savedata.session, "updateCoopCas").mockResolvedValue({
+        ok: true,
+        status: 200,
+        error: "",
+        failureKind: null,
+      });
       await withClient(rig.guestCtx, () => rig.guestScene.gameData.armCoopResumeCheckpointPersistence());
 
       await expect(
@@ -1724,12 +1745,20 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
       displacedState = "tombstoned";
       await expect(
         withClient(rig.guestCtx, () =>
-          rig.guestScene.gameData.persistCurrentCoopResumeCheckpoint(incomingJson, incoming!, false),
+          rig.guestScene.gameData.persistCurrentCoopResumeCheckpoint(incomingJson, incoming!, true),
         ),
-        "an exact tombstone permits lineage retirement and local-only durability",
+        "an exact tombstone permits lineage retirement followed by a new cloud-backed checkpoint",
       ).resolves.toEqual({ success: true });
       expect(decrypt(localStorage.getItem(keys[0])!, false)).toBe(incomingJson);
-      expect(localStorage.getItem(headKey), "the displaced head is cleared before ACK").toBeNull();
+      expect(cloudWrite, "the new lineage wins an empty-slot cloud CAS before ACK").toHaveBeenCalledOnce();
+      expect(
+        JSON.parse(localStorage.getItem(headKey) ?? "null"),
+        "the displaced head is replaced before ACK",
+      ).toMatchObject({
+        runId: incoming!.runId,
+        checkpointRevision: incoming!.checkpointRevision,
+        digest: incoming!.digest,
+      });
     } finally {
       tracked.forEach(([key, value]) => {
         value == null ? localStorage.removeItem(key) : localStorage.setItem(key, value);

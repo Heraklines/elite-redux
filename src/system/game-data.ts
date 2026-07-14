@@ -3718,27 +3718,6 @@ export class GameData {
             if (selectedHead.kind === "invalid") {
               return { success: false, reason: "cloud-conflict" };
             }
-            if (!bypassLogin && selected.cloudCas?.mode === "empty") {
-              // Empty CAS is valid only for the initial cloud-mirrored checkpoint. A non-cloud
-              // cadence message may advance an established exact parent, but may never ACK a
-              // physically empty/orphan slot as durable state.
-              if (!mirrorCloud || accountIdentity == null || selectedHead.kind !== "absent") {
-                return { success: false, reason: "cloud-conflict" };
-              }
-              const incomingStatus = await this.readCoopRunStatus({
-                clientSessionId,
-                coopRunId: commitment.runId,
-                slot: selected.slot,
-              });
-              if (
-                !exactRuntimeIsCurrent()
-                || localStorage.getItem(storageKey) !== selected.localRaw
-                || !incomingStatus.ok
-                || incomingStatus.value.state !== "missing"
-              ) {
-                return { success: false, reason: "cloud-conflict" };
-              }
-            }
             if (
               selectedHead.kind === "valid"
               && selectedHead.head.runId !== commitment.runId
@@ -3765,6 +3744,27 @@ export class GameData {
                 return { success: false, reason: "cloud-conflict" };
               }
               selectedHead = { kind: "absent" };
+            }
+            if (!bypassLogin && selected.cloudCas?.mode === "empty") {
+              // Empty CAS is valid only for an initial cloud-mirrored checkpoint. Retire an exactly
+              // tombstoned displaced lineage above first; a non-cloud cadence message still may not ACK
+              // a physically empty/orphan slot as durable state.
+              if (!mirrorCloud || accountIdentity == null || selectedHead.kind !== "absent") {
+                return { success: false, reason: "cloud-conflict" };
+              }
+              const incomingStatus = await this.readCoopRunStatus({
+                clientSessionId,
+                coopRunId: commitment.runId,
+                slot: selected.slot,
+              });
+              if (
+                !exactRuntimeIsCurrent()
+                || localStorage.getItem(storageKey) !== selected.localRaw
+                || !incomingStatus.ok
+                || incomingStatus.value.state !== "missing"
+              ) {
+                return { success: false, reason: "cloud-conflict" };
+              }
             }
             if (selected.cloudCas?.mode === "existing" && accountIdentity != null) {
               const observedCloudHead = {
