@@ -251,56 +251,64 @@ export async function driveBattleFallback(rig, keys, from, purpose) {
 }
 
 /**
- * Public-input driver for readiness-proven authority battle messages.
+ * Public-input driver for readiness-proven per-client battle messages.
  *
  * Both ordinary MessagePhase narration (for example, "Wild Yungoos fainted!") and ExpPhase can
  * block the authoritative phase queue on a human ACTION. The read-only semantic observer publishes
  * them only with the handler's complete `isAwaitingPromptAction()` contract and a phase-instance
- * discriminator. One distinct ready instance authorizes exactly one Space on the public authority.
- * The renderer remains in CoopReplayTurnPhase and must never receive these presses.
+ * discriminator. One distinct ready instance authorizes exactly one Space on that same public
+ * client. Most renderer phases are passive, but a narrated CoopFaintReplayPhase opens a real local
+ * MessagePhase prompt too; run 29321837675 proved leaving that readiness signal undriven prevents
+ * the guest from applying/ACKing the completed turn forever.
  */
 export function createBattlePromptAdvancer(rig, from, stats, purpose) {
-  const authority = rig.host;
-  if (!authority) {
+  if (!rig.host) {
     throw new Error(`${purpose}: battle prompt advancement requires the authenticated public host`);
   }
-  let cursor = from[authority.label] ?? 0;
+  const clients = Object.values(rig.clients);
+  const cursors = new Map(clients.map(client => [client.label, from[client.label] ?? 0]));
   const consumedInstances = new Set();
   return async () => {
-    const readyEvent = authority.evidence.events.slice(cursor).find(event => {
-      if (event.kind !== "browser-surface2") {
-        return false;
+    for (const client of clients) {
+      const readyEvent = client.evidence.events.slice(cursors.get(client.label) ?? 0).find(event => {
+        if (event.kind !== "browser-surface2") {
+          return false;
+        }
+        const observation = event.observation;
+        const expectedPhase = BATTLE_PROMPT_PHASES.get(observation.surfaceId);
+        const instanceKey = `${client.label}:${observation.surfaceId}:${observation.phaseInstance}`;
+        return (
+          expectedPhase != null
+          && observation.phase === expectedPhase
+          && observation.uiMode === "MESSAGE"
+          && observation.ownerModel === "local"
+          && observation.seatsWithInput?.includes(observation.localSeat)
+          && Number.isSafeInteger(observation.phaseInstance)
+          && observation.ready?.awaitingActionInput === true
+          && !consumedInstances.has(instanceKey)
+        );
+      });
+      if (!readyEvent) {
+        continue;
       }
-      const observation = event.observation;
-      const expectedPhase = BATTLE_PROMPT_PHASES.get(observation.surfaceId);
-      const instanceKey = `${observation.surfaceId}:${observation.phaseInstance}`;
-      return (
-        expectedPhase != null
-        && observation.phase === expectedPhase
-        && observation.uiMode === "MESSAGE"
-        && Number.isSafeInteger(observation.phaseInstance)
-        && observation.ready?.awaitingActionInput === true
-        && !consumedInstances.has(instanceKey)
-      );
-    });
-    if (!readyEvent) {
-      return false;
+      cursors.set(client.label, readyEvent.index + 1);
+      const { surfaceId, phase, phaseInstance } = readyEvent.observation;
+      consumedInstances.add(`${client.label}:${surfaceId}:${phaseInstance}`);
+      const statName = phase === "ExpPhase" ? "postBattleExpPrompts" : "battleMessagePrompts";
+      stats[statName] = (stats[statName] ?? 0) + 1;
+      client.evidence.record("campaign-battle-prompt-advance", {
+        surfaceId,
+        phase,
+        phaseInstance,
+        readyEventIndex: readyEvent.index,
+        promptOrdinal: stats[statName],
+        inputSeat: client.label,
+        authority: client === rig.host,
+      });
+      await client.press("Space", `${purpose}-${client.label}-${surfaceId}-${stats[statName]}`);
+      return true;
     }
-    cursor = readyEvent.index + 1;
-    const { surfaceId, phase, phaseInstance } = readyEvent.observation;
-    consumedInstances.add(`${surfaceId}:${phaseInstance}`);
-    const statName = phase === "ExpPhase" ? "postBattleExpPrompts" : "battleMessagePrompts";
-    stats[statName] = (stats[statName] ?? 0) + 1;
-    authority.evidence.record("campaign-battle-prompt-advance", {
-      surfaceId,
-      phase,
-      phaseInstance,
-      readyEventIndex: readyEvent.index,
-      promptOrdinal: stats[statName],
-      authoritySeat: authority.label,
-    });
-    await authority.press("Space", `${purpose}-${surfaceId}-${stats[statName]}`);
-    return true;
+    return false;
   };
 }
 

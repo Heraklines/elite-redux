@@ -54,6 +54,9 @@ class FakeEvidence {
         phase,
         phaseInstance,
         uiMode: "MESSAGE",
+        ownerModel: "local",
+        localSeat: 0,
+        seatsWithInput: [0],
         ready: { awaitingActionInput },
       },
     });
@@ -75,7 +78,7 @@ function fakeClient(label, texts = []) {
   };
 }
 
-test("ready battle narration and EXP instances advance once each on the public authority", async () => {
+test("ready local battle narration and EXP instances advance once on each public client", async () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
   const rig = { host: authority, clients: { authority, renderer } };
@@ -89,6 +92,9 @@ test("ready battle narration and EXP instances advance once each on the public a
   assert.equal(await advance(), false);
   authority.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 1);
   assert.equal(await advance(), false, "a duplicate ready observation must not re-drive one phase instance");
+  renderer.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 1);
+  assert.equal(await advance(), true, "a renderer faint narration is a distinct human-action surface");
+  assert.equal(await advance(), false);
   authority.evidence.pushBattleReadiness("battle:exp", "ExpPhase", true, 2);
   assert.equal(await advance(), true);
   assert.equal(await advance(), false);
@@ -97,16 +103,22 @@ test("ready battle narration and EXP instances advance once each on the public a
     authority.presses.map(entry => entry.key),
     ["Space", "Space"],
   );
-  assert.equal(renderer.presses.length, 0);
-  assert.equal(stats.battleMessagePrompts, 1);
-  assert.equal(stats.postBattleExpPrompts, 1);
-  const advances = authority.evidence.events.filter(event => event.kind === "campaign-battle-prompt-advance");
-  assert.equal(advances.length, 2);
   assert.deepEqual(
-    advances.map(event => [event.surfaceId, event.phaseInstance]),
+    renderer.presses.map(entry => entry.key),
+    ["Space"],
+  );
+  assert.equal(stats.battleMessagePrompts, 2);
+  assert.equal(stats.postBattleExpPrompts, 1);
+  const advances = [...authority.evidence.events, ...renderer.evidence.events].filter(
+    event => event.kind === "campaign-battle-prompt-advance",
+  );
+  assert.equal(advances.length, 3);
+  assert.deepEqual(
+    advances.map(event => [event.inputSeat, event.surfaceId, event.phaseInstance]),
     [
-      ["battle:message", 1],
-      ["battle:exp", 2],
+      ["authority", "battle:message", 1],
+      ["authority", "battle:exp", 2],
+      ["renderer", "battle:message", 1],
     ],
   );
 });

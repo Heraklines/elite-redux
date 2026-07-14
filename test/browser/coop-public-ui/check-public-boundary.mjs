@@ -107,6 +107,12 @@ if (
 ) {
   failures.push("coop-browser-entry.ts: missing the read-only visible render-profile attestation");
 }
+if (
+  !browserEntry.includes("semanticBattleAddress(battle)")
+  || !browserEntry.includes("address: { epoch, wave, turn }")
+) {
+  failures.push("coop-browser-entry.ts: setup option surfaces must remain observable before Battle construction");
+}
 
 if (failures.length > 0) {
   console.error(failures.join("\n"));
