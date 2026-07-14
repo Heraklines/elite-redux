@@ -2662,6 +2662,8 @@ let active: CoopRuntime | null = null;
  * after installing the destination scene, durability manager, and operation state together.
  */
 const pendingRuntimeActivations = new WeakMap<CoopRuntime, Set<() => void>>();
+/** Last scene installed alongside each runtime; direct engine-free tests intentionally share one scene. */
+const runtimeSceneBindings = new WeakMap<CoopRuntime, object>();
 
 export function runWhenCoopRuntimeActive(runtime: CoopRuntime, callback: () => void): () => void {
   let live = true;
@@ -2697,22 +2699,11 @@ function flushPendingRuntimeActivations(runtime: CoopRuntime): void {
   }
   pendingRuntimeActivations.delete(runtime);
   for (const callback of [...callbacks]) {
-    // `setCoopRuntime` is one part of the duo harness's context install; RND/ghost/module state follows it.
-    // Run on the next microtask so the full destination context is installed. If a synchronous pump already
-    // switched away again, put the exact callback back on this runtime rather than mutating the wrong peer.
-    queueMicrotask(() => {
-      if (active !== runtime) {
-        const pending = pendingRuntimeActivations.get(runtime) ?? new Set<() => void>();
-        pending.add(callback);
-        pendingRuntimeActivations.set(runtime, pending);
-        return;
-      }
-      try {
-        callback();
-      } catch (error) {
-        coopWarn("runtime", "destination-runtime continuation threw after activation", error);
-      }
-    });
+    try {
+      callback();
+    } catch (error) {
+      coopWarn("runtime", "destination-runtime continuation threw after activation", error);
+    }
   }
 }
 
@@ -2761,6 +2752,7 @@ export function coopSessionGeneration(): number {
 /** Register the live co-op session (called when a co-op run is being set up). */
 export function setCoopRuntime(runtime: CoopRuntime): void {
   active = runtime;
+  runtimeSceneBindings.set(runtime, globalScene);
   // Wave-2e: point the operation journal at THIS runtime's durability manager. Load-bearing in the duo
   // harness, where two runtimes coexist in-process and `withClient` swaps the active one per pumped client -
   // the migrated adapters' commit path must journal into the ACTIVE client's manager, not a stale global.
@@ -4594,10 +4586,16 @@ export function assembleCoopRuntime(
         // sender's record (or fail-loud throw when nothing is installed), and the receiver's watcher-adopt
         // reads its own empty record and never converges. Installing the assembly-owned opState here lands
         // the apply on the receiver's own record. Production has one runtime, so this scope is a no-op there.
-        apply: entry =>
-          active === runtime
-            ? withActiveCoopRuntimeOpState(opState, () => operationDurabilityHooks.apply?.(entry))
-            : "deferred",
+        apply: entry => {
+          const receiverScene = runtimeSceneBindings.get(runtime);
+          // The in-process engine harness owns distinct scenes, so a known destination scene mismatch is a
+          // valid deferred boundary. Engine-free operation tests intentionally share one scene (or never
+          // install a receiver scene); their stable runtime bindings remain safe and synchronous.
+          if (receiverScene != null && receiverScene !== globalScene) {
+            return "deferred";
+          }
+          return withActiveCoopRuntimeOpState(opState, () => operationDurabilityHooks.apply?.(entry));
+        },
         sendFullSnapshot: (cls, headRevision, controlHighWater) =>
           sendCoopDurabilitySnapshot(runtime, cls, headRevision, controlHighWater),
         onRecoveryExhausted: failure =>

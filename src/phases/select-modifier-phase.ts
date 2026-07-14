@@ -1341,7 +1341,7 @@ export class SelectModifierPhase extends BattlePhase {
       // that proof until the guest's addressed public continuation emits continuationReady.
       recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
       this.coopAwaitTerminalMaterialApplied(prepared.operationId);
-      return true;
+      return false;
     }
     if (isCoopDebug()) {
       coopLog(
@@ -1363,6 +1363,12 @@ export class SelectModifierPhase extends BattlePhase {
 
   /** HOST: publish the complete post-action result before any continuation surface opens. */
   private coopCommitPendingAuthorityResult(operationId = this.coopPendingAuthorityOperationId): boolean {
+    // A host-owned terminal already committed at the relay seam and armed its peer-material barrier. Preserve
+    // the historical `coopRelaySend() === false` contract for direct drivers, but stop its ordinary caller
+    // here before teardown/counter advance. The barrier callback owns that exact continuation now.
+    if (operationId == null && this.coopAwaitingMaterialResults.size > 0) {
+      return false;
+    }
     if (operationId == null || !isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)) {
       return true;
     }

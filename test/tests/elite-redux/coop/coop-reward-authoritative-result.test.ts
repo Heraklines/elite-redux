@@ -189,6 +189,7 @@ describe("P33 retained reward/shop authoritative results", () => {
       pinned: 2,
       label: "skip",
       choice: COOP_INTERACTION_LEAVE,
+      data: undefined,
       terminal: true,
       localRole: "host",
       wave: 7,
