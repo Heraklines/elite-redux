@@ -216,7 +216,7 @@ export class EvidenceSink {
     this.expectedMissingSystemSaveErrors = expectedMissingSystemSaveErrors;
     this.events = [];
     this.failures = [];
-    this.networkState = { account: null, lobby: null };
+    this.networkState = { account: null, lobby: null, apiFailure: null };
     this.writeTail = Promise.resolve();
   }
 
@@ -441,6 +441,15 @@ export class EvidenceSink {
       && !url.pathname.startsWith("/coop/lobby")
       && !url.pathname.startsWith("/coop/v3/lobby")
     ) {
+      return;
+    }
+    // A non-2xx on an endpoint the harness DRIVES navigation from (the co-op lobby or the
+    // account view) is a hard failure, not a "keep polling" miss: record it so the lobby
+    // waiters fail loud with the exact status instead of masking it as a generic timeout.
+    const status = response.status();
+    if (status < 200 || status >= 300) {
+      this.networkState.apiFailure = { pathname: url.pathname, status, url: safeUrl(response.url()) };
+      this.record("driver-api-failure", this.networkState.apiFailure);
       return;
     }
     let body;

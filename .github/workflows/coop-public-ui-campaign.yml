@@ -49,8 +49,10 @@ on:
           - guest-seat
           - host-seat
   push:
-    # Narrowly scoped to this campaign branch so pushes run a cheap live shakedown
-    # (8 waves, auto-first ON) without needing the workflow on the default branch.
+    # Narrowly scoped to this campaign branch so pushes run a cheap live smoke
+    # (8 waves) without needing the workflow on the default branch. LOUD-FAIL: a push
+    # run never auto-firsts - an unknown/undriven surface fails the run so a missing
+    # driver surfaces immediately instead of being pressed through silently.
     branches:
       - "ci/coop/p33-campaign-30w"
   schedule:
@@ -293,10 +295,13 @@ jobs:
           COOP_UI_ACCOUNT_MODE: register
           # push = cheap shakedown (8 waves, auto-first ON); dispatch = inputs; cron = 30-wave soak.
           COOP_UI_CAMPAIGN_WAVES: ${{ inputs.campaign_waves || (github.event_name == 'push' && '8') || '30' }}
-          # Only a shakedown may press through unknown surfaces; nightly + gating dispatch loud-fail.
-          COOP_UI_CAMPAIGN_MODE: ${{ (github.event_name == 'push' && 'shakedown') || (github.event_name == 'schedule' && 'nightly') || (inputs.auto_first && 'shakedown') || 'gating' }}
+          # Loud-fail everywhere by default. `shakedown` (the ONLY mode that permits press-through of
+          # an unknown surface) is now reachable ONLY by an explicit dispatch with auto_first=true - a
+          # deliberate ordering test. push = loud-fail smoke, schedule = nightly, dispatch = gating.
+          COOP_UI_CAMPAIGN_MODE: ${{ (github.event_name == 'schedule' && 'nightly') || (inputs.auto_first && 'shakedown') || 'gating' }}
           COOP_UI_REWARD_MODE: ${{ inputs.reward_mode || 'leave' }}
-          COOP_UI_AUTO_FIRST: ${{ (github.event_name == 'push' && '1') || (inputs.auto_first && '1') || '0' }}
+          # auto-first is NEVER a default (not on push, not on nightly). Explicit opt-in only.
+          COOP_UI_AUTO_FIRST: ${{ (inputs.auto_first && '1') || '0' }}
           # Default ON for push/schedule; only an explicit dispatch raise_speed=false turns it off.
           # (A bare `inputs.raise_speed == false` is TRUE on push, where inputs is null -> would wrongly skip.)
           COOP_UI_RAISE_SPEED: ${{ (github.event_name != 'workflow_dispatch' || inputs.raise_speed) && '1' || '0' }}

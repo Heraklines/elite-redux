@@ -260,8 +260,15 @@ function findSemanticOwnerClient(rig, surfaceId, cursors) {
   return null;
 }
 
-/** Find the OWNER client + the evidence event that identifies this appearance, or null. */
-function resolveSurfaceOwner(rig, driver, cursors, handledIndex) {
+/**
+ * Find the OWNER client + the evidence event that identifies this appearance, or null.
+ *
+ * `strict` (every loud-fail run - gating + nightly; false only under the explicit
+ * shakedown/auto-first ordering opt-in) forbids the role-default fallback: a surface that
+ * declares a v2 semantic mirror (`v2SurfaceId`) but whose mirror never reports an owner is a
+ * MISSING/MALFORMED marker, and drops the run loudly rather than silently assuming `rig.host`.
+ */
+function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) {
   const clients = Object.values(rig.clients);
   const notYetHandled = (client, event) =>
     event != null && event.index > (handledIndex.get(`${driver.name}:${client.label}`) ?? -1);
@@ -305,6 +312,16 @@ function resolveSurfaceOwner(rig, driver, cursors, handledIndex) {
       }
     }
   }
+  // The surface is up (presence found) but no per-client OWNER evidence resolved it. In a
+  // loud-fail run, refuse to assume the role default when the surface advertised a v2 mirror
+  // that should have named the owner - a missing/malformed marker must fail, not auto-advance.
+  if (strict && driver.v2SurfaceId) {
+    throw new Error(
+      `[campaign-owner-evidence] surface "${driver.name}" is up but its v2 semantic mirror `
+        + `(${driver.v2SurfaceId}) never reported an owner (ownerSeat === localSeat); refusing to `
+        + "assume the role default. Fix the surface's marker or run the explicit shakedown opt-in.",
+    );
+  }
   const owner = driver.owner.role ? rig[driver.owner.role] : null;
   if (!owner) {
     return null;
@@ -313,9 +330,9 @@ function resolveSurfaceOwner(rig, driver, cursors, handledIndex) {
 }
 
 /** Drive at most one pending between-wave surface. Returns the surface name driven, or null. */
-async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stats) {
+async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stats, strict) {
   for (const driver of dispatch) {
-    const resolved = resolveSurfaceOwner(rig, driver, cursors, handledIndex);
+    const resolved = resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict);
     if (!resolved) {
       continue;
     }
@@ -406,7 +423,9 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
       return { status: "continue" };
     }
 
-    const drove = await driveOnePendingSurface(rig, dispatch, surfaceCursors, handledIndex, stats);
+    // Loud-fail (strict) unless the explicit shakedown/auto-first ordering opt-in is set: the same
+    // gate that permits press-through of an unknown surface also permits the role-default fallback.
+    const drove = await driveOnePendingSurface(rig, dispatch, surfaceCursors, handledIndex, stats, !policy.autoFirst);
     if (drove) {
       stallSince = 0;
       lastPhaseProgress = phaseProgressSignature(clients);

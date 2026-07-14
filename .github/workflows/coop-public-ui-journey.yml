@@ -72,8 +72,14 @@ concurrency:
 
 env:
   COOP_BROWSER_ENTRY_CONTRACT: public-ui-v1
-  COOP_UI_SIGNAL_ORIGIN: ${{ vars.COOP_UI_SIGNAL_URL || 'https://er-coop-api.heraklines.workers.dev' }}
-  COOP_UI_API_ORIGIN: ${{ vars.COOP_UI_API_URL || vars.STAGING_SERVER_URL || 'https://er-save-api-staging.heraklines.workers.dev' }}
+  # Isolated P33 staging workers, HARDCODED to match the campaign workflow exactly (same
+  # COOP_IDENTITY_SECRET so the save-API-minted identity tickets validate on the signal worker).
+  # Previously the signal origin defaulted to the PROD worker (er-coop-api, no -staging) while the
+  # save-API defaulted to staging - a stale/unset repo var split the ticket-issuer from the signal
+  # origin, so the staging-minted ticket failed to validate on the prod signal worker and pairing
+  # never completed (the audit's journey-run pairing failure). Both pinned so no var can split them.
+  COOP_UI_SIGNAL_ORIGIN: https://er-coop-api-staging.heraklines.workers.dev
+  COOP_UI_API_ORIGIN: https://er-save-api-staging.heraklines.workers.dev
 
 jobs:
   browser-build:
