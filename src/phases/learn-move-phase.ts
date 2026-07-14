@@ -71,6 +71,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   private coopRelay: CoopInteractionRelay | null = null;
   private coopLocalRole: CoopRole | null = null;
   private coopInteractionCounter: (() => number) | null = null;
+  private coopRuntimeBound = false;
 
   constructor(
     partyMemberIndex: number,
@@ -113,15 +114,9 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       // lockstep owner/watcher mapping below (which assumes BOTH clients run a LearnMovePhase - false
       // here: the guest is a pure renderer parked in CoopReplayTurnPhase). Reached ONLY when the
       // netcode is authoritative, so solo / host-lockstep / lockstep stay byte-identical.
-      const controller = getCoopController();
-      if (controller == null) {
-        failCoopSharedSession("Learn-move phase could not bind to a live authoritative role");
+      if (!this.bindCoopAuthoritativeRuntime()) {
         return;
       }
-      this.coopLocalRole = controller.role;
-      this.coopInteractionCounter = () => controller.interactionCounter();
-      this.coopOperationBinding = captureCoopLearnMoveOperationBinding(controller.role);
-      this.coopRelay = getCoopInteractionRelay();
       this.coopAuthoritativeLearnMove(currentMoveset, move, pokemon);
     } else if (currentMoveset.length < pokemon.getMaxMoveCount()) {
       // Empty slot: the move auto-learns identically on both clients (deterministic), so
@@ -137,6 +132,24 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     } else {
       this.replaceMoveCheck(move, pokemon);
     }
+  }
+
+  /** Capture the phase's runtime once, before any authoritative UI callback or await can outlive ambient state. */
+  private bindCoopAuthoritativeRuntime(): boolean {
+    if (this.coopRuntimeBound) {
+      return true;
+    }
+    const controller = getCoopController();
+    if (controller == null) {
+      failCoopSharedSession("Learn-move phase could not bind to a live authoritative role");
+      return false;
+    }
+    this.coopLocalRole = controller.role;
+    this.coopInteractionCounter = () => controller.interactionCounter();
+    this.coopOperationBinding = captureCoopLearnMoveOperationBinding(controller.role);
+    this.coopRelay = getCoopInteractionRelay();
+    this.coopRuntimeBound = true;
+    return true;
   }
 
   /**
@@ -278,8 +291,12 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
    *    fallback ({@linkcode coopHostForwardLearnMove}).
    */
   private coopAuthoritativeLearnMove(currentMoveset: ReturnType<Pokemon["getMoveset"]>, move: Move, pokemon: Pokemon) {
-    const controller = getCoopController();
-    if (controller?.role === "guest") {
+    // The normal phase path binds in start(). Keep this guard here because existing reward-continuation
+    // adapters invoke this dispatch directly; they still must capture the exact runtime before opening UI.
+    if (!this.bindCoopAuthoritativeRuntime()) {
+      return;
+    }
+    if (this.coopLocalRole === "guest") {
       // #835 cross-ownership softlock: when a shop-continuation reward (TM Case / Learner's Shroom /
       // Memory Mushroom) is bought - by EITHER player - for a GUEST-owned mon whose moveset is FULL, the
       // "which move to forget" pick belongs to the GUEST (the mon's owner). The guest ALSO has this real
@@ -363,7 +380,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         (this.learnMoveType === LearnMoveType.TM || (this.learnMoveType === LearnMoveType.MEMORY && this.cost === -1))
         && globalScene.phaseManager.tryRemovePhase("SelectModifierPhase")
       ) {
-        advanceCoopInteractionForContinuation(controller.interactionCounter());
+        advanceCoopInteractionForContinuation(this.coopInteractionCounter?.() ?? -1);
       }
       // Pure renderer: for the EMPTY-slot / host-owned-mon case the persistent listener's
       // CoopReplayLearnMovePhase (level-up path) or the host's own picker is the sole renderer.
