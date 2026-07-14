@@ -18,6 +18,7 @@
 // =============================================================================
 
 import { TELEMETRY_MAX_BODY, type TelemetryRow, validateTelemetryPayload } from "./telemetry-ingest";
+import { handleTournamentRoute } from "./tournament-routes";
 
 interface Env {
   DB: D1Database;
@@ -25,6 +26,8 @@ interface Env {
   SESSION_SECRET: string;
   /** Optional origin allowlist; "*"/unset = allow all. */
   ALLOWED_ORIGIN?: string;
+  /** Comma-separated numeric admin account uids allowed to run tournament admin routes. */
+  TOURNAMENT_ADMIN_UIDS?: string;
 }
 
 interface TokenPayload {
@@ -110,7 +113,7 @@ function corsHeaders(env: Env, origin: string | null): Record<string, string> {
   const value = !allow || allow === "*" ? "*" : allow.split(",").includes(origin ?? "") ? (origin ?? "*") : "null";
   return {
     "Access-Control-Allow-Origin": value,
-    "Access-Control-Allow-Methods": "POST,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type,Authorization",
     "Access-Control-Max-Age": "86400",
   };
@@ -242,6 +245,16 @@ export default {
           return text("Unauthorized.", 401, cors);
         }
         return await handleBattle(request, auth, env, cors);
+      }
+      // Showdown Tournament (P1): /tournament/* routes. Auth is verified here (the
+      // route module gates admin actions by the token uid allowlist + attestation).
+      if (url.pathname.startsWith("/tournament/")) {
+        const auth = await authUser(request, env);
+        const caller = auth ? { uid: auth.uid, u: auth.u } : null;
+        const res = await handleTournamentRoute(url, request, caller, env, cors);
+        if (res) {
+          return res;
+        }
       }
       return text("Not found.", 404, cors);
     } catch (err) {
