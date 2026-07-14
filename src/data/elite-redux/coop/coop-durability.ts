@@ -604,6 +604,19 @@ interface PendingOperationContinuation {
   };
 }
 
+/** Host-side stage boundary: the canonical result is retained while each client opens its real next UI. */
+interface PendingHostOperationContinuation {
+  authority: CoopOperationAuthorityAddress;
+  expectedSurface: "sharedBoundary" | "terminal";
+  /** One matching authority surface may start the peer-convergence budget; duplicates can never extend it. */
+  authoritySurfaceRearmed: boolean;
+}
+
+/** Identity is load-bearing: a cancelled first-stage callback must not exhaust a newly rearmed deadline. */
+interface OperationContinuationDeadline {
+  cancel: () => void;
+}
+
 interface OperationAckEvidence {
   stage: CoopAuthorityAckStage;
   canonical: string;
@@ -851,11 +864,13 @@ export class CoopDurabilityManager {
   private readonly hostOperationAckEvidence = new Map<string, OperationAckEvidence>();
   /** Host: later plain cumulative ACKs parked behind an earlier operation that still lacks UI readiness. */
   private readonly pendingCumulativeAcks = new Map<string, number>();
+  /** Host: retained operations whose authority/peer continuation stages are still converging. */
+  private readonly pendingHostOperationContinuations = new Map<string, PendingHostOperationContinuation>();
   /** Host: exact checksum-bound frontiers emitted in the most recent full snapshots. */
   private readonly retainedSnapshotFrontiers = new Map<string, RetainedSnapshotFrontier>();
   /** Guest: committed snapshot proofs retained across a channel replacement (bounded, idempotent). */
   private readonly committedSnapshotAcks = new Map<string, Extract<CoopMessage, { t: "coopSnapshotAck" }>>();
-  private readonly operationContinuationTimers = new Map<string, () => void>();
+  private readonly operationContinuationTimers = new Map<string, OperationContinuationDeadline>();
   private readonly exhaustedOperationContinuations = new Set<string>();
   private readonly scheduleOperationContinuationDeadline: (callback: () => void, ms: number) => () => void;
   private readonly operationContinuationDeadlineMs: number;
@@ -922,6 +937,13 @@ export class CoopDurabilityManager {
     }
     const operation = operationAuthorityFor(cls, seq, msg);
     if (operation != null && seq > this.journal.ackedThrough(cls)) {
+      const key = operationAuthorityKey(operation.authority);
+      if (!this.pendingHostOperationContinuations.has(key)) {
+        this.pendingHostOperationContinuations.set(key, {
+          ...operation,
+          authoritySurfaceRearmed: false,
+        });
+      }
       this.armOperationContinuationDeadline(operation.authority);
     }
     try {
@@ -1331,6 +1353,58 @@ export class CoopDurabilityManager {
     return released;
   }
 
+  /**
+   * Host public-UI readiness chokepoint. The initial fixed budget still bounds the host reaching its own
+   * executable continuation. Its first correctly addressed surface then starts one fresh fixed peer budget.
+   * No relay ACK/input can call this method, and duplicate surface observations can never extend the window.
+   */
+  notifyOperationAuthorityContinuationSurface(
+    surface: CoopOperationContinuationSurface,
+    current: CoopOperationContinuationAddress,
+  ): number {
+    if (
+      this.disposed
+      || this.transport.role !== "host"
+      || !isSafeOperationAddressPart(current.epoch, false)
+      || !isSafeOperationAddressPart(current.wave)
+      || !isSafeOperationAddressPart(current.turn)
+    ) {
+      return 0;
+    }
+    let rearmed = 0;
+    const pending = [...this.pendingHostOperationContinuations.values()].sort(
+      (left, right) => left.authority.seq - right.authority.seq,
+    );
+    for (const operation of pending) {
+      if (
+        operation.authoritySurfaceRearmed
+        || !operationContinuationMatches(operation.expectedSurface, operation.authority, surface, current)
+      ) {
+        continue;
+      }
+      const key = operationAuthorityKey(operation.authority);
+      const deadline = this.operationContinuationTimers.get(key);
+      if (
+        deadline == null
+        || this.exhaustedOperationContinuations.has(key)
+        || this.journal.ackedThrough(operation.authority.cls) >= operation.authority.seq
+        || this.hostOperationAckEvidence.get(key)?.stage === "continuationReady"
+      ) {
+        continue;
+      }
+      operation.authoritySurfaceRearmed = true;
+      deadline.cancel();
+      this.operationContinuationTimers.delete(key);
+      this.armOperationContinuationDeadline(operation.authority);
+      coopLog(
+        "durability",
+        `host operation continuation window REARM key=${key} surface=${surface} at=${current.epoch}/${current.wave}/${current.turn}`,
+      );
+      rearmed++;
+    }
+    return rearmed;
+  }
+
   private acceptOperationAck(msg: Extract<CoopMessage, { t: "coopAck" }>, retained: CoopJournalEntry | null): void {
     const admitted = retained == null ? null : operationAuthorityFor(retained.cls, retained.seq, retained.msg);
     if (admitted == null) {
@@ -1465,8 +1539,9 @@ export class CoopDurabilityManager {
         if (this.hostOperationAckEvidence.get(key)?.stage !== "continuationReady") {
           break;
         }
-        this.operationContinuationTimers.get(key)?.();
+        this.operationContinuationTimers.get(key)?.cancel();
         this.operationContinuationTimers.delete(key);
+        this.pendingHostOperationContinuations.delete(key);
       } else if (entry.seq > cumulativeThrough) {
         break;
       }
@@ -1545,7 +1620,7 @@ export class CoopDurabilityManager {
   /** Cancel retained continuation deadlines even when their concrete journal entry was ring-evicted. */
   private cancelOperationContinuationThrough(cls: string, through: number): void {
     const prefix = `${cls}:`;
-    for (const [key, cancel] of [...this.operationContinuationTimers]) {
+    for (const [key, deadline] of [...this.operationContinuationTimers]) {
       if (!key.startsWith(prefix)) {
         continue;
       }
@@ -1553,8 +1628,9 @@ export class CoopDurabilityManager {
       const separator = remainder.indexOf(":");
       const seq = Number(separator < 0 ? remainder : remainder.slice(0, separator));
       if (Number.isSafeInteger(seq) && seq <= through) {
-        cancel();
+        deadline.cancel();
         this.operationContinuationTimers.delete(key);
+        this.pendingHostOperationContinuations.delete(key);
       }
     }
   }
@@ -1564,7 +1640,13 @@ export class CoopDurabilityManager {
     if (this.operationContinuationTimers.has(key) || this.exhaustedOperationContinuations.has(key)) {
       return;
     }
-    const cancel = this.scheduleOperationContinuationDeadline(() => {
+    const deadline: OperationContinuationDeadline = { cancel: () => {} };
+    deadline.cancel = this.scheduleOperationContinuationDeadline(() => {
+      // A host-surface rearm replaces the first-stage deadline. A stale callback that was already queued
+      // before cancellation has no authority to delete/exhaust the replacement stage.
+      if (this.operationContinuationTimers.get(key) !== deadline) {
+        return;
+      }
       this.operationContinuationTimers.delete(key);
       if (
         this.disposed
@@ -1574,6 +1656,7 @@ export class CoopDurabilityManager {
         return;
       }
       this.exhaustedOperationContinuations.add(key);
+      this.pendingHostOperationContinuations.delete(key);
       coopWarn("durability", `operation continuation EXHAUSTED key=${key}`);
       try {
         this.hooks.onRecoveryExhausted?.({
@@ -1587,7 +1670,7 @@ export class CoopDurabilityManager {
         coopWarn("durability", `operation continuation terminal hook threw key=${key}`, error);
       }
     }, this.operationContinuationDeadlineMs);
-    this.operationContinuationTimers.set(key, cancel);
+    this.operationContinuationTimers.set(key, deadline);
   }
 
   /** Engine-free diagnostics used by staging traces and exact lifecycle tests. */
@@ -1942,11 +2025,12 @@ export class CoopDurabilityManager {
     }
     this.pendingDeferred.clear();
     this.deferredFollowers.clear();
-    for (const cancel of this.operationContinuationTimers.values()) {
-      cancel();
+    for (const deadline of this.operationContinuationTimers.values()) {
+      deadline.cancel();
     }
     this.operationContinuationTimers.clear();
     this.pendingOperationContinuations.clear();
+    this.pendingHostOperationContinuations.clear();
     this.pendingCumulativeAcks.clear();
     this.retainedSnapshotFrontiers.clear();
     this.committedSnapshotAcks.clear();

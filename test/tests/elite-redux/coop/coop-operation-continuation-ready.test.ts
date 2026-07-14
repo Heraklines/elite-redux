@@ -6,6 +6,7 @@
 import { CoopDurabilityManager, type CoopDurabilityRecoveryFailure } from "#data/elite-redux/coop/coop-durability";
 import type { CoopAuthoritativeEnvelopeV1 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  notifyCoopOperationAuthorityContinuationSurface,
   notifyCoopOperationContinuationSurface,
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
@@ -194,6 +195,64 @@ describe("protocol-33 retained operation continuation lifecycle", () => {
       expect(guest.notifyOperationContinuationSurface("sharedInput", { epoch: 7, wave: 10, turn: 3 })).toBe(1);
       await flush();
       expect(host.unackedCount(), "the contiguous prefix releases only after both exact proofs exist").toBe(0);
+    } finally {
+      host.dispose();
+      guest.dispose();
+    }
+  });
+
+  it("gives peer convergence one fixed budget after the host opens its real continuation exactly once", async () => {
+    const pair = createLoopbackPair();
+    const deadlines: { callback: () => void; cancelled: boolean; ms: number }[] = [];
+    const failures: CoopDurabilityRecoveryFailure[] = [];
+    const host = new CoopDurabilityManager(pair.host, {
+      operationContinuationDeadlineMs: 25,
+      scheduleOperationContinuationDeadline: (callback, ms) => {
+        const deadline = { callback, cancelled: false, ms };
+        deadlines.push(deadline);
+        return () => {
+          deadline.cancelled = true;
+        };
+      },
+      onRecoveryExhausted: failure => failures.push(failure),
+    });
+    const guest = new CoopDurabilityManager(pair.guest, {
+      extractKey: message => (message.t === "envelope" ? { cls: "op:global", seq: message.envelope.revision } : null),
+      apply: () => "applied",
+    });
+    try {
+      setCoopOperationDurability(host);
+      const committed = envelope();
+      expect(host.commit("op:global", committed.revision, { t: "envelope", envelope: committed })).toBe(true);
+      await flush();
+      expect(deadlines).toHaveLength(1);
+      expect(deadlines[0].ms).toBe(25);
+      expect(host.unackedCount()).toBe(1);
+
+      expect(notifyCoopOperationAuthorityContinuationSurface("terminal", { epoch: 7, wave: 10, turn: 3 })).toBe(0);
+      expect(notifyCoopOperationAuthorityContinuationSurface("command", { epoch: 8, wave: 11, turn: 1 })).toBe(0);
+      expect(deadlines).toHaveLength(1);
+      expect(deadlines[0].cancelled).toBe(false);
+
+      expect(notifyCoopOperationAuthorityContinuationSurface("command", { epoch: 7, wave: 11, turn: 1 })).toBe(1);
+      expect(deadlines).toHaveLength(2);
+      expect(deadlines[0].cancelled).toBe(true);
+      expect(deadlines[1]).toMatchObject({ cancelled: false, ms: 25 });
+
+      expect(notifyCoopOperationAuthorityContinuationSurface("sharedInput", { epoch: 7, wave: 11, turn: 1 })).toBe(0);
+      expect(deadlines).toHaveLength(2);
+      // Even if a cancelled callback was already queued, it cannot exhaust or cancel the replacement stage.
+      deadlines[0].callback();
+      expect(failures).toEqual([]);
+      expect(deadlines[1].cancelled).toBe(false);
+      expect(host.unackedCount()).toBe(1);
+
+      setCoopOperationDurability(guest);
+      expect(notifyCoopOperationContinuationSurface("command", { epoch: 7, wave: 11, turn: 1 })).toBe(1);
+      await flush();
+      expect(host.unackedCount(), "only the guest's exact continuationReady releases retained authority").toBe(0);
+      expect(deadlines[1].cancelled).toBe(true);
+      expect(failures).toEqual([]);
     } finally {
       host.dispose();
       guest.dispose();

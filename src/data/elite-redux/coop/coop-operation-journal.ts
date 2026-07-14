@@ -215,6 +215,17 @@ export function notifyCoopOperationContinuationSurface(
 }
 
 /**
+ * Publish the host's matching real public continuation surface. This does not ACK or release authority; it
+ * starts the peer-convergence stage exactly once while the guest's ordered `continuationReady` remains due.
+ */
+export function notifyCoopOperationAuthorityContinuationSurface(
+  surface: CoopOperationContinuationSurface,
+  address: CoopOperationContinuationAddress,
+): number {
+  return activeDurability?.notifyOperationAuthorityContinuationSurface(surface, address) ?? 0;
+}
+
+/**
  * COMMIT -> JOURNAL (§4.1/§4.2). Called by a migrated surface adapter immediately after its
  * CoopOperationHost COMMITS an op. Journals the committed envelope (for resend / reconnect replay) and
  * broadcasts it on the `envelope` wire arm. Returns true when durability is OFF (legacy mode) or when the
