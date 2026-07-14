@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import {
+  applyErCustomTrainerPresentation,
   buildErCustomTrainerMember,
   erCustomTrainerHeldModifierConfigs,
   markErCustomTrainerUsed,
@@ -150,6 +151,12 @@ export class NewBattlePhase extends BattlePhase {
       if (resolved.introDialogue && !globalScene.skipCustomTrainerIntros) {
         trainer.encounterMessagesOverride = [resolved.introDialogue];
       }
+      // Per-trainer VICTORY / DEFEAT lines + TRAINER-SPRITE aura effect (this battle
+      // only). These reuse the ghost dialogue + aura seams EXACTLY (getVictoryMessages
+      // / getDefeatMessages instance overrides + erGhostAura, rendered by the existing
+      // applyErGhostAuraFx overlay in encounter-phase). Instance-level, so the shared
+      // trainerConfigs singleton is never mutated and nothing leaks to the next wave.
+      applyErCustomTrainerPresentation(trainer, resolved);
       globalScene.field.add(trainer);
       battle.trainer = trainer;
       battle.battleType = BattleType.TRAINER;

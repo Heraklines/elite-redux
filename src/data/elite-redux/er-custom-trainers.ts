@@ -94,6 +94,7 @@ import {
   normalizeErShinyLabSavedLook,
   sanitizeErShinyLabPresetName,
 } from "#data/elite-redux/er-shiny-lab-effects";
+import { isKnownTrainerAuraId } from "#data/elite-redux/er-trainer-fx";
 import { collectShowdownFreeMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
 import { Challenges } from "#enums/challenges";
 import { Gender } from "#data/gender";
@@ -102,6 +103,7 @@ import { MoveId } from "#enums/move-id";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
 import type { EnemyPokemon } from "#field/pokemon";
+import type { Trainer } from "#field/trainer";
 import { PokemonMove } from "#moves/pokemon-move";
 import { resolveHeldItemKey } from "#system/llm-director/held-item-resolver";
 import type { HeldModifierConfig } from "#types/held-modifier-config";
@@ -270,6 +272,30 @@ export interface ErCustomTrainer {
    * "Skip custom trainer intros" setting.
    */
   introDialogue?: string;
+  /**
+   * Optional line shown when the PLAYER beats this trainer (the victory line).
+   * Same normalization + cap as {@linkcode introDialogue}. Applied through the
+   * SAME instance-level `getVictoryMessages` override the ghost dialogue routine
+   * uses (see `markTrainerAsGhost` in er-ghost-teams.ts). Empty/absent => the
+   * trainer's default class victory line. NOT gated by the intro-skip setting.
+   */
+  victoryDialogue?: string;
+  /**
+   * Optional line shown when this trainer BEATS the player (the defeat line, i.e.
+   * the trainer wins). Same normalization + cap as {@linkcode introDialogue}.
+   * Applied through the SAME instance-level `getDefeatMessages` override the ghost
+   * dialogue routine uses. Empty/absent => the trainer's default class defeat line.
+   */
+  defeatDialogue?: string;
+  /**
+   * Optional TRAINER-SPRITE visual effect (an aura rendered around the trainer's
+   * field sprite), reusing the Ghost Trainer FX aura seam EXACTLY: the value is an
+   * aura id from the ghost FX catalog ({@linkcode TRAINER_AURA_EFFECTS}, validated
+   * via `isKnownTrainerAuraId`), stamped instance-level as `trainer.erGhostAura` at
+   * install and rendered by the existing `applyErGhostAuraFx` overlay in
+   * encounter-phase. Empty/absent/unknown => no aura (the plain trainer sprite).
+   */
+  trainerEffect?: string;
   team?: readonly ErCustomTrainerTeamEntry[];
 }
 
@@ -348,6 +374,12 @@ export interface ErCustomTrainerResolved {
   battleBgm: string;
   /** Normalized intro blurb shown at battle start, or "" for the default class line. */
   introDialogue: string;
+  /** Normalized victory line (player beats the trainer), or "" for the default class line. */
+  victoryDialogue: string;
+  /** Normalized defeat line (trainer beats the player), or "" for the default class line. */
+  defeatDialogue: string;
+  /** Ghost-FX aura id rendered around the trainer sprite, or "" for no aura. */
+  trainerEffect: string;
   /**
    * The REPRESENTATIVE members (variant 0 of each slot, slot-fill ignored) — the
    * authored default view. The FIELDED party for a run is derived per-seed via
@@ -442,24 +474,39 @@ export function normalizeBattleBgm(value: unknown): string {
 }
 
 /**
- * Normalize an authored `introDialogue`: strip control chars (so it stays on the
- * dialogue line), collapse to a single trimmed string, and cap at
- * {@linkcode ER_CUSTOM_TRAINER_INTRO_MAX}. A non-string or empty-after-trim value
- * => "" (no blurb; the trainer keeps its default class encounter line).
+ * Normalize an authored trainer dialogue LINE (intro / victory / defeat): strip
+ * control chars (so it stays on the dialogue line), collapse to a single trimmed
+ * string, and cap at {@linkcode ER_CUSTOM_TRAINER_INTRO_MAX}. A non-string or
+ * empty-after-trim value => "" (no line; the trainer keeps its default class line).
  */
-export function normalizeIntroDialogue(value: unknown): string {
+export function normalizeDialogueLine(value: unknown): string {
   if (typeof value !== "string") {
     return "";
   }
   let cleaned = "";
   for (const ch of value) {
     const code = ch.charCodeAt(0);
-    // Drop control chars (incl. newlines/tabs) so the blurb renders on one line.
+    // Drop control chars (incl. newlines/tabs) so the line renders on one line.
     if (code >= 0x20 && code !== 0x7f) {
       cleaned += ch;
     }
   }
   return cleaned.trim().slice(0, ER_CUSTOM_TRAINER_INTRO_MAX);
+}
+
+/** Normalize an authored `introDialogue` (alias of {@linkcode normalizeDialogueLine}). */
+export function normalizeIntroDialogue(value: unknown): string {
+  return normalizeDialogueLine(value);
+}
+
+/**
+ * Normalize an authored `trainerEffect`: an aura id from the Ghost Trainer FX
+ * catalog. Anything not in the known aura whitelist (`isKnownTrainerAuraId`) => ""
+ * (no aura). Mirrors how `sanitizeGhostProfile` clamps a ghost's `aura` field, so
+ * a custom trainer's effect is the SAME representation the ghost seam consumes.
+ */
+export function normalizeTrainerEffect(value: unknown): string {
+  return isKnownTrainerAuraId(value) ? value : "";
 }
 
 /**
@@ -676,7 +723,10 @@ function resolveEntry(key: string, entry: ErCustomTrainer): ErCustomTrainerResol
     spawnChance: normalizeSpawnChance(entry.spawnChance),
     challenge,
     battleBgm: normalizeBattleBgm(entry.battleBgm),
-    introDialogue: normalizeIntroDialogue(entry.introDialogue),
+    introDialogue: normalizeDialogueLine(entry.introDialogue),
+    victoryDialogue: normalizeDialogueLine(entry.victoryDialogue),
+    defeatDialogue: normalizeDialogueLine(entry.defeatDialogue),
+    trainerEffect: normalizeTrainerEffect(entry.trainerEffect),
     members,
     slots,
   };
@@ -1096,6 +1146,40 @@ export function buildErCustomTrainerMember(
   enemy.calculateStats();
   enemy.generateName();
   return enemy;
+}
+
+/**
+ * Apply a resolved custom trainer's VICTORY / DEFEAT lines and TRAINER-SPRITE
+ * effect onto a freshly-built `Trainer` INSTANCE, reusing the ghost seams EXACTLY:
+ *
+ *   - victory line -> `trainer.getVictoryMessages` override (player beats the
+ *     trainer). Same instance-level getter override `markTrainerAsGhost` sets for a
+ *     ghost's `defeated` line (er-ghost-teams.ts).
+ *   - defeat line  -> `trainer.getDefeatMessages` override (the trainer beats the
+ *     player). Same seam as a ghost's `defeatPlayer`/`afterWin` lines.
+ *   - trainer effect -> `trainer.erGhostAura` (an aura id), rendered lazily by the
+ *     existing `applyErGhostAuraFx` overlay once the trainer is revealed
+ *     (encounter-phase). Same seam a ghost's equipped aura rides on.
+ *
+ * Instance-level only: a fresh `Trainer` is built every wave, so nothing is mutated
+ * on the shared `trainerConfigs` singleton and nothing leaks to the next wave (same
+ * discipline as the battleBgm getter shadowing). Empty fields are no-ops (the
+ * trainer keeps its default class lines / plain sprite). The INTRO line is applied
+ * separately at the call site because it is gated by the "Skip custom trainer
+ * intros" setting; victory/defeat/effect are not gated.
+ */
+export function applyErCustomTrainerPresentation(trainer: Trainer, resolved: ErCustomTrainerResolved): void {
+  if (resolved.victoryDialogue) {
+    const line = resolved.victoryDialogue;
+    trainer.getVictoryMessages = () => [line];
+  }
+  if (resolved.defeatDialogue) {
+    const line = resolved.defeatDialogue;
+    trainer.getDefeatMessages = () => [line];
+  }
+  if (resolved.trainerEffect) {
+    trainer.erGhostAura = resolved.trainerEffect;
+  }
 }
 
 /** Resolve one member's authored held items to `HeldModifierConfig[]` (enemy-legal pool). */

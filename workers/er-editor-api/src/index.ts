@@ -581,6 +581,18 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
     "triples",
   ]);
   const validDifficulties = new Set(["youngster", "ace", "elite", "hell", "mystery"]);
+  // Ghost Trainer FX aura ids (TRAINER_AURA_EFFECTS in er-trainer-fx.ts) — the ONLY
+  // valid `trainerEffect` values, mirroring the runtime `isKnownTrainerAuraId` whitelist.
+  const validTrainerEffects = new Set([
+    "smoke",
+    "embers",
+    "frost",
+    "shadowaura",
+    "goldenglow",
+    "holyrays",
+    "cosmos",
+    "sparkstorm",
+  ]);
   for (const [key, tr] of Object.entries(delta)) {
     if (!/^[A-Z0-9_]{1,40}$/.test(key)) {
       return { ok: false, error: `bad trainer key: ${key}` };
@@ -641,6 +653,21 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
     }
     if (t.introDialogue !== undefined && !(typeof t.introDialogue === "string" && t.introDialogue.length <= 200)) {
       return { ok: false, error: `${key}: introDialogue must be a string up to 200 chars` };
+    }
+    if (
+      t.victoryDialogue !== undefined
+      && !(typeof t.victoryDialogue === "string" && t.victoryDialogue.length <= 200)
+    ) {
+      return { ok: false, error: `${key}: victoryDialogue must be a string up to 200 chars` };
+    }
+    if (t.defeatDialogue !== undefined && !(typeof t.defeatDialogue === "string" && t.defeatDialogue.length <= 200)) {
+      return { ok: false, error: `${key}: defeatDialogue must be a string up to 200 chars` };
+    }
+    if (
+      t.trainerEffect !== undefined
+      && !(typeof t.trainerEffect === "string" && validTrainerEffects.has(t.trainerEffect))
+    ) {
+      return { ok: false, error: `${key}: trainerEffect must be a known aura id (see TRAINER_AURA_EFFECTS)` };
     }
     if (!Array.isArray(t.team) || t.team.length === 0 || t.team.length > 6) {
       return { ok: false, error: `${key}: team must have 1-6 members` };
