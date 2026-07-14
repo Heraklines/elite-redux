@@ -27,12 +27,7 @@ import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
 import { installDuoLogCapture } from "#test/tools/coop-duo-harness";
 import { logSoakCoverage } from "#test/tools/coop-soak-coverage";
-import {
-  announceSoakSeed,
-  prepareCoopSoakContent,
-  runCoopSoak,
-  SOAK_PROFILES,
-} from "#test/tools/coop-soak-driver";
+import { announceSoakSeed, prepareCoopSoakContent, runCoopSoak, SOAK_PROFILES } from "#test/tools/coop-soak-driver";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
@@ -134,12 +129,17 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: mid-run mystery-encounter continuatio
     expect(result.runEnded, "no terminal run-end").toBeUndefined();
 
     // The ME SYNC surfaces fired: the MYSTERY_ENCOUNTER mode opened on the guest, and the ME relay kinds
-    // (mePresent present + meResync outcome + the `me` option pick chain) were streamed - recorded by the
-    // relay-send tap. These were ALL KNOWN_UNDRIVABLE before BUILD 1.
+    // (mePresent present + meResync outcome + the `me` option pick chain) were streamed. The coverage tap
+    // observes the exact outgoing retained P33 envelopes for the migrated presentation/terminal edges and
+    // their real 8M/9M address roots; no legacy raw fallback is required to make these assertions green.
+    // These were ALL KNOWN_UNDRIVABLE before BUILD 1.
     logSoakCoverage(result.hits, "god");
     const kinds = [...result.hits.kinds];
     expect(kinds, "the ME present relay kind fired").toContain("mePresent");
     expect(kinds, "the ME resync relay kind fired").toContain("meResync");
+    const bands = [...result.hits.bands];
+    expect(bands, "the durable ME presentation used the ME pump address band").toContain("mePump");
+    expect(bands, "the durable comprehensive terminal used the ME terminal address band").toContain("meTerm");
 
     // THE PRIMARY GATE: no unhealed DIGEST desync across the whole run incl. the ME wave.
     expect(
