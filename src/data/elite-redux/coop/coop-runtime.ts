@@ -3303,9 +3303,12 @@ function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAu
   if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
     return false;
   }
+  // Transport delivery can run while the sender is the ambient harness client. Bind both validation and
+  // publication to the receiving runtime so an ACK can never outlive a receipt written into the wrong peer.
+  const binding = { opState: runtime.opState, durability: runtime.durability ?? null };
   const op = envelope.pendingOperation;
   const parsed = op == null ? null : parseCoopOperationId(op.id);
-  const plan = preflightCoopBiomeJournalMaterialization(envelope);
+  const plan = preflightCoopBiomeJournalMaterialization(envelope, binding);
   if (op == null || parsed == null || plan == null) {
     return false;
   }
@@ -3336,7 +3339,7 @@ function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAu
     if (deterministicAddress) {
       // No interaction exists for a deterministic transition. Publish its exact receipt/permit directly;
       // buffering it in InteractionRelay would create a phantom owner/watcher action at this wave address.
-      return publishCoopBiomeJournalMaterialization(plan);
+      return publishCoopBiomeJournalMaterialization(plan, binding);
     }
     try {
       runtime.interactionRelay.materializeCommittedInteractionChoice(parsed.pinnedSeq, "biomePick", payload.nodeIndex, [
@@ -3346,7 +3349,7 @@ function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAu
       coopWarn("runtime", `biome committed relay materialization threw id=${op.id}; receipt remains unpublished`, e);
       return false;
     }
-    return publishCoopBiomeJournalMaterialization(plan);
+    return publishCoopBiomeJournalMaterialization(plan, binding);
   }
   if (op.kind === "CROSSROADS_PICK") {
     const payload = op.payload as CoopCrossroadsPickPayload;
@@ -3372,7 +3375,7 @@ function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAu
       );
       return false;
     }
-    return publishCoopBiomeJournalMaterialization(plan);
+    return publishCoopBiomeJournalMaterialization(plan, binding);
   }
   return false;
 }
@@ -4458,6 +4461,10 @@ export function assembleCoopRuntime(
   // re-assemble (it pulls a snapshot in place), so this never clears a live negotiation on a flap.
   clearNegotiatedCoopCapabilities();
   const durabilityEnabled = isCoopDurabilityEnabled();
+  // Epoch negotiation is delivered after controller assembly and may run while the other in-process client
+  // is ambient. Capture this receiver's stable ledger in the callback rather than using the ambient selector.
+  // It is assigned from controller.role below (not transport.role: P33 authority follows stable seats).
+  let opState!: CoopRuntimeOpState;
   let waveOperationBinding: CoopWaveAdvanceOperationBinding;
   const controller = new CoopSessionController(transport, {
     username: opts.username,
@@ -4471,7 +4478,8 @@ export function assembleCoopRuntime(
     requireFunctionalFingerprint: true,
     // The callback runs after assembly, on handshake/rejoin. Its stable binding cannot drift to the other
     // in-process engine while the peer's transport is being pumped.
-    onEpochNegotiated: epoch => applyCoopOperationEpoch(epoch, waveOperationBinding),
+    onEpochNegotiated: epoch =>
+      withActiveCoopRuntimeOpState(opState, () => applyCoopOperationEpoch(epoch, waveOperationBinding)),
     p33: opts.p33,
   });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
@@ -4514,7 +4522,7 @@ export function assembleCoopRuntime(
   const mePump = new CoopMePump(interactionRelay);
   const rendezvous = new CoopRendezvous(transport, { getEpoch: () => controller.sessionEpoch });
   const membership = new CoopMembershipController(() => controller.role);
-  const opState = createCoopRuntimeOpState(controller.role);
+  opState = createCoopRuntimeOpState(controller.role);
   // W2b/W2e (§4/§5): the application-level durability engine, flag-gated. Wave-2e plugs the operation
   // envelope in via the journal bridge's extractKey/apply hooks, so a committed op is journaled + ACKed +
   // resendable end-to-end (no longer a passive scaffold). Its reconnect() is wired into the #805 rejoin

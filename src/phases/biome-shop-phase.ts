@@ -483,6 +483,21 @@ export class BiomeShopPhase extends SelectModifierPhase {
         if (!isCoopRewardOperationEnabled() || commit != null) {
           const resend = (): void =>
             relay?.sendInteractionChoice(coopBiomeShopSeq(pinned), "biomeShop", COOP_INTERACTION_LEAVE);
+          // The authority must retain the complete terminal result before exposing the legacy companion.
+          // Otherwise a transient journal failure lets the watcher consume LEAVE and advance while the
+          // authority retries the same still-unretained terminal. A guest-owned intent still has to travel
+          // first so the host can execute/retain it; that owner remains parked below until the host's exact
+          // addressed result is materialized back into its relay.
+          if (
+            role === "host"
+            && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
+            && (commit == null
+              || commitRewardAuthoritativeResult(commit.operationId, undefined, this.coopRewardOperationBinding)
+                == null)
+          ) {
+            getCoopRuntime()?.durability?.reconnect();
+            continue;
+          }
           try {
             resend();
           } catch {
@@ -541,16 +556,6 @@ export class BiomeShopPhase extends SelectModifierPhase {
               getCoopRuntime()?.durability?.reconnect();
               continue;
             }
-          }
-          if (
-            role === "host"
-            && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
-            && (commit == null
-              || commitRewardAuthoritativeResult(commit.operationId, undefined, this.coopRewardOperationBinding)
-                == null)
-          ) {
-            getCoopRuntime()?.durability?.reconnect();
-            continue;
           }
           return this.advanceCoopBiomeTerminal(pinned);
         }

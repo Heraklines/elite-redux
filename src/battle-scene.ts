@@ -33,7 +33,12 @@ import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lis
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { ER_SILKEN_DECREE_ABILITY_ID } from "#data/elite-redux/abilities/silken-decree";
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
-import { getCoopBattleStreamer, getCoopController, isShowdownGuestFlip } from "#data/elite-redux/coop/coop-runtime";
+import {
+  getCoopBattleStreamer,
+  getCoopController,
+  isCoopAuthoritativeGuest,
+  isShowdownGuestFlip,
+} from "#data/elite-redux/coop/coop-runtime";
 import { grantErAchievementReward } from "#data/elite-redux/er-achievement-rewards";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
 import {
@@ -2203,8 +2208,31 @@ export class BattleScene extends SceneBase {
     // ER: a guardian fight's temporary challenge tokens (er-fight-tokens) MUST NOT
     // outlive that fight - strip them the moment any battle ends so they can never
     // leak into a normal wave. No-op outside the World Map gate.
-    clearErFightTokens();
+    const authoritativeGuest = isCoopAuthoritativeGuest();
+    if (!authoritativeGuest) {
+      clearErFightTokens();
+    }
     const isNewBiome = this.isNewBiome(lastBattle);
+    if (authoritativeGuest) {
+      // The retained wave/enemy carriers own every shared post-battle mutation on an authoritative
+      // renderer. Never even construct ReturnPhase or LevelCapPhase here: their factory calls are
+      // mutating leaks that the renderer gate can only catch after the wrong local tail was derived.
+      // The next encounter's presentation-only path materializes the adopted field, while the host
+      // snapshot supplies heals, resets, forms, Pokerus, relics, and level-cap state.
+      for (const enemyPokemon of this.getEnemyParty()) {
+        enemyPokemon.destroy();
+      }
+      if (!isNewBiome) {
+        // Background variants are presentation-only and still follow the adopted wave clock.
+        this.arena.updateBgForTimeOfDay();
+      }
+      if (!this.gameMode.hasRandomBiomes && !isNewBiome) {
+        this.phaseManager.pushNew("NextEncounterPhase");
+      } else {
+        this.phaseManager.pushNew("NewBiomeEncounterPhase");
+      }
+      return;
+    }
     /** Whether to reset and recall pokemon */
     const resetArenaState =
       isNewBiome

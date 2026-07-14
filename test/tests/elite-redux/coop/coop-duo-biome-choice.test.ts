@@ -1039,6 +1039,10 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         liveSelectBiome().start();
         await drainLoopback();
       });
+      // Retained envelopes are intentionally queued by destination so their apply callback can never run
+      // against the sender's scene/runtime. Pump the renderer's addressed inbox before asserting that this
+      // terminal was pre-delivered; a host-context drain only services the host inbox.
+      await withClient(rig.guestCtx, () => drainLoopback());
       expect(
         rig.hostRuntime.durability?.unackedCount(),
         "the natural single-node terminal remains retained before renderer projection",
@@ -1051,6 +1055,15 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         guestSwitch.mock.calls.find(c => c[0] === "SwitchBiomePhase"),
         "the renderer has not projected the pre-delivered terminal yet",
       ).toBeUndefined();
+      expect(
+        withClientSync(rig.guestCtx, () => getCoopBiomeTransitionCommitReceipt({ sourceWave: 13 })?.payload),
+        "the renderer retains the pre-delivered exact terminal in its own runtime before opening SelectBiome",
+      ).toMatchObject({
+        sourceBiomeId: rig.guestScene.arena.biomeId,
+        biomeId: hostBiome,
+        nodeIndex: -1,
+        nextWave: 14,
+      });
       await withClient(rig.guestCtx, async () => {
         // NOT chained (no setCoopBiomeInteractionStart): the natural single-node deterministic terminal.
         liveSelectBiome().start();
