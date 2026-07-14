@@ -3,7 +3,7 @@
   "taskId": "p33-wave24-fieldtrip-transition",
   "branch": "ci/coop/p33-wave24-fieldtrip-transition",
   "trainRef": "ci/coop/p33-mystery-public-transition",
-  "baseSha": "27098cef2496c349af93f4104b8ef1bcfe03c608",
+  "baseSha": "65dd82162691b4958fee78a44469c254449b2467",
   "allowedFiles": [
     ".github/coop-task-ownership/p33-wave24-fieldtrip-transition.json",
     "test/tests/elite-redux/coop/coop-soak-journey.test.ts",
