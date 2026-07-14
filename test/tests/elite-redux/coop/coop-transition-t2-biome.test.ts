@@ -99,19 +99,21 @@ async function pumpBoth(rig: DuoRig, rounds = 1): Promise<void> {
   }
 }
 
-async function waitForMode(rig: DuoRig, ctx: ClientCtx, mode: UiMode, label: string): Promise<void> {
+async function waitForMode(ctx: ClientCtx, mode: UiMode, label: string): Promise<void> {
   // Every authoritative transition below opens its target directly through setModeBoundedWhen. In the
   // headless renderer the fade tween may never tick, so allow the production 2s force-path to complete.
-  // Pressing ACTION against the outgoing MESSAGE handler is not a faithful shortcut: it can start a newer
-  // UI generation and supersede the exact bounded transition we are trying to prove.
-  for (let i = 0; i < 320; i++) {
-    await pumpBoth(rig);
-    if (ctx.scene.ui.getMode() === mode) {
-      return;
+  // Keep the destination engine installed while its local timer/tween callbacks run, matching separate
+  // browser processes. Alternating the ambient harness client during this local-only settle can falsely
+  // supersede the exact receiver's immutable phase fence.
+  await withClient(ctx, async () => {
+    for (let i = 0; i < 320; i++) {
+      if (ctx.scene.ui.getMode() === mode) {
+        return;
+      }
+      await new Promise<void>(resolve => setTimeout(resolve, 10));
     }
-    await new Promise<void>(resolve => setTimeout(resolve, 10));
-  }
-  throw new Error(`${label} never opened ${UiMode[mode]} (stuck on ${UiMode[ctx.scene.ui.getMode()]})`);
+    throw new Error(`${label} never opened ${UiMode[mode]} (stuck on ${UiMode[ctx.scene.ui.getMode()]})`);
+  });
 }
 
 async function pressUntilAccepted(rig: DuoRig, ctx: ClientCtx, button: Button, label: string): Promise<void> {
@@ -288,9 +290,9 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       hostMarket.start();
       await drainLoopback();
     });
-    await waitForMode(rig, rig.hostCtx, UiMode.BIOME_SHOP, "host biome market");
+    await waitForMode(rig.hostCtx, UiMode.BIOME_SHOP, "host biome market");
     await pressUntilAccepted(rig, rig.hostCtx, Button.CANCEL, "market leave");
-    await waitForMode(rig, rig.hostCtx, UiMode.CONFIRM, "market leave confirmation");
+    await waitForMode(rig.hostCtx, UiMode.CONFIRM, "market leave confirmation");
     await pressUntilAccepted(rig, rig.hostCtx, Button.ACTION, "market confirm yes");
 
     for (let i = 0; i < 80; i++) {
@@ -326,7 +328,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       guestCrossroads.start();
       await drainLoopback();
     });
-    await waitForMode(rig, rig.guestCtx, UiMode.OPTION_SELECT, "guest-owned Crossroads");
+    await waitForMode(rig.guestCtx, UiMode.OPTION_SELECT, "guest-owned Crossroads");
     if (leave) {
       await pressUntilAccepted(rig, rig.guestCtx, Button.DOWN, "Crossroads Leave cursor");
     }
@@ -358,7 +360,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       guestMap.start();
       await drainLoopback();
     });
-    await waitForMode(rig, rig.guestCtx, UiMode.ER_MAP, "guest-owned World Map");
+    await waitForMode(rig.guestCtx, UiMode.ER_MAP, "guest-owned World Map");
     // The real full World Map uses LEFT/RIGHT. Choose the second revealed route, then ACTION.
     await pressUntilAccepted(rig, rig.guestCtx, Button.RIGHT, "World Map second route");
     await pressUntilAccepted(rig, rig.guestCtx, Button.ACTION, "World Map travel");
