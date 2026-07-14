@@ -8,6 +8,7 @@
 // awaits the peer's pick; the SpoofGuest answers it in-process. This is the pure,
 // engine-free core - verified over a LoopbackTransport (the exact "test it via
 // spoofing" path) - that runs unchanged over the real WebRTC transport.
+// CI base probe: this comment-only delta preserves ddbaa0284 test semantics.
 
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { getCoopCausalTrace, resetCoopCausalTrace } from "#data/elite-redux/coop/coop-causal-trace";

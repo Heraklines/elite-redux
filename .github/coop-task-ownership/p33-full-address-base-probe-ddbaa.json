@@ -6,6 +6,7 @@
   "baseSha": "ddbaa0284473381c811381394f0c35856c1f8757",
   "allowedFiles": [
     ".github/coop-task-ownership/p33-full-address-base-probe-ddbaa.json",
-    "src/data/elite-redux/coop/coop-battle-stream.ts"
+    "src/data/elite-redux/coop/coop-battle-stream.ts",
+    "test/tests/elite-redux/coop/coop-battle-sync.test.ts"
   ]
 }
