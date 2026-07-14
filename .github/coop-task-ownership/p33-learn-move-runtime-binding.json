@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "taskId": "p33-learn-move-runtime-binding",
+  "branch": "ci/coop/p33-learn-move-runtime-binding",
+  "trainRef": "ci/coop/p33-mystery-public-transition",
+  "baseSha": "28b72b51549ec4db25f83f45cfc8fa0755bbf912",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-learn-move-runtime-binding.json",
+    "src/data/elite-redux/coop/coop-learn-move-operation.ts",
+    "src/phases/coop-replay-learn-move-batch.ts",
+    "src/phases/coop-replay-learn-move-phase.ts",
+    "src/phases/learn-move-batch-phase.ts",
+    "src/phases/learn-move-phase.ts",
+    "test/tests/elite-redux/coop/coop-duo-learn-move.test.ts",
+    "test/tests/elite-redux/coop/coop-learn-move-operation.test.ts"
+  ]
+}

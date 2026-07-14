@@ -4,14 +4,18 @@ import Overrides from "#app/overrides";
 import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import type { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   armCoopLearnMoveIntentResend,
+  type CoopLearnMoveOperationBinding,
+  captureCoopLearnMoveOperationBinding,
   commitCoopLearnMoveDecision,
   sendCoopLearnMovePrompt,
 } from "#data/elite-redux/coop/coop-learn-move-operation";
 import {
   advanceCoopInteractionForContinuation,
   clearCoopLearnMoveForwardInFlight,
+  failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
@@ -62,6 +66,11 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   private messageMode: UiMode;
   private readonly learnMoveType: LearnMoveType;
   private readonly cost: number;
+  /** Stable selectors for every authoritative picker callback / await tail owned by this phase. */
+  private coopOperationBinding: CoopLearnMoveOperationBinding | null = null;
+  private coopRelay: CoopInteractionRelay | null = null;
+  private coopLocalRole: CoopRole | null = null;
+  private coopInteractionCounter: (() => number) | null = null;
 
   constructor(
     partyMemberIndex: number,
@@ -104,6 +113,15 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       // lockstep owner/watcher mapping below (which assumes BOTH clients run a LearnMovePhase - false
       // here: the guest is a pure renderer parked in CoopReplayTurnPhase). Reached ONLY when the
       // netcode is authoritative, so solo / host-lockstep / lockstep stay byte-identical.
+      const controller = getCoopController();
+      if (controller == null) {
+        failCoopSharedSession("Learn-move phase could not bind to a live authoritative role");
+        return;
+      }
+      this.coopLocalRole = controller.role;
+      this.coopInteractionCounter = () => controller.interactionCounter();
+      this.coopOperationBinding = captureCoopLearnMoveOperationBinding(controller.role);
+      this.coopRelay = getCoopInteractionRelay();
       this.coopAuthoritativeLearnMove(currentMoveset, move, pokemon);
     } else if (currentMoveset.length < pokemon.getMaxMoveCount()) {
       // Empty slot: the move auto-learns identically on both clients (deterministic), so
@@ -151,30 +169,37 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     if (!globalScene.gameMode.isCoop) {
       return;
     }
-    const controller = getCoopController();
-    if (controller == null) {
+    const localRole = this.coopLocalRole ?? getCoopController()?.role;
+    if (localRole == null) {
       return;
     }
     const owner = (this.getPokemon() as { coopOwner?: CoopRole }).coopOwner ?? "host";
-    if (owner !== controller.role) {
+    if (owner !== localRole) {
       return;
     }
-    getCoopInteractionRelay()?.sendInteractionChoice(COOP_LEARN_MOVE_SEQ, "learnMove", moveIndex);
-    if (getCoopNetcodeMode() === "authoritative" && controller.role === "host") {
-      commitCoopLearnMoveDecision({
-        payload: {
-          type: "decision",
-          partySlot: this.partyMemberIndex,
-          moveId: this.moveId,
-          forgetSlot: moveIndex,
-          maxMoveCount: this.getPokemon().getMaxMoveCount(),
+    if (this.coopOperationBinding != null && localRole === "host") {
+      const committed = commitCoopLearnMoveDecision(
+        {
+          payload: {
+            type: "decision",
+            partySlot: this.partyMemberIndex,
+            moveId: this.moveId,
+            forgetSlot: moveIndex,
+            maxMoveCount: this.getPokemon().getMaxMoveCount(),
+          },
+          ownerRole: "host",
+          localRole: "host",
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: globalScene.currentBattle?.turn ?? 0,
         },
-        ownerRole: "host",
-        localRole: "host",
-        wave: globalScene.currentBattle?.waveIndex ?? 0,
-        turn: globalScene.currentBattle?.turn ?? 0,
-      });
+        this.coopOperationBinding,
+      );
+      if (!committed) {
+        failCoopSharedSession(`Host-owned learn-move decision for slot ${this.partyMemberIndex} was not retained`);
+        return;
+      }
     }
+    (this.coopRelay ?? getCoopInteractionRelay())?.sendInteractionChoice(COOP_LEARN_MOVE_SEQ, "learnMove", moveIndex);
   }
 
   /**
@@ -375,7 +400,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
    * degrades to the interactive host-drives picker (no await), still never a hang.
    */
   private async coopHostForwardLearnMove(move: Move, pokemon: Pokemon): Promise<void> {
-    const relay = getCoopInteractionRelay();
+    const relay = this.coopRelay;
     if (relay == null) {
       // Degraded but safe: no live relay -> the host drives the interactive picker itself (no await).
       this.replaceMoveCheck(move, pokemon);
@@ -392,16 +417,24 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     });
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
     const turn = globalScene.currentBattle?.turn ?? 0;
-    sendCoopLearnMovePrompt(
-      relay,
-      {
-        type: "prompt",
-        partySlot: slot,
-        moveId: this.moveId,
-        maxMoveCount,
-      },
-      { localRole: "host", wave, turn },
-    );
+    const operationBinding = this.coopOperationBinding;
+    if (
+      operationBinding == null
+      || !sendCoopLearnMovePrompt(
+        relay,
+        {
+          type: "prompt",
+          partySlot: slot,
+          moveId: this.moveId,
+          maxMoveCount,
+        },
+        { localRole: "host", wave, turn },
+        operationBinding,
+      )
+    ) {
+      failCoopSharedSession(`Learn-move prompt for slot ${slot} could not enter durable authority`);
+      return;
+    }
     const mirror = getCoopUiMirror();
     // Render the picker READ-ONLY (no-op callback: the outcome is the relayed pick, never this
     // callback) and mirror the GUEST's live cursor so the host watches the partner choose.
@@ -415,13 +448,21 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     }
     // null -> getMaxMoveCount() sentinel -> applyForgetResult keeps current moves + ends (no hang).
     const forgetSlot = res?.choice ?? maxMoveCount;
-    commitCoopLearnMoveDecision({
-      payload: { type: "decision", partySlot: slot, moveId: this.moveId, forgetSlot, maxMoveCount },
-      ownerRole: "guest",
-      localRole: "host",
-      wave,
-      turn,
-    });
+    if (
+      !commitCoopLearnMoveDecision(
+        {
+          payload: { type: "decision", partySlot: slot, moveId: this.moveId, forgetSlot, maxMoveCount },
+          ownerRole: "guest",
+          localRole: "host",
+          wave,
+          turn,
+        },
+        operationBinding,
+      )
+    ) {
+      failCoopSharedSession(`Learn-move decision for slot ${slot} could not enter durable authority`);
+      return;
+    }
     await this.applyForgetResult(forgetSlot, move, pokemon);
   }
 
@@ -448,7 +489,8 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     // the guard SET and does not also open the detached overlay (double-render guard).
     markCoopLearnMoveForwardInFlight(slot);
     const seq = COOP_LEARN_MOVE_FWD_SEQ_BASE + slot;
-    const relay = getCoopInteractionRelay();
+    const relay = this.coopRelay;
+    const operationBinding = this.coopOperationBinding;
     const mirror = getCoopUiMirror();
     coopLog("learnmove", "guest OWNS this full-moveset mon -> renders the forget-picker itself (#835)", {
       slot,
@@ -465,7 +507,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       clearCoopLearnMoveForwardInFlight(slot);
       // Relay the human's forget-slot to the host (the sole engine); it applies the forget + learns.
       coopLog("learnmove", "guest relays owned-mon forget-pick (#835)", { seq, moveIndex });
-      getCoopInteractionRelay()?.sendInteractionChoice(seq, "learnMove", moveIndex);
+      relay?.sendInteractionChoice(seq, "learnMove", moveIndex);
       const payload = {
         type: "decision" as const,
         partySlot: slot,
@@ -473,12 +515,15 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         forgetSlot: moveIndex,
         maxMoveCount: pokemon.getMaxMoveCount(),
       };
-      armCoopLearnMoveIntentResend({
-        payload,
-        wave: globalScene.currentBattle?.waveIndex ?? 0,
-        turn: globalScene.currentBattle?.turn ?? 0,
-        resend: () => getCoopInteractionRelay()?.sendInteractionChoice(seq, "learnMove", moveIndex),
-      });
+      armCoopLearnMoveIntentResend(
+        {
+          payload,
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: globalScene.currentBattle?.turn ?? 0,
+          resend: () => relay?.sendInteractionChoice(seq, "learnMove", moveIndex),
+        },
+        operationBinding,
+      );
       // DEFERRED continuation cleanup: now that the pick is committed, remove the back-out SelectModifier
       // copy + advance the alternation (the same commit the immediate no-op path does, but AFTER the pick
       // instead of before it - so the picker overlay lived long enough for the human to use it).
@@ -486,14 +531,13 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         (this.learnMoveType === LearnMoveType.TM || (this.learnMoveType === LearnMoveType.MEMORY && this.cost === -1))
         && globalScene.phaseManager.tryRemovePhase("SelectModifierPhase")
       ) {
-        advanceCoopInteractionForContinuation(getCoopController()?.interactionCounter() ?? -1);
+        advanceCoopInteractionForContinuation(this.coopInteractionCounter?.() ?? -1);
       }
       void globalScene.ui.setMode(this.messageMode).then(() => this.end());
     };
-    if (relay == null) {
-      // Degraded but safe: no live relay -> keep current moves (sentinel) + run the deferred cleanup.
-      coopWarn("learnmove", "no relay for guest-owned forget-picker; keeping current moves (#835)", { slot });
-      finish(pokemon.getMaxMoveCount());
+    if (relay == null || operationBinding == null) {
+      clearCoopLearnMoveForwardInFlight(slot);
+      failCoopSharedSession(`Guest-owned learn-move picker for slot ${slot} lost its runtime binding`);
       return;
     }
     // Render the REAL interactive move-forget picker (the shared #563 screen). beginSession("owner", ...)
@@ -660,11 +704,15 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       // #789-class: the continuation-copy removal is the interaction commit (see the guest mirror
       // branch above) - advance the alternation or the rotation stalls after a committed TM.
       if (globalScene.phaseManager.tryRemovePhase("SelectModifierPhase")) {
-        advanceCoopInteractionForContinuation(getCoopController()?.interactionCounter() ?? -1);
+        advanceCoopInteractionForContinuation(
+          this.coopInteractionCounter?.() ?? getCoopController()?.interactionCounter() ?? -1,
+        );
       }
     } else if (this.learnMoveType === LearnMoveType.MEMORY) {
       if (this.cost === -1 && globalScene.phaseManager.tryRemovePhase("SelectModifierPhase")) {
-        advanceCoopInteractionForContinuation(getCoopController()?.interactionCounter() ?? -1);
+        advanceCoopInteractionForContinuation(
+          this.coopInteractionCounter?.() ?? getCoopController()?.interactionCounter() ?? -1,
+        );
       } else if (this.cost !== -1) {
         if (!Overrides.WAIVE_ROLL_FEE_OVERRIDE) {
           globalScene.money -= this.cost;

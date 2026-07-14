@@ -5,7 +5,7 @@
 
 import { COOP_CAP_OP_LEARN_MOVE, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
-import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
+import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
 import type { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   type CoopAuthoritativeEnvelopeV1,
@@ -17,10 +17,22 @@ import {
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
-  journalCoopCommittedEnvelope,
+  getActiveCoopOperationDurability,
   registerCoopOperationApplier,
+  tryJournalCoopCommittedEnvelope,
+  tryJournalCoopCommittedEnvelopeFor,
 } from "#data/elite-redux/coop/coop-operation-journal";
-import { CoopOperationGuest, CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
+import {
+  CoopOperationGuest,
+  CoopOperationHost,
+  type CoopRuntimeOpState,
+  getActiveCoopRuntimeOpState,
+  maybeCoopOpSurfaceState,
+  registerCoopOpSurfaceState,
+  requireCoopOpSurfaceState,
+  requireCoopOpSurfaceStateFor,
+  resetActiveCoopRuntimeClocks,
+} from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE,
   COOP_LEARN_MOVE_FWD_SEQ_BASE,
@@ -35,13 +47,78 @@ type LearnDecision =
 
 const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_LEARN_MOVE_OP === "off");
 let enabled = DEFAULT_ENABLED;
-let epoch = 1;
-let revisionFloor = 0;
-let authorityHost: CoopOperationHost | null = null;
-let receiverGuest: CoopOperationGuest | null = null;
-let ordinal = 0;
 let retryMs = 1_000;
-const retries = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** Every mutable learn-move operation cell belongs to exactly one assembled co-op runtime. */
+interface LearnMoveOpState {
+  epoch: number;
+  revisionFloor: number;
+  authorityHost: CoopOperationHost | null;
+  receiverGuest: CoopOperationGuest | null;
+  ordinal: number;
+  readonly retries: Map<string, ReturnType<typeof setTimeout>>;
+}
+
+registerCoopOpSurfaceState(
+  "learnMove",
+  (): LearnMoveOpState => ({
+    epoch: 1,
+    revisionFloor: 0,
+    authorityHost: null,
+    receiverGuest: null,
+    ordinal: 0,
+    retries: new Map(),
+  }),
+);
+
+/** Stable runtime selectors captured before a picker callback, await, timer, or phase tail can resume. */
+export interface CoopLearnMoveOperationBinding {
+  readonly opState: CoopRuntimeOpState;
+  readonly durability: CoopDurabilityManager | null;
+}
+
+/** Capture the scheduling client; missing or wrong-role bindings are programming errors, never fallbacks. */
+export function captureCoopLearnMoveOperationBinding(expectedRole?: CoopRole): CoopLearnMoveOperationBinding {
+  const opState = getActiveCoopRuntimeOpState();
+  if (opState == null) {
+    throw new Error("[coop-op] no runtime installed for surface=learnMove (cannot capture continuation binding)");
+  }
+  if (expectedRole != null && opState.localRole != null && opState.localRole !== expectedRole) {
+    throw new Error(
+      `[coop-op] surface=learnMove binding role=${opState.localRole} cannot execute localRole=${expectedRole}`,
+    );
+  }
+  return { opState, durability: getActiveCoopOperationDurability() };
+}
+
+function state(binding?: CoopLearnMoveOperationBinding | null): LearnMoveOpState {
+  return binding == null
+    ? requireCoopOpSurfaceState<LearnMoveOpState>("learnMove")
+    : requireCoopOpSurfaceStateFor<LearnMoveOpState>(binding.opState, "learnMove");
+}
+
+function retainEnvelope(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  binding?: CoopLearnMoveOperationBinding | null,
+): boolean {
+  return binding == null
+    ? tryJournalCoopCommittedEnvelope(envelope)
+    : tryJournalCoopCommittedEnvelopeFor(binding.durability, envelope);
+}
+
+function assertBindingRole(binding: CoopLearnMoveOperationBinding | null | undefined, role: CoopRole): void {
+  const opState = binding?.opState ?? getActiveCoopRuntimeOpState();
+  if (opState == null) {
+    throw new Error("[coop-op] no runtime installed for surface=learnMove (cannot validate local role)");
+  }
+  if (opState.localRole != null && opState.localRole !== role) {
+    throw new Error(`[coop-op] surface=learnMove binding role=${opState.localRole} cannot execute localRole=${role}`);
+  }
+}
+
+function isCoopOpRuntimeError(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith("[coop-op]");
+}
 
 export function isCoopLearnMoveOperationEnabled(): boolean {
   return enabled && !isCoopSurfaceCapabilityBlocked(COOP_CAP_OP_LEARN_MOVE);
@@ -59,42 +136,57 @@ export function resetCoopLearnMoveRetryMs(): void {
   retryMs = 1_000;
 }
 export function resetCoopLearnMoveOperationState(): void {
-  CoopOperationHost.resetGlobalOrder();
-  for (const timer of retries.values()) {
+  const s = maybeCoopOpSurfaceState<LearnMoveOpState>("learnMove");
+  if (s == null) {
+    return;
+  }
+  resetActiveCoopRuntimeClocks();
+  for (const timer of s.retries.values()) {
     clearTimeout(timer);
   }
-  retries.clear();
-  authorityHost = null;
-  receiverGuest = null;
-  revisionFloor = 0;
-  ordinal = 0;
+  s.retries.clear();
+  s.authorityHost = null;
+  s.receiverGuest = null;
+  s.revisionFloor = 0;
+  s.ordinal = 0;
 }
 export function setCoopLearnMoveOperationRevisionFloor(value: number): void {
-  if (!Number.isFinite(value) || value <= 0 || value === revisionFloor) {
+  const s = maybeCoopOpSurfaceState<LearnMoveOpState>("learnMove");
+  if (s == null || !Number.isFinite(value) || value <= 0 || value === s.revisionFloor) {
     return;
   }
-  revisionFloor = value;
-  authorityHost = null;
-  receiverGuest = null;
+  s.revisionFloor = value;
+  s.ordinal = 0;
+  s.authorityHost = null;
+  s.receiverGuest = null;
 }
 export function setCoopLearnMoveOperationEpoch(value: number): void {
-  if (!Number.isSafeInteger(value) || value <= 0 || value === epoch) {
+  const s = maybeCoopOpSurfaceState<LearnMoveOpState>("learnMove");
+  if (s == null || !Number.isSafeInteger(value) || value <= 0 || value === s.epoch) {
     return;
   }
-  epoch = value;
+  s.epoch = value;
   resetCoopLearnMoveOperationState();
 }
 
-function host(): CoopOperationHost {
-  authorityHost ??= CoopOperationHost.global({ epoch, initialRevision: revisionFloor });
-  return authorityHost;
+function host(binding?: CoopLearnMoveOperationBinding | null): CoopOperationHost {
+  const s = state(binding);
+  s.authorityHost ??=
+    binding == null
+      ? CoopOperationHost.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor })
+      : CoopOperationHost.forRuntime(binding.opState, { epoch: s.epoch, initialRevision: s.revisionFloor });
+  return s.authorityHost;
 }
-function guest(): CoopOperationGuest {
-  receiverGuest ??= CoopOperationGuest.global({ epoch, initialRevision: revisionFloor });
-  return receiverGuest;
+function guest(binding?: CoopLearnMoveOperationBinding | null): CoopOperationGuest {
+  const s = state(binding);
+  s.receiverGuest ??=
+    binding == null
+      ? CoopOperationGuest.forActiveRuntime({ epoch: s.epoch, initialRevision: s.revisionFloor })
+      : CoopOperationGuest.forRuntime(binding.opState, { epoch: s.epoch, initialRevision: s.revisionFloor });
+  return s.receiverGuest;
 }
-function nextAddress(): number {
-  return revisionFloor + ++ordinal;
+function nextAddress(s: LearnMoveOpState): number {
+  return s.revisionFloor + ++s.ordinal;
 }
 function context(wave: number, turn: number) {
   const authoritativeState: CoopAuthoritativeBattleStateV1 = {
@@ -120,33 +212,53 @@ function context(wave: number, turn: number) {
 function kindOf(payload: LearnPayload): Extract<CoopOperationKind, "LEARN_MOVE" | "LEARN_MOVE_BATCH"> {
   return "moveId" in payload ? "LEARN_MOVE" : "LEARN_MOVE_BATCH";
 }
-function commit(params: {
-  payload: LearnPayload;
-  ownerRole: CoopRole;
-  localRole: CoopRole;
-  wave: number;
-  turn: number;
-}): void {
-  if (!isCoopLearnMoveOperationEnabled() || params.localRole !== "host") {
-    return;
+function commit(
+  params: {
+    payload: LearnPayload;
+    ownerRole: CoopRole;
+    localRole: CoopRole;
+    wave: number;
+    turn: number;
+  },
+  binding?: CoopLearnMoveOperationBinding | null,
+): boolean {
+  if (!isCoopLearnMoveOperationEnabled()) {
+    return true;
+  }
+  assertBindingRole(binding, params.localRole);
+  if (params.localRole !== "host") {
+    return false;
   }
   try {
+    const s = state(binding);
     const owner = coopSeatOfRole(params.ownerRole);
     const operation: CoopPendingOperation = {
-      id: makeCoopOperationId(epoch, owner, nextAddress(), kindOf(params.payload)),
+      id: makeCoopOperationId(s.epoch, owner, nextAddress(s), kindOf(params.payload)),
       kind: kindOf(params.payload),
       owner,
       status: "proposed",
       payload: structuredClone(params.payload),
     };
-    const result = host().submit(operation, context(params.wave, params.turn), intent =>
+    const result = host(binding).submit(operation, context(params.wave, params.turn), intent =>
       intent.owner === owner ? { ok: true } : { ok: false, reason: "wrong-owner" },
     );
-    if (result.kind === "committed") {
-      journalCoopCommittedEnvelope(result.envelope);
+    if (result.kind !== "committed" && result.kind !== "reack") {
+      return false;
     }
+    if (!retainEnvelope(result.envelope, binding)) {
+      coopWarn(
+        "learnmove",
+        `learn-move op could not retain rev=${result.envelope.revision} id=${operation.id}; refusing raw continuation`,
+      );
+      return false;
+    }
+    return true;
   } catch (error) {
-    coopWarn("learnmove", "learn-move op commit threw; legacy carrier remains active", error);
+    if (isCoopOpRuntimeError(error)) {
+      throw error;
+    }
+    coopWarn("learnmove", "learn-move op commit threw; refusing the unretained continuation", error);
+    return false;
   }
 }
 
@@ -154,58 +266,80 @@ export function sendCoopLearnMovePrompt(
   relay: CoopInteractionRelay,
   payload: Extract<CoopLearnMovePayload, { type: "prompt" }>,
   params: { localRole: CoopRole; wave: number; turn: number },
-): void {
-  commit({ payload, ownerRole: "guest", ...params });
+  binding?: CoopLearnMoveOperationBinding | null,
+): boolean {
+  if (!commit({ payload, ownerRole: "guest", ...params }, binding)) {
+    return false;
+  }
   relay.sendInteractionOutcome(COOP_LEARN_MOVE_FWD_SEQ_BASE + payload.partySlot, "learnMoveForward", {
     k: "learnMoveForward",
     ...payload,
   });
+  return true;
 }
 export function sendCoopLearnMoveBatchPrompt(
   relay: CoopInteractionRelay,
   payload: Extract<CoopLearnMoveBatchPayload, { type: "prompt" }>,
   params: { localRole: CoopRole; wave: number; turn: number },
-): void {
-  commit({ payload, ownerRole: payload.ownerIsGuest ? "guest" : "host", ...params });
+  binding?: CoopLearnMoveOperationBinding | null,
+): boolean {
+  if (!commit({ payload, ownerRole: payload.ownerIsGuest ? "guest" : "host", ...params }, binding)) {
+    return false;
+  }
   relay.sendInteractionOutcome(COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE + payload.partySlot, "learnMoveBatchForward", {
     k: "learnMoveBatchForward",
     partySlot: payload.partySlot,
     learnableIds: [...payload.learnableIds],
     ownerIsGuest: payload.ownerIsGuest,
   });
+  return true;
 }
-export function commitCoopLearnMoveDecision(params: {
-  payload: Extract<CoopLearnMovePayload, { type: "decision" }>;
-  ownerRole: CoopRole;
-  localRole: CoopRole;
-  wave: number;
-  turn: number;
-}): void {
-  commit(params);
+export function commitCoopLearnMoveDecision(
+  params: {
+    payload: Extract<CoopLearnMovePayload, { type: "decision" }>;
+    ownerRole: CoopRole;
+    localRole: CoopRole;
+    wave: number;
+    turn: number;
+  },
+  binding?: CoopLearnMoveOperationBinding | null,
+): boolean {
+  return commit(params, binding);
 }
-export function commitCoopLearnMoveBatchDecision(params: {
-  payload: Extract<CoopLearnMoveBatchPayload, { type: "decision" }>;
-  ownerRole: CoopRole;
-  localRole: CoopRole;
-  wave: number;
-  turn: number;
-}): void {
-  commit(params);
+export function commitCoopLearnMoveBatchDecision(
+  params: {
+    payload: Extract<CoopLearnMoveBatchPayload, { type: "decision" }>;
+    ownerRole: CoopRole;
+    localRole: CoopRole;
+    wave: number;
+    turn: number;
+  },
+  binding?: CoopLearnMoveOperationBinding | null,
+): boolean {
+  return commit(params, binding);
 }
 
 function retryKey(payload: LearnDecision): string {
   return `${kindOf(payload)}:${payload.partySlot}:${JSON.stringify(payload)}`;
 }
-function arm(payload: LearnDecision, _wave: number, _turn: number, resend: () => void): void {
+function arm(
+  payload: LearnDecision,
+  _wave: number,
+  _turn: number,
+  resend: () => void,
+  binding?: CoopLearnMoveOperationBinding | null,
+): void {
   if (!isCoopLearnMoveOperationEnabled()) {
     return;
   }
+  assertBindingRole(binding, "guest");
+  const s = state(binding);
   const key = retryKey(payload);
-  if (retries.has(key)) {
+  if (s.retries.has(key)) {
     return;
   }
   const tick = () => {
-    if (!retries.has(key)) {
+    if (!s.retries.has(key)) {
       return;
     }
     try {
@@ -213,34 +347,40 @@ function arm(payload: LearnDecision, _wave: number, _turn: number, resend: () =>
     } catch (error) {
       coopWarn("learnmove", "learn-move intent resend threw", error);
     }
-    if (retries.has(key)) {
-      retries.set(key, setTimeout(tick, retryMs));
+    if (s.retries.has(key)) {
+      s.retries.set(key, setTimeout(tick, retryMs));
     }
   };
-  retries.set(key, setTimeout(tick, retryMs));
+  s.retries.set(key, setTimeout(tick, retryMs));
 }
-export function armCoopLearnMoveIntentResend(params: {
-  payload: Extract<CoopLearnMovePayload, { type: "decision" }>;
-  wave: number;
-  turn: number;
-  resend: () => void;
-}): void {
-  arm(params.payload, params.wave, params.turn, params.resend);
+export function armCoopLearnMoveIntentResend(
+  params: {
+    payload: Extract<CoopLearnMovePayload, { type: "decision" }>;
+    wave: number;
+    turn: number;
+    resend: () => void;
+  },
+  binding?: CoopLearnMoveOperationBinding | null,
+): void {
+  arm(params.payload, params.wave, params.turn, params.resend, binding);
 }
-export function armCoopLearnMoveBatchIntentResend(params: {
-  payload: Extract<CoopLearnMoveBatchPayload, { type: "decision" }>;
-  wave: number;
-  turn: number;
-  resend: () => void;
-}): void {
-  arm(params.payload, params.wave, params.turn, params.resend);
+export function armCoopLearnMoveBatchIntentResend(
+  params: {
+    payload: Extract<CoopLearnMoveBatchPayload, { type: "decision" }>;
+    wave: number;
+    turn: number;
+    resend: () => void;
+  },
+  binding?: CoopLearnMoveOperationBinding | null,
+): void {
+  arm(params.payload, params.wave, params.turn, params.resend, binding);
 }
-function cancel(payload: LearnDecision, _wave: number, _turn: number): void {
+function cancel(s: LearnMoveOpState, payload: LearnDecision, _wave: number, _turn: number): void {
   const key = retryKey(payload);
-  const timer = retries.get(key);
+  const timer = s.retries.get(key);
   if (timer != null) {
     clearTimeout(timer);
-    retries.delete(key);
+    s.retries.delete(key);
   }
 }
 
@@ -271,6 +411,7 @@ function applyEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome 
   if (!valid(op.payload, op.kind)) {
     return "rejected";
   }
+  const s = state();
   const g = guest();
   if (g.hasApplied(op.id)) {
     return "duplicate";
@@ -279,7 +420,7 @@ function applyEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome 
     return "rejected";
   }
   if (op.payload.type === "decision") {
-    cancel(op.payload, envelope.wave, envelope.turn);
+    cancel(s, op.payload, envelope.wave, envelope.turn);
   }
   return "applied";
 }

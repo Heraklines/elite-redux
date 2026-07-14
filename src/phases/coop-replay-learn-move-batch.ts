@@ -7,7 +7,10 @@
 import { globalScene } from "#app/global-scene";
 import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { armCoopLearnMoveBatchIntentResend } from "#data/elite-redux/coop/coop-learn-move-operation";
+import {
+  armCoopLearnMoveBatchIntentResend,
+  captureCoopLearnMoveOperationBinding,
+} from "#data/elite-redux/coop/coop-learn-move-operation";
 import {
   clearCoopLearnMoveBatchInFlight,
   getCoopInteractionRelay,
@@ -67,6 +70,7 @@ export function openCoopLearnMoveBatchPickerInline(
     clearCoopLearnMoveBatchInFlight(partySlot);
     return;
   }
+  const operationBinding = captureCoopLearnMoveOperationBinding("guest");
   const mirror = getCoopUiMirror();
   // Snapshot the pre-panel moveset so `revert` (the panel's "undo" exit) restores it EXACTLY.
   const snapshotMoveset = [...pokemon.moveset];
@@ -117,17 +121,20 @@ export function openCoopLearnMoveBatchPickerInline(
         const { choice, data } = encodeCoopLearnMoveBatchTerminal(learned);
         coopLog("learnmove", "guest relays owned-mon batch terminal (#848)", { seq, count: choice });
         relay.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, choice, data);
-        armCoopLearnMoveBatchIntentResend({
-          payload: {
-            type: "decision",
-            partySlot,
-            assignments: learned.map(([moveId, slotIndex]) => [moveId, slotIndex]),
-            fallback: false,
+        armCoopLearnMoveBatchIntentResend(
+          {
+            payload: {
+              type: "decision",
+              partySlot,
+              assignments: learned.map(([moveId, slotIndex]) => [moveId, slotIndex]),
+              fallback: false,
+            },
+            wave: globalScene.currentBattle?.waveIndex ?? 0,
+            turn: globalScene.currentBattle?.turn ?? 0,
+            resend: () => relay.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, choice, data),
           },
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
-          resend: () => relay.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, choice, data),
-        });
+          operationBinding,
+        );
         clearCoopLearnMoveBatchInFlight(partySlot);
         closePanel();
       },
@@ -141,12 +148,16 @@ export function openCoopLearnMoveBatchPickerInline(
           seq,
         });
         relay.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, COOP_LEARN_MOVE_BATCH_FALLBACK);
-        armCoopLearnMoveBatchIntentResend({
-          payload: { type: "decision", partySlot, assignments: [], fallback: true },
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
-          resend: () => relay.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, COOP_LEARN_MOVE_BATCH_FALLBACK),
-        });
+        armCoopLearnMoveBatchIntentResend(
+          {
+            payload: { type: "decision", partySlot, assignments: [], fallback: true },
+            wave: globalScene.currentBattle?.waveIndex ?? 0,
+            turn: globalScene.currentBattle?.turn ?? 0,
+            resend: () =>
+              relay.sendInteractionChoice(seq, LEARN_MOVE_BATCH_CHOICE_KIND, COOP_LEARN_MOVE_BATCH_FALLBACK),
+          },
+          operationBinding,
+        );
         clearCoopLearnMoveBatchInFlight(partySlot);
         closePanel();
       },
