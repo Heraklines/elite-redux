@@ -25,4 +25,4 @@ ALLOWED_ORIGIN = "*"
 # Showdown Tournament (P1): comma-separated list of ADMIN account uids (the token `uid`,
 # a stable numeric account id) allowed to create/close/cancel/resolve tournaments. Empty
 # / unset = no admins (creation locked). Set the maintainer's account uid here.
-TOURNAMENT_ADMIN_UIDS = ""
+TOURNAMENT_ADMIN_UIDS = "2"   # staging uid of Heraklines1 (maintainer): tournament create/close/cancel/resolve
