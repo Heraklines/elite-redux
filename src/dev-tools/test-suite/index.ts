@@ -64,7 +64,7 @@ import { UiMode } from "#enums/ui-mode";
 import { formatConsoleSnapshot } from "#utils/console-ring-buffer";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { openScenarioBuilder } from "./builder";
-import { summarizeErCustomTrainer } from "./custom-trainer-picker";
+import { openDevMenuOverlay, summarizeErCustomTrainer } from "./custom-trainer-picker";
 import {
   buildErCustomTrainerDevScenario,
   buildErCustomTrainerTeamScenario,
@@ -326,9 +326,7 @@ function nextUnpassedScenario(after: DevScenario | null): DevScenario | null {
  * before deferring to openScenarioList.
  */
 function openPickerClean(ctx: DevMenuCtx): void {
-  Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE))
-    .then(() => openScenarioList(ctx))
-    .catch(() => {});
+  openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openScenarioList(ctx));
 }
 
 // Passed scenarios are remembered in localStorage (ordered, most-recent LAST) so
@@ -658,7 +656,9 @@ function openScenarioList(ctx: DevMenuCtx): void {
       // with the full resolved feature set. Sits directly under the builder.
       label: "\u{1F464} Custom Trainers",
       handler: () => {
-        openCustomTrainerList(ctx);
+        // Opened from INSIDE this OPTION_SELECT: collapse to MESSAGE first, else
+        // setOverlayMode(OPTION_SELECT) is a no-op and the list never shows (#937).
+        openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openCustomTrainerList(ctx));
         return true;
       },
     },
@@ -737,7 +737,7 @@ function openCustomTrainerList(ctx: DevMenuCtx): void {
       label: "(no custom trainers authored yet)",
       handler: () => {
         // A no-op selection just re-opens this list; the tester can then go Back.
-        openCustomTrainerList(ctx);
+        openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openCustomTrainerList(ctx));
         return true;
       },
     });
@@ -747,7 +747,8 @@ function openCustomTrainerList(ctx: DevMenuCtx): void {
       options.push({
         label: clampCustomTrainerLabel(summary),
         handler: () => {
-          openCustomTrainerActions(ctx, trainer);
+          // Nested OPTION_SELECT -> collapse to MESSAGE first (see openDevMenuOverlay).
+          openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openCustomTrainerActions(ctx, trainer));
           return true;
         },
       });
@@ -757,7 +758,7 @@ function openCustomTrainerList(ctx: DevMenuCtx): void {
     // Back to the main scenario picker (keeps a live UI mode - no modeless softlock).
     label: "Back",
     handler: () => {
-      openScenarioList(ctx);
+      openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openScenarioList(ctx));
       return true;
     },
   });
@@ -789,7 +790,7 @@ function openCustomTrainerActions(ctx: DevMenuCtx, trainer: ErCustomTrainerResol
     {
       label: "Back",
       handler: () => {
-        openCustomTrainerList(ctx);
+        openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openCustomTrainerList(ctx));
         return true;
       },
     },
@@ -813,7 +814,7 @@ function launchCustomTrainer(ctx: DevMenuCtx, trainer: ErCustomTrainerResolved):
           {
             label: "Back",
             handler: () => {
-              openCustomTrainerList(ctx);
+              openDevMenuOverlay(globalScene.ui, UiMode.MESSAGE, () => openCustomTrainerList(ctx));
               return true;
             },
           },

@@ -11,6 +11,42 @@ import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 /** How many species names a picker row lists before eliding with a trailing dot. */
 const MAX_TEAM_SUMMARY_SPECIES = 3;
 
+/** The minimal `globalScene.ui` surface {@linkcode openDevMenuOverlay} touches. */
+export interface DevMenuOverlayUi {
+  /** Collapse the ACTIVE ui handler to a plain mode (dev menu passes MESSAGE). */
+  setMode(mode: number): Promise<void> | void;
+}
+
+/**
+ * Open a NESTED dev-menu OPTION_SELECT overlay cleanly.
+ *
+ * ROOT CAUSE this guards (the #937 staging bug: the Custom Trainers picker's
+ * "select a custom trainer" text renders but the trainer ROWS never appear):
+ * `Ui.setModeInternal` early-returns when the requested mode already equals the
+ * ACTIVE mode (`this.mode === mode && !forceTransition`). The main scenario list
+ * IS an OPTION_SELECT, so selecting its "Custom Trainers" entry and then calling
+ * `setOverlayMode(OPTION_SELECT, …)` is a silent no-op - the new option list is
+ * never shown. The main list itself works only because it is opened from the
+ * TITLE mode (a DIFFERENT mode).
+ *
+ * The fix mirrors the working main-list opener (`openPickerClean`): collapse the
+ * active OPTION_SELECT to `messageMode` (MESSAGE) FIRST, then run `open` (which
+ * does `showText` + `setOverlayMode(OPTION_SELECT, …)`) so the subsequent overlay
+ * sees a different active mode and actually opens. The `open` runs AFTER the mode
+ * settles (a microtask), matching the proven async-open-after-`return true`
+ * pattern the title "Dev Scenarios" handler already relies on.
+ *
+ * Pure + injectable (no globalScene/Phaser import) so the invocation ordering is
+ * unit-testable. Returns a promise that resolves once `open` has run.
+ */
+export function openDevMenuOverlay(ui: DevMenuOverlayUi, messageMode: number, open: () => void): Promise<void> {
+  return Promise.resolve(ui.setMode(messageMode))
+    .then(() => {
+      open();
+    })
+    .catch(() => {});
+}
+
 /**
  * A one-line staff-facing summary of a custom trainer for the picker list:
  * `Name #id: Sp1, Sp2, Sp3…`. The species come from the REPRESENTATIVE members
