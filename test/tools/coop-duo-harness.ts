@@ -115,6 +115,7 @@ import {
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { captureCoopTrainerVictoryBoundary } from "#data/elite-redux/coop/coop-trainer-victory-boundary";
 import {
   type CoopActiveMysteryEncounterSnapshotV1,
   type CoopMessage,
@@ -911,6 +912,9 @@ export function mirrorHostBattleToGuest(
     trainer: hostBattle.trainer ?? undefined,
     double: hostBattle.double,
   });
+  // Production captures this immutable source-wave context when it applies the authoritative encounter
+  // descriptor. This direct test mirror bypasses EncounterPhase, so mirror that same seam explicitly.
+  captureCoopTrainerVictoryBoundary(guestScene, guestScene.currentBattle);
   guestScene.currentBattle.turn = hostBattle.turn;
   const enemyParty: EnemyPokemon[] = [];
   // Versus flip: the guest's local ENEMY party is the host's PLAYER party (the opponent). Co-op: the

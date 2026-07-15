@@ -39,6 +39,7 @@ import {
   isVersusSession,
   maybeBeginReplayRecording,
 } from "#data/elite-redux/coop/coop-runtime";
+import { captureCoopTrainerVictoryBoundary } from "#data/elite-redux/coop/coop-trainer-victory-boundary";
 import type {
   CoopEncounterAuthority,
   CoopSerializedEnemy,
@@ -459,6 +460,10 @@ export function applyCoopEncounterAuthority(battle: Battle, authority: CoopEncou
   }
   if (replacementTrainer != null) {
     globalScene.field.add(replacementTrainer);
+    // Retain the exact host-authored trainer reward/presentation identity while this source-wave Battle is
+    // still installed. A delayed retained victory may run only after NewBattle speculatively installed the
+    // next (possibly wild) Battle, at which point `currentBattle.trainer` is not the defeated trainer.
+    captureCoopTrainerVictoryBoundary(globalScene, battle);
   }
 }
 
