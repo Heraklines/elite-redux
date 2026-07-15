@@ -22,6 +22,7 @@ on:
           - fresh-resume
           - reverse-resume
           - faint-replacement
+          - market-wide-lens
       requester_seat:
         description: Seat that sends the first lobby invitation
         required: true
@@ -179,7 +180,7 @@ jobs:
     name: ${{ inputs.journey || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / primary accounts
     needs: browser-build
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: ${{ inputs.journey == 'market-wide-lens' && 55 || 35 }}
     steps:
       - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
@@ -208,7 +209,9 @@ jobs:
           COOP_UI_ASSET_DIR: .coop-no-local-asset-fallback
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          COOP_UI_JOURNEY: ${{ inputs.journey || 'fresh-resume' }}
+          # run-campaign.mjs consumes the same base config but owns its own campaign policy;
+          # `probe` keeps the base journey validator satisfied for the dedicated market route.
+          COOP_UI_JOURNEY: ${{ inputs.journey == 'market-wide-lens' && 'probe' || inputs.journey || 'fresh-resume' }}
           COOP_UI_ACCOUNT_MODE: register
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
           COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.faint_owner_seat || 'guest-seat' }}
@@ -216,8 +219,30 @@ jobs:
           COOP_UI_GUEST_TITLE_NEW_GAME_KEYS: ${{ inputs.guest_title_keys || '[]' }}
           COOP_UI_ACTION_DELAY_MS: ${{ (inputs.cadence == 'fast' && '70') || (inputs.cadence == 'slow' && '420') || '180' }}
           COOP_UI_SETTLE_DELAY_MS: ${{ (inputs.cadence == 'fast' && '300') || (inputs.cadence == 'slow' && '1300') || '750' }}
+          # This profile drives a real wave-10/20/30 market through public keys. It requires
+          # one paid Wide Lens purchase, proves both clients' money/item/stock projections,
+          # leaves normally, and advances again. Decade markets have the same owner parity
+          # without an odd intervening interaction, so this single journey does not claim
+          # both-owner-seat coverage.
+          COOP_UI_CAMPAIGN_WAVES: "30"
+          COOP_UI_CAMPAIGN_MODE: gating
+          COOP_UI_RENDER_PROFILE: animations-skipped-depth
+          COOP_UI_REWARD_MODE: leave
+          COOP_UI_RAISE_SPEED: "1"
+          COOP_UI_MARKET_MODE: ${{ inputs.journey == 'market-wide-lens' && 'target-held' || 'leave' }}
+          COOP_UI_MARKET_TARGET_ID: WIDE_LENS
+          COOP_UI_MARKET_SECOND_PURCHASE: "1"
+          COOP_UI_MARKET_REQUIRED_PURCHASES: ${{ inputs.journey == 'market-wide-lens' && '1' || '0' }}
+          COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS: "0"
+          COOP_UI_CHROME_TRACE: ${{ inputs.journey == 'market-wide-lens' && '0' || '1' }}
           NODE_OPTIONS: --max-old-space-size=4096
-        run: node test/browser/coop-public-ui/run.mjs
+        shell: bash
+        run: |
+          if [[ "${{ inputs.journey || 'fresh-resume' }}" == "market-wide-lens" ]]; then
+            node test/browser/coop-public-ui/run-campaign.mjs
+          else
+            node test/browser/coop-public-ui/run.mjs
+          fi
 
       - name: Upload compact public-UI diagnosis first
         if: always()
