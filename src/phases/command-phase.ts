@@ -672,7 +672,7 @@ export class CommandPhase extends FieldPhase {
       // SYNC fast-path: solo / spoof / no rendezvous / partner-half-exhausted / partner ALREADY at this
       // command point. Open immediately - deferring behind a `.then` when there is nothing to wait for
       // reorders the UI open by a microtask for no reason (solo must stay byte-identical).
-      this.enterOwnCommandBoundary(hasGeneratedSkip);
+      this.enterOwnCommandBoundary();
       return;
     }
     void pendingBarrier.then(crossed => {
@@ -683,13 +683,20 @@ export class CommandPhase extends FieldPhase {
         // arrival that releases us. Re-consume at the crossed boundary so entry stat stages/weather/forms
         // land before public input opens, instead of leaving the refreshed carrier buffered until too late.
         this.tryCoopCheckpointSync();
-        this.enterOwnCommandBoundary(hasGeneratedSkip);
+        this.enterOwnCommandBoundary();
       }
     });
   }
 
   /** Execute a forced owned-slot action only after the reciprocal command boundary, else open its UI. */
-  private enterOwnCommandBoundary(hasGeneratedSkip = false): void {
+  private enterOwnCommandBoundary(): void {
+    // The authoritative guest can reach its owned slot before the host has completed PostSummon. In that
+    // race, the first checkCommander() above legitimately sees no CommandedTag, then the post-summon
+    // checkpoint consumed at the reciprocal barrier materializes the tag. Re-evaluate at the actual
+    // continuation boundary so a late authoritative Commander relationship cannot expose one frame of
+    // selectable input. The operation is idempotent: it only reasserts the same inert skipped command.
+    this.checkCommander();
+    const hasGeneratedSkip = globalScene.currentBattle.turnCommands[this.fieldIndex]?.skip === true;
     if (hasGeneratedSkip) {
       this.end();
       return;

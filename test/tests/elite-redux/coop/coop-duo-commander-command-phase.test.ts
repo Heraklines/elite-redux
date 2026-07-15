@@ -10,7 +10,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { CommandedTag } from "#data/battler-tags";
+import { BattlerTagType, CommandedTag } from "#data/battler-tags";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
@@ -132,6 +132,66 @@ describe.skipIf(!RUN)("co-op Commander automatic command materialization", () =>
       broadcastSpy,
       "the inert Commander skip is not relayed as a selectable MoveId.NONE command",
     ).not.toHaveBeenCalled();
+
+    logs.flush();
+  }, 120_000);
+
+  it("reclassifies a guest-owned Commander skip materialized while its reciprocal barrier is closed", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const wave = rig.guestScene.currentBattle.waveIndex;
+    const turn = rig.guestScene.currentBattle.turn;
+    const point = `cmd:${wave}:${turn}`;
+    const commander = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+    const commandedAlly = commander.getAllies()[0];
+    const commandedTag = new CommandedTag(commander.id);
+    let authoritativeTagReady = false;
+    const originalGetTag = commandedAlly.getTag.bind(commandedAlly);
+    const getTagSpy = vi
+      .spyOn(commandedAlly, "getTag")
+      .mockImplementation(tagType =>
+        tagType === BattlerTagType.COMMANDED && authoritativeTagReady
+          ? (commandedTag as never)
+          : originalGetTag(tagType),
+      );
+    const setModeSpy = vi.spyOn(rig.guestScene.ui, "setMode");
+
+    rig.guestScene.currentBattle.turnCommands = {};
+    await withClient(rig.guestCtx, async () => {
+      new CommandPhase(COOP_GUEST_FIELD_INDEX).start();
+      await Promise.resolve();
+    });
+    expect(
+      rig.guestScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX],
+      "the early guest check legitimately precedes the host's post-summon Commander materialization",
+    ).toBeUndefined();
+
+    // This models the host's post-summon refresh becoming authoritative while the guest is sealed at
+    // cmd:<wave>:<turn>. The arrival releases that same boundary; no local command UI may flash open.
+    authoritativeTagReady = true;
+    await withClient(rig.hostCtx, () => {
+      rig.hostRuntime.rendezvous.arrive(point);
+    });
+    await withClient(rig.guestCtx, async () => {
+      await drainLoopback();
+      await Promise.resolve();
+    });
+
+    expect(getTagSpy.mock.calls.length, "Commander ownership is re-evaluated after reciprocal release").toBeGreaterThan(
+      1,
+    );
+    expect(rig.guestScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX]).toMatchObject({
+      command: Command.FIGHT,
+      move: { move: MoveId.NONE },
+      skip: true,
+    });
+    expect(
+      setModeSpy.mock.calls.some(
+        ([mode, openedFieldIndex]) =>
+          (mode === UiMode.COMMAND || mode === UiMode.FIGHT) && openedFieldIndex === COOP_GUEST_FIELD_INDEX,
+      ),
+      "a late authoritative Commander tag closes the boundary without exposing selectable input",
+    ).toBe(false);
 
     logs.flush();
   }, 120_000);
