@@ -1158,7 +1158,7 @@ export class CoopDurabilityManager {
     }
     this.clearDeferred(cls);
     if (outcome === "rejected") {
-      if (operationKey != null) {
+      if (operation != null && operationKey != null) {
         this.pendingOperationContinuations.delete(operationKey);
         this.recordOperationCausalStage(operation.authority, "material-rejected");
       }
