@@ -296,6 +296,13 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     );
     expect(rig.hostScene.currentBattle.waveIndex, "host generated wave 2 before command input").toBe(2);
     expect(rig.guestScene.currentBattle.waveIndex, "guest consumed the authoritative wave-2 carrier").toBe(2);
+    await withClient(rig.hostCtx, async () => {
+      // PhaseInterceptor.to(..., false) deliberately leaves the target unstarted. Park the host's real
+      // CommandPhase at the reciprocal barrier first; the public duo driver starts the prepared guest
+      // command next, proves both arrivals, and only then exposes either player's input surface.
+      rig.hostScene.phaseManager.getCurrentPhase().start();
+      await drainLoopback();
+    });
 
     for (let t = 0; t < 2; t++) {
       await driveDuoGuestTackleThroughPublicUi(game, rig);
