@@ -24,14 +24,12 @@ import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopStagedWaveAdvanceTransaction } from "#data/elite-redux/coop/coop-wave-operation";
 import { BattlerIndex } from "#enums/battler-index";
-import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
-  type DuoRig,
   driveClientPhaseQueueTo,
   driveDuoGuestTackleThroughPublicUi,
   installDuoLogCapture,
@@ -83,20 +81,23 @@ describe.skipIf(!RUN)("#838 VERIFY-1: co-op wild-flee wave-advance broadcast", (
     // best-effort
   });
 
-  function wireGuestCommand(rig: DuoRig): void {
-    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-      command: Command.FIGHT,
-      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-      moveId: MoveId.TACKLE,
-      targets: [BattlerIndex.ENEMY_2],
-    }));
-  }
-
   it("a Roar-induced wild flee reaches the guest's real next-wave COMMAND and completes retained readiness", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
-    wireGuestCommand(rig);
+
+    // A directly-constructed guest BattleScene begins on its inert boot/onboarding queue. Production has
+    // already crossed that queue before a live battle; align the harness through its established engine
+    // initialization seam so shiftPhase selects the real TurnInit -> Command queue for mirrored wave 1.
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.phaseManager.clearAllPhases();
+      rig.guestScene.phaseManager.shiftPhase();
+    });
+
+    // Submit the guest-owned Tackle through its real reciprocal COMMAND/FIGHT/TARGET_SELECT handlers before
+    // the host chooses Roar. This is the same two-engine public-input path used by the multiwave journeys;
+    // no command-request stub or detached phase stands in for the guest player.
+    await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
 
     // Spy on the host's authoritative wave-resolved send (the exact wire call broadcastCoopWaveResolved
     // makes). Before the #838 fix this fired for win/capture/AttemptRunPhase-flee but NEVER for the
@@ -104,9 +105,9 @@ describe.skipIf(!RUN)("#838 VERIFY-1: co-op wild-flee wave-advance broadcast", (
     const sendSpy = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved");
 
     await withClient(rig.hostCtx, async () => {
-      // Partner (guest slot) TACKLEs enemy 2 -> KO; host lead ROARs enemy 1 -> it flees LAST (no ally).
+      // The guest's public UI already committed TACKLE on enemy 2. Host lead ROARs enemy 1, resolving
+      // last after that KO so the remaining wild has no active ally and the forced-flee branch fires.
       game.move.select(MoveId.ROAR, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
-      game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
       await game.phaseInterceptor.to("BattleEndPhase", false);
     });
 
