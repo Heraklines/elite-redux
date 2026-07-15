@@ -65,6 +65,7 @@ import {
   dualTypeStabBonus,
 } from "#data/elite-redux/abilities/dual-type-move";
 import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
+import { erLibraryCastIsSpecial, erLibraryDamageMultiplier } from "#data/elite-redux/abilities/library";
 import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
 import { erApplySoulmateHealCopy, erApplySoulmateRedirect } from "#data/elite-redux/abilities/soulmate";
 import { getGraftedTypes } from "#data/elite-redux/abilities/type-graft";
@@ -5191,6 +5192,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           }
         }
       }
+      // ER Library (5928): a cast recorded move is computed as SPECIAL (holder's
+      // Sp.Atk vs the target's Sp.Def) regardless of its native category.
+      if (erLibraryCastIsSpecial(source, move)) {
+        variableCategory.value = MoveCategory.SPECIAL;
+      }
     }
     const moveCategory = variableCategory.value as MoveCategory;
 
@@ -5481,6 +5487,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
      */
     const erRelicDefenderMultiplier = this.isPlayer() ? erBloodPactTakeMultiplier() : 1;
 
+    /**
+     * ER Library (5928): a repeated use of a move recorded in a Library holder's
+     * library deals 15% less damage to that holder's whole side. 1 when the move
+     * is not a repeat of a recorded move on the defender's side.
+     */
+    const erLibraryMultiplier = erLibraryDamageMultiplier(this, move);
+
     damage.value = toDmgValue(
       baseDamage
         * targetMultiplier
@@ -5498,7 +5511,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         * hitsTagMultiplier.value
         * mistyTerrainMultiplier
         * erRelicMultiplier
-        * erRelicDefenderMultiplier,
+        * erRelicDefenderMultiplier
+        * erLibraryMultiplier,
     );
 
     // ER Overrule 815: on a CRITICAL hit, the holder's attacks deal double damage

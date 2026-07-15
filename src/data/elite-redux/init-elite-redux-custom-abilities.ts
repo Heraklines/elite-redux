@@ -62,6 +62,7 @@ import {
 import { ER_HEARTBREAK_ABILITY_ID, HeartbreakAbAttr } from "#data/elite-redux/abilities/heartbreak";
 import { ER_HYDRAPEX_ABILITY_ID, HydrapexAbAttr } from "#data/elite-redux/abilities/hydrapex";
 import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abilities/last-host";
+import { ER_LIBRARY_ABILITY_ID, LibraryAbAttr } from "#data/elite-redux/abilities/library";
 import { ER_LIFE_PRESERVER_ABILITY_ID, LifePreserverAbAttr } from "#data/elite-redux/abilities/life-preserver";
 import { ER_MYCELIAL_NETWORK_ABILITY_ID, MycelialNetworkAbAttr } from "#data/elite-redux/abilities/mycelial-network";
 import { ER_OMNIFORM_ABILITY_ID, OmniformAbAttr } from "#data/elite-redux/abilities/omniform";
@@ -540,6 +541,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
     },
     {
       draft: {
+        id: ER_LIBRARY_ABILITY_ID,
+        name: "Library",
+        description:
+          "The first move each opposing Pokemon uses is recorded (up to 3, newest kept). A repeated recorded move deals 15% less damage to this Pokemon's side. From the fight menu this Pokemon can cast recorded moves, twice per battle total, using its Sp. Atk.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_LIBRARY_ABILITY_ID,
+    },
+    {
+      draft: {
         id: ER_OMNIFORM_ABILITY_ID,
         name: "Omniform",
         description:
@@ -886,6 +897,10 @@ function buildCustomAbility(
     builder.attr(OverloadedPowerAbAttr);
     builder.attr(OverloadedPriorityAbAttr);
     builder.attr(OverloadedChipAbAttr);
+  }
+
+  if (pokerogueId === ER_LIBRARY_ABILITY_ID) {
+    builder.attr(LibraryAbAttr);
   }
 
   if (pokerogueId === ER_OMNIFORM_ABILITY_ID) {
