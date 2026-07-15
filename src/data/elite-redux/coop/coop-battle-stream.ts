@@ -269,17 +269,22 @@ function isStrictBattleEvent(value: unknown): value is CoopBattleEvent {
   }
 }
 
-function isStrictAuthoritativeState(value: unknown): value is CoopAuthoritativeBattleStateV1 {
+function isStrictAuthoritativeState(
+  value: unknown,
+  allowEmptyEnemyParty = false,
+): value is CoopAuthoritativeBattleStateV1 {
   if (value == null || typeof value !== "object") {
     return false;
   }
   const state = value as CoopAuthoritativeBattleStateV1;
-  const partiesValid = [state.playerParty, state.enemyParty].every(
-    party =>
-      Array.isArray(party)
-      && party.length > 0
-      && party.every(mon => mon != null && typeof mon === "object" && isSafeAddressPart(mon.id)),
-  );
+  const playerPartyValid =
+    Array.isArray(state.playerParty)
+    && state.playerParty.length > 0
+    && state.playerParty.every(mon => mon != null && typeof mon === "object" && isSafeAddressPart(mon.id));
+  const enemyPartyValid =
+    Array.isArray(state.enemyParty)
+    && (allowEmptyEnemyParty || state.enemyParty.length > 0)
+    && state.enemyParty.every(mon => mon != null && typeof mon === "object" && isSafeAddressPart(mon.id));
   const seenSeats = new Set<number>();
   const fieldValid =
     Array.isArray(state.field)
@@ -302,7 +307,8 @@ function isStrictAuthoritativeState(value: unknown): value is CoopAuthoritativeB
     && isSafeAddressPart(state.tick, false)
     && isSafeAddressPart(state.wave, false)
     && isSafeAddressPart(state.turn, false)
-    && partiesValid
+    && playerPartyValid
+    && enemyPartyValid
     && fieldValid
     && isSafeAddressPart(state.weather)
     && isSafeAddressPart(state.weatherTurnsLeft)
@@ -326,9 +332,22 @@ function hasCompleteAuthorityCompanions(
   msg: Pick<
     CoopCheckpointEnvelope,
     "epoch" | "wave" | "turn" | "revision" | "checkpoint" | "checksum" | "fullField" | "authoritativeState"
-  >,
+  > & { reason?: unknown },
 ): boolean {
   const state = msg.authoritativeState;
+  // A retained faint-switch may materialize at NewBattlePhase before that wave's enemy party exists.
+  // That is a complete automatic replacement boundary, not a partial carrier: the authoritative field
+  // contains only player seats and all three field companions still match exactly. Keep ordinary turn
+  // commits and every replacement with an enemy seat fail-closed on an empty enemy party.
+  const isPreEncounterReplacement =
+    msg.reason === "replacement"
+    && state != null
+    && typeof state === "object"
+    && Array.isArray(state.enemyParty)
+    && state.enemyParty.length === 0
+    && Array.isArray(state.field)
+    && state.field.length > 0
+    && state.field.every(seat => seat?.side === "player");
   if (
     !isSafeAddressPart(msg.epoch, false)
     || !isSafeAddressPart(msg.wave, false)
@@ -337,7 +356,7 @@ function hasCompleteAuthorityCompanions(
     || !isStrictChecksum(msg.checksum)
     || !isStrictCheckpoint(msg.checkpoint)
     || !isStrictFullField(msg.fullField)
-    || !isStrictAuthoritativeState(state)
+    || !isStrictAuthoritativeState(state, isPreEncounterReplacement)
     || state.tick !== msg.revision
     || state.tick <= (msg.checkpoint.tick as number)
     || state.wave !== msg.wave
