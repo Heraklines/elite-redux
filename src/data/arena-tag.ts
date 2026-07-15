@@ -1978,6 +1978,82 @@ export class PendingHealTag extends SerializableArenaTag {
   }
 }
 
+/**
+ * Elite Redux — reusable one-use entry-trap primitive ({@linkcode
+ * ArenaTagType.ER_INFESTATION_TRAP}). Placed on a side (normally the opposing
+ * side, via an entry ability such as Spore Bed). The NEXT grounded switch-in on
+ * that side has the trap's configured {@linkcode BattlerTagType} applied to it
+ * (Spore Bed → {@linkcode BattlerTagType.INFESTATION} for its ordinary 4-5 turn
+ * duration), after which the trap is spent — subsequent switch-ins are unaffected
+ * and the stale tag is removed at the next turn-end.
+ *
+ * Reusability: the applied effect ({@linkcode appliedTag}) is a serialized field,
+ * so different mons can trap with different battler tags through this one tag/
+ * archetype without minting a new {@linkcode ArenaTagType}.
+ *
+ * One-use is enforced by the {@linkcode consumed} flag rather than by removing the
+ * tag inside {@linkcode activateTrap} — {@linkcode Arena.applyTagsForSide} iterates
+ * `this.tags` directly, so splicing mid-iteration would skip a sibling hazard. The
+ * spent tag is instead reaped by {@linkcode lapse} at the next turn-end (which runs
+ * over a filtered copy, so removal there is safe).
+ */
+export class ErEntryTrapTag extends EntryHazardTag {
+  public override readonly tagType = ArenaTagType.ER_INFESTATION_TRAP;
+  public override get maxLayers() {
+    return 1 as const;
+  }
+
+  /** The battler tag applied to the grounded switch-in. */
+  public readonly appliedTag: BattlerTagType = BattlerTagType.INFESTATION;
+  /** Whether the trap has already caught a switch-in (one-use). */
+  public readonly consumed: boolean = false;
+
+  constructor(sourceId: number | undefined, side: ArenaTagSide) {
+    super(MoveId.NONE, sourceId, side);
+  }
+
+  /** Configure the applied effect (used by the entry archetype at placement time). */
+  public configure(appliedTag: BattlerTagType): void {
+    (this as Mutable<this>).appliedTag = appliedTag;
+  }
+
+  protected override get onAddMessageKey(): string {
+    return "arenaTag:erInfestationTrapOnAdd" + this.i18nSideKey;
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "arenaTag:erInfestationTrapOnRemove" + this.i18nSideKey;
+  }
+
+  override activateTrap(simulated: boolean, pokemon: Pokemon): boolean {
+    if (this.consumed || !pokemon.isAllowedInBattle()) {
+      return false;
+    }
+    if (simulated) {
+      return true;
+    }
+    // Roll the applied tag's ordinary duration through the seeded RNG (co-op safe).
+    // For INFESTATION this mirrors the vanilla 4-5 turn partial-trap window.
+    const duration = pokemon.randBattleSeedIntRange(4, 5);
+    pokemon.addTag(this.appliedTag, duration, MoveId.NONE, this.sourceId);
+    (this as Mutable<this>).consumed = true;
+    return true;
+  }
+
+  override lapse(): boolean {
+    // Keep until spent; once consumed, the next turn-end reaps it.
+    return !this.consumed;
+  }
+
+  public override loadTag(
+    source: BaseArenaTag & Pick<ErEntryTrapTag, "tagType" | "layers" | "appliedTag" | "consumed">,
+  ): void {
+    super.loadTag(source);
+    (this as Mutable<this>).appliedTag = source.appliedTag;
+    (this as Mutable<this>).consumed = source.consumed;
+  }
+}
+
 // TODO: swap `sourceMove` and `sourceId` and make `sourceMove` an optional parameter
 export function getArenaTag(
   tagType: ArenaTagType,
@@ -2017,6 +2093,8 @@ export function getArenaTag(
       return new FoamyWebTag(sourceId, side);
     case ArenaTagType.CREEPING_THORNS:
       return new CreepingThornsTag(sourceId, side);
+    case ArenaTagType.ER_INFESTATION_TRAP:
+      return new ErEntryTrapTag(sourceId, side);
     case ArenaTagType.ER_WEATHER_LOCK:
       return new ErWeatherLockTag(turnCount, sourceId, side);
     case ArenaTagType.STEALTH_ROCK:
@@ -2091,6 +2169,7 @@ export type ArenaTagTypeMap = {
   [ArenaTagType.HOT_COALS]: HotCoalsTag;
   [ArenaTagType.FOAMY_WEB]: FoamyWebTag;
   [ArenaTagType.CREEPING_THORNS]: CreepingThornsTag;
+  [ArenaTagType.ER_INFESTATION_TRAP]: ErEntryTrapTag;
   [ArenaTagType.ER_WEATHER_LOCK]: ErWeatherLockTag;
   [ArenaTagType.STEALTH_ROCK]: StealthRockTag;
   [ArenaTagType.STICKY_WEB]: StickyWebTag;

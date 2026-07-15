@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { SubstituteTag } from "#data/battler-tags";
 import { allMoves } from "#data/data-lists";
+import { markChivalryRedirect, pokemonCarriesChivalry } from "#data/elite-redux/abilities/chivalry";
 import { erRecordAchievementSwitchIn } from "#data/elite-redux/er-achievement-tracker";
 import { type ErBondedCharmSnapshot, erBondedCharmApply, erBondedCharmSnapshot } from "#data/elite-redux/er-relics";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
@@ -165,6 +166,18 @@ export class SwitchSummonPhase extends SummonPhase {
       && globalScene.currentBattle.turnCommands[this.fieldIndex]?.command === Command.POKEMON
         ? erBondedCharmSnapshot(this.lastPokemon)
         : [];
+
+    // ER Chivalry (5909): a VOLUNTARY switch-out (menu "Switch" command) of a
+    // Chivalry holder marks the incoming mon to redirect 25% of its direct
+    // damage to the now-off-field holder. Detected BEFORE leaveField() while the
+    // holder is still on the field (its active ability attrs are readable).
+    if (
+      this.switchType === SwitchType.SWITCH
+      && globalScene.currentBattle.turnCommands[this.fieldIndex]?.command === Command.POKEMON
+      && pokemonCarriesChivalry(this.lastPokemon)
+    ) {
+      markChivalryRedirect(switchedInPokemon, this.lastPokemon);
+    }
 
     if (this.lastPokemon.isOnField()) {
       this.lastPokemon.leaveField(this.switchType === SwitchType.SWITCH);

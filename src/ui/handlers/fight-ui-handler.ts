@@ -1,5 +1,6 @@
 import type { InfoToggle } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
+import { hasLibrary } from "#data/elite-redux/abilities/library";
 import { getErDamagePreview } from "#data/elite-redux/er-damage-preview";
 import { getTypeDamageMultiplierColor } from "#data/type";
 import { BattleType } from "#enums/battle-type";
@@ -15,6 +16,7 @@ import { DamageCalculatorModifier } from "#modifiers/modifier";
 import type { PokemonMove } from "#moves/pokemon-move";
 import type { CommandPhase } from "#phases/command-phase";
 import { BattleInfoOverlay } from "#ui/battle-info-overlay";
+import { LibraryPanel } from "#ui/library-panel";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { addTextObject, getTextColor } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
@@ -57,6 +59,9 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
 
   /** ER: the in-battle "Pokémon Stats" info overlay, also openable from move select (info/STATS key). */
   private battleInfo = new BattleInfoOverlay();
+
+  /** ER Library (5928): the recorded-move CAST panel, opened from the fight menu. */
+  public readonly library = new LibraryPanel();
 
   protected fieldIndex = 0;
   protected fromCommand: Command = Command.FIGHT;
@@ -226,6 +231,19 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     // button closes) — same as the command menu. Opened with the info/STATS key
     // (routed here via the buttonGoToFilter whitelist) so the detailed info
     // screen is reachable during move selection, not just from the command menu.
+    // ER Library (5928): while the cast panel is open it owns input. It opens
+    // with CYCLE_FORM (only for a Library holder that can currently cast).
+    if (this.library.isOpen) {
+      this.library.handleInput(button);
+      return true;
+    }
+    if (button === Button.CYCLE_FORM) {
+      const holder = (globalScene.phaseManager.getCurrentPhase() as CommandPhase).getPokemon();
+      if (holder && hasLibrary(holder) && this.library.open(holder)) {
+        this.getUi().playSelect();
+        return true;
+      }
+    }
     if (this.battleInfo.isOpen) {
       this.battleInfo.handleInput(button);
       return true;
@@ -614,6 +632,7 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     this.setInfoVis(false);
     this.moveInfoOverlay.clear();
     this.battleInfo.close();
+    this.library.close();
     messageHandler.bg.setVisible(true);
     this.eraseCursor();
     this.active = false;

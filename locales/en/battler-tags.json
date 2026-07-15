@@ -23,6 +23,8 @@
   "healBlockOnRemove": "{{pokemonNameWithAffix}} is no longer\nprevented from healing!",
   "healBlockCannotHeal": "{{pokemonNameWithAffix}} was prevented from healing!",
   "erBleedHealed": "{{pokemonNameWithAffix}}'s bleeding was healed!",
+  "erCommandedOnAdd": "{{pokemonNameWithAffix}} fell under puppet strings!",
+  "erCommandedLapse": "{{pokemonNameWithAffix}} is being controlled!",
   "erDespairOnAdd": "{{pokemonNameWithAffix}} fell into despair!",
   "erDrenchedOnAdd": "{{pokemonNameWithAffix}} became drenched!",
   "erEnrageOnAdd": "{{pokemonNameWithAffix}} became enraged!",

@@ -31,6 +31,7 @@ import {
 } from "#data/battler-tags";
 import { getBerryEffectFunc } from "#data/berry";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { erRendezvousPowerMultiplier } from "#data/elite-redux/abilities/rendezvous";
 import { HitMultiplierAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
 import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
@@ -1328,6 +1329,10 @@ export abstract class Move implements Localizable {
       power.value *=
         (source.getTag(BattlerTagType.SUPREME_OVERLORD) as SupremeOverlordTag | undefined)?.getBoost() ?? 1;
     }
+
+    // ER Rendezvous (5919): the SECOND of two linked allies to target the same
+    // opponent this turn gets +20% power.
+    power.value *= erRendezvousPowerMultiplier(source, target);
 
     return power.value;
   }
@@ -6955,6 +6960,36 @@ export class FlyingTypeMultiplierAttr extends MoveTypeChartOverrideAttr {
     // (thus leading to an infinite loop)
     // TODO: We may need to propagate `useIllusion` here for correct AI interactions
     multiplier.value *= target.getAttackTypeEffectiveness(PokemonType.FLYING, { source: user });
+    return true;
+  }
+}
+
+/**
+ * Elite Redux DUAL-TYPE MOVE primitive (Batch 3): generalizes Flying Press's
+ * `FlyingTypeMultiplierAttr` so any move instance can carry an arbitrary SECOND
+ * type for effectiveness (the product of both type charts). Attach to a move (or
+ * a scripted-move clone) via `.attr(DualTypeMoveAttr, PokemonType.X)`. STAB for
+ * the second type is handled in `Pokemon.calculateStabMultiplier` (either-type
+ * rule); this attr only contributes the effectiveness product. Lives in move.ts
+ * because `MoveTypeChartOverrideAttr` is a value only within this module.
+ */
+export class DualTypeMoveAttr extends MoveTypeChartOverrideAttr {
+  public readonly secondType: PokemonType;
+
+  constructor(secondType: PokemonType) {
+    super();
+    this.secondType = secondType;
+  }
+
+  apply(
+    user: Pokemon,
+    target: Pokemon,
+    _move: Move,
+    args: [multiplier: NumberHolder, types: readonly PokemonType[], moveType: PokemonType],
+  ): boolean {
+    const [multiplier] = args;
+    // Exclude `move` (like Flying Press) so this attr does not re-trigger itself.
+    multiplier.value *= target.getAttackTypeEffectiveness(this.secondType, { source: user });
     return true;
   }
 }

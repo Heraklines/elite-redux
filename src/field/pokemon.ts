@@ -56,6 +56,20 @@ import {
 import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/daily-seed/daily-run";
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { erBadSpliceOnLeaveField } from "#data/elite-redux/abilities/bad-splice";
+import { erFaultCurrentOnLeaveField, erOverloadedSelfLocked } from "#data/elite-redux/abilities/charge-stack";
+import { erApplyChivalry } from "#data/elite-redux/abilities/chivalry";
+import {
+  dualTypePrimeMoveType,
+  dualTypePrimeSecondType,
+  dualTypeStabBonus,
+} from "#data/elite-redux/abilities/dual-type-move";
+import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
+import { erLibraryCastIsSpecial, erLibraryDamageMultiplier } from "#data/elite-redux/abilities/library";
+import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
+import { erOmniformRevertOnLeaveField } from "#data/elite-redux/abilities/omniform";
+import { erApplySoulmateHealCopy, erApplySoulmateRedirect } from "#data/elite-redux/abilities/soulmate";
+import { getGraftedTypes } from "#data/elite-redux/abilities/type-graft";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { suppressesOpponentDamageBoosts } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
@@ -2514,6 +2528,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       types.add(this.summonData.addedType);
     }
 
+    // ER type-graft substrate (Batch 4): additional types grafted onto this
+    // Pokemon for the wave by Draconic Voodoo / Bad Splice stack on top of its
+    // native + added typing. Skipped under ignoreOverride like `addedType`.
+    if (!ignoreOverride) {
+      for (const grafted of getGraftedTypes(this)) {
+        types.add(grafted);
+      }
+    }
+
     return Array.from(types) as Mutable<NonEmptyTuple<PokemonType>>;
   }
 
@@ -3480,7 +3503,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     return (
       trapped.value
       || !!this.getTag(TrappedTag) // ER FEAR traps the bearer (ROM). Ghost's early-return above still lets // Ghosts switch out, matching vanilla trap rules.
-      || !!this.getTag(BattlerTagType.ER_FEAR)
+      || !!this.getTag(BattlerTagType.ER_FEAR) // ER Overloaded (5927): the holder cannot voluntarily switch while at 4 stacks.
+      || erOverloadedSelfLocked(this)
       || !!globalScene.arena.getTagOnSide(ArenaTagType.FAIRY_LOCK, side)
     );
   }
@@ -3522,6 +3546,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     globalScene.arena.applyTags(ArenaTagType.ION_DELUGE, moveTypeHolder);
     if (this.getTag(BattlerTagType.ELECTRIFIED)) {
       moveTypeHolder.value = PokemonType.ELECTRIC;
+    }
+
+    // ER Negative Feedback (5923) prime: the holder's primed next PHYSICAL move
+    // takes on the Electric primary type (Fairy second type is applied in
+    // getAttackTypeEffectiveness). Flipping the type here means absorb/redirect
+    // abilities (Volt Absorb, Lightning Rod) see it as Electric and interact.
+    const primedType = dualTypePrimeMoveType(this, move);
+    if (primedType !== undefined) {
+      moveTypeHolder.value = primedType;
     }
 
     return moveTypeHolder.value as PokemonType;
@@ -3719,6 +3752,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // Apply any typing changes from Freeze-Dry, etc.
     if (move) {
       applyMoveAttrs("MoveTypeChartOverrideAttr", source ?? null, this, move, multi, types, moveType);
+    }
+
+    // ER dual-type PRIME (Negative Feedback 5923): fold the primed move's SECOND
+    // type (Fairy) into the effectiveness product. Move-instance DualTypeMoveAttr
+    // second types (Closed Circuit's follow-up) are already handled by the
+    // MoveTypeChartOverrideAttr pass above; this covers only the primed case.
+    if (move && source && !ignoreSourceAbility) {
+      const primeSecond = dualTypePrimeSecondType(source, move);
+      if (primeSecond !== undefined) {
+        multi.value *= this.getAttackTypeEffectiveness(primeSecond, { source });
+      }
     }
 
     // ER OFFENSIVE type-chart overrides: the attacker's ability can rewrite how
@@ -4929,6 +4973,26 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
             );
           }
         }
+        // ER Relativity (5911): when the holder acted BEFORE this target this
+        // turn, its damaging moves use its CURRENT Speed in place of Atk/SpAtk.
+        // Order-based (Trick-Room-safe) — resolved inside `resolveOffenseStat`.
+        if (attr?.constructor?.name === "RelativityAbAttr") {
+          const sub = (
+            attr as unknown as { resolveOffenseStat: (s: Pokemon, t: Pokemon) => EffectiveStat | null }
+          ).resolveOffenseStat(source, this);
+          if (sub != null) {
+            sourceAtk.value = source.getEffectiveStat(
+              sub,
+              this,
+              undefined,
+              ignoreSourceAbility,
+              ignoreAbility,
+              ignoreAllyAbility,
+              isCritical,
+              simulated,
+            );
+          }
+        }
       }
     }
 
@@ -5034,6 +5098,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       stabMultiplier.value += 0.5;
     }
 
+    // ER dual-type move primitive (Batch 3): a dual-type move (Closed Circuit's
+    // follow-up, or a Negative Feedback prime) grants STAB if the user shares
+    // EITHER type — this adds the +0.5 for the SECOND type when the user has it
+    // and it isn't already the (post-conversion) move type.
+    stabMultiplier.value += dualTypeStabBonus(source, move, moveType);
+
     applyMoveAttrs("CombinedPledgeStabBoostAttr", source, this, move, stabMultiplier);
 
     if (!ignoreSourceAbility) {
@@ -5112,6 +5182,21 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
             variableCategory.value = overridden;
           }
         }
+        // ER Crosscut (5908): the SECOND strike of a doubled slicing/pulse move
+        // flips to the opposite category (each strike keyed on the strike index).
+        if (attr?.constructor?.name === "CrosscutSecondStrikeAbAttr") {
+          const flipped = (
+            attr as unknown as { resolveSecondStrikeCategory: (m: Move, s: Pokemon, t: Pokemon) => MoveCategory | null }
+          ).resolveSecondStrikeCategory(move, source, this);
+          if (flipped != null) {
+            variableCategory.value = flipped;
+          }
+        }
+      }
+      // ER Library (5928): a cast recorded move is computed as SPECIAL (holder's
+      // Sp.Atk vs the target's Sp.Def) regardless of its native category.
+      if (erLibraryCastIsSpecial(source, move)) {
+        variableCategory.value = MoveCategory.SPECIAL;
       }
     }
     const moveCategory = variableCategory.value as MoveCategory;
@@ -5403,6 +5488,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
      */
     const erRelicDefenderMultiplier = this.isPlayer() ? erBloodPactTakeMultiplier() : 1;
 
+    /**
+     * ER Library (5928): a repeated use of a move recorded in a Library holder's
+     * library deals 15% less damage to that holder's whole side. 1 when the move
+     * is not a repeat of a recorded move on the defender's side.
+     */
+    const erLibraryMultiplier = erLibraryDamageMultiplier(this, move);
+
     damage.value = toDmgValue(
       baseDamage
         * targetMultiplier
@@ -5420,7 +5512,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         * hitsTagMultiplier.value
         * mistyTerrainMultiplier
         * erRelicMultiplier
-        * erRelicDefenderMultiplier,
+        * erRelicDefenderMultiplier
+        * erLibraryMultiplier,
     );
 
     // ER Overrule 815: on a CRITICAL hit, the holder's attacks deal double damage
@@ -5649,6 +5742,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
 
+    // ER Last Host (ability): once per battle, a holder that would faint - from
+    // DIRECT *or* INDIRECT damage - while a foe is affected by Infestation clings to
+    // life at 1 HP, consuming that foe's Infestation and dealing 25% of its max HP.
+    // Deliberately OUTSIDE the `!preventEndure` guard above: unlike Endure/Sturdy,
+    // Last Host explicitly survives indirect damage (poison, weather, recoil, an
+    // Infestation tick, etc.), which the engine flags `preventEndure`.
+    if (!surviveDamage.value && this.hp - damage <= 0 && erTryLastHost(this)) {
+      surviveDamage.value = true;
+      damage = this.hp - 1;
+    }
+
     damage = Math.min(damage, this.hp);
     this.hp -= damage;
     // Co-op host turn recorder (#633, animation-replay redesign - Step 2): record the post-damage hp
@@ -5737,6 +5841,25 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (this.switchOutStatus && source) {
       damage = 0;
     }
+    // ER Chivalry (ability 5909): on a DIRECT hit, a doubles ally absorbs 50% of
+    // this Pokemon's incoming damage (raw), or — in singles after the holder
+    // voluntarily switched out — 25% is redirected to the off-field holder. The
+    // transferred share is removed from this Pokemon's incoming damage.
+    if (!isIndirectDamage && source && damage > 0) {
+      damage -= erApplyChivalry(this, damage);
+    }
+    // ER Soulmate (ability 5918): on a DIRECT hit, if this Pokemon's linked
+    // partner carries Soulmate, 25% is redirected to that partner as raw HP.
+    if (!isIndirectDamage && source && damage > 0) {
+      damage -= erApplySoulmateRedirect(this, damage);
+    }
+    // ER Life Preserver (ability 5916): once per battle, a DIRECT attack that
+    // would faint this Pokemon is clamped to leave it at 1 HP if a living ally
+    // carries the ability — and the attacker is Drenched. Direct hits only
+    // (indirect chip does not trigger it), and only when this hit is lethal.
+    if (!isIndirectDamage && source && damage > 0 && this.hp - damage <= 0 && erTryLifePreserver(this, source)) {
+      damage = this.hp - 1;
+    }
     damage = this.damage(damage, ignoreSegments, isIndirectDamage, ignoreFaintPhase);
     erRecordAchievementDamageAndUpdate(this, damage, source, isIndirectDamage ? "indirect" : "direct");
     // Damage amount may have changed, but needed to be queued before calling damage function
@@ -5759,6 +5882,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   public heal(amount: number): number {
     const healAmount = Math.min(amount, this.getMaxHp() - this.hp);
     this.hp += healAmount;
+    // ER Soulmate (ability 5918): 50% of the direct healing a Soulmate holder
+    // receives is copied to its linked ally (guarded against recursion).
+    erApplySoulmateHealCopy(this, healAmount);
     return healAmount;
   }
 
@@ -7635,6 +7761,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
     // Trigger abilities that activate upon leaving the field
     applyAbAttrs("PreLeaveFieldAbAttr", { pokemon: this });
+    // ER Fault Current (5926): reset the consecutive-active-turn counter on exit.
+    erFaultCurrentOnLeaveField(this);
+    // ER Bad Splice (5932): when the holder leaves, restore each opponent's exact
+    // prior typing by un-grafting only the types Bad Splice added.
+    erBadSpliceOnLeaveField(this);
+    // ER Omniform (5929): revert an adaptive-transform holder to its pre-battle
+    // species/form + stats (summonData was already reset above).
+    erOmniformRevertOnLeaveField(this);
     this.switchOutStatus = true;
     globalScene.triggerPokemonFormChange(this, SpeciesFormChangeActiveTrigger, true);
     globalScene.field.remove(this, destroy);

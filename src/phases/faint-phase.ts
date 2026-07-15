@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { allMoves } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
+import { erHeartbreakOnAllyFaint } from "#data/elite-redux/abilities/heartbreak";
 import { getCoopController, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
 import { isCoopRecording, withCoopMessageRecordingSuppressed } from "#data/elite-redux/coop/coop-turn-recorder";
 import {
@@ -100,6 +101,11 @@ export class FaintPhase extends PokemonPhase {
 
   private doFaint(): void {
     const pokemon = this.getPokemon();
+
+    // ER Heartbreak (ability 5920): if this fainting Pokemon was linked to a
+    // living Heartbreak holder, that holder gains +1 Speed / +1 higher attacking
+    // stat and loses -1 Def / -1 Sp.Def.
+    erHeartbreakOnAllyFaint(pokemon);
 
     // Track total times pokemon have been KO'd for Last Respects/Supreme Overlord
     if (pokemon.isPlayer()) {

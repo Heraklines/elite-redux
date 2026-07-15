@@ -181,4 +181,16 @@ export enum BattlerTagType {
    * (transient effect).
    */
   ER_EMPOWERED_SWITCH_IN = "ER_EMPOWERED_SWITCH_IN",
+  /**
+   * Elite Redux "Commanded" (applied by Puppet Strings, dex-custom): a one-turn
+   * volatile that hijacks the afflicted Pokemon's next action. The next time the
+   * bearer acts (checked in the PRE_MOVE lapse), if it chose a DAMAGING move it
+   * attacks a random living ally instead in doubles/triples (seeded pick) or, in
+   * singles, hits itself for 40% of that move's self-computed damage (no crit, no
+   * secondary effects, no contact procs); a STATUS move simply fails. Expires
+   * after that action or at the end of the turn it was due to act. Distinct from
+   * vanilla {@linkcode BattlerTagType.COMMANDED} (Tatsugiri's Commander). Cleared
+   * on switch-out (ordinary volatile); NOT cured by persistent-status cures.
+   */
+  ER_COMMANDED = "ER_COMMANDED",
 }
