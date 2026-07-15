@@ -16,7 +16,7 @@ import { TrainerType } from "#enums/trainer-type";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import { describe, expect, it } from "vitest";
 
-function scene(biomeId = BiomeId.TOWN): BattleScene {
+function scene(biomeId: BiomeId = BiomeId.TOWN): BattleScene {
   return { arena: { biomeId } } as BattleScene;
 }
 
