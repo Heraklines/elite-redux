@@ -1414,11 +1414,14 @@ export type CoopRetainedWaveContinuationIdentity =
  * Resolve the immutable source identity for a retained guest continuation. A caller that is actually
  * opening the post-battle surface must never reinterpret `null` as permission to use mutable scene state:
  * zero candidates means the retained boundary was lost, while multiple candidates mean the continuation
- * is ambiguous. Both are deterministic shared-terminal conditions. Host, solo, lockstep and explicitly
- * non-wave surfaces keep their ambient behavior.
+ * is ambiguous. Both are deterministic shared-terminal conditions by default. A phase that independently
+ * captures an immutable non-wave source may opt into ambient identity only when there are exactly zero
+ * candidates; ambiguity remains invalid. Host, solo, lockstep and explicitly non-wave surfaces keep their
+ * ambient behavior.
  */
 export function resolveCoopRetainedWaveContinuationIdentity(
   requireWaveBoundary: boolean,
+  allowMissingWaveBoundary = false,
 ): CoopRetainedWaveContinuationIdentity {
   const runtime = active;
   if (runtime == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
@@ -1446,6 +1449,14 @@ export function resolveCoopRetainedWaveContinuationIdentity(
       wave: (transaction.envelope.pendingOperation?.payload as CoopWaveAdvancePayload | undefined)?.wave ?? -1,
     }))
     .sort((a, b) => a.wave - b.wave || a.turn - b.turn || a.operationId.localeCompare(b.operationId));
+  // SelectBiomePhase is also entered by Crossroads, moves, abilities and Mystery Events after the previous
+  // WAVE_ADVANCE has already reached continuationReady and released. Those callers capture their ambient
+  // source synchronously at phase construction and may explicitly accept a truly absent wave candidate.
+  // A reward/shop boundary never opts in, and one or more unresolved-but-unaddressable candidates remain
+  // invalid for every caller, so ambiguity can never fall back to mutable scene state.
+  if (allowMissingWaveBoundary && candidates.length === 0) {
+    return { kind: "ambient" };
+  }
   const classification = candidates.length === 0 ? "missing" : candidates.length > 1 ? "ambiguous" : "invalid";
   const reason =
     `[coop-op] retained wave continuation identity ${classification}: candidateCount=${candidates.length} `

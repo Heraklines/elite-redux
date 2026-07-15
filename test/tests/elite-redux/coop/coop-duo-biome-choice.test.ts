@@ -1143,7 +1143,24 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     expect(
       withClientSync(rig.guestCtx, () => getCoopBiomeTransitionCommitReceipt({ sourceWave: sourceWave + 1 })),
       "no speculative wave-16 operation was invented",
-    ).toBeUndefined();
+    ).toBeNull();
+    logs.flush();
+  }, 300_000);
+
+  it("captures a non-wave map source at construction when no retained wave candidate exists", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+
+    const captured = withClientSync(rig.guestCtx, () => {
+      rig.guestScene.currentBattle.waveIndex = 21;
+      const phase = new SelectBiomePhase() as unknown as { requireCoopSourceWave(): number };
+      // Crossroads/move/ability map entries can resume after an await. They have no unresolved WAVE_ADVANCE,
+      // so the construction-time source—not a speculative next Battle—must address their biome operation.
+      rig.guestScene.currentBattle.waveIndex = 22;
+      return phase.requireCoopSourceWave();
+    });
+
+    expect(captured, "the zero-candidate non-wave map kept its immutable construction address").toBe(21);
     logs.flush();
   }, 300_000);
 });

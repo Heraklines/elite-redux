@@ -25,6 +25,7 @@
     "test/tests/elite-redux/coop/coop-guest-renderer.test.ts",
     "test/tests/elite-redux/coop/coop-renderer-allowlist.test.ts",
     "test/tests/elite-redux/coop/coop-soak-catch.test.ts",
+    "test/tests/elite-redux/coop/coop-soak-me.test.ts",
     "test/tests/elite-redux/coop/coop-wave-operation.test.ts",
     "test/tools/coop-duo-harness.ts",
     "test/tools/coop-soak-driver.ts"

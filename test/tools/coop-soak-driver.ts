@@ -71,12 +71,19 @@ import {
   captureCoopSaveDataNormalized,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import {
+  type CoopBiomeOperationBinding,
+  coopAuthoritativeBiomeTransitionOperationId,
+} from "#data/elite-redux/coop/coop-biome-operation";
+import {
   getCoopChecksumAssertionCount,
   resetCoopChecksumAssertionCount,
   setCoopChecksumAssertSeverity,
 } from "#data/elite-redux/coop/coop-checksum-assert";
 import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
-import { getCoopOperationJournalCommittedClasses } from "#data/elite-redux/coop/coop-operation-journal";
+import {
+  getCoopOperationJournalCommittedClasses,
+  getCoopOperationLiveSinkInvoked,
+} from "#data/elite-redux/coop/coop-operation-journal";
 import {
   clearCoopRuntime,
   getCoopActiveWaveTransition,
@@ -1996,6 +2003,16 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     beforeHostCross?: () => void,
   ): Promise<void> => {
     const point = `cmd:${wave}:${turn}`;
+    const transitionSourceWave = rig.hostScene.currentBattle.waveIndex;
+    type BiomeBoundarySeam = {
+      readonly phaseName: "SelectBiomePhase";
+      requireCoopSourceWave(): number;
+      start(): void;
+    };
+    const hostBiomeBinding: CoopBiomeOperationBinding = {
+      opState: rig.hostRuntime.opState,
+      durability: rig.hostRuntime.durability,
+    };
     // A real co-op pair owns one JS realm per client. Queue every frame for its destination while crossing
     // this multi-surface boundary so a retained biome apply, its promise continuation and the reciprocal
     // command arrival can never run under the partner's ambient scene/runtime in this two-engine fixture.
@@ -2007,21 +2024,47 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // Drive the guest's real phases: Crossroads auto-resolves under this soak profile; a resulting
       // SelectBiome renderer parks on the host's exact BIOME_PICK until the host commits below. The harness
       // never manufactures a choice, biome, counter advance, or receipt.
-      const guestBiomeBoundary = await withClient(rig.guestCtx, async () => {
+      let guestCrossroadsProjected = false;
+      let guestBiomeSourceWave: number | null = null;
+      let committedBiomeOperationId: string | null = null;
+      let hostBiomeProjected = false;
+      const guestBiomeBoundary = await withClient(rig.guestCtx, async (): Promise<BiomeBoundarySeam | null> => {
         let current = rig.guestScene.phaseManager.getCurrentPhase();
         const queued = rig.guestScene.phaseManager.getQueuedPhaseNames?.() ?? [];
         if (current?.phaseName !== "ErCrossroadsPhase" && queued.includes("ErCrossroadsPhase")) {
           current = await driveClientPhaseQueueTo(rig.guestScene, "ErCrossroadsPhase");
         }
         if (current?.phaseName === "ErCrossroadsPhase") {
+          guestCrossroadsProjected = true;
           current.start();
           await drainLoopback();
           current = rig.guestScene.phaseManager.getCurrentPhase();
         }
-        if (current?.phaseName === "SelectBiomePhase") {
+        // Reward terminals insert the real partner-counter gate ahead of the queued map. The manual guest
+        // scheduler must execute that actual phase too; both counters already converged in driveRewardShop,
+        // so it completes from public controller state without a fabricated arrival or receipt.
+        if (current?.phaseName === "CoopPartnerSyncPhase") {
           current.start();
           await drainLoopback();
-          return current;
+          current = rig.guestScene.phaseManager.getCurrentPhase();
+        }
+        const afterSyncQueued = rig.guestScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+        if (current?.phaseName !== "SelectBiomePhase" && afterSyncQueued.includes("SelectBiomePhase")) {
+          current = await driveClientPhaseQueueTo(rig.guestScene, "SelectBiomePhase");
+        }
+        if (current?.phaseName === "SelectBiomePhase") {
+          const biomeBoundary = current as BiomeBoundarySeam;
+          guestBiomeSourceWave = biomeBoundary.requireCoopSourceWave();
+          if (guestBiomeSourceWave !== transitionSourceWave) {
+            fail(
+              "desync",
+              transitionSourceWave,
+              `guest World Map source drifted (captured=${guestBiomeSourceWave} expected=${transitionSourceWave})`,
+            );
+          }
+          current.start();
+          await drainLoopback();
+          return biomeBoundary;
         }
         return null;
       });
@@ -2043,6 +2086,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             "CommandPhase",
             "ErDexNavPhase",
             "TheBargainPhase",
+            "ErCrossroadsPhase",
+            "SelectBiomePhase",
           ] as const);
           if (boundary === "ErDexNavPhase") {
             armHostDexNavAutoPicks();
@@ -2053,6 +2098,60 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             await driveBargainContinuation();
             continue;
           }
+          if (boundary === "ErCrossroadsPhase") {
+            if (!guestCrossroadsProjected) {
+              fail(
+                "no-park",
+                transitionSourceWave,
+                "authority reached Crossroads without the renderer's actual queued Crossroads surface",
+              );
+            }
+            await game.phaseInterceptor.to("ErCrossroadsPhase");
+            continue;
+          }
+          if (boundary === "SelectBiomePhase") {
+            if (guestBiomeBoundary == null || guestBiomeSourceWave == null) {
+              fail("no-park", transitionSourceWave, "authority reached World Map without its renderer peer surface");
+            }
+            const hostBiomeBoundary = rig.hostScene.phaseManager.getCurrentPhase() as BiomeBoundarySeam;
+            const hostSourceWave = hostBiomeBoundary.requireCoopSourceWave();
+            if (hostSourceWave !== guestBiomeSourceWave || hostSourceWave !== transitionSourceWave) {
+              fail(
+                "desync",
+                transitionSourceWave,
+                `World Map source mismatch host=${hostSourceWave} guest=${guestBiomeSourceWave} expected=${transitionSourceWave}`,
+              );
+            }
+            hostBiomeProjected = true;
+
+            // Run the authority's real SelectBiomePhase. The deterministic depth profile commits one exact
+            // retained BIOME_PICK; the renderer already parked above and may advance only after that journal
+            // receipt materializes. No operation helper is invoked to create or apply the result.
+            await game.phaseInterceptor.to("SelectBiomePhase");
+            committedBiomeOperationId = coopAuthoritativeBiomeTransitionOperationId(
+              transitionSourceWave,
+              hostBiomeBinding,
+            );
+            if (
+              committedBiomeOperationId == null
+              || parseCoopOperationId(committedBiomeOperationId)?.kind !== "BIOME_PICK"
+            ) {
+              fail(
+                "no-park",
+                transitionSourceWave,
+                "World Map could not derive its exact BIOME_PICK journal identity "
+                  + `(expected=${committedBiomeOperationId ?? "none"})`,
+              );
+            }
+            continue;
+          }
+          if (guestCrossroadsProjected && (guestBiomeBoundary != null) !== hostBiomeProjected) {
+            fail(
+              "desync",
+              transitionSourceWave,
+              `Crossroads decision diverged hostMoveOn=${hostBiomeProjected} guestMoveOn=${guestBiomeBoundary != null}`,
+            );
+          }
           break;
         }
       });
@@ -2061,6 +2160,31 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           for (let attempt = 0; attempt < 80; attempt++) {
             await drainLoopback();
             if (rig.guestScene.phaseManager.getCurrentPhase() !== guestBiomeBoundary) {
+              if (rig.hostScene.phaseManager.getCurrentPhase()?.phaseName === "SelectBiomePhase") {
+                fail(
+                  "no-park",
+                  transitionSourceWave,
+                  "renderer left World Map before the authority continuation was ready",
+                );
+              }
+              const journalEnvelope = getCoopOperationLiveSinkInvoked().find(
+                envelope => envelope.pendingOperation?.id === committedBiomeOperationId,
+              );
+              if (
+                committedBiomeOperationId == null
+                || journalEnvelope?.pendingOperation?.kind !== "BIOME_PICK"
+                || journalEnvelope.wave !== transitionSourceWave
+              ) {
+                fail(
+                  "no-park",
+                  transitionSourceWave,
+                  "renderer released World Map without the exact BIOME_PICK journal "
+                    + `(expected=${committedBiomeOperationId ?? "none"})`,
+                );
+              }
+              actionScript.push(
+                `wave ${transitionSourceWave}: both World Map surfaces continuation-ready after exact BIOME_PICK`,
+              );
               return;
             }
             await new Promise<void>(resolve => setTimeout(resolve, 10));

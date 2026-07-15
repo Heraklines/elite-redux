@@ -124,6 +124,12 @@ export class SelectBiomePhase extends BattlePhase {
   public readonly phaseName = "SelectBiomePhase";
   /** Immutable wave that created this biome transition; never re-read from a speculative next Battle. */
   private coopSourceWave: number | null;
+  /**
+   * Construction-time fallback for non-WAVE map sources (Crossroads, moves, abilities and MEs). A retained
+   * transaction, when present, still wins at start; capturing this now prevents an awaited UI/network seam
+   * from re-addressing the map through a speculative next Battle.
+   */
+  private readonly coopConstructionWave: number;
 
   /**
    * Co-op (#848): the interaction counter to advance ONCE at the terminal, or -1 when this
@@ -165,6 +171,7 @@ export class SelectBiomePhase extends BattlePhase {
   constructor(coopSourceWave: number | null = null) {
     super();
     this.coopSourceWave = coopSourceWave;
+    this.coopConstructionWave = coopSourceWave ?? globalScene.currentBattle?.waveIndex ?? -1;
   }
 
   /** Capture one durable address before any UI/network await can observe a newer ambient battle. */
@@ -172,14 +179,19 @@ export class SelectBiomePhase extends BattlePhase {
     if (this.coopSourceWave != null) {
       return this.coopSourceWave;
     }
-    const ambientWave = globalScene.currentBattle?.waveIndex ?? -1;
-    const identity = resolveCoopRetainedWaveContinuationIdentity(true);
+    // Explicit source addresses (VictoryPhase and retained callers) win immediately. Otherwise prefer the
+    // one unresolved retained transaction, but permit a genuinely absent candidate because SelectBiome is
+    // also a public continuation for non-wave operations. The resolver still returns invalid for one
+    // malformed or multiple ambiguous candidates, which must fail closed rather than use this fallback.
+    const identity = resolveCoopRetainedWaveContinuationIdentity(true, true);
     if (identity.kind === "invalid") {
       throw new Error(identity.reason);
     }
-    this.coopSourceWave = identity.kind === "retained" ? identity.address.wave : ambientWave;
+    this.coopSourceWave = identity.kind === "retained" ? identity.address.wave : this.coopConstructionWave;
     if (!Number.isSafeInteger(this.coopSourceWave) || this.coopSourceWave < 0) {
-      throw new Error(`[coop-op] SelectBiomePhase cannot capture source wave from ambient=${ambientWave}`);
+      throw new Error(
+        `[coop-op] SelectBiomePhase cannot capture source wave from construction=${this.coopConstructionWave}`,
+      );
     }
     return this.coopSourceWave;
   }
