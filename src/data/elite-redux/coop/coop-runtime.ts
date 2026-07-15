@@ -1349,7 +1349,7 @@ export function awaitCoopSettledWaveAdvanceAtBattleEnd(
   return true;
 }
 
-type CoopPhaseOwnedWaveContinuationSurface = "crossroads";
+type CoopPhaseOwnedWaveContinuationSurface = "biomeMarketWatcher" | "crossroads";
 
 function phaseOwnedWaveContinuationIsPublic(
   staged: CoopStagedWaveAdvanceTransaction,
@@ -1361,6 +1361,20 @@ function phaseOwnedWaveContinuationIsPublic(
   const payload = staged.envelope.pendingOperation?.payload as CoopWaveAdvancePayload;
   try {
     switch (surface) {
+      case "biomeMarketWatcher": {
+        // The non-owner side of a biome market deliberately never opens BIOME_SHOP. Its executable
+        // continuation is the SelectModifierPhase-owned watcher after authoritative stock has been
+        // reconstructed and while the partner-facing MESSAGE handler is live. Keep this attestation
+        // phase-, mode-, handler-, and address-bound so an arbitrary message screen cannot release a
+        // retained victory.
+        const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+        return (
+          globalScene.phaseManager?.getCurrentPhase()?.phaseName === "SelectModifierPhase"
+          && globalScene.ui.getMode() === UiMode.MESSAGE
+          && globalScene.ui.getHandler()?.active === true
+          && (currentWave === payload.wave || currentWave === payload.nextWave)
+        );
+      }
       case "crossroads": {
         // OPTION_SELECT is deliberately absent from the generic registry because many unrelated local and
         // account-only screens use it. Crossroads owns an explicit attestation after its real picker promise

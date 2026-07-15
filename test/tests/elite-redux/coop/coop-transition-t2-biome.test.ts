@@ -46,6 +46,7 @@ import {
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, getCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { getCoopStagedWaveAdvanceTransaction } from "#data/elite-redux/coop/coop-wave-operation";
 import {
   type ErRouteNode,
   getErPendingNodes,
@@ -353,6 +354,12 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         rig.hostRuntime.controller.interactionCounter() === counter + 1
         && rig.guestRuntime.controller.interactionCounter() === counter + 1
       ) {
+        const retained = getCoopStagedWaveAdvanceTransaction(10, rig.guestRuntime.waveOperationBinding);
+        expect(retained?.dataApplied, "the watcher opened only after retained wave DATA applied").toBe(true);
+        expect(
+          retained?.continuationReady,
+          "the phase-owned market watcher proves the real terminal-consumer continuation",
+        ).toBe(true);
         return;
       }
     }

@@ -1058,7 +1058,11 @@ export class BiomeShopPhase extends SelectModifierPhase {
 
   /** Publish readiness only while this phase's scene and runtime are installed together. */
   private notifyCoopBiomeContinuationSurfaceReady(): void {
-    const notify = () => notifyCoopWaveContinuationSurfaceReady(this.coopSourceAddress?.wave);
+    const notify = () =>
+      notifyCoopWaveContinuationSurfaceReady(
+        this.coopSourceAddress?.wave,
+        this.coopBiomeOwner ? undefined : "biomeMarketWatcher",
+      );
     if (this.coopBiomeOwningRuntime == null) {
       notify();
       return;
