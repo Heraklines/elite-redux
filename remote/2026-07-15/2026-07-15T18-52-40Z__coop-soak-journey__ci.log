@@ -1,0 +1,51 @@
+===== COOP SOAK RESULT =====
+profile: journey
+verdict: FAIL
+waves_requested: 45
+run: 29442234745 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T18-52-40Z
+
+----- driver lines -----
+(no [coop-soak] lines captured)
+
+----- vitest result tail -----
+[coop:launch] clearCoopRuntime role=host netcode=authoritative gen->2
+[coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: -1, termSeq: -1, wasOwner: false }
+[coop:transport] state host disconnected -> closed
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mco-op continuous journey: many mystery events plus biome transitions > plays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [32m3165[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak-journey.test.ts:101:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m > [22mco-op continuous journey: many mystery events plus biome transitions[2m > [22mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[31m[1mError[22m: cannot materialize mirrored guest input from LoginPhase; queued=[TitlePhase][39m
+[36m [2m❯[22m materializeMirroredGuestInputTurn test/tools/coop-duo-harness.ts:[2m1612:11[22m[39m
+    [90m1610|[39m   const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+    [90m1611|[39m   if (current?.phaseName !== "TitlePhase" || queued.length !== 0) {
+    [90m1612|[39m     throw new Error(
+    [90m   |[39m           [31m^[39m
+    [90m1613|[39m       `cannot materialize mirrored guest input from ${current?.phaseNa…
+    [90m1614|[39m     );
+[90m [2m❯[22m test/tools/coop-soak-driver.ts:[2m4078:42[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m633:18[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4078:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-journey.test.ts:[2m105:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 18:52:11
+[2m   Duration [22m 28.85s[2m (transform 19.72s, setup 24.04s, import 256ms, tests 3.61s, environment 753ms)[22m
+
