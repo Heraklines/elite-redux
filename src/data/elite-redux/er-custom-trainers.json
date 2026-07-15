@@ -795,7 +795,7 @@
           "SURF",
           "STOMPING_TANTRUM"
         ],
-        "slotChance": 30,
+        "slotChance": 1,
         "species": 10615
       },
       {
@@ -813,6 +813,7 @@
           "RLNA",
           "RLA"
         ],
+        "slotChance": 1,
         "species": 2089
       },
       {
@@ -834,6 +835,7 @@
           "DESTINY_BOND",
           "ENDURE"
         ],
+        "slotChance": 1,
         "species": 110
       },
       {
@@ -876,7 +878,6 @@
           "palette": "lavender",
           "surface": "wormhole"
         },
-        "slotChance": 45,
         "species": 93
       }
     ],
