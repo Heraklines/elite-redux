@@ -11,6 +11,7 @@
 // untouched. Regression: the rest of the kit (ability1, hidden, innates) is intact.
 // =============================================================================
 
+import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
@@ -34,14 +35,14 @@ describe.skipIf(!RUN)("ER Phantowl Emanate -> Spectralize swap", () => {
   });
 
   it("carries Spectralize as its 2nd active ability, not Emanate", async () => {
-    await game.classicMode.startBattle();
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
     const phantowl = getPokemonSpecies(PHANTOWL as never);
     expect(phantowl.ability2).toBe(SPECTRALIZE);
     expect([phantowl.ability1, phantowl.ability2, phantowl.abilityHidden]).not.toContain(EMANATE);
   });
 
   it("leaves the rest of the kit intact (innates unchanged)", async () => {
-    await game.classicMode.startBattle();
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
     const phantowl = getPokemonSpecies(PHANTOWL as never);
     // Base Phantowl innates map to non-empty passive slots; the override only
     // touched ability2, so the passive triple must still be populated.
