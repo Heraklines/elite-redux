@@ -17,8 +17,8 @@
 //   - its own stats + N-type typing (types 3..N via the N-type static model's
 //     `setExtraTypes`, so effectiveness/STAB/battle-info fold them in),
 //   - its own ACTIVE ability triple + INNATE (passive) triple,
-//   - a #287 sprite/icon redirect to `elite-redux/<slug>/…` (placeholder art
-//     until the assets phase lands — the redirect makes the key resolvable now),
+//   - a #287 sprite/icon redirect to `elite-redux/<slug>/…` (LIVE art on er-assets;
+//     each `slug` matches its published dir, e.g. `xerneas_mega`, `mew_primal`),
 //   - a registered form-change EDGE in `pokemonFormChanges` triggered by its
 //     mega stone / primal orb, so the reward pool offers the stone (Mega-Bracelet
 //     gated, #207/#318/#359) and holding it transforms the base mon.
@@ -148,7 +148,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     baseSpecies: SpeciesId.XERNEAS,
     formKey: "mega",
     formName: "Mega",
-    slug: "mega_xerneas",
+    slug: "xerneas_mega",
     types: [PokemonType.FAIRY],
     stats: [126, 151, 125, 151, 128, 99],
     actives: [AbilityId.LIMBER, AbilityId.LIMBER, AbilityId.LIMBER],
@@ -167,7 +167,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     baseSpecies: SpeciesId.PARASECT,
     formKey: "mega",
     formName: "Mega",
-    slug: "mega_parasect",
+    slug: "parasect_mega",
     types: [PokemonType.BUG, PokemonType.GRASS, PokemonType.GHOST],
     stats: [80, 120, 145, 80, 170, 20],
     actives: [ab(ER_SPORE_BED_ABILITY_ID), AbilityId.SHADOW_TAG, ab(ON_THE_PROWL)],
@@ -181,7 +181,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     baseSpecies: SpeciesId.HYDREIGON,
     formKey: "mega-x",
     formName: "Mega X",
-    slug: "mega_hydreigon_x",
+    slug: "hydreigon_mega_x",
     types: [PokemonType.DARK, PokemonType.DRAGON],
     stats: [92, 165, 123, 115, 90, 115],
     actives: [AbilityId.STRONG_JAW, AbilityId.STRONG_JAW, AbilityId.STRONG_JAW],
@@ -194,7 +194,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     baseSpecies: SpeciesId.SHUCKLE,
     formKey: "mega-y",
     formName: "Mega Y",
-    slug: "mega_shuckle_y",
+    slug: "shuckle_mega_y",
     types: [PokemonType.BUG, PokemonType.PSYCHIC],
     stats: [50, 50, 200, 130, 200, 20],
     actives: [AbilityId.BATTLE_ARMOR, ab(COWARD), ab(SELF_REPAIR)],
@@ -208,7 +208,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     baseSpecies: SpeciesId.ELECTIVIRE,
     formKey: "mega-x",
     formName: "Mega X",
-    slug: "mega_electivire_x",
+    slug: "electivire_mega_x",
     types: [PokemonType.ELECTRIC, PokemonType.DARK, PokemonType.GROUND],
     stats: [95, 163, 107, 85, 130, 60],
     actives: [AbilityId.GORILLA_TACTICS, ab(RAGING_BOXER), ab(STYGIAN_RUSH)],
@@ -222,7 +222,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     baseSpecies: SpeciesId.JUMPLUFF,
     formKey: "mega",
     formName: "Mega",
-    slug: "mega_jumpluff",
+    slug: "jumpluff_mega",
     types: [PokemonType.GRASS, PokemonType.FLYING, PokemonType.FAIRY],
     stats: [75, 115, 90, 100, 105, 150],
     actives: [ab(ER_GALE_BLOOM_ABILITY_ID), ab(ER_GALE_BLOOM_ABILITY_ID), ab(ER_GALE_BLOOM_ABILITY_ID)],
@@ -236,7 +236,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     baseSpecies: SpeciesId.MINUN,
     formKey: "mega",
     formName: "Mega",
-    slug: "mega_minun",
+    slug: "minun_mega",
     types: [PokemonType.ELECTRIC, PokemonType.FAIRY],
     stats: [60, 125, 95, 55, 85, 125],
     actives: [AbilityId.TRANSISTOR, ab(CLOSED_CIRCUIT), AbilityId.LIGHTNING_ROD],
@@ -250,7 +250,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     baseSpecies: SpeciesId.PLUSLE,
     formKey: "mega",
     formName: "Mega",
-    slug: "mega_plusle",
+    slug: "plusle_mega",
     types: [PokemonType.ELECTRIC, PokemonType.FAIRY],
     stats: [60, 55, 95, 115, 105, 115],
     actives: [ab(5332), ab(CLOSED_CIRCUIT), AbilityId.FRIEND_GUARD],
@@ -265,7 +265,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     baseSpecies: SpeciesId.REGIGIGAS,
     formKey: "primal",
     formName: "Primal",
-    slug: "primal_regigigas",
+    slug: "regigigas_primal",
     types: [
       PokemonType.NORMAL,
       PokemonType.ROCK,
@@ -286,7 +286,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     baseSpecies: SpeciesId.MEW,
     formKey: "primal",
     formName: "Primal",
-    slug: "primal_mew",
+    slug: "mew_primal",
     types: [PokemonType.PSYCHIC],
     stats: [100, 110, 130, 110, 130, 120],
     actives: [ab(BAD_SPLICE), ab(BAD_SPLICE), ab(BAD_SPLICE)],
@@ -298,12 +298,13 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
   // alongside the EXISTING ER Mega Skarmory Y (formKey collision resolved by the
   // maintainer 2026-07-15: new key, Y untouched). Active Light Metal / Power Edge
   // / Keen Edge; innates Crosscut (5908), Elude (5511), Puncture (5942). Stone
-  // Skarmorite Z. Sprite slug er_mega_skarmory_z (disk art is mega_scam_y_*).
+  // Skarmorite Z. Sprite slug skarmory_mega_z (published er-assets dir; the ER
+  // disk bake was mega_scam_y_*, republished under the game-side slug).
   {
     baseSpecies: SpeciesId.SKARMORY,
     formKey: "mega-z",
     formName: "Mega Z",
-    slug: "mega_skarmory_z",
+    slug: "skarmory_mega_z",
     types: [PokemonType.STEEL, PokemonType.FLYING, PokemonType.DRAGON],
     stats: [75, 135, 70, 135, 70, 110],
     actives: [AbilityId.LIGHT_METAL, ab(POWER_EDGE), ab(KEEN_EDGE)],
@@ -313,12 +314,12 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
   // #7 Mega Dragonite Z — Dragon/Flying/Steel (N-type). Additive THIRD mega key
   // (`mega-z`) alongside Dragonite's existing mega + mega-y. Active Chivalry
   // (5909) / Mega Drill / Stamina; innates Weighted Scales (5938), Knight's Honor
-  // (5939), Power Core. Stone Dragoninite Z. Slug er_mega_dragonite_z.
+  // (5939), Power Core. Stone Dragoninite Z. Slug dragonite_mega_z (published er-assets dir).
   {
     baseSpecies: SpeciesId.DRAGONITE,
     formKey: "mega-z",
     formName: "Mega Z",
-    slug: "mega_dragonite_z",
+    slug: "dragonite_mega_z",
     types: [PokemonType.DRAGON, PokemonType.FLYING, PokemonType.STEEL],
     stats: [91, 144, 144, 110, 110, 101],
     actives: [ab(CHIVALRY), ab(MEGA_DRILL), AbilityId.STAMINA],

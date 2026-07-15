@@ -37,13 +37,14 @@ import {
   ER_REGITUBE_SPECIES_ID,
   ER_TENTALECT_SPECIES_ID,
 } from "#data/elite-redux/er-newcomer-species";
+import { getErCryFile } from "#data/elite-redux/init-elite-redux-custom-species";
 import { EggTier } from "#enums/egg-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -198,6 +199,23 @@ describe.skipIf(!RUN)("ER newcomer new-species seam", () => {
     const hatched = new Egg({ scene: game.scene, species: ER_REGITUBE_SPECIES_ID as SpeciesId }).generatePlayerPokemon()
       .species.speciesId as number;
     expect(hatched).toBe(ER_REGITUBE_SPECIES_ID);
+  });
+
+  it("Tentalect's cry key resolves and loadAssets queues the published wav (loading-level)", async () => {
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const tentalect = getPokemonSpecies(ER_TENTALECT_SPECIES_ID as SpeciesId);
+
+    // The key `cry()` plays resolves to the species pass's wired hook.
+    expect(tentalect.getCryKey(0)).toBe("cry/er_tentalect");
+    // The published er-assets file path is wired (WAV, not the default .m4a).
+    expect(getErCryFile(ER_TENTALECT_SPECIES_ID)).toBe("audio/cry/tentalect.wav");
+
+    // loadAssets actually QUEUES the cry under the cry key, from the published
+    // path — the ER-custom sprite-only path otherwise never loads any cry.
+    const audioSpy = vi.spyOn(game.scene.load, "audio");
+    await tentalect.loadAssets(false, 0, false, undefined, false);
+    expect(audioSpy).toHaveBeenCalledWith("cry/er_tentalect", "audio/cry/tentalect.wav");
+    audioSpy.mockRestore();
   });
 
   it("the base Eevee family stays byte-identical (partner clones never mutate it)", () => {

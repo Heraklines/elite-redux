@@ -139,8 +139,10 @@ interface NewcomerEvoSpeciesDef {
   readonly evolvesFrom: SpeciesId;
   /** Evolution level (50 for all three per the patch). */
   readonly evolveLevel: number;
-  /** Optional explicit cry-audio key hook (asset lands in the assets phase). */
+  /** Optional explicit cry-audio key hook (the key `cry()` plays). */
   readonly cryKey?: string;
+  /** Optional cry-audio FILE path on er-assets (loaded under `cryKey`). */
+  readonly cryFile?: string;
   /**
    * Learnset additions appended to the CLONED pre-evo learnset — typing-appropriate
    * moves granted at the evolution level. Derivation documented per entry.
@@ -157,7 +159,9 @@ interface NewcomerEvoSpeciesDef {
  */
 export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
   // Tentalect — Tentacruel (Lv 50) branch. Water/Poison/Psychic. Tentacool->Tentacruel
-  // stays Lv 30 (untouched). Cry hook wired (tentalect asset lands in the assets phase).
+  // stays Lv 30 (untouched). Cry LIVE on er-assets: key `cry/er_tentalect` loads the
+  // published `audio/cry/tentalect.wav` (WAV: no AAC encoder was available at bake time;
+  // .wav decodes natively through the Web-Audio loader, so no transcode is needed).
   {
     speciesId: ER_TENTALECT_SPECIES_ID,
     name: "Tentalect",
@@ -170,6 +174,7 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     evolvesFrom: SpeciesId.TENTACRUEL,
     evolveLevel: 50,
     cryKey: "cry/er_tentalect",
+    cryFile: "audio/cry/tentalect.wav",
     // Psychic/Poison coverage on top of Tentacruel's Water/Poison kit.
     learnsetAdditions: [
       [50, MoveId.PSYCHIC],
@@ -254,7 +259,10 @@ export const ER_PARTNER_FAMILY: readonly PartnerFamilyDef[] = [
     base: SpeciesId.EEVEE,
     partnerId: ER_PARTNER_EEVEE_SPECIES_ID,
     name: "Partner Eevee",
-    slug: "partner_eevee",
+    // Published er-assets dir is `eevee_partner` (word-order reversed vs the game-side
+    // slug convention, matching the ROM bake). The 8 partner eeveelutions have no
+    // published art yet (Omniform transform targets only); they keep placeholder slugs.
+    slug: "eevee_partner",
     compositeId: ER_PARTNER_EEVEE_ABILITY_ID,
     mapType: null,
   },
@@ -382,6 +390,7 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
       catchRate: def.catchRate,
       extraTypes: def.types.length > 2 ? def.types.slice(2) : undefined,
       cryKey: def.cryKey,
+      cryFile: def.cryFile,
     });
     if (added) {
       result.speciesRegistered++;
