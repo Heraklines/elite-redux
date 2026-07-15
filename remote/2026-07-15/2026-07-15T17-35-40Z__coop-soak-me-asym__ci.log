@@ -1,0 +1,59 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: 150
+run: 29436978020 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T17-35-40Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] SEED=828633 WAVES=17 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=17 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] SEED=828633 WAVES=13 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=13 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=13 where=wave-start fields=[saveDataDigest] :: saveDataDigest:host="ea86c7b4b9b6423d"/guest="48c933c01c58eea5"
+[22m[39m[coop-soak] SAVE-DATA SUB-DIFF wave 13 @wave-start (seed 828633): saveDataDigest SUB-DIFF keys=[erMapState] :: erMapState: host={"biomeOverstayAnchor":null,"biomeLength":16,"biomeStartWave":13,"nodes":[{"biome":4,"kind":"biome"},{"biome":9,"kind":"biome"},{"biome":3,"kind":"biome"}],"travelTarget":null,"fragments":0} guest={"biomeOverstayAnchor":null,"biomeLength":null,"biomeStartWave":13,"nodes":[],"travelTarget":null,"fragments":0}
+[coop-soak] FINDING wave 13 @wave-start (seed 828633): unhealed DIGEST divergence [saveDataDigest] - saveDataDigest: host="ea86c7b4b9b6423d" guest="48c933c01c58eea5" || saveDataDigest SUB-DIFF keys=[erMapState] :: erMapState: host={"biomeOverstayAnchor":null,"biomeLength":16,"biomeStartWave":13,"nodes":[{"biome":4,"kind":"biome"},{"biome":9,"kind":"biome"},{"biome":3,"kind":"biome"}],"travelTarget":null,"fragments":0} guest={"biomeOverstayAnchor":null,"biomeLength":null,"biomeStartWave":13,"nodes":[],"travelTarget":null,"fragments":0}
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 15 (seed 828633): host-owned ME retained reward terminal did not finish after peer material apply (host=16 guest=16 expected=17 hostPhase=EggLapsePhase guestPhase=SelectModifierPhase). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T17-34-57-781Z__seed-828633__wave-15. Replay: SOAK_SEED=828633[39m
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 15 (seed 828633): host-owned ME retained reward terminal did not finish after peer material apply (host=16 guest=16 expected=17 hostPhase=EggLapsePhase guestPhase=SelectModifierPhase). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T17-35-20-226Z__seed-828633__wave-15. Replay: SOAK_SEED=828633[39m
+
+----- vitest result tail -----
+    [90m1581|[39m
+[90m [2m❯[22m processMeWave test/tools/coop-soak-driver.ts:[2m3192:15[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4158:7[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m173:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:213:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[31m[1mAssertionError[22m: soak found 1 unhealed DIGEST desync(s) across the guest-owned ME (replay SOAK_SEED=828633): [saveDataDigest]@13: expected [ { fields: 'saveDataDigest', …(4) } ] to deeply equal [][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [][39m
+[31m+ [[39m
+[31m+   {[39m
+[31m+     "fields": "saveDataDigest",[39m
+[31m+     "firstWave": 13,[39m
+[31m+     "lastWave": 13,[39m
+[31m+     "occurrences": 1,[39m
+[31m+     "sample": "saveDataDigest: host=\"ea86c7b4b9b6423d\" guest=\"48c933c01c58eea5\" || saveDataDigest SUB-DIFF keys=[erMapState] :: erMapState: host={\"biomeOverstayAnchor\":null,\"biomeLength\":16,\"biomeStartWave\":13,\"nodes\":[{\"biome\":4,\"kind\":\"biome\"},{\"biome\":9,\"kind\":\"biome\"},{\"biome\":3,\"kind\":\"biome\"}],\"travelTarget\":null,\"fragments\":0} guest={\"biomeOverstayAnchor\":null,\"biomeLength\":null,\"biomeStartWave\":13,\"nodes\":[],\"travelTarget\":null,\"fragments\":0}",[39m
+[31m+   },[39m
+[31m+ ][39m
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m265:7[22m[39m
+    [90m263|[39m       `soak found ${result.findings.length} unhealed DIGEST desync(s) …
+    [90m264|[39m         + result.findings.map(f => `[${f.fields}]@${f.firstWave}`).joi…
+    [90m265|[39m     )[33m.[39m[34mtoEqual[39m([])[33m;[39m
+    [90m   |[39m       [31m^[39m
+    [90m266|[39m
+    [90m267|[39m     logs[33m.[39m[34mflush[39m()[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 17:34:07
+[2m   Duration [22m 92.83s[2m (transform 37.82s, setup 47.80s, import 500ms, tests 76.27s, environment 2.11s)[22m
+
