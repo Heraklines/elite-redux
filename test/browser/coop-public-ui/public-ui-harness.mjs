@@ -24,18 +24,22 @@ const REWARD_OWNER = /OWNER drives reward screen/u;
 const GUEST_FAINT_PICKER = /guest own-faint picker OPEN/u;
 const HOST_SWITCH_PHASE = /Start Phase SwitchPhase/u;
 const GUEST_CONTINUATION_ACK = /guest ACK turn stage=continuationReady e=(\d+) wave=(\d+) turn=(\d+) rev=(\d+)/u;
-const SHARED_SESSION_TERMINAL = /\[coop:runtime\] shared session stopped safely: /u;
+const SHARED_SESSION_TERMINAL = /\[coop:runtime\] shared session (?:terminal requested|stopped safely):/u;
 const LAUNCH_SNAPSHOT_ABORT = /launchSnapshotAbort wave=\d+ reason=/u;
 const POST_TURN_PHASE_PROGRESS = /Start Phase ([A-Za-z0-9]+Phase)/u;
 const POST_TURN_AUTHORITY_PROGRESS = /\[coop:turn\] host recorder: append turn=\d+ seq=(\d+)/u;
 const POST_TURN_RENDERER_PROGRESS = /\[coop:replay\] guest replay turn=\d+: live increment seq=(\d+)\.\.(\d+)/u;
 const REWARD_RESULT_RETAINED = /reward authoritative RESULT retained rev=(\d+) tick=(\d+) id=([^\s]+)/u;
-const COOP_RECOVERY =
-  /Co-op Sync Recovery|recovery request attempt=|recovery EXHAUSTED|RENDEZVOUS RECOVERY RETRY|could not converge/iu;
+const FATAL_COOP_RECOVERY = /Co-op Sync Recovery|recovery request attempt=|recovery EXHAUSTED|could not converge/iu;
+const RENDEZVOUS_RECOVERY_RETRY_POINT = /\[coop:rendezvous\] RENDEZVOUS RECOVERY RETRY point=([^\s]+) after \d+ms/u;
 const TATSUGIRI_SPECIES_ID = 978;
 const DONDOZO_SPECIES_ID = 977;
 const POST_TURN_PROGRESS_ALLOWANCE_MS = 90_000;
 const POST_TURN_HARD_CEILING_MS = 360_000;
+// Trace-enabled four-core run 29405818635 reached the matching cmd:1:1 observations 0.45s and
+// 1.05s after the ordinary ceiling across the two owner parities, with causal Phaser progress.
+// Keep that measured launch allowance Commander-only; ordinary waits retain the tighter ceiling.
+const COMMANDER_BOUNDARY_HARD_CEILING_MS = 420_000;
 
 // Self-healing pairing cadence: how often the requester re-issues its ask while unpaired. Kept
 // well under the observed ~17s worker-side request TTL so each re-send REFRESHES the request and
@@ -1012,12 +1016,81 @@ export class DuoPublicUiRig {
     }
   }
 
-  assertNoRecoverySince(cursors, purpose) {
-    for (const client of Object.values(this.clients)) {
-      const recovery = client.evidence.find(COOP_RECOVERY, cursors[client.label]);
-      if (recovery != null) {
-        throw new Error(`${purpose}: ${client.label} entered recovery: ${recovery.text}`);
+  /**
+   * Advance only readiness-proven public battle prompts until both clients publish the same
+   * Commander boundary. Unlike the ordinary command-frontier driver, this must not require an
+   * owned command UI from both clients: Tatsugiri's owner automatically contributes its generated
+   * skip, while only Dondozo's owner receives public command input.
+   */
+  async waitForCommanderCommandBoundaryDrivingBattlePrompts(cursors, purpose, { expectedWave = null } = {}) {
+    if (!this.host || !this.guest) {
+      throw new Error(`${purpose}: Commander prompt advancement requires a paired host and guest`);
+    }
+    const clients = Object.values(this.clients);
+    const progressBudget = createPublicBattleProgressBudget(this, cursors, this.config.timeoutMs, {
+      hardCeilingMs: COMMANDER_BOUNDARY_HARD_CEILING_MS,
+    });
+    const advanceBattlePrompt = createBattlePromptAdvancer(this, cursors, {}, purpose, {
+      requireSharedCommandAddress: false,
+    });
+    while (Date.now() < progressBudget.observe()) {
+      for (const client of clients) {
+        const terminal =
+          client.evidence.find(SHARED_SESSION_TERMINAL, cursors[client.label])
+          ?? client.evidence.find(LAUNCH_SNAPSHOT_ABORT, cursors[client.label]);
+        if (terminal != null) {
+          throw new Error(`${purpose}: ${client.label} terminated before the Commander boundary: ${terminal.text}`);
+        }
       }
+      if (findSharedCommanderMatch(this.host, this.guest, cursors, expectedWave) != null) {
+        return this.assertCommanderCommandBoundary(cursors, purpose, { expectedWave });
+      }
+      if (await advanceBattlePrompt()) {
+        continue;
+      }
+      await delay(100);
+    }
+    throw new Error(`${purpose}: timed out driving public battle prompts to the shared Commander boundary`);
+  }
+
+  assertNoFatalRecoverySince(cursors, purpose) {
+    for (const client of Object.values(this.clients)) {
+      const recovery =
+        client.evidence.find(FATAL_COOP_RECOVERY, cursors[client.label])
+        ?? client.evidence.find(SHARED_SESSION_TERMINAL, cursors[client.label])
+        ?? client.evidence.find(LAUNCH_SNAPSHOT_ABORT, cursors[client.label]);
+      if (recovery != null) {
+        throw new Error(`${purpose}: ${client.label} entered fatal recovery/terminal: ${recovery.text}`);
+      }
+    }
+  }
+
+  /**
+   * A retained rendezvous retransmission is healthy only when it targets the exact Commander point
+   * that both browsers subsequently matched. Record the count for diagnosis while rejecting a
+   * malformed or unrelated retry; the caller already proved eventual exact address/digest convergence.
+   */
+  assertCommanderRetriesConverged(cursors, purpose, expectedPoint) {
+    for (const client of Object.values(this.clients)) {
+      const retries = [];
+      for (const event of client.evidence.events.slice(cursors[client.label])) {
+        const text = event.text ?? "";
+        if (!text.includes("RENDEZVOUS RECOVERY RETRY")) {
+          continue;
+        }
+        const match = RENDEZVOUS_RECOVERY_RETRY_POINT.exec(text);
+        if (match?.[1] !== expectedPoint) {
+          throw new Error(`${purpose}: ${client.label} retried an unexpected rendezvous point: ${text}`);
+        }
+        retries.push(event);
+      }
+      client.evidence.record("commander-rendezvous-retry-converged-proof", {
+        purpose,
+        point: expectedPoint,
+        retryCount: retries.length,
+        retryEvidenceIndices: retries.map(event => event.index),
+        outcome: "exact-address-and-digest-converged",
+      });
     }
   }
 
@@ -1060,7 +1133,8 @@ export class DuoPublicUiRig {
     if (unexpectedOwnerUi != null) {
       throw new Error(`${purpose}: Commander owner ${owner.label} incorrectly exposed a public command UI`);
     }
-    this.assertNoRecoverySince(cursors, purpose);
+    this.assertNoFatalRecoverySince(cursors, purpose);
+    this.assertCommanderRetriesConverged(cursors, purpose, observation.point);
     for (const client of Object.values(this.clients)) {
       client.evidence.record("shared-commander-boundary-proof", {
         purpose,
@@ -1094,7 +1168,7 @@ export class DuoPublicUiRig {
     if (findOwnedCommandUi(boundary.owner, boundary.cursors[boundary.owner.label]) != null) {
       throw new Error(`${purpose}: Commander owner exposed input while proving its automatic skip`);
     }
-    this.assertNoRecoverySince(boundary.cursors, purpose);
+    this.assertNoFatalRecoverySince(boundary.cursors, purpose);
     boundary.owner.evidence.record("commander-generated-skip-rendezvous-proof", {
       purpose,
       point: boundary.observation.point,
@@ -1537,9 +1611,11 @@ export class DuoPublicUiRig {
       ),
     );
     if (commanderFixture) {
-      const boundary = await this.assertCommanderCommandBoundary(phaseCursors, "fresh-wave-1-commander", {
-        expectedWave: 1,
-      });
+      const boundary = await this.waitForCommanderCommandBoundaryDrivingBattlePrompts(
+        phaseCursors,
+        "fresh-wave-1-commander",
+        { expectedWave: 1 },
+      );
       this.activeBattleWave = boundary.observation.wave;
       this.pendingCommanderBoundary = boundary;
     } else {
@@ -1641,9 +1717,11 @@ export class DuoPublicUiRig {
     let commandCursors = this.lastWaveCursors;
     let pendingContinuation = null;
     for (let round = 1; round <= this.config.maxTurns; round++) {
-      boundary ??= await this.assertCommanderCommandBoundary(commandCursors, `commander-turn-${round}`, {
-        expectedWave: this.activeBattleWave,
-      });
+      boundary ??= await this.waitForCommanderCommandBoundaryDrivingBattlePrompts(
+        commandCursors,
+        `commander-turn-${round}`,
+        { expectedWave: this.activeBattleWave },
+      );
       if (pendingContinuation != null) {
         await this.assertRetainedContinuation(pendingContinuation.cursors, pendingContinuation.name);
         pendingContinuation = null;
@@ -1662,7 +1740,7 @@ export class DuoPublicUiRig {
           expectedWave: this.activeBattleWave,
         });
         await this.assertRetainedContinuation(outcomeCursors, `commander-turn-${round}-reward`);
-        this.assertNoRecoverySince(this.lastWaveCursors, "Commander wave through retained reward");
+        this.assertNoFatalRecoverySince(this.lastWaveCursors, "Commander wave through retained reward");
         return round;
       }
       if (outcome.kind === "faint") {
@@ -1849,12 +1927,14 @@ export class DuoPublicUiRig {
     await this.assertRetainedRewardTerminal(terminalCursors, expectedRewardAddress, owner.publicSeat);
     const expectedWave = this.activeBattleWave == null ? null : this.activeBattleWave + 1;
     if (commanderFixture) {
-      const boundary = await this.assertCommanderCommandBoundary(commandCursors, "wave-2-commander-command", {
-        expectedWave,
-      });
+      const boundary = await this.waitForCommanderCommandBoundaryDrivingBattlePrompts(
+        commandCursors,
+        "wave-2-commander-command",
+        { expectedWave },
+      );
       this.activeBattleWave = boundary.observation.wave;
       this.pendingCommanderBoundary = boundary;
-      this.assertNoRecoverySince(commandCursors, "retained reward to wave-2 Commander command");
+      this.assertNoFatalRecoverySince(commandCursors, "retained reward to wave-2 Commander command");
     } else {
       await this.waitForAllLocalCommandsDrivingBattlePrompts(commandCursors, "next-wave-intro");
       const boundary = await this.assertSharedSurface("command", commandCursors, "wave-2-command", {

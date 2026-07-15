@@ -250,7 +250,10 @@ jobs:
           COOP_UI_MARKET_SECOND_PURCHASE: "1"
           COOP_UI_MARKET_REQUIRED_PURCHASES: ${{ inputs.journey == 'market-wide-lens' && '1' || '0' }}
           COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS: "0"
-          COOP_UI_CHROME_TRACE: ${{ inputs.journey == 'market-wide-lens' && '0' || '1' }}
+          # Puppeteer's screenshot-enabled CDP performance trace materially starves the two
+          # Commander renderers during the long multi-stat intro. Commander keeps checkpoint PNGs
+          # plus complete semantic/causal JSONL; only the optional performance timeline is omitted.
+          COOP_UI_CHROME_TRACE: ${{ (inputs.journey == 'market-wide-lens' || inputs.journey == 'commander-skip') && '0' || '1' }}
           NODE_OPTIONS: --max-old-space-size=4096
         shell: bash
         run: |
