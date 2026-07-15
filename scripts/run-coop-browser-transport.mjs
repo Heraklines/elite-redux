@@ -279,6 +279,88 @@ async function browserStatus(page) {
   });
 }
 
+async function installLifecycleProbe(page) {
+  return page.evaluate(() => {
+    const runtime = globalThis.__coopBrowserRuntime;
+    if (runtime == null || typeof runtime.rejoinDriver !== "function") {
+      throw new Error("browser lifecycle probe requires an installed rejoin driver");
+    }
+    if (globalThis.__coopBrowserLifecycleProbe != null) {
+      throw new Error("browser lifecycle probe was installed twice");
+    }
+    const probe = {
+      rejoinCalls: 0,
+      transitions: [],
+    };
+    globalThis.__coopBrowserLifecycleProbe = probe;
+    runtime.localTransport.onStateChange(state => {
+      probe.transitions.push({
+        state,
+        generation: runtime.localTransport.connectionGeneration(),
+      });
+    });
+    const rejoinDriver = runtime.rejoinDriver;
+    runtime.rejoinDriver = async () => {
+      probe.rejoinCalls++;
+      return rejoinDriver.call(runtime);
+    };
+    return true;
+  });
+}
+
+async function lifecycleProbeStatus(page) {
+  return page.evaluate(() => {
+    const runtime = globalThis.__coopBrowserRuntime;
+    const probe = globalThis.__coopBrowserLifecycleProbe;
+    if (runtime == null || probe == null) {
+      throw new Error("browser lifecycle probe is not installed");
+    }
+    return {
+      transport: runtime.localTransport.state,
+      generation: runtime.localTransport.connectionGeneration(),
+      wireReadyState: runtime.localTransport.wire.readyState,
+      rejoinCalls: probe.rejoinCalls,
+      disconnectedTransitions: probe.transitions.filter(entry => entry.state === "disconnected").length,
+      connectedTransitions: probe.transitions.filter(entry => entry.state === "connected").length,
+      transitions: [...probe.transitions],
+      peerConnectionCount: (globalThis.__coopBrowserPeerConnections ?? []).length,
+    };
+  });
+}
+
+async function forcePeerConnectionState(page, state, peerConnectionIndex = -1) {
+  return page.evaluate(
+    ({ forcedState, requestedIndex }) => {
+      const runtime = globalThis.__coopBrowserRuntime;
+      const peerConnections = globalThis.__coopBrowserPeerConnections ?? [];
+      const index = requestedIndex < 0 ? peerConnections.length - 1 : requestedIndex;
+      const pc = peerConnections[index];
+      if (runtime == null || pc == null) {
+        throw new Error(`peer failure fixture cannot resolve peer connection index ${index}`);
+      }
+      globalThis.__coopBrowserForcedPeerStates ??= new WeakMap();
+      const forcedStates = globalThis.__coopBrowserForcedPeerStates;
+      if (!Object.hasOwn(pc, "connectionState")) {
+        Object.defineProperty(pc, "connectionState", {
+          configurable: true,
+          get: () => forcedStates.get(pc),
+        });
+      }
+      forcedStates.set(pc, forcedState);
+      const channelStateBefore = runtime.localTransport.wire.readyState;
+      pc.dispatchEvent(new Event("connectionstatechange"));
+      return {
+        channelStateBefore,
+        generationAfterEvent: runtime.localTransport.connectionGeneration(),
+        peerConnectionCount: peerConnections.length,
+        peerConnectionIndex: index,
+        transportAfterEvent: runtime.localTransport.state,
+      };
+    },
+    { forcedState: state, requestedIndex: peerConnectionIndex },
+  );
+}
+
 let browser;
 try {
   await mkdir(artifactDir, { recursive: true });
@@ -361,6 +443,7 @@ try {
       checkpointCount: 0,
       continued: 0,
       pcFailureContinued: 0,
+      pcClosedContinued: 0,
     };
     globalThis.__coopBrowserRuntime.localTransport.onMessage(message => {
       if (message.t === "resumeCheckpoint" && message.checkpointId === "browser-midchunk-checkpoint") {
@@ -372,6 +455,9 @@ try {
       }
       if (message.t === "stallBeat" && message.waitingMs === 515_151) {
         globalThis.__coopBrowserProbe.pcFailureContinued++;
+      }
+      if (message.t === "stallBeat" && message.waitingMs === 616_161) {
+        globalThis.__coopBrowserProbe.pcClosedContinued++;
       }
     });
   });
@@ -478,58 +564,125 @@ try {
     throw new Error(`mid-chunk hot rejoin failed: ${JSON.stringify(firstRejoin)}`);
   }
 
-  // Browser regression: the RTCPeerConnection can reach failed while Chromium leaves its DataChannel open.
-  // Dispatch the native event against the tracked production PC with an injected failed state. The production
-  // adapter must retire that stuck-open carrier, emit one disconnect, and complete another real SDP/ICE rejoin.
-  const pcFailureTargetGeneration = firstRejoin[0].generation + 1;
-  const failedOpenCarrier = await hostPage.evaluate(() => {
-    const runtime = globalThis.__coopBrowserRuntime;
-    const transport = runtime.localTransport;
-    const wire = transport.wire;
-    const peerConnections = globalThis.__coopBrowserPeerConnections ?? [];
-    const pc = peerConnections.at(-1);
-    if (pc == null) {
-      throw new Error("browser peer-connection tracker captured no live connection");
-    }
-    const channelStateBefore = wire.readyState;
-    if (channelStateBefore !== "open") {
-      throw new Error(`peer failure fixture requires an open DataChannel, got ${channelStateBefore}`);
-    }
-    Object.defineProperty(pc, "connectionState", { configurable: true, get: () => "failed" });
-    pc.dispatchEvent(new Event("connectionstatechange"));
-    return {
-      channelStateBefore,
-      connectionCount: peerConnections.length,
-      generationBefore: transport.connectionGeneration(),
-      transportAfterEvent: transport.state,
-    };
-  });
-  if (failedOpenCarrier.channelStateBefore !== "open" || failedOpenCarrier.transportAfterEvent !== "disconnected") {
-    throw new Error(`failed-with-open-channel was not propagated immediately: ${JSON.stringify(failedOpenCarrier)}`);
+  // Observe the production runtime's public lifecycle seam without replacing it. Every terminal carrier
+  // below must produce one disconnect and one rejoin-driver call on EACH endpoint, even though close/error/
+  // peer-state callbacks can all fire for the same generation.
+  await Promise.all([installLifecycleProbe(hostPage), installLifecycleProbe(guestPage)]);
+
+  // A transient RTCPeerConnection.disconnected is not terminal. Force the native event, recover it within
+  // the production grace period, then wait beyond that exact exported duration. No lifecycle transition,
+  // rejoin attempt, PC replacement, or generation increment is allowed.
+  const transientBefore = await Promise.all([lifecycleProbeStatus(hostPage), lifecycleProbeStatus(guestPage)]);
+  const transientPcIndex = transientBefore[0].peerConnectionCount - 1;
+  const transientDisconnect = await forcePeerConnectionState(hostPage, "disconnected", transientPcIndex);
+  if (transientDisconnect.channelStateBefore !== "open" || transientDisconnect.transportAfterEvent !== "connected") {
+    throw new Error(`transient disconnected was not debounced: ${JSON.stringify(transientDisconnect)}`);
+  }
+  await delay(250);
+  const transientRecovery = await forcePeerConnectionState(hostPage, "connected", transientPcIndex);
+  const peerDisconnectedGraceMs = await hostPage.evaluate(() => globalThis.__coopBrowserBridge.peerDisconnectedGraceMs);
+  await delay(peerDisconnectedGraceMs + 250);
+  const transientAfter = await Promise.all([lifecycleProbeStatus(hostPage), lifecycleProbeStatus(guestPage)]);
+  if (
+    transientAfter.some(
+      (state, index) =>
+        state.transport !== "connected"
+        || state.generation !== transientBefore[index].generation
+        || state.rejoinCalls !== transientBefore[index].rejoinCalls
+        || state.disconnectedTransitions !== transientBefore[index].disconnectedTransitions
+        || state.peerConnectionCount !== transientBefore[index].peerConnectionCount,
+    )
+  ) {
+    throw new Error(
+      `transient disconnected escaped its debounce: ${JSON.stringify({ transientBefore, transientRecovery, transientAfter })}`,
+    );
   }
 
-  await Promise.all([
-    hostPage.waitForFunction(
-      generation =>
-        globalThis.__coopBrowserRuntime?.localTransport?.state === "connected"
-        && globalThis.__coopBrowserRuntime?.localTransport?.connectionGeneration?.() >= generation,
-      { timeout: 90_000, polling: 250 },
-      pcFailureTargetGeneration,
-    ),
-    guestPage.waitForFunction(
-      generation =>
-        globalThis.__coopBrowserRuntime?.localTransport?.state === "connected"
-        && globalThis.__coopBrowserRuntime?.localTransport?.connectionGeneration?.() >= generation,
-      { timeout: 90_000, polling: 250 },
-      pcFailureTargetGeneration,
-    ),
-  ]);
-  await hostPage.evaluate(() => {
-    globalThis.__coopBrowserRuntime.localTransport.send({ t: "stallBeat", waitingMs: 515_151 });
+  const exerciseTerminalPeerState = async ({ state, trafficMarker, probeKey }) => {
+    const before = await Promise.all([lifecycleProbeStatus(hostPage), lifecycleProbeStatus(guestPage)]);
+    const targetGeneration = before[0].generation + 1;
+    const terminalPcIndex = before[0].peerConnectionCount - 1;
+    const injected = await forcePeerConnectionState(hostPage, state, terminalPcIndex);
+    if (injected.channelStateBefore !== "open" || injected.transportAfterEvent !== "disconnected") {
+      throw new Error(`${state}-with-open-channel was not propagated immediately: ${JSON.stringify(injected)}`);
+    }
+    // Duplicate native callbacks from the same failed carrier must collapse before the asynchronous redial
+    // completes. This is the browser-native counterpart to the fake-PC exactly-once unit assertion.
+    await forcePeerConnectionState(hostPage, state, terminalPcIndex);
+
+    await Promise.all([
+      hostPage.waitForFunction(
+        generation =>
+          globalThis.__coopBrowserRuntime?.localTransport?.state === "connected"
+          && globalThis.__coopBrowserRuntime?.localTransport?.connectionGeneration?.() >= generation,
+        { timeout: 90_000, polling: 250 },
+        targetGeneration,
+      ),
+      guestPage.waitForFunction(
+        generation =>
+          globalThis.__coopBrowserRuntime?.localTransport?.state === "connected"
+          && globalThis.__coopBrowserRuntime?.localTransport?.connectionGeneration?.() >= generation,
+        { timeout: 90_000, polling: 250 },
+        targetGeneration,
+      ),
+    ]);
+    await hostPage.evaluate(marker => {
+      globalThis.__coopBrowserRuntime.localTransport.send({ t: "stallBeat", waitingMs: marker });
+    }, trafficMarker);
+    await guestPage.waitForFunction(
+      key => globalThis.__coopBrowserProbe?.[key] === 1,
+      {
+        timeout: 15_000,
+        polling: 50,
+      },
+      probeKey,
+    );
+
+    const after = await Promise.all([lifecycleProbeStatus(hostPage), lifecycleProbeStatus(guestPage)]);
+    for (const [index, endpoint] of ["host", "guest"].entries()) {
+      const expectedGeneration = before[index].generation + 1;
+      if (
+        after[index].transport !== "connected"
+        || after[index].wireReadyState !== "open"
+        || after[index].generation !== expectedGeneration
+        || after[index].rejoinCalls !== before[index].rejoinCalls + 1
+        || after[index].disconnectedTransitions !== before[index].disconnectedTransitions + 1
+      ) {
+        throw new Error(
+          `${state} carrier did not activate exactly one ${endpoint} lifecycle/rejoin: ${JSON.stringify({ before, injected, after })}`,
+        );
+      }
+    }
+
+    // Fire the superseded PC again AFTER its replacement is carrying traffic. The obsolete callback must
+    // not change state, generation, lifecycle counts, the replacement channel, or start another redial.
+    const staleBefore = await lifecycleProbeStatus(hostPage);
+    const staleEvent = await forcePeerConnectionState(hostPage, state, terminalPcIndex);
+    await delay(250);
+    const staleAfter = await lifecycleProbeStatus(hostPage);
+    if (
+      staleAfter.transport !== "connected"
+      || staleAfter.wireReadyState !== "open"
+      || staleAfter.generation !== staleBefore.generation
+      || staleAfter.rejoinCalls !== staleBefore.rejoinCalls
+      || staleAfter.disconnectedTransitions !== staleBefore.disconnectedTransitions
+    ) {
+      throw new Error(
+        `obsolete ${state} peer callback tore down its replacement: ${JSON.stringify({ staleBefore, staleEvent, staleAfter })}`,
+      );
+    }
+    return { before, injected, after, staleEvent, staleAfter };
+  };
+
+  const failedOpenCarrier = await exerciseTerminalPeerState({
+    state: "failed",
+    trafficMarker: 515_151,
+    probeKey: "pcFailureContinued",
   });
-  await guestPage.waitForFunction(() => globalThis.__coopBrowserProbe?.pcFailureContinued === 1, {
-    timeout: 15_000,
-    polling: 50,
+  const closedOpenCarrier = await exerciseTerminalPeerState({
+    state: "closed",
+    trafficMarker: 616_161,
+    probeKey: "pcClosedContinued",
   });
 
   const rejoined = await Promise.all([browserStatus(hostPage), browserStatus(guestPage)]);
@@ -537,13 +690,13 @@ try {
     rejoined.some(
       state =>
         state.transport !== "connected"
-        || state.generation < pcFailureTargetGeneration
+        || state.generation < firstRejoin[0].generation + 2
         || !state.snapshot?.partnerConnected
         || state.versionMismatch
         || state.fingerprintMismatch,
     )
   ) {
-    throw new Error(`hot rejoin failed: ${JSON.stringify(rejoined)}`);
+    throw new Error(`terminal peer-state hot rejoins failed: ${JSON.stringify(rejoined)}`);
   }
   if (browserErrors.length > 0) {
     throw new Error(`browser errors:\n${browserErrors.join("\n")}`);
@@ -556,7 +709,7 @@ try {
     );
   }
   process.stdout.write(
-    `[coop-browser] PASS native WebRTC handshake + exact 512KiB UTF-8 mid-chunk restart + failed-PC/open-channel recovery + hot rejoin + continued traffic ${JSON.stringify({ checkpointFixture, exactCheckpoint, failedOpenCarrier, rejoined })}\n`,
+    `[coop-browser] PASS native WebRTC handshake + exact 512KiB UTF-8 mid-chunk restart + transient-PC debounce + failed/closed-PC open-channel recovery + exact lifecycle activation + stale-PC fencing + continued traffic ${JSON.stringify({ checkpointFixture, exactCheckpoint, transientAfter, failedOpenCarrier, closedOpenCarrier, rejoined })}\n`,
   );
 } catch (error) {
   process.stderr.write(`[coop-browser] FAIL ${error.stack ?? error}\n`);
