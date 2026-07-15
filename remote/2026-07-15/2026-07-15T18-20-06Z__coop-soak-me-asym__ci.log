@@ -1,0 +1,53 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: 150
+run: 29439958932 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T18-20-06Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] SEED=828633 WAVES=17 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=17 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] SEED=828633 WAVES=13 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=13 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[31m[1mError[22m: client phase drive to CommandPhase HANG on NewBiomeEncounterPhase; queued=[TitlePhase], ui=MESSAGE[39m
+[36m [2m❯[22m driveClientPhaseQueueTo test/tools/coop-duo-harness.ts:[2m1525:15[22m[39m
+    [90m1523|[39m       if (Date.now() >= deadline) {
+    [90m1524|[39m         const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? […
+    [90m1525|[39m         throw new Error(
+    [90m   |[39m               [31m^[39m
+    [90m1526|[39m           `client phase drive to ${target} HANG on ${phase.phaseName};…
+    [90m1527|[39m             + `ui=${UiMode[scene.ui.getMode()] ?? scene.ui.getMode()}`,
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m633:12[22m[39m
+[90m [2m❯[22m crossCommandBoundaryWithReplayGuest test/tools/coop-soak-driver.ts:[2m2299:30[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4259:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m173:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:213:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[31m[1mError[22m: client phase drive to CommandPhase HANG on NewBiomeEncounterPhase; queued=[TitlePhase], ui=MESSAGE[39m
+[36m [2m❯[22m driveClientPhaseQueueTo test/tools/coop-duo-harness.ts:[2m1525:15[22m[39m
+    [90m1523|[39m       if (Date.now() >= deadline) {
+    [90m1524|[39m         const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? […
+    [90m1525|[39m         throw new Error(
+    [90m   |[39m               [31m^[39m
+    [90m1526|[39m           `client phase drive to ${target} HANG on ${phase.phaseName};…
+    [90m1527|[39m             + `ui=${UiMode[scene.ui.getMode()] ?? scene.ui.getMode()}`,
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m633:12[22m[39m
+[90m [2m❯[22m crossCommandBoundaryWithReplayGuest test/tools/coop-soak-driver.ts:[2m2299:30[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4259:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m231:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 18:18:40
+[2m   Duration [22m 85.57s[2m (transform 38.46s, setup 51.02s, import 505ms, tests 67.85s, environment 1.91s)[22m
+
