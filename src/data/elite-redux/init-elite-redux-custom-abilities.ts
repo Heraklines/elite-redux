@@ -79,6 +79,8 @@ import {
   PositiveFeedbackAbAttr,
   PositiveFeedbackPowerAbAttr,
   SynchronizedCurrentAbAttr,
+  SynchronizedCurrentBothAttackPowerAbAttr,
+  SynchronizedCurrentHealAbAttr,
 } from "#data/elite-redux/abilities/plusle-minun";
 import { ER_PRESSURE_VESSEL_ABILITY_ID, PressureVesselAbAttr } from "#data/elite-redux/abilities/pressure-vessel";
 import { ER_PUPPET_STRINGS_ABILITY_ID, PuppetStringsAbAttr } from "#data/elite-redux/abilities/puppet-strings";
@@ -477,7 +479,7 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
         id: ER_SYNCHRONIZED_CURRENT_ABILITY_ID,
         name: "Synchronized Current",
         description:
-          "If this Pokemon and an allied Plus- or Minus-aligned Pokemon both damage the same target in one turn, that target is paralyzed after both attacks resolve. Normal paralysis immunities apply.",
+          "If this Pokemon and an allied Plus- or Minus-aligned Pokemon both damage the same target in one turn, that target is paralyzed after both attacks resolve (normal paralysis immunities apply). With any ally: if both attack in a turn, each attack gains 25% power; if neither attacks, both restore 1/4 of their max HP at the end of the turn.",
         archetype: "unknown",
       },
       pokerogueId: ER_SYNCHRONIZED_CURRENT_ABILITY_ID,
@@ -507,7 +509,7 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
         id: ER_CLOSED_CIRCUIT_ABILITY_ID,
         name: "Closed Circuit",
         description:
-          "If this Pokemon and an ally target the same opponent in one turn, whichever acts second launches an extra 25-power Electric/Fairy attack at that opponent after both moves resolve.",
+          "If this Pokemon and an ally target the same opponent in one turn, BOTH launch an extra 25-power Electric/Fairy attack at that opponent after both moves resolve. If the target faints, a remaining extra attack carries over to another opponent.",
         archetype: "unknown",
       },
       pokerogueId: ER_CLOSED_CIRCUIT_ABILITY_ID,
@@ -903,6 +905,8 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_SYNCHRONIZED_CURRENT_ABILITY_ID) {
     builder.attr(SynchronizedCurrentAbAttr);
+    builder.attr(SynchronizedCurrentBothAttackPowerAbAttr);
+    builder.attr(SynchronizedCurrentHealAbAttr);
   }
 
   if (pokerogueId === ER_POSITIVE_FEEDBACK_ABILITY_ID) {
