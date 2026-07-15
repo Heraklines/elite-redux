@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "taskId": "p33-temp-modifier-lifecycle-codex",
+  "branch": "ci/coop/p33-temp-modifier-lifecycle-codex",
+  "trainRef": "ci/coop/p33-closure-codex",
+  "baseSha": "1fd8100db65996a64ffb28bbf04f6f3a86dd3e9d",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-temp-modifier-lifecycle-codex.json",
+    "test/tests/elite-redux/coop/coop-soak.test.ts",
+    "test/tools/coop-soak-driver.ts"
+  ]
+}
