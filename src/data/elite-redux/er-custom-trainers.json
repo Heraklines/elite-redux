@@ -795,7 +795,7 @@
           "SURF",
           "STOMPING_TANTRUM"
         ],
-        "slotChance": 1,
+        "slotChance": 30,
         "species": 10615
       },
       {
@@ -813,7 +813,6 @@
           "RLNA",
           "RLA"
         ],
-        "slotChance": 1,
         "species": 2089
       },
       {
@@ -835,7 +834,6 @@
           "DESTINY_BOND",
           "ENDURE"
         ],
-        "slotChance": 1,
         "species": 110
       },
       {
@@ -878,11 +876,42 @@
           "palette": "lavender",
           "surface": "wormhole"
         },
+        "slotChance": 50,
         "species": 93
       }
     ],
     "trainerClass": "KOGA",
     "trainerEffect": "shadowaura",
+    "weight": 100
+  },
+  "TRAINER_70008": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70008,
+    "maxWave": 120,
+    "minWave": 110,
+    "name": "Sabrina",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "BARRIER",
+          "FAKE_OUT",
+          "CONFUSE_RAY",
+          "FLASH_FREEZE"
+        ],
+        "species": 866
+      }
+    ],
+    "trainerClass": "SABRINA",
     "weight": 100
   }
 }
