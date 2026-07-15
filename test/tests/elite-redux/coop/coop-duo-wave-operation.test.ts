@@ -56,6 +56,7 @@ import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { BattleEndPhase } from "#phases/battle-end-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, type DuoRig, drainLoopback, installDuoLogCapture, withClient } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
@@ -305,6 +306,36 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       release,
       "the wave boundary did not steal or prematurely execute the ME continuation",
     ).not.toHaveBeenCalled();
+    logs.flush();
+  }, 300_000);
+
+  it("retained ordinary BattleEnd ignores a speculative next-wave Mystery battle and skips local settlement", async () => {
+    const rig = await bootDuo();
+    // Keep DATA unresolved until the real BattleEnd boundary. This mirrors production and ensures the
+    // phase constructor captures the exact wave-11 transaction instead of mutable ambient battle state.
+    registerCoopOperationLiveSink("op:wave", envelope => {
+      routed.push(envelope.pendingOperation?.payload as CoopWaveAdvancePayload);
+      return true;
+    });
+    await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 11 });
+
+    await withClient(rig.guestCtx, () => {
+      const phase = new BattleEndPhase(true);
+      // The next battle has speculated ahead to an ME. The addressed retained source is still wave 11.
+      rig.guestScene.currentBattle.waveIndex = 12;
+      rig.guestScene.currentBattle.battleType = BattleType.MYSTERY_ENCOUNTER;
+      vi.spyOn(rig.guestScene.currentBattle, "isBattleMysteryEncounter").mockReturnValue(true);
+      const addBattleScoreSpy = vi.spyOn(rig.guestScene.currentBattle, "addBattleScore");
+      const clearEnemyHeldItemsSpy = vi.spyOn(rig.guestScene, "clearEnemyHeldItemModifiers");
+      const rawPublisherSpy = vi.spyOn(rig.guestRuntime.battleStream, "sendWaveEndState");
+      const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+      phase.start();
+
+      expect(endSpy, "the exact retained wave-11 image releases BattleEnd").toHaveBeenCalledOnce();
+      expect(addBattleScoreSpy, "the guest does not dual-run victory settlement").not.toHaveBeenCalled();
+      expect(clearEnemyHeldItemsSpy, "the guest does not dual-run shared BattleEnd cleanup").not.toHaveBeenCalled();
+      expect(rawPublisherSpy, "the guest does not fall back to the raw wave-end carrier").not.toHaveBeenCalled();
+    });
     logs.flush();
   }, 300_000);
 

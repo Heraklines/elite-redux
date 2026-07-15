@@ -15,6 +15,7 @@
     "src/phases/select-modifier-phase.ts",
     "src/phases/victory-phase.ts",
     "test/tests/elite-redux/coop/coop-automatic-victory-seal.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts",
     "test/tests/elite-redux/coop/coop-guest-renderer.test.ts",
     "test/tests/elite-redux/coop/coop-renderer-allowlist.test.ts",
     "test/tests/elite-redux/coop/coop-wave-operation.test.ts",
