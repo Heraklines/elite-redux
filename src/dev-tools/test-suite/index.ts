@@ -32,11 +32,12 @@ import {
   setPendingDevStarters,
 } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
-import { formatCoopControlPlane } from "#data/elite-redux/coop/coop-diagnostics";
+import { formatCoopControlPlane, formatLiveCoopReportCorrelation } from "#data/elite-redux/coop/coop-diagnostics";
 import { DEVLOG_REPLAY_TRACE_MARKER } from "#data/elite-redux/er-bug-report";
 import { getReplayTrace } from "#data/elite-redux/replay-recorder";
 import { GameModes } from "#enums/game-modes";
 import { UiMode } from "#enums/ui-mode";
+import { formatErBuildIdentity, getErBuildIdentity } from "#utils/build-identity";
 import { formatConsoleSnapshot } from "#utils/console-ring-buffer";
 import { openScenarioBuilder } from "./builder";
 import { DEV_SCENARIOS, type DevScenario, resetDevOverrides } from "./scenarios";
@@ -67,7 +68,7 @@ function captureStateHeader(): string {
     // ER (#431): the build id makes stale-bundle reports identifiable at
     // triage - if a logged build differs from the latest deploy, the report
     // is from old code, not a live bug.
-    const build = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "?";
+    const build = getErBuildIdentity().id;
     return [
       `url:      ${location.href}`,
       `build:    ${build}`,
@@ -78,6 +79,23 @@ function captureStateHeader(): string {
     ].join("\n");
   } catch (err) {
     return `state capture failed: ${String(err)}`;
+  }
+}
+
+function captureBuildIdentityBlock(): string {
+  try {
+    return `${formatErBuildIdentity()}\n\n`;
+  } catch {
+    return "";
+  }
+}
+
+function captureCorrelationBlock(): string {
+  try {
+    const block = formatLiveCoopReportCorrelation();
+    return block ? `${block}\n\n` : "";
+  } catch {
+    return "";
   }
 }
 
@@ -123,7 +141,8 @@ function buildReport(comment?: string): string {
   // Send Logs attached only the state header + console, so a tester-filed co-op hang was NOT replayable).
   return (
     `${scenarioBlock}${shareBlock}${captureStateHeader()}\n\n${commentBlock}`
-    + `${captureControlPlaneBlock()}----- CONSOLE -----\n${formatConsoleSnapshot()}\n\n${captureReplayTraceBlock()}`
+    + `${captureBuildIdentityBlock()}${captureCorrelationBlock()}${captureControlPlaneBlock()}`
+    + `----- CONSOLE -----\n${formatConsoleSnapshot()}\n\n${captureReplayTraceBlock()}`
   );
 }
 

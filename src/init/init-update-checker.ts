@@ -31,6 +31,7 @@
 // =============================================================================
 
 import { IS_TEST, isApp, isBeta, isDev } from "#constants/app-constants";
+import { getErBuildIdentity } from "#utils/build-identity";
 
 /** How often to poll for a newer build while the tab is open. */
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -175,7 +176,7 @@ export function startUpdateChecker(): void {
   // log (incl. the in-game Send Logs ring buffer) carries the build id -
   // stale-bundle reports become identifiable at a glance.
   // biome-ignore lint/suspicious/noConsole: intentional diagnostic breadcrumb
-  console.log(`[ER] build ${runningBuildId() ?? "unknown"}`);
+  console.log(`[ER] build ${JSON.stringify(getErBuildIdentity())}`);
 
   window.setInterval(() => void checkOnce(), POLL_INTERVAL_MS);
   // Also check the moment the player returns to the tab — that's both the most

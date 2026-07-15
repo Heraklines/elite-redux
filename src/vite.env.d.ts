@@ -42,3 +42,5 @@ interface ViteTypeOptions {
 // Elite Redux — per-build id stamped into the bundle by `build-id-plugin`
 // (auto-reload on new version). Compared against `/version.json` at runtime.
 declare const __BUILD_ID__: string;
+/** Exact non-secret source/workflow/deployment identity emitted beside `__BUILD_ID__`. */
+declare const __BUILD_IDENTITY__: unknown;
