@@ -579,7 +579,7 @@ function hasSemanticSurface(rig, surfaceId, cursors) {
  * declares a v2 semantic mirror (`v2SurfaceId`) but whose mirror never reports an owner is a
  * MISSING/MALFORMED marker, and drops the run loudly rather than silently assuming `rig.host`.
  */
-function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) {
+export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) {
   const clients = Object.values(rig.clients);
   const notYetHandled = (client, event) =>
     event != null && event.index > (handledIndex.get(`${driver.name}:${client.label}`) ?? -1);

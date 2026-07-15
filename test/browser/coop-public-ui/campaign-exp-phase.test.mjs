@@ -10,6 +10,7 @@ import {
   createAnimationProgressBudget,
   createBattlePromptAdvancer,
   driveBattleFallback,
+  resolveSurfaceOwner,
   waitForOutcomeBounded,
 } from "./campaign.mjs";
 import { DuoPublicUiRig, PublicUiClient } from "./public-ui-harness.mjs";
@@ -145,6 +146,36 @@ function fakeClient(label, texts = []) {
     },
   };
 }
+
+test("phase presence waits for its declared semantic UI before judging owner evidence", () => {
+  const authority = fakeClient("authority", ["Start Phase EggLapsePhase"]);
+  const renderer = fakeClient("renderer", ["Start Phase EggLapsePhase"]);
+  const rig = { host: authority, clients: { authority, renderer } };
+  const driver = {
+    name: "egg",
+    present: /Start Phase EggLapsePhase/u,
+    v2SurfaceId: "egg:lapse",
+    owner: { role: "host" },
+  };
+  const cursors = { authority: 0, renderer: 0 };
+
+  assert.equal(
+    resolveSurfaceOwner(rig, driver, cursors, new Map(), true),
+    null,
+    "the preceding recall/message prompt must be driven before egg ownership is evaluated",
+  );
+
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: { surfaceId: "egg:lapse", localSeat: 0, ownerSeat: 1 },
+  });
+  assert.throws(
+    () => resolveSurfaceOwner(rig, driver, cursors, new Map(), true),
+    /never reported an owner/u,
+    "once the semantic surface exists, malformed owner evidence still fails loudly",
+  );
+});
 
 test("only ready active local battle narration and EXP instances advance once on each public client", async () => {
   const authority = fakeClient("authority");
