@@ -825,6 +825,70 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.dispose();
     });
 
+    it("does not let an older revision ACK cancel a newer exact commit request at the same turn", async () => {
+      const { host, guest } = createLoopbackPair();
+      const scheduled: { cb: () => void; cancelled: boolean }[] = [];
+      const exactRequests: number[] = [];
+      host.onMessage(message => {
+        if (message.t === "requestTurnCommit" && message.revision !== undefined) {
+          exactRequests.push(message.revision);
+        }
+      });
+      const guestStream = new CoopBattleStreamer(guest, {
+        authorityContext: () => ({ epoch: 7, wave: 1, turn: 1 }),
+        schedule: cb => {
+          const timer = { cb, cancelled: false };
+          scheduled.push(timer);
+          return () => {
+            timer.cancelled = true;
+          };
+        },
+      });
+      const first: Extract<CoopMessage, { t: "turnResolution" }> = {
+        t: "turnResolution",
+        epoch: 7,
+        wave: 1,
+        turn: 1,
+        revision: 21,
+        events: [{ k: "message", text: "first" }],
+        checkpoint: emptyCheckpoint(),
+        checksum: "2121212121212121",
+        preimage: "{}",
+        fullField: emptyFullField(),
+        authoritativeState: emptyAuthoritativeState(1, 1, 21),
+      };
+
+      host.send(first);
+      await flushWire();
+      const resolution = await guestStream.awaitTurn(1);
+      await flushWire();
+      expect(resolution?.revision).toBe(21);
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "materialApplied")).toBe(true);
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "presentationReady")).toBe(true);
+
+      guestStream.requestTurnCommit(7, 1, 1, 22);
+      await flushWire();
+      expect(
+        guestStream.retainedAuthorityDiagnostics().requests,
+        "two immutable revisions own independent retry slots",
+      ).toBe(2);
+
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "continuationReady")).toBe(true);
+      expect(guestStream.retainedAuthorityDiagnostics().requests, "the revision-21 ACK releases only revision 21").toBe(
+        1,
+      );
+
+      const requestsBeforeRetry = exactRequests.length;
+      for (const timer of [...scheduled]) {
+        if (!timer.cancelled) {
+          timer.cb();
+        }
+      }
+      await flushWire();
+      expect(exactRequests.slice(requestsBeforeRetry)).toEqual([22]);
+      guestStream.dispose();
+    });
+
     it("keeps turn and replacement deliveries independent at the same numeric address and revision", async () => {
       const { host, guest } = createLoopbackPair();
       const current = { epoch: 7, wave: 4, turn: 2 };
@@ -927,8 +991,13 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
 
       const oldWait = guestStream.awaitTurn(1);
       current.epoch = 8;
+      guestStream.requestTurnCommit(8, 1, 1, 20);
       const newWait = guestStream.awaitTurn(1);
       expect(await oldWait, "opening the new epoch dissolves the old addressed waiter").toBeNull();
+      expect(
+        guestStream.retainedAuthorityDiagnostics().requests,
+        "clearing the stale epoch-7 waiter leaves both epoch-8 exact and discovery requests intact",
+      ).toBe(2);
 
       hostStream.emitEvent(7, 1, 1, 0, { k: "message", text: "stale-live" });
       hostStream.emitTurn(
@@ -959,6 +1028,10 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       expect(resolution?.epoch).toBe(8);
       expect(resolution?.events).toEqual([{ k: "message", text: "current-turn" }]);
       expect(guestStream.consumeLiveEvents(1)).toEqual([{ seq: 0, event: { k: "message", text: "current-live" } }]);
+      expect(
+        guestStream.retainedAuthorityDiagnostics().requests,
+        "the current exact request remains until continuation-ready",
+      ).toBe(1);
       acknowledgeTurnThroughContinuation(guestStream, resolution!);
       hostStream.dispose();
       guestStream.dispose();
