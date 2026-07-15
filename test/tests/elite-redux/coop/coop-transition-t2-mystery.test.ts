@@ -564,7 +564,10 @@ describe.skipIf(!RUN)("T2 public-UI co-op Mystery transitions", () => {
       expect(rig.guestRuntime.durability?.appliedMarks()["op:global"] ?? 0).toBe(
         rig.hostRuntime.durability?.controlPlaneHighWater()["op:global"] ?? 0,
       );
-      expect(resync.count(), "the retained journey never needed a full state remirror/recovery").toBe(0);
+      expect(
+        resync.count(),
+        "retained ME_PRESENT state converged every round without a fallback full-state remirror",
+      ).toBe(0);
 
       const operations = distinctCommittedMeOperations(hostSend.mock.calls);
       expect([...operations.values()].filter(kind => kind === "ME_PRESENT")).toHaveLength(journey.picks.length);

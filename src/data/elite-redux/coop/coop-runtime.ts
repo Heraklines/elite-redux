@@ -1578,51 +1578,73 @@ function wireCoopWaveEndState(controller: CoopSessionController, battleStream: C
  * turning the pump's silent "identical state" assumption into detect-and-heal (reusing the
  * Phase A machinery). Additive: on a match nothing changes, so the working pump is intact.
  */
-function wireCoopMeChecksumCheck(battleStream: CoopBattleStreamer): void {
+function wireCoopMeChecksumCheck(runtime: CoopRuntime, battleStream: CoopBattleStreamer): void {
   battleStream.onMeChecksum((seq, ownerChecksum) => {
     const ours = captureCoopChecksum();
     if (ownerChecksum === COOP_CHECKSUM_SENTINEL || ours === COOP_CHECKSUM_SENTINEL || ownerChecksum === ours) {
       coopLog("checksum", `recv meChecksum seq=${seq} MATCH owner=${ownerChecksum} watcher=${ours}`);
       return;
     }
-    coopWarn("checksum", `me-entry MISMATCH seq=${seq} owner=${ownerChecksum} watcher=${ours} -> requesting stateSync`);
-    coopLog("resync", `await stateSync start seq=${seq}`);
-    const gen = coopSessionGeneration(); // #808: die if the session ends before the reply
-    void battleStream.requestStateSync(seq).then(blob => {
-      if (gen !== coopSessionGeneration()) {
-        coopWarn("resync", `stateSync reply seq=${seq} arrived AFTER session teardown -> dropped (#808)`);
-        return;
-      }
-      if (blob == null) {
-        coopWarn("resync", `await stateSync TIMEOUT/null seq=${seq}`);
-        return;
-      }
-      coopLog("resync", `await stateSync resolve seq=${seq} blob=${blob.length}b -> applying`);
-      try {
-        // #839: this heal fires MID-DIVERT - the stateSync reply resolves while the guest is diverting
-        // into (or parked in) CoopReplayMePhase for this same ME. Run it with `suppressResummon=true` so
-        // it stays a SAFE, advisory best-effort heal: it applies only the cheap per-mon scalar +
-        // module-let state writes and NEVER runs the heavy field COMPOSITION re-summon
-        // (reconcileCoopEnemyField / reconcileCoopPlayerField + per-mon initBattleInfo), which would tear
-        // down and rebuild the field sprites out from under the in-flight ME presentation. applyCoopFullSnapshot
-        // touches no phase queue and never cancels a relay waiter, so the ME divert proceeds regardless of
-        // whether this early heal converges - the AUTHORITATIVE convergence is the ME terminal's
-        // comprehensive meResync (applyCoopMeOutcome), which the guest still adopts. The still-diverged
-        // path below is advisory by design (#839): it must never disrupt the encounter.
-        const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
-        const liveRuntime = getCoopRuntime();
-        if (liveRuntime == null) {
+    // An ordered delivery batch can contain this legacy checksum immediately before the retained
+    // ME_PRESENT whose bound state explains it (multi-round encounters mutate party HP between screens).
+    // Let that batch drain before treating the mismatch as recovery-worthy.
+    queueMicrotask(() =>
+      runWhenCoopRuntimeActive(runtime, () => {
+        const settled = captureCoopChecksum();
+        if (
+          ownerChecksum === COOP_CHECKSUM_SENTINEL
+          || settled === COOP_CHECKSUM_SENTINEL
+          || ownerChecksum === settled
+        ) {
+          coopLog(
+            "checksum",
+            `recv meChecksum seq=${seq} MATCH after retained delivery owner=${ownerChecksum} watcher=${settled}`,
+          );
           return;
         }
-        // One central preflight enforces epoch, checksum/sentinel, membership, control digest, monotonic
-        // interaction counter, and Mystery revision before DATA is touched. Active replay applies inline
-        // transactionally; every other phase queues the same atomic apply at a safe boundary.
-        queueCoopAtomicSnapshotApply(liveRuntime, snapshot, `me-entry seq=${seq} comprehensive snapshot`);
-      } catch (e) {
-        /* a malformed resync blob must never crash the ME flow */
-        coopWarn("resync", `me-entry seq=${seq} malformed resync blob (ignored)`, e);
-      }
-    });
+        coopWarn(
+          "checksum",
+          `me-entry MISMATCH seq=${seq} owner=${ownerChecksum} watcher=${settled} -> requesting stateSync`,
+        );
+        coopLog("resync", `await stateSync start seq=${seq}`);
+        const gen = coopSessionGeneration(); // #808: die if the session ends before the reply
+        void battleStream.requestStateSync(seq).then(blob => {
+          if (gen !== coopSessionGeneration()) {
+            coopWarn("resync", `stateSync reply seq=${seq} arrived AFTER session teardown -> dropped (#808)`);
+            return;
+          }
+          if (blob == null) {
+            coopWarn("resync", `await stateSync TIMEOUT/null seq=${seq}`);
+            return;
+          }
+          coopLog("resync", `await stateSync resolve seq=${seq} blob=${blob.length}b -> applying`);
+          try {
+            // #839: this heal fires MID-DIVERT - the stateSync reply resolves while the guest is diverting
+            // into (or parked in) CoopReplayMePhase for this same ME. Run it with `suppressResummon=true` so
+            // it stays a SAFE, advisory best-effort heal: it applies only the cheap per-mon scalar +
+            // module-let state writes and NEVER runs the heavy field COMPOSITION re-summon
+            // (reconcileCoopEnemyField / reconcileCoopPlayerField + per-mon initBattleInfo), which would tear
+            // down and rebuild the field sprites out from under the in-flight ME presentation. applyCoopFullSnapshot
+            // touches no phase queue and never cancels a relay waiter, so the ME divert proceeds regardless of
+            // whether this early heal converges - the AUTHORITATIVE convergence is the ME terminal's
+            // comprehensive meResync (applyCoopMeOutcome), which the guest still adopts. The still-diverged
+            // path below is advisory by design (#839): it must never disrupt the encounter.
+            const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
+            const liveRuntime = getCoopRuntime();
+            if (liveRuntime == null) {
+              return;
+            }
+            // One central preflight enforces epoch, checksum/sentinel, membership, control digest, monotonic
+            // interaction counter, and Mystery revision before DATA is touched. Active replay applies inline
+            // transactionally; every other phase queues the same atomic apply at a safe boundary.
+            queueCoopAtomicSnapshotApply(liveRuntime, snapshot, `me-entry seq=${seq} comprehensive snapshot`);
+          } catch (e) {
+            /* a malformed resync blob must never crash the ME flow */
+            coopWarn("resync", `me-entry seq=${seq} malformed resync blob (ignored)`, e);
+          }
+        });
+      }),
+    );
   });
 }
 
@@ -3893,6 +3915,18 @@ function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAu
     if (coopMeInteractionStartValue() !== pinned) {
       return false;
     }
+    const immutableState = structuredClone(envelope.authoritativeState);
+    let stateApplied = applyCoopAuthoritativeBattleState(immutableState, true);
+    const appliedTick = coopAppliedStateTick();
+    if (!stateApplied && appliedTick === immutableState.tick) {
+      stateApplied = reapplyAcceptedCoopAuthoritativeBattleState(immutableState, true);
+    } else if (!stateApplied && appliedTick > immutableState.tick) {
+      // A later authenticated authority frame already subsumes this presentation; never roll it back.
+      stateApplied = true;
+    }
+    if (!stateApplied) {
+      return false;
+    }
     setCoopMeActivePresentation(payload.presentation);
     const retained = captureCoopActiveMysteryControl();
     if (
@@ -4826,7 +4860,7 @@ export function assembleCoopRuntime(
   wireCoopEnemyPartyResponder(controller, battleStream);
   wireCoopWaveResolved(controller, battleStream);
   wireCoopWaveEndState(controller, battleStream);
-  wireCoopMeChecksumCheck(battleStream);
+  wireCoopMeChecksumCheck(runtime, battleStream);
   wireCoopLiveEvents(controller, battleStream);
   wireCoopLearnMoveForward(interactionRelay);
   wireCoopLearnMoveBatchForward(interactionRelay);
