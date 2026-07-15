@@ -372,7 +372,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     });
     await withClient(rig.guestCtx, () => drainLoopback());
     expect(
-      retained?.continuationReady,
+      getCoopStagedWaveAdvanceTransaction(10, rig.guestRuntime.waveOperationBinding)?.continuationReady,
       "authoritative stock plus the live watcher loop attests the phase-owned continuation",
     ).toBe(true);
     await waitForMode(rig.hostCtx, UiMode.BIOME_SHOP, "host biome market");

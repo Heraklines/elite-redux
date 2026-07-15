@@ -10,6 +10,7 @@
     ".github/coop-task-ownership/p33-browser-process-isolation.json",
     ".github/coop-task-ownership/p33-final-merge-codex.json",
     ".github/coop-task-ownership/p33-terminal-turn-convergence.json",
+    ".github/workflows/coop-gate-sharded.yml",
     ".github/workflows/coop-public-ui-campaign.yml",
     ".github/workflows/coop-public-ui-journey.yml",
     "scripts/coop-browser-entry.ts",
