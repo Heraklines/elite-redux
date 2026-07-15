@@ -1,0 +1,14 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrlblr1z-2du7
+mode:     ?  wave:?
+seed:     ?
+party:    
+enemy:    
+
+----- CONSOLE -----
+[00:10:51.816] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[00:10:54.069] LOG: [ER] build mrlblr1z-2du7
+[00:10:54.717] LOG: [dev-tools] loaded — 528 scenarios + Send Logs button
+
+----- REPLAY TRACE (JSON) -----
+(none)
