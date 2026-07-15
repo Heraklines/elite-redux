@@ -2740,11 +2740,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   }> => {
     const hostPhase = rig.hostScene.phaseManager.getCurrentPhase() as unknown as CrossroadsPhaseSeam;
     if (hostPhase?.phaseName !== "ErCrossroadsPhase") {
-      fail(
-        "no-park",
-        wave,
-        `expected queued ErCrossroadsPhase, reached ${hostPhase?.phaseName ?? "none"}`,
-      );
+      fail("no-park", wave, `expected queued ErCrossroadsPhase, reached ${hostPhase?.phaseName ?? "none"}`);
     }
     const guestPhase = (await withClient(rig.guestCtx, () =>
       driveClientPhaseQueueTo(rig.guestScene, "ErCrossroadsPhase"),
