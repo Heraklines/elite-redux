@@ -934,12 +934,15 @@ export class CommandPhase extends FieldPhase {
 
   private failCommandStartAuthority(reason: string, envelope?: CoopCheckpointEnvelope): void {
     coopWarn("checkpoint", reason);
+    const wave = envelope?.wave ?? globalScene.currentBattle?.waveIndex;
+    const turn = envelope?.turn ?? globalScene.currentBattle?.turn;
+    const boundaryRevision = envelope?.revision;
     failCoopSharedSession(reason, {
       boundary: "surface",
       reasonCode: "recovery-exhausted",
-      wave: envelope?.wave ?? globalScene.currentBattle?.waveIndex,
-      turn: envelope?.turn ?? globalScene.currentBattle?.turn,
-      boundaryRevision: envelope?.revision,
+      ...(wave === undefined ? {} : { wave }),
+      ...(turn === undefined ? {} : { turn }),
+      ...(boundaryRevision === undefined ? {} : { boundaryRevision }),
     });
   }
 
