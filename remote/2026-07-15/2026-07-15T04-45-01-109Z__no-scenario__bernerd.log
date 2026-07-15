@@ -1,0 +1,862 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrlkwntu-175n
+mode:     4  wave:79
+seed:     jrtSL9h49hvSrycORl7Kq8U5
+party:    Vivillon(L64 120hp f0), Kartana(L64 175hp f0), Mew(L64 177hp f0), Kecleon(L60 160hp f0), Swampage(L60 202hp f0), Amphybuzz(L60 220hp f1)
+enemy:    Victreebel(L53), Tangrowth(L57), Vileplume(L51), Jumpluff(L53), Meowscarada(L53)
+
+----- COMMENT -----
+3rd time in 2 biomes with the same custom trainer
+
+----- CONSOLE -----
+[04:30:11.819] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[04:30:12.067] LOG: [ER] build mrlkwntu-175n
+[04:30:12.573] LOG: [dev-tools] loaded — 528 scenarios + Send Logs button
+[04:33:35.345] DEBUG: Destroying loading scene
+[04:33:35.345] DEBUG: Destroyed loading scene
+[04:33:35.396] LOG: Seed: KTBWF8RTjLPkKphXS5fzVJwS
+[04:33:35.396] LOG: Wave Seed: KTBWF8RTjLPkKphXS5fzVJwS 0
+[04:33:37.677] LOG: %cStart Phase LoginPhase color:green;
+[04:33:39.042] LOG: Client Session: o6vrOmwWLgO1FzdAKncfyiSSBM4gtmA6
+[04:33:39.562] DEBUG: Using cached system data
+[04:33:39.623] LOG: %cStart Phase TitlePhase color:green;
+[04:33:39.623] LOG: Getting Session Slot id: %d 2
+[04:33:39.637] LOG: use seasonal splash messages true
+[04:40:56.296] LOG: Getting Session Slot id: %d 2
+[04:40:56.320] LOG: Wave Seed: jrtSL9h49hvSrycORl7Kq8U5 0
+[04:40:56.320] LOG: Seed: jrtSL9h49hvSrycORl7Kq8U5
+[04:40:56.348] LOG: Wave Seed: ¸ÀÂ¡¶¶Ä¡ÀÇ± º¿£ 78
+[04:40:56.362] LOG: Applied Zinc 
+[04:40:56.362] LOG: Applied Protein 
+[04:40:56.362] LOG: Applied HP Up 
+[04:40:56.362] LOG: Applied Soul Dew 
+[04:40:56.362] LOG: Applied Soul Dew 
+[04:40:56.362] LOG: Applied Protein 
+[04:40:56.362] LOG: Applied Iron 
+[04:40:56.365] LOG: Applied Zinc 
+[04:40:56.365] LOG: Applied Protein 
+[04:40:56.365] LOG: Applied HP Up 
+[04:40:56.365] LOG: Applied Soul Dew 
+[04:40:56.365] LOG: Applied Soul Dew 
+[04:40:56.365] LOG: Applied Protein 
+[04:40:56.365] LOG: Applied Iron 
+[04:40:56.366] LOG: Applied Zinc 
+[04:40:56.366] LOG: Applied Protein 
+[04:40:56.366] LOG: Applied HP Up 
+[04:40:56.366] LOG: Applied Soul Dew 
+[04:40:56.366] LOG: Applied Soul Dew 
+[04:40:56.366] LOG: Applied Protein 
+[04:40:56.366] LOG: Applied Iron 
+[04:40:56.368] LOG: Applied Protein (enemy)
+[04:40:56.368] LOG: Applied HP Up (enemy)
+[04:40:56.368] LOG: Applied Protein (enemy)
+[04:40:56.368] LOG: Applied Iron (enemy)
+[04:40:56.368] LOG: Applied HP Up (enemy)
+[04:40:56.368] LOG: Applied Zinc (enemy)
+[04:40:56.368] LOG: Applied Protein (enemy)
+[04:40:56.528] LOG: %cStart Phase EncounterPhase color:green;
+[04:40:56.535] LOG: Pokemon: Foe Victreebel | Species ID: 71 | Level: 57 | Nature: Adamant (+Atk/-SpAtk)
+[04:40:56.535] LOG: Stats (IVs): HP: 191 (19), Atk: 163 (9), Def: 90 (10), Spatk: 127 (21), Spdef: 95 (19), Spd: 101 (30)
+[04:40:56.535] LOG: Ability: Sun's Bounty | Passive Ability: Ambush 
+[04:40:56.535] LOG: Moveset: ["Toxic","Soil Drain","Sunny Day","Venom Drench"]
+[04:40:56.535] LOG: Pokemon: Foe Tangrowth | Species ID: 465 | Level: 54 | Nature: Jolly (+Spd/-SpAtk)
+[04:40:56.535] LOG: Stats (IVs): HP: 209 (9), Atk: 138 (28), Def: 163 (19), Spatk: 115 (9), Spdef: 72 (25), Spd: 82 (28)
+[04:40:56.535] LOG: Ability: Tangling Hair | Passive Ability: Regenerator 
+[04:40:56.535] LOG: Moveset: ["Seed Bomb","Ancient Power","Poison Jab","Thief"]
+[04:40:56.536] LOG: Pokemon: Foe Vileplume | Species ID: 45 | Level: 56 | Nature: Modest (+SpAtk/-Atk)
+[04:40:56.536] LOG: Stats (IVs): HP: 192 (27), Atk: 92 (26), Def: 128 (30), Spatk: 160 (11), Spdef: 140 (22), Spd: 77 (29)
+[04:40:56.536] LOG: Ability: Effect Spore | Passive Ability: Natural Recovery 
+[04:40:56.536] LOG: Moveset: ["Sleep Powder","Solar Beam","Leech Seed","Night Shade"]
+[04:40:56.536] LOG: Pokemon: Foe Jumpluctrode | Species ID: 189 | Level: 57 | Nature: Quirky (-)
+[04:40:56.536] LOG: Stats (IVs): HP: 154 (17), Atk: 112 (26), Def: 94 (17), Spatk: 120 (16), Spdef: 110 (15), Spd: 171 (12)
+[04:40:56.536] LOG: Ability: Wind Rider | Passive Ability: Impenetrable 
+[04:40:56.536] LOG: Moveset: ["Tailwind","Misty Explosion","Double Shock","Sunny Day"]
+[04:40:56.536] LOG: Pokemon: Foe Meowscarada | Species ID: 908 | Level: 57 | Nature: Serious (-)
+[04:40:56.536] LOG: Stats (IVs): HP: 172 (23), Atk: 134 (8), Def: 97 (23), Spatk: 108 (20), Spdef: 95 (19), Spd: 149 (8)
+[04:40:56.536] LOG: Ability: Magic Bounce | Passive Ability: Overgrow 
+[04:40:56.536] LOG: Moveset: ["Chloroblast","Triple Axel","Sucker Punch","Grassy Terrain"]
+[04:42:38.985] LOG: Generated AI funcs
+[04:42:38.985] LOG: Applied Protein (enemy)
+[04:42:38.986] LOG: Applied HP Up (enemy)
+[04:42:38.986] LOG: Applied Protein (enemy)
+[04:42:38.986] LOG: Applied Iron (enemy)
+[04:42:38.987] LOG: Applied HP Up (enemy)
+[04:42:38.987] LOG: Applied Zinc (enemy)
+[04:42:38.987] LOG: Applied Protein (enemy)
+[04:42:38.988] LOG: Wave Seed: ¸ÀÂ¡¶¶Ä¡ÀÇ± º¿£ 78
+[04:42:39.200] LOG: Gym Leader Erika
+[04:43:05.604] LOG: Dialogue saved as seen: dialogue:erika.encounter.3
+[04:43:05.633] LOG: Gym Leader Erika
+[04:43:06.594] LOG: %cStart Phase SummonPhase color:green;
+[04:43:06.595] LOG: Erika
+[04:43:06.741] LOG: Applied Protein (enemy)
+[04:43:06.742] LOG: Applied HP Up (enemy)
+[04:43:06.742] LOG: Applied Protein (enemy)
+[04:43:06.742] LOG: Applied Iron (enemy)
+[04:43:06.742] LOG: Applied HP Up (enemy)
+[04:43:06.742] LOG: Applied Zinc (enemy)
+[04:43:06.743] LOG: Applied Protein (enemy)
+[04:43:06.873] LOG: %cStart Phase SummonPhase color:green;
+[04:43:06.874] LOG: Erika
+[04:43:07.024] LOG: Applied Protein (enemy)
+[04:43:07.025] LOG: Applied HP Up (enemy)
+[04:43:07.025] LOG: Applied Protein (enemy)
+[04:43:07.025] LOG: Applied Iron (enemy)
+[04:43:07.026] LOG: Applied HP Up (enemy)
+[04:43:07.026] LOG: Applied Zinc (enemy)
+[04:43:07.026] LOG: Applied Protein (enemy)
+[04:43:07.173] LOG: %cStart Phase SummonPhase color:green;
+[04:43:07.173] LOG: Erika
+[04:43:07.307] LOG: Applied Protein (enemy)
+[04:43:07.308] LOG: Applied HP Up (enemy)
+[04:43:07.308] LOG: Applied Protein (enemy)
+[04:43:07.308] LOG: Applied Iron (enemy)
+[04:43:07.308] LOG: Applied HP Up (enemy)
+[04:43:07.308] LOG: Applied Zinc (enemy)
+[04:43:07.309] LOG: Applied Protein (enemy)
+[04:43:07.439] LOG: %cStart Phase SummonPhase color:green;
+[04:43:07.599] LOG: Applied Zinc 
+[04:43:07.599] LOG: Applied Protein 
+[04:43:07.599] LOG: Applied HP Up 
+[04:43:07.599] LOG: Applied Soul Dew 
+[04:43:07.599] LOG: Applied Soul Dew 
+[04:43:07.600] LOG: Applied Protein 
+[04:43:07.600] LOG: Applied Iron 
+[04:43:07.724] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:43:07.831] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:43:07.842] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:07.842] LOG: Ran PSP for: Vivillon
+[04:43:07.854] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:07.855] LOG: %cStart Phase MovePhase color:green;
+[04:43:07.855] LOG: %cUser: Vivillon
+Move: TAILWIND
+Use Mode: FOLLOW_UP color:orchid
+[04:43:07.895] LOG: %cStart Phase MessagePhase color:green;
+[04:43:07.981] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:43:08.910] LOG: %cStart Phase MessagePhase color:green;
+[04:43:09.164] LOG: %cStart Phase MoveEndPhase color:green;
+[04:43:09.175] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:09.175] LOG: %cStart Phase MovePhase color:green;
+[04:43:09.175] LOG: %cUser: Vivillon
+Move: POWDER
+Use Mode: INDIRECT color:orchid
+[04:43:09.202] LOG: %cStart Phase MessagePhase color:green;
+[04:43:09.280] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:43:09.285] LOG: %cStart Phase MessagePhase color:green;
+[04:43:09.531] LOG: %cStart Phase MoveEndPhase color:green;
+[04:43:09.536] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:09.536] LOG: Ran PSP for: Victreebel
+[04:43:09.545] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:09.548] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:09.549] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:09.549] LOG: Ran PSP for: Tangrowth
+[04:43:09.554] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:09.555] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:09.555] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:09.555] LOG: Ran PSP for: Vileplume
+[04:43:09.558] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:09.558] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:09.579] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:43:09.751] LOG: %cStart Phase CommonAnimPhase color:green;
+[04:43:10.247] LOG: %cStart Phase MessagePhase color:green;
+[04:43:10.498] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:43:10.535] LOG: %cStart Phase TurnInitPhase color:green;
+[04:43:10.536] LOG: %cStart Phase CommandPhase color:green;
+[04:43:11.333] LOG: Seed: IZv0OKv9RucHqgrdB5f4zGR5
+[04:43:11.333] LOG: Wave Seed: IZv0OKv9RucHqgrdB5f4zGR5 0
+[04:43:11.335] LOG: Getting Session Slot id: %d 2
+[04:43:11.349] LOG: Wave Seed: jrtSL9h49hvSrycORl7Kq8U5 0
+[04:43:11.349] LOG: Seed: jrtSL9h49hvSrycORl7Kq8U5
+[04:43:11.364] LOG: Wave Seed: ¸ÀÂ¡¶¶Ä¡ÀÇ± º¿£ 78
+[04:43:11.377] LOG: Applied Zinc 
+[04:43:11.377] LOG: Applied Protein 
+[04:43:11.377] LOG: Applied HP Up 
+[04:43:11.377] LOG: Applied Soul Dew 
+[04:43:11.377] LOG: Applied Soul Dew 
+[04:43:11.377] LOG: Applied Protein 
+[04:43:11.377] LOG: Applied Iron 
+[04:43:11.378] LOG: Applied Zinc 
+[04:43:11.378] LOG: Applied Protein 
+[04:43:11.378] LOG: Applied HP Up 
+[04:43:11.378] LOG: Applied Soul Dew 
+[04:43:11.378] LOG: Applied Soul Dew 
+[04:43:11.379] LOG: Applied Protein 
+[04:43:11.379] LOG: Applied Iron 
+[04:43:11.379] LOG: Applied Zinc 
+[04:43:11.379] LOG: Applied Protein 
+[04:43:11.380] LOG: Applied HP Up 
+[04:43:11.380] LOG: Applied Soul Dew 
+[04:43:11.380] LOG: Applied Soul Dew 
+[04:43:11.380] LOG: Applied Protein 
+[04:43:11.380] LOG: Applied Iron 
+[04:43:11.381] LOG: Applied Protein (enemy)
+[04:43:11.381] LOG: Applied HP Up (enemy)
+[04:43:11.381] LOG: Applied Protein (enemy)
+[04:43:11.381] LOG: Applied Iron (enemy)
+[04:43:11.381] LOG: Applied HP Up (enemy)
+[04:43:11.381] LOG: Applied Zinc (enemy)
+[04:43:11.381] LOG: Applied Protein (enemy)
+[04:43:11.473] LOG: %cStart Phase EncounterPhase color:green;
+[04:43:11.474] LOG: Pokemon: Foe Victreebel | Species ID: 71 | Level: 57 | Nature: Adamant (+Atk/-SpAtk)
+[04:43:11.474] LOG: Stats (IVs): HP: 191 (19), Atk: 163 (9), Def: 90 (10), Spatk: 127 (21), Spdef: 95 (19), Spd: 101 (30)
+[04:43:11.474] LOG: Ability: Sun's Bounty | Passive Ability: Ambush 
+[04:43:11.474] LOG: Moveset: ["Toxic","Soil Drain","Sunny Day","Venom Drench"]
+[04:43:11.474] LOG: Pokemon: Foe Tangrowth | Species ID: 465 | Level: 54 | Nature: Jolly (+Spd/-SpAtk)
+[04:43:11.474] LOG: Stats (IVs): HP: 209 (9), Atk: 138 (28), Def: 163 (19), Spatk: 115 (9), Spdef: 72 (25), Spd: 82 (28)
+[04:43:11.474] LOG: Ability: Tangling Hair | Passive Ability: Regenerator 
+[04:43:11.474] LOG: Moveset: ["Seed Bomb","Ancient Power","Poison Jab","Thief"]
+[04:43:11.474] LOG: Pokemon: Foe Vileplume | Species ID: 45 | Level: 56 | Nature: Modest (+SpAtk/-Atk)
+[04:43:11.474] LOG: Stats (IVs): HP: 192 (27), Atk: 92 (26), Def: 128 (30), Spatk: 160 (11), Spdef: 140 (22), Spd: 77 (29)
+[04:43:11.474] LOG: Ability: Effect Spore | Passive Ability: Natural Recovery 
+[04:43:11.474] LOG: Moveset: ["Sleep Powder","Solar Beam","Leech Seed","Night Shade"]
+[04:43:11.474] LOG: Pokemon: Foe Jumpluctrode | Species ID: 189 | Level: 57 | Nature: Quirky (-)
+[04:43:11.474] LOG: Stats (IVs): HP: 154 (17), Atk: 112 (26), Def: 94 (17), Spatk: 120 (16), Spdef: 110 (15), Spd: 171 (12)
+[04:43:11.474] LOG: Ability: Wind Rider | Passive Ability: Impenetrable 
+[04:43:11.474] LOG: Moveset: ["Tailwind","Misty Explosion","Double Shock","Sunny Day"]
+[04:43:11.474] LOG: Pokemon: Foe Meowscarada | Species ID: 908 | Level: 57 | Nature: Serious (-)
+[04:43:11.474] LOG: Stats (IVs): HP: 172 (23), Atk: 134 (8), Def: 97 (23), Spatk: 108 (20), Spdef: 95 (19), Spd: 149 (8)
+[04:43:11.474] LOG: Ability: Magic Bounce | Passive Ability: Overgrow 
+[04:43:11.474] LOG: Moveset: ["Chloroblast","Triple Axel","Sucker Punch","Grassy Terrain"]
+[04:43:11.654] LOG: Generated AI funcs
+[04:43:11.654] LOG: Applied Protein (enemy)
+[04:43:11.654] LOG: Applied HP Up (enemy)
+[04:43:11.655] LOG: Applied Protein (enemy)
+[04:43:11.655] LOG: Applied Iron (enemy)
+[04:43:11.655] LOG: Applied HP Up (enemy)
+[04:43:11.655] LOG: Applied Zinc (enemy)
+[04:43:11.655] LOG: Applied Protein (enemy)
+[04:43:11.655] LOG: Wave Seed: ¸ÀÂ¡¶¶Ä¡ÀÇ± º¿£ 78
+[04:43:11.856] LOG: Gym Leader Erika
+[04:43:11.857] LOG: Dialogue dialogue:erika.encounter.3 skipped
+[04:43:11.908] LOG: Gym Leader Erika
+[04:43:13.367] LOG: %cStart Phase SummonPhase color:green;
+[04:43:13.368] LOG: Erika
+[04:43:13.515] LOG: Applied Protein (enemy)
+[04:43:13.516] LOG: Applied HP Up (enemy)
+[04:43:13.516] LOG: Applied Protein (enemy)
+[04:43:13.516] LOG: Applied Iron (enemy)
+[04:43:13.516] LOG: Applied HP Up (enemy)
+[04:43:13.516] LOG: Applied Zinc (enemy)
+[04:43:13.517] LOG: Applied Protein (enemy)
+[04:43:13.647] LOG: %cStart Phase SummonPhase color:green;
+[04:43:13.648] LOG: Erika
+[04:43:13.782] LOG: Applied Protein (enemy)
+[04:43:13.783] LOG: Applied HP Up (enemy)
+[04:43:13.783] LOG: Applied Protein (enemy)
+[04:43:13.783] LOG: Applied Iron (enemy)
+[04:43:13.783] LOG: Applied HP Up (enemy)
+[04:43:13.783] LOG: Applied Zinc (enemy)
+[04:43:13.784] LOG: Applied Protein (enemy)
+[04:43:13.914] LOG: %cStart Phase SummonPhase color:green;
+[04:43:13.914] LOG: Erika
+[04:43:14.065] LOG: Applied Protein (enemy)
+[04:43:14.066] LOG: Applied HP Up (enemy)
+[04:43:14.066] LOG: Applied Protein (enemy)
+[04:43:14.066] LOG: Applied Iron (enemy)
+[04:43:14.066] LOG: Applied HP Up (enemy)
+[04:43:14.066] LOG: Applied Zinc (enemy)
+[04:43:14.067] LOG: Applied Protein (enemy)
+[04:43:14.197] LOG: %cStart Phase SummonPhase color:green;
+[04:43:14.366] LOG: Applied Zinc 
+[04:43:14.366] LOG: Applied Protein 
+[04:43:14.366] LOG: Applied HP Up 
+[04:43:14.366] LOG: Applied Soul Dew 
+[04:43:14.366] LOG: Applied Soul Dew 
+[04:43:14.367] LOG: Applied Protein 
+[04:43:14.367] LOG: Applied Iron 
+[04:43:14.514] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:43:14.631] LOG: %cStart Phase SummonPhase color:green;
+[04:43:14.783] LOG: Applied Zinc 
+[04:43:14.783] LOG: Applied Protein 
+[04:43:14.783] LOG: Applied HP Up 
+[04:43:14.783] LOG: Applied Soul Dew 
+[04:43:14.783] LOG: Applied Soul Dew 
+[04:43:14.783] LOG: Applied Protein 
+[04:43:14.783] LOG: Applied Iron 
+[04:43:14.906] LOG: %cStart Phase SummonPhase color:green;
+[04:43:15.057] LOG: Applied Zinc 
+[04:43:15.058] LOG: Applied Protein 
+[04:43:15.058] LOG: Applied HP Up 
+[04:43:15.058] LOG: Applied Soul Dew 
+[04:43:15.058] LOG: Applied Soul Dew 
+[04:43:15.058] LOG: Applied Protein 
+[04:43:15.058] LOG: Applied Iron 
+[04:43:15.181] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:43:15.273] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:43:15.291] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:15.291] LOG: Ran PSP for: Mew
+[04:43:15.304] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:15.312] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:15.317] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:15.317] LOG: Ran PSP for: Vivillon
+[04:43:15.323] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:15.323] LOG: %cStart Phase MovePhase color:green;
+[04:43:15.323] LOG: %cUser: Vivillon
+Move: TAILWIND
+Use Mode: FOLLOW_UP color:orchid
+[04:43:15.347] LOG: %cStart Phase MessagePhase color:green;
+[04:43:15.414] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:43:16.390] LOG: %cStart Phase MessagePhase color:green;
+[04:43:16.647] LOG: %cStart Phase MoveEndPhase color:green;
+[04:43:16.660] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:16.660] LOG: %cStart Phase MovePhase color:green;
+[04:43:16.661] LOG: %cUser: Vivillon
+Move: POWDER
+Use Mode: INDIRECT color:orchid
+[04:43:16.683] LOG: %cStart Phase MessagePhase color:green;
+[04:43:16.773] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:43:16.780] LOG: %cStart Phase MessagePhase color:green;
+[04:43:17.031] LOG: %cStart Phase MoveEndPhase color:green;
+[04:43:17.038] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:17.038] LOG: Ran PSP for: Kartana
+[04:43:17.050] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:17.054] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:17.055] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:43:17.225] LOG: %cStart Phase MessagePhase color:green;
+[04:43:17.489] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:43:17.525] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:43:17.700] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:43:17.754] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:17.755] LOG: Ran PSP for: Victreebel
+[04:43:17.763] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:17.766] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:17.767] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:17.767] LOG: Ran PSP for: Tangrowth
+[04:43:17.771] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:17.771] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:17.771] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:17.771] LOG: Ran PSP for: Vileplume
+[04:43:17.774] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:17.774] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:17.793] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:43:17.967] LOG: %cStart Phase CommonAnimPhase color:green;
+[04:43:18.472] LOG: %cStart Phase MessagePhase color:green;
+[04:43:18.706] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:43:18.741] LOG: %cStart Phase TurnInitPhase color:green;
+[04:43:18.741] LOG: %cStart Phase CommandPhase color:green;
+[04:43:20.231] LOG: Move: DECORATE Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Vivillon
+[04:43:20.233] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:43:20.453] LOG: %cStart Phase CommandPhase color:green;
+[04:43:21.412] LOG: Move: LEAF_BLADE Move targets: {"targets":[3,4,5],"multiple":true} 
+Player Pokemon: Kartana
+[04:43:21.414] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:43:21.646] LOG: %cStart Phase CommandPhase color:green;
+[04:43:22.862] LOG: Move: FAKE_OUT Move targets: {"targets":[4,5,1],"multiple":false} 
+Player Pokemon: Mew
+[04:43:22.864] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:43:23.270] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:43:23.295] LOG: Battle Seed: 26c0KSvbBL870JaN
+[04:43:23.297] LOG: Move Pool: ["Soil Drain"]
+[04:43:23.297] LOG: Move Scores: [132]
+[04:43:23.297] LOG: Sorted Move Pool: ["Soil Drain"]
+[04:43:23.297] LOG: Chosen Move: Soil Drain
+[04:43:23.297] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:43:23.308] LOG: Applied Hard Stone (enemy)
+[04:43:23.315] LOG: Applied Hard Stone (enemy)
+[04:43:23.317] LOG: Applied Hard Stone (enemy)
+[04:43:23.333] LOG: Applied Black Glasses (enemy)
+[04:43:23.343] LOG: Applied Black Glasses (enemy)
+[04:43:23.350] LOG: Applied Black Glasses (enemy)
+[04:43:23.355] LOG: Move Pool: ["Seed Bomb"]
+[04:43:23.355] LOG: Move Scores: [1980]
+[04:43:23.355] LOG: Sorted Move Pool: ["Seed Bomb"]
+[04:43:23.355] LOG: Chosen Move: Seed Bomb
+[04:43:23.355] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:43:23.365] LOG: Move Pool: ["Solar Beam"]
+[04:43:23.365] LOG: Move Scores: [2496]
+[04:43:23.365] LOG: Sorted Move Pool: ["Solar Beam"]
+[04:43:23.365] LOG: Chosen Move: Solar Beam
+[04:43:23.365] LOG: %cStart Phase TurnStartPhase color:green;
+[04:43:23.382] LOG: %cStart Phase MovePhase color:green;
+[04:43:23.382] LOG: %cUser: Mew
+Move: FAKE_OUT
+Use Mode: NORMAL color:orchid
+[04:43:23.395] LOG: %cStart Phase MessagePhase color:green;
+[04:43:23.448] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:43:23.458] LOG: Applied Wide Lens 
+[04:43:23.816] LOG: crit stage: +0
+[04:43:23.819] LOG: Applied X Attack 
+[04:43:23.820] LOG: Move: Fake Out | Base damage: 58.28368098159509 | Power: 60 | Source attack: 277 | Target defense: 163
+[04:43:23.822] LOG: Move: Fake Out | Attack damage: 58
+[04:43:23.837] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:43:23.858] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:43:24.026] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:43:24.210] LOG: %cStart Phase MessagePhase color:green;
+[04:43:24.406] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:43:24.442] LOG: %cStart Phase MoveEndPhase color:green;
+[04:43:24.456] LOG: %cStart Phase MovePhase color:green;
+[04:43:24.456] LOG: %cUser: Vivillon
+Move: DECORATE
+Use Mode: NORMAL color:orchid
+[04:43:24.497] LOG: %cStart Phase MessagePhase color:green;
+[04:43:24.597] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:43:25.199] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:43:25.199] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:43:25.211] LOG: %cStart Phase MessagePhase color:green;
+[04:43:25.447] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:43:25.459] LOG: %cStart Phase MessagePhase color:green;
+[04:43:25.714] LOG: %cStart Phase MoveEndPhase color:green;
+[04:43:25.723] LOG: %cStart Phase MovePhase color:green;
+[04:43:25.723] LOG: %cUser: Kartana
+Move: LEAF_BLADE
+Use Mode: NORMAL color:orchid
+[04:43:25.751] LOG: %cStart Phase MessagePhase color:green;
+[04:43:25.847] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:43:26.349] LOG: crit stage: +3
+[04:43:26.351] LOG: Applied X Attack 
+[04:43:26.352] LOG: Move: Leaf Blade | Base damage: 799.0880000000001 | Power: 90 | Source attack: 1444 | Target defense: 90
+[04:43:26.353] LOG: Move: Leaf Blade | Attack damage: 4962
+[04:43:26.355] LOG: crit stage: +3
+[04:43:26.356] LOG: Applied X Attack 
+[04:43:26.357] LOG: Move: Leaf Blade | Base damage: 442.10993865030673 | Power: 90 | Source attack: 1444 | Target defense: 163
+[04:43:26.357] LOG: Move: Leaf Blade | Attack damage: 1477
+[04:43:26.358] LOG: crit stage: +3
+[04:43:26.360] LOG: Applied X Attack 
+[04:43:26.360] LOG: Move: Leaf Blade | Base damage: 562.4525 | Power: 90 | Source attack: 1444 | Target defense: 128
+[04:43:26.361] LOG: Move: Leaf Blade | Attack damage: 4606
+[04:43:26.361] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:43:26.383] LOG: %cStart Phase MessagePhase color:green;
+[04:43:26.581] LOG: %cStart Phase MessagePhase color:green;
+[04:43:26.797] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:43:26.834] LOG: %cStart Phase MessagePhase color:green;
+[04:43:27.031] LOG: %cStart Phase MessagePhase color:green;
+[04:43:27.256] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:43:27.408] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:43:27.593] LOG: %cStart Phase MessagePhase color:green;
+[04:43:27.806] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:43:27.842] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:43:27.876] LOG: %cStart Phase MessagePhase color:green;
+[04:43:28.073] LOG: %cStart Phase MessagePhase color:green;
+[04:43:28.289] LOG: %cStart Phase FaintPhase color:green;
+[04:43:29.679] LOG: %cStart Phase MessagePhase color:green;
+[04:43:49.661] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:43:49.833] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:43:49.835] LOG: %cStart Phase MessagePhase color:green;
+[04:43:50.097] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:43:50.133] LOG: %cStart Phase VictoryPhase color:green;
+[04:43:50.135] LOG: Applied Soothe Bell 
+[04:43:50.135] LOG: Applied Soothe Bell 
+[04:43:50.135] LOG: Applied Soothe Bell 
+[04:43:50.135] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:43:50.136] LOG: Applied Super EXP. Charm 
+[04:43:50.136] LOG: Applied EXP. Charm 
+[04:43:50.137] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:43:50.137] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:43:50.137] LOG: Applied Super EXP. Charm 
+[04:43:50.137] LOG: Applied EXP. Charm 
+[04:43:50.138] LOG: %cStart Phase LevelUpPhase color:green;
+[04:43:50.139] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:43:50.139] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:43:50.139] LOG: Applied Super EXP. Charm 
+[04:43:50.139] LOG: Applied EXP. Charm 
+[04:43:50.139] LOG: %cStart Phase LevelUpPhase color:green;
+[04:43:50.140] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:43:50.140] LOG: %cStart Phase FaintPhase color:green;
+[04:43:51.901] LOG: %cStart Phase MessagePhase color:green;
+[04:43:54.822] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:43:54.991] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:43:54.992] LOG: %cStart Phase MessagePhase color:green;
+[04:43:55.247] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:43:55.279] LOG: %cStart Phase VictoryPhase color:green;
+[04:43:55.279] LOG: Applied Soothe Bell 
+[04:43:55.282] LOG: Applied Soothe Bell 
+[04:43:55.282] LOG: Applied Soothe Bell 
+[04:43:55.282] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:43:55.282] LOG: Applied Super EXP. Charm 
+[04:43:55.282] LOG: Applied EXP. Charm 
+[04:43:55.283] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:43:55.283] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:43:55.283] LOG: Applied Super EXP. Charm 
+[04:43:55.283] LOG: Applied EXP. Charm 
+[04:43:55.283] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:43:55.283] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:43:55.283] LOG: Applied Super EXP. Charm 
+[04:43:55.283] LOG: Applied EXP. Charm 
+[04:43:55.284] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:43:55.284] LOG: %cStart Phase FaintPhase color:green;
+[04:43:56.961] LOG: %cStart Phase MessagePhase color:green;
+[04:43:57.329] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:43:57.491] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:43:57.493] LOG: %cStart Phase MessagePhase color:green;
+[04:43:57.747] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:43:57.778] LOG: %cStart Phase VictoryPhase color:green;
+[04:43:57.778] LOG: Applied Soothe Bell 
+[04:43:57.778] LOG: Applied Soothe Bell 
+[04:43:57.778] LOG: Applied Soothe Bell 
+[04:43:57.778] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:43:57.779] LOG: Applied Super EXP. Charm 
+[04:43:57.779] LOG: Applied EXP. Charm 
+[04:43:57.779] LOG: %cStart Phase LevelUpPhase color:green;
+[04:43:57.780] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:43:57.780] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:43:57.780] LOG: Applied Super EXP. Charm 
+[04:43:57.780] LOG: Applied EXP. Charm 
+[04:43:57.781] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:43:57.781] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:43:57.781] LOG: Applied Super EXP. Charm 
+[04:43:57.781] LOG: Applied EXP. Charm 
+[04:43:57.781] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:43:57.781] LOG: %cStart Phase MoveEndPhase color:green;
+[04:43:57.784] LOG: %cStart Phase MovePhase color:green;
+[04:43:57.784] LOG: %cStart Phase MoveEndPhase color:green;
+[04:43:57.785] LOG: %cStart Phase MovePhase color:green;
+[04:43:57.786] LOG: %cStart Phase MoveEndPhase color:green;
+[04:43:57.786] LOG: %cStart Phase MovePhase color:green;
+[04:43:57.786] LOG: %cStart Phase MoveEndPhase color:green;
+[04:43:57.786] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:43:57.786] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:43:57.786] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:43:57.786] LOG: %cStart Phase BerryPhase color:green;
+[04:43:57.790] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:43:57.792] LOG: %cStart Phase TurnEndPhase color:green;
+[04:43:57.797] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[04:43:57.797] LOG: %cStart Phase MessagePhase color:green;
+[04:43:58.022] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:43:58.027] LOG: %cStart Phase MessagePhase color:green;
+[04:43:58.281] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:43:58.288] LOG: %cStart Phase SwitchSummonPhase color:green;
+[04:43:58.497] LOG: Erika
+[04:43:58.566] LOG: Applied HP Up (enemy)
+[04:43:58.566] LOG: Applied Protein (enemy)
+[04:43:58.566] LOG: Applied Iron (enemy)
+[04:43:58.566] LOG: Applied HP Up (enemy)
+[04:43:58.566] LOG: Applied Zinc (enemy)
+[04:43:58.567] LOG: Applied Protein (enemy)
+[04:43:58.567] LOG: Applied Protein (enemy)
+[04:43:58.719] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:58.719] LOG: Ran PSP for: Meowscarada
+[04:43:58.719] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:58.719] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:58.720] LOG: %cStart Phase SwitchSummonPhase color:green;
+[04:43:58.956] LOG: Erika
+[04:43:59.040] LOG: Applied Protein (enemy)
+[04:43:59.041] LOG: Applied HP Up (enemy)
+[04:43:59.041] LOG: Applied Zinc (enemy)
+[04:43:59.041] LOG: Applied HP Up (enemy)
+[04:43:59.041] LOG: Applied Protein (enemy)
+[04:43:59.041] LOG: Applied Iron (enemy)
+[04:43:59.041] LOG: Applied Protein (enemy)
+[04:43:59.184] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:43:59.272] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:59.272] LOG: Ran PSP for: Jumpluctrode
+[04:43:59.273] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:59.273] LOG: %cStart Phase PostSummonPhase color:green;
+[04:43:59.287] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:43:59.443] LOG: %cStart Phase CommonAnimPhase color:green;
+[04:43:59.946] LOG: %cStart Phase MessagePhase color:green;
+[04:44:00.206] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:44:00.253] LOG: %cStart Phase SwitchSummonPhase color:green;
+[04:44:00.340] LOG: %cStart Phase PostSummonPhase color:green;
+[04:44:00.340] LOG: Ran PSP for: Vileplume
+[04:44:00.341] LOG: %cStart Phase PostSummonPhase color:green;
+[04:44:00.341] LOG: %cStart Phase PostSummonPhase color:green;
+[04:44:00.341] LOG: %cStart Phase TurnInitPhase color:green;
+[04:44:00.342] LOG: %cStart Phase CommandPhase color:green;
+[04:44:04.245] LOG: Move: DECORATE Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Vivillon
+[04:44:04.247] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:44:04.577] LOG: %cStart Phase CommandPhase color:green;
+[04:44:05.529] LOG: Move: LEAF_BLADE Move targets: {"targets":[3,4],"multiple":true} 
+Player Pokemon: Kartana
+[04:44:05.531] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:44:05.753] LOG: %cStart Phase CommandPhase color:green;
+[04:44:06.654] LOG: Move: FAKE_OUT Move targets: {"targets":[4,1],"multiple":false} 
+Player Pokemon: Mew
+[04:44:06.656] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:44:07.674] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:44:07.711] LOG: Battle Seed: 26c0KSvbBL870JaN
+[04:44:07.716] LOG: Move Pool: ["Chloroblast"]
+[04:44:07.717] LOG: Move Scores: [1440]
+[04:44:07.717] LOG: Sorted Move Pool: ["Chloroblast"]
+[04:44:07.717] LOG: Chosen Move: Chloroblast
+[04:44:07.717] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:44:07.744] LOG: Move Pool: ["Misty Explosion"]
+[04:44:07.744] LOG: Move Scores: [15]
+[04:44:07.744] LOG: Sorted Move Pool: ["Misty Explosion"]
+[04:44:07.744] LOG: Chosen Move: Misty Explosion
+[04:44:07.744] LOG: %cStart Phase TurnStartPhase color:green;
+[04:44:07.752] LOG: %cStart Phase MovePhase color:green;
+[04:44:07.752] LOG: %cUser: Mew
+Move: FAKE_OUT
+Use Mode: NORMAL color:orchid
+[04:44:07.755] LOG: %cStart Phase MessagePhase color:green;
+[04:44:07.806] LOG: %cStart Phase MessagePhase color:green;
+[04:44:07.997] LOG: %cStart Phase MoveEndPhase color:green;
+[04:44:08.005] LOG: %cStart Phase MovePhase color:green;
+[04:44:08.005] LOG: %cUser: Vivillon
+Move: DECORATE
+Use Mode: NORMAL color:orchid
+[04:44:08.029] LOG: %cStart Phase MessagePhase color:green;
+[04:44:08.122] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:44:08.688] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:44:08.688] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:44:08.693] LOG: %cStart Phase MessagePhase color:green;
+[04:44:08.952] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:44:08.956] LOG: %cStart Phase MessagePhase color:green;
+[04:44:09.209] LOG: %cStart Phase MoveEndPhase color:green;
+[04:44:09.212] LOG: %cStart Phase MovePhase color:green;
+[04:44:09.212] LOG: %cUser: Kartana
+Move: LEAF_BLADE
+Use Mode: NORMAL color:orchid
+[04:44:09.228] LOG: %cStart Phase MessagePhase color:green;
+[04:44:09.345] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:44:09.847] LOG: crit stage: +3
+[04:44:09.849] LOG: Applied X Attack 
+[04:44:09.850] LOG: Move: Leaf Blade | Base damage: 741.5661855670103 | Power: 90 | Source attack: 1444 | Target defense: 97
+[04:44:09.851] LOG: Move: Leaf Blade | Attack damage: 3188
+[04:44:09.852] LOG: crit stage: +3
+[04:44:09.854] LOG: Applied X Attack 
+[04:44:09.854] LOG: Move: Leaf Blade | Base damage: 765.1693617021276 | Power: 90 | Source attack: 1444 | Target defense: 94
+[04:44:09.855] LOG: Move: Leaf Blade | Attack damage: 4386
+[04:44:09.856] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:44:09.882] LOG: %cStart Phase MessagePhase color:green;
+[04:44:10.089] LOG: %cStart Phase MessagePhase color:green;
+[04:44:10.306] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:44:10.342] LOG: %cStart Phase MessagePhase color:green;
+[04:44:10.539] LOG: %cStart Phase MessagePhase color:green;
+[04:44:10.756] LOG: %cStart Phase FaintPhase color:green;
+[04:44:13.143] LOG: %cStart Phase MessagePhase color:green;
+[04:44:14.120] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:44:14.299] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:44:14.300] LOG: %cStart Phase MessagePhase color:green;
+[04:44:14.554] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:44:14.581] LOG: %cStart Phase VictoryPhase color:green;
+[04:44:14.582] LOG: Applied Soothe Bell 
+[04:44:14.582] LOG: Applied Soothe Bell 
+[04:44:14.582] LOG: Applied Soothe Bell 
+[04:44:14.582] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:44:14.582] LOG: Applied Super EXP. Charm 
+[04:44:14.582] LOG: Applied EXP. Charm 
+[04:44:14.582] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:44:14.582] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:44:14.582] LOG: Applied Super EXP. Charm 
+[04:44:14.582] LOG: Applied EXP. Charm 
+[04:44:14.583] LOG: %cStart Phase LevelUpPhase color:green;
+[04:44:14.583] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:44:14.583] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:44:14.583] LOG: Applied Super EXP. Charm 
+[04:44:14.583] LOG: Applied EXP. Charm 
+[04:44:14.584] LOG: %cStart Phase LevelUpPhase color:green;
+[04:44:14.584] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:44:14.584] LOG: %cStart Phase FaintPhase color:green;
+[04:44:16.336] LOG: %cStart Phase MessagePhase color:green;
+[04:44:16.645] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:44:16.807] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:44:16.808] LOG: %cStart Phase MessagePhase color:green;
+[04:44:17.069] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:44:17.099] LOG: %cStart Phase VictoryPhase color:green;
+[04:44:17.099] LOG: Applied Soothe Bell 
+[04:44:17.101] LOG: Applied Soothe Bell 
+[04:44:17.101] LOG: Applied Soothe Bell 
+[04:44:17.104] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:44:17.104] LOG: Applied Super EXP. Charm 
+[04:44:17.104] LOG: Applied EXP. Charm 
+[04:44:17.104] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:44:17.104] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:44:17.104] LOG: Applied Super EXP. Charm 
+[04:44:17.105] LOG: Applied EXP. Charm 
+[04:44:17.105] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:44:17.105] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:44:17.105] LOG: Applied Super EXP. Charm 
+[04:44:17.105] LOG: Applied EXP. Charm 
+[04:44:17.105] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:44:17.105] LOG: %cStart Phase MoveEndPhase color:green;
+[04:44:17.108] LOG: %cStart Phase MovePhase color:green;
+[04:44:17.108] LOG: %cStart Phase MoveEndPhase color:green;
+[04:44:17.108] LOG: %cStart Phase MovePhase color:green;
+[04:44:17.108] LOG: %cStart Phase MoveEndPhase color:green;
+[04:44:17.108] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:44:17.108] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:44:17.108] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:44:17.108] LOG: %cStart Phase BerryPhase color:green;
+[04:44:17.114] LOG: Applied Sitrus Berry 
+[04:44:17.114] LOG: Applied Zinc 
+[04:44:17.114] LOG: Applied Protein 
+[04:44:17.114] LOG: Applied HP Up 
+[04:44:17.114] LOG: Applied Soul Dew 
+[04:44:17.115] LOG: Applied Soul Dew 
+[04:44:17.115] LOG: Applied Protein 
+[04:44:17.115] LOG: Applied Iron 
+[04:44:17.138] LOG: %cStart Phase CommonAnimPhase color:green;
+[04:44:17.138] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:44:17.372] LOG: Applied Healing Charm 
+[04:44:17.378] LOG: %cStart Phase MessagePhase color:green;
+[04:44:17.631] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:44:17.635] LOG: %cStart Phase TurnEndPhase color:green;
+[04:44:17.640] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[04:44:17.640] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:44:17.831] LOG: Applied Healing Charm 
+[04:44:17.836] LOG: %cStart Phase MessagePhase color:green;
+[04:44:18.048] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:44:18.271] LOG: Applied Healing Charm 
+[04:44:18.275] LOG: %cStart Phase MessagePhase color:green;
+[04:44:18.514] LOG: %cStart Phase BattleEndPhase color:green;
+[04:44:18.515] LOG: Battle Score: 1259 (2 Turns x0.94)
+[04:44:18.515] LOG: Total Score: 26247
+[04:44:18.531] LOG: Applied Zinc 
+[04:44:18.531] LOG: Applied Protein 
+[04:44:18.531] LOG: Applied HP Up 
+[04:44:18.531] LOG: Applied Soul Dew 
+[04:44:18.532] LOG: Applied Soul Dew 
+[04:44:18.532] LOG: Applied Protein 
+[04:44:18.532] LOG: Applied Iron 
+[04:44:18.555] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[04:44:18.557] LOG: Gym Leader Erika
+[04:44:19.388] LOG: Gym Leader Erika
+[04:44:19.680] LOG: Dialogue saved as seen: dialogue:erika.victory.3
+[04:44:19.681] LOG: %cStart Phase MoneyRewardPhase color:green;
+[04:44:19.681] LOG: Applied Amulet Coin 
+[04:44:19.946] LOG: %cStart Phase ModifierRewardPhase color:green;
+[04:44:20.212] LOG: %cStart Phase EggLapsePhase color:green;
+[04:44:20.213] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:44:20.213] LOG: Wave Seed: ¸ÀÂ¡¶¶Ä¡ÀÇ± º¿£ 78
+[04:44:20.233] LOG: Applied Golden Poké Ball 
+[04:44:20.233] LOG: 0 0 [2,3,4,5,6,7,8,9,10,16,22]
+[04:44:20.233] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[04:44:20.233] LOG: 17 6 [8,10,11,12,13,14,23]
+[04:44:20.233] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"spell_tag","soundName":"se/restore","tier":2,"moveType":7,"boostPercent":20} 
+[04:44:20.234] LOG: 2 0 [4,5]
+[04:44:20.234] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[04:44:20.234] LOG: 15 9 [2,3,4,5,6,7,8,9,10,16,22]
+[04:44:20.234] LOG: GREAT 0
+[04:44:20.234] LOG: 13 9 [2,3,4,5,6,7,8,9,10,16,22]
+[04:44:20.234] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[04:44:21.745] LOG: Applied Amulet Coin 
+[04:44:27.371] WARN: cry/614 not found
+[04:44:27.770] WARN: cry/31-mega not found
+[04:44:29.546] LOG: Applied Amulet Coin 
+[04:44:29.897] LOG: Applied Amulet Coin 
+[04:44:29.912] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[04:44:32.664] LOG: %cStart Phase SelectBiomePhase color:green;
+[04:44:32.665] LOG: Wave Seed: ¸ÀÂ¡¶¶Ä¡ÀÇ± º¿£ 78
+[04:44:35.057] LOG: %cStart Phase SwitchBiomePhase color:green;
+[04:44:35.482] LOG: %cStart Phase NewBattlePhase color:green;
+[04:44:35.482] LOG: Wave Seed: ¹ÁÃ¢··Å¢ÁÈ²¡»À¤ 79
+[04:44:35.497] LOG: %cStart Phase ReturnPhase color:green;
+[04:44:35.590] LOG: %cStart Phase ReturnPhase color:green;
+[04:44:35.705] LOG: %cStart Phase ReturnPhase color:green;
+[04:44:35.805] LOG: %cStart Phase ShowTrainerPhase color:green;
+[04:44:35.906] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[04:44:35.928] LOG: Pokemon: Foe Victreebel | Species ID: 71 | Level: 53 | Nature: Adamant (+Atk/-SpAtk)
+[04:44:35.928] LOG: Stats (IVs): HP: 179 (19), Atk: 139 (9), Def: 84 (10), Spatk: 118 (21), Spdef: 89 (19), Spd: 95 (30)
+[04:44:35.928] LOG: Ability: Sun's Bounty | Passive Ability: Ambush 
+[04:44:35.928] LOG: Moveset: ["Toxic","Soil Drain","Sunny Day","Venom Drench"]
+[04:44:35.934] LOG: Pokemon: Foe Tangrowth | Species ID: 465 | Level: 57 | Nature: Jolly (+Spd/-SpAtk)
+[04:44:35.934] LOG: Stats (IVs): HP: 186 (9), Atk: 134 (28), Def: 158 (19), Spatk: 121 (9), Spdef: 76 (25), Spd: 85 (28)
+[04:44:35.934] LOG: Ability: Tangling Hair | Passive Ability: Regenerator 
+[04:44:35.934] LOG: Moveset: ["Seed Bomb","Ancient Power","Poison Jab","Thief"]
+[04:44:35.939] LOG: Pokemon: Foe Vileplume | Species ID: 45 | Level: 51 | Nature: Modest (+SpAtk/-Atk)
+[04:44:35.939] LOG: Stats (IVs): HP: 166 (27), Atk: 84 (26), Def: 117 (30), Spatk: 147 (11), Spdef: 118 (22), Spd: 70 (29)
+[04:44:35.940] LOG: Ability: Effect Spore | Passive Ability: Natural Recovery 
+[04:44:35.940] LOG: Moveset: ["Sleep Powder","Solar Beam","Leech Seed","Night Shade"]
+[04:44:35.946] LOG: Pokemon: Foe Jumpluctrode | Species ID: 189 | Level: 53 | Nature: Quirky (-)
+[04:44:35.946] LOG: Stats (IVs): HP: 144 (17), Atk: 90 (26), Def: 88 (17), Spatk: 112 (16), Spdef: 103 (15), Spd: 159 (12)
+[04:44:35.946] LOG: Ability: Wind Rider | Passive Ability: Impenetrable 
+[04:44:35.946] LOG: Moveset: ["Tailwind","Misty Explosion","Double Shock","Sunny Day"]
+[04:44:35.954] LOG: Pokemon: Foe Meowscarada | Species ID: 908 | Level: 53 | Nature: Serious (-)
+[04:44:35.954] LOG: Stats (IVs): HP: 161 (23), Atk: 125 (8), Def: 91 (23), Spatk: 101 (20), Spdef: 89 (19), Spd: 139 (8)
+[04:44:35.954] LOG: Ability: Magic Bounce | Passive Ability: Overgrow 
+[04:44:35.954] LOG: Moveset: ["Chloroblast","Triple Axel","Sucker Punch","Grassy Terrain"]
+[04:44:36.121] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"hp_up","soundName":"se/restore","tier":1,"stat":0,"key":"hp_up"} (enemy)
+[04:44:36.121] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"protein","soundName":"se/restore","tier":1,"stat":1,"key":"protein"} (enemy)
+[04:44:36.121] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[04:44:36.121] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"zinc","soundName":"se/restore","tier":1,"stat":4,"key":"zinc"} (enemy)
+[04:44:36.121] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[04:44:36.121] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"protein","soundName":"se/restore","tier":1,"stat":1,"key":"protein"} (enemy)
+[04:44:36.121] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"zinc","soundName":"se/restore","tier":0,"stat":4,"key":"zinc"} (enemy)
+[04:44:36.121] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"hp_up","soundName":"se/restore","tier":0,"stat":0,"key":"hp_up"} (enemy)
+[04:44:36.121] LOG: {"id":"BERRY","localeKey":"","iconImage":"starf_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":9} (enemy)
+[04:44:36.121] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} (enemy)
+[04:44:36.121] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[04:44:36.121] LOG: {"id":"BERRY","localeKey":"","iconImage":"starf_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":9} (enemy)
+[04:44:36.121] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"magnet","soundName":"se/restore","tier":2,"moveType":12,"boostPercent":20} (enemy)
+[04:44:36.121] LOG: {"id":"BERRY","localeKey":"","iconImage":"liechi_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":3} (enemy)
+[04:44:36.121] LOG: {"id":"BERRY","localeKey":"","iconImage":"apicot_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":6} (enemy)
+[04:44:36.121] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"hp_up","soundName":"se/restore","tier":0,"stat":0,"key":"hp_up"} (enemy)
+[04:44:36.121] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} (enemy)
+[04:44:36.121] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"hp_up","soundName":"se/restore","tier":1,"stat":0,"key":"hp_up"} (enemy)
+[04:44:36.121] LOG: {"id":"BERRY","localeKey":"","iconImage":"enigma_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":2} (enemy)
+[04:44:36.121] LOG: {"id":"BERRY","localeKey":"","iconImage":"lansat_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":8} (enemy)
+[04:44:36.121] LOG: Battle Seed: jLNHa6E4rWjEMnps
+[04:44:36.121] LOG: Applied Protein (enemy)
+[04:44:36.121] LOG: Applied Zinc (enemy)
+[04:44:36.122] LOG: Applied HP Up (enemy)
+[04:44:36.122] LOG: Applied Iron (enemy)
+[04:44:36.122] LOG: Applied HP Up (enemy)
+[04:44:36.122] LOG: Applied Protein (enemy)
+[04:44:36.122] LOG: Applied Zinc (enemy)
+[04:44:36.122] LOG: Applied Protein (enemy)
+[04:44:36.122] LOG: Applied Zinc (enemy)
+[04:44:36.122] LOG: Applied HP Up (enemy)
+[04:44:36.122] LOG: Applied Iron (enemy)
+[04:44:36.122] LOG: Applied HP Up (enemy)
+[04:44:36.122] LOG: Applied HP Up (enemy)
+[04:44:36.123] LOG: Generated AI funcs
+[04:44:36.175] DEBUG: Session data saved to slot 2!
+[04:44:36.176] LOG: Applied HP Up (enemy)
+[04:44:36.176] LOG: Applied Protein (enemy)
+[04:44:36.176] LOG: Applied Zinc (enemy)
+[04:44:36.176] LOG: Applied Protein (enemy)
+[04:44:36.176] LOG: Applied Zinc (enemy)
+[04:44:36.176] LOG: Applied HP Up (enemy)
+[04:44:36.176] LOG: Applied Iron (enemy)
+[04:44:36.176] LOG: Applied HP Up (enemy)
+[04:44:36.176] LOG: Applied HP Up (enemy)
+[04:44:36.176] LOG: Wave Seed: ¹ÁÃ¢··Å¢ÁÈ²¡»À¤ 79
+[04:44:36.381] LOG: erika Leader
+[04:44:37.012] LOG: Dialogue saved as seen: dialogue:erika.encounter.4
+[04:44:37.050] LOG: erika Leader
+[04:44:37.707] LOG: %cStart Phase CommonAnimPhase color:green;
+[04:44:37.707] LOG: %cStart Phase MessagePhase color:green;
+[04:44:37.939] LOG: %cStart Phase SummonPhase color:green;
+[04:44:37.939] LOG: Leader
+[04:44:38.090] LOG: Applied HP Up (enemy)
+[04:44:38.091] LOG: Applied Protein (enemy)
+[04:44:38.091] LOG: Applied Zinc (enemy)
+[04:44:38.091] LOG: Applied Protein (enemy)
+[04:44:38.092] LOG: Applied Zinc (enemy)
+[04:44:38.092] LOG: Applied HP Up (enemy)
+[04:44:38.092] LOG: Applied Iron (enemy)
+[04:44:38.092] LOG: Applied HP Up (enemy)
+[04:44:38.093] LOG: Applied HP Up (enemy)
+[04:44:38.239] LOG: %cStart Phase SummonPhase color:green;
+[04:44:38.391] LOG: Applied Zinc 
+[04:44:38.391] LOG: Applied Protein 
+[04:44:38.391] LOG: Applied HP Up 
+[04:44:38.391] LOG: Applied Soul Dew 
+[04:44:38.391] LOG: Applied Soul Dew 
+[04:44:38.391] LOG: Applied Protein 
+[04:44:38.391] LOG: Applied Iron 
+[04:44:38.523] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:44:38.623] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:44:38.625] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:44:38.626] LOG: %cStart Phase PostSummonPhase color:green;
+[04:44:38.626] LOG: Ran PSP for: Vivillon
+[04:44:38.627] LOG: %cStart Phase PostSummonPhase color:green;
+[04:44:38.627] LOG: %cStart Phase MovePhase color:green;
+[04:44:38.627] LOG: %cUser: Vivillon
+Move: TAILWIND
+Use Mode: FOLLOW_UP color:orchid
+[04:44:38.630] LOG: %cStart Phase MessagePhase color:green;
+[04:44:38.756] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:44:39.759] LOG: %cStart Phase MessagePhase color:green;
+[04:44:40.022] LOG: %cStart Phase MoveEndPhase color:green;
+[04:44:40.023] LOG: %cStart Phase PostSummonPhase color:green;
+[04:44:40.024] LOG: %cStart Phase MovePhase color:green;
+[04:44:40.024] LOG: %cUser: Vivillon
+Move: POWDER
+Use Mode: INDIRECT color:orchid
+[04:44:40.025] LOG: %cStart Phase MessagePhase color:green;
+[04:44:40.139] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:44:40.141] LOG: %cStart Phase MessagePhase color:green;
+[04:44:40.372] LOG: %cStart Phase MoveEndPhase color:green;
+[04:44:40.373] LOG: %cStart Phase PostSummonPhase color:green;
+[04:44:40.373] LOG: Ran PSP for: Victreebel
+[04:44:40.373] LOG: %cStart Phase PostSummonPhase color:green;
+[04:44:40.373] LOG: %cStart Phase PostSummonPhase color:green;
+[04:44:40.373] LOG: %cStart Phase TurnInitPhase color:green;
+[04:44:40.374] LOG: %cStart Phase CommandPhase color:green;
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"jrtSL9h49hvSrycORl7Kq8U5","gameModeId":4,"difficulty":"youngster","challenges":[],"roster":[{"id":1378801314,"player":true,"species":666,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":64,"exp":262144,"levelExp":0,"gender":0,"hp":120,"stats":[202,81,108,182,108,164],"ivs":[31,31,31,31,31,31],"nature":15,"moveset":[{"moveId":777,"ppUsed":7,"ppUp":0},{"moveId":13,"ppUsed":1,"ppUp":0},{"moveId":542,"ppUsed":0,"ppUp":0},{"moveId":686,"ppUsed":0,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":664,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[542],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[17],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[5058,5243,14],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":366,"targets":[0],"result":1,"useMode":4},{"move":600,"targets":[3],"result":1,"useMode":3},{"move":777,"targets":[1],"result":1,"useMode":1},{"move":777,"targets":[1],"result":1,"useMode":1},{"move":777,"targets":[1],"result":1,"useMode":1},{"move":777,"targets":[1],"result":1,"useMode":1},{"move":366,"targets":[0],"result":2,"useMode":4},{"move":366,"targets":[0],"result":1,"useMode":4},{"move":600,"targets":[3],"result":3,"useMode":3}]},"battleData":{"hitCount":1,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":230120219,"player":true,"species":798,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":64,"exp":283443,"levelExp":0,"gender":-1,"hp":175,"stats":[175,361,189,80,68,163],"ivs":[30,28,27,31,25,29],"nature":3,"moveset":[{"moveId":891,"ppUsed":1,"ppUp":1},{"moveId":348,"ppUsed":5,"ppUp":0},{"moveId":5001,"ppUsed":2,"ppUp":1},{"moveId":910,"ppUsed":0,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":798,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":11,"isTerastallized":false,"stellarTypesBoosted":[11,8,9],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[6,0,6,0,0,0,0],"moveQueue":[],"tags":[{"tagType":"CRIT_BOOST","turnCount":1,"sourceMove":777,"critStages":2}],"abilitySuppressed":false,"abilitiesApplied":[163,224],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[11,8,9],"berriesEatenLast":[],"moveHistory":[{"move":348,"targets":[3,4,5],"result":1,"useMode":1},{"move":5001,"targets":[3,4,5],"result":1,"useMode":1},{"move":348,"targets":[3],"result":1,"useMode":1},{"move":891,"targets":[5],"result":1,"useMode":1}]},"battleData":{"hitCount":1,"hasEatenBerry":true,"berriesEaten":[0],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":163,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[2],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2087294891,"player":true,"species":151,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":64,"exp":261249,"levelExp":0,"gender":-1,"hp":111,"stats":[219,163,159,147,152,147],"ivs":[28,27,21,22,30,22],"nature":11,"moveset":[{"moveId":613,"ppUsed":1,"ppUp":0},{"moveId":722,"ppUsed":1,"ppUp":0},{"moveId":252,"ppUsed":3,"ppUp":0},{"moveId":748,"ppUsed":2,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":151,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":13,"isTerastallized":false,"stellarTypesBoosted":[0],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[1,1,1,1,1,0,0],"moveQueue":[],"tags":[{"tagType":"NO_RETREAT","turnCount":0,"sourceMove":748,"sourceId":2087294891}],"abilitySuppressed":false,"abilitiesApplied":[109,5025],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":252,"targets":[5],"result":1,"useMode":1},{"move":722,"targets":[3],"useMode":1,"result":2},{"move":613,"targets":[3],"useMode":1,"result":2},{"move":748,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":3,"hasEatenBerry":true,"berriesEaten":[1],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":5051,"passive2":-1,"passive3":-1,"nature":24,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1615794061,"player":true,"species":352,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":59,"exp":205885,"levelExp":2255,"gender":0,"hp":158,"stats":[158,142,105,84,164,70],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":729,"ppUsed":0,"ppUp":0},{"moveId":252,"ppUsed":0,"ppUp":0},{"moveId":310,"ppUsed":0,"ppUp":0},{"moveId":293,"ppUsed":0,"ppUp":0}],"status":null,"friendship":91,"metLevel":5,"metBiome":-1,"metSpecies":352,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":222,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[5304,5030,156],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2624817004,"player":true,"species":10614,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":58,"exp":205147,"levelExp":10035,"gender":0,"hp":196,"stats":[196,172,109,82,107,158],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":40,"ppUsed":0,"ppUp":0},{"moveId":5106,"ppUsed":0,"ppUp":0},{"moveId":5141,"ppUsed":0,"ppUp":0},{"moveId":857,"ppUsed":0,"ppUp":0}],"status":null,"friendship":62,"metLevel":5,"metBiome":-1,"metSpecies":10612,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3224318188,"player":true,"species":10031,"formIndex":1,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":58,"exp":205147,"levelExp":10035,"gender":0,"hp":213,"stats":[213,119,144,223,150,86],"ivs":[31,31,31,31,31,31],"nature":15,"moveset":[{"moveId":483,"ppUsed":0,"ppUp":0},{"moveId":79,"ppUsed":0,"ppUp":0},{"moveId":831,"ppUsed":0,"ppUp":0},{"moveId":403,"ppUsed":0,"ppUp":0}],"status":null,"friendship":62,"metLevel":5,"metBiome":-1,"metSpecies":10029,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[118],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":78,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":78,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":78,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":2}},{"type":"command","wave":78,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":78,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":78,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":2}},{"type":"interaction","seq":0,"kind":"reward","choice":1},{"type":"interaction","seq":1,"kind":"reward","choice":3},{"type":"interaction","seq":2,"kind":"crossroads","choice":1},{"type":"interaction","seq":3,"kind":"biome","choice":7}],"endState":{"waveIndex":79,"money":36935,"party":[{"species":666,"level":64,"hp":120,"maxHp":202},{"species":798,"level":64,"hp":175,"maxHp":175},{"species":151,"level":64,"hp":177,"maxHp":219},{"species":352,"level":60,"hp":160,"maxHp":160},{"species":10614,"level":60,"hp":202,"maxHp":202},{"species":10031,"level":60,"hp":220,"maxHp":220}]},"checkpoint":{"wave":78,"seed":"jrtSL9h49hvSrycORl7Kq8U5","party":[{"id":1378801314,"player":true,"species":666,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":64,"exp":262144,"levelExp":0,"gender":0,"hp":120,"stats":[202,81,108,182,108,164],"ivs":[31,31,31,31,31,31],"nature":15,"moveset":[{"moveId":777,"ppUsed":7,"ppUp":0},{"moveId":13,"ppUsed":1,"ppUp":0},{"moveId":542,"ppUsed":0,"ppUp":0},{"moveId":686,"ppUsed":0,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":664,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[542],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[17],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[5058,5243,14],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":366,"targets":[0],"result":1,"useMode":4},{"move":600,"targets":[3],"result":1,"useMode":3},{"move":777,"targets":[1],"result":1,"useMode":1},{"move":777,"targets":[1],"result":1,"useMode":1},{"move":777,"targets":[1],"result":1,"useMode":1},{"move":777,"targets":[1],"result":1,"useMode":1},{"move":366,"targets":[0],"result":2,"useMode":4},{"move":366,"targets":[0],"result":1,"useMode":4},{"move":600,"targets":[3],"result":3,"useMode":3}]},"battleData":{"hitCount":1,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":230120219,"player":true,"species":798,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":64,"exp":283443,"levelExp":0,"gender":-1,"hp":175,"stats":[175,361,189,80,68,163],"ivs":[30,28,27,31,25,29],"nature":3,"moveset":[{"moveId":891,"ppUsed":1,"ppUp":1},{"moveId":348,"ppUsed":5,"ppUp":0},{"moveId":5001,"ppUsed":2,"ppUp":1},{"moveId":910,"ppUsed":0,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":798,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":11,"isTerastallized":false,"stellarTypesBoosted":[11,8,9],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[6,0,6,0,0,0,0],"moveQueue":[],"tags":[{"tagType":"CRIT_BOOST","turnCount":1,"sourceMove":777,"critStages":2}],"abilitySuppressed":false,"abilitiesApplied":[163,224],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[11,8,9],"berriesEatenLast":[],"moveHistory":[{"move":348,"targets":[3,4,5],"result":1,"useMode":1},{"move":5001,"targets":[3,4,5],"result":1,"useMode":1},{"move":348,"targets":[3],"result":1,"useMode":1},{"move":891,"targets":[5],"result":1,"useMode":1}]},"battleData":{"hitCount":1,"hasEatenBerry":true,"berriesEaten":[0],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":163,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[2],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2087294891,"player":true,"species":151,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":64,"exp":261249,"levelExp":0,"gender":-1,"hp":111,"stats":[219,163,159,147,152,147],"ivs":[28,27,21,22,30,22],"nature":11,"moveset":[{"moveId":613,"ppUsed":1,"ppUp":0},{"moveId":722,"ppUsed":1,"ppUp":0},{"moveId":252,"ppUsed":3,"ppUp":0},{"moveId":748,"ppUsed":2,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":151,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":13,"isTerastallized":false,"stellarTypesBoosted":[0],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[1,1,1,1,1,0,0],"moveQueue":[],"tags":[{"tagType":"NO_RETREAT","turnCount":0,"sourceMove":748,"sourceId":2087294891}],"abilitySuppressed":false,"abilitiesApplied":[109,5025],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":252,"targets":[5],"result":1,"useMode":1},{"move":722,"targets":[3],"useMode":1,"result":2},{"move":613,"targets":[3],"useMode":1,"result":2},{"move":748,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":3,"hasEatenBerry":true,"berriesEaten":[1],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":5051,"passive2":-1,"passive3":-1,"nature":24,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1615794061,"player":true,"species":352,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":59,"exp":205885,"levelExp":2255,"gender":0,"hp":158,"stats":[158,142,105,84,164,70],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":729,"ppUsed":0,"ppUp":0},{"moveId":252,"ppUsed":0,"ppUp":0},{"moveId":310,"ppUsed":0,"ppUp":0},{"moveId":293,"ppUsed":0,"ppUp":0}],"status":null,"friendship":91,"metLevel":5,"metBiome":-1,"metSpecies":352,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":222,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[5304,5030,156],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2624817004,"player":true,"species":10614,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":58,"exp":205147,"levelExp":10035,"gender":0,"hp":196,"stats":[196,172,109,82,107,158],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":40,"ppUsed":0,"ppUp":0},{"moveId":5106,"ppUsed":0,"ppUp":0},{"moveId":5141,"ppUsed":0,"ppUp":0},{"moveId":857,"ppUsed":0,"ppUp":0}],"status":null,"friendship":62,"metLevel":5,"metBiome":-1,"metSpecies":10612,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3224318188,"player":true,"species":10031,"formIndex":1,"abilityIndex":0,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":58,"exp":205147,"levelExp":10035,"gender":0,"hp":213,"stats":[213,119,144,223,150,86],"ivs":[31,31,31,31,31,31],"nature":15,"moveset":[{"moveId":483,"ppUsed":0,"ppUp":0},{"moveId":79,"ppUsed":0,"ppUp":0},{"moveId":831,"ppUsed":0,"ppUp":0},{"moveId":403,"ppUsed":0,"ppUp":0}],"status":null,"friendship":62,"metLevel":5,"metBiome":-1,"metSpecies":10029,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[118],"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":1,"className":"MapModifier"},{"player":true,"typeId":"BATON","args":[230120219],"stackCount":1,"className":"SwitchEffectTransferModifier"},{"player":true,"typeId":"SOUL_DEW","args":[230120219],"stackCount":1,"className":"PokemonNatureWeightModifier"},{"player":true,"typeId":"ER_UPGRADED_MAP","args":[],"stackCount":1,"className":"MapModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[4],"args":[230120219,4],"stackCount":2,"className":"BaseStatModifier"},{"player":true,"typeId":"SUPER_EXP_CHARM","args":[60],"stackCount":3,"className":"ExpBoosterModifier"},{"player":true,"typeId":"EXP_SHARE","args":[],"stackCount":2,"className":"ExpShareModifier"},{"player":true,"typeId":"EXP_CHARM","args":[25],"stackCount":6,"className":"ExpBoosterModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[0],"args":[230120219,0],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[0],"args":[2087294891,0],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[10],"args":[230120219,10],"stackCount":2,"className":"BerryModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[1],"args":[2087294891,1],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[2],"args":[2087294891,2],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"HEALING_CHARM","args":[1.1],"stackCount":2,"className":"HealingBoosterModifier"},{"player":true,"typeId":"SOOTHE_BELL","args":[230120219],"stackCount":3,"className":"PokemonFriendshipBoosterModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[8],"args":[230120219,8],"stackCount":2,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[5],"args":[2087294891,5],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"SOOTHE_BELL","args":[2087294891],"stackCount":3,"className":"PokemonFriendshipBoosterModifier"},{"player":true,"typeId":"GOLDEN_POKEBALL","args":[],"stackCount":1,"className":"ExtraModifierModifier"},{"player":true,"typeId":"FOCUS_BAND","args":[230120219],"stackCount":2,"className":"SurviveDamageModifier"},{"player":true,"typeId":"SOOTHE_BELL","args":[1378801314],"stackCount":3,"className":"PokemonFriendshipBoosterModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[10],"args":[2087294891,10],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"ATTACK_TYPE_BOOSTER","typePregenArgs":[8],"args":[230120219,8,20],"stackCount":1,"className":"AttackTypeBoosterModifier"},{"player":true,"typeId":"MEGA_BRACELET","args":[],"stackCount":1,"className":"MegaEvolutionAccessModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[1],"args":[230120219,1],"stackCount":2,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[1],"args":[1378801314,1],"stackCount":2,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[1],"args":[2087294891,1],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[1],"args":[230120219,1],"stackCount":2,"className":"BaseStatModifier"},{"player":true,"typeId":"WIDE_LENS","args":[2087294891,5],"stackCount":2,"className":"PokemonMoveAccuracyBoosterModifier"},{"player":true,"typeId":"ER_LUCKY_HEART","args":[230120219,"luckyHeart",2,0],"stackCount":2,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[0],"args":[230120219,0],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"ER_LOADED_DICE","args":[2624817004,"loadedDice",2,0],"stackCount":1,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"AMULET_COIN","args":[],"stackCount":2,"className":"MoneyMultiplierModifier"},{"player":true,"typeId":"FORM_CHANGE_ITEM","typePregenArgs":[158],"args":[3224318188,158,true],"stackCount":1,"className":"PokemonFormChangeItemModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[7],"args":[230120219,7],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[4],"args":[230120219,4],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[10],"args":[1378801314,10],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"TEMP_STAT_STAGE_BOOSTER","typePregenArgs":[1],"args":[1,5,5],"stackCount":1,"className":"TempStatStageBoosterModifier"}],"money":27429,"pokeballCounts":{"0":10,"1":5,"2":0,"3":0,"4":0}}}
