@@ -1,6 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
-import { coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   adoptCoopBiomeTransitionSwitchPermit,
   getCoopBiomeTransitionTailPermit,
@@ -127,6 +127,7 @@ export class SwitchBiomePhase extends BattlePhase {
 
     if (authoritativeCoop && permit != null) {
       try {
+        this.discardAlreadyMaterializedBattleAdvance(permit, sourceWave);
         this.prepareAuthoritativeTransition(authoritativeGuest, permit, sourceWave);
         this.materializeCoopTransition();
         this.end();
@@ -243,6 +244,35 @@ export class SwitchBiomePhase extends BattlePhase {
         });
       },
     });
+  }
+
+  /**
+   * A retained WAVE_ADVANCE can install the destination battle before this presentation tail runs. The
+   * SelectBiome queue still contains the ordinary NewBattlePhase for the same boundary; executing it would
+   * advance the renderer a second time (source N -> retained N+1 -> local N+2). Remove only that immediate,
+   * exact duplicate. Any different queue shape fails closed so an unrelated future battle cannot be eaten.
+   */
+  private discardAlreadyMaterializedBattleAdvance(
+    permit: NonNullable<ReturnType<typeof getCoopBiomeTransitionTailPermit>>,
+    ambientWave: number,
+  ): void {
+    if (ambientWave !== permit.nextWave) {
+      return;
+    }
+    const queued = globalScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+    const firstNewBattle = queued.indexOf("NewBattlePhase");
+    if (firstNewBattle < 0) {
+      return;
+    }
+    if (firstNewBattle !== 0 || !globalScene.phaseManager.tryRemovePhase("NewBattlePhase")) {
+      throw new Error(
+        `Could not discard exact duplicate NewBattlePhase for retained biome boundary ${permit.wave}->${permit.nextWave}; queue=[${queued.join(",")}]`,
+      );
+    }
+    coopLog(
+      "runtime",
+      `SwitchBiomePhase discarded duplicate NewBattlePhase after retained battle advance wave=${permit.wave}->${permit.nextWave}`,
+    );
   }
 
   private prepareAuthoritativeTransition(

@@ -343,7 +343,10 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         prompts.mock.calls.filter(call => String(call[0]).startsWith("Could not confirm the shared biome transition")),
         "only the two bounded confirmation retries are exposed before the shared terminal",
       ).toHaveLength(2);
-      expect(mutateArena, "missing authority never mutates the renderer biome").not.toHaveBeenCalled();
+      expect(
+        mutateArena.mock.calls.some(call => call[0] === destination),
+        "missing authority never materializes the uncommitted destination biome",
+      ).toBe(false);
       expect(rig.guestScene.arena.biomeId, "the renderer remains at its source biome").toBe(sourceBiome);
       expect(rig.guestRuntime.controller.interactionCounter(), "missing authority cannot advance ownership").toBe(
         pinned,
@@ -1289,11 +1292,17 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       switchPhase.coopBoundaryStillLive = () => true;
       const end = vi.spyOn(switchPhase, "end").mockImplementation(() => {});
       const arena = vi.spyOn(rig.guestScene, "newArena");
+      vi.spyOn(rig.guestScene.phaseManager, "getQueuedPhaseNames").mockReturnValue(["NewBattlePhase"]);
+      const removeDuplicateBattle = vi.spyOn(rig.guestScene.phaseManager, "tryRemovePhase").mockReturnValue(true);
       switchPhase.start();
       expect(arena, "the late renderer switch materializes the exact committed destination").toHaveBeenCalledWith(
         destination,
       );
       expect(end, "the exact late switch completes instead of entering permit recovery").toHaveBeenCalledOnce();
+      expect(
+        removeDuplicateBattle,
+        "the retained next-wave battle suppresses the queued local duplicate advance",
+      ).toHaveBeenCalledWith("NewBattlePhase");
       expect(getCoopBiomeTransitionTailPermit()).toMatchObject({
         wave: sourceWave,
         nextWave: sourceWave + 1,
