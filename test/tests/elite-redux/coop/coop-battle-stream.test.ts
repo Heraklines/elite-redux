@@ -210,6 +210,51 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(guestStream.peekEnemyPartyState(9), "a delayed lower tick cannot replace the command seal").toEqual(newer);
   });
 
+  it("bounds unconsumed event-only wave states to the latest four waves", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+
+    for (let wave = 1; wave <= 5; wave++) {
+      hostStream.sendEnemyParty(wave, [], -1, 3, { ...emptyAuthoritativeState(wave), tick: wave });
+      await guestStream.awaitEnemyParty(wave);
+    }
+
+    expect(
+      guestStream.peekEnemyPartyState(1),
+      "an event-only wave cannot leak forever without CommandPhase",
+    ).toBeUndefined();
+    expect(guestStream.peekEnemyPartyState(2)).toBeDefined();
+    expect(guestStream.peekEnemyPartyState(5)).toBeDefined();
+  });
+
+  it("rejects complete wave state addressed to a different carrier wave", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+
+    hostStream.sendEnemyParty(9, [], -1, 3, { ...emptyAuthoritativeState(8), wave: 8 });
+    await guestStream.awaitEnemyParty(9);
+
+    expect(guestStream.peekEnemyPartyState(9)).toBeUndefined();
+  });
+
+  it("fails closed when equal-tick enemy-party authority changes", async () => {
+    const { host, guest } = createLoopbackPair();
+    const current = { epoch: 7, wave: 9, turn: 1 };
+    const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+    const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+    const first = { ...emptyAuthoritativeState(9), tick: 12, money: 100 };
+    const conflicting = { ...first, money: 101 };
+
+    hostStream.sendEnemyParty(9, [], -1, 3, first);
+    await guestStream.awaitEnemyParty(9);
+    hostStream.sendEnemyParty(9, [], -1, 3, conflicting);
+    await flushWire();
+
+    expect(guestStream.retainedAuthorityDiagnostics().terminal).toBe(true);
+  });
+
   it("awaitEnemyParty resolves null on timeout (guest then generates its own - never hangs)", async () => {
     const { guest } = createLoopbackPair();
     const timer: { fire?: () => void } = {};

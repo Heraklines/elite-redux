@@ -3292,14 +3292,42 @@ export class CoopBattleStreamer {
     switch (msg.t) {
       case "enemyPartySync": {
         if (msg.authoritativeState !== undefined) {
-          const prior = this.enemyPartyStateByWave.get(msg.wave);
-          if (prior == null || msg.authoritativeState.tick > prior.tick) {
-            this.enemyPartyStateByWave.set(msg.wave, msg.authoritativeState);
-          } else if (msg.authoritativeState.tick < prior.tick) {
-            coopLog(
+          if (msg.authoritativeState.wave === msg.wave) {
+            const prior = this.enemyPartyStateByWave.get(msg.wave);
+            if (prior == null || msg.authoritativeState.tick > prior.tick) {
+              this.enemyPartyStateByWave.set(msg.wave, msg.authoritativeState);
+            } else if (msg.authoritativeState.tick < prior.tick) {
+              coopLog(
+                "stream",
+                `guest ignored regressed enemyParty state wave=${msg.wave} tick=${msg.authoritativeState.tick} retained=${prior.tick}`,
+              );
+            } else if (canonicalize(prior) !== canonicalize(msg.authoritativeState)) {
+              const current = this.currentAuthorityAddress(msg.authoritativeState.turn);
+              const reason = `Enemy-party authority changed at immutable wave/tick ${msg.wave}/${prior.tick}.`;
+              if (current == null) {
+                coopWarn("stream", `${reason} No authenticated runtime address remained for the shared terminal.`);
+              } else {
+                this.failLocalAckProgression(
+                  "replacement",
+                  {
+                    epoch: current.epoch,
+                    wave: msg.wave,
+                    turn: msg.authoritativeState.turn,
+                    revision: Math.max(1, msg.authoritativeState.tick),
+                  },
+                  reason,
+                );
+              }
+            }
+          } else {
+            coopWarn(
               "stream",
-              `guest ignored regressed enemyParty state wave=${msg.wave} tick=${msg.authoritativeState.tick} retained=${prior.tick}`,
+              `guest rejected enemyParty state address carrierWave=${msg.wave} stateWave=${msg.authoritativeState.wave}`,
             );
+          }
+          while (this.enemyPartyStateByWave.size > 4) {
+            const oldestWave = Math.min(...this.enemyPartyStateByWave.keys());
+            this.enemyPartyStateByWave.delete(oldestWave);
           }
         }
         if (msg.encounter === undefined) {
