@@ -2850,10 +2850,13 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "\n"
       + "DO (2 clients): play several waves. Have the reward-pick owner rush ahead (finish the fight fast)\n"
       + "while the partner lingers; use a continuation item (a TM/Capsule) in the shop; faint a mon and pick a\n"
-      + "replacement while the partner is mid-turn. EXPECT: neither client ever locks the other out of picking\n"
+      + "replacement while the partner is mid-turn. On one next-wave intro, close one peer while the arena is\n"
+      + "sliding to the next encounter. EXPECT: neither client ever locks the other out of picking\n"
       + "a move; the reward pick waits for both at the shop; the interaction stays in step (no 'partner lock'\n"
-      + "wedging the next battle). Duo-tested headlessly in coop-duo-pacing-barriers.test.ts,\n"
-      + "coop-duo-interaction-counter.test.ts, and the coop-rendezvous.test.ts primitive suite.",
+      + "wedging the next battle). A failed shared session exits coherently without a stale next-encounter\n"
+      + "callback crashing the surviving page. Duo-tested headlessly in coop-duo-pacing-barriers.test.ts,\n"
+      + "coop-duo-interaction-counter.test.ts, coop-guest-renderer.test.ts, and the coop-rendezvous.test.ts\n"
+      + "primitive suite.",
     setup: () => {
       resetDevOverrides();
       setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
