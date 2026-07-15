@@ -154,6 +154,17 @@ if (!harness?.includes("createPublicBattleProgressBudget(") || !harness.includes
   failures.push("public-ui-harness.mjs: command readiness must retain bounded progress and drain buffered evidence");
 }
 if (
+  !harness?.includes("const COMMANDER_POST_TURN_PROGRESS_ALLOWANCE_MS = 150_000")
+  || !harness.includes("progressAllowanceMs: COMMANDER_POST_TURN_PROGRESS_ALLOWANCE_MS")
+  || !harness.includes("hardCeilingMs: COMMANDER_BOUNDARY_HARD_CEILING_MS")
+  || !harness.includes("progressBudgetOptions = {}")
+  || !harness.includes("createPublicBattleProgressBudget(this, from, this.config.timeoutMs, progressBudgetOptions)")
+) {
+  failures.push(
+    "public-ui-harness.mjs: Commander post-turn waits must admit measured animation dilation under the immutable seven-minute ceiling",
+  );
+}
+if (
   !harness?.includes('findLastSemanticSurface(from, "reward-shop")')
   || !harness.includes("semantic.observation.ready.awaitingActionInput === true")
   || !harness.includes("semantic.observation.ownerSeat === client.publicSeat")

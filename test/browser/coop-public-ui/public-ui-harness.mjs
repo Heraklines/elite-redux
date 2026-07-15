@@ -40,6 +40,10 @@ const POST_TURN_HARD_CEILING_MS = 360_000;
 // 1.05s after the ordinary ceiling across the two owner parities, with causal Phaser progress.
 // Keep that measured launch allowance Commander-only; ordinary waits retain the tighter ceiling.
 const COMMANDER_BOUNDARY_HARD_CEILING_MS = 420_000;
+// Independent-process guest-owned run 29427072889 made real replay progress again after a measured
+// ~100s animation gap. Keep Commander waits alive across that observed dilation while retaining the
+// immutable seven-minute ceiling above; ordinary battle waits remain at the tighter 90s allowance.
+const COMMANDER_POST_TURN_PROGRESS_ALLOWANCE_MS = 150_000;
 
 // Self-healing pairing cadence: how often the requester re-issues its ask while unpaired. Kept
 // well under the observed ~17s worker-side request TTL so each re-send REFRESHES the request and
@@ -1780,6 +1784,10 @@ export class DuoPublicUiRig {
       await this.assertCommanderGeneratedSkipRendezvous(boundary, `commander-${boundary.observation.point}`);
       const outcome = await this.waitForPostTurnOutcome(outcomeCursors, {
         expectedCommandAddress: `${boundary.observation.epoch}:${boundary.observation.wave}:${boundary.observation.turn}`,
+        progressBudgetOptions: {
+          progressAllowanceMs: COMMANDER_POST_TURN_PROGRESS_ALLOWANCE_MS,
+          hardCeilingMs: COMMANDER_BOUNDARY_HARD_CEILING_MS,
+        },
       });
       if (outcome.kind === "reward") {
         await this.assertSharedSurface("reward", outcomeCursors, `commander-turn-${round}-reward`, {
@@ -1862,11 +1870,11 @@ export class DuoPublicUiRig {
     return { commandEvents, outcomeCursors };
   }
 
-  async waitForPostTurnOutcome(from, { expectedCommandAddress = null } = {}) {
+  async waitForPostTurnOutcome(from, { expectedCommandAddress = null, progressBudgetOptions = {} } = {}) {
     const advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, "public-ui-post-turn", {
       expectedCommandAddress,
     });
-    const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs);
+    const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs, progressBudgetOptions);
     while (Date.now() < progressBudget.observe()) {
       const values = Object.values(this.clients);
       const rewards = values.map(client => client.evidence.find(REWARD_PHASE, from[client.label]));
