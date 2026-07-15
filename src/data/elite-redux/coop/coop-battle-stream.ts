@@ -155,6 +155,8 @@ function isStrictFullField(value: unknown): value is CoopFullMonSnapshot[] {
     }
     const bi = (raw as { bi?: unknown }).bi;
     const mon = raw as Record<string, unknown>;
+    // BattlerTagType is a string enum at runtime. The frozen historical type says `number[]`, but no
+    // numeric-to-enum mapping ever existed; admitting numbers would produce a carrier that cannot converge.
     if (
       !isValidBattlerIndex(bi)
       || seen.has(bi)
@@ -174,8 +176,8 @@ function isStrictFullField(value: unknown): value is CoopFullMonSnapshot[] {
         move =>
           Array.isArray(move) && move.length === 2 && isSafeAddressPart(move[0], false) && isSafeAddressPart(move[1]),
       )
-      || !Array.isArray(mon.tags) // BattlerTagType is a string enum at runtime.  The historical wire type calls these // `number[]` through an unsafe cast, so accepting numbers as well keeps old captures // readable while allowing the production values (for example "SEEDED"/"ENCORE").
-      || !mon.tags.every(tag => (typeof tag === "string" && tag.length > 0) || isSafeAddressPart(tag))
+      || !Array.isArray(mon.tags)
+      || !mon.tags.every(tag => typeof tag === "string" && tag.length > 0)
     ) {
       return false;
     }
@@ -3087,19 +3089,21 @@ export class CoopBattleStreamer {
     turn: number,
     fromSeq: number,
   ): Promise<{ kind: "turn"; res: CoopTurnResolution | null } | { kind: "live" } | { kind: "checkpoint" }> {
-    // Fast paths: anything already buffered resolves without parking waiters. The OUT-OF-BAND
-    // checkpoint is checked FIRST (#788): it is always NEWER state than a buffered turn
-    // resolution (e.g. the post-faint replacement summon captured AFTER the turn ended), and
-    // its slot entries are ALIVE - applying it triggers the visual summon reposition the
-    // turn-end checkpoint (slot still fainted) skips. Live failure this fixes: the resolution
-    // beat the replacement snapshot into the buffer and the chooser never saw their mon
-    // come out on screen.
+    // Fast paths: anything already buffered resolves without parking waiters. Replacement authority
+    // normally follows the turn commit it repairs, but it can also be captured mid-turn and lose the
+    // delivery race to a newer final turn. Both carriers share the monotonic authoritative-state tick,
+    // so consume the newest revision instead of assuming one carrier class is always newer.
     const waitedAddress = this.currentAuthorityAddress(turn);
     const checkpoint = this.peekCheckpoint();
-    if (checkpoint != null && this.checkpointCanWakeTurn(checkpoint, waitedAddress, turn)) {
+    const bufferedTurn = this.bufferedTurnEntry(turn)?.[1];
+    if (
+      checkpoint != null
+      && this.checkpointCanWakeTurn(checkpoint, waitedAddress, turn)
+      && (bufferedTurn == null || checkpoint.revision > bufferedTurn.revision)
+    ) {
       return Promise.resolve({ kind: "checkpoint" as const });
     }
-    if (this.bufferedTurnEntry(turn) != null) {
+    if (bufferedTurn != null) {
       return this.awaitTurn(turn).then(res => ({ kind: "turn" as const, res }));
     }
     const liveEntry = this.liveTurnEntry(turn);
@@ -3134,6 +3138,13 @@ export class CoopBattleStreamer {
       // mon the guest has to command before the turn resolution can ever arrive.
       const settleCheckpoint = (envelope: CoopCheckpointEnvelope) => {
         if (settled || !this.checkpointCanWakeTurn(envelope, waitedAddress, turn)) {
+          return;
+        }
+        // A turn delivery resolves awaitTurn through a promise reaction. A checkpoint delivered in the
+        // following transport microtask can otherwise win before that reaction runs, despite being older.
+        // Admission is synchronous, so its immutable ledger is the ordering source of truth here.
+        const admittedTurn = this.highestSeenTurnAuthority.get(pendingTurnKey(envelope));
+        if (admittedTurn != null && admittedTurn.revision >= envelope.revision) {
           return;
         }
         settled = true;

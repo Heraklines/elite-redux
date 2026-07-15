@@ -2139,11 +2139,12 @@ export function captureCoopSaveDataNormalized(versusGuest = false): Record<strin
       out[key] = normalizeCoopErRelicBattleState(value);
       continue;
     }
-    // ER mon-keyed substrates (#839): both key a per-client `Pokemon.id` (erMoneyStreaks `[id, streak]`,
-    // erWardStones `[id, tier, charges, waveProgress]`), so normalize the id to its stable party slot -
+    // ER mon-keyed substrates (#839): these key a per-client `Pokemon.id` (erMoneyStreaks `[id, streak]`,
+    // erWardStones `[id, tier, charges, waveProgress]`, erResistBerries `[id, resistType]`), so normalize
+    // the id to its stable party slot -
     // otherwise an ME-granted mon (a divergent local id) diverges the digest forever, exactly like the
     // held-item modifier args above.
-    if (key === "erMoneyStreaks" || key === "erWardStones") {
+    if (key === "erMoneyStreaks" || key === "erWardStones" || key === "erResistBerries") {
       out[key] = normalizeCoopMonKeyedEntries(value, partyIndexById);
       continue;
     }
@@ -2367,8 +2368,7 @@ function captureVersusGuestChecksumState(): CoopChecksumState {
     .map(mon => ({ ...mon, bi: swapBi(mon.bi) }))
     .sort((a, b) => a.bi - b.bi);
   const enemyParty = globalScene.getEnemyParty();
-  const arenaTags = readArenaTags()
-    .map(([tagType, side]) => [tagType, swapArenaTagSide(side)] as [string, number]);
+  const arenaTags = readArenaTags().map(([tagType, side]) => [tagType, swapArenaTagSide(side)] as [string, number]);
   const canonicalArenaTags = sortCoopChecksumArenaTags(arenaTags);
   const modifiers = (() => {
     try {
@@ -3837,18 +3837,20 @@ function applyCoopAuthoritativeBattleStateInternal(
 /** Reconcile a live mon's battler tags to exactly the snapshot's tag-type set. */
 function reconcileTags(mon: Pokemon, wantTagTypes: number[]): void {
   try {
-    const want = new Set(wantTagTypes);
-    const have = new Set(mon.summonData.tags.map(t => t.tagType as unknown as number));
+    // Strict carrier admission guarantees runtime string identities. Numeric legacy values have no stable
+    // mapping to BattlerTagType and are rejected before apply rather than being silently mis-reconciled.
+    const want = new Set((wantTagTypes as unknown[]).filter((tag): tag is string => typeof tag === "string"));
+    const have = new Set(mon.summonData.tags.map(t => t.tagType as unknown as string));
     // Drop tags the host no longer has.
     for (const have_t of [...have]) {
       if (!want.has(have_t)) {
-        mon.removeTag(have_t as unknown as BattlerTagType);
+        mon.removeTag(have_t as BattlerTagType);
       }
     }
     // Add tags the host has that we don't (best-effort: identity only, no source-move).
     for (const want_t of want) {
       if (!have.has(want_t)) {
-        mon.addTag(want_t as unknown as BattlerTagType);
+        mon.addTag(want_t as BattlerTagType);
       }
     }
   } catch {

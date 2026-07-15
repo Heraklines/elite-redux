@@ -515,6 +515,104 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     hostStream.dispose();
   });
 
+  it("arbitrates same-turn final and replacement authority by revision", async () => {
+    const makePair = () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 1, turn: 1 };
+      return {
+        hostStream: new CoopBattleStreamer(host, { authorityContext: () => current }),
+        guestStream: new CoopBattleStreamer(guest, { authorityContext: () => current }),
+      };
+    };
+
+    const olderReplacement = makePair();
+    sendCompleteCheckpoint(
+      olderReplacement.hostStream,
+      "replacement",
+      { ...emptyCheckpoint(), tick: 19 },
+      "2020202020202020",
+      emptyAuthoritativeState(1, 1, 20),
+    );
+    olderReplacement.hostStream.emitTurn(
+      7,
+      1,
+      1,
+      [],
+      { ...emptyCheckpoint(), tick: 21 },
+      "2222222222222222",
+      "{}",
+      emptyFullField(),
+      emptyAuthoritativeState(1, 1, 22),
+    );
+    await flushWire();
+    const finalWon = await olderReplacement.guestStream.awaitTurnOrLiveEvent(1, 0);
+    expect(finalWon.kind, "revision 20 replacement cannot strand revision 22 final authority").toBe("turn");
+    if (finalWon.kind === "turn") {
+      expect(finalWon.res?.revision).toBe(22);
+    }
+    olderReplacement.hostStream.dispose();
+    olderReplacement.guestStream.dispose();
+
+    const newerReplacement = makePair();
+    newerReplacement.hostStream.emitTurn(
+      7,
+      1,
+      1,
+      [],
+      { ...emptyCheckpoint(), tick: 21 },
+      "2222222222222222",
+      "{}",
+      emptyFullField(),
+      emptyAuthoritativeState(1, 1, 22),
+    );
+    sendCompleteCheckpoint(
+      newerReplacement.hostStream,
+      "replacement",
+      { ...emptyCheckpoint(), tick: 23 },
+      "2424242424242424",
+      emptyAuthoritativeState(1, 1, 24),
+    );
+    await flushWire();
+    await expect(newerReplacement.guestStream.awaitTurnOrLiveEvent(1, 0)).resolves.toEqual({ kind: "checkpoint" });
+    newerReplacement.hostStream.dispose();
+    newerReplacement.guestStream.dispose();
+  });
+
+  it("does not let an older checkpoint win the parked-waiter promise microtask race", async () => {
+    const { host, guest } = createLoopbackPair();
+    const current = { epoch: 7, wave: 1, turn: 1 };
+    const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+    const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+    const raced = guestStream.awaitTurnOrLiveEvent(1, 0);
+
+    hostStream.emitTurn(
+      7,
+      1,
+      1,
+      [],
+      { ...emptyCheckpoint(), tick: 21 },
+      "2222222222222222",
+      "{}",
+      emptyFullField(),
+      emptyAuthoritativeState(1, 1, 22),
+    );
+    sendCompleteCheckpoint(
+      hostStream,
+      "replacement",
+      { ...emptyCheckpoint(), tick: 19 },
+      "2020202020202020",
+      emptyAuthoritativeState(1, 1, 20),
+    );
+
+    const winner = await raced;
+    expect(winner.kind).toBe("turn");
+    if (winner.kind === "turn") {
+      expect(winner.res?.revision).toBe(22);
+    }
+    hostStream.dispose();
+    guestStream.dispose();
+  });
+
   describe("protocol-33 retained authority transactions", () => {
     const context = () => ({ epoch: 7, wave: 1, turn: 1 });
 
@@ -543,6 +641,28 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       expect((await awaited)?.fullField[0].tags).toEqual(["SEEDED"]);
       hostStream.dispose();
       guestStream.dispose();
+    });
+
+    it("rejects numeric battler tags because no numeric-to-string enum mapping can converge", () => {
+      const { host } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: context });
+      const fullField = emptyFullField();
+      fullField[0].tags = [1];
+
+      expect(() =>
+        hostStream.emitTurn(
+          7,
+          1,
+          1,
+          [],
+          emptyCheckpoint(),
+          "deadbeefdeadbeef",
+          "{}",
+          fullField,
+          emptyAuthoritativeState(1),
+        ),
+      ).toThrow("refusing malformed turn commit");
+      hostStream.dispose();
     });
 
     it("recovers a dropped turn commit, re-ACKs a dropped ACK, and applies observers once", async () => {
@@ -587,13 +707,15 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       hostRetryTimers.shift()?.();
       await flushWire();
       expect(appliedDeliveries, "the production host retry was re-ACKed before observer/apply fan-out").toBe(1);
+      expect(
+        hostStream.retainedAuthorityDiagnostics().turnCommits,
+        "the successful exact re-ACK releases authority",
+      ).toBe(0);
 
       const pendingBefore = pendingReplies;
       guestStream.requestTurnCommit(7, 1, 1, resolution!.revision);
       await flushWire();
-      expect(pendingReplies, "the exact retained commit was cleared only after the successful re-ACK").toBeGreaterThan(
-        pendingBefore,
-      );
+      expect(pendingReplies, "a released old-address commit does not manufacture a pending reply").toBe(pendingBefore);
       hostStream.dispose();
       guestStream.dispose();
     });

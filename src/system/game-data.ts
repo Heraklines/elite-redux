@@ -18,6 +18,7 @@ import { Egg } from "#data/egg";
 import { coopGateAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { classifySessionProtection, enqueueSessionCloudMutation } from "#data/elite-redux/coop/coop-cloud-save-tail";
+import { isCoopControlPlaneSaveData } from "#data/elite-redux/coop/coop-control-plane";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   type CoopResumeLoadedSession,
@@ -1742,6 +1743,13 @@ export class GameData {
             checkpointRevision: coopController.checkpointRevision,
           }
         : undefined;
+    const coopControlPlane = getCoopControlPlaneSaveData();
+    if (
+      globalScene.gameMode?.isCoop === true
+      && (coopController == null || coopParticipants == null || coopRun == null || coopControlPlane == null)
+    ) {
+      throw new Error("refusing to serialize an incomplete co-op checkpoint identity/control plane");
+    }
     return {
       seed: globalScene.seed,
       playTime: globalScene.sessionPlayTime,
@@ -1801,7 +1809,7 @@ export class GameData {
       // Co-op W2b (contract doc §4): persist the control-plane snapshot (interaction counter + journal
       // high-water) so a cold resume keeps alternating-owner parity + revision ordering. undefined for
       // every solo save (no live co-op runtime), so non-co-op saves are byte-identical.
-      coopControlPlane: getCoopControlPlaneSaveData(),
+      coopControlPlane,
       coopRun,
       // Pair + authority-seat identity live in the save so discovery survives a missing browser-local
       // pointer/cloud restore without guessing ownership. Pre-seat-map saves are visibly blocked.
@@ -4530,6 +4538,12 @@ export class GameData {
     if (continuationGuard?.() === false) {
       throw new Error("session materialization invalidated before mutation");
     }
+    if (
+      (fromSession.gameMode as number) === GameModes.COOP
+      && !isCoopControlPlaneSaveData(fromSession.coopControlPlane)
+    ) {
+      throw new Error("session materialization refused a missing/invalid co-op control plane");
+    }
     if (isBeta || isDev) {
       try {
         console.debug(
@@ -4586,6 +4600,10 @@ export class GameData {
         destroyStagedPokemon();
         throw new Error("session materialization refused an invalid/stale co-op run identity");
       }
+      if (!applyCoopControlPlaneSaveData(fromSession.coopControlPlane)) {
+        destroyStagedPokemon();
+        throw new Error("session materialization failed to restore the co-op control plane");
+      }
     }
 
     globalScene.gameMode = getGameMode(fromSession.gameMode || GameModes.CLASSIC);
@@ -4616,10 +4634,6 @@ export class GameData {
     // ER Community Challenge: restore the allowed-species whitelist so the catch gate
     // keeps working after a mid-run reload (null/absent for non-community saves).
     setCommunityAllowedSpecies(fromSession.communityAllowedSpecies ?? null);
-    // Co-op W2b (contract doc §4): restore the control-plane snapshot onto the live co-op runtime so a COLD
-    // resume keeps alternating-owner parity + revision ordering continuous (absent/solo save -> no-op).
-    applyCoopControlPlaneSaveData(fromSession.coopControlPlane);
-
     globalScene.setSeed(fromSession.seed || globalScene.game.config.seed[0]);
     globalScene.resetSeed();
 

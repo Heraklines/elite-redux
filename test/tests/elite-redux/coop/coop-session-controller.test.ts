@@ -320,11 +320,7 @@ describe("co-op session controller (#633, P1)", () => {
       expect(h.interactionOwner()).toBe("guest"); // both converged
     });
 
-    it("a resume re-initializes the interaction counter identically on both clients (#833: no persisted restore)", () => {
-      // #833 dangler cleanup: the interaction counter is NOT persisted in SessionSaveData, and the
-      // production-dead `restoreInteractionCounter` seam was removed (nothing to restore). A real
-      // resume relies on BOTH clients re-initializing the counter identically from the fresh runtime
-      // assembly - which is exactly base 0 (host owns the first interaction). Assert that invariant.
+    it("a cold resume restores the persisted interaction counter identically on both clients", () => {
       const { host } = createLoopbackPair();
       const h = new CoopSessionController(host);
       h.advanceInteraction();
@@ -332,15 +328,15 @@ describe("co-op session controller (#633, P1)", () => {
       h.advanceInteraction(); // mid-run: counter = 3 -> owner guest
       expect(h.interactionCounter()).toBe(3);
 
-      // Post-reload: a fresh controller on EITHER role re-initializes to 0 (host owns interaction 0),
-      // so the even/odd ownership parity is preserved for a resume that re-enters from the top.
       const { host: host2, guest: guest2 } = createLoopbackPair();
       const resumedHost = new CoopSessionController(host2);
       const resumedGuest = new CoopSessionController(guest2);
-      expect(resumedHost.interactionCounter()).toBe(0);
-      expect(resumedGuest.interactionCounter()).toBe(0);
-      expect(resumedHost.interactionOwner()).toBe("host"); // fresh = 0 -> host owns the first interaction
-      expect(resumedGuest.interactionOwner()).toBe("host"); // both clients agree
+      resumedHost.restoreInteractionCounter(3);
+      resumedGuest.restoreInteractionCounter(3);
+      expect(resumedHost.interactionCounter()).toBe(3);
+      expect(resumedGuest.interactionCounter()).toBe(3);
+      expect(resumedHost.interactionOwner()).toBe("guest");
+      expect(resumedGuest.interactionOwner()).toBe("guest");
     });
 
     it("the snapshot carries the interaction owner + local-turn flag for the UI", () => {

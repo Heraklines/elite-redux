@@ -26,6 +26,7 @@
 // applies those exact bytes rather than re-reading a mutable slot.
 // =============================================================================
 
+import { type CoopControlPlaneSaveData, isCoopControlPlaneSaveData } from "#data/elite-redux/coop/coop-control-plane";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { canonicalCoopParticipantPair, isCoopRunId, sameCoopIdentity } from "#data/elite-redux/coop/coop-run-identity";
 import type { CoopResumeCommitment, CoopRole } from "#data/elite-redux/coop/coop-transport";
@@ -137,12 +138,7 @@ export interface CoopResumeSessionSummary {
         seats: { host: string; guest: string };
       }
     | undefined;
-  coopControlPlane?:
-    | {
-        interactionCounter: number;
-        journalHighWater: Record<string, number>;
-      }
-    | undefined;
+  coopControlPlane?: CoopControlPlaneSaveData | undefined;
   coopRun?:
     | {
         version: 1;
@@ -194,18 +190,14 @@ export async function digestCoopResumeSession(sessionJson: string): Promise<stri
 
 function sessionRevision(session: CoopResumeSessionSummary): number {
   const controlPlane = session.coopControlPlane;
-  if (controlPlane == null) {
-    return 0;
+  if (!isCoopControlPlaneSaveData(controlPlane)) {
+    return -1;
   }
-  const revisions = Object.values(controlPlane.journalHighWater ?? {}).filter(
-    revision => Number.isSafeInteger(revision) && revision >= 0,
-  );
-  return Math.max(
-    Number.isSafeInteger(controlPlane.interactionCounter) && controlPlane.interactionCounter >= 0
-      ? controlPlane.interactionCounter
-      : 0,
-    ...revisions,
-  );
+  let revision = controlPlane.interactionCounter;
+  for (const mark of Object.values(controlPlane.journalHighWater)) {
+    revision = Math.max(revision, mark);
+  }
+  return revision;
 }
 
 async function buildResumeCandidate(
@@ -250,6 +242,7 @@ export async function deriveCoopResumeCommitment(
     || sameCoopIdentity(participants.players[0], participants.players[1])
     || sameCoopIdentity(participants.seats.host, participants.seats.guest)
     || coopRun?.version !== 1
+    || !isCoopControlPlaneSaveData(session.coopControlPlane)
     || !isCoopRunId(coopRun.runId)
     || !Number.isSafeInteger(coopRun.checkpointRevision)
     || coopRun.checkpointRevision < 0
@@ -316,6 +309,7 @@ function sessionDisposition(
     || typeof participants.seats?.guest !== "string"
     || sameCoopIdentity(participants.seats.host, participants.seats.guest)
     || session.coopRun?.version !== 1
+    || !isCoopControlPlaneSaveData(session.coopControlPlane)
     || !isCoopRunId(session.coopRun.runId)
     || !Number.isSafeInteger(session.coopRun.checkpointRevision)
     || session.coopRun.checkpointRevision < 0

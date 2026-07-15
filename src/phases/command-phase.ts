@@ -63,7 +63,10 @@ import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { getMoveTargets } from "#moves/move-utils";
 import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
-import { rebroadcastCoopWaveStartAuthorityAfterEntryEffects } from "#phases/encounter-phase";
+import {
+  applyCoopEncounterAuthority,
+  rebroadcastCoopWaveStartAuthorityAfterEntryEffects,
+} from "#phases/encounter-phase";
 import { FieldPhase } from "#phases/field-phase";
 import type { MoveTargetSet } from "#types/move-target-set";
 import type { TurnMove } from "#types/turn-move";
@@ -591,6 +594,17 @@ export class CommandPhase extends FieldPhase {
       // checksum verification is owned by CoopReplayTurnPhase now (Phase B), not here.
       const enemies = streamer.consumeEnemyParty(waveIndex);
       if (enemies != null) {
+        // enemyPartySync is one authoritative carrier split across party, encounter identity, and state
+        // inboxes. A blocked NextEncounterPhase can leave all three for this final pre-input fallback.
+        // Never adopt only the party: trainer victory/reward routing depends on the exact descriptor.
+        const encounter = streamer.consumeEnemyPartyEncounter(waveIndex);
+        if (encounter == null) {
+          failCoopSharedSession(
+            `Wave ${waveIndex} authoritative encounter descriptor was unavailable at command input`,
+          );
+          return false;
+        }
+        applyCoopEncounterAuthority(globalScene.currentBattle, encounter);
         // #818: STRUCTURAL adopt - an ME-spawned battle's party exists only on the host,
         // so the guest must be able to BUILD it (species/count/shape), not just correct it.
         adoptCoopEnemiesStructural(enemies);
@@ -611,6 +625,9 @@ export class CommandPhase extends FieldPhase {
         failCoopSharedSession(`Wave ${waveIndex} authoritative entry state could not seal before command input`);
         return false;
       }
+      // Applying an encounter descriptor may reconstruct local trainer presentation. Reassert the pure
+      // renderer contract after the complete carrier has landed and before any public command input opens.
+      ensureCoopAuthoritativeCommandPresentation();
     } else if (controller.role === "host" && turn === 1 && this.fieldIndex === 0) {
       // Co-op HOST (#920): the entry-ability chain (PostSummonPhase) has now settled - terrain, weather,
       // entry-hazard arena tags and entry form changes are on the arena/field, but the wave-start

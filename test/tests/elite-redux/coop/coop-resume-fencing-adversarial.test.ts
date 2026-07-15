@@ -67,6 +67,39 @@ function clearLocalStorage(): void {
   }
 }
 
+describe("control-plane admission fails closed", () => {
+  it.each([
+    ["missing", undefined],
+    ["fractional counter", { interactionCounter: 1.5, journalHighWater: {} }],
+    ["negative counter", { interactionCounter: -1, journalHighWater: {} }],
+    ["unsafe counter", { interactionCounter: Number.MAX_SAFE_INTEGER + 1, journalHighWater: {} }],
+    ["null journal", { interactionCounter: 1, journalHighWater: null }],
+    ["array journal", { interactionCounter: 1, journalHighWater: [] }],
+    ["fractional revision", { interactionCounter: 1, journalHighWater: { "op:wave": 2.5 } }],
+    ["negative revision", { interactionCounter: 1, journalHighWater: { "op:wave": -1 } }],
+  ])("rejects a %s instead of normalizing it to a fresh runtime", async (_label, coopControlPlane) => {
+    const session = coopSession({
+      coopControlPlane: coopControlPlane as CoopResumeSessionSummary["coopControlPlane"],
+    });
+    await expect(deriveCoopResumeCommitment(JSON.stringify(session), session)).resolves.toBeNull();
+
+    recordCoopResumeMarker(0, "Alice", "Bob", session.waveIndex, RUN_A, session.coopRun!.checkpointRevision);
+    const discovery = await findCoopResumeCandidate("Alice", "Bob", "host", async slot =>
+      slot === 0 ? loaded(session) : undefined,
+    );
+    expect(discovery.kind).not.toBe("candidate");
+  });
+
+  it("preserves an odd interaction counter and the greatest journal revision in the commitment", async () => {
+    const session = coopSession({
+      coopControlPlane: { interactionCounter: 5, journalHighWater: { "op:global": 9, "op:wave": 4 } },
+    });
+    const commitment = await deriveCoopResumeCommitment(JSON.stringify(session), session);
+    expect(commitment).not.toBeNull();
+    expect(commitment!.revision).toBe(9);
+  });
+});
+
 // -----------------------------------------------------------------------------
 // ATTACK 6: digest mismatch. Host offers wave-20 digest D1; the transmitted /
 // local bytes digest to D2. The accepted-offer revalidation (coopResumeCommitmentMatches,

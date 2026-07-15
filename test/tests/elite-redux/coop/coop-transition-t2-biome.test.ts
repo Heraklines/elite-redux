@@ -349,7 +349,12 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     // Reproduce the production wave-20/160 shape: a previous public handler is still active when the
     // watcher starts. The watcher must explicitly replace it with a real MESSAGE surface before stock.
     await withClient(rig.guestCtx, async () => {
-      await rig.guestScene.ui.setModeBounded(UiMode.CONFIRM, 2_000, () => {}, () => {});
+      await rig.guestScene.ui.setModeBounded(
+        UiMode.CONFIRM,
+        2_000,
+        () => {},
+        () => {},
+      );
       expect(rig.guestScene.ui.getMode()).toBe(UiMode.CONFIRM);
       expect(rig.guestScene.ui.getHandler().active).toBe(true);
     });

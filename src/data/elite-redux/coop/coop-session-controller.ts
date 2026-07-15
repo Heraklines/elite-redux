@@ -1583,13 +1583,8 @@ export class CoopSessionController {
   }
 
   /**
-   * The raw interaction counter (the alternating-owner order). NOTE: this is NOT persisted in
-   * `SessionSaveData` - a co-op resume does NOT restore it. Both clients re-initialize it identically
-   * from the fresh runtime assembly (base 0), which preserves the even/odd ownership parity for a
-   * resume that re-enters an interaction from the TOP (the common case). A resume landing INSIDE an
-   * in-progress interaction (mid-ME / pending shop handoff) is not restorable as a half-state - see
-   * `docs/coop-structural-gaps.md` Part 3 (the dedicated `restoreInteractionCounter` seam was removed
-   * as production-dead: the counter is never saved, so there was nothing for it to restore).
+   * The raw interaction counter (the alternating-owner order). It is persisted in the co-op control
+   * plane and restored exactly on cold resume so odd/even ownership parity cannot reset to host.
    */
   interactionCounter(): number {
     const counter = this.interactionTurn.toJSON();
@@ -1663,13 +1658,13 @@ export class CoopSessionController {
    * NOT carried in the save; W2b adds `coopControlPlane` to `SessionSaveData` (populated at save, read at
    * load), so the seam now has a real value to restore. Restoring it keeps the alternating-owner PARITY and
    * the revision ordering CONTINUOUS across a cold resume rather than resetting to 0 - a resume from an ODD
-   * counter no longer silently FLIPS ownership. Tolerant of an absent/invalid value (older saves -> base 0,
-   * the prior behavior). A HOT rejoin does not use this (the runtime + its live counter survive in place,
+   * counter no longer silently FLIPS ownership. The resume admission layer rejects missing/invalid control
+   * planes before this seam. A HOT rejoin does not use this (the runtime + its live counter survive in place,
    * validated in Step 0); this is the COLD-resume path only.
    */
   restoreInteractionCounter(counter: number): void {
-    if (!Number.isFinite(counter) || counter < 0) {
-      return; // older save / invalid -> keep the fresh base-0 counter (prior behavior)
+    if (!Number.isSafeInteger(counter) || counter < 0) {
+      return;
     }
     this.interactionTurn.restore(counter);
     coopLog("interaction", `restoreInteractionCounter(${counter}) (role=${this.role}, cold-resume)`);

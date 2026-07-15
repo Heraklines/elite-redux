@@ -35,9 +35,7 @@ export function sortCoopChecksumTagIds(tags: readonly string[]): string[] {
 }
 
 /** Canonicalize string-enum arena tag identities by tag name, then numeric side. */
-export function sortCoopChecksumArenaTags(
-  tags: readonly (readonly [string, number])[],
-): [string, number][] {
+export function sortCoopChecksumArenaTags(tags: readonly (readonly [string, number])[]): [string, number][] {
   return tags
     .map(([tagType, side]) => [tagType, side] as [string, number])
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]));

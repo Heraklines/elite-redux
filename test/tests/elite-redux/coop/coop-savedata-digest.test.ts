@@ -61,12 +61,14 @@ import {
 } from "#data/elite-redux/er-map-nodes";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
+import { restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
 import { BattlerIndex } from "#enums/battler-index";
 import { BerryType } from "#enums/berry-type";
 import { BiomeId } from "#enums/biome-id";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { BerryModifier } from "#modifiers/modifier";
@@ -731,6 +733,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       lead.id = id;
       globalScene.addModifier(new BerryModifier(new BerryModifierType(BerryType.SITRUS), id, BerryType.SITRUS), true);
       restoreErMoneyStreaks([[id, 5]]);
+      restoreErResistBerries([[id, PokemonType.FIRE]]);
     };
     const hostDigest = withClientSync(rig.hostCtx, () => {
       seed(HOST_ID);
@@ -744,6 +747,10 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       expect(normalized.erMoneyStreaks, "the money-streak id normalized to its stable party slot token").toEqual([
         ["p0", 5],
       ]);
+      expect(
+        normalized.erResistBerries,
+        "the legacy resist-berry id normalized to its stable party slot token",
+      ).toEqual([["p0", PokemonType.FIRE]]);
       return captureCoopSaveDataDigest();
     });
     const guestDigest = withClientSync(rig.guestCtx, () => {

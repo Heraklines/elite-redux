@@ -1,6 +1,6 @@
 import type { PokeballCounts } from "#app/battle-scene";
 import type { Tutorial } from "#app/tutorial";
-import type { CoopControlPlaneSaveData } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopControlPlaneSaveData } from "#data/elite-redux/coop/coop-control-plane";
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";

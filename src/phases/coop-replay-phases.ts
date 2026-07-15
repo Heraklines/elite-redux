@@ -1228,6 +1228,9 @@ export class CoopFinalizeTurnPhase extends Phase {
           `guest finalize turn=${this.turn}: commit NOT converged checkpoint=${checkpointApplied} state=${stateApplied} `
             + `failures=${failures.length} host=${resolution.checksum} guest=${checksum}`,
         );
+        // Protocol-33 parks before the legacy verifyChecksum path. Emit the canonical leaf diff here too;
+        // otherwise retained retries expose only two opaque hashes and the causal hidden field is lost.
+        this.logChecksumPreimageDiff(resolution.preimage, `turn=${this.turn}`);
       }
       return converged;
     } catch (error) {
@@ -1457,22 +1460,8 @@ export class CoopFinalizeTurnPhase extends Phase {
     // canonical sub-diff of the host's streamed pre-image vs the guest's own recompute), TALLY it
     // (surfaced in the #808 health line + read by the soak/duo harness as `assertions`), and STILL heal
     // ONCE below as a safety net so a live player is never stranded. `stateSync` is now a rare-fault path.
-    const hostObj = this.parseCanonical(hostPreimage);
-    const guestObj = hostObj === undefined ? undefined : this.parseCanonical(canonicalize(captureCoopChecksumState()));
-    const assertionCount = recordCoopChecksumAssertion(`turn=${this.turn}`, hostObj, guestObj);
-    // The assertion emitter writes directly to console.error/warn, which embedded log collectors and some
-    // CI reporters can intercept. Mirror the canonical leaf diff through the durable co-op log channel so a
-    // tester's submitted host/guest logs always identify the exact nested field that caused the assertion.
-    if (hostObj !== undefined && guestObj !== undefined) {
-      const diff = collectCanonicalDiff(hostObj, guestObj);
-      coopWarn(
-        "checksum",
-        `turn=${this.turn} ASSERTION-DIFF ${diff.lines.length}${diff.truncated ? "+" : ""} field(s)`,
-      );
-      for (const line of diff.lines) {
-        coopWarn("checksum", line.trim());
-      }
-    }
+    const compared = this.logChecksumPreimageDiff(hostPreimage, `turn=${this.turn}`);
+    const assertionCount = recordCoopChecksumAssertion(`turn=${this.turn}`, compared?.hostObj, compared?.guestObj);
     coopWarn(
       "checksum",
       `turn=${this.turn} MISMATCH host=${hostChecksum} guest=${guestChecksum} assertion#${assertionCount} `
@@ -1543,6 +1532,24 @@ export class CoopFinalizeTurnPhase extends Phase {
     } catch {
       return;
     }
+  }
+
+  /** Mirror a host/guest canonical checksum leaf diff through the durable tester-log channel. */
+  private logChecksumPreimageDiff(
+    hostPreimage: string | undefined,
+    label: string,
+  ): { hostObj: unknown; guestObj: unknown } | undefined {
+    const hostObj = this.parseCanonical(hostPreimage);
+    const guestObj = hostObj === undefined ? undefined : this.parseCanonical(canonicalize(captureCoopChecksumState()));
+    if (hostObj === undefined || guestObj === undefined) {
+      return;
+    }
+    const diff = collectCanonicalDiff(hostObj, guestObj);
+    coopWarn("checksum", `${label} ASSERTION-DIFF ${diff.lines.length}${diff.truncated ? "+" : ""} field(s)`);
+    for (const line of diff.lines) {
+      coopWarn("checksum", line.trim());
+    }
+    return { hostObj, guestObj };
   }
 
   /**

@@ -101,6 +101,7 @@ import {
   resetCoopColosseumOperationState,
   setCoopColosseumOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-colosseum-operation";
+import { type CoopControlPlaneSaveData, isCoopControlPlaneSaveData } from "#data/elite-redux/coop/coop-control-plane";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { CoopDurabilityManager, isCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
 import {
@@ -3214,12 +3215,7 @@ export function getCoopController(): CoopSessionController | null {
  * durability journal high-water marks (so committed-op revisions continue monotonically across the save
  * boundary). Optional on the save; absent for every solo / pre-W2b save (fully backward-compatible).
  */
-export interface CoopControlPlaneSaveData {
-  /** The alternating-owner interaction counter at save time (§1.8). */
-  interactionCounter: number;
-  /** Per-class committed-op high-water marks at save time (§4.1); `{}` when nothing was committed. */
-  journalHighWater: Record<string, number>;
-}
+export type { CoopControlPlaneSaveData } from "#data/elite-redux/coop/coop-control-plane";
 
 /**
  * W2b: capture the live co-op control-plane snapshot for `getSessionSaveData()`, or `undefined` when there
@@ -3231,37 +3227,39 @@ export function getCoopControlPlaneSaveData(): CoopControlPlaneSaveData | undefi
     return;
   }
   try {
-    return {
+    const snapshot = {
       // Wave-2e: the UNION of the committer's journal high-water and the receiver's applied marks, so the
       // host (committer) and guest (receiver) serialize the SAME converged value - a plain highWaterMarks()
       // is populated only on the host, so the saveDataDigest would diverge the moment it commits an op.
       interactionCounter: runtime.controller.interactionCounter(),
       journalHighWater: runtime.durability?.controlPlaneHighWater() ?? {},
     };
-  } catch {
-    return; // the control-plane snapshot must never break the save path
+    return isCoopControlPlaneSaveData(snapshot) ? snapshot : undefined;
+  } catch (error) {
+    coopWarn("control-plane snapshot capture failed", error);
+    return;
   }
 }
 
 /**
  * W2b: restore a persisted control-plane snapshot onto the live co-op runtime on a COLD resume (§4). Tolerant
- * of an absent field (older/solo save -> no-op, the prior base-0 behavior). A HOT rejoin never calls this
- * (the runtime + its live counter survive in place - Step 0 validated).
+ * only of runtime restore exceptions after admission has proved a complete, valid co-op field; solo loads never call it.
+ * A HOT rejoin never calls this (the runtime + its live counter survive in place - Step 0 validated).
  */
-export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | undefined): void {
-  if (data == null) {
-    return;
+export function applyCoopControlPlaneSaveData(data: unknown): boolean {
+  if (!isCoopControlPlaneSaveData(data)) {
+    return false;
   }
   const runtime = active;
   if (runtime == null) {
-    return;
+    return false;
   }
   try {
     runtime.controller.restoreInteractionCounter(data.interactionCounter);
     // Wave-2e: restore the converged marks into BOTH the committer high-water AND the receiver applied
     // ledger, so a resumed guest neither re-applies an already-applied op nor diverges from the host on the
     // post-resume digest (both peers restore the identical value, §4.6).
-    const marks = data.journalHighWater ?? {};
+    const marks = data.journalHighWater;
     const legacyGlobalFloor = Object.entries(marks)
       .filter(([cls]) => cls.startsWith("op:") && cls !== "op:global")
       .reduce((sum, [, revision]) => sum + (Number.isSafeInteger(revision) && revision > 0 ? revision : 0), 0);
@@ -3288,8 +3286,10 @@ export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | u
     // Wave-2f KEYSTONE (W2e-R P0-3): floor the wave-advance producer + guest so a resumed run continues the
     // committed-op revision stream at N+1 and the restored receiver ledger accepts it.
     setCoopWaveAdvanceOperationRevisionFloor(marks["op:wave"] ?? 0, runtime.waveOperationBinding);
-  } catch {
-    /* control-plane restore is best-effort; a resume must never hard-fail on it */
+    return true;
+  } catch (error) {
+    coopWarn("control-plane restore failed", error);
+    return false;
   }
 }
 

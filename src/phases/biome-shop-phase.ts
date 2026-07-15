@@ -87,6 +87,8 @@ export function setCoopBiomeMarketTestSkip(on: boolean): void {
 export class BiomeShopPhase extends SelectModifierPhase {
   /** Runtime that owns this market, retained across async UI/relay continuations. */
   private readonly coopBiomeOwningRuntime = getCoopRuntime();
+  /** Scene that owns this market; ambient `globalScene` may be the peer after an async duo-harness yield. */
+  private readonly coopBiomeOwningScene = globalScene;
   /** The shop stock. `protected` so event-specific shops (e.g. ExoticShopPhase)
    * can override buildStock() to supply their own curated goods. */
   protected shopOptions: ModifierTypeOption[] = [];
@@ -111,8 +113,6 @@ export class BiomeShopPhase extends SelectModifierPhase {
   /** Invalidates callbacks retained by an older CONFIRM handler on this same phase instance. */
   private coopConfirmAttempt = 0;
   private coopTerminalPromise: Promise<boolean> | null = null;
-  /** True only after the watcher reconstructed authoritative stock and can consume the exact terminal stream. */
-  private coopBiomeWatcherContinuationReady = false;
   /**
    * Narrow subclass-owned execution marker for a relayed paid buy. The base phase deliberately keeps its
    * watcher/option axes private; this marker lets the market validate its retained host intent without
@@ -462,8 +462,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
   private coopBoundaryStillLive(generation: number, wave: number): boolean {
     return (
       coopSessionGeneration() === generation
-      && globalScene.currentBattle?.waveIndex === wave
-      && globalScene.phaseManager.getCurrentPhase() === this
+      && this.coopBiomeOwningScene.currentBattle?.waveIndex === wave
+      && this.coopBiomeOwningScene.phaseManager.getCurrentPhase() === this
     );
   }
 
@@ -856,7 +856,10 @@ export class BiomeShopPhase extends SelectModifierPhase {
    */
   private async coopBiomeWatch(): Promise<void> {
     const generation = coopSessionGeneration();
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const scene = this.coopBiomeOwningScene;
+    const runtime = this.coopBiomeOwningRuntime;
+    const controller = runtime?.controller ?? getCoopController();
+    const wave = scene.currentBattle?.waveIndex ?? -1;
     const pinned = this.coopBiomeStart;
     if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
       return;
@@ -879,7 +882,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       // through to the buy-apply loop and applies the guest's relayed buys verbatim, exactly like a normal
       // watcher (SelectModifierPhase's #828 host-option-owner-but-pick-watcher case).
       this.buildStock();
-      if (getCoopRuntime()?.spoof == null) {
+      if (runtime?.spoof == null) {
         relay.sendRewardOptions(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL, serializeRewardOptions(this.shopOptions));
       }
     } else {
@@ -887,7 +890,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
         return;
       }
-      const rebuilt = streamed == null ? null : reconstructRewardOptions(streamed, globalScene.getPlayerParty());
+      const rebuilt = streamed == null ? null : reconstructRewardOptions(streamed, scene.getPlayerParty());
       if (rebuilt == null) {
         this.coopBiomeAuthoritativeStockUnavailable("watcher could not recover/reconstruct streamed stock");
         return;
@@ -898,15 +901,14 @@ export class BiomeShopPhase extends SelectModifierPhase {
       this.shopOptions = rebuilt;
       this.qtys = this.shopOptions.map(() => 99);
     }
-    // Stock awaits can span another UI transition. Re-open and revalidate the exact watcher surface at
-    // the instant readiness is published; a buffered owner terminal remains safe until the loop below.
+    // Stock awaits can span another UI transition. Revalidate (and reopen only when actually lost) at the
+    // instant readiness is published; a buffered owner terminal remains safe until the loop below.
     if (!(await this.openCoopBiomeWatcherMessage(generation, wave, pinned))) {
       return;
     }
     // The watcher never opens BIOME_SHOP, so its equivalent executable continuation is the fully
     // materialized stock plus the live terminal-consumer loop. Record readiness only after option
     // authority has been resolved; phase construction or the initial waiting message is too early.
-    this.coopBiomeWatcherContinuationReady = true;
     this.notifyCoopBiomeContinuationSurfaceReady();
     const seq = coopBiomeShopSeq(this.coopBiomeStart);
     this.coopRewardOperationBinding ??= captureCoopRewardOperationBinding();
@@ -914,7 +916,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
     for (;;) {
       const action = await awaitCoopChoiceWithOrphanBackstop(
         relay,
-        getCoopController(),
+        controller,
         seq,
         pinned,
         COOP_BIOME_SHOP_CHOICE_KINDS,
@@ -928,7 +930,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
           "reward",
           `biome market watcher did not receive an exact terminal seq=${seq} attempt=${missingTerminalAttempts}/3 - reconnecting without inferring LEAVE`,
         );
-        getCoopRuntime()?.durability?.reconnect();
+        runtime?.durability?.reconnect();
         if (missingTerminalAttempts >= 3) {
           failCoopSharedSession(`Biome market watcher never received an exact terminal for ${pinned}`);
           return;
@@ -947,7 +949,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
           pinned: this.coopBiomeStart,
           action: { choice: action.choice, data: action.data, operationId: action.operationId },
           terminal,
-          localRole: getCoopController()?.role ?? "guest",
+          localRole: controller?.role ?? "guest",
           wave: this.coopRewardWave(),
           turn: this.coopRewardTurn(),
         },
@@ -1040,14 +1042,14 @@ export class BiomeShopPhase extends SelectModifierPhase {
       const retainedHostResultCommitted =
         decision.requiresAuthorityCommit
         && decision.operationId != null
-        && getCoopController()?.role === "host"
+        && controller?.role === "host"
         && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding);
       if (!retainedHostResultCommitted && money >= 0) {
         if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
           return;
         }
-        globalScene.money = money;
-        globalScene.updateMoneyText();
+        scene.money = money;
+        scene.updateMoneyText();
       }
       if (
         !retainedHostResultCommitted
@@ -1066,22 +1068,27 @@ export class BiomeShopPhase extends SelectModifierPhase {
     if (!this.advanceCoopBiomeTerminal(this.coopBiomeStart)) {
       return;
     }
-    globalScene.ui.clearText();
+    scene.ui.clearText();
     this.finishCoopBiomeShopLeave();
   }
 
   /** Materialize the watcher-facing MESSAGE handler and prove it still belongs to this exact market. */
   private async openCoopBiomeWatcherMessage(generation: number, wave: number, pinned: number): Promise<boolean> {
     const live = (): boolean => this.coopAsyncBoundaryStillLive(generation, wave, pinned);
-    const opened = await globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, live);
+    const scene = this.coopBiomeOwningScene;
+    const alreadyOpen = scene.ui.getMode() === UiMode.MESSAGE && scene.ui.getHandler()?.active === true;
+    if (alreadyOpen) {
+      return live();
+    }
+    const opened = await scene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, live);
     if (opened === "superseded" || !live()) {
       return false;
     }
-    globalScene.ui.showText("Your partner is browsing the market...", null, undefined, null, true);
+    scene.ui.showText("Your partner is browsing the market...", null, undefined, null, false);
     if (!live()) {
       return false;
     }
-    const publicSurface = globalScene.ui.getMode() === UiMode.MESSAGE && globalScene.ui.getHandler()?.active === true;
+    const publicSurface = scene.ui.getMode() === UiMode.MESSAGE && scene.ui.getHandler()?.active === true;
     if (!publicSurface) {
       failCoopSharedSession(`Biome market watcher could not open its continuation surface for ${pinned}`);
       return false;
