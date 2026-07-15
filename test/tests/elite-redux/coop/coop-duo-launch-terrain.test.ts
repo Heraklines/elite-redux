@@ -211,6 +211,18 @@ describe.skipIf(!RUN)("co-op DUO launch-snapshot: guest adopts the host's on-ent
     expect(coopWaveStartEntryEffectSignature({ ...base, tick: 99 })).toBe(coopWaveStartEntryEffectSignature(base));
   });
 
+  it("captures live post-summon stat stages instead of the stale save projection", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const enemy = game.scene.getEnemyField()[1];
+    expect(enemy).toBeDefined();
+    enemy.getStatStages()[1] = 1;
+
+    const state = captureCoopAuthoritativeBattleState(game.scene.currentBattle.turn);
+    expect(state).not.toBeNull();
+    const wireEnemy = state!.enemyParty.find(raw => raw.id === enemy.id);
+    expect((wireEnemy?.summonData as { statStages?: number[] } | undefined)?.statStages?.[1]).toBe(1);
+  });
+
   it("guest adopts a Cheap Tactics pre-command HP mutation from the refreshed retained carrier", async () => {
     game.override
       .enemySpecies(SpeciesId.SKWOVET)

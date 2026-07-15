@@ -2572,6 +2572,15 @@ function pokemonDataForWire(mon: Pokemon): Record<string, unknown> {
   // authoritative renderer must not recalculate under its own ER modifier/context, so the live network
   // carrier includes the host's exact array; applyAuthoritativeMonData already gives it precedence.
   data.stats = [...mon.stats];
+  // PokemonData is a save-oriented projection and can retain the pre-summon snapshot even after a live
+  // PostSummon ability mutates the battler's stages. Wave-start authority is captured precisely at that
+  // post-entry boundary, so stamp the live mechanical array explicitly. Otherwise the entry-effect seal
+  // notices a change elsewhere, re-broadcasts, but still carries zero stages and opens command on drifted math.
+  const summonData = data.summonData;
+  data.summonData = {
+    ...(summonData != null && typeof summonData === "object" ? summonData : {}),
+    statStages: [...mon.getStatStages()],
+  };
   return data;
 }
 
