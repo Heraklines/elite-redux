@@ -2551,12 +2551,16 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     ownerScene: BattleScene,
     wave: number,
     policy: "seeded" | "leave" = "seeded",
+    alreadyStarted = false,
   ): Promise<string> => {
     const reviveSlot = policy === "seeded" && profile === "level" ? firstFaintedPartySlot(ownerScene) : -1;
     const take =
       policy === "seeded"
       && (opts.forceTakeRewardWaves?.has(wave) === true || (rewardPolicy === "seeded" && rng() < 0.5));
-    await driveHostRewardShopOwner(shop, reviveSlot >= 0 ? { takeReward: take, reviveSlot } : { takeReward: take });
+    await driveHostRewardShopOwner(
+      shop,
+      reviveSlot >= 0 ? { takeReward: take, reviveSlot, alreadyStarted } : { takeReward: take, alreadyStarted },
+    );
     // reviveSlot>=0 means a Revive was TAKEN iff the pool rolled one (the shop path decides post-start); a
     // non-fainted party or no-Revive pool falls through to seeded take/leave. The label reflects the intent.
     if (reviveSlot >= 0 && !ownerScene.getPlayerParty()[reviveSlot]?.isFainted()) {
@@ -2627,6 +2631,23 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // retained WAVE_ADVANCE unresolved; the next wave then correctly fails closed on two candidate identities.
       // The retained WAVE_ADVANCE DATA is admitted only while that exact BattleEnd is current; the helper
       // stops before the queued SelectModifierPhase starts, so no detached surface can skip the boundary.
+      // A retained automatic terminal can arrive after the final replay finalizer, leaving the guest safely
+      // parked at a closed phantom CommandPhase with its boundary wake queued. Production releases that exact
+      // state when the host ENTERS the authoritative shop and phase-routes the displaced command. Start the
+      // host's real shop first (owner or watcher), then let the guest consume that route and drain its retained
+      // Victory/BattleEnd tail. Reaching the guest shop before starting the host manufactured a harness-only
+      // deadlock: nobody had announced the authoritative shop point that closes cmd:<wave>:<turn+1>.
+      let hostShopStarted = false;
+      if (hostOwns) {
+        await withClient(rig.hostCtx, async () => {
+          hostShop.start();
+          await drainLoopback();
+        });
+        hostShopStarted = true;
+      } else {
+        await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
+        hostShopStarted = true;
+      }
       const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
       await awaitGuestWaveTransaction(wave, false);
       // A terminal turn has TWO authoritative material boundaries: its TurnEnd checkpoint and the retained
@@ -2642,10 +2663,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       let action: string;
       if (hostOwns) {
         await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
-        action = await withClient(rig.hostCtx, () => driveOwnerReward(hostShop, rig.hostScene, wave, ownerPolicy));
+        action = await withClient(rig.hostCtx, () =>
+          driveOwnerReward(hostShop, rig.hostScene, wave, ownerPolicy, hostShopStarted),
+        );
         await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
       } else {
-        await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
         action = await withClient(rig.guestCtx, () => driveOwnerReward(guestShop, rig.guestScene, wave, ownerPolicy));
         await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
       }

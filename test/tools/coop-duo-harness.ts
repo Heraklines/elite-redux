@@ -2196,6 +2196,8 @@ export async function driveHostRewardShopOwner(
   opts: {
     takeReward?: boolean;
     reviveSlot?: number;
+    /** The real queued phase already arrived while routing a late retained partner boundary. */
+    alreadyStarted?: boolean;
     /** Start/arrive the other real client at this same reciprocal shop boundary. */
     partnerReady?: () => Promise<void>;
     /** Let the other client materialize the retained terminal before the owner continues. */
@@ -2204,7 +2206,9 @@ export async function driveHostRewardShopOwner(
 ): Promise<number> {
   // start() resolves owner/watcher from the pinned counter, streams the rolled options to the watcher,
   // and opens the owner screen (the prompt handler would drive the UI; here we drive the logic directly).
-  hostPhase.start();
+  if (!opts.alreadyStarted) {
+    hostPhase.start();
+  }
   await opts.partnerReady?.();
   // A guest owner adopts the host-rolled list over transport. Real UI input cannot occur until that
   // asynchronous adoption populates the grid; observe the same readiness boundary here so takeReward
