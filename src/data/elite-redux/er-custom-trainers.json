@@ -502,5 +502,83 @@
     ],
     "trainerClass": "MISTY",
     "weight": 100
+  },
+  "TRAINER_70005": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "youngsters now days have no respect for their elders!",
+    "difficulties": [
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70005,
+    "introDialogue": "bla bla bla, back in my days bla bla bla great pokemon war bla bla bla...",
+    "maxWave": 80,
+    "minWave": 40,
+    "name": "Lt Surge",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "THUNDER_PUNCH",
+          "RLNA",
+          "MACH_PUNCH",
+          "RLNA"
+        ],
+        "species": 125
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "QUICK_CLAW"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "FAKE_OUT",
+              "THUNDER_PUNCH",
+              "SEISMIC_FIST",
+              "ENCORE"
+            ],
+            "species": 26,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 2,
+            "level": null,
+            "moves": [
+              "EXPANDING_FORCE",
+              "LIGHTNING_STRIKE",
+              "RLA",
+              "LIGHT_SCREEN"
+            ],
+            "species": 2026,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "DRAINING_KISS",
+          "THUNDER_FANG",
+          "PURSUIT",
+          "SUBSTITUTE"
+        ],
+        "species": 836
+      }
+    ],
+    "trainerClass": "LT_SURGE",
+    "victoryDialogue": "50 years too early to fight me kid!",
+    "weight": 100
   }
 }
