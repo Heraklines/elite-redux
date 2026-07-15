@@ -1307,7 +1307,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       expect(preparePresentation).toHaveBeenCalledOnce();
       expect(presentationRetry.coopPresentationPreparing).toBe(false);
       expect(retryPresentation).toBeTypeOf("function");
-      retryPresentation?.();
+      (retryPresentation as unknown as () => void)();
       await Promise.resolve();
       expect(preparePresentation).toHaveBeenCalledTimes(2);
       expect(reenterStart, "presentation recovery never re-enters permit acquisition").not.toHaveBeenCalled();
