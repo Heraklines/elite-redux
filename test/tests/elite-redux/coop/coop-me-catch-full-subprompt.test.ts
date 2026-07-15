@@ -30,6 +30,7 @@ import {
   resetCoopMeOperationFlag,
   resetCoopMeOperationState,
   setCoopMeOperationEnabled,
+  setCoopMePresentationAuthorityStateHooksForTest,
 } from "#data/elite-redux/coop/coop-me-operation";
 import { setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
@@ -38,7 +39,11 @@ import {
   getCoopInteractionRelay,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopInteractionOutcome, CoopMessage } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopInteractionOutcome,
+  CoopMessage,
+} from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { UiMode } from "#enums/ui-mode";
 import { coopHostStreamCatchFullAwaitSlot } from "#mystery-encounters/encounter-phase-utils";
@@ -59,12 +64,33 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
     prevGlobalScene = globalScene;
     setCoopMeOperationEnabled(true);
     resetCoopMeOperationState();
+    setCoopMePresentationAuthorityStateHooksForTest({
+      capture: turn => ({
+        version: 1,
+        tick: 700 + turn,
+        wave: globalScene.currentBattle?.waveIndex ?? 7,
+        turn,
+        playerParty: [{ id: 1 }] as unknown as CoopAuthoritativeBattleStateV1["playerParty"],
+        enemyParty: [],
+        field: [],
+        weather: 0,
+        weatherTurnsLeft: 0,
+        terrain: 0,
+        terrainTurnsLeft: 0,
+        arenaTags: [],
+        money: 0,
+        pokeballCounts: [],
+        playerModifiers: [],
+        enemyModifiers: [],
+      }),
+    });
   });
 
   afterEach(() => {
     clearCoopRuntime();
     resetCoopMeOperationFlag();
     resetCoopMeOperationState();
+    setCoopMePresentationAuthorityStateHooksForTest(null);
     setCoopMeInteractionStart(-1); // drop the ME pin so the next file starts clean
     setActiveCoopReplayMePhaseForHarness(null);
     // Citizenship (#710): restore the real scene so the NEXT ER_SCENARIO file's GameManager does not reuse
@@ -126,7 +152,7 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
 
   it("HOST commits the exact catch-full sub-prompt as a durable ME_PRESENT step", async () => {
     const commitSpy = vi.spyOn(meOp, "commitMeOwnerIntent");
-    const { seqMe, guestRelay } = hostRig(3, 6, true);
+    const { seqMe, guestRelay, committedEnvelopes } = hostRig(3, 6, true);
 
     const hostAwait = coopHostStreamCatchFullAwaitSlot("Rattata");
     // Journal mode intentionally emits no raw mePresent. The committed presentation is the carrier;
@@ -143,6 +169,9 @@ describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
     expect((presentationCommits[0][0].payload as { presentation?: CoopInteractionOutcome }).presentation).toMatchObject(
       { k: "mePresent", subPrompt: { kind: "catchFull", pokemonName: "Rattata" } },
     );
+    expect(
+      committedEnvelopes.find(envelope => envelope.pendingOperation?.kind === "ME_PRESENT")?.authoritativeState.tick,
+    ).toBeGreaterThan(0);
   });
 
   it("HOST commits the guest-owned catch-full slot as a durable ME_SUB step", async () => {

@@ -347,6 +347,23 @@ const DEFAULT_ENABLED = !(typeof process !== "undefined" && process.env?.COOP_ME
 
 let enabled = DEFAULT_ENABLED;
 
+/** Engine capture seam; focused operation tests can supply a complete Phaser-free authority image. */
+export interface CoopMePresentationAuthorityStateHooks {
+  readonly capture: (turn: number) => CoopAuthoritativeBattleStateV1 | null;
+}
+
+const productionPresentationAuthorityStateHooks: CoopMePresentationAuthorityStateHooks = {
+  capture: turn => captureCoopAuthoritativeBattleState(turn),
+};
+let presentationAuthorityStateHooks = productionPresentationAuthorityStateHooks;
+
+/** Focused-test seam; passing null restores the real atomic engine capture. */
+export function setCoopMePresentationAuthorityStateHooksForTest(
+  hooks: CoopMePresentationAuthorityStateHooks | null,
+): void {
+  presentationAuthorityStateHooks = hooks ?? productionPresentationAuthorityStateHooks;
+}
+
 /**
  * Every mutable ME operation cursor belongs to one concrete runtime. Production still has one runtime per
  * process; the two-engine harness has two, so a host commit can no longer poison the guest's applied-id cursor,
@@ -677,7 +694,7 @@ function controlContext(wave: number, turn: number): CoopCommitContext {
 
 /** Capture the mechanical image described by the accompanying retained ME presentation. */
 function presentationContext(wave: number, turn: number): CoopCommitContext | null {
-  const authoritativeState = captureCoopAuthoritativeBattleState(turn);
+  const authoritativeState = presentationAuthorityStateHooks.capture(turn);
   if (
     authoritativeState == null
     || authoritativeState.tick <= 0

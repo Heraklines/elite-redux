@@ -13,6 +13,7 @@ import {
   resetCoopMeOperationFlag,
   resetCoopMeOperationState,
   setCoopMeOperationEnabled,
+  setCoopMePresentationAuthorityStateHooksForTest,
 } from "#data/elite-redux/coop/coop-me-operation";
 import { type CoopMeTerminalPayload, makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
 import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
@@ -105,6 +106,13 @@ describe("complete retained Mystery terminal transaction", () => {
     };
 
     setCoopMeOperationEnabled(true);
+    setCoopMePresentationAuthorityStateHooksForTest({
+      capture: turn => ({
+        ...authoritativeState(12),
+        turn,
+        playerParty: [{ id: 1 }] as unknown as CoopAuthoritativeBattleStateV1["playerParty"],
+      }),
+    });
     try {
       setActiveCoopRuntimeOpState(runtimeA);
       expect(nextCoopMePresentationStep(pinned)).toBe(0);
@@ -127,6 +135,7 @@ describe("complete retained Mystery terminal transaction", () => {
         resetCoopMeOperationState();
       }
       setActiveCoopRuntimeOpState(null);
+      setCoopMePresentationAuthorityStateHooksForTest(null);
       resetCoopMeOperationFlag();
     }
   });
