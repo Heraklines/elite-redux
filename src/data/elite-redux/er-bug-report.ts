@@ -83,7 +83,7 @@ export interface BugReportResult {
 }
 
 function readEnv(name: string): string {
-  const value = (import.meta.env as Record<string, unknown> | undefined)?.[name];
+  const value = (import.meta.env as unknown as Record<string, unknown> | undefined)?.[name];
   return typeof value === "string" ? value : "";
 }
 
