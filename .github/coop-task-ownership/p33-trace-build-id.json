@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "taskId": "p33-trace-build-id",
+  "branch": "ci/coop/p33-trace-build-id",
+  "trainRef": "ci/coop/p33-closure-codex",
+  "baseSha": "c07ee63df0baceff51cc604267b229a46e97adcb",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-trace-build-id.json",
+    "biome.jsonc",
+    "plugins/vite/build-id-plugin.ts",
+    "src/data/elite-redux/coop/coop-diagnostics.ts",
+    "src/data/elite-redux/coop/coop-report-correlation.ts",
+    "src/data/elite-redux/er-bug-report.ts",
+    "src/dev-tools/test-suite/index.ts",
+    "src/init/init-update-checker.ts",
+    "src/utils/build-identity.ts",
+    "src/vite.env.d.ts",
+    "test/plugins/build-id-plugin.test.ts",
+    "test/tests/elite-redux/data/er-bug-report.test.ts",
+    "test/tools/coop-diagnostics.test.ts",
+    "test/utils/report-correlation.test.ts"
+  ]
+}
