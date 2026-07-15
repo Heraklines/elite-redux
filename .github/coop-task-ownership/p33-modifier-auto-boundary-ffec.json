@@ -10,6 +10,7 @@
     "src/phases/encounter-phase.ts",
     "src/phases/trainer-victory-phase.ts",
     "test/tests/elite-redux/coop/coop-trainer-victory-boundary.test.ts",
-    "test/tools/coop-duo-harness.ts"
+    "test/tools/coop-duo-harness.ts",
+    "test/tools/coop-soak-driver.ts"
   ]
 }
