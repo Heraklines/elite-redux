@@ -55,6 +55,7 @@ import type { CommandPhase } from "#phases/command-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
+  driveClientPhaseQueueTo,
   driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   installHeadlessPlayerAtlasCompletionModel,
@@ -588,17 +589,44 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     // Preserve the real public command -> turn -> BattleEnd route while making the KO deterministic.
     // This changes only battle state, not the phase queue or retained operation protocol.
     withClientSync(rig.hostCtx, () => {
-      for (const enemy of rig.hostScene.getEnemyField()) {
+      const enemies = rig.hostScene.getEnemyField();
+      expect(enemies, "the double has one live target for each player").toHaveLength(2);
+      for (const enemy of enemies) {
         enemy.hp = 1;
       }
     });
     await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
+    const guestCommand = withClientSync(
+      rig.hostCtx,
+      () => rig.hostScene.currentBattle.turnCommands[COOP_GUEST_FIELD_INDEX],
+    );
+    expect(guestCommand?.targets, "RIGHT + confirm selected the second 1-HP enemy").toEqual([BattlerIndex.ENEMY_2]);
     const turn = rig.hostScene.currentBattle.turn;
     await withClient(rig.hostCtx, async () => {
       game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
+      expect(
+        rig.hostScene.currentBattle.turnCommands[COOP_HOST_FIELD_INDEX]?.targets,
+        "the host selected the first 1-HP enemy",
+      ).toEqual([BattlerIndex.ENEMY]);
       await game.phaseInterceptor.to("TurnEndPhase");
+      expect(
+        rig.hostScene.currentBattle.enemyParty.every(enemy => enemy.isFainted()),
+        "both targets were KO'd",
+      ).toBe(true);
+      expect(
+        rig.hostScene.phaseManager.getCurrentPhase().phaseName,
+        "Victory/EXP completed and reached the exact retained boundary",
+      ).toBe("BattleEndPhase");
     });
     await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+
+    // Do not inspect progression while either engine is still in its victory tail. Stop both before their
+    // real reward surface starts; reaching it proves BattleEnd completed and the retained DATA was applied.
+    await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectModifierPhase", false));
+    const guestReward = await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, "SelectModifierPhase"),
+    );
+    expect(guestReward.phaseName, "the renderer completed its victory tail too").toBe("SelectModifierPhase");
 
     const hostAfter = withClientSync(rig.hostCtx, () =>
       rig.hostScene.getPlayerParty().map(mon => ({ id: mon.id, owner: mon.coopOwner, exp: mon.exp })),
