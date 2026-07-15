@@ -1,0 +1,54 @@
+===== COOP SOAK RESULT =====
+profile: god-b
+verdict: FAIL
+waves_requested: 45
+run: 29410627869 (ci/coop/p33-auto-victory-seal)
+timestamp: 2026-07-15T11-11-28Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20365441 WAVES=45 - replay this run with:  SOAK_SEED=20365441 SOAK_WAVES=45 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] RUN ENDED crossing into wave 29 (seed 20365441): host at terminal phase TitlePhase. Survey stops here.
+[22m[39m[coop-soak] DONE seed=20365441 waves=28/45 resyncHeals=0 assertions=0 findings=0 trainerWaves=4 (fixed=3 random=1) skips={"mysteryEncounterDisabledV1":1} elapsedMs=54610
+[coop-soak] RUN ENDED at wave 29 (seed 20365441): host at terminal phase TitlePhase. Surveyed 28/45 waves under all invariants before the terminal.
+
+----- vitest result tail -----
+[33m[coop:runtime] shared session terminal requested: Your partner disconnected and no authenticated rejoin path is available.[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:launch] clearCoopRuntime role=host netcode=authoritative gen->4
+[coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: -1, termSeq: -1, wasOwner: false }
+[coop:transport] state host disconnected -> closed
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > retained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery[39m
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [32m7816[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:280:3[39m
+
+[33m[39m[32m·[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mAssertionError[22m: run-end at wave 29 surveyed only 28 waves - below the proven-survivable floor of 30 (a party this weak this early is a regression, not the late-game level ceiling; replay SOAK_SEED=20365441): expected 28 to be greater than or equal to 30[39m
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m222:11[22m[39m
+    [90m220|[39m             + `proven-survivable floor of ${coverageFloor} (a party th…
+    [90m221|[39m             + `not the late-game level ceiling; replay SOAK_SEED=${see…
+    [90m222|[39m         )[33m.[39m[34mtoBeGreaterThanOrEqual[39m(coverageFloor)[33m;[39m
+    [90m   |[39m           [31m^[39m
+    [90m223|[39m       }
+    [90m224|[39m       [35mif[39m (profile [33m===[39m [32m"god"[39m) {
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 11:09:58
+[2m   Duration [22m 89.51s[2m (transform 20.11s, setup 24.41s, import 240ms, tests 64.00s, environment 698ms)[22m
+
