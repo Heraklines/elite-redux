@@ -2108,6 +2108,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
               return game.phaseInterceptor.toFirst([
                 "CommandPhase",
                 "ErDexNavPhase",
+                "ScanIvsPhase",
                 "TheBargainPhase",
                 "ErCrossroadsPhase",
                 "SelectBiomePhase",
@@ -2118,6 +2119,20 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             armHostDexNavAutoPicks();
             await game.phaseInterceptor.to("ErDexNavPhase");
           });
+          continue;
+        }
+        if (boundary === "ScanIvsPhase") {
+          await withClient(rig.hostCtx, async () => {
+            const scanner = rig.hostScene.phaseManager.getCurrentPhase();
+            game.onNextPrompt(
+              "ScanIvsPhase",
+              UiMode.CONFIRM,
+              () => rig.hostScene.ui.processInput(Button.CANCEL),
+              () => rig.hostScene.phaseManager.getCurrentPhase() !== scanner,
+            );
+            await game.phaseInterceptor.to("ScanIvsPhase");
+          });
+          actionScript.push(`wave ${transitionSourceWave}: host declined IV Scanner through public UI`);
           continue;
         }
         if (boundary === "TheBargainPhase") {
@@ -3776,6 +3791,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // tolerate the "never reached TurnEndPhase" throw (the battle ended) - the party-length check is truth.
       await game.phaseInterceptor.to("TurnEndPhase").catch(() => {});
     });
+    // The capture terminal can bypass the host's ordinary TurnEnd interception, but the guest still has the
+    // exact turn-2 resolution buffered behind its open public CommandPhase. Drive that production replay edge
+    // just like every normal turn before asking either renderer to enter the retained reward boundary. Skipping
+    // it left CommandPhase current with TurnStart/CoopFinalize queued, so the host's shop arrival could never be
+    // answered even though the authoritative capture transaction had arrived successfully.
+    await withClient(rig.guestCtx, () => driveGuestReplayTurnWithFaint(rig, turn1 + 1));
     const captured = rig.hostScene.getPlayerParty().length === hostPartyBefore + 1;
     actionScript.push(`wave ${wave}: CATCH throw sp=${rootId} captured=${captured}`);
     // eslint-disable-next-line no-console
