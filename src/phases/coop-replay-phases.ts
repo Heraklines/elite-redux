@@ -82,6 +82,7 @@ import {
   isVersusSession,
   queueCoopAtomicSnapshotApply,
   queueCoopMeBattleVictoryTail,
+  registerCoopWaveAdvanceBoundaryWakeFactory,
   resolveCoopPendingWaveTransition,
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
@@ -1831,6 +1832,8 @@ export class CoopWaveAdvanceBoundaryPhase extends Phase {
     }
   }
 }
+
+registerCoopWaveAdvanceBoundaryWakeFactory(() => new CoopWaveAdvanceBoundaryPhase());
 
 /**
  * MINOR-1 (#633, converge-or-give-up cap): the count of CONSECUTIVE resyncs whose target divergence

@@ -19,6 +19,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import type { Phase } from "#app/phase";
 import {
   armCoopAbilityJournalMaterialization,
   COOP_ABILITY_ACTION_STRIDE,
@@ -1046,6 +1047,8 @@ interface CoopPendingWaveAdvance {
 }
 
 let pendingWaveAdvance: CoopPendingWaveAdvance | null = null;
+/** Engine-phase factory installed by coop-replay-phases without coupling this runtime module to phase classes. */
+let coopWaveAdvanceBoundaryWakeFactory: (() => Phase) | null = null;
 /** Complete host statement currently driving the guest's VictoryPhase tail, wave-keyed against stale reuse. */
 let activeGuestWaveTransition: CoopWaveAdvancePayload | null = null;
 /** The last wave the guest already ran the victory tail for (guards a duplicate `waveResolved`). */
@@ -1269,6 +1272,14 @@ export function notifyCoopWaveContinuationSurfaceReady(): boolean {
  */
 export function coopHasPendingWaveAdvance(): boolean {
   return pendingWaveAdvance != null && pendingWaveAdvance.wave > lastResolvedWave;
+}
+
+/**
+ * Install the engine-owned safe-boundary wake used when a retained WAVE_ADVANCE arrives after finalization.
+ * The factory seam avoids a runtime -> replay-phase import cycle while still appending a real Phase instance.
+ */
+export function registerCoopWaveAdvanceBoundaryWakeFactory(factory: (() => Phase) | null): void {
+  coopWaveAdvanceBoundaryWakeFactory = factory;
 }
 
 export function consumeCoopPendingWaveAdvance(): {
@@ -3426,13 +3437,14 @@ function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, envelope: CoopAu
     if (
       !continuationReady
       && coopHasPendingWaveAdvance()
+      && coopWaveAdvanceBoundaryWakeFactory != null
       && globalScene.phaseManager?.getCurrentPhase()?.phaseName !== "CoopWaveAdvanceBoundaryPhase"
-      && !globalScene.phaseManager?.hasPhaseOfType("CoopWaveAdvanceBoundaryPhase")
+      && !globalScene.phaseManager?.getQueuedPhaseNames().includes("CoopWaveAdvanceBoundaryPhase")
     ) {
       // The retained op may land AFTER CoopFinalizeTurnPhase already inspected pendingWaveAdvance. Appending
       // (never unshifting) a dedicated wake preserves the presentation -> checkpoint ordering while ensuring
       // the queue cannot empty into a phantom next turn without consuming the host-stated transition.
-      globalScene.phaseManager.pushNew("CoopWaveAdvanceBoundaryPhase");
+      globalScene.phaseManager.pushPhase(coopWaveAdvanceBoundaryWakeFactory());
       coopLog("runtime", `wave-advance JOURNAL queued safe-boundary wake wave=${payload.wave}`);
     }
     return continuationReady;

@@ -49,7 +49,6 @@ import {
   CoopMoveAnimReplayPhase,
   CoopStatStageReplayPhase,
   CoopStatusReplayPhase,
-  CoopWaveAdvanceBoundaryPhase,
 } from "#phases/coop-replay-phases";
 import { CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import { DamageAnimPhase } from "#phases/damage-anim-phase";
@@ -207,7 +206,6 @@ const PHASES = Object.freeze({
   CoopMoveAnimReplayPhase,
   CoopStatStageReplayPhase,
   CoopStatusReplayPhase,
-  CoopWaveAdvanceBoundaryPhase,
   CommonAnimPhase,
   DamageAnimPhase,
   DynamicPhaseMarker,
