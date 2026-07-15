@@ -234,9 +234,12 @@ test("sequential command driver submits the first owner before waiting for the p
   );
 
   assert.deepEqual(order, ["first", "second"]);
-  assert.deepEqual(result.outcomeCursors, { first: 1, second: 1 });
   assert.equal(firstEvidence.events.at(-1).kind, "sequential-command-proof");
   assert.equal(secondEvidence.events.at(-1).kind, "sequential-command-proof");
+  assert.deepEqual(result.outcomeCursors, {
+    first: firstEvidence.events.at(-1).index,
+    second: secondEvidence.events.at(-1).index,
+  });
 });
 
 function marketObservation({ localSeat, ownerSeat, marketOpen, stock, money, quantity }) {
