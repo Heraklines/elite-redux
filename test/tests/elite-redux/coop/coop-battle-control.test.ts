@@ -43,8 +43,10 @@ import {
 } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
+import { getCoopStagedWaveAdvanceTransaction } from "#data/elite-redux/coop/coop-wave-operation";
 import { captureGhostTeam } from "#data/elite-redux/er-ghost-teams";
 import { BattlerIndex } from "#enums/battler-index";
+import { Button } from "#enums/buttons";
 import { Challenges } from "#enums/challenges";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -58,6 +60,7 @@ import {
   driveClientPhaseQueueTo,
   driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
+  installCoopResyncProbe,
   installHeadlessPlayerAtlasCompletionModel,
   withClient,
   withClientSync,
@@ -571,6 +574,7 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
       rig.guestScene.phaseManager.shiftPhase();
     });
     pair.setAutomaticDelivery(false);
+    const resync = installCoopResyncProbe(rig.guestRuntime);
 
     const before = withClientSync(rig.hostCtx, () =>
       rig.hostScene.getPlayerParty().map(mon => ({ id: mon.id, owner: mon.coopOwner, exp: mon.exp })),
@@ -603,7 +607,14 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     expect(guestCommand?.targets, "RIGHT + confirm selected the second 1-HP enemy").toEqual([BattlerIndex.ENEMY_2]);
     const turn = rig.hostScene.currentBattle.turn;
     await withClient(rig.hostCtx, async () => {
-      game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
+      expect(rig.hostScene.ui.getMode(), "the host starts on its real command surface").toBe(UiMode.COMMAND);
+      expect(rig.hostScene.ui.processInput(Button.ACTION), "host opens Fight through COMMAND UI").toBe(true);
+      expect(rig.hostScene.ui.getMode(), "the host reaches its real move picker").toBe(UiMode.FIGHT);
+      expect(rig.hostScene.ui.processInput(Button.ACTION), "host picks Tackle through FIGHT UI").toBe(true);
+      const targetPhase = await driveClientPhaseQueueTo(rig.hostScene, "SelectTargetPhase");
+      targetPhase.start();
+      expect(rig.hostScene.ui.getMode(), "the host reaches its real target picker").toBe(UiMode.TARGET_SELECT);
+      expect(rig.hostScene.ui.processInput(Button.ACTION), "host confirms enemy slot 1 through TARGET UI").toBe(true);
       expect(
         rig.hostScene.currentBattle.turnCommands[COOP_HOST_FIELD_INDEX]?.targets,
         "the host selected the first 1-HP enemy",
@@ -627,6 +638,10 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
       driveClientPhaseQueueTo(rig.guestScene, "SelectModifierPhase"),
     );
     expect(guestReward.phaseName, "the renderer completed its victory tail too").toBe("SelectModifierPhase");
+    const retained = getCoopStagedWaveAdvanceTransaction(1, rig.guestRuntime.waveOperationBinding);
+    expect(retained?.dataApplied, "the guest reward boundary admitted the exact retained DATA").toBe(true);
+    expect(resync.count(), "the public victory journey requested no full-state recovery").toBe(0);
+    resync.restore();
 
     const hostAfter = withClientSync(rig.hostCtx, () =>
       rig.hostScene.getPlayerParty().map(mon => ({ id: mon.id, owner: mon.coopOwner, exp: mon.exp })),
