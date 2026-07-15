@@ -18,6 +18,7 @@
     "src/data/elite-redux/er-custom-trainers.ts",
     "src/data/elite-redux/er-trainer-runtime-hook.ts",
     "src/data/elite-redux/showdown/**",
+    "src/dev-tools/test-suite/scenarios.ts",
     "src/enums/ui-mode.ts",
     "src/phases/**",
     "src/system/game-data.ts",
