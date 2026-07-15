@@ -64,4 +64,14 @@ export enum ArenaTagType {
    * to {@linkcode WeatherType.NONE}. Field-wide.
    */
   ER_WEATHER_LOCK = "ER_WEATHER_LOCK",
+  /**
+   * Elite Redux — one-use entry trap primitive. Placed on a side (typically the
+   * opposing side, via an entry ability like Spore Bed); the NEXT grounded switch-in
+   * on that side has the trap's configured {@linkcode BattlerTagType} applied to it
+   * (Spore Bed uses {@linkcode BattlerTagType.INFESTATION}), then the trap is spent
+   * (removed at the next turn-end). Reusable: the applied effect is a serialized
+   * field on {@linkcode ErEntryTrapTag}, so different mons can trap with different
+   * effects without a new ArenaTagType.
+   */
+  ER_INFESTATION_TRAP = "ER_INFESTATION_TRAP",
 }

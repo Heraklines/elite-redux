@@ -34,13 +34,16 @@ import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { ER_PUPPET_STRINGS_ABILITY_ID, PuppetStringsAbAttr } from "#data/elite-redux/abilities/puppet-strings";
 import { ER_SILKEN_DECREE_ABILITY_ID, SilkenDecreeAbAttr } from "#data/elite-redux/abilities/silken-decree";
+import { ER_SPORE_BED_ABILITY_ID } from "#data/elite-redux/abilities/spore-bed";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
+import { EntryTrapOnFoeSideAbAttr } from "#data/elite-redux/archetypes/entry-trap-on-foe-side";
 import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus-to-stat";
 import { ER_ABILITIES, type ErAbilityDraft } from "#data/elite-redux/er-abilities";
 import { ER_ABILITY_ARCHETYPES, type ErArchetypeKind } from "#data/elite-redux/er-ability-archetypes";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { failIfRadianceOnFieldCondition } from "#moves/move-condition";
@@ -213,6 +216,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
         archetype: "unknown",
       },
       pokerogueId: ER_PUPPET_STRINGS_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_SPORE_BED_ABILITY_ID,
+        name: "Spore Bed",
+        description:
+          "On entry, lays a one-use Infestation trap on the opposing side. The next grounded foe to switch in is trapped by Infestation for its ordinary duration.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_SPORE_BED_ABILITY_ID,
     },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
@@ -407,6 +420,10 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_PUPPET_STRINGS_ABILITY_ID) {
     builder.attr(PuppetStringsAbAttr);
+  }
+
+  if (pokerogueId === ER_SPORE_BED_ABILITY_ID) {
+    builder.attr(EntryTrapOnFoeSideAbAttr, BattlerTagType.INFESTATION, "foe");
   }
 
   const ability = builder.build();
