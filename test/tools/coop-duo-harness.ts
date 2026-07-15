@@ -3062,13 +3062,21 @@ export async function drainGuestMeReplayNewRounds(replay: Phase, expected: numbe
  */
 export async function startGuestMeShopOwner(guestScene: BattleScene): Promise<ShopPhaseSeam> {
   let shop: ShopPhaseSeam | null = null;
+  let shopStarted = false;
   for (let i = 0; i < 16; i++) {
     await drainLoopback();
     const current = guestScene.phaseManager.getCurrentPhase();
     if (current?.phaseName === "SelectModifierPhase") {
       shop = current as unknown as ShopPhaseSeam;
+      // The direct guest scene deliberately uses a manual phase manager. Production automatically starts
+      // an unshifted phase when it becomes current; reproduce that scheduler edge here on the REAL queued
+      // phase (once), then let startCoopWatch adopt the already-streamed authoritative option pool.
+      if (!shopStarted && shop.typeOptions == null) {
+        current.start();
+        shopStarted = true;
+      }
     }
-    if (shop != null && (shop.typeOptions as unknown[]).length > 0) {
+    if (shop != null && Array.isArray(shop.typeOptions) && shop.typeOptions.length > 0) {
       break;
     }
   }
