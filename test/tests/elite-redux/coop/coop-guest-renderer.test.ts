@@ -928,6 +928,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
     const queueMessageSpy = vi.spyOn(globalScene.phaseManager, "queueMessage");
     const queueTurnEndSpy = vi.spyOn(globalScene.phaseManager, "queueTurnEndPhases");
+    const turnBeforeFinalize = globalScene.currentBattle.turn;
     // Drive the FINAL turn's replay + its deferred finalize. With the fix it is terminal.
     await driveReplayTurn(finalTurn);
 
@@ -942,6 +943,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase"),
       "no TurnEndPhase queued on the terminal final turn (no phantom turn N+1)",
     ).toBe(false);
+    expect(
+      globalScene.currentBattle.turn,
+      "the renderer still mirrors the host's already-settled numeric turn boundary",
+    ).toBe(turnBeforeFinalize + 1);
     // Exactly one victory tail is queued for this final addressed commit.
     expect(
       pushNewSpy.mock.calls.filter(([name]) => name === "VictoryPhase").length,

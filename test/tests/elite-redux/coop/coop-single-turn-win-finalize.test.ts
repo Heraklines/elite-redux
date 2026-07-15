@@ -9,13 +9,13 @@
 // host streams `waveResolved("win")` and parks as the reward WATCHER. When the host wins the wave in a
 // SINGLE turn, the guest consumes that pending wave-advance in the SAME finalize that runs the winning
 // turn - and `lastResolvedWave` is still behind, so `coopWaveAdvanceSignaledFor(wave)` reads false.
-// Pre-fix, finishTurn then fell into the turn-advance branch and called incrementTurn(), starting a
-// phantom turn N+1 the host already passed: the guest broadcast a command + awaited a turn-N+1 resolution
-// the host (now in the reward shop) never sent -> hard softlock right after the first battle.
+// Pre-fix, finishTurn then fell into the ordinary continuation branch: it advanced the cursor AND allowed
+// the queue to start TurnInit/Command for a turn the host already passed. The guest broadcast a command +
+// awaited a turn-N+1 resolution the host (now in the reward shop) never sent -> hard post-battle softlock.
 //
 // The fix peeks the still-PENDING advance (coopHasPendingWaveAdvance) and routes the single-turn win
-// through the TERMINAL branch: run the wave-advance tail (VictoryPhase), advance NO turn - exactly like a
-// multi-turn wave whose advance had already signaled. Protocol 32 has no gameplay fallback on a missing
+// through the TERMINAL branch: run the wave-advance tail (VictoryPhase), mirror the host's settled numeric
+// turn, but queue no TurnInit/Command. Protocol 32 has no gameplay fallback on a missing
 // commit; that condition terminates visibly instead of manufacturing a local turn.
 //
 // The pending advance is set through the REAL wired receive path: a runtime assembled on the guest
@@ -243,7 +243,7 @@ describe("#698 - single-turn-win finalize must not start a phantom next turn", (
     expect(coopHasPendingWaveAdvance()).toBe(true);
   });
 
-  it("CoopFinalizeTurnPhase.finishTurn(): a same-turn win runs the wave-advance tail and advances NO turn", async () => {
+  it("CoopFinalizeTurnPhase.finishTurn(): a same-turn win mirrors the settled turn without queuing a phantom loop", async () => {
     await startGuestWithPendingWin();
     // A delayed final carrier may arrive after local presentation speculatively queued the next encounter.
     // The retained host transition must replace that future instead of appending Victory behind it.
@@ -252,11 +252,11 @@ describe("#698 - single-turn-win finalize must not start a phantom next turn", (
     const phase = makeFinalizePhase(1);
     callPrivate(phase, "finishTurn");
 
-    // The phantom turn must NOT be created: no incrementTurn, no turn-order clear, turn stays put.
-    expect(rec.incrementTurnCalls).toBe(0);
-    expect(rec.clearLastTurnOrderCalls).toBe(0);
-    expect(rec.turn).toBe(1);
-    // The damaging turn-end engine must NOT run on the terminal branch either.
+    // Match the host's already-settled numeric turn boundary, but never queue the damaging turn-end engine
+    // or its TurnInit/Command continuation. A turn number alone is not a phantom playable turn.
+    expect(rec.incrementTurnCalls).toBe(1);
+    expect(rec.clearLastTurnOrderCalls).toBe(1);
+    expect(rec.turn).toBe(2);
     expect(rec.queueTurnEndCalls).toBe(0);
     expect(rec.clearPhaseQueueCalls, "the retained transition fences speculative future phases").toBe(1);
     expect(rec.queuedFuture, "the speculative local next-wave tail was discarded").toEqual([]);
