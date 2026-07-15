@@ -841,7 +841,7 @@ export class SelectModifierPhase extends BattlePhase {
    * @param cost - The cost of the modifier if it was purchased, or -1 if selected as the modifier reward
    * @param playSound - Whether the 'obtain modifier' sound should be played when adding the modifier.
    */
-  protected applyModifier(modifier: Modifier, cost = -1, playSound = false): void {
+  protected applyModifier(modifier: Modifier, cost = -1, playSound = false): boolean {
     const result = globalScene.addModifier(modifier, false, playSound, undefined, undefined, cost);
     // Causal reward trace: record the exact generated identity + resolved holder and whether the engine
     // accepted it on EACH side. A type-id-only log cannot distinguish two BERRY variants, and the live
@@ -897,7 +897,7 @@ export class SelectModifierPhase extends BattlePhase {
           globalScene.animateMoneyChanged(false);
         }
         if (!this.coopCommitPendingAuthorityResult()) {
-          return;
+          return false;
         }
         globalScene.playSound("se/buy");
         // Co-op (#633): the WATCHER has no MODIFIER_SELECT handler open (it shows a
@@ -908,14 +908,19 @@ export class SelectModifierPhase extends BattlePhase {
           (globalScene.ui.getHandler() as ModifierSelectUiHandler).updateCostText();
         }
       } else {
-        if (!this.coopCommitPendingAuthorityResult()) {
-          return;
+        // A rejected add is not an authoritative result. In particular, a market watcher must not ACK
+        // the retained operation or adopt its money after its local materialization failed. An owner has
+        // already exposed an intent at this point, so terminate the shared run instead of leaving that
+        // intent eligible for a later, unrelated commit.
+        if (this.coopPendingAuthorityOperationId != null && !this.coopWatcher) {
+          failCoopSharedSession(`Reward operation ${this.coopPendingAuthorityOperationId} was rejected locally`);
+          return false;
         }
         globalScene.ui.playError();
       }
     } else {
       if (!this.coopCommitPendingAuthorityResult()) {
-        return;
+        return false;
       }
       // Co-op (#633): the reward screen is closing - stop mirroring the cursor (a queued
       // move-learn continuation re-opens it via the copy phase, which re-begins the mirror).
@@ -930,6 +935,7 @@ export class SelectModifierPhase extends BattlePhase {
         this.coopAdvanceInteraction();
       }
     }
+    return result;
   }
 
   /**
@@ -948,7 +954,7 @@ export class SelectModifierPhase extends BattlePhase {
     validatedCost: number,
     authoritativeMoney: number,
     playSound = false,
-  ): void {
+  ): boolean {
     const priorWatcher = this.coopWatcher;
     const priorAdoptsOptions = this.coopAdoptsOptions;
     const priorRelayedMoney = this.coopRelayedMoney;
@@ -958,7 +964,7 @@ export class SelectModifierPhase extends BattlePhase {
     try {
       // Older compatibility carriers did not include the validated cost. Zero
       // still selects the paid-shop branch without recomputing or double-paying.
-      this.applyModifier(modifier, Math.max(0, validatedCost), playSound);
+      return this.applyModifier(modifier, Math.max(0, validatedCost), playSound);
     } finally {
       this.coopWatcher = priorWatcher;
       this.coopAdoptsOptions = priorAdoptsOptions;

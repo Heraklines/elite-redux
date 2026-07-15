@@ -769,6 +769,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         "reward",
         `biome market watcher applies buy slot=${slot} id=${opt?.type?.id ?? "?"} partySlot=${partySlot} option=${nestedOption} money=${money}`,
       );
+      let purchaseApplied = false;
       try {
         if (decision.authoritativeProjection === true) {
           if (slot >= 0 && slot < this.qtys.length) {
@@ -779,22 +780,37 @@ export class BiomeShopPhase extends SelectModifierPhase {
           }
           continue;
         }
-        if (opt?.type != null) {
-          const modifier =
-            opt.type instanceof PokemonModifierType
-              ? this.buildPokemonModifier(opt.type, partySlot, nestedOption)
-              : opt.type.newModifier();
-          if (modifier != null) {
-            this.pendingIndex = slot;
-            // Keep PAID-shop control flow while adopting the owner's exact
-            // balance. Passing -1 here means "free reward terminal" to the base
-            // phase and used to end this watcher after the first held item,
-            // racing it into SelectBiomePhase before the owner left the market.
-            this.applyCoopRelayedPurchase(modifier, validatedCost, money, false);
-          }
+        if (opt?.type == null) {
+          failCoopSharedSession(`Biome market buy ${decision.operationId ?? "legacy"} addressed missing stock ${slot}`);
+          return;
         }
-      } catch {
-        /* one bad relayed buy must never strand the watcher */
+        const modifier =
+          opt.type instanceof PokemonModifierType
+            ? this.buildPokemonModifier(opt.type, partySlot, nestedOption)
+            : opt.type.newModifier();
+        if (modifier == null) {
+          failCoopSharedSession(
+            `Biome market buy ${decision.operationId ?? "legacy"} could not materialize stock ${slot}`,
+          );
+          return;
+        }
+        this.pendingIndex = slot;
+        // Keep PAID-shop control flow while adopting the owner's exact balance. Passing -1 here means
+        // "free reward terminal" to the base phase and used to end this watcher after the first held item,
+        // racing it into SelectBiomePhase before the owner left the market.
+        purchaseApplied = this.applyCoopRelayedPurchase(modifier, validatedCost, money, false);
+      } catch (error) {
+        coopWarn(
+          "reward",
+          `biome market watcher apply failed operation=${decision.operationId ?? "legacy"} slot=${slot}`,
+          error,
+        );
+        failCoopSharedSession(`Biome market buy ${decision.operationId ?? "legacy"} could not be applied exactly`);
+        return;
+      }
+      if (!purchaseApplied) {
+        failCoopSharedSession(`Biome market buy ${decision.operationId ?? "legacy"} was rejected locally`);
+        return;
       }
       if (money >= 0 && decision.authoritativeProjection !== true) {
         if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
@@ -847,7 +863,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
     return false;
   }
 
-  protected override applyModifier(modifier: Modifier, cost = -1, playSound = false): void {
+  protected override applyModifier(modifier: Modifier, cost = -1, playSound = false): boolean {
     // Co-op (#673) OWNER: capture the buy BEFORE the stock decrement resets pendingIndex,
     // then relay it self-describing: [slotIntoStreamedStock] +
     // [targetPartySlot, moneyAfter, nestedOption, validatedCost].
@@ -894,10 +910,16 @@ export class BiomeShopPhase extends SelectModifierPhase {
           partySlot,
           this.coopResolvedModifierOption,
         );
-        return;
+        return true;
       }
     }
-    super.applyModifier(modifier, cost, playSound);
+    const applied = super.applyModifier(modifier, cost, playSound);
+    if (!applied) {
+      if (coopBoughtSlot >= 0) {
+        failCoopSharedSession(`Biome market owner purchase at stock ${coopBoughtSlot} was rejected locally`);
+      }
+      return false;
+    }
     // catalog-v2 (#900): a completed paid purchase. BLACK_FRIDAY (black market, one credit per run)
     // or BIOME_TOURIST (distinct biome shop types). Fully guarded - never disturbs the buy.
     try {
@@ -922,7 +944,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       && commitRewardAuthoritativeResult(preparedOperationId, undefined, this.coopRewardOperationBinding) == null
     ) {
       failCoopSharedSession(`Biome market buy result ${preparedOperationId} could not be retained`);
-      return;
+      return false;
     }
     if (cost !== -1 && this.pendingIndex >= 0 && this.pendingIndex < this.qtys.length) {
       this.qtys[this.pendingIndex] = Math.max(0, this.qtys[this.pendingIndex] - 1);
@@ -930,6 +952,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       handler.setStock?.(this.pendingIndex, this.qtys[this.pendingIndex]);
       this.pendingIndex = -1;
     }
+    return true;
   }
 
   /** Guest market owner: project the committed result only after its complete state was atomically applied. */

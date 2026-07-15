@@ -62,7 +62,7 @@ import {
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -85,7 +85,7 @@ interface BiomeShopSeam {
   copy(): BiomeShopSeam;
   coopBiomeTerminal(): void;
   pendingIndex: number;
-  applyCoopRelayedPurchase(modifier: unknown, validatedCost: number, authoritativeMoney: number): void;
+  applyCoopRelayedPurchase(modifier: unknown, validatedCost: number, authoritativeMoney: number): boolean;
 }
 
 describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned copy, lockstep advance", () => {
@@ -230,7 +230,7 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
       phase.pendingIndex = 0;
       rig.hostScene.money = 2_000;
 
-      phase.applyCoopRelayedPurchase(modifier!, 100, 1_020);
+      expect(phase.applyCoopRelayedPurchase(modifier!, 100, 1_020)).toBe(true);
 
       expect(rig.hostRuntime.controller.interactionCounter(), "buy does not terminate the pinned market").toBe(1);
       expect(rig.hostScene.money, "watcher adopts the owner's exact post-buy money").toBe(1_020);
@@ -242,6 +242,38 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
       allLogs.filter(line => /advance interaction SKIP unpinned/i.test(line)),
       "a paid watcher replay never enters the free-reward terminal path",
     ).toHaveLength(0);
+  }, 120_000);
+
+  it("watcher rejects a failed market apply without adopting money or consuming stock", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, async () => {
+      const phase = liveBiomeShop() as unknown as BiomeShopSeam;
+      const option = makeWideLensOption();
+      if (option == null) {
+        throw new Error("Wide Lens must generate a concrete market option");
+      }
+      const modifier = option.type.newModifier(rig.hostScene.getPlayerParty()[1]);
+      expect(modifier).not.toBeNull();
+      phase.coopBiomeStart = 1;
+      phase.coopBiomeOwner = false;
+      phase.coopBiomeOptionOwner = true;
+      phase.shopOptions = [option];
+      phase.qtys = [1];
+      phase.pendingIndex = 0;
+      rig.hostScene.money = 2_000;
+
+      const addModifierSpy = vi.spyOn(rig.hostScene, "addModifier").mockReturnValue(false);
+      try {
+        expect(phase.applyCoopRelayedPurchase(modifier!, 100, 1_020)).toBe(false);
+      } finally {
+        addModifierSpy.mockRestore();
+      }
+
+      expect(rig.hostScene.money, "a rejected apply cannot adopt the owner's money").toBe(2_000);
+      expect(phase.qtys[0], "a rejected apply cannot consume authoritative stock").toBe(1);
+    });
   }, 120_000);
 
   // ===========================================================================================
