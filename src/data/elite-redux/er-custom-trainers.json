@@ -996,5 +996,227 @@
     ],
     "trainerClass": "SABRINA",
     "weight": 100
+  },
+  "TRAINER_70009": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70009,
+    "maxWave": 135,
+    "minWave": 125,
+    "name": "Leader",
+    "team": [
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "EXTREME_SPEED",
+              "FLAMETHROWER",
+              "SUBSTITUTE",
+              "DOUBLE_KICK"
+            ],
+            "species": 59,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 0,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "LUM_BERRY"
+              },
+              {
+                "count": 1,
+                "item": "SHELL_BELL"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "CLOSE_COMBAT",
+              "TEMPER_FLARE",
+              "CRUNCH",
+              "EXTREME_SPEED"
+            ],
+            "species": 10603,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "BLAZE_KICK",
+              "TAKE_DOWN",
+              "SUNNY_DAY",
+              "MEGA_KICK"
+            ],
+            "species": 78,
+            "weight": 3
+          },
+          {
+            "abilitySlot": 2,
+            "level": null,
+            "moves": [
+              "DAZZLING_GLEAM",
+              "DOUBLE_KICK",
+              "RLA",
+              "RLNA"
+            ],
+            "species": 4078,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "EVIOLITE"
+          },
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "METRONOME",
+          "RLNA",
+          "SUNNY_DAY",
+          "FLAME_BURST"
+        ],
+        "species": 126
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "ATOMIC_FIRE",
+              "ROCK_POLISH",
+              "RLA",
+              "RLNA"
+            ],
+            "species": 10002,
+            "weight": 4
+          },
+          {
+            "abilitySlot": 0,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "LEFTOVERS"
+              },
+              {
+                "count": 2,
+                "item": "IRON"
+              },
+              {
+                "count": 2,
+                "item": "ZINC"
+              },
+              {
+                "count": 1,
+                "item": "SITRUS_BERRY"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "METEOR_BEAM",
+              "BURN_UP",
+              "ROCK_POLISH",
+              "RECOVER"
+            ],
+            "sanityOff": true,
+            "shiny": {
+              "surface": "softshade"
+            },
+            "species": 10002,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "WILL_O_WISP",
+              "RLA",
+              "FOUL_PLAY",
+              "FIRE_FANG"
+            ],
+            "species": 229,
+            "weight": 10
+          },
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "NASTY_PLOT",
+              "FIRE_FANG",
+              "CRUNCH",
+              "SUCKER_PUNCH"
+            ],
+            "species": 229,
+            "weight": 10
+          },
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "RLA",
+              "CRUNCH",
+              "ECLIPSE",
+              "SUCKER_PUNCH"
+            ],
+            "species": 10112,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "CHARCOAL"
+          },
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SOLAR_BEAM",
+          "FIRE_BLAST",
+          "EARTH_POWER",
+          "CALM_MIND"
+        ],
+        "shiny": {
+          "palette": "inferno",
+          "surface": "watercolor"
+        },
+        "slotChance": 5,
+        "species": 146
+      }
+    ],
+    "trainerClass": "BLAINE",
+    "weight": 100
   }
 }
