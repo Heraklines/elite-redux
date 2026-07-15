@@ -70,6 +70,7 @@ import {
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
+  pumpDuoDestinations,
   setCoopHarnessLiveEvents,
   withClient,
   withClientSync,
@@ -242,6 +243,9 @@ describe.skipIf(!RUN)(
         broadcastCoopWaveEndState();
         await drainLoopback();
       });
+      // waveEndState is intentionally destination-pumped by the two-engine adapter: apply it only while
+      // the guest's complete scene/runtime context is installed, as two independent browsers would.
+      await pumpDuoDestinations(rig, 4);
       const waveEndApplied = withClientSync(rig.guestCtx, () =>
         applyCoopAuthoritativeBattleState(consumeCoopPendingWaveEndState() ?? undefined, true),
       );

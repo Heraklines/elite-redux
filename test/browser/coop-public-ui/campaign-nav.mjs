@@ -34,6 +34,39 @@ export function planNavigationStep(observation, targetId) {
   return { kind: "navigate" };
 }
 
+function orderedAxisKeys(navKeys) {
+  if (navKeys.length !== 2) {
+    return null;
+  }
+  if (navKeys.includes("ArrowDown") && navKeys.includes("ArrowUp")) {
+    return { forward: "ArrowDown", backward: "ArrowUp" };
+  }
+  if (navKeys.includes("ArrowRight") && navKeys.includes("ArrowLeft")) {
+    return { forward: "ArrowRight", backward: "ArrowLeft" };
+  }
+  return null;
+}
+
+/**
+ * Prefer a directed step when the semantic surface exposes a one-dimensional ordered list.
+ * Alternating Up/Down from the first item only visits the two wrap-around endpoints and can
+ * permanently skip every middle option (the real difficulty menu exposed exactly this failure).
+ * Grid-shaped surfaces keep the caller's axis-cycling fallback because option order does not
+ * describe their geometry.
+ */
+export function chooseNavigationKey(observation, targetId, navKeys, step) {
+  const options = observation?.optionIds;
+  const current = Array.isArray(options) ? options.indexOf(observation.selectedOptionId) : -1;
+  const target = Array.isArray(options) ? options.indexOf(targetId) : -1;
+  const axis = orderedAxisKeys(navKeys);
+  if (axis != null && current >= 0 && target >= 0 && options.length > 1) {
+    const forward = (target - current + options.length) % options.length;
+    const backward = (current - target + options.length) % options.length;
+    return forward <= backward ? axis.forward : axis.backward;
+  }
+  return navKeys[step % navKeys.length];
+}
+
 /** Wait until a semantic observation for `surfaceId` appears at/after `fromCursor`, or null on timeout. */
 async function readSemantic(client, surfaceId, fromCursor, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
@@ -136,7 +169,7 @@ export async function selectOptionById(
     // navigate: press a direction, then verify the selected id actually changed.
     const before = observation.selectedOptionId;
     const beforeIndex = event.index;
-    const key = navKeys[step % navKeys.length];
+    const key = chooseNavigationKey(observation, targetId, navKeys, step);
     await client.press(key, `nav-move-${label}-step${step}`);
     const afterEvent = await waitForNewerSelection(client, surfaceId, beforeIndex, before, timeoutMs);
     if (afterEvent == null) {

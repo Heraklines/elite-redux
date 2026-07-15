@@ -57,6 +57,7 @@ import {
   drainLoopback,
   driveGuestMeReplay,
   driveGuestMirrorQuiz,
+  driveHostMeRewardShopWithGuestReplay,
   driveHostRewardShopOwner,
   type ErQuizPhaseSeam,
   installDuoLogCapture,
@@ -236,6 +237,7 @@ describe.skipIf(!RUN)(
       // Spy the guest's comprehensive ME-outcome apply (the guest's SOLE convergence mechanism - it runs
       // no engine). It must fire EXACTLY once (the host streams meResync at its terminal).
       const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
+      let replay!: Phase;
 
       // ===== Drive the HOST through the ME FULLY (it FIFO-buffers presentation + meResync on 8M and the
       // LEAVE terminal on 9M into the relay), THEN drive the guest which drains with zero network wait.
@@ -257,7 +259,7 @@ describe.skipIf(!RUN)(
         await game.phaseInterceptor.to("SelectModifierPhase", false);
         const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
         expect(hostShop.phaseName, "host reached the embedded end-of-ME reward shop").toBe("SelectModifierPhase");
-        await driveHostRewardShopOwner(hostShop, { takeReward: false });
+        replay = await driveHostMeRewardShopWithGuestReplay(hostShop, rig.guestCtx, rig.guestScene);
         // The embedded shop MUST NOT have advanced the counter (it suppresses during the ME) - still 0.
         expect(
           rig.hostRuntime.controller.interactionCounter(),
@@ -289,7 +291,7 @@ describe.skipIf(!RUN)(
       // ===== Drive the GUEST's REAL CoopReplayMePhase: it consumes the host's buffered 8M present +
       // 8M meResync + 9M LEAVE (FIFO), applies the outcome, leaves the encounter, advances once. A
       // no-progress stall THROWS (the hang detection). =====
-      const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+      const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(replay));
 
       // The guest left the encounter exactly once (the single `settled` terminal).
       expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once)").toBe(true);
@@ -327,6 +329,7 @@ describe.skipIf(!RUN)(
       const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
       const counterBefore = rig.hostRuntime.controller.interactionCounter();
       expect(counterBefore, "Hot Spring is host-owned at the initial even counter").toBe(0);
+      let replay!: Phase;
 
       await withClient(rig.hostCtx, async () => {
         // Dispose the encounter intro using the normal prompt path, then stop on the live selector.
@@ -382,7 +385,7 @@ describe.skipIf(!RUN)(
           "Hot Spring selected narration rendered only after the MESSAGE transition completed",
         ).toBe(true);
         const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-        await driveHostRewardShopOwner(hostShop, { takeReward: false });
+        replay = await driveHostMeRewardShopWithGuestReplay(hostShop, rig.guestCtx, rig.guestScene);
         expect(rig.hostRuntime.controller.interactionCounter(), "empty ME shop did not double-advance").toBe(
           counterBefore,
         );
@@ -392,7 +395,7 @@ describe.skipIf(!RUN)(
       expect(rig.hostRuntime.controller.interactionCounter(), "host completed the Hot Spring exactly once").toBe(
         counterBefore + 1,
       );
-      const guestReplay = await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+      const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(replay));
       expect(guestReplay.settled, "guest left the exact Hot Spring terminal without parking").toBe(true);
       expect(rig.guestRuntime.controller.interactionCounter(), "guest Hot Spring counter converged").toBe(
         counterBefore + 1,
@@ -775,6 +778,9 @@ describe.skipIf(!RUN)(
       const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
       // Tap the retained host transport. P33 carries the quiz session and every host-owned answer as
       // addressed operations; the raw mePresent/quizAns relays are intentionally absent in journal mode.
+      let guestMePhase: Phase | undefined;
+      let guestQuizQuestions = 0;
+      let guestQuizAnswered = 0;
 
       // A mirror-quiz handoff must be INTERLEAVED (the IT #2 split), NOT driven host-fully-first. On the
       // quiz's `mePresent subPrompt {kind:"quiz"}`, the guest's CoopReplayMePhase.start races the 8M outcome
@@ -836,7 +842,38 @@ describe.skipIf(!RUN)(
         await game.phaseInterceptor.to("SelectModifierPhase", false);
         const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
         expect(hostShop.phaseName, "host reached the embedded post-quiz reward shop").toBe("SelectModifierPhase");
-        await driveHostRewardShopOwner(hostShop, { takeReward: false });
+        await driveHostRewardShopOwner(hostShop, {
+          takeReward: false,
+          // A real client cannot leave this reciprocal shop before the watcher arrives. Start the guest's
+          // already-buffered ME replay here, consume the mirrored quiz, and let its production tail reach
+          // the same shop boundary before the host commits LEAVE.
+          partnerReady: async () => {
+            await withClient(rig.guestCtx, async () => {
+              guestMePhase = await startGuestMeReplay(rig.guestScene);
+              let quizPhase: ErQuizPhaseSeam | undefined;
+              for (let i = 0; i < 16; i++) {
+                await drainLoopback();
+                const current = rig.guestScene.phaseManager.getCurrentPhase();
+                if (current?.phaseName === "ErQuizPhase") {
+                  quizPhase = current as unknown as ErQuizPhaseSeam;
+                  break;
+                }
+              }
+              if (quizPhase == null) {
+                throw new Error("guest did not reach its mirrored quiz before the reciprocal reward shop");
+              }
+              guestQuizQuestions = quizPhase.questions.length;
+              guestQuizAnswered = await driveGuestMirrorQuiz(rig.guestScene, quizPhase, QUIZ_QUESTIONS);
+            });
+          },
+          partnerSettle: async () => {
+            await withClient(rig.guestCtx, async () => {
+              for (let i = 0; i < 16; i++) {
+                await drainLoopback();
+              }
+            });
+          },
+        });
         // MAJOR-3: the embedded ME shop suppresses its own advance mid-ME - still counter 0.
         expect(
           rig.hostRuntime.controller.interactionCounter(),
@@ -896,33 +933,17 @@ describe.skipIf(!RUN)(
       // consuming a terminal), and run the mirror ErQuizPhase - the FOLLOW side, buffer-hitting every
       // owner-relayed quizAns with zero local input. The re-armed race is left PARKED (its outcomeArm2 +
       // terminalArm2 pending) so STEP D can resolve it under the guest ctx. =====
-      let guestMePhase: Phase | undefined;
-      await withClient(rig.guestCtx, async () => {
-        guestMePhase = await startGuestMeReplay(rig.guestScene);
-
-        let quizPhase: ErQuizPhaseSeam | undefined;
-        for (let i = 0; i < 16; i++) {
-          await drainLoopback();
-          const cur = rig.guestScene.phaseManager.getCurrentPhase();
-          if (cur?.phaseName === "ErQuizPhase") {
-            quizPhase = cur as unknown as ErQuizPhaseSeam;
-            break;
-          }
-        }
-        expect(
-          quizPhase,
-          "guest QUEUED its mirror ErQuizPhase after the quiz handoff (#818 settleForWatcherQuiz)",
-        ).toBeDefined();
-        expect(quizPhase!.questions.length, "guest mirror quiz renders the host's identical streamed questions").toBe(
-          QUIZ_QUESTIONS,
-        );
-
-        const answered = await driveGuestMirrorQuiz(rig.guestScene, quizPhase!, QUIZ_QUESTIONS);
-        expect(
-          answered,
-          "guest mirror quiz consumed every owner-relayed answer with zero local input (FOLLOW side, #818)",
-        ).toBe(QUIZ_QUESTIONS);
-      });
+      expect(
+        guestMePhase,
+        "guest QUEUED its mirror ErQuizPhase after the quiz handoff (#818 settleForWatcherQuiz)",
+      ).toBeDefined();
+      expect(guestQuizQuestions, "guest mirror quiz renders the host's identical streamed questions").toBe(
+        QUIZ_QUESTIONS,
+      );
+      expect(
+        guestQuizAnswered,
+        "guest mirror quiz consumed every owner-relayed answer with zero local input (FOLLOW side, #818)",
+      ).toBe(QUIZ_QUESTIONS);
       // The guest has NOT converged / advanced yet (the host has not sent its terminal meResync + LEAVE).
       expect(
         applyMeOutcomeSpy.mock.calls.length,
@@ -1054,6 +1075,8 @@ describe.skipIf(!RUN)(
       // Spy the guest's sole convergence mechanism (fires EXACTLY once at the host's terminal meResync).
       const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
       // Tap the retained host transport: each round is a distinct addressed ME_PRESENT operation.
+      let replay!: Phase;
+      let newRounds = 0;
 
       // ===== STEP A (host): drive the REAL delve DIVE -> PUSH(survives) -> BANK, then the embedded reward
       // shop, and PARK at PostMysteryEncounterPhase WITHOUT running it - so the 3 round presents are streamed
@@ -1093,7 +1116,25 @@ describe.skipIf(!RUN)(
           await game.phaseInterceptor.to("SelectModifierPhase", false);
           const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
           expect(hostShop.phaseName, "host reached the embedded end-of-delve reward shop").toBe("SelectModifierPhase");
-          await driveHostRewardShopOwner(hostShop, { takeReward: false });
+          await driveHostRewardShopOwner(hostShop, {
+            takeReward: false,
+            // Materialize every buffered delve round on the watcher before the owner leaves the
+            // reciprocal shop. This preserves the terminal-empty ordering while matching two browsers:
+            // both are physically present at the shop boundary at the same time.
+            partnerReady: async () => {
+              await withClient(rig.guestCtx, async () => {
+                replay = await startGuestMeReplay(rig.guestScene);
+                newRounds = await drainGuestMeReplayNewRounds(replay, EXPECTED_NEW_ROUNDS);
+              });
+            },
+            partnerSettle: async () => {
+              await withClient(rig.guestCtx, async () => {
+                for (let i = 0; i < 16; i++) {
+                  await drainLoopback();
+                }
+              });
+            },
+          });
           expect(
             rig.hostRuntime.controller.interactionCounter(),
             "embedded ME reward shop suppressed its own advance (MAJOR-3, still counter 0 mid-ME)",
@@ -1137,9 +1178,6 @@ describe.skipIf(!RUN)(
       // (beginNewRound re-renders + re-arms, inheriting the live 9M arm). The 9M terminal inbox is still
       // empty, so the phase PARKS (does NOT settle) after the 2 new rounds. A no-progress stall would leave
       // newRoundsRendered < 2 and fail the assert below (loud, not a hang). =====
-      const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
-      const newRounds = await withClient(rig.guestCtx, () => drainGuestMeReplayNewRounds(replay, EXPECTED_NEW_ROUNDS));
-
       // The load-bearing #831 assertion: the guest re-rendered BOTH repeated-select rounds (pre-fix it
       // rendered ZERO - the re-fired presents fell to the stray branch and it headed for the terminal).
       expect(newRounds, "guest re-rendered BOTH repeated option-select rounds (two adopted presentations) (#831)").toBe(

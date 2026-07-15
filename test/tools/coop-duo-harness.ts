@@ -2727,8 +2727,17 @@ export async function buildDuoForMe(
   // Headless best-effort UI: neutralize the host's achievement candy-bar UI (see neutralizeCoopCandyBar)
   // so a won wave's REALISTIC_FLASH candy grant on an evolved starter can't throw an unhandled rejection.
   neutralizeCoopCandyBar(hostScene);
-  const hostRuntime = buildRuntime(pair.host, "Host", "authoritative");
-  const guestRuntime = buildRuntime(pair.guest, "Guest", "authoritative");
+  const suppliedPair = pair as typeof pair & { flush?: (role: CoopRole, limit?: number) => number };
+  // Mystery encounters use the same retained operation carriers as ordinary battle/reward journeys.
+  // Give their legacy loopback rig the same destination-context adapter as buildDuo: otherwise an
+  // inbound ME/reward continuation can resume while the sender's process-global scene is installed,
+  // a state that cannot occur when the two players run in separate browsers.
+  const runtimePair: DestinationEnvelopePumpPair =
+    typeof suppliedPair.flush === "function"
+      ? (suppliedPair as DestinationEnvelopePumpPair)
+      : destinationPumpOperationEnvelopes(suppliedPair);
+  const hostRuntime = buildRuntime(runtimePair.host, "Host", "authoritative");
+  const guestRuntime = buildRuntime(runtimePair.guest, "Guest", "authoritative");
   hostRuntime.controller.role = "host";
   guestRuntime.controller.role = "guest";
 
@@ -2748,6 +2757,7 @@ export async function buildDuoForMe(
     // starts identical and thereafter keeps its OWN money-streak / overstay / relic state.
     moduleLets: snapshotModuleLets(),
     mePins: { ...IDLE_ME_PINS },
+    pumpInbound: () => runtimePair.flush("host"),
   };
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
@@ -2761,6 +2771,7 @@ export async function buildDuoForMe(
     ghost: emptyGhostSnapshot(),
     moduleLets: snapshotModuleLets(),
     mePins: { ...IDLE_ME_PINS },
+    pumpInbound: () => runtimePair.flush("guest"),
   };
   await withClient(guestCtx, () => {
     toCoopGameMode(guestScene);
@@ -2778,7 +2789,7 @@ export async function buildDuoForMe(
   guestRuntime.controller.connect();
   await drainLoopback();
 
-  const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair };
+  const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair: runtimePair };
   liveDuoRigs.add(rig);
   return rig;
 }
