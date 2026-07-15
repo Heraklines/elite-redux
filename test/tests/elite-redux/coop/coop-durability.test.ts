@@ -29,6 +29,14 @@ import { afterEach, describe, expect, it } from "vitest";
 function durableMsg(wave: number): CoopMessage {
   return { t: "waveResolved", wave, outcome: "win" };
 }
+function nestedDurableMsg(value: number): Extract<CoopMessage, { t: "rewardOptions" }> {
+  return {
+    t: "rewardOptions",
+    seq: 1,
+    reroll: 0,
+    options: [{ id: "RARE_CANDY", tier: 0, upgradeCount: 0, cost: 0, pregenArgs: [value] }],
+  };
+}
 /** A cosmetic frame (render tick) - sheddable, never journaled. */
 function cosmeticMsg(seq: number): CoopMessage {
   return { t: "battleEvent", epoch: 7, wave: 1, turn: 1, seq, event: { k: "msg", text: "x" } as never };
@@ -190,6 +198,22 @@ describe("durability §4.3: bounded outbound queue + backpressure", () => {
     expect(q.byteSize()).toBe(0);
   });
 
+  it("owns an immutable snapshot of a dark-channel frame", () => {
+    const q = new CoopOutboundQueue();
+    const offered = nestedDurableMsg(11);
+    expect(q.offer(offered, 10)).toBe("queued");
+    offered.options[0].pregenArgs![0] = 99;
+
+    const flushed: number[] = [];
+    q.drain(message => {
+      if (message.t === "rewardOptions") {
+        flushed.push(message.options[0].pregenArgs?.[0] ?? -1);
+        message.options[0].pregenArgs![0] = 77;
+      }
+    });
+    expect(flushed).toEqual([11]);
+  });
+
   it("sheds cosmetic/internal frames instead of queuing them (fire-and-forget)", () => {
     const q = new CoopOutboundQueue();
     expect(q.offer(cosmeticMsg(1), 10)).toBe("shed");
@@ -238,6 +262,24 @@ describe("durability §4.1/§4.2: journal commit + cumulative ACK + resend tail"
     expect(j.highWaterMark("envelope")).toBe(3);
     expect(j.depth()).toBe(3);
     expect(j.classes()).toEqual(["envelope"]);
+  });
+
+  it("keeps journal retention immutable from caller and replay-consumer mutation", () => {
+    const j = new CoopJournal();
+    const committed = nestedDurableMsg(12);
+    expect(j.commit("envelope", 1, committed)).toBe(true);
+    committed.options[0].pregenArgs![0] = 98;
+
+    const replay = j.resendTail("envelope");
+    expect((replay[0].msg as Extract<CoopMessage, { t: "rewardOptions" }>).options[0].pregenArgs).toEqual([12]);
+    (replay[0].msg as Extract<CoopMessage, { t: "rewardOptions" }>).options[0].pregenArgs![0] = 76;
+
+    expect(
+      (j.entry("envelope", 1)?.msg as Extract<CoopMessage, { t: "rewardOptions" }>).options[0].pregenArgs,
+      "mutating a returned replay copy cannot rewrite the retained identity",
+    ).toEqual([12]);
+    expect(j.commit("envelope", 1, nestedDurableMsg(12))).toBe(true);
+    expect(j.commit("envelope", 1, nestedDurableMsg(13))).toBe(false);
   });
 
   it("resendTail returns the committed-but-unacked tail; a cumulative ACK shrinks it (§4.2)", () => {

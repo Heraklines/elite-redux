@@ -133,6 +133,42 @@ function acknowledgeReplacementThroughContinuation(stream: CoopBattleStreamer, e
 }
 
 describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
+  it("withholds malformed host events before authority retention", () => {
+    const { host } = createLoopbackPair();
+    const stream = new CoopBattleStreamer(host);
+    const state = emptyAuthoritativeState(1, 1, 20);
+
+    expect(() =>
+      stream.emitTurn(
+        7,
+        1,
+        1,
+        [{ k: "moveUsed", bi: 0, moveId: 1, targets: [-1] }],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        state,
+      ),
+    ).toThrow("malformed turn event index=0");
+    expect(stream.retainedAuthorityDiagnostics().turnCommits).toBe(0);
+    expect(() =>
+      stream.emitTurn(
+        7,
+        1,
+        1,
+        [{ k: "moveUsed", bi: 0, moveId: 1, targets: [] }],
+        emptyCheckpoint(),
+        "deadbeefdeadbeef",
+        "{}",
+        emptyFullField(),
+        state,
+      ),
+    ).not.toThrow();
+    expect(stream.retainedAuthorityDiagnostics().turnCommits).toBe(1);
+    stream.dispose();
+  });
+
   it("the guest adopts the host's exact enemy party", async () => {
     const { host, guest } = createLoopbackPair();
     const hostStream = new CoopBattleStreamer(host);
@@ -1460,6 +1496,83 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       guestStream.requestReplacementCheckpoint(newEnvelope);
       await flushWire();
       expect(rawRevisions.at(-1), "the newer unacked replacement remains independently replayable").toBe(22);
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
+    it("releases a stale replacement after a newer applied turn reaches continuation-ready", async () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 4, turn: 2 };
+      const hostTerminals: string[] = [];
+      const hostStream = new CoopBattleStreamer(host, {
+        authorityContext: () => current,
+        onAuthorityTerminal: reason => hostTerminals.push(reason),
+      });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+      const stale = checkpointEnvelope();
+
+      hostStream.sendCheckpoint(
+        stale.reason,
+        stale.epoch,
+        stale.wave,
+        stale.turn,
+        stale.checkpoint,
+        stale.checksum,
+        stale.fullField,
+        stale.authoritativeState,
+      );
+      await flushWire();
+      expect(hostStream.retainedAuthorityDiagnostics().replacementCommits).toBe(1);
+
+      current.wave = 5;
+      current.turn = 1;
+      const newerState = emptyAuthoritativeState(5, 1, 30);
+      const awaited = guestStream.awaitTurn(1);
+      hostStream.emitTurn(
+        7,
+        5,
+        1,
+        [],
+        { ...emptyCheckpoint(), tick: 29 },
+        "3030303030303030",
+        "{}",
+        emptyFullField(),
+        newerState,
+      );
+      const newer = await awaited;
+      expect(newer).not.toBeNull();
+      expect(guestStream.acknowledgeTurnCommit(newer!, "materialApplied")).toBe(true);
+      await flushWire();
+      expect(
+        hostStream.retainedAuthorityDiagnostics().replacementCommits,
+        "material application alone cannot causally retire retained authority",
+      ).toBe(1);
+      expect(guestStream.acknowledgeTurnCommit(newer!, "presentationReady")).toBe(true);
+      await flushWire();
+      expect(
+        hostStream.retainedAuthorityDiagnostics().replacementCommits,
+        "presentation readiness alone cannot causally retire retained authority",
+      ).toBe(1);
+      expect(guestStream.acknowledgeTurnCommit(newer!, "continuationReady")).toBe(true);
+      await flushWire();
+
+      expect(
+        hostStream.retainedAuthorityDiagnostics().replacementCommits,
+        "the newer full state causally subsumes the old replacement",
+      ).toBe(0);
+      expect(hostStream.retainedAuthorityDiagnostics().deliveryTimers).toBe(0);
+      expect(guestStream.retainedAuthorityDiagnostics().bufferedAuthority, "obsolete guest work is pruned").toBe(0);
+      expect(guestStream.retainedAuthorityDiagnostics().waiters).toBe(0);
+
+      expect(
+        guestStream.acknowledgeReplacement(stale, "materialApplied"),
+        "an already-admitted delayed frame can still emit a late ACK",
+      ).toBe(true);
+      await flushWire();
+      expect(hostTerminals, "a late exact ACK for retired authority is harmless").toEqual([]);
+      expect(hostStream.retainedAuthorityDiagnostics().terminal).toBe(false);
+      expect(hostStream.retainedAuthorityDiagnostics().fatalPending).toBe(false);
+
       hostStream.dispose();
       guestStream.dispose();
     });

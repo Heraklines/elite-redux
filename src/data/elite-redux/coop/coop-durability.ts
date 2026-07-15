@@ -233,7 +233,9 @@ export class CoopOutboundQueue {
       );
       return "collapsed";
     }
-    this.frames.push({ msg, bytes: byteSize });
+    // The dark-channel queue is a wire-retention boundary. Own an immutable send-time snapshot so a
+    // caller reusing/mutating its engine object cannot rewrite what a later `open` event transmits.
+    this.frames.push({ msg: structuredClone(msg), bytes: byteSize });
     this.bytes += byteSize;
     return "queued";
   }
@@ -247,7 +249,7 @@ export class CoopOutboundQueue {
     const pending = this.frames.splice(0, this.frames.length);
     this.bytes = 0;
     for (const f of pending) {
-      send(f.msg);
+      send(structuredClone(f.msg));
     }
   }
 
@@ -311,6 +313,8 @@ export class CoopJournal {
 
   /** Record a committed operation (host side, at commit→applied, §1.3). Seq MUST be monotonic per class. */
   commit(cls: string, seq: number, msg: CoopMessage): boolean {
+    const immutableMsg = structuredClone(msg);
+    const immutableCanonical = JSON.stringify(immutableMsg);
     const hw = this.highWater.get(cls) ?? 0;
     let list = this.byClass.get(cls);
     if (list == null) {
@@ -321,7 +325,7 @@ export class CoopJournal {
     if (existing != null) {
       // One revision has one immutable wire representation. A re-ACK may re-publish it, but a caller can
       // never smuggle a conflicting payload under an already-committed sequence number.
-      return JSON.stringify(existing.msg) === JSON.stringify(msg);
+      return JSON.stringify(existing.msg) === immutableCanonical;
     }
 
     // A cold restore persists the high-water but intentionally not the bounded replay ring. Likewise a
@@ -329,7 +333,7 @@ export class CoopJournal {
     // concrete message is reinserted; the high-water alone is not durability. Keep the list ordered because
     // tail replay and deep-gap detection depend on ascending sequence numbers.
     const insertionIndex = list.findIndex(entry => entry.seq > seq);
-    const entry = { cls, seq, msg };
+    const entry = { cls, seq, msg: immutableMsg };
     if (insertionIndex < 0) {
       list.push(entry);
     } else {
@@ -344,7 +348,7 @@ export class CoopJournal {
     }
     // A very old retry may be below a full ring and get evicted immediately. Report failure rather than
     // letting a gameplay permit outrun an entry that is not actually replayable.
-    return list.some(retained => retained.seq === seq && JSON.stringify(retained.msg) === JSON.stringify(msg));
+    return list.some(retained => retained.seq === seq && JSON.stringify(retained.msg) === immutableCanonical);
   }
 
   /** Record the peer's cumulative ACK: it has applied class `cls` through revision `upto` (§4.2). */
@@ -372,7 +376,7 @@ export class CoopJournal {
       return [];
     }
     const ack = this.ackedThrough(cls);
-    return list.filter(e => e.seq > ack);
+    return list.filter(e => e.seq > ack).map(entry => structuredClone(entry));
   }
 
   /** Every committed entry after `from` (for reconnect-from-revision replay, §4.4), in order. */
@@ -381,12 +385,13 @@ export class CoopJournal {
     if (list == null) {
       return [];
     }
-    return list.filter(e => e.seq > from);
+    return list.filter(e => e.seq > from).map(entry => structuredClone(entry));
   }
 
   /** Exact retained canonical entry, including ACKed entries that still remain inside the bounded ring. */
   entry(cls: string, seq: number): CoopJournalEntry | null {
-    return this.byClass.get(cls)?.find(candidate => candidate.seq === seq) ?? null;
+    const retained = this.byClass.get(cls)?.find(candidate => candidate.seq === seq);
+    return retained == null ? null : structuredClone(retained);
   }
 
   /**
@@ -421,8 +426,9 @@ export class CoopJournal {
   /** Total committed-but-unacked entries across all classes (surfaced in the health line). */
   unackedCount(): number {
     let n = 0;
-    for (const cls of this.byClass.keys()) {
-      n += this.resendTail(cls).length;
+    for (const [cls, entries] of this.byClass) {
+      const ack = this.ackedThrough(cls);
+      n += entries.filter(entry => entry.seq > ack).length;
     }
     return n;
   }

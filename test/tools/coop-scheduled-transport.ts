@@ -123,7 +123,9 @@ export function createScheduledCoopPair(options: { automatic?: boolean } = {}): 
   let flushRole: ((role: CoopRole, limit?: number) => number) | null = null;
 
   const enqueue = (role: CoopRole, message: CoopMessage): void => {
-    queues[role].push({ message, generation });
+    // A real DataChannel serializes at send time. Snapshot here so sender-side engine mutation after
+    // `send()` cannot rewrite a queued frame while the other client is waiting for its scheduled turn.
+    queues[role].push({ message: structuredClone(message), generation });
     if (automaticDelivery) {
       queueMicrotask(() => flushRole?.(role));
     }
@@ -175,10 +177,12 @@ export function createScheduledCoopPair(options: { automatic?: boolean } = {}): 
           continue;
         }
         const duplicate = consumeFault(duplicates[role], frame.message);
-        endpoints[role].deliver(frame.message);
+        endpoints[role].deliver(structuredClone(frame.message));
         delivered++;
         if (duplicate) {
-          endpoints[role].deliver(frame.message);
+          // Two network deliveries are two independently parsed values. A receiver mutating its first
+          // working copy must not corrupt the deliberate duplicate used to prove idempotency.
+          endpoints[role].deliver(structuredClone(frame.message));
           delivered++;
         }
       }

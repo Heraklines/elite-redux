@@ -750,7 +750,10 @@ export class MovePhase extends PokemonPhase {
         k: "moveUsed",
         bi: pokemon.getBattlerIndex(),
         moveId,
-        targets: [...this.targets],
+        // A later action in the same turn can still carry an engine target sentinel after an earlier
+        // action fainted that target. Sentinels have no replayable field entity; omit them from the
+        // presentation cue (the replay phase safely falls back to the user for a targetless animation).
+        targets: this.targets.filter(target => Number.isSafeInteger(target) && target >= 0 && target <= 11),
       });
     }
 

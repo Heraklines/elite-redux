@@ -106,6 +106,7 @@ const AUTHORITY_FATAL_RETRY_MS = 500;
 const AUTHORITY_FATAL_DEADLINE_MS = 3_000;
 const AUTHORITY_ACK_RETENTION = 32;
 const AUTHORITY_COMMIT_RETENTION = 64;
+const AUTHORITY_RETIRED_REPLACEMENT_RETENTION = AUTHORITY_COMMIT_RETENTION;
 // Longer than the 120s hot-rejoin grace, but finite: a reconnect gets its full recovery window before
 // unacknowledged gameplay authority transitions both peers into the shared terminal.
 const AUTHORITY_COMMIT_RETENTION_MS = 150_000;
@@ -485,6 +486,16 @@ interface AckEvidence<T> {
   value: T;
 }
 
+interface ReplacementAckIdentity {
+  epoch: number;
+  wave: number;
+  turn: number;
+  revision: number;
+  checkpointTick: number;
+  stateTick: number;
+  checksum: string;
+}
+
 export type CoopAuthorityContinuationSurface = "command" | "sharedInput" | "terminal";
 
 export type CoopAuthorityContinuationExpectation =
@@ -623,6 +634,35 @@ function sameAuthorityAddress(
     && left.turn === right.turn
     && left.revision === right.revision
   );
+}
+
+function replacementIsCausallyDominatedBy(
+  retained: CoopCheckpointEnvelope,
+  authority: CoopTurnResolution | CoopCheckpointEnvelope,
+): boolean {
+  const addressAdvanced =
+    authority.wave > retained.wave
+    || (authority.wave === retained.wave
+      && (authority.turn > retained.turn
+        || (authority.turn === retained.turn && authority.revision > retained.revision)));
+  return (
+    authority.epoch === retained.epoch
+    && addressAdvanced
+    && authority.revision > retained.revision
+    && authority.authoritativeState.tick > retained.authoritativeState.tick
+  );
+}
+
+function replacementAckIdentity(envelope: CoopCheckpointEnvelope): ReplacementAckIdentity {
+  return {
+    epoch: envelope.epoch,
+    wave: envelope.wave,
+    turn: envelope.turn,
+    revision: envelope.revision,
+    checkpointTick: envelope.checkpoint.tick as number,
+    stateTick: envelope.authoritativeState.tick,
+    checksum: envelope.checksum,
+  };
 }
 
 function authorityFailureKey(failure: CoopAuthorityFailure): string {
@@ -778,6 +818,12 @@ export class CoopBattleStreamer {
   private readonly pendingReplacementContinuations = new Map<string, PendingReplacementContinuation>();
   /** HOST: bounded proof that a causally newer replacement was ACKed before an old turn is superseded. */
   private readonly hostAppliedReplacementAcks = new Map<string, Extract<CoopMessage, { t: "battleCheckpointAck" }>>();
+  /**
+   * HOST: immutable identities of replacement frames retired by a newer, fully-applied authority commit.
+   * A delayed ACK for one of these frames is harmless and must not turn successful convergence into a
+   * protocol fatal after its retry/timer was deliberately released.
+   */
+  private readonly causallyRetiredReplacementAuthority = new Map<string, ReplacementAckIdentity>();
   private authorityFailureHandlers = new Set<(failure: CoopAuthorityFailure) => void>();
   private lastAuthorityFailure: CoopAuthorityFailure | null = null;
   /** Receiver-side exactly-once guard: duplicates are re-ACKed without routing terminal cleanup twice. */
@@ -1193,6 +1239,7 @@ export class CoopBattleStreamer {
     this.hostReplacementAckEvidence.clear();
     this.pendingReplacementContinuations.clear();
     this.hostAppliedReplacementAcks.clear();
+    this.causallyRetiredReplacementAuthority.clear();
     this.inbox.clear();
     this.pendingSince.clear();
     this.liveEvents.clear();
@@ -1452,6 +1499,76 @@ export class CoopBattleStreamer {
     return true;
   }
 
+  /**
+   * A continuation-ready ACK for a strictly newer complete state proves that the guest no longer needs an
+   * older replacement snapshot from the same epoch. Retaining that dominated frame until its original
+   * deadline only replays cross-wave traffic and can falsely terminate an otherwise converged session.
+   *
+   * Address order and state revision must both advance. This deliberately excludes a superseded turn ACK,
+   * equal/conflicting revisions, future addresses, and every other epoch.
+   */
+  private releaseCausallyDominatedReplacements(
+    authority: CoopTurnResolution | CoopCheckpointEnvelope,
+    source: "turnResolution" | "replacement",
+  ): number {
+    let released = 0;
+    for (const [key, retained] of this.sentReplacementCheckpoints) {
+      if (!replacementIsCausallyDominatedBy(retained, authority)) {
+        continue;
+      }
+      this.causallyRetiredReplacementAuthority.set(key, replacementAckIdentity(retained));
+      while (this.causallyRetiredReplacementAuthority.size > AUTHORITY_RETIRED_REPLACEMENT_RETENTION) {
+        const oldest = this.causallyRetiredReplacementAuthority.keys().next().value as string | undefined;
+        if (oldest == null) {
+          break;
+        }
+        this.causallyRetiredReplacementAuthority.delete(oldest);
+      }
+      this.sentReplacementCheckpoints.delete(key);
+      this.sentReplacementDeadlines.delete(key);
+      this.sentReplacementTimers.get(key)?.();
+      this.sentReplacementTimers.delete(key);
+      released++;
+      coopLog(
+        "stream",
+        `host RELEASE causally dominated replacement key=${key} via ${source} key=${authorityKey(authority)}`,
+      );
+    }
+    return released;
+  }
+
+  /** Drop guest-side working transactions made obsolete by the same newer full-state proof. */
+  private discardCausallyDominatedGuestReplacements(authority: CoopTurnResolution | CoopCheckpointEnvelope): number {
+    const discard = <T>(entries: Map<string, T>, envelopeOf: (value: T) => CoopCheckpointEnvelope): number => {
+      let removed = 0;
+      for (const [key, value] of entries) {
+        if (!replacementIsCausallyDominatedBy(envelopeOf(value), authority)) {
+          continue;
+        }
+        entries.delete(key);
+        removed++;
+      }
+      return removed;
+    };
+    let removed = discard(this.pendingCheckpoints, value => value);
+    removed += discard(this.appliedOutOfBandCheckpoints, value => value);
+    removed += discard(this.pendingReplacementContinuations, value => value.envelope);
+    for (const key of [...this.replacementRedeliveryRequests]) {
+      const retained = this.seenReplacementAuthority.get(key)?.value;
+      if (retained != null && replacementIsCausallyDominatedBy(retained, authority)) {
+        this.replacementRedeliveryRequests.delete(key);
+        removed++;
+      }
+    }
+    if (removed > 0) {
+      coopLog(
+        "stream",
+        `guest DISCARD ${removed} causally dominated replacement transaction(s) via key=${authorityKey(authority)}`,
+      );
+    }
+    return removed;
+  }
+
   // --- HOST side --------------------------------------------------------------
 
   /** HOST: send the exact enemy party the guest must adopt verbatim for `wave`. */
@@ -1607,6 +1724,13 @@ export class CoopBattleStreamer {
     authoritativeState: CoopAuthoritativeBattleStateV1,
   ): void {
     const revision = authoritativeState.tick;
+    const invalidEventIndex = events.findIndex(event => !isStrictBattleEvent(event));
+    if (invalidEventIndex >= 0) {
+      throw new Error(
+        `refusing malformed turn event index=${invalidEventIndex} e=${epoch} wave=${wave} turn=${turn} `
+          + `event=${JSON.stringify(events[invalidEventIndex])}`,
+      );
+    }
     coopLog(
       "replay",
       `host SEND turnResolution e=${epoch} wave=${wave} turn=${turn} rev=${revision} events=${events.length} checksum=${checksum}`,
@@ -1643,6 +1767,14 @@ export class CoopBattleStreamer {
    */
   emitEvent(epoch: number, wave: number, turn: number, seq: number, event: CoopBattleEvent): void {
     if (this.authorityTerminalStarted) {
+      return;
+    }
+    if (!isStrictBattleEvent(event)) {
+      coopWarn(
+        "replay",
+        `host WITHHOLD malformed live battleEvent e=${epoch} wave=${wave} turn=${turn} seq=${seq} `
+          + `event=${JSON.stringify(event)}`,
+      );
       return;
     }
     // HOT PATH (per battle event): build the trace string only when debug is on.
@@ -1929,6 +2061,9 @@ export class CoopBattleStreamer {
     } else if (stage === "continuationReady") {
       this.pendingTurnContinuations.delete(key);
       this.clearTurnCommitRequest(turnCommitRequestKey(resolution));
+      if (superseding == null) {
+        this.discardCausallyDominatedGuestReplacements(resolution);
+      }
     }
     this.transport.send(ack);
     coopLog(
@@ -1986,6 +2121,7 @@ export class CoopBattleStreamer {
     this.replacementRedeliveryRequests.delete(key);
     if (stage === "continuationReady") {
       this.pendingReplacementContinuations.delete(key);
+      this.discardCausallyDominatedGuestReplacements(envelope);
     }
     this.transport.send(ack);
     coopLog(
@@ -3254,6 +3390,7 @@ export class CoopBattleStreamer {
     this.hostReplacementAckEvidence.clear();
     this.pendingReplacementContinuations.clear();
     this.hostAppliedReplacementAcks.clear();
+    this.causallyRetiredReplacementAuthority.clear();
     this.authorityFailureHandlers.clear();
     this.lastAuthorityFailure = null;
     this.ackedAuthorityFailures.clear();
@@ -3444,18 +3581,22 @@ export class CoopBattleStreamer {
         if (this.authorityTerminalStarted) {
           return;
         }
+        const invalidEventIndex = Array.isArray(msg.events)
+          ? msg.events.findIndex(event => !isStrictBattleEvent(event))
+          : -1;
         const structurallyComplete =
           typeof msg.preimage === "string"
           && msg.preimage.length > 0
           && Array.isArray(msg.events)
-          && msg.events.every(isStrictBattleEvent)
+          && invalidEventIndex < 0
           && hasCompleteAuthorityCompanions(msg);
         if (!structurallyComplete) {
           coopWarn(
             "replay",
             `guest DROP malformed turnResolution turn=${msg.turn} preimage=${typeof msg.preimage === "string"} `
               + `fullField=${Array.isArray(msg.fullField) ? msg.fullField.length : 0} `
-              + `state=${msg.authoritativeState == null ? 0 : 1} checksum=${msg.checksum}`,
+              + `state=${msg.authoritativeState == null ? 0 : 1} checksum=${msg.checksum} `
+              + `invalidEvent=${invalidEventIndex}`,
           );
           return;
         }
@@ -3822,6 +3963,9 @@ export class CoopBattleStreamer {
           // materialApplied/presentationReady may suppress duplicate work, but never release authority.
           return;
         }
+        if (msg.status === "applied") {
+          this.releaseCausallyDominatedReplacements(retained, "turnResolution");
+        }
         this.sentTurnCommits.delete(key);
         this.sentTurnCommitDeadlines.delete(key);
         this.sentTurnCommitTimers.get(key)?.();
@@ -3865,8 +4009,22 @@ export class CoopBattleStreamer {
         }
         const key = authorityKey(msg);
         const retained = this.sentReplacementCheckpoints.get(key);
+        const causallyRetired = this.causallyRetiredReplacementAuthority.get(key);
         const prior = this.hostReplacementAckEvidence.get(key);
         const stage = msg.stage;
+        if (
+          retained == null
+          && causallyRetired != null
+          && isAuthorityAckStage(stage)
+          && msg.reason === "replacement"
+          && sameAuthorityAddress(msg, causallyRetired)
+          && msg.checkpointTick === causallyRetired.checkpointTick
+          && msg.stateTick === causallyRetired.stateTick
+          && msg.checksum === causallyRetired.checksum
+        ) {
+          coopLog("stream", `host IGNORE late ACK for causally retired replacement stage=${stage} key=${key}`);
+          return;
+        }
         if (
           retained == null
           || !isAuthorityAckStage(stage)
@@ -3909,6 +4067,7 @@ export class CoopBattleStreamer {
         this.sentReplacementDeadlines.delete(key);
         this.sentReplacementTimers.get(key)?.();
         this.sentReplacementTimers.delete(key);
+        this.releaseCausallyDominatedReplacements(retained, "replacement");
         coopLog("stream", `host RELEASE retained replacement after continuationReady key=${key}`);
         return;
       }

@@ -330,7 +330,9 @@ class CoopFaultTransport implements CoopTransport {
     if (r < drop + reorder) {
       this.counters.reordered += 1;
       this.tickHeld();
-      this.held.push({ msg, remaining: 1 });
+      // Snapshot when the wire accepts the frame, not when the artificial hold releases it. Otherwise
+      // later engine mutation aliases into the held payload, unlike a real serialized DataChannel frame.
+      this.held.push({ msg: structuredClone(msg), remaining: 1 });
       return;
     }
     if (r < drop + reorder + delay) {
@@ -339,7 +341,7 @@ class CoopFaultTransport implements CoopTransport {
       const span = maxDelay - 2 + 1;
       const remaining = 2 + Math.floor(this.rng() * span);
       this.tickHeld();
-      this.held.push({ msg, remaining });
+      this.held.push({ msg: structuredClone(msg), remaining });
       return;
     }
     // Pass through unchanged.

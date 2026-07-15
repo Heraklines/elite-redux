@@ -355,6 +355,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       hostMarket.start();
       await drainLoopback();
     });
+    await withClient(rig.guestCtx, () => drainLoopback());
     expect(
       retained?.continuationReady,
       "authoritative stock plus the live watcher loop attests the phase-owned continuation",

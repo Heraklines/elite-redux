@@ -4,6 +4,7 @@
  */
 
 import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
+import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import { describe, expect, it, vi } from "vitest";
 
@@ -107,5 +108,58 @@ describe("co-op production-transition scheduled transport", () => {
     ).toEqual([1]);
     pair.flush("guest");
     expect(guestRx.mock.calls.map(([message]) => message.ts)).toEqual([1, 2]);
+  });
+
+  it("snapshots queued and duplicated frames like serialized network deliveries", () => {
+    const pair = createScheduledCoopPair();
+    const received: number[] = [];
+    pair.guest.onMessage(message => {
+      if (message.t !== "rewardOptions") {
+        return;
+      }
+      received.push(message.options[0].pregenArgs?.[0] ?? -1);
+      message.options[0].pregenArgs![0] = 77;
+    });
+    pair.duplicateNext("guest", message => message.t === "rewardOptions");
+    const sent: Extract<CoopMessage, { t: "rewardOptions" }> = {
+      t: "rewardOptions",
+      seq: 1,
+      reroll: 0,
+      options: [{ id: "RARE_CANDY", tier: 0, upgradeCount: 0, cost: 0, pregenArgs: [11] }],
+    };
+
+    pair.host.send(sent);
+    sent.options[0].pregenArgs![0] = 99;
+    pair.flush("guest");
+
+    expect(received, "post-send and first-receiver mutation cannot alias into either delivery").toEqual([11, 11]);
+  });
+
+  it("snapshots fault-held frames when the hold begins", () => {
+    const scheduled = createScheduledCoopPair();
+    const pair = wrapCoopFaultPair(
+      scheduled,
+      { drop: 0, reorder: 1, delay: 0, faultable: message => message.t === "rewardOptions" },
+      { seed: 33 },
+    );
+    const received: number[] = [];
+    pair.guest.onMessage(message => {
+      if (message.t === "rewardOptions") {
+        received.push(message.options[0].pregenArgs?.[0] ?? -1);
+      }
+    });
+    const sent: Extract<CoopMessage, { t: "rewardOptions" }> = {
+      t: "rewardOptions",
+      seq: 2,
+      reroll: 0,
+      options: [{ id: "RARE_CANDY", tier: 0, upgradeCount: 0, cost: 0, pregenArgs: [12] }],
+    };
+
+    pair.host.send(sent);
+    sent.options[0].pregenArgs![0] = 98;
+    pair.host.send(ping(3));
+    scheduled.flush("guest");
+
+    expect(received, "reorder/delay storage owns an immutable send-time snapshot").toEqual([12]);
   });
 });
