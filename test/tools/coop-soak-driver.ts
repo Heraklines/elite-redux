@@ -2913,6 +2913,31 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         );
       }
 
+      // The terminal envelope advances the shared interaction counter before both local phase managers
+      // necessarily finish their confirmation teardown. A real browser keeps rendering during that tail.
+      // Wait until BOTH concrete market instances have actually left before classifying/opening the chained
+      // continuation; inspecting immediately can still see SelectModifierPhase, then pump into an unstarted
+      // Crossroads only after the continuation-ready waiter has already begun.
+      let bothMarketsExited = false;
+      for (let attempt = 0; attempt < 160; attempt++) {
+        await pumpDuoDestinations(rig, 1);
+        const hostExited = rig.hostScene.phaseManager.getCurrentPhase() !== hostMarket;
+        const guestExited = rig.guestScene.phaseManager.getCurrentPhase() !== guestMarket;
+        if (hostExited && guestExited) {
+          bothMarketsExited = true;
+          break;
+        }
+        await new Promise<void>(resolve => setTimeout(resolve, 10));
+      }
+      if (!bothMarketsExited) {
+        fail(
+          "no-park",
+          wave,
+          `biome market terminal did not leave on both clients (host=${rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"} `
+            + `guest=${rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"})`,
+        );
+      }
+
       // A real shared continuation is not complete merely because its mechanical terminal advanced. The
       // renderer must also have opened the addressed continuation surface before the retained wave journal
       // can release. On every tenth wave the market can chain into Crossroads; expose that real public prompt
