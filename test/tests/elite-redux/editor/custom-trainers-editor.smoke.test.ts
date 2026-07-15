@@ -52,6 +52,7 @@ interface EditorHarness {
   CTR_LIVE: Record<string, any>;
   HELD_ITEMS: { key: string; label: string; category: string }[];
   CHALLENGE_VALUES: Record<string, { value: number; label: string }[]>;
+  CHALLENGE_PRESETS: { name: string; challenge: string; challengeValue: number }[];
   ctr: { current: Record<string, any>; baseline: Record<string, any> };
   ctrConfig: {
     current: { windowSize: number; windowChancePct: number };
@@ -138,6 +139,7 @@ beforeAll(() => {
       get CTR_LIVE(){ return CTR_LIVE; }, set CTR_LIVE(v){ CTR_LIVE = v; },
       get HELD_ITEMS(){ return HELD_ITEMS; }, set HELD_ITEMS(v){ HELD_ITEMS = v; },
       get CHALLENGE_VALUES(){ return CHALLENGE_VALUES; }, set CHALLENGE_VALUES(v){ CHALLENGE_VALUES = v; },
+      get CHALLENGE_PRESETS(){ return CHALLENGE_PRESETS; }, set CHALLENGE_PRESETS(v){ CHALLENGE_PRESETS = v; },
       setTab(v){ activeTab = v; },
     };`;
   const dom = new JSDOM(HARNESS_HTML, { runScripts: "outside-only", pretendToBeVisual: true });
@@ -214,6 +216,12 @@ beforeEach(() => {
       { value: 10, label: "RDX (Elite Redux)" },
     ],
   };
+  // Named challenge presets fixture (mined from the achievement catalog).
+  ct.CHALLENGE_PRESETS = [
+    { name: "I Cast Fireball!", challenge: "monotype", challengeValue: 10 },
+    { name: "Extra Ordinary", challenge: "monotype", challengeValue: 1 },
+    { name: "Redux Means Redux", challenge: "monogen", challengeValue: 10 },
+  ];
   // Ghost Trainer FX aura catalog fixture (the per-trainer sprite-effect picker).
   ct.TRAINER_FX.length = 0;
   ct.trainerFxById.clear();
@@ -793,6 +801,44 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     victory.value = "z".repeat(250);
     ct.onCustomTrainerInput(victory);
     expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].victoryDialogue.length).toBe(200);
+  });
+
+  it("named challenge preset picker sets the challenge + value fields and serializes", () => {
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // The preset picker is a SEPARATE select from the main challenge dropdown.
+    const preset = q("#ctr-challenge-preset") as HTMLSelectElement;
+    expect(preset).not.toBeNull();
+    expect(q("#ctr-challenge")).not.toBeNull();
+    expect(preset).not.toBe(q("#ctr-challenge")); // distinct controls
+    // It offers the seeded presets grouped by kind (optgroups) + a placeholder.
+    expect(preset.querySelector("option")!.getAttribute("value")).toBe(""); // placeholder first
+    expect([...preset.querySelectorAll("optgroup")].length).toBeGreaterThanOrEqual(2);
+    const presetVals = [...preset.querySelectorAll("option")].map(o => (o as HTMLOptionElement).value);
+    expect(presetVals).toContain("monotype:10"); // I Cast Fireball!
+    expect(presetVals).toContain("monogen:10"); // Redux Means Redux
+
+    // Pick "I Cast Fireball!" (monotype:10) -> both fields are set under the hood.
+    preset.value = "monotype:10";
+    ct.onCustomTrainerChange(preset);
+    expect(ct.ctr.current[key].challenge).toBe("monotype");
+    expect(ct.ctr.current[key].challengeValue).toBe(10);
+    // The main dropdown + value dropdown now reflect it (single gating mechanism).
+    expect((q("#ctr-challenge") as HTMLSelectElement).value).toBe("monotype");
+    expect((q("#ctr-challenge-value") as HTMLSelectElement).value).toBe("10");
+    let delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.challenge).toBe("monotype");
+    expect(delta.challengeValue).toBe(10);
+
+    // Applying a mono-gen preset re-points both fields.
+    const preset2 = q("#ctr-challenge-preset") as HTMLSelectElement;
+    preset2.value = "monogen:10";
+    ct.onCustomTrainerChange(preset2);
+    expect(ct.ctr.current[key].challenge).toBe("monogen");
+    expect(ct.ctr.current[key].challengeValue).toBe(10);
+    delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.challenge).toBe("monogen");
+    expect(delta.challengeValue).toBe(10);
   });
 
   it("challenge value dropdown appears for parameterizable kinds, serializes, and clears otherwise", () => {

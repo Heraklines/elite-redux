@@ -1618,6 +1618,31 @@ function normalizeCtrChallengeValue(value) {
   const n = Math.floor(Number(value));
   return Number.isFinite(n) && n >= 1 ? n : null;
 }
+
+// Named challenge PRESETS (editor/data/challenge-presets.json): {name, challenge,
+// challengeValue} configs mined from the achievement catalog (themed mono-type /
+// mono-gen runs). A SEPARATE picker from the main challenge dropdown; picking one
+// just SETS the challenge kind + value fields (one gating mechanism under the
+// hood). Loaded in init(); empty until then (the preset picker hides).
+let CHALLENGE_PRESETS = [];
+/** <optgroup>s for the preset picker, grouped by challenge kind (its label). */
+function ctrPresetOptionsHtml() {
+  const groups = new Map();
+  for (const p of CHALLENGE_PRESETS) {
+    if (!groups.has(p.challenge)) {
+      groups.set(p.challenge, []);
+    }
+    groups.get(p.challenge).push(p);
+  }
+  let html = "";
+  for (const [kind, list] of groups) {
+    const groupLabel = CHALLENGE_LABELS[kind] || kind;
+    html += `<optgroup label="${esc(groupLabel)}">${list
+      .map(p => `<option value="${esc(p.challenge)}:${p.challengeValue}">${esc(p.name)}</option>`)
+      .join("")}</optgroup>`;
+  }
+  return html;
+}
 const CHALLENGE_LABELS = {
   none: "None",
   inverse: "Inverse Battle",
@@ -2917,6 +2942,17 @@ function renderCustomTrainers(root) {
           </select>
         </label>`
       : "";
+    // Named-preset picker (SEPARATE from the main dropdown). Picking one just SETS
+    // the challenge kind + value below. Placeholder-only when nothing is chosen.
+    const challPresetSel =
+      CHALLENGE_PRESETS.length > 0
+        ? `<label class="ctr-preset-lbl" title="Named challenge configurations from the achievement catalog (themed mono-type / mono-gen runs). Picking one SETS the Challenge exclusivity + Value fields.">Named preset
+            <select id="ctr-challenge-preset">
+              <option value="">(apply a named preset…)</option>
+              ${ctrPresetOptionsHtml()}
+            </select>
+          </label>`
+        : "";
     const bgmSel = ctrBgmOptions(t.battleBgm || "");
     form = `<div class="ctr-form">
       <fieldset class="ctr-sec"><legend>Identity</legend>
@@ -2960,6 +2996,7 @@ function renderCustomTrainers(root) {
         <br /><label>Battle type <select id="ctr-battletype">${battleSel}</select></label>
         <label>Challenge exclusivity <select id="ctr-challenge">${challSel}</select></label>
         ${challValueSel}
+        ${challPresetSel}
         <p class="hint" style="margin:6px 0 0">Spawning is capped GLOBALLY by the Spawn density panel above (how often ANY custom trainer appears). When a window fires, ONE trainer is picked by weight among the eligible not-yet-used trainers, then it appears once at a wave in its range, sliding forward past boss/fixed/mystery waves. No repeats per run.</p>
       </fieldset>
       <fieldset class="full ctr-sec"><legend>Team (1-6)</legend>
@@ -3151,6 +3188,19 @@ function onCustomTrainerChange(el) {
     // "(any value)" -> null (unset); otherwise the chosen numeric value.
     t.challengeValue = el.value === "" ? null : normalizeCtrChallengeValue(el.value);
     refreshChrome();
+    return true;
+  } else if (el.id === "ctr-challenge-preset") {
+    // Named preset: SET the challenge kind + value (one gating mechanism). The
+    // encoded value is "<challenge>:<value>". Placeholder ("") is a no-op. The
+    // picker re-renders to a placeholder (the applied fields show below).
+    if (el.value) {
+      const [kind, val] = el.value.split(":");
+      if (CHALLENGE_OPTIONS.includes(kind)) {
+        t.challenge = kind;
+        t.challengeValue = normalizeCtrChallengeValue(val);
+      }
+    }
+    render();
     return true;
   } else if (el.id === "ctr-effect") {
     // Pick a trainer sprite effect (aura); re-render so the preview swatch updates.
@@ -4533,6 +4583,7 @@ async function init() {
       trainerFxData,
       heldItemsData,
       challengeValuesData,
+      challengePresetsData,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
@@ -4576,6 +4627,8 @@ async function init() {
       fetchJson("./data/held-items.json", []),
       // Challenge VALUE option lists (generated). Fallback → {} (value dropdown hides).
       fetchJson("./data/challenge-values.json", {}),
+      // Named challenge presets (generated). Fallback → [] (preset picker hides).
+      fetchJson("./data/challenge-presets.json", []),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -4709,6 +4762,13 @@ async function init() {
           CHALLENGE_VALUES[kind] = opts.filter(o => o && typeof o.value === "number" && typeof o.label === "string");
         }
       }
+    }
+
+    // Named challenge presets: keep only well-formed {name,challenge,challengeValue}.
+    if (Array.isArray(challengePresetsData)) {
+      CHALLENGE_PRESETS = challengePresetsData.filter(
+        p => p && typeof p.name === "string" && typeof p.challenge === "string" && typeof p.challengeValue === "number",
+      );
     }
 
     // Egg-move source + factory-set index for the per-member legality/set helpers.

@@ -335,6 +335,57 @@ mkdirSync("editor/data", { recursive: true });
   );
 }
 
+// Named challenge PRESETS (editor/data/challenge-presets.json): named challenge
+// configurations {name, challenge, challengeValue} extracted from the ACHIEVEMENT
+// catalog. Only achievements defined by a SINGLE {challenge kind, value} config
+// are derivable (a `ChallengeAchv` whose predicate is `c instanceof <Single*
+// Challenge> && c.value === N`) - the themed mono-type / mono-gen runs. Multi-
+// challenge STACKS (e.g. Monochrome Requiem = Monocolor + Nuzlocke, the apex
+// Inferno/Cocytus stacks = SingleType + Doubles + Ghost) carry no single value and
+// are SKIPPED (reported in the console count). The human name is the achievement's
+// localized display name (locales/en/achv.json[<key>].name). Static parse only.
+{
+  const achvSrc = read("src/system/achv.ts");
+  const achvNames = JSON.parse(read("locales/en/achv.json"));
+  // The ER mono-gen "RDX" pseudo-generation constant (value used by the RDX achv).
+  const rdxMatch = achvSrc.match(/ER_RDX_CHALLENGE_GEN\s*=\s*(\d+)/);
+  const rdxGen = rdxMatch ? Number(rdxMatch[1]) : 10;
+  const CLASS_TO_KIND = { SingleTypeChallenge: "monotype", SingleGenerationChallenge: "monogen" };
+  const presets = [];
+  // Each `new ChallengeAchv("<localeKey>", ... c => ... c instanceof <Class> &&
+  // c.value === <N|ER_RDX_CHALLENGE_GEN> ...)` yields ONE {name, challenge, value}.
+  // The `(?!new ChallengeAchv\()` guard stops the gap from crossing INTO the next
+  // constructor, so a non-mono achv's name can't grab a later mono achv's predicate
+  // (which would shift every name by one).
+  const re =
+    /new ChallengeAchv\(\s*"([^"]+)"(?:(?!new ChallengeAchv\()[\s\S])*?c instanceof (SingleTypeChallenge|SingleGenerationChallenge)\s*&&\s*c\.value === (\w+)/g;
+  let m;
+  while ((m = re.exec(achvSrc)) !== null) {
+    const [, localeKey, className, rawValue] = m;
+    const kind = CLASS_TO_KIND[className];
+    if (!kind) {
+      continue;
+    }
+    const value = rawValue === "ER_RDX_CHALLENGE_GEN" ? rdxGen : Number(rawValue);
+    if (!Number.isInteger(value) || value < 1) {
+      continue;
+    }
+    const name = achvNames[localeKey] && achvNames[localeKey].name ? achvNames[localeKey].name : localeKey;
+    presets.push({ name, challenge: kind, challengeValue: value });
+  }
+  // Stable order: by challenge kind, then value.
+  presets.sort((a, b) => a.challenge.localeCompare(b.challenge) || a.challengeValue - b.challengeValue);
+  if (presets.length === 0) {
+    throw new Error("gen-editor-data: parsed 0 challenge presets — ChallengeAchv format changed?");
+  }
+  writeFileSync("editor/data/challenge-presets.json", `${JSON.stringify(presets, null, 2)}\n`);
+  const monoType = presets.filter(p => p.challenge === "monotype").length;
+  const monoGen = presets.filter(p => p.challenge === "monogen").length;
+  console.log(
+    `challenge-presets: ${presets.length} (${monoType} mono-type / ${monoGen} mono-gen incl. RDX). Skipped multi-challenge stacks (Monochrome Requiem, apex Inferno/Cocytus/Giudecca) - no single {kind,value}.`,
+  );
+}
+
 writeFileSync("editor/data/moves.json", `${JSON.stringify(uniqueMoves, null, 2)}\n`);
 console.log(`moves: ${uniqueMoves.length} (incl. ${erMoveCount} ER custom names)`);
 console.log("species/items/trainers: run the dump tool (see header) — they come from the live runtime tables.");
