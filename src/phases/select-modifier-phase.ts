@@ -21,15 +21,16 @@ import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-re
 import {
   coopMeInProgress,
   coopSessionGeneration,
+  type CoopRetainedWaveContinuationAddress,
   failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
   getCoopRendezvous,
-  getCoopRetainedWaveContinuationAddress,
   getCoopRuntime,
   getCoopUiMirror,
   notifyCoopWaveContinuationSurfaceReady,
+  resolveCoopRetainedWaveContinuationIdentity,
   runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_REWARD_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
@@ -248,14 +249,17 @@ export class SelectModifierPhase extends BattlePhase {
    *  at this value, so the owner's terminal + the watcher's terminal + a reconcile
    *  broadcast can't double-count this one interaction. -1 = solo / not captured. */
   private coopInteractionStart = -1;
-  /** Durable source-wave address; ambient currentBattle may already be a speculative next wave. */
-  private readonly coopSourceWave: number | null;
+  /** Durable source address; ambient currentBattle may already be a speculative future wave/turn. */
+  private readonly coopSourceAddress: CoopRetainedWaveContinuationAddress | null;
+  /** A retained guest continuation with no single source identity may not open or mutate a reward surface. */
+  private readonly coopContinuationIdentityFailure: string | null;
 
   constructor(
     rerollCount = 0,
     modifierTiers?: ModifierTier[],
     customModifierSettings?: CustomModifierSettings,
     isCopy = false,
+    inheritedCoopSourceAddress?: CoopRetainedWaveContinuationAddress | null,
   ) {
     super();
 
@@ -263,15 +267,36 @@ export class SelectModifierPhase extends BattlePhase {
     this.modifierTiers = modifierTiers;
     this.customModifierSettings = customModifierSettings;
     this.isCopy = isCopy;
-    this.coopSourceWave = getCoopRetainedWaveContinuationAddress()?.wave ?? null;
+    const continuationIdentity =
+      inheritedCoopSourceAddress !== undefined
+        ? inheritedCoopSourceAddress == null
+          ? ({ kind: "ambient" } as const)
+          : ({ kind: "retained", address: inheritedCoopSourceAddress } as const)
+        : resolveCoopRetainedWaveContinuationIdentity(!coopMeInProgress());
+    this.coopSourceAddress = continuationIdentity.kind === "retained" ? continuationIdentity.address : null;
+    this.coopContinuationIdentityFailure =
+      continuationIdentity.kind === "invalid" ? continuationIdentity.reason : null;
   }
 
   private coopRewardWave(): number {
-    return this.coopSourceWave ?? globalScene.currentBattle?.waveIndex ?? -1;
+    return this.coopSourceAddress?.wave ?? globalScene.currentBattle?.waveIndex ?? -1;
+  }
+
+  private coopRewardTurn(): number {
+    return this.coopSourceAddress?.turn ?? globalScene.currentBattle?.turn ?? 0;
   }
 
   start() {
     super.start();
+
+    if (this.coopContinuationIdentityFailure != null) {
+      coopWarn("reward", `${this.coopContinuationIdentityFailure} - refusing mutable ambient reward address`);
+      failCoopSharedSession(this.coopContinuationIdentityFailure, {
+        boundary: "surface",
+        reasonCode: "continuation-failed",
+      });
+      return false;
+    }
 
     if (!this.isPlayer()) {
       return false;
@@ -620,6 +645,9 @@ export class SelectModifierPhase extends BattlePhase {
       "SelectModifierPhase",
       this.rerollCount + 1,
       this.typeOptions.map(o => o.type?.tier).filter(t => t !== undefined) as ModifierTier[],
+      undefined,
+      false,
+      this.coopSourceAddress,
     );
     globalScene.ui.clearText();
     globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
@@ -1150,7 +1178,7 @@ export class SelectModifierPhase extends BattlePhase {
       .then(() => {
         // The retained wave's DATA already landed in the queued BattleEndPhase. Record readiness only
         // after this real public shop handler has committed, never when a phase object is constructed.
-        notifyCoopWaveContinuationSurfaceReady(this.coopSourceWave ?? undefined);
+        notifyCoopWaveContinuationSurfaceReady(this.coopSourceAddress?.wave);
       });
   }
 
@@ -1258,6 +1286,7 @@ export class SelectModifierPhase extends BattlePhase {
         allowLuckUpgrades: false,
       },
       true,
+      this.coopSourceAddress,
     );
     // Co-op (#837): the continuation copy MUST inherit the SAME pinned interaction counter this shop
     // opened on. Without it the copy starts at -1 and, if its own terminal ever advances (a backed-out
@@ -1360,7 +1389,7 @@ export class SelectModifierPhase extends BattlePhase {
         terminal: choice === COOP_INTERACTION_LEAVE,
         localRole: controller.role,
         wave: this.coopRewardWave(),
-        turn: globalScene.currentBattle?.turn ?? 0,
+        turn: this.coopRewardTurn(),
       },
       this.coopRewardOperationBinding,
     );
@@ -1544,7 +1573,7 @@ export class SelectModifierPhase extends BattlePhase {
               terminal,
               localRole: "guest",
               wave: this.coopRewardWave(),
-              turn: globalScene.currentBattle?.turn ?? 0,
+              turn: this.coopRewardTurn(),
             },
             this.coopRewardOperationBinding,
           );
@@ -1976,7 +2005,7 @@ export class SelectModifierPhase extends BattlePhase {
       this.getRerollCost(globalScene.lockModifierTiers),
     );
     // Watchers open the same real surface through a separate async path from resetModifierSelect.
-    notifyCoopWaveContinuationSurfaceReady(this.coopSourceWave ?? undefined);
+    notifyCoopWaveContinuationSurfaceReady(this.coopSourceAddress?.wave);
     this.coopBeginMirror("watcher");
     // Await on the PINNED interaction counter (#633), matching the owner's pinned send seq.
     // Reading the live counter here would let an inbound reconcile broadcast (which can bump
@@ -2005,7 +2034,7 @@ export class SelectModifierPhase extends BattlePhase {
           terminal: action.choice === COOP_INTERACTION_LEAVE,
           localRole: controller.role,
           wave: this.coopRewardWave(),
-          turn: globalScene.currentBattle?.turn ?? 0,
+          turn: this.coopRewardTurn(),
         },
         this.coopRewardOperationBinding,
       );
@@ -2109,6 +2138,9 @@ export class SelectModifierPhase extends BattlePhase {
           "SelectModifierPhase",
           this.rerollCount + 1,
           this.typeOptions.map(o => o.type?.tier).filter(t => t !== undefined) as ModifierTier[],
+          undefined,
+          false,
+          this.coopSourceAddress,
         );
         globalScene.ui.clearText();
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());

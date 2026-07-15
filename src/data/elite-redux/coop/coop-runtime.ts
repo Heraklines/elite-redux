@@ -1251,7 +1251,60 @@ function maybeMarkCoopWaveContinuationReady(wave: number, binding: CoopWaveAdvan
  * after staging (so it is not a generic deferred-operation receipt); without this engine-owned wake, a
  * transaction that correctly waited in BattleEnd could apply DATA yet never record its later public surface.
  */
-export function getCoopRetainedWaveContinuationAddress(): { readonly wave: number; readonly turn: number } | null {
+export interface CoopRetainedWaveContinuationAddress {
+  readonly wave: number;
+  readonly turn: number;
+}
+
+export type CoopRetainedWaveContinuationIdentity =
+  | { readonly kind: "ambient" }
+  | { readonly kind: "retained"; readonly address: CoopRetainedWaveContinuationAddress }
+  | { readonly kind: "invalid"; readonly reason: string };
+
+/**
+ * Resolve the immutable source identity for a retained guest continuation. A caller that is actually
+ * opening the post-battle surface must never reinterpret `null` as permission to use mutable scene state:
+ * zero candidates means the retained boundary was lost, while multiple candidates mean the continuation
+ * is ambiguous. Both are deterministic shared-terminal conditions. Host, solo, lockstep and explicitly
+ * non-wave surfaces keep their ambient behavior.
+ */
+export function resolveCoopRetainedWaveContinuationIdentity(
+  requireWaveBoundary: boolean,
+): CoopRetainedWaveContinuationIdentity {
+  const runtime = active;
+  if (runtime == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
+    return { kind: "ambient" };
+  }
+  if (!requireWaveBoundary) {
+    return { kind: "ambient" };
+  }
+  const address = getCoopPendingWaveContinuationBoundary(runtime.waveOperationBinding);
+  if (address != null) {
+    return { kind: "retained", address };
+  }
+
+  const binding = runtime.waveOperationBinding;
+  const staged = describeCoopWaveAdvanceOperationBinding(binding);
+  const candidates = staged.stagedWaves
+    .map(wave => getCoopStagedWaveAdvanceTransaction(wave, binding))
+    .filter(transaction => transaction != null && !transaction.continuationReady)
+    .map(transaction => ({
+      operationId: transaction.operationId,
+      turn: transaction.envelope.authoritativeState.turn,
+      wave: (transaction.envelope.pendingOperation?.payload as CoopWaveAdvancePayload | undefined)?.wave ?? -1,
+    }))
+    .sort((a, b) => a.wave - b.wave || a.turn - b.turn || a.operationId.localeCompare(b.operationId));
+  const classification = candidates.length === 0 ? "missing" : candidates.length > 1 ? "ambiguous" : "invalid";
+  const reason =
+    `[coop-op] retained wave continuation identity ${classification}: candidateCount=${candidates.length} `
+    + `candidates=[${candidates.map(candidate => `${candidate.operationId}@${candidate.wave}:${candidate.turn}`).join(",")}] `
+    + `stagedWaves=[${[...staged.stagedWaves].sort((a, b) => a - b).join(",")}] `
+    + `stagedOperationIds=[${[...staged.stagedOperationIds].sort().join(",")}]`;
+  return { kind: "invalid", reason };
+}
+
+/** Compatibility read for diagnostics that do not own a public continuation surface. */
+export function getCoopRetainedWaveContinuationAddress(): CoopRetainedWaveContinuationAddress | null {
   const runtime = active;
   if (runtime == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
     return null;
