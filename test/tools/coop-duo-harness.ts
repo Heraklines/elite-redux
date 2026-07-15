@@ -1560,9 +1560,9 @@ export interface DuoRig {
 }
 
 /**
- * A guest command boundary reached through the real queued between-wave transition. The next replay must
- * replace that live command surface through the phase manager, rather than start a detached replay object
- * whose `end()` would shift an unrelated queue.
+ * A guest wave reached through the real queued between-wave transition. Every turn in that same wave must
+ * replace its live command surface through the phase manager, rather than start a detached replay object
+ * whose `end()` would shift an unrelated queue. The exact wave fence naturally expires at the next battle.
  */
 const realGuestCommandBoundaries = new WeakMap<object, { wave: number; turn: number }>();
 
@@ -1850,6 +1850,7 @@ export async function remirrorWave(rig: DuoRig, opts?: { preserveGuestPlayerPart
   ) {
     return;
   }
+  realGuestCommandBoundaries.delete(rig.guestScene);
   await withClient(rig.guestCtx, () => {
     mirrorHostBattleToGuest(rig.hostScene, rig.guestScene, opts);
     const gf = rig.guestScene.getPlayerField();
@@ -2011,7 +2012,7 @@ export async function driveGuestReplayTurn(
     replay = guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
     if (
       realBoundary?.wave === guestScene.currentBattle.waveIndex
-      && realBoundary.turn === turn
+      && guestScene.currentBattle.turn === turn
       && current?.phaseName === "CommandPhase"
     ) {
       // The production guest reaches CoopReplayTurnPhase through TurnStart after public commands. These
@@ -2023,7 +2024,6 @@ export async function driveGuestReplayTurn(
       guestScene.phaseManager.unshiftPhase(replay);
       guestScene.phaseManager.shiftPhase();
       replayStarted = true;
-      realGuestCommandBoundaries.delete(guestScene);
     }
   }
   if (!replayStarted) {
