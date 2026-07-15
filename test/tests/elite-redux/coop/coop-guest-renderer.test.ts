@@ -369,6 +369,31 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     }
   });
 
+  it("drops a stale next-encounter tween after shared teardown clears its battle", async () => {
+    await startCoopGuest();
+    const battle = globalScene.currentBattle;
+    const phase = new NextEncounterPhase() as unknown as { doEncounter: () => void };
+    let delayedComplete: (() => void) | undefined;
+    const tweenSpy = vi.spyOn(globalScene.tweens, "add").mockImplementation(config => {
+      delayedComplete = (config as Phaser.Types.Tweens.TweenBuilderConfig).onComplete as (() => void) | undefined;
+      return {} as Phaser.Tweens.Tween;
+    });
+    try {
+      phase.doEncounter();
+      expect(delayedComplete, "the real next-encounter transition registered its delayed callback").toBeTypeOf(
+        "function",
+      );
+      globalScene.currentBattle = null!;
+      expect(
+        () => delayedComplete?.(),
+        "a shared-terminal teardown makes the stale presentation callback inert",
+      ).not.toThrow();
+    } finally {
+      globalScene.currentBattle = battle;
+      tweenSpy.mockRestore();
+    }
+  });
+
   it("does not clear Showdown's guest trainer through the classic co-op fallback", async () => {
     await startCoopGuest();
     getCoopController()!.setSessionKind("versus");
