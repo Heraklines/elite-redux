@@ -104,6 +104,104 @@ function highestInWindowId(existing: Record<string, unknown>): number {
   return maxId;
 }
 
+/** The full-window rejection shared by both NEW-trainer id-exhaustion paths. */
+function windowFullConflict(key: string): CustomTrainerConflict {
+  return {
+    key,
+    error: `${key}: custom-trainer id window ${ER_CUSTOM_TRAINER_ID_MIN}-${ER_CUSTOM_TRAINER_ID_MAX} is full`,
+  };
+}
+
+/** Outcome of a MODIFICATION delta entry (a key the client loaded with a baseline). */
+type ModificationOutcome = { ok: false; conflict: CustomTrainerConflict } | { ok: true; value: unknown };
+
+/**
+ * Resolve a MODIFICATION of a trainer the client loaded (`baselines[key]` present):
+ * rejected if it was deleted or changed by someone else since the client loaded,
+ * else applied verbatim keeping the REPO id (client id drift ignored).
+ */
+function resolveTrainerModification(
+  key: string,
+  value: unknown,
+  existing: Record<string, unknown>,
+  baselineHash: string,
+): ModificationOutcome {
+  if (!Object.hasOwn(existing, key)) {
+    return {
+      ok: false,
+      conflict: { key, error: `${key}: deleted by someone else since you loaded - reload to get the current state` },
+    };
+  }
+  if (hashTrainerEntry(existing[key]) !== baselineHash) {
+    return {
+      ok: false,
+      conflict: { key, error: `${key}: modified by someone else since you loaded - reload to get their version` },
+    };
+  }
+  const repoId = (existing[key] as { id?: unknown }).id;
+  return {
+    ok: true,
+    value: typeof repoId === "number" ? { ...(value as Record<string, unknown>), id: repoId } : value,
+  };
+}
+
+/**
+ * Outcome of a NEW-trainer delta entry (no client baseline). `nextMaxId` is the
+ * running in-window id cursor AFTER this allocation attempt - the caller adopts it
+ * even on a conflict so id allocation stays monotonic (mirrors the original in-place
+ * `maxId` advancement, incl. the window-exhaustion-during-re-key path).
+ */
+type NewTrainerAllocation =
+  | { ok: false; conflict: CustomTrainerConflict; nextMaxId: number }
+  | {
+      ok: true;
+      targetKey: string;
+      committedId: number;
+      entry: Record<string, unknown>;
+      nextMaxId: number;
+      rekeyed: boolean;
+    };
+
+/**
+ * Mint a server id for a NEW trainer = current max in-window id + 1. A same-key
+ * collision with a teammate's existing trainer NEVER rejects: the trainer is
+ * re-keyed to `TRAINER_<realId>` (advancing past any already-taken derived key)
+ * so both survive. Rejected only when the id window is exhausted.
+ */
+function allocateNewTrainer(
+  key: string,
+  value: unknown,
+  existing: Record<string, unknown>,
+  merged: Record<string, unknown>,
+  maxId: number,
+): NewTrainerAllocation {
+  if (maxId + 1 > ER_CUSTOM_TRAINER_ID_MAX) {
+    return { ok: false, conflict: windowFullConflict(key), nextMaxId: maxId };
+  }
+  let nextMaxId = maxId + 1;
+  let targetKey = key;
+  let rekeyed = false;
+  if (Object.hasOwn(existing, key)) {
+    rekeyed = true;
+    targetKey = `TRAINER_${nextMaxId}`;
+    while (Object.hasOwn(merged, targetKey)) {
+      if (nextMaxId + 1 > ER_CUSTOM_TRAINER_ID_MAX) {
+        return { ok: false, conflict: windowFullConflict(key), nextMaxId };
+      }
+      nextMaxId += 1;
+      targetKey = `TRAINER_${nextMaxId}`;
+    }
+  }
+  return {
+    ok: true,
+    targetKey,
+    committedId: nextMaxId,
+    entry: { ...(value as Record<string, unknown>), id: nextMaxId },
+    nextMaxId,
+    rekeyed,
+  };
+}
+
 /**
  * Apply a client `delta` (trainerKey -> entry | null) onto the CURRENT repo map.
  *   - `null` value => explicit DELETE (never inferred from absence),
@@ -137,69 +235,32 @@ export function mergeCustomTrainersDelta(
       delete merged[key];
       continue;
     }
-    const hasBaseline = Object.hasOwn(base, key);
-    const inRepo = Object.hasOwn(existing, key);
 
-    if (hasBaseline) {
+    if (Object.hasOwn(base, key)) {
       // MODIFICATION of a trainer that existed when the client loaded.
-      if (!inRepo) {
-        conflicts.push({
-          key,
-          error: `${key}: deleted by someone else since you loaded - reload to get the current state`,
-        });
-        continue;
+      const outcome = resolveTrainerModification(key, value, existing, base[key]);
+      if (outcome.ok) {
+        merged[key] = outcome.value;
+      } else {
+        conflicts.push(outcome.conflict);
       }
-      if (hashTrainerEntry(existing[key]) !== base[key]) {
-        conflicts.push({
-          key,
-          error: `${key}: modified by someone else since you loaded - reload to get their version`,
-        });
-        continue;
-      }
-      // Apply verbatim, but keep the REPO id (ignore any client id drift).
-      const repoId = (existing[key] as { id?: unknown }).id;
-      merged[key] = typeof repoId === "number" ? { ...(value as Record<string, unknown>), id: repoId } : value;
       continue;
     }
 
-    // NEW trainer (client had no baseline for it): mint a server id. A same-key
-    // collision with a teammate's trainer NEVER rejects - the trainer is re-keyed
-    // to TRAINER_<realId> so both survive.
-    if (maxId + 1 > ER_CUSTOM_TRAINER_ID_MAX) {
-      conflicts.push({
-        key,
-        error: `${key}: custom-trainer id window ${ER_CUSTOM_TRAINER_ID_MIN}-${ER_CUSTOM_TRAINER_ID_MAX} is full`,
-      });
+    // NEW trainer (client had no baseline for it): mint a server id (re-keying on a
+    // same-key collision). Adopt the advanced cursor even on a conflict so ids stay
+    // monotonic across the batch.
+    const allocation = allocateNewTrainer(key, value, existing, merged, maxId);
+    maxId = allocation.nextMaxId;
+    if (!allocation.ok) {
+      conflicts.push(allocation.conflict);
       continue;
     }
-    maxId += 1;
-    const newId = maxId;
-    let targetKey = key;
-    if (inRepo) {
-      // Derive a fresh key from the allocated id. Guard against the (astronomically
-      // unlikely) case the derived key is itself already taken by advancing the id.
-      targetKey = `TRAINER_${newId}`;
-      let windowFull = false;
-      while (Object.hasOwn(merged, targetKey)) {
-        if (maxId + 1 > ER_CUSTOM_TRAINER_ID_MAX) {
-          windowFull = true;
-          break;
-        }
-        maxId += 1;
-        targetKey = `TRAINER_${maxId}`;
-      }
-      if (windowFull) {
-        conflicts.push({
-          key,
-          error: `${key}: custom-trainer id window ${ER_CUSTOM_TRAINER_ID_MIN}-${ER_CUSTOM_TRAINER_ID_MAX} is full`,
-        });
-        continue;
-      }
-      keyRemap[key] = targetKey;
+    if (allocation.rekeyed) {
+      keyRemap[key] = allocation.targetKey;
     }
-    const committedId = maxId;
-    idRemap[key] = committedId;
-    merged[targetKey] = { ...(value as Record<string, unknown>), id: committedId };
+    idRemap[key] = allocation.committedId;
+    merged[allocation.targetKey] = allocation.entry;
   }
 
   return { merged, idRemap, keyRemap, conflicts };
