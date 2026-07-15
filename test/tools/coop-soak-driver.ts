@@ -2338,6 +2338,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX
             && rig.guestScene.currentBattle.waveIndex === wave
             && rig.guestScene.currentBattle.turn === turn,
+          drivePublicPhaseInput: phase => {
+            if (phase.phaseName !== "ScanIvsPhase" || rig.guestScene.ui.getMode() !== UiMode.CONFIRM) {
+              return false;
+            }
+            rig.guestScene.ui.processInput(Button.CANCEL);
+            actionScript.push(`wave ${transitionSourceWave}: guest declined IV Scanner through public UI`);
+            return true;
+          },
         }),
       );
       await withClient(rig.guestCtx, async () => {
