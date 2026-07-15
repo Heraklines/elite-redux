@@ -16,6 +16,7 @@ const [
   { captureCoopSaveDataDigest },
   { canonicalize, fnv1a64 },
   { getCoopRuntime },
+  { BattlerTagType },
   { PokemonModifierType },
   { StatusEffect },
   { UiMode },
@@ -24,6 +25,7 @@ const [
   import("../src/data/elite-redux/coop/coop-battle-engine"),
   import("../src/data/elite-redux/coop/coop-battle-checksum"),
   import("../src/data/elite-redux/coop/coop-runtime"),
+  import("../src/enums/battler-tag-type"),
   import("../src/modifier/modifier-type"),
   import("../src/enums/status-effect"),
   import("../src/enums/ui-mode"),
@@ -53,6 +55,7 @@ const BINDING_PREFIX = "[coop-browser:binding] ";
 const DIGEST_PARTS_PREFIX = "[coop-browser:digest-parts] ";
 const RENDER_PROFILE_PREFIX = "[coop-browser:render-profile] ";
 const MARKET_PREFIX = "[coop-browser:market] ";
+const COMMANDER_PREFIX = "[coop-browser:commander] ";
 const CHECKSUM_SENTINEL = "0000000000000000";
 
 /**
@@ -512,6 +515,7 @@ let lastSemanticPhase: object | null = null;
 let semanticPhaseInstance = 0;
 let lastObservedRenderProfile = "";
 let lastObservedMarket = "";
+let lastObservedCommander = "";
 
 interface MarketOptionProjection {
   readonly index: number;
@@ -646,6 +650,59 @@ function observeBiomeMarket(): void {
   }
 }
 
+/**
+ * Emit a strict, read-only Commander boundary marker while a real CommandPhase is active.
+ * The public driver uses this only as an assertion oracle: it still supplies the Dondozo's
+ * move through the canvas and proves the hidden Tatsugiri's generated skip via rendezvous logs.
+ */
+function observeCommanderBoundary(): void {
+  try {
+    const runtime = getCoopRuntime();
+    const membership = runtime?.membership.snapshot();
+    const battle = globalScene?.currentBattle;
+    const phase = globalScene?.phaseManager?.getCurrentPhase()?.phaseName;
+    if (runtime == null || membership?.state !== "active" || battle == null || phase !== "CommandPhase") {
+      return;
+    }
+    const commanded = globalScene.getPlayerParty().find(pokemon => pokemon.getTag(BattlerTagType.COMMANDED) != null);
+    const commandedTag = commanded?.getTag(BattlerTagType.COMMANDED);
+    const commander = commandedTag?.getSourcePokemon();
+    const commanderOwnerRole = (commander as (Pokemon & { readonly coopOwner?: "host" | "guest" }) | undefined)
+      ?.coopOwner;
+    if (commanded == null || commander == null || (commanderOwnerRole !== "host" && commanderOwnerRole !== "guest")) {
+      return;
+    }
+    const { digest: stateDigest } = computeMechanicalDigest();
+    const observation = {
+      version: 1,
+      localRole: runtime.controller.role,
+      localSeat: runtime.controller.seat,
+      commanderOwnerRole,
+      epoch: runtime.controller.sessionEpoch,
+      membershipRevision: membership.revision,
+      connectionGeneration: membership.connectionGeneration,
+      wave: battle.waveIndex,
+      turn: battle.turn,
+      point: `cmd:${battle.waveIndex}:${battle.turn}`,
+      stateDigest,
+      commanderPokemonId: commander.id,
+      commanderSpeciesId: commander.species.speciesId,
+      commanderBattlerIndex: commander.getBattlerIndex(),
+      commandedPokemonId: commanded.id,
+      commandedSpeciesId: commanded.species.speciesId,
+      commandedBattlerIndex: commanded.getBattlerIndex(),
+    } as const;
+    const canonical = JSON.stringify(observation);
+    if (canonical === lastObservedCommander) {
+      return;
+    }
+    lastObservedCommander = canonical;
+    console.info(`${COMMANDER_PREFIX}${canonical}`);
+  } catch {
+    // The Commander animation or CommandPhase may be entering/leaving between observer samples.
+  }
+}
+
 function semanticBattleAddress(battle: { waveIndex: number; turn: number } | null | undefined) {
   return { wave: battle?.waveIndex ?? 0, turn: battle?.turn ?? 0 } as const;
 }
@@ -744,6 +801,12 @@ function observeSemanticSurface(): void {
     }
 
     const selection = readSelection(handler, uiMode);
+    const teamSpeciesIds =
+      uiMode === "STARTER_SELECT"
+        ? ((handler as unknown as { starterSpecies?: Array<{ speciesId: number }> }).starterSpecies?.map(
+            species => species.speciesId,
+          ) ?? null)
+        : null;
     // Title/setup menus exist before a Battle object. Address 0:0 is an explicit non-battle
     // sentinel that lets the public driver wait for their real option surfaces instead of
     // racing repeated Action keys; gameplay surfaces still carry their actual wave/turn.
@@ -774,6 +837,7 @@ function observeSemanticSurface(): void {
       semanticSurfaceInstance,
       `${epoch}:${wave}:${turn}`,
       selection.selectedOptionId ?? "",
+      teamSpeciesIds?.join(",") ?? "",
       ownerSeat ?? "?",
       awaitingActionInput,
     ].join("|");
@@ -800,6 +864,7 @@ function observeSemanticSurface(): void {
       selectedOptionId: selection.selectedOptionId,
       optionIds: selection.optionIds,
       optionCount: selection.optionCount,
+      teamSpeciesIds,
       ready: { handlerActive: true, awaitingActionInput },
       phase,
       phaseInstance: semanticSurfaceInstance,
@@ -822,6 +887,7 @@ setInterval(() => {
   observeSemanticSurface();
   observeRenderProfile();
   observeBiomeMarket();
+  observeCommanderBoundary();
 }, 100);
 
 // Strictly read-only observer bridge. `ready` is a non-mutating probe; the former

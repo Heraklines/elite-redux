@@ -8,6 +8,8 @@ on:
       - ".github/workflows/coop-public-ui-journey.yml"
       - "scripts/coop-browser-entry.ts"
       - "scripts/prepare-coop-browser-artifact.mjs"
+      - "src/dev-tools/registry.ts"
+      - "src/ui/handlers/starter-select-ui-handler.ts"
       - "test/browser/coop-public-ui/**"
   workflow_dispatch:
     inputs:
@@ -22,6 +24,7 @@ on:
           - fresh-resume
           - reverse-resume
           - faint-replacement
+          - commander-skip
           - market-wide-lens
       requester_seat:
         description: Seat that sends the first lobby invitation
@@ -114,7 +117,7 @@ jobs:
           status=$?
           set -e
           diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
-          owned="$(grep -E '^scripts/coop-browser-entry\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          owned="$(grep -E '^(scripts/coop-browser-entry|src/dev-tools/registry|src/ui/handlers/starter-select-ui-handler)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
           if [ -n "$owned" ]; then
             printf '%s\n' "$owned"
             exit 1
@@ -129,8 +132,12 @@ jobs:
             .github/workflows/coop-public-ui-journey.yml \
             scripts/coop-browser-entry.ts \
             scripts/prepare-coop-browser-artifact.mjs \
+            src/dev-tools/registry.ts \
+            src/ui/handlers/starter-select-ui-handler.ts \
             test/browser/coop-public-ui/browser-workflow-fanout.test.mjs \
+            test/browser/coop-public-ui/campaign-nav.mjs \
             test/browser/coop-public-ui/check-public-boundary.mjs \
+            test/browser/coop-public-ui/commander-evidence.test.mjs \
             test/browser/coop-public-ui/config.mjs \
             test/browser/coop-public-ui/evidence.mjs \
             test/browser/coop-public-ui/journeys.mjs \
@@ -150,12 +157,16 @@ jobs:
       - name: Verify bounded public post-turn progress contracts
         run: node --test test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs
 
+      - name: Verify strict Commander browser evidence contracts
+        run: node --test test/browser/coop-public-ui/commander-evidence.test.mjs
+
       - name: Build normal application with CI-only read-only observer
         env:
           COOP_BROWSER_OUT_DIR: dist-coop-public-ui
           VITE_BYPASS_LOGIN: 0
           VITE_BYPASS_TUTORIAL: 0
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
+          VITE_COOP_BROWSER_FIXTURE: ${{ inputs.journey == 'commander-skip' && 'commander-skip' || 'off' }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_SERVER_URL: ${{ env.COOP_UI_API_ORIGIN }}
         run: pnpm exec vite build --mode beta --config test/browser/coop-public-ui/vite.config.mjs
@@ -177,10 +188,14 @@ jobs:
           if-no-files-found: error
 
   primary-journey:
-    name: ${{ inputs.journey || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / primary accounts
+    name: ${{ inputs.journey || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / ${{ inputs.journey == 'commander-skip' && matrix.commander_owner_seat || 'primary accounts' }}
     needs: browser-build
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.journey == 'market-wide-lens' && 55 || 35 }}
+    timeout-minutes: ${{ inputs.journey == 'market-wide-lens' && 55 || inputs.journey == 'commander-skip' && 45 || 35 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        commander_owner_seat: ${{ fromJSON(inputs.journey == 'commander-skip' && '["host-seat","guest-seat"]' || '["host-seat"]') }}
     steps:
       - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
@@ -215,6 +230,7 @@ jobs:
           COOP_UI_ACCOUNT_MODE: register
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
           COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.faint_owner_seat || 'guest-seat' }}
+          COOP_UI_COMMANDER_OWNER_SEAT: ${{ matrix.commander_owner_seat }}
           COOP_UI_HOST_TITLE_NEW_GAME_KEYS: ${{ inputs.host_title_keys || '[]' }}
           COOP_UI_GUEST_TITLE_NEW_GAME_KEYS: ${{ inputs.guest_title_keys || '[]' }}
           COOP_UI_ACTION_DELAY_MS: ${{ (inputs.cadence == 'fast' && '70') || (inputs.cadence == 'slow' && '420') || '180' }}
@@ -248,7 +264,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coop-public-ui-primary-compact-${{ github.sha }}-${{ github.run_attempt }}
+          name: coop-public-ui-primary-compact-${{ matrix.commander_owner_seat }}-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             dev-logs/coop-public-ui/**/summary.json
             dev-logs/coop-public-ui/**/*.jsonl
@@ -263,7 +279,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coop-public-ui-primary-${{ github.sha }}-${{ github.run_attempt }}
+          name: coop-public-ui-primary-${{ matrix.commander_owner_seat }}-${{ github.sha }}-${{ github.run_attempt }}
           path: dev-logs/coop-public-ui/**
           retention-days: 14
           if-no-files-found: warn

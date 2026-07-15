@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "taskId": "p33-browser-commander-skip",
+  "branch": "ci/coop/p33-browser-commander-skip",
+  "trainRef": "ci/coop/p33-closure-codex",
+  "baseSha": "e5934162fcb0695f56c41004dc25402a065e9366",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-browser-commander-skip.json",
+    ".github/workflows/coop-public-ui-journey.yml",
+    "scripts/coop-browser-entry.ts",
+    "src/dev-tools/registry.ts",
+    "src/ui/handlers/starter-select-ui-handler.ts",
+    "test/browser/coop-public-ui/README.md",
+    "test/browser/coop-public-ui/campaign-nav.mjs",
+    "test/browser/coop-public-ui/check-public-boundary.mjs",
+    "test/browser/coop-public-ui/commander-evidence.test.mjs",
+    "test/browser/coop-public-ui/config.mjs",
+    "test/browser/coop-public-ui/evidence.mjs",
+    "test/browser/coop-public-ui/journeys.mjs",
+    "test/browser/coop-public-ui/public-ui-harness.mjs",
+    "test/browser/coop-public-ui/run.mjs"
+  ]
+}

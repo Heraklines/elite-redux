@@ -53,6 +53,7 @@ try {
     durationMs: finishedAt.getTime() - startedAt.getTime(),
     baseOrigin: new URL(config.baseUrl).origin,
     requesterSeat: config.requesterSeat,
+    commanderOwnerSeat: config.journey === "commander-skip" ? config.commanderOwnerSeat : null,
     replacementCount: rig?.replacementCount ?? 0,
     browserArtifact: preview
       ? {
