@@ -5134,6 +5134,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
             variableCategory.value = overridden;
           }
         }
+        // ER Crosscut (5908): the SECOND strike of a doubled slicing/pulse move
+        // flips to the opposite category (each strike keyed on the strike index).
+        if (attr?.constructor?.name === "CrosscutSecondStrikeAbAttr") {
+          const flipped = (
+            attr as unknown as { resolveSecondStrikeCategory: (m: Move, s: Pokemon, t: Pokemon) => MoveCategory | null }
+          ).resolveSecondStrikeCategory(move, source, this);
+          if (flipped != null) {
+            variableCategory.value = flipped;
+          }
+        }
       }
     }
     const moveCategory = variableCategory.value as MoveCategory;

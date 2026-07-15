@@ -39,6 +39,11 @@ import {
 } from "#data/elite-redux/abilities/borrowed-time";
 import { CleansingLightAbAttr, ER_CLEANSING_LIGHT_ABILITY_ID } from "#data/elite-redux/abilities/cleansing-light";
 import { CommonRootAbAttr, ER_COMMON_ROOT_ABILITY_ID } from "#data/elite-redux/abilities/common-root";
+import {
+  CrosscutPowerAbAttr,
+  CrosscutSecondStrikeAbAttr,
+  ER_CROSSCUT_ABILITY_ID,
+} from "#data/elite-redux/abilities/crosscut";
 import { DandelionBurstAbAttr, ER_DANDELION_BURST_ABILITY_ID } from "#data/elite-redux/abilities/dandelion-burst";
 import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abilities/last-host";
 import { ER_LIFE_PRESERVER_ABILITY_ID, LifePreserverAbAttr } from "#data/elite-redux/abilities/life-preserver";
@@ -366,6 +371,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_BORROWED_TIME_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_CROSSCUT_ABILITY_ID,
+        name: "Crosscut",
+        description:
+          "This Pokemon's single-hit slicing and pulse moves strike twice at 70% power each: once with the move's own category and once with the opposite, using the matching offense and defense. Multi-hit moves are unaffected.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_CROSSCUT_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -613,6 +628,11 @@ function buildCustomAbility(
   if (pokerogueId === ER_BORROWED_TIME_ABILITY_ID) {
     builder.attr(BorrowedTimeSummonAbAttr);
     builder.attr(BorrowedTimeDecayAbAttr);
+  }
+
+  if (pokerogueId === ER_CROSSCUT_ABILITY_ID) {
+    builder.attr(CrosscutSecondStrikeAbAttr);
+    builder.attr(CrosscutPowerAbAttr);
   }
 
   const ability = builder.build();
