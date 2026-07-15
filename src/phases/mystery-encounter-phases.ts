@@ -1376,6 +1376,7 @@ export class PostMysteryEncounterPhase extends Phase {
         "CommandPhase",
         "TurnStartPhase",
         "TurnEndPhase",
+        "CoopSealTurnPhase",
         "CoopReplayTurnPhase",
         "CoopInertPhase",
         "BattleEndPhase",

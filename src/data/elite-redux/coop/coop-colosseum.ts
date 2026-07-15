@@ -807,6 +807,7 @@ function makeRealColosseumRoundOps(counter: number): CoopColosseumRoundOps {
           "CommandPhase",
           "TurnStartPhase",
           "TurnEndPhase",
+          "CoopSealTurnPhase",
           "CoopReplayTurnPhase",
           "CoopInertPhase",
           "BattleEndPhase",

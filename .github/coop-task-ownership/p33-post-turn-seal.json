@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "taskId": "p33-post-turn-seal",
+  "branch": "ci/coop/p33-post-turn-seal",
+  "trainRef": "ci/coop/p33-closure-codex",
+  "baseSha": "e18a7f3cfc448c241a8d7673ca3cc6d325c88cfd",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-post-turn-seal.json",
+    "src/data/elite-redux/coop/coop-colosseum.ts",
+    "src/data/elite-redux/coop/coop-turn-recorder.ts",
+    "src/phase-manager.ts",
+    "src/phases/coop-seal-turn-phase.ts",
+    "src/phases/mystery-encounter-phases.ts",
+    "src/phases/turn-end-phase.ts",
+    "test/tests/elite-redux/coop/coop-duo-post-turn-seal.test.ts"
+  ]
+}

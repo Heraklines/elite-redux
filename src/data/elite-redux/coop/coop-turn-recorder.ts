@@ -16,8 +16,8 @@
 //     desync between the host's emit and the guest's await).
 //   - The phase manager's `queueMessage` tap calls `recordCoopMessage(text)` while a
 //     recording is open, capturing each narration line in resolution order.
-//   - The host's TurnEndPhase calls `endCoopRecording()` to take + clear the buffer and
-//     stream it via the battle streamer.
+//   - The root-level CoopSealTurnPhase runs after TurnEnd's complete child/deferred subtree,
+//     then calls `endCoopRecording()` to take + clear the buffer and stream the settled state.
 //
 // MVP scope: only `message` events are recorded (narration). Correctness ("same moves,
 // same damage, same mon faints") comes from the streamed CHECKPOINT, not per-move events;
@@ -158,7 +158,7 @@ export function recordCoopEvent(event: CoopBattleEvent): void {
 }
 
 /**
- * HOST: take + clear the open recording. Returns the stamped turn + the ordered events
+ * HOST: take + clear the open recording at the root post-turn seal. Returns the stamped turn + the ordered events
  * (empty + turn -1 when nothing was recorded, so the caller can decide whether to emit).
  */
 export function endCoopRecording(): CoopRecording {

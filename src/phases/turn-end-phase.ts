@@ -2,16 +2,6 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { fieldPositionForSlot } from "#data/battle-format";
-import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
-import { captureCoopAuthoritativeCarrier } from "#data/elite-redux/coop/coop-battle-engine";
-import { coopWarn } from "#data/elite-redux/coop/coop-debug";
-import {
-  coopSessionGeneration,
-  getCoopBattleStreamer,
-  getCoopController,
-  isAuthoritativeBattleSession,
-} from "#data/elite-redux/coop/coop-runtime";
-import { endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyFieldMedic } from "#data/elite-redux/er-relics";
 import { TerrainType } from "#data/terrain";
@@ -156,9 +146,7 @@ export class TurnEndPhase extends FieldPhase {
 
     this.erAutoShiftNonAdjacentSurvivors();
 
-    if (this.emitCoopTurn()) {
-      this.end();
-    }
+    this.end();
   }
 
   /**
@@ -208,70 +196,6 @@ export class TurnEndPhase extends FieldPhase {
       const centre = lo.i + 1;
       [party[centre], party[hi.i]] = [party[hi.i], party[centre]];
       void hi.p.setFieldPosition(fieldPositionForSlot(centre, capacity), 500);
-    }
-  }
-
-  /**
-   * Co-op HOST, AUTHORITATIVE netcode only (#633, TRACK-2 Phase B): the host is the sole
-   * engine; at the settled post-turn boundary it STREAMS this turn's ordered narration
-   * events (recorded since TurnStart) + the authoritative checkpoint + the full-state
-   * checksum. The guest's CoopReplayTurnPhase awaits + renders them. Emitted with the turn
-   * number STAMPED at TurnStart (incrementTurn() already ran above, so `currentBattle.turn`
-   * is now N+1) so the host's emit-turn matches the guest's await-turn exactly. In LOCKSTEP
-   * there is NO emit (both engines resolve; the per-turn checkpoint heals via CommandPhase).
-   * Hard no-op for solo / non-host; the recording is closed either way so it never leaks
-   * into the next turn.
-   */
-  private emitCoopTurn(): boolean {
-    const recording = endCoopRecording();
-    // Core-battle authoritative stream: co-op OR showdown-versus (C3). Solo/non-host no-op.
-    if (!isAuthoritativeBattleSession()) {
-      return true;
-    }
-    const controller = getCoopController();
-    const streamer = getCoopBattleStreamer();
-    if (controller == null || streamer == null || controller.role !== "host" || recording.turn < 0) {
-      return true;
-    }
-    const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    const fatal = (reason: string): false => {
-      const generation = coopSessionGeneration();
-      void streamer
-        .broadcastAuthorityFailure({
-          epoch: controller.sessionEpoch,
-          wave,
-          turn: recording.turn,
-          boundary: "turnResolution",
-          reason,
-        })
-        .then(() => {
-          if (generation === coopSessionGeneration()) {
-            terminateCoopAuthoritySession(reason);
-          }
-        });
-      return false;
-    };
-    try {
-      const carrier = captureCoopAuthoritativeCarrier(recording.turn, "turnResolution");
-      if (carrier == null) {
-        coopWarn("checkpoint", `host could not capture complete turnResolution turn=${recording.turn}`);
-        return fatal(`Host could not capture complete turn authority for wave ${wave}, turn ${recording.turn}.`);
-      }
-      streamer.emitTurn(
-        controller.sessionEpoch,
-        carrier.authoritativeState.wave,
-        recording.turn,
-        recording.events,
-        carrier.checkpoint,
-        carrier.checksum,
-        carrier.preimage,
-        carrier.fullField,
-        carrier.authoritativeState,
-      );
-      return true;
-    } catch (error) {
-      coopWarn("checkpoint", `host failed to emit turnResolution turn=${recording.turn}`, error);
-      return fatal(`Host could not publish complete turn authority for wave ${wave}, turn ${recording.turn}.`);
     }
   }
 }
