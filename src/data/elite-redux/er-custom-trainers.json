@@ -396,5 +396,111 @@
     "trainerClass": "YOUNGSTER",
     "victoryDialogue": "Throughout Heaven and Earth, I alone am the Honored One...",
     "weight": 20
+  },
+  "TRAINER_70004": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70004,
+    "maxWave": 40,
+    "minWave": 30,
+    "name": "Misty",
+    "team": [
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SCOPE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "AQUA_JET",
+          "BRINE",
+          "HYPNOSIS",
+          "CONFUSE_RAY"
+        ],
+        "species": 54
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "TEARFUL_LOOK",
+          "RAIN_DANCE",
+          "SURF",
+          "RLNA"
+        ],
+        "species": 817
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "LIGHT_SCREEN",
+              "PSYBEAM",
+              "RECOVER",
+              "AURORA_BEAM"
+            ],
+            "sanityOff": true,
+            "species": 121,
+            "weight": 13
+          },
+          {
+            "abilitySlot": 0,
+            "fusion": {
+              "abilitySlot": 2,
+              "formIndex": 0,
+              "species": 318
+            },
+            "level": null,
+            "moves": [
+              "RLA",
+              "CRUNCH",
+              "BATON_PASS",
+              "BRINE"
+            ],
+            "sanityOff": true,
+            "shiny": {
+              "around": "shadowaura",
+              "name": "Abyssal",
+              "palette": "obsidian"
+            },
+            "species": 121,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SCOPE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "VISE_GRIP",
+          "AQUA_JET",
+          "FURY_CUTTER",
+          "SWORDS_DANCE"
+        ],
+        "sanityOff": true,
+        "species": 98
+      }
+    ],
+    "trainerClass": "MISTY",
+    "weight": 100
   }
 }
