@@ -624,7 +624,27 @@ export class CoopRendezvous {
     }
     const { point } = msg;
     if (this.partnerArrived.has(point)) {
-      // Idempotent: a duplicate / re-delivered arrival for a point already seen is a harmless no-op.
+      // A duplicate is normally a harmless no-op. There is one important exception: a client can
+      // re-enter an OLD CommandPhase after both peers already crossed a newer host point (the retained
+      // wave-12 CommandPhase that reappeared after guest-owned ME finalization). Its restored rendezvous
+      // state no longer remembers the host's old arrival, so it retransmits the old point and parks. The
+      // host DOES remember that partner arrival and used to drop the retransmit here, leaving the guest
+      // sealed forever. If the host has a causally-later local point, explicitly route the regressed peer
+      // to that point. A duplicate of the newest/current point still remains a no-op.
+      if (this.transport.role === "host") {
+        const authoritativePoint = this.latestAuthoritativeLocalPoint(point);
+        if (authoritativePoint !== undefined) {
+          const routeAlreadyPending = [...this.pendingRouteAcks.values()].some(
+            route => route.point === authoritativePoint && route.displacedPoint === point,
+          );
+          if (!routeAlreadyPending) {
+            coopWarn("rendezvous", `host ROUTE regressed duplicate=${point} -> authoritative=${authoritativePoint}`);
+            void this.publishAuthoritativeRoute(authoritativePoint, point, this.defaultTimeoutMs);
+          }
+          return;
+        }
+      }
+      // Idempotent: a duplicate / re-delivered arrival for the current point is a harmless no-op.
       if (isCoopDebug()) {
         coopLog("rendezvous", `RECV arrival point=${point} -> DUPLICATE (already seen) role=${this.transport.role}`);
       }
@@ -671,7 +691,7 @@ export class CoopRendezvous {
     // authoritative logical phase: publish it proactively and require the guest ACK before that wrong branch
     // can close. This is the live cmd:6:2 vs shop:6:5 softlock shape.
     if (this.transport.role === "host" && !this.localArrived.has(point)) {
-      const localPoint = this.latestUnmatchedLocalPointForSameWave(point);
+      const localPoint = this.latestAuthoritativeLocalPoint(point);
       if (localPoint !== undefined) {
         coopWarn(
           "rendezvous",
@@ -705,17 +725,32 @@ export class CoopRendezvous {
     return;
   }
 
-  /** Most-recent host-local point on the same wave that the partner has not reached. */
-  private latestUnmatchedLocalPointForSameWave(foreignPoint: string): string | undefined {
-    const wave = this.pointWave(foreignPoint);
-    if (wave === undefined) {
+  /**
+   * Host-local point that proves `foreignPoint` is no longer the authoritative branch. Set insertion order
+   * is the local causal order: {@linkcode arrive} inserts exactly once and reannounce never moves an entry.
+   * When the host also reached `foreignPoint`, only a later insertion can win. When it never reached that
+   * divergent point, a higher wave is intrinsically newer; on the same wave retain the existing watcher rule
+   * and require a local point the partner has not reached. These guards prevent a normal duplicate of the
+   * newest point, or a stale shared past point, from inventing forward progress.
+   */
+  private latestAuthoritativeLocalPoint(foreignPoint: string): string | undefined {
+    const foreignWave = this.pointWave(foreignPoint);
+    if (foreignWave === undefined) {
       return;
     }
     const local = [...this.localArrived];
-    for (let i = local.length - 1; i >= 0; i--) {
-      const point = local[i];
-      if (point !== foreignPoint && this.pointWave(point) === wave && !this.partnerArrived.has(point)) {
-        return point;
+    const foreignIndex = local.indexOf(foreignPoint);
+    const minimumIndex = foreignIndex < 0 ? 0 : foreignIndex + 1;
+    for (let i = local.length - 1; i >= minimumIndex; i--) {
+      const candidate = local[i];
+      const candidateWave = this.pointWave(candidate);
+      if (
+        candidate !== foreignPoint
+        && candidateWave !== undefined
+        && candidateWave >= foreignWave
+        && (foreignIndex >= 0 || candidateWave > foreignWave || !this.partnerArrived.has(candidate))
+      ) {
+        return candidate;
       }
     }
     return;

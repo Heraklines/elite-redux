@@ -394,6 +394,53 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     guest.dispose();
   });
 
+  it("routes a guest that regresses to an already-observed command after both peers crossed the next wave", async () => {
+    const pair = createLoopbackPair();
+    const host = new CoopRendezvous(pair.host);
+    const guest = new CoopRendezvous(pair.guest);
+
+    // The guest alone touched the phantom cmd:12:1 while the host took a non-battle ME branch. Both peers
+    // then genuinely crossed cmd:13:1. This is the live guest-owned ME ordering: a retained old wave-12
+    // CommandPhase became current after its rendezvous control state had been rebuilt. Its retransmit is a
+    // duplicate to the host, and the host never had a local cmd:12:1 from which same-wave matching could heal.
+    guest.arrive("cmd:12:1");
+    await flush();
+    guest.arrive("cmd:13:1");
+    await flush();
+    host.arrive("cmd:13:1");
+    await flush();
+    guest.purgeBufferedArrivals("simulate retained old CommandPhase after authoritative wave advance");
+
+    const result = await guest.rendezvous("cmd:12:1");
+
+    expect(result.timedOut).toBe(false);
+    expect(result.point).toBe("cmd:12:1");
+    expect(result.crossPoint).toBe("cmd:13:1");
+    expect(result.authoritativePoint).toBe("cmd:13:1");
+
+    host.dispose();
+    guest.dispose();
+  });
+
+  it("routes a stale duplicate command to a causally-later same-wave shop boundary", async () => {
+    const pair = createLoopbackPair();
+    const host = new CoopRendezvous(pair.host);
+    const guest = new CoopRendezvous(pair.guest);
+
+    await Promise.all([host.rendezvous("cmd:3:1"), guest.rendezvous("cmd:3:1")]);
+    host.arrive("shop:3:0");
+    await flush();
+    guest.purgeBufferedArrivals("simulate catch finalization retaining the old CommandPhase");
+
+    const result = await guest.rendezvous("cmd:3:1");
+
+    expect(result.timedOut).toBe(false);
+    expect(result.authoritativePoint).toBe("shop:3:0");
+
+    host.dispose();
+    guest.dispose();
+  });
+
   it("#847 a partner arrival at a point WE ALSO reached does NOT cross-release the NEXT barrier (stale shared past-point guard)", async () => {
     const pair = createLoopbackPair();
     const host = new CoopRendezvous(pair.host);
