@@ -195,6 +195,21 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(guestStream.consumeEnemyPartyState(9), "boundary state is one-shot").toBeUndefined();
   });
 
+  it("keeps the newest complete wave state when an older enemy-party carrier is replayed", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+    const older = emptyAuthoritativeState(9);
+    const newer = { ...older, tick: older.tick + 1, money: 999 };
+
+    hostStream.sendEnemyParty(9, [{ fieldIndex: 2, data: { speciesId: 1 } }], -1, 0, newer);
+    await guestStream.awaitEnemyParty(9);
+    hostStream.sendEnemyParty(9, [{ fieldIndex: 2, data: { speciesId: 1 } }], -1, 0, older);
+    await flushWire();
+
+    expect(guestStream.peekEnemyPartyState(9), "a delayed lower tick cannot replace the command seal").toEqual(newer);
+  });
+
   it("awaitEnemyParty resolves null on timeout (guest then generates its own - never hangs)", async () => {
     const { guest } = createLoopbackPair();
     const timer: { fire?: () => void } = {};

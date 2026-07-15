@@ -3292,7 +3292,15 @@ export class CoopBattleStreamer {
     switch (msg.t) {
       case "enemyPartySync": {
         if (msg.authoritativeState !== undefined) {
-          this.enemyPartyStateByWave.set(msg.wave, msg.authoritativeState);
+          const prior = this.enemyPartyStateByWave.get(msg.wave);
+          if (prior == null || msg.authoritativeState.tick > prior.tick) {
+            this.enemyPartyStateByWave.set(msg.wave, msg.authoritativeState);
+          } else if (msg.authoritativeState.tick < prior.tick) {
+            coopLog(
+              "stream",
+              `guest ignored regressed enemyParty state wave=${msg.wave} tick=${msg.authoritativeState.tick} retained=${prior.tick}`,
+            );
+          }
         }
         if (msg.encounter === undefined) {
           // Legacy/unit carriers without the complete descriptor still populate the early hints. The

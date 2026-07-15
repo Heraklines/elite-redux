@@ -21,6 +21,7 @@ import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous"
 import {
   coopHasPendingWaveAdvance,
   coopOwnerOfPlayerFieldSlot,
+  failCoopSharedSession,
   getCoopBattleStreamer,
   getCoopBattleSync,
   getCoopController,
@@ -570,14 +571,14 @@ export class CommandPhase extends FieldPhase {
    * guarded: no-op outside a live co-op session, and the apply/capture are themselves
    * wrapped so a sync hiccup can never break the turn.
    */
-  private tryCoopCheckpointSync(): void {
+  private tryCoopCheckpointSync(): boolean {
     if (!globalScene.gameMode.isCoop) {
-      return;
+      return true;
     }
     const controller = getCoopController();
     const streamer = getCoopBattleStreamer();
     if (controller == null || streamer == null) {
-      return;
+      return true;
     }
     const { turn, waveIndex } = globalScene.currentBattle;
     // M6c (#633): the LOCKSTEP per-turn checkpoint broadcast/adopt that used to live here was
@@ -599,11 +600,16 @@ export class CommandPhase extends FieldPhase {
       // gating the state read on `enemies != null` then strands that newer state until checksum repair. Always
       // consume/apply the latest state at this final pre-input funnel. `undefined` remains a guarded no-op.
       const waveStartState = streamer.consumeEnemyPartyState(waveIndex);
-      if (waveStartState !== undefined && !applyCoopAuthoritativeBattleState(waveStartState, true)) {
+      if (
+        waveStartState !== undefined
+        && !applyCoopAuthoritativeBattleState(waveStartState, true)
+        && !reapplyAcceptedCoopAuthoritativeBattleState(waveStartState, true)
+      ) {
         // EncounterPhase may already have accepted this exact tick for coherent intro rendering. Reassert
         // only that same accepted image at the final public-input seal; a stale/different payload remains
         // rejected, while a newer post-summon carrier is admitted normally above.
-        reapplyAcceptedCoopAuthoritativeBattleState(waveStartState, true);
+        failCoopSharedSession(`Wave ${waveIndex} authoritative entry state could not seal before command input`);
+        return false;
       }
     } else if (controller.role === "host" && turn === 1 && this.fieldIndex === 0) {
       // Co-op HOST (#920): the entry-ability chain (PostSummonPhase) has now settled - terrain, weather,
@@ -614,6 +620,7 @@ export class CommandPhase extends FieldPhase {
       // so it evaluates once per wave; a hard no-op unless an entry effect actually changed state (self-latching).
       rebroadcastCoopWaveStartAuthorityAfterEntryEffects();
     }
+    return true;
   }
 
   public override start(): void {
@@ -624,7 +631,9 @@ export class CommandPhase extends FieldPhase {
     // membership must come from an authoritative seat manifest, never a local presentation guess.
     ensureCoopAuthoritativeCommandPresentation();
 
-    this.tryCoopCheckpointSync();
+    if (!this.tryCoopCheckpointSync()) {
+      return;
+    }
 
     globalScene.updateGameInfo();
     this.resetCursorIfNeeded();
@@ -707,7 +716,9 @@ export class CommandPhase extends FieldPhase {
     // ordinary rendezvous callback left that newer carrier buffered and opened input with stale map/biome
     // state. The consume is one-shot and host-safe, so making the funnel own it covers every route without
     // deriving or mutating guest mechanics.
-    this.tryCoopCheckpointSync();
+    if (!this.tryCoopCheckpointSync()) {
+      return;
+    }
     // The authoritative guest can reach its owned slot before the host has completed PostSummon. In that
     // race, the first checkCommander() above legitimately sees no CommandedTag, then the post-summon
     // checkpoint consumed at the reciprocal barrier materializes the tag. Re-evaluate at the actual
