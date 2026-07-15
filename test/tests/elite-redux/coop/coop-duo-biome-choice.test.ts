@@ -53,6 +53,7 @@ import {
   setCoopOrphanGraceMs,
   setCoopWaveBarrierMs,
 } from "#data/elite-redux/coop/coop-interaction-relay";
+import { getCoopBiomeTransitionTailPermit } from "#data/elite-redux/coop/coop-renderer-gate";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_PICK_SEQ_BASE, COOP_CROSSROADS_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
@@ -283,6 +284,11 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     await drainLoopback();
   }
 
+  function setPendingNodesForBoth(rig: DuoRig, nodes: readonly ErRouteNode[]): void {
+    withClientSync(rig.hostCtx, () => setErPendingNodes(nodes.map(node => ({ ...node }))));
+    withClientSync(rig.guestCtx, () => setErPendingNodes(nodes.map(node => ({ ...node }))));
+  }
+
   interface CrossroadsSeam {
     phaseName: string;
     start(): void;
@@ -333,7 +339,10 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         await new Promise<void>(resolve => setTimeout(resolve, 2));
       }
 
-      expect(prompts, "only the two bounded confirmation retries are exposed").toHaveBeenCalledTimes(2);
+      expect(
+        prompts.mock.calls.filter(call => String(call[0]).startsWith("Could not confirm the shared biome transition")),
+        "only the two bounded confirmation retries are exposed before the shared terminal",
+      ).toHaveLength(2);
       expect(mutateArena, "missing authority never mutates the renderer biome").not.toHaveBeenCalled();
       expect(rig.guestScene.arena.biomeId, "the renderer remains at its source biome").toBe(sourceBiome);
       expect(rig.guestRuntime.controller.interactionCounter(), "missing authority cannot advance ownership").toBe(
@@ -649,7 +658,14 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     // Both engines stayed in the SAME biome (no SwitchBiomePhase queued).
     expect(rig.guestScene.arena.biomeId, "both engines stay in the same biome on STAY").toBe(biomeBefore);
     // The overstay anchor was armed (past the free window) - the matching notoriety machinery.
-    expect(erBiomeOverstayAnchor(), "STAY past the free window arms the overstay anchor").not.toBeNull();
+    expect(
+      withClientSync(rig.hostCtx, () => erBiomeOverstayAnchor()),
+      "STAY past the free window arms the host overstay anchor",
+    ).not.toBeNull();
+    expect(
+      withClientSync(rig.guestCtx, () => erBiomeOverstayAnchor()),
+      "STAY past the free window arms the guest overstay anchor",
+    ).not.toBeNull();
     // The watcher mirror session began (the crossroads screen was MIRRORED, not amputated).
     expect(
       beginSpy.mock.calls.some(c => c[0] === "watcher"),
@@ -681,7 +697,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       { biome: BiomeId.FOREST, revealed: true },
       { biome: BiomeId.VOLCANO, revealed: true },
     ];
-    setErPendingNodes(nodes);
+    setPendingNodesForBoth(rig, nodes);
     const chosen = BiomeId.VOLCANO;
 
     const beginSpy = vi.spyOn(CoopUiMirror.prototype, "beginSession");
@@ -719,12 +735,13 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     // The crossroads deferred its terminal by pinning the biome interaction (shared module state here;
     // one per-process pin in production). Snapshot it so the WATCHER engine sees its OWN pin too (the
     // owner engine clears the shared global at its terminal - production-faithful restore).
-    const pinAfterLeave = coopBiomeInteractionStartValue();
-    expect(pinAfterLeave, "the crossroads Leave pinned the biome interaction").toBe(counterBefore);
+    const ownerPinAfterLeave = withClientSync(ownerCtx, () => coopBiomeInteractionStartValue());
+    const watcherPinAfterLeave = withClientSync(watcherCtx, () => coopBiomeInteractionStartValue());
+    expect(ownerPinAfterLeave, "the crossroads Leave pinned the owner biome interaction").toBe(counterBefore);
+    expect(watcherPinAfterLeave, "the crossroads Leave pinned the watcher biome interaction").toBe(counterBefore);
     watcherCap = installUiCapture(watcherCtx.scene);
     try {
       await arriveBoundary(watcherCtx, "biomepick:11");
-      setCoopBiomeInteractionStart(pinAfterLeave); // the owner engine's chained pin
       await withClient(ownerCtx, async () => {
         const phase = liveSelectBiome();
         phase.start(); // reaches coopBiomePickOwner and opens the real ER_MAP handler
@@ -745,7 +762,6 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
         rig.hostRuntime.durability?.unackedCount(),
         "the exact interactive terminal stays retained until the watcher opens its continuation",
       ).toBeGreaterThan(0);
-      setCoopBiomeInteractionStart(pinAfterLeave); // the watcher engine's own chained pin
       await withClient(watcherCtx, async () => {
         const phase = liveSelectBiome();
         phase.start(); // reaches coopBiomePickWatch (ER_MAP mocked), beginSession("watcher"), awaits relay
@@ -796,7 +812,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
 
     rig.hostScene.currentBattle.waveIndex = 11;
     rig.guestScene.currentBattle.waveIndex = 11;
-    setErPendingNodes([
+    setPendingNodesForBoth(rig, [
       { biome: BiomeId.FOREST, revealed: true },
       { biome: BiomeId.VOLCANO, revealed: true },
     ]);
@@ -876,7 +892,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     rig.hostScene.currentBattle.waveIndex = 11;
     rig.guestScene.currentBattle.waveIndex = 11;
 
-    setErPendingNodes([
+    setPendingNodesForBoth(rig, [
       { biome: BiomeId.FOREST, revealed: true },
       { biome: BiomeId.VOLCANO, revealed: true },
     ]);
@@ -962,7 +978,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     rig.hostScene.currentBattle.waveIndex = 11;
     rig.guestScene.currentBattle.waveIndex = 11;
 
-    setErPendingNodes([
+    setPendingNodesForBoth(rig, [
       { biome: BiomeId.FOREST, revealed: true },
       { biome: BiomeId.VOLCANO, revealed: true },
     ]);
@@ -1252,9 +1268,39 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     expect(hostSwitch.mock.calls.find(call => call[0] === "SwitchBiomePhase")?.[1]).toBe(destination);
     expect(guestSwitch.mock.calls.find(call => call[0] === "SwitchBiomePhase")?.[1]).toBe(destination);
     expect(
+      guestSwitch.mock.calls.find(call => call[0] === "SwitchBiomePhase")?.[2],
+      "the queued renderer Switch retains SelectBiome's immutable source-wave address",
+    ).toBe(sourceWave);
+    expect(
       withClientSync(rig.guestCtx, () => getCoopBiomeTransitionCommitReceipt({ sourceWave: sourceWave + 1 })),
       "no speculative wave-16 operation was invented",
     ).toBeNull();
+
+    await withClient(rig.guestCtx, () => {
+      expect(
+        getCoopBiomeTransitionTailPermit(),
+        "the renderer retained its own exact wave-15 switch permit",
+      ).toMatchObject({ wave: sourceWave, nextWave: sourceWave + 1, switchAdopted: false });
+      const switchPhase = new SwitchBiomePhase(destination, sourceWave) as unknown as {
+        start(): void;
+        end(): void;
+        coopBoundaryStillLive(): boolean;
+      };
+      switchPhase.coopBoundaryStillLive = () => true;
+      const end = vi.spyOn(switchPhase, "end").mockImplementation(() => {});
+      const arena = vi.spyOn(rig.guestScene, "newArena");
+      switchPhase.start();
+      expect(arena, "the late renderer switch materializes the exact committed destination").toHaveBeenCalledWith(
+        destination,
+      );
+      expect(end, "the exact late switch completes instead of entering permit recovery").toHaveBeenCalledOnce();
+      expect(getCoopBiomeTransitionTailPermit()).toMatchObject({
+        wave: sourceWave,
+        nextWave: sourceWave + 1,
+        switchAdopted: true,
+        switchPrepared: true,
+      });
+    });
     logs.flush();
   }, 300_000);
 

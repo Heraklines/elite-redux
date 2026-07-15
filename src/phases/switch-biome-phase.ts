@@ -33,6 +33,8 @@ import { getBiomeName } from "#utils/common";
 export class SwitchBiomePhase extends BattlePhase {
   public readonly phaseName = "SwitchBiomePhase";
   private readonly nextBiome: BiomeId;
+  /** Immutable source boundary captured by SelectBiome before speculative NewBattle state can advance. */
+  private readonly coopSourceWave: number | null;
   private coopPermitRecoveryShown = false;
   private coopPermitRecoveryAttempts = 0;
   private historyRecorded = false;
@@ -51,10 +53,12 @@ export class SwitchBiomePhase extends BattlePhase {
   private coopRevealsApplied = false;
   private coopStructureApplied = false;
 
-  constructor(nextBiome: BiomeId) {
+  constructor(nextBiome: BiomeId, coopSourceWave: number | null = null) {
     super();
 
     this.nextBiome = nextBiome;
+    this.coopSourceWave =
+      coopSourceWave != null && Number.isSafeInteger(coopSourceWave) && coopSourceWave >= 0 ? coopSourceWave : null;
   }
 
   start() {
@@ -85,17 +89,24 @@ export class SwitchBiomePhase extends BattlePhase {
     const sourceWave = globalScene.currentBattle?.waveIndex ?? -1;
     const activePermit = authoritativeCoop ? getCoopBiomeTransitionTailPermit() : null;
     const replayingCommittedSwitch = activePermit?.switchAdopted === true;
+    // The next battle can be mirrored before this queued presentation tail starts. Keep the permit addressed
+    // to SelectBiome's immutable completed-wave boundary, but admit only the exact same or immediately-next
+    // ambient battle so an obsolete queued phase cannot spend authority at an unrelated future wave.
+    const permitWave =
+      this.coopSourceWave != null && (sourceWave === this.coopSourceWave || sourceWave === this.coopSourceWave + 1)
+        ? this.coopSourceWave
+        : sourceWave;
     let permit = authoritativeCoop
       ? adoptCoopBiomeTransitionSwitchPermit({
           destinationBiomeId: this.nextBiome,
           sourceBiomeId: sourceBiome,
-          wave: sourceWave,
+          wave: permitWave,
         })
       : null;
     if (authoritativeCoop && permit == null) {
       coopWarn(
         "runtime",
-        `SwitchBiomePhase refused unsanctioned authoritative mutation source=${sourceBiome} destination=${this.nextBiome} wave=${sourceWave}`,
+        `SwitchBiomePhase refused unsanctioned authoritative mutation source=${sourceBiome} destination=${this.nextBiome} ambientWave=${sourceWave} sourceWave=${permitWave}`,
       );
       this.parkForAuthoritativePermit();
       return;

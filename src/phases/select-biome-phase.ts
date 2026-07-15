@@ -1284,7 +1284,7 @@ export class SelectBiomePhase extends BattlePhase {
       if (isCoopAuthoritativeGuestGated()) {
         // The renderer owns no between-biome run mutation. The committed BIOME_PICK already armed the exact
         // transition permit; queue only its presentation tail and wait for the next complete host carrier.
-        globalScene.phaseManager.unshiftNew("SwitchBiomePhase", nextBiome);
+        globalScene.phaseManager.unshiftNew("SwitchBiomePhase", nextBiome, currentWaveIndex);
         if (this.coopAdvancePinned >= 0) {
           const controller = getCoopController();
           advanceCoopInteractionForContinuation(this.coopAdvancePinned);
@@ -1333,7 +1333,7 @@ export class SelectBiomePhase extends BattlePhase {
       // single-node / travel-target / random resolution, or an anti-hang fallback). The watcher applies this
       // biome VERBATIM, so the owner can never travel one-sided-silently and the two clients can never land in
       // different biomes. Idempotent (coopBiomeRelaySent) so the picker pick + this funnel never double-send.
-      globalScene.phaseManager.unshiftNew("SwitchBiomePhase", nextBiome);
+      globalScene.phaseManager.unshiftNew("SwitchBiomePhase", nextBiome, currentWaveIndex);
       // Co-op (#848): terminate the biome interaction with the single from-pinned advance (idempotent,
       // #837). Fires when this phase participated in an interaction: a chained crossroads-Leave (always)
       // or a multi-node World-Map pick. A purely-deterministic natural transition never ticks the counter.
