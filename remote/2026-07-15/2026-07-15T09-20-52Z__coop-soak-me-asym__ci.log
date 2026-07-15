@@ -1,0 +1,56 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: 45
+run: 29404021601 (ci/coop/p33-auto-victory-seal)
+timestamp: 2026-07-15T09-20-52Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=12 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=12 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=14 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=14 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=16 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=16 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 12 (seed 828633): guest retained World Map boundary did not release after host commit (current=SelectBiomePhase, queued=[NewBattlePhase]). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T09-20-52-649Z__seed-828633__wave-12. Replay: SOAK_SEED=828633[39m
+
+----- vitest result tail -----
+[31m[1mAssertionError[22m: wave 12 is HOST-OWNED by counter parity: expected 'guest-owned' to be 'host-owned' // Object.is equality[39m
+
+Expected: [32m"[7mho[27mst-owned"[39m
+Received: [31m"[7mgue[27mst-owned"[39m
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m191:89[22m[39m
+    [90m189|[39m     expect(result.mysteryEncounters.length, "exactly one ME driven - n…
+    [90m190|[39m     expect(result.mysteryEncounters[0].wave, "the one ME was the desig…
+    [90m191|[39m     expect(result.mysteryEncounters[0].path, "wave 12 is HOST-OWNED by…
+    [90m   |[39m                                                                                         [31m^[39m
+    [90m192|[39m     [34mexpect[39m(
+    [90m193|[39m       result[33m.[39mskips[33m.[39mmysteryEncounterWaveHit[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:212:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 12 (seed 828633): guest retained World Map boundary did not release after host commit (current=SelectBiomePhase, queued=[NewBattlePhase]). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T09-20-52-649Z__seed-828633__wave-12. Replay: SOAK_SEED=828633[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1566:11[22m[39m
+    [90m1564|[39m       phaseState: phaseStateDump(rig),
+    [90m1565|[39m     });
+    [90m1566|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1567|[39m   };
+    [90m1568|[39m
+[90m [2m❯[22m test/tools/coop-soak-driver.ts:[2m2051:9[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m574:12[22m[39m
+[90m [2m❯[22m crossCommandBoundaryWithReplayGuest test/tools/coop-soak-driver.ts:[2m2042:7[22m[39m
+[90m [2m❯[22m playWave test/tools/coop-soak-driver.ts:[2m2226:7[22m[39m
+[90m [2m❯[22m processNormalWave test/tools/coop-soak-driver.ts:[2m3138:21[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m3693:7[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m231:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 09:19:32
+[2m   Duration [22m 79.96s[2m (transform 38.33s, setup 50.37s, import 496ms, tests 62.59s, environment 1.55s)[22m
+
