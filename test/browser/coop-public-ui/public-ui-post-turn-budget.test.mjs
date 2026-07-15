@@ -5,9 +5,9 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createPublicBattleProgressBudget, DuoPublicUiRig, PublicUiClient } from "./public-ui-harness.mjs";
 import { marketObservationView } from "./evidence.mjs";
 import { assertMarketPurchaseConverged, planMarketGridKeys } from "./market-journey.mjs";
+import { createPublicBattleProgressBudget, DuoPublicUiRig, PublicUiClient } from "./public-ui-harness.mjs";
 
 class FakeEvidence {
   constructor(label) {
@@ -276,9 +276,10 @@ test("market observer parser and purchase proof cover money, quantity, and both 
   const parsed = marketObservationView(`[coop-browser:market] ${JSON.stringify(before.owner)}`);
   assert.equal(parsed.options[1].id, "WIDE_LENS");
   assert.throws(
-    () => marketObservationView(
-      `[coop-browser:market] ${JSON.stringify({ ...before.owner, selectedIndex: 5, selectedItemId: "WIDE_LENS" })}`,
-    ),
+    () =>
+      marketObservationView(
+        `[coop-browser:market] ${JSON.stringify({ ...before.owner, selectedIndex: 5, selectedItemId: "WIDE_LENS" })}`,
+      ),
     /invalid market observation/u,
   );
   assert.deepEqual(planMarketGridKeys(0, 5), ["ArrowDown", "ArrowRight"]);

@@ -607,8 +607,9 @@ function observeBiomeMarket(): void {
           },
         ];
       })
-      .toSorted((left, right) =>
-        left.typeId.localeCompare(right.typeId) || left.pokemonId - right.pokemonId || left.quantity - right.quantity,
+      .toSorted(
+        (left, right) =>
+          left.typeId.localeCompare(right.typeId) || left.pokemonId - right.pokemonId || left.quantity - right.quantity,
       );
     const party = globalScene.getPlayerParty().map((pokemon, slot) => ({
       slot,

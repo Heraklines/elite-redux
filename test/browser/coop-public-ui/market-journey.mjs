@@ -22,7 +22,9 @@ function quantityOf(observation, typeId, pokemonId) {
 }
 
 function catalogKey(observation) {
-  return JSON.stringify(observation.options.map(({ index, id, cost, targetModel }) => ({ index, id, cost, targetModel })));
+  return JSON.stringify(
+    observation.options.map(({ index, id, cost, targetModel }) => ({ index, id, cost, targetModel })),
+  );
 }
 
 /** Exact non-wrapping directions through the market's visible 4x4 grid. */
@@ -76,7 +78,10 @@ export function assertMarketPurchaseConverged(beforeByLabel, afterByLabel, { own
     if (!sameAddress(before.address, ownerBefore.address) || !sameAddress(after.address, ownerBefore.address)) {
       throw new Error(`market purchase ${targetId} crossed an address on ${label}`);
     }
-    if (before.pinnedInteraction !== ownerBefore.pinnedInteraction || after.pinnedInteraction !== ownerBefore.pinnedInteraction) {
+    if (
+      before.pinnedInteraction !== ownerBefore.pinnedInteraction
+      || after.pinnedInteraction !== ownerBefore.pinnedInteraction
+    ) {
       throw new Error(`market purchase ${targetId} crossed an interaction pin on ${label}`);
     }
     if (catalogKey(before) !== catalogKey(ownerBefore) || catalogKey(after) !== catalogKey(ownerBefore)) {
@@ -119,7 +124,10 @@ export function assertMarketPurchaseConverged(beforeByLabel, afterByLabel, { own
   for (const label of labels) {
     const before = beforeByLabel[label];
     const after = afterByLabel[label];
-    if (before.party[partySlot]?.pokemonId !== targetPokemonId || after.party[partySlot]?.pokemonId !== targetPokemonId) {
+    if (
+      before.party[partySlot]?.pokemonId !== targetPokemonId
+      || after.party[partySlot]?.pokemonId !== targetPokemonId
+    ) {
       throw new Error(`market target party identity diverged on ${label}`);
     }
     const beforeQuantity = quantityOf(before, targetId, targetPokemonId);
@@ -216,15 +224,17 @@ async function selectGridItem(owner, targetIndex, pinnedInteraction) {
     );
   }
   if (event.observation.selectedIndex !== targetIndex) {
-    throw new Error(`${owner.label}: market cursor reached ${event.observation.selectedIndex}, expected ${targetIndex}`);
+    throw new Error(
+      `${owner.label}: market cursor reached ${event.observation.selectedIndex}, expected ${targetIndex}`,
+    );
   }
 }
 
 async function selectPartyTarget(owner, from, partySlot) {
-  let event = await owner.evidence.waitForCondition(
-    sink => sink.findLastSemanticSurface(from, "party:reward-target"),
-    { timeoutMs: owner.config.timeoutMs, description: "market party-target picker" },
-  );
+  let event = await owner.evidence.waitForCondition(sink => sink.findLastSemanticSurface(from, "party:reward-target"), {
+    timeoutMs: owner.config.timeoutMs,
+    description: "market party-target picker",
+  });
   const selected = /^cursor:(\d+)$/u.exec(event.observation.selectedOptionId ?? "");
   if (selected == null) {
     throw new Error(`${owner.label}: party-target picker exposed no selected party slot`);
@@ -237,7 +247,8 @@ async function selectPartyTarget(owner, from, partySlot) {
     event = await owner.evidence.waitForCondition(
       sink => {
         const next = sink.findLastSemanticSurface(from, "party:reward-target");
-        return next?.index > eventIndex && next.observation.selectedOptionId === `cursor:${cursor + (key === "ArrowDown" ? 1 : -1)}`
+        return next?.index > eventIndex
+          && next.observation.selectedOptionId === `cursor:${cursor + (key === "ArrowDown" ? 1 : -1)}`
           ? next
           : null;
       },
@@ -281,12 +292,14 @@ async function buyPartyItem(rig, snapshot, targetId, partySlot) {
           }
           const afterOption = optionById(observation, targetId);
           const beforeOption = optionById(snapshot.byLabel[client.label], targetId);
-          return afterOption != null
+          return (
+            afterOption != null
             && beforeOption != null
             && beforeOption.stock - afterOption.stock === 1
             && observation.money === expectedMoney
             && quantityOf(observation, targetId, targetPokemonId) === heldQuantityBefore + 1
-            && (client !== owner || observation.marketOpen);
+            && (client !== owner || observation.marketOpen)
+          );
         },
         `applied ${targetId} market purchase`,
       ),
@@ -321,7 +334,11 @@ async function leaveMarket(owner, pinnedInteraction) {
  * buys a second party item when affordable/in stock, then leaves normally. Missing target stock is
  * evidence, not a hidden fallback; the campaign's final required-count/parity contract decides pass/fail.
  */
-export async function driveTargetedMarket(rig, from, { targetId = "WIDE_LENS", partySlot = 0, secondPurchase = true } = {}) {
+export async function driveTargetedMarket(
+  rig,
+  from,
+  { targetId = "WIDE_LENS", partySlot = 0, secondPurchase = true } = {},
+) {
   let snapshot = await readMarketPair(rig, from);
   const purchases = [];
   const primary = await buyPartyItem(rig, snapshot, targetId, partySlot);
