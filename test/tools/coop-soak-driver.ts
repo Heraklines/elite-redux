@@ -3549,11 +3549,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // (the exact footgun coop-duo-mystery IT #4 clears). Drain the queue so the continuous run's next wave is
     // driven cleanly.
     (game.promptHandler as unknown as { prompts: unknown[] }).prompts.length = 0;
-    // Clear the GUEST's leftover ME phase queue so its NEXT-wave replay does not re-divert into a spurious
-    // second CoopReplayMePhase (driveGuestMeReplay drives THROUGH the leave terminal but leaves the guest's
-    // post-ME phase queue populated - see the harness scope note). The next wave's remirror rebuilds the
-    // guest's currentBattle; this drops the stale ME phases so the replay runs a clean CoopReplayTurnPhase.
-    // #633 FOLLOW-UP (finding (a) - POST-ME COUNTER DESYNC, the HARNESS LEAK): ALSO clear the guest's ME
+    // #633 FOLLOW-UP (finding (a) - POST-ME COUNTER DESYNC, the HARNESS LEAK): clear the guest's ME
     // interaction pin here. driveGuestMeReplay / the guest-owned drive above run the guest's ME divert
     // (coopSetMePinForGuest sets coopMeInteractionStart so coopMeInProgress() is TRUE across the whole guest
     // ME, exactly as production) but stop at the CoopReplayMePhase LEAVE terminal - they never drive the
@@ -3568,10 +3564,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // (`ctx.mePins = readMePins()`, line ~406); withClientSync deliberately drops them (it restores prev.mePins
     // without saving), so a coopClearMePinForGuest under withClientSync would set the global to -1 but leave
     // guestCtx.mePins.start at the leaked ME counter - the exact no-op that let the spurious re-divert persist.
-    await withClient(rig.guestCtx, () => {
-      rig.guestScene.phaseManager.clearPhaseQueue();
-      coopClearMePinForGuest();
-    });
+    // Do NOT clear the phase queue here. The retained ME_TERMINAL deliberately replaced the locally-derived
+    // tail with its authoritative NewBattlePhase. Dropping that real tail leaves the old wave as current; when
+    // the next queue drive starts the remaining phase, PhaseManager falls through to a phantom CommandPhase
+    // on wave W instead of materializing wave W+1 (journey seed 828633, cmd:12:1 while host is at cmd:13:1).
+    await withClient(rig.guestCtx, () => coopClearMePinForGuest());
 
     // The whole ME advanced the alternation counter EXACTLY once (like a shop). Assert LOCKSTEP.
     const hostAfter = rig.hostRuntime.controller.interactionCounter();
