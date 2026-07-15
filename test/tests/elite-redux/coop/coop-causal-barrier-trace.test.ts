@@ -99,6 +99,7 @@ describe("co-op causal barrier tracing", () => {
       const operationEvents = getCoopCausalTrace().filter(event => event.causalId === "9:0:REWARD:12004");
       expect(operationEvents.map(event => `${event.role}:${event.stage}`)).toEqual([
         "host:retained",
+        "host:continuation-deadline",
         "guest:material-applied",
         "host:material-applied",
         "guest:presentation-ready",
@@ -107,6 +108,7 @@ describe("co-op causal barrier tracing", () => {
         "host:continuation-ready",
         "host:released",
       ]);
+      expect(operationEvents[1].detail).toBe("stage=authority-surface budgetMs=180000");
       expect(operationEvents.every(event => event.epoch === 9 && event.revision === 1)).toBe(true);
       expect(JSON.stringify(operationEvents)).not.toContain("payload-must-not-enter-causal-trace");
 
@@ -144,7 +146,13 @@ describe("co-op causal barrier tracing", () => {
       continuation.fire(0);
 
       const events = getCoopCausalTrace();
-      expect(events.map(event => event.stage)).toEqual(["retained", "delivery-retry", "terminal"]);
+      expect(events.map(event => event.stage)).toEqual([
+        "retained",
+        "continuation-deadline",
+        "delivery-retry",
+        "terminal",
+      ]);
+      expect(events[1].detail).toBe("stage=authority-surface budgetMs=10");
       expect(new Set(events.map(event => event.causalId)).size).toBe(1);
       expect(events[0].causalId).toMatch(/^operation:e9:r1:id#[0-9a-f]{8}:len=\d+$/);
       expect(events[0].causalId.length).toBeLessThan(80);
