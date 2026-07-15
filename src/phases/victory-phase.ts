@@ -183,6 +183,8 @@ export class VictoryPhase extends PokemonPhase {
             undefined,
             undefined,
             ghostRewards ?? gameMode.getFixedBattle(currentWaveIndex)?.customModifierRewardSettings,
+            false,
+            { kind: "wave-boundary" },
           );
         } else if (gameMode.isDaily) {
           globalScene.phaseManager.pushNew("ModifierRewardPhase", modifierTypes.EXP_CHARM);
@@ -259,7 +261,9 @@ export class VictoryPhase extends PokemonPhase {
           if (globalScene.arena.biomeId === BiomeId.ABYSS) {
             globalScene.phaseManager.pushNew("TheBargainPhase");
           } else {
-            globalScene.phaseManager.pushNew("BiomeShopPhase");
+            globalScene.phaseManager.pushNew("BiomeShopPhase", 0, undefined, undefined, false, {
+              kind: "wave-boundary",
+            });
           }
         }
 
@@ -424,11 +428,18 @@ function applyPostVictoryHook(waveIndex: number): void {
       guaranteed.push(new ModifierTypeOption(resolved, 0));
     }
     if (guaranteed.length > 0) {
-      globalScene.phaseManager.pushNew("SelectModifierPhase", 0, undefined, {
-        guaranteedModifierTypeOptions: guaranteed,
-        fillRemaining: false,
-        rerollMultiplier: 0,
-      });
+      globalScene.phaseManager.pushNew(
+        "SelectModifierPhase",
+        0,
+        undefined,
+        {
+          guaranteedModifierTypeOptions: guaranteed,
+          fillRemaining: false,
+          rerollMultiplier: 0,
+        },
+        false,
+        { kind: "wave-boundary" },
+      );
     }
   }
 
