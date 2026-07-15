@@ -5223,6 +5223,23 @@ export function assembleCoopRuntime(
   const notifyContinuationSurface = battleStream.notifyContinuationSurface.bind(battleStream);
   battleStream.notifyContinuationSurface = surface => {
     const released = notifyContinuationSurface(surface);
+    // WAVE_ADVANCE owns a separate retained DATA + continuation transaction from the battle stream's
+    // turn/replacement carrier. A no-shop tail (notably a successful wild flee) crosses BattleEnd and
+    // NewBattle without constructing a reward phase, so its first executable continuation is the next
+    // wave's real COMMAND surface reported through this chokepoint. Re-address the one exact unresolved
+    // wave transaction and let the existing verifier prove DATA-applied + active handler + nextWave/turn-1;
+    // never infer a source wave from the mutable scene and never release an ambiguous retained set.
+    if (
+      surface === "command"
+      && active === runtime
+      && isCoopAuthoritativeGuest()
+      && usesRetainedCoopWaveTransaction(runtime)
+    ) {
+      const retainedWave = getCoopPendingWaveContinuationBoundary(runtime.waveOperationBinding);
+      if (retainedWave != null) {
+        maybeMarkCoopWaveContinuationReady(retainedWave.wave, runtime.waveOperationBinding);
+      }
+    }
     durability?.retryDeferred("op:global");
     publishPendingCoopSnapshotProof(runtime);
     return released;
