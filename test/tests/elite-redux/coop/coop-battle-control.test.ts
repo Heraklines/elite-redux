@@ -53,6 +53,7 @@ import { UiMode } from "#enums/ui-mode";
 import type { CommandPhase } from "#phases/command-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { buildDuo, withClient } from "#test/tools/coop-duo-harness";
+import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
 import Phaser from "phaser";
@@ -116,7 +117,8 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
    */
   const startCoopDouble = async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    startLocalCoopSession({ username: "Host" });
+    const runtime = startLocalCoopSession({ username: "Host" });
+    await negotiateLocalSpoofPeer(runtime);
     game.scene.gameMode = getGameMode(GameModes.COOP);
     expect(game.scene.gameMode.isCoop).toBe(true);
     const field = game.scene.getPlayerField();

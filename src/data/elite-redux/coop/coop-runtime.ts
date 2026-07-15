@@ -4922,11 +4922,6 @@ export function startLocalCoopSession(
   runtime.controller.setNetcodeMode(opts.netcodeMode ?? "authoritative");
   runtime.partnerTransport = guest;
   runtime.spoof = new SpoofGuest(guest);
-  // Arm the same-build CPU peer before the authority opens negotiation. The
-  // spoof mirrors the host's protocol identity, capabilities, and functional
-  // fingerprint, so this factory produces a real compatible session rather than
-  // a one-sided fixture that strict save/carrier capture must reject.
-  runtime.spoof.connect();
   // Showdown 1v1 (D0): a versus vs-CPU session also stands up the showdown-speaking spoof opponent on
   // the guest endpoint so negotiate + wager + the enemy-command relay play through solo.
   if ((opts.kind ?? "coop") === "versus") {

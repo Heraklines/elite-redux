@@ -57,6 +57,7 @@ import type { PersistentModifier } from "#modifiers/modifier";
 import { PokemonMove } from "#moves/pokemon-move";
 import { PokemonData } from "#system/pokemon-data";
 import { GameManager } from "#test/framework/game-manager";
+import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
 import type { TurnMove } from "#types/turn-move";
 import { getPokemonSpecies, getPokemonSpeciesForm } from "#utils/pokemon-utils";
 import Phaser from "phaser";
@@ -90,7 +91,8 @@ describe.skipIf(!RUN)("co-op battle checksum + resync - real engine (#633, TRACK
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     // The checksum + full-snapshot resync is the AUTHORITATIVE netcode's machinery; opt in
     // explicitly since the selectable default is now "lockstep" (#633, A/B).
-    startLocalCoopSession({ username: "Host", netcodeMode: "authoritative" });
+    const runtime = startLocalCoopSession({ username: "Host", netcodeMode: "authoritative" });
+    await negotiateLocalSpoofPeer(runtime);
     game.scene.gameMode = getGameMode(GameModes.COOP);
     expect(game.scene.gameMode.isCoop).toBe(true);
     const field = game.scene.getPlayerField();

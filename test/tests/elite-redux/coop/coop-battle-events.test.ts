@@ -54,6 +54,7 @@ import {
   CoopMoveAnimReplayPhase,
 } from "#phases/coop-replay-phases";
 import { GameManager } from "#test/framework/game-manager";
+import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -100,7 +101,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   /** Start a co-op authoritative double as the HOST and tag field ownership. */
   const startCoopHost = async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    startLocalCoopSession({ username: "Host", netcodeMode: "authoritative" });
+    const runtime = startLocalCoopSession({ username: "Host", netcodeMode: "authoritative" });
+    await negotiateLocalSpoofPeer(runtime);
     game.scene.gameMode = getGameMode(GameModes.COOP);
     expect(game.scene.gameMode.isCoop).toBe(true);
     const field = game.scene.getPlayerField();
@@ -112,6 +114,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   /** Start a co-op authoritative double, then flip the LOCAL engine into the GUEST role. */
   const startCoopGuest = async () => {
     const field = await startCoopHost();
+    getCoopRuntime()!.spoof?.dispose();
     getCoopController()!.role = "guest";
     return field;
   };

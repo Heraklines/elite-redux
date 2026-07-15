@@ -70,6 +70,7 @@ import { EncounterPhase } from "#phases/encounter-phase";
 import { NextEncounterPhase } from "#phases/next-encounter-phase";
 import { VoucherType } from "#system/voucher";
 import { GameManager } from "#test/framework/game-manager";
+import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
 import { installHeadlessCoopSemanticProjectionOracle } from "#test/tools/coop-semantic-presentation";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
@@ -201,7 +202,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     // The pure-renderer behavior is the AUTHORITATIVE netcode; opt in explicitly since the
     // selectable default is now "lockstep" (#633, A/B - both engines resolve in lockstep).
-    startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
+    const runtime = startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
+    // Establish the strict save/carrier identity while this assembled controller is still the host,
+    // then remove the CPU listener before this legacy one-engine fixture changes seats to guest.
+    await negotiateLocalSpoofPeer(runtime, { disposeAfter: true });
     game.scene.gameMode = getGameMode(GameModes.COOP);
     const field = game.scene.getPlayerField();
     field[COOP_HOST_FIELD_INDEX].coopOwner = "host";
