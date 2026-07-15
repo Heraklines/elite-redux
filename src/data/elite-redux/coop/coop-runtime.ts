@@ -1107,13 +1107,13 @@ interface CoopPendingAutomaticVictorySeal {
 }
 
 function usesRetainedCoopWaveTransaction(runtime: CoopRuntime | null = active): boolean {
+  // Showdown-versus reuses the authoritative battle stream, but it has no co-op wave/reward tail:
+  // a KO is settled by showdownResult instead of WAVE_ADVANCE. Admitting a versus runtime here
+  // makes VictoryPhase wait for a transition that broadcastCoopWaveResolved deliberately never
+  // creates outside GameModes.COOP, so the valid KO is misclassified as a missing source boundary
+  // and both players are torn down before the result can be delivered.
   return (
     runtime != null
-    // Showdown-versus reuses the authoritative battle stream, but it has no co-op wave/reward tail:
-    // a KO is settled by showdownResult instead of WAVE_ADVANCE. Admitting a versus runtime here
-    // makes VictoryPhase wait for a transition that broadcastCoopWaveResolved deliberately never
-    // creates outside GameModes.COOP, so the valid KO is misclassified as a missing source boundary
-    // and both players are torn down before the result can be delivered.
     && !runtime.controller.isVersusSession()
     && isCoopWaveAdvanceOperationEnabled()
     && isCoopCapabilityNegotiated(COOP_CAP_OP_WAVE)

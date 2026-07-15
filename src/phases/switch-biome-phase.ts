@@ -3,6 +3,7 @@ import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-autho
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   adoptCoopBiomeTransitionSwitchPermit,
+  finalizeCoopBiomeTransitionAfterRetainedBattlePermit,
   getCoopBiomeTransitionTailPermit,
   markCoopBiomeTransitionHistoryRecorded,
   markCoopBiomeTransitionSwitchPrepared,
@@ -52,6 +53,12 @@ export class SwitchBiomePhase extends BattlePhase {
   private coopRoutesApplied = false;
   private coopRevealsApplied = false;
   private coopStructureApplied = false;
+  /** Exact permit whose duplicate NewBattle tail was removed after retained authority advanced already. */
+  private coopRetainedBattlePermit: {
+    readonly operationId: string;
+    readonly destinationBiomeId: number;
+    readonly nextWave: number;
+  } | null = null;
 
   constructor(nextBiome: BiomeId, coopSourceWave: number | null = null) {
     super();
@@ -269,6 +276,11 @@ export class SwitchBiomePhase extends BattlePhase {
         `Could not discard exact duplicate NewBattlePhase for retained biome boundary ${permit.wave}->${permit.nextWave}; queue=[${queued.join(",")}]`,
       );
     }
+    this.coopRetainedBattlePermit = {
+      operationId: permit.operationId,
+      destinationBiomeId: permit.destinationBiomeId,
+      nextWave: permit.nextWave,
+    };
     coopLog(
       "runtime",
       `SwitchBiomePhase discarded duplicate NewBattlePhase after retained battle advance wave=${permit.wave}->${permit.nextWave}`,
@@ -401,10 +413,33 @@ export class SwitchBiomePhase extends BattlePhase {
     if (this.ended) {
       return;
     }
+    const retainedBattlePermit = this.coopRetainedBattlePermit;
     try {
       super.end();
+      if (retainedBattlePermit != null) {
+        if (globalScene.phaseManager.getCurrentPhase() === this) {
+          throw new Error(`Queue did not advance after retained biome boundary ${retainedBattlePermit.nextWave}`);
+        }
+        if (finalizeCoopBiomeTransitionAfterRetainedBattlePermit(retainedBattlePermit) == null) {
+          throw new Error(`Could not retire retained biome permit ${retainedBattlePermit.operationId}`);
+        }
+        this.coopRetainedBattlePermit = null;
+      }
       this.ended = true;
     } catch (error) {
+      const queueAlreadyAdvanced = globalScene.phaseManager.getCurrentPhase() !== this;
+      if (queueAlreadyAdvanced && retainedBattlePermit != null) {
+        // shiftPhase installs the next phase before starting it. If that start threw, the old Switch phase
+        // cannot retry. Retire only the exact fully prepared permit, then stop the binary session instead
+        // of leaving a live client with an orphaned single-slot transition.
+        finalizeCoopBiomeTransitionAfterRetainedBattlePermit(retainedBattlePermit);
+        this.coopRetainedBattlePermit = null;
+        this.ended = true;
+        failCoopSharedSession(
+          `The shared biome transition to ${this.nextBiome} installed a next phase that could not start.`,
+        );
+        return;
+      }
       coopWarn("runtime", "SwitchBiomePhase queue shift threw; exact permit remains retryable", error);
       this.parkForAuthoritativePermit();
     }

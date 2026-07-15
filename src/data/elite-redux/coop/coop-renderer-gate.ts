@@ -584,6 +584,34 @@ export function finalizeCoopBiomeTransitionEncounterPermit(params: {
   return { ...permit };
 }
 
+/**
+ * Retire the exact transition when a retained WAVE_ADVANCE already installed the destination battle.
+ * In that schedule SwitchBiome removes its now-duplicate NewBattlePhase, so no NewBiomeEncounterPhase
+ * exists to consume/finalize the permit. The caller may use this seam only after its own queue shift has
+ * succeeded; every mutation stage and the exact destination boundary still have to match here.
+ */
+export function finalizeCoopBiomeTransitionAfterRetainedBattlePermit(params: {
+  readonly operationId: string;
+  readonly destinationBiomeId: number;
+  readonly nextWave: number;
+}): CoopBiomeTransitionTailPermit | null {
+  const permit = biomeTransitionTailPermit;
+  if (
+    permit == null
+    || !permit.switchAdopted
+    || !permit.historyRecorded
+    || !permit.switchPrepared
+    || permit.encounterAdopted
+    || permit.operationId !== params.operationId
+    || permit.destinationBiomeId !== params.destinationBiomeId
+    || permit.nextWave !== params.nextWave
+  ) {
+    return null;
+  }
+  biomeTransitionTailPermit = null;
+  return { ...permit };
+}
+
 /** Clear a stale permit on teardown/recovery. */
 export function clearCoopBiomeTransitionTailPermit(): void {
   biomeTransitionTailPermit = null;

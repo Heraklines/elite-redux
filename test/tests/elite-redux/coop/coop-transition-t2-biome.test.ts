@@ -819,6 +819,64 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     });
   }, 120_000);
 
+  it("SwitchBiome retires its exact permit when retained authority already installed the destination battle", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
+
+    await withClient(rig.guestCtx, () => {
+      const sourceWave = 10;
+      const nextWave = 11;
+      const sourceBiomeId = rig.guestScene.arena.biomeId;
+      const operationId = coopAuthoritativeBiomeTransitionOperationId(sourceWave);
+      const address = operationId == null ? null : parseCoopOperationId(operationId);
+      expect(address).not.toBeNull();
+      expect(
+        armCoopBiomeTransitionTailPermit({
+          operationId: operationId!,
+          sessionEpoch: address!.epoch,
+          revision: 1,
+          wave: sourceWave,
+          sourceBiomeId,
+          destinationBiomeId: BiomeId.VOLCANO,
+          nextWave,
+        }),
+      ).toBe(true);
+
+      // Model the production ordering from the soak: retained WAVE_ADVANCE has installed wave 11 while
+      // SelectBiome's ordinary NewBattlePhase is still the immediate queued duplicate.
+      rig.guestScene.currentBattle.waveIndex = nextWave;
+      const phase = new SwitchBiomePhase(BiomeId.VOLCANO, sourceWave);
+      const boundary = { live: true };
+      syntheticBoundaries.add(boundary);
+      (phase as unknown as { coopBoundaryStillLive(): boolean }).coopBoundaryStillLive = () => boundary.live;
+      const phaseManager = rig.guestScene.phaseManager;
+      const current = vi.spyOn(phaseManager, "getCurrentPhase").mockReturnValue(phase);
+      const queued = vi.spyOn(phaseManager, "getQueuedPhaseNames").mockReturnValue(["NewBattlePhase"]);
+      const remove = vi.spyOn(phaseManager, "tryRemovePhase").mockReturnValue(true);
+      const replacement = {} as ReturnType<typeof phaseManager.getCurrentPhase>;
+      const shift = vi.spyOn(phaseManager, "shiftPhase").mockImplementation(() => {
+        current.mockReturnValue(replacement);
+      });
+
+      phase.start();
+
+      expect(remove).toHaveBeenCalledWith("NewBattlePhase");
+      expect(
+        shift,
+        "SwitchBiome moved into the retained carrier's already-installed continuation",
+      ).toHaveBeenCalledOnce();
+      expect(rig.guestScene.arena.biomeId).toBe(BiomeId.VOLCANO);
+      expect(
+        getCoopBiomeTransitionTailPermit(),
+        "the skipped duplicate encounter tail cannot strand the single permit slot",
+      ).toBeNull();
+      queued.mockRestore();
+      remove.mockRestore();
+      shift.mockRestore();
+      current.mockRestore();
+    });
+  }, 120_000);
+
   it("stale Crossroads and biome-market callbacks cannot relay, mutate, or advance after replacement", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);

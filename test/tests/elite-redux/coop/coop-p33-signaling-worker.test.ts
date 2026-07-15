@@ -354,11 +354,11 @@ describe("P33 authenticated signaling Worker", () => {
       },
     });
     expect(accepted.body.code).not.toBe(first.code);
-    expect(sqlite.prepare("SELECT state FROM coop_runs_p33 WHERE code = ?").get(first.code)).toEqual({ state: "ended" });
+    expect(sqlite.prepare("SELECT state FROM coop_runs_p33 WHERE code = ?").get(first.code)).toEqual({
+      state: "ended",
+    });
     expect(
-      sqlite
-        .prepare("SELECT COUNT(*) AS count FROM coop_pair_members_p33 WHERE code = ?")
-        .get(accepted.body.code),
+      sqlite.prepare("SELECT COUNT(*) AS count FROM coop_pair_members_p33 WHERE code = ?").get(accepted.body.code),
     ).toEqual({ count: 2 });
   });
 
