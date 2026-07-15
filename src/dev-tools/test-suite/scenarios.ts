@@ -2906,6 +2906,30 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: a saved run cannot be loaded solo from Continue",
+    description:
+      "CO-OP title/load safety - verify with a co-op save but WITHOUT its saved partner connected.\n"
+      + "\n"
+      + "DO: select Continue or the co-op slot from Load Game while no compatible live co-op lobby session\n"
+      + "exists. EXPECT: the game explains that co-op resume requires New Game > Co-op plus the exact saved\n"
+      + "partner, then returns to safe title options after confirmation. It must NOT start a run, queue an\n"
+      + "encounter, install an undefined game mode, crash, or alter the co-op save. Reconnect through Co-op\n"
+      + "with the exact partner and confirm the normal Resume offer still works. Regression-covered in\n"
+      + "coop-title-save-refusal.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: biome-boundary heal + same-biome travel (#841)",
     description:
       "CO-OP internal (verify with TWO clients across a biome BOUNDARY, ~every 10 waves) - two audit #841\n"

@@ -1431,12 +1431,25 @@ export class TitlePhase extends Phase {
         this.loaded = true;
         globalScene.ui.showText(i18next.t("menu:sessionSuccess"), null, () => this.end());
       } else {
-        this.end();
+        this.returnToTitleAfterSaveLoadFailure();
       }
     } catch (err) {
       console.error(err);
-      globalScene.ui.showText(i18next.t("menu:failedToLoadSession"), null);
+      this.returnToTitleAfterSaveLoadFailure();
     }
+  }
+
+  private returnToTitleAfterSaveLoadFailure(): void {
+    this.loaded = false;
+    globalScene.ui.showText(
+      `${i18next.t("menu:failedToLoadSession")} If this is a co-op save, choose New Game > Co-op and connect to the exact saved partner before continuing.`,
+      null,
+      () => {
+        void this.showOptions(NO_SAVE_SLOT);
+      },
+      null,
+      true,
+    );
   }
 
   initDailyRun(): void {
