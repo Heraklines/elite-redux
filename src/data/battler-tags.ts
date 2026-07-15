@@ -1782,11 +1782,68 @@ export abstract class DamagingTrapTag extends TrappedTag {
 
       if (!cancelled.value) {
         const denom = this.damageDenominatorOverride ?? 8;
-        pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / denom), { result: HitResult.INDIRECT });
+        const dealt = pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / denom), { result: HitResult.INDIRECT });
+        // ER Mycelial Network: when a foe loses HP to INFESTATION specifically,
+        // an opposing holder recovers half the lost HP (overflow past full HP
+        // spills to its lowest-HP living ally in doubles/triples).
+        if (this.tagType === BattlerTagType.INFESTATION && dealt > 0) {
+          applyMycelialNetworkHeal(pokemon, dealt);
+        }
       }
     }
 
     return ret;
+  }
+}
+
+/**
+ * ER Mycelial Network reaction to an INFESTATION HP-loss tick. Heals each
+ * opposing Mycelial Network holder by half the amount `victim` lost; any healing
+ * beyond the holder's missing HP spills to that holder's lowest-HP living ally
+ * (doubles/triples only — in singles the overflow is wasted).
+ */
+function applyMycelialNetworkHeal(victim: Pokemon, dealt: number): void {
+  const heal = Math.floor(dealt / 2);
+  if (heal <= 0) {
+    return;
+  }
+  for (const holder of victim.getOpponents()) {
+    if (
+      !holder?.isActive(true)
+      || !holder.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "MycelialNetworkAbAttr")
+    ) {
+      continue;
+    }
+    const holderMissing = holder.getMaxHp() - holder.hp;
+    const toHolder = Math.min(heal, holderMissing);
+    if (toHolder > 0) {
+      globalScene.phaseManager.unshiftNew(
+        "PokemonHealPhase",
+        holder.getBattlerIndex(),
+        toHolder,
+        i18next.t("battlerTags:seededLapse", { pokemonNameWithAffix: getPokemonNameWithAffix(holder) }),
+        false,
+        true,
+      );
+    }
+    const overflow = heal - toHolder;
+    if (overflow <= 0) {
+      continue;
+    }
+    // Overflow spills to the lowest-HP living ally (doubles/triples only).
+    const allies = holder.getAllies().filter(a => a?.isActive(true) && !a.isFullHp());
+    if (allies.length === 0) {
+      continue;
+    }
+    const target = allies.reduce((lowest, a) => (a.getHpRatio() < lowest.getHpRatio() ? a : lowest));
+    globalScene.phaseManager.unshiftNew(
+      "PokemonHealPhase",
+      target.getBattlerIndex(),
+      overflow,
+      i18next.t("battlerTags:seededLapse", { pokemonNameWithAffix: getPokemonNameWithAffix(target) }),
+      false,
+      true,
+    );
   }
 }
 

@@ -33,6 +33,7 @@ import { type AbAttr, ConditionalCritAbAttr, PostFaintAbAttr } from "#abilities/
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { CommonRootAbAttr, ER_COMMON_ROOT_ABILITY_ID } from "#data/elite-redux/abilities/common-root";
+import { ER_MYCELIAL_NETWORK_ABILITY_ID, MycelialNetworkAbAttr } from "#data/elite-redux/abilities/mycelial-network";
 import { ER_PUPPET_STRINGS_ABILITY_ID, PuppetStringsAbAttr } from "#data/elite-redux/abilities/puppet-strings";
 import { ER_SILKEN_DECREE_ABILITY_ID, SilkenDecreeAbAttr } from "#data/elite-redux/abilities/silken-decree";
 import { ER_SPORE_BED_ABILITY_ID } from "#data/elite-redux/abilities/spore-bed";
@@ -249,6 +250,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_COMMON_ROOT_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_MYCELIAL_NETWORK_ABILITY_ID,
+        name: "Mycelial Network",
+        description:
+          "Whenever a foe loses HP to Infestation, this Pokemon heals half that amount. If it is at full HP, the overflow heals its lowest-HP ally (doubles and triples only).",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_MYCELIAL_NETWORK_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -454,6 +465,10 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_COMMON_ROOT_ABILITY_ID) {
     builder.attr(CommonRootAbAttr);
+  }
+
+  if (pokerogueId === ER_MYCELIAL_NETWORK_ABILITY_ID) {
+    builder.attr(MycelialNetworkAbAttr);
   }
 
   const ability = builder.build();
