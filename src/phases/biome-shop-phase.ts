@@ -47,6 +47,7 @@ import {
   getCoopController,
   getCoopInteractionRelay,
   getCoopRuntime,
+  notifyCoopWaveContinuationSurfaceReady,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_SHOP_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { erRecordBiomeShopPurchase, erRecordBlackMarketPurchase } from "#data/elite-redux/er-achievement-detection";
@@ -316,6 +317,12 @@ export class BiomeShopPhase extends SelectModifierPhase {
         this.qtys,
       )
       .then(result => {
+        if (result === "completed") {
+          // A retained wave is not continuation-safe merely because its biome-market phase exists.
+          // Release the source transaction only after the real public BIOME_SHOP handler committed.
+          notifyCoopWaveContinuationSurfaceReady(this.coopSourceAddress?.wave);
+          return;
+        }
         if (result === "superseded" && this.coopBoundaryStillLive(generation, wave)) {
           this.openBiomeShop();
         }
@@ -701,6 +708,10 @@ export class BiomeShopPhase extends SelectModifierPhase {
       this.shopOptions = rebuilt;
       this.qtys = this.shopOptions.map(() => 99);
     }
+    // The watcher never opens BIOME_SHOP, so its equivalent executable continuation is the fully
+    // materialized stock plus the live terminal-consumer loop. Record readiness only after option
+    // authority has been resolved; phase construction or the initial waiting message is too early.
+    notifyCoopWaveContinuationSurfaceReady(this.coopSourceAddress?.wave);
     const seq = coopBiomeShopSeq(this.coopBiomeStart);
     this.coopRewardOperationBinding ??= captureCoopRewardOperationBinding();
     let missingTerminalAttempts = 0;
