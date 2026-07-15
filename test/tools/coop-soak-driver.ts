@@ -3076,7 +3076,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // BiomeShopPhase intentionally presents as SelectModifierPhase to party continuations, but its market
       // protocol and stock are distinct. Route that concrete phase through the market's public owner/watcher
       // path; ordinary selectable reward continuations retain their calibrated driver.
-      if (rig.hostScene.phaseManager.hasPhaseOfType("BiomeShopPhase")) {
+      if (
+        rig.hostScene.phaseManager.hasPhaseOfType(
+          "SelectModifierPhase",
+          phase => phase instanceof BiomeShopPhase,
+        )
+      ) {
         await driveBiomeMarketLeave(wave, sampleBoundaryOnce);
       } else {
         await driveRewardShop(wave, false, "queued", sampleBoundaryOnce, "leave");
