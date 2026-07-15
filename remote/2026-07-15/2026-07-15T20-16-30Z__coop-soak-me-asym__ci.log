@@ -1,0 +1,56 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: 150
+run: 29447520526 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T20-16-30Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=17 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=17 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=13 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=13 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+
+----- vitest result tail -----
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:213:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[22m[39m[33m[coop:relay] dispose() failing inFlightWaiters=1 (choice=0 outcome=1 rewardOptions=0) -> all resolve null[39m
+[33m[coop:relay] AWAIT interactionOutcome seq=8000013 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+[33m[coop:rendezvous] RENDEZVOUS ABORT point=cmd:12:1 - waiter torn down without partner arrival role=guest[39m
+[33m[coop:rendezvous] next-command barrier cmd:12:1 ABORTED during teardown/recovery - command UI remains closed[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:213:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1) > drives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m28278[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak-me.test.ts:213:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:213:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[31m[1mError[22m: client phase drive to guest command 13:1 HANG on CommandPhase; queued=[TurnStartPhase], ui=MESSAGE[39m
+[36m [2m❯[22m driveClientPhaseQueueTo test/tools/coop-duo-harness.ts:[2m1530:15[22m[39m
+    [90m1528|[39m       if (Date.now() >= deadline) {
+    [90m1529|[39m         const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? […
+    [90m1530|[39m         throw new Error(
+    [90m   |[39m               [31m^[39m
+    [90m1531|[39m           `client phase drive to ${target} HANG on ${phase.phaseName};…
+    [90m1532|[39m             + `ui=${UiMode[scene.ui.getMode()] ?? scene.ui.getMode()}`,
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m633:12[22m[39m
+[90m [2m❯[22m crossCommandBoundaryWithReplayGuest test/tools/coop-soak-driver.ts:[2m2319:28[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4306:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m231:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m4 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 20:14:52
+[2m   Duration [22m 97.46s[2m (transform 30.82s, setup 38.98s, import 406ms, tests 84.52s, environment 1.32s)[22m
+
