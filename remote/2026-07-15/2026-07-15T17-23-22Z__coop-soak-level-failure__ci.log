@@ -1,0 +1,415 @@
+{
+  "invariant": "no-park",
+  "seed": 20260715,
+  "wave": 15,
+  "detail": "World Map did not leave on both clients (host=SwitchBiomePhase guest=SelectBiomePhase)",
+  "replay": "SOAK_SEED=20260715",
+  "phaseState": {
+    "hostPhase": "SwitchBiomePhase",
+    "guestPhase": "SelectBiomePhase",
+    "hostInteractionCounter": 18,
+    "guestInteractionCounter": 17,
+    "hostWave": 15,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 3788688414,
+        "battlerIndex": -1,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 303,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 3662759971,
+        "battlerIndex": -1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 225,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 3513527939,
+        "battlerIndex": -1,
+        "speciesId": 266,
+        "speciesName": "Silcoon",
+        "hp": 0,
+        "maxHp": 33,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 5048,
+            "ppUsed": 0
+          },
+          {
+            "id": 522,
+            "ppUsed": 0
+          },
+          {
+            "id": 33,
+            "ppUsed": 0
+          },
+          {
+            "id": 40,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 1109512508,
+        "battlerIndex": -1,
+        "speciesId": 285,
+        "speciesName": "Shroomish",
+        "hp": 0,
+        "maxHp": 32,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 72,
+            "ppUsed": 0
+          },
+          {
+            "id": 885,
+            "ppUsed": 0
+          },
+          {
+            "id": 77,
+            "ppUsed": 0
+          },
+          {
+            "id": 78,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 3788688414,
+        "battlerIndex": 0,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 303,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 3662759971,
+        "battlerIndex": 1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 225,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 153,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 3513527939,
+        "battlerIndex": 2,
+        "speciesId": 266,
+        "speciesName": "Silcoon",
+        "hp": 0,
+        "maxHp": 33,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 5048,
+            "ppUsed": 0
+          },
+          {
+            "id": 522,
+            "ppUsed": 0
+          },
+          {
+            "id": 33,
+            "ppUsed": 0
+          },
+          {
+            "id": 40,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 1109512508,
+        "battlerIndex": 3,
+        "speciesId": 285,
+        "speciesName": "Shroomish",
+        "hp": 0,
+        "maxHp": 32,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 72,
+            "ppUsed": 0
+          },
+          {
+            "id": 885,
+            "ppUsed": 0
+          },
+          {
+            "id": 77,
+            "ppUsed": 0
+          },
+          {
+            "id": 78,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260715 preseeded=false",
+    "wave 1: host slot move=53 guest slot move=53",
+    "wave 1 turn 1: progress enemyHp=[16:0/14,263:0/14] playerHp=[143:303/303,94:179/179]",
+    "wave 1: reward shop owner=host take-nonparty",
+    "wave 2 turn 1: replay guest reciprocally crossed cmd:2:1",
+    "wave 2 turn 1: staged guest-owned lead at 1 HP on both engines",
+    "wave 2: host slot move=85 guest slot move=85",
+    "wave 2 turn 1: forced-faint guest EXPLOSION self-KO",
+    "wave 2 turn 1: progress enemyHp=[824:0/15,924:0/16] playerHp=[143:197/303,94:0/179]",
+    "wave 2: reward shop owner=guest take-nonparty",
+    "wave 3 turn 1: replay guest reciprocally crossed cmd:3:1",
+    "wave 3: host slot move=53 guest slot move=247",
+    "wave 3 turn 1: guest SWITCH -> party[5]",
+    "wave 3 turn 1: progress enemyHp=[21:16/16,285:17/17] playerHp=[143:197/303,445:206/235]",
+    "wave 3 turn 2: replay guest reciprocally crossed cmd:3:2",
+    "wave 3 turn 2: guest SWITCH -> party[5]",
+    "wave 3 turn 3: replay guest reciprocally crossed cmd:3:3",
+    "wave 3: reward shop owner=host leave",
+    "wave 4 turn 1: replay guest reciprocally crossed cmd:4:1",
+    "wave 4: host slot move=85 guest slot move=85",
+    "wave 4 turn 1: progress enemyHp=[915:0/17,831:0/18] playerHp=[143:197/303,248:197/225]",
+    "wave 4: reward shop owner=guest take-nonparty",
+    "wave 5 turn 1: replay guest reciprocally crossed cmd:5:1",
+    "wave 5: TRAINER (fixed)",
+    "wave 5 turn 1: host SWITCH -> party[2]",
+    "wave 5: host slot move=53 guest slot move=247",
+    "wave 5 turn 1: progress enemyHp=[263:18/18,13:0/18] playerHp=[149:213/213,248:197/225]",
+    "wave 5 turn 2: replay guest reciprocally crossed cmd:5:2",
+    "wave 5: reward shop owner=host revive party[3]",
+    "wave 5: guest chose Crossroads Leave through public UI",
+    "wave 5: guest drove World Map via public UI=true and both consumed 1826955439966668:1:BIOME_PICK:9700005",
+    "wave 6 turn 1: replay guest reciprocally crossed cmd:6:1",
+    "wave 6: BIOME 0->1",
+    "wave 6: host slot move=85 guest slot move=85",
+    "wave 6 turn 1: progress enemyHp=[519:0/20,399:0/23] playerHp=[149:213/213,248:197/225]",
+    "wave 6: reward shop owner=host leave",
+    "wave 7 turn 1: replay guest reciprocally crossed cmd:7:1",
+    "wave 7: host slot move=53 guest slot move=53",
+    "wave 7 turn 1: progress enemyHp=[734:0/21,819:0/26] playerHp=[149:213/213,248:197/225]",
+    "wave 7: reward shop owner=guest leave",
+    "wave 8 turn 1: replay guest reciprocally crossed cmd:8:1",
+    "wave 8: TRAINER (fixed)",
+    "wave 8: host slot move=85 guest slot move=85",
+    "wave 8 turn 1: progress enemyHp=[653:0/24,731:0/22] playerHp=[149:213/213,248:197/225]",
+    "wave 8: reward shop owner=host take-nonparty",
+    "wave 9 turn 1: replay guest reciprocally crossed cmd:9:1",
+    "wave 9: host slot move=53 guest slot move=53",
+    "wave 9 turn 1: guest SWITCH -> party[3]",
+    "wave 9 turn 1: progress enemyHp=[427:0/24,263:24/24] playerHp=[149:213/213,94:179/179]",
+    "wave 9 turn 2: replay guest reciprocally crossed cmd:9:2",
+    "wave 9 turn 2: host SWITCH -> party[2]",
+    "wave 9: reward shop owner=guest leave",
+    "wave 10 turn 1: replay guest reciprocally crossed cmd:10:1",
+    "wave 10: host slot move=85 guest slot move=85",
+    "wave 10 turn 1: progress enemyHp=[263:0/24,915:0/26] playerHp=[143:197/303,94:179/179]",
+    "wave 10: biome market owner=host leave",
+    "wave 10: drained 1 milestone reward continuation(s)",
+    "wave 10: guest chose Crossroads Leave through public UI",
+    "wave 10: guest drove World Map via public UI=true and both consumed 1826955439966668:1:BIOME_PICK:9700011",
+    "wave 11 turn 1: replay guest reciprocally crossed cmd:11:1",
+    "wave 11: BIOME 1->2",
+    "wave 11 turn 1: host SWITCH -> party[2]",
+    "wave 11: host slot move=53 guest slot move=53",
+    "wave 11 turn 1: progress enemyHp=[546:24/24,548:0/27] playerHp=[149:213/213,94:179/179]",
+    "wave 11 turn 2: replay guest reciprocally crossed cmd:11:2",
+    "wave 11: reward shop owner=host leave",
+    "wave 12 turn 1: replay guest reciprocally crossed cmd:12:1",
+    "wave 12: TRAINER (random)",
+    "wave 12 turn 1: host SWITCH -> party[2]",
+    "wave 12: host slot move=247 guest slot move=85",
+    "wave 12 turn 1: progress enemyHp=[447:26/26,406:0/26] playerHp=[143:303/303,94:179/179]",
+    "wave 12 turn 2: replay guest reciprocally crossed cmd:12:2",
+    "wave 12 turn 3: replay guest reciprocally crossed cmd:12:3",
+    "wave 12: reward shop owner=guest leave",
+    "wave 13 turn 1: replay guest reciprocally crossed cmd:13:1",
+    "wave 13: host slot move=85 guest slot move=85",
+    "wave 13 turn 1: progress enemyHp=[285:0/30,266:0/30] playerHp=[143:303/303,94:179/179]",
+    "wave 13: reward shop owner=host leave",
+    "wave 14 turn 1: replay guest reciprocally crossed cmd:14:1",
+    "wave 14: host slot move=85 guest slot move=85",
+    "wave 14 turn 1: guest SWITCH -> party[3]",
+    "wave 14 turn 1: progress enemyHp=[58:0/31,266:30/30] playerHp=[143:303/303,248:224/225]",
+    "wave 14 turn 2: replay guest reciprocally crossed cmd:14:2",
+    "wave 14: reward shop owner=guest leave",
+    "wave 15 turn 1: replay guest reciprocally crossed cmd:15:1",
+    "wave 15: host slot move=85 guest slot move=85",
+    "wave 15 turn 1: progress enemyHp=[266:0/33,285:0/32] playerHp=[143:303/303,248:225/225]",
+    "wave 15: reward shop owner=host leave",
+    "wave 15: guest chose Crossroads Leave through public UI"
+  ]
+}
