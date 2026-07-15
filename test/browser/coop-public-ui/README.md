@@ -24,6 +24,17 @@ the same address, digest, and continuation surface. Every battle turn also corre
 | `fresh-resume` | `fresh-wave2`, close both pages, reopen/login, pair in the same direction, accept Resume, reach command UI | Same as `fresh-wave2` |
 | `reverse-resume` | Same, but reverse which player sends the lobby request after reopening | Same as `fresh-wave2`; this is the invitation-direction regression |
 | `faint-replacement` | Pair, Resume, submit battle commands, select a legal replacement through the public picker, observe summon/continued battle | A shared save at a deterministic low-HP boundary |
+| `commander-skip` | Pair, New Run, publicly confirm visible Dondozo/Tatsugiri teams, drive only Dondozo's command UI, prove the hidden Commander skip traverses reciprocal `cmd:<wave>:<turn>`, retain rewards, and reach the next shared Commander command boundary | Dedicated CI bundle only; runs both Commander ownership parities on isolated fresh accounts |
+
+`commander-skip` has one explicit setup-fidelity boundary. Fresh isolated accounts cannot reliably select
+account-locked Dondozo/Tatsugiri, so only the dedicated public-browser build
+(`VITE_COOP_BROWSER_FIXTURE=commander-skip`) accepts the exact per-client `coopfixture=commander|dondozo`
+URL checkpoint. That checkpoint pre-populates the normal visible starter-team strip; each browser still
+submits and confirms it with real keys. Lobby pairing, challenge/difficulty choice, battle commands,
+rewards, WebRTC, rendering, and wave continuation all remain production paths. The fixture never writes
+dex/save unlocks, is inert in ordinary local/staging/production bundles, and performs no post-launch
+mutation. This journey proves co-op authority from the configured-party boundary onward; it does not claim
+to test natural collection/unlock acquisition.
 
 `fresh-*` marks the subsequent title layout as `Continue, New Game` only after both clients have publicly
 reached the wave-2 command surface. If that save was not actually persisted, the next keyboard action takes
@@ -62,6 +73,7 @@ Relevant options:
 - `COOP_UI_REQUESTER_SEAT=guest-seat|host-seat` controls who sends the initial invitation.
 - `COOP_UI_ACCOUNT_MODE=login|register` chooses visible login or first-time registration; CI uses `register`.
 - `COOP_UI_FAINT_OWNER_SEAT=guest-seat|host-seat` identifies the prepared replacement owner.
+- `COOP_UI_COMMANDER_OWNER_SEAT=guest-seat|host-seat` chooses the fixture's Tatsugiri owner; CI fans both.
 - `COOP_UI_HOST_TITLE_NEW_GAME_KEYS` and `COOP_UI_GUEST_TITLE_NEW_GAME_KEYS` are JSON key arrays. Use
   `["ArrowDown"]` when a prepared account already shows Continue above New Game.
 - `COOP_UI_CHALLENGE_KEYS`, `COOP_UI_STARTER_KEYS`, `COOP_UI_DIFFICULTY_KEYS`, `COOP_UI_BATTLE_KEYS`,

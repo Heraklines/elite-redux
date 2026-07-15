@@ -58,7 +58,14 @@ function keySequence(name, fallback) {
   return value;
 }
 
-const allowedJourneys = new Set(["probe", "fresh-wave2", "fresh-resume", "reverse-resume", "faint-replacement"]);
+const allowedJourneys = new Set([
+  "probe",
+  "fresh-wave2",
+  "fresh-resume",
+  "reverse-resume",
+  "faint-replacement",
+  "commander-skip",
+]);
 const allowedSeats = new Set(["host-seat", "guest-seat"]);
 const allowedAccountModes = new Set(["login", "register"]);
 const defaultCoopChallengeKeys = [...Array.from({ length: 10 }, () => "ArrowDown"), "ArrowRight", "Space", "Space"];
@@ -76,12 +83,16 @@ export function loadConfig() {
   }
   const requesterSeat = process.env.COOP_UI_REQUESTER_SEAT?.trim() || "guest-seat";
   const faintOwnerSeat = process.env.COOP_UI_FAINT_OWNER_SEAT?.trim() || "guest-seat";
+  const commanderOwnerSeat = process.env.COOP_UI_COMMANDER_OWNER_SEAT?.trim() || "host-seat";
   const accountMode = process.env.COOP_UI_ACCOUNT_MODE?.trim() || "login";
   if (!allowedSeats.has(requesterSeat)) {
     throw new Error(`COOP_UI_REQUESTER_SEAT must be one of ${[...allowedSeats].join(", ")}`);
   }
   if (!allowedSeats.has(faintOwnerSeat)) {
     throw new Error(`COOP_UI_FAINT_OWNER_SEAT must be one of ${[...allowedSeats].join(", ")}`);
+  }
+  if (!allowedSeats.has(commanderOwnerSeat)) {
+    throw new Error(`COOP_UI_COMMANDER_OWNER_SEAT must be one of ${[...allowedSeats].join(", ")}`);
   }
   if (!allowedAccountModes.has(accountMode)) {
     throw new Error(`COOP_UI_ACCOUNT_MODE must be one of ${[...allowedAccountModes].join(", ")}`);
@@ -142,6 +153,7 @@ export function loadConfig() {
     },
     requesterSeat,
     faintOwnerSeat,
+    commanderOwnerSeat,
     accountMode,
     allowedConsoleErrors: (process.env.COOP_UI_ALLOWED_CONSOLE_ERRORS ?? "")
       .split("||")

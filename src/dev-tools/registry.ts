@@ -24,8 +24,11 @@
 
 import Overrides from "#app/overrides";
 import type { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
+import { Nature } from "#enums/nature";
+import { SpeciesId } from "#enums/species-id";
 import type { ModifierTypeFunc } from "#types/modifier-types";
-import type { Starter } from "#types/save-data";
+import type { Starter, StarterMoveset } from "#types/save-data";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 
 /** Context handed to dev-menu factories so they can launch runs. */
@@ -77,6 +80,54 @@ export function consumePendingDevStarters(): Starter[] | null {
   const s = pendingStarters;
   pendingStarters = null;
   return s;
+}
+
+// --- Public-browser Commander starter checkpoint ----------------------------
+
+/**
+ * Whether this exact bundle was built for the dedicated Commander public-UI journey.
+ *
+ * This is deliberately separate from the broad staging dev-tools switch. Normal local,
+ * staging, and production builds never set this exact value, so a URL parameter alone
+ * cannot expose an unavailable starter or alter a player's starter screen.
+ */
+export function isCoopBrowserCommanderFixtureBuild(): boolean {
+  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+  return env?.VITE_COOP_BROWSER_FIXTURE === "commander-skip";
+}
+
+/**
+ * Return the single starter to pre-populate in the normal co-op starter UI for the
+ * Commander browser checkpoint. Both the dedicated build flag and an exact per-client
+ * URL value are required. The caller still renders the ordinary starter screen and the
+ * browser journey must submit and confirm the visible team with public keyboard input.
+ */
+export function getCoopBrowserCommanderFixtureStarters(): Starter[] | null {
+  if (!isCoopBrowserCommanderFixtureBuild() || typeof location === "undefined") {
+    return null;
+  }
+  const fixture = new URLSearchParams(location.search).get("coopfixture");
+  const speciesId = fixture === "commander" ? SpeciesId.TATSUGIRI : fixture === "dondozo" ? SpeciesId.DONDOZO : null;
+  if (speciesId == null) {
+    return null;
+  }
+  const moveset = (
+    speciesId === SpeciesId.DONDOZO ? [MoveId.WATER_SPOUT, MoveId.TACKLE] : [MoveId.TACKLE]
+  ) as StarterMoveset;
+  return [
+    {
+      speciesId,
+      shiny: false,
+      variant: 0,
+      formIndex: 0,
+      abilityIndex: 0,
+      passive: false,
+      nature: Nature.HARDY,
+      moveset,
+      pokerus: false,
+      ivs: new Array(6).fill(31),
+    },
+  ];
 }
 
 // --- One-shot mystery-encounter override (scenario → first ME) ----------------

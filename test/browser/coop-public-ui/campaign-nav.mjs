@@ -122,6 +122,39 @@ export async function confirmDefaultStarterTeam(client, { timeoutMs = 15_000 } =
 }
 
 /**
+ * Submit and confirm the visible one-mon party materialized by the build-gated Commander fixture.
+ * The observer is assertion-only: Enter and Space are still the real public starter UI actions.
+ */
+export async function confirmSeededStarterTeam(client, expectedSpeciesId, { timeoutMs = 15_000 } = {}) {
+  const seeded = await client.evidence.waitForCondition(
+    sink => {
+      const event = sink.findLastSemanticSurface(0, "starter-select");
+      return event?.observation.teamSpeciesIds?.length === 1
+        && event.observation.teamSpeciesIds[0] === expectedSpeciesId
+        ? event
+        : null;
+    },
+    {
+      timeoutMs,
+      description: `visible seeded starter team species=${expectedSpeciesId}`,
+    },
+  );
+  client.evidence.record("seeded-starter-visible-proof", {
+    expectedSpeciesId,
+    observation: seeded.observation,
+  });
+  const confirmCursor = client.evidence.cursor();
+  await client.press("Enter", "starter-submit-visible-seeded-team");
+  await waitForSemanticSurface(client, "confirm:SelectStarterPhase", {
+    fromCursor: confirmCursor,
+    timeoutMs,
+  });
+  const launchCursor = client.evidence.cursor();
+  await client.press("Space", "starter-confirm-visible-seeded-team");
+  return { launchCursor };
+}
+
+/**
  * Drive `client` to select the option with stable id `targetId` on `surfaceId`, verifying
  * that each navigation keypress actually changed the selected id (a press that does not move
  * the cursor is a stall; too many in a row is a loud failure, never a silent blind pulse).

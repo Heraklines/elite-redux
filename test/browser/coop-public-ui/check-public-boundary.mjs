@@ -8,6 +8,7 @@ import { readFile } from "node:fs/promises";
 
 const files = [
   "public-ui-harness.mjs",
+  "campaign-nav.mjs",
   "journeys.mjs",
   "run.mjs",
   "evidence.mjs",
@@ -71,6 +72,17 @@ if (
     "preview-server.mjs: preview must verify the immutable manifest, honor pinned production asset redirects, and never mount game source",
   );
 }
+if (
+  !harness?.includes("findSharedCommanderMatch(")
+  || !harness.includes("findOwnedCommandUi(boundary.owner")
+  || !harness.includes("commander-generated-skip-rendezvous-proof")
+  || !harness.includes("next-command barrier")
+  || !harness.includes("assertNoRecoverySince(")
+) {
+  failures.push(
+    "public-ui-harness.mjs: Commander must prove the hidden owner has no UI and traverses the reciprocal cmd rendezvous",
+  );
+}
 if (!viteConfig?.includes("SOURCE_ENTRY") || !viteConfig.includes("sourceEntryReplaced")) {
   failures.push("vite.config.mjs: exact-SHA browser build entry replacement must stay explicit and idempotent");
 }
@@ -111,6 +123,20 @@ if (
     "public-ui-harness.mjs: reward leave must prove the owner confirmation and addressed non-actionable watcher",
   );
 }
+
+const fixtureRegistry = await readFile(new URL("../../../src/dev-tools/registry.ts", import.meta.url), "utf8");
+const starterHandler = await readFile(
+  new URL("../../../src/ui/handlers/starter-select-ui-handler.ts", import.meta.url),
+  "utf8",
+);
+if (
+  !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "commander-skip"')
+  || !fixtureRegistry.includes('get("coopfixture")')
+  || !starterHandler.includes("getCoopBrowserCommanderFixtureStarters()")
+  || !starterHandler.includes("{ allowUncaught: true }")
+) {
+  failures.push("Commander starter checkpoint must require the exact build+URL gate at the visible starter UI");
+}
 const rewardConfirmOpen = harness?.indexOf("await owner.press(openConfirmKey") ?? -1;
 const rewardConfirmReady = harness?.indexOf("owner.waitForOwnedRewardConfirm(rewardConfirmCursors[owner.label]") ?? -1;
 const rewardConfirmAccept = harness?.indexOf("for (const [index, key] of confirmKeys.entries())") ?? -1;
@@ -145,6 +171,17 @@ if (
 }
 
 const browserEntry = await readFile(new URL("../../../scripts/coop-browser-entry.ts", import.meta.url), "utf8");
+if (
+  !browserEntry.includes("[coop-browser:commander]")
+  || !browserEntry.includes("function observeCommanderBoundary(): void")
+  || !browserEntry.includes("pokemon.getTag(BattlerTagType.COMMANDED)")
+  || !browserEntry.includes("const commanderOwnerRole =")
+  || !browserEntry.includes("commanderOwnerRole,")
+  || !browserEntry.includes("stateDigest")
+  || /\.addTag\(BattlerTagType\.COMMANDED|\.removeTag\(BattlerTagType\.COMMANDED/u.test(browserEntry)
+) {
+  failures.push("coop-browser-entry.ts: Commander observer must remain a strict read-only boundary oracle");
+}
 if (!browserEntry.includes("import type { Pokemon }") || browserEntry.includes("export {};")) {
   failures.push("coop-browser-entry.ts: the static Pokemon type import must be the sole top-level-await module marker");
 }

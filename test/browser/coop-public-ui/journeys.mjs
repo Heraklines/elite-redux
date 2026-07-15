@@ -47,12 +47,21 @@ async function faintReplacement(rig) {
   }
 }
 
+async function commanderSkip(rig) {
+  await rig.loginBoth();
+  await rig.pair(rig.config.requesterSeat);
+  await rig.startFreshRun({ commanderFixture: true });
+  await rig.driveCommanderWaveToReward();
+  await rig.leaveRewardsAndReachWave2({ commanderFixture: true });
+}
+
 const journeys = {
   probe,
   "fresh-wave2": freshWave2,
   "fresh-resume": freshResume,
   "reverse-resume": reverseResume,
   "faint-replacement": faintReplacement,
+  "commander-skip": commanderSkip,
 };
 
 export async function runJourney(rig, name) {

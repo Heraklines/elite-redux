@@ -5,7 +5,12 @@
 
 import puppeteer from "puppeteer";
 import { createBattlePromptAdvancer } from "./campaign.mjs";
-import { confirmDefaultStarterTeam, selectOptionById, waitForSemanticSurface } from "./campaign-nav.mjs";
+import {
+  confirmDefaultStarterTeam,
+  confirmSeededStarterTeam,
+  selectOptionById,
+  waitForSemanticSurface,
+} from "./campaign-nav.mjs";
 import { delay, EvidenceSink } from "./evidence.mjs";
 
 const TITLE_PHASE = /Start Phase TitlePhase/u;
@@ -25,6 +30,10 @@ const POST_TURN_PHASE_PROGRESS = /Start Phase ([A-Za-z0-9]+Phase)/u;
 const POST_TURN_AUTHORITY_PROGRESS = /\[coop:turn\] host recorder: append turn=\d+ seq=(\d+)/u;
 const POST_TURN_RENDERER_PROGRESS = /\[coop:replay\] guest replay turn=\d+: live increment seq=(\d+)\.\.(\d+)/u;
 const REWARD_RESULT_RETAINED = /reward authoritative RESULT retained rev=(\d+) tick=(\d+) id=([^\s]+)/u;
+const COOP_RECOVERY =
+  /Co-op Sync Recovery|recovery request attempt=|recovery EXHAUSTED|RENDEZVOUS RECOVERY RETRY|could not converge/iu;
+const TATSUGIRI_SPECIES_ID = 978;
+const DONDOZO_SPECIES_ID = 977;
 const POST_TURN_PROGRESS_ALLOWANCE_MS = 90_000;
 const POST_TURN_HARD_CEILING_MS = 360_000;
 
@@ -433,6 +442,64 @@ function diffDigestComponents(host, guest, address, cursors) {
   return diffs.length > 0 ? diffs.join("; ") : "no component-level difference (combined-hash only)";
 }
 
+function comparableCommanderObservation(observation) {
+  return {
+    commanderOwnerRole: observation.commanderOwnerRole,
+    epoch: observation.epoch,
+    membershipRevision: observation.membershipRevision,
+    connectionGeneration: observation.connectionGeneration,
+    wave: observation.wave,
+    turn: observation.turn,
+    point: observation.point,
+    stateDigest: observation.stateDigest,
+    commanderPokemonId: observation.commanderPokemonId,
+    commanderSpeciesId: observation.commanderSpeciesId,
+    commanderBattlerIndex: observation.commanderBattlerIndex,
+    commandedPokemonId: observation.commandedPokemonId,
+    commandedSpeciesId: observation.commandedSpeciesId,
+    commandedBattlerIndex: observation.commandedBattlerIndex,
+  };
+}
+
+function findSharedCommanderMatch(host, guest, cursors, expectedWave) {
+  const hostEvents = host.evidence.events
+    .slice(cursors[host.label])
+    .filter(event => event.kind === "browser-commander")
+    .toReversed();
+  const guestEvents = guest.evidence.events
+    .slice(cursors[guest.label])
+    .filter(event => event.kind === "browser-commander")
+    .toReversed();
+  for (const hostEvent of hostEvents) {
+    const comparable = comparableCommanderObservation(hostEvent.observation);
+    if (expectedWave != null && comparable.wave !== expectedWave) {
+      continue;
+    }
+    const canonical = JSON.stringify(comparable);
+    const guestEvent = guestEvents.find(
+      candidate => JSON.stringify(comparableCommanderObservation(candidate.observation)) === canonical,
+    );
+    if (guestEvent) {
+      return { hostEvent, guestEvent, comparable };
+    }
+  }
+  return null;
+}
+
+function findOwnedCommandUi(client, from) {
+  const semantic = client.evidence.findLastSemanticSurface(from, "command:command");
+  if (
+    semantic?.observation.ready?.handlerActive === true
+    && semantic.observation.phase === "CommandPhase"
+    && semantic.observation.uiMode === "COMMAND"
+    && semantic.observation.localSeat === client.publicSeat
+    && semantic.observation.seatsWithInput?.includes(client.publicSeat)
+  ) {
+    return semantic;
+  }
+  return client.evidence.find(LOCAL_COMMAND, from) ?? null;
+}
+
 export class PublicUiClient {
   constructor(browserContext, credentials, config) {
     this.context = browserContext;
@@ -473,8 +540,12 @@ export class PublicUiClient {
     // cold reopen exercises production cache behavior instead of reloading tens of thousands of assets.
     await this.page.setCacheEnabled(true);
     this.evidence.attach(this.page);
-    this.evidence.record("navigate", { url: new URL(this.config.baseUrl).origin });
-    await this.page.goto(this.config.baseUrl, { waitUntil: "domcontentloaded", timeout: this.config.bootTimeoutMs });
+    const entryUrl = new URL(this.config.baseUrl);
+    if (this.config.journey === "commander-skip") {
+      entryUrl.searchParams.set("coopfixture", this.label === this.config.commanderOwnerSeat ? "commander" : "dondozo");
+    }
+    this.evidence.record("navigate", { url: entryUrl.origin });
+    await this.page.goto(entryUrl, { waitUntil: "domcontentloaded", timeout: this.config.bootTimeoutMs });
     await this.page.waitForSelector("#app canvas", { timeout: this.config.bootTimeoutMs });
   }
 
@@ -941,6 +1012,103 @@ export class DuoPublicUiRig {
     }
   }
 
+  assertNoRecoverySince(cursors, purpose) {
+    for (const client of Object.values(this.clients)) {
+      const recovery = client.evidence.find(COOP_RECOVERY, cursors[client.label]);
+      if (recovery != null) {
+        throw new Error(`${purpose}: ${client.label} entered recovery: ${recovery.text}`);
+      }
+    }
+  }
+
+  /**
+   * Prove both built clients observe the same Commander command boundary while only Dondozo's
+   * owner exposes an actionable command UI. The observation is read-only and never drives input.
+   */
+  async assertCommanderCommandBoundary(cursors, purpose, { expectedWave = null } = {}) {
+    if (!this.host || !this.guest) {
+      throw new Error(`${purpose}: Commander proof requires a paired host and guest`);
+    }
+    const match = await this.host.evidence.waitForCondition(
+      () => findSharedCommanderMatch(this.host, this.guest, cursors, expectedWave),
+      {
+        timeoutMs: this.config.timeoutMs,
+        description: `${purpose} shared Commander address/digest`,
+      },
+    );
+    const observation = match.comparable;
+    if (
+      observation.commanderSpeciesId !== TATSUGIRI_SPECIES_ID
+      || observation.commandedSpeciesId !== DONDOZO_SPECIES_ID
+    ) {
+      throw new Error(
+        `${purpose}: fixture did not materialize Tatsugiri Commander + commanded Dondozo: ${JSON.stringify(observation)}`,
+      );
+    }
+    const owner = this.client(this.config.commanderOwnerSeat);
+    if (owner.publicRole !== observation.commanderOwnerRole) {
+      throw new Error(
+        `${purpose}: configured Commander owner ${owner.label}/${owner.publicRole} disagrees with ${observation.commanderOwnerRole}`,
+      );
+    }
+    const actor = Object.values(this.clients).find(client => client !== owner);
+    const actionable = await actor.evidence.waitForCondition(() => findOwnedCommandUi(actor, cursors[actor.label]), {
+      timeoutMs: this.config.timeoutMs,
+      description: `${purpose} public Dondozo command UI`,
+    });
+    const unexpectedOwnerUi = findOwnedCommandUi(owner, cursors[owner.label]);
+    if (unexpectedOwnerUi != null) {
+      throw new Error(`${purpose}: Commander owner ${owner.label} incorrectly exposed a public command UI`);
+    }
+    this.assertNoRecoverySince(cursors, purpose);
+    for (const client of Object.values(this.clients)) {
+      client.evidence.record("shared-commander-boundary-proof", {
+        purpose,
+        observation,
+        commanderOwnerLabel: owner.label,
+        dondozoActorLabel: actor.label,
+        actionableEvidenceIndex: actionable.index,
+      });
+    }
+    return { actor, owner, observation, cursors };
+  }
+
+  /** Prove the hidden, locally owned generated skip used the real reciprocal cmd rendezvous. */
+  async assertCommanderGeneratedSkipRendezvous(boundary, purpose) {
+    const pointPattern = new RegExp(
+      `next-command barrier (?:ARRIVE\\+AWAIT )?${escapeRegExp(boundary.observation.point)}(?: |$)`,
+      "u",
+    );
+    const [ownerBarrier, actorBarrier] = await Promise.all([
+      boundary.owner.evidence.waitFor(pointPattern, {
+        from: boundary.cursors[boundary.owner.label],
+        timeoutMs: this.config.timeoutMs,
+        description: `${purpose} Commander-owner generated-skip rendezvous`,
+      }),
+      boundary.actor.evidence.waitFor(pointPattern, {
+        from: boundary.cursors[boundary.actor.label],
+        timeoutMs: this.config.timeoutMs,
+        description: `${purpose} Dondozo-owner reciprocal rendezvous`,
+      }),
+    ]);
+    if (findOwnedCommandUi(boundary.owner, boundary.cursors[boundary.owner.label]) != null) {
+      throw new Error(`${purpose}: Commander owner exposed input while proving its automatic skip`);
+    }
+    this.assertNoRecoverySince(boundary.cursors, purpose);
+    boundary.owner.evidence.record("commander-generated-skip-rendezvous-proof", {
+      purpose,
+      point: boundary.observation.point,
+      side: "automatic-skip",
+      evidenceIndex: ownerBarrier.index,
+    });
+    boundary.actor.evidence.record("commander-generated-skip-rendezvous-proof", {
+      purpose,
+      point: boundary.observation.point,
+      side: "public-command",
+      evidenceIndex: actorBarrier.index,
+    });
+  }
+
   static async launch(config) {
     const browser = await puppeteer.launch({
       headless: config.headless,
@@ -1290,7 +1458,7 @@ export class DuoPublicUiRig {
     return proof;
   }
 
-  async startFreshRun() {
+  async startFreshRun({ commanderFixture = false } = {}) {
     if (!this.host) {
       throw new Error("startFreshRun requires a paired public host (call pair() first)");
     }
@@ -1327,7 +1495,13 @@ export class DuoPublicUiRig {
     const starterLaunchCursors = Object.fromEntries(
       await Promise.all(
         Object.values(this.clients).map(async client => {
-          const result = await confirmDefaultStarterTeam(client, { timeoutMs: this.config.timeoutMs });
+          const result = commanderFixture
+            ? await confirmSeededStarterTeam(
+                client,
+                client.label === this.config.commanderOwnerSeat ? TATSUGIRI_SPECIES_ID : DONDOZO_SPECIES_ID,
+                { timeoutMs: this.config.timeoutMs },
+              )
+            : await confirmDefaultStarterTeam(client, { timeoutMs: this.config.timeoutMs });
           return [client.label, result.launchCursor];
         }),
       ),
@@ -1362,11 +1536,19 @@ export class DuoPublicUiRig {
         }),
       ),
     );
-    await this.waitForAllLocalCommandsDrivingBattlePrompts(phaseCursors, "fresh-wave-1-intro");
-    const boundary = await this.assertSharedSurface("command", phaseCursors, "fresh-wave-1-command", {
-      expectedWave: 1,
-    });
-    this.activeBattleWave = boundary.wave;
+    if (commanderFixture) {
+      const boundary = await this.assertCommanderCommandBoundary(phaseCursors, "fresh-wave-1-commander", {
+        expectedWave: 1,
+      });
+      this.activeBattleWave = boundary.observation.wave;
+      this.pendingCommanderBoundary = boundary;
+    } else {
+      await this.waitForAllLocalCommandsDrivingBattlePrompts(phaseCursors, "fresh-wave-1-intro");
+      const boundary = await this.assertSharedSurface("command", phaseCursors, "fresh-wave-1-command", {
+        expectedWave: 1,
+      });
+      this.activeBattleWave = boundary.wave;
+    }
     await Promise.all(Object.values(this.clients).map(client => client.checkpoint("wave-1-command")));
   }
 
@@ -1444,6 +1626,53 @@ export class DuoPublicUiRig {
       commandCursors = outcomeCursors;
     }
     throw new Error(`Battle did not reach rewards in ${this.config.maxTurns} public command rounds`);
+  }
+
+  /**
+   * Drive a Commander wave: only Dondozo receives real public input while the hidden Tatsugiri
+   * must traverse the same reciprocal cmd barrier automatically on its owning client.
+   */
+  async driveCommanderWaveToReward() {
+    this.lastWaveCursors =
+      this.pendingCommanderBoundary?.cursors
+      ?? Object.fromEntries(Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]));
+    let boundary = this.pendingCommanderBoundary;
+    this.pendingCommanderBoundary = null;
+    let commandCursors = this.lastWaveCursors;
+    let pendingContinuation = null;
+    for (let round = 1; round <= this.config.maxTurns; round++) {
+      boundary ??= await this.assertCommanderCommandBoundary(commandCursors, `commander-turn-${round}`, {
+        expectedWave: this.activeBattleWave,
+      });
+      if (pendingContinuation != null) {
+        await this.assertRetainedContinuation(pendingContinuation.cursors, pendingContinuation.name);
+        pendingContinuation = null;
+      }
+      const outcomeCursors = Object.fromEntries(
+        Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
+      );
+      await boundary.actor.sequence(
+        this.config.keys.battle,
+        `commander-${boundary.observation.point}-dondozo-public-move`,
+      );
+      await this.assertCommanderGeneratedSkipRendezvous(boundary, `commander-${boundary.observation.point}`);
+      const outcome = await this.waitForPostTurnOutcome(outcomeCursors);
+      if (outcome.kind === "reward") {
+        await this.assertSharedSurface("reward", outcomeCursors, `commander-turn-${round}-reward`, {
+          expectedWave: this.activeBattleWave,
+        });
+        await this.assertRetainedContinuation(outcomeCursors, `commander-turn-${round}-reward`);
+        this.assertNoRecoverySince(this.lastWaveCursors, "Commander wave through retained reward");
+        return round;
+      }
+      if (outcome.kind === "faint") {
+        throw new Error("Commander public journey reached an unexpected faint replacement");
+      }
+      pendingContinuation = { cursors: outcomeCursors, name: `commander-turn-${round}-next-command` };
+      commandCursors = outcomeCursors;
+      boundary = null;
+    }
+    throw new Error(`Commander battle did not reach rewards in ${this.config.maxTurns} public command rounds`);
   }
 
   /**
@@ -1569,7 +1798,7 @@ export class DuoPublicUiRig {
     await Promise.all(Object.values(this.clients).map(value => value.checkpoint("replacement-applied")));
   }
 
-  async leaveRewardsAndReachWave2() {
+  async leaveRewardsAndReachWave2({ commanderFixture = false } = {}) {
     const values = Object.values(this.clients);
     const ownerCursors =
       this.lastWaveCursors ?? Object.fromEntries(values.map(client => [client.label, client.pageCursor]));
@@ -1618,12 +1847,21 @@ export class DuoPublicUiRig {
       await owner.press(key, `leave-reward-screen:${index + 2}/${this.config.keys.rewardLeave.length}`);
     }
     await this.assertRetainedRewardTerminal(terminalCursors, expectedRewardAddress, owner.publicSeat);
-    await this.waitForAllLocalCommandsDrivingBattlePrompts(commandCursors, "next-wave-intro");
     const expectedWave = this.activeBattleWave == null ? null : this.activeBattleWave + 1;
-    const boundary = await this.assertSharedSurface("command", commandCursors, "wave-2-command", {
-      expectedWave,
-    });
-    this.activeBattleWave = boundary.wave;
+    if (commanderFixture) {
+      const boundary = await this.assertCommanderCommandBoundary(commandCursors, "wave-2-commander-command", {
+        expectedWave,
+      });
+      this.activeBattleWave = boundary.observation.wave;
+      this.pendingCommanderBoundary = boundary;
+      this.assertNoRecoverySince(commandCursors, "retained reward to wave-2 Commander command");
+    } else {
+      await this.waitForAllLocalCommandsDrivingBattlePrompts(commandCursors, "next-wave-intro");
+      const boundary = await this.assertSharedSurface("command", commandCursors, "wave-2-command", {
+        expectedWave,
+      });
+      this.activeBattleWave = boundary.wave;
+    }
     await Promise.all(values.map(client => client.checkpoint("wave-2-command")));
     // A successful fresh wave boundary creates Continue above New Game on the next
     // public title menu. Treat that visible layout change as a journey postcondition.
