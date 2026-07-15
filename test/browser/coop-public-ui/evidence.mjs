@@ -12,6 +12,7 @@ const SURFACE_PREFIX = "[coop-browser:surface] ";
 const SURFACE2_PREFIX = "[coop-browser:surface2] ";
 const BINDING_PREFIX = "[coop-browser:binding] ";
 const RENDER_PROFILE_PREFIX = "[coop-browser:render-profile] ";
+const MARKET_PREFIX = "[coop-browser:market] ";
 const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
 const CHECKSUM_SENTINEL = "0000000000000000";
 
@@ -198,7 +199,109 @@ function renderProfileView(text) {
   return Object.freeze({ ...value });
 }
 
+/** Parse the strict CI-only biome-market observation used for purchase convergence proofs. */
+export function marketObservationView(text) {
+  if (!text.startsWith(MARKET_PREFIX)) {
+    return null;
+  }
+  let value;
+  try {
+    value = JSON.parse(text.slice(MARKET_PREFIX.length));
+  } catch (error) {
+    throw new Error("built browser emitted malformed market JSON", { cause: error });
+  }
+  const validAddress =
+    value?.address
+    && Number.isSafeInteger(value.address.epoch)
+    && value.address.epoch > 0
+    && Number.isSafeInteger(value.address.wave)
+    && value.address.wave > 0
+    && Number.isSafeInteger(value.address.turn)
+    && value.address.turn > 0;
+  const validOptions =
+    Array.isArray(value?.options)
+    && value.options.length > 0
+    && value.options.every(
+      (option, index) =>
+        option
+        && option.index === index
+        && typeof option.id === "string"
+        && option.id.length > 0
+        && typeof option.name === "string"
+        && Number.isSafeInteger(option.cost)
+        && option.cost >= 0
+        && Number.isSafeInteger(option.stock)
+        && option.stock >= 0
+        && (option.targetModel === "direct" || option.targetModel === "party"),
+    );
+  const validParty =
+    Array.isArray(value?.party)
+    && value.party.every(
+      (pokemon, index) =>
+        pokemon
+        && pokemon.slot === index
+        && Number.isSafeInteger(pokemon.pokemonId)
+        && Number.isSafeInteger(pokemon.speciesId),
+    );
+  const validHeld =
+    Array.isArray(value?.heldModifiers)
+    && value.heldModifiers.every(
+      modifier =>
+        modifier
+        && typeof modifier.typeId === "string"
+        && modifier.typeId.length > 0
+        && Number.isSafeInteger(modifier.pokemonId)
+        && Number.isSafeInteger(modifier.quantity)
+        && modifier.quantity >= 0,
+    );
+  const validSelection =
+    value?.selectedIndex === null
+      ? value?.selectedItemId === null
+      : Number.isSafeInteger(value?.selectedIndex)
+        && value.selectedIndex >= 0
+        && value.selectedIndex < (value.options?.length ?? 0)
+        && value.selectedItemId === value.options[value.selectedIndex]?.id;
+  if (
+    !value
+    || typeof value !== "object"
+    || value.version !== 1
+    || !validAddress
+    || !Number.isSafeInteger(value.pinnedInteraction)
+    || value.pinnedInteraction < 0
+    || (value.localRole !== "host" && value.localRole !== "guest")
+    || !Number.isSafeInteger(value.localSeat)
+    || !Number.isSafeInteger(value.ownerSeat)
+    || ![0, 1].includes(value.localSeat)
+    || ![0, 1].includes(value.ownerSeat)
+    || typeof value.localOwner !== "boolean"
+    || value.localOwner !== (value.localSeat === value.ownerSeat)
+    || value.stockModel !== (value.localOwner ? "authoritative-visible" : "replica-apply-ledger")
+    || typeof value.marketOpen !== "boolean"
+    || typeof value.uiMode !== "string"
+    || typeof value.phaseClass !== "string"
+    || !validSelection
+    || !Number.isSafeInteger(value.money)
+    || value.money < 0
+    || !validOptions
+    || !validParty
+    || !validHeld
+  ) {
+    throw new Error("built browser emitted an invalid market observation");
+  }
+  return Object.freeze({
+    ...value,
+    address: Object.freeze({ ...value.address }),
+    options: Object.freeze(value.options.map(option => Object.freeze({ ...option }))),
+    party: Object.freeze(value.party.map(pokemon => Object.freeze({ ...pokemon }))),
+    heldModifiers: Object.freeze(value.heldModifiers.map(modifier => Object.freeze({ ...modifier }))),
+  });
+}
+
 function recordBrowserObservations(sink, text) {
+  const market = marketObservationView(text);
+  if (market != null) {
+    sink.record("browser-market", { observation: market });
+  }
   const renderProfile = renderProfileView(text);
   if (renderProfile) {
     sink.record("browser-render-profile", { observation: renderProfile });
@@ -314,6 +417,14 @@ export class EvidenceSink {
     return this.events
       .slice(from)
       .find(event => event.kind === "browser-render-profile" && event.observation.moveAnimations === moveAnimations);
+  }
+
+  /** Latest strict market projection, optionally filtered by a predicate. */
+  findLastMarket(from = 0, predicate = () => true) {
+    return this.events
+      .slice(from)
+      .toReversed()
+      .find(event => event.kind === "browser-market" && predicate(event.observation));
   }
 
   /** The latest v2 semantic surface observation (optionally matching a surfaceId) from `from`. */

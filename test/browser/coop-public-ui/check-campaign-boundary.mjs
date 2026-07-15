@@ -20,6 +20,7 @@ const files = [
   "solo-classic.mjs",
   "run-solo.mjs",
   "terminal-watchdog.mjs",
+  "market-journey.mjs",
 ];
 
 // Mirror of check-public-boundary.mjs's private-state boundary: no game source import, no
@@ -63,6 +64,16 @@ if (
   || !campaign.includes("observation.ready?.handlerActive === true")
 ) {
   failures.push("campaign.mjs: battle prompt input must be address-exact and active-handler readiness-proven");
+}
+const market = await readFile(new URL("market-journey.mjs", import.meta.url), "utf8");
+if (
+  !market.includes("planMarketGridKeys(")
+  || !market.includes("assertMarketPurchaseConverged(")
+  || !market.includes('owner.press("Space", `market-buy-${targetId}`)')
+  || !market.includes('owner.press("Backspace", "market-open-leave-confirmation")')
+  || /page\.evaluate\(|globalScene|getCoopRuntime|applyModifier|sendInteractionChoice/u.test(market)
+) {
+  failures.push("market-journey.mjs: market coverage must drive only public input and consume read-only observations");
 }
 
 if (failures.length > 0) {

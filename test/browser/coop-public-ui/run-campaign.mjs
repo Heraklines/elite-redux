@@ -69,6 +69,7 @@ try {
     requesterSeat: config.requesterSeat,
     replacementCount: rig?.replacementCount ?? 0,
     finalWave: rig?.activeBattleWave ?? null,
+    marketCoverage: rig?.marketCoverage ?? null,
     browserArtifact: preview
       ? {
           sha: preview.manifest.sha,

@@ -298,6 +298,25 @@ test("the short outcome wait names a fully submitted turn as progress", async ()
   });
 });
 
+test("the campaign outcome wait accepts the first owned command frontier without waiting for its peer", async () => {
+  const authority = fakeClient("authority", ["CommandPhase regression -> LOCAL UI"]);
+  authority.publicSeat = 0;
+  const renderer = fakeClient("renderer");
+  renderer.publicSeat = 1;
+  const rig = {
+    host: authority,
+    clients: { authority, renderer },
+    config: { faintOwnerSeat: "renderer" },
+  };
+
+  assert.deepEqual(
+    await waitForOutcomeBounded(rig, { authority: 0, renderer: 0 }, 50, {
+      stopOnOwnedCommandFrontier: true,
+    }),
+    { kind: "command", client: authority },
+  );
+});
+
 test("fallback input is sent only to the client whose command never entered the turn", async () => {
   const authority = fakeClient("authority", ["[coop:turn] host recorder: begin turn=1"]);
   const renderer = fakeClient("renderer");

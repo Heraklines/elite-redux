@@ -16,6 +16,7 @@ const [
   { captureCoopSaveDataDigest },
   { canonicalize, fnv1a64 },
   { getCoopRuntime },
+  { PokemonModifierType },
   { StatusEffect },
   { UiMode },
 ] = await Promise.all([
@@ -23,6 +24,7 @@ const [
   import("../src/data/elite-redux/coop/coop-battle-engine"),
   import("../src/data/elite-redux/coop/coop-battle-checksum"),
   import("../src/data/elite-redux/coop/coop-runtime"),
+  import("../src/modifier/modifier-type"),
   import("../src/enums/status-effect"),
   import("../src/enums/ui-mode"),
 ]);
@@ -50,6 +52,7 @@ const SURFACE2_PREFIX = "[coop-browser:surface2] ";
 const BINDING_PREFIX = "[coop-browser:binding] ";
 const DIGEST_PARTS_PREFIX = "[coop-browser:digest-parts] ";
 const RENDER_PROFILE_PREFIX = "[coop-browser:render-profile] ";
+const MARKET_PREFIX = "[coop-browser:market] ";
 const CHECKSUM_SENTINEL = "0000000000000000";
 
 /**
@@ -508,6 +511,139 @@ let lastSemanticProbeAt = 0;
 let lastSemanticPhase: object | null = null;
 let semanticPhaseInstance = 0;
 let lastObservedRenderProfile = "";
+let lastObservedMarket = "";
+
+interface MarketOptionProjection {
+  readonly index: number;
+  readonly id: string;
+  readonly name: string;
+  readonly cost: number;
+  readonly stock: number;
+  readonly targetModel: "direct" | "party";
+}
+
+interface MarketHeldModifierProjection {
+  readonly typeId: string;
+  readonly pokemonId: number;
+  readonly quantity: number;
+}
+
+/**
+ * Emit the biome market's human-visible catalog plus the minimum mechanical projection needed
+ * to assert a purchase. This observer is CI-only and strictly read-only: the journey still moves
+ * the grid, opens the party picker, confirms APPLY, and leaves through public keyboard input.
+ */
+function observeBiomeMarket(): void {
+  try {
+    const runtime = getCoopRuntime();
+    const membership = runtime?.membership.snapshot();
+    const battle = globalScene?.currentBattle;
+    const currentPhase = globalScene?.phaseManager?.getCurrentPhase();
+    const ui = globalScene?.ui;
+    if (runtime == null || membership?.state !== "active" || battle == null || currentPhase == null || ui == null) {
+      return;
+    }
+    const phase = currentPhase as unknown as {
+      shopOptions?: Array<{ type?: { id?: string; name?: string }; cost?: number }>;
+      qtys?: number[];
+      coopBiomeStart?: number;
+      coopBiomeOwner?: boolean;
+    };
+    if (
+      !Array.isArray(phase.shopOptions)
+      || phase.shopOptions.length === 0
+      || !Number.isSafeInteger(phase.coopBiomeStart)
+      || (phase.coopBiomeStart ?? -1) < 0
+    ) {
+      return;
+    }
+    const handler = ui.getHandler() as unknown as {
+      active?: boolean;
+      getCursor?: () => number;
+      getStock?: (index: number) => number;
+    };
+    const uiMode = UiMode[ui.getMode()];
+    const marketOpen = uiMode === "BIOME_SHOP" && handler.active === true;
+    const localSeat = runtime.controller.seat;
+    const localOwner = phase.coopBiomeOwner === true;
+    const ownerSeat = localOwner ? localSeat : localSeat === 0 ? 1 : 0;
+    const options: MarketOptionProjection[] = phase.shopOptions.map((option, index) => {
+      const stock = Number.isSafeInteger(phase.qtys?.[index])
+        ? Math.max(0, phase.qtys?.[index] ?? 0)
+        : marketOpen && typeof handler.getStock === "function"
+          ? Math.max(0, handler.getStock(index))
+          : 0;
+      return {
+        index,
+        id: option.type?.id ?? `slot:${index}`,
+        name: option.type?.name ?? "",
+        cost: Number.isFinite(option.cost) ? Math.max(0, Math.trunc(option.cost ?? 0)) : 0,
+        stock,
+        targetModel: option.type instanceof PokemonModifierType ? "party" : "direct",
+      };
+    });
+    let selectedIndex: number | null = null;
+    if (marketOpen && typeof handler.getCursor === "function") {
+      const cursor = handler.getCursor();
+      selectedIndex = Number.isSafeInteger(cursor) ? cursor : null;
+    }
+    const heldModifiers: MarketHeldModifierProjection[] = globalScene.modifiers
+      .flatMap(modifier => {
+        const projected = modifier as unknown as {
+          type?: { id?: string };
+          pokemonId?: number;
+          stackCount?: number;
+          getStackCount?: () => number;
+        };
+        if (typeof projected.type?.id !== "string" || !Number.isSafeInteger(projected.pokemonId)) {
+          return [];
+        }
+        const stack = typeof projected.getStackCount === "function" ? projected.getStackCount() : projected.stackCount;
+        return [
+          {
+            typeId: projected.type.id,
+            pokemonId: projected.pokemonId as number,
+            quantity: Number.isSafeInteger(stack) ? Math.max(0, stack ?? 0) : 0,
+          },
+        ];
+      })
+      .toSorted((left, right) =>
+        left.typeId.localeCompare(right.typeId) || left.pokemonId - right.pokemonId || left.quantity - right.quantity,
+      );
+    const party = globalScene.getPlayerParty().map((pokemon, slot) => ({
+      slot,
+      pokemonId: pokemon.id,
+      speciesId: pokemon.species.speciesId,
+    }));
+    const observation = {
+      version: 1,
+      address: { epoch: runtime.controller.sessionEpoch, wave: battle.waveIndex, turn: battle.turn },
+      pinnedInteraction: phase.coopBiomeStart as number,
+      localRole: runtime.controller.role,
+      localSeat,
+      ownerSeat,
+      localOwner,
+      marketOpen,
+      uiMode,
+      phaseClass: currentPhase.constructor.name,
+      selectedIndex,
+      selectedItemId: selectedIndex == null ? null : (options[selectedIndex]?.id ?? null),
+      money: globalScene.money,
+      stockModel: localOwner ? "authoritative-visible" : "replica-apply-ledger",
+      options,
+      party,
+      heldModifiers,
+    } as const;
+    const canonical = JSON.stringify(observation);
+    if (canonical === lastObservedMarket) {
+      return;
+    }
+    lastObservedMarket = canonical;
+    console.info(`${MARKET_PREFIX}${canonical}`);
+  } catch {
+    // The phase may be re-opening after a party picker or tearing down. Gameplay errors remain fatal.
+  }
+}
 
 function semanticBattleAddress(battle: { waveIndex: number; turn: number } | null | undefined) {
   return { wave: battle?.waveIndex ?? 0, turn: battle?.turn ?? 0 } as const;
@@ -684,6 +820,7 @@ setInterval(() => {
   observeContinuationSurface();
   observeSemanticSurface();
   observeRenderProfile();
+  observeBiomeMarket();
 }, 100);
 
 // Strictly read-only observer bridge. `ready` is a non-mutating probe; the former

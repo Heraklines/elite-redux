@@ -116,6 +116,22 @@ loud-fail contract: only `shakedown` may press through an UNKNOWN surface (`COOP
 `gating` and `nightly` runs fail loudly and immediately on any surface with no registered driver.
 `check-campaign-boundary.mjs` re-applies the private-state prohibitions to the campaign files.
 
+The opt-in market profile adds `COOP_UI_MARKET_MODE=target-held`. It reads the CI-only, read-only market
+projection, navigates the real 4x4 canvas grid to `COOP_UI_MARKET_TARGET_ID` (default `WIDE_LENS`), opens
+the real party picker, chooses `COOP_UI_MARKET_PARTY_SLOT`, confirms APPLY, proves the paid money change,
+held-item quantity, and one stock-ledger decrement on both clients, then verifies the market stayed open.
+It buys the same already-proven compatible held item again when stock/money permit, then leaves through
+the normal confirmation. Set
+`COOP_UI_MARKET_REQUIRED_PURCHASES=2` and `COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS=1` for the two-parity
+gold-standard run. Because a fresh run's market stock is seed-dependent, that strict profile needs a
+prepared deterministic save/account pair or a sufficiently calibrated campaign seed; it never substitutes
+a different item while claiming Wide Lens coverage.
+
+Dropping or reordering a WebRTC market terminal is intentionally not injected by this public driver. Doing
+so would require mutating the page's private DataChannel, which violates the human-equivalent boundary.
+That fault belongs in the loopback/transport fault matrix; this browser lane proves the natural retained
+terminal over real staging WebRTC and public inputs.
+
 ## Run speed and the fidelity-profile split
 
 Two-browser runs are slow; the following keep them fast WITHOUT weakening what makes them

@@ -133,6 +133,16 @@ if (
 if (!harness?.includes("createBattlePromptAdvancer(this, from") || !harness.includes("await advanceBattlePrompt()")) {
   failures.push("public-ui-harness.mjs: post-turn waits must drive readiness-proven public battle prompts");
 }
+if (
+  !harness?.includes("driveSequentialCommandRound(")
+  || !harness.includes("pending.delete(client.label)")
+  || !harness.includes('record("sequential-command-proof"')
+  || !harness.includes("const commandClient = values.find(")
+) {
+  failures.push(
+    "public-ui-harness.mjs: reciprocal commands must be submitted in public owner-UI order without waiting for both surfaces",
+  );
+}
 
 const browserEntry = await readFile(new URL("../../../scripts/coop-browser-entry.ts", import.meta.url), "utf8");
 if (!browserEntry.includes("import type { Pokemon }") || browserEntry.includes("export {};")) {
@@ -182,6 +192,16 @@ if (
   || !browserEntry.includes("optionHandler.config?.options")
 ) {
   failures.push("coop-browser-entry.ts: setup option surfaces must remain observable before Battle construction");
+}
+if (
+  !browserEntry.includes("[coop-browser:market]")
+  || !browserEntry.includes("function observeBiomeMarket(): void")
+  || !browserEntry.includes('targetModel: option.type instanceof PokemonModifierType ? "party" : "direct"')
+  || !browserEntry.includes('stockModel: localOwner ? "authoritative-visible" : "replica-apply-ledger"')
+  || !browserEntry.includes("heldModifiers,")
+  || /globalScene\.money\s*=|\.setStock\(|\.applyModifier\(/u.test(browserEntry)
+) {
+  failures.push("coop-browser-entry.ts: market observer must expose read-only catalog/state proof without mutation");
 }
 
 if (failures.length > 0) {

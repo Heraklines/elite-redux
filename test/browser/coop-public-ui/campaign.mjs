@@ -14,6 +14,7 @@ import {
   SHARED_SESSION_TERMINAL,
 } from "./campaign-policy.mjs";
 import { delay } from "./evidence.mjs";
+import { driveTargetedMarket } from "./market-journey.mjs";
 
 const START_PHASE = /Start Phase (\w+)/u;
 const ANIMATION_PROGRESS_PHASE = /Start Phase (MoveEffectPhase|MoveAnimPhase|CoopMoveAnimReplayPhase)/u;
@@ -241,6 +242,20 @@ export function clientsAwaitingTurnProgress(rig, from) {
   return Object.values(rig.clients).filter(client => !client.evidence.find(TURN_PROGRESS, from[client.label] ?? 0));
 }
 
+function findOwnedCommandFrontier(client, from) {
+  const semantic = client.evidence.findLastSemanticSurface(from, "command:command");
+  if (
+    semantic?.observation.ready?.handlerActive === true
+    && semantic.observation.phase === "CommandPhase"
+    && semantic.observation.uiMode === "COMMAND"
+    && semantic.observation.localSeat === client.publicSeat
+    && semantic.observation.seatsWithInput?.includes(client.publicSeat)
+  ) {
+    return semantic;
+  }
+  return client.evidence.find(LOCAL_COMMAND, from);
+}
+
 /**
  * Drive only the clients whose first command never entered the turn path. A valid but CPU-starved
  * browser turn can take much longer than the short fallback window. Run 29312876722 proved that
@@ -412,7 +427,12 @@ export async function waitForOutcomeBounded(
   rig,
   from,
   timeoutMs,
-  { stopOnTurnProgress = false, advanceBattlePrompt = null, extendForAnimationProgress = false } = {},
+  {
+    stopOnTurnProgress = false,
+    stopOnOwnedCommandFrontier = false,
+    advanceBattlePrompt = null,
+    extendForAnimationProgress = false,
+  } = {},
 ) {
   const clients = Object.values(rig.clients);
   const fixedDeadline = Date.now() + timeoutMs;
@@ -447,6 +467,12 @@ export async function waitForOutcomeBounded(
     if (clients.every(client => client.evidence.find(LOCAL_COMMAND, from[client.label]))) {
       return { kind: "command" };
     }
+    if (stopOnOwnedCommandFrontier) {
+      const commandClient = clients.find(client => findOwnedCommandFrontier(client, from[client.label]) != null);
+      if (commandClient != null) {
+        return { kind: "command", client: commandClient };
+      }
+    }
     if (stopOnTurnProgress && clientsAwaitingTurnProgress(rig, from).length === 0) {
       return { kind: "turn-progress" };
     }
@@ -467,17 +493,30 @@ export async function waitForOutcomeBounded(
  */
 async function driveBattleWave(rig, policy, stats) {
   const clients = Object.values(rig.clients);
-  let cursors = fromEach(clients, client => client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0);
+  let commandCursors = fromEach(clients, client => client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0);
+  let pendingCommandProof = null;
   const fallbackWindow = Math.min(rig.config.timeoutMs, 15_000);
   for (let turn = 1; turn <= rig.config.maxTurns; turn++) {
-    await Promise.all(clients.map(client => client.waitForLocalCommand(cursors[client.label])));
-    stats.turns = turn;
-    await Promise.all(clients.map(client => client.checkpoint(`wave-${stats.wave}-turn-${turn}-command`)));
-    const from = fromEach(clients, client => client.evidence.cursor());
     const purpose = `wave-${stats.wave}-turn-${turn}`;
+    const { outcomeCursors } = await rig.driveSequentialCommandRound(
+      commandCursors,
+      policy.keys.battle,
+      `${purpose}-attack-first`,
+    );
+    if (pendingCommandProof != null) {
+      await rig.assertSharedSurface("command", pendingCommandProof.cursors, pendingCommandProof.name, {
+        expectedWave: rig.activeBattleWave,
+      });
+      await rig.assertRetainedContinuation(pendingCommandProof.cursors, pendingCommandProof.name);
+      pendingCommandProof = null;
+    }
+    stats.turns = turn;
+    const from = outcomeCursors;
     const advanceBattlePrompt = createBattlePromptAdvancer(rig, from, stats, purpose);
-    await Promise.all(clients.map(client => client.sequence(policy.keys.battle, `${purpose}-attack-first`)));
-    let outcome = await waitForOutcomeBounded(rig, from, fallbackWindow, { stopOnTurnProgress: true });
+    let outcome = await waitForOutcomeBounded(rig, from, fallbackWindow, {
+      stopOnTurnProgress: true,
+      stopOnOwnedCommandFrontier: true,
+    });
     const fallbackClients = [];
     let turnProgressed = false;
     if (outcome?.kind === "turn-progress") {
@@ -491,6 +530,7 @@ async function driveBattleWave(rig, policy, stats) {
       outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, {
         advanceBattlePrompt,
         extendForAnimationProgress: true,
+        stopOnOwnedCommandFrontier: true,
       });
     }
     if (!outcome && !turnProgressed) {
@@ -506,6 +546,7 @@ async function driveBattleWave(rig, policy, stats) {
       outcome = await waitForOutcomeBounded(rig, from, rig.config.timeoutMs, {
         advanceBattlePrompt,
         extendForAnimationProgress: true,
+        stopOnOwnedCommandFrontier: true,
       });
     }
     if (!outcome) {
@@ -534,12 +575,11 @@ async function driveBattleWave(rig, policy, stats) {
       await rig.driveReplacement(outcome.client);
     }
     if (outcome.kind === "command") {
-      await rig.assertSharedSurface("command", from, `wave-${stats.wave}-turn-${turn}-next-command`, {
-        expectedWave: rig.activeBattleWave,
-      });
-      await rig.assertRetainedContinuation(from, `wave-${stats.wave}-turn-${turn}-next-command`);
+      // The next command owners open one at a time. The next sequential round proves and
+      // consumes both public surfaces before asserting two-sided continuation convergence.
+      pendingCommandProof = { cursors: from, name: `wave-${stats.wave}-turn-${turn}-next-command` };
     }
-    cursors = from;
+    commandCursors = from;
   }
   throw new Error(`[campaign-softlock] wave ${stats.wave} did not reach rewards in ${rig.config.maxTurns} rounds`);
 }
@@ -656,7 +696,11 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
     }
     const { client } = resolved;
     await client.checkpoint(`wave-${stats.wave}-${driver.name}-owner`);
-    await client.sequence(driver.keys, `campaign-${driver.name}`);
+    if (driver.name === "biome-shop" && driver.market?.mode === "target-held") {
+      stats.market = await driveTargetedMarket(rig, cursors, driver.market);
+    } else {
+      await client.sequence(driver.keys, `campaign-${driver.name}`);
+    }
     client.evidence.record("campaign-surface", { surface: driver.name, ownerSeat: client.label });
     stats.surfaces.push({ surface: driver.name, ownerSeat: client.label });
     // Suppress THIS appearance on every client that shows it, keyed by each client's OWN
@@ -793,6 +837,7 @@ export async function runCampaign(rig) {
   await progress.note("campaign start", {
     targetWaves: policy.targetWaves,
     rewardMode: policy.rewardMode,
+    market: policy.market,
     renderProfile: policy.renderProfile,
   });
 
@@ -809,6 +854,7 @@ export async function runCampaign(rig) {
 
   let wavesCleared = 0;
   let status = "continue";
+  const marketCoverage = { visits: [], purchases: [] };
   try {
     for (let ordinal = 1; ordinal <= policy.targetWaves; ordinal++) {
       const waveNo = rig.activeBattleWave;
@@ -842,6 +888,10 @@ export async function runCampaign(rig) {
         break;
       }
       const advanced = await advanceToNextWaveCommand(rig, policy, ordinal, stats, surfaceCursors);
+      if (stats.market != null) {
+        marketCoverage.visits.push(stats.market);
+        marketCoverage.purchases.push(...stats.market.purchases);
+      }
       status = advanced.status;
       wavesCleared += 1;
       await Promise.all(clients.map(client => client.checkpoint(`wave-${waveNo}-cleared`)));
@@ -858,7 +908,19 @@ export async function runCampaign(rig) {
     if (status === "continue" && wavesCleared >= policy.targetWaves) {
       await assertRenderProfileExecution(rig, policy, progress);
     }
+    if (marketCoverage.purchases.length < policy.market.requiredPurchases) {
+      throw new Error(
+        `market coverage bought ${marketCoverage.purchases.length} ${policy.market.targetId} items; required ${policy.market.requiredPurchases}`,
+      );
+    }
+    if (
+      policy.market.requireBothOwnerSeats
+      && new Set(marketCoverage.purchases.map(purchase => purchase.ownerSeat)).size < 2
+    ) {
+      throw new Error("market coverage did not buy through both interaction-owner seat parities");
+    }
   } finally {
+    rig.marketCoverage = marketCoverage;
     await progress.summary({
       targetWaves: policy.targetWaves,
       renderProfile: policy.renderProfile,
@@ -867,6 +929,7 @@ export async function runCampaign(rig) {
       finalWave: rig.activeBattleWave,
       lastStatus: status,
       replacementCount: rig.replacementCount,
+      marketCoverage,
     });
     await progress.flush();
   }

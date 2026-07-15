@@ -102,6 +102,7 @@ function envKeys(name, fallback) {
 }
 
 const allowedRewardModes = new Set(["leave", "pick-first"]);
+const allowedMarketModes = new Set(["leave", "target-held"]);
 const allowedModes = new Set(["gating", "shakedown", "nightly"]);
 const allowedRenderProfiles = new Set(["animations-on-surface", "animations-skipped-depth"]);
 
@@ -129,6 +130,14 @@ export function loadCampaignPolicy() {
         + `unknown surfaces in a "${mode}" run (unknown surface = loud fail).`,
     );
   }
+  const marketMode = envTrim("COOP_UI_MARKET_MODE") || "leave";
+  if (!allowedMarketModes.has(marketMode)) {
+    throw new Error(`COOP_UI_MARKET_MODE must be one of ${[...allowedMarketModes].join(", ")}`);
+  }
+  const marketTargetId = envTrim("COOP_UI_MARKET_TARGET_ID") || "WIDE_LENS";
+  if (!/^[A-Z0-9_]+$/u.test(marketTargetId)) {
+    throw new Error("COOP_UI_MARKET_TARGET_ID must be a stable uppercase modifier id");
+  }
   return {
     mode,
     targetWaves: envInteger("COOP_UI_CAMPAIGN_WAVES", 30),
@@ -137,6 +146,14 @@ export function loadCampaignPolicy() {
     autoFirst: autoFirstRequested && mode === "shakedown",
     stallMs: envInteger("COOP_UI_CAMPAIGN_STALL_MS", 8_000),
     rewardMode,
+    market: {
+      mode: marketMode,
+      targetId: marketTargetId,
+      partySlot: envInteger("COOP_UI_MARKET_PARTY_SLOT", 0),
+      secondPurchase: envBoolean("COOP_UI_MARKET_SECOND_PURCHASE", true),
+      requiredPurchases: envInteger("COOP_UI_MARKET_REQUIRED_PURCHASES", 0),
+      requireBothOwnerSeats: envBoolean("COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS", false),
+    },
     renderProfile,
     moveAnimationsExpected: renderProfile === "animations-on-surface",
     raiseSpeed: envBoolean("COOP_UI_RAISE_SPEED", true),
@@ -242,6 +259,7 @@ export function buildDispatchTable(policy) {
       v2SurfaceId: "biome-market",
       owner: { marker: BIOME_SHOP_OWNER },
       keys: policy.keys.biomeShopLeave,
+      market: policy.market,
     },
     {
       name: "crossroads",

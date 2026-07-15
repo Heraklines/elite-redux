@@ -6,6 +6,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createPublicBattleProgressBudget, DuoPublicUiRig, PublicUiClient } from "./public-ui-harness.mjs";
+import { marketObservationView } from "./evidence.mjs";
+import { assertMarketPurchaseConverged, planMarketGridKeys } from "./market-journey.mjs";
 
 class FakeEvidence {
   constructor(label) {
@@ -19,6 +21,10 @@ class FakeEvidence {
 
   record(kind, detail) {
     this.events.push({ index: this.events.length, kind, ...detail });
+  }
+
+  cursor() {
+    return this.events.length;
   }
 
   find(pattern, from = 0) {
@@ -41,6 +47,22 @@ class FakeEvidence {
     }
     return event;
   }
+}
+
+function ownedCommand(localSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
+  return {
+    kind: "browser-surface2",
+    observation: {
+      operationClass: "command",
+      surfaceId: "command:command",
+      phase: "CommandPhase",
+      uiMode: "COMMAND",
+      address,
+      localSeat,
+      seatsWithInput: [localSeat],
+      ready: { handlerActive: true },
+    },
+  };
 }
 
 function at(ms) {
@@ -173,6 +195,102 @@ test("command wait drains an owned semantic surface buffered as its deadline cal
 
   const result = await PublicUiClient.prototype.waitForLocalCommand.call(client, 0);
   assert.equal(result, evidence.events[0]);
+});
+
+test("sequential command driver submits the first owner before waiting for the partner UI", async () => {
+  const order = [];
+  const firstEvidence = new FakeEvidence("first");
+  const secondEvidence = new FakeEvidence("second");
+  firstEvidence.push(ownedCommand(0));
+  const first = {
+    label: "first",
+    publicSeat: 0,
+    evidence: firstEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("first");
+      secondEvidence.push(ownedCommand(1));
+    },
+  };
+  const second = {
+    label: "second",
+    publicSeat: 1,
+    evidence: secondEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("second");
+    },
+  };
+  const rig = {
+    clients: { first, second },
+    config: { timeoutMs: 1_000 },
+  };
+
+  const result = await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(
+    rig,
+    { first: 0, second: 0 },
+    ["Space", "Space", "Space"],
+    "turn-2",
+  );
+
+  assert.deepEqual(order, ["first", "second"]);
+  assert.deepEqual(result.outcomeCursors, { first: 1, second: 1 });
+  assert.equal(firstEvidence.events.at(-1).kind, "sequential-command-proof");
+  assert.equal(secondEvidence.events.at(-1).kind, "sequential-command-proof");
+});
+
+function marketObservation({ localSeat, ownerSeat, marketOpen, stock, money, quantity }) {
+  return {
+    version: 1,
+    address: { epoch: 73, wave: 10, turn: 4 },
+    pinnedInteraction: 19,
+    localRole: localSeat === 0 ? "host" : "guest",
+    localSeat,
+    ownerSeat,
+    localOwner: localSeat === ownerSeat,
+    marketOpen,
+    uiMode: marketOpen ? "BIOME_SHOP" : "MESSAGE",
+    phaseClass: "BiomeShopPhase",
+    selectedIndex: marketOpen ? 1 : null,
+    selectedItemId: marketOpen ? "WIDE_LENS" : null,
+    money,
+    stockModel: marketOpen ? "authoritative-visible" : "replica-apply-ledger",
+    options: [
+      { index: 0, id: "POKEBALL", name: "Poke Ball", cost: 200, stock: 6, targetModel: "direct" },
+      { index: 1, id: "WIDE_LENS", name: "Wide Lens", cost: 1_200, stock, targetModel: "party" },
+    ],
+    party: [{ slot: 0, pokemonId: 9001, speciesId: 25 }],
+    heldModifiers: quantity === 0 ? [] : [{ typeId: "WIDE_LENS", pokemonId: 9001, quantity }],
+  };
+}
+
+test("market observer parser and purchase proof cover money, quantity, and both stock ledgers", () => {
+  const before = {
+    owner: marketObservation({ localSeat: 0, ownerSeat: 0, marketOpen: true, stock: 3, money: 5_000, quantity: 0 }),
+    watcher: marketObservation({ localSeat: 1, ownerSeat: 0, marketOpen: false, stock: 99, money: 5_000, quantity: 0 }),
+  };
+  const after = {
+    owner: marketObservation({ localSeat: 0, ownerSeat: 0, marketOpen: true, stock: 2, money: 3_800, quantity: 1 }),
+    watcher: marketObservation({ localSeat: 1, ownerSeat: 0, marketOpen: false, stock: 98, money: 3_800, quantity: 1 }),
+  };
+  const parsed = marketObservationView(`[coop-browser:market] ${JSON.stringify(before.owner)}`);
+  assert.equal(parsed.options[1].id, "WIDE_LENS");
+  assert.throws(
+    () => marketObservationView(
+      `[coop-browser:market] ${JSON.stringify({ ...before.owner, selectedIndex: 5, selectedItemId: "WIDE_LENS" })}`,
+    ),
+    /invalid market observation/u,
+  );
+  assert.deepEqual(planMarketGridKeys(0, 5), ["ArrowDown", "ArrowRight"]);
+  const proof = assertMarketPurchaseConverged(before, after, {
+    ownerLabel: "owner",
+    targetId: "WIDE_LENS",
+    partySlot: 0,
+  });
+  assert.equal(proof.cost, 1_200);
+  assert.equal(proof.ownerStockAfter, 2);
+  assert.equal(proof.watcherStockAfter, 98);
+  assert.equal(proof.moneyAfter, 3_800);
 });
 
 test("reward leave waits for the exact owned actionable semantic shop surface", async () => {
