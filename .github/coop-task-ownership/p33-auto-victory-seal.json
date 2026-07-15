@@ -17,6 +17,7 @@
     "src/phases/er-crossroads-phase.ts",
     "src/phases/select-biome-phase.ts",
     "src/phases/select-modifier-phase.ts",
+    "src/phases/switch-biome-phase.ts",
     "src/phases/victory-phase.ts",
     "test/tests/elite-redux/coop/coop-automatic-victory-seal.test.ts",
     "test/tests/elite-redux/coop/coop-duo-biome-choice.test.ts",

@@ -78,6 +78,7 @@ import {
   SelectBiomePhase,
   setCoopBiomeContinuationRecoveryPolicyForTest,
 } from "#phases/select-biome-phase";
+import { SwitchBiomePhase } from "#phases/switch-biome-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
@@ -302,6 +303,45 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       true;
     return phase;
   }
+
+  it("missing SwitchBiome permit exhausts finitely into the shared terminal without mutation", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+
+    await withClient(rig.guestCtx, async () => {
+      rig.guestScene.currentBattle.waveIndex = 6;
+      const pinned = rig.guestRuntime.controller.interactionCounter();
+      const sourceBiome = rig.guestScene.arena.biomeId;
+      const destination = sourceBiome === BiomeId.FOREST ? BiomeId.VOLCANO : BiomeId.FOREST;
+      const phase = new SwitchBiomePhase(destination) as unknown as {
+        start(): void;
+        coopBoundaryStillLive(): boolean;
+      };
+      phase.coopBoundaryStillLive = () => true;
+      vi.spyOn(rig.guestScene.ui, "setModeBoundedWhen").mockResolvedValue("completed");
+      const prompts = vi.spyOn(rig.guestScene.ui, "showText").mockImplementation((...args: unknown[]) => {
+        const callback = args[2];
+        if (typeof callback === "function") {
+          queueMicrotask(() => (callback as () => void)());
+        }
+      });
+      const mutateArena = vi.spyOn(rig.guestScene, "newArena");
+
+      phase.start();
+      for (let attempt = 0; attempt < 80 && rig.guestRuntime.localTransport.state !== "closed"; attempt++) {
+        await drainLoopback();
+        await new Promise<void>(resolve => setTimeout(resolve, 2));
+      }
+
+      expect(prompts, "only the two bounded confirmation retries are exposed").toHaveBeenCalledTimes(2);
+      expect(mutateArena, "missing authority never mutates the renderer biome").not.toHaveBeenCalled();
+      expect(rig.guestScene.arena.biomeId, "the renderer remains at its source biome").toBe(sourceBiome);
+      expect(rig.guestRuntime.controller.interactionCounter(), "missing authority cannot advance ownership").toBe(
+        pinned,
+      );
+      expect(rig.guestRuntime.localTransport.state, "retry exhaustion closes the shared runtime").toBe("closed");
+    });
+  });
 
   it("bounded map recovery retries automatically, deduplicates timers, and fences a replaced boundary", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);

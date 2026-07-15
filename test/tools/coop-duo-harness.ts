@@ -303,6 +303,12 @@ export interface ClientCtx {
    */
   moduleLets?: CoopModuleLetSnapshot;
   /**
+   * The complete World-Map / biome-transition substrate for this browser process. Unlike the older
+   * money/relic module-let model, this is always isolated: a committed BIOME_PICK permit is one-shot and
+   * letting the host and guest share it lets the first client consume/clear the other client's authority.
+   */
+  biomeState?: CoopBiomeModuleSnapshot;
+  /**
    * The 3 mystery-encounter pins for THIS client (save/restore around the swap; idle off-ME).
    * Optional: ctxs that never reach an ME (the wave/shop spike tests) omit it and the swap treats
    * them as idle; an ME-driving ctx carries the live pins so the host's and guest's never bleed.
@@ -356,6 +362,56 @@ interface CoopModuleLetSnapshot {
   authoritativeTravelClassification: { readonly wave: number; readonly target: BiomeId | null } | null;
 }
 
+interface CoopBiomeModuleSnapshot {
+  /** Full World-Map UI/routing substrate; production clients own independent module instances. */
+  mapState: ErMapSaveData;
+  /** The actual route-decision input, intentionally separate from the persisted map state. */
+  pendingNodes: ErRouteNode[];
+  pendingNodesReady: boolean;
+  /** Deferred Crossroads Leave -> SelectBiome interaction pin, or -1 when idle. */
+  biomeInteractionStart: number;
+  /** Exact committed Switch/NewBiome permit, including this client's independent stage progress. */
+  biomeTailPermit: CoopBiomeTransitionTailPermit | null;
+  authoritativeTravelClassification: { readonly wave: number; readonly target: BiomeId | null } | null;
+  overstayAnchor: number | null;
+  biomeLength: number | null;
+  biomeStartWave: number;
+}
+
+function snapshotBiomeModuleState(): CoopBiomeModuleSnapshot {
+  return {
+    mapState: structuredClone(getErMapSaveData()),
+    pendingNodes: getErPendingNodes().map(node => ({ ...node })),
+    pendingNodesReady: erPendingNodesReady(),
+    biomeInteractionStart: coopBiomeInteractionInProgress() ? coopBiomeInteractionStartValue() : -1,
+    biomeTailPermit: snapshotCoopBiomeTransitionTailPermit(),
+    authoritativeTravelClassification: snapshotAuthoritativeMapTravelClassification(),
+    overstayAnchor: erBiomeOverstayAnchor(),
+    biomeLength: getErBiomeLength(),
+    biomeStartWave: getErBiomeStartWave(),
+  };
+}
+
+function restoreBiomeModuleState(s: CoopBiomeModuleSnapshot): void {
+  restoreErMapState(structuredClone(s.mapState), s.biomeStartWave);
+  if (s.pendingNodesReady) {
+    setErPendingNodes(s.pendingNodes.map(node => ({ ...node })));
+  } else {
+    markErPendingNodesAwaitingAuthority();
+  }
+  setErBiomeOverstayAnchor(s.overstayAnchor);
+  setErBiomeStructureExtent(s.biomeLength, s.biomeStartWave);
+  if (s.biomeInteractionStart >= 0) {
+    setCoopBiomeInteractionStart(s.biomeInteractionStart);
+  } else {
+    clearCoopBiomeInteractionStart();
+  }
+  if (!restoreCoopBiomeTransitionTailPermit(s.biomeTailPermit)) {
+    throw new Error("Invalid isolated co-op biome-tail permit snapshot");
+  }
+  restoreAuthoritativeMapTravelClassification(s.authoritativeTravelClassification);
+}
+
 function snapshotModuleLets(): CoopModuleLetSnapshot {
   return {
     achievementRun: getErAchievementRunState(),
@@ -377,26 +433,17 @@ function restoreModuleLets(s: CoopModuleLetSnapshot): void {
   restoreErAchievementRunState(s.achievementRun);
   restoreErMoneyStreaks(s.moneyStreaks);
   restoreErRelicBattleState(s.relic);
-  // restoreErMapState resets routing + structure; restore the non-persisted pending nodes and the exact
-  // structure/overstay snapshot afterward. This makes a two-engine map transition faithful instead of both
-  // scenes accidentally sharing one process-global graph.
-  restoreErMapState(structuredClone(s.mapState), s.biomeStartWave);
-  if (s.pendingNodesReady) {
-    setErPendingNodes(s.pendingNodes.map(node => ({ ...node })));
-  } else {
-    markErPendingNodesAwaitingAuthority();
-  }
-  setErBiomeOverstayAnchor(s.overstayAnchor);
-  setErBiomeStructureExtent(s.biomeLength, s.biomeStartWave);
-  if (s.biomeInteractionStart >= 0) {
-    setCoopBiomeInteractionStart(s.biomeInteractionStart);
-  } else {
-    clearCoopBiomeInteractionStart();
-  }
-  if (!restoreCoopBiomeTransitionTailPermit(s.biomeTailPermit)) {
-    throw new Error("Invalid isolated co-op biome-tail permit snapshot");
-  }
-  restoreAuthoritativeMapTravelClassification(s.authoritativeTravelClassification);
+  restoreBiomeModuleState({
+    mapState: s.mapState,
+    pendingNodes: s.pendingNodes,
+    pendingNodesReady: s.pendingNodesReady,
+    biomeInteractionStart: s.biomeInteractionStart,
+    biomeTailPermit: s.biomeTailPermit,
+    authoritativeTravelClassification: s.authoritativeTravelClassification,
+    overstayAnchor: s.overstayAnchor,
+    biomeLength: s.biomeLength,
+    biomeStartWave: s.biomeStartWave,
+  });
 }
 
 function snapshotGhostState(): ErGhostRunStateSnapshot {
@@ -462,6 +509,7 @@ function captureLiveCtx(): {
   rndState: string;
   ghost: ErGhostRunStateSnapshot;
   moduleLets: CoopModuleLetSnapshot;
+  biomeState: CoopBiomeModuleSnapshot;
   mePins: MePins;
 } {
   return {
@@ -471,6 +519,7 @@ function captureLiveCtx(): {
     ghost: snapshotGhostState(),
     // Snapshot the module-lets so the prev-restore is faithful when isolation is ON; harmless when OFF.
     moduleLets: snapshotModuleLets(),
+    biomeState: snapshotBiomeModuleState(),
     mePins: readMePins(),
   };
 }
@@ -509,6 +558,9 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
   if (coopHarnessModuleLetIsolation && ctx.moduleLets !== undefined) {
     restoreModuleLets(ctx.moduleLets);
   }
+  if (ctx.biomeState !== undefined) {
+    restoreBiomeModuleState(ctx.biomeState);
+  }
   writeMePins(ctx.mePins ?? IDLE_ME_PINS);
   // Runtime activation is deliberately LAST: setCoopRuntime flushes continuations
   // queued by runWhenCoopRuntimeActive. Those callbacks must see this client's
@@ -523,12 +575,16 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     if (coopHarnessModuleLetIsolation) {
       ctx.moduleLets = snapshotModuleLets();
     }
+    if (ctx.biomeState !== undefined) {
+      ctx.biomeState = snapshotBiomeModuleState();
+    }
     initGlobalScene(prev.scene);
     Phaser.Math.RND.state(prev.rndState);
     restoreGhostState(prev.ghost);
     if (coopHarnessModuleLetIsolation) {
       restoreModuleLets(prev.moduleLets);
     }
+    restoreBiomeModuleState(prev.biomeState);
     writeMePins(prev.mePins);
     if (prevAccountIdentity != null && loggedInUser != null) {
       loggedInUser.username = prevAccountIdentity;
@@ -563,6 +619,9 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
   if (coopHarnessModuleLetIsolation && ctx.moduleLets !== undefined) {
     restoreModuleLets(ctx.moduleLets);
   }
+  if (ctx.biomeState !== undefined) {
+    restoreBiomeModuleState(ctx.biomeState);
+  }
   // 4. mystery-encounter pins (start / battleCounter / presentation)
   writeMePins(ctx.mePins ?? IDLE_ME_PINS);
   // 5. coop active runtime + role-gated hooks, LAST. setCoopRuntime flushes
@@ -579,6 +638,9 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
     if (coopHarnessModuleLetIsolation) {
       ctx.moduleLets = snapshotModuleLets();
     }
+    if (ctx.biomeState !== undefined) {
+      ctx.biomeState = snapshotBiomeModuleState();
+    }
     ctx.mePins = readMePins();
     initGlobalScene(prev.scene);
     Phaser.Math.RND.state(prev.rndState);
@@ -586,6 +648,7 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
     if (coopHarnessModuleLetIsolation) {
       restoreModuleLets(prev.moduleLets);
     }
+    restoreBiomeModuleState(prev.biomeState);
     writeMePins(prev.mePins);
     if (prevAccountIdentity != null && loggedInUser != null) {
       loggedInUser.username = prevAccountIdentity;
@@ -1725,6 +1788,7 @@ export async function buildDuo(
     // #837: seed both ctxs from the host's current module-let state (the launch mirror), so each engine
     // starts identical and thereafter keeps its OWN money-streak / overstay / relic state.
     moduleLets: snapshotModuleLets(),
+    biomeState: snapshotBiomeModuleState(),
     mePins: { ...IDLE_ME_PINS },
     pumpInbound: () => runtimePair.flush("host"),
   };
@@ -1742,6 +1806,7 @@ export async function buildDuo(
     rndState: Phaser.Math.RND.state(),
     ghost: emptyGhostSnapshot(),
     moduleLets: structuredClone(hostCtx.moduleLets!),
+    biomeState: structuredClone(hostCtx.biomeState!),
     mePins: { ...IDLE_ME_PINS },
     pumpInbound: () => runtimePair.flush("guest"),
   };
@@ -2838,6 +2903,7 @@ export async function buildDuoForMe(
     // #837: seed both ctxs from the host's current module-let state (the launch mirror), so each engine
     // starts identical and thereafter keeps its OWN money-streak / overstay / relic state.
     moduleLets: snapshotModuleLets(),
+    biomeState: snapshotBiomeModuleState(),
     mePins: { ...IDLE_ME_PINS },
     pumpInbound: () => runtimePair.flush("host"),
   };
@@ -2852,6 +2918,7 @@ export async function buildDuoForMe(
     rndState: Phaser.Math.RND.state(),
     ghost: emptyGhostSnapshot(),
     moduleLets: snapshotModuleLets(),
+    biomeState: structuredClone(hostCtx.biomeState!),
     mePins: { ...IDLE_ME_PINS },
     pumpInbound: () => runtimePair.flush("guest"),
   };
@@ -3709,6 +3776,7 @@ export async function buildShowdownDuo(
     rndState: Phaser.Math.RND.state(),
     ghost: snapshotGhostState(),
     moduleLets: snapshotModuleLets(),
+    biomeState: snapshotBiomeModuleState(),
     mePins: { ...IDLE_ME_PINS },
     ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("host") } : {}),
   };
@@ -3723,6 +3791,7 @@ export async function buildShowdownDuo(
     rndState: Phaser.Math.RND.state(),
     ghost: emptyGhostSnapshot(),
     moduleLets: snapshotModuleLets(),
+    biomeState: structuredClone(hostCtx.biomeState!),
     mePins: { ...IDLE_ME_PINS },
     ...(typeof scheduledPair.flush === "function" ? { pumpInbound: () => scheduledPair.flush!("guest") } : {}),
   };

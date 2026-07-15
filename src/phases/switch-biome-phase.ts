@@ -7,7 +7,7 @@ import {
   markCoopBiomeTransitionHistoryRecorded,
   markCoopBiomeTransitionSwitchPrepared,
 } from "#data/elite-redux/coop/coop-renderer-gate";
-import { coopSessionGeneration, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { coopSessionGeneration, failCoopSharedSession, getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import {
   type ErRouteNode,
   erBiomeRoutingActive,
@@ -34,6 +34,7 @@ export class SwitchBiomePhase extends BattlePhase {
   public readonly phaseName = "SwitchBiomePhase";
   private readonly nextBiome: BiomeId;
   private coopPermitRecoveryShown = false;
+  private coopPermitRecoveryAttempts = 0;
   private historyRecorded = false;
   private switchPrepared = false;
   private ended = false;
@@ -371,6 +372,13 @@ export class SwitchBiomePhase extends BattlePhase {
   /** Missing authority never advances the queue; reconnect/replay may arm the exact permit, then retry. */
   private parkForAuthoritativePermit(): void {
     if (this.coopPermitRecoveryShown || !this.coopBoundaryStillLive()) {
+      return;
+    }
+    this.coopPermitRecoveryAttempts++;
+    if (this.coopPermitRecoveryAttempts > 2) {
+      failCoopSharedSession(
+        `The shared biome transition to ${this.nextBiome} lost its exact committed permit after bounded recovery.`,
+      );
       return;
     }
     this.coopPermitRecoveryShown = true;
