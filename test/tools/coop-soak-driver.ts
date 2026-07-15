@@ -118,6 +118,7 @@ import {
   coopMeInteractionStartValue,
   coopSetMePinForGuest,
 } from "#phases/mystery-encounter-phases";
+import { BiomeShopPhase } from "#phases/biome-shop-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { TheBargainPhase } from "#phases/the-bargain-phase";
 import type { GameManager } from "#test/framework/game-manager";
@@ -2343,6 +2344,145 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     }
   };
 
+  /** Wait for one client's real UI mode while keeping that complete client context installed. */
+  const awaitClientUiMode = async (
+    ctx: DuoRig["hostCtx"],
+    mode: UiMode,
+    label: string,
+  ): Promise<void> => {
+    // Headless Phaser does not tick every fade tween. The bounded production mode transition has a two-
+    // second force path, so retain this exact client's globals while that local callback settles rather
+    // than alternating the process-global harness context underneath it.
+    await withClient(ctx, async () => {
+      for (let attempt = 0; attempt < 320; attempt++) {
+        if (ctx.scene.ui.getMode() === mode) {
+          return;
+        }
+        await new Promise<void>(resolve => setTimeout(resolve, 10));
+      }
+      throw new Error(
+        `${label} never opened ${UiMode[mode]} (stuck on ${UiMode[ctx.scene.ui.getMode()]})`,
+      );
+    });
+  };
+
+  /** Press one public UI button, bounded by destination-context pumps just like two independent browsers. */
+  const pressClientUiUntilAccepted = async (
+    ctx: DuoRig["hostCtx"],
+    button: Button,
+    label: string,
+  ): Promise<void> => {
+    for (let attempt = 0; attempt < 80; attempt++) {
+      const accepted = await withClient(ctx, () => ctx.scene.ui.processInput(button));
+      await pumpDuoDestinations(rig, 1);
+      if (accepted) {
+        return;
+      }
+      await new Promise<void>(resolve => setTimeout(resolve, 10));
+    }
+    throw new Error(`${label} never accepted ${Button[button]}`);
+  };
+
+  /**
+   * Drive the every-ten-wave Biome Market through its real owner/watcher phases and public UI terminal.
+   *
+   * BiomeShopPhase deliberately inherits phaseName="SelectModifierPhase" for party-continuation
+   * compatibility, but it owns `shopOptions`, not the ordinary reward phase's `typeOptions`. Treating this
+   * phase as ShopPhaseSeam made an odd-counter milestone call the HOST watcher helper and dereference an
+   * undefined typeOptions array before the actual GUEST owner had even started. Route by concrete phase
+   * identity instead: both queued renderers enter the market, the parity owner presses CANCEL/CONFIRM, and
+   * the retained terminal must advance both counters exactly once.
+   */
+  const driveBiomeMarketLeave = async (
+    wave: number,
+    beforeSharedInput?: () => Promise<void>,
+  ): Promise<void> => {
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+    const hostOwns = counterBefore % 2 === 0;
+    const destinationScheduled = rig.pair.setDestinationContextDelivery != null;
+    rig.pair.setDestinationContextDelivery?.(destinationScheduled);
+    try {
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectModifierPhase", false));
+      const hostMarket = rig.hostScene.phaseManager.getCurrentPhase();
+      if (!(hostMarket instanceof BiomeShopPhase)) {
+        fail(
+          "no-park",
+          wave,
+          `expected queued BiomeShopPhase, reached ${hostMarket?.constructor.name ?? hostMarket?.phaseName ?? "none"}`,
+        );
+      }
+      const guestMarket = await withClient(rig.guestCtx, () =>
+        driveClientPhaseQueueTo(rig.guestScene, "BiomeShopPhase", {
+          matches: phase => phase instanceof BiomeShopPhase,
+        }),
+      );
+      if (!(guestMarket instanceof BiomeShopPhase)) {
+        fail(
+          "no-park",
+          wave,
+          `guest did not reach queued BiomeShopPhase (current=${guestMarket?.constructor.name ?? guestMarket?.phaseName ?? "none"})`,
+        );
+      }
+
+      // Match ordinary rewards: DATA must be applied and both real queues must expose the shared surface
+      // before measuring the immutable boundary or allowing either owner to provide input.
+      await awaitGuestWaveTransaction(wave, false);
+      await beforeSharedInput?.();
+      hitMode(UiMode.BIOME_SHOP);
+
+      const ownerCtx = hostOwns ? rig.hostCtx : rig.guestCtx;
+      const watcherCtx = hostOwns ? rig.guestCtx : rig.hostCtx;
+      const ownerMarket = hostOwns ? hostMarket : guestMarket;
+      const watcherMarket = hostOwns ? guestMarket : hostMarket;
+
+      // Start the watcher first so the option/terminal streams always have a live consumer, then start the
+      // concrete parity owner. No private callback or stock mutation is invoked by the harness.
+      await withClient(watcherCtx, async () => {
+        watcherMarket.start();
+        await drainLoopback();
+      });
+      await withClient(ownerCtx, async () => {
+        ownerMarket.start();
+        await drainLoopback();
+      });
+      await pumpDuoDestinations(rig, 4);
+
+      await awaitClientUiMode(ownerCtx, UiMode.BIOME_SHOP, `${hostOwns ? "host" : "guest"} biome market`);
+      await pressClientUiUntilAccepted(ownerCtx, Button.CANCEL, "biome market leave");
+      await awaitClientUiMode(ownerCtx, UiMode.CONFIRM, "biome market leave confirmation");
+      await pressClientUiUntilAccepted(ownerCtx, Button.ACTION, "biome market confirm yes");
+
+      let advanced = false;
+      for (let attempt = 0; attempt < 80; attempt++) {
+        await pumpDuoDestinations(rig, 1);
+        if (
+          rig.hostRuntime.controller.interactionCounter() === counterBefore + 1
+          && rig.guestRuntime.controller.interactionCounter() === counterBefore + 1
+        ) {
+          advanced = true;
+          break;
+        }
+      }
+      if (!advanced) {
+        fail(
+          "lockstep",
+          wave,
+          `biome market did not advance both counters once (before=${counterBefore} `
+            + `host=${rig.hostRuntime.controller.interactionCounter()} `
+            + `guest=${rig.guestRuntime.controller.interactionCounter()})`,
+        );
+      }
+
+      // A real shared continuation is not complete merely because its mechanical terminal advanced. The
+      // renderer must also have opened the addressed continuation surface before the retained wave journal
+      // can release. Keep this assertion identical to the ordinary reward path.
+      await awaitGuestWaveTransaction(wave, true);
+      actionScript.push(`wave ${wave}: biome market owner=${hostOwns ? "host" : "guest"} leave`);
+    } finally {
+      rig.pair.setDestinationContextDelivery?.(false);
+    }
+  };
+
   // ---------------------------------------------------------------------------
   // #633 MID-RUN MYSTERY-ENCOUNTER CONTINUATION (BUILD 1). Port buildDuoForMe's pump INLINE into the
   // continuous wave loop: when a wave is a FORCED ME, mirror the host's ME onto the guest (mirrorHostMeToGuest,
@@ -2933,9 +3073,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       if (milestoneShops > 8) {
         fail("no-park", wave, "milestone reward tail queued more than 8 SelectModifierPhase continuations");
       }
-      // This crosses both queued tails, routes by the pinned counter, opens the real owner + watcher, leaves
-      // through the public terminal, and retains the exact +1 counter and continuationReady assertions.
-      await driveRewardShop(wave, false, "queued", sampleBoundaryOnce, "leave");
+      // BiomeShopPhase intentionally presents as SelectModifierPhase to party continuations, but its market
+      // protocol and stock are distinct. Route that concrete phase through the market's public owner/watcher
+      // path; ordinary selectable reward continuations retain their calibrated driver.
+      if (rig.hostScene.phaseManager.hasPhaseOfType("BiomeShopPhase")) {
+        await driveBiomeMarketLeave(wave, sampleBoundaryOnce);
+      } else {
+        await driveRewardShop(wave, false, "queued", sampleBoundaryOnce, "leave");
+      }
     }
     await sampleBoundaryOnce();
     if (milestoneShops > 0) {
