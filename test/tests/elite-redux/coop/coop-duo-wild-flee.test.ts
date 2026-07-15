@@ -21,7 +21,6 @@ import { initGlobalScene } from "#app/global-scene";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopStagedWaveAdvanceTransaction } from "#data/elite-redux/coop/coop-wave-operation";
 import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
@@ -35,6 +34,7 @@ import {
   installDuoLogCapture,
   withClient,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -83,7 +83,11 @@ describe.skipIf(!RUN)("#838 VERIFY-1: co-op wild-flee wave-advance broadcast", (
 
   it("a Roar-induced wild flee reaches the guest's real next-wave COMMAND and completes retained readiness", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    // Boot with ordinary delivery so both controllers complete their production handshake, then move the
+    // reciprocal battle journey onto destination-context delivery. In one Vitest process an ordinary
+    // loopback can otherwise resume the guest's command-rendezvous continuation while the host globals are
+    // installed -- a state impossible across two browsers -- and open COMMAND on the wrong BattleScene.
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
 
     // A directly-constructed guest BattleScene begins on its inert boot/onboarding queue. Production has
@@ -93,6 +97,7 @@ describe.skipIf(!RUN)("#838 VERIFY-1: co-op wild-flee wave-advance broadcast", (
       rig.guestScene.phaseManager.clearAllPhases();
       rig.guestScene.phaseManager.shiftPhase();
     });
+    pair.setAutomaticDelivery(false);
 
     // Submit the guest-owned Tackle through its real reciprocal COMMAND/FIGHT/TARGET_SELECT handlers before
     // the host chooses Roar. This is the same two-engine public-input path used by the multiwave journeys;
