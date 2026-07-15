@@ -1,0 +1,56 @@
+===== COOP SOAK RESULT =====
+profile: level
+verdict: FAIL
+waves_requested: 55
+run: 29436978020 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T17-35-41Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260715 WAVES=55 - replay this run with:  SOAK_SEED=20260715 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] FINDING wave 47 @post-shop (seed 20260715): guest scalar OVER-grant - money host=0 guest=6350 (guest OVER-grant) | ball[0] host=5 guest=45 (guest OVER-grant) | ball[1] host=0 guest=10 (guest OVER-grant)
+[22m[39m[coop-soak] RUN ENDED crossing into wave 48 (seed 20260715): host at terminal phase TitlePhase. Survey stops here.
+[22m[39m[coop-soak] DONE seed=20260715 waves=47/55 resyncHeals=0 assertions=0 findings=1 trainerWaves=7 (fixed=4 random=3) skips={"mysteryEncounterDisabledV1":1} elapsedMs=62535
+[coop-soak] FINDING [postShopScalarOverGrant] waves 47-47 x1 :: money host=0 guest=6350 (guest OVER-grant) | ball[0] host=5 guest=45 (guest OVER-grant) | ball[1] host=0 guest=10 (guest OVER-grant)
+[coop-soak] RUN ENDED at wave 48 (seed 20260715): host at terminal phase TitlePhase. Surveyed 47/55 waves under all invariants before the terminal.
+
+----- vitest result tail -----
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [32m7527[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:280:3[39m
+
+[33m[39m[32m·[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:156:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mAssertionError[22m: soak found 1 unhealed DIGEST desync(s) (replay SOAK_SEED=20260715): [postShopScalarOverGrant]@47: expected [ { …(5) } ] to deeply equal [][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [][39m
+[31m+ [[39m
+[31m+   {[39m
+[31m+     "fields": "postShopScalarOverGrant",[39m
+[31m+     "firstWave": 47,[39m
+[31m+     "lastWave": 47,[39m
+[31m+     "occurrences": 1,[39m
+[31m+     "sample": "money host=0 guest=6350 (guest OVER-grant) | ball[0] host=5 guest=45 (guest OVER-grant) | ball[1] host=0 guest=10 (guest OVER-grant)",[39m
+[31m+   },[39m
+[31m+ ][39m
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m239:9[22m[39m
+    [90m237|[39m         `soak found ${result.findings.length} unhealed DIGEST desync(s…
+    [90m238|[39m           + result.findings.map(f => `[${f.fields}]@${f.firstWave}`).j…
+    [90m239|[39m       )[33m.[39m[34mtoEqual[39m([])[33m;[39m
+    [90m   |[39m         [31m^[39m
+    [90m240|[39m
+    [90m241|[39m       // A successful recovery snapshot must never turn a causal repli…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 17:34:04
+[2m   Duration [22m 97.07s[2m (transform 20.26s, setup 24.43s, import 251ms, tests 71.58s, environment 658ms)[22m
+
