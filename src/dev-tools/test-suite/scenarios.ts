@@ -286,7 +286,8 @@ function customTrainerTestParty(): Starter[] {
  * ({@linkcode setErCustomTrainerDevForce}): the picked trainer installs at the
  * launched wave with the FULL feature set (sprite + gender, aura, battle music,
  * intro/victory/defeat lines, weighted-slot rolls, slot-fill, RLA/RLNA tokens,
- * shiny-lab looks, BST bypass) exactly as a real run would field it.
+ * shiny-lab looks, per-member Insanity ability overrides, BST bypass) exactly
+ * as a real run would field it.
  *
  * Wave eligibility is handled by {@linkcode planErCustomTrainerLaunch}: the run
  * difficulty is force-adjusted to one the trainer allows and the starting wave is
@@ -312,7 +313,8 @@ export function buildErCustomTrainerDevScenario(
       + `Forced spawn on wave ${wave} (difficulty ${difficulty}).\n`
       + "DO: fight it. EXPECT the authored party, sprite + gender, aura, battle\n"
       + "music, intro / victory / defeat lines, weighted slots + slot-fill, RLA /\n"
-      + "RLNA move rolls and shiny-lab looks, exactly as a real run fields it.",
+      + "RLNA move rolls, shiny-lab looks and Insanity ability/innate overrides,\n"
+      + "exactly as a real run fields it.",
     setup: () => {
       resetDevOverrides();
       // Arm the one-shot dev force + pin a difficulty/wave the trainer allows.

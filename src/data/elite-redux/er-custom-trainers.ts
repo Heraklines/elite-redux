@@ -100,7 +100,7 @@
 import { speciesEggMoves } from "#balance/moves/egg-moves";
 import { globalScene } from "#app/global-scene";
 import { isDevToolsEnabled } from "#app/dev-tools/registry";
-import { allMoves } from "#data/data-lists";
+import { allAbilities, allMoves } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { getErCustomTrainerSprite } from "#data/elite-redux/er-custom-trainer-sprites";
@@ -115,6 +115,7 @@ import {
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { isKnownTrainerAuraId } from "#data/elite-redux/er-trainer-fx";
 import { collectShowdownFreeMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
+import { AbilityId } from "#enums/ability-id";
 import { Challenges } from "#enums/challenges";
 import { Gender } from "#data/gender";
 import { MoveCategory } from "#enums/move-category";
@@ -242,6 +243,18 @@ export interface ErCustomTrainerHeldItem {
   count?: number;
 }
 
+/**
+ * Per-battle ability substitutions for one authored team member. Missing slots
+ * keep the species/form's normal ability. These are copied onto the spawned
+ * EnemyPokemon instance and never mutate shared species data.
+ */
+export interface ErCustomTrainerInsanity {
+  /** AbilityId replacing the active ability, or absent to keep the normal active. */
+  ability?: number;
+  /** AbilityIds replacing innate slots 1-3; null/absent entries keep that slot. */
+  innates?: readonly (number | null)[];
+}
+
 /** One authored team member (raw JSON shape — kept loose; it is editor-written). */
 export interface ErCustomTrainerMember {
   /** Pokerogue speciesId (vanilla < 10000, ER-custom >= 10000). */
@@ -258,6 +271,8 @@ export interface ErCustomTrainerMember {
   moves?: readonly string[];
   /** Index into the species' ability list (active ability pick). */
   abilitySlot?: number;
+  /** Optional per-battle active/innate substitutions authored via Insanity mode. */
+  insanity?: ErCustomTrainerInsanity | null;
   fusion?: ErCustomTrainerFusion | null;
   heldItems?: readonly ErCustomTrainerHeldItem[];
   /** Shiny Lab visual effect the mon fields with (see {@linkcode ErCustomTrainerShiny}). */
@@ -404,6 +419,11 @@ export interface ErCustomTrainerMemberResolved {
   /** Ordered move slots incl. RLA/RLNA tokens (resolved via `resolveErCustomTrainerMoveIds`). */
   moveSpecs: readonly ErCustomTrainerMoveSpec[];
   abilitySlot: number;
+  /** Instance-only active/innate substitutions for this custom-trainer battle. */
+  insanity?: {
+    ability: AbilityId | null;
+    innates: readonly [AbilityId | null, AbilityId | null, AbilityId | null];
+  } | null;
   fusion: { speciesId: number; formIndex: number; abilitySlot: number } | null;
   heldItemKeys: readonly { key: string; count: number }[];
   /** Serialized Shiny Lab look this member fields with, or `null` (renders normally). */
@@ -758,6 +778,20 @@ function resolveMember(m: ErCustomTrainerMember): ErCustomTrainerMemberResolved 
     .filter(h => h && typeof h.item === "string" && h.item.length > 0)
     .map(h => ({ key: h.item, count: Number.isInteger(h.count) && (h.count as number) > 0 ? (h.count as number) : 1 }));
   const shiny = resolveShinyLook(m.shiny);
+  const rawInsanity = m.insanity && typeof m.insanity === "object" ? m.insanity : null;
+  const resolveAbilityId = (value: unknown): AbilityId | null =>
+    Number.isInteger(value) && (value as number) > AbilityId.NONE ? (value as AbilityId) : null;
+  const rawInnates = Array.isArray(rawInsanity?.innates) ? rawInsanity.innates : [];
+  const insanity = rawInsanity
+    ? {
+        ability: resolveAbilityId(rawInsanity.ability),
+        innates: [
+          resolveAbilityId(rawInnates[0]),
+          resolveAbilityId(rawInnates[1]),
+          resolveAbilityId(rawInnates[2]),
+        ] as const,
+      }
+    : null;
   return {
     speciesId: m.species,
     formIndex: Number.isInteger(m.formIndex) ? (m.formIndex as number) : 0,
@@ -765,6 +799,7 @@ function resolveMember(m: ErCustomTrainerMember): ErCustomTrainerMemberResolved 
     moveIds: ids,
     moveSpecs: specs,
     abilitySlot: clampSlot(m.abilitySlot),
+    insanity,
     fusion,
     heldItemKeys,
     shinyLook: shiny ? shiny.look : null,
@@ -1494,6 +1529,17 @@ export function buildErCustomTrainerMember(
   }
   if (member.fusion) {
     applyErCustomTrainerFusion(enemy, member.fusion);
+  }
+  // Insanity substitutions use the same per-Pokemon storage as the Ability
+  // Randomizer. Apply after form/fusion setup so slot ownership is correct.
+  // This touches only this EnemyPokemon's CustomPokemonData, never species data.
+  if (member.insanity) {
+    const overrides = [member.insanity.ability, ...member.insanity.innates] as const;
+    overrides.forEach((abilityId, slot) => {
+      if (abilityId != null && allAbilities[abilityId]) {
+        enemy.setAbilityOverrideForSlot(slot, abilityId);
+      }
+    });
   }
   if (moveIds.length > 0) {
     const moves = moveIds.map(id => new PokemonMove(id));

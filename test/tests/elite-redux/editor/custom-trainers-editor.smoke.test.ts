@@ -72,6 +72,8 @@ interface EditorHarness {
   learn: { current: Record<string, [number, number][]>; baseline: Record<string, unknown> };
   tms: { current: Record<string, number[]>; baseline: Record<string, unknown> };
   moveById: Map<number, { id: number; name: string }>;
+  abilById: Map<number, { id: number; name: string; description: string }>;
+  abilIdByNormalizedName: Map<string, number>;
   ctrOpenMembers: Set<number>;
   ctrSetSel: Map<number, number>;
   legalMovesCache: Map<string, unknown>;
@@ -135,7 +137,7 @@ beforeAll(() => {
       blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal, ctrFusedName, ctrLiveToEdit,
       ctrBuildBaselines, hashCtrTrainerEntry, markCustomTrainersSaved,
       render, onCustomTrainerInput, onCustomTrainerChange, onCustomTrainerClick, buildDeltas,
-      ctr, ctrConfig, spByConst, spById, trainerClassByName, trainerSpriteByKey, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
+      ctr, ctrConfig, spByConst, spById, trainerClassByName, trainerSpriteByKey, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, abilById, abilIdByNormalizedName, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
       get CTR_LIVE(){ return CTR_LIVE; }, set CTR_LIVE(v){ CTR_LIVE = v; },
       get HELD_ITEMS(){ return HELD_ITEMS; }, set HELD_ITEMS(v){ HELD_ITEMS = v; },
@@ -167,6 +169,8 @@ beforeEach(() => {
   ct.learn.current = {};
   ct.tms.current = {};
   ct.moveById.clear();
+  ct.abilById.clear();
+  ct.abilIdByNormalizedName.clear();
   ct.spByConst.clear();
   ct.spById.clear();
   ct.MOVE_SET.clear();
@@ -176,6 +180,15 @@ beforeEach(() => {
   addSpecies("SPECIES_GENGAR", 94, "Gengar");
   for (const mv of ["THUNDERBOLT", "BODY_SLAM", "SHADOW_BALL", "THUNDER", "SURF"]) {
     ct.MOVE_SET.add(mv);
+  }
+  for (const ability of [
+    { id: 2, name: "Drizzle", description: "Rain on entry." },
+    { id: 3, name: "Speed Boost", description: "Raises Speed." },
+    { id: 5, name: "Sturdy", description: "Survives a hit." },
+    { id: 153, name: "Moxie", description: "Raises Attack after a KO." },
+  ]) {
+    ct.abilById.set(ability.id, ability);
+    ct.abilIdByNormalizedName.set(ability.name.toLowerCase(), ability.id);
   }
   // Trainer-class sprite catalog: ACE_TRAINER ships both m/f sprites; HIKER a single one.
   ct.trainerClassByName.clear();
@@ -554,6 +567,61 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     const { bad } = ct.buildDeltas();
     expect(bad.some(b => /SURF/.test(b))).toBe(true);
     expect(bad.some(b => /\bRLA\b|\bRLNA\b/.test(b))).toBe(false);
+  });
+
+  it("Insanity exposes searchable ability fields and serializes instance overrides by AbilityId", () => {
+    const key = newTrainer("Chaos Staff");
+    setSpecies(0, "SPECIES_SNORLAX");
+
+    const toggle = q('.ctr-insanity-on[data-idx="0"]') as HTMLInputElement;
+    expect(toggle).not.toBeNull();
+    toggle.checked = true;
+    ct.onCustomTrainerChange(toggle);
+
+    const active = q('.ctr-insanity-ability[data-idx="0"]') as HTMLInputElement;
+    const innate1 = q('.ctr-insanity-innate[data-idx="0"][data-slot="0"]') as HTMLInputElement;
+    const innate2 = q('.ctr-insanity-innate[data-idx="0"][data-slot="1"]') as HTMLInputElement;
+    const innate3 = q('.ctr-insanity-innate[data-idx="0"][data-slot="2"]') as HTMLInputElement;
+    expect(active.getAttribute("list")).toBe("abilities-list");
+    expect(innate1.getAttribute("list")).toBe("abilities-list");
+
+    const typeAbility = (input: HTMLInputElement, value: string) => {
+      input.value = value;
+      ct.onCustomTrainerInput(input);
+      ct.onCustomTrainerChange(input);
+    };
+    typeAbility(active, "drizzle");
+    typeAbility(innate1, "Sturdy");
+    typeAbility(innate2, "Moxie");
+    typeAbility(innate3, "Speed Boost");
+
+    expect(ct.ctr.current[key].team[0].insanity).toEqual({
+      ability: "Drizzle",
+      innates: ["Sturdy", "Moxie", "Speed Boost"],
+    });
+    const { deltas, bad } = ct.buildDeltas();
+    expect(bad).toEqual([]);
+    const member = (deltas["custom-trainers"] as Record<string, any>)[key].team[0];
+    expect(member.insanity).toEqual({ ability: 2, innates: [5, 153, 3] });
+
+    // Numeric live JSON reopens as searchable display names, not raw ids.
+    const reopened = ct.ctrLiveToEdit({
+      id: 70080,
+      name: "Reopen",
+      trainerClass: "ACE_TRAINER",
+      team: [{ species: 143, insanity: member.insanity }],
+    });
+    expect(reopened.team[0].insanity).toEqual({
+      ability: "Drizzle",
+      innates: ["Sturdy", "Moxie", "Speed Boost"],
+    });
+
+    // Free text is allowed while typing, but an unknown ability cannot be saved.
+    const activeAgain = q('.ctr-insanity-ability[data-idx="0"]') as HTMLInputElement;
+    activeAgain.value = "Definitely Not An Ability";
+    ct.onCustomTrainerInput(activeAgain);
+    expect(activeAgain.style.borderColor).not.toBe("");
+    expect(ct.buildDeltas().bad.some(message => message.includes("unknown Insanity ability"))).toBe(true);
   });
 
   it("move legality: numeric learnset -> enum keys (learned move passes); two-word input normalizes; nonsense flagged; RLA/RLNA exempt", () => {

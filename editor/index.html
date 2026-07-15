@@ -195,6 +195,17 @@
       .ctr-moves-head { margin-top: 8px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
       .ctr-moves-head select { max-width: 240px; }
       .ctr-move-err { color: #e0556a; font-size: 12px; margin-top: 5px; line-height: 1.45; }
+      .ctr-insanity { margin-top: 8px; border-left: 3px solid var(--line); padding: 6px 8px; background: rgba(255,255,255,.025); }
+      .ctr-insanity.on { border-left-color: #e0556a; background: rgba(224,85,106,.07); }
+      .ctr-insanity-toggle { font-weight: 700; color: var(--text); }
+      .ctr-insanity.on .ctr-insanity-toggle { color: #ef8293; }
+      .ctr-insanity-fields { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 10px; margin-top: 7px; }
+      .ctr-insanity-fields input { width: 170px; max-width: 100%; }
+      .ctr-insanity-fields .hint { flex-basis: 100%; margin: 0; }
+      @media (max-width: 760px) {
+        .ctr-insanity-fields label { width: 100%; display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; }
+        .ctr-insanity-fields input { width: 100%; min-width: 0; }
+      }
       /* Per-member Shiny Lab effect picker + swatch approximation. */
       .ctr-shiny { margin-top: 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
       .ctr-shiny-lbl { color: var(--muted); font-size: 12px; }

@@ -61,6 +61,7 @@ import {
 } from "#data/elite-redux/er-custom-trainers";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
+import { AbilityId } from "#enums/ability-id";
 import { Challenges } from "#enums/challenges";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
@@ -687,6 +688,53 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // Fusion constructed on the enemy side.
     expect(enemy!.isFusion()).toBe(true);
     expect(enemy!.fusionSpecies?.speciesId).toBe(SpeciesId.RAYQUAZA);
+  });
+
+  it("applies Insanity abilities only to the spawned enemy instance", () => {
+    setErCustomTrainersForTesting({
+      INSANITY_TEST: {
+        id: 70007,
+        name: "Insanity Test",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        team: [
+          {
+            species: SpeciesId.SNORLAX,
+            abilitySlot: 0,
+            insanity: {
+              ability: AbilityId.DRIZZLE,
+              innates: [AbilityId.STURDY, AbilityId.MOXIE, AbilityId.SPEED_BOOST],
+            },
+          },
+        ],
+      },
+    } as never);
+    const member = getErCustomTrainers()[0].members[0];
+    const enemy = buildErCustomTrainerMember(member, 0, 50, false)!;
+
+    expect(enemy.getAbility().id).toBe(AbilityId.DRIZZLE);
+    expect(
+      enemy
+        .getPassiveAbilities()
+        .slice(0, 3)
+        .map(ability => ability?.id ?? AbilityId.NONE),
+    ).toEqual([AbilityId.STURDY, AbilityId.MOXIE, AbilityId.SPEED_BOOST]);
+
+    // The shared species/form still reports its original kit. A second spawn of
+    // the same resolved member with Insanity removed also gets that normal kit.
+    const speciesActive = enemy.species.getAbility(enemy.abilityIndex);
+    const speciesInnates = enemy.species.getPassiveAbilities(enemy.formIndex);
+    expect(speciesActive).not.toBe(AbilityId.DRIZZLE);
+    expect(speciesInnates).not.toEqual([AbilityId.STURDY, AbilityId.MOXIE, AbilityId.SPEED_BOOST]);
+
+    const normal = buildErCustomTrainerMember({ ...member, insanity: null }, 1, 50, false)!;
+    expect(normal.getAbility().id).toBe(speciesActive);
+    expect(
+      normal
+        .getPassiveAbilities()
+        .slice(0, 3)
+        .map(ability => ability?.id ?? AbilityId.NONE),
+    ).toEqual(speciesInnates);
   });
 
   it("battleBgm normalizes: valid key kept, garbage/absent -> '' (no override)", () => {
