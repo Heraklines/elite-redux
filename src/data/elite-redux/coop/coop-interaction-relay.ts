@@ -349,7 +349,11 @@ export class CoopInteractionRelay {
   /** #809: ask the partner to open its Revival Blessing picker for `fieldIndex`. */
   promptRevival(fieldIndex: number, operationId?: string): void {
     coopLog("relay", `SEND revivalPrompt fieldIndex=${fieldIndex} (#809)`);
-    this.transport.send({ t: "revivalPrompt", fieldIndex, ...(operationId === undefined ? {} : { operationId }) });
+    this.transport.send({
+      t: "revivalPrompt",
+      fieldIndex,
+      ...(operationId === undefined ? {} : { operationId }),
+    });
   }
 
   /** Deliver a committed prompt through the same picker seam, suppressing its raw legacy echo. */
@@ -556,6 +560,15 @@ export class CoopInteractionRelay {
   }
 
   /**
+   * Read-only ordering probe used by replay surfaces before they arm competing presentation edges.
+   * This deliberately does not dequeue the outcome: {@linkcode awaitInteractionOutcome} remains the
+   * only consumer, preserving FIFO and the relay's single-waiter semantics.
+   */
+  hasBufferedInteractionOutcomeFor(seq: number): boolean {
+    return (this.outcomeInbox.get(seq)?.length ?? 0) > 0;
+  }
+
+  /**
    * WATCHER (#633, TRACK-2 Phase C): take the next host-resolved outcome for interaction
    * `seq` (FIFO). Resolves immediately if one is buffered, else waits for the next, or
    * resolves `null` on timeout (the watcher then leaves, never hangs). Mirrors
@@ -741,11 +754,23 @@ export class CoopInteractionRelay {
    * is the pending interaction the whole session is blocked on (the top co-op softlock signature).
    * Pure read; never mutates relay state.
    */
-  describeAwaitedInteractions(): { seq: number; ageMs: number; expectedKinds: readonly string[] }[] {
+  describeAwaitedInteractions(): {
+    seq: number;
+    ageMs: number;
+    expectedKinds: readonly string[];
+  }[] {
     const now = Date.now();
-    const out: { seq: number; ageMs: number; expectedKinds: readonly string[] }[] = [];
+    const out: {
+      seq: number;
+      ageMs: number;
+      expectedKinds: readonly string[];
+    }[] = [];
     for (const [seq, since] of this.pendingSince) {
-      out.push({ seq, ageMs: now - since, expectedKinds: this.pending.get(seq)?.expectedKinds ?? [] });
+      out.push({
+        seq,
+        ageMs: now - since,
+        expectedKinds: this.pending.get(seq)?.expectedKinds ?? [],
+      });
     }
     return out.sort((a, b) => a.seq - b.seq);
   }
@@ -1051,7 +1076,12 @@ export class CoopInteractionRelay {
         return;
       }
       coopLog("relay", `RECV requestRewardOptions key=${key} -> REPLAY count=${options.length}`);
-      this.transport.send({ t: "rewardOptions", seq: msg.seq, reroll: msg.reroll, options });
+      this.transport.send({
+        t: "rewardOptions",
+        seq: msg.seq,
+        reroll: msg.reroll,
+        options,
+      });
       return;
     }
     if (msg.t !== "interactionChoice") {
@@ -1079,7 +1109,11 @@ export class CoopInteractionRelay {
       this.addTransientRawChoiceCredit(key);
     }
     // #861: carry the wire `kind` onto the choice so the KIND-VALIDATION can gate delivery + buffer-hits.
-    this.deliverInteractionChoice(msg.seq, { choice: msg.choice, data: msg.data, kind: msg.kind });
+    this.deliverInteractionChoice(msg.seq, {
+      choice: msg.choice,
+      data: msg.data,
+      kind: msg.kind,
+    });
   }
 
   private choiceCreditKey(seq: number, kind: string, choice: number, data: number[] | undefined): string {
@@ -1161,7 +1195,10 @@ export class CoopInteractionRelay {
 export interface CoopPeerAdvanceProbe {
   /** Cancellable await that resolves once the PEER broadcasts a counter strictly beyond `counter`
    *  (owner committed + moved on). `cancel()` drops the waiter if the relayed pick wins the race first. */
-  awaitPeerAdvancePast(counter: number): { promise: Promise<void>; cancel: () => void };
+  awaitPeerAdvancePast(counter: number): {
+    promise: Promise<void>;
+    cancel: () => void;
+  };
 }
 
 /** When the owner is observed to have advanced past the interaction, how long to still let a genuinely
