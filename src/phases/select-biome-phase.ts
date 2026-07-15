@@ -38,6 +38,7 @@ import {
   getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
+  notifyCoopWaveContinuationSurfaceReady,
   resolveCoopRetainedWaveContinuationIdentity,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_PICK_CHOICE_KINDS, COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
@@ -578,6 +579,10 @@ export class SelectBiomePhase extends BattlePhase {
         // Relay the owner's live cursor only after the bounded map transition is genuinely active.
         this.clearBiomeCommitRecovery();
         getCoopUiMirror()?.beginSession("owner", UiMode.ER_MAP, mirrorSeq);
+        // A retained biome boundary is continuation-safe only once this exact phase owns a live, actionable
+        // ER_MAP handler. Phase construction and the completed rendezvous are not public surfaces. The runtime
+        // revalidates phase, mode, handler activity and source wave before releasing retained authority.
+        notifyCoopWaveContinuationSurfaceReady(wave);
       });
   }
 
@@ -623,6 +628,10 @@ export class SelectBiomePhase extends BattlePhase {
       }
       this.clearBiomeCommitRecovery();
       getCoopUiMirror()?.beginSession("watcher", UiMode.ER_MAP, mirrorSeq);
+      // The watcher exposes the same real map handler, but its onSelect is deliberately inert and authority
+      // remains the awaited owner relay below. Publishing here proves the renderer has an executable public
+      // continuation without granting it any mechanical decision authority.
+      notifyCoopWaveContinuationSurfaceReady(boundaryWave);
     } catch {
       coopWarn("reward", "biome pick WATCHER map failed to open (still awaiting relay) (#848)");
     }

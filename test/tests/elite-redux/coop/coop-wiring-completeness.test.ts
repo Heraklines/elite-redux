@@ -294,4 +294,37 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
       "terminateCoopAuthoritySession(",
     );
   });
+
+  it("publishes retained SelectBiome readiness only after each real ER_MAP surface opens", () => {
+    const source = readFileSync(
+      join(__dirname, "..", "..", "..", "..", "src", "phases", "select-biome-phase.ts"),
+      "utf8",
+    );
+    const ownerStart = source.indexOf("private coopBiomePickOwner(");
+    const ownerEnd = source.indexOf("/** OWNER terminal:", ownerStart);
+    const watcherStart = source.indexOf("private async coopBiomePickWatch(");
+    const watcherEnd = source.indexOf("private committedBiomePayload(", watcherStart);
+    expect(ownerStart, "the owner World Map implementation exists").toBeGreaterThanOrEqual(0);
+    expect(ownerEnd, "the owner implementation has a bounded source section").toBeGreaterThan(ownerStart);
+    expect(watcherStart, "the watcher World Map implementation exists").toBeGreaterThanOrEqual(0);
+    expect(watcherEnd, "the watcher implementation has a bounded source section").toBeGreaterThan(watcherStart);
+
+    for (const [label, body, mirrorRole] of [
+      ["owner", source.slice(ownerStart, ownerEnd), "owner"],
+      ["watcher", source.slice(watcherStart, watcherEnd), "watcher"],
+    ] as const) {
+      const modeOpen = body.indexOf("setModeBoundedWhen(");
+      const supersededGuard = body.indexOf('=== "superseded"');
+      const mirrorOpen = body.indexOf(`beginSession("${mirrorRole}", UiMode.ER_MAP`);
+      const readiness = body.indexOf("notifyCoopWaveContinuationSurfaceReady(");
+      expect(modeOpen, `${label} opens ER_MAP through the bounded live-phase seam`).toBeGreaterThanOrEqual(0);
+      expect(supersededGuard, `${label} rejects a replaced UI transition`).toBeGreaterThan(modeOpen);
+      expect(mirrorOpen, `${label} starts its real ER_MAP mirror only after replacement rejection`).toBeGreaterThan(
+        supersededGuard,
+      );
+      expect(readiness, `${label} publishes retained readiness from the open public surface`).toBeGreaterThan(
+        mirrorOpen,
+      );
+    }
+  });
 });
