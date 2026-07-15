@@ -12,6 +12,10 @@
     "src/phases/coop-seal-turn-phase.ts",
     "src/phases/mystery-encounter-phases.ts",
     "src/phases/turn-end-phase.ts",
-    "test/tests/elite-redux/coop/coop-duo-post-turn-seal.test.ts"
+    "test/tests/elite-redux/coop/coop-duo-engine.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-interaction-counter.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-post-turn-seal.test.ts",
+    "test/tests/elite-redux/coop/coop-duo-revive-sync.test.ts",
+    "test/tests/elite-redux/coop/coop-wiring-completeness.test.ts"
   ]
 }

@@ -264,9 +264,10 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
   it("routes turn and replacement publication through one all-or-nothing authority capture", () => {
     const root = join(__dirname, "..", "..", "..", "..", "src");
     const turnEnd = readFileSync(join(root, "phases", "turn-end-phase.ts"), "utf8");
+    const turnSeal = readFileSync(join(root, "phases", "coop-seal-turn-phase.ts"), "utf8");
     const replacement = readFileSync(join(root, "phases", "coop-push-replacement-checkpoint-phase.ts"), "utf8");
     for (const [label, source] of [
-      ["turnResolution", turnEnd],
+      ["turnResolution", turnSeal],
       ["replacement", replacement],
     ] as const) {
       expect(source, `${label} uses the coherent capture chokepoint`).toContain("captureCoopAuthoritativeCarrier(");
@@ -274,7 +275,15 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
         "?? undefined",
       );
     }
-    expect(turnEnd, "turn publication passes the required full field companion").toContain("carrier.fullField");
+    expect(turnSeal, "turn publication passes the required full field companion").toContain("carrier.fullField");
+    expect(turnEnd, "TurnEnd cannot publish before its state-bearing descendants settle").not.toContain(
+      "captureCoopAuthoritativeCarrier(",
+    );
+    const phaseManager = readFileSync(join(root, "phase-manager.ts"), "utf8");
+    expect(
+      phaseManager,
+      "the turn seal is a root sibling immediately after TurnEnd, not a child that deferred work can overtake",
+    ).toMatch(/"TurnEndPhase",\s*"CoopSealTurnPhase"/);
     expect(replacement, "replacement publication passes the required full field companion").toContain(
       "carrier.fullField",
     );
@@ -291,6 +300,9 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
       "clearCoopRuntime(",
     );
     expect(replay, "turn and replacement failures route through the shared terminal helper").toContain(
+      "terminateCoopAuthoritySession(",
+    );
+    expect(turnSeal, "turn-seal failures route through the shared terminal helper").toContain(
       "terminateCoopAuthoritySession(",
     );
   });

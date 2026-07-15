@@ -90,7 +90,8 @@ describe.skipIf(!RUN)("co-op DUO: immutable turn carrier seals after post-turn c
         return;
       }
       emittedChecksum = message.checksum;
-      emittedHp = message.authoritativeState?.playerParty[COOP_GUEST_FIELD_INDEX]?.hp;
+      const hp = message.authoritativeState?.playerParty[COOP_GUEST_FIELD_INDEX]?.hp;
+      emittedHp = typeof hp === "number" ? hp : undefined;
     });
 
     let hpBefore = 0;
