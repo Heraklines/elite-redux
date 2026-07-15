@@ -277,6 +277,7 @@ import {
   type CoopStagedWaveAdvanceTransaction,
   type CoopWaveAdvanceOperationBinding,
   commitWaveAdvanceOwnerIntent,
+  describeCoopWaveAdvanceOperationBinding,
   getCoopStagedWaveAdvanceTransaction,
   isCoopWaveAdvanceOperationEnabled,
   isCoopWaveAdvanceTransactionComplete,
@@ -1130,6 +1131,12 @@ export function consumeCoopPendingWaveEndState(): CoopAuthoritativeBattleStateV1
 function tryApplyCoopSettledWaveData(wave: number, binding: CoopWaveAdvanceOperationBinding): boolean {
   const staged = getCoopStagedWaveAdvanceTransaction(wave, binding);
   if (staged == null) {
+    const evidence = describeCoopWaveAdvanceOperationBinding(binding);
+    coopWarn(
+      "progression",
+      `retained WAVE_ADVANCE DATA missing wave=${wave} bindingRole=${evidence.role ?? "unset"} `
+        + `stagedWaves=[${evidence.stagedWaves.join(",")}] stagedIds=[${evidence.stagedOperationIds.join(",")}]`,
+    );
     return false;
   }
   if (staged.dataApplied) {

@@ -188,6 +188,20 @@ export interface CoopWaveAdvanceOperationBinding {
   readonly durability: CoopDurabilityManager | null;
 }
 
+/** Compact anomaly evidence for a BattleEnd that cannot find the retained transaction it is waiting on. */
+export function describeCoopWaveAdvanceOperationBinding(binding: CoopWaveAdvanceOperationBinding): {
+  readonly role: CoopRole | null;
+  readonly stagedWaves: number[];
+  readonly stagedOperationIds: string[];
+} {
+  const s = state(binding);
+  return {
+    role: binding.opState.localRole,
+    stagedWaves: [...s.stagedWaveOperationIdByWave.keys()],
+    stagedOperationIds: [...s.stagedWaveTransactions.keys()],
+  };
+}
+
 /** Missing or role-mismatched runtime state is a programming error, never a process-global fallback. */
 export function captureCoopWaveAdvanceOperationBinding(expectedRole?: CoopRole): CoopWaveAdvanceOperationBinding {
   const opState = getActiveCoopRuntimeOpState();
