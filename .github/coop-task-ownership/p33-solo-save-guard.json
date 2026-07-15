@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "taskId": "p33-solo-save-guard",
+  "branch": "ci/coop/p33-solo-save-guard",
+  "trainRef": "ci/coop/p33-closure-codex",
+  "baseSha": "048247f66689fa5fca54371224a13eadacfafbcc",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-solo-save-guard.json",
+    "test/tests/elite-redux/coop/coop-title-save-refusal.test.ts"
+  ]
+}
