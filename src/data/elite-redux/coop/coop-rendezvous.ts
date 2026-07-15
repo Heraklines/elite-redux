@@ -33,8 +33,34 @@
 // =============================================================================
 
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { recordCoopCausalEvent } from "#data/elite-redux/coop/coop-causal-trace";
 import { beginCoopMachineWait } from "#data/elite-redux/coop/coop-stall-probe";
 import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
+
+const RENDEZVOUS_CAUSAL_POINT_LIMIT = 192;
+
+/** Stable, bounded token for a point that may originate in a future UI surface. */
+function boundedRendezvousPoint(point: string): string {
+  if (point.length <= RENDEZVOUS_CAUSAL_POINT_LIMIT && /^[a-z][a-z0-9-]*(?::\d+){0,2}$/.test(point)) {
+    return point;
+  }
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < point.length; index++) {
+    hash ^= point.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `point#${(hash >>> 0).toString(16).padStart(8, "0")}:len=${point.length}`;
+}
+
+function rendezvousPointAddress(point: string): { wave?: number; turn?: number } {
+  const [surface, waveValue, turnValue] = point.split(":", 3);
+  const wave = Number(waveValue);
+  const turn = Number(turnValue);
+  return {
+    ...(Number.isSafeInteger(wave) && wave >= 0 ? { wave } : {}),
+    ...(surface === "cmd" && Number.isSafeInteger(turn) && turn >= 0 ? { turn } : {}),
+  };
+}
 
 /**
  * How long a rendezvous await blocks for the partner's arrival before giving up. The two live
@@ -176,6 +202,28 @@ export class CoopRendezvous {
     });
   }
 
+  private recordCausalStage(stage: string, point: string, detail?: string): void {
+    const epoch = this.getEpoch();
+    recordCoopCausalEvent({
+      domain: "recovery",
+      stage,
+      causalId: `rendezvous:e${epoch}:${boundedRendezvousPoint(point)}`,
+      role: this.transport.role,
+      epoch,
+      ...rendezvousPointAddress(point),
+      ...(detail == null ? {} : { detail }),
+    });
+  }
+
+  private recordWaitOutcome(point: string, result: CoopRendezvousResult): CoopRendezvousResult {
+    this.recordCausalStage(
+      result.timedOut ? "abort" : "release",
+      point,
+      result.timedOut ? undefined : `outcome=${result.crossPoint == null ? "exact" : "cross-point"}`,
+    );
+    return result;
+  }
+
   /**
    * True when the PARTNER's arrival for `point` has already been received (buffered or live). Lets a
    * caller take a SYNCHRONOUS fast-path (arrive + proceed immediately, no promise) when there is
@@ -220,6 +268,8 @@ export class CoopRendezvous {
       return false;
     }
 
+    const previousLocal = new Set(this.localArrived);
+    const previousPartner = new Set(this.partnerArrived);
     const locallyAwaited = new Set(this.pending.keys());
     const peerAwaiting = new Set(snapshot.awaiting);
     const nextLocal = new Set(snapshot.partnerArrived);
@@ -237,6 +287,16 @@ export class CoopRendezvous {
     }
     for (const point of nextPartner) {
       this.partnerArrived.add(point);
+    }
+    for (const point of nextLocal) {
+      if (!previousLocal.has(point)) {
+        this.recordCausalStage("local-arrival", point, "source=control-restore");
+      }
+    }
+    for (const point of nextPartner) {
+      if (!previousPartner.has(point)) {
+        this.recordCausalStage("peer-arrival", point, "source=control-restore");
+      }
     }
 
     // Reassert every proven local arrival before releasing any waiter. If its earlier carrier was the lost
@@ -269,6 +329,7 @@ export class CoopRendezvous {
       return;
     }
     this.localArrived.add(point);
+    this.recordCausalStage("local-arrival", point);
     coopLog("rendezvous", `ARRIVE point=${point} (send) role=${this.transport.role}`);
     this.transport.send({ t: "rendezvous", point });
   }
@@ -293,6 +354,7 @@ export class CoopRendezvous {
    * recovery is needed, never permission to cross a shared boundary independently.
    */
   awaitPartner(point: string, timeoutMs = this.defaultTimeoutMs): Promise<CoopRendezvousResult> {
+    this.recordCausalStage("wait-open", point);
     if (this.partnerArrived.has(point)) {
       if (isCoopDebug()) {
         coopLog(
@@ -300,23 +362,27 @@ export class CoopRendezvous {
           `AWAIT point=${point} -> partner already arrived (buffer-hit) role=${this.transport.role}`,
         );
       }
-      return Promise.resolve({ point, timedOut: false });
+      return Promise.resolve(this.recordWaitOutcome(point, { point, timedOut: false }));
     }
     // A buffered FOREIGN arrival is a classified branch mismatch, not packet loss. Preserve the existing
     // catch-up release until the authoritative phase-route operation replaces it.
     const buffered = this.foreignArrival(point);
     if (buffered !== undefined) {
       if (this.transport.role === "host") {
-        return this.publishAuthoritativeRoute(point, buffered, timeoutMs);
+        return this.publishAuthoritativeRoute(point, buffered, timeoutMs).then(result =>
+          this.recordWaitOutcome(point, result),
+        );
       }
       const route = this.latestGuestRoute;
       if (route != null && route.displacedPoint === point && route.point === buffered) {
-        return Promise.resolve({
-          point,
-          timedOut: false,
-          crossPoint: route.point,
-          authoritativePoint: route.point,
-        });
+        return Promise.resolve(
+          this.recordWaitOutcome(point, {
+            point,
+            timedOut: false,
+            crossPoint: route.point,
+            authoritativePoint: route.point,
+          }),
+        );
       }
       coopLog("rendezvous", `AWAIT point=${point} sees partner at ${buffered}; guest WAITING for host phaseRoute`);
     }
@@ -367,6 +433,7 @@ export class CoopRendezvous {
             `AWAIT point=${point} CROSS-POINT release (partner at ${res.crossPoint}) role=${this.transport.role}`,
           );
         }
+        this.recordWaitOutcome(point, res);
         resolve(res);
       };
       const armRecoveryTimer = (): (() => void) =>
@@ -564,6 +631,7 @@ export class CoopRendezvous {
       return;
     }
     this.partnerArrived.add(point);
+    this.recordCausalStage("peer-arrival", point);
     const waiter = this.pending.get(point);
     if (waiter) {
       if (isCoopDebug()) {
