@@ -680,6 +680,8 @@ export class CoopBattleStreamer {
   private readonly hostTurnAckEvidence = new Map<string, AckEvidence<Extract<CoopMessage, { t: "turnCommitAck" }>>>();
   /** GUEST: presentation-complete turn commits waiting for their real public continuation surface. */
   private readonly pendingTurnContinuations = new Map<string, PendingTurnContinuation>();
+  /** Exact retained wave carriers admitted after/before an early next-command continuation prediction. */
+  private readonly admittedWaveAdvanceContinuations = new Set<string>();
   /**
    * GUEST: live battle events buffered by turn, keyed inner by `seq` so a duplicate / out-of-order
    * `battleEvent` is de-duped + a stutter (a missing seq) is tolerated (#633, animation layer LIVE).
@@ -1186,6 +1188,7 @@ export class CoopBattleStreamer {
     this.ackedTurnCommits.clear();
     this.hostTurnAckEvidence.clear();
     this.pendingTurnContinuations.clear();
+    this.admittedWaveAdvanceContinuations.clear();
     this.ackedReplacementCommits.clear();
     this.hostReplacementAckEvidence.clear();
     this.pendingReplacementContinuations.clear();
@@ -1500,6 +1503,11 @@ export class CoopBattleStreamer {
       `host SEND enemyPartySync wave=${wave} count=${enemies.length} meType=${resolvedMeType ?? "-"} battleType=${resolvedBattleType ?? "-"}`,
     );
     this.transport.send(message);
+  }
+
+  /** GUEST: inspect the complete wave-start state without removing the final CommandPhase seal. */
+  peekEnemyPartyState(wave: number): CoopAuthoritativeBattleStateV1 | undefined {
+    return this.enemyPartyStateByWave.get(wave);
   }
 
   /** GUEST: consume the complete state paired with this wave's enemy-party handoff, if supplied. */
@@ -2036,6 +2044,23 @@ export class CoopBattleStreamer {
     return true;
   }
 
+  /** Record the exact retained terminal that can authorize an early command prediction at wave+1 turn 1. */
+  noteWaveAdvanceAdmitted(epoch: number, wave: number): boolean {
+    if (this.authorityTerminalStarted) {
+      return false;
+    }
+    const key = `${epoch}:${wave}`;
+    if (this.admittedWaveAdvanceContinuations.has(key)) {
+      return false;
+    }
+    this.admittedWaveAdvanceContinuations.add(key);
+    if (this.admittedWaveAdvanceContinuations.size > 512) {
+      this.admittedWaveAdvanceContinuations.delete(this.admittedWaveAdvanceContinuations.values().next().value!);
+    }
+    coopLog("stream", `guest admitted WAVE_ADVANCE continuation e=${epoch} wave=${wave}`);
+    return true;
+  }
+
   registerReplacementContinuation(
     envelope: CoopCheckpointEnvelope,
     expectation: CoopAuthorityContinuationExpectation,
@@ -2094,8 +2119,10 @@ export class CoopBattleStreamer {
       // early prediction—must decide whether authority retention can be released.
       return (
         (surface === "command" || surface === "sharedInput")
-        && current.wave === expectation.wave
-        && current.turn === expectation.turn
+        && ((current.wave === expectation.wave && current.turn === expectation.turn)
+          || (this.admittedWaveAdvanceContinuations.has(`${expectation.epoch}:${expectation.wave}`)
+            && current.wave === expectation.wave + 1
+            && current.turn === 1))
       );
     }
     if (surface === "terminal") {
@@ -3198,6 +3225,7 @@ export class CoopBattleStreamer {
     this.ackedTurnCommits.clear();
     this.hostTurnAckEvidence.clear();
     this.pendingTurnContinuations.clear();
+    this.admittedWaveAdvanceContinuations.clear();
     this.highestSeenTurnAuthority.clear();
     this.seenTurnAuthority.clear();
     this.enemyPartyWaiters.clear();

@@ -865,10 +865,10 @@ export class EncounterPhase extends BattlePhase {
     // The generation loop must not roll modifiers over the verbatim party; that would double held items.
     this.coopAdoptedEnemyParty = true;
     this.coopEnemyAuthority = enemies;
-    // The enemy handoff is also the first coherent boundary of the new wave. Apply the host's complete
-    // state here so between-wave HP/modifier/party mutations are visible before the first command, rather
-    // than relying on a later checksum mismatch to repair them after the player has already seen stale UI.
-    applyCoopAuthoritativeBattleState(streamer.consumeEnemyPartyState(battle.waveIndex), true);
+    // The enemy handoff is the first coherent presentation boundary of the new wave. Apply the host's
+    // complete state here, but RETAIN it for CommandPhase: summon/entry presentation can mutate stages,
+    // abilities and forms after this point, and the last pre-input funnel must reassert or replace it.
+    applyCoopAuthoritativeBattleState(streamer.peekEnemyPartyState(battle.waveIndex), true);
   }
 
   /**

@@ -1531,7 +1531,14 @@ export function notifyCoopWaveContinuationSurfaceReady(
   if (!Number.isSafeInteger(wave) || wave < 0) {
     return false;
   }
-  return maybeMarkCoopWaveContinuationReady(wave, runtime.waveOperationBinding, phaseOwnedSurface);
+  const ready = maybeMarkCoopWaveContinuationReady(wave, runtime.waveOperationBinding, phaseOwnedSurface);
+  if (ready) {
+    // Biome-market watchers and other phase-owned continuations deliberately do not open a normal
+    // registry-backed UI mode. Their executable public/terminal loop is still the exact continuation
+    // for the final turn commit on this old battle shell.
+    runtime.battleStream.notifyContinuationSurface("sharedInput");
+  }
+  return ready;
 }
 
 /**
@@ -3705,6 +3712,10 @@ function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, envelope: CoopAu
     if (staged == null || staged.operationId !== operation.id) {
       return false;
     }
+    // CoopFinalizeTurnPhase may have registered a next-command continuation before this retained
+    // terminal reached the guest. Admission of the exact staged WAVE_ADVANCE is the missing causal
+    // proof that upgrades that prediction to the old-shell/next-wave shared boundary.
+    runtime.battleStream.noteWaveAdvanceAdmitted(envelope.sessionEpoch, payload.wave);
     if (!staged.bootstrapProjected) {
       if (globalScene.currentBattle?.waveIndex !== payload.wave || payload.wave <= lastResolvedWave) {
         return false;

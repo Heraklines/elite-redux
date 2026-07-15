@@ -5,7 +5,10 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
-import { applyCoopAuthoritativeBattleState } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  applyCoopAuthoritativeBattleState,
+  reapplyAcceptedCoopAuthoritativeBattleState,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
@@ -595,7 +598,13 @@ export class CommandPhase extends FieldPhase {
       // can consume the repeated party first while a newer post-PostSummon carrier is delivered afterward;
       // gating the state read on `enemies != null` then strands that newer state until checksum repair. Always
       // consume/apply the latest state at this final pre-input funnel. `undefined` remains a guarded no-op.
-      applyCoopAuthoritativeBattleState(streamer.consumeEnemyPartyState(waveIndex), true);
+      const waveStartState = streamer.consumeEnemyPartyState(waveIndex);
+      if (waveStartState !== undefined && !applyCoopAuthoritativeBattleState(waveStartState, true)) {
+        // EncounterPhase may already have accepted this exact tick for coherent intro rendering. Reassert
+        // only that same accepted image at the final public-input seal; a stale/different payload remains
+        // rejected, while a newer post-summon carrier is admitted normally above.
+        reapplyAcceptedCoopAuthoritativeBattleState(waveStartState, true);
+      }
     } else if (controller.role === "host" && turn === 1 && this.fieldIndex === 0) {
       // Co-op HOST (#920): the entry-ability chain (PostSummonPhase) has now settled - terrain, weather,
       // entry-hazard arena tags and entry form changes are on the arena/field, but the wave-start

@@ -178,7 +178,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(res?.[0]?.data.speciesId).toBe(1);
   });
 
-  it("pairs the complete new-wave state with enemyPartySync until the guest consumes it", async () => {
+  it("retains the complete new-wave state across encounter peek until command consumes it", async () => {
     const { host, guest } = createLoopbackPair();
     const hostStream = new CoopBattleStreamer(host);
     const guestStream = new CoopBattleStreamer(guest);
@@ -187,6 +187,10 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     hostStream.sendEnemyParty(9, [{ fieldIndex: 2, data: { speciesId: 1 } }], -1, 0, state);
     await guestStream.awaitEnemyParty(9);
 
+    expect(guestStream.peekEnemyPartyState(9)).toEqual(state);
+    expect(guestStream.peekEnemyPartyState(9), "encounter presentation does not consume the command seal").toEqual(
+      state,
+    );
     expect(guestStream.consumeEnemyPartyState(9)).toEqual(state);
     expect(guestStream.consumeEnemyPartyState(9), "boundary state is one-shot").toBeUndefined();
   });
@@ -586,6 +590,53 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
         "the renderer-active reward surface at the exact predicted address is valid continuation proof",
       ).toBe(1);
       expect(guestStream.notifyContinuationSurface("sharedInput"), "continuation releases exactly once").toBe(0);
+
+      hostStream.dispose();
+      guestStream.dispose();
+    });
+
+    it("accepts wave+1 turn 1 only after the exact wave-advance carrier is admitted", async () => {
+      const { host, guest } = createLoopbackPair();
+      const current = { epoch: 7, wave: 1, turn: 3 };
+      const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+      const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+
+      const awaited = guestStream.awaitTurn(3);
+      emitCompleteTurn(hostStream, 3, [], emptyCheckpoint(), "deadbeefdeadbeef");
+      const resolution = await awaited;
+      expect(resolution).not.toBeNull();
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "materialApplied")).toBe(true);
+      expect(guestStream.acknowledgeTurnCommit(resolution!, "presentationReady")).toBe(true);
+      expect(
+        guestStream.registerTurnContinuation(resolution!, undefined, {
+          kind: "command",
+          epoch: 7,
+          wave: 1,
+          turn: 4,
+        }),
+      ).toBe(true);
+
+      current.wave = 2;
+      current.turn = 1;
+      expect(
+        guestStream.notifyContinuationSurface("command"),
+        "a next-wave surface cannot release an unproven next-command prediction",
+      ).toBe(0);
+      expect(guestStream.noteWaveAdvanceAdmitted(8, 1)).toBe(true);
+      expect(guestStream.notifyContinuationSurface("command"), "wrong-epoch carriers cannot release").toBe(0);
+      expect(guestStream.noteWaveAdvanceAdmitted(7, 2)).toBe(true);
+      expect(guestStream.notifyContinuationSurface("command"), "wrong-wave carriers cannot release").toBe(0);
+      expect(guestStream.noteWaveAdvanceAdmitted(7, 1)).toBe(true);
+      expect(guestStream.noteWaveAdvanceAdmitted(7, 1), "duplicate admission is idempotent").toBe(false);
+
+      current.wave = 3;
+      expect(guestStream.notifyContinuationSurface("command"), "later unrelated waves remain fenced").toBe(0);
+      current.wave = 2;
+      expect(
+        guestStream.notifyContinuationSurface("command"),
+        "wave+1 turn 1 releases after exact terminal admission",
+      ).toBe(1);
+      expect(guestStream.notifyContinuationSurface("command"), "continuation releases exactly once").toBe(0);
 
       hostStream.dispose();
       guestStream.dispose();
