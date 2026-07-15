@@ -429,6 +429,19 @@ function pendingTurnKey(address: { epoch: number; wave: number; turn: number }):
   return `${address.epoch}:${address.wave}:${address.turn}`;
 }
 
+type TurnCommitRequest = { epoch: number; wave: number; turn: number; revision?: number };
+
+/**
+ * A revisionless request asks for the newest commit at one logical turn. Once a concrete revision is
+ * known, its retry lifecycle is an independent immutable transaction and must not share a timer slot
+ * with another revision at the same epoch/wave/turn.
+ */
+function turnCommitRequestKey(request: TurnCommitRequest): string {
+  return request.revision === undefined
+    ? `latest:${pendingTurnKey(request)}`
+    : `exact:${authorityKey({ ...request, revision: request.revision })}`;
+}
+
 interface CoopTurnAddress {
   epoch: number;
   wave: number;
@@ -658,10 +671,7 @@ export class CoopBattleStreamer {
   private readonly sentTurnCommitTimers = new Map<string, () => void>();
   private readonly sentTurnCommitDeadlines = new Map<string, number>();
   /** GUEST: every turn requested but not yet apply+checksum ACKed, including reconnect replay. */
-  private readonly requestedTurnCommits = new Map<
-    string,
-    { epoch: number; wave: number; turn: number; revision?: number }
-  >();
+  private readonly requestedTurnCommits = new Map<string, TurnCommitRequest>();
   private readonly turnRequestTimers = new Map<string, () => void>();
   private readonly turnCommitHandlers = new Set<(resolution: CoopTurnResolution) => void>();
   /** GUEST: latest monotonic evidence emitted for each exact immutable turn commit. */
@@ -1018,7 +1028,11 @@ export class CoopBattleStreamer {
       return false;
     }
     const key = pendingTurnKey(address);
-    return current.turn === address.turn || this.pending.has(key) || this.requestedTurnCommits.has(key);
+    return current.turn === address.turn || this.pending.has(key) || this.hasRequestedTurnAddress(address);
+  }
+
+  private hasRequestedTurnAddress(address: CoopTurnAddress): boolean {
+    return [...this.requestedTurnCommits.values()].some(request => sameTurnAddress(request, address));
   }
 
   private acceptsAuthorityFailureAddress(failure: CoopAuthorityFailure): boolean {
@@ -1036,7 +1050,7 @@ export class CoopBattleStreamer {
     const exactKey = authorityKey(failure);
     return (
       this.pending.has(turnKey)
-      || this.requestedTurnCommits.has(turnKey)
+      || this.hasRequestedTurnAddress(failure)
       || this.sentTurnCommits.has(exactKey)
       || this.sentReplacementCheckpoints.has(exactKey)
       || this.issuedTurnAuthority.has(exactKey)
@@ -1700,7 +1714,7 @@ export class CoopBattleStreamer {
     });
   }
 
-  private sendTurnCommitRequest(request: { epoch: number; wave: number; turn: number; revision?: number }): void {
+  private sendTurnCommitRequest(request: TurnCommitRequest): void {
     this.transport.send({ t: "requestTurnCommit", ...request });
   }
 
@@ -1710,13 +1724,42 @@ export class CoopBattleStreamer {
     this.turnRequestTimers.delete(key);
   }
 
+  private clearTurnCommitRequestsAtAddress(address: CoopTurnAddress): void {
+    for (const [key, request] of this.requestedTurnCommits) {
+      if (sameTurnAddress(request, address)) {
+        this.clearTurnCommitRequest(key);
+      }
+    }
+  }
+
+  private clearSupersededTurnCommitRequests(address: {
+    epoch: number;
+    wave: number;
+    turn: number;
+    revision: number;
+  }): void {
+    for (const [key, request] of this.requestedTurnCommits) {
+      if (
+        sameTurnAddress(request, address)
+        && (request.revision === undefined || request.revision < address.revision)
+      ) {
+        this.clearTurnCommitRequest(key);
+      }
+    }
+  }
+
   /** GUEST: keep requesting one exact logical turn until its verified ACK clears the request. */
   requestTurnCommit(epoch: number, wave: number, turn: number, revision?: number): void {
     if (this.authorityTerminalStarted) {
       return;
     }
-    const key = pendingTurnKey({ epoch, wave, turn });
     const request = { epoch, wave, turn, ...(revision === undefined ? {} : { revision }) };
+    const key = turnCommitRequestKey(request);
+    if (revision !== undefined) {
+      // The exact commit replaces only the open-ended discovery request. Other exact revisions keep their
+      // own retry/ACK lifecycle until each is explicitly superseded or reaches continuation-ready.
+      this.clearTurnCommitRequest(turnCommitRequestKey({ epoch, wave, turn }));
+    }
     this.requestedTurnCommits.set(key, request);
     this.sendTurnCommitRequest(request);
     if (this.turnRequestTimers.has(key)) {
@@ -1877,7 +1920,7 @@ export class CoopBattleStreamer {
       discardAuthorityThrough(this.inbox, resolution);
     } else if (stage === "continuationReady") {
       this.pendingTurnContinuations.delete(key);
-      this.clearTurnCommitRequest(pendingTurnKey(resolution));
+      this.clearTurnCommitRequest(turnCommitRequestKey(resolution));
     }
     this.transport.send(ack);
     coopLog(
@@ -2987,7 +3030,9 @@ export class CoopBattleStreamer {
       if (key !== lookup.key && stale.turn === turn) {
         coopWarn("stream", `guest awaitTurn turn=${turn} superseding stale addressed waiter key=${key}`);
         stale.finish(null);
-        this.clearTurnCommitRequest(key);
+        if (stale.address != null) {
+          this.clearTurnCommitRequestsAtAddress(stale.address);
+        }
       }
     }
     const duplicate = this.pending.get(lookup.key);
@@ -3378,6 +3423,7 @@ export class CoopBattleStreamer {
         }
         if (admission.kind === "older") {
           this.turnRedeliveryRequests.delete(authorityKey(msg));
+          this.clearTurnCommitRequest(turnCommitRequestKey(msg));
           coopWarn(
             "stream",
             `guest DROP older turn revision e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
@@ -3415,6 +3461,7 @@ export class CoopBattleStreamer {
           );
           return;
         }
+        this.clearSupersededTurnCommitRequests(msg);
         const address: CoopTurnAddress = { epoch: msg.epoch, wave: msg.wave, turn: msg.turn };
         const waitKey = pendingTurnKey(address);
         const bufferKey = bufferedAuthorityKey("turnResolution", res);
