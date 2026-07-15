@@ -1868,6 +1868,7 @@ export class DuoPublicUiRig {
     const commandEvents = {};
     const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs);
     let advanceBattlePrompt = null;
+    let promptCommandAddress = null;
 
     while (pending.size > 0 && Date.now() < progressBudget.observe()) {
       let droveCommand = false;
@@ -1897,9 +1898,8 @@ export class DuoPublicUiRig {
           // The reciprocal command surface is intentionally sequential. Once one player submits, the peer can
           // still be rendering the preceding turn, so its last command observation is not required to match yet.
           // Pin prompt admission to the exact public address that authorized this submission instead.
-          advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, `${purpose}-prompt-frontier`, {
-            expectedCommandAddress: `${commandAddress.epoch}:${commandAddress.wave}:${commandAddress.turn}`,
-          });
+          promptCommandAddress = `${commandAddress.epoch}:${commandAddress.wave}:${commandAddress.turn}`;
+          advanceBattlePrompt = null;
         }
         droveCommand = true;
         // Re-scan after every submission: that public choice may synchronously open the peer UI.
@@ -1908,7 +1908,13 @@ export class DuoPublicUiRig {
       if (droveCommand) {
         continue;
       }
-      advanceBattlePrompt ??= createBattlePromptAdvancer(this, from, {}, `${purpose}-prompt-frontier`);
+      advanceBattlePrompt ??= createBattlePromptAdvancer(
+        this,
+        from,
+        {},
+        `${purpose}-prompt-frontier`,
+        promptCommandAddress == null ? undefined : { expectedCommandAddress: promptCommandAddress },
+      );
       if (await advanceBattlePrompt()) {
         continue;
       }
