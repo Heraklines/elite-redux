@@ -260,11 +260,10 @@ export class WebRtcTransport implements CoopTransport {
       return;
     }
     this.disconnectedGeneration = gen;
-    this.transportFailureReason = reason;
-    coopWarn(
-      "webrtc",
-      `carrier LOST role=${this.role} state=${this._state} gen=${gen} reason=${reason}`,
-    );
+    // A connected-path refusal records the more precise causal reason before it closes the carrier. Preserve
+    // that evidence when the resulting channel-close callback arrives synchronously.
+    this.transportFailureReason ??= reason;
+    coopWarn("webrtc", `carrier LOST role=${this.role} state=${this._state} gen=${gen} reason=${reason}`);
     this.inboundChunks.clear();
     this.setState("disconnected");
     if (!retireWire) {

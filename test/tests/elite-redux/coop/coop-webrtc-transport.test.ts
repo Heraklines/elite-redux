@@ -609,8 +609,7 @@ describe("peer-connection lifecycle: a failed PC cannot hide behind an open Data
     private readonly listeners = new Map<string, Array<(event: Event) => void>>();
 
     addEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
-      const callback =
-        typeof listener === "function" ? listener : (event: Event) => listener.handleEvent(event);
+      const callback = typeof listener === "function" ? listener : (event: Event) => listener.handleEvent(event);
       const listeners = this.listeners.get(type) ?? [];
       listeners.push(callback);
       this.listeners.set(type, listeners);
@@ -641,8 +640,7 @@ describe("peer-connection lifecycle: a failed PC cannot hide behind an open Data
     private readonly listeners = new Map<string, Array<(event: Event) => void>>();
 
     addEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
-      const callback =
-        typeof listener === "function" ? listener : (event: Event) => listener.handleEvent(event);
+      const callback = typeof listener === "function" ? listener : (event: Event) => listener.handleEvent(event);
       const listeners = this.listeners.get(type) ?? [];
       listeners.push(callback);
       this.listeners.set(type, listeners);
@@ -674,36 +672,32 @@ describe("peer-connection lifecycle: a failed PC cannot hide behind an open Data
     const pc = new FakeRtcPeerConnection();
     const transport = new WebRtcTransport(
       "host",
-      wireFromRtcChannel(
-        "host",
-        channel as unknown as RTCDataChannel,
-        pc as unknown as RTCPeerConnection,
-      ),
+      wireFromRtcChannel("host", channel as unknown as RTCDataChannel, pc as unknown as RTCPeerConnection),
     );
     const states: CoopConnectionState[] = [];
     transport.onStateChange(state => states.push(state));
     return { channel, pc, states, transport };
   }
 
-  it.each(["failed", "closed"] as const)(
-    "treats peer connection %s as immediately terminal even while the DataChannel still says open",
-    terminalState => {
-      const { channel, pc, states, transport } = makeTransport();
-      expect(channel.readyState).toBe("open");
+  it.each([
+    "failed",
+    "closed",
+  ] as const)("treats peer connection %s as immediately terminal even while the DataChannel still says open", terminalState => {
+    const { channel, pc, states, transport } = makeTransport();
+    expect(channel.readyState).toBe("open");
 
-      pc.setConnectionState(terminalState);
+    pc.setConnectionState(terminalState);
 
-      expect(transport.state).toBe("disconnected");
-      expect(states, "lifecycle/rejoin receives exactly one disconnect transition").toEqual(["disconnected"]);
-      expect(transport.disconnectReason()).toBe(`peer connection ${terminalState}`);
-      expect(channel.closeCount, "the stuck-open data channel is retired").toBe(1);
-      expect(pc.closeCount, "the failed peer connection is retired").toBe(1);
+    expect(transport.state).toBe("disconnected");
+    expect(states, "lifecycle/rejoin receives exactly one disconnect transition").toEqual(["disconnected"]);
+    expect(transport.disconnectReason()).toBe(`peer connection ${terminalState}`);
+    expect(channel.closeCount, "the stuck-open data channel is retired").toBe(1);
+    expect(pc.closeCount, "the failed peer connection is retired").toBe(1);
 
-      pc.fire("connectionstatechange");
-      channel.fire("close");
-      expect(states, "duplicate carrier callbacks cannot start another rejoin").toEqual(["disconnected"]);
-    },
-  );
+    pc.fire("connectionstatechange");
+    channel.fire("close");
+    expect(states, "duplicate carrier callbacks cannot start another rejoin").toEqual(["disconnected"]);
+  });
 
   it("debounces a transient disconnected state, cancels on recovery, then fails once after the bounded grace", async () => {
     vi.useFakeTimers();
