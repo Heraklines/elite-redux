@@ -1,0 +1,54 @@
+===== COOP SOAK RESULT =====
+profile: god-a
+verdict: FAIL
+waves_requested: 200
+run: 29434372987 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T16-56-44Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260715 WAVES=200 - replay this run with:  SOAK_SEED=20260715 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=11 where=wave-start fields=[saveDataDigest] :: saveDataDigest:host="77f338f5bbcbc131"/guest="71fadf300b277ede"
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=6 where=wave-start fields=[saveDataDigest] :: saveDataDigest:host="f803c6459461b2f1"/guest="c87bbf4bd19346e2"
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 15 (seed 20260715): World Map did not leave on both clients (host=SwitchBiomePhase guest=SelectBiomePhase). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T16-56-35-747Z__seed-20260715__wave-15. Replay: SOAK_SEED=20260715[39m
+
+----- vitest result tail -----
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4229:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m175:22[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[31m[1mAssertionError[22m: no mismatch was hidden by the one-heal path: expected [ { wave: 6, …(4) } ] to deeply equal [][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [][39m
+[31m+ [[39m
+[31m+   {[39m
+[31m+     "classification": "unexpected",[39m
+[31m+     "fields": [[39m
+[31m+       "saveDataDigest",[39m
+[31m+     ],[39m
+[31m+     "sample": "saveDataDigest:host=\"f803c6459461b2f1\"/guest=\"c87bbf4bd19346e2\"",[39m
+[31m+     "wave": 6,[39m
+[31m+     "where": "wave-start",[39m
+[31m+   },[39m
+[31m+ ][39m
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m305:85[22m[39m
+    [90m303|[39m     expect(result.wavesCompleted, "the focused lifecycle crossed every…
+    [90m304|[39m     expect(result.findings, "no modifier/save divergence survived a bo…
+    [90m305|[39m     expect(result.preHealMismatches, "no mismatch was hidden by the on…
+    [90m   |[39m                                                                                     [31m^[39m
+    [90m306|[39m     expect(result.resyncHeals, "the boundary driver never invoked reco…
+    [90m307|[39m     expect(result.assertions, "the live per-turn checksum never reques…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m   Start at [22m 16:55:42
+[2m   Duration [22m 62.08s[2m (transform 20.12s, setup 24.53s, import 270ms, tests 36.30s, environment 801ms)[22m
+
