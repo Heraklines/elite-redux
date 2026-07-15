@@ -1,0 +1,57 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: 150
+run: 29442971887 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T19-05-09Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=17 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=17 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=13 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=13 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 16 (seed 828633): wave driving threw (strand/stall): PhaseInterceptor.to("TurnEndPhase") did not reach its target (soft-lock / freeze?): stuck at phase "CommandPhase", UI mode MODIFIER_SELECT (=6), interceptor state "interrupted".
+
+----- vitest result tail -----
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 16 (seed 828633): wave driving threw (strand/stall): PhaseInterceptor.to("TurnEndPhase") did not reach its target (soft-lock / freeze?): stuck at phase "CommandPhase", UI mode MODIFIER_SELECT (=6), interceptor state "interrupted".
+Original: Timed out in waitUntil!. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T19-04-39-614Z__seed-828633__wave-16. Replay: SOAK_SEED=828633[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1581:11[22m[39m
+    [90m1579|[39m       phaseState: phaseStateDump(rig),
+    [90m1580|[39m     });
+    [90m1581|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1582|[39m   };
+    [90m1583|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4252:7[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m173:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:213:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[31m[1mError[22m: client phase drive to guest command 13:1 HANG on CommandPhase; queued=[TurnStartPhase], ui=MESSAGE[39m
+[36m [2m❯[22m driveClientPhaseQueueTo test/tools/coop-duo-harness.ts:[2m1530:15[22m[39m
+    [90m1528|[39m       if (Date.now() >= deadline) {
+    [90m1529|[39m         const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? […
+    [90m1530|[39m         throw new Error(
+    [90m   |[39m               [31m^[39m
+    [90m1531|[39m           `client phase drive to ${target} HANG on ${phase.phaseName};…
+    [90m1532|[39m             + `ui=${UiMode[scene.ui.getMode()] ?? scene.ui.getMode()}`,
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m633:12[22m[39m
+[90m [2m❯[22m crossCommandBoundaryWithReplayGuest test/tools/coop-soak-driver.ts:[2m2319:28[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4287:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m231:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 19:03:02
+[2m   Duration [22m 126.32s[2m (transform 39.87s, setup 49.98s, import 563ms, tests 109.03s, environment 1.74s)[22m
+
