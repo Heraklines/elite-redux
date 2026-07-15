@@ -509,6 +509,7 @@
     "challenge": "none",
     "defeatDialogue": "youngsters now days have no respect for their elders!",
     "difficulties": [
+      "youngster",
       "ace",
       "elite",
       "hell"
