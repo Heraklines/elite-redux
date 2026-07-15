@@ -118,8 +118,8 @@ describe.skipIf(!RUN)("co-op continuous journey: many mystery events plus biome 
 
     expect(result.wavesCompleted, "the campaign continued after the final forced event").toBe(LAST_WAVE);
     expect(result.runEnded, "the campaign did not silently terminal/degrade").toBeUndefined();
-    expect(result.actionScript, "wave 10 used the odd-seat guest as the real milestone reward owner").toContain(
-      "wave 10: reward shop owner=guest leave",
+    expect(result.actionScript, "wave 10 used the odd-seat guest as the real biome-market owner").toContain(
+      "wave 10: biome market owner=guest leave",
     );
     expect(result.actionScript, "wave 10 drained its milestone continuation without parking either renderer").toContain(
       "wave 10: drained 1 milestone reward continuation(s)",
