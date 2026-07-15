@@ -42,6 +42,7 @@
 // it is exhaustively unit-testable headlessly.
 // =============================================================================
 
+import { recordCoopCausalEvent } from "#data/elite-redux/coop/coop-causal-trace";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type {
   CoopAuthorityAckStage,
@@ -644,6 +645,7 @@ export interface CoopDurabilityRecoveryFailure {
 interface PendingDurabilityRecovery extends CoopDurabilityRecoveryFailure {
   startedAt: number;
   cancel: () => void;
+  authority: CoopOperationAuthorityAddress | null;
 }
 
 interface PendingDeferredApply {
@@ -724,6 +726,28 @@ function operationAuthorityFor(
 
 function operationAuthorityKey(authority: CoopOperationAuthorityAddress): string {
   return `${authority.cls}:${authority.seq}:${authority.epoch}:${authority.wave}:${authority.turn}:${authority.operationId}`;
+}
+
+const OPERATION_CAUSAL_ID_LIMIT = 192;
+const TRACED_OPERATION_STAGE_LIMIT = 2_048;
+
+/** Preserve ordinary operation ids exactly; reduce an anomalous oversized id to a stable bounded address. */
+function operationCausalId(authority: CoopOperationAuthorityAddress): string {
+  if (
+    authority.operationId.length <= OPERATION_CAUSAL_ID_LIMIT
+    && /^(?:\d+:\d+:[A-Z][A-Z0-9_]*:\d+|\d+:revision:\d+)$/.test(authority.operationId)
+  ) {
+    return authority.operationId;
+  }
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < authority.operationId.length; index++) {
+    hash ^= authority.operationId.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (
+    `operation:e${authority.epoch}:r${authority.seq}:id#${(hash >>> 0).toString(16).padStart(8, "0")}`
+    + `:len=${authority.operationId.length}`
+  );
 }
 
 function operationAckCanonical(msg: Extract<CoopMessage, { t: "coopAck" }>): string {
@@ -883,6 +907,8 @@ export class CoopDurabilityManager {
   private readonly operationContinuationTimers = new Map<string, OperationContinuationDeadline>();
   /** A final lost operation has no follower that can make the receiver request its missing revision. */
   private readonly operationDeliveryRetries = new Map<string, PendingOperationDeliveryRetry>();
+  /** One-shot lifecycle edges already emitted by this manager; fixed-cap and reset with the session lifecycle. */
+  private readonly tracedOperationStages = new Set<string>();
   private readonly exhaustedOperationContinuations = new Set<string>();
   private readonly scheduleOperationContinuationDeadline: (callback: () => void, ms: number) => () => void;
   private readonly operationContinuationDeadlineMs: number;
@@ -929,6 +955,36 @@ export class CoopDurabilityManager {
     this.off = transport.onMessage(msg => this.onMessage(msg));
   }
 
+  private recordOperationCausalStage(
+    authority: CoopOperationAuthorityAddress,
+    stage: string,
+    detail?: string,
+  ): void {
+    const stageKey = `${operationAuthorityKey(authority)}:${this.transport.role}:${stage}:${detail ?? ""}`;
+    if (this.tracedOperationStages.has(stageKey)) {
+      return;
+    }
+    this.tracedOperationStages.add(stageKey);
+    while (this.tracedOperationStages.size > TRACED_OPERATION_STAGE_LIMIT) {
+      const oldest = this.tracedOperationStages.values().next().value as string | undefined;
+      if (oldest == null) {
+        break;
+      }
+      this.tracedOperationStages.delete(oldest);
+    }
+    recordCoopCausalEvent({
+      domain: "operation",
+      stage,
+      causalId: operationCausalId(authority),
+      role: this.transport.role,
+      epoch: authority.epoch,
+      revision: authority.seq,
+      wave: authority.wave,
+      turn: authority.turn,
+      ...(detail == null ? {} : { detail }),
+    });
+  }
+
   /**
    * COMMIT a durable op (committer side): journal it (so it can be resent/replayed) then broadcast it. The
    * broadcast rides the transport's outbound queue, so a send while the channel is dark is not lost (§4.3).
@@ -948,6 +1004,9 @@ export class CoopDurabilityManager {
       return false;
     }
     const operation = operationAuthorityFor(cls, seq, msg);
+    if (operation != null) {
+      this.recordOperationCausalStage(operation.authority, "retained");
+    }
     if (operation != null && seq > this.journal.ackedThrough(cls)) {
       const key = operationAuthorityKey(operation.authority);
       if (!this.pendingHostOperationContinuations.has(key)) {
@@ -1041,11 +1100,11 @@ export class CoopDurabilityManager {
 
   /** Receiver: apply an inbound committed op idempotently by `(cls, seq)` (§1.6), then ACK / request tail. */
   private receiveOp(cls: string, seq: number, msg: CoopMessage): void {
+    const operation = operationAuthorityFor(cls, seq, msg);
     if (this.ledger.isDuplicate(cls, seq)) {
       this.clearDeferred(cls);
       this.clearRecoveryAfterProgress(cls);
       // Already applied (a safe resend, §4.2): re-ACK so the committer stops resending, do NOT re-apply.
-      const operation = operationAuthorityFor(cls, seq, msg);
       if (operation == null) {
         this.transport.send({ t: "coopAck", cls, seq: this.ledger.appliedThrough(cls) });
       } else {
@@ -1064,7 +1123,7 @@ export class CoopDurabilityManager {
             `deferred follower overflow cls=${cls} waiting=${deferred.entry.seq} got=${seq} `
               + `limit=${this.deferredFollowerLimit} -> bounded recovery`,
           );
-          this.requestBoundedRecovery(cls, seq, "gap");
+          this.requestBoundedRecovery(cls, seq, "gap", operation?.authority);
           return;
         }
         followers.set(seq, msg);
@@ -1074,10 +1133,9 @@ export class CoopDurabilityManager {
       }
       // A revision was missed: do NOT apply out of order - request the tail after our last-applied (§4.4).
       coopWarn("durability", `gap cls=${cls} got=${seq} have=${this.ledger.appliedThrough(cls)} -> request tail`);
-      this.requestBoundedRecovery(cls, seq, "gap");
+      this.requestBoundedRecovery(cls, seq, "gap", operation?.authority);
       return;
     }
-    const operation = operationAuthorityFor(cls, seq, msg);
     const operationKey = operation == null ? null : operationAuthorityKey(operation.authority);
     if (operation != null && operationKey != null && !this.pendingOperationContinuations.has(operationKey)) {
       this.pendingOperationContinuations.set(operationKey, {
@@ -1102,9 +1160,10 @@ export class CoopDurabilityManager {
     if (outcome === "rejected") {
       if (operationKey != null) {
         this.pendingOperationContinuations.delete(operationKey);
+        this.recordOperationCausalStage(operation.authority, "material-rejected");
       }
       coopWarn("durability", `apply REJECTED cls=${cls} seq=${seq} -> no ack (retriable)`);
-      this.requestBoundedRecovery(cls, seq, "apply-rejected");
+      this.requestBoundedRecovery(cls, seq, "apply-rejected", operation?.authority);
       return;
     }
     this.ledger.markApplied(cls, seq);
@@ -1121,7 +1180,8 @@ export class CoopDurabilityManager {
       if (operationKey != null) {
         this.pendingOperationContinuations.delete(operationKey);
       }
-      this.requestBoundedRecovery(cls, seq, "apply-rejected");
+      this.recordOperationCausalStage(operation.authority, "material-rejected", "reason=ack-refused");
+      this.requestBoundedRecovery(cls, seq, "apply-rejected", operation.authority);
       return;
     }
     const pending = this.pendingOperationContinuations.get(operationAuthorityKey(operation.authority));
@@ -1183,6 +1243,10 @@ export class CoopDurabilityManager {
     };
     this.pendingDeferred.set(entry.cls, pending);
     this.scheduleDeferredRetry(pending);
+    const operation = operationAuthorityFor(entry.cls, entry.seq, entry.msg);
+    if (operation != null) {
+      this.recordOperationCausalStage(operation.authority, "material-deferred");
+    }
     coopLog("durability", `apply DEFERRED cls=${entry.cls} seq=${entry.seq} -> no ack (boundary pending)`);
   }
 
@@ -1225,6 +1289,10 @@ export class CoopDurabilityManager {
       `deferred continuation EXHAUSTED cls=${failure.cls} from=${failure.from} blocked=${failure.blockedSeq} `
         + `attempts=${failure.attempts} deadlineMs=${this.deferredDeadlineMs}`,
     );
+    const operation = operationAuthorityFor(pending.entry.cls, pending.entry.seq, pending.entry.msg);
+    if (operation != null) {
+      this.recordOperationCausalStage(operation.authority, "terminal", "reason=deferred-timeout");
+    }
     try {
       this.hooks.onRecoveryExhausted?.(failure);
     } catch (error) {
@@ -1264,7 +1332,10 @@ export class CoopDurabilityManager {
     }
     // The deferred head completed but a later buffered revision proves an intermediate frame is missing.
     // Only now is this a genuine gap; enter the existing bounded resync path from the advanced cursor.
-    this.requestBoundedRecovery(cls, Math.min(...followers.keys()), "gap");
+    const blockedSeq = Math.min(...followers.keys());
+    const blockedMessage = followers.get(blockedSeq);
+    const operation = blockedMessage == null ? null : operationAuthorityFor(cls, blockedSeq, blockedMessage);
+    this.requestBoundedRecovery(cls, blockedSeq, "gap", operation?.authority);
   }
 
   private sendOperationAck(
@@ -1344,6 +1415,17 @@ export class CoopDurabilityManager {
       // Evidence remains canonical locally. A retained-envelope replay/reconnect re-sends this exact stage.
       coopWarn("durability", `operation ACK send deferred key=${key} stage=${stage}`, error);
     }
+    this.recordOperationCausalStage(
+      authority,
+      stage === "materialApplied"
+        ? "material-applied"
+        : stage === "presentationReady"
+          ? "presentation-ready"
+          : "continuation-ready",
+      surface == null || continuation == null
+        ? "proof=published"
+        : `proof=published surface=${surface} at=${continuation.epoch}/${continuation.wave}/${continuation.turn}`,
+    );
     return ack;
   }
 
@@ -1546,6 +1628,17 @@ export class CoopDurabilityManager {
       }
     }
     this.hostOperationAckEvidence.set(key, { stage: msg.stage, canonical, value: msg });
+    this.recordOperationCausalStage(
+      authority,
+      msg.stage === "materialApplied"
+        ? "material-applied"
+        : msg.stage === "presentationReady"
+          ? "presentation-ready"
+          : "continuation-ready",
+      msg.surface == null
+        ? "proof=received"
+        : `proof=received surface=${msg.surface} at=${msg.continuationEpoch}/${msg.continuationWave}/${msg.continuationTurn}`,
+    );
     if (msg.stage === "materialApplied" || msg.stage === "continuationReady") {
       this.cancelOperationDeliveryRetry(key);
       this.settleOperationMaterialWaiters(key, true);
@@ -1596,6 +1689,7 @@ export class CoopDurabilityManager {
         this.cancelOperationDeliveryRetry(key);
         this.settleOperationMaterialWaiters(key, true);
         this.pendingHostOperationContinuations.delete(key);
+        this.recordOperationCausalStage(admitted.authority, "released", "proof=continuation-ready");
       } else if (entry.seq > cumulativeThrough) {
         break;
       }
@@ -1682,6 +1776,7 @@ export class CoopDurabilityManager {
       const separator = remainder.indexOf(":");
       const seq = Number(separator < 0 ? remainder : remainder.slice(0, separator));
       if (Number.isSafeInteger(seq) && seq <= through) {
+        const pending = this.pendingHostOperationContinuations.get(key);
         const evidence = this.hostOperationAckEvidence.get(key);
         this.settleOperationMaterialWaiters(
           key,
@@ -1691,6 +1786,9 @@ export class CoopDurabilityManager {
         this.operationContinuationTimers.delete(key);
         this.cancelOperationDeliveryRetry(key);
         this.pendingHostOperationContinuations.delete(key);
+        if (pending != null) {
+          this.recordOperationCausalStage(pending.authority, "released", "proof=snapshot");
+        }
       }
     }
   }
@@ -1719,6 +1817,7 @@ export class CoopDurabilityManager {
       this.cancelOperationDeliveryRetry(key);
       this.settleOperationMaterialWaiters(key, false);
       this.pendingHostOperationContinuations.delete(key);
+      this.recordOperationCausalStage(authority, "terminal", "reason=continuation-timeout");
       coopWarn("durability", `operation continuation EXHAUSTED key=${key}`);
       try {
         this.hooks.onRecoveryExhausted?.({
@@ -1774,6 +1873,7 @@ export class CoopDurabilityManager {
     const elapsed = this.recoveryNow() - pending.startedAt;
     if (pending.attempts >= this.recoveryMaxAttempts || elapsed >= this.recoveryDeadlineMs) {
       this.cancelOperationDeliveryRetry(key);
+      this.recordOperationCausalStage(authority, "retry-exhausted", `attempts=${pending.attempts}`);
       coopWarn(
         "durability",
         `operation delivery retries exhausted key=${key} attempts=${pending.attempts}; continuation deadline remains armed`,
@@ -1786,6 +1886,7 @@ export class CoopDurabilityManager {
       return;
     }
     pending.attempts++;
+    this.recordOperationCausalStage(authority, "delivery-retry", `attempt=${pending.attempts}`);
     coopLog(
       "durability",
       `operation delivery RETRY key=${key} attempt=${pending.attempts}/${this.recoveryMaxAttempts}`,
@@ -1842,6 +1943,7 @@ export class CoopDurabilityManager {
     cls: string,
     blockedSeq: number,
     reason: CoopDurabilityRecoveryFailure["reason"],
+    authority: CoopOperationAuthorityAddress | null = null,
   ): void {
     if (this.disposed) {
       return;
@@ -1853,6 +1955,9 @@ export class CoopDurabilityManager {
     const current = this.pendingRecovery.get(cls);
     if (current?.from === from) {
       current.blockedSeq = Math.max(current.blockedSeq, blockedSeq);
+      if (authority != null && (current.authority == null || reason === "apply-rejected")) {
+        current.authority = authority;
+      }
       if (reason === "apply-rejected") {
         current.reason = reason;
       }
@@ -1867,6 +1972,7 @@ export class CoopDurabilityManager {
       reason,
       startedAt: this.recoveryNow(),
       cancel: () => {},
+      authority,
     };
     this.pendingRecovery.set(cls, pending);
     this.sendRecoveryAttempt(pending);
@@ -1886,6 +1992,13 @@ export class CoopDurabilityManager {
       return;
     }
     pending.attempts++;
+    if (pending.authority != null) {
+      this.recordOperationCausalStage(
+        pending.authority,
+        "recovery-retry",
+        `attempt=${pending.attempts} reason=${pending.reason}`,
+      );
+    }
     coopWarn(
       "durability",
       `recover cls=${pending.cls} from=${pending.from} blocked=${pending.blockedSeq} `
@@ -1937,6 +2050,9 @@ export class CoopDurabilityManager {
       `recovery EXHAUSTED cls=${failure.cls} from=${failure.from} blocked=${failure.blockedSeq} `
         + `attempts=${failure.attempts} reason=${failure.reason}`,
     );
+    if (pending.authority != null) {
+      this.recordOperationCausalStage(pending.authority, "terminal", `reason=${pending.reason}`);
+    }
     try {
       this.hooks.onRecoveryExhausted?.(failure);
     } catch (error) {
@@ -1973,6 +2089,10 @@ export class CoopDurabilityManager {
     const tail = this.journal.tailFrom(cls, from);
     coopLog("durability", `resync cls=${cls} from=${from} -> replay ${tail.length} entries`);
     for (const e of tail) {
+      const operation = operationAuthorityFor(e.cls, e.seq, e.msg);
+      if (operation != null) {
+        this.recordOperationCausalStage(operation.authority, "delivery-retry", "reason=tail-request");
+      }
       this.transport.send(e.msg);
     }
   }
@@ -2045,6 +2165,10 @@ export class CoopDurabilityManager {
       if (tail.length > 0) {
         coopLog("durability", `${reason} resend cls=${cls} unacked=${tail.length}`);
         for (const e of tail) {
+          const operation = operationAuthorityFor(e.cls, e.seq, e.msg);
+          if (operation != null) {
+            this.recordOperationCausalStage(operation.authority, "delivery-retry", `reason=${reason}`);
+          }
           this.transport.send(e.msg);
         }
       }
@@ -2157,6 +2281,7 @@ export class CoopDurabilityManager {
     this.pendingCumulativeAcks.clear();
     this.retainedSnapshotFrontiers.clear();
     this.committedSnapshotAcks.clear();
+    this.tracedOperationStages.clear();
     this.journal.restoreHighWater(highWater);
     // Restore the committer's peer-ACK view too: a converged save has the peer applied through the high-water,
     // so without this the committer's acked=0 makes a post-resume reconnect resync spuriously escalate to a
@@ -2196,6 +2321,7 @@ export class CoopDurabilityManager {
     this.pendingCumulativeAcks.clear();
     this.retainedSnapshotFrontiers.clear();
     this.committedSnapshotAcks.clear();
+    this.tracedOperationStages.clear();
     this.off();
   }
 }
