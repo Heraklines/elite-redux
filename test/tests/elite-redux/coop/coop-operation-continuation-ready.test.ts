@@ -264,6 +264,7 @@ describe("protocol-33 retained operation continuation lifecycle", () => {
     const failures: CoopDurabilityRecoveryFailure[] = [];
     const host = new CoopDurabilityManager(pair.host, {
       operationContinuationDeadlineMs: 25,
+      operationAuthorityContinuationDeadlineMs: 40,
       scheduleOperationContinuationDeadline: (callback, ms) => {
         const deadline = { callback, cancelled: false, ms };
         deadlines.push(deadline);
@@ -283,7 +284,7 @@ describe("protocol-33 retained operation continuation lifecycle", () => {
       expect(host.commit("op:global", committed.revision, { t: "envelope", envelope: committed })).toBe(true);
       await flush();
       expect(deadlines).toHaveLength(1);
-      expect(deadlines[0].ms).toBe(25);
+      expect(deadlines[0].ms, "host construction has its own bounded budget").toBe(40);
       expect(host.unackedCount()).toBe(1);
 
       expect(notifyCoopOperationAuthorityContinuationSurface("terminal", { epoch: 7, wave: 10, turn: 3 })).toBe(0);
@@ -294,7 +295,10 @@ describe("protocol-33 retained operation continuation lifecycle", () => {
       expect(notifyCoopOperationAuthorityContinuationSurface("command", { epoch: 7, wave: 11, turn: 1 })).toBe(1);
       expect(deadlines).toHaveLength(2);
       expect(deadlines[0].cancelled).toBe(true);
-      expect(deadlines[1]).toMatchObject({ cancelled: false, ms: 25 });
+      expect(deadlines[1], "the exact host surface starts the tighter peer budget").toMatchObject({
+        cancelled: false,
+        ms: 25,
+      });
 
       expect(notifyCoopOperationAuthorityContinuationSurface("sharedInput", { epoch: 7, wave: 11, turn: 1 })).toBe(0);
       expect(deadlines).toHaveLength(2);

@@ -661,7 +661,14 @@ const DURABILITY_RECOVERY_MAX_ATTEMPTS = 8;
 const DURABILITY_RECOVERY_DEADLINE_MS = 12_000;
 const DURABILITY_DEFERRED_RETRY_MS = 100;
 const DURABILITY_DEFERRED_DEADLINE_MS = 60_000;
-const OPERATION_CONTINUATION_DEADLINE_MS = 60_000;
+/**
+ * The committer can legitimately spend most of a minute persisting the completed wave, materializing the
+ * next encounter, and loading its assets before its own public continuation exists. Keep that host-side
+ * construction budget separate from the tighter peer-convergence budget that begins only after the host
+ * proves its continuation is executable.
+ */
+const OPERATION_AUTHORITY_CONTINUATION_DEADLINE_MS = 180_000;
+const OPERATION_PEER_CONTINUATION_DEADLINE_MS = 60_000;
 
 function defaultDurabilitySchedule(callback: () => void, ms: number): () => void {
   const timer = setTimeout(callback, ms);
@@ -853,8 +860,10 @@ export interface CoopDurabilityHooks {
   deferredRetryMs?: number;
   /** Maximum valid-boundary wait before the same peer-coherent terminal supervisor is invoked. */
   deferredDeadlineMs?: number;
-  /** Host deadline for an applied operation to expose its correctly addressed public continuation. */
+  /** Peer-convergence deadline after the host exposes its correctly addressed public continuation. */
   operationContinuationDeadlineMs?: number;
+  /** Initial deadline for the host to construct its own correctly addressed public continuation. */
+  operationAuthorityContinuationDeadlineMs?: number;
   /** Dedicated timer seam for deterministic continuation-retention tests. */
   scheduleOperationContinuationDeadline?: (callback: () => void, ms: number) => () => void;
   /** Runtime bridge into the peer-coherent terminal supervisor after one class exhausts its retry budget. */
@@ -911,7 +920,8 @@ export class CoopDurabilityManager {
   private readonly tracedOperationStages = new Set<string>();
   private readonly exhaustedOperationContinuations = new Set<string>();
   private readonly scheduleOperationContinuationDeadline: (callback: () => void, ms: number) => () => void;
-  private readonly operationContinuationDeadlineMs: number;
+  private readonly operationAuthorityContinuationDeadlineMs: number;
+  private readonly operationPeerContinuationDeadlineMs: number;
   private disposed = false;
 
   constructor(
@@ -931,7 +941,15 @@ export class CoopDurabilityManager {
     this.deferredFollowerLimit = journalCapacity;
     this.scheduleOperationContinuationDeadline =
       hooks.scheduleOperationContinuationDeadline ?? defaultDurabilitySchedule;
-    this.operationContinuationDeadlineMs = hooks.operationContinuationDeadlineMs ?? OPERATION_CONTINUATION_DEADLINE_MS;
+    this.operationPeerContinuationDeadlineMs =
+      hooks.operationContinuationDeadlineMs ?? OPERATION_PEER_CONTINUATION_DEADLINE_MS;
+    // Keep the old single-hook test seam backwards compatible: a caller that supplies only the peer value
+    // still gets one deterministic budget for both stages. Production, which supplies neither, gets the
+    // deliberately wider authority-construction window.
+    this.operationAuthorityContinuationDeadlineMs =
+      hooks.operationAuthorityContinuationDeadlineMs
+      ?? hooks.operationContinuationDeadlineMs
+      ?? OPERATION_AUTHORITY_CONTINUATION_DEADLINE_MS;
     if (
       !Number.isSafeInteger(this.recoveryInitialMs)
       || this.recoveryInitialMs <= 0
@@ -947,8 +965,10 @@ export class CoopDurabilityManager {
       || this.deferredDeadlineMs < this.deferredRetryMs
       || !Number.isSafeInteger(this.deferredFollowerLimit)
       || this.deferredFollowerLimit <= 0
-      || !Number.isSafeInteger(this.operationContinuationDeadlineMs)
-      || this.operationContinuationDeadlineMs <= 0
+      || !Number.isSafeInteger(this.operationAuthorityContinuationDeadlineMs)
+      || this.operationAuthorityContinuationDeadlineMs <= 0
+      || !Number.isSafeInteger(this.operationPeerContinuationDeadlineMs)
+      || this.operationPeerContinuationDeadlineMs <= 0
     ) {
       throw new Error("invalid durability recovery timing configuration");
     }
@@ -1012,7 +1032,7 @@ export class CoopDurabilityManager {
           materialWaiters: new Set(),
         });
       }
-      this.armOperationContinuationDeadline(operation.authority);
+      this.armOperationContinuationDeadline(operation.authority, "authority-surface");
       this.armOperationDeliveryRetry(operation.authority);
     }
     try {
@@ -1521,7 +1541,7 @@ export class CoopDurabilityManager {
       operation.authoritySurfaceRearmed = true;
       deadline.cancel();
       this.operationContinuationTimers.delete(key);
-      this.armOperationContinuationDeadline(operation.authority);
+      this.armOperationContinuationDeadline(operation.authority, "peer-convergence");
       coopLog(
         "durability",
         `host operation continuation window REARM key=${key} surface=${surface} at=${current.epoch}/${current.wave}/${current.turn}`,
@@ -1789,12 +1809,19 @@ export class CoopDurabilityManager {
     }
   }
 
-  private armOperationContinuationDeadline(authority: CoopOperationAuthorityAddress): void {
+  private armOperationContinuationDeadline(
+    authority: CoopOperationAuthorityAddress,
+    stage: "authority-surface" | "peer-convergence",
+  ): void {
     const key = operationAuthorityKey(authority);
     if (this.operationContinuationTimers.has(key) || this.exhaustedOperationContinuations.has(key)) {
       return;
     }
     const deadline: OperationContinuationDeadline = { cancel: () => {} };
+    const deadlineMs =
+      stage === "authority-surface"
+        ? this.operationAuthorityContinuationDeadlineMs
+        : this.operationPeerContinuationDeadlineMs;
     deadline.cancel = this.scheduleOperationContinuationDeadline(() => {
       // A host-surface rearm replaces the first-stage deadline. A stale callback that was already queued
       // before cancellation has no authority to delete/exhaust the replacement stage.
@@ -1826,8 +1853,9 @@ export class CoopDurabilityManager {
       } catch (error) {
         coopWarn("durability", `operation continuation terminal hook threw key=${key}`, error);
       }
-    }, this.operationContinuationDeadlineMs);
+    }, deadlineMs);
     this.operationContinuationTimers.set(key, deadline);
+    this.recordOperationCausalStage(authority, "continuation-deadline", `stage=${stage} budgetMs=${deadlineMs}`);
   }
 
   /**
