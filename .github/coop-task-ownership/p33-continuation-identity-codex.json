@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "taskId": "p33-continuation-identity-codex",
+  "branch": "ci/coop/p33-continuation-identity-codex",
+  "trainRef": "ci/coop/p33-closure-codex",
+  "baseSha": "771d9549ab0fac7f0b4cea5e4a00fd39032e0430",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-continuation-identity-codex.json",
+    "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/phases/select-modifier-phase.ts",
+    "test/tests/elite-redux/coop/coop-retained-continuation-identity.test.ts"
+  ]
+}
