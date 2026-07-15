@@ -130,9 +130,7 @@ export async function confirmSeededStarterTeam(client, expectedSpecies, { timeou
   const seeded = await client.evidence.waitForCondition(
     sink => {
       const event = sink.findLastSemanticSurface(0, "starter-select");
-      return JSON.stringify(event?.observation.teamSpeciesIds) === JSON.stringify(expectedSpeciesIds)
-        ? event
-        : null;
+      return JSON.stringify(event?.observation.teamSpeciesIds) === JSON.stringify(expectedSpeciesIds) ? event : null;
     },
     {
       timeoutMs,

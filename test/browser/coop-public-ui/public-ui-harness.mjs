@@ -1664,9 +1664,10 @@ export class DuoPublicUiRig {
                 ? [MAGIKARP_SPECIES_ID, BULBASAUR_SPECIES_ID]
                 : [BULBASAUR_SPECIES_ID]
               : null;
-          const result = expectedSeededSpecies == null
-            ? await confirmDefaultStarterTeam(client, { timeoutMs: this.config.timeoutMs })
-            : await confirmSeededStarterTeam(client, expectedSeededSpecies, { timeoutMs: this.config.timeoutMs });
+          const result =
+            expectedSeededSpecies == null
+              ? await confirmDefaultStarterTeam(client, { timeoutMs: this.config.timeoutMs })
+              : await confirmSeededStarterTeam(client, expectedSeededSpecies, { timeoutMs: this.config.timeoutMs });
           return [client.label, result.launchCursor];
         }),
       ),
