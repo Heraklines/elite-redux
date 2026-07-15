@@ -32,9 +32,11 @@
 import { type AbAttr, ConditionalCritAbAttr, PostFaintAbAttr } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { CommonRootAbAttr, ER_COMMON_ROOT_ABILITY_ID } from "#data/elite-redux/abilities/common-root";
 import { ER_PUPPET_STRINGS_ABILITY_ID, PuppetStringsAbAttr } from "#data/elite-redux/abilities/puppet-strings";
 import { ER_SILKEN_DECREE_ABILITY_ID, SilkenDecreeAbAttr } from "#data/elite-redux/abilities/silken-decree";
 import { ER_SPORE_BED_ABILITY_ID } from "#data/elite-redux/abilities/spore-bed";
+import { ER_TANGLED_SEED_ABILITY_ID, TangledSeedAbAttr } from "#data/elite-redux/abilities/tangled-seed";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
 import { EntryTrapOnFoeSideAbAttr } from "#data/elite-redux/archetypes/entry-trap-on-foe-side";
@@ -226,6 +228,26 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
         archetype: "unknown",
       },
       pokerogueId: ER_SPORE_BED_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_TANGLED_SEED_ABILITY_ID,
+        name: "Tangled Seed",
+        description:
+          "When this Pokemon applies Leech Seed, the seeded target cannot voluntarily switch out until the end of the following turn. Forced switches still work.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_TANGLED_SEED_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_COMMON_ROOT_ABILITY_ID,
+        name: "Common Root",
+        description:
+          "Whenever a foe loses HP to Leech Seed, every active Pokemon on this Pokemon's side recovers the ordinary Leech Seed amount, not just the seeder.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_COMMON_ROOT_ABILITY_ID,
     },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
@@ -424,6 +446,14 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_SPORE_BED_ABILITY_ID) {
     builder.attr(EntryTrapOnFoeSideAbAttr, BattlerTagType.INFESTATION, "foe");
+  }
+
+  if (pokerogueId === ER_TANGLED_SEED_ABILITY_ID) {
+    builder.attr(TangledSeedAbAttr);
+  }
+
+  if (pokerogueId === ER_COMMON_ROOT_ABILITY_ID) {
+    builder.attr(CommonRootAbAttr);
   }
 
   const ability = builder.build();

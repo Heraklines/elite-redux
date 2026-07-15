@@ -1207,6 +1207,15 @@ export class SeedTag extends SerializableBattlerTag {
       }),
     );
     (this as Mutable<this>).sourceIndex = source.getBattlerIndex();
+
+    // ER Tangled Seed: the seeder's ability prevents the seeded target from
+    // voluntarily switching until the end of the FOLLOWING turn. TRAPPED blocks
+    // the voluntary switch command (Pokemon.isTrapped) but not forced switches
+    // (Roar / Whirlwind). turnCount 2: applied mid-turn, survives this turn-end,
+    // expires at the end of the following turn.
+    if (source.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "TangledSeedAbAttr")) {
+      pokemon.addTag(BattlerTagType.TRAPPED, 2, MoveId.LEECH_SEED, source.id);
+    }
   }
 
   lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
@@ -1249,6 +1258,33 @@ export class SeedTag extends SerializableBattlerTag {
       false,
       true,
     );
+
+    // ER Common Root: when a foe loses HP to Leech Seed and any Pokemon on the
+    // seeder's side carries Common Root, EVERY OTHER active ally on that side also
+    // recovers the ordinary Leech Seed amount (the seeder itself already healed
+    // above). Skipped when Liquid Ooze reversed the drain into damage.
+    if (!reverseDrain) {
+      const allies = source.getAllies().filter(a => a?.isActive(true));
+      const hasCommonRoot = (p: Pokemon): boolean =>
+        p.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "CommonRootAbAttr");
+      const sideHasCommonRoot = hasCommonRoot(source) || allies.some(hasCommonRoot);
+      if (sideHasCommonRoot) {
+        for (const ally of allies) {
+          if (!ally.isFullHp()) {
+            globalScene.phaseManager.unshiftNew(
+              "PokemonHealPhase",
+              ally.getBattlerIndex(),
+              damage,
+              i18next.t("battlerTags:seededLapse", {
+                pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+              }),
+              false,
+              true,
+            );
+          }
+        }
+      }
+    }
     return true;
   }
 
