@@ -284,10 +284,10 @@ import {
   isValidCoopWaveAdvancePayload,
   markCoopWaveAdvanceBootstrapProjected,
   markCoopWaveAdvanceContinuationReady,
-  markCoopWaveAdvanceDataApplied,
   resetCoopWaveAdvanceOperationState,
   resolveCoopBiomeBoundaryFlag,
   setCoopWaveAdvanceOperationRevisionFloor,
+  tryApplyCoopWaveAdvanceDataAtBoundary,
 } from "#data/elite-redux/coop/coop-wave-operation";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
 import {
@@ -1110,6 +1110,11 @@ function releaseCoopSettledWaveBoundary(wave: number): boolean {
   }
 }
 
+/** Exact proof that the queued BattleEnd for `wave` currently owns retained DATA admission. */
+export function isCoopSettledWaveBoundaryPending(wave: number): boolean {
+  return pendingSettledWaveBoundary?.wave === wave && pendingSettledWaveBoundary.released === false;
+}
+
 /**
  * GUEST: take + clear any pending host wave-end authoritative snapshot (#838). Returns the host's
  * complete post-exp battle state to apply, or null when none is pending or this wave was already
@@ -1142,24 +1147,13 @@ function tryApplyCoopSettledWaveData(wave: number, binding: CoopWaveAdvanceOpera
   if (staged.dataApplied) {
     return releaseCoopSettledWaveBoundary(wave);
   }
-  if (globalScene.currentBattle?.waveIndex !== wave) {
-    coopWarn(
-      "progression",
-      `retained WAVE_ADVANCE DATA refused outside source wave expected=${wave} actual=${globalScene.currentBattle?.waveIndex ?? -1}`,
-    );
-    return false;
-  }
-  const immutableState = structuredClone(staged.envelope.authoritativeState);
-  let applied = applyCoopAuthoritativeBattleState(immutableState, true);
-  // The state applier admits its monotonic tick before its final renderer work. If that latter work throws,
-  // retry the exact already-admitted image through the established reassert seam instead of converting an
-  // idempotent retry into a permanent stale-tick wait.
-  if (!applied && coopAppliedStateTick() === immutableState.tick) {
-    applied = reapplyAcceptedCoopAuthoritativeBattleState(immutableState, true);
-  }
-  if (!applied || !markCoopWaveAdvanceDataApplied(wave, binding)) {
+  const outcome = tryApplyCoopWaveAdvanceDataAtBoundary(wave, binding);
+  if (outcome === "rejected") {
     coopWarn("progression", `retained WAVE_ADVANCE DATA apply rejected wave=${wave}`);
     failCoopSharedSession(`Could not apply the complete retained state for wave ${wave}.`);
+    return false;
+  }
+  if (outcome !== "applied") {
     return false;
   }
   coopLog(
@@ -1177,6 +1171,7 @@ function tryApplyCoopSettledWaveData(wave: number, binding: CoopWaveAdvanceOpera
 export function awaitCoopSettledWaveAdvanceAtBattleEnd(
   release: () => void,
   binding: CoopWaveAdvanceOperationBinding | null = active?.waveOperationBinding ?? null,
+  sourceWave: number = globalScene.currentBattle?.waveIndex ?? -1,
 ): boolean {
   const runtime = active;
   if (runtime == null || binding == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
@@ -1188,7 +1183,7 @@ export function awaitCoopSettledWaveAdvanceAtBattleEnd(
   if (globalScene.currentBattle?.isBattleMysteryEncounter?.()) {
     return false;
   }
-  const wave = globalScene.currentBattle?.waveIndex ?? -1;
+  const wave = sourceWave;
   if (!Number.isSafeInteger(wave) || wave < 0) {
     failCoopSharedSession("The retained post-battle boundary had no valid source wave.");
     return true;

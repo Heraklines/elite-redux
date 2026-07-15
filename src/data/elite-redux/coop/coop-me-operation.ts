@@ -51,6 +51,7 @@
 // =============================================================================
 
 import { canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
+import { captureCoopAuthoritativeBattleState } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_CAP_OP_ME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
@@ -674,6 +675,21 @@ function controlContext(wave: number, turn: number): CoopCommitContext {
   return { wave, turn, logicalPhase: "MYSTERY_ENCOUNTER", authoritativeState: placeholder };
 }
 
+/** Capture the mechanical image described by the accompanying retained ME presentation. */
+function presentationContext(wave: number, turn: number): CoopCommitContext | null {
+  const authoritativeState = captureCoopAuthoritativeBattleState(turn);
+  if (
+    authoritativeState == null
+    || authoritativeState.tick <= 0
+    || authoritativeState.wave !== wave
+    || authoritativeState.turn !== turn
+    || authoritativeState.playerParty.length === 0
+  ) {
+    return null;
+  }
+  return { wave, turn, logicalPhase: "MYSTERY_ENCOUNTER", authoritativeState };
+}
+
 /**
  * Which seat DRIVES an ME decision of `kind` pinned at `pinned`. The presentation ack + the terminal are
  * always HOST-authoritative (the host is the sole ME engine, #693); the alternated pick/sub/button/quiz
@@ -767,7 +783,15 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
     // The AUTHORITY (coop host) is the sole committer (invariant 3). When the LOCAL owner is the host, it
     // commits its own intent here; when the owner is the guest, the host commits on adopt (watcher seam).
     if (params.localRole === "host") {
-      const res = host().submit(intent, controlContext(params.wave, params.turn), seatValidator(ownerSeat));
+      const context =
+        params.kind === "ME_PRESENT"
+          ? presentationContext(params.wave, params.turn)
+          : controlContext(params.wave, params.turn);
+      if (context == null) {
+        coopWarn("me", `ME_PRESENT ${intent.id} had no complete authoritative state image`);
+        return null;
+      }
+      const res = host().submit(intent, context, seatValidator(ownerSeat));
       if (res.kind === "committed" || res.kind === "reack") {
         // COMMIT -> JOURNAL (Wave-2e, §4.1/§4.2): register the committed ME step with the durability journal
         // (resend / reconnect replay). An idempotent re-ACK is journaled again as well: this is the

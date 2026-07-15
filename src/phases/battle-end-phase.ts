@@ -13,13 +13,13 @@ import {
   failCoopSharedSession,
   getCoopWaveAdvanceRuntimeBinding,
   isCoopAuthoritativeGuest,
+  isCoopSettledWaveBoundaryPending,
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopAuthorityContinuationSurface } from "#data/elite-redux/coop/coop-ui-registry";
 import {
   type CoopWaveAdvanceOperationBinding,
   isValidCoopWaveAdvancePayload,
   registerCoopWaveAdvanceBoundaryDataApplier,
-  tryApplyCoopWaveAdvanceDataAtBoundary,
 } from "#data/elite-redux/coop/coop-wave-operation";
 import { erAdvanceCommunityItemCharges } from "#data/elite-redux/er-community-items";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
@@ -66,14 +66,16 @@ registerCoopWaveAdvanceBoundaryDataApplier(envelope => {
   }
   const sourceWave = payload.wave;
   const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
-  if (currentWave > sourceWave) {
+  const phaseName = globalScene.phaseManager?.getCurrentPhase()?.phaseName;
+  const exactQueuedBattleEnd =
+    phaseName === "BattleEndPhase" && currentWave === sourceWave + 1 && isCoopSettledWaveBoundaryPending(sourceWave);
+  if (currentWave > sourceWave && !exactQueuedBattleEnd) {
     return "rejected";
   }
-  if (currentWave !== sourceWave) {
+  if (currentWave !== sourceWave && !exactQueuedBattleEnd) {
     return "deferred";
   }
 
-  const phaseName = globalScene.phaseManager?.getCurrentPhase()?.phaseName;
   let publicSourceBoundary = false;
   try {
     const handlerActive = globalScene.ui.getHandler()?.active === true;
@@ -122,12 +124,17 @@ export class BattleEndPhase extends BattlePhase {
    * ledger owner stable across that delay instead of looking it up again only when BattleEnd eventually starts.
    */
   private readonly retainedWaveBinding: CoopWaveAdvanceOperationBinding | null;
+  /** The battle this queued phase closes, before a speculative tail can replace `currentBattle`. */
+  private readonly retainedSourceWave: number;
+  private readonly retainedSourceWasTrainer: boolean;
 
   constructor(isVictory: boolean) {
     super();
 
     this.isVictory = isVictory;
     this.retainedWaveBinding = getCoopWaveAdvanceRuntimeBinding();
+    this.retainedSourceWave = globalScene.currentBattle?.waveIndex ?? -1;
+    this.retainedSourceWasTrainer = globalScene.currentBattle?.trainer != null;
   }
 
   start() {
@@ -140,20 +147,10 @@ export class BattleEndPhase extends BattlePhase {
     );
     globalScene.phaseManager.removeAllPhasesOfType("BattleEndPhase");
 
-    // Make BattleEnd itself the deterministic DATA wake. Polling and UI notifications remain backstops,
-    // but correctness no longer depends on a retry timer happening to fire while this short phase is live.
-    if (isCoopAuthoritativeGuest()) {
-      const wave = globalScene.currentBattle?.waveIndex ?? -1;
-      const binding = this.retainedWaveBinding ?? getCoopWaveAdvanceRuntimeBinding();
-      if (binding == null) {
-        failCoopSharedSession(`The retained wave ${wave} BattleEnd had no owning runtime.`);
-        return;
-      }
-      const dataOutcome = tryApplyCoopWaveAdvanceDataAtBoundary(wave, binding);
-      if (dataOutcome === "rejected") {
-        failCoopSharedSession(`Could not apply the complete retained state at wave ${wave} BattleEnd.`);
-        return;
-      }
+    const retainedBinding = this.retainedWaveBinding ?? getCoopWaveAdvanceRuntimeBinding();
+    if (isCoopAuthoritativeGuest() && retainedBinding == null) {
+      failCoopSharedSession(`The retained wave ${this.retainedSourceWave} BattleEnd had no owning runtime.`);
+      return;
     }
 
     // P33 guest: the host's post-BattleEnd image already contains every mutation below. Hold this phase
@@ -161,7 +158,8 @@ export class BattleEndPhase extends BattlePhase {
     if (
       awaitCoopSettledWaveAdvanceAtBattleEnd(
         () => this.releaseRetainedBoundary(),
-        this.retainedWaveBinding ?? getCoopWaveAdvanceRuntimeBinding(),
+        retainedBinding,
+        this.retainedSourceWave,
       )
     ) {
       return;
@@ -238,7 +236,7 @@ export class BattleEndPhase extends BattlePhase {
       this.recordLocalBattleStats();
       this.retainedLocalStatsRecorded = true;
     }
-    coopLog("progression", `GUEST retained WAVE_ADVANCE BattleEnd release wave=${globalScene.currentBattle.waveIndex}`);
+    coopLog("progression", `GUEST retained WAVE_ADVANCE BattleEnd release wave=${this.retainedSourceWave}`);
     this.end();
     this.retainedBoundaryReleased = true;
   }
@@ -247,11 +245,11 @@ export class BattleEndPhase extends BattlePhase {
     globalScene.gameData.gameStats.battles++;
     if (
       globalScene.gameMode.isEndless
-      && globalScene.currentBattle.waveIndex + 1 > globalScene.gameData.gameStats.highestEndlessWave
+      && this.retainedSourceWave + 1 > globalScene.gameData.gameStats.highestEndlessWave
     ) {
-      globalScene.gameData.gameStats.highestEndlessWave = globalScene.currentBattle.waveIndex + 1;
+      globalScene.gameData.gameStats.highestEndlessWave = this.retainedSourceWave + 1;
     }
-    if (this.isVictory && globalScene.currentBattle.trainer) {
+    if (this.isVictory && this.retainedSourceWasTrainer) {
       globalScene.gameData.gameStats.trainersDefeated++;
     }
   }
