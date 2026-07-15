@@ -33,6 +33,7 @@ import { type AbAttr, ConditionalCritAbAttr, PostFaintAbAttr } from "#abilities/
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { CommonRootAbAttr, ER_COMMON_ROOT_ABILITY_ID } from "#data/elite-redux/abilities/common-root";
+import { DandelionBurstAbAttr, ER_DANDELION_BURST_ABILITY_ID } from "#data/elite-redux/abilities/dandelion-burst";
 import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abilities/last-host";
 import { ER_MYCELIAL_NETWORK_ABILITY_ID, MycelialNetworkAbAttr } from "#data/elite-redux/abilities/mycelial-network";
 import { ER_PUPPET_STRINGS_ABILITY_ID, PuppetStringsAbAttr } from "#data/elite-redux/abilities/puppet-strings";
@@ -271,6 +272,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_LAST_HOST_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_DANDELION_BURST_ABILITY_ID,
+        name: "Dandelion Burst",
+        description:
+          "Once per battle, when this Pokemon falls to half HP or lower, it applies Leech Seed to all foes and uses Cotton Spore against the opposing side. Normal immunities apply.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_DANDELION_BURST_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -484,6 +495,10 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_LAST_HOST_ABILITY_ID) {
     builder.attr(LastHostAbAttr);
+  }
+
+  if (pokerogueId === ER_DANDELION_BURST_ABILITY_ID) {
+    builder.attr(DandelionBurstAbAttr);
   }
 
   const ability = builder.build();
