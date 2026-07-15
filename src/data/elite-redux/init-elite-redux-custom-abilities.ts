@@ -32,6 +32,11 @@
 import { type AbAttr, ConditionalCritAbAttr, PostFaintAbAttr } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
+import {
+  BorrowedTimeDecayAbAttr,
+  BorrowedTimeSummonAbAttr,
+  ER_BORROWED_TIME_ABILITY_ID,
+} from "#data/elite-redux/abilities/borrowed-time";
 import { CleansingLightAbAttr, ER_CLEANSING_LIGHT_ABILITY_ID } from "#data/elite-redux/abilities/cleansing-light";
 import { CommonRootAbAttr, ER_COMMON_ROOT_ABILITY_ID } from "#data/elite-redux/abilities/common-root";
 import { DandelionBurstAbAttr, ER_DANDELION_BURST_ABILITY_ID } from "#data/elite-redux/abilities/dandelion-burst";
@@ -351,6 +356,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_RELATIVITY_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_BORROWED_TIME_ABILITY_ID,
+        name: "Borrowed Time",
+        description:
+          "On entry, this Pokemon swaps its raw Speed with the fastest opposing Pokemon for 3 turns. Each turn, one third of the original difference returns to each side until both are back to normal.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_BORROWED_TIME_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -593,6 +608,11 @@ function buildCustomAbility(
   if (pokerogueId === ER_RELATIVITY_ABILITY_ID) {
     builder.attr(RelativityAbAttr);
     builder.attr(RelativityDefenseReductionAbAttr);
+  }
+
+  if (pokerogueId === ER_BORROWED_TIME_ABILITY_ID) {
+    builder.attr(BorrowedTimeSummonAbAttr);
+    builder.attr(BorrowedTimeDecayAbAttr);
   }
 
   const ability = builder.build();
