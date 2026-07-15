@@ -250,7 +250,7 @@ export class ErCrossroadsPhase extends Phase {
       globalScene.ui.setMode(UiMode.MESSAGE);
       if (moveOn) {
         setErLeaveBiomeNow();
-        globalScene.phaseManager.unshiftNew("SelectBiomePhase");
+        globalScene.phaseManager.unshiftNew("SelectBiomePhase", this.coopSourceWave);
       } else {
         erMarkBiomeStay(this.coopSourceWave);
       }
@@ -819,7 +819,7 @@ export class ErCrossroadsPhase extends Phase {
         // chained SelectBiomePhase owns the single terminal advance for the whole decision.
         setErLeaveBiomeNow();
         setCoopBiomeInteractionStart(pinned);
-        globalScene.phaseManager.unshiftNew("SelectBiomePhase");
+        globalScene.phaseManager.unshiftNew("SelectBiomePhase", this.coopSourceWave);
       } else {
         // STAY: arm the overstay anchor (a no-op inside the free window) and terminate the
         // interaction here with the single from-pinned advance.
@@ -857,7 +857,7 @@ export class ErCrossroadsPhase extends Phase {
       // End the biome now: flag the early exit (isNewBiome honors it) and open the
       // World Map node picker ahead of the queued NewBattlePhase.
       setErLeaveBiomeNow();
-      globalScene.phaseManager.unshiftNew("SelectBiomePhase");
+      globalScene.phaseManager.unshiftNew("SelectBiomePhase", this.coopSourceWave);
     } else {
       // STAY: the run continues in this biome. If this is a deliberate choice to
       // linger PAST the notoriety-free window, arm the overstay anchor - from here

@@ -359,27 +359,32 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       vi.spyOn(rig.guestScene.currentBattle, "isBattleMysteryEncounter").mockReturnValue(true);
       const pushNewSpy = vi.spyOn(rig.guestScene.phaseManager, "pushNew");
 
-      // Enter the actual production DATA-admission seam. The retained source identity is captured by the
-      // PhaseManager-created BattleEndPhase even though ambient battle state has speculated to wave 12/ME;
-      // starting it while it is current lets the registered boundary applier admit the exact wave-11 image
-      // and project pendingWaveAdvance. Merely toggling dataApplied would bypass this bootstrap entirely.
+      // Enter the actual production tail in its real order. The retained materializer first consumes the
+      // operation and sanctions Victory/BattleEnd, then Victory creates the source-addressed BattleEnd.
+      // Constructing BattleEnd before that consume is deliberately rejected by strict tails and would test
+      // an impossible production order rather than the retained DATA-admission seam.
       rig.guestScene.phaseManager.clearPhaseQueue();
-      rig.guestScene.phaseManager.pushNew("BattleEndPhase", true);
-      rig.guestScene.phaseManager.shiftPhase();
-      const retainedBoundary = rig.guestScene.phaseManager.getCurrentPhase();
-      expect(retainedBoundary, "the exact production BattleEnd boundary is current").toBeInstanceOf(BattleEndPhase);
-      // The test PhaseInterceptor deliberately disables PhaseManager's automatic startCurrentPhase hook.
-      // Start this current, manager-created boundary exactly once so its real retained DATA applier runs.
-      retainedBoundary!.start();
-
       expect(
         () => CoopFinalizeTurnPhase.runPendingWaveAdvanceTail(),
-        "the real retained bootstrap must not dereference speculative wave-12 Mystery state",
+        "the retained operation must materialize without reading speculative Mystery state",
       ).not.toThrow();
       expect(
         pushNewSpy.mock.calls.find(call => call[0] === "VictoryPhase")?.slice(2),
-        "the production materializer activates and queues the ordinary wave-11 Victory tail",
+        "the retained materializer queues the ordinary wave-11 Victory tail",
       ).toEqual([false, 11]);
+
+      // PhaseInterceptor disables automatic starts. Shift into the manager-created Victory and start it
+      // exactly once; its normal end() shifts to the sanctioned, source-addressed BattleEnd boundary.
+      rig.guestScene.phaseManager.shiftPhase();
+      const retainedVictory = rig.guestScene.phaseManager.getCurrentPhase();
+      expect(retainedVictory.phaseName).toBe("VictoryPhase");
+      retainedVictory.start();
+      const retainedBoundary = rig.guestScene.phaseManager.getCurrentPhase();
+      expect(retainedBoundary, "the exact production BattleEnd boundary is current").toBeInstanceOf(BattleEndPhase);
+      expect(
+        () => retainedBoundary.start(),
+        "the real retained BattleEnd bootstrap must admit DATA without dereferencing wave-12 Mystery state",
+      ).not.toThrow();
     });
     logs.flush();
   }, 300_000);
