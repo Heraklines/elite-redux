@@ -250,6 +250,11 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
       if (w < WAVES) {
         await arriveGuestCommandBoundary(rig, w + 1);
         await withClient(rig.hostCtx, async () => {
+          // Scheduled delivery is intentionally disabled for this public-input journey. Deliver the
+          // guest's exact command arrival while the host's complete process context is installed before
+          // starting the host CommandPhase; otherwise the correct packet remains queued and the phase
+          // waits forever for an arrival the fixture never pumps.
+          await drainLoopback();
           await game.phaseInterceptor.to("CommandPhase");
         });
         expect(rig.hostScene.currentBattle.waveIndex, `wave ${w}: host advanced to wave ${w + 1}`).toBe(w + 1);

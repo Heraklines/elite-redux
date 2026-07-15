@@ -1996,82 +1996,116 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     beforeHostCross?: () => void,
   ): Promise<void> => {
     const point = `cmd:${wave}:${turn}`;
-    // The directly-constructed guest has a manual phase scheduler. Production already queued the same
-    // Crossroads/World-Map tail on both clients, but the host interceptor alone would otherwise execute it.
-    // Drive the guest's real phases: Crossroads auto-resolves under this soak profile; a resulting
-    // SelectBiome renderer parks on the host's exact BIOME_PICK until the host commits below. The harness
-    // never manufactures a choice, biome, counter advance, or receipt.
-    const guestBiomeBoundary = await withClient(rig.guestCtx, async () => {
-      let current = rig.guestScene.phaseManager.getCurrentPhase();
-      const queued = rig.guestScene.phaseManager.getQueuedPhaseNames?.() ?? [];
-      if (current?.phaseName !== "ErCrossroadsPhase" && queued.includes("ErCrossroadsPhase")) {
-        current = await driveClientPhaseQueueTo(rig.guestScene, "ErCrossroadsPhase");
-      }
-      if (current?.phaseName === "ErCrossroadsPhase") {
-        current.start();
-        await drainLoopback();
-        current = rig.guestScene.phaseManager.getCurrentPhase();
-      }
-      if (current?.phaseName === "SelectBiomePhase") {
-        current.start();
-        await drainLoopback();
-        return current;
-      }
-      return null;
-    });
-    const hostHasCommandable = rig.hostScene
-      .getPlayerParty()
-      .some(mon => mon.coopOwner === "host" && !mon.isFainted() && mon.isAllowedInBattle());
-    withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.reannounce(point));
-    await drainLoopback();
-    await withClient(rig.hostCtx, async () => {
-      beforeHostCross?.();
-      // A reward continuation can be created DURING this crossing (ModifierRewardPhase applies the item),
-      // so inspecting the queue before advancing is too early. Stop at either structural branch, then arm
-      // Dex Nav only after it actually exists. This also guarantees no Dex Nav prompt can leak into an
-      // ordinary CommandPhase crossing.
-      const boundary = await game.phaseInterceptor.toFirst(["CommandPhase", "ErDexNavPhase", "TheBargainPhase"]);
-      if (boundary === "ErDexNavPhase") {
-        armHostDexNavAutoPicks();
-      } else if (boundary === "TheBargainPhase") {
-        await driveBargainContinuation();
-      }
-      await game.phaseInterceptor.to("CommandPhase");
-    });
-    if (guestBiomeBoundary != null) {
-      await withClient(rig.guestCtx, async () => {
-        for (let attempt = 0; attempt < 80; attempt++) {
-          await drainLoopback();
-          if (rig.guestScene.phaseManager.getCurrentPhase() !== guestBiomeBoundary) {
-            return;
-          }
-          await new Promise<void>(resolve => setTimeout(resolve, 10));
-        }
+    // A real co-op pair owns one JS realm per client. Queue every frame for its destination while crossing
+    // this multi-surface boundary so a retained biome apply, its promise continuation and the reciprocal
+    // command arrival can never run under the partner's ambient scene/runtime in this two-engine fixture.
+    const destinationScheduled = rig.pair.setDestinationContextDelivery != null;
+    rig.pair.setDestinationContextDelivery?.(destinationScheduled);
+    try {
+      // The directly-constructed guest has a manual phase scheduler. Production already queued the same
+      // Crossroads/World-Map tail on both clients, but the host interceptor alone would otherwise execute it.
+      // Drive the guest's real phases: Crossroads auto-resolves under this soak profile; a resulting
+      // SelectBiome renderer parks on the host's exact BIOME_PICK until the host commits below. The harness
+      // never manufactures a choice, biome, counter advance, or receipt.
+      const guestBiomeBoundary = await withClient(rig.guestCtx, async () => {
+        let current = rig.guestScene.phaseManager.getCurrentPhase();
         const queued = rig.guestScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+        if (current?.phaseName !== "ErCrossroadsPhase" && queued.includes("ErCrossroadsPhase")) {
+          current = await driveClientPhaseQueueTo(rig.guestScene, "ErCrossroadsPhase");
+        }
+        if (current?.phaseName === "ErCrossroadsPhase") {
+          current.start();
+          await drainLoopback();
+          current = rig.guestScene.phaseManager.getCurrentPhase();
+        }
+        if (current?.phaseName === "SelectBiomePhase") {
+          current.start();
+          await drainLoopback();
+          return current;
+        }
+        return null;
+      });
+      const hostHasCommandable = rig.hostScene
+        .getPlayerParty()
+        .some(mon => mon.coopOwner === "host" && !mon.isFainted() && mon.isAllowedInBattle());
+      withClientSync(rig.guestCtx, () => rig.guestRuntime.rendezvous.reannounce(point));
+      // The early guest arrival is now destination-scheduled; publish it to the host before its command
+      // boundary starts waiting. This is delivery, not a manufactured rendezvous or direct state mutation.
+      await withClient(rig.hostCtx, () => drainLoopback());
+      await withClient(rig.hostCtx, async () => {
+        beforeHostCross?.();
+        // A reward continuation can be created DURING this crossing (ModifierRewardPhase applies the item),
+        // so inspecting the queue before advancing is too early. Stop at either structural branch, then arm
+        // Dex Nav only after it actually exists. This also guarantees no Dex Nav prompt can leak into an
+        // ordinary CommandPhase crossing.
+        // When the guest is already parked on SelectBiome, stop the authority immediately after committing
+        // that exact BIOME_PICK. Production can deliver it while the host renders its SwitchBiome/NewBattle
+        // tail; running the entire host tail first made the shared-process harness restore newer ambient state
+        // before the guest's receipt continuation executed.
+        const boundaries = [
+          "CommandPhase",
+          "ErDexNavPhase",
+          "TheBargainPhase",
+          ...(guestBiomeBoundary == null ? [] : ["SelectBiomePhase"]),
+        ] as const;
+        for (;;) {
+          const boundary = await game.phaseInterceptor.toFirst(boundaries);
+          if (boundary === "ErDexNavPhase") {
+            armHostDexNavAutoPicks();
+            await game.phaseInterceptor.to("ErDexNavPhase");
+            continue;
+          }
+          if (boundary === "TheBargainPhase") {
+            await driveBargainContinuation();
+            continue;
+          }
+          if (boundary === "SelectBiomePhase") {
+            await game.phaseInterceptor.to("SelectBiomePhase");
+          }
+          break;
+        }
+      });
+      if (guestBiomeBoundary != null) {
+        await withClient(rig.guestCtx, async () => {
+          for (let attempt = 0; attempt < 80; attempt++) {
+            await drainLoopback();
+            if (rig.guestScene.phaseManager.getCurrentPhase() !== guestBiomeBoundary) {
+              return;
+            }
+            await new Promise<void>(resolve => setTimeout(resolve, 10));
+          }
+          const queued = rig.guestScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+          fail(
+            "no-park",
+            wave,
+            "guest retained World Map boundary did not release after host commit "
+              + `(current=${rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}, queued=[${queued.join(",")}])`,
+          );
+        });
+      }
+      // With a biome commit this resumes only after the renderer consumed its exact receipt. Without one it
+      // starts the CommandPhase that toFirst deliberately left untouched, publishing the host's reciprocal
+      // arrival in both cases.
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase"));
+      await pumpDuoDestinations(rig, 2);
+      if (!hostHasCommandable) {
+        actionScript.push(
+          `wave ${wave} turn ${turn}: host half exhausted; guest command proceeds without reciprocal await`,
+        );
+        return;
+      }
+      const guestResult = await withClient(rig.guestCtx, () => rig.guestRuntime.rendezvous.awaitPartner(point));
+      if (guestResult.timedOut || guestResult.crossPoint !== undefined) {
         fail(
           "no-park",
           wave,
-          "guest retained World Map boundary did not release after host commit "
-            + `(current=${rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}, queued=[${queued.join(",")}])`,
+          `replay guest did not reciprocally cross ${point} (timedOut=${guestResult.timedOut} crossPoint=${guestResult.crossPoint ?? "none"})`,
         );
-      });
+      }
+      actionScript.push(`wave ${wave} turn ${turn}: replay guest reciprocally crossed ${point}`);
+    } finally {
+      rig.pair.setDestinationContextDelivery?.(false);
     }
-    await drainLoopback();
-    if (!hostHasCommandable) {
-      actionScript.push(
-        `wave ${wave} turn ${turn}: host half exhausted; guest command proceeds without reciprocal await`,
-      );
-      return;
-    }
-    const guestResult = await withClient(rig.guestCtx, () => rig.guestRuntime.rendezvous.awaitPartner(point));
-    if (guestResult.timedOut || guestResult.crossPoint !== undefined) {
-      fail(
-        "no-park",
-        wave,
-        `replay guest did not reciprocally cross ${point} (timedOut=${guestResult.timedOut} crossPoint=${guestResult.crossPoint ?? "none"})`,
-      );
-    }
-    actionScript.push(`wave ${wave} turn ${turn}: replay guest reciprocally crossed ${point}`);
   };
 
   /** Play ONE host wave to a terminal (bounded by the NO-PARK turn budget); the guest replays each turn. */
