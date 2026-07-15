@@ -2252,6 +2252,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     wave: number,
     deferAdvanceToMeTerminal = false,
     fixtureMode: "queued" | "capture-compat" = "queued",
+    beforeSharedInput?: () => Promise<void>,
   ): Promise<void> => {
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
@@ -2287,6 +2288,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       if (fixtureMode === "queued") {
         await awaitGuestWaveTransaction(wave, false);
       }
+      // A terminal turn has TWO authoritative material boundaries: its TurnEnd checkpoint and the retained
+      // BattleEnd DATA image. The host may execute automatic PokemonHeal/BattleEnd work while the guest is
+      // still rendering the final turn. Compare only after both clients have reached this exact retained
+      // boundary, but before either owner can mutate the reward surface. Sampling immediately after
+      // playWave() races those two legitimate phases (and, on natural expiry, mistakes the host's lapsed
+      // temporary modifier for a desync before the guest has been allowed to adopt the retained image).
+      await beforeSharedInput?.();
       // #849: the reward shop is the real MODIFIER_SELECT surface (owner drives, watcher mirrors over the relay).
       hitMode(UiMode.MODIFIER_SELECT);
 
@@ -2937,12 +2945,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   const processNormalWave = async (wave: number): Promise<void> => {
     await assertWaveBoundary(wave); // (a)+(b) wave-start clean-start parity
     const outcome = await playWave(wave); // (c) NO-PARK
-    await assertPostTurnConverged(wave); // (a) POST-TURN real replay-desync detector
     // A flee terminal advances through BattleEnd/NewBattle and has no reward screen. The authoritative
     // runtime can produce it through encounter behavior even though this driver never presses RUN. Treating
     // every terminal as a victory made the harness wait for a nonexistent SelectModifierPhase at wave 176.
-    if (outcome !== "flee") {
-      await driveRewardShop(wave);
+    if (outcome === "flee") {
+      // There is no shared-input surface on a flee. Retain the existing terminal probe until the dedicated
+      // flee crossing exposes an equivalent public retained-boundary waiter.
+      await assertPostTurnConverged(wave);
+    } else {
+      await driveRewardShop(wave, false, "queued", () => assertPostTurnConverged(wave));
     }
     assertScalarConvergence(wave, "post-shop"); // #843 pokeball-drift classifier (money + ball inventory)
   };
