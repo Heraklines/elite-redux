@@ -17,6 +17,7 @@
     "src/phase-manager.ts",
     "src/phases/**",
     "src/ui/handlers/starter-select-ui-handler.ts",
+    "src/ui/ui.ts",
     "test/browser/coop-public-ui/**",
     "test/tests/elite-redux/coop/**",
     "test/tools/coop-duo-harness.ts",
