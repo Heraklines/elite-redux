@@ -737,5 +737,150 @@
     ],
     "trainerClass": "ERIKA",
     "weight": 100
+  },
+  "TRAINER_70007": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "double",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70007,
+    "maxWave": 100,
+    "minWave": 95,
+    "name": "Koga",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "TOXIC",
+          "TOXIC_SPIKES",
+          "SHADOW_SNEAK",
+          "PARTING_SHOT"
+        ],
+        "species": 168
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "IRON"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "FLASH",
+          "CONFUSION",
+          "SLEEP_POWDER",
+          "DRAINING_KISS"
+        ],
+        "species": 756
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "TOXIC_PLUNGE",
+          "TOXIC",
+          "SURF",
+          "STOMPING_TANTRUM"
+        ],
+        "species": 10615
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "FUMIGATION_BOMB",
+          "INFESTATION",
+          "RLNA",
+          "RLA"
+        ],
+        "species": 2089
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "EXPLOSION",
+          "FLAMETHROWER",
+          "DESTINY_BOND",
+          "ENDURE"
+        ],
+        "species": 110
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          },
+          {
+            "count": 1,
+            "item": "EVIOLITE"
+          },
+          {
+            "count": 2,
+            "item": "IRON"
+          },
+          {
+            "count": 2,
+            "item": "ZINC"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "HYPNOSIS",
+          "NIGHTMARE",
+          "DREAM_EATER",
+          "PROTECT"
+        ],
+        "shiny": {
+          "name": "Nightmare",
+          "palette": "lavender",
+          "surface": "wormhole"
+        },
+        "slotChance": 40,
+        "species": 93
+      }
+    ],
+    "trainerClass": "KOGA",
+    "trainerEffect": "shadowaura",
+    "weight": 100
   }
 }
