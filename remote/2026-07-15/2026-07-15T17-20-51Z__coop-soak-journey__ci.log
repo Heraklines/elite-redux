@@ -1,0 +1,51 @@
+===== COOP SOAK RESULT =====
+profile: journey
+verdict: FAIL
+waves_requested: 45
+run: 29435951070 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T17-20-51Z
+
+----- driver lines -----
+(no [coop-soak] lines captured)
+
+----- vitest result tail -----
+[22m[39m[32mStart Phase: MovePhase[39m
+[38;2;0;0;0mUser: Eternatus[39m
+[38;2;0;0;0mMove: THUNDERBOLT[39m
+[38;2;0;0;0mUse Mode: NORMAL[39m
+[coop:turn] host recorder: append turn=1 seq=0 k=moveUsed total=1 live=true
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[32mStart Phase: MessagePhase[39m
+[34mEternatus used Thunderbolt![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[32mStart Phase: MoveEffectPhase[39m
+crit stage: +0
+Move: Thunderbolt | Base damage: 200709.2 | Power: 108 | Source attack: 3220 | Target defense: 7
+Move: Thunderbolt | Attack damage: 200709
+[coop:turn] host recorder: append turn=1 seq=1 k=hp total=2 live=true
+[coop:turn] host recorder: append turn=1 seq=2 k=faint total=3 live=true
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[32mStart Phase: DamageAnimPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[32mStart Phase: FaintPhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[32mStart Phase: MessagePhase[39m
+[34mWild Whismur fainted![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[32mStart Phase: VictoryPhase[39m
+[coop:progression] HOST applyPartyExp COMPUTE wave=3 expValue=29.8 koMon=Whismur
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[32mStart Phase: MoveEndPhase[39m
+[coop:turn] host recorder: append turn=1 seq=3 k=hp total=4 live=true
+[coop:turn] host recorder: append turn=1 seq=4 k=message total=5 live=true
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[32mStart Phase: DamageAnimPhase[39m
+
