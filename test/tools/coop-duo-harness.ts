@@ -1601,14 +1601,18 @@ export function markRealGuestCommandBoundary(scene: BattleScene, wave: number, t
  * Replace the directly-constructed guest scene's inert boot TitlePhase with the production guest input tail.
  *
  * A real browser reaches wave one through NewBattle -> Encounter -> TurnInit. `buildDuo` intentionally mirrors
- * the already-live host battle instead, so those boot phases never ran and TitlePhase has no queue behind it.
+ * the already-live host battle instead, so those boot phases never ran. Depending on whether the fixture's
+ * phase interceptor has advanced once, the inert shape is Login -> [Title] or Title -> [].
  * Materialize exactly the omitted TurnInit boundary through the real phase manager; TurnInit then creates the
  * actual per-slot CommandPhases and renderer TurnStart tail. This is valid only for that empty boot shape.
  */
 export function materializeMirroredGuestInputTurn(scene: BattleScene): void {
   const current = scene.phaseManager.getCurrentPhase();
   const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
-  if (current?.phaseName !== "TitlePhase" || queued.length !== 0) {
+  const untouchedLoginBoot =
+    current?.phaseName === "LoginPhase" && queued.length === 1 && queued[0] === "TitlePhase";
+  const untouchedTitleBoot = current?.phaseName === "TitlePhase" && queued.length === 0;
+  if (!untouchedLoginBoot && !untouchedTitleBoot) {
     throw new Error(
       `cannot materialize mirrored guest input from ${current?.phaseName ?? "none"}; queued=[${queued.join(",")}]`,
     );
