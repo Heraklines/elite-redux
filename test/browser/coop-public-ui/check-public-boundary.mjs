@@ -59,6 +59,10 @@ const run = sources.get("run.mjs");
 const preview = sources.get("preview-server.mjs");
 const provision = sources.get("provision-accounts.mjs");
 const viteConfig = sources.get("vite.config.mjs");
+const journeyWorkflow = await readFile(
+  new URL("../../../.github/workflows/coop-public-ui-journey.yml", import.meta.url),
+  "utf8",
+);
 if (!run?.includes("startSealedPreview(config)")) {
   failures.push("run.mjs: every gameplay journey must start from a verified sealed browser artifact");
 }
@@ -75,12 +79,32 @@ if (
 if (
   !harness?.includes("findSharedCommanderMatch(")
   || !harness.includes("findOwnedCommandUi(boundary.owner")
+  || !harness.includes("async waitForCommanderCommandBoundaryDrivingBattlePrompts(")
+  || !harness.includes("const advanceBattlePrompt = createBattlePromptAdvancer(this, cursors, {}, purpose, {")
+  || !harness.includes("const POST_TURN_HARD_CEILING_MS = 360_000;")
+  || !harness.includes("const COMMANDER_BOUNDARY_HARD_CEILING_MS = 420_000;")
+  || !harness.includes("hardCeilingMs: COMMANDER_BOUNDARY_HARD_CEILING_MS")
+  || !harness.includes("return this.assertCommanderCommandBoundary(cursors, purpose, { expectedWave })")
+  || (harness.match(/waitForCommanderCommandBoundaryDrivingBattlePrompts\(/gu)?.length ?? 0) < 4
   || !harness.includes("commander-generated-skip-rendezvous-proof")
+  || !harness.includes("commander-rendezvous-retry-converged-proof")
+  || !harness.includes("RENDEZVOUS_RECOVERY_RETRY_POINT")
+  || !harness.includes("(?:terminal requested|stopped safely)")
   || !harness.includes("next-command barrier")
-  || !harness.includes("assertNoRecoverySince(")
+  || !harness.includes("assertNoFatalRecoverySince(")
+  || !harness.includes("match?.[1] !== expectedPoint")
 ) {
   failures.push(
-    "public-ui-harness.mjs: Commander must prove the hidden owner has no UI and traverses the reciprocal cmd rendezvous",
+    "public-ui-harness.mjs: Commander must drive public prompts, prove hidden-owner rendezvous, and admit only exact-point converged retries",
+  );
+}
+if (
+  !journeyWorkflow.includes(
+    "(inputs.journey == 'market-wide-lens' || inputs.journey == 'commander-skip') && '0' || '1'",
+  )
+) {
+  failures.push(
+    "coop-public-ui-journey.yml: Commander must omit only the optional CDP performance trace while retaining mandatory evidence",
   );
 }
 if (!viteConfig?.includes("SOURCE_ENTRY") || !viteConfig.includes("sourceEntryReplaced")) {
