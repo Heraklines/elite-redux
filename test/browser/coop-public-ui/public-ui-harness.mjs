@@ -1936,6 +1936,14 @@ export class DuoPublicUiRig {
           return { kind: "faint", client };
         }
       }
+      // A renderer can still be parked on an exact, readiness-proven narration prompt
+      // after the authority has opened the next command frontier. Drain that human input
+      // before accepting the frontier; returning first strands the renderer and makes the
+      // next sequential round observe only one real browser. Structural reward/faint
+      // outcomes above retain priority over cosmetic prompt advancement.
+      if (await advanceBattlePrompt()) {
+        continue;
+      }
       // The next command frontier is healthy as soon as ONE addressed owner UI opens. Its
       // public choice unlocks the partner's UI, so requiring both here creates a harness-only
       // deadlock. driveSequentialCommandRound consumes this frontier one owner at a time.
@@ -1949,7 +1957,6 @@ export class DuoPublicUiRig {
         }
         return { kind: "command", client: commandClient };
       }
-      await advanceBattlePrompt();
       await delay(100);
     }
     throw new Error("Timed out waiting for public post-turn command, faint, or reward evidence");
