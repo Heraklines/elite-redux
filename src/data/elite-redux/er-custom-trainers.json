@@ -120,7 +120,7 @@
     "id": 70002,
     "maxWave": 30,
     "minWave": 15,
-    "name": "Brock",
+    "name": "Loser",
     "team": [
       {
         "variants": [
@@ -412,7 +412,7 @@
     "id": 70004,
     "maxWave": 50,
     "minWave": 30,
-    "name": "Misty",
+    "name": "Leader",
     "team": [
       {
         "abilitySlot": 2,
@@ -520,7 +520,7 @@
     "introDialogue": "bla bla bla, back in my days bla bla bla great pokemon war bla bla bla...",
     "maxWave": 70,
     "minWave": 50,
-    "name": "Lt Surge",
+    "name": "Leader",
     "team": [
       {
         "abilitySlot": 0,
@@ -597,7 +597,7 @@
     "id": 70006,
     "maxWave": 90,
     "minWave": 70,
-    "name": "Erika",
+    "name": "Leader",
     "team": [
       {
         "abilitySlot": 1,
@@ -752,7 +752,7 @@
     "id": 70007,
     "maxWave": 110,
     "minWave": 95,
-    "name": "Koga",
+    "name": "Leader",
     "team": [
       {
         "abilitySlot": 0,
@@ -886,9 +886,10 @@
   },
   "TRAINER_70008": {
     "battleBgm": "battle_kanto_gym",
-    "battleType": "single",
+    "battleType": "triple",
     "challenge": "none",
     "difficulties": [
+      "youngster",
       "ace",
       "elite",
       "hell"
@@ -897,7 +898,7 @@
     "id": 70008,
     "maxWave": 120,
     "minWave": 110,
-    "name": "Sabrina",
+    "name": "Leader",
     "team": [
       {
         "abilitySlot": 0,
@@ -909,6 +910,88 @@
           "FLASH_FREEZE"
         ],
         "species": 866
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "FOCUS_BLAST",
+              "PSYCHIC",
+              "HYPNOSIS",
+              "THUNDERBOLT"
+            ],
+            "species": 65,
+            "weight": 4
+          },
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "FOCUS_BLAST",
+              "PSYCHIC",
+              "HYPNOSIS",
+              "THUNDERBOLT"
+            ],
+            "species": 10099,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "PSYCHIC",
+          "OMINOUS_WIND",
+          "SLEEP_POWDER",
+          "MOONLIGHT"
+        ],
+        "species": 49
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "TOXIC_ORB"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "ASSIST",
+          "DARK_VOID",
+          "FAKE_OUT",
+          "TRICK"
+        ],
+        "shiny": {
+          "palette": "hyperpigment"
+        },
+        "species": 677
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "MIRROR_COAT",
+          "COUNTER",
+          "ENCORE",
+          "SAFEGUARD"
+        ],
+        "species": 202
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "COSMIC_POWER",
+          "HELPING_HAND",
+          "SECRET_POWER",
+          "HIDDEN_POWER"
+        ],
+        "slotChance": 25,
+        "species": 10220
       }
     ],
     "trainerClass": "SABRINA",
