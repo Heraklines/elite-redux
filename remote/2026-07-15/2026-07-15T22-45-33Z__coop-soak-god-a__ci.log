@@ -1,0 +1,11 @@
+===== COOP SOAK RESULT =====
+profile: god-a
+verdict: FAIL
+waves_requested: 200
+run: 29456444161 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T22-45-33Z
+
+----- driver lines -----
+(no [coop-soak] lines captured)
+
+----- vitest result tail -----
