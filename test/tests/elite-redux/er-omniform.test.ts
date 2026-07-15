@@ -3,6 +3,7 @@ import {
   clearOmniformRegistry,
   ER_OMNIFORM_ABILITY_ID,
   erOmniformOnMoveStart,
+  erOmniformRevertOnLeaveField,
   registerOmniformMapping,
 } from "#data/elite-redux/abilities/omniform";
 import { AbilityId } from "#enums/ability-id";
@@ -84,15 +85,20 @@ describe.skipIf(!RUN)("ER Omniform (5929)", () => {
     expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.FLAREON);
   });
 
-  it("reverts to the pre-battle form when summon data is reset (wave/battle end)", async () => {
+  it("reverts to the pre-battle form + stats when the holder leaves the field (wave/battle end)", async () => {
     await game.classicMode.startBattle(SpeciesId.EEVEE);
     const holder = game.field.getPlayerPokemon();
+    const spdBefore = holder.getStat(Stat.SPD);
 
     erOmniformOnMoveStart(holder, allMoves[MoveId.WATER_GUN]);
     expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.VAPOREON);
+    expect(holder.getStat(Stat.SPD)).not.toBe(spdBefore);
 
+    // leaveField (switch-out / wave end) reverts the species + stats.
     holder.resetSummonData();
+    erOmniformRevertOnLeaveField(holder);
     expect(holder.getSpeciesForm().speciesId).toBe(SpeciesId.EEVEE);
+    expect(holder.getStat(Stat.SPD)).toBe(spdBefore);
   });
 
   it("does nothing for an unmapped move type (general: no forced transform)", async () => {

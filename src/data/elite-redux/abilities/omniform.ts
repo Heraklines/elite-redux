@@ -38,7 +38,7 @@
 import { PostSummonAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
-import type { PokemonSpeciesForm } from "#data/pokemon-species";
+import type { PokemonSpecies, PokemonSpeciesForm } from "#data/pokemon-species";
 import type { AbilityId } from "#enums/ability-id";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { SpeciesId } from "#enums/species-id";
@@ -129,6 +129,43 @@ function resolveSpeciesForm(target: OmniformTarget): PokemonSpeciesForm {
   return species;
 }
 
+/** The holder's pre-transform identity, snapshotted the first time it transforms in a wave. */
+interface OmniformOriginal {
+  wave: number;
+  species: PokemonSpecies;
+  formIndex: number;
+}
+
+const OMNIFORM_ORIGINAL = new WeakMap<Pokemon, OmniformOriginal>();
+
+/** Snapshot the holder's pre-battle species/form once per wave (so revert is exact). */
+function snapshotOriginal(user: Pokemon): void {
+  const wave = globalScene.currentBattle?.waveIndex ?? 0;
+  const existing = OMNIFORM_ORIGINAL.get(user);
+  if (!existing || existing.wave !== wave) {
+    OMNIFORM_ORIGINAL.set(user, { wave, species: user.species, formIndex: user.formIndex });
+  }
+}
+
+/**
+ * Revert an Omniform holder to its pre-battle species/form + stats. Driven from
+ * `Pokemon.leaveField` (switch-out / faint / wave end — the mega-revert
+ * precedent). `summonData` (the pinned ability + swapped moveset) is already
+ * cleared by `resetSummonData` in `leaveField`; this restores the species-level
+ * state that lives outside summon data.
+ */
+export function erOmniformRevertOnLeaveField(holder: Pokemon): void {
+  const original = OMNIFORM_ORIGINAL.get(holder);
+  if (!original) {
+    return;
+  }
+  OMNIFORM_ORIGINAL.delete(holder);
+  holder.species = original.species;
+  holder.formIndex = original.formIndex;
+  holder.calculateStats();
+  holder.generateName();
+}
+
 /**
  * A seeded, level-appropriate move set (up to `OMNIFORM_DERIVED_MOVE_COUNT`)
  * from `speciesForm`'s learnset, preferring the most recently learned moves the
@@ -171,14 +208,24 @@ export function erOmniformOnMoveStart(user: Pokemon, move: Move): void {
     return;
   }
   const speciesForm = resolveSpeciesForm(target);
+  const targetSpecies = getPokemonSpecies(target.speciesId);
 
-  // Mega-style form change via the Transform substrate (auto-reverts at wave end).
-  user.summonData.speciesForm = speciesForm;
+  // Snapshot the pre-battle identity (once per wave) so revert is exact even
+  // after a chain of transforms.
+  snapshotOriginal(user);
+
+  // Mega-style form change: swap the holder's species/form so `calculateStats`
+  // (which reads `getSpeciesForm(true)` — ignoring summon-data overrides) picks
+  // up the TARGET form's base stats, exactly like a mega changing `formIndex`.
+  // The new species also drives typing / sprite / name. Reverts on leaveField.
+  user.species = targetSpecies;
+  user.formIndex = target.formIndex;
   // Pin Omniform so it persists across the transform and can chain again.
   user.summonData.ability = ER_OMNIFORM_ABILITY_ID as AbilityId;
-  // Let the new form's own typing take over (clear any prior wholesale override).
+  // Drop any prior wholesale type override so the new form's typing applies.
   user.summonData.types = [];
   user.calculateStats();
+  user.generateName();
 
   // Replace every move EXCEPT the one being used with the derived set, keeping
   // the used move in its original slot.

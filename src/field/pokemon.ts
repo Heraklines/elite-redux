@@ -67,6 +67,7 @@ import {
 import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
 import { erLibraryCastIsSpecial, erLibraryDamageMultiplier } from "#data/elite-redux/abilities/library";
 import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
+import { erOmniformRevertOnLeaveField } from "#data/elite-redux/abilities/omniform";
 import { erApplySoulmateHealCopy, erApplySoulmateRedirect } from "#data/elite-redux/abilities/soulmate";
 import { getGraftedTypes } from "#data/elite-redux/abilities/type-graft";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
@@ -7765,6 +7766,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // ER Bad Splice (5932): when the holder leaves, restore each opponent's exact
     // prior typing by un-grafting only the types Bad Splice added.
     erBadSpliceOnLeaveField(this);
+    // ER Omniform (5929): revert an adaptive-transform holder to its pre-battle
+    // species/form + stats (summonData was already reset above).
+    erOmniformRevertOnLeaveField(this);
     this.switchOutStatus = true;
     globalScene.triggerPokemonFormChange(this, SpeciesFormChangeActiveTrigger, true);
     globalScene.field.remove(this, destroy);
