@@ -21,6 +21,7 @@
     "src/battle-scene.ts",
     "src/data/elite-redux/coop/coop-ability-operation.ts",
     "src/data/elite-redux/coop/coop-ability-picker-relay.ts",
+    "src/data/elite-redux/coop/coop-authority-apply.ts",
     "src/data/elite-redux/coop/coop-battle-engine.ts",
     "src/data/elite-redux/coop/coop-battle-stream.ts",
     "src/data/elite-redux/coop/coop-biome-operation.ts",
