@@ -1769,7 +1769,9 @@ export class DuoPublicUiRig {
         `commander-${boundary.observation.point}-dondozo-public-move`,
       );
       await this.assertCommanderGeneratedSkipRendezvous(boundary, `commander-${boundary.observation.point}`);
-      const outcome = await this.waitForPostTurnOutcome(outcomeCursors);
+      const outcome = await this.waitForPostTurnOutcome(outcomeCursors, {
+        expectedCommandAddress: `${boundary.observation.epoch}:${boundary.observation.wave}:${boundary.observation.turn}`,
+      });
       if (outcome.kind === "reward") {
         await this.assertSharedSurface("reward", outcomeCursors, `commander-turn-${round}-reward`, {
           expectedWave: this.activeBattleWave,
@@ -1851,8 +1853,10 @@ export class DuoPublicUiRig {
     return { commandEvents, outcomeCursors };
   }
 
-  async waitForPostTurnOutcome(from) {
-    const advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, "public-ui-post-turn");
+  async waitForPostTurnOutcome(from, { expectedCommandAddress = null } = {}) {
+    const advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, "public-ui-post-turn", {
+      expectedCommandAddress,
+    });
     const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs);
     while (Date.now() < progressBudget.observe()) {
       const values = Object.values(this.clients);

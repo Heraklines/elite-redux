@@ -48,6 +48,7 @@ for (const file of files) {
 }
 
 const harness = sources.get("public-ui-harness.mjs");
+const campaign = await readFile(new URL("campaign.mjs", import.meta.url), "utf8");
 const evaluateCalls = harness?.match(/page\.evaluate\(/gu)?.length ?? 0;
 if (evaluateCalls !== 1 || !harness?.includes("document.activeElement.blur()")) {
   failures.push(
@@ -93,9 +94,13 @@ if (
   || !harness.includes("next-command barrier")
   || !harness.includes("assertNoFatalRecoverySince(")
   || !harness.includes("match?.[1] !== expectedPoint")
+  || !harness.includes("expectedCommandAddress:")
+  || !harness.includes("boundary.observation.epoch")
+  || !campaign.includes("expectedCommandAddress ??")
+  || !campaign.includes("currentSharedCommandAddress(clients, purpose)")
 ) {
   failures.push(
-    "public-ui-harness.mjs: Commander must drive public prompts, prove hidden-owner rendezvous, and admit only exact-point converged retries",
+    "public-ui-harness.mjs: Commander must drive exact-address public prompts, prove hidden-owner rendezvous, and admit only exact-point converged retries",
   );
 }
 if (

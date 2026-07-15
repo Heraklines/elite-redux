@@ -291,12 +291,23 @@ function currentSharedCommandAddress(clients, purpose) {
  * leaving that readiness signal undriven prevents the guest from applying/ACKing the completed turn
  * forever.
  */
-export function createBattlePromptAdvancer(rig, from, stats, purpose, { requireSharedCommandAddress = true } = {}) {
+export function createBattlePromptAdvancer(
+  rig,
+  from,
+  stats,
+  purpose,
+  { requireSharedCommandAddress = true, expectedCommandAddress = null } = {},
+) {
   if (!rig.host) {
     throw new Error(`${purpose}: battle prompt advancement requires the authenticated public host`);
   }
   const clients = Object.values(rig.clients);
-  const expectedAddress = requireSharedCommandAddress ? currentSharedCommandAddress(clients, purpose) : null;
+  // Ordinary battles derive the address from both clients' last public command surface. Commander is
+  // intentionally asymmetric: the hidden Tatsugiri owner must never expose that surface. Its strict
+  // read-only Commander observation already proves one shared epoch/wave/turn, so that caller supplies
+  // the exact address instead of weakening prompt admission to any live battle address.
+  const expectedAddress =
+    expectedCommandAddress ?? (requireSharedCommandAddress ? currentSharedCommandAddress(clients, purpose) : null);
   const cursors = new Map(clients.map(client => [client.label, from[client.label] ?? 0]));
   const consumedInstances = new Set();
   return async () => {

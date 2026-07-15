@@ -5,6 +5,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createBattlePromptAdvancer } from "./campaign.mjs";
 import { marketObservationView } from "./evidence.mjs";
 import { assertMarketPurchaseConverged, planMarketGridKeys } from "./market-journey.mjs";
 import {
@@ -73,6 +74,52 @@ function ownedCommand(localSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
 function at(ms) {
   return new Date(ms).toISOString();
 }
+
+test("Commander post-turn prompts use its proven address without inventing a hidden-owner command surface", async () => {
+  const address = { epoch: 73, wave: 1, turn: 2 };
+  const pressed = [];
+  const makeClient = (label, publicSeat) => ({
+    label,
+    publicSeat,
+    evidence: new FakeEvidence(label),
+    press: async key => pressed.push({ label, key }),
+  });
+  const host = makeClient("host-seat", 0);
+  const guest = makeClient("guest-seat", 1);
+  const rig = { host, clients: { host, guest } };
+  // Commander deliberately exposes no command surface on its owner. The read-only Commander oracle has
+  // already proven this exact address, and only an actionable prompt at that address may spend a key.
+  guest.evidence.push({
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "battle:message",
+      phase: "MessagePhase",
+      phaseInstance: 8,
+      uiMode: "MESSAGE",
+      ownerModel: "local",
+      coop: true,
+      localSeat: 1,
+      seatsWithInput: [1],
+      address: { ...address, turn: address.turn + 1 },
+      ready: { handlerActive: true, awaitingActionInput: true },
+    },
+  });
+  const advance = createBattlePromptAdvancer(rig, { "host-seat": 0, "guest-seat": 0 }, {}, "commander-post-turn", {
+    expectedCommandAddress: `${address.epoch}:${address.wave}:${address.turn}`,
+  });
+  assert.equal(await advance(), false, "a prompt from another turn is not admitted");
+
+  guest.evidence.push({
+    kind: "browser-surface2",
+    observation: {
+      ...guest.evidence.events[0].observation,
+      phaseInstance: 9,
+      address,
+    },
+  });
+  assert.equal(await advance(), true, "the exact Commander-addressed prompt remains publicly drivable");
+  assert.deepEqual(pressed, [{ label: "guest-seat", key: "Space" }]);
+});
 
 const ZERO_PROGRESS_BUDGET = Object.freeze({
   progressAllowanceMs: 0,
