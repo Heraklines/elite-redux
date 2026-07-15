@@ -1389,34 +1389,69 @@
         ]
       },
       {
-        "abilitySlot": 1,
-        "heldItems": [
-          {
-            "count": 1,
-            "item": "TWISTED_SPOON"
-          },
-          {
-            "count": 1,
-            "item": "IRON"
-          },
-          {
-            "count": 1,
-            "item": "CALCIUM"
-          },
-          {
-            "count": 1,
-            "item": "CARBOS"
-          }
-        ],
-        "level": null,
-        "moves": [
-          "PSYSTRIKE",
-          "AURA_SPHERE",
-          "FLAMETHROWER",
-          "RLA"
-        ],
         "slotChance": 15,
-        "species": 150
+        "variants": [
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "TWISTED_SPOON"
+              },
+              {
+                "count": 1,
+                "item": "IRON"
+              },
+              {
+                "count": 1,
+                "item": "CALCIUM"
+              },
+              {
+                "count": 1,
+                "item": "CARBOS"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "PSYSTRIKE",
+              "AURA_SPHERE",
+              "FLAMETHROWER",
+              "RLA"
+            ],
+            "species": 150,
+            "weight": 1
+          },
+          {
+            "abilitySlot": 1,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "TWISTED_SPOON"
+              },
+              {
+                "count": 1,
+                "item": "IRON"
+              },
+              {
+                "count": 1,
+                "item": "CALCIUM"
+              },
+              {
+                "count": 1,
+                "item": "CARBOS"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "PSYSTRIKE",
+              "AURA_SPHERE",
+              "MOONBLAST",
+              "RLNA"
+            ],
+            "species": 10107,
+            "weight": 100
+          }
+        ]
       },
       {
         "abilitySlot": 1,
