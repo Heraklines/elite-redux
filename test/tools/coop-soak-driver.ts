@@ -2011,7 +2011,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     };
     const hostBiomeBinding: CoopBiomeOperationBinding = {
       opState: rig.hostRuntime.opState,
-      durability: rig.hostRuntime.durability,
+      durability: rig.hostRuntime.durability ?? null,
     };
     // A real co-op pair owns one JS realm per client. Queue every frame for its destination while crossing
     // this multi-surface boundary so a retained biome apply, its promise continuation and the reciprocal
@@ -2053,7 +2053,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           current = await driveClientPhaseQueueTo(rig.guestScene, "SelectBiomePhase");
         }
         if (current?.phaseName === "SelectBiomePhase") {
-          const biomeBoundary = current as BiomeBoundarySeam;
+          const biomeBoundary = current as unknown as BiomeBoundarySeam;
           guestBiomeSourceWave = biomeBoundary.requireCoopSourceWave();
           if (guestBiomeSourceWave !== transitionSourceWave) {
             fail(
@@ -2113,7 +2113,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             if (guestBiomeBoundary == null || guestBiomeSourceWave == null) {
               fail("no-park", transitionSourceWave, "authority reached World Map without its renderer peer surface");
             }
-            const hostBiomeBoundary = rig.hostScene.phaseManager.getCurrentPhase() as BiomeBoundarySeam;
+            const hostBiomeBoundary = rig.hostScene.phaseManager.getCurrentPhase() as unknown as BiomeBoundarySeam;
             const hostSourceWave = hostBiomeBoundary.requireCoopSourceWave();
             if (hostSourceWave !== guestBiomeSourceWave || hostSourceWave !== transitionSourceWave) {
               fail(
@@ -2159,7 +2159,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         await withClient(rig.guestCtx, async () => {
           for (let attempt = 0; attempt < 80; attempt++) {
             await drainLoopback();
-            if (rig.guestScene.phaseManager.getCurrentPhase() !== guestBiomeBoundary) {
+            if ((rig.guestScene.phaseManager.getCurrentPhase() as unknown) !== guestBiomeBoundary) {
               if (rig.hostScene.phaseManager.getCurrentPhase()?.phaseName === "SelectBiomePhase") {
                 fail(
                   "no-park",
