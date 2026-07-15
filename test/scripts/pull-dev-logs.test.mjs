@@ -4,6 +4,7 @@
  */
 
 import assert from "node:assert/strict";
+import { join } from "node:path";
 import test from "node:test";
 import {
   buildGithubHeaders,
@@ -102,7 +103,7 @@ test("a raw-log 403 fails the pull instead of reporting zero new logs", async ()
       return true;
     },
   );
-  assert.deepEqual(messages, []);
+  assert.deepEqual(messages, ["1 new log(s) queued from 1 total; downloading with concurrency 1."]);
 });
 
 test("redacts explicit, header, query, and JSON credential forms", () => {
@@ -116,4 +117,166 @@ test("redacts explicit, header, query, and JSON credential forms", () => {
     assert.doesNotMatch(output, new RegExp(leaked.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(output, /<redacted>/);
+});
+
+test("downloads 1,001 reports with bounded concurrency and deterministic progress", async () => {
+  const paths = Array.from(
+    { length: 1_001 },
+    (_, index) => `remote/2026-07-15/report-${String(index).padStart(4, "0")}.log`,
+  ).reverse();
+  const files = new Map();
+  const messages = [];
+  let activeRawRequests = 0;
+  let maxActiveRawRequests = 0;
+  let rawRequestCount = 0;
+
+  const fetchImpl = async url => {
+    if (url.includes("git/ref/heads")) {
+      return response(200, JSON.stringify({ object: { sha: "tree-sha" } }));
+    }
+    if (url.includes("git/trees")) {
+      return response(200, JSON.stringify({ tree: paths.map(path => ({ type: "blob", path })) }));
+    }
+    activeRawRequests++;
+    rawRequestCount++;
+    maxActiveRawRequests = Math.max(maxActiveRawRequests, activeRawRequests);
+    const reportIndex = Number(/report-(\d+)\.log$/.exec(url)?.[1] ?? 0);
+    if (reportIndex % 2 === 0) {
+      await new Promise(resolve => setImmediate(resolve));
+    } else {
+      await Promise.resolve();
+    }
+    activeRawRequests--;
+    return response(200, `report ${reportIndex}`);
+  };
+
+  const result = await pullDevLogs({
+    fetchImpl,
+    credential: { token: "test-token", source: "GH_TOKEN" },
+    concurrency: 7,
+    progressSteps: 4,
+    requestTimeoutMs: 2_000,
+    fileExists: path => files.has(path),
+    makeDirectory: () => {},
+    writeFile: (path, contents) => files.set(path, contents),
+    renameFile: (from, to) => {
+      files.set(to, files.get(from));
+      files.delete(from);
+    },
+    log: message => messages.push(message),
+  });
+
+  assert.deepEqual(result, { downloaded: 1_001, total: 1_001, credentialSource: "GH_TOKEN" });
+  assert.equal(rawRequestCount, 1_001);
+  assert.equal(maxActiveRawRequests, 7);
+  assert.equal(
+    [...files.keys()].some(path => path.endsWith(".partial")),
+    false,
+  );
+
+  const progress = messages.filter(message => message.startsWith("Progress:"));
+  assert.deepEqual(
+    progress.map(message => Number(/Progress: (\d+)\//.exec(message)?.[1])),
+    [251, 502, 753, 1_001],
+  );
+  assert.match(progress[0], /report-0250\.log/);
+  assert.match(progress[1], /report-0501\.log/);
+  assert.match(progress[2], /report-0752\.log/);
+  assert.match(progress[3], /report-1000\.log/);
+});
+
+test("times out a stuck raw request without exposing the credential", async () => {
+  const secret = "github_pat_timeout_secret";
+  const startedAt = Date.now();
+
+  await assert.rejects(
+    pullDevLogs({
+      fetchImpl: async (url, { signal } = {}) => {
+        if (url.includes("git/ref/heads")) {
+          return response(200, JSON.stringify({ object: { sha: "tree-sha" } }));
+        }
+        if (url.includes("git/trees")) {
+          return response(200, JSON.stringify({ tree: [{ type: "blob", path: "remote/2026-07-15/stuck.log" }] }));
+        }
+        return new Promise((_, reject) => {
+          signal.addEventListener("abort", () => reject(new Error(`aborted ${secret}`)), { once: true });
+        });
+      },
+      credential: { token: secret, source: "GH_TOKEN" },
+      requestTimeoutMs: 25,
+      fileExists: () => false,
+      log: () => {},
+    }),
+    error => {
+      assert.equal(error.name, "GithubRequestTimeoutError");
+      assert.equal(error.timeoutMs, 25);
+      assert.match(error.message, /timed out after 25ms/);
+      assert.match(error.message, /downloading remote\/2026-07-15\/stuck\.log/);
+      assert.doesNotMatch(error.message, new RegExp(secret));
+      return true;
+    },
+  );
+  assert.ok(Date.now() - startedAt < 500);
+});
+
+test("resumes an interrupted atomic write and preserves final and DONE skips", async () => {
+  const resumablePath = "remote/2026-07-15/resumable.log";
+  const existingPath = "remote/2026-07-15/existing.log";
+  const donePath = "remote/2026-07-15/triaged.log";
+  const entries = [resumablePath, existingPath, donePath].map(path => ({ type: "blob", path }));
+  const outRoot = "test-output";
+  const resumableOutput = join(outRoot, resumablePath);
+  const existingOutput = join(outRoot, existingPath);
+  const triagedOutput = join(outRoot, donePath).replace(/\.log$/, ".DONE.log");
+  const files = new Map([
+    [existingOutput, "already present"],
+    [triagedOutput, "already triaged"],
+  ]);
+  let rawRequestCount = 0;
+
+  const fetchImpl = async url => {
+    if (url.includes("git/ref/heads")) {
+      return response(200, JSON.stringify({ object: { sha: "tree-sha" } }));
+    }
+    if (url.includes("git/trees")) {
+      return response(200, JSON.stringify({ tree: entries }));
+    }
+    rawRequestCount++;
+    return response(200, `download ${rawRequestCount}`);
+  };
+  const common = {
+    fetchImpl,
+    outRoot,
+    fileExists: path => files.has(path),
+    makeDirectory: () => {},
+    writeFile: (path, contents) => files.set(path, contents),
+    log: () => {},
+  };
+
+  await assert.rejects(
+    pullDevLogs({
+      ...common,
+      renameFile: () => {
+        throw new Error("simulated interruption before atomic rename");
+      },
+    }),
+    /simulated interruption/,
+  );
+  assert.equal(files.has(resumableOutput), false);
+  assert.equal(files.get(`${resumableOutput}.partial`), "download 1");
+
+  const result = await pullDevLogs({
+    ...common,
+    renameFile: (from, to) => {
+      files.set(to, files.get(from));
+      files.delete(from);
+    },
+  });
+
+  assert.deepEqual(result, { downloaded: 1, total: 3, credentialSource: "none" });
+  assert.equal(rawRequestCount, 2);
+  assert.equal(files.get(resumableOutput), "download 2");
+  assert.equal(files.has(`${resumableOutput}.partial`), false);
+  assert.equal(files.get(existingOutput), "already present");
+  assert.equal(files.get(triagedOutput), "already triaged");
 });
