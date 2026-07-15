@@ -543,6 +543,11 @@ export class PublicUiClient {
     this.pageGeneration = 0;
     this.publicRole = null;
     this.publicSeat = null;
+    // Journey-owned state, learned only after the public authentication flow succeeds. A cold
+    // page reopen keeps the browser context and account session, so an already-authenticated
+    // player must be given time to reach TitlePhase instead of being driven through Register a
+    // second time while the automatic session restore is still loading.
+    this.authenticatedOnce = false;
     this.titleNewGameKeys = [
       ...(this.label === "host-seat" ? config.keys.titleNewGame.hostSeat : config.keys.titleNewGame.guestSeat),
     ];
@@ -590,6 +595,7 @@ export class PublicUiClient {
   async loginOrReuseSession() {
     const title = this.evidence.find(TITLE_PHASE, this.pageCursor);
     if (title) {
+      this.authenticatedOnce = true;
       return title;
     }
     await this.evidence.waitFor(LOGIN_PHASE, {
@@ -600,10 +606,36 @@ export class PublicUiClient {
     await delay(this.config.settleDelayMs);
     const autoTitle = this.evidence.find(TITLE_PHASE, this.pageCursor);
     if (autoTitle) {
+      this.authenticatedOnce = true;
       return autoTitle;
     }
 
-    if (this.config.accountMode === "register") {
+    if (this.authenticatedOnce) {
+      const restoreDeadline = Date.now() + Math.min(this.config.bootTimeoutMs, 15_000);
+      while (Date.now() < restoreDeadline) {
+        const restoredTitle = this.evidence.find(TITLE_PHASE, this.pageCursor);
+        if (restoredTitle) {
+          this.evidence.record("public-session-restored", { proof: "TitlePhase" });
+          return restoredTitle;
+        }
+        if (this.evidence.networkState.account?.username === this.credentials.username) {
+          const titleAfterAccountRestore = await this.evidence.waitFor(TITLE_PHASE, {
+            from: this.pageCursor,
+            timeoutMs: this.config.bootTimeoutMs,
+            description: "TitlePhase after restored public account response",
+          });
+          this.evidence.record("public-session-restored", { proof: "account-view+TitlePhase" });
+          return titleAfterAccountRestore;
+        }
+        await delay(100);
+      }
+      this.evidence.record("public-session-restore-expired", {
+        fallback: "visible-login-form",
+        waitedMs: Math.min(this.config.bootTimeoutMs, 15_000),
+      });
+    }
+
+    if (this.config.accountMode === "register" && !this.authenticatedOnce) {
       await this.openRegistrationForm();
       await this.fillRegistrationForm();
     } else {
@@ -613,6 +645,7 @@ export class PublicUiClient {
       await this.fillLoginForm();
     }
     const entered = await this.completePostAuthentication();
+    this.authenticatedOnce = true;
     if (TITLE_PHASE.test(entered.text ?? "")) {
       await delay(this.config.settleDelayMs);
       return entered;

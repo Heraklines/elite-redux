@@ -43,6 +43,7 @@ import {
   buildDuo,
   type DuoRig,
   drainLoopback,
+  driveClientPhaseQueueTo,
   driveDuoGuestTackleThroughPublicUi,
   driveGuestReplayTurn,
   forceItemRewards,
@@ -284,9 +285,18 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
     );
 
     // ===== The NEXT battle resolves turns 1-2 with NO stall (the wedge the counter drift caused). =====
-    // Let the public command driver bring BOTH engines to the reciprocal boundary. Stopping the host before
-    // CommandPhase and then starting only the guest would correctly keep its UI closed under the hardened
-    // barrier; that old harness order asserted the very one-sided opening production now forbids.
+    // Cross the real between-wave queues in authority order. The host must generate and publish wave 2's
+    // immutable enemy carrier before the guest's NextEncounterPhase can consume it. Stop both before their
+    // CommandPhase starts; the public command driver below then opens the reciprocal barrier on both sides.
+    await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase", false));
+    await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, "wave 2 CommandPhase", {
+        matches: phase => phase.phaseName === "CommandPhase" && rig.guestScene.currentBattle.waveIndex === 2,
+      }),
+    );
+    expect(rig.hostScene.currentBattle.waveIndex, "host generated wave 2 before command input").toBe(2);
+    expect(rig.guestScene.currentBattle.waveIndex, "guest consumed the authoritative wave-2 carrier").toBe(2);
+
     for (let t = 0; t < 2; t++) {
       await driveDuoGuestTackleThroughPublicUi(game, rig);
       if (t === 0) {
