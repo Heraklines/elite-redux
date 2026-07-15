@@ -54,6 +54,13 @@ export const COOP_KEEPALIVE_MS = 5_000;
 export const COOP_KEEPALIVE_SUSPEND_FACTOR = 3;
 
 /**
+ * A peer connection may report `disconnected` while ICE is changing routes and recover without replacing
+ * the carrier. Give that transient state a short bounded grace period, but never debounce `failed` or
+ * `closed`: those states cannot carry another gameplay frame and must enter hot rejoin immediately.
+ */
+export const COOP_PC_DISCONNECTED_GRACE_MS = 5_000;
+
+/**
  * Conservative application framing below common SCTP message ceilings. Session/launch snapshots
  * grow throughout a long campaign; splitting their JSON keeps a late-wave save from becoming one
  * oversized RTCDataChannel send while remaining transparent to every protocol consumer.
@@ -126,6 +133,11 @@ export interface CoopWireChannel {
   onOpen(handler: () => void): void;
   /** Register the channel-close handler. */
   onClose(handler: () => void): void;
+  /**
+   * Register a carrier-loss handler. Unlike `onClose`, this also observes the owning RTCPeerConnection,
+   * whose `failed`/`closed` state can strand an apparently-open RTCDataChannel.
+   */
+  onConnectionLost?(handler: (reason: string) => void): void;
   onBufferedAmountLow?(handler: () => void): void;
   /**
    * #857: the most recent RAW channel error message (e.g. the SCTP abort reason
@@ -180,6 +192,8 @@ export class WebRtcTransport implements CoopTransport {
   private logicalRecoveryGeneration: number | null = null;
   /** Self-identifying local transport failure surfaced through the existing disconnect diagnostics. */
   private transportFailureReason: string | undefined;
+  /** The current generation has already emitted its one lifecycle disconnect transition. */
+  private disconnectedGeneration: number | null = null;
   private readonly inboundChunks = new Map<
     string,
     { readonly total: number; readonly parts: (string | undefined)[]; received: number; bytes: number }
@@ -213,7 +227,7 @@ export class WebRtcTransport implements CoopTransport {
       }
     });
     wire.onOpen(() => {
-      if (gen !== this.wireGeneration) {
+      if (gen !== this.wireGeneration || this.disconnectedGeneration === gen) {
         return;
       }
       coopLog("webrtc", `channel OPEN role=${this.role} gen=${gen}`);
@@ -223,19 +237,46 @@ export class WebRtcTransport implements CoopTransport {
       this.drainLogicalOutbound();
     });
     wire.onClose(() => {
-      if (gen !== this.wireGeneration) {
-        return;
-      }
-      coopLog("webrtc", `channel CLOSE role=${this.role} state=${this._state} gen=${gen}`);
-      this.inboundChunks.clear();
-      this.setState("disconnected");
+      this.handleConnectionLost(wire, gen, wire.lastError ?? "data channel closed", true);
+    });
+    wire.onConnectionLost?.(reason => {
+      this.handleConnectionLost(wire, gen, reason, true);
     });
     wire.onMessage(data => {
-      if (gen !== this.wireGeneration) {
+      if (gen !== this.wireGeneration || this.disconnectedGeneration === gen) {
         return;
       }
       this.receive(data);
     });
+  }
+
+  /**
+   * Collapse every close/failure signal for one carrier generation into exactly one lifecycle transition.
+   * The failing wire is captured before notifying listeners: a synchronous rejoin may install a replacement,
+   * and cleanup must never close that fresh generation.
+   */
+  private handleConnectionLost(wire: CoopWireChannel, gen: number, reason: string, retireWire: boolean): void {
+    if (gen !== this.wireGeneration || this.disconnectedGeneration === gen || this._state === "closed") {
+      return;
+    }
+    this.disconnectedGeneration = gen;
+    // A connected-path refusal records the more precise causal reason before it closes the carrier. Preserve
+    // that evidence when the resulting channel-close callback arrives synchronously.
+    this.transportFailureReason ??= reason;
+    coopWarn("webrtc", `carrier LOST role=${this.role} state=${this._state} gen=${gen} reason=${reason}`);
+    this.inboundChunks.clear();
+    this.setState("disconnected");
+    if (!retireWire) {
+      return;
+    }
+    try {
+      wire.close();
+    } catch (error) {
+      coopWarn(
+        "webrtc",
+        `failed carrier cleanup threw role=${this.role} gen=${gen}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**
@@ -250,6 +291,7 @@ export class WebRtcTransport implements CoopTransport {
     this.blockedSendGeneration = null;
     this.logicalRecoveryGeneration = null;
     this.transportFailureReason = undefined;
+    this.disconnectedGeneration = null;
     for (const logical of this.logicalOutbound) {
       logical.attempt = null;
     }
@@ -660,6 +702,7 @@ export class WebRtcTransport implements CoopTransport {
     this.logicalOutboundBytes = 0;
     this.blockedSendGeneration = null;
     this.logicalRecoveryGeneration = null;
+    this.disconnectedGeneration = null;
     this.transportFailureReason = undefined;
     this.msgHandlers.clear();
     this.stateHandlers.clear();
@@ -896,11 +939,74 @@ export function wireFromRtcChannel(role: CoopRole, channel: RTCDataChannel, pc?:
   // #857: capture the raw channel error message so the transport can surface the DROP REASON on the
   // reconnect banner (previously log-only, then discarded). Still logged for the captured console.
   let lastError: string | undefined;
+  let connectionLostReason: string | undefined;
+  let disconnectedTimer: ReturnType<typeof setTimeout> | null = null;
+  const connectionLostHandlers = new Set<(reason: string) => void>();
+  const clearDisconnectedTimer = (): void => {
+    if (disconnectedTimer != null) {
+      clearTimeout(disconnectedTimer);
+      disconnectedTimer = null;
+    }
+  };
+  const notifyConnectionLost = (reason: string): void => {
+    if (connectionLostReason != null) {
+      return;
+    }
+    clearDisconnectedTimer();
+    connectionLostReason = reason;
+    coopWarn("webrtc", `peer connection LOST role=${role} reason=${reason} channel=${channel.readyState}`);
+    for (const handler of connectionLostHandlers) {
+      handler(reason);
+    }
+  };
+  const scheduleDisconnected = (source: "peer" | "ice"): void => {
+    if (connectionLostReason != null || disconnectedTimer != null) {
+      return;
+    }
+    coopWarn(
+      "webrtc",
+      `peer connection DISCONNECTED role=${role} source=${source} grace=${COOP_PC_DISCONNECTED_GRACE_MS}ms channel=${channel.readyState}`,
+    );
+    disconnectedTimer = setTimeout(() => {
+      disconnectedTimer = null;
+      notifyConnectionLost(`${source} connection remained disconnected for ${COOP_PC_DISCONNECTED_GRACE_MS}ms`);
+    }, COOP_PC_DISCONNECTED_GRACE_MS);
+  };
+  const observePeerConnection = (): void => {
+    if (pc == null || connectionLostReason != null) {
+      return;
+    }
+    const state = pc.connectionState;
+    coopLog("webrtc", `peer connection state role=${role} state=${state} channel=${channel.readyState}`);
+    if (state === "failed" || state === "closed") {
+      notifyConnectionLost(`peer connection ${state}`);
+    } else if (state === "disconnected") {
+      scheduleDisconnected("peer");
+    } else if (state === "connected") {
+      clearDisconnectedTimer();
+    }
+  };
+  const observeIceConnection = (): void => {
+    if (pc == null || connectionLostReason != null) {
+      return;
+    }
+    const state = pc.iceConnectionState;
+    coopLog("webrtc", `ICE connection state role=${role} state=${state} channel=${channel.readyState}`);
+    if (state === "failed" || state === "closed") {
+      notifyConnectionLost(`ICE connection ${state}`);
+    } else if (state === "disconnected") {
+      scheduleDisconnected("ice");
+    } else if (state === "connected" || state === "completed") {
+      clearDisconnectedTimer();
+    }
+  };
   channel.addEventListener("error", ev => {
     const errLike = (ev as { error?: { message?: string } }).error;
     lastError = errLike?.message ?? "?";
     coopWarn("webrtc", `channel ERROR role=${role} readyState=${channel.readyState} err=${lastError}`);
   });
+  pc?.addEventListener("connectionstatechange", observePeerConnection);
+  pc?.addEventListener("iceconnectionstatechange", observeIceConnection);
   const wire: CoopWireChannel = {
     get readyState() {
       return channel.readyState;
@@ -923,6 +1029,7 @@ export function wireFromRtcChannel(role: CoopRole, channel: RTCDataChannel, pc?:
       // the SUPERSEDED wire on every rejoin; without also closing the pc, the old connection stayed
       // alive (holding ICE/DTLS/TURN) and its teardown aborted the fresh channel -> the reconnect flap.
       try {
+        clearDisconnectedTimer();
         channel.close();
       } catch {
         /* the channel may already be closed */
@@ -942,9 +1049,18 @@ export function wireFromRtcChannel(role: CoopRole, channel: RTCDataChannel, pc?:
     onClose: handler => {
       channel.addEventListener("close", () => handler());
     },
+    onConnectionLost: handler => {
+      connectionLostHandlers.add(handler);
+      if (connectionLostReason != null) {
+        handler(connectionLostReason);
+      }
+    },
     onBufferedAmountLow: handler => {
       channel.addEventListener("bufferedamountlow", () => handler());
     },
   };
+  // Do not wait for a future event if the adapter is handed an already-terminal peer connection.
+  observePeerConnection();
+  observeIceConnection();
   return wire;
 }
