@@ -7,7 +7,9 @@
   "allowedFiles": [
     ".github/coop-task-ownership/p33-continuation-identity-codex.json",
     "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/phases/biome-shop-phase.ts",
     "src/phases/select-modifier-phase.ts",
+    "src/phases/victory-phase.ts",
     "test/tests/elite-redux/coop/coop-retained-continuation-identity.test.ts"
   ]
 }
