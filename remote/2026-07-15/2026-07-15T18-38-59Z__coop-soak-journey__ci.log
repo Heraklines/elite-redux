@@ -1,0 +1,53 @@
+===== COOP SOAK RESULT =====
+profile: journey
+verdict: FAIL
+waves_requested: 45
+run: 29441297793 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T18-38-59Z
+
+----- driver lines -----
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=5 where=wave-start fields=[field] :: field:host=[{"bi":0,"partyIndex":0,"speciesId":890,"hp":2065,"maxHp":2065,"status":0,"statStages":[0,0,2,0,0,0,0],"fainted":false,"abilityId":5258,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":["ER_ENRAGE","ER_ITEM_DISABLED"],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1715,"maxHp":1715,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5144,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":["ER_ITEM_DISABLED"],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":399,"hp":20,"maxHp":20,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":5181,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[158,0],[70,0],[300,0],[111,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":161,"hp":18,"maxHp":18,"status":0,"statStages":[-1,0,-1,0,4,0,0],"fainted":false,"abilityId":50,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[10,0],[111,0],[154,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]/guest=[{"bi":0,"partyIndex":0,"speciesId":890,"hp":2065,"maxHp":2065,"status":0,"statStages":[0,0,2,0,0,0,0],"fainted":false,"abilityId":5258,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":["ER_ENRAGE","ER_ITEM_DISABLED"],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1715,"maxHp":1715,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5144,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":["ER_ITEM_DISABLED"],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":399,"hp":20,"maxHp":20,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5181,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[158,0],[70,0],[300,0],[111,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":161,"hp":18,"maxHp":18,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":50,"formIndex":0,"isTerastallized":false,"teraType":0,"bossSegments":0,"bossSegmentIndex":0,"moves":[[10,0],[111,0],[154,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=8 where=wave-start fields=[field] :: field:host=[{"bi":0,"partyIndex":0,"speciesId":890,"hp":2065,"maxHp":2065,"status":0,"statStages":[-1,0,1,0,0,0,0],"fainted":false,"abilityId":5258,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":["ER_ENRAGE"],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1715,"maxHp":1715,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":5144,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":158,"hp":26,"maxHp":26,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":22,"formIndex":0,"isTerastallized":false,"teraType":10,"bossSegments":0,"bossSegmentIndex":0,"moves":[[5002,0],[423,0],[184,0],[43,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":821,"hp":22,"maxHp":22,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":5067,"formIndex":0,"isTerastallized":false,"teraType":2,"bossSegments":0,"bossSegmentIndex":0,"moves":[[16,0],[468,0],[31,0],[43,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]/guest=[{"bi":0,"partyIndex":0,"speciesId":890,"hp":2065,"maxHp":2065,"status":0,"statStages":[-1,0,1,0,0,0,0],"fainted":false,"abilityId":5258,"formIndex":0,"isTerastallized":false,"teraType":3,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":["ER_ENRAGE"],"transformSpeciesId":0,"transformFormIndex":0},{"bi":1,"partyIndex":1,"speciesId":384,"hp":1715,"maxHp":1715,"status":0,"statStages":[-1,0,-1,0,0,0,0],"fainted":false,"abilityId":5144,"formIndex":0,"isTerastallized":false,"teraType":15,"bossSegments":0,"bossSegmentIndex":0,"moves":[[34,0],[247,0],[53,0],[85,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":2,"partyIndex":0,"speciesId":158,"hp":26,"maxHp":26,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":22,"formIndex":0,"isTerastallized":false,"teraType":10,"bossSegments":0,"bossSegmentIndex":0,"moves":[[5002,0],[423,0],[184,0],[43,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0},{"bi":3,"partyIndex":1,"speciesId":821,"hp":22,"maxHp":22,"status":0,"statStages":[0,0,0,0,0,0,0],"fainted":false,"abilityId":5067,"formIndex":0,"isTerastallized":false,"teraType":2,"bossSegments":0,"bossSegmentIndex":0,"moves":[[16,0],[468,0],[31,0],[43,0]],"tags":[],"transformSpeciesId":0,"transformFormIndex":0}]
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+
+----- vitest result tail -----
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[33m[coop:relay] dispose() failing inFlightWaiters=1 (choice=0 outcome=1 rewardOptions=0) -> all resolve null[39m
+[33m[coop:relay] AWAIT interactionOutcome seq=8000013 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mco-op continuous journey: many mystery events plus biome transitions > plays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m20112[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak-journey.test.ts:101:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m > [22mco-op continuous journey: many mystery events plus biome transitions[2m > [22mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[31m[1mTypeError[22m: Cannot read properties of undefined (reading '0')[39m
+[36m [2m❯[22m CommandPhase.start src/phases/command-phase.ts:[2m625:56[22m[39m
+    [90m623|[39m     [35mthis[39m[33m.[39m[34mcheckCommander[39m()[33m;[39m
+    [90m624|[39m
+    [90m625|[39m     const hasGeneratedSkip = globalScene.currentBattle.turnCommands[th…
+    [90m   |[39m                                                        [31m^[39m
+    [90m626|[39m
+    [90m627|[39m     const coopController = globalScene.gameMode.isCoop ? getCoopContro…
+[90m [2m❯[22m driveClientPhaseQueueTo test/tools/coop-duo-harness.ts:[2m1522:11[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m633:12[22m[39m
+[90m [2m❯[22m crossCommandBoundaryWithReplayGuest test/tools/coop-soak-driver.ts:[2m2282:28[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4237:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-journey.test.ts:[2m105:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 18:38:14
+[2m   Duration [22m 44.80s[2m (transform 18.96s, setup 23.08s, import 238ms, tests 20.53s, environment 773ms)[22m
+
