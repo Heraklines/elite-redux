@@ -44,6 +44,7 @@ import {
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { getCoopUiRelayEdges, resetCoopUiRelayTrace } from "#data/elite-redux/coop/coop-ui-relay-trace";
 import { captureGhostTeam } from "#data/elite-redux/er-ghost-teams";
+import { BattlerIndex } from "#enums/battler-index";
 import { Challenges } from "#enums/challenges";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -52,8 +53,16 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { CommandPhase } from "#phases/command-phase";
 import { GameManager } from "#test/framework/game-manager";
-import { buildDuo, withClient } from "#test/tools/coop-duo-harness";
+import {
+  buildDuo,
+  driveDuoGuestTackleThroughPublicUi,
+  driveGuestReplayTurn,
+  installHeadlessPlayerAtlasCompletionModel,
+  withClient,
+  withClientSync,
+} from "#test/tools/coop-duo-harness";
 import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
 import Phaser from "phaser";
@@ -308,59 +317,11 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     expect(getCoopController()?.role).toBe("host");
   });
 
-  it("a co-op run LOOPS to the next wave: win the double -> reward -> wave 2 is still a co-op double", async () => {
-    await startCoopDouble();
-    const startWave = globalScene.currentBattle.waveIndex;
-
-    // Win the wave: the human commands ONLY field slot 0 (partner auto-resolves),
-    // then KO both foes so the victory -> reward -> next-wave chain runs.
-    game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX);
-    await game.doKillOpponents();
-    await game.toNextWave();
-
-    // The run advanced a wave with no hang/crash; the merged party is intact; the
-    // co-op session is still live; and checkIsDouble keeps the new wave a DOUBLE.
-    expect(globalScene.currentBattle.waveIndex).toBeGreaterThan(startWave);
-    expect(globalScene.currentBattle.double).toBe(true);
-    expect(globalScene.getPlayerParty()).toHaveLength(2);
-    expect(getCoopController()?.role).toBe("host");
-  });
-
-  it("co-op runs 10 waves end-to-end: no hang, no desync, every wave a healthy double", async () => {
-    await startCoopDouble();
-    const TARGET_WAVES = 10;
-    const startWave = globalScene.currentBattle.waveIndex;
-
-    for (let i = 0; i < TARGET_WAVES; i++) {
-      const wave = globalScene.currentBattle.waveIndex;
-
-      // Pre-turn health: co-op forces a DOUBLE, the enemy field is populated, and BOTH
-      // players still have a controllable mon (the field leads are one host / one guest).
-      expect(globalScene.currentBattle.double, `wave ${wave} should be a co-op double`).toBe(true);
-      expect(globalScene.getEnemyField().length, `wave ${wave} has on-field enemies`).toBeGreaterThan(0);
-      const party = globalScene.getPlayerParty();
-      expect(coopOwnedCount(party, "host"), `wave ${wave}: host owns a mon`).toBeGreaterThan(0);
-      expect(coopOwnedCount(party, "guest"), `wave ${wave}: guest owns a mon`).toBeGreaterThan(0);
-      // Field slot ownership stays host=0 / guest=1 (the command-routing invariant).
-      const field = globalScene.getPlayerField();
-      expect(field[COOP_HOST_FIELD_INDEX]?.coopOwner, `wave ${wave}: field 0 is host`).toBe("host");
-      expect(field[COOP_GUEST_FIELD_INDEX]?.coopOwner, `wave ${wave}: field 1 is guest`).toBe("guest");
-
-      // The human commands ONLY the host slot; the guest slot auto-resolves over the
-      // relay. If the guest slot ever stalled, this turn would hang (test timeout).
-      game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX);
-      await game.doKillOpponents();
-      await game.toNextWave();
-
-      expect(globalScene.currentBattle.waveIndex, `advanced past wave ${wave}`).toBeGreaterThan(wave);
-    }
-
-    // The run cleared 10 co-op doubles back-to-back with a single human selection per
-    // turn - no hang, no crash, the session stayed live and the mode stayed co-op.
-    expect(globalScene.currentBattle.waveIndex).toBeGreaterThanOrEqual(startWave + TARGET_WAVES);
-    expect(globalScene.gameMode.isCoop).toBe(true);
-    expect(getCoopController()?.role).toBe("host");
-  }, 180_000);
+  // Multi-wave continuation belongs to the production-shaped two-engine journeys:
+  // `coop-duo-multiwave.test.ts` crosses three real retained BattleEnd + shop boundaries, while
+  // `coop-automatic-victory-seal.test.ts` owns the ten-wave production-fidelity assertion. The former
+  // one-engine doKillOpponents()/toNextWave shortcuts never emitted an exact BattleEnd operation and
+  // therefore correctly fail under strict P33 negotiation instead of representing a playable journey.
 
   it("co-op is challenge-capable: the co-op gameMode carries challenges and accepts one (co-op challenge)", () => {
     // The co-op flow routes through the challenge-select screen, so the co-op
@@ -594,22 +555,63 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     expect(soloSnap?.party.length).toBeGreaterThan(0);
   });
 
-  it("P3 progression: winning a co-op double grants EXP to BOTH the host's and the guest's mon", async () => {
-    const field = await startCoopDouble();
-    const hostMon = field[COOP_HOST_FIELD_INDEX];
-    const guestMon = field[COOP_GUEST_FIELD_INDEX];
-    const hostExpBefore = hostMon.exp;
-    const guestExpBefore = guestMon.exp;
+  it("P3 progression: an exact two-engine victory grants and mirrors EXP for BOTH owners", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createScheduledCoopPair({ automatic: true });
+    const rig = await buildDuo(game, pair, setCoopRuntime, scene => {
+      scene.gameMode = getGameMode(GameModes.COOP);
+    });
+    installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
 
-    // Win the wave (human commands slot 0; partner auto-resolves), then advance so
-    // the victory -> EXP chain runs for the whole merged party.
-    game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX);
-    await game.doKillOpponents();
-    await game.toNextWave();
+    // Align the direct guest scene to the same real command boundary as a browser client. Once booted,
+    // destination-scheduled delivery guarantees that every continuation runs under its own client context.
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.phaseManager.clearAllPhases();
+      rig.guestScene.phaseManager.shiftPhase();
+    });
+    pair.setAutomaticDelivery(false);
 
-    // Both halves of the co-op party share the run's progression: each player's mon
-    // gained EXP from the shared win.
-    expect(hostMon.exp).toBeGreaterThan(hostExpBefore);
-    expect(guestMon.exp).toBeGreaterThan(guestExpBefore);
-  });
+    const before = withClientSync(rig.hostCtx, () =>
+      rig.hostScene.getPlayerParty().map(mon => ({ id: mon.id, owner: mon.coopOwner, exp: mon.exp })),
+    );
+    expect(rig.hostScene.currentBattle.double, "the authoritative journey is a co-op double").toBe(true);
+    expect(before, "the merged two-player party is intact").toHaveLength(2);
+    expect(
+      before.find(mon => mon.owner === "host"),
+      "host-owned participant exists",
+    ).toBeDefined();
+    expect(
+      before.find(mon => mon.owner === "guest"),
+      "guest-owned participant exists",
+    ).toBeDefined();
+
+    // Preserve the real public command -> turn -> BattleEnd route while making the KO deterministic.
+    // This changes only battle state, not the phase queue or retained operation protocol.
+    withClientSync(rig.hostCtx, () => {
+      for (const enemy of rig.hostScene.getEnemyField()) {
+        enemy.hp = 1;
+      }
+    });
+    await driveDuoGuestTackleThroughPublicUi(game, rig, { restartAlreadyOpenHost: true });
+    const turn = rig.hostScene.currentBattle.turn;
+    await withClient(rig.hostCtx, async () => {
+      game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
+      await game.phaseInterceptor.to("TurnEndPhase");
+    });
+    await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+
+    const hostAfter = withClientSync(rig.hostCtx, () =>
+      rig.hostScene.getPlayerParty().map(mon => ({ id: mon.id, owner: mon.coopOwner, exp: mon.exp })),
+    );
+    const guestAfter = withClientSync(rig.guestCtx, () =>
+      rig.guestScene.getPlayerParty().map(mon => ({ id: mon.id, owner: mon.coopOwner, exp: mon.exp })),
+    );
+    for (const owner of ["host", "guest"] as const) {
+      const prior = before.find(mon => mon.owner === owner)!;
+      const authoritative = hostAfter.find(mon => mon.id === prior.id);
+      const mirrored = guestAfter.find(mon => mon.id === prior.id);
+      expect(authoritative?.exp, `${owner}-owned mon gained shared EXP`).toBeGreaterThan(prior.exp);
+      expect(mirrored?.exp, `${owner}-owned EXP converged on the renderer`).toBe(authoritative?.exp);
+    }
+  }, 120_000);
 });
