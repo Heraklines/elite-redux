@@ -11,9 +11,10 @@ import { GameModes } from "../src/enums/game-modes";
 // instead, whose bridge is deliberately read-only and cannot pair or mutate the game.
 await import("../src/main");
 
-const [{ globalScene }, { connectCoopWithCode }] = await Promise.all([
+const [{ globalScene }, { connectCoopWithCode }, { COOP_PC_DISCONNECTED_GRACE_MS }] = await Promise.all([
   import("../src/global-scene"),
   import("../src/data/elite-redux/coop/coop-webrtc-connect"),
+  import("../src/data/elite-redux/coop/coop-webrtc-transport"),
 ]);
 
 Object.defineProperty(globalThis, "__coopBrowserBridge", {
@@ -23,6 +24,7 @@ Object.defineProperty(globalThis, "__coopBrowserBridge", {
   value: Object.freeze({
     ready: () => globalScene?.gameData != null,
     gameModeCoop: GameModes.COOP,
+    peerDisconnectedGraceMs: COOP_PC_DISCONNECTED_GRACE_MS,
     connect: (code: string, role: CoopRole, opts?: Parameters<typeof connectCoopWithCode>[2]) =>
       connectCoopWithCode(code, role, opts),
   }),

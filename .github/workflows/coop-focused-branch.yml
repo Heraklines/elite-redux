@@ -14,7 +14,10 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "scripts/coop-gate-timings.json"
+      - "scripts/coop-browser-transport-entry.ts"
       - "scripts/guard-coop-task-ownership.mjs"
+      - "scripts/prepare-coop-browser-artifact.mjs"
+      - "scripts/run-coop-browser-transport.mjs"
       - "scripts/run-coop-gate.mjs"
       - "scripts/run-coop-static-gate.mjs"
       - "scripts/write-coop-ci-status.mjs"
@@ -35,6 +38,7 @@ jobs:
     name: Select affected integration shards
     runs-on: ubuntu-latest
     outputs:
+      browser_transport: ${{ steps.browser.outputs.browser_transport }}
       declared_base_sha: ${{ steps.ownership.outputs.base_sha }}
       matrix: ${{ steps.plan.outputs.matrix }}
     steps:
@@ -181,6 +185,25 @@ jobs:
           echo "exit_code=$status" >> "$GITHUB_OUTPUT"
           exit "$status"
 
+      - name: Select the real-browser transport lane when its owned stack changed
+        id: browser
+        env:
+          COOP_DECLARED_BASE: ${{ steps.ownership.outputs.base_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet "$COOP_DECLARED_BASE" HEAD -- \
+            scripts/coop-browser-transport-entry.ts \
+            scripts/prepare-coop-browser-artifact.mjs \
+            scripts/run-coop-browser-transport.mjs \
+            scripts/vite.coop-browser.config.mjs \
+            src/data/elite-redux/coop/coop-webrtc-connect.ts \
+            src/data/elite-redux/coop/coop-webrtc-transport.ts; then
+            echo "browser_transport=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "browser_transport=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Write focused planner status evidence
         if: always()
         env:
@@ -291,6 +314,131 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  browser-build:
+    if: github.repository == 'Heraklines/elite-redux' && needs.plan.outputs.browser_transport == 'true'
+    needs: plan
+    name: Focused immutable production browser bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Build and seal the exact branch browser bundle once
+        id: build
+        env:
+          COOP_BROWSER_OUT_DIR: dist-coop-browser
+          VITE_COOP_SERVER_URL: http://127.0.0.1:4174
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          pnpm exec vite build --mode production --config scripts/vite.coop-browser.config.mjs \
+            2>&1 | tee coop-focused-browser-build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -eq 0 ]; then
+            node scripts/prepare-coop-browser-artifact.mjs
+            status=$?
+          fi
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Write focused browser-build status evidence
+        if: always()
+        env:
+          BUILD_EXIT: ${{ steps.build.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs --output coop-focused-browser-build-status.json
+          --kind browser-build --exit-code "$BUILD_EXIT" --log coop-focused-browser-build.log
+
+      - name: Publish the immutable browser execution input
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-browser-bundle-${{ github.sha }}
+          overwrite: true
+          path: dist-coop-browser/**
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload focused browser-build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-browser-build-${{ github.sha }}-${{ steps.build.outcome }}
+          overwrite: true
+          path: |
+            coop-focused-browser-build-status.json
+            coop-focused-browser-build.log
+            dist-coop-browser/coop-browser-artifact.json
+          retention-days: 7
+          if-no-files-found: warn
+
+  browser:
+    if: github.repository == 'Heraklines/elite-redux' && needs.plan.outputs.browser_transport == 'true' && needs.browser-build.result == 'success'
+    needs: [plan, browser-build]
+    name: Focused browser-native WebRTC lifecycle and rejoin
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-deps
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: coop-focused-browser-bundle-${{ github.sha }}
+          path: dist-coop-browser
+
+      - name: Install isolated Chrome runtime
+        run: pnpm exec puppeteer browsers install chrome
+
+      - name: Run two-context sealed-production transport checkpoint
+        id: browser
+        env:
+          COOP_BROWSER_ASSET_DIR: assets
+          COOP_BROWSER_DIST: dist-coop-browser
+          NODE_OPTIONS: --max-old-space-size=4096
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          node scripts/run-coop-browser-transport.mjs 2>&1 | tee coop-focused-browser-transport.log
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Write focused browser status evidence
+        if: always()
+        env:
+          BROWSER_EXIT: ${{ steps.browser.outputs.exit_code }}
+        run: >-
+          node scripts/write-coop-ci-status.mjs --output coop-focused-browser-status.json
+          --kind browser --exit-code "$BROWSER_EXIT" --log coop-focused-browser-transport.log
+          --assignment dist-coop-browser/coop-browser-artifact.json
+
+      - name: Upload focused browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-focused-browser-${{ github.sha }}-${{ steps.browser.outcome }}
+          overwrite: true
+          path: |
+            coop-focused-browser-status.json
+            coop-focused-browser-transport.log
+            dist-coop-browser/coop-browser-artifact.json
+            dev-logs/coop-browser/**
+          retention-days: 7
+          if-no-files-found: warn
+
   gate:
     if: github.repository == 'Heraklines/elite-redux'
     needs: plan
@@ -368,15 +516,25 @@ jobs:
   focused-required:
     name: Focused co-op required aggregate
     if: always()
-    needs: [plan, static, gate]
+    needs: [plan, static, browser-build, browser, gate]
     runs-on: ubuntu-latest
     steps:
       - name: Require planner, branch static checks, and every selected shard
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
           STATIC_RESULT: ${{ needs.static.result }}
+          BROWSER_SCOPE: ${{ needs.plan.outputs.browser_transport }}
+          BROWSER_BUILD_RESULT: ${{ needs.browser-build.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
           GATE_RESULT: ${{ needs.gate.result }}
         run: |
           test "$PLAN_RESULT" = success
           test "$STATIC_RESULT" = success
           test "$GATE_RESULT" = success
+          if [ "$BROWSER_SCOPE" = true ]; then
+            test "$BROWSER_BUILD_RESULT" = success
+            test "$BROWSER_RESULT" = success
+          else
+            test "$BROWSER_BUILD_RESULT" = skipped
+            test "$BROWSER_RESULT" = skipped
+          fi
