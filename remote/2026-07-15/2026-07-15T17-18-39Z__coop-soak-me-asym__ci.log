@@ -1,0 +1,52 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: 150
+run: 29435848497 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T17-18-39Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] SEED=828633 WAVES=17 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=17 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+
