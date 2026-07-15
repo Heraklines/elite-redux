@@ -129,6 +129,7 @@ import {
 } from "#data/elite-redux/er-run-difficulty";
 import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { getErShinyLabEarnedTierForPokemon, rollErShinyLabWildSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
+import { applyErAtlasFrameRate } from "#data/elite-redux/er-sprite-anim";
 import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
 import {
   applyErWardStoneBlock,
@@ -1058,6 +1059,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         frameRate: 10,
         repeat: -1,
       });
+      // ER: honour a multi-frame custom atlas's authored cadence (no-op otherwise).
+      applyErAtlasFrameRate(globalScene.anims, battleSpriteKey, globalScene.textures.get(battleSpriteKey)?.customData);
     }
     // With everything loaded, now begin playing the animation.
     this.playAnim();

@@ -412,6 +412,17 @@ function addAtlasFrames(tex: Phaser.Textures.Texture, atlas: any): void {
   const entries: [string, any][] = Array.isArray(framesNode)
     ? framesNode.filter((f: any) => f?.filename && f?.frame).map((f: any) => [f.filename, f])
     : Object.entries(framesNode).filter(([, f]: [string, any]) => f?.frame);
+  // Mirror Phaser's JSONHash/JSONArray parsers: copy every non-frames top-level JSON
+  // key onto the texture's customData, so authored metadata (e.g. an `animation`
+  // cadence block for multi-frame ER "GIF" atlases) is readable exactly as in-game.
+  (tex as any).customData ??= {};
+  const cd = (tex as any).customData as Record<string, any>;
+  for (const key of Object.keys(atlas)) {
+    if (key === "frames" || key === "textures") {
+      continue;
+    }
+    cd[key] = atlas[key];
+  }
   for (const [name, f] of entries) {
     const fr = tex.add(name, 0, f.frame.x, f.frame.y, f.frame.w, f.frame.h);
     if (fr && f.trimmed && f.sourceSize && f.spriteSourceSize) {

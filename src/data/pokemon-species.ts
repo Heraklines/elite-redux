@@ -12,6 +12,7 @@ import {
   pokemonSpeciesLevelMoves,
 } from "#balance/pokemon-level-moves";
 import { speciesStarterCosts } from "#balance/starters";
+import { applyErAtlasFrameRate } from "#data/elite-redux/er-sprite-anim";
 import type { GrowthRate } from "#data/exp";
 import { Gender } from "#data/gender";
 import { AbilityId } from "#enums/ability-id";
@@ -913,6 +914,9 @@ export abstract class PokemonSpeciesForm {
           repeat: -1,
         });
       }
+      // ER: a multi-frame custom atlas may carry its own authored cadence (e.g. a
+      // baked GIF at 116.7 ms/frame); honour it. No-op for vanilla/single-frame.
+      applyErAtlasFrameRate(scene.anims, spriteKey, scene.textures.get(spriteKey)?.customData);
     };
 
     const finalize = async (): Promise<void> => {
