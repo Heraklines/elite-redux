@@ -19,9 +19,9 @@ import {
 } from "#data/elite-redux/coop/coop-reward-operation";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
+  type CoopRetainedWaveContinuationAddress,
   coopMeInProgress,
   coopSessionGeneration,
-  type CoopRetainedWaveContinuationAddress,
   failCoopSharedSession,
   getCoopController,
   getCoopInteractionRelay,
@@ -97,6 +97,12 @@ import { NumberHolder } from "#utils/common";
 import i18next from "i18next";
 
 export type ModifierSelectCallback = (rowCursor: number, cursor: number) => boolean;
+
+/** Construction-time provenance for the reward phase's co-op address. */
+export type SelectModifierCoopContinuation =
+  | { readonly kind: "ambient" }
+  | { readonly kind: "wave-boundary" }
+  | { readonly kind: "inherited"; readonly address: CoopRetainedWaveContinuationAddress | null };
 
 // Co-op (#633): action-type codes packed as data[0] of a relayed reward choice, so the
 // WATCHER can route a pick whose `choice` alone is ambiguous (reward vs shop both carry a
@@ -250,7 +256,7 @@ export class SelectModifierPhase extends BattlePhase {
    *  broadcast can't double-count this one interaction. -1 = solo / not captured. */
   private coopInteractionStart = -1;
   /** Durable source address; ambient currentBattle may already be a speculative future wave/turn. */
-  private readonly coopSourceAddress: CoopRetainedWaveContinuationAddress | null;
+  protected readonly coopSourceAddress: CoopRetainedWaveContinuationAddress | null;
   /** A retained guest continuation with no single source identity may not open or mutate a reward surface. */
   private readonly coopContinuationIdentityFailure: string | null;
 
@@ -259,7 +265,7 @@ export class SelectModifierPhase extends BattlePhase {
     modifierTiers?: ModifierTier[],
     customModifierSettings?: CustomModifierSettings,
     isCopy = false,
-    inheritedCoopSourceAddress?: CoopRetainedWaveContinuationAddress | null,
+    coopContinuation: SelectModifierCoopContinuation = { kind: "ambient" },
   ) {
     super();
 
@@ -268,33 +274,27 @@ export class SelectModifierPhase extends BattlePhase {
     this.customModifierSettings = customModifierSettings;
     this.isCopy = isCopy;
     const continuationIdentity =
-      inheritedCoopSourceAddress !== undefined
-        ? inheritedCoopSourceAddress == null
-          ? ({ kind: "ambient" } as const)
-          : ({ kind: "retained", address: inheritedCoopSourceAddress } as const)
-        : resolveCoopRetainedWaveContinuationIdentity(!coopMeInProgress());
+      coopContinuation.kind === "wave-boundary"
+        ? resolveCoopRetainedWaveContinuationIdentity(true)
+        : coopContinuation.kind === "inherited" && coopContinuation.address != null
+          ? ({ kind: "retained", address: coopContinuation.address } as const)
+          : ({ kind: "ambient" } as const);
     this.coopSourceAddress = continuationIdentity.kind === "retained" ? continuationIdentity.address : null;
-    this.coopContinuationIdentityFailure =
-      continuationIdentity.kind === "invalid" ? continuationIdentity.reason : null;
+    this.coopContinuationIdentityFailure = continuationIdentity.kind === "invalid" ? continuationIdentity.reason : null;
   }
 
-  private coopRewardWave(): number {
+  protected coopRewardWave(): number {
     return this.coopSourceAddress?.wave ?? globalScene.currentBattle?.waveIndex ?? -1;
   }
 
-  private coopRewardTurn(): number {
+  protected coopRewardTurn(): number {
     return this.coopSourceAddress?.turn ?? globalScene.currentBattle?.turn ?? 0;
   }
 
   start() {
     super.start();
 
-    if (this.coopContinuationIdentityFailure != null) {
-      coopWarn("reward", `${this.coopContinuationIdentityFailure} - refusing mutable ambient reward address`);
-      failCoopSharedSession(this.coopContinuationIdentityFailure, {
-        boundary: "surface",
-        reasonCode: "continuation-failed",
-      });
+    if (!this.coopContinuationIdentityIsUsable()) {
       return false;
     }
 
@@ -500,6 +500,19 @@ export class SelectModifierPhase extends BattlePhase {
     this.resetModifierSelect(modifierSelectCallback);
   }
 
+  /** Refuse a retained wave surface whose immutable construction identity was lost or ambiguous. */
+  protected coopContinuationIdentityIsUsable(): boolean {
+    if (this.coopContinuationIdentityFailure == null) {
+      return true;
+    }
+    coopWarn("reward", `${this.coopContinuationIdentityFailure} - refusing mutable ambient reward address`);
+    failCoopSharedSession(this.coopContinuationIdentityFailure, {
+      boundary: "surface",
+      reasonCode: "continuation-failed",
+    });
+    return false;
+  }
+
   // Pick a modifier from among the rewards and apply it
   private selectRewardModifierOption(cursor: number, modifierSelectCallback: ModifierSelectCallback): boolean {
     if (this.typeOptions.length === 0) {
@@ -647,7 +660,7 @@ export class SelectModifierPhase extends BattlePhase {
       this.typeOptions.map(o => o.type?.tier).filter(t => t !== undefined) as ModifierTier[],
       undefined,
       false,
-      this.coopSourceAddress,
+      { kind: "inherited", address: this.coopSourceAddress },
     );
     globalScene.ui.clearText();
     globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
@@ -1286,7 +1299,7 @@ export class SelectModifierPhase extends BattlePhase {
         allowLuckUpgrades: false,
       },
       true,
-      this.coopSourceAddress,
+      { kind: "inherited", address: this.coopSourceAddress },
     );
     // Co-op (#837): the continuation copy MUST inherit the SAME pinned interaction counter this shop
     // opened on. Without it the copy starts at -1 and, if its own terminal ever advances (a backed-out
@@ -2140,7 +2153,7 @@ export class SelectModifierPhase extends BattlePhase {
           this.typeOptions.map(o => o.type?.tier).filter(t => t !== undefined) as ModifierTier[],
           undefined,
           false,
-          this.coopSourceAddress,
+          { kind: "inherited", address: this.coopSourceAddress },
         );
         globalScene.ui.clearText();
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());

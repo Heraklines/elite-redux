@@ -27,6 +27,7 @@ import {
   resetCoopWaveAdvanceOperationFlag,
   setCoopWaveAdvanceOperationEnabled,
 } from "#data/elite-redux/coop/coop-wave-operation";
+import { BiomeShopPhase } from "#phases/biome-shop-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -132,7 +133,12 @@ describe("co-op retained continuation identity", () => {
       );
     }
 
-    const phase = new SelectModifierPhase() as unknown as SelectModifierIdentitySeam;
+    const directPhase = new SelectModifierPhase() as unknown as SelectModifierIdentitySeam;
+    expect(directPhase.coopContinuationIdentityFailure, "an unclassified direct reward stays non-wave").toBeNull();
+
+    const phase = new SelectModifierPhase(0, undefined, undefined, false, {
+      kind: "wave-boundary",
+    }) as unknown as SelectModifierIdentitySeam;
     expect(phase.coopSourceAddress, "the caller did not silently capture ambient currentBattle").toBeNull();
     expect(phase.coopContinuationIdentityFailure).toBe(identity.kind === "invalid" ? identity.reason : null);
   });
@@ -140,24 +146,37 @@ describe("co-op retained continuation identity", () => {
   it("captures exact source wave and turn and carries both into continuation copies", () => {
     const runtime = installRuntime("guest");
     registerCoopWaveAdvanceBoundaryDataApplier(() => "deferred", runtime.waveOperationBinding);
-    expect(
-      applyCoopWaveAdvanceEnvelopeForBinding(retainedEnvelope(18, 7, 1), runtime.waveOperationBinding),
-    ).toBe("applied");
+    expect(applyCoopWaveAdvanceEnvelopeForBinding(retainedEnvelope(18, 7, 1), runtime.waveOperationBinding)).toBe(
+      "applied",
+    );
 
     expect(resolveCoopRetainedWaveContinuationIdentity(true)).toEqual({
       kind: "retained",
       address: { wave: 18, turn: 7 },
     });
-    const phase = new SelectModifierPhase() as unknown as SelectModifierIdentitySeam;
+    const phase = new SelectModifierPhase(0, undefined, undefined, false, {
+      kind: "wave-boundary",
+    }) as unknown as SelectModifierIdentitySeam;
     expect(phase.coopRewardWave()).toBe(18);
     expect(phase.coopRewardTurn()).toBe(7);
 
     const inherited = new SelectModifierPhase(1, undefined, undefined, false, {
-      wave: 18,
-      turn: 7,
+      kind: "inherited",
+      address: { wave: 18, turn: 7 },
     }) as unknown as SelectModifierIdentitySeam;
     expect(inherited.coopSourceAddress).toEqual({ wave: 18, turn: 7 });
     expect(inherited.coopRewardTurn()).toBe(7);
+
+    const biomeCopy = new BiomeShopPhase(0, undefined, undefined, false, {
+      kind: "inherited",
+      address: { wave: 18, turn: 7 },
+    }).copy() as unknown as SelectModifierIdentitySeam;
+    expect(biomeCopy.coopSourceAddress, "biome continuation copy kept exact wave and turn").toEqual({
+      wave: 18,
+      turn: 7,
+    });
+    expect(biomeCopy.coopRewardWave()).toBe(18);
+    expect(biomeCopy.coopRewardTurn()).toBe(7);
   });
 
   it("fails closed with sorted evidence when more than one retained continuation is unresolved", () => {

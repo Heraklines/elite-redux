@@ -59,7 +59,7 @@ import { HealShopCostModifier } from "#modifiers/modifier";
 import type { ModifierTypeOption } from "#modifiers/modifier-type";
 import { getPlayerShopModifierTypeOptionsForWave, PokemonModifierType } from "#modifiers/modifier-type";
 import type { ModifierSelectCallback } from "#phases/select-modifier-phase";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
+import { type SelectModifierCoopContinuation, SelectModifierPhase } from "#phases/select-modifier-phase";
 import { SHOP_TYPE_BY_BIOME } from "#ui/handlers/biome-shop-ui-handler";
 import { NumberHolder } from "#utils/common";
 import i18next from "i18next";
@@ -135,8 +135,17 @@ export class BiomeShopPhase extends SelectModifierPhase {
    * already-rolled stock, and mark it a continuation so {@linkcode start} re-opens WITHOUT re-handshaking.
    */
   override copy(): SelectModifierPhase {
-    const Ctor = this.constructor as new () => BiomeShopPhase;
-    const copied = new Ctor();
+    const Ctor = this.constructor as new (
+      rerollCount?: number,
+      modifierTiers?: undefined,
+      customModifierSettings?: undefined,
+      isCopy?: boolean,
+      coopContinuation?: SelectModifierCoopContinuation,
+    ) => BiomeShopPhase;
+    const copied = new Ctor(0, undefined, undefined, false, {
+      kind: "inherited",
+      address: this.coopSourceAddress,
+    });
     copied.shopOptions = this.shopOptions;
     copied.qtys = this.qtys;
     copied.coopBiomeStart = this.coopBiomeStart;
@@ -150,6 +159,9 @@ export class BiomeShopPhase extends SelectModifierPhase {
   override start(): false | undefined {
     // NOTE: intentionally does NOT call super.start() - that builds the vanilla
     // reward options + opens MODIFIER_SELECT. We build the biome stock instead.
+    if (!this.coopContinuationIdentityIsUsable()) {
+      return false;
+    }
     if (!this.isPlayer()) {
       this.end();
       return false;
@@ -270,7 +282,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
    * supply their own curated goods (see ExoticShopPhase).
    */
   protected buildStock(): void {
-    const waveIndex = globalScene.currentBattle.waveIndex;
+    const waveIndex = this.coopRewardWave();
     const baseCost = new NumberHolder(globalScene.getWaveMoneyAmount(1));
     globalScene.applyModifier(HealShopCostModifier, true, baseCost);
     // Same hook the reward screen used: on x0 waves this returns the 16-slot
@@ -475,8 +487,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
             data: undefined,
             terminal: true,
             localRole: role,
-            wave,
-            turn: globalScene.currentBattle?.turn ?? 0,
+            wave: this.coopRewardWave(),
+            turn: this.coopRewardTurn(),
           },
           this.coopRewardOperationBinding,
         );
@@ -547,8 +559,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
                   action: { choice: action.choice, data: action.data, operationId: action.operationId },
                   terminal: true,
                   localRole: role,
-                  wave,
-                  turn: globalScene.currentBattle?.turn ?? 0,
+                  wave: this.coopRewardWave(),
+                  turn: this.coopRewardTurn(),
                 },
                 this.coopRewardOperationBinding,
               ).adopt;
@@ -729,8 +741,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
           action: { choice: action.choice, data: action.data, operationId: action.operationId },
           terminal,
           localRole: getCoopController()?.role ?? "guest",
-          wave: globalScene.currentBattle?.waveIndex ?? -1,
-          turn: globalScene.currentBattle?.turn ?? 0,
+          wave: this.coopRewardWave(),
+          turn: this.coopRewardTurn(),
         },
         this.coopRewardOperationBinding,
       );
@@ -884,8 +896,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
           data: [partySlot, resultingMoney, this.coopResolvedModifierOption, cost],
           terminal: false,
           localRole: getCoopController()?.role ?? "guest",
-          wave: globalScene.currentBattle?.waveIndex ?? -1,
-          turn: globalScene.currentBattle?.turn ?? 0,
+          wave: this.coopRewardWave(),
+          turn: this.coopRewardTurn(),
         },
         this.coopRewardOperationBinding,
       );
@@ -993,8 +1005,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
           action: { choice: action.choice, data: action.data, operationId: action.operationId },
           terminal: false,
           localRole: "guest",
-          wave,
-          turn: globalScene.currentBattle?.turn ?? 0,
+          wave: this.coopRewardWave(),
+          turn: this.coopRewardTurn(),
         },
         this.coopRewardOperationBinding,
       );

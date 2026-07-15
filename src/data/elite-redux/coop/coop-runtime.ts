@@ -1287,7 +1287,10 @@ export function resolveCoopRetainedWaveContinuationIdentity(
   const staged = describeCoopWaveAdvanceOperationBinding(binding);
   const candidates = staged.stagedWaves
     .map(wave => getCoopStagedWaveAdvanceTransaction(wave, binding))
-    .filter(transaction => transaction != null && !transaction.continuationReady)
+    .filter(
+      (transaction): transaction is CoopStagedWaveAdvanceTransaction =>
+        transaction != null && !transaction.continuationReady,
+    )
     .map(transaction => ({
       operationId: transaction.operationId,
       turn: transaction.envelope.authoritativeState.turn,
