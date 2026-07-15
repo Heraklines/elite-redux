@@ -590,8 +590,12 @@ export class CommandPhase extends FieldPhase {
         // #818: STRUCTURAL adopt - an ME-spawned battle's party exists only on the host,
         // so the guest must be able to BUILD it (species/count/shape), not just correct it.
         adoptCoopEnemiesStructural(enemies);
-        applyCoopAuthoritativeBattleState(streamer.consumeEnemyPartyState(waveIndex), true);
       }
+      // The party image and its complete state are intentionally separate one-shot buffers. EncounterPhase
+      // can consume the repeated party first while a newer post-PostSummon carrier is delivered afterward;
+      // gating the state read on `enemies != null` then strands that newer state until checksum repair. Always
+      // consume/apply the latest state at this final pre-input funnel. `undefined` remains a guarded no-op.
+      applyCoopAuthoritativeBattleState(streamer.consumeEnemyPartyState(waveIndex), true);
     } else if (controller.role === "host" && turn === 1 && this.fieldIndex === 0) {
       // Co-op HOST (#920): the entry-ability chain (PostSummonPhase) has now settled - terrain, weather,
       // entry-hazard arena tags and entry form changes are on the arena/field, but the wave-start

@@ -266,6 +266,9 @@ describe.skipIf(!RUN)("co-op DUO launch-snapshot: guest adopts the host's on-ent
         staleState!,
         encounter,
       );
+      // Reproduce the level-soak carrier shape directly: the retained party was already sent with zero
+      // stages, then a PostSummon entry effect changed the live battler before the refreshed state capture.
+      rig.hostScene.getEnemyField()[0].getStatStages()[1] = 1;
       rebroadcastCoopWaveStartAuthorityAfterEntryEffects();
     });
 
@@ -275,6 +278,10 @@ describe.skipIf(!RUN)("co-op DUO launch-snapshot: guest adopts the host's on-ent
 
     await withClient(rig.guestCtx, async () => {
       await drainLoopback();
+      expect(
+        rig.guestRuntime.battleStream.consumeEnemyParty(wave),
+        "encounter setup can consume the repeated party before its refreshed state",
+      ).not.toBeNull();
       rig.guestScene.phaseManager.clearAllPhases();
       rig.guestScene.phaseManager.shiftPhase();
       const command = await driveClientPhaseQueueTo(rig.guestScene, "CommandPhase");
@@ -285,6 +292,10 @@ describe.skipIf(!RUN)("co-op DUO launch-snapshot: guest adopts the host's on-ent
       rig.guestScene.getPlayerParty().map(mon => mon.hp),
       "guest applies the refreshed automatic-move result before opening cmd:1:1",
     ).toEqual(damagedHostHp);
+    expect(
+      rig.guestScene.getEnemyField()[0].getStatStages()[1],
+      "guest applies the refreshed entry stat stage even after the repeated party was consumed",
+    ).toBe(1);
 
     logs.flush();
   }, 300_000);
