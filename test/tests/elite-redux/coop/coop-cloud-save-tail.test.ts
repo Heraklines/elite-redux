@@ -202,6 +202,7 @@ describe("co-op account-wide session cloud ordering", () => {
         players: ["Alice", "Bob"] as [string, string],
         seats: { host: "Alice", guest: "Bob" },
       },
+      coopControlPlane: { interactionCounter: 0, journalHighWater: {} },
       coopRun: { version: 1 as const, runId, checkpointRevision: 0 },
     });
     recordCoopResumeMarker(0, "Alice", "Bob", 1, oldRun, 0);

@@ -26,6 +26,7 @@ import { GameModes } from "#enums/game-modes";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const TEST_RUN_ID = `test-run-${"a".repeat(24)}`;
+const TEST_CONTROL_PLANE = { interactionCounter: 0, journalHighWater: {} } as const;
 
 function loadedResumeSession<T extends object>(session: T, sessionJson = JSON.stringify(session)) {
   return { session, sessionJson };
@@ -1212,6 +1213,7 @@ describe("#810: resume offer/reply protocol + marker", () => {
             players: ["Alice", "Carol"] as [string, string],
             seats: { host: "Alice", guest: "Carol" },
           },
+          coopControlPlane: TEST_CONTROL_PLANE,
           coopRun: { version: 1 as const, runId: `test-run-${"c".repeat(24)}`, checkpointRevision: 8 },
         },
       ],
@@ -1226,6 +1228,7 @@ describe("#810: resume offer/reply protocol + marker", () => {
             players: ["alice", "bob"] as [string, string],
             seats: { host: "alice", guest: "bob" },
           },
+          coopControlPlane: TEST_CONTROL_PLANE,
           coopRun: { version: 1 as const, runId: TEST_RUN_ID, checkpointRevision: 7 },
         },
       ],
@@ -1294,6 +1297,7 @@ describe("#810: resume offer/reply protocol + marker", () => {
         players: ["Alice", "Bob"] as [string, string],
         seats: { host: "Alice", guest: "Bob" },
       },
+      coopControlPlane: TEST_CONTROL_PLANE,
       coopRun: { version: 1 as const, runId: TEST_RUN_ID, checkpointRevision: 12 },
     };
     const discovery = await findCoopResumeCandidate("Alice", "Bob", "guest", async slot =>
@@ -1360,6 +1364,7 @@ describe("#810: resume offer/reply protocol + marker", () => {
             players: ["Alice", "Bob"] as [string, string],
             seats: { host: "Alice", guest: "Bob" },
           },
+          coopControlPlane: TEST_CONTROL_PLANE,
           coopRun: { version: 1 as const, runId: TEST_RUN_ID, checkpointRevision: 3 },
         },
       ],
