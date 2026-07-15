@@ -48,11 +48,13 @@ import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
+  beginRewardShopWatch,
   buildDuo,
+  drainLoopback,
   type DuoRig,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
-  driveHostRewardShopOwner,
+  driveRewardShopOwnerLeaveViaUi,
   installDuoLogCapture,
   installHeadlessPlayerAtlasCompletionModel,
   pumpDuoDestinations,
@@ -153,11 +155,20 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
     expect(hostShop.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
     const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
     if (hostOwns) {
-      await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward: false }));
-      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+      const watcherPinned = await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
+      expect(watcherPinned, "guest watcher parked at the same interaction").toBe(counterBefore);
+      await withClient(rig.hostCtx, () => driveRewardShopOwnerLeaveViaUi(hostShop));
+      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
+      await withClient(rig.hostCtx, () => drainLoopback());
     } else {
-      await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward: false }));
-      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+      const watcherPinned = await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
+      expect(watcherPinned, "host watcher parked at the same interaction").toBe(counterBefore);
+      await withClient(rig.guestCtx, () => driveRewardShopOwnerLeaveViaUi(guestShop));
+      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
+      // The host materializes the guest-owned retained result, then the guest owner receives the result
+      // and emits its completed interaction counter back to the host. Pump both explicit loopback legs.
+      await withClient(rig.guestCtx, () => drainLoopback());
+      await withClient(rig.hostCtx, () => drainLoopback());
     }
     await pumpDuoDestinations(rig);
     expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once").toBe(counterBefore + 1);
