@@ -22,6 +22,7 @@
     "test/mocks/mocks-container/mock-sprite.ts",
     "test/tests/elite-redux/coop/**",
     "test/tools/coop-duo-harness.ts",
+    "test/tools/coop-soak-coverage.ts",
     "test/tools/coop-soak-driver.ts",
     "workers/er-coop-api/src/p33-signaling.ts"
   ]
