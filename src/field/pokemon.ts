@@ -56,6 +56,7 @@ import {
 import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/daily-seed/daily-run";
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { suppressesOpponentDamageBoosts } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
@@ -5647,6 +5648,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           erRecordAchievementRelicSurvive(this);
         }
       }
+    }
+
+    // ER Last Host (ability): once per battle, a holder that would faint - from
+    // DIRECT *or* INDIRECT damage - while a foe is affected by Infestation clings to
+    // life at 1 HP, consuming that foe's Infestation and dealing 25% of its max HP.
+    // Deliberately OUTSIDE the `!preventEndure` guard above: unlike Endure/Sturdy,
+    // Last Host explicitly survives indirect damage (poison, weather, recoil, an
+    // Infestation tick, etc.), which the engine flags `preventEndure`.
+    if (!surviveDamage.value && this.hp - damage <= 0 && erTryLastHost(this)) {
+      surviveDamage.value = true;
+      damage = this.hp - 1;
     }
 
     damage = Math.min(damage, this.hp);

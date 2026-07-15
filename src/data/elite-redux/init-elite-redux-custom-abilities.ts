@@ -33,6 +33,7 @@ import { type AbAttr, ConditionalCritAbAttr, PostFaintAbAttr } from "#abilities/
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { CommonRootAbAttr, ER_COMMON_ROOT_ABILITY_ID } from "#data/elite-redux/abilities/common-root";
+import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abilities/last-host";
 import { ER_MYCELIAL_NETWORK_ABILITY_ID, MycelialNetworkAbAttr } from "#data/elite-redux/abilities/mycelial-network";
 import { ER_PUPPET_STRINGS_ABILITY_ID, PuppetStringsAbAttr } from "#data/elite-redux/abilities/puppet-strings";
 import { ER_SILKEN_DECREE_ABILITY_ID, SilkenDecreeAbAttr } from "#data/elite-redux/abilities/silken-decree";
@@ -260,6 +261,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_MYCELIAL_NETWORK_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_LAST_HOST_ABILITY_ID,
+        name: "Last Host",
+        description:
+          "Once per battle, if this Pokemon would faint while a foe is affected by Infestation, it survives at 1 HP: it consumes the Infestation on the highest-HP affected foe, which then loses 25% of its max HP.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_LAST_HOST_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -469,6 +480,10 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_MYCELIAL_NETWORK_ABILITY_ID) {
     builder.attr(MycelialNetworkAbAttr);
+  }
+
+  if (pokerogueId === ER_LAST_HOST_ABILITY_ID) {
+    builder.attr(LastHostAbAttr);
   }
 
   const ability = builder.build();
