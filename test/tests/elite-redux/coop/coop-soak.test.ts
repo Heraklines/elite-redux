@@ -306,6 +306,10 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
     expect(result.resyncHeals, "the boundary driver never invoked recovery").toBe(0);
     expect(result.assertions, "the live per-turn checksum never requested a heal").toBe(0);
     expect(recoverySpy, "the guest never requested a production full-state recovery").not.toHaveBeenCalled();
+    expect(
+      result.postWaveStates.map(state => state.resyncHeals),
+      "every retained modifier sample was reached without an earlier boundary recovery",
+    ).toEqual([0, 0, 0, 0, 0, 0]);
     expect(result.postWaveStates.map(state => state.wave)).toEqual([1, 2, 3, 4, 5, 6]);
 
     const remainingBattles = [5, 4, 3, 2, 1, 0];
