@@ -321,6 +321,11 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
 
     await withClient(rig.guestCtx, () => {
       const phase = new BattleEndPhase(true);
+      // This fixture deliberately keeps the live sink unresolved so BattleEnd captures the durable
+      // wave-11 identity before ambient state speculates ahead. Mark the already-delivered retained
+      // image applied at that exact identity; otherwise the fixture would ask the guest applier to
+      // rewind an unrelated, manually-mutated wave-12 scene and correctly enter shared recovery.
+      markCoopWaveAdvanceDataApplied(11, rig.guestRuntime.waveOperationBinding);
       // The next battle has speculated ahead to an ME. The addressed retained source is still wave 11.
       rig.guestScene.currentBattle.waveIndex = 12;
       rig.guestScene.currentBattle.battleType = BattleType.MYSTERY_ENCOUNTER;
@@ -350,6 +355,7 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     expect(waveOp.coopWaveAdvanceSanctionedTails(payload!)).toEqual([
       "VictoryPhase",
       "BattleEndPhase",
+      "CoopVictorySealPhase",
       "GameOverPhase",
     ]);
 

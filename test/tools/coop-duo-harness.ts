@@ -2440,10 +2440,44 @@ export async function driveRetainedTeachMoveRewardWatch(
  */
 const REWARD_WATCH_MAX_IDLE = 32;
 
+/**
+ * Require a real queued reward phase to release before a caller crosses into its next surface. Mechanical
+ * counter/result completion is necessary but insufficient: SelectModifierPhase ends only after its bounded
+ * MESSAGE transition settles. Call inside the phase owner's ClientCtx. An already-exited phase is a no-op;
+ * detached-fixture compatibility is isolated in driveGuestRewardWatch and earns no queue-exit proof.
+ */
+export async function awaitRewardShopPhaseExit(phase: ShopPhaseSeam): Promise<void> {
+  const phaseManager = globalScene.phaseManager;
+  if (phaseManager.getCurrentPhase() !== (phase as unknown as Phase)) {
+    return;
+  }
+  for (let attempt = 0; attempt < 320; attempt++) {
+    await drainLoopback();
+    if (phaseManager.getCurrentPhase() !== (phase as unknown as Phase)) {
+      return;
+    }
+    await new Promise<void>(resolve => setTimeout(resolve, 10));
+  }
+  const queued = phaseManager.getQueuedPhaseNames?.() ?? [];
+  throw new Error(
+    "reward terminal completed but live SelectModifierPhase did not exit within 320 pumps "
+      + `(interaction=${phase.coopInteractionStart}, queued=[${queued.join(",")}])`,
+  );
+}
+
 export async function driveGuestRewardWatch(
   guestPhase: ShopPhaseSeam,
   opts: { alreadyStarted?: boolean } = {},
 ): Promise<void> {
+  const phaseManager = globalScene.phaseManager;
+  // Production queues one concrete SelectModifierPhase and Phase.end() must actually release it before
+  // the next surface is ready. A counter advance is only the mechanical terminal: the UI transition that
+  // calls super.end() can still be pending. Returning at the counter used to let the shared-process soak
+  // swap globals while that promise was unresolved, leaving the guest on SelectModifierPhase while the
+  // host entered Crossroads/World Map. Keep detached legacy fixtures compatible in one isolated branch;
+  // they deliberately drive a phase that is not installed in the phase manager and therefore have no
+  // meaningful queue-exit boundary to await.
+  const drivesLiveQueuedPhase = phaseManager.getCurrentPhase() === (guestPhase as unknown as Phase);
   // start() (watcher branch) is async-ish: it awaits the owner's options, opens the cosmetic screen,
   // then loops on awaitInteractionChoice. We kick it off, then drain the loopback repeatedly so each
   // buffered/relayed owner pick is delivered + applied until the LEAVE/terminal ADVANCES the interaction.
@@ -2477,13 +2511,32 @@ export async function driveGuestRewardWatch(
     const counter = getCoopRuntime()?.controller.interactionCounter();
     return counter != null && pinned >= 0 && counter > pinned;
   };
+  let mechanicalTerminalReached = false;
   for (let i = 0; i < REWARD_WATCH_MAX_IDLE; i++) {
     await drainLoopback();
     // Completed when EITHER the watcher left (coopWatcher cleared - e.g. a no-relay short-circuit) OR the
     // interaction counter advanced past the pinned one (the owner's terminal was mirrored + applied).
     if (!(guestPhase as unknown as { coopWatcher: boolean }).coopWatcher || advancedPastPinned() || terminalApplied) {
+      mechanicalTerminalReached = true;
+      break;
+    }
+  }
+  if (mechanicalTerminalReached) {
+    if (!drivesLiveQueuedPhase) {
       return;
     }
+    // A host watching a guest-owned retained intent has only consumed the INTENT here. Its current phase
+    // cannot exit until the guest materializes the host RESULT and the exact receipt returns. The caller
+    // must pump that peer causal leg, then use awaitRewardShopPhaseExit on both live phases. This is not a
+    // completed counter-only terminal: the local counter is deliberately still pinned.
+    if (terminalApplied && !advancedPastPinned()) {
+      return;
+    }
+    // Keep this client's complete context installed until the real async MESSAGE transition invokes
+    // super.end() and PhaseManager selects the next queued phase. This is event-driven in browsers; the
+    // bounded timer loop models Phaser's headless transition fallback without mutating the phase/counter.
+    await awaitRewardShopPhaseExit(guestPhase);
+    return;
   }
   // NO-PROGRESS STALL: after REWARD_WATCH_MAX_IDLE drains the watcher neither left NOR advanced the
   // interaction - the owner's terminal never arrived (a relay drop / owner hang / counter-parity mismatch).

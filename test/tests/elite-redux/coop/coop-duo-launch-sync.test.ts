@@ -39,7 +39,6 @@ import { captureCoopChecksum, captureCoopChecksumState } from "#data/elite-redux
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -48,6 +47,7 @@ import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
+  awaitRewardShopPhaseExit,
   beginRewardShopWatch,
   buildDuo,
   type DuoRig,
@@ -63,6 +63,7 @@ import {
   type ShopPhaseSeam,
   withClient,
 } from "#test/tools/coop-duo-harness";
+import { createScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -177,6 +178,16 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
         await withClient(rig.hostCtx, () => drainLoopback());
       }
       await pumpDuoDestinations(rig);
+      await withClient(rig.hostCtx, () => awaitRewardShopPhaseExit(hostShop));
+      await withClient(rig.guestCtx, () => awaitRewardShopPhaseExit(guestShop));
+      expect(
+        rig.hostScene.phaseManager.getCurrentPhase(),
+        "host opened the continuation instead of remaining on a mechanically-complete reward phase",
+      ).not.toBe(hostShop);
+      expect(
+        rig.guestScene.phaseManager.getCurrentPhase(),
+        "guest opened the continuation instead of remaining on a mechanically-complete reward phase",
+      ).not.toBe(guestShop);
       expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once").toBe(counterBefore + 1);
       expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced the counter once").toBe(
         counterBefore + 1,
@@ -188,8 +199,9 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
 
   it("seed-pinned mirror: per-wave WAVE-START checksum MATCHES; the ONLY residual is the move-PP bug", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = createScheduledCoopPair({ automatic: true });
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    pair.setAutomaticDelivery(false);
     installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
     wireGuestCommand(rig);
 

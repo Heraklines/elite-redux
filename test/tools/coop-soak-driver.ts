@@ -123,6 +123,7 @@ import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { TheBargainPhase } from "#phases/the-bargain-phase";
 import type { GameManager } from "#test/framework/game-manager";
 import {
+  awaitRewardShopPhaseExit,
   beginRewardShopWatch,
   buildDuo,
   type DuoLogs,
@@ -1995,6 +1996,29 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     beforeHostCross?: () => void,
   ): Promise<void> => {
     const point = `cmd:${wave}:${turn}`;
+    // The directly-constructed guest has a manual phase scheduler. Production already queued the same
+    // Crossroads/World-Map tail on both clients, but the host interceptor alone would otherwise execute it.
+    // Drive the guest's real phases: Crossroads auto-resolves under this soak profile; a resulting
+    // SelectBiome renderer parks on the host's exact BIOME_PICK until the host commits below. The harness
+    // never manufactures a choice, biome, counter advance, or receipt.
+    const guestBiomeBoundary = await withClient(rig.guestCtx, async () => {
+      let current = rig.guestScene.phaseManager.getCurrentPhase();
+      const queued = rig.guestScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+      if (current?.phaseName !== "ErCrossroadsPhase" && queued.includes("ErCrossroadsPhase")) {
+        current = await driveClientPhaseQueueTo(rig.guestScene, "ErCrossroadsPhase");
+      }
+      if (current?.phaseName === "ErCrossroadsPhase") {
+        current.start();
+        await drainLoopback();
+        current = rig.guestScene.phaseManager.getCurrentPhase();
+      }
+      if (current?.phaseName === "SelectBiomePhase") {
+        current.start();
+        await drainLoopback();
+        return current;
+      }
+      return null;
+    });
     const hostHasCommandable = rig.hostScene
       .getPlayerParty()
       .some(mon => mon.coopOwner === "host" && !mon.isFainted() && mon.isAllowedInBattle());
@@ -2014,6 +2038,24 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       }
       await game.phaseInterceptor.to("CommandPhase");
     });
+    if (guestBiomeBoundary != null) {
+      await withClient(rig.guestCtx, async () => {
+        for (let attempt = 0; attempt < 80; attempt++) {
+          await drainLoopback();
+          if (rig.guestScene.phaseManager.getCurrentPhase() !== guestBiomeBoundary) {
+            return;
+          }
+          await new Promise<void>(resolve => setTimeout(resolve, 10));
+        }
+        const queued = rig.guestScene.phaseManager.getQueuedPhaseNames?.() ?? [];
+        fail(
+          "no-park",
+          wave,
+          "guest retained World Map boundary did not release after host commit "
+            + `(current=${rig.guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}, queued=[${queued.join(",")}])`,
+        );
+      });
+    }
     await drainLoopback();
     if (!hostHasCommandable) {
       actionScript.push(
@@ -2326,6 +2368,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         await pumpDuoDestinations(rig, 4);
       }
       if (fixtureMode === "queued") {
+        // Mechanical result/counter convergence is not a continuation boundary. Keep each renderer's
+        // complete context installed until its actual queued SelectModifierPhase exits; otherwise the
+        // pending MESSAGE transition can resume after a context swap and strand one side before Crossroads.
+        await withClient(rig.hostCtx, () => awaitRewardShopPhaseExit(hostShop));
+        await withClient(rig.guestCtx, () => awaitRewardShopPhaseExit(guestShop));
         await awaitGuestWaveTransaction(wave, true);
       }
       actionScript.push(`wave ${wave}: reward shop owner=${hostOwns ? "host" : "guest"} ${action}`);
