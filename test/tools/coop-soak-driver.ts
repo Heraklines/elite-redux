@@ -2045,6 +2045,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         await pumpDuoDestinations(rig, 1);
       }
       fail("no-park", transitionSourceWave, `${label} never opened ${UiMode[mode]} or left ${phase.phaseName}`);
+      throw new Error(`unreachable after ${label} public-surface failure`);
     };
     const waitForBothBoundaryPhasesToExit = async (
       hostPhase: object,
