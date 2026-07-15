@@ -7,6 +7,7 @@ import { initChallenges } from "#data/challenge";
 import { initTrainerTypeDialogue } from "#data/dialogue";
 import { wireEliteReduxManualComposites } from "#data/elite-redux/abilities/composite-newcomers";
 import { registerErFinalBossFormChange } from "#data/elite-redux/er-final-boss";
+import { applyNewcomerLearnsetAdditions, injectNewcomerForms } from "#data/elite-redux/er-newcomer-forms";
 import {
   initEliteReduxCSourceCorrections,
   remapEliteReduxMoveIdsByName,
@@ -99,6 +100,17 @@ export function initializeGame() {
   }
   console.info(
     `[er-b1c] injected ${megaFormResult.injected} ER mega forms (skipped ${megaFormResult.skippedExisting} already present)`,
+  );
+  // Elite Redux: hand-authored newcomer-patch fakemon megas/primals. Injected as
+  // real forms (N-type typing + active/innate kits + sprite redirect + stone
+  // form-change edge) onto existing species. Runs AFTER injectAllErMegaForms so a
+  // species' base form may already be seeded; idempotent.
+  const newcomerFormResult = injectNewcomerForms();
+  if (newcomerFormResult.errors.length > 0) {
+    console.warn("[er-newcomer-forms] issues:", newcomerFormResult.errors.slice(0, 5));
+  }
+  console.info(
+    `[er-newcomer-forms] injected ${newcomerFormResult.injected} forms (skipped ${newcomerFormResult.skippedExisting}), ${newcomerFormResult.edgesRegistered} stone edges`,
   );
   // Elite Redux Phase B2: register ER-custom abilities + moves (ids ≥ 5000).
   // Must run AFTER initAbilities() / initMoves() so the vanilla baselines
@@ -257,6 +269,10 @@ export function initializeGame() {
   console.info(
     `[er-b6] patched ${movesetResult.speciesPatched} species' level-up movesets (${movesetResult.movesetEntriesApplied} [level, move] entries; skipped ${movesetResult.speciesSkippedNoMapping} no-mapping + ${movesetResult.speciesSkippedEmpty} empty; dropped ${movesetResult.moveIdsDropped} unmapped move ids)`,
   );
+  // Newcomer-patch learnset additions (e.g. Mega Parasect's Leaf Blade). MUST run
+  // AFTER initEliteReduxMovesets rebuilds the table from the ER dump.
+  const newcomerLearnAdds = applyNewcomerLearnsetAdditions();
+  console.info(`[er-newcomer-forms] applied ${newcomerLearnAdds} learnset additions`);
   // Elite Redux Phase B6: wire ER per-species level evolution requirements
   // into pokerogue's `pokemonEvolutions` table (kinds 0/3/4 — LEVEL,
   // LEVEL_MALE, LEVEL_FEMALE). Form changes (kinds 1/2/5 — MEGA, PRIMAL,
