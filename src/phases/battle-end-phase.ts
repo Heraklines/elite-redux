@@ -16,6 +16,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopAuthorityContinuationSurface } from "#data/elite-redux/coop/coop-ui-registry";
 import {
+  type CoopWaveAdvanceOperationBinding,
   isValidCoopWaveAdvancePayload,
   registerCoopWaveAdvanceBoundaryDataApplier,
   tryApplyCoopWaveAdvanceDataAtBoundary,
@@ -115,11 +116,18 @@ export class BattleEndPhase extends BattlePhase {
   isVictory: boolean;
   private retainedBoundaryReleased = false;
   private retainedLocalStatsRecorded = false;
+  /**
+   * A queued phase belongs to the runtime that created it. In production there is one runtime per process,
+   * while the two-engine fidelity harness swaps the ambient runtime between clients. Keep the operation
+   * ledger owner stable across that delay instead of looking it up again only when BattleEnd eventually starts.
+   */
+  private readonly retainedWaveBinding: CoopWaveAdvanceOperationBinding | null;
 
   constructor(isVictory: boolean) {
     super();
 
     this.isVictory = isVictory;
+    this.retainedWaveBinding = getCoopWaveAdvanceRuntimeBinding();
   }
 
   start() {
@@ -136,7 +144,7 @@ export class BattleEndPhase extends BattlePhase {
     // but correctness no longer depends on a retry timer happening to fire while this short phase is live.
     if (isCoopAuthoritativeGuest()) {
       const wave = globalScene.currentBattle?.waveIndex ?? -1;
-      const binding = getCoopWaveAdvanceRuntimeBinding();
+      const binding = this.retainedWaveBinding ?? getCoopWaveAdvanceRuntimeBinding();
       if (binding == null) {
         failCoopSharedSession(`The retained wave ${wave} BattleEnd had no owning runtime.`);
         return;
@@ -150,7 +158,12 @@ export class BattleEndPhase extends BattlePhase {
 
     // P33 guest: the host's post-BattleEnd image already contains every mutation below. Hold this phase
     // until that exact retained DATA applies, then release the existing host-stated tail without dual-run.
-    if (awaitCoopSettledWaveAdvanceAtBattleEnd(() => this.releaseRetainedBoundary())) {
+    if (
+      awaitCoopSettledWaveAdvanceAtBattleEnd(
+        () => this.releaseRetainedBoundary(),
+        this.retainedWaveBinding ?? getCoopWaveAdvanceRuntimeBinding(),
+      )
+    ) {
       return;
     }
 

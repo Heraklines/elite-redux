@@ -407,9 +407,17 @@ async function driveGuestOwnedEmbeddedReward(game: GameManager, rig: DuoRig): Pr
 }
 
 async function openMatchingNextCommandSurfaces(game: GameManager, rig: DuoRig): Promise<void> {
-  const hostAlreadyRunningCommand = rig.hostScene.phaseManager.getCurrentPhase()?.phaseName === "CommandPhase";
-  if (!hostAlreadyRunningCommand) {
+  const hostAlreadyAtCommand = rig.hostScene.phaseManager.getCurrentPhase()?.phaseName === "CommandPhase";
+  if (!hostAlreadyAtCommand) {
     await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase", false));
+  }
+  const commandPoint = `cmd:${NEXT_WAVE}:1`;
+  const hostAlreadyAnnounced = rig.hostRuntime.rendezvous.describeArrivals().localArrived.includes(commandPoint);
+  if (!hostAlreadyAnnounced) {
+    await withClient(rig.hostCtx, async () => {
+      rig.hostScene.phaseManager.getCurrentPhase().start();
+      await drainLoopback();
+    });
   }
   const guestCommand = await driveQueuedPhaseWithPublicDialogue(rig.guestCtx, "guest-owned next CommandPhase", {
     matches: phase =>
@@ -420,15 +428,11 @@ async function openMatchingNextCommandSurfaces(game: GameManager, rig: DuoRig): 
     guestCommand.start();
     await drainLoopback();
   });
-  if (hostAlreadyRunningCommand) {
-    await withClient(rig.hostCtx, async () => {
-      for (let attempt = 0; attempt < 120 && rig.hostScene.ui.getMode() !== UiMode.COMMAND; attempt++) {
-        await drainLoopback();
-      }
-    });
-  } else {
-    await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase"));
-  }
+  await withClient(rig.hostCtx, async () => {
+    for (let attempt = 0; attempt < 120 && rig.hostScene.ui.getMode() !== UiMode.COMMAND; attempt++) {
+      await drainLoopback();
+    }
+  });
   await withClient(rig.guestCtx, () => drainLoopback());
   expect(rig.hostScene.ui.getMode(), "host opened its next command UI").toBe(UiMode.COMMAND);
   expect(rig.guestScene.ui.getMode(), "guest opened its next command UI").toBe(UiMode.COMMAND);

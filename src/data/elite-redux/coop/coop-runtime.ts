@@ -1167,9 +1167,12 @@ function tryApplyCoopSettledWaveData(wave: number, binding: CoopWaveAdvanceOpera
  * active, the phase is held until the exact embedded state applies; the host-settled snapshot already
  * contains those mutations, so the guest then releases the queued continuation without dual-running them.
  */
-export function awaitCoopSettledWaveAdvanceAtBattleEnd(release: () => void): boolean {
+export function awaitCoopSettledWaveAdvanceAtBattleEnd(
+  release: () => void,
+  binding: CoopWaveAdvanceOperationBinding | null = active?.waveOperationBinding ?? null,
+): boolean {
   const runtime = active;
-  if (runtime == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
+  if (runtime == null || binding == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
     return false;
   }
   // A Mystery battle is the continuation of an already-retained ME terminal transaction. Its BattleEnd
@@ -1184,7 +1187,7 @@ export function awaitCoopSettledWaveAdvanceAtBattleEnd(release: () => void): boo
     return true;
   }
   pendingSettledWaveBoundary = { wave, release, released: false };
-  tryApplyCoopSettledWaveData(wave, runtime.waveOperationBinding);
+  tryApplyCoopSettledWaveData(wave, binding);
   return true;
 }
 
