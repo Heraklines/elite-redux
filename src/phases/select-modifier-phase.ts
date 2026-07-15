@@ -259,6 +259,8 @@ export class SelectModifierPhase extends BattlePhase {
   protected readonly coopSourceAddress: CoopRetainedWaveContinuationAddress | null;
   /** Runtime that constructed this phase; async UI completion may resume under the other in-process client. */
   private readonly coopOwningRuntime = getCoopRuntime();
+  /** Scene that owns this phase. Unlike ambient `globalScene`, this stays stable across duo-harness context swaps. */
+  private readonly coopOwningScene = globalScene;
   /** A retained guest continuation with no single source identity may not open or mutate a reward surface. */
   private readonly coopContinuationIdentityFailure: string | null;
 
@@ -1804,41 +1806,64 @@ export class SelectModifierPhase extends BattlePhase {
     if (!(await this.coopAwaitShopBarrier(spoofed))) {
       return;
     }
-    // #872: the barrier wait can resume AFTER the scene moved on (run over /
-    // wave torn down / this phase superseded). Opening the shop then reads currentBattle.waveIndex on
-    // null - an UNCAUGHT rejection that kills the client's phase machine (the live "game froze, only
-    // arrow keys work" class). Bail loudly instead; the phase machine has already moved past us.
-    if (!this.coopShopSceneAlive("post-barrier owner open")) {
-      return;
-    }
-    if (coopIsWatcher) {
-      // #828 guest pick-owner on a guest-owned ME: it does NOT roll (the HOST is the sole ME engine +
-      // streamed the pool), so ADOPT the host's streamed options first, THEN open the owner screen.
-      await this.startCoopOwnerAdoptOptions(modifierSelectCallback);
-      return;
-    }
-    this.resetModifierSelect(modifierSelectCallback);
-    // Co-op (#633): relay our cursor so the partner's screen mirrors it live.
-    this.coopBeginMirror("owner");
+    // The wait can settle while the other in-process client is ambient. Re-enter the runtime/scene that
+    // owns THIS phase before checking currency or touching UI. Production invokes immediately; the duo
+    // harness queues until it next installs this exact client context.
+    this.coopResumeOnOwningRuntime(() => {
+      // #872/#P33: the barrier can also settle AFTER this shop was superseded by the next encounter. A
+      // merely non-null currentBattle is insufficient: wave 16 can be live while this wave-15 promise is
+      // stale. Only the phase instance that still owns its captured scene may reopen MODIFIER_SELECT.
+      if (!this.coopShopSceneAlive("post-barrier owner open")) {
+        return;
+      }
+      if (coopIsWatcher) {
+        // #828 guest pick-owner on a guest-owned ME: it does NOT roll (the HOST is the sole ME engine +
+        // streamed the pool), so ADOPT the host's streamed options first, THEN open the owner screen.
+        void this.startCoopOwnerAdoptOptions(modifierSelectCallback);
+        return;
+      }
+      this.resetModifierSelect(modifierSelectCallback);
+      // Co-op (#633): relay our cursor so the partner's screen mirrors it live.
+      this.coopBeginMirror("owner");
+    });
   }
 
   /**
-   * #872: is this shop phase still entitled to touch the screen after an async wait? A parked
-   * continuation (shop barrier / option adopt) can resolve long after the run ended - opening the
-   * modifier UI then NPEs on the torn-down battle (getRerollCost reads currentBattle.waveIndex),
-   * an UNCAUGHT rejection that kills the client's phase machine (the live freeze class caught by
-   * the me-asym soak). False = log + walk away WITHOUT touching the phase manager. Deliberately
-   * ONLY the battle-gone check (the exact NPE precondition): a phase-currency check over-fires in
-   * the two-engine harness, where async continuations can resume under the OTHER client's ctx swap.
+   * Run a post-await continuation only under the runtime/scene that constructed this phase. Ambient
+   * `globalScene` is process-wide and can point at the other duo-harness client when a promise settles.
+   * Binding both together makes the production entitlement check testable without weakening it for the
+   * harness. The returned cancel handle is intentionally unused: session teardown clears runtime work.
+   */
+  private coopResumeOnOwningRuntime(callback: () => void): void {
+    if (this.coopOwningRuntime == null) {
+      callback();
+      return;
+    }
+    runWhenCoopRuntimeActive(this.coopOwningRuntime, () => {
+      if (globalScene !== this.coopOwningScene) {
+        coopWarn("reward", "stale shop continuation DROPPED: owning runtime was rebound to another scene");
+        return;
+      }
+      callback();
+    });
+  }
+
+  /**
+   * #872/P33: is this exact shop phase still entitled to touch its owning screen after an async wait?
+   * A parked continuation can resolve after teardown OR after a later battle replaced it. Inspect the
+   * captured scene, not ambient `globalScene`, so a legitimate duo-client context swap never over-fires.
    */
   private coopShopSceneAlive(context: string): boolean {
-    if (globalScene.currentBattle != null) {
+    const battleLive = this.coopOwningScene.currentBattle != null;
+    const currentPhase = this.coopOwningScene.phaseManager.getCurrentPhase();
+    if (battleLive && currentPhase === this) {
       return true;
     }
     coopWarn(
       "reward",
-      `stale shop continuation DROPPED (${context}): currentBattle is gone `
-        + "- the run moved on during an async wait; not opening the shop screen (#872 anti-freeze)",
+      `stale shop continuation DROPPED (${context}): `
+        + `${battleLive ? `phase was replaced by ${currentPhase?.phaseName ?? "none"}` : "currentBattle is gone"} `
+        + "- not opening the shop screen (#872/P33 anti-freeze)",
     );
     return false;
   }

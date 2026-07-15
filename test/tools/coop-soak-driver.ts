@@ -3143,9 +3143,18 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       let retainedTerminalDrovePostMystery = false;
 
       if (!noRewardShop) {
+        const setDestinationDelivery = rig.pair.setDestinationContextDelivery;
+        if (setDestinationDelivery == null) {
+          fail("no-park", wave, "host-owned embedded ME reward requires destination-context transport scheduling");
+        }
+        const deliverInDestinationContext = setDestinationDelivery as (enabled: boolean) => void;
+        // Keep the COMPLETE embedded-shop exchange on each destination runtime, starting with stock/arrival.
+        // Enabling this only for the later terminal left the guest's scheduler edge executing under hostCtx.
+        deliverInDestinationContext(true);
         // Start the owner shop synchronously so its option stream + arrival are queued, then flush them under
-        // the guest context. CoopReplayMePhase's reward-options handoff ends detached and automatically starts
-        // the guest's own SelectModifierPhase watcher, whose arrival releases the host barrier.
+        // the guest context. CoopReplayMePhase's reward-options handoff queues the guest's own
+        // SelectModifierPhase watcher; the headless scheduler edge below starts it so its arrival releases
+        // the host barrier exactly as the browser scheduler would.
         withClientSync(rig.hostCtx, () => hostShop.start());
         let guestShop!: ShopPhaseSeam;
         await withClient(rig.guestCtx, async () => {
@@ -3154,6 +3163,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             const current = rig.guestScene.phaseManager.getCurrentPhase();
             if (current?.phaseName === "SelectModifierPhase") {
               guestShop = current as unknown as ShopPhaseSeam;
+              // The headless phase manager stops before start(); a browser scheduler starts an unshifted
+              // phase as soon as it becomes current. Start THIS production-queued watcher once so it sends
+              // its reciprocal shop arrival and opens the same public projection a human guest sees. Merely
+              // observing phaseName let the driver commit the host's private terminal while its barrier was
+              // still closed, leaving a stale wave-15 promise that reopened MODIFIER_SELECT over wave 16.
+              if (guestShop.typeOptions == null) {
+                guestShop.start();
+              }
+              await drainLoopback();
               break;
             }
           }
@@ -3168,16 +3186,17 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // guest materially applies that exact result and the peer-material callback ends/advances it. Ending
         // here used to replace the phase with PostMysteryEncounter before the ACK callback, which correctly
         // failed the strict phase fence and left the comprehensive ME terminal empty.
-        const setDestinationDelivery = rig.pair.setDestinationContextDelivery;
-        if (setDestinationDelivery == null) {
-          fail("no-park", wave, "host-owned embedded ME reward requires destination-context transport scheduling");
-        }
-        const deliverInDestinationContext = setDestinationDelivery as (enabled: boolean) => void;
         let parkedForPeerMaterial = false;
-        deliverInDestinationContext(true);
         try {
-          await withClient(rig.hostCtx, async () => {
-            await drainLoopback();
+          await withClient(rig.hostCtx, () => drainLoopback());
+          // Do not synthesize a leave before the actual public owner surface exists. This is the same
+          // causality a keyboard-driven browser enforces: no MODIFIER_SELECT means no human can confirm.
+          await awaitClientUiMode(
+            rig.hostCtx,
+            UiMode.MODIFIER_SELECT,
+            `wave ${wave} host-owned ME embedded reward owner`,
+          );
+          await withClient(rig.hostCtx, () => {
             hostShop.coopEndMirror();
             parkedForPeerMaterial = hostShop.coopRelaySend(-1, undefined, "skip");
             // Compatibility/non-retained fallback only. In the retained path the production callback owns

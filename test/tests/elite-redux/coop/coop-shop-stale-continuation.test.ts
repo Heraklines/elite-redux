@@ -35,12 +35,16 @@ describe.skipIf(!RUN)("coop #872 - stale shop continuation is dropped, not an NP
   let prevGlobalScene: BattleScene | undefined;
   let setMode: ReturnType<typeof vi.fn>;
 
-  /** Install a stub scene; `battle` null = torn down, `current` = what the phase manager reports as running. */
-  function installScene(battle: { waveIndex: number } | null, current: unknown): void {
+  /** Install a stub scene whose reported current phase can be changed after constructing the subject. */
+  function installScene(battle: { waveIndex: number } | null): {
+    scene: BattleScene;
+    setCurrent: (phase: unknown) => void;
+  } {
     // The real UI contract is Promise-returning. Keep the engine-free seam faithful so the positive
     // live-scene case also reaches resetModifierSelect's readiness continuation.
     setMode = vi.fn().mockResolvedValue(undefined);
-    initGlobalScene({
+    let current: unknown;
+    const scene = {
       currentBattle: battle,
       phaseManager: { getCurrentPhase: () => current },
       ui: { setMode },
@@ -49,7 +53,14 @@ describe.skipIf(!RUN)("coop #872 - stale shop continuation is dropped, not an NP
       // getRerollCost dependencies on the LIVE path (the guard must not over-fire there):
       applyModifier: vi.fn(),
       findModifiers: () => [],
-    } as unknown as BattleScene);
+    } as unknown as BattleScene;
+    initGlobalScene(scene);
+    return {
+      scene,
+      setCurrent: phase => {
+        current = phase;
+      },
+    };
   }
 
   beforeEach(() => {
@@ -64,35 +75,59 @@ describe.skipIf(!RUN)("coop #872 - stale shop continuation is dropped, not an NP
   });
 
   it("coopShopSceneAlive: false when the battle is torn down (the soak NPE precondition)", () => {
+    const owner = installScene(null);
     const phase = new SelectModifierPhase();
-    installScene(null, phase);
+    owner.setCurrent(phase);
     expect(phase["coopShopSceneAlive"]("test: battle gone")).toBe(false);
   });
 
-  it("coopShopSceneAlive: true while the battle is live - EVEN when another phase reports current (the duo-harness ctx-swap shape, must NOT over-fire)", () => {
+  it("coopShopSceneAlive: false when a later phase replaced this shop in the same live battle", () => {
+    const owner = installScene({ waveIndex: 45 });
     const phase = new SelectModifierPhase();
-    installScene({ waveIndex: 45 }, { some: "other phase" });
+    owner.setCurrent({ phaseName: "CommandPhase" });
+    expect(phase["coopShopSceneAlive"]("test: superseded")).toBe(false);
+  });
+
+  it("coopShopSceneAlive: checks the captured owner scene during a duo-harness ambient context swap", () => {
+    const owner = installScene({ waveIndex: 45 });
+    const phase = new SelectModifierPhase();
+    owner.setCurrent(phase);
+    const ambient = installScene({ waveIndex: 99 });
+    ambient.setCurrent({ phaseName: "CommandPhase" });
     expect(phase["coopShopSceneAlive"]("test: ctx-swap")).toBe(true);
   });
 
   it("coopShopSceneAlive: true while the shop is legitimately live", () => {
+    const owner = installScene({ waveIndex: 45 });
     const phase = new SelectModifierPhase();
-    installScene({ waveIndex: 45 }, phase);
+    owner.setCurrent(phase);
     expect(phase["coopShopSceneAlive"]("test: live")).toBe(true);
   });
 
   it("post-barrier owner open on a torn-down battle resolves cleanly and never touches the UI (soak stack)", async () => {
+    const owner = installScene(null);
     const phase = new SelectModifierPhase();
-    installScene(null, phase);
+    owner.setCurrent(phase);
     // spoofed=true short-circuits the rendezvous wait, isolating the post-await continuation -
     // the exact frame the soak's unhandled rejection pointed at (select-modifier-phase NPE).
     await expect(phase["coopOpenOwnerShopAfterBarrier"](() => false, false, true)).resolves.toBeUndefined();
     expect(setMode).not.toHaveBeenCalled();
   });
 
-  it("post-barrier owner open still opens the shop when the scene is live (no over-guard)", async () => {
+  it("post-barrier owner open cannot reopen over a later live CommandPhase", async () => {
+    const owner = installScene({ waveIndex: 46 });
     const phase = new SelectModifierPhase();
-    installScene({ waveIndex: 45 }, phase);
+    owner.setCurrent({ phaseName: "CommandPhase" });
+    await expect(
+      phase["coopOpenOwnerShopAfterBarrier"](() => false, false, true),
+    ).resolves.toBeUndefined();
+    expect(setMode).not.toHaveBeenCalled();
+  });
+
+  it("post-barrier owner open still opens the shop when the scene is live (no over-guard)", async () => {
+    const owner = installScene({ waveIndex: 45 });
+    const phase = new SelectModifierPhase();
+    owner.setCurrent(phase);
     await expect(phase["coopOpenOwnerShopAfterBarrier"](() => false, false, true)).resolves.toBeUndefined();
     expect(setMode).toHaveBeenCalled();
   });
