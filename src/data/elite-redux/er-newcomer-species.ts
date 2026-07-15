@@ -83,7 +83,11 @@ export const ER_ASTOOT_SPECIES_ID = 70002;
 export const ER_DISCUPID_SPECIES_ID = 70003;
 export const ER_REGITUBE_SPECIES_ID = 70004;
 
-export const ER_PARTNER_EEVEE_SPECIES_ID = 70011;
+// NOTE: there is intentionally NO ER_PARTNER_EEVEE_SPECIES_ID. Partner Eevee is
+// NOT a new species — it is the VANILLA Eevee "partner" FORM (formKey "partner",
+// `pokemon-species.ts` EEVEE.forms[1], isStarterSelectable). The Omniform kit is
+// grafted onto THAT form (its innate[0] -> composite 5946); the 8 partner
+// eeveelutions below stay as transform-target species (maintainer 2026-07-16).
 export const ER_PARTNER_VAPOREON_SPECIES_ID = 70012;
 export const ER_PARTNER_JOLTEON_SPECIES_ID = 70013;
 export const ER_PARTNER_FLAREON_SPECIES_ID = 70014;
@@ -237,40 +241,29 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
 const REGITUBE_EGG_TIER = EggTier.EPIC;
 const REGITUBE_STARTER_COST = 6;
 
-/** Base eeveelution -> partner (new species id, grafted composite id, move type). */
+/** Base eeveelution -> partner transform-target (new species id, grafted composite id, move type). */
 interface PartnerFamilyDef {
   readonly base: SpeciesId;
   readonly partnerId: number;
   readonly name: string;
-  readonly slug: string;
   /** The [baseInnate + Omniform] composite id that replaces the base kit's innate[0]. */
   readonly compositeId: number;
-  /** The move type that maps TO this partner in the family Omniform registry (eeveelutions only). */
-  readonly mapType: PokemonType | null;
+  /** The move type that chains INTO this partner in the family Omniform registry. */
+  readonly mapType: PokemonType;
 }
 
 /**
- * The partner-Eevee family. Partner Eevee is the starter head; the 8 partner
- * eeveelutions are Omniform transform targets. `mapType` is the move type that
- * chains INTO each partner (null for Eevee, which is never a target).
+ * The 8 partner EEVEELUTIONS — Omniform transform targets ONLY (no starter cost,
+ * no egg tier, no wild spawn). The family HEAD (Partner Eevee) is NOT here: it is
+ * the vanilla Eevee "partner" form, grafted separately below. Each entry's sprite
+ * aliases its BASE eeveelution's existing vanilla art (no new er-assets needed);
+ * `mapType` is the move type that adapts/chains INTO it.
  */
 export const ER_PARTNER_FAMILY: readonly PartnerFamilyDef[] = [
-  {
-    base: SpeciesId.EEVEE,
-    partnerId: ER_PARTNER_EEVEE_SPECIES_ID,
-    name: "Partner Eevee",
-    // Published er-assets dir is `eevee_partner` (word-order reversed vs the game-side
-    // slug convention, matching the ROM bake). The 8 partner eeveelutions have no
-    // published art yet (Omniform transform targets only); they keep placeholder slugs.
-    slug: "eevee_partner",
-    compositeId: ER_PARTNER_EEVEE_ABILITY_ID,
-    mapType: null,
-  },
   {
     base: SpeciesId.VAPOREON,
     partnerId: ER_PARTNER_VAPOREON_SPECIES_ID,
     name: "Partner Vaporeon",
-    slug: "partner_vaporeon",
     compositeId: ER_PARTNER_VAPOREON_ABILITY_ID,
     mapType: PokemonType.WATER,
   },
@@ -278,7 +271,6 @@ export const ER_PARTNER_FAMILY: readonly PartnerFamilyDef[] = [
     base: SpeciesId.JOLTEON,
     partnerId: ER_PARTNER_JOLTEON_SPECIES_ID,
     name: "Partner Jolteon",
-    slug: "partner_jolteon",
     compositeId: ER_PARTNER_JOLTEON_ABILITY_ID,
     mapType: PokemonType.ELECTRIC,
   },
@@ -286,7 +278,6 @@ export const ER_PARTNER_FAMILY: readonly PartnerFamilyDef[] = [
     base: SpeciesId.FLAREON,
     partnerId: ER_PARTNER_FLAREON_SPECIES_ID,
     name: "Partner Flareon",
-    slug: "partner_flareon",
     compositeId: ER_PARTNER_FLAREON_ABILITY_ID,
     mapType: PokemonType.FIRE,
   },
@@ -294,7 +285,6 @@ export const ER_PARTNER_FAMILY: readonly PartnerFamilyDef[] = [
     base: SpeciesId.ESPEON,
     partnerId: ER_PARTNER_ESPEON_SPECIES_ID,
     name: "Partner Espeon",
-    slug: "partner_espeon",
     compositeId: ER_PARTNER_ESPEON_ABILITY_ID,
     mapType: PokemonType.PSYCHIC,
   },
@@ -302,7 +292,6 @@ export const ER_PARTNER_FAMILY: readonly PartnerFamilyDef[] = [
     base: SpeciesId.UMBREON,
     partnerId: ER_PARTNER_UMBREON_SPECIES_ID,
     name: "Partner Umbreon",
-    slug: "partner_umbreon",
     compositeId: ER_PARTNER_UMBREON_ABILITY_ID,
     mapType: PokemonType.DARK,
   },
@@ -310,7 +299,6 @@ export const ER_PARTNER_FAMILY: readonly PartnerFamilyDef[] = [
     base: SpeciesId.LEAFEON,
     partnerId: ER_PARTNER_LEAFEON_SPECIES_ID,
     name: "Partner Leafeon",
-    slug: "partner_leafeon",
     compositeId: ER_PARTNER_LEAFEON_ABILITY_ID,
     mapType: PokemonType.GRASS,
   },
@@ -318,7 +306,6 @@ export const ER_PARTNER_FAMILY: readonly PartnerFamilyDef[] = [
     base: SpeciesId.GLACEON,
     partnerId: ER_PARTNER_GLACEON_SPECIES_ID,
     name: "Partner Glaceon",
-    slug: "partner_glaceon",
     compositeId: ER_PARTNER_GLACEON_ABILITY_ID,
     mapType: PokemonType.ICE,
   },
@@ -326,14 +313,14 @@ export const ER_PARTNER_FAMILY: readonly PartnerFamilyDef[] = [
     base: SpeciesId.SYLVEON,
     partnerId: ER_PARTNER_SYLVEON_SPECIES_ID,
     name: "Partner Sylveon",
-    slug: "partner_sylveon",
     compositeId: ER_PARTNER_SYLVEON_ABILITY_ID,
     mapType: PokemonType.FAIRY,
   },
 ];
 
-/** Partner Eevee starter cost (documented default; maintainer veto). */
-const PARTNER_EEVEE_STARTER_COST = 4;
+/** Family head: the vanilla Eevee "partner" FORM the Omniform composite is grafted onto. */
+const PARTNER_HEAD_SPECIES = SpeciesId.EEVEE;
+const PARTNER_HEAD_FORM_KEY = "partner";
 
 /** Aggregated result of a single {@linkcode injectErNewcomerSpecies} run. */
 export interface InjectErNewcomerSpeciesResult {
@@ -361,11 +348,40 @@ function addEvolutionEdge(from: SpeciesId, targetId: number, level: number): boo
 }
 
 /**
- * Register every newcomer species record (evolution-only, partner family,
- * Regitube), their evolution edges, egg/starter tables, and the partner-family
- * Omniform mappings. Idempotent. Must run AFTER `initEliteReduxSpecies()` (base
- * eeveelution kits final, so the partner clones are exact) and AFTER
- * `initEliteReduxCustomSpecies()` (ErCustomSpecies plumbing installed).
+ * Graft the [Fluffy + Omniform] composite ({@linkcode ER_PARTNER_EEVEE_ABILITY_ID})
+ * onto the VANILLA Eevee "partner" form's innate[0], leaving innate[1]/[2] and every
+ * OTHER Eevee form (Normal, G-Max) plus base-Eevee species state untouched. Partner
+ * Eevee is NOT a new species — this attaches the Omniform kit to the already
+ * starter-selectable vanilla form. Returns the partner form index (for the Omniform
+ * head mapping), or -1 if the form is absent. Idempotent (re-writes the same triple).
+ */
+function graftPartnerEeveeComposite(result: InjectErNewcomerSpeciesResult): number {
+  const eevee = getPokemonSpecies(PARTNER_HEAD_SPECIES);
+  if (!eevee) {
+    result.errors.push(`partner Eevee head: base species ${PARTNER_HEAD_SPECIES} not found`);
+    return -1;
+  }
+  const idx = eevee.forms.findIndex(f => f.formKey === PARTNER_HEAD_FORM_KEY);
+  if (idx < 0) {
+    result.errors.push(`partner Eevee head: no "${PARTNER_HEAD_FORM_KEY}" form on Eevee`);
+    return -1;
+  }
+  const form = eevee.forms[idx];
+  const cur = [...form.getPassiveAbilities()];
+  // Typed as plain numbers so each widens to AbilityId (same as registerErEditorMon's
+  // innate passing); the composite id + the two preserved innates keep the form's
+  // original innate[1]/[2] intact.
+  const grafted: [number, number, number] = [ER_PARTNER_EEVEE_ABILITY_ID, cur[1] ?? 0, cur[2] ?? 0];
+  form.setPassives(grafted);
+  return idx;
+}
+
+/**
+ * Register every newcomer species record (evolution-only, partner eeveelutions,
+ * Regitube), their evolution edges, egg/starter tables, the Partner-Eevee-form
+ * composite graft, and the partner Omniform mappings. Idempotent. Must run AFTER
+ * `initEliteReduxSpecies()` (base eeveelution kits final, so the partner clones are
+ * exact) and AFTER `initEliteReduxCustomSpecies()` (ErCustomSpecies plumbing installed).
  */
 export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
   const result: InjectErNewcomerSpeciesResult = {
@@ -424,7 +440,10 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
     (speciesStarterCosts as Record<number, number>)[ER_REGITUBE_SPECIES_ID] = REGITUBE_STARTER_COST;
   }
 
-  // --- 3. Partner-Eevee family (exact live-kit clones + composite graft). ---
+  // --- 3. Partner EEVEELUTIONS (8 transform-target species). Exact clone of the
+  // base eeveelution kit with the composite grafted onto innate[0]; sprite aliased
+  // to the base eeveelution's existing vanilla art (no new er-assets). NO starter
+  // cost / egg tier, so they never leak into grid/egg/wild (transform targets only). ---
   for (const def of ER_PARTNER_FAMILY) {
     const base = getPokemonSpecies(def.base);
     if (!base) {
@@ -434,16 +453,13 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
     // Exact clone of the base kit; graft the composite onto innate[0].
     const actives: [number, number, number] = [base.ability1, base.ability2, base.abilityHidden];
     const baseInnates = [...base.getPassiveAbilities()];
-    const innates: [number, number, number] = [
-      def.compositeId,
-      baseInnates[1] ?? 0,
-      baseInnates[2] ?? 0,
-    ];
+    const innates: [number, number, number] = [def.compositeId, baseInnates[1] ?? 0, baseInnates[2] ?? 0];
     const extraTypes = base.getExtraTypes();
     const added = registerErEditorMon({
       speciesId: def.partnerId,
       name: def.name,
-      slug: def.slug,
+      // No slug: the sprite/icon aliases the base eeveelution's vanilla art.
+      spriteAlias: def.base,
       type1: base.type1,
       type2: base.type2,
       baseStats: [...base.baseStats] as [number, number, number, number, number, number],
@@ -458,25 +474,24 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
       result.speciesAlreadyPresent++;
     }
   }
-  // Partner Eevee obtainability: a SEPARATE starter mon (own dex slot + starter
-  // cost), NOT a form on vanilla Eevee — so vanilla Eevee stays byte-identical.
-  // No egg tier (not egg-obtainable). The 8 partner eeveelutions get neither, so
-  // they never leak into grid/egg/wild (Omniform transform targets only).
-  (speciesStarterCosts as Record<number, number>)[ER_PARTNER_EEVEE_SPECIES_ID] = PARTNER_EEVEE_STARTER_COST;
 
-  // --- 4. Production Omniform mappings: chain the whole partner family. Every
-  // partner species (Eevee + all 8) maps each of the 8 element types to the
-  // matching partner eeveelution, so a mapped-type move adapts/chains freely. ---
-  const targets = ER_PARTNER_FAMILY.filter(d => d.mapType !== null);
+  // --- 3b. Partner Eevee HEAD: graft the composite onto the vanilla Eevee "partner"
+  // FORM (starter-selectable already; no new species, no starter cost). Base Eevee +
+  // the Normal/G-Max forms stay byte-identical. ---
+  const partnerFormIndex = graftPartnerEeveeComposite(result);
+
+  // --- 4. Production Omniform mappings. The HEAD (Eevee partner form, keyed by
+  // (EEVEE, partnerFormIndex)) maps each element type to the matching partner
+  // eeveelution; every partner eeveelution also chains among the whole set. ---
+  if (partnerFormIndex >= 0) {
+    for (const target of ER_PARTNER_FAMILY) {
+      registerOmniformMapping(PARTNER_HEAD_SPECIES, partnerFormIndex, target.mapType, target.partnerId as SpeciesId, 0);
+      result.omniformMappings++;
+    }
+  }
   for (const holder of ER_PARTNER_FAMILY) {
-    for (const target of targets) {
-      registerOmniformMapping(
-        holder.partnerId as SpeciesId,
-        0,
-        target.mapType as PokemonType,
-        target.partnerId as SpeciesId,
-        0,
-      );
+    for (const target of ER_PARTNER_FAMILY) {
+      registerOmniformMapping(holder.partnerId as SpeciesId, 0, target.mapType, target.partnerId as SpeciesId, 0);
       result.omniformMappings++;
     }
   }

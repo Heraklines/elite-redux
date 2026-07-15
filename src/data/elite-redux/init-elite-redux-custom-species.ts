@@ -28,6 +28,7 @@ import { PokemonSpecies } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
 import { PokemonType } from "#enums/pokemon-type";
 import type { Variant } from "#sprites/variant";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 /** Lookup: ER species id → kebab-case sprite slug ("phantowl", "abyssand"...). */
 const ER_SPRITE_BY_SPECIES_ID = new Map<number, string>(ER_SPRITE_MANIFEST.map(e => [e.speciesId, e.slug]));
@@ -245,6 +246,14 @@ class ErCustomSpecies extends PokemonSpecies {
    * path never queues any cry, so the mon is silent.
    */
   private static readonly _cryUrls = new Map<number, string>();
+  /**
+   * Pokerogue speciesId → a VANILLA base speciesId whose sprites/icon this custom
+   * species ALIASES (reuses verbatim) instead of the `elite-redux/{slug}/…` scheme.
+   * Used by the partner eeveelutions (transform-target species that render as their
+   * base eeveelution — no bespoke art). When set, the sprite/icon/loadAssets
+   * overrides delegate to the base species. Mutually exclusive with a sprite slug.
+   */
+  private static readonly _spriteAliases = new Map<number, number>();
 
   /**
    * Override of the base `localize()`. Looks up the draft name installed
@@ -281,6 +290,11 @@ class ErCustomSpecies extends PokemonSpecies {
     return ErCustomSpecies._cryUrls.get(id);
   }
 
+  /** Alias a custom species' sprites/icon to a VANILLA base species (no bespoke art). */
+  static registerSpriteAlias(id: number, baseSpeciesId: number): void {
+    ErCustomSpecies._spriteAliases.set(id, baseSpeciesId);
+  }
+
   /** ER sprite slug for a pokerogue species id, or undefined if not an ER custom. */
   static getSpriteSlug(id: number): string | undefined {
     return ErCustomSpecies._spriteSlugs.get(id);
@@ -298,6 +312,10 @@ class ErCustomSpecies extends PokemonSpecies {
     variant?: number,
     back?: boolean,
   ): string {
+    const alias = ErCustomSpecies._spriteAliases.get(this.speciesId);
+    if (alias !== undefined) {
+      return getPokemonSpecies(alias).getSpriteAtlasPath(_female, 0, shiny, variant, back);
+    }
     const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
     if (!slug) {
       // Fall through to vanilla path (will 404 — log once)
@@ -332,6 +350,10 @@ class ErCustomSpecies extends PokemonSpecies {
     variant?: number,
     back?: boolean,
   ): string {
+    const alias = ErCustomSpecies._spriteAliases.get(this.speciesId);
+    if (alias !== undefined) {
+      return getPokemonSpecies(alias).getSpriteId(_female, 0, shiny, variant ?? 0, back);
+    }
     const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
     if (!slug) {
       return super.getSpriteId(_female, _formIndex, shiny, variant ?? 0, back);
@@ -348,6 +370,10 @@ class ErCustomSpecies extends PokemonSpecies {
    * sheet (which has no frames for id >= 10000).
    */
   override getIconAtlasKey(_formIndex?: number, _shiny?: boolean, _variant?: number): string {
+    const alias = ErCustomSpecies._spriteAliases.get(this.speciesId);
+    if (alias !== undefined) {
+      return getPokemonSpecies(alias).getIconAtlasKey(0, _shiny, _variant);
+    }
     const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
     if (!slug) {
       return super.getIconAtlasKey(_formIndex, _shiny, _variant);
@@ -360,6 +386,10 @@ class ErCustomSpecies extends PokemonSpecies {
    * a single frame "0001.png" — return that string.
    */
   override getIconId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number): string {
+    const alias = ErCustomSpecies._spriteAliases.get(this.speciesId);
+    if (alias !== undefined) {
+      return getPokemonSpecies(alias).getIconId(female, 0, shiny, variant);
+    }
     const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
     if (!slug) {
       return super.getIconId(female, formIndex, shiny, variant);
@@ -413,6 +443,12 @@ class ErCustomSpecies extends PokemonSpecies {
     // sprite-only regardless (see below), so the caller's value is irrelevant.
     _spriteOnly = false,
   ): Promise<void> {
+    const alias = ErCustomSpecies._spriteAliases.get(this.speciesId);
+    if (alias !== undefined) {
+      // Render EXACTLY as the base eeveelution: delegate to its vanilla loadAssets
+      // (real sprite atlas + shiny variant colours + bundled icon), NOT the slug scheme.
+      return getPokemonSpecies(alias).loadAssets(female, 0, shiny, variant, startLoad, back, _spriteOnly);
+    }
     const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
     if (slug) {
       // Preload the icon atlas (key matches getIconAtlasKey output).
@@ -472,8 +508,17 @@ export function getErCryFile(speciesId: number): string | undefined {
 export interface ErEditorMonSpec {
   speciesId: number;
   name: string;
-  /** er-assets sprite directory slug (images/pokemon/elite-redux/<slug>/). */
-  slug: string;
+  /**
+   * er-assets sprite directory slug (images/pokemon/elite-redux/<slug>/). Optional
+   * when {@linkcode spriteAlias} is set (the sprite/icon then reuses a vanilla base).
+   */
+  slug?: string;
+  /**
+   * Alias this species' sprites/icon to a VANILLA base speciesId (reuse its art
+   * verbatim) instead of `elite-redux/<slug>/…`. Mutually exclusive with `slug`.
+   * Used by the partner eeveelutions (transform targets that render as their base).
+   */
+  spriteAlias?: number;
   type1: PokemonType;
   type2: PokemonType | null;
   baseStats: readonly [number, number, number, number, number, number];
@@ -543,9 +588,17 @@ export function registerErEditorMon(spec: ErEditorMonSpec): boolean {
   if (spec.cryFile) {
     ErCustomSpecies.registerCryFile(spec.speciesId, spec.cryFile);
   }
-  ErCustomSpecies.registerSpriteSlug(spec.speciesId, spec.slug);
+  // Sprite source: a vanilla base alias (partner eeveelutions) OR the ER slug art.
+  if (spec.spriteAlias !== undefined) {
+    ErCustomSpecies.registerSpriteAlias(spec.speciesId, spec.spriteAlias);
+  } else if (spec.slug) {
+    ErCustomSpecies.registerSpriteSlug(spec.speciesId, spec.slug);
+  }
   if (!starterColors[spec.speciesId]) {
-    starterColors[spec.speciesId] = ["ffffff", "ffffff"];
+    // Aliased species inherit the base's starter colours (its candy/egg palette);
+    // slug species have no vanilla palette, so default to white as before.
+    const base = spec.spriteAlias === undefined ? undefined : starterColors[spec.spriteAlias];
+    starterColors[spec.speciesId] = base ?? ["ffffff", "ffffff"];
   }
   (allSpecies as PokemonSpecies[]).push(species);
   return true;

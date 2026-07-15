@@ -16,9 +16,11 @@
 //   - evolutions fire only AT the level (L49 -> none, L50 -> valid), the evolved
 //     mon carries the correct N-typing, and evolving registers the dex entry;
 //   - NO starter-grid / egg / wild leak for the evolution species + the 8 partner
-//     eeveelutions (#232/#352), while partner Eevee IS a starter and Regitube IS
-//     egg-obtainable;
-//   - the base Eevee family stays byte-identical (partner clones never mutate it).
+//     eeveelutions (#232/#352). Partner Eevee is NOT a new species — it is the
+//     vanilla Eevee "partner" FORM with the [Fluffy + Omniform] composite grafted
+//     onto innate[0]; Regitube IS egg-obtainable;
+//   - the base eeveelution species stay byte-identical, and every NON-partner Eevee
+//     form + base-Eevee species state is untouched (only the partner form is grafted).
 //
 // Gated behind ER_SCENARIO=1.
 // =============================================================================
@@ -28,12 +30,13 @@ import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
 import { allAbilities } from "#data/data-lists";
 import { Egg } from "#data/egg";
+import { ER_PARTNER_EEVEE_ABILITY_ID } from "#data/elite-redux/abilities/composite-newcomers";
 import {
   ER_ASTOOT_SPECIES_ID,
   ER_DISCUPID_SPECIES_ID,
   ER_NEWCOMER_EVO_SPECIES,
-  ER_PARTNER_EEVEE_SPECIES_ID,
   ER_PARTNER_FAMILY,
+  ER_PARTNER_VAPOREON_SPECIES_ID,
   ER_REGITUBE_SPECIES_ID,
   ER_TENTALECT_SPECIES_ID,
 } from "#data/elite-redux/er-newcomer-species";
@@ -167,7 +170,9 @@ describe.skipIf(!RUN)("ER newcomer new-species seam", () => {
       ER_TENTALECT_SPECIES_ID,
       ER_ASTOOT_SPECIES_ID,
       ER_DISCUPID_SPECIES_ID,
-      ...ER_PARTNER_FAMILY.filter(d => d.partnerId !== ER_PARTNER_EEVEE_SPECIES_ID).map(d => d.partnerId),
+      // ER_PARTNER_FAMILY is now the 8 transform-target eeveelutions (Partner Eevee
+      // is the vanilla form, not a species) — none may leak into grid/egg/wild.
+      ...ER_PARTNER_FAMILY.map(d => d.partnerId),
     ];
     for (const id of noLeakIds) {
       expect(Object.hasOwn(starterCosts, id), `starter cost absent for ${id}`).toBe(false);
@@ -175,12 +180,34 @@ describe.skipIf(!RUN)("ER newcomer new-species seam", () => {
     }
   });
 
-  it("partner Eevee is a starter mon (own cost, no egg tier); Regitube is egg-obtainable", () => {
+  it("Partner Eevee is the vanilla Eevee 'partner' FORM with the composite graft (no new 70011 species); Regitube is egg-obtainable", () => {
     const starterCosts = speciesStarterCosts as Record<number, number>;
     const eggTiers = speciesEggTiers as Record<number, EggTier>;
 
-    expect(Object.hasOwn(starterCosts, ER_PARTNER_EEVEE_SPECIES_ID)).toBe(true);
-    expect(Object.hasOwn(eggTiers, ER_PARTNER_EEVEE_SPECIES_ID)).toBe(false);
+    // No standalone Partner Eevee species was created (70011 must not exist).
+    expect(getPokemonSpecies(70011 as SpeciesId)).toBeUndefined();
+    expect(Object.hasOwn(starterCosts, 70011)).toBe(false);
+
+    // The vanilla Eevee 'partner' form carries the [Fluffy + Omniform] composite as
+    // innate[0] (grafted); its other Eevee forms + base species stay byte-identical.
+    const eevee = getPokemonSpecies(SpeciesId.EEVEE);
+    const partnerIdx = eevee.forms.findIndex(f => f.formKey === "partner");
+    expect(partnerIdx).toBeGreaterThan(0);
+    expect(eevee.forms[partnerIdx].getPassiveAbilities()[0]).toBe(ER_PARTNER_EEVEE_ABILITY_ID);
+    // Normal form + species-level passives unchanged.
+    const normalIdx = eevee.forms.findIndex(f => f.formKey === "");
+    expect([...eevee.forms[normalIdx].getPassiveAbilities()]).toEqual([218, 56, 168]);
+    expect([...eevee.getPassiveAbilities()]).toEqual([218, 56, 168]);
+
+    // A partner eeveelution's sprite ALIASES its base eeveelution's vanilla art.
+    const partnerVaporeon = getPokemonSpecies(ER_PARTNER_VAPOREON_SPECIES_ID as SpeciesId);
+    const vaporeon = getPokemonSpecies(SpeciesId.VAPOREON);
+    expect(partnerVaporeon.getSpriteAtlasPath(false, 0, false, 0, false)).toBe(
+      vaporeon.getSpriteAtlasPath(false, 0, false, 0, false),
+    );
+    expect(partnerVaporeon.getSpriteId(false, 0, false, 0, false)).toBe(
+      vaporeon.getSpriteId(false, 0, false, 0, false),
+    );
 
     // Regitube: registered Water standalone, egg tier + starter cost, kit resolves.
     const regi = getPokemonSpecies(ER_REGITUBE_SPECIES_ID as SpeciesId);
