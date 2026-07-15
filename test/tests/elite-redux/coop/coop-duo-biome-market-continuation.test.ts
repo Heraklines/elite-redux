@@ -84,6 +84,8 @@ interface BiomeShopSeam {
   buildStock(): void;
   copy(): BiomeShopSeam;
   coopBiomeTerminal(): void;
+  pendingIndex: number;
+  applyCoopRelayedPurchase(modifier: unknown, validatedCost: number, authoritativeMoney: number): void;
 }
 
 describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned copy, lockstep advance", () => {
@@ -151,6 +153,13 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
     return opt;
   }
 
+  /** The live #moulas capture bought this non-continuation held item from a guest-owned market. */
+  function makeWideLensOption(): ReturnType<typeof generateModifierTypeOption> {
+    const opt = generateModifierTypeOption(modifierTypes.WIDE_LENS);
+    (opt as unknown as { cost: number }).cost = 100;
+    return opt;
+  }
+
   // ===========================================================================================
   // A. DETERMINISTIC (no UI): copy() must produce a pinned BiomeShopPhase, not an unpinned reward-row
   // orphan. Pins as if the market opened at counter 9 (guest-owned in the live capture). FAILS-BEFORE:
@@ -186,6 +195,50 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
     );
     expect(result.copiedStock, "the copy re-opens the SAME rolled stock (no re-roll)").toBe(1);
     expect(result.copiedOwner, "the copy inherits the pick-owner role").toBe(true);
+  }, 120_000);
+
+  it("guest-owned market watcher applies Wide Lens as a paid replay without ending the market", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, async () => {
+      // Odd interaction => guest owns the market and the host is the watcher,
+      // matching the tester capture. Keep both controllers on the same pin.
+      rig.hostRuntime.controller.advanceInteraction(0);
+      await drainLoopback();
+    });
+    await withClient(rig.guestCtx, async () => {
+      await drainLoopback();
+    });
+    expect(rig.hostRuntime.controller.interactionCounter()).toBe(1);
+    expect(rig.guestRuntime.controller.interactionCounter()).toBe(1);
+
+    await withClient(rig.hostCtx, async () => {
+      const phase = liveBiomeShop() as unknown as BiomeShopSeam;
+      const option = makeWideLensOption();
+      const target = rig.hostScene.getPlayerParty()[1];
+      const modifier = option.type.newModifier(target);
+      expect(modifier).not.toBeNull();
+      phase.coopBiomeStart = 1;
+      phase.coopBiomeOwner = false;
+      phase.coopBiomeOptionOwner = true;
+      phase.shopOptions = [option];
+      phase.qtys = [1];
+      phase.pendingIndex = 0;
+      rig.hostScene.money = 2_000;
+
+      phase.applyCoopRelayedPurchase(modifier!, 100, 1_020);
+
+      expect(rig.hostRuntime.controller.interactionCounter(), "buy does not terminate the pinned market").toBe(1);
+      expect(rig.hostScene.money, "watcher adopts the owner's exact post-buy money").toBe(1_020);
+      expect(phase.qtys[0], "watcher decrements the bought stock once").toBe(0);
+    });
+
+    const allLogs = [...logs.host, ...logs.guest];
+    expect(
+      allLogs.filter(line => /advance interaction SKIP unpinned/i.test(line)),
+      "a paid watcher replay never enters the free-reward terminal path",
+    ).toHaveLength(0);
   }, 120_000);
 
   // ===========================================================================================
@@ -302,6 +355,13 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
         };
         let drove = false;
         ui.setModeBoundedWhen = (...args: unknown[]): Promise<"completed"> => {
+          if (args[0] === UiMode.CONFIRM) {
+            // BiomeShopPhase uses the bounded co-op transition seam for the
+            // leave prompt. The old harness only drove setOverlayMode/
+            // setModeWithoutClear, so it never clicked Yes and therefore never
+            // sent the LEAVE terminal it later expected the watcher to apply.
+            queueMicrotask(() => (args[3] as () => void)());
+          }
           if (args[0] === UiMode.BIOME_SHOP && !drove) {
             drove = true;
             // Production opens the market through the bounded transition seam:

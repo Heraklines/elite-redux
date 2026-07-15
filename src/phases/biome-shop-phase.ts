@@ -786,8 +786,11 @@ export class BiomeShopPhase extends SelectModifierPhase {
               : opt.type.newModifier();
           if (modifier != null) {
             this.pendingIndex = slot;
-            // Free apply (cost -1): the money is set VERBATIM from the owner below, never re-deducted.
-            this.applyModifier(modifier, -1, false);
+            // Keep PAID-shop control flow while adopting the owner's exact
+            // balance. Passing -1 here means "free reward terminal" to the base
+            // phase and used to end this watcher after the first held item,
+            // racing it into SelectBiomePhase before the owner left the market.
+            this.applyCoopRelayedPurchase(modifier, validatedCost, money, false);
           }
         }
       } catch {

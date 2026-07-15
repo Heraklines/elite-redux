@@ -924,6 +924,40 @@ export class SelectModifierPhase extends BattlePhase {
     }
   }
 
+  /**
+   * Apply a paid modifier replay on a non-interactive co-op watcher.
+   *
+   * A negative cost is the base reward phase's terminal sentinel: it clears the
+   * UI, ends the phase, and advances the interaction. Market replays used to
+   * pass `-1` merely to avoid charging twice, which accidentally tore down the
+   * watcher after the first held item and let the next biome start before the
+   * owner had left the market. Preserve paid-purchase control flow instead and
+   * temporarily install the normal watcher money/UI context so the owner's
+   * post-purchase balance is adopted without touching an interactive handler.
+   */
+  protected applyCoopRelayedPurchase(
+    modifier: Modifier,
+    validatedCost: number,
+    authoritativeMoney: number,
+    playSound = false,
+  ): void {
+    const priorWatcher = this.coopWatcher;
+    const priorAdoptsOptions = this.coopAdoptsOptions;
+    const priorRelayedMoney = this.coopRelayedMoney;
+    this.coopWatcher = true;
+    this.coopAdoptsOptions = true;
+    this.coopRelayedMoney = authoritativeMoney;
+    try {
+      // Older compatibility carriers did not include the validated cost. Zero
+      // still selects the paid-shop branch without recomputing or double-paying.
+      this.applyModifier(modifier, Math.max(0, validatedCost), playSound);
+    } finally {
+      this.coopWatcher = priorWatcher;
+      this.coopAdoptsOptions = priorAdoptsOptions;
+      this.coopRelayedMoney = priorRelayedMoney;
+    }
+  }
+
   // Opens the party menu specifically for fusions
   protected openFusionMenu(
     modifierType: PokemonModifierType,
