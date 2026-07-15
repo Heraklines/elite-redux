@@ -139,6 +139,103 @@ mkdirSync("editor/data", { recursive: true });
   console.log(`trainer-fx: ${trainerFx.length} aura effects.`);
 }
 
+// Held-item catalog (editor/data/held-items.json): the full set of enemy-legal
+// held-item keys resolveHeldItemKey (src/system/llm-director/held-item-resolver.ts)
+// can field, grouped by category so the Custom Trainers editor's held-item picker
+// can offer them ergonomically. Four categories, parsed STATICALLY from the game
+// source (same "no TS import" style as the lists above):
+//   booster — the 18 ATTACK_TYPE_BOOSTER items (AttackTypeBoosterItem enum)
+//   berry   — every BerryType as `<NAME>_BERRY`
+//   gem     — the ER elemental gems (ER_*_GEM keys in modifier-type.ts)
+//   utility — a curated set of fixed keyed items that make sense on an enemy
+// The resolver is the source of truth at runtime; keys here MUST match the keys it
+// accepts (booster item names, `<berry>_BERRY`, `ER_*_GEM`, plain fixed keys).
+{
+  // Title-case a SCREAMING_SNAKE key: "MYSTIC_WATER" -> "Mystic Water".
+  const titleCase = key =>
+    key
+      .toLowerCase()
+      .split("_")
+      .filter(Boolean)
+      .map(w => w.slice(0, 1).toUpperCase() + w.slice(1))
+      .join(" ");
+  const held = [];
+
+  // booster: the AttackTypeBoosterItem enum (module-local in modifier-type.ts).
+  {
+    const src = read("src/modifier/modifier-type.ts");
+    const m = src.match(/enum AttackTypeBoosterItem\s*\{([\s\S]*?)\}/);
+    const names = m ? [...m[1].matchAll(/^\s*([A-Z][A-Z0-9_]+)\s*,?/gm)].map(x => x[1]) : [];
+    for (const name of names) {
+      held.push({ key: name, label: titleCase(name), category: "booster" });
+    }
+    if (names.length === 0) {
+      throw new Error("gen-editor-data: parsed 0 type boosters — AttackTypeBoosterItem enum format changed?");
+    }
+  }
+
+  // berry: BerryType enum members -> `<NAME>_BERRY`.
+  {
+    const src = read("src/enums/berry-type.ts");
+    const m = src.match(/enum BerryType\s*\{([\s\S]*?)\}/);
+    const names = m ? [...m[1].matchAll(/^\s*([A-Z][A-Z0-9_]+)\s*,?/gm)].map(x => x[1]) : [];
+    for (const name of names) {
+      held.push({ key: `${name}_BERRY`, label: `${titleCase(name)} Berry`, category: "berry" });
+    }
+    if (names.length === 0) {
+      throw new Error("gen-editor-data: parsed 0 berries — BerryType enum format changed?");
+    }
+  }
+
+  // gem: the ER elemental-gem keys registered in modifier-type.ts.
+  {
+    const src = read("src/modifier/modifier-type.ts");
+    const keys = [...src.matchAll(/^\s*(ER_[A-Z]+_GEM):\s*\(\)\s*=>/gm)].map(x => x[1]);
+    for (const key of [...new Set(keys)]) {
+      // "ER_FIRE_GEM" -> "Fire Gem"; "ER_OMNI_GEM" -> "Omni Gem".
+      held.push({ key, label: titleCase(key.replace(/^ER_/, "")), category: "gem" });
+    }
+    if (keys.length === 0) {
+      throw new Error("gen-editor-data: parsed 0 elemental gems — ER_*_GEM registration format changed?");
+    }
+  }
+
+  // utility: curated fixed keyed items (mirrors the resolver's plain-key path).
+  // SILK_SCARF is intentionally absent here — it lives in the booster category.
+  const UTILITY_KEYS = [
+    "LEFTOVERS",
+    "SHELL_BELL",
+    "FOCUS_BAND",
+    "QUICK_CLAW",
+    "KINGS_ROCK",
+    "WIDE_LENS",
+    "SCOPE_LENS",
+    "GRIP_CLAW",
+    "TOXIC_ORB",
+    "FLAME_ORB",
+    "BATON",
+    "SOOTHE_BELL",
+    "SOUL_DEW",
+    "MYSTICAL_ROCK",
+    "GOLDEN_PUNCH",
+    "BERRY_POUCH",
+    "EVIOLITE",
+    "LUCKY_EGG",
+    "GOLDEN_EGG",
+    "REVIVER_SEED",
+    "MULTI_LENS",
+  ];
+  for (const key of UTILITY_KEYS) {
+    held.push({ key, label: titleCase(key), category: "utility" });
+  }
+
+  writeFileSync("editor/data/held-items.json", `${JSON.stringify(held, null, 2)}\n`);
+  const byCat = held.reduce((acc, h) => ((acc[h.category] = (acc[h.category] || 0) + 1), acc), {});
+  console.log(
+    `held-items: ${held.length} (${byCat.booster} booster / ${byCat.berry} berry / ${byCat.gem} gem / ${byCat.utility} utility).`,
+  );
+}
+
 writeFileSync("editor/data/moves.json", `${JSON.stringify(uniqueMoves, null, 2)}\n`);
 console.log(`moves: ${uniqueMoves.length} (incl. ${erMoveCount} ER custom names)`);
 console.log("species/items/trainers: run the dump tool (see header) — they come from the live runtime tables.");

@@ -1533,6 +1533,35 @@ const HELD_ITEM_OPTIONS = [
   "MULTI_LENS",
 ];
 
+// Full held-item catalog (editor/data/held-items.json): the complete set of
+// enemy-legal keys the game-side resolveHeldItemKey can field, grouped by
+// category so the held-item picker can offer type boosters, berries and gems
+// (not just the old curated 22). Loaded in init(); falls back to the curated
+// HELD_ITEM_OPTIONS (as "utility") when the generated file is absent so the
+// picker is never empty. The runtime resolver is the source of truth — keys
+// stay free-form, this list is just ergonomics.
+let HELD_ITEMS = HELD_ITEM_OPTIONS.map(key => ({ key, label: prettify(key), category: "utility" }));
+const HELD_CATEGORY_ORDER = ["booster", "berry", "gem", "utility"];
+const HELD_CATEGORY_LABEL = { booster: "type booster", berry: "berry", gem: "gem", utility: "utility" };
+
+/** Held-item picker <option>s, sorted by category (boosters → berries → gems →
+ *  utility) then label, each tagged with its category for at-a-glance grouping. */
+function heldItemsDatalistHtml() {
+  const catRank = k => {
+    const i = HELD_CATEGORY_ORDER.indexOf(k);
+    return i < 0 ? HELD_CATEGORY_ORDER.length : i;
+  };
+  const sorted = [...HELD_ITEMS].sort(
+    (a, b) => catRank(a.category) - catRank(b.category) || (a.label || a.key).localeCompare(b.label || b.key),
+  );
+  return `<datalist id="helditems-list">${sorted
+    .map(
+      h =>
+        `<option value="${esc(h.key)}">${esc(h.label || prettify(h.key))} · ${esc(HELD_CATEGORY_LABEL[h.category] || h.category || "item")}</option>`,
+    )
+    .join("")}</datalist>`;
+}
+
 // BST curve (defaults from er-balance-knobs: er.elite.bstCaps / er.hell.bstCaps,
 // #418/#419). Pairs are [up-to-wave, cap]; past the last wave there is no cap.
 const BST_CAPS = {
@@ -2930,7 +2959,8 @@ function renderCustomTrainers(root) {
         <div class="ctr-layout-main">${form}</div>
         ${panel}
       </div>
-    </div>`;
+    </div>
+    ${heldItemsDatalistHtml()}`;
   // The sprite preview reads the live CDN atlas, so paint it after the DOM exists.
   updateCtrSpritePreview();
   // Paint each list card's trainer sprite (lazy CDN atlas crop, ~44px tall). The
@@ -4450,6 +4480,7 @@ async function init() {
       bgmData,
       shinyEffectsData,
       trainerFxData,
+      heldItemsData,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
@@ -4489,6 +4520,8 @@ async function init() {
       fetchJson("./data/shiny-effects.json", { palette: [], surface: [], around: [] }),
       // Ghost Trainer FX aura catalog (generated). Fallback → empty (picker offers "(none)").
       fetchJson("./data/trainer-fx.json", []),
+      // Held-item catalog (generated). Fallback → the curated HELD_ITEM_OPTIONS below.
+      fetchJson("./data/held-items.json", []),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -4600,6 +4633,19 @@ async function init() {
       trainerFxById.set(e.id, e);
     }
 
+    // Held-item catalog: the full grouped picker (booster/berry/gem/utility). Fall
+    // back to the curated HELD_ITEM_OPTIONS (as "utility") when the generated file
+    // is absent or malformed, so the picker is never empty.
+    if (Array.isArray(heldItemsData) && heldItemsData.length > 0) {
+      HELD_ITEMS = heldItemsData
+        .filter(h => h && typeof h.key === "string" && h.key.length > 0)
+        .map(h => ({
+          key: h.key,
+          label: typeof h.label === "string" && h.label ? h.label : prettify(h.key),
+          category: typeof h.category === "string" && h.category ? h.category : "utility",
+        }));
+    }
+
     // Egg-move source + factory-set index for the per-member legality/set helpers.
     EGG_MOVES_LIVE = eggLive && typeof eggLive === "object" ? eggLive : {};
     factoryByConst.clear();
@@ -4693,10 +4739,9 @@ async function init() {
     tcdl.id = "trainerclass-list";
     tcdl.innerHTML = TRAINER_CLASSES.map(t => `<option value="${t.name}">${prettify(t.name)}</option>`).join("");
     document.body.appendChild(tcdl);
-    const hidl = document.createElement("datalist");
-    hidl.id = "helditems-list";
-    hidl.innerHTML = HELD_ITEM_OPTIONS.map(k => `<option value="${k}">${prettify(k)}</option>`).join("");
-    document.body.appendChild(hidl);
+    // NB: the held-item datalist (#helditems-list) is rendered INSIDE the Custom
+    // Trainers section (heldItemsDatalistHtml) so it reflects the full grouped
+    // HELD_ITEMS catalog loaded above — no global body-level datalist here.
 
     render();
     setStatus(`${SPECIES.length} species, ${ITEMS.length} items loaded.`);

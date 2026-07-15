@@ -50,6 +50,7 @@ interface EditorHarness {
   hashCtrTrainerEntry(entry: unknown): string;
   markCustomTrainersSaved(delta: Record<string, unknown>, data: Record<string, unknown>): void;
   CTR_LIVE: Record<string, any>;
+  HELD_ITEMS: { key: string; label: string; category: string }[];
   ctr: { current: Record<string, any>; baseline: Record<string, any> };
   ctrConfig: {
     current: { windowSize: number; windowChancePct: number };
@@ -134,6 +135,7 @@ beforeAll(() => {
       ctr, ctrConfig, spByConst, spById, trainerClassByName, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
       get CTR_LIVE(){ return CTR_LIVE; }, set CTR_LIVE(v){ CTR_LIVE = v; },
+      get HELD_ITEMS(){ return HELD_ITEMS; }, set HELD_ITEMS(v){ HELD_ITEMS = v; },
       setTab(v){ activeTab = v; },
     };`;
   const dom = new JSDOM(HARNESS_HTML, { runScripts: "outside-only", pretendToBeVisual: true });
@@ -187,6 +189,15 @@ beforeEach(() => {
   seedShiny("palette", "inferno", "Inferno", "#ff6a24");
   seedShiny("surface", "holofoil", "Holo Foil", "#7fe0ff");
   seedShiny("around", "zaps", "Zaps", "#ffd27a");
+  // Held-item catalog fixture: at least one of each grouped category so the
+  // picker's grouping can be asserted (booster/berry/gem/utility).
+  ct.HELD_ITEMS = [
+    { key: "CHARCOAL", label: "Charcoal", category: "booster" },
+    { key: "SILK_SCARF", label: "Silk Scarf", category: "booster" },
+    { key: "SITRUS_BERRY", label: "Sitrus Berry", category: "berry" },
+    { key: "ER_FIRE_GEM", label: "Fire Gem", category: "gem" },
+    { key: "LEFTOVERS", label: "Leftovers", category: "utility" },
+  ];
   // Ghost Trainer FX aura catalog fixture (the per-trainer sprite-effect picker).
   ct.TRAINER_FX.length = 0;
   ct.trainerFxById.clear();
@@ -766,6 +777,37 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     victory.value = "z".repeat(250);
     ct.onCustomTrainerInput(victory);
     expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].victoryDialogue.length).toBe(200);
+  });
+
+  it("held-item picker is fed from the full grouped catalog (booster/berry/gem/utility)", () => {
+    newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // Add a held-item row (the member is expanded by default) so the picker input
+    // + its datalist render.
+    ct.onCustomTrainerClick({ target: q('.ctr-held-add[data-idx="0"]')! });
+    const input = q('.ctr-held-item[data-idx="0"][data-heldidx="0"]') as HTMLInputElement;
+    expect(input).not.toBeNull();
+    // The input references the shared held-item datalist rendered in the section.
+    expect(input.getAttribute("list")).toBe("helditems-list");
+    const dl = q("#helditems-list") as HTMLDataListElement;
+    expect(dl).not.toBeNull();
+    const opts = [...dl.querySelectorAll("option")] as HTMLOptionElement[];
+    const values = opts.map(o => o.value);
+    // Every catalog key is offered, incl. the new type-booster / berry / gem keys.
+    expect(values).toContain("CHARCOAL");
+    expect(values).toContain("SITRUS_BERRY");
+    expect(values).toContain("ER_FIRE_GEM");
+    expect(values).toContain("LEFTOVERS");
+    // Grouped: boosters come before berries before gems before utility.
+    const firstIdx = k => values.indexOf(k);
+    expect(firstIdx("CHARCOAL")).toBeLessThan(firstIdx("SITRUS_BERRY"));
+    expect(firstIdx("SITRUS_BERRY")).toBeLessThan(firstIdx("ER_FIRE_GEM"));
+    expect(firstIdx("ER_FIRE_GEM")).toBeLessThan(firstIdx("LEFTOVERS"));
+    // Each option's text tags its category for at-a-glance grouping.
+    const charcoal = opts.find(o => o.value === "CHARCOAL")!;
+    expect(charcoal.textContent).toMatch(/booster/i);
+    const berry = opts.find(o => o.value === "SITRUS_BERRY")!;
+    expect(berry.textContent).toMatch(/berry/i);
   });
 
   it("dialogue fields are relabeled from the TRAINER's point of view (bindings unchanged)", () => {

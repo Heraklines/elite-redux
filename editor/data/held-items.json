@@ -1,0 +1,347 @@
+[
+  {
+    "key": "SILK_SCARF",
+    "label": "Silk Scarf",
+    "category": "booster"
+  },
+  {
+    "key": "BLACK_BELT",
+    "label": "Black Belt",
+    "category": "booster"
+  },
+  {
+    "key": "SHARP_BEAK",
+    "label": "Sharp Beak",
+    "category": "booster"
+  },
+  {
+    "key": "POISON_BARB",
+    "label": "Poison Barb",
+    "category": "booster"
+  },
+  {
+    "key": "SOFT_SAND",
+    "label": "Soft Sand",
+    "category": "booster"
+  },
+  {
+    "key": "HARD_STONE",
+    "label": "Hard Stone",
+    "category": "booster"
+  },
+  {
+    "key": "SILVER_POWDER",
+    "label": "Silver Powder",
+    "category": "booster"
+  },
+  {
+    "key": "SPELL_TAG",
+    "label": "Spell Tag",
+    "category": "booster"
+  },
+  {
+    "key": "METAL_COAT",
+    "label": "Metal Coat",
+    "category": "booster"
+  },
+  {
+    "key": "CHARCOAL",
+    "label": "Charcoal",
+    "category": "booster"
+  },
+  {
+    "key": "MYSTIC_WATER",
+    "label": "Mystic Water",
+    "category": "booster"
+  },
+  {
+    "key": "MIRACLE_SEED",
+    "label": "Miracle Seed",
+    "category": "booster"
+  },
+  {
+    "key": "MAGNET",
+    "label": "Magnet",
+    "category": "booster"
+  },
+  {
+    "key": "TWISTED_SPOON",
+    "label": "Twisted Spoon",
+    "category": "booster"
+  },
+  {
+    "key": "NEVER_MELT_ICE",
+    "label": "Never Melt Ice",
+    "category": "booster"
+  },
+  {
+    "key": "DRAGON_FANG",
+    "label": "Dragon Fang",
+    "category": "booster"
+  },
+  {
+    "key": "BLACK_GLASSES",
+    "label": "Black Glasses",
+    "category": "booster"
+  },
+  {
+    "key": "FAIRY_FEATHER",
+    "label": "Fairy Feather",
+    "category": "booster"
+  },
+  {
+    "key": "SITRUS_BERRY",
+    "label": "Sitrus Berry",
+    "category": "berry"
+  },
+  {
+    "key": "LUM_BERRY",
+    "label": "Lum Berry",
+    "category": "berry"
+  },
+  {
+    "key": "ENIGMA_BERRY",
+    "label": "Enigma Berry",
+    "category": "berry"
+  },
+  {
+    "key": "LIECHI_BERRY",
+    "label": "Liechi Berry",
+    "category": "berry"
+  },
+  {
+    "key": "GANLON_BERRY",
+    "label": "Ganlon Berry",
+    "category": "berry"
+  },
+  {
+    "key": "PETAYA_BERRY",
+    "label": "Petaya Berry",
+    "category": "berry"
+  },
+  {
+    "key": "APICOT_BERRY",
+    "label": "Apicot Berry",
+    "category": "berry"
+  },
+  {
+    "key": "SALAC_BERRY",
+    "label": "Salac Berry",
+    "category": "berry"
+  },
+  {
+    "key": "LANSAT_BERRY",
+    "label": "Lansat Berry",
+    "category": "berry"
+  },
+  {
+    "key": "STARF_BERRY",
+    "label": "Starf Berry",
+    "category": "berry"
+  },
+  {
+    "key": "LEPPA_BERRY",
+    "label": "Leppa Berry",
+    "category": "berry"
+  },
+  {
+    "key": "ER_OMNI_GEM",
+    "label": "Omni Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_NORMAL_GEM",
+    "label": "Normal Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_FIRE_GEM",
+    "label": "Fire Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_WATER_GEM",
+    "label": "Water Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_ELECTRIC_GEM",
+    "label": "Electric Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_GRASS_GEM",
+    "label": "Grass Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_ICE_GEM",
+    "label": "Ice Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_FIGHTING_GEM",
+    "label": "Fighting Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_POISON_GEM",
+    "label": "Poison Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_GROUND_GEM",
+    "label": "Ground Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_FLYING_GEM",
+    "label": "Flying Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_PSYCHIC_GEM",
+    "label": "Psychic Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_BUG_GEM",
+    "label": "Bug Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_ROCK_GEM",
+    "label": "Rock Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_GHOST_GEM",
+    "label": "Ghost Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_DRAGON_GEM",
+    "label": "Dragon Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_DARK_GEM",
+    "label": "Dark Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_STEEL_GEM",
+    "label": "Steel Gem",
+    "category": "gem"
+  },
+  {
+    "key": "ER_FAIRY_GEM",
+    "label": "Fairy Gem",
+    "category": "gem"
+  },
+  {
+    "key": "LEFTOVERS",
+    "label": "Leftovers",
+    "category": "utility"
+  },
+  {
+    "key": "SHELL_BELL",
+    "label": "Shell Bell",
+    "category": "utility"
+  },
+  {
+    "key": "FOCUS_BAND",
+    "label": "Focus Band",
+    "category": "utility"
+  },
+  {
+    "key": "QUICK_CLAW",
+    "label": "Quick Claw",
+    "category": "utility"
+  },
+  {
+    "key": "KINGS_ROCK",
+    "label": "Kings Rock",
+    "category": "utility"
+  },
+  {
+    "key": "WIDE_LENS",
+    "label": "Wide Lens",
+    "category": "utility"
+  },
+  {
+    "key": "SCOPE_LENS",
+    "label": "Scope Lens",
+    "category": "utility"
+  },
+  {
+    "key": "GRIP_CLAW",
+    "label": "Grip Claw",
+    "category": "utility"
+  },
+  {
+    "key": "TOXIC_ORB",
+    "label": "Toxic Orb",
+    "category": "utility"
+  },
+  {
+    "key": "FLAME_ORB",
+    "label": "Flame Orb",
+    "category": "utility"
+  },
+  {
+    "key": "BATON",
+    "label": "Baton",
+    "category": "utility"
+  },
+  {
+    "key": "SOOTHE_BELL",
+    "label": "Soothe Bell",
+    "category": "utility"
+  },
+  {
+    "key": "SOUL_DEW",
+    "label": "Soul Dew",
+    "category": "utility"
+  },
+  {
+    "key": "MYSTICAL_ROCK",
+    "label": "Mystical Rock",
+    "category": "utility"
+  },
+  {
+    "key": "GOLDEN_PUNCH",
+    "label": "Golden Punch",
+    "category": "utility"
+  },
+  {
+    "key": "BERRY_POUCH",
+    "label": "Berry Pouch",
+    "category": "utility"
+  },
+  {
+    "key": "EVIOLITE",
+    "label": "Eviolite",
+    "category": "utility"
+  },
+  {
+    "key": "LUCKY_EGG",
+    "label": "Lucky Egg",
+    "category": "utility"
+  },
+  {
+    "key": "GOLDEN_EGG",
+    "label": "Golden Egg",
+    "category": "utility"
+  },
+  {
+    "key": "REVIVER_SEED",
+    "label": "Reviver Seed",
+    "category": "utility"
+  },
+  {
+    "key": "MULTI_LENS",
+    "label": "Multi Lens",
+    "category": "utility"
+  }
+]

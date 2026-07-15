@@ -31,6 +31,7 @@ import {
   buildErCustomTrainerMember,
   clearErCustomTrainerDevForce,
   type ErCustomTrainerMemberResolved,
+  erCustomTrainerHeldModifierConfigs,
   erCustomTrainerWindowIndex,
   erCustomTrainerWindowWave,
   getErCustomTrainerDevForce,
@@ -988,6 +989,44 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // A plain mon stays non-forced (no erShinyLab stamped).
     const plain = buildErCustomTrainerMember(resolved.members[1], 1, 50, false);
     expect(plain!.customPokemonData.erShinyLab).toBeUndefined();
+  });
+
+  // ---- ROUND 10 / FEATURE 6: held-item full catalog -------------------------
+  it("held items: a berry, a type booster and an elemental gem all resolve onto the enemy", () => {
+    // The resolver now handles three families: plain keyed items (gems, fixed
+    // items), the ATTACK_TYPE_BOOSTER family (a generic generator specialized by
+    // PokemonType), and the BERRY family (specialized by BerryType). All three
+    // must field on an authored enemy.
+    const member: ErCustomTrainerMemberResolved = {
+      speciesId: SpeciesId.PIKACHU,
+      formIndex: 0,
+      level: 50,
+      moveIds: [],
+      moveSpecs: [],
+      abilitySlot: 0,
+      fusion: null,
+      heldItemKeys: [
+        { key: "SITRUS_BERRY", count: 1 }, // BERRY family (was unresolvable before)
+        { key: "CHARCOAL", count: 1 }, // ATTACK_TYPE_BOOSTER family (Fire booster)
+        { key: "ER_FIRE_GEM", count: 2 }, // plain ER elemental-gem key (already resolved)
+        { key: "LEFTOVERS", count: 1 }, // plain fixed held item (back-compat)
+      ],
+      shinyLook: null,
+      shinyName: "",
+    };
+    const configs = erCustomTrainerHeldModifierConfigs(member);
+    // All four keys resolve to a held-item modifier (newModifier present).
+    expect(configs.length).toBe(4);
+    for (const c of configs) {
+      expect(typeof (c.modifier as { newModifier?: unknown }).newModifier).toBe("function");
+    }
+    // Counts pass through (the gem authored count 2 is preserved).
+    expect(configs[2].stackCount).toBe(2);
+
+    // A bogus key still resolves to nothing (dropped), and an unknown-but-plausible
+    // berry/booster typo does too (never crashes, never a phantom item).
+    const bogus: ErCustomTrainerMemberResolved = { ...member, heldItemKeys: [{ key: "NOT_A_REAL_ITEM", count: 1 }] };
+    expect(erCustomTrainerHeldModifierConfigs(bogus).length).toBe(0);
   });
 
   // ---- FEATURE 1: weighted slot variants -----------------------------------
