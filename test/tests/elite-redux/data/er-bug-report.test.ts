@@ -5,8 +5,9 @@
 
 // Unit tests for the in-game bug reporter assembly + console ring buffer (#220).
 
-import { buildBugReport } from "#data/elite-redux/er-bug-report";
+import { buildBugReport, buildDevLogText } from "#data/elite-redux/er-bug-report";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { ER_BUILD_IDENTITY_MARKER } from "#utils/build-identity";
 import { formatConsoleSnapshot, getConsoleSnapshot, installConsoleRingBuffer } from "#utils/console-ring-buffer";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -30,8 +31,13 @@ describe("ER bug report", () => {
     expect(report.description).toBe("the game froze after EXP");
     expect(report.state.erDifficulty).toBe("hell");
     expect(report.state.version).toBeTruthy();
+    expect(report.buildIdentity.id).toBeTruthy();
+    expect(report.coopCorrelation).toBeNull();
     expect(typeof report.logs).toBe("string");
     // party is captured defensively even with no active scene.
     expect(Array.isArray(report.state.party)).toBe(true);
+    const devlog = buildDevLogText(report);
+    expect(devlog).toContain(`build:    ${report.buildIdentity.id}`);
+    expect(devlog).toContain(ER_BUILD_IDENTITY_MARKER);
   });
 });
