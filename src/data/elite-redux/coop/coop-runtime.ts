@@ -1343,6 +1343,36 @@ export function awaitCoopSettledWaveAdvanceAtBattleEnd(
   return true;
 }
 
+type CoopPhaseOwnedWaveContinuationSurface = "crossroads";
+
+function phaseOwnedWaveContinuationIsPublic(
+  staged: CoopStagedWaveAdvanceTransaction,
+  surface: CoopPhaseOwnedWaveContinuationSurface,
+): boolean {
+  if (!staged.dataApplied) {
+    return false;
+  }
+  const payload = staged.envelope.pendingOperation?.payload as CoopWaveAdvancePayload;
+  try {
+    switch (surface) {
+      case "crossroads": {
+        // OPTION_SELECT is deliberately absent from the generic registry because many unrelated local and
+        // account-only screens use it. Crossroads owns an explicit attestation after its real picker promise
+        // has committed; accept only that exact phase + mode + active-handler tuple.
+        const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+        return (
+          globalScene.phaseManager?.getCurrentPhase()?.phaseName === "ErCrossroadsPhase"
+          && globalScene.ui.getMode() === UiMode.OPTION_SELECT
+          && globalScene.ui.getHandler()?.active === true
+          && (currentWave === payload.wave || currentWave === payload.nextWave)
+        );
+      }
+    }
+  } catch {
+    return false;
+  }
+}
+
 function retainedWaveContinuationIsPublic(staged: CoopStagedWaveAdvanceTransaction): boolean {
   if (!staged.dataApplied) {
     return false;
@@ -1378,12 +1408,19 @@ function retainedWaveContinuationIsPublic(staged: CoopStagedWaveAdvanceTransacti
   }
 }
 
-function maybeMarkCoopWaveContinuationReady(wave: number, binding: CoopWaveAdvanceOperationBinding): boolean {
+function maybeMarkCoopWaveContinuationReady(
+  wave: number,
+  binding: CoopWaveAdvanceOperationBinding,
+  phaseOwnedSurface?: CoopPhaseOwnedWaveContinuationSurface,
+): boolean {
   const staged = getCoopStagedWaveAdvanceTransaction(wave, binding);
   if (staged == null) {
     return false;
   }
-  if (!staged.continuationReady && retainedWaveContinuationIsPublic(staged)) {
+  const publicSurface = phaseOwnedSurface == null
+    ? retainedWaveContinuationIsPublic(staged)
+    : phaseOwnedWaveContinuationIsPublic(staged, phaseOwnedSurface);
+  if (!staged.continuationReady && publicSurface) {
     markCoopWaveAdvanceContinuationReady(wave, binding);
     coopLog("progression", `retained WAVE_ADVANCE continuationReady wave=${wave}`);
   }
@@ -1475,7 +1512,10 @@ export function getCoopRetainedWaveContinuationAddress(): CoopRetainedWaveContin
   return getCoopPendingWaveContinuationBoundary(runtime.waveOperationBinding);
 }
 
-export function notifyCoopWaveContinuationSurfaceReady(sourceWave?: number): boolean {
+export function notifyCoopWaveContinuationSurfaceReady(
+  sourceWave?: number,
+  phaseOwnedSurface?: CoopPhaseOwnedWaveContinuationSurface,
+): boolean {
   const runtime = active;
   if (runtime == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
     return false;
@@ -1484,7 +1524,7 @@ export function notifyCoopWaveContinuationSurfaceReady(sourceWave?: number): boo
   if (!Number.isSafeInteger(wave) || wave < 0) {
     return false;
   }
-  return maybeMarkCoopWaveContinuationReady(wave, runtime.waveOperationBinding);
+  return maybeMarkCoopWaveContinuationReady(wave, runtime.waveOperationBinding, phaseOwnedSurface);
 }
 
 /**

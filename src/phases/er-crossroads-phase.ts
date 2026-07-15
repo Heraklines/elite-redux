@@ -406,7 +406,7 @@ export class ErCrossroadsPhase extends Phase {
 
   /** Publish only after the phase's own runtime and scene are installed together. */
   private notifyCoopContinuationSurfaceReady(): void {
-    const notify = () => notifyCoopWaveContinuationSurfaceReady(this.coopSourceWave);
+    const notify = () => notifyCoopWaveContinuationSurfaceReady(this.coopSourceWave, "crossroads");
     if (this.coopOwningRuntime == null) {
       notify();
       return;

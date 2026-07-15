@@ -6,6 +6,7 @@
   "baseSha": "8f13927a5d66e15df6f5984395ccd354c76d3646",
   "allowedFiles": [
     ".github/coop-task-ownership/p33-auto-victory-seal-repair.json",
+    "src/data/elite-redux/coop/coop-runtime.ts",
     "src/phases/er-crossroads-phase.ts",
     "test/tools/coop-duo-harness.ts",
     "test/tools/coop-soak-driver.ts"
