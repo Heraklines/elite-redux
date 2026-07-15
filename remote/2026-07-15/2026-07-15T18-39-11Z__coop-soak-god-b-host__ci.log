@@ -1,0 +1,242 @@
+[log] [coop-soak] SEED=20365444 WAVES=200 - replay this run with:  SOAK_SEED=20365444 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[log] Wave Seed: coop-soak-20365444 0
+[log] %cStart Phase: TitlePhase color:green
+[log] %cStart Phase: EncounterPhase color:green
+[log] %cStart Phase: SummonPhase color:green
+[log] %cStart Phase: ToggleDoublePositionPhase color:green
+[log] %cStart Phase: SummonPhase color:green
+[log] %cStart Phase: CheckSwitchPhase color:green
+[log] %cStart Phase: CheckSwitchPhase color:green
+[log] %cStart Phase: InitEncounterPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] %cStart Phase: ShowAbilityPhase color:green
+[log] %cStart Phase: StatStageChangePhase color:green
+[log] %cStart Phase: MessagePhase color:green
+[log] %cStart Phase: HideAbilityPhase color:green
+[log] %cStart Phase: ShowAbilityPhase color:green
+[log] %cStart Phase: MessagePhase color:green
+[log] %cStart Phase: HideAbilityPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] %cStart Phase: TurnInitPhase color:green
+[log] %cStart Phase: CommandPhase color:green
+[log] [coop:transport] state host connecting -> connected
+[log] [coop:transport] state guest connecting -> connected
+[log] [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[log] [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[log] [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[log] [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[log] [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[log] [coop:turn] host recorder: REGISTER live emitter (was=false)
+[log] [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[log] [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[log] [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[log] [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[log] [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[log] [coop:turn] host recorder: REGISTER live emitter (was=true)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:launch] session connect role=host partnerRole=guest netcode=authoritative username=Host version=er-coop-33 tiebreak=0.6190615308592213
+[log] [coop:transport] send host t=hello role=host v=er-coop-33 epoch=1826960107941274 tiebreak=0.6190615308592213
+[log] [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=6ba757f0b644976c(1107) movesName=7a8dd7bf7aae9d1c(1107) movesets=573b3b198f518a35(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=b01447e38bf0f4c9(1047)
+[log] [coop-fp] local moveMap=e9b828360aafb9e2(1032) movesData=6ba757f0b644976c(1107) movesName=7a8dd7bf7aae9d1c(1107) movesets=573b3b198f518a35(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=b01447e38bf0f4c9(1047)
+[log] [coop:transport] send host t=dataFingerprint fp
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:launch] session connect role=guest partnerRole=host netcode=authoritative username=Guest version=er-coop-33 tiebreak=0.8057189242616319
+[log] [coop:transport] send guest t=hello role=guest v=er-coop-33 epoch=0 tiebreak=0.8057189242616319
+[log] [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=6ba757f0b644976c(1107) movesName=7a8dd7bf7aae9d1c(1107) movesets=573b3b198f518a35(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=b01447e38bf0f4c9(1047)
+[log] [coop-fp] local moveMap=e9b828360aafb9e2(1032) movesData=6ba757f0b644976c(1107) movesName=7a8dd7bf7aae9d1c(1107) movesets=573b3b198f518a35(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=b01447e38bf0f4c9(1047)
+[log] [coop:transport] send guest t=dataFingerprint fp
+[log] [coop:transport] recv guest t=hello role=host v=er-coop-33 epoch=1826960107941274 tiebreak=0.6190615308592213 handlers=1
+[log] [coop:launch] hello recv partner=Host partnerRole=host (local role=guest; no conflict)
+[log] [coop:launch] RUN IDENTITY host-hello-new-epoch-same-run run=606d763a-65b4-4a31-abb6-9a2e83ecebc1 checkpointRev=0
+[log] [coop:launch] EPOCH ADOPT epoch=1826960107941274 from same-run host hello
+[log] [coop:transport] send guest t=hello role=guest v=er-coop-33 epoch=1826960107941274 tiebreak=0.8057189242616319
+[log] [coop:session] capabilities NEGOTIATED local=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:transport] recv guest t=dataFingerprint fp handlers=1
+[log] [coop:checksum] MATCH - data tables identical across clients
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:transport] recv host t=hello role=guest v=er-coop-33 epoch=0 tiebreak=0.8057189242616319 handlers=1
+[log] [coop:launch] hello recv partner=Guest partnerRole=guest (local role=host; no conflict)
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:transport] recv host t=dataFingerprint fp handlers=1
+[log] [coop:checksum] MATCH - data tables identical across clients
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:transport] recv host t=hello role=guest v=er-coop-33 epoch=1826960107941274 tiebreak=0.8057189242616319 handlers=1
+[log] [coop:launch] hello recv partner=Guest partnerRole=guest (local role=host; no conflict)
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] [coop:checksum] capture digest=e566dad4ed37fa61 field=4 biome=0 seed=coop-soak-20365444 weather=0 terrain=0 money=0 party=[890,384,493,150,382,888] partyLevels=[500,500,500,500,500,500] arenaTags=0 modifiers=2 heldItemsDigest=1 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp890/hp2065-2065/st0/ab5258/form0/tera0:3/boss0:0 bi1:sp384/hp1715-1715/st0/ab263/form0/tera0:15/boss0:0 bi2:sp16/hp14-14/st0/ab62/form0/tera0:2/boss0:0 bi3:sp263/hp14-14/st0/ab5109/form0/tera0:0/boss0:0]
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] %cStart Phase: SelectTargetPhase color:green
+[log] [coop:owner] broadcast own-slot fi=0 turn=1 role=host cmd=0
+[log] [coop:relay] broadcastLocalCommand SEND fieldIndex=0 owner=host turn=1 command=0 cursor=3 moveId=85 targets=[2]
+[log] [coop:transport] send host t=command fi=0 owner=host turn=1 cmd=0 cursor=3 move=85
+[log] [coop:transport] recv guest t=command fi=0 owner=host turn=1 cmd=0 cursor=3 move=85 handlers=1
+[log] [coop:relay] recv command fieldIndex=0 turn=1 command=0 -> BUFFERED (no awaiter yet)
+[log] %cStart Phase: CommandPhase color:green
+[log] [coop:battle] CommandPhase slot=1 turn=1 owner=guest role=host -> partner path
+[log] [coop:relay] host requestPartnerCommand SEND fieldIndex=1 turn=1 moveSlots=[0,1,2,3] (awaiting peer)
+[log] [coop:transport] send host t=commandRequest fi=1 owner=guest turn=1 slots=4
+[log] [coop:transport] recv guest t=commandRequest fi=1 owner=guest turn=1 slots=4 handlers=1
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:relay] peer recv commandRequest fieldIndex=1 owner=guest turn=1 moveSlots=[0,1,2,3] -> reply command=2 cursor=3 moveId=-
+[log] [coop:transport] send guest t=command fi=1 owner=guest turn=1 cmd=2 cursor=3 move=-
+[log] [coop:transport] recv host t=command fi=1 owner=guest turn=1 cmd=2 cursor=3 move=- handlers=1
+[log] [coop:relay] recv command fieldIndex=1 turn=1 command=2 -> resolved awaiting request
+[log] %cStart Phase: EnemyCommandPhase color:green
+[log] %cStart Phase: EnemyCommandPhase color:green
+[log] %cStart Phase: TurnStartPhase color:green
+[log] [coop-diag] turn-start authoritative guard mode=authoritative role=host turn=1 diverts=false
+[log] [coop:turn] host recorder: begin turn=1 (no prior open recording)
+[log] %cStart Phase: SwitchSummonPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] [coop:turn] host recorder: append turn=1 seq=0 k=message total=1 live=true
+[log] %cStart Phase: ShowAbilityPhase color:green
+[log] %cStart Phase: CommonAnimPhase color:green
+[log] %cStart Phase: MessagePhase color:green
+[log] %cStart Phase: HideAbilityPhase color:green
+[log] %cStart Phase: MovePhase color:green
+[log] [coop:turn] host recorder: append turn=1 seq=1 k=moveUsed total=2 live=true
+[log] %cStart Phase: MessagePhase color:green
+[log] %cStart Phase: MoveEffectPhase color:green
+[log] [coop:turn] host recorder: append turn=1 seq=2 k=hp total=3 live=true
+[log] [coop:turn] host recorder: append turn=1 seq=3 k=faint total=4 live=true
+[log] [coop:turn] host recorder: append turn=1 seq=4 k=message total=5 live=true
+[log] %cStart Phase: DamageAnimPhase color:green
+[log] %cStart Phase: MessagePhase color:green
+[log] %cStart Phase: FaintPhase color:green
+[log] %cStart Phase: MessagePhase color:green
+[log] %cStart Phase: VictoryPhase color:green
+[log] [coop:progression] HOST applyPartyExp COMPUTE wave=1 expValue=21 koMon=Pidgey
+[log] %cStart Phase: MoveEndPhase color:green
+[log] [coop:turn] host recorder: append turn=1 seq=5 k=hp total=6 live=true
+[log] [coop:turn] host recorder: append turn=1 seq=6 k=message total=7 live=true
+[log] %cStart Phase: DamageAnimPhase color:green
+[log] %cStart Phase: MessagePhase color:green
+[log] %cStart Phase: MovePhase color:green
+[log] [coop:turn] host recorder: append turn=1 seq=7 k=moveUsed total=8 live=true
+[log] %cStart Phase: MessagePhase color:green
+[log] %cStart Phase: MoveEffectPhase color:green
+[log] [coop:turn] host recorder: append turn=1 seq=8 k=hp total=9 live=true
+[log] %cStart Phase: DamageAnimPhase color:green
+[log] %cStart Phase: MoveEndPhase color:green
+[log] %cStart Phase: MovePhase color:green
+[log] %cStart Phase: MoveEndPhase color:green
+[log] %cStart Phase: CheckInterludePhase color:green
+[log] %cStart Phase: WeatherEffectPhase color:green
+[log] %cStart Phase: PositionalTagPhase color:green
+[log] %cStart Phase: BerryPhase color:green
+[log] %cStart Phase: CheckStatusEffectPhase color:green
+[log] %cStart Phase: TurnEndPhase color:green
+[log] [coop:turn] host recorder: finalize turn=1 events=9 seq=9
+[log] [coop:checkpoint] build field=4 weather=0/0 terrain=4/7 arenaTags=0 money=0 mons=[bi0:sp890/hp2061-2065/st0/fnt0 bi1:sp150/hp1723-1725/st0/fnt0 bi2:sp16/hp0-14/st7/fnt1 bi3:sp263/hp14-14/st0/fnt0]
+[log] [coop:checkpoint] host capture field=4 weather=0 terrain=4 money=0 arenaTags=0 mons=[bi0:sp890/hp2061-2065/st0/fnt0 bi1:sp150/hp1723-1725/st0/fnt0 bi2:sp16/hp0-14/st7/fnt1 bi3:sp263/hp14-14/st0/fnt0]
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] [coop:replay] host SEND turnResolution e=1826960107941274 wave=1 turn=1 rev=3 events=9 checksum=184737fe61f5ddc8
+[log] [coop:transport] send host t=turnResolution e=1826960107941274 wave=1 turn=1 rev=3 events=9 checksum=184737fe61f5ddc8
+[log] [coop:transport] recv guest t=turnResolution e=1826960107941274 wave=1 turn=1 rev=3 events=9 checksum=184737fe61f5ddc8 handlers=1
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] %cStart Phase: PokemonHealPhase color:green
+[log] %cStart Phase: MessagePhase color:green
+[log] %cStart Phase: TurnInitPhase color:green
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:transport] recv host t=rendezvous point=cmd:1:2 handlers=1
+[log] [coop:rendezvous] RECV arrival point=cmd:1:2 -> BUFFER (no waiter yet) role=host
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:transport] recv host t=rendezvous point=cmd:1:2 handlers=1
+[log] [coop:rendezvous] RECV arrival point=cmd:1:2 -> DUPLICATE (already seen) role=host
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] %cStart Phase: CommandPhase color:green
+[log] [coop:rendezvous] ARRIVE point=cmd:1:2 (send) role=host
+[log] [coop:transport] send host t=rendezvous point=cmd:1:2
+[log] [coop:rendezvous] next-command barrier cmd:1:2 SYNC pass (partner already arrived)
+[log] [coop:transport] recv guest t=rendezvous point=cmd:1:2 handlers=1
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] [coop:interaction] interactionCounter() read -> 0 (role=guest)

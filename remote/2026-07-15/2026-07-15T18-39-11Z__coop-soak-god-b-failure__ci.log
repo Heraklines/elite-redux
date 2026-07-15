@@ -1,0 +1,330 @@
+{
+  "invariant": "no-park",
+  "seed": 20365444,
+  "wave": 1,
+  "detail": "wave driving threw (strand/stall): client phase drive to guest command 1:2 HANG on TitlePhase; queued=[], ui=TITLE",
+  "replay": "SOAK_SEED=20365444",
+  "phaseState": {
+    "hostPhase": "CommandPhase",
+    "guestPhase": "TitlePhase",
+    "hostInteractionCounter": 0,
+    "guestInteractionCounter": 0,
+    "hostWave": 1,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 1424749567,
+        "battlerIndex": -1,
+        "speciesId": 890,
+        "speciesName": "Eternatus",
+        "hp": 2065,
+        "maxHp": 2065,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          2,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 1922961403,
+        "battlerIndex": -1,
+        "speciesId": 150,
+        "speciesName": "Mewtwo",
+        "hp": 1723,
+        "maxHp": 1725,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 1292114401,
+        "battlerIndex": -1,
+        "speciesId": 16,
+        "speciesName": "Pidgey",
+        "hp": 0,
+        "maxHp": 14,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 314,
+            "ppUsed": 0
+          },
+          {
+            "id": 211,
+            "ppUsed": 0
+          },
+          {
+            "id": 28,
+            "ppUsed": 0
+          },
+          {
+            "id": 64,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 3057440265,
+        "battlerIndex": -1,
+        "speciesId": 263,
+        "speciesName": "Zigzagoon",
+        "hp": 14,
+        "maxHp": 14,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 45,
+            "ppUsed": 0
+          },
+          {
+            "id": 38,
+            "ppUsed": 0
+          },
+          {
+            "id": 707,
+            "ppUsed": 1
+          },
+          {
+            "id": 300,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 1424749567,
+        "battlerIndex": 0,
+        "speciesId": 890,
+        "speciesName": "Eternatus",
+        "hp": 2061,
+        "maxHp": 2065,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          2,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 1922961403,
+        "battlerIndex": 1,
+        "speciesId": 150,
+        "speciesName": "Mewtwo",
+        "hp": 1723,
+        "maxHp": 1725,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 1292114401,
+        "battlerIndex": 2,
+        "speciesId": 16,
+        "speciesName": "Pidgey",
+        "hp": 0,
+        "maxHp": 14,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 314,
+            "ppUsed": 0
+          },
+          {
+            "id": 211,
+            "ppUsed": 0
+          },
+          {
+            "id": 28,
+            "ppUsed": 0
+          },
+          {
+            "id": 64,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 3057440265,
+        "battlerIndex": 3,
+        "speciesId": 263,
+        "speciesName": "Zigzagoon",
+        "hp": 14,
+        "maxHp": 14,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 45,
+            "ppUsed": 0
+          },
+          {
+            "id": 38,
+            "ppUsed": 0
+          },
+          {
+            "id": 707,
+            "ppUsed": 1
+          },
+          {
+            "id": 300,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20365444 preseeded=false",
+    "wave 1: host slot move=85 guest slot move=53",
+    "wave 1 turn 1: guest SWITCH -> party[3]",
+    "wave 1 turn 1: progress enemyHp=[16:0/14,263:14/14] playerHp=[890:2061/2065,150:1723/1725]"
+  ]
+}
