@@ -319,7 +319,7 @@ export function rebroadcastCoopWaveStartAuthorityAfterEntryEffects(): CoopCheckp
     if (sentState === undefined) {
       failCoopSharedSession(`The host reached wave ${wave} commands without a complete encounter bootstrap.`, {
         boundary: "surface",
-        reasonCode: "authority-missing",
+        reasonCode: "invalid-authority",
         wave,
         turn: battle.turn,
       });
@@ -345,7 +345,7 @@ export function rebroadcastCoopWaveStartAuthorityAfterEntryEffects(): CoopCheckp
     if (carrier == null) {
       failCoopSharedSession(`The host could not capture settled command authority for wave ${wave}.`, {
         boundary: "surface",
-        reasonCode: "authority-missing",
+        reasonCode: "capture-failed",
         wave,
         turn: battle.turn,
       });
@@ -363,7 +363,7 @@ export function rebroadcastCoopWaveStartAuthorityAfterEntryEffects(): CoopCheckp
     if (retained == null) {
       failCoopSharedSession(`The host could not retain settled command authority for wave ${wave}.`, {
         boundary: "surface",
-        reasonCode: "authority-missing",
+        reasonCode: "invalid-authority",
         wave,
         turn: battle.turn,
       });
@@ -378,11 +378,13 @@ export function rebroadcastCoopWaveStartAuthorityAfterEntryEffects(): CoopCheckp
   } catch (error) {
     coopWarn("stream", "host failed to retain post-summon command-start authority", error);
     const battle = globalScene.currentBattle;
+    const wave = battle?.waveIndex;
+    const turn = battle?.turn;
     failCoopSharedSession("The host could not publish the next shared command boundary.", {
       boundary: "surface",
-      reasonCode: "authority-missing",
-      wave: battle?.waveIndex,
-      turn: battle?.turn,
+      reasonCode: "capture-failed",
+      ...(wave === undefined ? {} : { wave }),
+      ...(turn === undefined ? {} : { turn }),
     });
     return null;
   }
