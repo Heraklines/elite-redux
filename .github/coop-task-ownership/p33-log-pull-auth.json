@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "taskId": "p33-log-pull-auth",
+  "branch": "ci/coop/p33-log-pull-auth",
+  "trainRef": "ci/coop/p33-closure-codex",
+  "baseSha": "07bdf49bd4bb5be39027b35de191e04ccfabad05",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-log-pull-auth.json",
+    "scripts/pull-dev-logs.mjs",
+    "test/scripts/pull-dev-logs.test.mjs"
+  ]
+}
