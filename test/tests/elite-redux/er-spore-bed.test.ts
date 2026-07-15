@@ -35,7 +35,7 @@ describe.skipIf(!RUN)("ER Spore Bed (5902) — Infestation entry trap", () => {
 
   it("lays an ER Infestation trap on the opposing side on entry, without catching the already-present foe", async () => {
     game.override.enemySpecies(SpeciesId.MAGIKARP);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
 
     const trap = game.scene.arena.getTagOnSide(ArenaTagType.ER_INFESTATION_TRAP, ArenaTagSide.ENEMY);
     expect(trap).toBeInstanceOf(ErEntryTrapTag);
@@ -45,7 +45,7 @@ describe.skipIf(!RUN)("ER Spore Bed (5902) — Infestation entry trap", () => {
 
   it("catches the next GROUNDED opposing switch-in with Infestation, then is spent (one-use)", async () => {
     game.override.enemySpecies(SpeciesId.MAGIKARP);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
 
     const enemy = game.field.getEnemyPokemon();
     const trap = game.scene.arena.getTagOnSide(ArenaTagType.ER_INFESTATION_TRAP, ArenaTagSide.ENEMY) as ErEntryTrapTag;
@@ -68,7 +68,7 @@ describe.skipIf(!RUN)("ER Spore Bed (5902) — Infestation entry trap", () => {
   it("does NOT catch an ungrounded (Flying) switch-in, and stays armed", async () => {
     // Pidgey is Normal/Flying → ungrounded → immune to a grounded-only entry trap.
     game.override.enemySpecies(SpeciesId.PIDGEY);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
 
     const enemy = game.field.getEnemyPokemon();
     const trap = game.scene.arena.getTagOnSide(ArenaTagType.ER_INFESTATION_TRAP, ArenaTagSide.ENEMY) as ErEntryTrapTag;

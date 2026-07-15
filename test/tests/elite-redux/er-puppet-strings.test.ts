@@ -40,7 +40,7 @@ describe.skipIf(!RUN)("ER Puppet Strings (5901) + Commanded volatile", () => {
     // slower, so on turn 1 the player's Psychic Commands it, then the enemy acts
     // Commanded within the same turn.
     game.override.ability(PUPPET_STRINGS).enemySpecies(SpeciesId.SNORLAX).enemyStatusEffect(StatusEffect.POISON);
-    await game.classicMode.startBattle([SpeciesId.ELECTRODE]);
+    await game.classicMode.startBattle(SpeciesId.ELECTRODE);
 
     const player = game.field.getPlayerPokemon();
     const enemy = game.field.getEnemyPokemon();
@@ -57,7 +57,7 @@ describe.skipIf(!RUN)("ER Puppet Strings (5901) + Commanded volatile", () => {
 
   it("only Commands once per switch-in; resets on switch-out", async () => {
     game.override.ability(PUPPET_STRINGS).enemySpecies(SpeciesId.SNORLAX).enemyStatusEffect(StatusEffect.POISON);
-    await game.classicMode.startBattle([SpeciesId.ELECTRODE]);
+    await game.classicMode.startBattle(SpeciesId.ELECTRODE);
 
     const player = game.field.getPlayerPokemon();
     const enemy = game.field.getEnemyPokemon();
@@ -96,7 +96,7 @@ describe.skipIf(!RUN)("ER Puppet Strings (5901) + Commanded volatile", () => {
     // the enemy uses Harden (a self-buff that never touches the player — note Splash is
     // a DAMAGING move in ER, so it can't be used here).
     game.override.ability(AbilityId.BALL_FETCH).enemySpecies(SpeciesId.MAGIKARP).enemyMoveset(MoveId.HARDEN);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
 
     const player = game.field.getPlayerPokemon();
     const enemy = game.field.getEnemyPokemon();
@@ -152,7 +152,7 @@ describe.skipIf(!RUN)("ER Puppet Strings (5901) + Commanded volatile", () => {
 
   it("a Commanded status move simply fails", async () => {
     game.override.ability(AbilityId.BALL_FETCH).enemySpecies(SpeciesId.MAGIKARP).enemyMoveset(MoveId.HARDEN);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
 
     const player = game.field.getPlayerPokemon();
     const enemy = game.field.getEnemyPokemon();
