@@ -18,6 +18,7 @@
     "scripts/pull-dev-logs.mjs",
     "scripts/run-coop-browser-transport.mjs",
     "src/battle-scene.ts",
+    "src/phase-manager.ts",
     "src/data/elite-redux/coop/**",
     "src/data/elite-redux/er-custom-trainer-bst-flag.ts",
     "src/data/elite-redux/er-custom-trainers.json",
