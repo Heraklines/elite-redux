@@ -130,6 +130,11 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   protected type1Icon: Phaser.GameObjects.Sprite;
   protected type2Icon: Phaser.GameObjects.Sprite;
   protected type3Icon: Phaser.GameObjects.Sprite;
+  /**
+   * ER N-type substrate: icons for a 4th+ type (Primal Regigigas is sextuple-typed).
+   * Created lazily so a mon with ≤3 types renders byte-identically to before.
+   */
+  protected extraTypeIcons: Phaser.GameObjects.Sprite[] = [];
   protected expBar: Phaser.GameObjects.Image;
 
   public expMaskRect: Phaser.GameObjects.Graphics;
@@ -641,8 +646,9 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
    * Update the type icons to match the pokemon's types
    */
   setTypes(types: PokemonType[]): void {
+    const key = `pbinfo_${this.player ? "player" : "enemy"}`;
     this.type1Icon
-      .setTexture(`pbinfo_${this.player ? "player" : "enemy"}_type${types.length > 1 ? "1" : ""}`)
+      .setTexture(`${key}_type${types.length > 1 ? "1" : ""}`)
       .setFrame(PokemonType[types[0]].toLowerCase());
     this.type2Icon.setVisible(types.length > 1);
     this.type3Icon.setVisible(types.length > 2);
@@ -651,6 +657,28 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
     }
     if (types.length > 2) {
       this.type3Icon.setFrame(PokemonType[types[2]].toLowerCase());
+    }
+    // ER N-type substrate: lay out a 4th+ type icon in the row started by
+    // type3Icon (continuing outward on the same stride/axis as type3 vs type1),
+    // so a sextuple-typed mon shows all six. Icons are pooled per-slot.
+    const dx = this.type3Icon.x - this.type1Icon.x;
+    const dy = this.type3Icon.y - this.type1Icon.y;
+    for (let i = 3; i < types.length; i++) {
+      let icon = this.extraTypeIcons[i - 3];
+      if (!icon) {
+        icon = globalScene.add
+          .sprite(0, 0, `${key}_type`)
+          .setName(`icon_type_${i + 1}`)
+          .setOrigin(0);
+        this.extraTypeIcons[i - 3] = icon;
+        this.add(icon);
+      }
+      icon.setPosition(this.type3Icon.x + dx * (i - 2), this.type3Icon.y + dy * (i - 2));
+      icon.setFrame(PokemonType[types[i]].toLowerCase());
+      icon.setVisible(true);
+    }
+    for (let i = Math.max(0, types.length - 3); i < this.extraTypeIcons.length; i++) {
+      this.extraTypeIcons[i].setVisible(false);
     }
   }
 

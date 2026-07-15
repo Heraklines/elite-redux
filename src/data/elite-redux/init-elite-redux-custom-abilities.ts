@@ -61,6 +61,13 @@ import {
 import { ER_SILKEN_DECREE_ABILITY_ID, SilkenDecreeAbAttr } from "#data/elite-redux/abilities/silken-decree";
 import { ER_SPORE_BED_ABILITY_ID } from "#data/elite-redux/abilities/spore-bed";
 import { ER_TANGLED_SEED_ABILITY_ID, TangledSeedAbAttr } from "#data/elite-redux/abilities/tangled-seed";
+import {
+  ER_WORLD_IN_PIECES_ABILITY_ID,
+  WorldInPiecesRemoveTypeAbAttr,
+  WorldInPiecesRestoreAbAttr,
+  WorldInPiecesSpeedAbAttr,
+  WorldInPiecesSummonAbAttr,
+} from "#data/elite-redux/abilities/world-in-pieces";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
 import { EntryTrapOnFoeSideAbAttr } from "#data/elite-redux/archetypes/entry-trap-on-foe-side";
@@ -392,6 +399,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_CHIVALRY_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_WORLD_IN_PIECES_ABILITY_ID,
+        name: "World in Pieces",
+        description:
+          "This Pokemon is Normal/Rock/Ice/Steel/Electric/Dragon. The first direct hit each turn strips one non-Normal type after it lands; each missing type grants +20% Speed. Every KO it scores restores one type.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_WORLD_IN_PIECES_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -648,6 +665,13 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_CHIVALRY_ABILITY_ID) {
     builder.attr(ChivalryAbAttr);
+  }
+
+  if (pokerogueId === ER_WORLD_IN_PIECES_ABILITY_ID) {
+    builder.attr(WorldInPiecesSummonAbAttr);
+    builder.attr(WorldInPiecesRemoveTypeAbAttr);
+    builder.attr(WorldInPiecesSpeedAbAttr);
+    builder.attr(WorldInPiecesRestoreAbAttr);
   }
 
   const ability = builder.build();

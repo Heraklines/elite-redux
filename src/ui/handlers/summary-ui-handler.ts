@@ -1126,10 +1126,9 @@ export class SummaryUiHandler extends UiHandler {
         };
 
         const types = this.pokemon?.getTypes(false, false, true, false)!; // TODO: is this bang correct?
-        profileContainer.add(getTypeIcon(0, types[0]));
-        if (types.length > 1) {
-          profileContainer.add(getTypeIcon(1, types[1]));
-        }
+        // ER N-type substrate: lay out ALL types (a Primal Regigigas is sextuple-
+        // typed) on the existing 34px stride, not just the first two.
+        types.forEach((type, index) => profileContainer.add(getTypeIcon(index, type)));
 
         if (this.pokemon?.getLuck()) {
           const luckLabelText = addTextObject(
