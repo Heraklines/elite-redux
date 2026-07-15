@@ -24,6 +24,7 @@ const COOP_NEW_BIOME_END_WATCHDOG_MS = 5_000;
 export class NewBiomeEncounterPhase extends EncounterPhase {
   public readonly phaseName = "NewBiomeEncounterPhase";
   private coopPermitRecoveryShown = false;
+  private coopPresentationRecoveryShown = false;
   private coopGeneration = -1;
   private coopWave = -1;
   private coopBattle: typeof globalScene.currentBattle | null = null;
@@ -42,6 +43,7 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
   private coopCompleted = false;
   private coopInteractivePresentationPending = false;
   private coopPermitRecoveryAttempts = 0;
+  private coopPresentationRecoveryAttempts = 0;
   private coopIntroTimer: ReturnType<typeof setTimeout> | null = null;
   private coopTerminalTimer: ReturnType<typeof setTimeout> | null = null;
   private coopEndTimer: ReturnType<typeof setTimeout> | null = null;
@@ -89,6 +91,14 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
       super.start();
       return;
     }
+    this.beginAuthoritativeGuestPresentation();
+  }
+
+  /** Retry only the already-authorized presentation seam; never reacquire its retained permit/carrier. */
+  private beginAuthoritativeGuestPresentation(): void {
+    if (this.coopPresentationPreparing || !this.coopBoundaryStillLive()) {
+      return;
+    }
     this.coopPresentationPreparing = true;
     void this.prepareCoopAuthoritativeGuestPresentationOnly(() => this.startGuestPresentation()).catch(error => {
       if (!this.coopBoundaryStillLive()) {
@@ -96,7 +106,7 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
       }
       coopWarn("runtime", "NewBiome authoritative carrier/presentation preparation failed closed", error);
       this.coopPresentationPreparing = false;
-      this.parkForAuthoritativePermit(() => this.start());
+      this.parkForAuthoritativePresentation(() => this.beginAuthoritativeGuestPresentation());
     });
   }
 
@@ -412,6 +422,54 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
         this.coopPermitRecoveryShown = false;
         coopWarn("runtime", "NewBiome recovery surface failed to open", error);
         this.parkForAuthoritativePermit(retry);
+      });
+  }
+
+  /** A transient atlas/UI failure retains the adopted carrier and retries presentation only. */
+  private parkForAuthoritativePresentation(retry: () => void): void {
+    if (this.coopPresentationRecoveryShown || !this.coopBoundaryStillLive()) {
+      return;
+    }
+    this.coopPresentationRecoveryAttempts++;
+    if (this.coopPresentationRecoveryAttempts > 2) {
+      failCoopSharedSession(
+        `The authoritative new-biome presentation remained incomplete after bounded recovery at wave ${this.coopWave}.`,
+      );
+      return;
+    }
+    this.coopPresentationRecoveryShown = true;
+    void globalScene.ui
+      .setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.coopBoundaryStillLive())
+      .then(result => {
+        if (!this.coopBoundaryStillLive()) {
+          return;
+        }
+        if (result === "superseded") {
+          this.coopPresentationRecoveryShown = false;
+          this.parkForAuthoritativePresentation(retry);
+          return;
+        }
+        globalScene.ui.showText(
+          "Could not render the shared new-biome encounter. Confirm to retry.",
+          null,
+          () => {
+            if (!this.coopBoundaryStillLive()) {
+              return;
+            }
+            this.coopPresentationRecoveryShown = false;
+            retry();
+          },
+          null,
+          true,
+        );
+      })
+      .catch(error => {
+        if (!this.coopBoundaryStillLive()) {
+          return;
+        }
+        this.coopPresentationRecoveryShown = false;
+        coopWarn("runtime", "NewBiome presentation recovery surface failed to open", error);
+        this.parkForAuthoritativePresentation(retry);
       });
   }
 

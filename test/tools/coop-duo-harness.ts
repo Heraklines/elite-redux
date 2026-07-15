@@ -1514,6 +1514,11 @@ export async function driveClientPhaseQueueTo(
       continue;
     }
 
+    // The production browser's atlas loader populates renderer caches for every newly materialized
+    // battler. A long-running headless journey creates fresh enemy objects after buildDuo's initial
+    // installation, so refresh the completion model at each real phase boundary before that phase can
+    // exercise the exact launch-ready gate. This wraps only newly seen Pokemon and remains idempotent.
+    installHeadlessPlayerAtlasCompletionModel(scene);
     phase.start();
     const deadline = Date.now() + perPhaseTimeoutMs;
     while (scene.phaseManager.getCurrentPhase() === phase) {
@@ -2947,6 +2952,10 @@ export async function buildDuoForMe(
   await withClient(guestCtx, () => {
     toCoopGameMode(guestScene);
     mirrorHostMeToGuest(hostScene, guestScene);
+    // Mystery rigs are a separate construction path from buildDuo. They still cross ordinary biome
+    // transitions after the embedded encounter, so install the same production-shaped renderer cache
+    // completion model before the first retained transition tail can run.
+    installHeadlessPlayerAtlasCompletionModel(guestScene);
     const gf = guestScene.getPlayerField();
     gf[0].coopOwner = "host";
     gf[1].coopOwner = "guest";

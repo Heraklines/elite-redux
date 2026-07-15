@@ -380,6 +380,7 @@ test("the short public journey advances readiness-proven narration before pollin
 
   assert.deepEqual(await DuoPublicUiRig.prototype.waitForPostTurnOutcome.call(rig, { authority: 0, renderer: 0 }), {
     kind: "command",
+    client: authority,
   });
   assert.deepEqual(
     authority.presses.map(entry => entry.key),

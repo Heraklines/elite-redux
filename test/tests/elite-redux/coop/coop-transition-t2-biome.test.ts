@@ -1205,7 +1205,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       phase.coopAuthoritativeGuest = true;
       phase.coopBoundaryStillLive = () => true;
       const replacement = {} as ReturnType<typeof rig.hostScene.phaseManager.getCurrentPhase>;
-      vi.spyOn(rig.hostScene.phaseManager, "getCurrentPhase").mockReturnValue(replacement);
+      vi.spyOn(rig.hostScene.phaseManager, "getCurrentPhase").mockReturnValueOnce(replacement);
       phase.shiftCoopAuthoritativeGuestPresentationOnly = () => {
         throw new Error("synthetic next phase start failure after queue install");
       };
@@ -1214,6 +1214,11 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       expect(phase.coopCompleted, "the exact consumed permit is retired before terminal teardown").toBe(true);
       expect(getCoopBiomeTransitionTailPermit()).toBeNull();
       expect(getCoopRuntime(), "the installed-but-failed next phase cannot leave shared play half-alive").toBeNull();
+      expect(
+        rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
+        "terminal teardown replaces a lifetime-fenced retained phase without calling its stale end hook",
+      ).toBe("TitlePhase");
+      expect(rig.hostScene.phaseManager.getQueuedPhaseNames()).toEqual([]);
     });
   }, 120_000);
 
@@ -1277,6 +1282,35 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       expect(assetReady).not.toHaveBeenCalled();
       assetSpies.forEach(spy => spy.mockRestore());
       assetCurrent.mockRestore();
+
+      const presentationRetry = new NewBiomeEncounterPhase() as unknown as {
+        coopPresentationPreparing: boolean;
+        coopBoundaryStillLive(requirePermit?: boolean): boolean;
+        prepareCoopAuthoritativeGuestPresentationOnly(onReady: () => void | Promise<void>): Promise<void>;
+        parkForAuthoritativePresentation(retry: () => void): void;
+        beginAuthoritativeGuestPresentation(): void;
+        start(): void;
+      };
+      presentationRetry.coopBoundaryStillLive = () => true;
+      const preparePresentation = vi
+        .spyOn(presentationRetry, "prepareCoopAuthoritativeGuestPresentationOnly")
+        .mockRejectedValueOnce(new Error("synthetic first atlas completion failure"))
+        .mockResolvedValueOnce();
+      let retryPresentation: (() => void) | null = null;
+      vi.spyOn(presentationRetry, "parkForAuthoritativePresentation").mockImplementation(retry => {
+        retryPresentation = retry;
+      });
+      const reenterStart = vi.spyOn(presentationRetry, "start");
+      presentationRetry.beginAuthoritativeGuestPresentation();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(preparePresentation).toHaveBeenCalledOnce();
+      expect(presentationRetry.coopPresentationPreparing).toBe(false);
+      expect(retryPresentation).toBeTypeOf("function");
+      retryPresentation?.();
+      await Promise.resolve();
+      expect(preparePresentation).toHaveBeenCalledTimes(2);
+      expect(reenterStart, "presentation recovery never re-enters permit acquisition").not.toHaveBeenCalled();
 
       vi.useFakeTimers();
       try {

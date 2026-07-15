@@ -2528,13 +2528,14 @@ function finalizeCoopSharedTerminal(runtime: CoopRuntime, endAuthenticatedRun: b
   }
   try {
     releaseCoopTerminalPhaseProgression();
-    const interruptedPhase = globalScene.phaseManager.getCurrentPhase();
     clearCoopRuntime();
     globalScene.reset();
+    // A retained phase deliberately refuses end() once clearCoopRuntime invalidates its generation.
+    // Terminal teardown owns progression now: discard every gameplay tail, install exactly one title,
+    // and shift directly instead of asking stale phase-specific end hooks to advance the queue.
+    globalScene.phaseManager.clearAllPhases();
     globalScene.phaseManager.unshiftNew("TitlePhase");
-    if (globalScene.phaseManager.getCurrentPhase() === interruptedPhase) {
-      interruptedPhase?.end();
-    }
+    globalScene.phaseManager.shiftPhase();
   } catch {
     // Engine-free relay tests and pre-scene failures still terminate the runtime/control plane.
     clearCoopRuntime();

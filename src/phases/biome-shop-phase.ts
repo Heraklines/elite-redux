@@ -54,6 +54,7 @@ import {
   getCoopInteractionRelay,
   getCoopRuntime,
   notifyCoopWaveContinuationSurfaceReady,
+  runWhenCoopRuntimeActive,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_BIOME_SHOP_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { erRecordBiomeShopPurchase, erRecordBlackMarketPurchase } from "#data/elite-redux/er-achievement-detection";
@@ -84,6 +85,8 @@ export function setCoopBiomeMarketTestSkip(on: boolean): void {
 }
 
 export class BiomeShopPhase extends SelectModifierPhase {
+  /** Runtime that owns this market, retained across async UI/relay continuations. */
+  private readonly coopBiomeOwningRuntime = getCoopRuntime();
   /** The shop stock. `protected` so event-specific shops (e.g. ExoticShopPhase)
    * can override buildStock() to supply their own curated goods. */
   protected shopOptions: ModifierTypeOption[] = [];
@@ -333,7 +336,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         if (result === "completed") {
           // A retained wave is not continuation-safe merely because its biome-market phase exists.
           // Release the source transaction only after the real public BIOME_SHOP handler committed.
-          notifyCoopWaveContinuationSurfaceReady(this.coopSourceAddress?.wave);
+          this.notifyCoopBiomeContinuationSurfaceReady();
           return;
         }
         if (result === "superseded" && this.coopBoundaryStillLive(generation, wave)) {
@@ -890,7 +893,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
     // The watcher never opens BIOME_SHOP, so its equivalent executable continuation is the fully
     // materialized stock plus the live terminal-consumer loop. Record readiness only after option
     // authority has been resolved; phase construction or the initial waiting message is too early.
-    notifyCoopWaveContinuationSurfaceReady(this.coopSourceAddress?.wave);
+    this.notifyCoopBiomeContinuationSurfaceReady();
     const seq = coopBiomeShopSeq(this.coopBiomeStart);
     this.coopRewardOperationBinding ??= captureCoopRewardOperationBinding();
     let missingTerminalAttempts = 0;
@@ -1051,6 +1054,16 @@ export class BiomeShopPhase extends SelectModifierPhase {
     }
     globalScene.ui.clearText();
     this.finishCoopBiomeShopLeave();
+  }
+
+  /** Publish readiness only while this phase's scene and runtime are installed together. */
+  private notifyCoopBiomeContinuationSurfaceReady(): void {
+    const notify = () => notifyCoopWaveContinuationSurfaceReady(this.coopSourceAddress?.wave);
+    if (this.coopBiomeOwningRuntime == null) {
+      notify();
+      return;
+    }
+    runWhenCoopRuntimeActive(this.coopBiomeOwningRuntime, notify);
   }
 
   /** Never let a market continue against locally generated stock after authority was lost. */
