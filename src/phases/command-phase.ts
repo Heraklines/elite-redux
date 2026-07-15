@@ -624,11 +624,30 @@ export class CommandPhase extends FieldPhase {
       return;
     }
 
-    if (this.tryExecuteQueuedMove()) {
+    const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
+    const coopSlotOwner = coopController == null ? null : coopOwnerOfPlayerFieldSlot(this.fieldIndex);
+    const isLocalCoopSlot = coopController != null && coopSlotOwner === coopController.role;
+    const isAuthoritativeGuestPartnerSlot =
+      coopController?.role === "guest"
+      && getCoopNetcodeMode() === "authoritative"
+      && coopSlotOwner !== coopController.role;
+
+    // An authoritative guest must classify the host-owned slot as renderer-only BEFORE consulting the
+    // checkpoint-carried move queue. Otherwise a host recharge sentinel can execute on the guest engine.
+    if (isAuthoritativeGuestPartnerSlot && this.tryCoopAutoResolve()) {
       return;
     }
 
-    if (this.tryCoopAutoResolve()) {
+    // Forced/queued commands on THIS client's owned slot still represent arrival at the reciprocal command
+    // boundary. Do not execute them before the barrier: Meteor Assault/Hyper Beam leaves MoveId.NONE queued,
+    // and the old ordering skipped the guest's arrival while the host remained sealed at cmd:<wave>:<turn>.
+    // Partner slots retain the legacy authoritative ordering so the host can execute a forced partner action
+    // directly instead of asking the peer to choose an action that is not actually selectable.
+    if (!isLocalCoopSlot && this.tryExecuteQueuedMove()) {
+      return;
+    }
+
+    if (!isLocalCoopSlot && this.tryCoopAutoResolve()) {
       return;
     }
 
@@ -644,7 +663,7 @@ export class CommandPhase extends FieldPhase {
       // SYNC fast-path: solo / spoof / no rendezvous / partner-half-exhausted / partner ALREADY at this
       // command point. Open immediately - deferring behind a `.then` when there is nothing to wait for
       // reorders the UI open by a microtask for no reason (solo must stay byte-identical).
-      this.openOwnCommandUi();
+      this.enterOwnCommandBoundary();
       return;
     }
     void pendingBarrier.then(crossed => {
@@ -655,9 +674,16 @@ export class CommandPhase extends FieldPhase {
         // arrival that releases us. Re-consume at the crossed boundary so entry stat stages/weather/forms
         // land before public input opens, instead of leaving the refreshed carrier buffered until too late.
         this.tryCoopCheckpointSync();
-        this.openOwnCommandUi();
+        this.enterOwnCommandBoundary();
       }
     });
+  }
+
+  /** Execute a forced owned-slot action only after the reciprocal command boundary, else open its UI. */
+  private enterOwnCommandBoundary(): void {
+    if (!this.tryExecuteQueuedMove()) {
+      this.openOwnCommandUi();
+    }
   }
 
   /**

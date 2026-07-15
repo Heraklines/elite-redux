@@ -30,7 +30,9 @@ import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
+import { MoveUseMode } from "#enums/move-use-mode";
 import { SpeciesId } from "#enums/species-id";
+import { CommandPhase } from "#phases/command-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   arriveGuestCommandBoundary,
@@ -133,6 +135,54 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
     const hr = await hostBarrier;
     expect(hostCrossed, "the leader proceeds once the follower arrived").toBe(true);
     expect(hr.timedOut, "both reached the barrier - no anti-hang timeout needed").toBe(false);
+
+    logs.flush();
+  }, 120_000);
+
+  // ===========================================================================================
+  // A forced local action (recharge / two-turn continuation) is still a REAL command boundary.
+  // The production regression skipped the barrier because tryExecuteQueuedMove ran first: the guest
+  // shipped MoveId.NONE and entered replay while the host stayed sealed waiting for its arrival.
+  // ===========================================================================================
+  it("an owned queued recharge crosses the command barrier before it auto-commits", async () => {
+    setCoopRendezvousWaitMs(60_000);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+
+    const wave = rig.guestScene.currentBattle.waveIndex;
+    const turn = rig.guestScene.currentBattle.turn;
+    const point = `cmd:${wave}:${turn}`;
+    await withClient(rig.hostCtx, () => {
+      rig.hostRuntime.rendezvous.arrive(point);
+    });
+    await drainLoopback();
+
+    const arriveSpy = vi.spyOn(rig.guestRuntime.rendezvous, "arrive");
+    const broadcastSpy = vi.spyOn(rig.guestRuntime.battleSync, "broadcastLocalCommand");
+    await withClient(rig.guestCtx, async () => {
+      const owned = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+      owned.summonData.moveQueue = [{ move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL }];
+      rig.guestScene.currentBattle.turnCommands = {};
+      new CommandPhase(COOP_GUEST_FIELD_INDEX).start();
+      await Promise.resolve();
+    });
+
+    expect(
+      arriveSpy.mock.calls.map(call => String(call[0])),
+      "the forced-action owner still announced arrival at the reciprocal command point",
+    ).toContain(point);
+    expect(
+      broadcastSpy.mock.calls.some(
+        ([fieldIndex, sentTurn, command]) =>
+          fieldIndex === COOP_GUEST_FIELD_INDEX
+          && sentTurn === turn
+          && command.command === Command.FIGHT
+          && command.cursor === -1
+          && command.moveId === MoveId.NONE,
+      ),
+      "the queued recharge committed only after the partner arrival was observed",
+    ).toBe(true);
 
     logs.flush();
   }, 120_000);
