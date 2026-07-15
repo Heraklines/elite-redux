@@ -14,7 +14,10 @@ export class MockSprite implements MockGameObject {
   public scene;
   public anims;
   public list: MockGameObject[] = [];
-  public name: string;
+  // Phaser.GameObjects.GameObject initializes every public name to the empty string. Several production
+  // filters call `sprite.name.includes(...)` across heterogeneous container children, so leaving the mock
+  // uninitialized turns a valid Phaser read into a headless-only TypeError even when setName() is never called.
+  public name = "";
   public active = true;
 
   /** Mirror Phaser's public render state instead of hiding it behind the wrapped sprite. */

@@ -149,6 +149,7 @@ import {
   driveHostRewardShopOwner,
   mirrorHostMeToGuest,
   markRealGuestCommandBoundary,
+  materializeMirroredGuestInputTurn,
   pumpDuoDestinations,
   reachQueuedRewardShop,
   relayGuestMeOptionIndexOnly,
@@ -2002,6 +2003,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     wave: number,
     turn: number,
     beforeHostCross?: () => void,
+    restartAlreadyOpenHost = false,
   ): Promise<void> => {
     const point = `cmd:${wave}:${turn}`;
     const transitionSourceWave = rig.hostScene.currentBattle.waveIndex;
@@ -2273,7 +2275,27 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // With a biome commit this resumes only after the renderer consumed its exact receipt. Without one it
       // starts the CommandPhase that toFirst deliberately left untouched, publishing the host's reciprocal
       // arrival in both cases.
-      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase"));
+      await withClient(rig.hostCtx, async () => {
+        if (restartAlreadyOpenHost) {
+          const current = rig.hostScene.phaseManager.getCurrentPhase();
+          if (
+            current?.phaseName !== "CommandPhase"
+            || rig.hostScene.currentBattle.waveIndex !== wave
+            || rig.hostScene.currentBattle.turn !== turn
+          ) {
+            throw new Error(
+              `initial host command boundary is not current: ${current?.phaseName ?? "none"} `
+                + `${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn}`,
+            );
+          }
+          // Wave one opened before buildDuo installed the live runtime. Re-enter this untouched public phase
+          // once so it publishes the reciprocal rendezvous just like a production browser launched in co-op.
+          current.start();
+          await drainLoopback();
+          return;
+        }
+        await game.phaseInterceptor.to("CommandPhase");
+      });
       await pumpDuoDestinations(rig, 2);
       // The old soak manufactured only the guest rendezvous arrival. That let the host proceed but never
       // opened the guest's production UiMode.COMMAND surface, so retained reward operations could not emit
@@ -4048,6 +4070,19 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       resyncHeals,
     });
   };
+
+  // The host's wave-one CommandPhase and the direct guest mirror both predate the live co-op runtime. Replace
+  // only the guest's inert boot phase with its omitted TurnInit tail, then cross the same public reciprocal
+  // command boundary used by every later turn. This removes the sole synthetic-only first-turn exception.
+  if (rig.hostScene.currentBattle.battleType !== BattleType.MYSTERY_ENCOUNTER) {
+    await withClient(rig.guestCtx, () => materializeMirroredGuestInputTurn(rig.guestScene));
+    await crossCommandBoundaryWithReplayGuest(
+      rig.hostScene.currentBattle.waveIndex,
+      rig.hostScene.currentBattle.turn,
+      undefined,
+      true,
+    );
+  }
   for (let wave = 1; wave <= waves; wave++) {
     // Sample cumulatively before the next wave can terminal and clear the runtime's session-local diagnostic
     // ledger. A wave-180 GameOver used to erase 179 waves of op:wave/op:reward evidence before the sole

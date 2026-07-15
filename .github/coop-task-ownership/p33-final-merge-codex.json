@@ -12,6 +12,7 @@
     ".github/coop-task-ownership/p33-terminal-turn-convergence.json",
     ".github/workflows/coop-public-ui-journey.yml",
     "scripts/coop-public-ui-contract-check.mjs",
+    "src/battle.ts",
     "src/data/elite-redux/coop/**",
     "src/dev-tools/registry.ts",
     "src/phase-manager.ts",

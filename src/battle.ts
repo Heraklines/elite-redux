@@ -141,6 +141,14 @@ export class Battle {
       this.setDouble(false);
     }
 
+    // A Battle owns a valid command substrate for its entire lifetime. Normal play refreshes these maps in
+    // incrementTurn(), and authoritative encounter adoption refreshes them after a format commit, but retained
+    // transitions (notably a Mystery Encounter handing directly into renderer input) can expose the newly
+    // constructed Battle before either hook. CommandPhase must never be able to dereference an undefined map.
+    const commandSlots = this._arrangement.activeIndices();
+    this.turnCommands = Object.fromEntries(commandSlots.map(index => [index, null]));
+    this.preTurnCommands = Object.fromEntries(commandSlots.map(index => [index, null]));
+
     this.enemyLevels =
       battleType === BattleType.TRAINER
         ? trainer?.getPartyLevels(this.waveIndex)

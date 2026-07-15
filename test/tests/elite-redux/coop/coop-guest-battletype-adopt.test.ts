@@ -15,6 +15,7 @@
 //   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-guest-battletype-adopt.test.ts
 // =============================================================================
 
+import { Battle } from "#app/battle";
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
@@ -167,4 +168,17 @@ describe.skipIf(!RUN)("co-op GUEST newBattle adopts the host's battleType verdic
     });
     logs.flush();
   }, 240_000);
+
+  it("constructs a valid command substrate before any turn or encounter-adoption hook runs", () => {
+    const battle = new Battle(getGameMode(GameModes.COOP), {
+      waveIndex: 15,
+      battleType: BattleType.MYSTERY_ENCOUNTER,
+      double: true,
+    });
+
+    expect(Object.keys(battle.turnCommands).map(Number)).toEqual([0, 1, 2, 3]);
+    expect(Object.keys(battle.preTurnCommands).map(Number)).toEqual([0, 1, 2, 3]);
+    expect(Object.values(battle.turnCommands).every(command => command == null)).toBe(true);
+    expect(Object.values(battle.preTurnCommands).every(command => command == null)).toBe(true);
+  });
 });
