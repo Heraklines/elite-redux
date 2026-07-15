@@ -112,13 +112,13 @@ import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { ModifierOverride } from "#modifiers/modifier-type";
+import { BiomeShopPhase, setCoopBiomeMarketTestSkip } from "#phases/biome-shop-phase";
 import { getCoopMeHostPresentation } from "#phases/coop-replay-me-phase";
 import {
   coopClearMePinForGuest,
   coopMeInteractionStartValue,
   coopSetMePinForGuest,
 } from "#phases/mystery-encounter-phases";
-import { BiomeShopPhase } from "#phases/biome-shop-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { TheBargainPhase } from "#phases/the-bargain-phase";
 import type { GameManager } from "#test/framework/game-manager";
@@ -2345,11 +2345,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   };
 
   /** Wait for one client's real UI mode while keeping that complete client context installed. */
-  const awaitClientUiMode = async (
-    ctx: DuoRig["hostCtx"],
-    mode: UiMode,
-    label: string,
-  ): Promise<void> => {
+  const awaitClientUiMode = async (ctx: DuoRig["hostCtx"], mode: UiMode, label: string): Promise<void> => {
     // Headless Phaser does not tick every fade tween. The bounded production mode transition has a two-
     // second force path, so retain this exact client's globals while that local callback settles rather
     // than alternating the process-global harness context underneath it.
@@ -2360,18 +2356,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         }
         await new Promise<void>(resolve => setTimeout(resolve, 10));
       }
-      throw new Error(
-        `${label} never opened ${UiMode[mode]} (stuck on ${UiMode[ctx.scene.ui.getMode()]})`,
-      );
+      throw new Error(`${label} never opened ${UiMode[mode]} (stuck on ${UiMode[ctx.scene.ui.getMode()]})`);
     });
   };
 
   /** Press one public UI button, bounded by destination-context pumps just like two independent browsers. */
-  const pressClientUiUntilAccepted = async (
-    ctx: DuoRig["hostCtx"],
-    button: Button,
-    label: string,
-  ): Promise<void> => {
+  const pressClientUiUntilAccepted = async (ctx: DuoRig["hostCtx"], button: Button, label: string): Promise<void> => {
     for (let attempt = 0; attempt < 80; attempt++) {
       const accepted = await withClient(ctx, () => ctx.scene.ui.processInput(button));
       await pumpDuoDestinations(rig, 1);
@@ -2393,14 +2383,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * identity instead: both queued renderers enter the market, the parity owner presses CANCEL/CONFIRM, and
    * the retained terminal must advance both counters exactly once.
    */
-  const driveBiomeMarketLeave = async (
-    wave: number,
-    beforeSharedInput?: () => Promise<void>,
-  ): Promise<void> => {
+  const driveBiomeMarketLeave = async (wave: number, beforeSharedInput?: () => Promise<void>): Promise<void> => {
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
     const destinationScheduled = rig.pair.setDestinationContextDelivery != null;
     rig.pair.setDestinationContextDelivery?.(destinationScheduled);
+    // GameManager keeps the every-ten-wave market disabled in broad engine tests by default. This
+    // production-fidelity leg owns the real public market boundary, so opt in only for this bounded surface
+    // and restore the standing harness default even when the market fails closed.
+    setCoopBiomeMarketTestSkip(false);
     try {
       await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectModifierPhase", false));
       const hostMarket = rig.hostScene.phaseManager.getCurrentPhase();
@@ -2479,6 +2470,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       await awaitGuestWaveTransaction(wave, true);
       actionScript.push(`wave ${wave}: biome market owner=${hostOwns ? "host" : "guest"} leave`);
     } finally {
+      setCoopBiomeMarketTestSkip(true);
       rig.pair.setDestinationContextDelivery?.(false);
     }
   };
@@ -3076,12 +3068,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // BiomeShopPhase intentionally presents as SelectModifierPhase to party continuations, but its market
       // protocol and stock are distinct. Route that concrete phase through the market's public owner/watcher
       // path; ordinary selectable reward continuations retain their calibrated driver.
-      if (
-        rig.hostScene.phaseManager.hasPhaseOfType(
-          "SelectModifierPhase",
-          phase => phase instanceof BiomeShopPhase,
-        )
-      ) {
+      if (rig.hostScene.phaseManager.hasPhaseOfType("SelectModifierPhase", phase => phase instanceof BiomeShopPhase)) {
         await driveBiomeMarketLeave(wave, sampleBoundaryOnce);
       } else {
         await driveRewardShop(wave, false, "queued", sampleBoundaryOnce, "leave");
