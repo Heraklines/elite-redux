@@ -50,6 +50,17 @@ import { ER_HEARTBREAK_ABILITY_ID, HeartbreakAbAttr } from "#data/elite-redux/ab
 import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abilities/last-host";
 import { ER_LIFE_PRESERVER_ABILITY_ID, LifePreserverAbAttr } from "#data/elite-redux/abilities/life-preserver";
 import { ER_MYCELIAL_NETWORK_ABILITY_ID, MycelialNetworkAbAttr } from "#data/elite-redux/abilities/mycelial-network";
+import {
+  ClosedCircuitAbAttr,
+  ER_CLOSED_CIRCUIT_ABILITY_ID,
+  ER_NEGATIVE_FEEDBACK_ABILITY_ID,
+  ER_POSITIVE_FEEDBACK_ABILITY_ID,
+  ER_SYNCHRONIZED_CURRENT_ABILITY_ID,
+  NegativeFeedbackAbAttr,
+  PositiveFeedbackAbAttr,
+  PositiveFeedbackPowerAbAttr,
+  SynchronizedCurrentAbAttr,
+} from "#data/elite-redux/abilities/plusle-minun";
 import { ER_PRESSURE_VESSEL_ABILITY_ID, PressureVesselAbAttr } from "#data/elite-redux/abilities/pressure-vessel";
 import { ER_PUPPET_STRINGS_ABILITY_ID, PuppetStringsAbAttr } from "#data/elite-redux/abilities/puppet-strings";
 import { ER_QUICKENING_GRACE_ABILITY_ID, QuickeningGraceAbAttr } from "#data/elite-redux/abilities/quickening-grace";
@@ -442,6 +453,46 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_HEARTBREAK_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_SYNCHRONIZED_CURRENT_ABILITY_ID,
+        name: "Synchronized Current",
+        description:
+          "If this Pokemon and an allied Plus- or Minus-aligned Pokemon both damage the same target in one turn, that target is paralyzed after both attacks resolve. Normal paralysis immunities apply.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_SYNCHRONIZED_CURRENT_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_POSITIVE_FEEDBACK_ABILITY_ID,
+        name: "Positive Feedback",
+        description:
+          "When this Pokemon damages a paralyzed target, it consumes the paralysis, the attack gains 25% power, and the target's higher defensive stat drops one stage.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_POSITIVE_FEEDBACK_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_NEGATIVE_FEEDBACK_ABILITY_ID,
+        name: "Negative Feedback",
+        description:
+          "When this Pokemon damages a paralyzed target, it consumes the paralysis, gains +1 Speed, suppresses one of the target's held items until the end of the following turn, and its own next physical move becomes Electric/Fairy dual-type.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_NEGATIVE_FEEDBACK_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_CLOSED_CIRCUIT_ABILITY_ID,
+        name: "Closed Circuit",
+        description:
+          "If this Pokemon and an ally target the same opponent in one turn, whichever acts second launches an extra 25-power Electric/Fairy attack at that opponent after both moves resolve.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_CLOSED_CIRCUIT_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -717,6 +768,23 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_HEARTBREAK_ABILITY_ID) {
     builder.attr(HeartbreakAbAttr);
+  }
+
+  if (pokerogueId === ER_SYNCHRONIZED_CURRENT_ABILITY_ID) {
+    builder.attr(SynchronizedCurrentAbAttr);
+  }
+
+  if (pokerogueId === ER_POSITIVE_FEEDBACK_ABILITY_ID) {
+    builder.attr(PositiveFeedbackPowerAbAttr);
+    builder.attr(PositiveFeedbackAbAttr);
+  }
+
+  if (pokerogueId === ER_NEGATIVE_FEEDBACK_ABILITY_ID) {
+    builder.attr(NegativeFeedbackAbAttr);
+  }
+
+  if (pokerogueId === ER_CLOSED_CIRCUIT_ABILITY_ID) {
+    builder.attr(ClosedCircuitAbAttr);
   }
 
   const ability = builder.build();

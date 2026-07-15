@@ -20,6 +20,7 @@
 // =============================================================================
 
 import type { Pokemon } from "#field/pokemon";
+import { erClosedCircuitOnHit, erSyncCurrentOnHit } from "./plusle-minun";
 import { erRendezvousOnHit } from "./rendezvous";
 import { recordTurnAttack } from "./turn-attack-ledger";
 
@@ -30,6 +31,8 @@ import { recordTurnAttack } from "./turn-attack-ledger";
 export function erBatch3OnTargetHit(user: Pokemon, target: Pokemon, damaging: boolean): void {
   // Second-actor triggers first (they read the PARTNER's prior ledger entry).
   erRendezvousOnHit(user, target);
+  erSyncCurrentOnHit(user, target, damaging);
+  erClosedCircuitOnHit(user, target);
   // Record this hit last so it is visible to LATER movers this turn.
   recordTurnAttack(user, target, damaging);
 }

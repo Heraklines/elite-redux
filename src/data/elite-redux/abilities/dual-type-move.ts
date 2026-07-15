@@ -36,13 +36,15 @@
 // move or leaves the field (whichever first) — documented.
 // =============================================================================
 
-import { DualTypeMoveAttr } from "#data/moves/move";
 import { MoveCategory } from "#enums/move-category";
 import { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
-import type { Move } from "#moves/move";
+import type { DualTypeMoveAttr, Move } from "#moves/move";
 
-export { DualTypeMoveAttr };
+// `DualTypeMoveAttr` (the value) lives in `move.ts`; importing it here as a value
+// would form an import cycle (move.ts → … → pokemon.ts → this file), so we detect
+// it by constructor name and re-export only its TYPE for callers that annotate.
+export type { DualTypeMoveAttr };
 
 /** Per-target dual-type prime: the target's next physical move becomes primary/second. */
 interface DualTypePrime {
@@ -90,11 +92,21 @@ export function dualTypePrimeMoveType(pokemon: Pokemon, move: Move): PokemonType
 
 /** The SECOND effectiveness type contributed by a prime OR a `DualTypeMoveAttr`. */
 export function dualTypeSecondType(source: Pokemon, move: Move): PokemonType | undefined {
-  if (dualTypePrimeApplies(source, move)) {
-    return DUAL_TYPE_PRIME.get(source)?.secondType;
+  const primed = dualTypePrimeSecondType(source, move);
+  if (primed !== undefined) {
+    return primed;
   }
-  const attr = move.attrs.find(a => a instanceof DualTypeMoveAttr) as DualTypeMoveAttr | undefined;
+  const attr = move.attrs.find(a => a?.constructor?.name === "DualTypeMoveAttr") as DualTypeMoveAttr | undefined;
   return attr?.secondType;
+}
+
+/**
+ * The SECOND effectiveness type from an active PRIME only (not a `DualTypeMoveAttr`,
+ * which the engine already applies via `MoveTypeChartOverrideAttr`). Read by
+ * `getAttackTypeEffectiveness` to fold the prime's second type into the product.
+ */
+export function dualTypePrimeSecondType(source: Pokemon, move: Move): PokemonType | undefined {
+  return dualTypePrimeApplies(source, move) ? DUAL_TYPE_PRIME.get(source)?.secondType : undefined;
 }
 
 /**

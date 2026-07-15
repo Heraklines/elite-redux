@@ -57,6 +57,11 @@ import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/dai
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { erApplyChivalry } from "#data/elite-redux/abilities/chivalry";
+import {
+  dualTypePrimeMoveType,
+  dualTypePrimeSecondType,
+  dualTypeStabBonus,
+} from "#data/elite-redux/abilities/dual-type-move";
 import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
 import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
 import { erApplySoulmateHealCopy, erApplySoulmateRedirect } from "#data/elite-redux/abilities/soulmate";
@@ -3528,6 +3533,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       moveTypeHolder.value = PokemonType.ELECTRIC;
     }
 
+    // ER Negative Feedback (5923) prime: the holder's primed next PHYSICAL move
+    // takes on the Electric primary type (Fairy second type is applied in
+    // getAttackTypeEffectiveness). Flipping the type here means absorb/redirect
+    // abilities (Volt Absorb, Lightning Rod) see it as Electric and interact.
+    const primedType = dualTypePrimeMoveType(this, move);
+    if (primedType !== undefined) {
+      moveTypeHolder.value = primedType;
+    }
+
     return moveTypeHolder.value as PokemonType;
   }
 
@@ -3723,6 +3737,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // Apply any typing changes from Freeze-Dry, etc.
     if (move) {
       applyMoveAttrs("MoveTypeChartOverrideAttr", source ?? null, this, move, multi, types, moveType);
+    }
+
+    // ER dual-type PRIME (Negative Feedback 5923): fold the primed move's SECOND
+    // type (Fairy) into the effectiveness product. Move-instance DualTypeMoveAttr
+    // second types (Closed Circuit's follow-up) are already handled by the
+    // MoveTypeChartOverrideAttr pass above; this covers only the primed case.
+    if (move && source && !ignoreSourceAbility) {
+      const primeSecond = dualTypePrimeSecondType(source, move);
+      if (primeSecond !== undefined) {
+        multi.value *= this.getAttackTypeEffectiveness(primeSecond, { source });
+      }
     }
 
     // ER OFFENSIVE type-chart overrides: the attacker's ability can rewrite how
@@ -5057,6 +5082,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (matchesSourceType && moveType !== PokemonType.STELLAR) {
       stabMultiplier.value += 0.5;
     }
+
+    // ER dual-type move primitive (Batch 3): a dual-type move (Closed Circuit's
+    // follow-up, or a Negative Feedback prime) grants STAB if the user shares
+    // EITHER type — this adds the +0.5 for the SECOND type when the user has it
+    // and it isn't already the (post-conversion) move type.
+    stabMultiplier.value += dualTypeStabBonus(source, move, moveType);
 
     applyMoveAttrs("CombinedPledgeStabBoostAttr", source, this, move, stabMultiplier);
 

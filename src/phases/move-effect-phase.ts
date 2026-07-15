@@ -6,6 +6,7 @@ import { ConditionalProtectTag } from "#data/arena-tag";
 import { MoveAnim } from "#data/battle-anims";
 import { ProtectedTag, SemiInvulnerableTag, SubstituteTag, TypeBoostTag } from "#data/battler-tags";
 import { erBatch3OnTargetHit } from "#data/elite-redux/abilities/batch3-on-hit";
+import { consumeDualTypePrimeOnUse, dualTypePrimeApplies } from "#data/elite-redux/abilities/dual-type-move";
 import {
   ConditionalAlwaysHitAbAttr,
   erMoveAlwaysHitsForUserType,
@@ -114,6 +115,12 @@ export class MoveEffectPhase extends PokemonPhase {
   private firstHit: boolean;
   /** Is this the last strike of a move? */
   private lastHit: boolean;
+  /**
+   * ER Negative Feedback (5923): whether the user was ALREADY dual-type-primed
+   * when this move began. Snapshotted so the move that SETS the prime (in its own
+   * PostAttack) does not also consume it — only a move that started primed does.
+   */
+  private erStartedPrimed = false;
 
   /**
    * @param useMode - The {@linkcode MoveUseMode} corresponding to how this move was used.
@@ -155,6 +162,10 @@ export class MoveEffectPhase extends PokemonPhase {
     }
 
     const move = this.move;
+
+    // ER Negative Feedback (5923): snapshot whether the user began this move
+    // already dual-type-primed, so only a move that STARTED primed consumes it.
+    this.erStartedPrimed = dualTypePrimeApplies(user, move);
 
     /**
      * Does an effect from this move override other effects on this turn?
@@ -689,6 +700,12 @@ export class MoveEffectPhase extends PokemonPhase {
       this.applyOnTargetEffects(user, target, firstTarget, result);
     }
     if (this.lastHit) {
+      // ER Negative Feedback (5923) prime: consume the holder's dual-type prime
+      // once its (physical) move has fully resolved — but ONLY if the move began
+      // primed (not the move that just SET the prime in its own PostAttack).
+      if (this.erStartedPrimed) {
+        consumeDualTypePrimeOnUse(user, this.move);
+      }
       globalScene.triggerPokemonFormChange(user, SpeciesFormChangePostMoveTrigger);
 
       // Multi-hit check for Wimp Out/Emergency Exit
