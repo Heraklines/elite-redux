@@ -34,7 +34,7 @@ function envelope(operationId = "9:0:REWARD:12004"): CoopAuthoritativeEnvelopeV1
   return {
     version: 1,
     sessionEpoch: 9,
-    revision: 4,
+    revision: 1,
     wave: 12,
     turn: 4,
     logicalPhase: "REWARD_SELECT",
@@ -108,7 +108,7 @@ describe("co-op causal barrier tracing", () => {
         "host:continuation-ready",
         "host:released",
       ]);
-      expect(operationEvents.every(event => event.epoch === 9 && event.revision === 4)).toBe(true);
+      expect(operationEvents.every(event => event.epoch === 9 && event.revision === 1)).toBe(true);
       expect(JSON.stringify(operationEvents)).not.toContain("payload-must-not-enter-causal-trace");
 
       const edgeCount = getCoopCausalTrace().length;
@@ -147,7 +147,7 @@ describe("co-op causal barrier tracing", () => {
       const events = getCoopCausalTrace();
       expect(events.map(event => event.stage)).toEqual(["retained", "delivery-retry", "terminal"]);
       expect(new Set(events.map(event => event.causalId)).size).toBe(1);
-      expect(events[0].causalId).toMatch(/^operation:e9:r4:id#[0-9a-f]{8}:len=\d+$/);
+      expect(events[0].causalId).toMatch(/^operation:e9:r1:id#[0-9a-f]{8}:len=\d+$/);
       expect(events[0].causalId.length).toBeLessThan(80);
       expect(JSON.stringify(events)).not.toContain("private-operation");
       expect(JSON.stringify(events)).not.toContain("payload-must-not-enter-causal-trace");
