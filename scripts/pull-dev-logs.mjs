@@ -11,8 +11,10 @@
 // Downloads use a bounded worker pool and request deadline. Each log is first
 // written to a `.partial` twin and atomically renamed, so an interrupted pull
 // resumes without treating a truncated local file as complete.
-// Authentication is selected, in order, from GH_TOKEN, GITHUB_TOKEN, then the
-// documented github_token.txt file on the current user's Desktop.
+// Authentication is selected, in order, from GH_TOKEN, GITHUB_TOKEN, the
+// documented github_token.txt file on the current user's Desktop, then the
+// signed-in Git credential manager. Credential values are never logged.
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -39,6 +41,29 @@ function defaultTokenFiles(env, homeDir) {
   ]);
 }
 
+function readGithubGitCredential() {
+  try {
+    return execFileSync("git", ["credential", "fill"], {
+      encoding: "utf8",
+      input: "protocol=https\nhost=github.com\n\n",
+      stdio: ["pipe", "pipe", "ignore"],
+      timeout: 5_000,
+      windowsHide: true,
+    });
+  } catch {
+    return "";
+  }
+}
+
+function passwordFromGitCredential(output) {
+  for (const line of String(output ?? "").split(/\r?\n/)) {
+    if (line.startsWith("password=")) {
+      return line.slice("password=".length).trim();
+    }
+  }
+  return "";
+}
+
 /**
  * Select the first documented GitHub credential without ever logging its value.
  * Dependencies are injectable so source precedence can be tested without
@@ -50,6 +75,7 @@ export function selectGithubCredential({
   tokenFiles = defaultTokenFiles(env, homeDir),
   fileExists = existsSync,
   readFile = path => readFileSync(path, "utf8"),
+  readGitCredential = readGithubGitCredential,
 } = {}) {
   for (const envName of ["GH_TOKEN", "GITHUB_TOKEN"]) {
     const token = env[envName]?.trim();
@@ -72,6 +98,11 @@ export function selectGithubCredential({
     if (token) {
       return { token, source: `token file ${tokenFile}` };
     }
+  }
+
+  const gitCredential = passwordFromGitCredential(readGitCredential());
+  if (gitCredential) {
+    return { token: gitCredential, source: "git credential manager" };
   }
 
   return null;
@@ -157,7 +188,7 @@ export async function classifyGithubHttpError(response, { stage, credential } = 
   } else if (status === 403 && !credential) {
     message =
       `GitHub denied the unauthenticated request while ${stage} (HTTP 403). `
-      + "Set GH_TOKEN or GITHUB_TOKEN, or place github_token.txt on the current user's Desktop.";
+      + "Set GH_TOKEN or GITHUB_TOKEN, place github_token.txt on the current user's Desktop, or sign in with Git.";
   } else if (status === 403) {
     message =
       `GitHub denied access while ${stage} (HTTP 403; credential source: ${authSource}). `

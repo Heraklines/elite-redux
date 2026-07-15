@@ -35,6 +35,7 @@ test("selects documented GitHub credential sources in deterministic precedence o
       readPaths.push(path);
       return "gh-file";
     },
+    readGitCredential: () => "password=gh-manager\n",
   };
 
   assert.deepEqual(selectGithubCredential(options), { token: "gh-primary", source: "GH_TOKEN" });
@@ -49,6 +50,30 @@ test("selects documented GitHub credential sources in deterministic precedence o
     token: "gh-file",
     source: "token file /home/tester/Desktop/github_token.txt",
   });
+
+  assert.deepEqual(selectGithubCredential({ ...options, env: {}, fileExists: () => false }), {
+    token: "gh-manager",
+    source: "git credential manager",
+  });
+  assert.equal(
+    selectGithubCredential({ ...options, env: {}, fileExists: () => false, readGitCredential: () => "" }),
+    null,
+  );
+});
+
+test("parses Git credential output without confusing usernames or leaking malformed values", () => {
+  assert.deepEqual(
+    selectGithubCredential({
+      env: {},
+      tokenFiles: [],
+      readGitCredential: () => "protocol=https\nhost=github.com\nusername=octocat\npassword=manager-secret\n",
+    }),
+    { token: "manager-secret", source: "git credential manager" },
+  );
+  assert.equal(
+    selectGithubCredential({ env: {}, tokenFiles: [], readGitCredential: () => "username=manager-secret\n" }),
+    null,
+  );
 });
 
 test("adds authentication only when a credential is available", () => {
@@ -246,6 +271,7 @@ test("resumes an interrupted atomic write and preserves final and DONE skips", a
   };
   const common = {
     fetchImpl,
+    credential: null,
     outRoot,
     fileExists: path => files.has(path),
     makeDirectory: () => {},
