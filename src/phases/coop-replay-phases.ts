@@ -1822,7 +1822,9 @@ export class CoopFinalizeTurnPhase extends Phase {
  * exactly-once gate. If normal finalization consumed the operation first, this is an immediate no-op.
  */
 export class CoopWaveAdvanceBoundaryPhase extends Phase {
-  public readonly phaseName = "CoopWaveAdvanceBoundaryPhase";
+  // PhaseString is intentionally frozen in the central registry. This is the zero-argument, tail-only
+  // variant of the existing finalizer family, so it uses that already-sanctioned queue identity.
+  public readonly phaseName = "CoopFinalizeTurnPhase";
 
   public start(): void {
     try {

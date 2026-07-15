@@ -2082,10 +2082,7 @@ export async function reachQueuedRewardShop(scene: BattleScene): Promise<ShopPha
   // behind the scene's inert boot TitlePhase. Production reaches the same queued phase by ending the
   // replay/current engine phase. Admit only those exact production-owned shapes, then continue through
   // the real phase manager; do not clear the queue or construct/apply a reward surface out of order.
-  if (
-    current?.phaseName === "TitlePhase"
-    && (queued[0] === "CoopWaveAdvanceBoundaryPhase" || queued[0] === "VictoryPhase")
-  ) {
+  if (current?.phaseName === "TitlePhase" && (queued[0] === "CoopFinalizeTurnPhase" || queued[0] === "VictoryPhase")) {
     scene.phaseManager.shiftPhase();
     await drainLoopback();
   }

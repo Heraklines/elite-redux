@@ -3438,11 +3438,10 @@ function materializeCoopWaveAdvanceFromOp(runtime: CoopRuntime, envelope: CoopAu
       !continuationReady
       && coopHasPendingWaveAdvance()
       && coopWaveAdvanceBoundaryWakeFactory != null
-      && globalScene.phaseManager?.getCurrentPhase()?.phaseName !== "CoopWaveAdvanceBoundaryPhase"
-      && !globalScene.phaseManager?.getQueuedPhaseNames().includes("CoopWaveAdvanceBoundaryPhase")
+      && !globalScene.phaseManager?.getQueuedPhaseNames().includes("CoopFinalizeTurnPhase")
     ) {
       // The retained op may land AFTER CoopFinalizeTurnPhase already inspected pendingWaveAdvance. Appending
-      // (never unshifting) a dedicated wake preserves the presentation -> checkpoint ordering while ensuring
+      // (never unshifting) a tail-only finalizer wake preserves presentation -> checkpoint ordering while ensuring
       // the queue cannot empty into a phantom next turn without consuming the host-stated transition.
       globalScene.phaseManager.pushPhase(coopWaveAdvanceBoundaryWakeFactory());
       coopLog("runtime", `wave-advance JOURNAL queued safe-boundary wake wave=${payload.wave}`);
