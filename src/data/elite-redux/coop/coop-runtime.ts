@@ -1417,9 +1417,10 @@ function maybeMarkCoopWaveContinuationReady(
   if (staged == null) {
     return false;
   }
-  const publicSurface = phaseOwnedSurface == null
-    ? retainedWaveContinuationIsPublic(staged)
-    : phaseOwnedWaveContinuationIsPublic(staged, phaseOwnedSurface);
+  const publicSurface =
+    phaseOwnedSurface == null
+      ? retainedWaveContinuationIsPublic(staged)
+      : phaseOwnedWaveContinuationIsPublic(staged, phaseOwnedSurface);
   if (!staged.continuationReady && publicSurface) {
     markCoopWaveAdvanceContinuationReady(wave, binding);
     coopLog("progression", `retained WAVE_ADVANCE continuationReady wave=${wave}`);
