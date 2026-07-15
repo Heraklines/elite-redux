@@ -185,6 +185,30 @@ function findOwnedCommandOrTerminal(client, from) {
   );
 }
 
+/**
+ * SelectGenderPhase first exposes its preceding MESSAGE projection, then replaces it with the
+ * actionable option picker. Do not spend the one public confirm key until that picker proves its
+ * handler, phase instance, options, and local input ownership are all live.
+ */
+export function findActionableFirstLoginGenderSurface(evidence, from = 0) {
+  const event = evidence.findLastSemanticSurface(from, "option-select:SelectGenderPhase");
+  const observation = event?.observation;
+  if (
+    observation?.phase !== "SelectGenderPhase"
+    || !Number.isSafeInteger(observation.phaseInstance)
+    || observation.phaseInstance < 2
+    || observation.uiMode !== "OPTION_SELECT"
+    || observation.ready?.handlerActive !== true
+    || !observation.seatsWithInput?.includes(0)
+    || observation.optionIds?.length !== 2
+    || !observation.optionIds.includes("boy")
+    || !observation.optionIds.includes("girl")
+  ) {
+    return null;
+  }
+  return event;
+}
+
 function findOwnedReadyReward(client, from) {
   const semantic = client.evidence.findLastSemanticSurface(from, "reward-shop");
   return semantic?.observation.operationClass === "reward"
@@ -589,7 +613,18 @@ export class PublicUiClient {
       await delay(this.config.settleDelayMs);
       return entered;
     }
+    const onboardingCursor = entered.index ?? this.pageCursor;
     await delay(this.config.settleDelayMs);
+    const actionableGenderOrTitle = await this.evidence.waitForCondition(
+      sink => sink.find(TITLE_PHASE, onboardingCursor) ?? findActionableFirstLoginGenderSurface(sink, onboardingCursor),
+      {
+        timeoutMs: this.config.bootTimeoutMs,
+        description: "actionable first-login gender option surface or TitlePhase",
+      },
+    );
+    if (TITLE_PHASE.test(actionableGenderOrTitle.text ?? "")) {
+      return actionableGenderOrTitle;
+    }
     const titleCursor = this.evidence.cursor();
     await this.press("Space", "complete-first-login-gender-prompt");
     const titleAfterOnboarding = await this.evidence.waitFor(TITLE_PHASE, {

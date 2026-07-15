@@ -7,7 +7,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { marketObservationView } from "./evidence.mjs";
 import { assertMarketPurchaseConverged, planMarketGridKeys } from "./market-journey.mjs";
-import { createPublicBattleProgressBudget, DuoPublicUiRig, PublicUiClient } from "./public-ui-harness.mjs";
+import {
+  createPublicBattleProgressBudget,
+  DuoPublicUiRig,
+  findActionableFirstLoginGenderSurface,
+  PublicUiClient,
+} from "./public-ui-harness.mjs";
 
 class FakeEvidence {
   constructor(label) {
@@ -72,6 +77,42 @@ function at(ms) {
 const ZERO_PROGRESS_BUDGET = Object.freeze({
   progressAllowanceMs: 0,
   hardCeilingMs: 0,
+});
+
+test("first-login gender confirm waits for the actionable option picker, not its preceding message", () => {
+  const evidence = new FakeEvidence("new-account");
+  evidence.push({
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "battle:message",
+      phase: "SelectGenderPhase",
+      phaseInstance: 1,
+      uiMode: "MESSAGE",
+      seatsWithInput: [0],
+      ready: { handlerActive: true, awaitingActionInput: false },
+    },
+  });
+
+  assert.equal(
+    findActionableFirstLoginGenderSurface(evidence, 0),
+    null,
+    "the public confirm key must not be spent on SelectGenderPhase's preceding MESSAGE projection",
+  );
+
+  evidence.push({
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "option-select:SelectGenderPhase",
+      phase: "SelectGenderPhase",
+      phaseInstance: 2,
+      uiMode: "OPTION_SELECT",
+      seatsWithInput: [0],
+      optionIds: ["boy", "girl"],
+      ready: { handlerActive: true, awaitingActionInput: null },
+    },
+  });
+
+  assert.equal(findActionableFirstLoginGenderSurface(evidence, 0), evidence.events[1]);
 });
 
 test("post-turn progress extends the soft deadline but never the immutable hard ceiling", () => {

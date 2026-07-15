@@ -56,6 +56,11 @@ on:
         required: true
         type: boolean
         default: false
+      chrome_trace:
+        description: Diagnostic opt-in for the resource-heavy Chrome CDP performance timeline
+        required: true
+        type: boolean
+        default: false
       host_title_keys:
         description: JSON keys before host selects New Game; use ["ArrowDown"] for an existing save
         required: true
@@ -250,10 +255,10 @@ jobs:
           COOP_UI_MARKET_SECOND_PURCHASE: "1"
           COOP_UI_MARKET_REQUIRED_PURCHASES: ${{ inputs.journey == 'market-wide-lens' && '1' || '0' }}
           COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS: "0"
-          # Puppeteer's screenshot-enabled CDP performance trace materially starves the two
-          # Commander renderers during the long multi-stat intro. Commander keeps checkpoint PNGs
-          # plus complete semantic/causal JSONL; only the optional performance timeline is omitted.
-          COOP_UI_CHROME_TRACE: ${{ (inputs.journey == 'market-wide-lens' || inputs.journey == 'commander-skip') && '0' || '1' }}
+          # A measured 537 MB screenshot-enabled CDP performance trace starved two real 10x clients.
+          # Normal two-player fidelity keeps PNGs, semantic/network JSONL, key latency, render and
+          # WebRTC evidence while omitting only that optional timeline. Manual diagnostics may opt in.
+          COOP_UI_CHROME_TRACE: ${{ inputs.chrome_trace && '1' || '0' }}
           NODE_OPTIONS: --max-old-space-size=4096
         shell: bash
         run: |

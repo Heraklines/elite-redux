@@ -36,13 +36,14 @@ dex/save unlocks, is inert in ordinary local/staging/production bundles, and per
 mutation. This journey proves co-op authority from the configured-party boundary onward; it does not claim
 to test natural collection/unlock acquisition.
 
-The CI Commander matrix disables only Puppeteer's optional screenshot-enabled CDP performance timeline.
-Measured trace-on runs made one client's real Commander stat/message intro take longer than seven minutes
-while it continued advancing normally. Per-checkpoint PNGs, per-seat semantic/causal JSONL, console output,
-public keyboard input, both real renderers, staging WebRTC, and every address/digest/continuation assertion
-remain enabled. The explicit fidelity delta is therefore loss of Chrome's low-level performance timeline,
-not loss of gameplay, input, rendering, network, or causal evidence. Other public journeys retain their
-existing trace policy.
+The CI public-UI matrix disables only Puppeteer's optional screenshot-enabled CDP performance timeline by
+default. A measured trace artifact reached 537 MB and starved two real 10x clients even though both kept
+advancing at the same co-op address over a healthy RTC connection. Per-checkpoint PNGs, per-seat
+semantic/causal/network JSONL, console output, per-key latency, public keyboard input, both real renderers,
+staging WebRTC, and every address/digest/continuation assertion remain enabled. The explicit fidelity delta
+is therefore loss of Chrome's low-level performance timeline, not loss of gameplay, input, rendering,
+network, or causal evidence. A manually dispatched diagnostic run can set `chrome_trace=true` to capture
+that timeline when its resource cost is specifically needed; it is not part of a normal two-player verdict.
 
 `fresh-*` marks the subsequent title layout as `Continue, New Game` only after both clients have publicly
 reached the wave-2 command surface. If that save was not actually persisted, the next keyboard action takes

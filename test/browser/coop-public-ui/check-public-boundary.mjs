@@ -99,12 +99,24 @@ if (
   );
 }
 if (
-  !journeyWorkflow.includes(
-    "(inputs.journey == 'market-wide-lens' || inputs.journey == 'commander-skip') && '0' || '1'",
-  )
+  !journeyWorkflow.includes("chrome_trace:")
+  || !journeyWorkflow.includes("Diagnostic opt-in for the resource-heavy Chrome CDP performance timeline")
+  || !journeyWorkflow.includes("COOP_UI_CHROME_TRACE: ${{ inputs.chrome_trace && '1' || '0' }}")
 ) {
   failures.push(
-    "coop-public-ui-journey.yml: Commander must omit only the optional CDP performance trace while retaining mandatory evidence",
+    "coop-public-ui-journey.yml: normal two-player journeys must omit the optional CDP performance trace with an explicit diagnostic opt-in",
+  );
+}
+if (
+  !harness.includes("findActionableFirstLoginGenderSurface")
+  || !harness.includes('findLastSemanticSurface(from, "option-select:SelectGenderPhase")')
+  || !harness.includes('observation.uiMode !== "OPTION_SELECT"')
+  || !harness.includes("!Number.isSafeInteger(observation.phaseInstance)")
+  || !harness.includes("observation.phaseInstance < 2")
+  || !harness.includes("actionable first-login gender option surface or TitlePhase")
+) {
+  failures.push(
+    "public-ui-harness.mjs: first-login gender confirmation must wait for the actionable option picker instead of its preceding message",
   );
 }
 if (!viteConfig?.includes("SOURCE_ENTRY") || !viteConfig.includes("sourceEntryReplaced")) {
