@@ -1,0 +1,51 @@
+===== COOP SOAK RESULT =====
+profile: god-c
+verdict: FAIL
+waves_requested: 200
+run: 29435951070 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T17-20-51Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20470474 WAVES=200 - replay this run with:  SOAK_SEED=20470474 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[coop:interaction] interactionCounter() read -> 6 (role=host)
+[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[coop:interaction] interactionCounter() read -> 6 (role=guest)
+[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[32mStart Phase: SwitchBiomePhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[32mStart Phase: NewBattlePhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[32mStart Phase: ReturnPhase[39m
+[34mCome back, Eternatus![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:stream] host RE-SEND unacked turn commit e=1826955309852831 wave=2 turn=1 rev=9
+[coop:transport] send host t=turnResolution e=1826955309852831 wave=2 turn=1 rev=9 events=11 checksum=f808a950ddb897d6
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:transport] recv guest t=turnResolution e=1826955309852831 wave=2 turn=1 rev=9 events=11 checksum=f808a950ddb897d6 handlers=1
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:transport] send guest t=requestTurnCommit e=1826955309852831 wave=2 turn=1 rev=9
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:transport] recv host t=requestTurnCommit e=1826955309852831 wave=2 turn=1 rev=9 handlers=1
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[32mStart Phase: ReturnPhase[39m
+[34mCome back, Rayquaza![39m
+
