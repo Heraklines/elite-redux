@@ -2207,9 +2207,16 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * would read undefined). Gated to "level" so the god profile is byte-identical (reviveSlot stays undefined).
    * MUST be called inside withClient(ownerCtx) with the OWNER's scene.
    */
-  const driveOwnerReward = async (shop: ShopPhaseSeam, ownerScene: BattleScene, wave: number): Promise<string> => {
-    const reviveSlot = profile === "level" ? firstFaintedPartySlot(ownerScene) : -1;
-    const take = opts.forceTakeRewardWaves?.has(wave) === true || (rewardPolicy === "seeded" && rng() < 0.5);
+  const driveOwnerReward = async (
+    shop: ShopPhaseSeam,
+    ownerScene: BattleScene,
+    wave: number,
+    policy: "seeded" | "leave" = "seeded",
+  ): Promise<string> => {
+    const reviveSlot = policy === "seeded" && profile === "level" ? firstFaintedPartySlot(ownerScene) : -1;
+    const take =
+      policy === "seeded"
+      && (opts.forceTakeRewardWaves?.has(wave) === true || (rewardPolicy === "seeded" && rng() < 0.5));
     await driveHostRewardShopOwner(shop, reviveSlot >= 0 ? { takeReward: take, reviveSlot } : { takeReward: take });
     // reviveSlot>=0 means a Revive was TAKEN iff the pool rolled one (the shop path decides post-start); a
     // non-fainted party or no-Revive pool falls through to seeded take/leave. The label reflects the intent.
@@ -2253,6 +2260,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     deferAdvanceToMeTerminal = false,
     fixtureMode: "queued" | "capture-compat" = "queued",
     beforeSharedInput?: () => Promise<void>,
+    ownerPolicy: "seeded" | "leave" = "seeded",
   ): Promise<void> => {
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
@@ -2301,11 +2309,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       let action: string;
       if (hostOwns) {
         await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
-        action = await withClient(rig.hostCtx, () => driveOwnerReward(hostShop, rig.hostScene, wave));
+        action = await withClient(rig.hostCtx, () => driveOwnerReward(hostShop, rig.hostScene, wave, ownerPolicy));
         await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
       } else {
         await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
-        action = await withClient(rig.guestCtx, () => driveOwnerReward(guestShop, rig.guestScene, wave));
+        action = await withClient(rig.guestCtx, () => driveOwnerReward(guestShop, rig.guestScene, wave, ownerPolicy));
         await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
       }
       if (destinationScheduled) {
@@ -2896,19 +2904,25 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * A BOSS wave (every 10th). #843: the harness mirror now carries the host's authoritative boss segments
    * onto the guest enemy (mirrorHostBattleToGuest re-asserts setBoss + bossSegmentIndex), so the guest is a
    * FAITHFUL boss and the wave-start + post-turn DIGEST invariants run on boss waves EXACTLY like a normal
-   * wave (no more digest skip). The ONE thing that stays boss-specific is the reward tail: a boss VictoryPhase
-   * AUTO-GRANTS via ModifierRewardPhase with NO owner/watcher SelectModifierPhase, so it advances the
-   * alternating interaction counter by ZERO - there is no shop to drive. We preserve that semantic (drive any
-   * host boss SelectModifierPhase SOLO if one is queued, reconciling the guest counter) instead of running the
-   * normal owner/watcher driveRewardShop (which would assert a +1 advance the boss auto-grant never makes).
+   * wave (no more digest skip). The boss reward itself AUTO-GRANTS via ModifierRewardPhase and advances the
+   * alternating interaction counter by ZERO. A milestone/biome tail can still queue a later SelectModifierPhase;
+   * each such real shared surface is driven through its parity owner + watcher and advances the counter once.
    */
   const processBossWave = async (wave: number): Promise<void> => {
     await assertWaveBoundary(wave); // (a)+(b) wave-start clean-start parity - boss segments now carried
     await playWave(wave); // (c) NO-PARK
-    await assertPostTurnConverged(wave); // (a) POST-TURN real replay-desync detector
-    // Boss reward tail: auto-grant, no shop, counter +0 (see doc above). Clear any guest phantom queue and
-    // drive a host boss SelectModifierPhase SOLO only if one was actually queued.
-    withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.clearPhaseQueue());
+    // A pure boss auto-grant has no shop and advances the interaction counter by zero. A milestone may then
+    // queue one or more genuine shared reward continuations. Those surfaces still belong to the parity owner:
+    // never clear the other renderer's queue or drive an odd-counter HOST watcher as though it were the owner.
+    // Sample the retained boundary only after both real queues reach the first shared surface (same rule as a
+    // normal reward); if there is no shared surface, preserve the existing post-turn convergence probe.
+    let boundarySampled = false;
+    const sampleBoundaryOnce = async (): Promise<void> => {
+      if (!boundarySampled) {
+        boundarySampled = true;
+        await assertPostTurnConverged(wave);
+      }
+    };
     // A deep milestone may queue MORE THAN ONE selectable reward surface (for example a normal milestone
     // reward followed by a biome/relic continuation). The old one-shot `if` drained only the first and left
     // the next MODIFIER_SELECT parked until the following wave, producing the documented ~wave-140 full-run
@@ -2919,21 +2933,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       if (milestoneShops > 8) {
         fail("no-park", wave, "milestone reward tail queued more than 8 SelectModifierPhase continuations");
       }
-      await withClient(rig.hostCtx, async () => {
-        armHostFaintAutoPick(); // #845: drive a boss killing-turn host faint's PARTY picker on this crossing
-        await game.phaseInterceptor.to("SelectModifierPhase", false);
-        const shop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
-        if (shop.phaseName === "SelectModifierPhase") {
-          await driveHostRewardShopOwner(shop, { takeReward: false });
-        }
-      });
-      const hostCtr = rig.hostRuntime.controller.interactionCounter();
-      await withClient(rig.guestCtx, () => {
-        while (rig.guestRuntime.controller.interactionCounter() < hostCtr) {
-          rig.guestRuntime.controller.advanceInteraction();
-        }
-      });
+      // This crosses both queued tails, routes by the pinned counter, opens the real owner + watcher, leaves
+      // through the public terminal, and retains the exact +1 counter and continuationReady assertions.
+      await driveRewardShop(wave, false, "queued", sampleBoundaryOnce, "leave");
     }
+    await sampleBoundaryOnce();
     if (milestoneShops > 0) {
       actionScript.push(`wave ${wave}: drained ${milestoneShops} milestone reward continuation(s)`);
     }
@@ -3468,19 +3472,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     //     ModifierRewardPhase, queuesSelectModifier=false) with NO owner/watcher SelectModifierPhase - even
     //     when the %10 wave rolled a TRAINER instead of a wild boss (the trainer's mons are not isBoss, so
     //     the isBoss check alone misses it and processNormalWave would wrongly assert a +1 shop advance).
-    //     Both are handled by processBossWave (drive any queued host shop SOLO, reconcile the guest counter,
-    //     counter +0), matching the trainer-victory reward-tail semantics the #846 directive called out.
+    //     Both are handled by processBossWave: the automatic reward remains counter +0, while any separate
+    //     queued milestone/biome continuation uses its real parity owner + watcher and advances once.
     // 🔴 #832 PROFILE-GATED boss-tail routing. Under "level", a NON-%10 WILD wave can roll a boss-SEGMENTED
     // enemy (isBoss true) that STILL presents a NORMAL owner/watcher reward shop (VictoryPhase
-    // queuesSelectModifier=true, +1 counter), NOT a boss AUTO-GRANT - routing it to processBossWave (which
-    // assumes an auto-grant tail with no owner/watcher shop) leaves the normal shop UNDRIVEN, and the wave
-    // crossing then strands at it (seed 12345 wave 68: a WILD boss-segmented enemy, queuesSelectModifier=true,
-    // host is the watcher awaiting owner options that never come). Only %10 milestones/bosses actually
-    // auto-grant, so under "level" classify bossWave by %10 ALONE; the non-%10 boss-flagged wave then goes
-    // through processNormalWave, whose driveRewardShop drives its real shop correctly (and safely SKIPs if a
-    // wave unexpectedly auto-grants - no +1 assertion). The "god" profile keeps the ORIGINAL detection
-    // BYTE-IDENTICALLY (its own deep-wave boss-reward-tail strand at ~wave 140 is the separate documented
-    // follow-up; the 25-wave PR god run rolls no non-%10 boss wave, so this is behavior-preserving there).
+    // queuesSelectModifier=true, +1 counter), NOT a boss AUTO-GRANT. Under "level" classify bossWave by %10
+    // alone so this ordinary shop keeps the normal-wave path and its post-turn assertions. The god profile
+    // retains its historical boss detection; processBossWave now drives any real continuation through both
+    // renderers instead of clearing the parity owner and attempting to use a watcher as the owner.
     const bossWave =
       !isMeWave && (wave % 10 === 0 || (profile !== "level" && rig.hostScene.getEnemyField().some(e => e.isBoss())));
     // #843 CATCH LEG (BUILD 1): a DESIGNATED catch wave (opts.catchWaves) that is a normal (non-ME, non-boss)
