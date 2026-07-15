@@ -1245,6 +1245,16 @@
           "formIndex": 0,
           "species": 128
         },
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "ER_ROCK_GEM"
+          },
+          {
+            "count": 2,
+            "item": "SITRUS_BERRY"
+          }
+        ],
         "level": null,
         "moves": [
           "ROLLOUT",
