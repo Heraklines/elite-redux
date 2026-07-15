@@ -1490,6 +1490,8 @@ export async function driveClientPhaseQueueTo(
     matches?: (phase: Phase) => boolean;
     maxPhases?: number;
     perPhaseTimeoutMs?: number;
+    /** Pump the other browser's scheduled inbox while this client's real phase awaits a reciprocal route. */
+    pumpPeer?: () => Promise<void>;
   } = {},
 ): Promise<Phase> {
   const matches = options.matches ?? (phase => phase.phaseName === target);
@@ -1513,6 +1515,7 @@ export async function driveClientPhaseQueueTo(
     phase.start();
     const deadline = Date.now() + perPhaseTimeoutMs;
     while (scene.phaseManager.getCurrentPhase() === phase) {
+      await options.pumpPeer?.();
       await drainLoopback();
       if (Date.now() >= deadline) {
         const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
@@ -2167,7 +2170,10 @@ export interface ShopPhaseSeam {
  * real Victory -> BattleEnd -> SelectModifier path and stops before the public reward surface starts.
  * Call inside the destination client's {@linkcode withClient} context.
  */
-export async function reachQueuedRewardShop(scene: BattleScene): Promise<ShopPhaseSeam> {
+export async function reachQueuedRewardShop(
+  scene: BattleScene,
+  options: { pumpPeer?: () => Promise<void> } = {},
+): Promise<ShopPhaseSeam> {
   const current = scene.phaseManager.getCurrentPhase();
   const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
 
@@ -2180,7 +2186,7 @@ export async function reachQueuedRewardShop(scene: BattleScene): Promise<ShopPha
     await drainLoopback();
   }
 
-  return (await driveClientPhaseQueueTo(scene, "SelectModifierPhase")) as unknown as ShopPhaseSeam;
+  return (await driveClientPhaseQueueTo(scene, "SelectModifierPhase", options)) as unknown as ShopPhaseSeam;
 }
 
 /**

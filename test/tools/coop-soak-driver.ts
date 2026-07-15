@@ -2648,7 +2648,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
         hostShopStarted = true;
       }
-      const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
+      const guestShop = await withClient(rig.guestCtx, () =>
+        reachQueuedRewardShop(rig.guestScene, {
+          // Real browsers run both event loops concurrently. The in-process scheduled transport needs the
+          // host inbox pumped while the guest's phantom command awaits its authoritative shop phaseRoute.
+          pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+        }),
+      );
       await awaitGuestWaveTransaction(wave, false);
       // A terminal turn has TWO authoritative material boundaries: its TurnEnd checkpoint and the retained
       // BattleEnd DATA image. The host may execute automatic PokemonHeal/BattleEnd work while the guest is
