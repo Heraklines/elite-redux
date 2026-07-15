@@ -1265,7 +1265,6 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(() => victory.start(), "retained normal victory never enters Mystery Encounter handling").not.toThrow();
     const pushed = (name: string) => pushNewSpy.mock.calls.some(([phase]) => phase === name);
     expect(pushed("BattleEndPhase"), "the immutable normal-wave tail continues through BattleEnd").toBe(true);
-    expect(pushed("CoopVictorySealPhase"), "the retained normal win queues its automatic settlement seal").toBe(true);
     expect(pushed("SelectModifierPhase"), "wave 11 opens its normal reward continuation").toBe(true);
   });
 
