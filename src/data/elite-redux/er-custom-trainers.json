@@ -207,6 +207,7 @@
             ],
             "sanityOff": true,
             "shiny": {
+              "name": "Crystal",
               "palette": "glassbody",
               "surface": "glasswarp"
             },
