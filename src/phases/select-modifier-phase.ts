@@ -257,6 +257,8 @@ export class SelectModifierPhase extends BattlePhase {
   private coopInteractionStart = -1;
   /** Durable source address; ambient currentBattle may already be a speculative future wave/turn. */
   protected readonly coopSourceAddress: CoopRetainedWaveContinuationAddress | null;
+  /** Runtime that constructed this phase; async UI completion may resume under the other in-process client. */
+  private readonly coopOwningRuntime = getCoopRuntime();
   /** A retained guest continuation with no single source identity may not open or mutate a reward surface. */
   private readonly coopContinuationIdentityFailure: string | null;
 
@@ -1191,8 +1193,18 @@ export class SelectModifierPhase extends BattlePhase {
       .then(() => {
         // The retained wave's DATA already landed in the queued BattleEndPhase. Record readiness only
         // after this real public shop handler has committed, never when a phase object is constructed.
-        notifyCoopWaveContinuationSurfaceReady(this.coopSourceAddress?.wave);
+        this.notifyCoopContinuationSurfaceReady();
       });
+  }
+
+  /** Preserve the phase's runtime across async UI completion in the two-engine fidelity harness. */
+  private notifyCoopContinuationSurfaceReady(): void {
+    const notify = () => notifyCoopWaveContinuationSurfaceReady(this.coopSourceAddress?.wave);
+    if (this.coopOwningRuntime == null) {
+      notify();
+      return;
+    }
+    runWhenCoopRuntimeActive(this.coopOwningRuntime, notify);
   }
 
   updateSeed(): void {
@@ -2018,7 +2030,7 @@ export class SelectModifierPhase extends BattlePhase {
       this.getRerollCost(globalScene.lockModifierTiers),
     );
     // Watchers open the same real surface through a separate async path from resetModifierSelect.
-    notifyCoopWaveContinuationSurfaceReady(this.coopSourceAddress?.wave);
+    this.notifyCoopContinuationSurfaceReady();
     this.coopBeginMirror("watcher");
     // Await on the PINNED interaction counter (#633), matching the owner's pinned send seq.
     // Reading the live counter here would let an inbound reconcile broadcast (which can bump

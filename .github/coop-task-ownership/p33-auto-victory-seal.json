@@ -12,6 +12,7 @@
     "src/phase-manager.ts",
     "src/phases/battle-end-phase.ts",
     "src/phases/coop-victory-seal-phase.ts",
+    "src/phases/select-modifier-phase.ts",
     "src/phases/victory-phase.ts",
     "test/tests/elite-redux/coop/coop-automatic-victory-seal.test.ts",
     "test/tests/elite-redux/coop/coop-guest-renderer.test.ts",
