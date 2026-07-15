@@ -72,4 +72,39 @@ describe("co-op title save refusal", () => {
     acknowledgeFailure?.();
     expect(showOptionsSpy).toHaveBeenCalledWith(-1);
   });
+
+  it("preserves the normal completion path for a successful solo save load", async () => {
+    let acknowledgeSuccess: (() => void) | undefined;
+    const scene = {
+      gameData: {
+        loadSession: vi.fn().mockResolvedValue(true),
+      },
+      sessionSlotId: -1,
+      ui: {
+        resetModeChain: vi.fn(),
+        setMode: vi.fn(),
+        showText: vi.fn((_message: string, _delay: number | null, callback: (() => void) | undefined) => {
+          acknowledgeSuccess = callback;
+        }),
+      },
+    } as unknown as BattleScene;
+    initGlobalScene(scene);
+
+    const phase = new TitlePhase();
+    const testablePhase = phase as unknown as {
+      loadSaveSlot(slotId: number): Promise<void>;
+    };
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => undefined);
+
+    await testablePhase.loadSaveSlot(1);
+
+    expect(scene.gameData.loadSession).toHaveBeenCalledWith(1);
+    expect(scene.sessionSlotId).toBe(1);
+    expect(scene.ui.showText).toHaveBeenCalledWith(expect.any(String), null, expect.any(Function));
+    expect(endSpy).not.toHaveBeenCalled();
+
+    expect(acknowledgeSuccess).toBeTypeOf("function");
+    acknowledgeSuccess?.();
+    expect(endSpy).toHaveBeenCalledOnce();
+  });
 });
