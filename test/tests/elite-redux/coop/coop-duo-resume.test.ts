@@ -1244,7 +1244,11 @@ describe.skipIf(!RUN)("co-op DUO lobby RESUME flow (#810)", () => {
         await started;
         const scan = withClient(rig.hostCtx, () => rig.hostScene.gameData.getSessionsForCoopResume());
         await vi.waitFor(() => expect(cloudRead.mock.calls.length).toBeGreaterThanOrEqual(5));
-        await flush();
+        // Do not call the two-client `flush()` while this authenticated host operation is suspended.
+        // Pumping the guest here lets the scan resume under the wrong process-global account/runtime and
+        // correctly trips its production fail-closed fence. The durable debt is the exact local milestone
+        // proving the scan has reached the blocked account-scoped cloud mutation tail.
+        await vi.waitFor(() => expect(localStorage.getItem(debtKeys[0])).not.toBeNull());
         expect(duplicateDelete, "repair cannot bypass the account mutation tail").not.toHaveBeenCalled();
         if (switchAccount && loggedInUser != null) {
           loggedInUser.username = `${account}-changed`;
