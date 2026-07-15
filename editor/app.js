@@ -2233,13 +2233,37 @@ function legalMovesFor(speciesConst) {
   return out;
 }
 
+/** The legal-move pool for a MEMBER: its species' pool UNIONED with its FUSION
+ *  partner's pool when fused (a fusion can legally know moves from both species,
+ *  mirroring the game's fused learnset + the RLA/RLNA install-time union). A
+ *  non-fused member returns exactly legalMovesFor(species) (the cached Set, not
+ *  mutated). */
+function legalMovesForMember(m) {
+  const base = legalMovesFor(m.species);
+  if (!m || !m.fusion || !m.fusion.species) {
+    return base;
+  }
+  const fus = legalMovesFor(m.fusion.species);
+  if (fus.size === 0) {
+    return base;
+  }
+  if (base.size === 0) {
+    return fus;
+  }
+  const out = new Set(base);
+  for (const mv of fus) {
+    out.add(mv);
+  }
+  return out;
+}
+
 /** True when enforcement is ON for this member AND `move` is not in its legal pool.
  *  The RLA/RLNA tokens are ALWAYS legal (resolved to a legal move at install). */
 function ctrMoveIllegal(m, move) {
   if (m.sanityOff || !move || ctrIsMoveToken(move)) {
     return false;
   }
-  const legal = legalMovesFor(m.species);
+  const legal = legalMovesForMember(m);
   // An empty pool = no legality data for this species; don't flag (never blocks).
   return legal.size > 0 && !legal.has(move);
 }
@@ -2250,7 +2274,7 @@ function ctrIllegalMoves(m) {
   if (m.sanityOff) {
     return [];
   }
-  const legal = legalMovesFor(m.species);
+  const legal = legalMovesForMember(m);
   if (legal.size === 0) {
     return [];
   }
@@ -2618,7 +2642,8 @@ function ctrMemberHtml(m, i) {
   // offers the RLA/RLNA tokens FIRST, then the legal pool when we HAVE data (else
   // the full move set so a data gap never traps the user; matches the save gate).
   const enforce = !m.sanityOff;
-  const legal = enforce ? legalMovesFor(m.species) : null;
+  // Union the fusion partner's legal moves so a fused mon's datalist offers both.
+  const legal = enforce ? legalMovesForMember(m) : null;
   const useLegalList = enforce && legal && legal.size > 0;
   const poolNames = useLegalList ? [...legal].sort() : [...MOVE_SET].sort();
   const tokenOpts = ["RLA", "RLNA"]

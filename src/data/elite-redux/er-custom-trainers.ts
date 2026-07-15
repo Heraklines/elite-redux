@@ -1134,6 +1134,35 @@ function legalMovePool(speciesId: number, wantStatus: boolean): readonly number[
 }
 
 /**
+ * The legal-move pool an RLA/RLNA token draws from for a resolved member: the
+ * member's own species pool, UNIONED with its FUSION partner's pool when fused.
+ * A fusion can legally know moves from BOTH species (mirrors how the game builds a
+ * fused mon's learnset), so a fused member's random legal move may come from either
+ * side. Returned SORTED by move id (deterministic walk order). A non-fused member
+ * returns exactly {@linkcode legalMovePool} (byte-identical to the old behavior).
+ */
+function legalMovePoolForMember(member: ErCustomTrainerMemberResolved, wantStatus: boolean): readonly number[] {
+  const base = legalMovePool(member.speciesId, wantStatus);
+  if (!member.fusion) {
+    return base;
+  }
+  const fusion = legalMovePool(member.fusion.speciesId, wantStatus);
+  if (fusion.length === 0) {
+    return base;
+  }
+  if (base.length === 0) {
+    return fusion;
+  }
+  const set = new Set<number>(base);
+  for (const id of fusion) {
+    set.add(id);
+  }
+  const out = [...set];
+  out.sort((a, b) => a - b);
+  return out;
+}
+
+/**
  * Seeded pick of a legal move for one RLA/RLNA token slot: start at
  * `hashSeed(...move...) % pool.length` and walk FORWARD deterministically until a
  * move not already in `used` is found (no duplicates within the moveset). Returns
@@ -1183,7 +1212,7 @@ export function resolveErCustomTrainerMoveIds(
       used.add(spec.id);
       return;
     }
-    const pool = legalMovePool(member.speciesId, spec.token === "RLNA");
+    const pool = legalMovePoolForMember(member, spec.token === "RLNA");
     const picked = pickTokenMove(seed, key, slotIndex, moveIndex, pool, used);
     if (picked !== undefined) {
       chosen.push(picked);

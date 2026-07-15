@@ -1095,6 +1095,55 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     expect(erCustomTrainerHeldModifierConfigs(bogus).length).toBe(0);
   });
 
+  // ---- ROUND 10 / FEATURE 7: fusion move-pool union (RLA/RLNA) --------------
+  it("RLA/RLNA on a FUSED member draws from the UNION of both species' legal pools", () => {
+    // A base member (Pikachu) vs. the SAME member fused with Machamp. Its 4 RLA
+    // slots resolve from a seeded walk of the legal pool; a fused member's pool is
+    // the UNION of both species, so the fused universe is a strict SUPERSET of the
+    // base-only universe (Machamp contributes Fighting moves Pikachu can't learn).
+    const rlaMember = (fusion: ErCustomTrainerMemberResolved["fusion"]): ErCustomTrainerMemberResolved => ({
+      speciesId: SpeciesId.PIKACHU,
+      formIndex: 0,
+      level: 50,
+      moveIds: [],
+      moveSpecs: [
+        { kind: "token", token: "RLA" },
+        { kind: "token", token: "RLA" },
+        { kind: "token", token: "RLA" },
+        { kind: "token", token: "RLA" },
+      ],
+      abilitySlot: 0,
+      fusion,
+      heldItemKeys: [],
+      shinyLook: null,
+      shinyName: "",
+    });
+    const universe = (member: ErCustomTrainerMemberResolved): Set<number> => {
+      const out = new Set<number>();
+      for (let i = 0; i < 120; i++) {
+        for (const id of resolveErCustomTrainerMoveIds(`SEED${i}`, "FUSEKEY", 0, member)) {
+          out.add(id);
+        }
+      }
+      return out;
+    };
+    const baseOnly = universe(rlaMember(null));
+    const fused = universe(rlaMember({ speciesId: SpeciesId.MACHAMP, formIndex: 0, abilitySlot: 0 }));
+
+    // Every base-reachable move is still reachable when fused (union superset)...
+    for (const id of baseOnly) {
+      expect(fused.has(id)).toBe(true);
+    }
+    // ...and the fusion adds moves the base alone never reaches (strict superset).
+    expect(fused.size).toBeGreaterThan(baseOnly.size);
+
+    // Determinism: the same seed + member yields the identical ordered moveset.
+    const fusedMember = rlaMember({ speciesId: SpeciesId.MACHAMP, formIndex: 0, abilitySlot: 0 });
+    expect(resolveErCustomTrainerMoveIds("SEED7", "FUSEKEY", 0, fusedMember)).toEqual(
+      resolveErCustomTrainerMoveIds("SEED7", "FUSEKEY", 0, fusedMember),
+    );
+  });
+
   // ---- FEATURE 1: weighted slot variants -----------------------------------
   it("flat member is back-compat: 1 variant weight 1, slotChance 100 (representative == variant 0)", () => {
     const FLAT = {

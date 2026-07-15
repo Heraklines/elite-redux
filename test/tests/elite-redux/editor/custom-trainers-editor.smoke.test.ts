@@ -803,6 +803,44 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].victoryDialogue.length).toBe(200);
   });
 
+  it("fusion move-pool union: a move legal only on the fusion partner is NOT flagged illegal", () => {
+    // Base Pikachu learns THUNDERBOLT; fusion partner Machamp learns CROSS_CHOP.
+    // A fused member can legally know EITHER (union), so CROSS_CHOP must pass on
+    // the fused member but be flagged on the non-fused one.
+    ct.moveById.set(85, { id: 85, name: "Thunderbolt" });
+    ct.moveById.set(238, { id: 238, name: "Cross Chop" });
+    ct.MOVE_SET.add("THUNDERBOLT");
+    ct.MOVE_SET.add("CROSS_CHOP");
+    ct.learn.current.SPECIES_PIKACHU = [[1, 85]]; // Pikachu -> Thunderbolt
+    ct.learn.current.SPECIES_MACHAMP = [[1, 238]]; // Machamp -> Cross Chop
+    ct.legalMovesCache.clear();
+    addSpecies("SPECIES_MACHAMP", 68, "Machamp");
+
+    const key = newTrainer();
+    const t = ct.ctr.current[key];
+    setSpecies(0, "SPECIES_PIKACHU");
+    const m = t.team[0];
+
+    // Non-fused: CROSS_CHOP (Machamp-only) is illegal; THUNDERBOLT is legal.
+    expect(ct.ctrMoveIllegal(m, "CROSS_CHOP")).toBe(true);
+    expect(ct.ctrMoveIllegal(m, "THUNDERBOLT")).toBe(false);
+
+    // Fuse with Machamp -> the union now covers CROSS_CHOP too (no longer illegal),
+    // and the base's THUNDERBOLT stays legal.
+    const fusOn = q('.ctr-fusion-on[data-idx="0"]') as HTMLInputElement;
+    fusOn.checked = true;
+    ct.onCustomTrainerChange(fusOn);
+    const fusSp = q('.ctr-fusion-species[data-idx="0"]') as HTMLInputElement;
+    fusSp.value = "SPECIES_MACHAMP";
+    ct.onCustomTrainerInput(fusSp);
+    ct.onCustomTrainerChange(fusSp);
+    expect(m.fusion.species).toBe("SPECIES_MACHAMP");
+    expect(ct.ctrMoveIllegal(m, "CROSS_CHOP")).toBe(false); // fusion-partner move now legal
+    expect(ct.ctrMoveIllegal(m, "THUNDERBOLT")).toBe(false); // base move still legal
+    // A move on NEITHER species is still flagged.
+    expect(ct.ctrMoveIllegal(m, "SURF")).toBe(true);
+  });
+
   it("copy member: into a slot (first empty / new) and as a new possibility (weight 100, auto-weighted)", () => {
     const key = newTrainer();
     const t = ct.ctr.current[key];
