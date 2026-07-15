@@ -278,6 +278,7 @@ import {
   type CoopWaveAdvanceOperationBinding,
   commitWaveAdvanceOwnerIntent,
   describeCoopWaveAdvanceOperationBinding,
+  getCoopPendingWaveContinuationBoundary,
   getCoopStagedWaveAdvanceTransaction,
   isCoopWaveAdvanceOperationEnabled,
   isCoopWaveAdvanceTransactionComplete,
@@ -1250,12 +1251,20 @@ function maybeMarkCoopWaveContinuationReady(wave: number, binding: CoopWaveAdvan
  * after staging (so it is not a generic deferred-operation receipt); without this engine-owned wake, a
  * transaction that correctly waited in BattleEnd could apply DATA yet never record its later public surface.
  */
-export function notifyCoopWaveContinuationSurfaceReady(): boolean {
+export function getCoopRetainedWaveContinuationAddress(): { readonly wave: number; readonly turn: number } | null {
+  const runtime = active;
+  if (runtime == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
+    return null;
+  }
+  return getCoopPendingWaveContinuationBoundary(runtime.waveOperationBinding);
+}
+
+export function notifyCoopWaveContinuationSurfaceReady(sourceWave?: number): boolean {
   const runtime = active;
   if (runtime == null || !isCoopAuthoritativeGuest() || !usesRetainedCoopWaveTransaction(runtime)) {
     return false;
   }
-  const wave = globalScene.currentBattle?.waveIndex ?? -1;
+  const wave = sourceWave ?? globalScene.currentBattle?.waveIndex ?? -1;
   if (!Number.isSafeInteger(wave) || wave < 0) {
     return false;
   }

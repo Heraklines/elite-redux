@@ -70,6 +70,8 @@ registerCoopWaveAdvanceBoundaryDataApplier(envelope => {
   const phaseName = globalScene.phaseManager?.getCurrentPhase()?.phaseName;
   const exactQueuedBattleEnd =
     phaseName === "BattleEndPhase" && currentWave === sourceWave + 1 && isCoopSettledWaveBoundaryPending(sourceWave);
+  const exactGameOverFinalizer =
+    payload.outcome === "gameOver" && phaseName === "CoopFinalizeTurnPhase" && currentWave === sourceWave;
   if (currentWave > sourceWave && !exactQueuedBattleEnd) {
     return "rejected";
   }
@@ -89,7 +91,7 @@ registerCoopWaveAdvanceBoundaryDataApplier(envelope => {
   } catch {
     publicSourceBoundary = false;
   }
-  if (phaseName !== "BattleEndPhase" && !publicSourceBoundary) {
+  if (phaseName !== "BattleEndPhase" && !publicSourceBoundary && !exactGameOverFinalizer) {
     return "deferred";
   }
 
@@ -134,7 +136,8 @@ export class BattleEndPhase extends BattlePhase {
 
     this.isVictory = isVictory;
     this.retainedWaveBinding = getCoopWaveAdvanceRuntimeBinding();
-    const retainedBoundary = getCoopPendingWaveAdvanceBoundary(this.retainedWaveBinding);
+    const retainedBoundary =
+      this.retainedWaveBinding == null ? null : getCoopPendingWaveAdvanceBoundary(this.retainedWaveBinding);
     this.retainedSourceWave = retainedBoundary?.wave ?? globalScene.currentBattle?.waveIndex ?? -1;
     this.retainedSourceWasTrainer =
       retainedBoundary == null

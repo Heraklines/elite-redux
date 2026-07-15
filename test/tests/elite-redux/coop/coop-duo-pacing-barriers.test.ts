@@ -188,6 +188,48 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
   }, 120_000);
 
   // ===========================================================================================
+  // A generated skip (Commander / trailing BALL or RUN slot) is also an OWNED command boundary.
+  // The old early return ended the phase before ownership classification, so a guest-owned
+  // Commander slot never announced its arrival and left the host sealed at cmd:<wave>:<turn>.
+  // ===========================================================================================
+  it("an owned Commander skip crosses the command barrier before it ends", async () => {
+    setCoopRendezvousWaitMs(60_000);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+
+    const wave = rig.guestScene.currentBattle.waveIndex;
+    const turn = rig.guestScene.currentBattle.turn;
+    const point = `cmd:${wave}:${turn}`;
+    await withClient(rig.hostCtx, () => {
+      rig.hostRuntime.rendezvous.arrive(point);
+    });
+    await drainLoopback();
+
+    const arriveSpy = vi.spyOn(rig.guestRuntime.rendezvous, "arrive");
+    const broadcastSpy = vi.spyOn(rig.guestRuntime.battleSync, "broadcastLocalCommand");
+    await withClient(rig.guestCtx, async () => {
+      const owned = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+      const ally = owned.getAllies()[0];
+      vi.spyOn(ally, "getTag").mockReturnValue({ getSourcePokemon: () => owned } as never);
+      rig.guestScene.currentBattle.turnCommands = {};
+      new CommandPhase(COOP_GUEST_FIELD_INDEX).start();
+      await Promise.resolve();
+    });
+
+    expect(
+      arriveSpy.mock.calls.map(call => String(call[0])),
+      "the Commander-owned skipped slot still announced the reciprocal command point",
+    ).toContain(point);
+    expect(
+      broadcastSpy,
+      "Commander is an inert skip, not a selectable or relayed MoveId.NONE command",
+    ).not.toHaveBeenCalled();
+
+    logs.flush();
+  }, 120_000);
+
+  // ===========================================================================================
   // A real host CommandPhase INVOKES the next-command barrier at cmd:<wave>:<turn> (proves the
   // wiring in command-phase.ts is live). The guest pre-arrives so the host's barrier buffer-hits
   // (no block), then the host's real turn opens its command as usual.

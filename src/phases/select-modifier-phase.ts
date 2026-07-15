@@ -26,6 +26,7 @@ import {
   getCoopInteractionRelay,
   getCoopNetcodeMode,
   getCoopRendezvous,
+  getCoopRetainedWaveContinuationAddress,
   getCoopRuntime,
   getCoopUiMirror,
   notifyCoopWaveContinuationSurfaceReady,
@@ -247,6 +248,8 @@ export class SelectModifierPhase extends BattlePhase {
    *  at this value, so the owner's terminal + the watcher's terminal + a reconcile
    *  broadcast can't double-count this one interaction. -1 = solo / not captured. */
   private coopInteractionStart = -1;
+  /** Durable source-wave address; ambient currentBattle may already be a speculative next wave. */
+  private readonly coopSourceWave: number | null;
 
   constructor(
     rerollCount = 0,
@@ -260,6 +263,11 @@ export class SelectModifierPhase extends BattlePhase {
     this.modifierTiers = modifierTiers;
     this.customModifierSettings = customModifierSettings;
     this.isCopy = isCopy;
+    this.coopSourceWave = getCoopRetainedWaveContinuationAddress()?.wave ?? null;
+  }
+
+  private coopRewardWave(): number {
+    return this.coopSourceWave ?? globalScene.currentBattle?.waveIndex ?? -1;
   }
 
   start() {
@@ -437,7 +445,7 @@ export class SelectModifierPhase extends BattlePhase {
       if (spoofed || ownsThisShop) {
         coopLog(
           "reward",
-          `OWNER drives reward screen (start=${this.coopInteractionStart} role=${coopController.role} spoof=${spoofed} adoptsOptions=${coopIsWatcher} wave=${globalScene.currentBattle?.waveIndex})`,
+          `OWNER drives reward screen (start=${this.coopInteractionStart} role=${coopController.role} spoof=${spoofed} adoptsOptions=${coopIsWatcher} wave=${this.coopRewardWave()})`,
         );
         // The OWNER WAITS at the barrier until the partner reaches the shop, THEN opens the pickable
         // screen (a dead partner resolves the wait via the anti-hang timeout so the owner never hangs).
@@ -445,7 +453,7 @@ export class SelectModifierPhase extends BattlePhase {
       } else {
         coopLog(
           "reward",
-          `WATCHER waits for partner's reward picks (start=${this.coopInteractionStart} role=${coopController.role} wave=${globalScene.currentBattle?.waveIndex})`,
+          `WATCHER waits for partner's reward picks (start=${this.coopInteractionStart} role=${coopController.role} wave=${this.coopRewardWave()})`,
         );
         // #800 (live "it's not letting me pick anything"): the mirrored screen looks EXACTLY like
         // the watcher's own, so blocked input reads as a bug. Say whose turn it is, plainly.
@@ -504,7 +512,7 @@ export class SelectModifierPhase extends BattlePhase {
     modifierSelectCallback: ModifierSelectCallback,
   ): boolean {
     const shopOptions = getPlayerShopModifierTypeOptionsForWave(
-      globalScene.currentBattle.waveIndex,
+      this.coopRewardWave(),
       globalScene.getWaveMoneyAmount(1),
     );
     const shopOption =
@@ -1136,7 +1144,7 @@ export class SelectModifierPhase extends BattlePhase {
       .then(() => {
         // The retained wave's DATA already landed in the queued BattleEndPhase. Record readiness only
         // after this real public shop handler has committed, never when a phase object is constructed.
-        notifyCoopWaveContinuationSurfaceReady();
+        notifyCoopWaveContinuationSurfaceReady(this.coopSourceWave ?? undefined);
       });
   }
 
@@ -1175,7 +1183,7 @@ export class SelectModifierPhase extends BattlePhase {
     }
 
     const baseMultiplier = Math.min(
-      Math.ceil(globalScene.currentBattle.waveIndex / 10) * baseValue * 2 ** this.rerollCount * multiplier,
+      Math.ceil(this.coopRewardWave() / 10) * baseValue * 2 ** this.rerollCount * multiplier,
       Number.MAX_SAFE_INTEGER,
     );
 
@@ -1345,7 +1353,7 @@ export class SelectModifierPhase extends BattlePhase {
         data: wire,
         terminal: choice === COOP_INTERACTION_LEAVE,
         localRole: controller.role,
-        wave: globalScene.currentBattle?.waveIndex ?? -1,
+        wave: this.coopRewardWave(),
         turn: globalScene.currentBattle?.turn ?? 0,
       },
       this.coopRewardOperationBinding,
@@ -1529,7 +1537,7 @@ export class SelectModifierPhase extends BattlePhase {
               action: { choice: action.choice, data: action.data, operationId: action.operationId },
               terminal,
               localRole: "guest",
-              wave: globalScene.currentBattle?.waveIndex ?? -1,
+              wave: this.coopRewardWave(),
               turn: globalScene.currentBattle?.turn ?? 0,
             },
             this.coopRewardOperationBinding,
@@ -1700,7 +1708,7 @@ export class SelectModifierPhase extends BattlePhase {
    * counter (never the live counter), so a mid-interaction reconcile can't move it.
    */
   private coopShopPoint(): string | null {
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.coopRewardWave();
     if (this.coopInteractionStart < 0 || wave < 0) {
       return null;
     }
@@ -1962,7 +1970,7 @@ export class SelectModifierPhase extends BattlePhase {
       this.getRerollCost(globalScene.lockModifierTiers),
     );
     // Watchers open the same real surface through a separate async path from resetModifierSelect.
-    notifyCoopWaveContinuationSurfaceReady();
+    notifyCoopWaveContinuationSurfaceReady(this.coopSourceWave ?? undefined);
     this.coopBeginMirror("watcher");
     // Await on the PINNED interaction counter (#633), matching the owner's pinned send seq.
     // Reading the live counter here would let an inbound reconcile broadcast (which can bump
@@ -1990,7 +1998,7 @@ export class SelectModifierPhase extends BattlePhase {
           action: { choice: action.choice, data: action.data, operationId: action.operationId },
           terminal: action.choice === COOP_INTERACTION_LEAVE,
           localRole: controller.role,
-          wave: globalScene.currentBattle?.waveIndex ?? -1,
+          wave: this.coopRewardWave(),
           turn: globalScene.currentBattle?.turn ?? 0,
         },
         this.coopRewardOperationBinding,
@@ -2173,7 +2181,7 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopRelayedOption = data[3] ?? 0;
       if (projectionOnly) {
         const shopOptions = getPlayerShopModifierTypeOptionsForWave(
-          globalScene.currentBattle.waveIndex,
+          this.coopRewardWave(),
           globalScene.getWaveMoneyAmount(1),
         );
         const row = data[1] ?? -1;

@@ -221,6 +221,26 @@ export function getCoopPendingWaveAdvanceBoundary(
   return { wave: payload.wave, victoryKind: payload.victoryKind };
 }
 
+/**
+ * The one retained wave transaction whose public continuation has not opened yet. Unlike the BattleEnd
+ * DATA selector above, this remains addressable after DATA applies so a reward/market/terminal surface
+ * never falls back to a speculative future `currentBattle` while proving continuation readiness.
+ */
+export function getCoopPendingWaveContinuationBoundary(
+  binding?: CoopWaveAdvanceOperationBinding | null,
+): { readonly wave: number; readonly turn: number } | null {
+  const unresolved = [...state(binding).stagedWaveTransactions.values()].filter(staged => !staged.continuationReady);
+  if (unresolved.length !== 1) {
+    return null;
+  }
+  const envelope = unresolved[0].envelope;
+  const payload = envelope.pendingOperation?.payload;
+  if (!isValidCoopWaveAdvancePayload(payload)) {
+    return null;
+  }
+  return { wave: payload.wave, turn: envelope.authoritativeState.turn };
+}
+
 /** Missing or role-mismatched runtime state is a programming error, never a process-global fallback. */
 export function captureCoopWaveAdvanceOperationBinding(expectedRole?: CoopRole): CoopWaveAdvanceOperationBinding {
   const opState = getActiveCoopRuntimeOpState();

@@ -619,10 +619,7 @@ export class CommandPhase extends FieldPhase {
 
     this.checkCommander();
 
-    if (globalScene.currentBattle.turnCommands[this.fieldIndex]?.skip) {
-      this.end();
-      return;
-    }
+    const hasGeneratedSkip = globalScene.currentBattle.turnCommands[this.fieldIndex]?.skip === true;
 
     const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
     const coopSlotOwner = coopController == null ? null : coopOwnerOfPlayerFieldSlot(this.fieldIndex);
@@ -631,6 +628,15 @@ export class CommandPhase extends FieldPhase {
       coopController?.role === "guest"
       && getCoopNetcodeMode() === "authoritative"
       && coopSlotOwner !== coopController.role;
+
+    // Generated skips are commands too. Commander, and the trailing slots after BALL/RUN, do not open
+    // input, but an OWNED skipped slot must still announce the reciprocal command boundary. Ending it
+    // here used to strand the peer at cmd:<wave>:<turn> exactly like a queued recharge did. Non-owned
+    // renderer/engine slots keep the immediate skip: their owning peer is responsible for the arrival.
+    if (hasGeneratedSkip && !isLocalCoopSlot) {
+      this.end();
+      return;
+    }
 
     // An authoritative guest must classify the host-owned slot as renderer-only BEFORE consulting the
     // checkpoint-carried move queue. Otherwise a host recharge sentinel can execute on the guest engine.
@@ -663,7 +669,7 @@ export class CommandPhase extends FieldPhase {
       // SYNC fast-path: solo / spoof / no rendezvous / partner-half-exhausted / partner ALREADY at this
       // command point. Open immediately - deferring behind a `.then` when there is nothing to wait for
       // reorders the UI open by a microtask for no reason (solo must stay byte-identical).
-      this.enterOwnCommandBoundary();
+      this.enterOwnCommandBoundary(hasGeneratedSkip);
       return;
     }
     void pendingBarrier.then(crossed => {
@@ -674,13 +680,17 @@ export class CommandPhase extends FieldPhase {
         // arrival that releases us. Re-consume at the crossed boundary so entry stat stages/weather/forms
         // land before public input opens, instead of leaving the refreshed carrier buffered until too late.
         this.tryCoopCheckpointSync();
-        this.enterOwnCommandBoundary();
+        this.enterOwnCommandBoundary(hasGeneratedSkip);
       }
     });
   }
 
   /** Execute a forced owned-slot action only after the reciprocal command boundary, else open its UI. */
-  private enterOwnCommandBoundary(): void {
+  private enterOwnCommandBoundary(hasGeneratedSkip = false): void {
+    if (hasGeneratedSkip) {
+      this.end();
+      return;
+    }
     if (!this.tryExecuteQueuedMove()) {
       this.openOwnCommandUi();
     }
