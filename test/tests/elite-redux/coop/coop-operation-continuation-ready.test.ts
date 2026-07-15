@@ -61,6 +61,63 @@ async function flush(): Promise<void> {
 afterEach(() => setCoopOperationDurability(null));
 
 describe("protocol-33 retained operation continuation lifecycle", () => {
+  it("re-sends a dropped final operation without requiring a follower or reconnect", async () => {
+    const pair = createLoopbackPair();
+    const realSend = pair.host.send.bind(pair.host);
+    let dropEnvelope = true;
+    pair.host.send = message => {
+      if (dropEnvelope && message.t === "envelope") {
+        dropEnvelope = false;
+        return;
+      }
+      realSend(message);
+    };
+    const scheduled: { callback: () => void; cancelled: boolean }[] = [];
+    let applications = 0;
+    const host = new CoopDurabilityManager(pair.host, {
+      recoveryInitialMs: 1,
+      recoveryMaxMs: 1,
+      recoveryMaxAttempts: 2,
+      recoveryDeadlineMs: 100,
+      scheduleRecovery: callback => {
+        const pending = { callback, cancelled: false };
+        scheduled.push(pending);
+        return () => {
+          pending.cancelled = true;
+        };
+      },
+    });
+    const guest = new CoopDurabilityManager(pair.guest, {
+      extractKey: message => (message.t === "envelope" ? { cls: "op:global", seq: message.envelope.revision } : null),
+      apply: () => {
+        applications++;
+        return "applied";
+      },
+    });
+    setCoopOperationDurability(guest);
+    try {
+      const committed = envelope();
+      expect(host.commit("op:global", committed.revision, { t: "envelope", envelope: committed })).toBe(true);
+      await flush();
+      expect(applications, "the one initial delivery was intentionally lost").toBe(0);
+      expect(scheduled).toHaveLength(1);
+
+      scheduled[0].cancelled = true;
+      scheduled[0].callback();
+      await flush();
+      expect(applications, "the retained final revision retransmits without a later gap signal").toBe(1);
+      expect(scheduled.at(-1)?.cancelled, "materialApplied stops the next delivery retry").toBe(true);
+      expect(host.unackedCount(), "material receipt still does not weaken continuation retention").toBe(1);
+
+      expect(notifyCoopOperationContinuationSurface("sharedInput", { epoch: 7, wave: 10, turn: 3 })).toBe(1);
+      await flush();
+      expect(host.unackedCount()).toBe(0);
+    } finally {
+      host.dispose();
+      guest.dispose();
+    }
+  });
+
   it("retains after material apply, rejects unrelated readiness, re-ACKs retransmit, and releases only at final UI", async () => {
     const pair = createLoopbackPair();
     const guestAcks: Extract<CoopMessage, { t: "coopAck" }>[] = [];

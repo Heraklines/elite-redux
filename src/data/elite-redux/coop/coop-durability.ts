@@ -619,6 +619,14 @@ interface OperationContinuationDeadline {
   cancel: () => void;
 }
 
+/** Host delivery retry for the exact last retained operation when no later revision exists to expose a gap. */
+interface PendingOperationDeliveryRetry {
+  authority: CoopOperationAuthorityAddress;
+  startedAt: number;
+  attempts: number;
+  cancel: () => void;
+}
+
 interface OperationAckEvidence {
   stage: CoopAuthorityAckStage;
   canonical: string;
@@ -873,6 +881,8 @@ export class CoopDurabilityManager {
   /** Guest: committed snapshot proofs retained across a channel replacement (bounded, idempotent). */
   private readonly committedSnapshotAcks = new Map<string, Extract<CoopMessage, { t: "coopSnapshotAck" }>>();
   private readonly operationContinuationTimers = new Map<string, OperationContinuationDeadline>();
+  /** A final lost operation has no follower that can make the receiver request its missing revision. */
+  private readonly operationDeliveryRetries = new Map<string, PendingOperationDeliveryRetry>();
   private readonly exhaustedOperationContinuations = new Set<string>();
   private readonly scheduleOperationContinuationDeadline: (callback: () => void, ms: number) => () => void;
   private readonly operationContinuationDeadlineMs: number;
@@ -948,6 +958,7 @@ export class CoopDurabilityManager {
         });
       }
       this.armOperationContinuationDeadline(operation.authority);
+      this.armOperationDeliveryRetry(operation.authority);
     }
     try {
       this.transport.send(msg);
@@ -1536,6 +1547,7 @@ export class CoopDurabilityManager {
     }
     this.hostOperationAckEvidence.set(key, { stage: msg.stage, canonical, value: msg });
     if (msg.stage === "materialApplied" || msg.stage === "continuationReady") {
+      this.cancelOperationDeliveryRetry(key);
       this.settleOperationMaterialWaiters(key, true);
     }
     if (msg.stage !== "continuationReady") {
@@ -1581,6 +1593,7 @@ export class CoopDurabilityManager {
         }
         this.operationContinuationTimers.get(key)?.cancel();
         this.operationContinuationTimers.delete(key);
+        this.cancelOperationDeliveryRetry(key);
         this.settleOperationMaterialWaiters(key, true);
         this.pendingHostOperationContinuations.delete(key);
       } else if (entry.seq > cumulativeThrough) {
@@ -1676,6 +1689,7 @@ export class CoopDurabilityManager {
         );
         deadline.cancel();
         this.operationContinuationTimers.delete(key);
+        this.cancelOperationDeliveryRetry(key);
         this.pendingHostOperationContinuations.delete(key);
       }
     }
@@ -1702,6 +1716,7 @@ export class CoopDurabilityManager {
         return;
       }
       this.exhaustedOperationContinuations.add(key);
+      this.cancelOperationDeliveryRetry(key);
       this.settleOperationMaterialWaiters(key, false);
       this.pendingHostOperationContinuations.delete(key);
       coopWarn("durability", `operation continuation EXHAUSTED key=${key}`);
@@ -1718,6 +1733,82 @@ export class CoopDurabilityManager {
       }
     }, this.operationContinuationDeadlineMs);
     this.operationContinuationTimers.set(key, deadline);
+  }
+
+  /**
+   * Retransmit an operation until the peer proves material receipt. Gap recovery cannot recover the final
+   * lost revision in a class because the receiver has no later follower from which to infer that gap.
+   * Continuation retention remains independent: material receipt stops delivery retries, while the exact
+   * presentation/continuation ACK is still required to release the journal.
+   */
+  private armOperationDeliveryRetry(authority: CoopOperationAuthorityAddress): void {
+    const key = operationAuthorityKey(authority);
+    if (this.operationDeliveryRetries.has(key) || this.exhaustedOperationContinuations.has(key)) {
+      return;
+    }
+    const pending: PendingOperationDeliveryRetry = {
+      authority,
+      startedAt: this.recoveryNow(),
+      attempts: 0,
+      cancel: () => {},
+    };
+    pending.cancel = this.scheduleRecovery(() => this.sendOperationDeliveryRetry(pending), this.recoveryInitialMs);
+    this.operationDeliveryRetries.set(key, pending);
+  }
+
+  private sendOperationDeliveryRetry(pending: PendingOperationDeliveryRetry): void {
+    const { authority } = pending;
+    const key = operationAuthorityKey(authority);
+    if (this.operationDeliveryRetries.get(key) !== pending) {
+      return;
+    }
+    const evidence = this.hostOperationAckEvidence.get(key);
+    if (
+      this.disposed
+      || this.journal.ackedThrough(authority.cls) >= authority.seq
+      || (evidence != null && OPERATION_ACK_STAGE_ORDER[evidence.stage] >= OPERATION_ACK_STAGE_ORDER.materialApplied)
+    ) {
+      this.cancelOperationDeliveryRetry(key);
+      return;
+    }
+    const elapsed = this.recoveryNow() - pending.startedAt;
+    if (pending.attempts >= this.recoveryMaxAttempts || elapsed >= this.recoveryDeadlineMs) {
+      this.cancelOperationDeliveryRetry(key);
+      coopWarn(
+        "durability",
+        `operation delivery retries exhausted key=${key} attempts=${pending.attempts}; continuation deadline remains armed`,
+      );
+      return;
+    }
+    const retained = this.journal.entry(authority.cls, authority.seq);
+    if (retained == null) {
+      this.cancelOperationDeliveryRetry(key);
+      return;
+    }
+    pending.attempts++;
+    coopLog(
+      "durability",
+      `operation delivery RETRY key=${key} attempt=${pending.attempts}/${this.recoveryMaxAttempts}`,
+    );
+    try {
+      this.transport.send(retained.msg);
+    } catch (error) {
+      coopWarn("durability", `operation delivery retry send deferred key=${key}`, error);
+    }
+    if (this.operationDeliveryRetries.get(key) !== pending) {
+      return;
+    }
+    const delay = Math.min(this.recoveryInitialMs * 2 ** (pending.attempts - 1), this.recoveryMaxMs);
+    pending.cancel = this.scheduleRecovery(() => this.sendOperationDeliveryRetry(pending), delay);
+  }
+
+  private cancelOperationDeliveryRetry(key: string): void {
+    const pending = this.operationDeliveryRetries.get(key);
+    if (pending == null) {
+      return;
+    }
+    pending.cancel();
+    this.operationDeliveryRetries.delete(key);
   }
 
   /** Resolve and forget every exact phase waiter once; promise continuations run outside this wire stack. */
@@ -2059,6 +2150,10 @@ export class CoopDurabilityManager {
     }
     this.pendingDeferred.clear();
     this.deferredFollowers.clear();
+    for (const pending of this.operationDeliveryRetries.values()) {
+      pending.cancel();
+    }
+    this.operationDeliveryRetries.clear();
     this.pendingCumulativeAcks.clear();
     this.retainedSnapshotFrontiers.clear();
     this.committedSnapshotAcks.clear();
@@ -2089,6 +2184,10 @@ export class CoopDurabilityManager {
       deadline.cancel();
     }
     this.operationContinuationTimers.clear();
+    for (const pending of this.operationDeliveryRetries.values()) {
+      pending.cancel();
+    }
+    this.operationDeliveryRetries.clear();
     this.pendingOperationContinuations.clear();
     for (const [key] of this.pendingHostOperationContinuations) {
       this.settleOperationMaterialWaiters(key, false);
