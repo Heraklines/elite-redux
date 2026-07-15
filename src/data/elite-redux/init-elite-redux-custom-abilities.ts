@@ -37,6 +37,7 @@ import {
   BorrowedTimeSummonAbAttr,
   ER_BORROWED_TIME_ABILITY_ID,
 } from "#data/elite-redux/abilities/borrowed-time";
+import { ChivalryAbAttr, ER_CHIVALRY_ABILITY_ID } from "#data/elite-redux/abilities/chivalry";
 import { CleansingLightAbAttr, ER_CLEANSING_LIGHT_ABILITY_ID } from "#data/elite-redux/abilities/cleansing-light";
 import { CommonRootAbAttr, ER_COMMON_ROOT_ABILITY_ID } from "#data/elite-redux/abilities/common-root";
 import {
@@ -381,6 +382,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_CROSSCUT_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_CHIVALRY_ABILITY_ID,
+        name: "Chivalry",
+        description:
+          "In doubles, this Pokemon takes 50% of the direct damage aimed at its ally as a raw, unmitigated hit. In singles, when it voluntarily switches out, the incoming Pokemon sends 25% of the direct damage it takes to the off-field holder until the end of its next turn.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_CHIVALRY_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -633,6 +644,10 @@ function buildCustomAbility(
   if (pokerogueId === ER_CROSSCUT_ABILITY_ID) {
     builder.attr(CrosscutSecondStrikeAbAttr);
     builder.attr(CrosscutPowerAbAttr);
+  }
+
+  if (pokerogueId === ER_CHIVALRY_ABILITY_ID) {
+    builder.attr(ChivalryAbAttr);
   }
 
   const ability = builder.build();

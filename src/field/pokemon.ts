@@ -56,6 +56,7 @@ import {
 import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/daily-seed/daily-run";
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { erApplyChivalry } from "#data/elite-redux/abilities/chivalry";
 import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
 import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
@@ -5779,6 +5780,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     globalScene.phaseManager.unshiftPhase(damagePhase);
     if (this.switchOutStatus && source) {
       damage = 0;
+    }
+    // ER Chivalry (ability 5909): on a DIRECT hit, a doubles ally absorbs 50% of
+    // this Pokemon's incoming damage (raw), or — in singles after the holder
+    // voluntarily switched out — 25% is redirected to the off-field holder. The
+    // transferred share is removed from this Pokemon's incoming damage.
+    if (!isIndirectDamage && source && damage > 0) {
+      damage -= erApplyChivalry(this, damage);
     }
     // ER Life Preserver (ability 5916): once per battle, a DIRECT attack that
     // would faint this Pokemon is clamped to leave it at 1 HP if a living ally
