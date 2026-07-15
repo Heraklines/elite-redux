@@ -2365,7 +2365,89 @@ function ctrSlotControlsHtml(m, i) {
       ${n > 1 ? `<button type="button" class="ctr-var-del" data-idx="${i}" title="Remove this possibility">✕ possibility</button>` : ""}
     </span>`;
   }
-  return `<div class="ctr-slot-ctrls">${slotProb}${weightedToggle}${weightedCtrls}</div>`;
+  return `<div class="ctr-slot-ctrls">${slotProb}${weightedToggle}${weightedCtrls}${ctrCopyControlHtml(i)}</div>`;
+}
+
+/** The per-member "Copy" picker: copies the CURRENTLY-SHOWN possibility either
+ *  into a slot (first empty / new slot) or as a new possibility of a chosen slot
+ *  (weight 100, auto-weighted). A SEPARATE control from the possibility +/✕. */
+function ctrCopyControlHtml(i) {
+  const t = ctrCur();
+  if (!t) {
+    return "";
+  }
+  const slotOpts = t.team
+    .map((s, si) => {
+      const nm = s.species ? spByConst.get(s.species)?.name || s.species : "(empty)";
+      return `<option value="poss:${si}">Slot ${si + 1}: ${esc(nm)}</option>`;
+    })
+    .join("");
+  // A slot target is available when there is an empty slot OR room to append.
+  const canSlot = t.team.length < 6 || t.team.some(s => !s.species);
+  return `<select class="ctr-copy" data-idx="${i}" title="Copy this Pokémon (the currently-shown possibility) elsewhere">
+    <option value="">⧉ Copy…</option>
+    <optgroup label="Copy into a slot">
+      <option value="slot:auto"${canSlot ? "" : " disabled"}>First empty / new slot</option>
+    </optgroup>
+    <optgroup label="Copy as a possibility of">${slotOpts}</optgroup>
+  </select>`;
+}
+
+/** Build a fresh single-possibility SLOT object from cloned member fields. */
+function ctrSlotFromFields(fields) {
+  return {
+    ...ctrCopyMemberFields(fields),
+    slotChance: 100,
+    weighted: false,
+    cur: 0,
+    variants: [{ ...ctrCopyMemberFields(fields), weight: 1 }],
+  };
+}
+
+/** Execute a member Copy command ("slot:auto" | "poss:<idx>") from source slot `srcIdx`. */
+function ctrCopyMember(t, srcIdx, cmd) {
+  const src = t.team[srcIdx];
+  if (!src) {
+    return;
+  }
+  ctrEnsureSlot(src);
+  ctrSyncCurrentVariant(src); // fold live edits into the shown possibility first
+  const fields = ctrCopyMemberFields(src); // deep clone of the SHOWN possibility
+  if (cmd === "slot:auto") {
+    // Least-destructive: fill the first EMPTY slot (species ""), else append a new
+    // slot when there is room. A full, all-filled team can't take a slot copy.
+    const emptyIdx = t.team.findIndex(s => !s.species);
+    if (emptyIdx >= 0) {
+      t.team[emptyIdx] = ctrSlotFromFields(fields);
+      ctrSetSel.set(emptyIdx, -1);
+      ctrOpenMembers.add(emptyIdx);
+      ctrFocusIdx = emptyIdx;
+    } else if (t.team.length < 6) {
+      t.team.push(ctrSlotFromFields(fields));
+      ctrOpenMembers.add(t.team.length - 1);
+      ctrFocusIdx = t.team.length - 1;
+    } else {
+      setStatus("Team is full (6 members) — no empty slot to copy into.");
+    }
+    return;
+  }
+  const poss = cmd.match(/^poss:(\d+)$/);
+  if (poss) {
+    const targetIdx = Number(poss[1]);
+    const target = t.team[targetIdx];
+    if (!target) {
+      return;
+    }
+    ctrEnsureSlot(target);
+    ctrSyncCurrentVariant(target);
+    // Append as a new possibility (weight 100), auto-enabling the weighted slot.
+    target.weighted = true;
+    target.variants.push({ ...ctrCopyMemberFields(fields), weight: 100 });
+    ctrLoadVariant(target, target.variants.length - 1);
+    ctrSetSel.set(targetIdx, -1);
+    ctrOpenMembers.add(targetIdx);
+    ctrFocusIdx = targetIdx;
+  }
 }
 
 /** The <option>s for one shiny-effect category select: "(none)" + the registry. */
@@ -3215,6 +3297,14 @@ function onCustomTrainerChange(el) {
     return true;
   } else if (el.id === "ctr-endless") {
     t.endless = el.checked;
+    render();
+    return true;
+  } else if (el.classList.contains("ctr-copy") && m) {
+    // Copy the shown possibility into a slot / as a new possibility, then reset the
+    // picker to its placeholder on re-render.
+    if (el.value) {
+      ctrCopyMember(t, idx, el.value);
+    }
     render();
     return true;
   } else if (el.classList.contains("ctr-weighted") && m) {

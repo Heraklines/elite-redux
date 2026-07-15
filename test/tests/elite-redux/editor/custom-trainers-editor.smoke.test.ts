@@ -803,6 +803,61 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].victoryDialogue.length).toBe(200);
   });
 
+  it("copy member: into a slot (first empty / new) and as a new possibility (weight 100, auto-weighted)", () => {
+    const key = newTrainer();
+    const t = ct.ctr.current[key];
+    setSpecies(0, "SPECIES_PIKACHU");
+    // Give the lead a distinctive moveset so we can prove a DEEP clone.
+    const mv0 = q('.ctr-move[data-idx="0"][data-slot="0"]') as HTMLInputElement;
+    mv0.value = "THUNDERBOLT";
+    ct.onCustomTrainerInput(mv0);
+
+    // The Copy picker renders on the member.
+    const copy = q('.ctr-copy[data-idx="0"]') as HTMLSelectElement;
+    expect(copy).not.toBeNull();
+
+    // --- Target A: copy into a slot. The blank trainer has only the lead, so the
+    // copy appends as a NEW slot (no other empty slot exists).
+    copy.value = "slot:auto";
+    ct.onCustomTrainerChange(copy);
+    expect(t.team.length).toBe(2);
+    // Slot 2 is a deep clone of the lead (species + moves), a SEPARATE object.
+    expect(t.team[1].species).toBe("SPECIES_PIKACHU");
+    expect(t.team[1].moves[0]).toBe("THUNDERBOLT");
+    expect(t.team[1]).not.toBe(t.team[0]);
+    t.team[1].species = "SPECIES_RAICHU"; // mutating the copy must not touch the source
+    expect(t.team[0].species).toBe("SPECIES_PIKACHU");
+    t.team[1].species = "SPECIES_PIKACHU";
+
+    // --- Target B: copy the lead AS A NEW POSSIBILITY of slot 2. Slot 2 becomes a
+    // weighted slot with a 2nd possibility at weight 100.
+    ct.render();
+    const copy0 = q('.ctr-copy[data-idx="0"]') as HTMLSelectElement;
+    copy0.value = "poss:1";
+    ct.onCustomTrainerChange(copy0);
+    expect(t.team[1].weighted).toBe(true);
+    expect(t.team[1].variants.length).toBe(2);
+    // The appended possibility is the deep-cloned lead at weight 100.
+    const appended = t.team[1].variants[1];
+    expect(appended.species).toBe("SPECIES_PIKACHU");
+    expect(appended.moves[0]).toBe("THUNDERBOLT");
+    expect(appended.weight).toBe(100);
+
+    // --- Slot target when an EMPTY slot exists: fills it rather than appending.
+    // Add a blank 3rd member, then copy the lead into the first empty slot.
+    ct.onCustomTrainerClick({ target: q("#ctr-add-member")! });
+    expect(t.team.length).toBe(3);
+    expect(t.team[2].species).toBe(""); // blank/empty
+    ct.render();
+    const copyLead = q('.ctr-copy[data-idx="0"]') as HTMLSelectElement;
+    copyLead.value = "slot:auto";
+    ct.onCustomTrainerChange(copyLead);
+    // Filled the empty slot 3 (no new slot appended).
+    expect(t.team.length).toBe(3);
+    expect(t.team[2].species).toBe("SPECIES_PIKACHU");
+    expect(t.team[2].moves[0]).toBe("THUNDERBOLT");
+  });
+
   it("named challenge preset picker sets the challenge + value fields and serializes", () => {
     const key = newTrainer();
     setSpecies(0, "SPECIES_PIKACHU");
