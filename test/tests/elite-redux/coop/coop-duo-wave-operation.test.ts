@@ -350,6 +350,10 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
 
   it("retained ordinary Victory ignores speculative Mystery classification with no encounter payload", async () => {
     const rig = await bootDuo({ preserveProductionWaveSink: true });
+    // The retained journal's production sink bootstraps only at its addressed source wave. Mirror that exact
+    // pre-delivery boundary first, then let the renderer speculate to wave 12 after the immutable operation
+    // has landed. Starting this fixture at the boot wave (1) would correctly reject a wave-11 transaction.
+    rig.guestScene.currentBattle.waveIndex = 11;
     await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 11 });
 
     await withClient(rig.guestCtx, () => {

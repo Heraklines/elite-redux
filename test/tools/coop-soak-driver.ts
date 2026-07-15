@@ -2327,6 +2327,23 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         );
         return;
       }
+      if (guestBiomeBoundary != null) {
+        // PhaseInterceptor starts the host's SwitchBiome/NewBiomeEncounter tail while driving it to Command,
+        // but it deliberately disables the guest PhaseManager's automatic start hook. Drain the guest's
+        // actual committed biome tail to the same public command boundary before comparing destinations.
+        // Merely awaiting the command rendezvous here would leave the guest parked on an unstarted
+        // SwitchBiomePhase and misclassify a harness scheduling gap as a production biome desync.
+        const guestCommand = await withClient(rig.guestCtx, () =>
+          driveClientPhaseQueueTo(rig.guestScene, "CommandPhase"),
+        );
+        if (guestCommand.phaseName !== "CommandPhase") {
+          fail(
+            "no-park",
+            transitionSourceWave,
+            `World Map guest tail reached ${guestCommand.phaseName} instead of CommandPhase`,
+          );
+        }
+      }
       const guestResult = await withClient(rig.guestCtx, () => rig.guestRuntime.rendezvous.awaitPartner(point));
       if (guestResult.timedOut || guestResult.crossPoint !== undefined) {
         fail(

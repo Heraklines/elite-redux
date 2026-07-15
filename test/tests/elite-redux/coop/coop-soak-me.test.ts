@@ -147,6 +147,7 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: mid-run mystery-encounter continuatio
       `soak found ${result.findings.length} unhealed DIGEST desync(s) (replay SOAK_SEED=${seed}): `
         + result.findings.map(f => `[${f.fields}]@${f.firstWave}`).join(", "),
     ).toEqual([]);
+    expect(result.assertions, "no production checksum assertion fired across the ME and biome boundaries").toBe(0);
 
     logs.flush();
   }, 600_000);
