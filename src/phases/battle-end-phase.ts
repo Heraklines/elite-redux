@@ -9,7 +9,9 @@ import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import {
   awaitCoopSettledWaveAdvanceAtBattleEnd,
   broadcastCoopWaveEndState,
+  type CoopAutomaticVictorySealIdentity,
   consumeCoopPendingWaveEndState,
+  deferCoopAutomaticVictorySealAtBattleEnd,
   failCoopSharedSession,
   getCoopWaveAdvanceRuntimeBinding,
   isCoopAuthoritativeGuest,
@@ -130,11 +132,14 @@ export class BattleEndPhase extends BattlePhase {
   /** The battle this queued phase closes, before a speculative tail can replace `currentBattle`. */
   private readonly retainedSourceWave: number;
   private readonly retainedSourceWasTrainer: boolean;
+  /** Normal retained wins settle only after every automatic post-victory child has drained. */
+  private readonly automaticVictorySeal: CoopAutomaticVictorySealIdentity | null;
 
-  constructor(isVictory: boolean) {
+  constructor(isVictory: boolean, automaticVictorySeal: CoopAutomaticVictorySealIdentity | null = null) {
     super();
 
     this.isVictory = isVictory;
+    this.automaticVictorySeal = automaticVictorySeal;
     this.retainedWaveBinding = getCoopWaveAdvanceRuntimeBinding();
     const retainedBoundary =
       this.retainedWaveBinding == null ? null : getCoopPendingWaveAdvanceBoundary(this.retainedWaveBinding);
@@ -219,9 +224,13 @@ export class BattleEndPhase extends BattlePhase {
     }
 
     globalScene.updateModifiers();
-    // HOST: capture only after every BattleEnd stat/modifier/material mutation above has settled. This
-    // seals DATA + destination in the retained WAVE_ADVANCE envelope, then emits raw compatibility state.
-    broadcastCoopWaveEndState(this.isVictory);
+    // Normal retained wins still have automatic TrainerVictory/Money/Modifier/Egg/buff/heal children ahead
+    // of their first interactive continuation. Stage that exact phase-owned boundary here and let the
+    // explicit CoopVictorySealPhase capture after those children drain. Capture/flee and legacy sessions
+    // retain the established BattleEnd settlement timing.
+    if (!deferCoopAutomaticVictorySealAtBattleEnd(this.automaticVictorySeal)) {
+      broadcastCoopWaveEndState(this.isVictory);
+    }
     // Keep the enemy objects serializable through the settled capture, then tear down presentation exactly
     // as before. The retained post-battle image explicitly marks enemy seats hidden on the guest.
     for (const p of globalScene.getEnemyParty()) {

@@ -387,6 +387,9 @@ export interface SoakBoundaryDigest {
  */
 export interface SoakPostWaveState {
   wave: number;
+  victoryKind: "wild" | "trainer" | null;
+  hostMoney: number;
+  guestMoney: number;
   hostPlayerModifiers: Record<string, unknown>[];
   guestPlayerModifiers: Record<string, unknown>[];
   retainedWaveTransaction: {
@@ -3522,8 +3525,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         return Array.isArray(modifiers) ? structuredClone(modifiers as Record<string, unknown>[]) : [];
       });
     const staged = getCoopStagedWaveAdvanceTransaction(wave, rig.guestRuntime.waveOperationBinding);
+    const victoryKind = (staged?.envelope.pendingOperation?.payload as { victoryKind?: unknown } | undefined)
+      ?.victoryKind;
     postWaveStates.push({
       wave,
+      victoryKind: victoryKind === "wild" || victoryKind === "trainer" ? victoryKind : null,
+      hostMoney: await withClient(rig.hostCtx, () => rig.hostScene.money),
+      guestMoney: await withClient(rig.guestCtx, () => rig.guestScene.money),
       hostPlayerModifiers: await modifiersFor(rig.hostCtx),
       guestPlayerModifiers: await modifiersFor(rig.guestCtx),
       retainedWaveTransaction:

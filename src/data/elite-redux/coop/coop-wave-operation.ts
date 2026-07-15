@@ -516,6 +516,11 @@ export function coopWaveAdvanceSanctionedTails(payload: CoopWaveAdvancePayload):
         tails.push("TrainerVictoryPhase");
       }
       tails.push("BattleEndPhase");
+      if (payload.outcome === "win") {
+        // A normal win defers retained DATA until every automatic post-victory child has drained. Capture
+        // keeps its established BattleEnd settlement and therefore never constructs this extra boundary.
+        tails.push("CoopVictorySealPhase");
+      }
       if (payload.nextWave === payload.wave) {
         tails.push("GameOverPhase");
       } else {

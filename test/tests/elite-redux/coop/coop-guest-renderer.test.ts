@@ -1227,6 +1227,43 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(pushed("CommandPhase"), "the guest does NOT jump to a next-wave CommandPhase").toBe(false);
   });
 
+  it("retained normal victory cannot be reclassified by a speculative next-wave Mystery Battle", async () => {
+    await startCoopGuest();
+    const sourceWave = 11;
+    globalScene.currentBattle.waveIndex = sourceWave;
+    globalScene.currentBattle.battleType = BattleType.WILD;
+    for (const enemy of globalScene.getEnemyParty()) {
+      enemy.hp = 0;
+      enemy.doSetStatus(StatusEffect.FAINT);
+    }
+    const partner = getCoopRuntime()!.partnerTransport!;
+    sendWaveAdvance(partner, "win");
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    // Reproduce C1 exactly: the retained source is ordinary wave 11, while mutable ambient state already
+    // advertises wave 12 as MYSTERY_ENCOUNTER without an encounter object. The old ambient classifier called
+    // handleMysteryEncounterVictory and dereferenced `continuousEncounter` on undefined.
+    globalScene.currentBattle.waveIndex = sourceWave + 1;
+    globalScene.currentBattle.battleType = BattleType.MYSTERY_ENCOUNTER;
+    globalScene.currentBattle.mysteryEncounter = undefined;
+    setCoopWaveTailSanction([
+      "VictoryPhase",
+      "BattleEndPhase",
+      "CoopVictorySealPhase",
+      "NewBattlePhase",
+      "NextEncounterPhase",
+    ]);
+    const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
+    const lastEnemy = globalScene.getEnemyParty().at(-1)!;
+    const victory = game.scene.phaseManager.create("VictoryPhase", lastEnemy.id, false, sourceWave);
+
+    expect(() => victory.start(), "retained normal victory never enters Mystery Encounter handling").not.toThrow();
+    const pushed = (name: string) => pushNewSpy.mock.calls.some(([phase]) => phase === name);
+    expect(pushed("BattleEndPhase"), "the immutable normal-wave tail continues through BattleEnd").toBe(true);
+    expect(pushed("CoopVictorySealPhase"), "the retained normal win queues its automatic settlement seal").toBe(true);
+    expect(pushed("SelectModifierPhase"), "wave 11 opens its normal reward continuation").toBe(true);
+  });
+
   // (F2) VOUCHER CREDIT (#633 trainer-victory deadlock): because the guest now runs its OWN
   // TrainerVictoryPhase, its OWN account credits the full ER-difficulty egg-voucher amount. The voucher
   // grant is a `ModifierRewardPhase(modifierTypes.VOUCHER)` whose AddVoucherModifier bumps the LOCAL

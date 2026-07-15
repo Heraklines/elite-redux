@@ -386,7 +386,13 @@ describe("co-op WAVE-ADVANCE operation - the keystone (Wave-2f)", () => {
     it("WILD win: Victory cascade WITHOUT TrainerVictoryPhase", () => {
       const tails = coopWaveAdvanceSanctionedTails(payload({ wave: 5, outcome: "win", victoryKind: "wild" }));
       expect(tails).toEqual(
-        expect.arrayContaining(["VictoryPhase", "BattleEndPhase", "NewBattlePhase", "NextEncounterPhase"]),
+        expect.arrayContaining([
+          "VictoryPhase",
+          "BattleEndPhase",
+          "CoopVictorySealPhase",
+          "NewBattlePhase",
+          "NextEncounterPhase",
+        ]),
       );
       expect(tails).not.toContain("TrainerVictoryPhase");
       expect(tails).not.toContain("GameOverPhase");
@@ -396,6 +402,13 @@ describe("co-op WAVE-ADVANCE operation - the keystone (Wave-2f)", () => {
       const tails = coopWaveAdvanceSanctionedTails(payload({ wave: 5, outcome: "win", victoryKind: "trainer" }));
       expect(tails).toContain("VictoryPhase");
       expect(tails).toContain("TrainerVictoryPhase");
+      expect(tails).toContain("CoopVictorySealPhase");
+    });
+
+    it("CAPTURE retains its established BattleEnd settlement without an automatic-victory seal", () => {
+      const tails = coopWaveAdvanceSanctionedTails(payload({ wave: 5, outcome: "capture", victoryKind: "wild" }));
+      expect(tails).toContain("BattleEndPhase");
+      expect(tails).not.toContain("CoopVictorySealPhase");
     });
 
     it("BIOME boundary sanctions only SelectBiome; destination tails require the later exact pick", () => {

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "taskId": "p33-auto-victory-seal",
+  "branch": "ci/coop/p33-auto-victory-seal",
+  "trainRef": "ci/coop/p33-closure-codex",
+  "baseSha": "a68fc8995b8762a027320ea7a901d673d6290075",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-auto-victory-seal.json",
+    "src/data/elite-redux/coop/coop-renderer-gate.ts",
+    "src/data/elite-redux/coop/coop-runtime.ts",
+    "src/data/elite-redux/coop/coop-wave-operation.ts",
+    "src/phase-manager.ts",
+    "src/phases/battle-end-phase.ts",
+    "src/phases/coop-victory-seal-phase.ts",
+    "src/phases/victory-phase.ts",
+    "test/tests/elite-redux/coop/coop-automatic-victory-seal.test.ts",
+    "test/tests/elite-redux/coop/coop-guest-renderer.test.ts",
+    "test/tests/elite-redux/coop/coop-renderer-allowlist.test.ts",
+    "test/tests/elite-redux/coop/coop-wave-operation.test.ts",
+    "test/tools/coop-soak-driver.ts"
+  ]
+}
