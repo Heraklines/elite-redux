@@ -4931,6 +4931,26 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
             );
           }
         }
+        // ER Relativity (5911): when the holder acted BEFORE this target this
+        // turn, its damaging moves use its CURRENT Speed in place of Atk/SpAtk.
+        // Order-based (Trick-Room-safe) — resolved inside `resolveOffenseStat`.
+        if (attr?.constructor?.name === "RelativityAbAttr") {
+          const sub = (
+            attr as unknown as { resolveOffenseStat: (s: Pokemon, t: Pokemon) => EffectiveStat | null }
+          ).resolveOffenseStat(source, this);
+          if (sub != null) {
+            sourceAtk.value = source.getEffectiveStat(
+              sub,
+              this,
+              undefined,
+              ignoreSourceAbility,
+              ignoreAbility,
+              ignoreAllyAbility,
+              isCritical,
+              simulated,
+            );
+          }
+        }
       }
     }
 

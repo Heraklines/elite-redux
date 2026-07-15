@@ -42,6 +42,11 @@ import { ER_PRESSURE_VESSEL_ABILITY_ID, PressureVesselAbAttr } from "#data/elite
 import { ER_PUPPET_STRINGS_ABILITY_ID, PuppetStringsAbAttr } from "#data/elite-redux/abilities/puppet-strings";
 import { ER_QUICKENING_GRACE_ABILITY_ID, QuickeningGraceAbAttr } from "#data/elite-redux/abilities/quickening-grace";
 import { ER_RAIN_PUMP_ABILITY_ID, RainPumpAbAttr } from "#data/elite-redux/abilities/rain-pump";
+import {
+  ER_RELATIVITY_ABILITY_ID,
+  RelativityAbAttr,
+  RelativityDefenseReductionAbAttr,
+} from "#data/elite-redux/abilities/relativity";
 import { ER_SILKEN_DECREE_ABILITY_ID, SilkenDecreeAbAttr } from "#data/elite-redux/abilities/silken-decree";
 import { ER_SPORE_BED_ABILITY_ID } from "#data/elite-redux/abilities/spore-bed";
 import { ER_TANGLED_SEED_ABILITY_ID, TangledSeedAbAttr } from "#data/elite-redux/abilities/tangled-seed";
@@ -336,6 +341,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_LIFE_PRESERVER_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_RELATIVITY_ABILITY_ID,
+        name: "Relativity",
+        description:
+          "When this Pokemon acts before its target, its damaging moves use its Speed instead of Attack or Sp. Atk. When it acts after its target, it takes 25% less damage from that target. Based on move order, not speed.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_RELATIVITY_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -573,6 +588,11 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_LIFE_PRESERVER_ABILITY_ID) {
     builder.attr(LifePreserverAbAttr);
+  }
+
+  if (pokerogueId === ER_RELATIVITY_ABILITY_ID) {
+    builder.attr(RelativityAbAttr);
+    builder.attr(RelativityDefenseReductionAbAttr);
   }
 
   const ability = builder.build();
