@@ -1609,8 +1609,7 @@ export function markRealGuestCommandBoundary(scene: BattleScene, wave: number, t
 export function materializeMirroredGuestInputTurn(scene: BattleScene): void {
   const current = scene.phaseManager.getCurrentPhase();
   const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
-  const untouchedLoginBoot =
-    current?.phaseName === "LoginPhase" && queued.length === 1 && queued[0] === "TitlePhase";
+  const untouchedLoginBoot = current?.phaseName === "LoginPhase" && queued.length === 1 && queued[0] === "TitlePhase";
   const untouchedTitleBoot = current?.phaseName === "TitlePhase" && queued.length === 0;
   if (!untouchedLoginBoot && !untouchedTitleBoot) {
     throw new Error(

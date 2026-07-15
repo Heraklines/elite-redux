@@ -2085,19 +2085,34 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       await withClient(rig.hostCtx, () => drainLoopback());
       await withClient(rig.hostCtx, () => beforeHostCross?.());
       for (;;) {
-        const boundary = await withClient(rig.hostCtx, async () => {
-          // A reward continuation can be created DURING this crossing (ModifierRewardPhase applies the item),
-          // so inspecting the queue before advancing is too early. Stop at either structural branch, then arm
-          // Dex Nav only after it actually exists. This also guarantees no Dex Nav prompt can leak into an
-          // ordinary CommandPhase crossing.
-          return game.phaseInterceptor.toFirst([
-            "CommandPhase",
-            "ErDexNavPhase",
-            "TheBargainPhase",
-            "ErCrossroadsPhase",
-            "SelectBiomePhase",
-          ] as const);
-        });
+        const boundary = restartAlreadyOpenHost
+          ? await withClient(rig.hostCtx, () => {
+              const current = rig.hostScene.phaseManager.getCurrentPhase();
+              if (
+                current?.phaseName !== "CommandPhase"
+                || rig.hostScene.currentBattle.waveIndex !== wave
+                || rig.hostScene.currentBattle.turn !== turn
+              ) {
+                throw new Error(
+                  `initial host command boundary is not current: ${current?.phaseName ?? "none"} `
+                    + `${rig.hostScene.currentBattle.waveIndex}:${rig.hostScene.currentBattle.turn}`,
+                );
+              }
+              return "CommandPhase" as const;
+            })
+          : await withClient(rig.hostCtx, async () => {
+              // A reward continuation can be created DURING this crossing (ModifierRewardPhase applies the item),
+              // so inspecting the queue before advancing is too early. Stop at either structural branch, then arm
+              // Dex Nav only after it actually exists. This also guarantees no Dex Nav prompt can leak into an
+              // ordinary CommandPhase crossing.
+              return game.phaseInterceptor.toFirst([
+                "CommandPhase",
+                "ErDexNavPhase",
+                "TheBargainPhase",
+                "ErCrossroadsPhase",
+                "SelectBiomePhase",
+              ] as const);
+            });
         if (boundary === "ErDexNavPhase") {
           await withClient(rig.hostCtx, async () => {
             armHostDexNavAutoPicks();
