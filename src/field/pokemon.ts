@@ -57,6 +57,7 @@ import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/dai
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
+import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { suppressesOpponentDamageBoosts } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
@@ -5748,6 +5749,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     globalScene.phaseManager.unshiftPhase(damagePhase);
     if (this.switchOutStatus && source) {
       damage = 0;
+    }
+    // ER Life Preserver (ability 5916): once per battle, a DIRECT attack that
+    // would faint this Pokemon is clamped to leave it at 1 HP if a living ally
+    // carries the ability — and the attacker is Drenched. Direct hits only
+    // (indirect chip does not trigger it), and only when this hit is lethal.
+    if (!isIndirectDamage && source && damage > 0 && this.hp - damage <= 0 && erTryLifePreserver(this, source)) {
+      damage = this.hp - 1;
     }
     damage = this.damage(damage, ignoreSegments, isIndirectDamage, ignoreFaintPhase);
     erRecordAchievementDamageAndUpdate(this, damage, source, isIndirectDamage ? "indirect" : "direct");

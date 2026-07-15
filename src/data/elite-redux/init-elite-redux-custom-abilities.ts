@@ -36,6 +36,7 @@ import { CleansingLightAbAttr, ER_CLEANSING_LIGHT_ABILITY_ID } from "#data/elite
 import { CommonRootAbAttr, ER_COMMON_ROOT_ABILITY_ID } from "#data/elite-redux/abilities/common-root";
 import { DandelionBurstAbAttr, ER_DANDELION_BURST_ABILITY_ID } from "#data/elite-redux/abilities/dandelion-burst";
 import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abilities/last-host";
+import { ER_LIFE_PRESERVER_ABILITY_ID, LifePreserverAbAttr } from "#data/elite-redux/abilities/life-preserver";
 import { ER_MYCELIAL_NETWORK_ABILITY_ID, MycelialNetworkAbAttr } from "#data/elite-redux/abilities/mycelial-network";
 import { ER_PRESSURE_VESSEL_ABILITY_ID, PressureVesselAbAttr } from "#data/elite-redux/abilities/pressure-vessel";
 import { ER_PUPPET_STRINGS_ABILITY_ID, PuppetStringsAbAttr } from "#data/elite-redux/abilities/puppet-strings";
@@ -325,6 +326,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_QUICKENING_GRACE_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_LIFE_PRESERVER_ABILITY_ID,
+        name: "Life Preserver",
+        description:
+          "Once per battle, when this Pokemon's ally would faint from a direct attack, the ally survives at 1 HP and the attacker becomes Drenched. Water-type attackers are unaffected.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_LIFE_PRESERVER_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -558,6 +569,10 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_QUICKENING_GRACE_ABILITY_ID) {
     builder.attr(QuickeningGraceAbAttr);
+  }
+
+  if (pokerogueId === ER_LIFE_PRESERVER_ABILITY_ID) {
+    builder.attr(LifePreserverAbAttr);
   }
 
   const ability = builder.build();
