@@ -1,0 +1,55 @@
+===== COOP SOAK RESULT =====
+profile: journey
+verdict: FAIL
+waves_requested: 45
+run: 29449594062 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T20-48-33Z
+
+----- driver lines -----
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+[coop-soak] ME DRIVEN wave 14 (seed 828633): ER_HOT_SPRING [host-owned]
+[coop-soak] ME DRIVEN wave 16 (seed 828633): BERRIES_ABOUND [host-owned]
+[coop-soak] ME DRIVEN wave 18 (seed 828633): ER_PICNIC [host-owned]
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 20 (seed 828633): wave driving threw (strand/stall): guest retained wave 20 did not reach continuationReady within 24 destination pumps (current=NewBattlePhase dataApplied=true continuationReady=false). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T20-48-33-558Z__seed-828633__wave-20. Replay: SOAK_SEED=828633[39m
+
+----- vitest result tail -----
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[33m[coop:relay] dispose() failing inFlightWaiters=4 (choice=0 outcome=4 rewardOptions=0) -> all resolve null[39m
+[33m[coop:relay] AWAIT interactionOutcome seq=8000013 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+[33m[coop:relay] AWAIT interactionOutcome seq=8000016 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+[33m[coop:relay] AWAIT interactionOutcome seq=8000018 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+[33m[coop:relay] AWAIT interactionOutcome seq=8000020 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mco-op continuous journey: many mystery events plus biome transitions > plays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m28812[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak-journey.test.ts:101:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m > [22mco-op continuous journey: many mystery events plus biome transitions[2m > [22mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 20 (seed 828633): wave driving threw (strand/stall): guest retained wave 20 did not reach continuationReady within 24 destination pumps (current=NewBattlePhase dataApplied=true continuationReady=false). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T20-48-33-558Z__seed-828633__wave-20. Replay: SOAK_SEED=828633[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1581:11[22m[39m
+    [90m1579|[39m       phaseState: phaseStateDump(rig),
+    [90m1580|[39m     });
+    [90m1581|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1582|[39m   };
+    [90m1583|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4297:7[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-journey.test.ts:[2m105:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 20:47:40
+[2m   Duration [22m 53.39s[2m (transform 18.92s, setup 22.92s, import 246ms, tests 29.27s, environment 771ms)[22m
+
