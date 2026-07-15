@@ -1,0 +1,56 @@
+===== COOP SOAK RESULT =====
+profile: journey
+verdict: FAIL
+waves_requested: 45
+run: 29454188790 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T22-07-03Z
+
+----- driver lines -----
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+[coop-soak] ME DRIVEN wave 14 (seed 828633): ER_HOT_SPRING [host-owned]
+[coop-soak] ME DRIVEN wave 16 (seed 828633): BERRIES_ABOUND [host-owned]
+[coop-soak] ME DRIVEN wave 18 (seed 828633): ER_PICNIC [host-owned]
+[coop-soak] ME DRIVEN wave 24 (seed 828633): FIELD_TRIP [guest-owned]
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 25 (seed 828633): wave driving threw (strand/stall): client phase drive to SelectModifierPhase HANG on TitlePhase; queued=[], ui=TITLE. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T22-07-02-709Z__seed-828633__wave-25. Replay: SOAK_SEED=828633[39m
+
+----- vitest result tail -----
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: 8_000_027, termSeq: -1, wasOwner: false }
+[coop:transport] state host disconnected -> closed
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[33m[coop:rendezvous] RENDEZVOUS ABORT point=shop:25:28 - waiter torn down without partner arrival role=host[39m
+[33m[coop:rendezvous] shop-pick-commit barrier shop:25:28 ABORTED during teardown/recovery - pick screen remains closed[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mco-op continuous journey: many mystery events plus biome transitions > plays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m45101[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak-journey.test.ts:101:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m > [22mco-op continuous journey: many mystery events plus biome transitions[2m > [22mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 25 (seed 828633): wave driving threw (strand/stall): client phase drive to SelectModifierPhase HANG on TitlePhase; queued=[], ui=TITLE. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T22-07-02-709Z__seed-828633__wave-25. Replay: SOAK_SEED=828633[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1581:11[22m[39m
+    [90m1579|[39m       phaseState: phaseStateDump(rig),
+    [90m1580|[39m     });
+    [90m1581|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1582|[39m   };
+    [90m1583|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4297:7[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-journey.test.ts:[2m105:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 22:05:52
+[2m   Duration [22m 69.73s[2m (transform 18.93s, setup 23.07s, import 253ms, tests 45.51s, environment 740ms)[22m
+
