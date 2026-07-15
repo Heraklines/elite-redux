@@ -5,6 +5,7 @@
   "trainRef": "ci/coop/p33-closure-codex",
   "baseSha": "9eaada40a15e3a1b4b3fd251ec3d210eaf2a7418",
   "allowedFiles": [
+    ".github/coop-task-ownership/p33-closure-codex.json",
     ".github/coop-task-ownership/p33-log-pull-hardening.json",
     "scripts/pull-dev-logs.mjs",
     "test/scripts/pull-dev-logs.test.mjs"
