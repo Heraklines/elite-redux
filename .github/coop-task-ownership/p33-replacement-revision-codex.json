@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "taskId": "p33-replacement-revision-codex",
+  "branch": "ci/coop/p33-replacement-revision-codex",
+  "trainRef": "ci/coop/p33-closure-codex",
+  "baseSha": "ffec851b40180d7ecc543237636c5e4a8d6a3763",
+  "allowedFiles": [
+    ".github/coop-task-ownership/p33-replacement-revision-codex.json",
+    "src/data/elite-redux/coop/coop-battle-stream.ts",
+    "test/tests/elite-redux/coop/coop-replacement-carrier-transaction.test.ts"
+  ]
+}
