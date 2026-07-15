@@ -2116,50 +2116,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           continue;
         }
         if (boundary === "ErCrossroadsPhase") {
-          const hostCrossroads = rig.hostScene.phaseManager.getCurrentPhase();
-          const guestCrossroads = await withClient(rig.guestCtx, () =>
-            driveClientPhaseQueueTo(rig.guestScene, "ErCrossroadsPhase"),
-          );
+          const crossroads = await openQueuedCrossroadsSurface(transitionSourceWave);
+          const hostCrossroads = crossroads.hostPhase;
+          const guestCrossroads = crossroads.guestPhase;
           guestCrossroadsProjected = true;
-          const hostCounter = withClientSync(rig.hostCtx, () => rig.hostRuntime.controller.interactionCounter());
-          const guestCounter = withClientSync(rig.guestCtx, () => rig.guestRuntime.controller.interactionCounter());
-          if (hostCounter !== guestCounter) {
-            fail(
-              "lockstep",
-              transitionSourceWave,
-              `Crossroads opened with divergent counters host=${hostCounter} guest=${guestCounter}`,
-            );
-          }
-          const pinned = hostCounter;
-          const hostOwns = withClientSync(rig.hostCtx, () => rig.hostRuntime.controller.isLocalOwnerAtCounter(pinned));
-          const guestOwns = withClientSync(rig.guestCtx, () =>
-            rig.guestRuntime.controller.isLocalOwnerAtCounter(pinned),
-          );
-          if (hostOwns === guestOwns) {
-            fail("desync", transitionSourceWave, `Crossroads owner parity diverged at pinned=${pinned}`);
-          }
-
-          // Production-fidelity T2 seam: both real phases enter xroads:<wave>; no synthetic arrival. The
-          // pinned owner then selects Leave through the public OPTION_SELECT cursor.
-          await withClient(rig.hostCtx, async () => {
-            hostCrossroads.start();
-            await drainLoopback();
-          });
-          await withClient(rig.guestCtx, async () => {
-            guestCrossroads.start();
-            await drainLoopback();
-          });
-          const crossroadsOwnerCtx = hostOwns ? rig.hostCtx : rig.guestCtx;
-          const crossroadsOwnerPhase = hostOwns ? hostCrossroads : guestCrossroads;
-          const crossroadsSurface = await waitForPublicModeOrPhaseExit(
-            crossroadsOwnerCtx,
-            crossroadsOwnerPhase,
-            UiMode.OPTION_SELECT,
-            `${crossroadsOwnerCtx.label}-owned Crossroads`,
-          );
-          if (crossroadsSurface !== "opened") {
-            fail("no-park", transitionSourceWave, "Crossroads owner left before exposing its public choice surface");
-          }
+          const pinned = crossroads.pinned;
+          const crossroadsOwnerCtx = crossroads.ownerCtx;
           await pressClientUiUntilAccepted(crossroadsOwnerCtx, Button.DOWN, "Crossroads Leave cursor");
           await pressClientUiUntilAccepted(crossroadsOwnerCtx, Button.ACTION, "Crossroads Leave");
           await waitForBothBoundaryPhasesToExit(hostCrossroads, guestCrossroads, "Crossroads Leave");
@@ -2753,6 +2715,117 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     throw new Error(`${label} never accepted ${Button[button]}`);
   };
 
+  type CrossroadsPhaseSeam = {
+    readonly phaseName: "ErCrossroadsPhase";
+    start(): void;
+  };
+
+  /**
+   * Open both renderers' real queued Crossroads phases and stop before either player chooses an option.
+   *
+   * The every-ten-wave market can chain directly into Crossroads. In that case the retained WAVE_ADVANCE
+   * is intentionally not continuation-ready merely because both phase queues point at ErCrossroadsPhase:
+   * a player cannot act until start() exposes OPTION_SELECT. This helper creates exactly that public boundary
+   * and is idempotent for the later next-wave crossing, which resumes an already-visible prompt instead of
+   * starting either phase twice. The caller must keep `setCoopBiomePickerDrivenByTest()` armed while invoking
+   * this helper so the headless-only auto-resolver cannot bypass the production owner/watcher surface.
+   */
+  const openQueuedCrossroadsSurface = async (
+    wave: number,
+  ): Promise<{
+    hostPhase: CrossroadsPhaseSeam;
+    guestPhase: CrossroadsPhaseSeam;
+    ownerCtx: DuoRig["hostCtx"];
+    pinned: number;
+  }> => {
+    const hostPhase = rig.hostScene.phaseManager.getCurrentPhase() as unknown as CrossroadsPhaseSeam;
+    if (hostPhase?.phaseName !== "ErCrossroadsPhase") {
+      fail(
+        "no-park",
+        wave,
+        `expected queued ErCrossroadsPhase, reached ${hostPhase?.phaseName ?? "none"}`,
+      );
+    }
+    const guestPhase = (await withClient(rig.guestCtx, () =>
+      driveClientPhaseQueueTo(rig.guestScene, "ErCrossroadsPhase"),
+    )) as unknown as CrossroadsPhaseSeam;
+    if (guestPhase?.phaseName !== "ErCrossroadsPhase") {
+      fail(
+        "no-park",
+        wave,
+        `guest did not reach queued ErCrossroadsPhase (current=${guestPhase?.phaseName ?? "none"})`,
+      );
+    }
+
+    const hostCounter = withClientSync(rig.hostCtx, () => rig.hostRuntime.controller.interactionCounter());
+    const guestCounter = withClientSync(rig.guestCtx, () => rig.guestRuntime.controller.interactionCounter());
+    if (hostCounter !== guestCounter) {
+      fail("lockstep", wave, `Crossroads opened with divergent counters host=${hostCounter} guest=${guestCounter}`);
+    }
+    const pinned = hostCounter;
+    const hostOwns = withClientSync(rig.hostCtx, () => rig.hostRuntime.controller.isLocalOwnerAtCounter(pinned));
+    const guestOwns = withClientSync(rig.guestCtx, () => rig.guestRuntime.controller.isLocalOwnerAtCounter(pinned));
+    if (hostOwns === guestOwns) {
+      fail("desync", wave, `Crossroads owner parity diverged at pinned=${pinned}`);
+    }
+
+    let hostOpen = withClientSync(rig.hostCtx, () => rig.hostScene.ui.getMode() === UiMode.OPTION_SELECT);
+    let guestOpen = withClientSync(rig.guestCtx, () => rig.guestScene.ui.getMode() === UiMode.OPTION_SELECT);
+    if (hostOpen !== guestOpen) {
+      fail(
+        "desync",
+        wave,
+        `Crossroads public surface was already asymmetric hostOpen=${hostOpen} guestOpen=${guestOpen}`,
+      );
+    }
+    if (!hostOpen) {
+      await withClient(rig.hostCtx, async () => {
+        hostPhase.start();
+        await drainLoopback();
+      });
+      await withClient(rig.guestCtx, async () => {
+        guestPhase.start();
+        await drainLoopback();
+      });
+      for (let attempt = 0; attempt < 320; attempt++) {
+        hostOpen = await withClient(rig.hostCtx, async () => {
+          await drainLoopback();
+          if (rig.hostScene.ui.getMode() === UiMode.OPTION_SELECT) {
+            return true;
+          }
+          await new Promise<void>(resolve => setTimeout(resolve, 10));
+          return false;
+        });
+        guestOpen = await withClient(rig.guestCtx, async () => {
+          await drainLoopback();
+          if (rig.guestScene.ui.getMode() === UiMode.OPTION_SELECT) {
+            return true;
+          }
+          await new Promise<void>(resolve => setTimeout(resolve, 10));
+          return false;
+        });
+        if (hostOpen && guestOpen) {
+          break;
+        }
+        await pumpDuoDestinations(rig, 1);
+      }
+      if (!hostOpen || !guestOpen) {
+        fail(
+          "no-park",
+          wave,
+          `Crossroads did not expose OPTION_SELECT on both clients hostOpen=${hostOpen} guestOpen=${guestOpen}`,
+        );
+      }
+    }
+
+    return {
+      hostPhase,
+      guestPhase,
+      ownerCtx: hostOwns ? rig.hostCtx : rig.guestCtx,
+      pinned,
+    };
+  };
+
   /**
    * Drive the every-ten-wave Biome Market through its real owner/watcher phases and public UI terminal.
    *
@@ -2846,7 +2919,29 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
 
       // A real shared continuation is not complete merely because its mechanical terminal advanced. The
       // renderer must also have opened the addressed continuation surface before the retained wave journal
-      // can release. Keep this assertion identical to the ordinary reward path.
+      // can release. On every tenth wave the market can chain into Crossroads; expose that real public prompt
+      // now, without choosing, so the post-wave capture observes the same actionable boundary a human does.
+      // The later next-wave crossing resumes this already-open owner/watcher pair idempotently.
+      const hostContinuation = rig.hostScene.phaseManager.getCurrentPhase();
+      const guestContinuation = rig.guestScene.phaseManager.getCurrentPhase();
+      const hostAtCrossroads = hostContinuation?.phaseName === "ErCrossroadsPhase";
+      const guestAtCrossroads = guestContinuation?.phaseName === "ErCrossroadsPhase";
+      if (hostAtCrossroads !== guestAtCrossroads) {
+        fail(
+          "desync",
+          wave,
+          `post-market continuation diverged host=${hostContinuation?.phaseName ?? "none"} `
+            + `guest=${guestContinuation?.phaseName ?? "none"}`,
+        );
+      }
+      if (hostAtCrossroads) {
+        setCoopBiomePickerDrivenByTest();
+        try {
+          await openQueuedCrossroadsSurface(wave);
+        } finally {
+          resetCoopBiomePickerDrivenByTest();
+        }
+      }
       await awaitGuestWaveTransaction(wave, true);
       actionScript.push(`wave ${wave}: biome market owner=${hostOwns ? "host" : "guest"} leave`);
     } finally {
