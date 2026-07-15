@@ -56,6 +56,7 @@ import {
 import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/daily-seed/daily-run";
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { erFaultCurrentOnLeaveField, erOverloadedSelfLocked } from "#data/elite-redux/abilities/charge-stack";
 import { erApplyChivalry } from "#data/elite-redux/abilities/chivalry";
 import {
   dualTypePrimeMoveType,
@@ -3489,7 +3490,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     return (
       trapped.value
       || !!this.getTag(TrappedTag) // ER FEAR traps the bearer (ROM). Ghost's early-return above still lets // Ghosts switch out, matching vanilla trap rules.
-      || !!this.getTag(BattlerTagType.ER_FEAR)
+      || !!this.getTag(BattlerTagType.ER_FEAR) // ER Overloaded (5927): the holder cannot voluntarily switch while at 4 stacks.
+      || erOverloadedSelfLocked(this)
       || !!globalScene.arena.getTagOnSide(ArenaTagType.FAIRY_LOCK, side)
     );
   }
@@ -7733,6 +7735,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
     // Trigger abilities that activate upon leaving the field
     applyAbAttrs("PreLeaveFieldAbAttr", { pokemon: this });
+    // ER Fault Current (5926): reset the consecutive-active-turn counter on exit.
+    erFaultCurrentOnLeaveField(this);
     this.switchOutStatus = true;
     globalScene.triggerPokemonFormChange(this, SpeciesFormChangeActiveTrigger, true);
     globalScene.field.remove(this, destroy);

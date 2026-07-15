@@ -29,7 +29,7 @@
 // (i18next would otherwise return the missing-key placeholder).
 // =============================================================================
 
-import { type AbAttr, ConditionalCritAbAttr, PostFaintAbAttr } from "#abilities/ab-attrs";
+import { type AbAttr, ConditionalCritAbAttr, PostFaintAbAttr, RedirectTypeMoveAbAttr } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
 import {
@@ -46,6 +46,17 @@ import {
   ER_CROSSCUT_ABILITY_ID,
 } from "#data/elite-redux/abilities/crosscut";
 import { DandelionBurstAbAttr, ER_DANDELION_BURST_ABILITY_ID } from "#data/elite-redux/abilities/dandelion-burst";
+import {
+  CapacitorBankAbsorbAbAttr,
+  CapacitorBankGainAbAttr,
+  ER_CAPACITOR_BANK_ABILITY_ID,
+  ER_FAULT_CURRENT_ABILITY_ID,
+  ER_OVERLOADED_ABILITY_ID,
+  FaultCurrentAbAttr,
+  OverloadedChipAbAttr,
+  OverloadedPowerAbAttr,
+  OverloadedPriorityAbAttr,
+} from "#data/elite-redux/abilities/electivire";
 import { ER_HEARTBREAK_ABILITY_ID, HeartbreakAbAttr } from "#data/elite-redux/abilities/heartbreak";
 import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abilities/last-host";
 import { ER_LIFE_PRESERVER_ABILITY_ID, LifePreserverAbAttr } from "#data/elite-redux/abilities/life-preserver";
@@ -493,6 +504,36 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_CLOSED_CIRCUIT_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_CAPACITOR_BANK_ABILITY_ID,
+        name: "Capacitor Bank",
+        description:
+          "This Pokemon builds up to 4 charges: +1 when it lands an attack, +1 when it is hit by a damaging move, and it absorbs Electric moves for +1 (redirecting them to itself in doubles). Its own Electric moves spend one charge each. Multi-hit moves grant one charge.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_CAPACITOR_BANK_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_FAULT_CURRENT_ABILITY_ID,
+        name: "Fault Current",
+        description:
+          "Every second turn this Pokemon stays on the field, it discharges all of its charges as a spread Electric attack on all opponents, dealing 15 power per charge spent. The counter resets when it switches out.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_FAULT_CURRENT_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_OVERLOADED_ABILITY_ID,
+        name: "Overloaded",
+        description:
+          "While at 4 charges, this Pokemon's Electric moves gain 25% power and +1 priority and it cannot switch out. If it ends a turn still at 4 charges, it loses 1/8 of its max HP.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_OVERLOADED_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -785,6 +826,22 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_CLOSED_CIRCUIT_ABILITY_ID) {
     builder.attr(ClosedCircuitAbAttr);
+  }
+
+  if (pokerogueId === ER_CAPACITOR_BANK_ABILITY_ID) {
+    builder.attr(CapacitorBankGainAbAttr);
+    builder.attr(CapacitorBankAbsorbAbAttr);
+    builder.attr(RedirectTypeMoveAbAttr, PokemonType.ELECTRIC);
+  }
+
+  if (pokerogueId === ER_FAULT_CURRENT_ABILITY_ID) {
+    builder.attr(FaultCurrentAbAttr);
+  }
+
+  if (pokerogueId === ER_OVERLOADED_ABILITY_ID) {
+    builder.attr(OverloadedPowerAbAttr);
+    builder.attr(OverloadedPriorityAbAttr);
+    builder.attr(OverloadedChipAbAttr);
   }
 
   const ability = builder.build();

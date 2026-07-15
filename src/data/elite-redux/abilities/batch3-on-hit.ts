@@ -20,6 +20,8 @@
 // =============================================================================
 
 import type { Pokemon } from "#field/pokemon";
+import type { Move } from "#moves/move";
+import { erCapacitorBankOnAttack } from "./electivire";
 import { erClosedCircuitOnHit, erSyncCurrentOnHit } from "./plusle-minun";
 import { erRendezvousOnHit } from "./rendezvous";
 import { recordTurnAttack } from "./turn-attack-ledger";
@@ -28,11 +30,13 @@ import { recordTurnAttack } from "./turn-attack-ledger";
  * Drive Batch 3 same-turn effects for `user`'s hit on `target`, then record the
  * hit. `damaging` is whether the hit dealt direct damage.
  */
-export function erBatch3OnTargetHit(user: Pokemon, target: Pokemon, damaging: boolean): void {
+export function erBatch3OnTargetHit(user: Pokemon, target: Pokemon, move: Move, damaging: boolean): void {
   // Second-actor triggers first (they read the PARTNER's prior ledger entry).
   erRendezvousOnHit(user, target);
   erSyncCurrentOnHit(user, target, damaging);
   erClosedCircuitOnHit(user, target);
+  // Capacitor Bank: +1 stack when the holder lands an attack (once per move).
+  erCapacitorBankOnAttack(user, move, damaging);
   // Record this hit last so it is visible to LATER movers this turn.
   recordTurnAttack(user, target, damaging);
 }

@@ -7,6 +7,7 @@ import { MoveAnim } from "#data/battle-anims";
 import { ProtectedTag, SemiInvulnerableTag, SubstituteTag, TypeBoostTag } from "#data/battler-tags";
 import { erBatch3OnTargetHit } from "#data/elite-redux/abilities/batch3-on-hit";
 import { consumeDualTypePrimeOnUse, dualTypePrimeApplies } from "#data/elite-redux/abilities/dual-type-move";
+import { erCapacitorBankConsumeOnElectricUse } from "#data/elite-redux/abilities/electivire";
 import {
   ConditionalAlwaysHitAbAttr,
   erMoveAlwaysHitsForUserType,
@@ -246,6 +247,11 @@ export class MoveEffectPhase extends PokemonPhase {
 
     this.firstHit = user.turnData.hitCount === user.turnData.hitsLeft;
     this.lastHit = user.turnData.hitsLeft === 1 || !targets.some(t => t.isActive(true));
+    // ER Capacitor Bank (5925): the holder's Electric moves consume ONE charge
+    // stack per move (guarded to the first strike so a multi-hit move spends one).
+    if (this.firstHit) {
+      erCapacitorBankConsumeOnElectricUse(user, move);
+    }
     erRecordAchievementMoveResolution(user, move, targets, this.hitChecks, this.useMode, this.firstHit);
 
     // Play the animation if the move was successful against any of its targets or it has a POST_TARGET effect (like self destruct)
@@ -951,7 +957,7 @@ export class MoveEffectPhase extends PokemonPhase {
     // ledger recording. Runs after PostAttack so second-actor triggers see the
     // first actor's already-recorded hit.
     if (this.move.is("AttackMove")) {
-      erBatch3OnTargetHit(user, target, dealsDamage);
+      erBatch3OnTargetHit(user, target, this.move, dealsDamage);
     }
 
     // We assume only enemy Pokemon are able to have the EnemyAttackStatusEffectChanceModifier from tokens

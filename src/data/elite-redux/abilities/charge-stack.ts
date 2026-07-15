@@ -73,3 +73,26 @@ export function incrementActiveTurns(pokemon: Pokemon): number {
 export function resetActiveTurns(pokemon: Pokemon): void {
   ACTIVE_TURNS.delete(pokemon);
 }
+
+// --- Cross-cutting hooks consumed by pokemon.ts ------------------------------
+// Kept HERE (not in electivire.ts) so pokemon.ts can import them WITHOUT pulling
+// in electivire.ts's scripted-move-util dependency, which would form an import
+// cycle (electivire → scripted-move-util → move.ts → … → pokemon.ts).
+
+/** Whether `pokemon` is an Overloaded holder currently at exactly max stacks. */
+function overloadedActive(pokemon: Pokemon): boolean {
+  return (
+    getCharge(pokemon) === CHARGE_STACK_MAX
+    && pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "OverloadedChipAbAttr")
+  );
+}
+
+/** ER Overloaded (5927): the holder cannot voluntarily switch while at 4 stacks. */
+export function erOverloadedSelfLocked(pokemon: Pokemon): boolean {
+  return overloadedActive(pokemon);
+}
+
+/** ER Fault Current (5926): reset the active-turn counter when the holder leaves. */
+export function erFaultCurrentOnLeaveField(pokemon: Pokemon): void {
+  resetActiveTurns(pokemon);
+}
