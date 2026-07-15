@@ -353,12 +353,19 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     await commitAndDeliver(rig, "win", { battleType: BattleType.WILD, waveIndex: 11 });
 
     await withClient(rig.guestCtx, () => {
-      markCoopWaveAdvanceDataApplied(11, rig.guestRuntime.waveOperationBinding);
       rig.guestScene.currentBattle.waveIndex = 12;
       rig.guestScene.currentBattle.battleType = BattleType.MYSTERY_ENCOUNTER;
       rig.guestScene.currentBattle.mysteryEncounter = undefined;
       vi.spyOn(rig.guestScene.currentBattle, "isBattleMysteryEncounter").mockReturnValue(true);
       const pushNewSpy = vi.spyOn(rig.guestScene.phaseManager, "pushNew");
+
+      // Enter the actual production DATA-admission seam. The retained source identity is captured by the
+      // PhaseManager-created BattleEndPhase even though ambient battle state has speculated to wave 12/ME;
+      // starting it while it is current lets the registered boundary applier admit the exact wave-11 image
+      // and project pendingWaveAdvance. Merely toggling dataApplied would bypass this bootstrap entirely.
+      rig.guestScene.phaseManager.clearPhaseQueue();
+      rig.guestScene.phaseManager.pushNew("BattleEndPhase", true);
+      rig.guestScene.phaseManager.shiftPhase();
 
       expect(
         () => CoopFinalizeTurnPhase.runPendingWaveAdvanceTail(),
