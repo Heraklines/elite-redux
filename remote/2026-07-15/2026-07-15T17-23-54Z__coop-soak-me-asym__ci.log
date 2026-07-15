@@ -1,0 +1,56 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: 150
+run: 29436098182 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T17-23-54Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] SEED=828633 WAVES=17 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=17 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] SEED=828633 WAVES=13 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=13 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 10 (seed 828633): World Map did not leave on both clients (host=PartyHealPhase guest=SelectBiomePhase). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T17-23-18-029Z__seed-828633__wave-10. Replay: SOAK_SEED=828633[39m
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 10 (seed 828633): World Map did not leave on both clients (host=PartyHealPhase guest=SelectBiomePhase). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T17-23-36-014Z__seed-828633__wave-10. Replay: SOAK_SEED=828633[39m
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 10 (seed 828633): World Map did not leave on both clients (host=PartyHealPhase guest=SelectBiomePhase). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T17-23-53-995Z__seed-828633__wave-10. Replay: SOAK_SEED=828633[39m
+
+----- vitest result tail -----
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:155:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 10 (seed 828633): World Map did not leave on both clients (host=PartyHealPhase guest=SelectBiomePhase). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T17-23-36-014Z__seed-828633__wave-10. Replay: SOAK_SEED=828633[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1579:11[22m[39m
+    [90m1577|[39m       phaseState: phaseStateDump(rig),
+    [90m1578|[39m     });
+    [90m1579|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1580|[39m   };
+    [90m1581|[39m
+[90m [2m❯[22m waitForBothBoundaryPhasesToExit test/tools/coop-soak-driver.ts:[2m2063:7[22m[39m
+[90m [2m❯[22m crossCommandBoundaryWithReplayGuest test/tools/coop-soak-driver.ts:[2m2220:11[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4246:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m173:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:213:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 10 (seed 828633): World Map did not leave on both clients (host=PartyHealPhase guest=SelectBiomePhase). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T17-23-53-995Z__seed-828633__wave-10. Replay: SOAK_SEED=828633[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1579:11[22m[39m
+    [90m1577|[39m       phaseState: phaseStateDump(rig),
+    [90m1578|[39m     });
+    [90m1579|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1580|[39m   };
+    [90m1581|[39m
+[90m [2m❯[22m waitForBothBoundaryPhasesToExit test/tools/coop-soak-driver.ts:[2m2063:7[22m[39m
+[90m [2m❯[22m crossCommandBoundaryWithReplayGuest test/tools/coop-soak-driver.ts:[2m2220:11[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4246:11[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m231:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 17:22:30
+[2m   Duration [22m 83.19s[2m (transform 38.16s, setup 50.91s, import 530ms, tests 65.52s, environment 1.57s)[22m
+
