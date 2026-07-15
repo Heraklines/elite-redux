@@ -812,7 +812,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         failCoopSharedSession(`Biome market buy ${decision.operationId ?? "legacy"} was rejected locally`);
         return;
       }
-      if (money >= 0 && decision.authoritativeProjection !== true) {
+      if (money >= 0) {
         if (!this.coopAsyncBoundaryStillLive(generation, wave, pinned)) {
           return;
         }
