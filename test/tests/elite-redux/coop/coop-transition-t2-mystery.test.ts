@@ -49,6 +49,7 @@ import {
   reachQueuedRewardShop,
   type ShopPhaseSeam,
   setCoopHarnessModuleLetIsolation,
+  shiftQueuedGuestBootTail,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -178,6 +179,9 @@ async function driveQueuedPhaseWithPublicDialogue(
       }
       if (matches(phase)) {
         return phase;
+      }
+      if (shiftQueuedGuestBootTail(ctx.scene)) {
+        continue;
       }
       phase.start();
       const deadline = Date.now() + 10_000;
@@ -391,7 +395,11 @@ async function driveGuestOwnedEmbeddedReward(game: GameManager, rig: DuoRig): Pr
   await pressPublicButton(rig.guestCtx, Button.ACTION, "embedded reward confirmation");
 
   await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
-  await pumpBoth(rig, 4);
+  await pumpUntil(
+    rig,
+    () => rig.guestScene.phaseManager.getCurrentPhase() !== guestShop,
+    "guest embedded reward continuation",
+  );
   expect(rig.hostRuntime.controller.interactionCounter(), "embedded shop does not consume the ME interaction").toBe(
     pinned,
   );

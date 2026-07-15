@@ -51,12 +51,14 @@ import { UiMode } from "#enums/ui-mode";
 import { MysteryEncounterPhase } from "#phases/mystery-encounter-phases";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  beginRewardShopWatch,
   buildDuoForMe,
   drainGuestMeReplayNewRounds,
   drainGuestMeReplayToSettle,
   drainLoopback,
   driveGuestMeReplay,
   driveGuestMirrorQuiz,
+  driveGuestRewardWatch,
   driveHostMeRewardShopWithGuestReplay,
   driveHostRewardShopOwner,
   type ErQuizPhaseSeam,
@@ -546,6 +548,8 @@ describe.skipIf(!RUN)(
       // BUFFERED, since the guest's outcome race is deferred to STEP D - and advances the counter once). =====
       await withClient(rig.hostCtx, async () => {
         for (let i = 0; i < 16; i++) {
+          await drainLoopback();
+          await withClient(rig.guestCtx, () => drainLoopback());
           await drainLoopback();
           if (hostScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase") {
             break;
@@ -1077,6 +1081,7 @@ describe.skipIf(!RUN)(
       // Tap the retained host transport: each round is a distinct addressed ME_PRESENT operation.
       let replay!: Phase;
       let newRounds = 0;
+      let guestShop!: ShopPhaseSeam;
 
       // ===== STEP A (host): drive the REAL delve DIVE -> PUSH(survives) -> BANK, then the embedded reward
       // shop, and PARK at PostMysteryEncounterPhase WITHOUT running it - so the 3 round presents are streamed
@@ -1125,14 +1130,17 @@ describe.skipIf(!RUN)(
               await withClient(rig.guestCtx, async () => {
                 replay = await startGuestMeReplay(rig.guestScene);
                 newRounds = await drainGuestMeReplayNewRounds(replay, EXPECTED_NEW_ROUNDS);
+                const current = rig.guestScene.phaseManager.getCurrentPhase();
+                expect(
+                  current?.phaseName,
+                  "the repeated-round replay handed off to its real embedded reward watcher",
+                ).toBe("SelectModifierPhase");
+                guestShop = current as unknown as ShopPhaseSeam;
+                await beginRewardShopWatch(guestShop);
               });
             },
             partnerSettle: async () => {
-              await withClient(rig.guestCtx, async () => {
-                for (let i = 0; i < 16; i++) {
-                  await drainLoopback();
-                }
-              });
+              await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true }));
             },
           });
           expect(
@@ -1183,11 +1191,12 @@ describe.skipIf(!RUN)(
       expect(newRounds, "guest re-rendered BOTH repeated option-select rounds (two adopted presentations) (#831)").toBe(
         EXPECTED_NEW_ROUNDS,
       );
-      // The phase is PARKED, not settled (the host has not sent its terminal yet) - no premature leave.
+      // The replay is settled because it handed control to the REAL embedded reward watcher. This is a
+      // continuation handoff, not an ME terminal: no outcome was applied and neither counter advanced.
       expect(
         (replay as unknown as { settled: boolean }).settled,
-        "guest CoopReplayMePhase is PARKED mid-delve (NOT settled before the host terminal)",
-      ).toBe(false);
+        "guest CoopReplayMePhase settled only into the embedded reward continuation",
+      ).toBe(true);
       // The guest has not converged / advanced yet (no terminal meResync).
       expect(applyMeOutcomeSpy.mock.calls.length, "guest applied NO meResync yet (host terminal still parked)").toBe(0);
       expect(
@@ -1213,11 +1222,24 @@ describe.skipIf(!RUN)(
       // ===== STEP D (guest): drain so the host's now-buffered meResync (8M) + LEAVE (9M) deliver to the
       // guest's PARKED re-armed race UNDER the guest ctx: applyCoopMeOutcome converges the guest, then the
       // LEAVE runs leaveEncounterWithoutBattle + advanceInteraction (the single terminal). =====
-      const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(replay));
+      await withClient(rig.guestCtx, async () => {
+        for (let i = 0; i < 16; i++) {
+          await drainLoopback();
+          if (
+            applyMeOutcomeSpy.mock.calls.length === 1
+            && rig.guestRuntime.controller.interactionCounter() === counterBefore + 1
+          ) {
+            break;
+          }
+        }
+      });
 
       // The terminal STILL settles exactly once after the multi-round loop (all existing terminal machinery
       // unchanged): the guest left once, applied the host's meResync once.
-      expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once) at the delve terminal").toBe(true);
+      expect(
+        (replay as unknown as { settled: boolean }).settled,
+        "guest replay remained exactly-once settled through the detached delve terminal",
+      ).toBe(true);
       expect(
         applyMeOutcomeSpy.mock.calls.length,
         "guest applied the host's comprehensive meResync exactly once (its sole convergence path)",
@@ -1373,6 +1395,8 @@ describe.skipIf(!RUN)(
 
       await withClient(rig.hostCtx, async () => {
         for (let i = 0; i < 16; i++) {
+          await drainLoopback();
+          await withClient(rig.guestCtx, () => drainLoopback());
           await drainLoopback();
           if (hostScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase") {
             break;

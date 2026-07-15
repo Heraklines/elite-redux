@@ -1390,6 +1390,21 @@ export async function drainLoopback(): Promise<void> {
 }
 
 /**
+ * Reproduce the one scheduler edge omitted by the directly-constructed guest scene. Its boot TitlePhase is
+ * deliberately inert, while production Phaser automatically shifts an engine-owned retained wave tail that
+ * arrives behind it. No other queue shape is admitted here.
+ */
+export function shiftQueuedGuestBootTail(scene: BattleScene): boolean {
+  const phase = scene.phaseManager.getCurrentPhase();
+  const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+  if (phase?.phaseName !== "TitlePhase" || (queued[0] !== "CoopFinalizeTurnPhase" && queued[0] !== "VictoryPhase")) {
+    return false;
+  }
+  scene.phaseManager.shiftPhase();
+  return true;
+}
+
+/**
  * Drive one manually-pumped client's REAL phase queue until `target` is current, stopping BEFORE the
  * target starts. This is the guest-side counterpart to {@linkcode PhaseInterceptor.to(..., false)}:
  * the duo guest has no interceptor because its scene is constructed directly, but production-transition
@@ -1422,6 +1437,10 @@ export async function driveClientPhaseQueueTo(
     }
     if (matches(phase)) {
       return phase;
+    }
+
+    if (shiftQueuedGuestBootTail(scene)) {
+      continue;
     }
 
     phase.start();
