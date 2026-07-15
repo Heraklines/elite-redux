@@ -366,6 +366,11 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       rig.guestScene.phaseManager.clearPhaseQueue();
       rig.guestScene.phaseManager.pushNew("BattleEndPhase", true);
       rig.guestScene.phaseManager.shiftPhase();
+      const retainedBoundary = rig.guestScene.phaseManager.getCurrentPhase();
+      expect(retainedBoundary, "the exact production BattleEnd boundary is current").toBeInstanceOf(BattleEndPhase);
+      // The test PhaseInterceptor deliberately disables PhaseManager's automatic startCurrentPhase hook.
+      // Start this current, manager-created boundary exactly once so its real retained DATA applier runs.
+      retainedBoundary!.start();
 
       expect(
         () => CoopFinalizeTurnPhase.runPendingWaveAdvanceTail(),

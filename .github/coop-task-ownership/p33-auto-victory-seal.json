@@ -14,6 +14,7 @@
     "src/phase-manager.ts",
     "src/phases/battle-end-phase.ts",
     "src/phases/coop-victory-seal-phase.ts",
+    "src/phases/er-crossroads-phase.ts",
     "src/phases/select-biome-phase.ts",
     "src/phases/select-modifier-phase.ts",
     "src/phases/victory-phase.ts",

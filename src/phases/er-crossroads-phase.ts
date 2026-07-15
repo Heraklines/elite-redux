@@ -71,6 +71,7 @@ import type { CoopSessionController } from "#data/elite-redux/coop/coop-session-
 import { erHasNotoriety } from "#data/elite-redux/er-biome-notoriety";
 import { erMarkBiomeStay, setErLeaveBiomeNow } from "#data/elite-redux/er-biome-structure";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
+import type { BiomeId } from "#enums/biome-id";
 import { UiMode } from "#enums/ui-mode";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { getBiomeName } from "#utils/common";
@@ -133,6 +134,26 @@ interface CoopCrossroadsContinuationRecovery {
 export class ErCrossroadsPhase extends Phase {
   public readonly phaseName = "ErCrossroadsPhase";
 
+  /**
+   * Crossroads is queued from the completed wave's Victory tail. A renderer can expose the next speculative
+   * battle before this queued phase starts, so every durable address and callback must retain the immutable
+   * construction boundary instead of consulting mutable `currentBattle` after an await.
+   */
+  private readonly coopSourceWave: number;
+  private readonly coopSourceTurn: number;
+  private readonly coopSourceBiomeId: BiomeId;
+
+  constructor(sourceWave: number | null = null) {
+    super();
+    if (sourceWave != null && (!Number.isSafeInteger(sourceWave) || sourceWave < 0)) {
+      throw new Error(`[coop-op] Crossroads received invalid source wave ${sourceWave}`);
+    }
+    const ambientWave = globalScene.currentBattle?.waveIndex ?? -1;
+    this.coopSourceWave = sourceWave ?? ambientWave;
+    this.coopSourceTurn = globalScene.currentBattle?.turn ?? 0;
+    this.coopSourceBiomeId = globalScene.arena.biomeId;
+  }
+
   /** Guards against a double input firing the resolution twice. */
   private resolving = false;
 
@@ -144,6 +165,14 @@ export class ErCrossroadsPhase extends Phase {
   private coopStartCounter = -1;
   private coopCommitRecovery: CoopCrossroadsContinuationRecovery | null = null;
   private coopCommitRecoveryToken = 0;
+
+  /** Exact completed-wave identity retained across speculative next-battle projection. */
+  public requireCoopSourceWave(): number {
+    if (this.coopSourceWave < 0) {
+      throw new Error("Crossroads has no valid source-wave identity");
+    }
+    return this.coopSourceWave;
+  }
 
   start(): void {
     super.start();
@@ -178,7 +207,7 @@ export class ErCrossroadsPhase extends Phase {
 
     // Warn once the player is past the free window: from here, staying makes the
     // locals hostile (enemies grow stronger the longer you linger).
-    const overstaying = erHasNotoriety(globalScene.currentBattle?.waveIndex ?? 0);
+    const overstaying = erHasNotoriety(this.coopSourceWave);
     const prompt = overstaying
       ? `The locals in ${biomeName} grow hostile. Stay anyway, or leave?`
       : `A crossroads in ${biomeName}. Stay (locals turn hostile over time), or leave?`;
@@ -195,7 +224,7 @@ export class ErCrossroadsPhase extends Phase {
   /** The crossroads prompt text (owner + watcher render the identical line). */
   private crossroadsPrompt(): string {
     const biomeName = getBiomeName(globalScene.arena.biomeId);
-    return erHasNotoriety(globalScene.currentBattle?.waveIndex ?? 0)
+    return erHasNotoriety(this.coopSourceWave)
       ? `The locals in ${biomeName} grow hostile. Stay anyway, or leave?`
       : `A crossroads in ${biomeName}. Stay (locals turn hostile over time), or leave?`;
   }
@@ -213,7 +242,7 @@ export class ErCrossroadsPhase extends Phase {
     // FIRST, before the #858 boundary barrier: an async await here would resume OUTSIDE the two-engine
     // harness's per-client ctx swap and advance the WRONG engine.
     if (coopBiomePickerAutoResolvesInTest()) {
-      const moveOn = erHasNotoriety(globalScene.currentBattle?.waveIndex ?? 0);
+      const moveOn = erHasNotoriety(this.coopSourceWave);
       coopLog(
         "reward",
         `crossroads AUTO-RESOLVE (vitest, picker not driven, no counter tick) -> moveOn=${moveOn} (#848)`,
@@ -223,7 +252,7 @@ export class ErCrossroadsPhase extends Phase {
         setErLeaveBiomeNow();
         globalScene.phaseManager.unshiftNew("SelectBiomePhase");
       } else {
-        erMarkBiomeStay(globalScene.currentBattle?.waveIndex ?? 0);
+        erMarkBiomeStay(this.coopSourceWave);
       }
       this.end();
       return;
@@ -268,7 +297,7 @@ export class ErCrossroadsPhase extends Phase {
    */
   private async coopAwaitBoundaryBarrier(): Promise<boolean> {
     const generation = coopSessionGeneration();
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.requireCoopSourceWave();
     if (!this.boundaryStillLive(generation, wave)) {
       return false;
     }
@@ -322,7 +351,7 @@ export class ErCrossroadsPhase extends Phase {
     this.coopOwnerPromptState = "opening";
     const mirrorSeq = COOP_CROSSROADS_SEQ_BASE + pinned;
     const generation = coopSessionGeneration();
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.requireCoopSourceWave();
     const options: OptionSelectItem[] = [
       {
         label: "Stay",
@@ -396,10 +425,10 @@ export class ErCrossroadsPhase extends Phase {
       choice,
       payload: { optionIndex: choice },
       localRole: role,
-      wave: globalScene.currentBattle?.waveIndex ?? -1,
+      wave: this.requireCoopSourceWave(),
       turn: 0,
-      boundarySourceBiomeId: globalScene.arena.biomeId,
-      boundaryNextWave: (globalScene.currentBattle?.waveIndex ?? -1) + 1,
+      boundarySourceBiomeId: this.coopSourceBiomeId,
+      boundaryNextWave: this.requireCoopSourceWave() + 1,
       allowedRoutes: [],
       deterministicDestination: null,
     });
@@ -411,7 +440,7 @@ export class ErCrossroadsPhase extends Phase {
       commit?.payload != null && "optionIndex" in commit.payload ? commit.payload.optionIndex === 1 : moveOn;
     if (coopBiomeCommitRequired(role)) {
       const generation = coopSessionGeneration();
-      const wave = globalScene.currentBattle?.waveIndex ?? -1;
+      const wave = this.requireCoopSourceWave();
       armCoopBiomeIntentResend({
         operationId,
         wave,
@@ -420,7 +449,7 @@ export class ErCrossroadsPhase extends Phase {
         resend,
         isCurrent: () =>
           coopSessionGeneration() === generation
-          && globalScene.currentBattle?.waveIndex === wave
+          && this.coopSourceWave === wave
           && globalScene.phaseManager.getCurrentPhase() === this,
       });
       this.coopCommitPending = true;
@@ -435,7 +464,7 @@ export class ErCrossroadsPhase extends Phase {
   private async coopWatchFlow(pinned: number): Promise<void> {
     const mirrorSeq = COOP_CROSSROADS_SEQ_BASE + pinned;
     const generation = coopSessionGeneration();
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.requireCoopSourceWave();
     // Read-only copy of the SAME screen for the cursor mirror. The handlers are cosmetic
     // no-ops: the awaited relay is the sole authority (a replayed owner ACTION must never
     // resolve the watcher against its own possibly-drifted cursor).
@@ -506,7 +535,7 @@ export class ErCrossroadsPhase extends Phase {
       receipt == null
       || receipt.operationId !== operationId
       || receipt.kind !== "CROSSROADS_PICK"
-      || receipt.wave !== (globalScene.currentBattle?.waveIndex ?? -1)
+      || receipt.wave !== this.requireCoopSourceWave()
       || (payload?.optionIndex !== 0 && payload?.optionIndex !== 1)
     ) {
       return null;
@@ -516,7 +545,7 @@ export class ErCrossroadsPhase extends Phase {
 
   private async finishCommittedCrossroadsWatcher(operationId: string, pinned: number): Promise<void> {
     const generation = coopSessionGeneration();
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.requireCoopSourceWave();
     const receipt = await awaitCoopBiomeCommitReceipt(operationId);
     if (!this.boundaryStillLive(generation, wave)) {
       return;
@@ -546,10 +575,10 @@ export class ErCrossroadsPhase extends Phase {
       pinned,
       res,
       localRole: role,
-      wave: globalScene.currentBattle?.waveIndex ?? -1,
+      wave: this.requireCoopSourceWave(),
       turn: 0,
-      sourceBiomeId: globalScene.arena.biomeId,
-      nextWave: (globalScene.currentBattle?.waveIndex ?? -1) + 1,
+      sourceBiomeId: this.coopSourceBiomeId,
+      nextWave: this.requireCoopSourceWave() + 1,
       allowedRoutes: [],
       deterministicDestination: null,
     });
@@ -585,7 +614,7 @@ export class ErCrossroadsPhase extends Phase {
       // ANTI-HANG (#848): disconnect / stall / stale-reject backstop. Both clients fall back to the SAME
       // deterministic auto-resolve (leave once the locals turned hostile), so the fallback cannot desync -
       // it is what both would independently compute off the shared wave index.
-      moveOn = erHasNotoriety(globalScene.currentBattle?.waveIndex ?? 0);
+      moveOn = erHasNotoriety(this.coopSourceWave);
       coopWarn(
         "reward",
         `crossroads WATCHER: owner pick TIMEOUT/disconnect/reject(${decision.reason}) -> deterministic fallback moveOn=${moveOn} (#848)`,
@@ -603,7 +632,7 @@ export class ErCrossroadsPhase extends Phase {
     moveOn: boolean,
   ): Promise<void> {
     const generation = coopSessionGeneration();
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.requireCoopSourceWave();
     const receipt = await awaitCoopBiomeCommitReceipt(operationId);
     if (!this.boundaryStillLive(generation, wave)) {
       return;
@@ -627,12 +656,12 @@ export class ErCrossroadsPhase extends Phase {
   private parkCrossroadsCommitRecovery(retry: () => void): void {
     getCoopUiMirror()?.endSession();
     const generation = coopSessionGeneration();
-    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    const wave = this.requireCoopSourceWave();
     if (!this.boundaryStillLive(generation, wave)) {
       return;
     }
 
-    const turn = globalScene.currentBattle?.turn ?? 0;
+    const turn = this.coopSourceTurn;
     const boundaryRevision =
       this.coopStartCounter >= 0 ? this.coopStartCounter : Math.max(0, getCoopController()?.interactionCounter() ?? 0);
     let recovery = this.coopCommitRecovery;
@@ -765,7 +794,7 @@ export class ErCrossroadsPhase extends Phase {
   private boundaryStillLive(generation: number, wave: number): boolean {
     return (
       coopSessionGeneration() === generation
-      && globalScene.currentBattle?.waveIndex === wave
+      && this.coopSourceWave === wave
       && globalScene.phaseManager.getCurrentPhase() === this
     );
   }
@@ -783,7 +812,7 @@ export class ErCrossroadsPhase extends Phase {
     this.resolving = true;
     try {
       const generation = coopSessionGeneration();
-      const wave = globalScene.currentBattle?.waveIndex ?? -1;
+      const wave = this.requireCoopSourceWave();
       void globalScene.ui.setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.boundaryStillLive(generation, wave));
       if (moveOn) {
         // End the biome now; open the World Map picker ahead of the queued NewBattlePhase. The
@@ -794,7 +823,7 @@ export class ErCrossroadsPhase extends Phase {
       } else {
         // STAY: arm the overstay anchor (a no-op inside the free window) and terminate the
         // interaction here with the single from-pinned advance.
-        erMarkBiomeStay(globalScene.currentBattle?.waveIndex ?? 0);
+        erMarkBiomeStay(this.coopSourceWave);
         const controller = getCoopController();
         advanceCoopInteractionForContinuation(pinned);
         if (controller != null && controller.interactionCounter() <= pinned) {
@@ -834,7 +863,7 @@ export class ErCrossroadsPhase extends Phase {
       // linger PAST the notoriety-free window, arm the overstay anchor - from here
       // the locals grow hostile (enemies climb in level + power the longer you
       // stay). Inside the free window this is a no-op (staying is still free).
-      erMarkBiomeStay(globalScene.currentBattle?.waveIndex ?? 0);
+      erMarkBiomeStay(this.coopSourceWave);
     }
     this.end();
   }

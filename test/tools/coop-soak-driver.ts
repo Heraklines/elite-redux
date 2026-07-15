@@ -133,7 +133,6 @@ import {
   coopMeInteractionStartValue,
   coopSetMePinForGuest,
 } from "#phases/mystery-encounter-phases";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { TheBargainPhase } from "#phases/the-bargain-phase";
 import type { GameManager } from "#test/framework/game-manager";
 import {
@@ -2581,7 +2580,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   const driveRewardShop = async (
     wave: number,
     deferAdvanceToMeTerminal = false,
-    fixtureMode: "queued" | "capture-compat" = "queued",
     beforeSharedInput?: () => Promise<void>,
     ownerPolicy: "seeded" | "leave" = "seeded",
   ): Promise<void> => {
@@ -2607,18 +2605,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         bumpSkip("rewardShopUnavailable");
         return;
       }
-      // Normal and ME-battle campaigns must execute the guest's ACTUAL queued Victory -> BattleEnd tail.
+      // Every campaign, including AttemptCapture, must execute the guest's ACTUAL queued Victory -> BattleEnd
+      // tail. A detached synthetic reward surface can advance the interaction counter while leaving the
+      // retained WAVE_ADVANCE unresolved; the next wave then correctly fails closed on two candidate identities.
       // The retained WAVE_ADVANCE DATA is admitted only while that exact BattleEnd is current; the helper
       // stops before the queued SelectModifierPhase starts, so no detached surface can skip the boundary.
-      // The old capture leg has no guest turn-finalizer (AttemptCapture ends before TurnEnd) and remains an
-      // explicit compatibility fixture until that separate campaign drives its capture presentation tail.
-      const guestShop =
-        fixtureMode === "queued"
-          ? await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene))
-          : (withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam);
-      if (fixtureMode === "queued") {
-        await awaitGuestWaveTransaction(wave, false);
-      }
+      const guestShop = await withClient(rig.guestCtx, () => reachQueuedRewardShop(rig.guestScene));
+      await awaitGuestWaveTransaction(wave, false);
       // A terminal turn has TWO authoritative material boundaries: its TurnEnd checkpoint and the retained
       // BattleEnd DATA image. The host may execute automatic PokemonHeal/BattleEnd work while the guest is
       // still rendering the final turn. Compare only after both clients have reached this exact retained
@@ -2644,14 +2637,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // rounds are bounded and cover the longest retained-result chain without a timing sleep.
         await pumpDuoDestinations(rig, 4);
       }
-      if (fixtureMode === "queued") {
-        // Mechanical result/counter convergence is not a continuation boundary. Keep each renderer's
-        // complete context installed until its actual queued SelectModifierPhase exits; otherwise the
-        // pending MESSAGE transition can resume after a context swap and strand one side before Crossroads.
-        await withClient(rig.hostCtx, () => awaitRewardShopPhaseExit(hostShop));
-        await withClient(rig.guestCtx, () => awaitRewardShopPhaseExit(guestShop));
-        await awaitGuestWaveTransaction(wave, true);
-      }
+      // Mechanical result/counter convergence is not a continuation boundary. Keep each renderer's
+      // complete context installed until its actual queued SelectModifierPhase exits; otherwise the
+      // pending MESSAGE transition can resume after a context swap and strand one side before Crossroads.
+      await withClient(rig.hostCtx, () => awaitRewardShopPhaseExit(hostShop));
+      await withClient(rig.guestCtx, () => awaitRewardShopPhaseExit(guestShop));
+      await awaitGuestWaveTransaction(wave, true);
       actionScript.push(`wave ${wave}: reward shop owner=${hostOwns ? "host" : "guest"} ${action}`);
 
       const hostAfter = rig.hostRuntime.controller.interactionCounter();
@@ -3398,7 +3389,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       if (rig.hostScene.phaseManager.hasPhaseOfType("SelectModifierPhase", phase => phase instanceof BiomeShopPhase)) {
         await driveBiomeMarketLeave(wave, sampleBoundaryOnce);
       } else {
-        await driveRewardShop(wave, false, "queued", sampleBoundaryOnce, "leave");
+        await driveRewardShop(wave, false, sampleBoundaryOnce, "leave");
       }
     }
     await sampleBoundaryOnce();
@@ -3421,7 +3412,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // flee crossing exposes an equivalent public retained-boundary waiter.
       await assertPostTurnConverged(wave);
     } else {
-      await driveRewardShop(wave, false, "queued", () => assertPostTurnConverged(wave));
+      await driveRewardShop(wave, false, () => assertPostTurnConverged(wave));
     }
     assertScalarConvergence(wave, "post-shop"); // #843 pokeball-drift classifier (money + ball inventory)
   };
@@ -3607,8 +3598,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     );
 
     // ===== Reward shop + boundary (the captured wave still awards the wave-win reward pool). =====
-    withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.clearPhaseQueue());
-    await driveRewardShop(wave, false, "capture-compat");
+    // AttemptCapture has no guest TurnEnd, so the retained journal wake routes its speculative CommandPhase
+    // into the real Victory -> BattleEnd -> reward tail. Never clear that queue or construct a detached shop:
+    // continuationReady belongs to this exact retained wave transaction.
+    await driveRewardShop(wave);
     assertLockstep(wave, "catch-wave-end");
     assertScalarConvergence(wave, "post-shop");
   };

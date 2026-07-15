@@ -85,6 +85,7 @@ import {
   type DuoRig,
   drainLoopback,
   installDuoLogCapture,
+  pumpDuoDestinations,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -288,8 +289,8 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   }
 
   /** These legacy focused probes construct a phase directly; make that synthetic instance the live seam. */
-  function liveCrossroads(): ErCrossroadsPhase {
-    const phase = new ErCrossroadsPhase();
+  function liveCrossroads(sourceWave: number | null = null): ErCrossroadsPhase {
+    const phase = new ErCrossroadsPhase(sourceWave);
     (phase as unknown as { boundaryStillLive(generation: number, wave: number): boolean }).boundaryStillLive = () =>
       true;
     return phase;
@@ -506,6 +507,76 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     }
     throw new Error("crossroads WATCH HANG: watcher never applied the owner's pick");
   }
+
+  it("retains one Crossroads source when the guest renderer already exposes the next battle", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const sourceWave = 5;
+    rig.hostScene.currentBattle.waveIndex = sourceWave;
+    // Victory passes the completed source explicitly even if the renderer's ambient next battle won the race.
+    rig.guestScene.currentBattle.waveIndex = sourceWave + 1;
+    const hostPhase = withClientSync(rig.hostCtx, () => liveCrossroads(sourceWave));
+    const guestPhase = withClientSync(rig.guestCtx, () => liveCrossroads(sourceWave));
+    const hostSend = vi.spyOn(rig.pair.host, "send");
+    const guestSend = vi.spyOn(rig.pair.guest, "send");
+    rig.pair.setDestinationContextDelivery?.(true);
+    try {
+      await withClient(rig.hostCtx, async () => {
+        hostPhase.start();
+        await drainLoopback();
+      });
+      await withClient(rig.guestCtx, async () => {
+        guestPhase.start();
+        await drainLoopback();
+      });
+
+      for (let attempt = 0; attempt < 320; attempt++) {
+        await pumpDuoDestinations(rig, 1);
+        if (rig.hostScene.ui.getMode() === UiMode.OPTION_SELECT) {
+          break;
+        }
+        await withClient(rig.hostCtx, () => new Promise<void>(resolve => setTimeout(resolve, 10)));
+      }
+      expect(rig.hostScene.ui.getMode(), "the source-wave owner opens the real Crossroads surface").toBe(
+        UiMode.OPTION_SELECT,
+      );
+      for (let attempt = 0; attempt < 80; attempt++) {
+        const accepted = await withClient(rig.hostCtx, () => rig.hostScene.ui.processInput(Button.ACTION));
+        await pumpDuoDestinations(rig, 1);
+        if (accepted) {
+          break;
+        }
+      }
+      for (let attempt = 0; attempt < 80; attempt++) {
+        await pumpDuoDestinations(rig, 1);
+        if (
+          rig.hostRuntime.controller.interactionCounter() === 1
+          && rig.guestRuntime.controller.interactionCounter() === 1
+        ) {
+          break;
+        }
+      }
+
+      const rendezvousPoints = (spy: typeof hostSend): string[] =>
+        spy.mock.calls.flatMap(call => (call[0].t === "rendezvous" ? [call[0].point] : []));
+      expect(hostPhase.requireCoopSourceWave()).toBe(sourceWave);
+      expect(guestPhase.requireCoopSourceWave()).toBe(sourceWave);
+      expect(rendezvousPoints(hostSend), "host retains the completed-wave Crossroads address").toContain(
+        `xroads:${sourceWave}`,
+      );
+      expect(rendezvousPoints(guestSend), "speculative guest still retains the completed-wave address").toContain(
+        `xroads:${sourceWave}`,
+      );
+      expect(rendezvousPoints(guestSend), "guest never invents a next-wave Crossroads address").not.toContain(
+        `xroads:${sourceWave + 1}`,
+      );
+      expect(rig.hostRuntime.controller.interactionCounter(), "host completed the public Stay terminal once").toBe(1);
+      expect(rig.guestRuntime.controller.interactionCounter(), "guest adopted that same terminal once").toBe(1);
+    } finally {
+      rig.pair.setDestinationContextDelivery?.(false);
+    }
+    logs.flush();
+  }, 300_000);
 
   // =====================================================================================
   // SCENARIO 1: CROSSROADS STAY - both continue the same biome, overstay armed, one advance.
