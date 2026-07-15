@@ -56,6 +56,7 @@ import {
 import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/daily-seed/daily-run";
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { erBadSpliceOnLeaveField } from "#data/elite-redux/abilities/bad-splice";
 import { erFaultCurrentOnLeaveField, erOverloadedSelfLocked } from "#data/elite-redux/abilities/charge-stack";
 import { erApplyChivalry } from "#data/elite-redux/abilities/chivalry";
 import {
@@ -66,6 +67,7 @@ import {
 import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
 import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
 import { erApplySoulmateHealCopy, erApplySoulmateRedirect } from "#data/elite-redux/abilities/soulmate";
+import { getGraftedTypes } from "#data/elite-redux/abilities/type-graft";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { suppressesOpponentDamageBoosts } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
@@ -2522,6 +2524,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // check type added to Pokemon from moves like Forest's Curse or Trick Or Treat.
     if (!ignoreOverride && this.summonData.addedType) {
       types.add(this.summonData.addedType);
+    }
+
+    // ER type-graft substrate (Batch 4): additional types grafted onto this
+    // Pokemon for the wave by Draconic Voodoo / Bad Splice stack on top of its
+    // native + added typing. Skipped under ignoreOverride like `addedType`.
+    if (!ignoreOverride) {
+      for (const grafted of getGraftedTypes(this)) {
+        types.add(grafted);
+      }
     }
 
     return Array.from(types) as Mutable<NonEmptyTuple<PokemonType>>;
@@ -7737,6 +7748,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     applyAbAttrs("PreLeaveFieldAbAttr", { pokemon: this });
     // ER Fault Current (5926): reset the consecutive-active-turn counter on exit.
     erFaultCurrentOnLeaveField(this);
+    // ER Bad Splice (5932): when the holder leaves, restore each opponent's exact
+    // prior typing by un-grafting only the types Bad Splice added.
+    erBadSpliceOnLeaveField(this);
     this.switchOutStatus = true;
     globalScene.triggerPokemonFormChange(this, SpeciesFormChangeActiveTrigger, true);
     globalScene.field.remove(this, destroy);

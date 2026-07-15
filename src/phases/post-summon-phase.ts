@@ -2,6 +2,7 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { EntryHazardTag } from "#data/arena-tag";
 import { MysteryEncounterPostSummonTag } from "#data/battler-tags";
+import { erBadSpliceOnOpponentSummon } from "#data/elite-redux/abilities/bad-splice";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyCursedIdol } from "#data/elite-redux/er-relics";
@@ -58,6 +59,9 @@ export class PostSummonPhase extends PokemonPhase {
     this.applyErBiomeSwitchIn(pokemon);
     erApplyTerrainSeeds(pokemon);
     erApplyCursedIdol(pokemon);
+    // ER Bad Splice (5932): if an opposing active holder carries Bad Splice,
+    // splice this just-summoned foe from its own party.
+    erBadSpliceOnOpponentSummon(pokemon);
 
     this.end();
   }

@@ -6,6 +6,7 @@ import { ConditionalProtectTag } from "#data/arena-tag";
 import { MoveAnim } from "#data/battle-anims";
 import { ProtectedTag, SemiInvulnerableTag, SubstituteTag, TypeBoostTag } from "#data/battler-tags";
 import { erBatch3OnTargetHit } from "#data/elite-redux/abilities/batch3-on-hit";
+import { erBatch4OnTargetHit } from "#data/elite-redux/abilities/batch4-on-hit";
 import { consumeDualTypePrimeOnUse, dualTypePrimeApplies } from "#data/elite-redux/abilities/dual-type-move";
 import { erCapacitorBankConsumeOnElectricUse } from "#data/elite-redux/abilities/electivire";
 import {
@@ -958,6 +959,7 @@ export class MoveEffectPhase extends PokemonPhase {
     // first actor's already-recorded hit.
     if (this.move.is("AttackMove")) {
       erBatch3OnTargetHit(user, target, this.move, dealsDamage);
+      erBatch4OnTargetHit(user, target, this.move, dealsDamage);
     }
 
     // We assume only enemy Pokemon are able to have the EnemyAttackStatusEffectChanceModifier from tokens

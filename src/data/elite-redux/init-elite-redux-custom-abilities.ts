@@ -32,6 +32,7 @@
 import { type AbAttr, ConditionalCritAbAttr, PostFaintAbAttr, RedirectTypeMoveAbAttr } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { BadSpliceAbAttr, ER_BAD_SPLICE_ABILITY_ID } from "#data/elite-redux/abilities/bad-splice";
 import {
   BorrowedTimeDecayAbAttr,
   BorrowedTimeSummonAbAttr,
@@ -46,6 +47,7 @@ import {
   ER_CROSSCUT_ABILITY_ID,
 } from "#data/elite-redux/abilities/crosscut";
 import { DandelionBurstAbAttr, ER_DANDELION_BURST_ABILITY_ID } from "#data/elite-redux/abilities/dandelion-burst";
+import { DraconicVoodooAbAttr, ER_DRACONIC_VOODOO_ABILITY_ID } from "#data/elite-redux/abilities/draconic-voodoo";
 import {
   CapacitorBankAbsorbAbAttr,
   CapacitorBankGainAbAttr,
@@ -58,6 +60,7 @@ import {
   OverloadedPriorityAbAttr,
 } from "#data/elite-redux/abilities/electivire";
 import { ER_HEARTBREAK_ABILITY_ID, HeartbreakAbAttr } from "#data/elite-redux/abilities/heartbreak";
+import { ER_HYDRAPEX_ABILITY_ID, HydrapexAbAttr } from "#data/elite-redux/abilities/hydrapex";
 import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abilities/last-host";
 import { ER_LIFE_PRESERVER_ABILITY_ID, LifePreserverAbAttr } from "#data/elite-redux/abilities/life-preserver";
 import { ER_MYCELIAL_NETWORK_ABILITY_ID, MycelialNetworkAbAttr } from "#data/elite-redux/abilities/mycelial-network";
@@ -534,6 +537,36 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_OVERLOADED_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_DRACONIC_VOODOO_ABILITY_ID,
+        name: "Draconic Voodoo",
+        description:
+          "On entry, the opposing Pokemon directly across gains Dragon as an additional type for the rest of the battle. Whenever this Pokemon damages a target with a biting or Dragon-type move, that target also gains Dragon. Never removes existing types.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_DRACONIC_VOODOO_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_HYDRAPEX_ABILITY_ID,
+        name: "Hydrapex",
+        description:
+          "When this Pokemon uses a single-target biting or Dragon-type move, two side heads each strike another Dragon-typed opponent at 35% power with no added effects. Inert when no other Dragon-typed opponent is present.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_HYDRAPEX_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_BAD_SPLICE_ABILITY_ID,
+        name: "Bad Splice",
+        description:
+          "While this Pokemon is active, each opposing Pokemon is spliced with the types of one random living member of its own party, gaining them as additional types. The splice is removed when this Pokemon leaves the field.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_BAD_SPLICE_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -842,6 +875,18 @@ function buildCustomAbility(
     builder.attr(OverloadedPowerAbAttr);
     builder.attr(OverloadedPriorityAbAttr);
     builder.attr(OverloadedChipAbAttr);
+  }
+
+  if (pokerogueId === ER_DRACONIC_VOODOO_ABILITY_ID) {
+    builder.attr(DraconicVoodooAbAttr);
+  }
+
+  if (pokerogueId === ER_HYDRAPEX_ABILITY_ID) {
+    builder.attr(HydrapexAbAttr);
+  }
+
+  if (pokerogueId === ER_BAD_SPLICE_ABILITY_ID) {
+    builder.attr(BadSpliceAbAttr);
   }
 
   const ability = builder.build();
