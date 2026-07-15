@@ -56,6 +56,7 @@ export const ER_FAMILIAR_ABILITY_ID = 5941;
 export const ER_PUNCTURE_ABILITY_ID = 5942;
 export const ER_RAINBOW_FISH_ABILITY_ID = 5943;
 export const ER_GALE_BLOOM_ABILITY_ID = 5944;
+export const ER_DECOMPOSER_ABILITY_ID = 5945;
 
 /**
  * A single manual-composite definition: the display name, the verbatim short
@@ -88,6 +89,8 @@ const DEEP_CUTS = 5438;
 const PINNACLE_BLADE = 5401;
 const AIR_BLOWER = 5058;
 const HARUKAZE = 5534;
+const PARASITIC_SPORES = 5314;
+const ITCHY_DEFENSE = 5207;
 
 /**
  * The manual-composite registry, keyed by pokerogue ability id. This is the
@@ -154,6 +157,16 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
     name: "Gale Bloom",
     description: "Air Blower + Harukaze.",
     constituents: [AIR_BLOWER, HARUKAZE],
+  },
+  // Decomposer (maintainer 2026-07-15): the newcomer-patch innate that had no
+  // definition is a composite of two existing ER abilities. Both constituents
+  // stay fully active with their own gates; their detailed descriptions surface
+  // via the #201 constituent-detail pattern.
+  [ER_DECOMPOSER_ABILITY_ID]: {
+    id: ER_DECOMPOSER_ABILITY_ID,
+    name: "Decomposer",
+    description: "Parasitic Spores + Itchy Defense.",
+    constituents: [PARASITIC_SPORES, ITCHY_DEFENSE],
   },
 };
 

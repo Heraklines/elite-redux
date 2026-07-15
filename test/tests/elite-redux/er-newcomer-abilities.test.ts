@@ -51,7 +51,7 @@ function containsAll(haystack: string[], needle: string[]): boolean {
   return true;
 }
 
-describe.skipIf(!RUN)("ER newcomer abilities (5933-5944)", () => {
+describe.skipIf(!RUN)("ER newcomer abilities (5933-5945)", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
 
