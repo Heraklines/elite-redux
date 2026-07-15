@@ -39,7 +39,7 @@ export interface BuildIdentityOptions {
   entropy?: () => string;
 }
 
-const SHA_PATTERN = /^[0-9a-f]{7,64}$/iu;
+const SHA_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/iu;
 
 function text(value: string | undefined, maxLength = 256): string | null {
   if (value == null) {
@@ -57,7 +57,9 @@ function text(value: string | undefined, maxLength = 256): string | null {
 }
 
 function sha(value: string | undefined): string | null {
-  const candidate = text(value, 64)?.toLowerCase() ?? null;
+  // Do not sanitize or truncate revision material before validation: either the complete environment value
+  // is an exact supported digest or it is not source identity.
+  const candidate = value?.toLowerCase() ?? null;
   return candidate != null && SHA_PATTERN.test(candidate) ? candidate : null;
 }
 
@@ -75,12 +77,9 @@ function publicUrl(value: string | undefined): string | null {
     if (url.protocol !== "https:" && url.protocol !== "http:") {
       return null;
     }
-    // A Pages URL is public identity only. Strip any accidentally supplied credentials/query material.
-    url.username = "";
-    url.password = "";
-    url.search = "";
-    url.hash = "";
-    return text(url.toString(), 512);
+    // A Pages origin is public identity only. Discard credentials and every path/query/fragment byte so
+    // an accidentally secret-bearing URL can never be stamped into a bundle or tester report.
+    return text(url.origin, 512);
   } catch {
     return null;
   }

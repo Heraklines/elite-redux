@@ -60,6 +60,7 @@ export function captureCoopReportCorrelation(): CoopReportCorrelationV1 | null {
   try {
     const controller = runtime.controller;
     const binding = safe(() => controller.authenticatedBinding) ?? null;
+    const membership = safe(() => runtime.membership.snapshot()) ?? null;
     const localRole = controller.role;
     const localSeat = safe(() => controller.localSeatId) ?? safe(() => controller.seat) ?? null;
     let partnerSeat =
@@ -77,6 +78,8 @@ export function captureCoopReportCorrelation(): CoopReportCorrelationV1 | null {
       sessionId: binding?.sessionId ?? null,
       bindingSource: binding?.source ?? null,
       authoritySeat: binding?.authoritySeatId ?? safe(() => controller.authoritySeatId) ?? null,
+      membershipRevision: membership?.revision ?? null,
+      membershipConnectionGeneration: membership?.connectionGeneration ?? null,
       localRole,
       localSeat,
       partnerRole: localRole === "host" ? "guest" : "host",
