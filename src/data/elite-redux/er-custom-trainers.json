@@ -795,6 +795,7 @@
           "SURF",
           "STOMPING_TANTRUM"
         ],
+        "slotChance": 30,
         "species": 10615
       },
       {
@@ -875,7 +876,7 @@
           "palette": "lavender",
           "surface": "wormhole"
         },
-        "slotChance": 40,
+        "slotChance": 45,
         "species": 93
       }
     ],
