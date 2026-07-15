@@ -9,6 +9,7 @@
     "docs/plans/2026-07-14-showdown-tournament-design.md",
     "editor/**",
     "locales/en/settings.json",
+    "scripts/coop-browser-entry.ts",
     "scripts/gen-editor-data.mjs",
     "src/battle-scene.ts",
     "src/data/elite-redux/coop/**",
