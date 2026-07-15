@@ -127,6 +127,36 @@ describe("co-op session controller (#633, P1)", () => {
   });
 
   describe("host controller <-> spoofed guest (local-dev path)", () => {
+    it("negotiates protocol-33 capabilities, persistence identity, and functional fingerprint", async () => {
+      clearNegotiatedCoopCapabilities();
+      const { host, guest } = createLoopbackPair();
+      const required = [COOP_CAP_OP_BIOME, COOP_CAP_DURABILITY_JOURNAL];
+      const controller = new CoopSessionController(host, {
+        username: "Host",
+        version: COOP_PROTOCOL_VERSION,
+        localCapabilities: required,
+        requiredCapabilities: required,
+        requireFunctionalFingerprint: true,
+      });
+      const spoof = new SpoofGuest(guest);
+
+      try {
+        spoof.connect();
+        controller.connect();
+        const compatible = await controller.awaitPartnerCompatibility();
+
+        expect(compatible?.partnerName).toBe("Player 2 (CPU)");
+        expect(controller.partnerVersion).toBe(COOP_PROTOCOL_VERSION);
+        expect(controller.compatibilityAccepted).toBe(true);
+        expect(controller.sessionEpoch).toBeGreaterThan(0);
+        expect(controller.runId).not.toBe("");
+      } finally {
+        spoof.dispose();
+        controller.dispose();
+        clearNegotiatedCoopCapabilities();
+      }
+    });
+
     it("runs the full handshake: connect -> partner picks -> both ready -> merged party", async () => {
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, { username: "Ash" });

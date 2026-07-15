@@ -13,8 +13,9 @@
 // developed and played locally with a single human. The real second player drops
 // in behind the same transport interface at phase P6; nothing else changes.
 //
-// The spoof only emits the wire messages a real partner would (`hello` then a
-// `rosterSync` snapshot). It is engine-free: timing (e.g. "the partner takes a
+// The spoof only emits the wire messages a real partner would (the negotiated
+// `hello` / data fingerprint followed by a `rosterSync` snapshot). It is
+// engine-free: timing (e.g. "the partner takes a
 // few seconds to lock in") is the caller's job - the live phase schedules
 // `announcePicking()` then `lockIn()` off `globalScene.time`; tests drive them
 // directly and flush microtasks. This keeps the spoof headlessly testable.
@@ -23,7 +24,7 @@
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
-import type { CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { Command } from "#enums/command";
 
 /** Options for {@linkcode SpoofGuest}. */
@@ -32,7 +33,7 @@ export interface SpoofGuestOptions {
   username?: string;
   /** The roster the spoof "picks" (defaults to a tiny valid demo team). */
   roster?: CoopRosterEntry[];
-  /** Protocol/game version for the handshake. */
+  /** Explicit protocol-version override for mismatch tests; normally mirrors the local host. */
   version?: string;
 }
 
@@ -55,15 +56,21 @@ const DEFAULT_SPOOF_ROSTER: CoopRosterEntry[] = [
 export class SpoofGuest {
   private readonly transport: CoopTransport;
   private readonly username: string;
-  private readonly version: string;
+  /** Explicit mismatch override for tests; the local CPU normally mirrors the host build. */
+  private readonly version: string | undefined;
   private readonly roster: CoopRosterEntry[];
+  private connected = false;
+  private disposed = false;
+  private pendingHello: Extract<CoopMessage, { t: "hello"; username: string }> | null = null;
+  private pendingFingerprint: Extract<CoopMessage, { t: "dataFingerprint" }> | null = null;
+  private readonly offMessage: () => void;
   /** Answers the host's in-battle command requests over the transport (#633, LIVE-C). */
   private readonly battleSync: CoopBattleSync;
 
   constructor(transport: CoopTransport, opts: SpoofGuestOptions = {}) {
     this.transport = transport;
     this.username = opts.username ?? "Player 2 (CPU)";
-    this.version = opts.version ?? "1";
+    this.version = opts.version;
     this.roster = (opts.roster ?? DEFAULT_SPOOF_ROSTER).map(e => ({ speciesId: e.speciesId, cost: e.cost }));
     // Stand in for a real guest in battle: pick the FIRST legal move the host
     // offered (the host did the legality work; the spoof needs no engine). An
@@ -85,22 +92,43 @@ export class SpoofGuest {
         ...(offeredMove == null ? {} : { moveId: offeredMove.moveId, targets: [...(offeredMove.targetSets[0] ?? [])] }),
       };
     });
+    // A local CPU is a same-build peer, not a protocol-1 shortcut. Observe the
+    // host's real opening frames and mirror the exact negotiated control identity,
+    // capability advertisement, and data fingerprint back across the transport.
+    // Buffering keeps both call orders valid: controller.connect() -> spoof.connect()
+    // (unit tests) and spoof.connect() -> controller.connect() (the local factory).
+    this.offMessage = transport.onMessage(msg => {
+      if (msg.t === "hello" && "username" in msg) {
+        this.pendingHello = msg;
+        if (this.connected) {
+          this.replyHello(msg);
+        }
+      } else if (msg.t === "dataFingerprint") {
+        this.pendingFingerprint = msg;
+        if (this.connected) {
+          this.replyFingerprint(msg);
+        }
+      }
+    });
   }
 
-  /** Announce the spoofed partner (mirrors a real client's opening `hello`). */
+  /** Arm the negotiated peer handshake (idempotent). */
   connect(): void {
+    if (this.connected || this.disposed) {
+      return;
+    }
+    this.connected = true;
     coopLog(
       "ai",
-      `spoof connect role=${this.transport.role} username=${this.username} version=${this.version} `
+      `spoof connect role=${this.transport.role} username=${this.username} version=${this.version ?? "mirror-host"} `
         + `rosterSpecies=[${this.roster.map(e => e.speciesId).join(",")}]`,
     );
-    this.transport.send({
-      t: "hello",
-      version: this.version,
-      username: this.username,
-      role: this.transport.role,
-      epoch: 0,
-    });
+    if (this.pendingHello != null) {
+      this.replyHello(this.pendingHello);
+    }
+    if (this.pendingFingerprint != null) {
+      this.replyFingerprint(this.pendingFingerprint);
+    }
   }
 
   /** Send the roster as "still choosing" (drives the host's "Partner is choosing..." state). */
@@ -127,7 +155,28 @@ export class SpoofGuest {
 
   /** Stop answering battle command requests (call on teardown). */
   dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+    this.offMessage();
     this.battleSync.dispose();
+  }
+
+  private replyHello(hostHello: Extract<CoopMessage, { t: "hello"; username: string }>): void {
+    this.transport.send({
+      t: "hello",
+      version: this.version ?? hostHello.version,
+      username: this.username,
+      role: this.transport.role,
+      epoch: hostHello.epoch,
+      ...(hostHello.runId == null ? {} : { runId: hostHello.runId, checkpointRevision: hostHello.checkpointRevision }),
+      ...(hostHello.capabilities == null ? {} : { capabilities: [...hostHello.capabilities] }),
+    });
+  }
+
+  private replyFingerprint(hostFingerprint: Extract<CoopMessage, { t: "dataFingerprint" }>): void {
+    this.transport.send({ t: "dataFingerprint", fp: structuredClone(hostFingerprint.fp) });
   }
 
   private sendRoster(ready: boolean): void {

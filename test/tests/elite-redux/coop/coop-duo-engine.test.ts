@@ -23,6 +23,7 @@ import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
@@ -94,8 +95,14 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     // --- Pair over the loopback; the HOST runtime sits on the `host` endpoint. ---
     const pair = createLoopbackPair();
     const hostRuntime = buildRuntime(pair.host, "Host", "authoritative");
+    hostRuntime.spoof = new SpoofGuest(pair.guest);
+    hostRuntime.spoof.connect();
     setCoopRuntime(hostRuntime);
     hostRuntime.controller.connect();
+    expect(
+      await hostRuntime.controller.awaitPartnerCompatibility(),
+      "the engine fixture negotiates a complete same-build peer before gameplay",
+    ).not.toBeNull();
     // Flip into co-op + tag field ownership, host role.
     hostScene.gameMode = getGameMode(GameModes.COOP);
     const field = hostScene.getPlayerField();
@@ -103,25 +110,12 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     field[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
     hostRuntime.controller.role = "host";
 
-    // A guest stub on the OTHER endpoint just to answer the host's commandRequest for the
-    // partner slot (so the host's turn resolves). It picks the first legal move. This is the
-    // ONLY faked part of THIS smoke test; the next test wires a real guest engine instead.
+    // Observe the OTHER endpoint. SpoofGuest is the representative negotiated local peer and
+    // answers the partner command through the production CoopBattleSync request path.
     const guestEnd = pair.guest;
     let emittedTurnResolution = false;
     let emittedAuthoritativeState: Record<string, unknown> | undefined;
     guestEnd.onMessage(msg => {
-      if (msg.t === "commandRequest") {
-        guestEnd.send({
-          t: "command",
-          fieldIndex: msg.fieldIndex,
-          turn: msg.turn,
-          // #851: echo the request's owner exactly as the real answerRequest does, so the host's
-          // owner-keyed pending request is matched (a stub that dropped it would strand the await).
-          ...(msg.owner == null ? {} : { owner: msg.owner }),
-          ...(msg.epoch == null ? {} : { epoch: msg.epoch, wave: msg.wave, pokemonId: msg.pokemonId }),
-          command: { command: Command.FIGHT, cursor: 0, moveId: MoveId.TACKLE, targets: [BattlerIndex.ENEMY] },
-        });
-      }
       if (msg.t === "turnResolution") {
         emittedTurnResolution = true;
         emittedAuthoritativeState = msg.authoritativeState as unknown as Record<string, unknown> | undefined;
