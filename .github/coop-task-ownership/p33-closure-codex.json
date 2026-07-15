@@ -11,6 +11,7 @@
     "locales/en/settings.json",
     "scripts/coop-browser-entry.ts",
     "scripts/gen-editor-data.mjs",
+    "scripts/run-coop-browser-transport.mjs",
     "src/battle-scene.ts",
     "src/data/elite-redux/coop/**",
     "src/data/elite-redux/er-custom-trainer-bst-flag.ts",
