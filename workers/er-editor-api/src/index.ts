@@ -661,6 +661,20 @@ function validateCustomTrainersDelta(delta: unknown): ValidationResult {
     if (t.challenge !== undefined && !validChallenges.has(t.challenge as string)) {
       return { ok: false, error: `${key}: challenge must be a known challenge key (see ErCustomTrainerChallenge)` };
     }
+    // Optional challenge VALUE parameter (mono-type/gen/color/...): a positive
+    // integer within the widest challenge maxValue (SINGLE_TYPE = 18). The game
+    // clamps per-challenge; here we only bound the raw int. The game also drops it
+    // for a non-value-bearing / "none" challenge, so a stray value is harmless.
+    if (
+      t.challengeValue !== undefined
+      && !(
+        Number.isInteger(t.challengeValue)
+        && (t.challengeValue as number) >= 1
+        && (t.challengeValue as number) <= 18
+      )
+    ) {
+      return { ok: false, error: `${key}: challengeValue must be an integer 1-18` };
+    }
     if (
       t.difficulties !== undefined
       && (!Array.isArray(t.difficulties) || t.difficulties.some(d => !validDifficulties.has(d as string)))

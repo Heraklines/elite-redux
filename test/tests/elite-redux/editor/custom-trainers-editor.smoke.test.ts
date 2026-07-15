@@ -51,6 +51,7 @@ interface EditorHarness {
   markCustomTrainersSaved(delta: Record<string, unknown>, data: Record<string, unknown>): void;
   CTR_LIVE: Record<string, any>;
   HELD_ITEMS: { key: string; label: string; category: string }[];
+  CHALLENGE_VALUES: Record<string, { value: number; label: string }[]>;
   ctr: { current: Record<string, any>; baseline: Record<string, any> };
   ctrConfig: {
     current: { windowSize: number; windowChancePct: number };
@@ -136,6 +137,7 @@ beforeAll(() => {
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
       get CTR_LIVE(){ return CTR_LIVE; }, set CTR_LIVE(v){ CTR_LIVE = v; },
       get HELD_ITEMS(){ return HELD_ITEMS; }, set HELD_ITEMS(v){ HELD_ITEMS = v; },
+      get CHALLENGE_VALUES(){ return CHALLENGE_VALUES; }, set CHALLENGE_VALUES(v){ CHALLENGE_VALUES = v; },
       setTab(v){ activeTab = v; },
     };`;
   const dom = new JSDOM(HARNESS_HTML, { runScripts: "outside-only", pretendToBeVisual: true });
@@ -198,6 +200,20 @@ beforeEach(() => {
     { key: "ER_FIRE_GEM", label: "Fire Gem", category: "gem" },
     { key: "LEFTOVERS", label: "Leftovers", category: "utility" },
   ];
+  // Challenge VALUE option lists fixture: a couple of parameterizable kinds
+  // (mono-type / mono-gen) so the value dropdown can be exercised. `inverse` is
+  // deliberately absent -> not parameterizable (no value dropdown).
+  ct.CHALLENGE_VALUES = {
+    monotype: [
+      { value: 9, label: "Steel" },
+      { value: 10, label: "Fire" },
+      { value: 11, label: "Water" },
+    ],
+    monogen: [
+      { value: 1, label: "Gen 1" },
+      { value: 10, label: "RDX (Elite Redux)" },
+    ],
+  };
   // Ghost Trainer FX aura catalog fixture (the per-trainer sprite-effect picker).
   ct.TRAINER_FX.length = 0;
   ct.trainerFxById.clear();
@@ -777,6 +793,57 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     victory.value = "z".repeat(250);
     ct.onCustomTrainerInput(victory);
     expect((ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key].victoryDialogue.length).toBe(200);
+  });
+
+  it("challenge value dropdown appears for parameterizable kinds, serializes, and clears otherwise", () => {
+    const key = newTrainer();
+    setSpecies(0, "SPECIES_PIKACHU");
+    // Default challenge is "none" -> no value dropdown.
+    expect(q("#ctr-challenge-value")).toBeNull();
+    let delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.challengeValue).toBeUndefined();
+
+    // Pick a parameterizable challenge (mono-type) -> the value dropdown appears.
+    const chall = q("#ctr-challenge") as HTMLSelectElement;
+    chall.value = "monotype";
+    ct.onCustomTrainerChange(chall);
+    const valSel = q("#ctr-challenge-value") as HTMLSelectElement;
+    expect(valSel).not.toBeNull();
+    // The option list is the seeded mono-type values + a "(any value)" first entry.
+    const optVals = [...valSel.querySelectorAll("option")].map(o => (o as HTMLOptionElement).value);
+    expect(optVals[0]).toBe(""); // "(any value)"
+    expect(optVals).toContain("10"); // Fire
+    // Still unset -> not serialized (any value qualifies).
+    delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.challenge).toBe("monotype");
+    expect(delta.challengeValue).toBeUndefined();
+
+    // Pick Fire (10) -> challengeValue serializes.
+    valSel.value = "10";
+    ct.onCustomTrainerChange(valSel);
+    expect(ct.ctr.current[key].challengeValue).toBe(10);
+    delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.challengeValue).toBe(10);
+
+    // Switch to a NON-parameterizable challenge (inverse) -> dropdown gone AND the
+    // stale value is dropped (never serialized under a valueless challenge).
+    chall.value = "inverse";
+    ct.onCustomTrainerChange(chall);
+    expect(q("#ctr-challenge-value")).toBeNull();
+    expect(ct.ctr.current[key].challengeValue).toBeNull();
+    delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.challenge).toBe("inverse");
+    expect(delta.challengeValue).toBeUndefined();
+
+    // Back to mono-gen, pick the RDX pseudo-gen (10) -> serializes.
+    chall.value = "monogen";
+    ct.onCustomTrainerChange(chall);
+    const valSel2 = q("#ctr-challenge-value") as HTMLSelectElement;
+    valSel2.value = "10";
+    ct.onCustomTrainerChange(valSel2);
+    delta = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(delta.challenge).toBe("monogen");
+    expect(delta.challengeValue).toBe(10);
   });
 
   it("held-item picker is fed from the full grouped catalog (booster/berry/gem/utility)", () => {

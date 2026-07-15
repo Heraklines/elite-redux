@@ -40,6 +40,7 @@ import {
   isErCustomTrainerDevForceArmed,
   markErCustomTrainerUsed,
   normalizeBattleBgm,
+  normalizeChallengeValue,
   normalizeDialogueLine,
   normalizeErCustomTrainerSpawnConfig,
   normalizeIntroDialogue,
@@ -989,6 +990,71 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // A plain mon stays non-forced (no erShinyLab stamped).
     const plain = buildErCustomTrainerMember(resolved.members[1], 1, 50, false);
     expect(plain!.customPokemonData.erShinyLab).toBeUndefined();
+  });
+
+  // ---- ROUND 10 / FEATURE 3: challenge VALUE gate ---------------------------
+  it("normalizeChallengeValue keeps a positive int, else null", () => {
+    expect(normalizeChallengeValue(10)).toBe(10);
+    expect(normalizeChallengeValue(1)).toBe(1);
+    expect(normalizeChallengeValue(3.9)).toBe(3); // floored
+    expect(normalizeChallengeValue(0)).toBeNull();
+    expect(normalizeChallengeValue(-2)).toBeNull();
+    expect(normalizeChallengeValue(undefined)).toBeNull();
+    expect(normalizeChallengeValue("10")).toBeNull();
+  });
+
+  it("challengeValue resolves; the gate requires the run's challenge VALUE to match when set", () => {
+    const T = {
+      // Mono-Fire (SINGLE_TYPE value 10 = PokemonType.FIRE + 1): only under a Fire run.
+      FIRE_ONLY: {
+        id: 70060,
+        name: "Fire Only",
+        trainerClass: "ACE_TRAINER",
+        difficulties: ["ace"],
+        minWave: 1,
+        maxWave: 200,
+        challenge: "monotype",
+        challengeValue: 10,
+        team: [{ species: SpeciesId.CHARIZARD }],
+      },
+      // Same challenge, no value: any monotype value qualifies (original behavior).
+      ANY_TYPE: {
+        id: 70061,
+        name: "Any Type",
+        trainerClass: "PSYCHIC",
+        difficulties: ["ace"],
+        minWave: 1,
+        maxWave: 200,
+        challenge: "monotype",
+        team: [{ species: SpeciesId.ALAKAZAM }],
+      },
+    };
+    setErCustomTrainersForTesting(T as never);
+    const byKey = new Map(getErCustomTrainers().map(t => [t.key, t]));
+    expect(byKey.get("FIRE_ONLY")!.challengeValue).toBe(10);
+    expect(byKey.get("ANY_TYPE")!.challengeValue).toBeNull();
+
+    globalScene.seed = "CHALLSEED";
+    setErDifficulty("ace");
+    setErCustomTrainerSpawnConfigForTesting({ windowSize: 10, windowChancePct: 100 });
+
+    // No SINGLE_TYPE challenge active: neither trainer's gate passes.
+    resetErCustomTrainerTracking();
+    expect(playRun(1, 200).length).toBe(0);
+
+    // Run is Mono-WATER (value 11): ANY_TYPE (unset value) qualifies; FIRE_ONLY
+    // (needs value 10) does NOT.
+    globalScene.gameMode.setChallengeValue(Challenges.SINGLE_TYPE, 11);
+    resetErCustomTrainerTracking();
+    const waterKeys = new Set(playRun(1, 200).map(p => p.key));
+    expect(waterKeys.has("ANY_TYPE")).toBe(true);
+    expect(waterKeys.has("FIRE_ONLY")).toBe(false);
+
+    // Run is Mono-FIRE (value 10): FIRE_ONLY now qualifies too.
+    globalScene.gameMode.setChallengeValue(Challenges.SINGLE_TYPE, 10);
+    resetErCustomTrainerTracking();
+    const fireKeys = new Set(playRun(1, 200).map(p => p.key));
+    expect(fireKeys.has("FIRE_ONLY")).toBe(true);
   });
 
   // ---- ROUND 10 / FEATURE 6: held-item full catalog -------------------------

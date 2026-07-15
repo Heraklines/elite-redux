@@ -1604,6 +1604,20 @@ const CHALLENGE_OPTIONS = [
   "usagetier",
   "triples",
 ];
+// Challenge VALUE option lists (editor/data/challenge-values.json), keyed by the
+// challenge key above. A challenge present here is "parameterizable": the editor
+// shows a second dropdown of human options mapped to the game's numeric value
+// encoding. Loaded in init(); empty until then (the value dropdown just hides).
+let CHALLENGE_VALUES = {};
+/** Whether a challenge key carries a VALUE parameter (has an option list). */
+function ctrChallengeIsParameterizable(challenge) {
+  return Array.isArray(CHALLENGE_VALUES[challenge]) && CHALLENGE_VALUES[challenge].length > 0;
+}
+/** Normalize an authored challengeValue: a positive integer, else null (unset). */
+function normalizeCtrChallengeValue(value) {
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) && n >= 1 ? n : null;
+}
 const CHALLENGE_LABELS = {
   none: "None",
   inverse: "Inverse Battle",
@@ -1939,6 +1953,7 @@ function blankCtrTrainer() {
     endless: false,
     weight: 100,
     challenge: "none",
+    challengeValue: null,
     battleBgm: "",
     introDialogue: "",
     victoryDialogue: "",
@@ -1965,6 +1980,8 @@ function ctrLiveToEdit(entry) {
     // absent both => 100. New saves always write `weight`.
     weight: resolveCtrWeight(entry.weight, entry.spawnChance),
     challenge: entry.challenge ?? "none",
+    // Optional challenge VALUE (mono-type/gen/color/... parameter); positive int or null.
+    challengeValue: normalizeCtrChallengeValue(entry.challengeValue),
     // Trimmed bgm key; anything not [a-z0-9_] (or absent) normalizes to "" (none).
     battleBgm: normalizeCtrBattleBgm(entry.battleBgm),
     introDialogue: typeof entry.introDialogue === "string" ? entry.introDialogue.slice(0, 200) : "",
@@ -2885,6 +2902,21 @@ function renderCustomTrainers(root) {
     const challSel = CHALLENGE_OPTIONS.map(
       c => `<option value="${c}"${t.challenge === c ? " selected" : ""}>${CHALLENGE_LABELS[c]}</option>`,
     ).join("");
+    // Value dropdown: shown only for a value-bearing challenge (mono-type/gen/
+    // color/...). "(any value)" leaves challengeValue unset (any value qualifies).
+    const challValueSel = ctrChallengeIsParameterizable(t.challenge)
+      ? `<label class="ctr-challvalue-lbl" title="Restrict this trainer to ONE specific value of the chosen challenge (e.g. a specific mono-type). '(any value)' matches any value of that challenge.">Value
+          <select id="ctr-challenge-value">
+            <option value=""${t.challengeValue == null ? " selected" : ""}>(any value)</option>
+            ${CHALLENGE_VALUES[t.challenge]
+              .map(
+                o =>
+                  `<option value="${o.value}"${t.challengeValue === o.value ? " selected" : ""}>${esc(o.label)}</option>`,
+              )
+              .join("")}
+          </select>
+        </label>`
+      : "";
     const bgmSel = ctrBgmOptions(t.battleBgm || "");
     form = `<div class="ctr-form">
       <fieldset class="ctr-sec"><legend>Identity</legend>
@@ -2927,6 +2959,7 @@ function renderCustomTrainers(root) {
         <label title="Relative odds this trainer is the one fielded when a spawn window fires (weight / total weight among eligible trainers). Higher = more likely. Default 100.">Weight <input type="number" id="ctr-weight" value="${normalizeCtrWeight(t.weight)}" min="1" step="1" style="width:72px" /></label>
         <br /><label>Battle type <select id="ctr-battletype">${battleSel}</select></label>
         <label>Challenge exclusivity <select id="ctr-challenge">${challSel}</select></label>
+        ${challValueSel}
         <p class="hint" style="margin:6px 0 0">Spawning is capped GLOBALLY by the Spawn density panel above (how often ANY custom trainer appears). When a window fires, ONE trainer is picked by weight among the eligible not-yet-used trainers, then it appears once at a wave in its range, sliding forward past boss/fixed/mystery waves. No repeats per run.</p>
       </fieldset>
       <fieldset class="full ctr-sec"><legend>Team (1-6)</legend>
@@ -3106,6 +3139,19 @@ function onCustomTrainerChange(el) {
     return true;
   } else if (el.id === "ctr-challenge") {
     t.challenge = el.value;
+    // A challengeValue only applies to a value-bearing challenge; drop it when the
+    // new kind can't carry one (or is "none"). Re-render so the value dropdown
+    // appears/disappears for the new kind.
+    if (!ctrChallengeIsParameterizable(t.challenge)) {
+      t.challengeValue = null;
+    }
+    render();
+    return true;
+  } else if (el.id === "ctr-challenge-value") {
+    // "(any value)" -> null (unset); otherwise the chosen numeric value.
+    t.challengeValue = el.value === "" ? null : normalizeCtrChallengeValue(el.value);
+    refreshChrome();
+    return true;
   } else if (el.id === "ctr-effect") {
     // Pick a trainer sprite effect (aura); re-render so the preview swatch updates.
     t.trainerEffect = normalizeCtrTrainerEffect(el.value);
@@ -4211,6 +4257,11 @@ function buildDeltas() {
       // any old spawnChance on load, but new saves are weight-only.
       weight: normalizeCtrWeight(t.weight),
       challenge: t.challenge || "none",
+      // challengeValue: serialize ONLY for a value-bearing challenge with a value
+      // set (not "(any value)"). Omitted otherwise (byte-clean; any-value default).
+      ...(ctrChallengeIsParameterizable(t.challenge) && normalizeCtrChallengeValue(t.challengeValue) !== null
+        ? { challengeValue: normalizeCtrChallengeValue(t.challengeValue) }
+        : {}),
       ...(normalizeCtrBattleBgm(t.battleBgm) ? { battleBgm: normalizeCtrBattleBgm(t.battleBgm) } : {}),
       // Intro blurb: trimmed + 200-char cap; omit when empty (byte-clean default).
       ...((t.introDialogue || "").trim() ? { introDialogue: (t.introDialogue || "").trim().slice(0, 200) } : {}),
@@ -4481,6 +4532,7 @@ async function init() {
       shinyEffectsData,
       trainerFxData,
       heldItemsData,
+      challengeValuesData,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
@@ -4522,6 +4574,8 @@ async function init() {
       fetchJson("./data/trainer-fx.json", []),
       // Held-item catalog (generated). Fallback → the curated HELD_ITEM_OPTIONS below.
       fetchJson("./data/held-items.json", []),
+      // Challenge VALUE option lists (generated). Fallback → {} (value dropdown hides).
+      fetchJson("./data/challenge-values.json", {}),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -4644,6 +4698,17 @@ async function init() {
           label: typeof h.label === "string" && h.label ? h.label : prettify(h.key),
           category: typeof h.category === "string" && h.category ? h.category : "utility",
         }));
+    }
+
+    // Challenge VALUE option lists: the per-kind human options for the value
+    // dropdown. Keep only well-formed {value:number,label:string} arrays.
+    if (challengeValuesData && typeof challengeValuesData === "object") {
+      CHALLENGE_VALUES = {};
+      for (const [kind, opts] of Object.entries(challengeValuesData)) {
+        if (Array.isArray(opts)) {
+          CHALLENGE_VALUES[kind] = opts.filter(o => o && typeof o.value === "number" && typeof o.label === "string");
+        }
+      }
     }
 
     // Egg-move source + factory-set index for the per-member legality/set helpers.

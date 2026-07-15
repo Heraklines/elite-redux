@@ -236,6 +236,105 @@ mkdirSync("editor/data", { recursive: true });
   );
 }
 
+// Challenge VALUE option lists (editor/data/challenge-values.json): for each
+// value-bearing challenge kind the Custom Trainers editor exposes, the human
+// options mapped to the GAME's numeric value encoding (see challenge.ts). Keyed
+// by the editor's ErCustomTrainerChallenge key. Where the game defines the label
+// table (types / colors / the RDX gen constant) it is parsed STATICALLY; the
+// small fixed numeric semantics (starter-cost/points/support/passives/fresh
+// start, defined only by challenge.ts logic) carry generator-authored labels.
+{
+  const titleCase = key =>
+    key
+      .toLowerCase()
+      .split("_")
+      .filter(Boolean)
+      .map(w => w.slice(0, 1).toUpperCase() + w.slice(1))
+      .join(" ");
+
+  // SINGLE_TYPE: value = PokemonType index + 1 (NORMAL..FAIRY = 1..18). Parse the
+  // PokemonType enum in file order, drop UNKNOWN(-1), and take NORMAL..FAIRY.
+  const typeSrc = read("src/enums/pokemon-type.ts");
+  const typeBody = typeSrc.slice(typeSrc.indexOf("{") + 1, typeSrc.lastIndexOf("}"));
+  const typeNames = [];
+  for (const line of typeBody.split("\n")) {
+    const m = line.match(/^\s*([A-Z][A-Z0-9_]+)\s*(?:=|,)/);
+    if (m && m[1] !== "UNKNOWN") {
+      typeNames.push(m[1]);
+    }
+  }
+  // NORMAL is value 0, so index in this filtered list == PokemonType value;
+  // challengeValue = value + 1. FAIRY (index 17) is the last selectable (max 18);
+  // STELLAR and beyond are not part of the SINGLE_TYPE range.
+  const monotype = typeNames.slice(0, 18).map((name, i) => ({ value: i + 1, label: titleCase(name) }));
+
+  // MONO_COLOR: value = color index + 1 (ER_COLOR_NAMES order).
+  const colorSrc = read("src/data/elite-redux/er-species-colors.ts");
+  const colorMatch = colorSrc.match(/ER_COLOR_NAMES\s*=\s*\[([\s\S]*?)\]/);
+  const colorNames = colorMatch ? [...colorMatch[1].matchAll(/"([^"]+)"/g)].map(x => x[1]) : [];
+  const monocolor = colorNames.map((name, i) => ({ value: i + 1, label: titleCase(name) }));
+
+  // SINGLE_GENERATION: value = the gen number directly (1..9), plus the ER pseudo-
+  // gen RDX = ER_RDX_CHALLENGE_GEN (parsed from challenge.ts).
+  const challSrc = read("src/data/challenge.ts");
+  const rdxMatch = challSrc.match(/ER_RDX_CHALLENGE_GEN\s*=\s*(\d+)/);
+  const rdxGen = rdxMatch ? Number(rdxMatch[1]) : 10;
+  const monogen = [];
+  for (let g = 1; g <= 9; g++) {
+    monogen.push({ value: g, label: `Gen ${g}` });
+  }
+  monogen.push({ value: rdxGen, label: "RDX (Elite Redux)" });
+
+  // USAGE_TIER: value = tier (1=UU, 2=RU, 3=PU, 4=NU; see challenge.ts / #384).
+  const usagetier = [
+    { value: 1, label: "UU" },
+    { value: 2, label: "RU" },
+    { value: 3, label: "PU" },
+    { value: 4, label: "NU" },
+  ];
+  // LOWER_MAX_STARTER_COST / LOWER_STARTER_POINTS: value = amount subtracted from
+  // the default 10; the run displays 10 - value. 1..9.
+  const maxcost = [];
+  const points = [];
+  for (let v = 1; v <= 9; v++) {
+    maxcost.push({ value: v, label: `Max cost ${10 - v}` });
+    points.push({ value: v, label: `${10 - v} points` });
+  }
+  // LIMITED_SUPPORT / PASSIVES / FRESH_START: small fixed mode enums (challenge.ts).
+  const limitedsupport = [
+    { value: 1, label: "No healing (shop on)" },
+    { value: 2, label: "No shop (healing on)" },
+    { value: 3, label: "No support (neither)" },
+  ];
+  const passives = [
+    { value: 1, label: "Trainers & final boss only" },
+    { value: 2, label: "All Pokemon" },
+  ];
+  const freshstart = [
+    { value: 1, label: "Classic" },
+    { value: 2, label: "Elite Redux" },
+  ];
+
+  const challengeValues = {
+    monotype,
+    monogen,
+    monocolor,
+    maxcost,
+    points,
+    usagetier,
+    limitedsupport,
+    passives,
+    freshstart,
+  };
+  if (monotype.length === 0 || monocolor.length === 0) {
+    throw new Error("gen-editor-data: parsed 0 challenge types/colors — enum format changed?");
+  }
+  writeFileSync("editor/data/challenge-values.json", `${JSON.stringify(challengeValues, null, 2)}\n`);
+  console.log(
+    `challenge-values: ${monotype.length} types / ${monocolor.length} colors / ${monogen.length} gens (RDX=${rdxGen}) / ${Object.keys(challengeValues).length} kinds.`,
+  );
+}
+
 writeFileSync("editor/data/moves.json", `${JSON.stringify(uniqueMoves, null, 2)}\n`);
 console.log(`moves: ${uniqueMoves.length} (incl. ${erMoveCount} ER custom names)`);
 console.log("species/items/trainers: run the dump tool (see header) — they come from the live runtime tables.");
