@@ -32,11 +32,14 @@
 import { type AbAttr, ConditionalCritAbAttr, PostFaintAbAttr } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { CleansingLightAbAttr, ER_CLEANSING_LIGHT_ABILITY_ID } from "#data/elite-redux/abilities/cleansing-light";
 import { CommonRootAbAttr, ER_COMMON_ROOT_ABILITY_ID } from "#data/elite-redux/abilities/common-root";
 import { DandelionBurstAbAttr, ER_DANDELION_BURST_ABILITY_ID } from "#data/elite-redux/abilities/dandelion-burst";
 import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abilities/last-host";
 import { ER_MYCELIAL_NETWORK_ABILITY_ID, MycelialNetworkAbAttr } from "#data/elite-redux/abilities/mycelial-network";
+import { ER_PRESSURE_VESSEL_ABILITY_ID, PressureVesselAbAttr } from "#data/elite-redux/abilities/pressure-vessel";
 import { ER_PUPPET_STRINGS_ABILITY_ID, PuppetStringsAbAttr } from "#data/elite-redux/abilities/puppet-strings";
+import { ER_RAIN_PUMP_ABILITY_ID, RainPumpAbAttr } from "#data/elite-redux/abilities/rain-pump";
 import { ER_SILKEN_DECREE_ABILITY_ID, SilkenDecreeAbAttr } from "#data/elite-redux/abilities/silken-decree";
 import { ER_SPORE_BED_ABILITY_ID } from "#data/elite-redux/abilities/spore-bed";
 import { ER_TANGLED_SEED_ABILITY_ID, TangledSeedAbAttr } from "#data/elite-redux/abilities/tangled-seed";
@@ -282,6 +285,35 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
       },
       pokerogueId: ER_DANDELION_BURST_ABILITY_ID,
     },
+    {
+      draft: {
+        id: ER_CLEANSING_LIGHT_ABILITY_ID,
+        name: "Cleansing Light",
+        description:
+          "For every direct KO this Pokemon scores, its lowest-HP living ally heals 10% of its max HP. A second KO in the same turn also cures that ally's status.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_CLEANSING_LIGHT_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_PRESSURE_VESSEL_ABILITY_ID,
+        name: "Pressure Vessel",
+        description:
+          "This Pokemon's Defense and Sp. Def scale with its remaining PP: 1.5x at full PP across its moveset, down to 1.0x when empty (1.25x at half).",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_PRESSURE_VESSEL_ABILITY_ID,
+    },
+    {
+      draft: {
+        id: ER_RAIN_PUMP_ABILITY_ID,
+        name: "Rain Pump",
+        description: "At the end of each turn in rain, every one of this Pokemon's moves recovers 1 PP.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_RAIN_PUMP_ABILITY_ID,
+    },
   ];
   for (const { draft, pokerogueId } of manualDrafts) {
     if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
@@ -499,6 +531,18 @@ function buildCustomAbility(
 
   if (pokerogueId === ER_DANDELION_BURST_ABILITY_ID) {
     builder.attr(DandelionBurstAbAttr);
+  }
+
+  if (pokerogueId === ER_CLEANSING_LIGHT_ABILITY_ID) {
+    builder.attr(CleansingLightAbAttr);
+  }
+
+  if (pokerogueId === ER_PRESSURE_VESSEL_ABILITY_ID) {
+    builder.attr(PressureVesselAbAttr);
+  }
+
+  if (pokerogueId === ER_RAIN_PUMP_ABILITY_ID) {
+    builder.attr(RainPumpAbAttr);
   }
 
   const ability = builder.build();
