@@ -107,6 +107,12 @@ export class BiomeShopPhase extends SelectModifierPhase {
   /** Invalidates callbacks retained by an older CONFIRM handler on this same phase instance. */
   private coopConfirmAttempt = 0;
   private coopTerminalPromise: Promise<boolean> | null = null;
+  /**
+   * Narrow subclass-owned execution marker for a relayed paid buy. The base phase deliberately keeps its
+   * watcher/option axes private; this marker lets the market validate its retained host intent without
+   * reaching through that encapsulation or duplicating the base's UI/money context machinery.
+   */
+  private coopExecutingRelayedMarketBuy = false;
   // coopPendingAuthorityOperationId is inherited (now `protected`) from SelectModifierPhase - the same
   // runtime slot the base's applyModifier commits; a same-name private redeclaration here was TS2415.
   /**
@@ -534,7 +540,10 @@ export class BiomeShopPhase extends SelectModifierPhase {
     rollbackState: NonNullable<ReturnType<typeof captureCoopAuthoritativeBattleState>>,
   ): boolean {
     rollbackState.tick = Math.max(rollbackState.tick, coopAppliedStateTick() + 1);
-    const restored = applyCoopAuthoritativeBattleState(rollbackState, true);
+    // `authoritativeGuest` controls guest-only material adoption details. A retained guest-owned market is
+    // executed by the host, so treating that host rollback as a guest apply can corrupt the local authority
+    // boundary (and the two-engine harness's next context). Legacy guest-side execution still uses true.
+    const restored = applyCoopAuthoritativeBattleState(rollbackState, getCoopController()?.role === "guest");
     const failures = drainCoopApplyFailures();
     return restored && failures.length === 0;
   }
@@ -1047,6 +1056,35 @@ export class BiomeShopPhase extends SelectModifierPhase {
     return null;
   }
 
+  /**
+   * Preserve SelectModifierPhase's private watcher context while refusing to trust a guest-proposed balance.
+   * The base helper is still the single place that suppresses interactive watcher UI and threads relayed
+   * money. In retained host-result mode we replace that proposal with the balance derived from the host's
+   * own validated cost before entering it; legacy watcher replay keeps the original authoritative balance.
+   */
+  protected override applyCoopRelayedPurchase(
+    modifier: Modifier,
+    validatedCost: number,
+    authoritativeMoney: number,
+    playSound = false,
+  ): boolean {
+    const retainedHostExecution =
+      getCoopController()?.role === "host"
+      && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
+      && this.coopPendingAuthorityOperationId != null;
+    const trustedMoney =
+      retainedHostExecution && !Overrides.WAIVE_ROLL_FEE_OVERRIDE
+        ? globalScene.money - Math.max(0, validatedCost)
+        : authoritativeMoney;
+    const prior = this.coopExecutingRelayedMarketBuy;
+    this.coopExecutingRelayedMarketBuy = true;
+    try {
+      return super.applyCoopRelayedPurchase(modifier, validatedCost, trustedMoney, playSound);
+    } finally {
+      this.coopExecutingRelayedMarketBuy = prior;
+    }
+  }
+
   /** catalog-v2 (#900): overridden true by the Black Market variant (BLACK_FRIDAY vs BIOME_TOURIST). */
   protected erIsBlackMarket(): boolean {
     return false;
@@ -1111,7 +1149,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
     const pendingAuthorityOperationId =
       controller?.role === "host" && retainedResultMode ? this.coopPendingAuthorityOperationId : null;
     const operationIdToCommit = preparedOperationId ?? pendingAuthorityOperationId;
-    const executesRetainedWatcherIntent = controller?.role === "host" && retainedResultMode && this.coopWatcher;
+    const executesRetainedWatcherIntent =
+      controller?.role === "host" && retainedResultMode && this.coopExecutingRelayedMarketBuy;
     if (executesRetainedWatcherIntent && pendingAuthorityOperationId == null) {
       failCoopSharedSession(`Biome market host received an unaddressed retained buy at stock ${this.pendingIndex}`);
       return false;
@@ -1140,17 +1179,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
     }
     let applied = false;
     try {
-      const adoptsOptionsBefore = this.coopAdoptsOptions;
-      try {
-        // The host executes a guest-owned market intent against its own material state. The raw guest money
-        // field is proposal evidence only; the retained host result carries the balance both renderers adopt.
-        if (executesRetainedWatcherIntent) {
-          this.coopAdoptsOptions = false;
-        }
-        applied = super.applyModifier(modifier, cost, playSound);
-      } finally {
-        this.coopAdoptsOptions = adoptsOptionsBefore;
-      }
+      applied = super.applyModifier(modifier, cost, playSound);
       if (!applied) {
         throw new Error("modifier engine rejected the purchase");
       }

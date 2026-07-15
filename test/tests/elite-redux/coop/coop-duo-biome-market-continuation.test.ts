@@ -221,6 +221,26 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
     });
   }
 
+  /**
+   * A shared terminal deliberately resets the scene once its quorum completes. Observe the last material
+   * boundary before that reset (or the still-live boundary when finalization is asynchronous) so rollback
+   * assertions distinguish an actual partial mutation from the intentional post-terminal empty title state.
+   */
+  function observeBeforeTerminalReset<T>(scene: BattleScene, read: () => T): { read(): T; dispose(): void } {
+    let captured: T | undefined;
+    let didCapture = false;
+    const reset = scene.reset.bind(scene);
+    const spy = vi.spyOn(scene, "reset").mockImplementation((clearScene, clearData, reloadI18n) => {
+      captured = read();
+      didCapture = true;
+      reset(clearScene, clearData, reloadI18n);
+    });
+    return {
+      read: () => (didCapture ? captured! : read()),
+      dispose: () => spy.mockRestore(),
+    };
+  }
+
   // ===========================================================================================
   // A. DETERMINISTIC (no UI): copy() must produce a pinned BiomeShopPhase, not an unpinned reward-row
   // orphan. Pins as if the market opened at counter 9 (guest-owned in the live capture). FAILS-BEFORE:
@@ -321,16 +341,29 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
       phase.pendingIndex = 0;
       rig.hostScene.money = 2_000;
       prepareHostMarketIntent(phase, 1, 0, [1, 1_900, 0, 100]);
+      const before = marketMaterialSignature();
+      const terminalBoundary = observeBeforeTerminalReset(rig.hostScene, () => ({
+        material: marketMaterialSignature(),
+        qtys: [...phase.qtys],
+        pendingIndex: phase.pendingIndex,
+      }));
 
       const addModifierSpy = vi.spyOn(rig.hostScene, "addModifier").mockReturnValue(false);
+      let observed: ReturnType<typeof terminalBoundary.read> | null = null;
       try {
         expect(phase.applyCoopRelayedPurchase(modifier!, 100, 1_900)).toBe(false);
+        observed = terminalBoundary.read();
       } finally {
         addModifierSpy.mockRestore();
+        terminalBoundary.dispose();
+      }
+      if (observed == null) {
+        throw new Error("rejected market apply did not expose its terminal boundary");
       }
 
-      expect(rig.hostScene.money, "a rejected apply cannot adopt the owner's money").toBe(2_000);
-      expect(phase.qtys[0], "a rejected apply cannot consume authoritative stock").toBe(1);
+      expect(observed.material, "a rejected apply cannot mutate money, party, held items, or balls").toBe(before);
+      expect(observed.qtys, "a rejected apply cannot consume authoritative stock").toEqual([1]);
+      expect(observed.pendingIndex).toBe(0);
       expect(isCoopSharedTerminalFrozen(rig.hostRuntime), "a rejected addressed intent fails both peers closed").toBe(
         true,
       );
@@ -360,6 +393,13 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
       prepareHostMarketIntent(phase, 1, 0, [0, 1_900, 0, 100]);
       const before = marketMaterialSignature();
       const hpBefore = target.hp;
+      const terminalBoundary = observeBeforeTerminalReset(rig.hostScene, () => ({
+        material: marketMaterialSignature(),
+        hp: target.hp,
+        qtys: [...phase.qtys],
+        pendingIndex: phase.pendingIndex,
+        queued: rig.hostScene.phaseManager.getQueuedPhaseNames(),
+      }));
 
       const addModifierSpy = vi.spyOn(rig.hostScene, "addModifier").mockImplementation(() => {
         rig.hostScene.money = 17;
@@ -368,20 +408,24 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
         (rig.hostScene.phaseManager as unknown as { unshiftPhase(queued: unknown): void }).unshiftPhase(phase.copy());
         throw new Error("injected TM apply failure after partial mutation");
       });
+      let observed: ReturnType<typeof terminalBoundary.read> | null = null;
       try {
         expect(phase.applyCoopRelayedPurchase(modifier!, 100, 1_900)).toBe(false);
+        observed = terminalBoundary.read();
       } finally {
         addModifierSpy.mockRestore();
+        terminalBoundary.dispose();
+      }
+      if (observed == null) {
+        throw new Error("thrown market apply did not expose its terminal boundary");
       }
 
-      expect(marketMaterialSignature(), "money, party data, and held items return to the exact before-image").toBe(
-        before,
-      );
-      expect(rig.hostScene.getPlayerParty()[0].hp).toBe(hpBefore);
-      expect(phase.qtys).toEqual([1]);
-      expect(phase.pendingIndex).toBe(0);
+      expect(observed.material, "money, party data, and held items return to the exact before-image").toBe(before);
+      expect(observed.hp).toBe(hpBefore);
+      expect(observed.qtys).toEqual([1]);
+      expect(observed.pendingIndex).toBe(0);
       expect(
-        rig.hostScene.phaseManager.getQueuedPhaseNames().filter(name => name === "SelectModifierPhase"),
+        observed.queued.filter(name => name === "SelectModifierPhase"),
         "the failed TM cannot leave its market continuation runnable",
       ).toHaveLength(0);
       expect(isCoopSharedTerminalFrozen(rig.hostRuntime), "the partial apply enters the retained shared terminal").toBe(
