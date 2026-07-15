@@ -1,0 +1,51 @@
+===== COOP SOAK RESULT =====
+profile: god-a
+verdict: FAIL
+waves_requested: 200
+run: 29435848497 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T17-18-38Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260715 WAVES=200 - replay this run with:  SOAK_SEED=20260715 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[32mStart Phase: NewBattlePhase[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[32mStart Phase: CoopPartnerSyncPhase[39m
+[coop:interaction] interactionCounter() read -> 2 (role=host)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[32mStart Phase: NextEncounterPhase[39m
+Starting species pool tier: COMMON
+Pokemon: Wild Spinarak | Species ID: 167 | Level: 3 | Nature: Hardy (-)
+Stats (IVs): HP: 15 (31), Atk: 10 (31), Def: 8 (31), Spatk: 7 (31), Spdef: 7 (31), Spd: 8 (31)
+Ability: Prankster | Passive Ability: Poison Touch 
+Moveset: [ 'Poison Sting', 'Toxic Thread', 'Pounce', 'Sonic Boom' ]
+Starting species pool tier: UNCOMMON
+Pokemon: Wild Oddish | Species ID: 43 | Level: 3 | Nature: Hardy (-)
+Stats (IVs): HP: 16 (31), Atk: 8 (31), Def: 9 (31), Spatk: 10 (31), Spdef: 8 (31), Spd: 7 (31)
+Ability: Poison Absorb | Passive Ability: Regenerator 
+Moveset: [ 'Acid', 'Mega Drain', 'Stun Spore', 'Sweet Scent' ]
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[38;2;0;60;189mUI mode changed from MESSAGE (=0) to MESSAGE (=0)![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:interaction] interactionCounter() read -> 2 (role=host)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:replay] host SEND enemyPartySync wave=3 count=2 meType=-1 battleType=0
+[coop:transport] send host t=enemyPartySync wave=3 enemies=2 battleType=0
+[34mA wild Spinarak and Oddish appeared![39m
+[coop:transport] recv guest t=enemyPartySync wave=3 enemies=2 battleType=0 handlers=1
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[33m[bgm] audio missing from cache for key "battle_wild"; keeping the current track (#826)[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[32mStart Phase: ToggleDoublePositionPhase[39m
+
