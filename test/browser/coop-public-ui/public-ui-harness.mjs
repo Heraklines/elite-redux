@@ -1013,8 +1013,8 @@ export class PublicUiClient {
 }
 
 export class DuoPublicUiRig {
-  constructor(browser, config) {
-    this.browser = browser;
+  constructor(browsers, config) {
+    this.browsers = browsers;
     this.config = config;
     this.clients = {};
     this.tracePage = null;
@@ -1219,39 +1219,48 @@ export class DuoPublicUiRig {
   }
 
   static async launch(config) {
-    const browser = await puppeteer.launch({
-      headless: config.headless,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--autoplay-policy=no-user-gesture-required",
-        "--use-fake-ui-for-media-stream",
-        // CPU headroom for two 10x co-op engines on one shared runner (the turn-1 input-starvation
-        // finding). Mute the audio pipeline outright, and stop Chrome from throttling the
-        // non-fronted client - both co-op engines must keep running in lockstep, or the backgrounded
-        // guest's turn replay lags and deepens the commit stall. Standard Puppeteer perf flags; no
-        // GPU flag (the game needs WebGL and software GL would be slower).
-        "--mute-audio",
-        "--disable-background-timer-throttling",
-        "--disable-backgrounding-occluded-windows",
-        "--disable-renderer-backgrounding",
-      ],
-    });
-    const rig = new DuoPublicUiRig(browser, config);
+    const launchBrowser = () =>
+      puppeteer.launch({
+        headless: config.headless,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--autoplay-policy=no-user-gesture-required",
+          "--use-fake-ui-for-media-stream",
+          // Each player owns an independent Chrome process. A single process made one real renderer
+          // share browser-global focus and scheduling with the other: run 29421978972 took minutes to
+          // drain Summon/PostSummon while the peer waited at cmd:1:1. Separate processes match two
+          // players on two devices and prevent bringToFront for one seat from backgrounding its peer.
+          // Keep the background flags as a second guard for OS-level occlusion on hosted runners.
+          "--mute-audio",
+          "--disable-background-timer-throttling",
+          "--disable-backgrounding-occluded-windows",
+          "--disable-renderer-backgrounding",
+        ],
+      });
+    const launchResults = await Promise.allSettled([launchBrowser(), launchBrowser()]);
+    const browsers = launchResults.flatMap(result => (result.status === "fulfilled" ? [result.value] : []));
+    const launchFailure = launchResults.find(result => result.status === "rejected");
+    if (launchFailure) {
+      await Promise.allSettled(browsers.map(browser => browser.close()));
+      throw launchFailure.reason;
+    }
+    const [hostBrowser, guestBrowser] = browsers;
+    const rig = new DuoPublicUiRig(browsers, config);
     try {
       const [hostContext, guestContext] = await Promise.all([
-        browser.createBrowserContext(),
-        browser.createBrowserContext(),
+        hostBrowser.createBrowserContext(),
+        guestBrowser.createBrowserContext(),
       ]);
-      if (hostContext === guestContext) {
-        throw new Error("Puppeteer returned one browser context for both players");
+      if (hostBrowser === guestBrowser || hostContext === guestContext) {
+        throw new Error("Puppeteer did not isolate both players into distinct browser processes and contexts");
       }
       rig.clients["host-seat"] = new PublicUiClient(hostContext, config.credentials.hostSeat, config);
       rig.clients["guest-seat"] = new PublicUiClient(guestContext, config.credentials.guestSeat, config);
       await Promise.all(Object.values(rig.clients).map(client => client.init()));
       return rig;
     } catch (error) {
-      await browser.close().catch(() => {});
+      await Promise.allSettled(browsers.map(browser => browser.close()));
       throw error;
     }
   }
@@ -2002,7 +2011,7 @@ export class DuoPublicUiRig {
       await client.checkpoint("final").catch(() => {});
       await client.evidence.flush().catch(() => {});
     }
-    await this.browser.close();
+    await Promise.allSettled(this.browsers.map(browser => browser.close()));
   }
 
   assertClean() {
