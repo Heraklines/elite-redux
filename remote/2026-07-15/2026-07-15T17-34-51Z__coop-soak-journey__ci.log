@@ -1,0 +1,53 @@
+===== COOP SOAK RESULT =====
+profile: journey
+verdict: FAIL
+waves_requested: 45
+run: 29436978020 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T17-34-51Z
+
+----- driver lines -----
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=13 where=wave-start fields=[saveDataDigest] :: saveDataDigest:host="a4de9dbcb81eee5c"/guest="54a73b8c7a2a0054"
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 14 (seed 828633): host-owned ME retained reward terminal did not finish after peer material apply (host=16 guest=16 expected=17 hostPhase=EggLapsePhase guestPhase=SelectModifierPhase). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T17-34-50-942Z__seed-828633__wave-14. Replay: SOAK_SEED=828633[39m
+
+----- vitest result tail -----
+[coop:transport] state guest disconnected -> closed
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[33m[coop:relay] dispose() failing inFlightWaiters=2 (choice=0 outcome=2 rewardOptions=0) -> all resolve null[39m
+[33m[coop:relay] AWAIT interactionOutcome seq=8000013 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+[33m[coop:relay] AWAIT interactionOutcome seq=8000016 RESOLVE null (TIMEOUT or supersede) -> watcher leaves[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m[2m > [22m[2mco-op continuous journey: many mystery events plus biome transitions[2m > [22m[2mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mco-op continuous journey: many mystery events plus biome transitions > plays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m21092[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak-journey.test.ts:101:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-journey.test.ts[2m:101:3[22m[2m > [22mco-op continuous journey: many mystery events plus biome transitions[2m > [22mplays through thirteen heterogeneous events, later battles, and repeated world-map boundaries without drift
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 14 (seed 828633): host-owned ME retained reward terminal did not finish after peer material apply (host=16 guest=16 expected=17 hostPhase=EggLapsePhase guestPhase=SelectModifierPhase). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-15T17-34-50-942Z__seed-828633__wave-14. Replay: SOAK_SEED=828633[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1579:11[22m[39m
+    [90m1577|[39m       phaseState: phaseStateDump(rig),
+    [90m1578|[39m     });
+    [90m1579|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1580|[39m   };
+    [90m1581|[39m
+[90m [2m❯[22m processMeWave test/tools/coop-soak-driver.ts:[2m3192:15[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m4158:7[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-journey.test.ts:[2m105:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 17:34:03
+[2m   Duration [22m 47.01s[2m (transform 19.73s, setup 24.12s, import 248ms, tests 21.53s, environment 897ms)[22m
+
