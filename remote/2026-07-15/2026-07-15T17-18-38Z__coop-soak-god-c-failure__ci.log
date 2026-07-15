@@ -1,0 +1,379 @@
+{
+  "invariant": "no-park",
+  "seed": 20470474,
+  "wave": 10,
+  "detail": "World Map did not leave on both clients (host=PartyHealPhase guest=SelectBiomePhase)",
+  "replay": "SOAK_SEED=20470474",
+  "phaseState": {
+    "hostPhase": "PartyHealPhase",
+    "guestPhase": "SelectBiomePhase",
+    "hostInteractionCounter": 12,
+    "guestInteractionCounter": 11,
+    "hostWave": 10,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 2876069112,
+        "battlerIndex": -1,
+        "speciesId": 493,
+        "speciesName": "Arceus",
+        "hp": 1865,
+        "maxHp": 1865,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 2906580093,
+        "battlerIndex": -1,
+        "speciesId": 384,
+        "speciesName": "Rayquaza",
+        "hp": 1715,
+        "maxHp": 1715,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 3338501308,
+        "battlerIndex": -1,
+        "speciesId": 108,
+        "speciesName": "Lickitung",
+        "hp": 0,
+        "maxHp": 31,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 1
+          },
+          {
+            "id": 111,
+            "ppUsed": 0
+          },
+          {
+            "id": 205,
+            "ppUsed": 0
+          },
+          {
+            "id": 35,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 965818348,
+        "battlerIndex": -1,
+        "speciesId": 819,
+        "speciesName": "Skwovet",
+        "hp": 0,
+        "maxHp": 26,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 33,
+            "ppUsed": 0
+          },
+          {
+            "id": 5067,
+            "ppUsed": 0
+          },
+          {
+            "id": 111,
+            "ppUsed": 0
+          },
+          {
+            "id": 254,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 2876069112,
+        "battlerIndex": 0,
+        "speciesId": 493,
+        "speciesName": "Arceus",
+        "hp": 1865,
+        "maxHp": 1865,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 2906580093,
+        "battlerIndex": 1,
+        "speciesId": 384,
+        "speciesName": "Rayquaza",
+        "hp": 1715,
+        "maxHp": 1715,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 3338501308,
+        "battlerIndex": 2,
+        "speciesId": 108,
+        "speciesName": "Lickitung",
+        "hp": 0,
+        "maxHp": 31,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 1
+          },
+          {
+            "id": 111,
+            "ppUsed": 0
+          },
+          {
+            "id": 205,
+            "ppUsed": 0
+          },
+          {
+            "id": 35,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 965818348,
+        "battlerIndex": 3,
+        "speciesId": 819,
+        "speciesName": "Skwovet",
+        "hp": 0,
+        "maxHp": 26,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 33,
+            "ppUsed": 0
+          },
+          {
+            "id": 5067,
+            "ppUsed": 0
+          },
+          {
+            "id": 111,
+            "ppUsed": 0
+          },
+          {
+            "id": 254,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20470474 preseeded=false",
+    "wave 1: host slot move=34 guest slot move=34",
+    "wave 1 turn 1: progress enemyHp=[16:0/14,263:0/14] playerHp=[890:2061/2065,384:1715/1715]",
+    "wave 1: reward shop owner=host leave",
+    "wave 2 turn 1: replay guest reciprocally crossed cmd:2:1",
+    "wave 2: host slot move=53 guest slot move=53",
+    "wave 2 turn 1: progress enemyHp=[664:0/14,276:0/14] playerHp=[890:2061/2065,384:1715/1715]",
+    "wave 2: reward shop owner=guest leave",
+    "wave 3 turn 1: replay guest reciprocally crossed cmd:3:1",
+    "wave 3: host slot move=85 guest slot move=247",
+    "wave 3 turn 1: progress enemyHp=[19:0/15,290:0/15] playerHp=[890:2061/2065,384:1715/1715]",
+    "wave 3: reward shop owner=host take-nonparty",
+    "wave 4 turn 1: replay guest reciprocally crossed cmd:4:1",
+    "wave 4: host slot move=53 guest slot move=85",
+    "wave 4 turn 1: progress enemyHp=[396:18/18,572:0/19] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 4 turn 2: replay guest reciprocally crossed cmd:4:2",
+    "wave 4: reward shop owner=guest take-nonparty",
+    "wave 5 turn 1: replay guest reciprocally crossed cmd:5:1",
+    "wave 5: TRAINER (fixed)",
+    "wave 5: host slot move=34 guest slot move=34",
+    "wave 5 turn 1: progress enemyHp=[506:0/18,263:0/18] playerHp=[890:2060/2065,384:1715/1715]",
+    "wave 5: reward shop owner=host leave",
+    "wave 5: guest chose Crossroads Leave through public UI",
+    "wave 5: guest drove World Map via public UI=true and both consumed 1826955157986819:1:BIOME_PICK:9700005",
+    "wave 6 turn 1: replay guest reciprocally crossed cmd:6:1",
+    "wave 6: BIOME 0->1",
+    "wave 6: host slot move=34 guest slot move=34",
+    "wave 6 turn 1: progress enemyHp=[519:0/23,819:0/23] playerHp=[890:2055/2065,384:1715/1715]",
+    "wave 6: reward shop owner=host take-nonparty",
+    "wave 7 turn 1: replay guest reciprocally crossed cmd:7:1",
+    "wave 7: host slot move=85 guest slot move=85",
+    "wave 7 turn 1: progress enemyHp=[915:0/24,161:0/22] playerHp=[890:2058/2065,384:1715/1715]",
+    "wave 7: reward shop owner=guest take-nonparty",
+    "wave 8 turn 1: replay guest reciprocally crossed cmd:8:1",
+    "wave 8: TRAINER (fixed)",
+    "wave 8: host slot move=53 guest slot move=34",
+    "wave 8 turn 1: guest SWITCH -> party[3]",
+    "wave 8 turn 1: progress enemyHp=[387:0/27,16:22/22] playerHp=[890:2048/2065,150:1723/1725]",
+    "wave 8 turn 2: replay guest reciprocally crossed cmd:8:2",
+    "wave 8: reward shop owner=host take-nonparty",
+    "wave 9 turn 1: replay guest reciprocally crossed cmd:9:1",
+    "wave 9: host slot move=53 guest slot move=53",
+    "wave 9 turn 1: progress enemyHp=[399:0/26,519:0/28] playerHp=[890:2057/2065,150:1723/1725]",
+    "wave 9: reward shop owner=guest leave",
+    "wave 10 turn 1: replay guest reciprocally crossed cmd:10:1",
+    "wave 10 turn 1: host SWITCH -> party[2]",
+    "wave 10: host slot move=85 guest slot move=34",
+    "wave 10 turn 1: progress enemyHp=[108:31/31,819:0/26] playerHp=[493:1865/1865,150:1720/1725]",
+    "wave 10 turn 2: replay guest reciprocally crossed cmd:10:2",
+    "wave 10 turn 2: guest SWITCH -> party[3]",
+    "wave 10: biome market owner=host leave",
+    "wave 10: drained 1 milestone reward continuation(s)",
+    "wave 10: guest chose Crossroads Leave through public UI"
+  ]
+}

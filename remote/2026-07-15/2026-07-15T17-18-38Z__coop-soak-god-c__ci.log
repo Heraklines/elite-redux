@@ -1,0 +1,51 @@
+===== COOP SOAK RESULT =====
+profile: god-c
+verdict: FAIL
+waves_requested: 200
+run: 29435848497 (ci/coop/p33-final-merge-codex)
+timestamp: 2026-07-15T17-18-38Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20470474 WAVES=200 - replay this run with:  SOAK_SEED=20470474 SOAK_WAVES=200 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+[coop:runtime] ignore raw waveEndState for correctness wave=4 tick=23
+[coop:relay] RECV rewardOptions key=3:0 -> BUFFER rewardOptionsInbox (latest-wins) count=3
+[coop:rendezvous] RECV arrival point=shop:4:3 -> BUFFER (no waiter yet) role=guest
+[coop:transport] recv host t=coopAck cls=op:global seq=7 handlers=1
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:runtime] consume wave-advance wave=4 outcome=win transition=WAVE_VICTORY/next5/biome0/egg1/wild (lastResolved 3 -> 4)
+[coop:replay] guest wave-advance outcome=win wave=4 next=WAVE_VICTORY/wave5 biomeChange=false eggLapse=true victoryKind=wild battleType=TRAINER queues=VictoryPhase (host-stated)
+[coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[33m[coop:replay] guest wave-advance wave=4: replacing speculative future queue [NextEncounterPhase][39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:progression] GUEST applyPartyExp SKIP wave=5 koMon=Eternatus (awaiting host waveEndState)
+[coop-diag] VictoryPhase win-branch role=guest battleType=TRAINER queuesTrainerVictory=false queuesSelectModifier=true wave=4
+[coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[coop-diag] VictoryTail role=guest wave=4 source=host-stated trainer=false egg=true biomeShop=false biomeChange=false crossroads=false nextWave=5
+[coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:280:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[22m[39m[coop:heal] erMoneyStreaks host entries=12 -> restored (#837/#348)
+[coop:heal] biomeOverstayAnchor host=null -> restored (#837/#504)
+[coop:heal] erBiomeStructure host length=25 startWave=1 -> restored (#841 item 5)
+[coop:heal] erRelicBattleState host wave=4 -> restored (#837)
+[coop:heal] erMapState host nodes=0 travelTarget=- fragments=0 -> restored (#865/#841 item 1)
+[coop:heal] erPendingNodes host count=4 revealed=2 -> restored (#865)
+[coop:resync] guest apply authoritativeState tick=23 wave=4 turn=2 party=6/2 field=4
+[coop:resync] presentation settle boundary=resync-stable side=player desired=visible ids=[1139362077,2802075046] changed=0 phase=BattleEndPhase
+[coop:resync] presentation settle boundary=wave-start-pre-intro side=enemy desired=visible ids=[] changed=0 phase=BattleEndPhase
+[coop:runtime] wave-advance retained DATA boundary admitted wave=4
+[coop:progression] retained WAVE_ADVANCE DATA applied wave=4 tick=23
+[coop:progression] GUEST retained WAVE_ADVANCE BattleEnd release wave=4
+
