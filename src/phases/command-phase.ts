@@ -176,10 +176,13 @@ export class CommandPhase extends FieldPhase {
     // If the Pokemon has applied Commander's effects to an ally, skip this command.
     // Any multi format + ANY ally (was `double` + first-ally-only, so a triple's
     // hidden Tatsugiri still got prompted for a command).
+    // The tag's source id is the durable Commander relationship. An authoritative co-op
+    // materialization can resolve that id to a different Pokemon object than this phase's
+    // presentation instance, so reference equality would incorrectly expose command input.
     const pokemon = this.getPokemon();
     if (
       (globalScene.currentBattle?.getBattlerCount() ?? 0) > 1
-      && pokemon.getAllies().some(ally => ally.getTag(BattlerTagType.COMMANDED)?.getSourcePokemon() === pokemon)
+      && pokemon.getAllies().some(ally => ally.getTag(BattlerTagType.COMMANDED)?.sourceId === pokemon.id)
     ) {
       globalScene.currentBattle.turnCommands[this.fieldIndex] = {
         command: Command.FIGHT,
