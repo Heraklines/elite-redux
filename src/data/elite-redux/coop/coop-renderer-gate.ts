@@ -409,14 +409,28 @@ export function canArmCoopBiomeTransitionTailPermit(permit: CoopBiomeTransitionT
   if (biomeTransitionTailPermit == null) {
     return true;
   }
-  return (
+  const exactRetry =
     biomeTransitionTailPermit.operationId === permit.operationId
     && biomeTransitionTailPermit.sessionEpoch === permit.sessionEpoch
     && biomeTransitionTailPermit.revision === permit.revision
     && biomeTransitionTailPermit.wave === permit.wave
     && biomeTransitionTailPermit.sourceBiomeId === permit.sourceBiomeId
     && biomeTransitionTailPermit.destinationBiomeId === permit.destinationBiomeId
-    && biomeTransitionTailPermit.nextWave === permit.nextWave
+    && biomeTransitionTailPermit.nextWave === permit.nextWave;
+  if (exactRetry) {
+    return true;
+  }
+  // NewBiomeEncounter adopts the permit before shifting to the ensuing public boundary, then normally
+  // clears it immediately after that shift. If the post-shift finalizer is displaced (for example by a
+  // presentation callback/re-entry), the old permit can remain `encounterAdopted` even though the client
+  // has demonstrably continued through later waves. Do not let that already-consumed tombstone reject the
+  // next dense, host-committed BIOME_PICK forever. A replacement is admitted only when every ordering fact
+  // proves it is later in the same session; an unconsumed Switch/NewBiome permit still fails closed.
+  return (
+    biomeTransitionTailPermit.encounterAdopted
+    && biomeTransitionTailPermit.sessionEpoch === permit.sessionEpoch
+    && permit.revision > biomeTransitionTailPermit.revision
+    && permit.wave >= biomeTransitionTailPermit.nextWave
   );
 }
 

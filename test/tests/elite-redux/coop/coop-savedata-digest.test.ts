@@ -536,10 +536,14 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     rig.hostScene.currentBattle.waveIndex = WAVE;
     rig.guestScene.currentBattle.waveIndex = WAVE;
     // Two REVEALED onward nodes (shared er-map state); the owner picks the SECOND (a non-default choice).
-    setErPendingNodes([
+    const routeNodes = [
       { biome: BiomeId.FOREST, revealed: true },
       { biome: BiomeId.VOLCANO, revealed: true },
-    ] satisfies ErRouteNode[]);
+    ] satisfies ErRouteNode[];
+    // The duo harness always isolates world-map routing state per simulated browser. Seed the route
+    // inside BOTH client contexts; writing the ambient module let leaves each ctx's saved route unchanged.
+    await withClient(rig.hostCtx, () => setErPendingNodes(routeNodes));
+    await withClient(rig.guestCtx, () => setErPendingNodes(routeNodes));
     const chosen = BiomeId.VOLCANO;
 
     // What the OLD deterministic bypass WOULD have rolled (so we prove the owner's pick is honored INSTEAD).
@@ -664,10 +668,12 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     const WAVE = 11;
     rig.hostScene.currentBattle.waveIndex = WAVE;
     rig.guestScene.currentBattle.waveIndex = WAVE;
-    setErPendingNodes([
+    const routeNodes = [
       { biome: BiomeId.FOREST, revealed: true },
       { biome: BiomeId.VOLCANO, revealed: true },
-    ] satisfies ErRouteNode[]);
+    ] satisfies ErRouteNode[];
+    await withClient(rig.hostCtx, () => setErPendingNodes(routeNodes));
+    await withClient(rig.guestCtx, () => setErPendingNodes(routeNodes));
     // Force every raw relay await to time out. There is deliberately no retained authoritative receipt.
     vi.spyOn(CoopInteractionRelay.prototype, "awaitInteractionChoice").mockResolvedValue(null);
 

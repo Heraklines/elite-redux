@@ -372,6 +372,8 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
     if (
       this.coopGeneration < 0
       || coopSessionGeneration() !== this.coopGeneration
+      || globalScene.gameMode?.isCoop !== true
+      || getCoopController()?.netcodeMode !== "authoritative"
       || globalScene.currentBattle !== this.coopBattle
       || globalScene.currentBattle?.waveIndex !== this.coopWave
       || globalScene.phaseManager.getCurrentPhase() !== this

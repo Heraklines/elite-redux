@@ -122,25 +122,25 @@ export async function confirmDefaultStarterTeam(client, { timeoutMs = 15_000 } =
 }
 
 /**
- * Submit and confirm the visible one-mon party materialized by the build-gated Commander fixture.
+ * Submit and confirm a visible party materialized by a build-gated public-browser fixture.
  * The observer is assertion-only: Enter and Space are still the real public starter UI actions.
  */
-export async function confirmSeededStarterTeam(client, expectedSpeciesId, { timeoutMs = 15_000 } = {}) {
+export async function confirmSeededStarterTeam(client, expectedSpecies, { timeoutMs = 15_000 } = {}) {
+  const expectedSpeciesIds = Array.isArray(expectedSpecies) ? expectedSpecies : [expectedSpecies];
   const seeded = await client.evidence.waitForCondition(
     sink => {
       const event = sink.findLastSemanticSurface(0, "starter-select");
-      return event?.observation.teamSpeciesIds?.length === 1
-        && event.observation.teamSpeciesIds[0] === expectedSpeciesId
+      return JSON.stringify(event?.observation.teamSpeciesIds) === JSON.stringify(expectedSpeciesIds)
         ? event
         : null;
     },
     {
       timeoutMs,
-      description: `visible seeded starter team species=${expectedSpeciesId}`,
+      description: `visible seeded starter team species=${expectedSpeciesIds.join(",")}`,
     },
   );
   client.evidence.record("seeded-starter-visible-proof", {
-    expectedSpeciesId,
+    expectedSpeciesIds,
     observation: seeded.observation,
   });
   const confirmCursor = client.evidence.cursor();

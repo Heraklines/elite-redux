@@ -570,6 +570,20 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
             nextWave: 11,
           }),
         ).toBe(true);
+        const laterOperationId = coopAuthoritativeBiomeTransitionOperationId(15);
+        expect(laterOperationId).not.toBeNull();
+        expect(
+          armCoopBiomeTransitionTailPermit({
+            operationId: laterOperationId!,
+            sessionEpoch,
+            revision: 3,
+            wave: 15,
+            sourceBiomeId: BiomeId.VOLCANO,
+            destinationBiomeId: BiomeId.FOREST,
+            nextWave: 16,
+          }),
+          "a later commit cannot displace an unconsumed transition permit",
+        ).toBe(false);
         expect(
           adoptCoopBiomeTransitionSwitchPermit({
             sourceBiomeId,
@@ -653,6 +667,26 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
           beforeEncounterBattle,
         );
         expect(getCoopBiomeTransitionTailPermit(), "the mismatched consumer cannot spend the permit").not.toBeNull();
+
+        expect(
+          armCoopBiomeTransitionTailPermit({
+            operationId: laterOperationId!,
+            sessionEpoch,
+            revision: 3,
+            wave: 15,
+            sourceBiomeId: BiomeId.VOLCANO,
+            destinationBiomeId: BiomeId.FOREST,
+            nextWave: 16,
+          }),
+          "a later dense commit replaces a fully consumed permit whose post-shift finalizer was displaced",
+        ).toBe(true);
+        expect(getCoopBiomeTransitionTailPermit()).toMatchObject({
+          operationId: laterOperationId,
+          revision: 3,
+          wave: 15,
+          switchAdopted: false,
+          encounterAdopted: false,
+        });
       } finally {
         ui.showText = realShowText;
       }

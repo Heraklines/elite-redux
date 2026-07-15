@@ -2289,6 +2289,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         );
         return;
       }
+      let guestBiomeCommandBoundary: { tryCoopCheckpointSync(): void } | null = null;
       if (guestBiomeBoundary != null) {
         // PhaseInterceptor starts the host's SwitchBiome/NewBiomeEncounter tail while driving it to Command,
         // but it deliberately disables the guest PhaseManager's automatic start hook. Drain the guest's
@@ -2305,6 +2306,16 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             `World Map guest tail reached ${guestCommand.phaseName} instead of CommandPhase`,
           );
         }
+        // driveClientPhaseQueueTo intentionally stops BEFORE its target starts. Production does not expose
+        // input in that state: CommandPhase.start() first consumes the latest wave-start authority (including
+        // the host-rolled World-Map routes/biome structure), then crosses the reciprocal barrier and opens
+        // input. The soak manually models the barrier below, so invoke that exact production adoption seam
+        // here as well. Otherwise the next loop samples its "wave-start" digest against a guest that is one
+        // private method call earlier than any human-visible command surface and falsely reports erMapState.
+        await withClient(rig.guestCtx, () => {
+          guestBiomeCommandBoundary = guestCommand as unknown as { tryCoopCheckpointSync(): void };
+          guestBiomeCommandBoundary.tryCoopCheckpointSync();
+        });
       }
       const guestResult = await withClient(rig.guestCtx, () => rig.guestRuntime.rendezvous.awaitPartner(point));
       if (guestResult.timedOut || guestResult.crossPoint !== undefined) {
@@ -2313,6 +2324,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           wave,
           `replay guest did not reciprocally cross ${point} (timedOut=${guestResult.timedOut} crossPoint=${guestResult.crossPoint ?? "none"})`,
         );
+      }
+      if (guestBiomeCommandBoundary != null) {
+        // CommandPhase's real continuation funnel consumes again after the reciprocal barrier: a refreshed
+        // carrier may arrive while that barrier is pending. Match that second production seam before the
+        // soak observes the next wave boundary.
+        await withClient(rig.guestCtx, () => guestBiomeCommandBoundary?.tryCoopCheckpointSync());
       }
       if (guestBiomeBoundary != null && rig.hostScene.arena.biomeId !== rig.guestScene.arena.biomeId) {
         fail(

@@ -96,6 +96,12 @@ export function isCoopBrowserCommanderFixtureBuild(): boolean {
   return env?.VITE_COOP_BROWSER_FIXTURE === "commander-skip";
 }
 
+/** Whether this exact bundle was built for the deterministic faint-replacement browser journey. */
+export function isCoopBrowserFaintFixtureBuild(): boolean {
+  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+  return env?.VITE_COOP_BROWSER_FIXTURE === "faint-replacement";
+}
+
 /**
  * Return the single starter to pre-populate in the normal co-op starter UI for the
  * Commander browser checkpoint. Both the dedicated build flag and an exact per-client
@@ -128,6 +134,43 @@ export function getCoopBrowserCommanderFixtureStarters(): Starter[] | null {
       ivs: new Array(6).fill(31),
     },
   ];
+}
+
+/**
+ * Materialize the deterministic public faint-replacement precondition in the normal starter UI.
+ *
+ * The configured owner visibly submits a Magikarp lead with Healing Wish plus a legal reserve.
+ * Healing Wish makes the first real public command self-faint without depending on a random wave-1
+ * enemy, while the other seat receives a one-mon attacking team. The exact build flag and per-page
+ * URL value keep this CI-only fixture unreachable in normal local, staging, and production bundles.
+ */
+export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
+  if (!isCoopBrowserFaintFixtureBuild() || typeof location === "undefined") {
+    return null;
+  }
+  const fixture = new URLSearchParams(location.search).get("coopfixture");
+  if (fixture !== "faint-owner" && fixture !== "faint-partner") {
+    return null;
+  }
+  const specs =
+    fixture === "faint-owner"
+      ? [
+          { speciesId: SpeciesId.MAGIKARP, moveset: [MoveId.HEALING_WISH] },
+          { speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.WATER_SPOUT] },
+        ]
+      : [{ speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.WATER_SPOUT] }];
+  return specs.map(({ speciesId, moveset }) => ({
+    speciesId,
+    shiny: false,
+    variant: 0,
+    formIndex: 0,
+    abilityIndex: 0,
+    passive: false,
+    nature: Nature.HARDY,
+    moveset: moveset as StarterMoveset,
+    pokerus: false,
+    ivs: new Array(6).fill(31),
+  }));
 }
 
 // --- One-shot mystery-encounter override (scenario → first ME) ----------------

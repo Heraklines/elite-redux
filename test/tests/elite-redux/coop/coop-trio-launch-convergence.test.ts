@@ -143,6 +143,10 @@ describe.skipIf(!RUN)("co-op TRIO M5: 1 authority + 2 renderers converge from on
       rndState: Phaser.Math.RND.state(),
       ghost: emptyGhostSnapshot(),
       moduleLets: structuredClone(rig.hostCtx.moduleLets!),
+      // World-map/biome module state is always isolated, independently of the optional broader
+      // module-let isolation switch. Without an owned snapshot, applyCoopLaunchSession restored the
+      // host map only into the ambient process global and the next guest-2 swap observed stale state.
+      biomeState: structuredClone(rig.hostCtx.biomeState!),
     };
     await withClient(guest2Ctx, () => {
       toCoop(guest2Scene);

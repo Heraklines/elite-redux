@@ -3380,19 +3380,29 @@ export class CoopBattleStreamer {
         if (this.authorityTerminalStarted) {
           return;
         }
-        if (
-          typeof msg.preimage !== "string"
-          || msg.preimage.length === 0
-          || !Array.isArray(msg.events)
-          || !msg.events.every(isStrictBattleEvent)
-          || !hasCompleteAuthorityCompanions(msg)
-          || !this.acceptsAwaitedTurnAddress(msg)
-        ) {
+        const structurallyComplete =
+          typeof msg.preimage === "string"
+          && msg.preimage.length > 0
+          && Array.isArray(msg.events)
+          && msg.events.every(isStrictBattleEvent)
+          && hasCompleteAuthorityCompanions(msg);
+        if (!structurallyComplete) {
           coopWarn(
             "replay",
             `guest DROP malformed turnResolution turn=${msg.turn} preimage=${typeof msg.preimage === "string"} `
               + `fullField=${Array.isArray(msg.fullField) ? msg.fullField.length : 0} `
               + `state=${msg.authoritativeState == null ? 0 : 1} checksum=${msg.checksum}`,
+          );
+          return;
+        }
+        if (!this.acceptsAwaitedTurnAddress(msg)) {
+          // Retained commits may be redelivered after the guest has already crossed the corresponding
+          // boundary. They are valid carriers, but they must not be admitted under a different awaited
+          // address. Keep this distinct from schema validation: `state=1` in the malformed diagnostic only
+          // meant that authoritativeState existed and repeatedly obscured this stale-delivery condition.
+          coopWarn(
+            "stream",
+            `guest DROP unawaited turnResolution e=${msg.epoch} wave=${msg.wave} turn=${msg.turn} rev=${msg.revision}`,
           );
           return;
         }

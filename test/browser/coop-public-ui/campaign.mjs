@@ -599,12 +599,12 @@ async function driveBattleWave(rig, policy, stats) {
  * The client that reports ITSELF as owner of `surfaceId` in the v2 semantic mirror
  * (ownerSeat === its own localSeat), or null. Evidence-derived ownership - never rig.host.
  */
-function findSemanticOwnerClient(rig, surfaceId, cursors) {
+function findSemanticOwner(rig, surfaceId, cursors) {
   for (const client of Object.values(rig.clients)) {
     const event = client.evidence.findLastSemanticSurface(cursors[client.label] ?? 0, surfaceId);
     const observation = event?.observation;
     if (observation && observation.ownerSeat != null && observation.ownerSeat === observation.localSeat) {
-      return client;
+      return { client, markerEvent: event };
     }
   }
   return null;
@@ -635,6 +635,38 @@ export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) 
   const notYetHandled = (client, event) =>
     event != null && event.index > (handledIndex.get(`${driver.name}:${client.label}`) ?? -1);
 
+  // The v2 projection is the actionable public surface and its own ownership contract. Legacy
+  // OWNER lines can be emitted while preceding narration is still active, or before a campaign's
+  // post-battle cursor is captured. Prefer the semantic appearance whenever a driver declares one;
+  // otherwise a valid visible reward/market can be parked even though both browsers report its owner.
+  if (driver.v2SurfaceId) {
+    const semanticOwner = findSemanticOwner(rig, driver.v2SurfaceId, cursors);
+    if (semanticOwner) {
+      const readiness = semanticOwner.markerEvent.observation.ready;
+      // Phase/owner evidence can precede the real handler by several seconds while narration or
+      // transitions finish. Keyboard input in that interval is legitimately discarded. Wait for
+      // the observer's addressed actionable projection; this is the same state a human sees before
+      // acting and prevents a valid reward from being stranded by an early leave/pick sequence.
+      if (readiness?.handlerActive !== true || readiness.awaitingActionInput === false) {
+        return null;
+      }
+      if (notYetHandled(semanticOwner.client, semanticOwner.markerEvent)) {
+        return semanticOwner;
+      }
+      return null;
+    }
+    if (!hasSemanticSurface(rig, driver.v2SurfaceId, cursors)) {
+      return null;
+    }
+    if (strict) {
+      throw new Error(
+        `[campaign-owner-evidence] surface "${driver.name}" is up but its v2 semantic mirror `
+          + `(${driver.v2SurfaceId}) never reported an owner (ownerSeat === localSeat); refusing to `
+          + "assume the role default. Fix the surface's marker or run the explicit shakedown opt-in.",
+      );
+    }
+  }
+
   if (driver.owner.marker) {
     for (const client of clients) {
       const event = client.evidence.find(driver.owner.marker, cursors[client.label]);
@@ -658,20 +690,6 @@ export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) 
   if (!presence) {
     return null;
   }
-  // Prefer the evidence-derived v2 owner (ownerSeat === localSeat) over any role assumption.
-  if (driver.v2SurfaceId) {
-    const v2Owner = findSemanticOwnerClient(rig, driver.v2SurfaceId, cursors);
-    if (v2Owner) {
-      return { client: v2Owner, markerEvent: presence.markerEvent };
-    }
-    // The phase may already be current while a preceding message prompt is still
-    // actionable (EggLapsePhase begins behind "Come back, <mon>!", for example).
-    // Let the generic prompt driver clear that public UI first. Only reject an
-    // owner contract after the declared semantic surface has actually appeared.
-    if (!hasSemanticSurface(rig, driver.v2SurfaceId, cursors)) {
-      return null;
-    }
-  }
   if (driver.owner.guestMarker) {
     const guest = rig.guest;
     if (guest) {
@@ -684,13 +702,6 @@ export function resolveSurfaceOwner(rig, driver, cursors, handledIndex, strict) 
   // The surface is up (presence found) but no per-client OWNER evidence resolved it. In a
   // loud-fail run, refuse to assume the role default when the surface advertised a v2 mirror
   // that should have named the owner - a missing/malformed marker must fail, not auto-advance.
-  if (strict && driver.v2SurfaceId) {
-    throw new Error(
-      `[campaign-owner-evidence] surface "${driver.name}" is up but its v2 semantic mirror `
-        + `(${driver.v2SurfaceId}) never reported an owner (ownerSeat === localSeat); refusing to `
-        + "assume the role default. Fix the surface's marker or run the explicit shakedown opt-in.",
-    );
-  }
   const owner = driver.owner.role ? rig[driver.owner.role] : null;
   if (!owner) {
     return null;
@@ -722,6 +733,15 @@ async function driveOnePendingSurface(rig, dispatch, cursors, handledIndex, stat
       const seen = c.evidence.findLast(suppress, cursors[c.label]);
       if (seen) {
         handledIndex.set(`${driver.name}:${c.label}`, seen.index);
+      }
+      if (driver.v2SurfaceId) {
+        const semantic = c.evidence.findLastSemanticSurface(cursors[c.label], driver.v2SurfaceId);
+        if (semantic) {
+          handledIndex.set(
+            `${driver.name}:${c.label}`,
+            Math.max(handledIndex.get(`${driver.name}:${c.label}`) ?? -1, semantic.index),
+          );
+        }
       }
     }
     return driver.name;

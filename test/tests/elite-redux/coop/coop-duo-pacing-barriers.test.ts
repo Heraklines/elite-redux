@@ -165,7 +165,10 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
       owned.summonData.moveQueue = [{ move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL }];
       rig.guestScene.currentBattle.turnCommands = {};
       new CommandPhase(COOP_GUEST_FIELD_INDEX).start();
-      await Promise.resolve();
+      // Keep the complete guest context installed through the buffered rendezvous continuation. A
+      // single microtask did not cover the rendezvous promise chain, allowing enterOwnCommandBoundary
+      // to resume after teardown against the next test's scene.
+      await drainLoopback();
     });
 
     expect(
@@ -214,7 +217,7 @@ describe.skipIf(!RUN)("co-op DUO pacing barriers (#839): reciprocal next-command
       vi.spyOn(ally, "getTag").mockReturnValue({ getSourcePokemon: () => owned } as never);
       rig.guestScene.currentBattle.turnCommands = {};
       new CommandPhase(COOP_GUEST_FIELD_INDEX).start();
-      await Promise.resolve();
+      await drainLoopback();
     });
 
     expect(

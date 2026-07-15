@@ -194,11 +194,13 @@ const starterHandler = await readFile(
 );
 if (
   !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "commander-skip"')
+  || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "faint-replacement"')
   || !fixtureRegistry.includes('get("coopfixture")')
   || !starterHandler.includes("getCoopBrowserCommanderFixtureStarters()")
+  || !starterHandler.includes("getCoopBrowserFaintFixtureStarters()")
   || !starterHandler.includes("{ allowUncaught: true }")
 ) {
-  failures.push("Commander starter checkpoint must require the exact build+URL gate at the visible starter UI");
+  failures.push("Browser starter checkpoints must require the exact build+URL gate at the visible starter UI");
 }
 const rewardConfirmOpen = harness?.indexOf("await owner.press(openConfirmKey") ?? -1;
 const rewardConfirmReady = harness?.indexOf("owner.waitForOwnedRewardConfirm(rewardConfirmCursors[owner.label]") ?? -1;

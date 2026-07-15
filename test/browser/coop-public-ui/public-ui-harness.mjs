@@ -34,6 +34,8 @@ const FATAL_COOP_RECOVERY = /Co-op Sync Recovery|recovery request attempt=|recov
 const RENDEZVOUS_RECOVERY_RETRY_POINT = /\[coop:rendezvous\] RENDEZVOUS RECOVERY RETRY point=([^\s]+) after \d+ms/u;
 const TATSUGIRI_SPECIES_ID = 978;
 const DONDOZO_SPECIES_ID = 977;
+const MAGIKARP_SPECIES_ID = 129;
+const BULBASAUR_SPECIES_ID = 1;
 const POST_TURN_PROGRESS_ALLOWANCE_MS = 90_000;
 const POST_TURN_HARD_CEILING_MS = 360_000;
 // Trace-enabled four-core run 29405818635 reached the matching cmd:1:1 observations 0.45s and
@@ -580,6 +582,11 @@ export class PublicUiClient {
     const entryUrl = new URL(this.config.baseUrl);
     if (this.config.journey === "commander-skip") {
       entryUrl.searchParams.set("coopfixture", this.label === this.config.commanderOwnerSeat ? "commander" : "dondozo");
+    } else if (this.config.journey === "faint-replacement") {
+      entryUrl.searchParams.set(
+        "coopfixture",
+        this.label === this.config.faintOwnerSeat ? "faint-owner" : "faint-partner",
+      );
     }
     this.evidence.record("navigate", { url: entryUrl.origin });
     await this.page.goto(entryUrl, { waitUntil: "domcontentloaded", timeout: this.config.bootTimeoutMs });
@@ -1613,7 +1620,7 @@ export class DuoPublicUiRig {
     return proof;
   }
 
-  async startFreshRun({ commanderFixture = false } = {}) {
+  async startFreshRun({ commanderFixture = false, faintFixture = false } = {}) {
     if (!this.host) {
       throw new Error("startFreshRun requires a paired public host (call pair() first)");
     }
@@ -1650,13 +1657,16 @@ export class DuoPublicUiRig {
     const starterLaunchCursors = Object.fromEntries(
       await Promise.all(
         Object.values(this.clients).map(async client => {
-          const result = commanderFixture
-            ? await confirmSeededStarterTeam(
-                client,
-                client.label === this.config.commanderOwnerSeat ? TATSUGIRI_SPECIES_ID : DONDOZO_SPECIES_ID,
-                { timeoutMs: this.config.timeoutMs },
-              )
-            : await confirmDefaultStarterTeam(client, { timeoutMs: this.config.timeoutMs });
+          const expectedSeededSpecies = commanderFixture
+            ? [client.label === this.config.commanderOwnerSeat ? TATSUGIRI_SPECIES_ID : DONDOZO_SPECIES_ID]
+            : faintFixture
+              ? client.label === this.config.faintOwnerSeat
+                ? [MAGIKARP_SPECIES_ID, BULBASAUR_SPECIES_ID]
+                : [BULBASAUR_SPECIES_ID]
+              : null;
+          const result = expectedSeededSpecies == null
+            ? await confirmDefaultStarterTeam(client, { timeoutMs: this.config.timeoutMs })
+            : await confirmSeededStarterTeam(client, expectedSeededSpecies, { timeoutMs: this.config.timeoutMs });
           return [client.label, result.launchCursor];
         }),
       ),

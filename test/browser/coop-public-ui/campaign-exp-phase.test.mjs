@@ -177,6 +177,77 @@ test("phase presence waits for its declared semantic UI before judging owner evi
   );
 });
 
+test("semantic owner remains driveable when its earlier legacy OWNER line is outside the cursor", () => {
+  const authority = fakeClient("authority", ["OWNER drives reward screen"]);
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const driver = {
+    name: "reward",
+    present: /OWNER drives reward screen/u,
+    v2SurfaceId: "reward-shop",
+    owner: { marker: /OWNER drives reward screen/u },
+  };
+  const cursors = { authority: authority.evidence.events.length, renderer: 0 };
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "reward-shop",
+      localSeat: 0,
+      ownerSeat: 0,
+      ready: { handlerActive: true, awaitingActionInput: true },
+    },
+  });
+
+  assert.equal(
+    resolveSurfaceOwner(rig, driver, cursors, new Map(), true)?.client,
+    authority,
+    "the visible semantic reward surface is the authoritative campaign appearance",
+  );
+});
+
+test("semantic owner is not driven until the visible handler accepts input", () => {
+  const authority = fakeClient("authority", ["OWNER drives reward screen"]);
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const driver = {
+    name: "reward",
+    present: /OWNER drives reward screen/u,
+    v2SurfaceId: "reward-shop",
+    owner: { marker: /OWNER drives reward screen/u },
+  };
+  const cursors = { authority: 0, renderer: 0 };
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "reward-shop",
+      localSeat: 0,
+      ownerSeat: 0,
+      ready: { handlerActive: true, awaitingActionInput: false },
+    },
+  });
+  assert.equal(resolveSurfaceOwner(rig, driver, cursors, new Map(), true), null);
+
+  authority.evidence.events.push({
+    index: authority.evidence.events.length,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "reward-shop",
+      localSeat: 0,
+      ownerSeat: 0,
+      ready: { handlerActive: true, awaitingActionInput: true },
+    },
+  });
+  assert.equal(resolveSurfaceOwner(rig, driver, cursors, new Map(), true)?.client, authority);
+  const handled = new Map([["reward:authority", authority.evidence.events.at(-1).index]]);
+  assert.equal(
+    resolveSurfaceOwner(rig, driver, cursors, handled, true),
+    null,
+    "an already-driven semantic appearance waits for the phase to advance instead of becoming malformed",
+  );
+});
+
 test("only ready active local battle narration and EXP instances advance once on each public client", async () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");

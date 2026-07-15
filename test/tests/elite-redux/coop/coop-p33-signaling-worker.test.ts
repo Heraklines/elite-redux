@@ -324,6 +324,44 @@ describe("P33 authenticated signaling Worker", () => {
     expect(sqlite.prepare("SELECT COUNT(*) AS count FROM coop_runs_p33").get()).toEqual({ count: 1 });
   });
 
+  it("reclaims a stale account-unique pair when both closed browsers explicitly pair again", async () => {
+    const first = await pair();
+    // Browser page teardown is not a reliable place for a fetch/beacon. Reproduce the server state
+    // from the public journey: the discoverable lobby rows have gone, but the old run's account-unique
+    // membership survived and both gameplay heartbeats are older than one full presence window.
+    sqlite.prepare("DELETE FROM coop_lobby_p33 WHERE paired_code = ?").run(first.code);
+    vi.setSystemTime(start + 12_001);
+
+    const alice = await announce("er-account:11", "Alice", nonce("alice-cold-ticket"), nonce("alice-cold-client"));
+    const bob = await announce("er-account:22", "Bob", nonce("bob-cold-ticket"), nonce("bob-cold-client"));
+    expect(
+      await call("/coop/v3/lobby/request", {
+        body: { self: alice.presenceId, target: bob.presenceId },
+        token: alice.pairingToken,
+      }),
+    ).toMatchObject({ status: 200 });
+    const accepted = await call("/coop/v3/lobby/respond", {
+      body: { self: bob.presenceId, from: alice.presenceId, accept: true },
+      token: bob.pairingToken,
+    });
+
+    expect(accepted).toMatchObject({
+      status: 200,
+      body: {
+        transportRole: "offerer",
+        account: { accountId: "er-account:22" },
+        peer: { accountId: "er-account:11" },
+      },
+    });
+    expect(accepted.body.code).not.toBe(first.code);
+    expect(sqlite.prepare("SELECT state FROM coop_runs_p33 WHERE code = ?").get(first.code)).toEqual({ state: "ended" });
+    expect(
+      sqlite
+        .prepare("SELECT COUNT(*) AS count FROM coop_pair_members_p33 WHERE code = ?")
+        .get(accepted.body.code),
+    ).toEqual({ count: 2 });
+  });
+
   it("hot-rejoins only the same account, rotates its bearer, and increments exactly one connection generation", async () => {
     const { alice, bob, code } = await pair();
     expect(

@@ -38,11 +38,11 @@ async function reverseResume(rig) {
 async function faintReplacement(rig) {
   await rig.loginBoth();
   await rig.pair(rig.config.requesterSeat);
-  await rig.resumeRun();
+  await rig.startFreshRun({ faintFixture: true });
   await rig.driveWaveToReward({ allowFaint: true });
   if (rig.replacementCount === 0) {
     throw new Error(
-      "Prepared faint journey reached rewards without a faint; seed the two staging accounts at the documented low-HP boundary",
+      "Deterministic Healing Wish journey reached rewards without opening the configured owner's faint replacement",
     );
   }
 }

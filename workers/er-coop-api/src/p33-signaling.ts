@@ -622,6 +622,34 @@ async function createPairing(
     const code = newPairingCode();
     try {
       await env.DB.batch([
+        // A hard browser close cannot reliably deliver /leave. Once BOTH endpoints of an old run
+        // have missed the full presence window, a newly authenticated lobby request from either
+        // account is an explicit cold-session replacement. Retire that stale ownership before the
+        // account-unique pair-member insert below. Without this, the live request is accepted by the
+        // lobby but createPairing throws on coop_pair_members_p33(account_id), gets flattened to the
+        // misleading "requester unavailable" 409, and no public-UI retry can recover.
+        env.DB.prepare(
+          `UPDATE coop_runs_p33 SET state = 'ended', updated_at = ?
+           WHERE state <> 'ended'
+             AND offerer_seen_at < ? AND answerer_seen_at < ?
+             AND code IN (
+               SELECT member.code FROM coop_pair_members_p33 AS member
+               JOIN coop_lobby_p33 AS fresh ON fresh.account_id = member.account_id
+               WHERE fresh.presence_id IN (?, ?)
+             )`,
+        ).bind(now, now - LOBBY_PRESENCE_MS, now - LOBBY_PRESENCE_MS, offererId, answererId),
+        env.DB.prepare(
+          `DELETE FROM coop_pair_members_p33
+           WHERE code IN (SELECT code FROM coop_runs_p33 WHERE state = 'ended')`,
+        ),
+        env.DB.prepare(
+          `DELETE FROM coop_lobby_p33
+           WHERE paired_code IN (SELECT code FROM coop_runs_p33 WHERE state = 'ended')`,
+        ),
+        env.DB.prepare(
+          `DELETE FROM coop_signals_p33
+           WHERE code IN (SELECT code FROM coop_runs_p33 WHERE state = 'ended')`,
+        ),
         env.DB.prepare(
           `INSERT INTO coop_runs_p33
             (code, offerer_presence_id, answerer_presence_id, offerer_account_id, answerer_account_id,

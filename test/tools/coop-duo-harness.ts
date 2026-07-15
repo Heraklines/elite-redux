@@ -1619,9 +1619,15 @@ export async function driveDuoGuestTackleThroughPublicUi(
       rig.hostScene.phaseManager.getCurrentPhase().start();
       await drainLoopback();
     } else if (rig.hostScene.phaseManager.getCurrentPhase().phaseName === "CommandPhase") {
-      // A between-wave caller may already have stopped the real host queue on this exact command surface
-      // after materializing both clients. It is already started and waiting at the reciprocal barrier;
-      // asking PhaseInterceptor.to() for the current phase waits for a transition that cannot occur.
+      // Between-wave callers deliberately stop BEFORE this exact phase so both clients can materialize
+      // before either input surface opens. Start the prepared host phase here, alongside the prepared guest
+      // phase above. Treating a merely-current phase as already started omitted the host rendezvous arrival
+      // and left the guest correctly sealed at MESSAGE on every wave after the first. A few older journeys
+      // intentionally ran the target CommandPhase before the next loop; preserve that already-open surface
+      // instead of starting the same phase twice.
+      if (rig.hostScene.ui.getMode() !== UiMode.COMMAND && rig.hostScene.ui.getMode() !== UiMode.FIGHT) {
+        rig.hostScene.phaseManager.getCurrentPhase().start();
+      }
       await drainLoopback();
     } else {
       await hostGame.phaseInterceptor.to("CommandPhase");

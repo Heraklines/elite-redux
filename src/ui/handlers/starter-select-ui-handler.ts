@@ -1,6 +1,9 @@
 import type { Ability } from "#abilities/ability";
 import { PLAYER_PARTY_MAX_SIZE } from "#app/constants";
-import { getCoopBrowserCommanderFixtureStarters } from "#app/dev-tools/registry";
+import {
+  getCoopBrowserCommanderFixtureStarters,
+  getCoopBrowserFaintFixtureStarters,
+} from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { starterColors } from "#app/global-vars/starter-colors";
 import Overrides from "#app/overrides";
@@ -1755,7 +1758,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           this.seedTeamFromStarters(showdownBuild.seedStarters);
         }
       }
-      const coopBrowserStarters = getCoopBrowserCommanderFixtureStarters();
+      const coopBrowserStarters =
+        getCoopBrowserCommanderFixtureStarters() ?? getCoopBrowserFaintFixtureStarters();
       if (globalScene.gameMode.isCoop && coopBrowserStarters != null) {
         // CI checkpoint only: materialize the otherwise account-locked species in the NORMAL visible
         // starter UI. The browser still submits and confirms this team through public keys, and the
@@ -7161,7 +7165,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    *   - "Use Last Team" ({@linkcode restoreLastTeam}) with the persisted last run team.
    *   - Showdown Team Menu EDIT (addendum): the preset's mons reconstructed via `manifestToStarter`,
    *     each carrying its saved stage/shiny/item/moves/nature/ability, so editing starts pre-populated.
-   *   - The build-gated Commander browser checkpoint, which alone may render its uncaught fixture starter.
+   *   - Build-gated co-op browser checkpoints, which alone may render their uncaught fixture starters.
    * Skips species not caught in this save + any the active challenge forbids, and stops adding once the
    * point-value limit would be exceeded (effectively unlimited in showdown). Returns false when nothing
    * could be added. Rules are NOT enforced here - Ready/Done re-validates as usual, so a now-illegal

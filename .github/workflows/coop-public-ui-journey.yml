@@ -184,7 +184,7 @@ jobs:
           VITE_BYPASS_LOGIN: 0
           VITE_BYPASS_TUTORIAL: 0
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          VITE_COOP_BROWSER_FIXTURE: ${{ inputs.journey == 'commander-skip' && 'commander-skip' || 'off' }}
+          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || 'off' }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_SERVER_URL: ${{ env.COOP_UI_API_ORIGIN }}
         run: pnpm exec vite build --mode beta --config test/browser/coop-public-ui/vite.config.mjs
