@@ -1492,6 +1492,8 @@ export async function driveClientPhaseQueueTo(
     perPhaseTimeoutMs?: number;
     /** Pump the other browser's scheduled inbox while this client's real phase awaits a reciprocal route. */
     pumpPeer?: () => Promise<void>;
+    /** Drive an explicitly-recognized public prompt while the current phase remains blocked on human input. */
+    drivePublicPhaseInput?: (phase: Phase) => boolean | Promise<boolean>;
   } = {},
 ): Promise<Phase> {
   const matches = options.matches ?? (phase => phase.phaseName === target);
@@ -1515,6 +1517,7 @@ export async function driveClientPhaseQueueTo(
     phase.start();
     const deadline = Date.now() + perPhaseTimeoutMs;
     while (scene.phaseManager.getCurrentPhase() === phase) {
+      await options.drivePublicPhaseInput?.(phase);
       await options.pumpPeer?.();
       await drainLoopback();
       if (Date.now() >= deadline) {
@@ -2172,7 +2175,10 @@ export interface ShopPhaseSeam {
  */
 export async function reachQueuedRewardShop(
   scene: BattleScene,
-  options: { pumpPeer?: () => Promise<void> } = {},
+  options: {
+    pumpPeer?: () => Promise<void>;
+    drivePublicPhaseInput?: (phase: Phase) => boolean | Promise<boolean>;
+  } = {},
 ): Promise<ShopPhaseSeam> {
   const current = scene.phaseManager.getCurrentPhase();
   const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];

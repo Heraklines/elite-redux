@@ -2606,6 +2606,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   ): Promise<void> => {
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
+    let guestAccountRewardAcknowledged = false;
 
     // Every two-engine campaign shares one JS realm for two runtimes. During this interaction, queue EVERY
     // transport frame until its destination ClientCtx is installed: reward options can resume a watcher, a
@@ -2653,6 +2654,22 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           // Real browsers run both event loops concurrently. The in-process scheduled transport needs the
           // host inbox pumped while the guest's phantom command awaits its authoritative shop phaseRoute.
           pumpPeer: () => withClient(rig.hostCtx, () => drainLoopback()),
+          // Fixed trainer rewards can include an account-local voucher. Unlike shared run modifiers, the
+          // authoritative renderer intentionally applies that voucher to its own account and presents the
+          // normal acknowledgement message. A real player dismisses it with ACTION; the headless two-engine
+          // driver must do the same through the public UI boundary instead of mistaking it for a phase hang.
+          // No other phase or UI mode is admitted here, so an unexpected prompt still fails closed.
+          drivePublicPhaseInput: phase => {
+            if (
+              guestAccountRewardAcknowledged
+              || phase.phaseName !== "ModifierRewardPhase"
+              || rig.guestScene.ui.getMode() !== UiMode.MESSAGE
+            ) {
+              return false;
+            }
+            guestAccountRewardAcknowledged = rig.guestScene.ui.processInput(Button.ACTION);
+            return guestAccountRewardAcknowledged;
+          },
         }),
       );
       await awaitGuestWaveTransaction(wave, false);
