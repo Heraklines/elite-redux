@@ -333,6 +333,18 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
         matches: phase => phase instanceof BiomeShopPhase,
       }),
     );
+    const retained = getCoopStagedWaveAdvanceTransaction(10, rig.guestRuntime.waveOperationBinding);
+    expect(retained?.dataApplied, "the market cannot open before retained wave DATA applies").toBe(true);
+    expect(retained?.continuationReady, "phase construction alone cannot release retained authority").toBe(false);
+
+    await withClient(rig.guestCtx, () => {
+      (
+        guestMarket as unknown as {
+          notifyCoopBiomeContinuationSurfaceReady(): void;
+        }
+      ).notifyCoopBiomeContinuationSurfaceReady();
+    });
+    expect(retained?.continuationReady, "an inactive watcher cannot attest a public continuation").toBe(false);
 
     // Start the real watcher first, then drive the owner's real BIOME_SHOP/CANCEL/CONFIRM handlers.
     await withClient(rig.guestCtx, async () => {
@@ -343,6 +355,10 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       hostMarket.start();
       await drainLoopback();
     });
+    expect(
+      retained?.continuationReady,
+      "authoritative stock plus the live watcher loop attests the phase-owned continuation",
+    ).toBe(true);
     await waitForMode(rig.hostCtx, UiMode.BIOME_SHOP, "host biome market");
     await pressUntilAccepted(rig, rig.hostCtx, Button.CANCEL, "market leave");
     await waitForMode(rig.hostCtx, UiMode.CONFIRM, "market leave confirmation");

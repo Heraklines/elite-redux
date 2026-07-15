@@ -1368,8 +1368,12 @@ function phaseOwnedWaveContinuationIsPublic(
         // phase-, mode-, handler-, and address-bound so an arbitrary message screen cannot release a
         // retained victory.
         const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
+        const currentPhase = globalScene.phaseManager?.getCurrentPhase() as
+          | { phaseName?: string; coopBiomeWatcherContinuationReady?: boolean }
+          | undefined;
         return (
-          globalScene.phaseManager?.getCurrentPhase()?.phaseName === "SelectModifierPhase"
+          currentPhase?.phaseName === "SelectModifierPhase"
+          && currentPhase.coopBiomeWatcherContinuationReady === true
           && globalScene.ui.getMode() === UiMode.MESSAGE
           && globalScene.ui.getHandler()?.active === true
           && (currentWave === payload.wave || currentWave === payload.nextWave)

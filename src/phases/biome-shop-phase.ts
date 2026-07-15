@@ -111,6 +111,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
   /** Invalidates callbacks retained by an older CONFIRM handler on this same phase instance. */
   private coopConfirmAttempt = 0;
   private coopTerminalPromise: Promise<boolean> | null = null;
+  /** True only after the watcher reconstructed authoritative stock and can consume the exact terminal stream. */
+  private coopBiomeWatcherContinuationReady = false;
   /**
    * Narrow subclass-owned execution marker for a relayed paid buy. The base phase deliberately keeps its
    * watcher/option axes private; this marker lets the market validate its retained host intent without
@@ -893,6 +895,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
     // The watcher never opens BIOME_SHOP, so its equivalent executable continuation is the fully
     // materialized stock plus the live terminal-consumer loop. Record readiness only after option
     // authority has been resolved; phase construction or the initial waiting message is too early.
+    this.coopBiomeWatcherContinuationReady = true;
     this.notifyCoopBiomeContinuationSurfaceReady();
     const seq = coopBiomeShopSeq(this.coopBiomeStart);
     this.coopRewardOperationBinding ??= captureCoopRewardOperationBinding();
