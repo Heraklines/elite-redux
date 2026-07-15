@@ -5,6 +5,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { PokemonPhase } from "#app/phases/pokemon-phase";
 import { CenterOfAttentionTag, type EncoreTag } from "#data/battler-tags";
+import { erOmniformOnMoveStart } from "#data/elite-redux/abilities/omniform";
 import {
   isCoopRecording,
   recordCoopEvent,
@@ -218,6 +219,10 @@ export class MovePhase extends PokemonPhase {
       // Struggle's "There are no more moves it can use" message
 
       globalScene.triggerPokemonFormChange(user, SpeciesFormChangePreMoveTrigger);
+      // ER Omniform (5929): adaptive mega-style transform driven by the move's
+      // type, applied BEFORE the move resolves so its stats + speed order are
+      // re-evaluated mid-turn.
+      erOmniformOnMoveStart(user, move);
       // TODO: apply gorilla tactics here instead of in the move effect phase
     }
 

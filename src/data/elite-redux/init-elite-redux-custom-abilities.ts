@@ -64,6 +64,7 @@ import { ER_HYDRAPEX_ABILITY_ID, HydrapexAbAttr } from "#data/elite-redux/abilit
 import { ER_LAST_HOST_ABILITY_ID, LastHostAbAttr } from "#data/elite-redux/abilities/last-host";
 import { ER_LIFE_PRESERVER_ABILITY_ID, LifePreserverAbAttr } from "#data/elite-redux/abilities/life-preserver";
 import { ER_MYCELIAL_NETWORK_ABILITY_ID, MycelialNetworkAbAttr } from "#data/elite-redux/abilities/mycelial-network";
+import { ER_OMNIFORM_ABILITY_ID, OmniformAbAttr } from "#data/elite-redux/abilities/omniform";
 import {
   ClosedCircuitAbAttr,
   ER_CLOSED_CIRCUIT_ABILITY_ID,
@@ -539,6 +540,16 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
     },
     {
       draft: {
+        id: ER_OMNIFORM_ABILITY_ID,
+        name: "Omniform",
+        description:
+          "When this Pokemon uses a move whose type is mapped for its current form, it adapts mega-style into the mapped form before the move resolves: its stats and speed are recalculated and its other moves are replaced by the new form's set. The transform can chain and reverts after battle.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_OMNIFORM_ABILITY_ID,
+    },
+    {
+      draft: {
         id: ER_DRACONIC_VOODOO_ABILITY_ID,
         name: "Draconic Voodoo",
         description:
@@ -875,6 +886,10 @@ function buildCustomAbility(
     builder.attr(OverloadedPowerAbAttr);
     builder.attr(OverloadedPriorityAbAttr);
     builder.attr(OverloadedChipAbAttr);
+  }
+
+  if (pokerogueId === ER_OMNIFORM_ABILITY_ID) {
+    builder.attr(OmniformAbAttr);
   }
 
   if (pokerogueId === ER_DRACONIC_VOODOO_ABILITY_ID) {
