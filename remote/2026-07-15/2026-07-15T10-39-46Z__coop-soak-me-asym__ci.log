@@ -1,0 +1,55 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: 45
+run: 29408214386 (ci/coop/p33-auto-victory-seal)
+timestamp: 2026-07-15T10-39-46Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=12 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=12 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=14 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=14 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=16 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=16 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+
+----- vitest result tail -----
+    [90m117|[39m
+    [90m118|[39m     // The soak DROVE the ME (not skipped as disabled, not counted as …
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:154:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[31m[1mAssertionError[22m: wave 12 is HOST-OWNED by counter parity: expected 'guest-owned' to be 'host-owned' // Object.is equality[39m
+
+Expected: [32m"[7mho[27mst-owned"[39m
+Received: [31m"[7mgue[27mst-owned"[39m
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m191:89[22m[39m
+    [90m189|[39m     expect(result.mysteryEncounters.length, "exactly one ME driven - n…
+    [90m190|[39m     expect(result.mysteryEncounters[0].wave, "the one ME was the desig…
+    [90m191|[39m     expect(result.mysteryEncounters[0].path, "wave 12 is HOST-OWNED by…
+    [90m   |[39m                                                                                         [31m^[39m
+    [90m192|[39m     [34mexpect[39m(
+    [90m193|[39m       result[33m.[39mskips[33m.[39mmysteryEncounterWaveHit[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:212:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[31m[1mError[22m: Test timed out in 600000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m212:3[22m[39m
+    [90m210|[39m   }[33m,[39m [34m600_000[39m)[33m;[39m
+    [90m211|[39m
+    [90m212|[39m   it("drives a GUEST-OWNED ME inline (counter parity), then surveys pa…
+    [90m   |[39m   [31m^[39m
+    [90m213|[39m     // #633 FOLLOW-UP (ME LEG VARIANT: the GUEST-OWNED non-battle path…
+    [90m214|[39m     // direction). BUILD 1 drove only the HOST-OWNED path (wave 12, ev…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 10:28:44
+[2m   Duration [22m 661.66s[2m (transform 37.36s, setup 47.13s, import 476ms, tests 645.40s, environment 1.93s)[22m
+
