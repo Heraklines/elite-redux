@@ -397,7 +397,7 @@ async function driveGuestOwnedEmbeddedReward(game: GameManager, rig: DuoRig): Pr
   await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true }));
   await pumpUntil(
     rig,
-    () => rig.guestScene.phaseManager.getCurrentPhase() !== guestShop,
+    () => rig.guestScene.phaseManager.getCurrentPhase() !== (guestShop as unknown as Phase),
     "guest embedded reward continuation",
   );
   expect(rig.hostRuntime.controller.interactionCounter(), "embedded shop does not consume the ME interaction").toBe(
