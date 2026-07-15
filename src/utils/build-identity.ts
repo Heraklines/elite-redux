@@ -148,8 +148,7 @@ export function normalizeErBuildIdentity(value: unknown): ErBuildIdentityV1 | nu
     ((source === "github" || source === "cloudflare") && sha == null)
     || (source === "github" && workflow == null)
     || (source !== "github" && workflow != null)
-    || ((source === "local" || source === "legacy" || source === "unknown")
-      && (sha != null || deployment != null))
+    || ((source === "local" || source === "legacy" || source === "unknown") && (sha != null || deployment != null))
   ) {
     return null;
   }

@@ -5,11 +5,11 @@
 
 // Unit tests for the in-game bug reporter assembly + console ring buffer (#220).
 
-import { buildBugReport, buildDevLogText } from "#data/elite-redux/er-bug-report";
 import {
   COOP_REPORT_CORRELATION_MARKER,
   createCoopReportCorrelation,
 } from "#data/elite-redux/coop/coop-report-correlation";
+import { buildBugReport, buildDevLogText } from "#data/elite-redux/er-bug-report";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ER_BUILD_IDENTITY_MARKER } from "#utils/build-identity";
 import { formatConsoleSnapshot, getConsoleSnapshot, installConsoleRingBuffer } from "#utils/console-ring-buffer";

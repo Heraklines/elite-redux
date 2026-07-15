@@ -56,18 +56,20 @@ describe("exact build identity", () => {
     expect(JSON.stringify(identity)).not.toMatch(/secret|hidden|token/u);
   });
 
-  it.each(["abcdef0", `${GITHUB_SHA}0`, `${"c".repeat(64)}0`, `${"d".repeat(20)}\n${"d".repeat(20)}`])(
-    "rejects a non-exact source revision %s",
-    malformedSha => {
-      const identity = resolveBuildIdentity({
-        env: { GITHUB_SHA: malformedSha },
-        now: () => 1234,
-        entropy: () => "malformed-sha",
-      });
+  it.each([
+    "abcdef0",
+    `${GITHUB_SHA}0`,
+    `${"c".repeat(64)}0`,
+    `${"d".repeat(20)}\n${"d".repeat(20)}`,
+  ])("rejects a non-exact source revision %s", malformedSha => {
+    const identity = resolveBuildIdentity({
+      env: { GITHUB_SHA: malformedSha },
+      now: () => 1234,
+      entropy: () => "malformed-sha",
+    });
 
-      expect(identity).toMatchObject({ source: "local", sha: null });
-    },
-  );
+    expect(identity).toMatchObject({ source: "local", sha: null });
+  });
 
   it("keeps a unique, safe fallback for local builds", () => {
     const first = resolveBuildIdentity({ env: {}, now: () => 1234, entropy: () => "local-A!" });
