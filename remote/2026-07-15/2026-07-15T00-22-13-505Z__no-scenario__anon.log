@@ -1,0 +1,60 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrlblr1z-2du7
+mode:     ?  wave:?
+seed:     xiSppwEk4EqYUvyrTmV5v5Vo
+party:    
+enemy:    
+
+----- CONSOLE -----
+[00:10:51.816] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[00:10:54.069] LOG: [ER] build mrlblr1z-2du7
+[00:10:54.717] LOG: [dev-tools] loaded — 528 scenarios + Send Logs button
+[00:20:43.260] DEBUG: Destroying loading scene
+[00:20:43.260] DEBUG: Destroyed loading scene
+[00:20:43.631] LOG: Seed: xiSppwEk4EqYUvyrTmV5v5Vo
+[00:20:43.632] LOG: Wave Seed: xiSppwEk4EqYUvyrTmV5v5Vo 0
+[00:20:50.815] LOG: %cStart Phase LoginPhase color:green;
+[00:20:51.661] LOG: Client Session: Ah5ayNr7Naz9F6W1E1Aey8q84xd9D2o2
+[00:20:52.619] DEBUG: Using cached system data
+[00:20:52.855] LOG: %cStart Phase TitlePhase color:green;
+[00:20:52.860] LOG: Getting Session Slot id: %d 1
+[00:20:52.926] LOG: use seasonal splash messages true
+[00:21:48.171] LOG: Getting Session Slot id: %d 0
+[00:21:48.201] LOG: Getting Session Slot id: %d 1
+[00:21:48.225] LOG: Getting Session Slot id: %d 2
+[00:21:48.230] LOG: Getting Session Slot id: %d 3
+[00:21:48.236] LOG: Getting Session Slot id: %d 4
+[00:21:48.470] LOG: Getting Session Slot id: %d 1
+[00:21:48.625] ERROR: Invalid save data JSON detected! Session not found.
+[00:21:48.627] ERROR: Invalid save data JSON detected! Session not found.
+[00:21:48.629] ERROR: Invalid save data JSON detected! Session not found.
+[00:21:53.222] WARN: Attempted to load save slot of -1 through load game menu!
+[00:21:53.257] LOG: use seasonal splash messages true
+[00:21:57.009] LOG: %cStart Phase TitlePhase color:green;
+[00:21:57.011] LOG: Getting Session Slot id: %d 1
+[00:21:57.042] LOG: use seasonal splash messages true
+[00:21:58.690] LOG: %cStart Phase TitlePhase color:green;
+[00:21:58.692] LOG: Getting Session Slot id: %d 1
+[00:21:58.716] LOG: use seasonal splash messages true
+[00:21:59.523] LOG: Getting Session Slot id: %d 0
+[00:21:59.531] LOG: Getting Session Slot id: %d 1
+[00:21:59.544] LOG: Getting Session Slot id: %d 2
+[00:21:59.549] LOG: Getting Session Slot id: %d 3
+[00:21:59.553] LOG: Getting Session Slot id: %d 4
+[00:21:59.691] LOG: Getting Session Slot id: %d 1
+[00:21:59.741] ERROR: Invalid save data JSON detected! Session not found.
+[00:21:59.768] ERROR: Invalid save data JSON detected! Session not found.
+[00:21:59.775] ERROR: Invalid save data JSON detected! Session not found.
+[00:22:01.714] LOG: Getting Session Slot id: %d 1
+[00:22:01.722] WARN: [coop:launch] loadSession slot=1 REFUSED: co-op save without a live partner connection (#807)
+[00:22:01.724] ERROR: TypeError: Cannot read properties of undefined (reading 'getStartingBiome')
+TypeError: Cannot read properties of undefined (reading 'getStartingBiome')
+    at TitlePhase.end (https://elite-redux-staging.pages.dev/assets/battle-scene-Dtl-ZE0H.js:462:857)
+    at TitlePhase.loadSaveSlot (https://elite-redux-staging.pages.dev/assets/battle-scene-Dtl-ZE0H.js:461:2347)
+[00:22:01.733] ERROR: [unhandledrejection] TypeError: Cannot read properties of undefined (reading 'isCoop')
+TypeError: Cannot read properties of undefined (reading 'isCoop')
+    at UI.showText (https://elite-redux-staging.pages.dev/assets/battle-scene-Dtl-ZE0H.js:1052:27450)
+    at TitlePhase.loadSaveSlot (https://elite-redux-staging.pages.dev/assets/battle-scene-Dtl-ZE0H.js:461:2384)
+
+----- REPLAY TRACE (JSON) -----
+(none)
